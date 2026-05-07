@@ -1,0 +1,1252 @@
+# Acceptance Criteria — DebugBundle
+
+Version: v1
+Last updated: 2026-03-13
+
+---
+
+## 1. SDK Acceptance
+
+### AC-SDK-01: Node SDK Basic Capture
+- **Given** a Node.js Express app with `@debugbundle/sdk-node` installed and initialized
+- **When** an unhandled exception occurs during a request
+- **Then** the SDK captures the exception with request metadata, stack trace, and service identity
+- **And** batches and ships the event to the ingestion API without blocking the request
+
+### AC-SDK-02: Node SDK Safe Failure
+- **Given** a running Node.js application with the SDK
+- **When** the DebugBundle SDK encounters an internal error
+- **Then** the host application continues running without disruption
+- **And** the SDK logs an internal diagnostic
+
+### AC-SDK-03: Browser SDK Capture
+- **Given** a browser app with `@debugbundle/sdk-browser` initialized
+- **When** a frontend exception occurs
+- **Then** the SDK captures the exception with breadcrumbs from the ring buffer (recent clicks, route changes, network summaries, console entries — up to `maxBreadcrumbs`)
+- **And** breadcrumbs are attached to the exception event, not shipped independently (default `breadcrumbsOnErrorOnly: true`)
+- **And** the combined payload is batched and shipped before the page unloads
+
+### AC-SDK-04: Duplicate Suppression
+- **Given** the same error occurring 100 times in 5 seconds
+- **Then** the SDK sends the first 3 events normally
+- **And** suppresses duplicates in a 30-second window
+- **And** emits an aggregate summary event with the suppressed count
+
+### AC-SDK-05: Redaction Defaults
+- **Given** a request with an `authorization` header and a `password` body field
+- **When** the SDK captures the event
+- **Then** the authorization header is redacted before transmission
+- **And** the password field is redacted before transmission
+
+### AC-SDK-06: Node.js Vanilla Hooks
+- **Given** a vanilla Node.js application (no framework) with `@debugbundle/sdk-node` initialized
+- **When** `captureExceptions()` and `captureRejections()` are called
+- **Then** uncaught exceptions via `process.on('uncaughtException')` are captured
+- **And** unhandled promise rejections via `process.on('unhandledRejection')` are captured
+- **And** `captureConsole()` wraps `console.error` and `console.warn` when opt-in enabled
+
+### AC-SDK-07: PHP Vanilla Hooks
+- **Given** a vanilla PHP application (no framework) with `DebugBundle::init()` called
+- **When** `captureErrors()`, `captureExceptions()`, `captureShutdown()` are called
+- **Then** PHP errors via `set_error_handler()` are captured
+- **And** uncaught exceptions via `set_exception_handler()` are captured
+- **And** fatal errors via `register_shutdown_function()` are captured
+- **And** all events flush at request termination
+
+### AC-SDK-08: Python Vanilla Hooks
+- **Given** a vanilla Python application (no framework) with `debugbundle.init()` called
+- **When** `capture_exceptions()` and `capture_logging()` are called
+- **Then** uncaught exceptions via `sys.excepthook` are captured
+- **And** log records via the `logging` module handler are captured at the configured level
+- **And** asyncio loop exceptions are captured when asyncio is detected
+
+### AC-SDK-09: Log Capture In-Process
+- **Given** any SDK with log capture enabled
+- **When** the application emits a log at or above the configured `logLevel`
+- **Then** the log is captured as a structured `log_event` (level, message, context, timestamp)
+- **And** the log record is captured in-process via logging library handler (not by reading log files)
+- **And** redaction is applied before the log enters the batch buffer
+- **And** logs below the configured level are silently discarded
+
+### AC-SDK-10: Logger Auto-Detection
+- **Given** a Node.js application with pino or winston installed
+- **When** `debugbundle.init()` is called
+- **Then** the SDK auto-detects the installed logger and registers a DebugBundle transport
+- **And** the same auto-detection applies to Python (structlog/loguru) and PHP (Monolog)
+
+### AC-SDK-11: Universal Interface Consistency
+- **Given** any language SDK (Node, PHP, Python, Browser)
+- **Then** the SDK exposes: `init`, `captureException`, `captureError`, `captureLog`, `captureRequest`, `captureMessage`, `setContext`, `flush`
+- **And** method names follow language-idiomatic conventions (camelCase/snake_case/PascalCase)
+- **And** all methods have identical semantic behavior across languages
+
+### AC-SDK-12: Cross-Context Trace Correlation
+- **Given** a browser SDK and Node.js backend SDK both initialized
+- **When** the browser makes a `fetch` request to the backend
+- **Then** the browser SDK injects `X-DebugBundle-Trace-Id` (UUID v4) into the request
+- **And** the backend SDK reads the header and tags all events from that request with the trace ID
+- **And** the generated bundle links frontend breadcrumbs to backend exceptions via the shared trace ID
+
+### AC-SDK-13: Loop Protection Recovery
+- **Given** SDK in suppression mode (>10 identical errors in 2s)
+- **When** no matching errors occur for 60 seconds
+- **Then** suppression resets and normal capture resumes
+- **And** during sustained suppression, a checkpoint aggregate is emitted every 30 seconds
+- **And** on process restart, all suppression state resets (in-memory only)
+
+### AC-SDK-14: Browser Device Context Capture
+- **Given** a browser app with `@debugbundle/sdk-browser` initialized
+- **When** a `frontend_exception` occurs
+- **Then** the exception event payload includes a `device` field containing: raw user agent string, parsed browser name/version, parsed OS name/version, device type (`desktop`/`mobile`/`tablet`/`unknown`), screen resolution, viewport size, device pixel ratio, touch capability, language/locale, connection type (when available), and color scheme preference
+- **And** device data is collected once on `init()` and reused for all events in the session
+- **And** the generated bundle's `context.device` block is populated from this data
+- **And** `context.device.browser` agrees with `frontend_exception.browser` on the same event
+- **And** unavailable fields (e.g. `connection_type` on browsers without Network Information API) are set to `null`
+- **And** no fine-grained hardware identifiers (GPU model, serial numbers) are collected
+
+---
+
+## 2. Ingestion Acceptance
+
+### AC-ING-01: Event Acceptance
+- **Given** a valid batched event payload with a valid project token
+- **When** `POST /v1/events` is called
+- **Then** the API accepts the events, returns `{"accepted": N, "rejected": 0}`
+- **And** raw events are persisted to object storage
+- **And** processing work is enqueued
+
+### AC-ING-02: Invalid Payload Rejection
+- **Given** a malformed or oversized event payload
+- **When** `POST /v1/events` is called
+- **Then** the API returns an explicit error response with rejected count and error details
+
+### AC-ING-03: Invalid Token Rejection
+- **Given** an invalid or revoked project token
+- **When** `POST /v1/events` is called
+- **Then** the API returns a 401 unauthorized response
+
+---
+
+## 3. Bundle Generation Acceptance
+
+### AC-BND-01: Deterministic Bundle
+- **Given** the same set of normalized events for an incident
+- **When** the bundle generator runs twice
+- **Then** both runs produce identical `bundle.json` output
+
+### AC-BND-02: Complete Bundle
+- **Given** a standard HTTP exception incident with backend + frontend context
+- **When** the bundle is generated
+- **Then** the bundle contains: signal metadata, summary (title, description, likely_cause, confidence), impact, context (error, request, response, logs, frontend, environment, deploy, dependencies), reproduction, verification, links, redaction, and metadata
+
+### AC-BND-03: Bundle Retrieval
+- **Given** a generated bundle for incident `inc_42`
+- **When** `GET /v1/incidents/inc_42/bundle` is called
+- **Then** the full bundle JSON is returned with all required fields
+
+### AC-BND-04: Pending Bundle Status
+- **Given** a bundle still being processed
+- **When** `GET /v1/incidents/{id}/bundle` is called
+- **Then** the API returns `{"status": "pending"}`
+
+### AC-BND-05: Bundle Regeneration
+- **Given** an incident with an existing bundle (v1)
+- **When** significant new events arrive for the same incident
+- **Then** the bundle is regenerated with a new version (v2)
+- **And** `bundle.updated` webhook fires
+- **And** only the latest bundle version is retained (no historical snapshots)
+
+### AC-BND-06: Bundle Retention Cleanup
+- **Given** an incident past its retention period
+- **When** the retention cleanup job runs
+- **Then** the incident, all associated bundles, and reproduction artifacts are deleted atomically
+
+---
+
+## 4. Reproduction Acceptance
+
+### AC-REP-01: Reproduction Generation
+- **Given** an incident with a complete request snapshot
+- **When** the reproduction engine runs
+- **Then** reproduction artifacts include curl, HTTPie, and JSON spec
+- **And** confidence is > 0.5
+- **And** reason explains the confidence
+
+### AC-REP-02: Low-Confidence Reproduction
+- **Given** an incident without a request snapshot (e.g., background job failure)
+- **When** the reproduction engine runs
+- **Then** `possible` is `false` and confidence is explicit
+- **And** the bundle is still generated and available
+
+---
+
+## 5. Incident Grouping Acceptance
+
+### AC-GRP-01: Same Failure Grouping
+- **Given** the same TypeError with the same stack trace on the same route
+- **When** it occurs 238 times
+- **Then** all occurrences land in the same incident
+- **And** `occurrence_count` reflects the total
+
+### AC-GRP-02: Different Failure Separation
+- **Given** a TypeError on `/checkout` and a different TypeError on `/login`
+- **When** grouping runs
+- **Then** they produce separate incidents
+
+### AC-GRP-03: Normalization Stability
+- **Given** a route `/users/550e8400-e29b-41d4-a716-446655440000/orders` and a route `/users/123/orders`
+- **When** the normalization pipeline runs
+- **Then** both routes normalize to `/users/{param}/orders`
+- **And** error messages with embedded UUIDs, emails, or timestamps have those values stripped
+- **And** the resulting fingerprint is identical for structurally equivalent failures
+
+### AC-GRP-04: Spike Detection
+- **Given** an incident with a 1-hour baseline of 10 occurrences per 5-minute window
+- **When** 35 occurrences arrive in a 5-minute window (ratio ≥ 3.0)
+- **Then** the incident is flagged as spiking with `spike_detected_at` set
+- **And** the `incident.spike_detected` webhook fires
+
+### AC-GRP-05: Regression Detection
+- **Given** a resolved incident with fingerprint `fp_abc123`
+- **When** a new event with matching fingerprint arrives
+- **Then** the incident transitions to `regressed` status
+- **And** the bundle is regenerated
+- **And** `bundle.reopened` webhook fires
+- **And** if the regression occurs within 24 hours of a deploy, the deploy is correlated
+
+### AC-GRP-06: Bundle Refresh Thresholds
+- **Given** a new incident
+- **When** the 1st, 3rd, and 10th occurrences arrive
+- **Then** the bundle is regenerated at each threshold
+
+### AC-GRP-07: Occurrence Sampling
+- **Given** an incident with repeated occurrences of the same grouped failure
+- **When** the 1st, 2nd, and 3rd occurrences are processed without a new deploy or severity increase
+- **Then** the 1st occurrence remains stored with full raw detail as the canonical first sample
+- **And** the 3rd occurrence remains stored with full raw detail as the current latest sample
+- **And** the displaced 2nd occurrence is retained as summary-only metadata (`is_sampled = false`) without a remaining raw-event object in object storage
+- **And** when a later occurrence is the first one after a deploy or raises the incident's highest observed severity, that occurrence is also retained with full raw detail
+- **And** the bundle is also regenerated when new deploy metadata or a new context type is added
+
+### AC-GRP-07: Occurrence Sampling
+- **Given** an incident with 500 occurrences
+- **Then** full event detail is stored for: first occurrence, most recent, first after each deploy, highest severity
+- **And** remaining occurrences are stored as summary-only records
+
+### AC-GRP-08: Explainability
+- **Given** an event assigned to an incident
+- **Then** the grouping response includes `matched_fields` listing which fields contributed to the fingerprint match
+
+---
+
+## 6. Retrieval Acceptance
+
+### AC-RET-01: Incident List Filtering
+- **Given** a project with incidents across multiple environments and severities
+- **When** `GET /v1/incidents?environment=production&severity=high&status=open` is called
+- **Then** only matching incidents are returned
+- **And** results are paginated with cursor-based pagination
+- **And** the response includes `project_name`, `service_name`, `fingerprint_version`, `spike_detected_at`, `resolved_at`, `regressed_at`, `matched_fields`, and `occurrence_count`
+
+### AC-RET-02: Incident Resolve Mutation
+- **Given** an authenticated organization member viewing an `open` incident
+- **When** `POST /v1/incidents/{id}/resolve` is called for that incident
+- **Then** the incident transitions to `resolved`
+- **And** `resolved_at` is persisted and returned in the response
+- **And** the resolution is idempotent for repeated requests against the same incident
+- **And** the `bundle.resolved` webhook is emitted for matching webhook subscriptions
+
+### AC-RET-03: Bundle Pending Status
+- **Given** an incident whose bundle is still being processed
+- **When** `GET /v1/incidents/{id}/bundle` is called
+- **Then** the response is `{"status": "pending"}`
+- **And** the client can poll until it transitions to the full bundle or a failed status
+
+### AC-RET-04: Response Format Consistency
+- **Given** any retrieval API endpoint
+- **When** a valid request is made
+- **Then** the response is JSON with explicit nulls (no omitted fields), ISO 8601 timestamps, stable field names, and redaction markers where applicable
+
+---
+
+## 7. CLI Acceptance
+
+### AC-CLI-01: Incident Listing
+- **Given** an authenticated CLI session
+- **When** `debugbundle incidents --recent` is run
+- **Then** recent incidents are displayed in human-readable format
+
+### AC-CLI-02: JSON Output
+- **Given** an authenticated CLI session
+- **When** `debugbundle bundle inc_42 --json` is run
+- **Then** the full bundle is output as stable JSON suitable for agent consumption
+
+### AC-CLI-03: Incident Resolution
+- **Given** an authenticated CLI session
+- **When** `debugbundle resolve inc_42` is run
+- **Then** the CLI resolves the incident through the same lifecycle service used by the HTTP API
+- **And** the returned output includes the updated status and `resolved_at` timestamp
+
+### AC-CLI-04: Doctor Command
+- **Given** a project with SDK installed and project token configured
+- **When** `debugbundle doctor` is run
+- **Then** a structured status report is returned with check-by-check results
+- **And** `debugbundle doctor --json` returns machine-readable JSON
+
+### AC-CLI-05: Local Verification
+- **Given** a correctly configured local development environment
+- **When** `debugbundle verify local` is run
+- **Then** a synthetic event is sent, ingestion is confirmed, bundle generation is confirmed, and retrieval is confirmed
+
+### AC-CLI-06: Production Verification
+- **Given** a deployed application with SDK instrumentation
+- **When** `debugbundle verify cloud` is run
+- **Then** the system confirms that production traffic is reaching DebugBundle
+
+### AC-CLI-07: Ingest Command
+- **Given** a local-only or connected project with a file containing newline-delimited JSON events
+- **When** `debugbundle ingest <source-file>` is run
+- **Then** events are parsed from the source file and forwarded for processing (local or cloud)
+- **And** human-readable output summarizes the count of ingested events
+- **And** `--json` returns a machine-readable result
+- **And** exit code is 4 when no valid events are found in the source file
+
+### AC-CLI-08: Watch Command
+- **Given** a local-only or connected project with a configured events directory
+- **When** `debugbundle watch` is run
+- **Then** the CLI polls for new events in the events directory at a configured interval
+- **And** partial lines are buffered across poll cycles until a complete newline-terminated line arrives
+- **And** cloud mode forwards events to the API; local mode delegates to local processing
+- **And** human-readable output displays ingestion progress
+- **And** `--json` returns machine-readable results
+
+### AC-CLI-09: Process Command
+- **Given** a local-only project with raw events in `.debugbundle/local/events/`
+- **When** `debugbundle process` is run
+- **Then** events are processed locally: normalized, fingerprinted, grouped, and bundles generated
+- **And** results are stored in `.debugbundle/bundles/local/`
+
+### AC-CLI-10: Clean Command
+- **Given** a project with local state and artifacts in `.debugbundle/`
+- **When** `debugbundle clean` is run
+- **Then** local events, state, and bundle artifacts are removed
+- **And** `profile.json`, `connection.json`, and agent skill files are preserved
+
+### AC-CLI-11: Reopen Command
+- **Given** a resolved incident
+- **When** `debugbundle reopen <incident-id>` is run
+- **Then** the incident transitions back to `open` status
+- **And** human-readable and `--json` output confirm the state change
+
+### AC-CLI-12: Setup Non-Interactive Mode
+- **Given** an environment where interactive prompts are unavailable (CI, agent)
+- **When** `debugbundle setup --non-interactive` is run
+- **Then** static detection proceeds without prompting for user input
+- **And** `.debugbundle/` scaffold is created with profile and connection config
+- **And** the command exits with a clear summary of what was generated
+
+### AC-CLI-13: Canonical NDJSON Ingestion
+- **Given** a service in any language that can emit newline-delimited DebugBundle event envelopes
+- **When** `debugbundle ingest <file> --format debugbundle-ndjson` or `debugbundle watch --format debugbundle-ndjson` is run
+- **Then** the CLI accepts the file without language-specific parsing rules
+- **And** the resulting events feed into the same local/cloud processing pipeline as SDK-generated events
+
+### AC-CLI-14: Shared Parser Registry
+- **Given** the built-in CLI log formats
+- **When** `debugbundle ingest` or `debugbundle watch` validates `--format`
+- **Then** format resolution occurs through a shared parser registry package
+- **And** the CLI command modules do not embed parser-specific regex logic or format dispatch beyond registry selection
+
+### AC-CLI-15: Zero-Install Backend Coverage Policy
+- **Given** a newly supported backend ecosystem
+- **When** the zero-install CLI path is documented for that ecosystem
+- **Then** the documentation identifies either a first-party parser for a common native log format or a supported transformation into `debugbundle-ndjson`
+
+---
+
+## 8. Webhook Acceptance
+
+### AC-WHK-01: Bundle Created Webhook
+- **Given** a project with a webhook configured for `bundle.created`
+- **When** a new failure bundle is generated
+- **Then** the webhook endpoint receives a signed payload with event details, bundle reference, and summary
+- **And** the payload does not embed the full bundle
+
+### AC-WHK-02: Webhook Filtering
+- **Given** a webhook filtered to `severity_min: high` and `environment: production`
+- **When** a low-severity staging bundle is created
+- **Then** the webhook is NOT triggered
+
+### AC-WHK-03: Webhook Retry
+- **Given** a webhook endpoint that returns 500
+- **When** a webhook delivery is attempted
+- **Then** the system retries 5 times with exponential backoff (1s → 5s → 30s → 2min → 10min)
+- **And** marks the delivery as `failed` after the 5th retry
+- **And** the delivery status is inspectable via API/CLI/MCP
+
+### AC-WHK-04: Webhook Auto-Disable
+- **Given** a webhook endpoint that consistently fails
+- **When** 50 consecutive delivery failures occur (across any deliveries)
+- **Then** the webhook status is set to `disabled`
+- **And** the owner is notified via email
+
+---
+
+## 9. MCP Acceptance
+
+### AC-MCP-01: Interface Parity
+- **Given** an incident with a generated bundle
+- **When** retrieved via API, CLI (`--json`), and MCP
+- **Then** all three return equivalent data structures
+
+### AC-MCP-02: Granular Parity Tests
+Each MCP tool must produce results that match its API/CLI equivalent:
+- Incident list parity (`debugbundle_list_incidents` = `GET /v1/incidents` = `debugbundle incidents --json`)
+- Incident resolve parity (`resolve_incident` = `POST /v1/incidents/{id}/resolve` = `debugbundle resolve <id> --json`)
+- Bundle parity (`debugbundle_get_bundle` = `GET /v1/incidents/{id}/bundle` = `debugbundle bundle <id> --json`)
+- Reproduction parity (`debugbundle_get_reproduction` = `GET /v1/incidents/{id}/reproduction` = `debugbundle reproduce <id> --json`)
+- Doctor parity (`debugbundle_doctor` = `debugbundle doctor --json`)
+- Verification parity (`debugbundle_verify_local` / `debugbundle_verify_cloud` = CLI verify equivalents)
+- Capture policy parity (`get_capture_policy` / `update_capture_policy` = `debugbundle capture-policy get/set --json`)
+- Probe parity (`activate_probe` / `list_active_probes` / `deactivate_probe` = `debugbundle probe activate/list/deactivate --json`)
+- Project parity (`list_projects` / `create_project` / `update_project` / `delete_project` = `debugbundle project list/create/update/delete --json`)
+- Billing parity (`get_billing_summary` / `increase_capacity` / `schedule_capacity_reduction` / `cancel_capacity_reduction` = `debugbundle billing get/capacity increase/capacity schedule-reduction/capacity cancel-reduction --json`)
+- Member parity (`list_members` / `list_member_invites` / `invite_member` / `cancel_member_invite` / `update_member_role` / `remove_member` = `debugbundle member list/invites/invite/cancel-invite/update-role/remove --json`)
+
+If CLI says something is healthy and MCP says something different, that is a product bug.
+
+---
+
+## 10. Auth Acceptance
+
+### AC-AUTH-01: Agent-Assisted Signup
+- **Given** an AI agent initiating signup
+- **When** the agent guides the flow and the human completes email-code verification
+- **Then** an account and project are created
+- **And** the agent can proceed with SDK installation and verification
+
+### AC-AUTH-02: Token Isolation
+- **Given** a project token
+- **When** used to call `GET /v1/incidents`
+- **Then** the request is rejected (project tokens are write-only for ingestion)
+
+### AC-AUTH-03: Email Verification Gating
+- **Given** a user identity that has not completed email verification
+- **When** the user attempts to create a member token in the web app
+- **Then** the request is rejected with a verification-required error
+- **And** after completing email verification, member token creation succeeds
+
+### AC-AUTH-04: Member Token Full Access
+- **Given** a valid member token (email was verified before or during its creation)
+- **When** the token bearer creates a project token via API
+- **Then** the project token is created successfully (no additional email verification required)
+
+### AC-AUTH-05: Role Permissions
+- **Given** a Member-role user token
+- **When** the user attempts to invite another member or manage billing
+- **Then** the request is rejected with a permissions error
+- **And** the user can still read incidents, bundles, manage webhooks/alerts
+
+### AC-AUTH-06: Session And Member-Token Parity
+- **Given** the same verified user identity
+- **When** the user calls a member-authorized route once through the web session and once through a member token
+- **Then** both requests resolve to the same authorization outcome
+- **And** both execute the same underlying domain behavior
+
+### AC-AUTH-07: Browser Auth Storage Boundary
+- **Given** a normal web-app login flow
+- **When** the SPA authenticates the user
+- **Then** the browser receives a secure session cookie
+- **And** the SPA does not require a browser-stored member token for routine interactive use
+
+---
+
+## 11. Self-Host Acceptance
+
+### AC-SH-01: Self-Host Boot
+- **Given** the `deploy/selfhost/` directory
+- **When** `docker compose up` is run
+- **Then** all services start (web, API, worker, Postgres, Redis, LocalStack S3)
+- **And** `/health` returns healthy status
+
+### AC-SH-02: Self-Host Verification
+- **Given** a running self-hosted instance
+- **When** `debugbundle verify local` is run against it
+- **Then** the full verification flow passes
+
+### AC-SH-03: Self-Host Unlimited
+- **Given** a self-hosted instance
+- **When** more than 1 project, more than 1 member, or more than 1 webhook is configured
+- **Then** all features work without restriction (no plan enforcement, no billing integration)
+
+---
+
+## 12. Billing Failure Acceptance
+
+### AC-BILL-01: Billing Isolation
+- **Given** an active project with existing bundles
+- **When** the billing provider (Stripe) is unreachable
+- **Then** bundle retrieval via API/CLI/MCP continues to work
+- **And** existing debugging workflows are not interrupted
+- **And** billing-related operations return explicit errors without affecting core debugging access
+
+---
+
+## 13. Alert Acceptance
+
+### AC-ALT-01: Alert on New Incident
+- **Given** an alert rule configured for "new incident" on a project
+- **When** a new incident is created
+- **Then** the alert fires to the configured channel (email, Slack, Discord, or webhook)
+- **And** the alert payload includes incident title, severity, service, and a link to the bundle
+
+### AC-ALT-02: Alert on Spike
+- **Given** an alert rule configured for "error spike"
+- **When** an incident's spike condition triggers (FR-GRP-03)
+- **Then** the alert fires with spike details (current rate, baseline rate, ratio)
+
+### AC-ALT-03: Alert on Regression After Deploy
+- **Given** an alert rule configured for "regression after deploy"
+- **When** an incident transitions to `regressed` and a deploy is correlated (FR-GRP-04)
+- **Then** the alert fires with regression details (incident title, deploy version, time since deploy)
+
+### AC-ALT-04: Alert CRUD
+- **Given** an authenticated user
+- **When** creating, listing, or deleting alert rules via API or CLI
+- **Then** the operations succeed and the rules take effect immediately
+
+---
+
+## 14. Email Acceptance
+
+### AC-EMAIL-01: Email Code Delivery
+- **Given** a user requests a browser sign-in code
+- **When** the request is accepted
+- **Then** an email sign-in code is sent from `noreply@debugbundle.com`
+- **And** the email has both HTML and plain-text versions
+- **And** the code is valid for 10 minutes
+
+### AC-EMAIL-02: Email Anti-Spam
+- **Given** an event that would trigger repeated email notifications
+- **When** multiple notifications would fire within a short window
+- **Then** they are batched into a digest rather than sent individually
+- **And** critical emails (email sign-in codes and security alerts) are never suppressed
+
+### AC-EMAIL-03: Email Provider Abstraction
+- **Given** the email system configured
+- **When** the transport implementation is refactored behind the same provider abstraction
+- **Then** no email-sending code outside the email package needs to change
+
+---
+
+## 15. Profile Acceptance
+
+### AC-PROF-01: Static Profile Detection
+- **Given** a repository with `package.json`, `pyproject.toml`, `docker-compose.yml`, and CI configs
+- **When** `debugbundle setup` runs
+- **Then** `profile.json` is auto-populated with detected languages, frameworks, services, infrastructure, and build commands
+- **And** profile carries `"validation_status": "static-analysis-only"`
+- **And** no AI agent or network access is required for this step
+
+### AC-PROF-02: Profile Validation
+- **Given** a `.debugbundle/profile.json` with missing required fields
+- **When** `debugbundle profile validate` is run
+- **Then** specific validation errors are reported with field paths
+- **And** `--json` mode outputs machine-readable validation results
+
+### AC-PROF-03: Profile Staleness Warning
+- **Given** a `profile.json` with `last_reviewed_at` older than the staleness threshold
+- **When** `debugbundle doctor` runs
+- **Then** the doctor report includes a warning about stale profile
+
+### AC-PROF-04: Skill File Generation
+- **Given** a repository where `debugbundle setup` has run
+- **Then** `.agents/skills/debugbundle/SKILL.md` exists per agentskills.io spec and teaches agents to use DebugBundle
+- **And** SKILL.md has YAML frontmatter with `name: debugbundle`
+- **And** `references/` directory contains `cli.md`, `mcp.md`, `bundle-schema.md`
+- **And** the file does not require manual editing to be functional
+- **And** old locations (`.debugbundle/skill/`, `skills/debugbundle/`) are not created
+
+---
+
+## 16. Documentation Acceptance
+
+### AC-DOC-01: API Documentation
+- **Given** a new or changed API route
+- **Then** matching OpenAPI documentation exists with request/response schemas and examples
+
+### AC-DOC-02: CLI Documentation
+- **Given** a new or changed CLI command
+- **Then** help text, usage examples, and docs page exist
+
+### AC-DOC-03: SDK Documentation
+- **Given** a new or changed SDK method
+- **Then** JSDoc/TSDoc (or language-equivalent docstrings), README example, and docs page exist
+
+### AC-DOC-04: Webhook Documentation
+- **Given** a new or changed webhook event type
+- **Then** JSON schema, payload example, and docs page exist
+
+### AC-DOC-05: MCP Tool Documentation
+- **Given** a new or changed MCP tool
+- **Then** the tool schema includes an accurate description, typed parameters with descriptions, and a structured return shape
+- **And** the tool description matches the behavior of its API/CLI equivalent
+- **And** an entry exists in the MCP tool reference documentation
+
+### AC-DOC-06: LLM/Agent Discovery via llms.txt
+- **Given** the production deployment at `debugbundle.com`
+- **When** an LLM agent or crawler requests `GET /llms.txt`
+- **Then** a well-formed `llms.txt` file is returned with: project name, primary documentation URL, and links to core concepts, API reference, CLI reference, webhook events, bundle schema, machine-readable schemas (OpenAPI JSON, bundle JSON schema, webhook events JSON schema), example bundles, and agent workflows documentation
+- **And** the response has `Content-Type: text/plain`
+- **And** all URLs in the file resolve to valid documentation pages or JSON artifacts
+
+### AC-DOC-07: Machine-Readable Artifacts Published
+- **Given** the production deployment
+- **When** an agent requests the machine-readable schema endpoints
+- **Then** `GET /openapi.json` returns a valid OpenAPI 3.x specification covering all public API routes
+- **And** `GET /schemas/bundle.json` returns a valid JSON Schema for the bundle format
+- **And** `GET /schemas/webhook-events.json` returns a valid JSON Schema for webhook event payloads
+- **And** each schema validates against its meta-schema (OpenAPI, JSON Schema Draft 2020-12)
+
+### AC-DOC-08: Documentation Versioning
+- **Given** the documentation site
+- **Then** documentation is served under versioned paths (`/docs/v1/`, future `/docs/v2/`)
+- **And** the current version is the default when accessing `/docs/`
+- **And** schema URLs include version identifiers (`/schemas/bundle.json`)
+
+### AC-DOC-09: Documentation Generated From Source
+- **Given** a new or changed API route, webhook payload, or CLI command
+- **When** the documentation generation pipeline runs
+- **Then** API routes produce matching OpenAPI spec entries
+- **And** webhook payloads produce matching JSON schema entries
+- **And** CLI commands produce matching command reference entries
+- **And** no manual documentation-only updates are required for interface changes
+
+### AC-DOC-10: Documentation Examples Validated
+- **Given** example payloads in documentation (API examples, webhook examples, bundle examples)
+- **When** the CI validation pipeline runs
+- **Then** API examples validate against the OpenAPI spec
+- **And** webhook examples validate against the webhook JSON schema
+- **And** bundle examples validate against the bundle JSON schema
+- **And** CLI examples execute successfully (or are syntax-checked)
+
+### AC-DOC-11: Example Bundle Artifacts
+- **Given** the repository `examples/` directory
+- **Then** `examples/bundle.failure.json` exists and validates against the bundle JSON schema
+- **And** `examples/bundle.improvement.json` exists and validates against the bundle JSON schema
+- **And** both examples are referenced in documentation and in `llms.txt`
+- **And** CI validates these artifacts on every commit
+
+### AC-DOC-12: Agent Workflows Documentation
+- **Given** the documentation site
+- **Then** a dedicated agent workflows section exists at `/docs/agent-workflows`
+- **And** it covers: webhook-triggered bundle fetch and analysis, support ticket probe activation with trigger tokens, CLI/MCP-driven incident investigation, and automated PR creation from bundle analysis
+- **And** each workflow includes concrete examples with actual API/CLI/MCP invocations
+
+### AC-DOC-13: Static Public Site Export
+- **Given** the public marketing/docs/blog build pipeline
+- **When** the public site is built for production
+- **Then** the output is a fully static export that can be uploaded to S3 and served through CloudFront
+- **And** no Node.js server runtime is required to serve marketing pages, blog content, docs pages, sitemap, robots, or machine-readable documentation artifacts
+
+### AC-DOC-14: Shared Public Site Route Layouts
+- **Given** the public site at `debugbundle.com`
+- **When** a user navigates between marketing pages, docs, and blog content
+- **Then** marketing and legal pages use the standard site layout
+- **And** `/docs` uses the Fumadocs docs layout
+- **And** `/blog` uses the blog/content layout
+- **And** all three route groups are served from the same statically exported Next.js application
+
+### AC-DOC-15: Static SEO Surfaces
+- **Given** the production public site deployment
+- **Then** sitemap and robots files are published as static assets
+- **And** key marketing, docs, and blog routes expose stable metadata and canonical URLs through standard Next.js metadata generation
+
+---
+
+## 17. End-to-End Agent Workflow Acceptance
+
+### AC-E2E-01: Full Agent Loop
+- **Given** a deployed application with DebugBundle configured
+- **When** a production exception occurs
+- **Then** a bundle is generated
+- **And** a `bundle.created` webhook is delivered
+- **And** an AI agent can fetch the bundle via API/CLI/MCP
+- **And** the bundle contains sufficient context for the agent to propose a fix
+
+---
+
+## 18. Local Analysis Acceptance
+
+### AC-ANA-01: Local Improvement Analysis
+- **Given** a project with local bundles in `.debugbundle/bundles/local/` and a valid `profile.json`
+- **When** a user or agent runs `debugbundle analyze --type improvement --local`
+- **Then** the command reads local bundles, profile, and relevant source code
+- **And** outputs a bundle JSON with `bundle_type: "improvement"`
+- **And** follows the analysis recipe schemas from `.agents/skills/debugbundle/assets/schemas/`
+- **And** no cloud credentials are required
+
+### AC-ANA-02: Free vs Paid Tier Analysis
+- **Given** a Free-tier user running local analysis
+- **Then** analysis uses only local bundles and the user’s own agent/LLM
+- **And** a Team-tier user receives automated improvement bundles generated cloud-side on every ingested event
+
+---
+
+## 19. Onboarding Acceptance
+
+### AC-ONB-01: Agent-Driven Installation
+- **Given** a user provides their AI agent with the DebugBundle installation prompt from docs
+- **When** the agent executes the prompt
+- **Then** the SDK package is installed
+- **And** `debugbundle setup` is run (the single entrypoint, not `init`)
+- **And** `.debugbundle/` directory is created with `profile.json`, `local/connection.json`
+- **And** `.agents/skills/debugbundle/SKILL.md` is created per agentskills.io spec
+- **And** the agent reads the skill and understands how to use DebugBundle
+- **And** local-only mode works without a cloud account
+
+### AC-ONB-02: Skill Discovery
+- **Given** `debugbundle setup` has run
+- **Then** `.agents/skills/debugbundle/SKILL.md` exists per agentskills.io spec and is structured for agent discovery
+- **And** the skill teaches agents to: check incidents on bug reports, fetch/analyze bundles, validate the profile, and resolve incidents after a fix is verified or after intentional verification incidents have served their purpose
+
+### AC-ONB-03: Two-Phase Profile Generation
+- **Given** a repository with `package.json`, `docker-compose.yml`, and `.github/workflows/`
+- **When** `debugbundle setup` runs
+- **Then** `profile.json` is auto-populated with detected languages, frameworks, services, infrastructure, and build commands via static file analysis
+- **And** no AI agent is required for this initial profile
+- **And** the skill layer provides a "Profile Validation" task for deeper agent-driven analysis later
+- **And** `profile.json` carries `"validation_status": "static-analysis-only"`
+
+### AC-ONB-04: AGENTS.md Integration
+- **Given** `debugbundle setup` runs in a repo that has an `AGENTS.md`
+- **Then** a DebugBundle section is appended to `AGENTS.md`
+- **And** the section instructs agents to check DebugBundle incidents before investigating bugs, read `.agents/skills/debugbundle/SKILL.md`, use `debugbundle inspect` / `get_bundle`, run reproduction artifacts from `.debugbundle/bundles/local/reproductions/` before proposing fixes, and resolve incidents after a verified fix or completed intentional verification flow
+
+### AC-ONB-05: Local-Only Setup
+- **Given** a developer running `debugbundle setup` and choosing local-only mode
+- **Then** no cloud account, member token, or project token is required
+- **And** `.debugbundle/local/connection.json` shows `"mode": "local-only"`
+- **And** the SDK is configured with file transport for `local`/`development` environments
+- **And** `debugbundle process` can produce bundles from locally captured events
+
+### AC-ONB-06: Cloud Upgrade
+- **Given** a local-only project
+- **When** `debugbundle connect` is run
+- **Then** connection config is updated without uploading existing local events
+- **And** cloud transport is enabled for selected environments
+- **And** existing local incidents remain untouched in `state.json`
+
+### AC-ONB-07: Gitignore Management
+- **Given** `debugbundle setup` runs
+- **Then** `.gitignore` contains entries for `.debugbundle/local/events/`, `.debugbundle/local/state.json`, `.debugbundle/bundles/`
+- **And** `.debugbundle/profile.json`, `.debugbundle/local/connection.json`, and `.agents/skills/debugbundle/` are NOT gitignored
+
+---
+
+## 20. Browser Volume Control Acceptance
+
+### AC-BRW-01: Breadcrumbs-On-Error-Only Default
+- **Given** a browser app with `@debugbundle/sdk-browser` initialized with default config
+- **When** the user navigates pages, clicks buttons, and triggers network requests — but no exception occurs
+- **Then** zero `frontend_breadcrumb` events are shipped to the ingestion API
+- **And** breadcrumbs accumulate in the local ring buffer only
+
+### AC-BRW-02: Breadcrumbs Shipped With Exception
+- **Given** a browser SDK with `breadcrumbsOnErrorOnly: true` (default)
+- **And** the ring buffer contains 7 breadcrumbs (3 clicks, 2 route changes, 2 network)
+- **When** a `frontend_exception` occurs
+- **Then** the exception event is shipped with all 7 breadcrumbs attached as `breadcrumbs[]`
+- **And** the ring buffer is cleared after flush
+- **And** no standalone `frontend_breadcrumb` events are emitted
+
+### AC-BRW-03: Ring Buffer Cap
+- **Given** a browser SDK with `maxBreadcrumbs: 10` (default)
+- **When** 15 breadcrumb-worthy interactions occur before an exception
+- **Then** only the 10 most recent breadcrumbs are attached to the exception event
+- **And** the 5 oldest breadcrumbs were discarded from the ring buffer
+
+### AC-BRW-04: Per-Event-Type Toggles
+- **Given** a browser SDK initialized with `captureNetwork: false` and `captureClicks: true`
+- **When** the user clicks a button and a network request fires
+- **Then** the click is added to the ring buffer
+- **And** the network request is not captured
+
+### AC-BRW-05: Network Request Filtering
+- **Given** a browser SDK with `networkFilter: { statusCodes: [400, 599] }` (default)
+- **When** a `200 OK` response, a `404 Not Found`, and a `500 Internal Server Error` occur
+- **Then** only the 404 and 500 responses are added to the breadcrumb ring buffer
+- **And** the 200 response is silently excluded
+
+### AC-BRW-06: Session Sampling Coherence
+- **Given** a browser SDK with `sessionSampleRate: 0.5`
+- **When** a new session starts
+- **Then** a single random decision determines whether the entire session is captured or skipped
+- **And** if sampled out, zero breadcrumbs and zero non-exception events are captured for the entire session
+- **And** `frontend_exception` events are still captured regardless of session sampling
+
+### AC-BRW-07: Max Events Per Session Cap
+- **Given** a browser SDK with `maxEventsPerSession: 100`
+- **When** 100 events have been captured in the current session
+- **And** additional clicks and route changes occur
+- **Then** breadcrumbs stop accumulating in the ring buffer
+- **And** `frontend_exception` events are still captured and shipped
+- **And** the cap resets on page reload (new session)
+
+### AC-BRW-08: High-Volume Scenario
+- **Given** a production app with 1,000 concurrent browser users and `breadcrumbsOnErrorOnly: true`
+- **When** each user generates ~50 breadcrumbs/min but only 2% trigger exceptions
+- **Then** ingestion receives ~20 exception events/min (each with ≤10 breadcrumbs) — not 50,000 standalone breadcrumbs/min
+- **And** the Free-tier rate limit (1,000 events/min per project token) is not exceeded
+
+---
+
+## 21. Probe Acceptance
+
+### AC-PRB-01: Always-On Probe Buffers Locally
+- **Given** a backend or browser SDK with `probe()` calls in application code and no remote activations
+- **When** application code calls `debugbundle.probe('checkout.pricing.tax', { cart, total })`
+- **Then** the data is serialized, redacted, and stored in the per-label ring buffer for `checkout.pricing.tax`
+- **And** no `probe_event` is shipped to ingestion (data only sits in local memory)
+- **And** the ring buffer evicts the oldest entry when capacity (`maxProbeEntriesPerLabel`, default 10) is exceeded
+
+### AC-PRB-02: Always-On Probe Flushes on Error
+- **Given** a backend SDK with probe ring buffers containing data for labels `checkout.pricing.tax` and `auth.rbac`
+- **When** an error occurs (`backend_exception` or `frontend_exception`)
+- **Then** all probe ring buffers are flushed alongside the error event batch to `POST /v1/events`
+- **And** the flushed probe events have `activation_id: null` (indicating always-on flush)
+- **And** probe data flows through the standard pipeline and attaches to the incident's bundle as `context.probe_data[]`
+- **And** the ring buffers are cleared after flush
+
+### AC-PRB-03: Remote Activation Triggers Independent Shipping (Solo+)
+- **Given** a running application with `probe('checkout.pricing.tax', data)` calls in the code
+- **And** a member activates probes with pattern `checkout.*` via `POST /v1/projects/{id}/probes/activate` with TTL 300s
+- **When** the SDK's next config poll completes (within `probesPollInterval`)
+- **Then** subsequent `probe('checkout.pricing.tax', data)` calls emit `probe_event` events immediately (standard batching)
+- **And** each `probe_event` contains the label, serialized + redacted data, and `activation_id`
+- **And** the ring buffer continues to operate normally in parallel (data is both buffered and shipped)
+
+### AC-PRB-04: TTL Expiry Deactivates Remote Probes
+- **Given** a remote probe activation with `ttl_seconds: 60`
+- **When** 60 seconds have elapsed since activation
+- **Then** the SDK stops emitting `probe_event` independently for that activation (local TTL enforcement)
+- **And** always-on ring buffer behavior continues unchanged
+- **And** the server returns the activation as expired on the next `GET /v1/projects/{id}/probes` call
+
+### AC-PRB-05: Probe Events Attach to Bundles
+- **Given** a `probe_event` with `trace_id: "abc-123"` captured during an error flush or remote activation
+- **And** an incident whose events contain the same `trace_id: "abc-123"`
+- **When** the bundle is generated for that incident
+- **Then** the bundle's `context.probe_data[]` includes the probe event data (label, data, timestamp, activation_id)
+- **And** probe data is also matched by time window + service when `trace_id` is absent
+
+### AC-PRB-06: Probe Events Are NOT Fingerprinted
+- **Given** 100 `probe_event` events with label `checkout.pricing.tax`
+- **When** the processing worker normalizes and fingerprints events
+- **Then** no incident is created from probe events alone
+- **And** probe events are stored but not grouped
+
+### AC-PRB-07: Lazy Probe Variant (Backend)
+- **Given** a backend SDK in always-on mode (no remote activations)
+- **When** application code calls `debugbundle.probe('checkout.pricing.tax', () => expensiveComputation())`
+- **Then** the callback IS invoked (data is needed for the ring buffer)
+- **And** the result is serialized, redacted, and stored in the ring buffer
+- **Given** a backend SDK with a heavy probe `debugbundle.probe('db-plan', () => data, { heavy: true })`
+- **And** no remote activation matching `db-plan`
+- **When** the heavy probe is called
+- **Then** the callback is NOT invoked (heavy probes are dormant in always-on mode)
+- **And** no data is buffered for that label
+
+### AC-PRB-08: Browser Probe Always-On Behavior
+- **Given** a browser SDK with probe ring buffers containing data
+- **When** a `frontend_exception` occurs
+- **Then** all probe ring buffers flush alongside the error (same as backend behavior)
+- **And** probe data ships via standard batching
+- **And** probe ring buffers are separate from the breadcrumb ring buffer
+
+### AC-PRB-09: Browser Probe Remote Activation (Solo+)
+- **Given** a browser SDK for a paid-tier project with an active remote probe matching `checkout.ui.*`
+- **When** application code calls `debugbundle.probe('checkout.ui.cart-render', { renderTime: 42 })`
+- **Then** a `probe_event` is emitted and shipped directly (independent of error occurrence)
+- **And** the probe event does NOT count toward `maxEventsPerSession`
+- **And** the probe event respects `sessionSampleRate`
+
+### AC-PRB-10: Free-Tier Always-On Probes
+- **Given** a Free-tier project token used to initialize any SDK
+- **When** application code calls `debugbundle.probe('checkout.pricing', { total: 42 })`
+- **Then** the data is buffered in the per-label ring buffer (always-on mode works on Free tier)
+- **When** an error occurs
+- **Then** probe ring buffers flush alongside the error event
+- **And** the SDK does NOT poll `GET /v1/sdk/config` (no remote activation on Free tier)
+- **And** `POST /v1/projects/{id}/probes/activate` returns 403 for Free-tier projects
+
+### AC-PRB-11: Backend Config Polling Efficiency (Solo+)
+- **Given** a backend SDK polling `GET /v1/sdk/config` with no remote activations (paid tier)
+- **When** the server responds with an empty `active_probes` array and ETag `"abc"`
+- **And** the SDK polls again with `If-None-Match: "abc"`
+- **Then** the server returns 304 Not Modified with no body
+- **And** the SDK maintains its cached (empty) remote activation state
+
+### AC-PRB-12: Browser Probe Delivery — Zero Polling (Solo+)
+- **Given** a browser SDK for a paid-tier project initialized with `debugbundle.init()`
+- **Then** the SDK makes exactly ONE `GET /v1/sdk/config` request (CDN-cached)
+- **And** the SDK does NOT set up any periodic polling interval
+- **When** the browser SDK sends events via `POST /v1/events`
+- **Then** it reads the `probe_directives` field from the response body
+- **And** updates its local remote activation state accordingly
+
+### AC-PRB-13: CDN Edge-Caching
+- **Given** 1,000 browser SDKs calling `GET /v1/sdk/config` within a 30-second window for the same project
+- **Then** at most 1 request reaches the Cloudflare Worker (origin)
+- **And** the remaining requests are served from CDN edge cache
+- **And** the response includes `Cache-Control: public, s-maxage=30`
+
+### AC-PRB-14: Trigger Token Returned on Activation (Solo+)
+- **Given** a paid-tier project with a valid member token
+- **When** `POST /v1/projects/{id}/probes/activate` succeeds
+- **Then** the response includes a `trigger_token` field prefixed with `dbundle_probe_`
+- **And** the response includes a `trigger_expires_at` field
+- **And** the token is HMAC-SHA256 signed, scoped to the activation's labels, service, and environment
+- **And** `trigger_expires_at` defaults to `expires_at` when `trigger_ttl_seconds` is not provided
+
+### AC-PRB-15: Trigger Token via Query Parameter (Backend)
+- **Given** a backend SDK initialized for a paid-tier project
+- **And** a valid trigger token `dbundle_probe_abc...`
+- **When** an HTTP request arrives with query parameter `_debug_probe=dbundle_probe_abc...`
+- **Then** the SDK validates the trigger token locally (signature + expiry)
+- **And** matching probes ship independently for that single request only (in addition to always-on ring buffer)
+- **And** no additional API call is made to validate the token
+
+### AC-PRB-16: Trigger Token via Header (Backend)
+- **Given** a backend SDK initialized for a paid-tier project
+- **And** a valid trigger token
+- **When** an HTTP request arrives with header `X-DebugBundle-Probe-Trigger: dbundle_probe_abc...`
+- **Then** the SDK validates the trigger token locally and activates matching probes for that request
+- **And** the header is consumed silently (not forwarded or logged)
+
+### AC-PRB-17: Trigger Token via Query Parameter (Browser)
+- **Given** a browser SDK initialized for a paid-tier project
+- **When** a page loads with `?_debug_probe=dbundle_probe_abc...` in the URL
+- **Then** the SDK reads the trigger token from the query parameter
+- **And** strips `_debug_probe` from the URL bar via `history.replaceState`
+- **And** activates matching probes for independent shipping for that session/page load only
+
+### AC-PRB-18: Expired Trigger Token Rejected
+- **Given** a trigger token whose TTL has elapsed
+- **When** the token is presented via query param or header
+- **Then** the SDK rejects the token silently (no error to the user)
+- **And** no independently-shipped probe events are emitted for that request
+- **And** always-on ring buffer behavior is unaffected
+
+### AC-PRB-19: Trigger Token Does Not Persist
+- **Given** a valid trigger token used on request N
+- **When** request N+1 arrives without the trigger token
+- **Then** probes return to their polling-derived state (independent shipping only if a matching remote activation exists via normal config)
+- **And** always-on ring buffer continues operating regardless
+
+### AC-PRB-20: Independent Trigger Token TTL
+- **Given** an activation created with `ttl_seconds: 300` and `trigger_ttl_seconds: 86400`
+- **When** the passive activation expires after 5 minutes
+- **Then** the trigger token remains valid for 24 hours
+- **And** a request arriving at hour 12 with the trigger token still activates matching probes for independent shipping
+- **And** the passive polling path shows no active probes (activation expired)
+
+### AC-PRB-21: Support-Ticket Trigger Token Workflow
+- **Given** an agent investigating a user-reported issue
+- **When** the agent activates probes with `trigger_ttl_seconds: 86400`
+- **And** sends the trigger token link to the user (e.g., `https://app.example.com/checkout?_debug_probe=dbundle_probe_...`)
+- **And** the user clicks the link hours later
+- **Then** the browser SDK reads and strips the token from the URL
+- **And** matching probes activate for independent shipping for that user's session
+- **And** diagnostic data is captured and attached to the incident bundle
+
+### AC-PRB-22: Ring Buffer Configuration
+- **Given** an SDK initialized with `maxProbeLabels: 5` and `maxProbeEntriesPerLabel: 3`
+- **When** `probe()` is called with 6 distinct labels
+- **Then** the 6th label is silently dropped
+- **When** `probe()` is called 4 times for the same label
+- **Then** only the 3 most recent entries remain in the ring buffer
+
+### AC-PRB-23: Heavy Probe Fires on Remote Activation (Solo+)
+- **Given** a backend SDK with `probe('db-plan', () => db.explain(query), { heavy: true })`
+- **And** a remote activation matching `db-plan` on a paid-tier project
+- **When** the probe is called
+- **Then** the callback IS invoked and the result ships as a `probe_event` with the `activation_id`
+
+---
+
+## 22. Weekly Reporting Acceptance
+
+### AC-RPT-01: Weekly Report Delivery
+- **Given** a project with incidents generated during the past week
+- **When** the weekly reporting schedule fires
+- **Then** a summary report is delivered via the configured channel (email or Slack)
+- **And** the report includes: total bundles generated (by type), new incidents, regressions, top spiking incidents
+- **And** projects with zero activity receive no report (no noise)
+
+---
+
+## 23. Event Classification & Capture Policy Acceptance
+
+### AC-EVT-01: Event Classification Correctness
+- **Given** events of each canonical type processed through the normalization pipeline
+- **When** the worker classifies each event
+- **Then** `backend_exception` → `incident_signal`
+- **And** `frontend_exception` → `incident_signal`
+- **And** `log_event` with `level` in (`error`, `fatal`, `critical`) → `incident_signal`
+- **And** `log_event` with `level` below `error` → `context_signal`
+- **And** `request_event` → `context_signal`
+- **And** `frontend_breadcrumb` → `context_signal`
+- **And** `deploy_metadata` → `context_signal`
+- **And** `error_suppressed` → `operational_signal`
+- **And** `probe_event` without `activation_id` (error-flush) → `context_signal`
+- **And** `probe_event` with `activation_id` (standalone) → `operational_signal`
+
+### AC-EVT-02: Event Class Persisted
+- **Given** a normalized event processed by the worker
+- **When** the event is stored in `incident_events`
+- **Then** the `event_class` column contains the correct classification
+- **And** `event_class` is never null
+
+### AC-EVT-03: Free Tier Billing Excludes Non-Incident Events
+- **Given** a Free-tier project with 100 `incident_signal` events and 500 `context_signal` events and 200 `operational_signal` events in a billing period
+- **When** the billing query counts usage against the 750/month quota
+- **Then** only the 100 `incident_signal` events are counted
+- **And** the project is not over quota
+
+### AC-EVT-04: Capture Policy Defaults
+- **Given** a new project is created
+- **When** the capture policy is queried via `GET /v1/projects/{id}/capture-policy`
+- **Then** Free-tier projects default to preset `minimal`
+- **And** paid-tier projects default to preset `balanced`
+- **And** all override fields are `null` (preset controls apply)
+
+### AC-EVT-05: Capture Policy CRUD
+- **Given** a project with member-token auth
+- **When** `PATCH /v1/projects/{id}/capture-policy` is called with `{ "preset": "investigative" }`
+- **Then** the policy updates to the `investigative` preset
+- **And** `GET /v1/projects/{id}/capture-policy` returns the new preset with resolved control values
+
+### AC-EVT-06: Capture Policy Advanced Overrides
+- **Given** a project with preset `balanced`
+- **When** `PATCH /v1/projects/{id}/capture-policy` is called with `{ "capture_logs": "info" }`
+- **Then** the `capture_logs` override is stored as `info`
+- **And** the resolved policy shows `capture_logs: "info"` (override) with all other controls resolved from the `balanced` preset
+
+### AC-EVT-07: SDK Config Includes Capture Policy
+- **Given** a project with a capture policy set
+- **When** an SDK calls `GET /v1/sdk/config` with a valid project token
+- **Then** the response includes a `capture_policy` object with all resolved control values
+- **And** the SDK uses these controls to filter events before sending
+
+### AC-EVT-08: Ingestion Enforces Capture Policy Server-Side
+- **Given** a project with preset `minimal` (which sets `capture_request_events: "off"`)
+- **When** an SDK sends a `request_event` to `POST /v1/events`
+- **Then** the event is rejected with reason `capture_policy_rejected`
+- **And** the accepted count does not include rejected events
+- **And** rejected events are not persisted to S3
+
+### AC-EVT-09: SDK Local Capture Policy Enforcement
+- **Given** an SDK initialized with a project whose capture policy sets `capture_logs: "error"`
+- **When** the application emits a `warning`-level log
+- **Then** the SDK suppresses the log event locally (does not send it)
+- **And** no network request is made for the suppressed event
+
+### AC-EVT-10: Capture Policy Interface Parity
+- **Given** the capture-policy management feature
+- **Then** `GET /v1/projects/{id}/capture-policy` is available via API
+- **And** `debugbundle capture-policy get --project <id>` is available via CLI
+- **And** `get_capture_policy` is available via MCP
+- **And** all three return identical policy data for the same project
+
+### AC-PROJ-01: Project Deletion Parity
+- **Given** an owner in an organization with project `proj_123`
+- **When** `DELETE /v1/projects/proj_123` succeeds
+- **Then** the API returns the deleted project identity payload
+- **And** `debugbundle project delete proj_123` is available via CLI
+- **And** `delete_project` is available via MCP
+- **And** the web project settings destructive action deletes the same project and returns the operator to the projects inventory
+
+### AC-PROJ-02: Project Deletion Authorization and Missing State
+- **Given** a non-owner member in the same organization
+- **When** that member calls `DELETE /v1/projects/proj_123`
+- **Then** the server returns `403 { "error": "forbidden" }`
+- **When** an owner deletes a project that is not visible in their organization
+- **Then** the server returns `404 { "error": "project_not_found" }`
+
+---
+
+## 24. Browser Relay Acceptance
+
+### AC-REL-01: Local-Only Relay End-to-End
+- **Given** a full-stack app with `@debugbundle/sdk-browser` configured with `endpoint: '/debugbundle/browser'` and `@debugbundle/sdk-node` relay handler mounted at `POST /debugbundle/browser` in local-only mode
+- **When** a `frontend_exception` occurs in the browser
+- **Then** the browser SDK sends the event to the same-origin relay endpoint
+- **And** the relay writes a valid event file to `.debugbundle/local/events/`
+- **And** `debugbundle process` produces a bundle containing the browser error
+
+### AC-REL-02: Full-Stack Cross-Context Bundle
+- **Given** a browser `frontend_exception` and a backend `backend_exception` sharing the same `correlation.trace_id`
+- **When** both events are written to `.debugbundle/local/events/` (browser via relay, backend via file transport)
+- **And** `debugbundle process` runs
+- **Then** both events are grouped into the same incident
+- **And** the resulting bundle contains both frontend and backend context
+
+### AC-REL-03: Origin Validation
+- **Given** a relay handler with default same-origin configuration
+- **When** a request arrives with `Origin: https://evil.example.com` to a relay hosted on `app.example.com`
+- **Then** the relay responds with `403 Forbidden`
+- **And** the payload is not processed
+
+### AC-REL-04: Payload Validation
+- **Given** a relay handler
+- **When** a request contains an unknown event type `backend_exception` (not a browser type)
+- **Then** the event is rejected
+- **And** valid browser events in the same batch are still accepted
+
+### AC-REL-05: Field Override Enforcement
+- **Given** a browser payload containing `"project_token": "dbundle_proj_stolen"` and `"organization_id": "org_123"`
+- **When** the relay processes the payload
+- **Then** `project_token` is stripped (relay attaches its own server-side)
+- **And** `organization_id` is stripped
+- **And** `sdk_name` is forced to `@debugbundle/sdk-browser`
+
+### AC-REL-06: Credential Isolation
+- **Given** a browser SDK in relay mode (`endpoint: '/debugbundle/browser'`)
+- **When** the browser SDK sends an event
+- **Then** no `Authorization` header or `projectToken` is included in the request
+- **And** the relay attaches credentials server-side when forwarding to cloud
+
+### AC-REL-07: Connected Durable Delivery
+- **Given** a relay in connected durable mode (default)
+- **When** the relay receives a valid browser event
+- **Then** the event is written to `.debugbundle/local/browser-relay-spool/` before cloud forwarding
+- **And** if cloud forwarding fails, the spool file is retained for retry
+
+### AC-REL-08: Rate Limiting
+- **Given** a relay with default rate limit (60 req/min per IP)
+- **When** a single IP sends 61 requests within one minute
+- **Then** the 61st request returns `429 Too Many Requests`
+
+### AC-REL-09: Wire Format Alignment
+- **Given** a browser event written to `.debugbundle/local/events/` by the relay
+- **When** the file is inspected
+- **Then** the filename follows `<timestamp>-<sequence>-<service>.events.json` convention
+- **And** the file contains a valid JSON array of event envelopes
+- **And** the format is identical to files written by the Node SDK file transport
+
+### AC-REL-10: Static-Only Direct Delivery Unchanged
+- **Given** a static-only site with `debugbundle.init({ projectToken: '...', service: 'marketing' })`
+- **When** a `frontend_exception` occurs
+- **Then** the browser SDK sends directly to DebugBundle cloud (no relay involved)
+- **And** the `Authorization` header includes the project token
+
+---
+
+## 25. GitHub Repository Automation Acceptance
+
+### AC-GHA-01: GitHub App Installation
+- **Given** a Solo or Team organization owner in the project's GitHub tab
+- **When** the owner clicks "Connect GitHub" and completes the GitHub App installation flow
+- **Then** a `github_installations` record is created with status `active`
+- **And** the available repositories are listed for selection
+
+### AC-GHA-02: Primary Repo Assignment
+- **Given** a project with an active GitHub App installation
+- **When** the owner selects a repository as the project's primary repo
+- **Then** a `project_github_repos` record is created linking the project to that repo
+- **And** only one repo can be assigned per project (UNIQUE constraint on `project_id`)
+
+### AC-GHA-03: Dispatch Rule Creation
+- **Given** a project with an assigned primary repo
+- **When** the owner creates a dispatch rule with event types `[bundle.created]`, severity_min `high`, and cooldown 300s
+- **Then** a `github_dispatch_rules` record is persisted
+- **And** the rule is returned in the dispatch rules list
+
+### AC-GHA-04: Default Rule Preset
+- **Given** a project where a repo is being assigned for the first time
+- **When** the repo assignment completes
+- **Then** DebugBundle offers a default rule preset: `event_types: [bundle.created, bundle.reopened]`, `severity_min: high`, `incident_status: new_or_reopened`, `cooldown_seconds: 300`
+
+### AC-GHA-05: Dispatch On Incident Lifecycle Event
+- **Given** a project with an assigned repo and an enabled dispatch rule matching `bundle.created` with `severity_min: high`
+- **When** a new high-severity incident fires `bundle.created`
+- **Then** the worker evaluates the matching rule
+- **And** a delivery record is persisted with status `pending`
+- **And** a `repository_dispatch` is sent to the assigned repo with `event_type: "debugbundle.incident"`
+- **And** the `client_payload` contains `debugbundle_event`, `incident_id`, `severity`, `title`, `links`, and `dispatch_id`
+- **And** the delivery record status is updated to `delivered`
+
+### AC-GHA-06: Cooldown Enforcement
+- **Given** a dispatch rule with `cooldown_seconds: 300`
+- **When** the same incident fingerprint triggers a dispatch within 300 seconds of the last dispatch
+- **Then** the duplicate dispatch is skipped
+- **And** no new delivery record is created
+
+### AC-GHA-07: Filter Evaluation Parity
+- **Given** a dispatch rule with `environments: ["production"]` and `severity_min: "high"`
+- **When** a `bundle.created` event fires for environment `staging` with severity `medium`
+- **Then** the rule does not match
+- **And** the same filter evaluation function used for webhook delivery produces the same result
+
+### AC-GHA-08: Installation Token Caching
+- **Given** a GitHub App installation with a cached access token in Redis (TTL 50 min)
+- **When** a dispatch is needed within the cache window
+- **Then** the cached token is reused without calling GitHub's token exchange API
+
+### AC-GHA-09: Retry On Failure
+- **Given** a dispatch delivery that failed with a transient GitHub error
+- **When** the retry schedule fires (1s → 5s → 30s → 2min → 10min)
+- **Then** the delivery is retried up to 5 times
+- **And** after 5 failed attempts the delivery status is `failed`
+- **And** the rule is NOT auto-disabled
+
+### AC-GHA-10: Rate Limiting
+- **Given** a project that has sent 100 dispatches in the current hour
+- **When** the 101st dispatch is triggered
+- **Then** the dispatch is dropped and logged
+- **And** the delivery history shows a rate-limit warning
+
+### AC-GHA-11: Installation Lifecycle — Suspended
+- **Given** an active GitHub App installation
+- **When** GitHub sends `installation.suspend` to `POST /v1/github/app/webhook`
+- **Then** the installation status is updated to `suspended`
+- **And** dispatches are paused for all projects using this installation
+- **And** the project GitHub tab shows a "GitHub connection lost" warning
+
+### AC-GHA-12: Installation Lifecycle — Removed
+- **Given** an active GitHub App installation
+- **When** GitHub sends `installation.deleted` to `POST /v1/github/app/webhook`
+- **Then** the installation status is updated to `removed`
+- **And** automation rules for affected projects are disabled
+
+### AC-GHA-13: Delivery History
+- **Given** a project with dispatch deliveries
+- **When** the owner views the project GitHub tab → Delivery History
+- **Then** each delivery shows rule name, incident title, timestamp, status, attempt count, and last error
+- **And** failed deliveries show the HTTP status code from GitHub
+- **And** a "Retry" button is available on failed deliveries
+
+### AC-GHA-14: Free Tier Gating
+- **Given** a Free-tier project
+- **When** the owner navigates to the project's GitHub tab
+- **Then** the integration panel shows an upgrade prompt
+- **And** no GitHub App connection, repo assignment, or dispatch rules can be created
+
+### AC-GHA-15: Interface Parity
+- **Given** any GitHub automation management operation (installation status, repo assignment, rule CRUD, delivery history, retry)
+- **When** the operation is performed
+- **Then** it is available through API, CLI, and MCP
+- **And** all three interfaces call the same domain services
+
+### AC-GHA-16: Dispatch Payload Stability
+- **Given** a `repository_dispatch` sent by DebugBundle
+- **When** the receiving workflow inspects `client_payload`
+- **Then** the payload matches the documented stable contract
+- **And** `dispatch_id` is globally unique per delivery attempt for deduplication
+
+### AC-GHA-17: Self-Host GitHub App
+- **Given** a self-hosted DebugBundle deployment with custom `GITHUB_APP_ID` and `GITHUB_APP_PRIVATE_KEY` environment variables
+- **When** the operator completes GitHub App setup
+- **Then** dispatch rule evaluation, delivery, and retry logic is identical to cloud
+- **And** no code paths differ between cloud and self-host

@@ -1,0 +1,31 @@
+node_modules/
+.pnpm-store/
+.pnpm-debug.log*
+.pnpm-state*
+coverage/
+starter-kit/
+dist/
+.source/
+.env
+.env.local
+.venv/
+.DS_Store
+*.tsbuildinfo
+site/
+.local-repos/
+.local-notes/
+.tmp/
+/STATUS.md
+/TODO.md
+spec/local/
+
+# SDK clone roots (managed by scripts/bootstrap-sdks.sh)
+sdks/debugbundle-js/
+sdks/debugbundle-python/
+sdks/debugbundle-php/
+sdks/debugbundle-action/
+
+# DebugBundle (managed by debugbundle setup)
+.debugbundle/local/*
+!.debugbundle/local/connection.json
+.debugbundle/bundles/

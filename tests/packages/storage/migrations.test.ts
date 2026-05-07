@@ -1,0 +1,172 @@
+import { describe, expect, it, vi } from "vitest";
+
+import {
+  bootstrapStorageSchema,
+  REQUIRED_API_TABLES,
+  REQUIRED_WORKER_TABLES,
+  STORAGE_BOOTSTRAP_SQL
+} from "../../../packages/storage/src/migrations.js";
+
+const ALL_REQUIRED_TABLES = Array.from(new Set([...REQUIRED_API_TABLES, ...REQUIRED_WORKER_TABLES]));
+
+describe("storage bootstrap schema", () => {
+  it("should bootstrap an empty schema inside a transaction", async (): Promise<void> => {
+    const query = vi
+      .fn()
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValue({ rows: [] });
+
+    const result = await bootstrapStorageSchema({ query });
+
+    expect(result).toEqual({ status: "bootstrapped" });
+    expect(query).toHaveBeenCalledWith("BEGIN", []);
+    expect(query).toHaveBeenCalledWith("COMMIT", []);
+  });
+
+  it("should no-op when the clean schema is already bootstrapped", async (): Promise<void> => {
+    const query = vi
+      .fn()
+      .mockResolvedValueOnce({
+        rows: ALL_REQUIRED_TABLES.map((table_name) => ({ table_name }))
+      });
+
+    const result = await bootstrapStorageSchema({ query });
+
+    expect(result).toEqual({ status: "already_bootstrapped" });
+    expect(query).toHaveBeenCalledTimes(1);
+  });
+
+  it("should leave schema evolution to db migrations when all required tables already exist", async (): Promise<void> => {
+    const query = vi
+      .fn()
+      .mockResolvedValueOnce({
+        rows: ALL_REQUIRED_TABLES.map((table_name) => ({ table_name }))
+      });
+
+    const result = await bootstrapStorageSchema({ query });
+
+    expect(result).toEqual({ status: "already_bootstrapped" });
+    expect(query).toHaveBeenCalledTimes(1);
+  });
+
+  it("should fail when a legacy schema history table is present", async (): Promise<void> => {
+    const query = vi.fn().mockResolvedValueOnce({ rows: [{ table_name: "schema_migrations" }] });
+
+    await expect(bootstrapStorageSchema({ query })).rejects.toThrow("storage_bootstrap_legacy_schema_detected");
+  });
+
+  it("should fail when only part of the required schema exists", async (): Promise<void> => {
+    const query = vi.fn().mockResolvedValueOnce({ rows: [{ table_name: "users" }, { table_name: "organizations" }] });
+
+    await expect(bootstrapStorageSchema({ query })).rejects.toThrow("storage_bootstrap_partial_schema_detected");
+  });
+
+  it("should rollback and surface bootstrap failures", async (): Promise<void> => {
+    const query = vi
+      .fn()
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [] })
+      .mockRejectedValueOnce(new Error("db exploded"))
+      .mockResolvedValueOnce({ rows: [] });
+
+    await expect(bootstrapStorageSchema({ query })).rejects.toThrow("storage_bootstrap_failed: db exploded");
+    expect(query).toHaveBeenCalledWith("ROLLBACK", []);
+    expect(query).not.toHaveBeenCalledWith("COMMIT", []);
+  });
+
+  it("should surface rollback failure details", async (): Promise<void> => {
+    const query = vi
+      .fn()
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [] })
+      .mockRejectedValueOnce(new Error("bootstrap blew up"))
+      .mockRejectedValueOnce(new Error("rollback blew up"));
+
+    let thrown: unknown;
+    try {
+      await bootstrapStorageSchema({ query });
+    } catch (error) {
+      thrown = error;
+    }
+
+    expect(thrown).toBeInstanceOf(Error);
+    const message = (thrown as Error).message;
+    expect(message).toContain("storage_bootstrap_rollback_failed");
+    expect(message).toContain("bootstrap blew up");
+    expect(message).toContain("rollback blew up");
+  });
+
+  it("should stringify non-Error bootstrap failures", async (): Promise<void> => {
+    const query = vi
+      .fn()
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [] })
+      .mockRejectedValueOnce("plain string failure")
+      .mockResolvedValueOnce({ rows: [] });
+
+    await expect(bootstrapStorageSchema({ query })).rejects.toThrow("plain string failure");
+  });
+
+  it("should stringify non-Error rollback failures", async (): Promise<void> => {
+    const query = vi
+      .fn()
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [] })
+      .mockRejectedValueOnce("bootstrap failed badly")
+      .mockRejectedValueOnce("rollback failed badly");
+
+    let thrown: unknown;
+    try {
+      await bootstrapStorageSchema({ query });
+    } catch (error) {
+      thrown = error;
+    }
+
+    expect(thrown).toBeInstanceOf(Error);
+    const message = (thrown as Error).message;
+    expect(message).toContain("bootstrap_error=bootstrap failed badly");
+    expect(message).toContain("rollback_error=rollback failed badly");
+  });
+
+  it("should expose required tables for auth, alert, billing, and github flows", (): void => {
+    expect(REQUIRED_API_TABLES).toContain("email_auth_challenges");
+    expect(REQUIRED_API_TABLES).toContain("oauth_identities");
+    expect(REQUIRED_API_TABLES).toContain("processed_billing_events");
+    expect(REQUIRED_API_TABLES).toContain("github_dispatch_deliveries");
+    expect(REQUIRED_WORKER_TABLES).toContain("alert_deliveries");
+    expect(REQUIRED_WORKER_TABLES).toContain("weekly_report_deliveries");
+  });
+
+  it("should describe the final schema directly without schema evolution sql", (): void => {
+    expect(STORAGE_BOOTSTRAP_SQL.includes("schema_migrations")).toBe(false);
+    expect(STORAGE_BOOTSTRAP_SQL.includes("ALTER TABLE")).toBe(false);
+    expect(STORAGE_BOOTSTRAP_SQL.includes("IF NOT EXISTS")).toBe(false);
+    expect(STORAGE_BOOTSTRAP_SQL.includes(":legacy-")).toBe(false);
+  });
+
+  it("should include critical foreign keys with the expected deletion behavior", (): void => {
+    expect(STORAGE_BOOTSTRAP_SQL.includes("organization_id uuid NOT NULL REFERENCES organizations(id) ON DELETE CASCADE")).toBe(true);
+    expect(STORAGE_BOOTSTRAP_SQL.includes("organization_id uuid REFERENCES organizations(id) ON DELETE SET NULL")).toBe(true);
+    expect(STORAGE_BOOTSTRAP_SQL.includes("project_id uuid NOT NULL REFERENCES projects(id) ON DELETE CASCADE")).toBe(true);
+    expect(STORAGE_BOOTSTRAP_SQL.includes("webhook_id uuid REFERENCES agent_webhooks(id) ON DELETE CASCADE")).toBe(true);
+    expect(STORAGE_BOOTSTRAP_SQL.includes("installation_id uuid NOT NULL REFERENCES github_installations(id) ON DELETE CASCADE")).toBe(true);
+  });
+
+  it("should include critical uniqueness constraints for ownership and delivery paths", (): void => {
+    expect(STORAGE_BOOTSTRAP_SQL.includes("UNIQUE (project_id, environment, service_id, fingerprint)")).toBe(true);
+    expect(STORAGE_BOOTSTRAP_SQL.includes("UNIQUE (organization_id, user_id)")).toBe(true);
+    expect(STORAGE_BOOTSTRAP_SQL.includes("UNIQUE (organization_id, email)")).toBe(true);
+    expect(STORAGE_BOOTSTRAP_SQL.includes("project_id uuid NOT NULL UNIQUE REFERENCES projects(id) ON DELETE CASCADE")).toBe(true);
+    expect(STORAGE_BOOTSTRAP_SQL.includes("CREATE UNIQUE INDEX github_dispatch_deliveries_rule_dedupe_key_idx")).toBe(true);
+  });
+
+  it("should include hot-path indexes for retrieval and claim queries", (): void => {
+    expect(STORAGE_BOOTSTRAP_SQL.includes("incident_events_incident_occurred_event_idx")).toBe(true);
+    expect(STORAGE_BOOTSTRAP_SQL.includes("webhook_deliveries_status_next_attempt_idx")).toBe(true);
+    expect(STORAGE_BOOTSTRAP_SQL.includes("github_dispatch_deliveries_status_next_attempt_idx")).toBe(true);
+    expect(STORAGE_BOOTSTRAP_SQL.includes("sessions_token_hash_idx")).toBe(true);
+    expect(STORAGE_BOOTSTRAP_SQL.includes("alert_deliveries_project_status_idx")).toBe(true);
+    expect(STORAGE_BOOTSTRAP_SQL.includes("organizations_stripe_customer_id_key")).toBe(true);
+  });
+});

@@ -1,0 +1,12 @@
+{
+  "name": "@debugbundle/example-fastify-basic",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node server.mjs"
+  },
+  "dependencies": {
+    "@debugbundle/sdk-node": "next",
+    "fastify": "^5.6.0"
+  }
+}

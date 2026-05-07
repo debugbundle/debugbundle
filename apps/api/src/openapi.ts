@@ -1,0 +1,1525 @@
+import { z } from "zod";
+import { zodToJsonSchema } from "zod-to-json-schema";
+
+import { SESSION_COOKIE_NAME } from "../../../packages/auth/src/index.js";
+import {
+  AlertListResponseSchema,
+  AlertResponseSchema,
+} from "../../../packages/alert-client/src/index.js";
+import {
+  BillingSummaryResponseSchema,
+} from "../../../packages/billing-client/src/index.js";
+import {
+  BundleV1Schema,
+  CapturePolicyUpdateSchema,
+  EventEnvelopeSchema,
+} from "../../../packages/shared-types/src/index.js";
+import {
+  DeletedProjectRecordSchema,
+  ProjectCreateResponseSchema,
+  ProjectDeleteResponseSchema,
+  ProjectListResponseSchema,
+} from "../../../packages/project-management-client/src/index.js";
+import {
+  IncidentResponseSchema,
+  IncidentsResponseSchema,
+  LogsResponseSchema,
+  ReproductionResponseSchema,
+  ServicesResponseSchema,
+} from "../../../packages/retrieval-client/src/index.js";
+import {
+  TokenCreateResponseSchema,
+  TokenListResponseSchema,
+} from "../../../packages/token-management/src/index.js";
+import {
+  RetryWebhookDeliveryResponseSchema,
+  WebhookCreateResponseSchema,
+  WebhookDeliveriesResponseSchema,
+  WebhookResponseSchema,
+  WebhookTestResponseSchema,
+  WebhookListResponseSchema,
+} from "../../../packages/webhook-client/src/index.js";
+import {
+  WeeklyReportChannelListResponseSchema,
+  WeeklyReportChannelResponseSchema,
+} from "../../../packages/weekly-report-client/src/index.js";
+import {
+  AccountDeleteBodySchema,
+  AcceptInviteBodySchema,
+  AlertsQuerySchema,
+  BillingCheckoutBodySchema,
+  BillingCapacityChangeBodySchema,
+  CreateAlertBodySchema,
+  CreateOrganizationInviteBodySchema,
+  CreateProjectBodySchema,
+  CreateTokenBodySchema,
+  CreateWebhookBodySchema,
+  CreateWeeklyReportChannelBodySchema,
+  GithubAuthCallbackQuerySchema,
+  IncidentParamsSchema,
+  IncidentsQuerySchema,
+  LogsQuerySchema,
+  MemberTokenParamsSchema,
+  OrganizationInviteParamsSchema,
+  OrganizationMemberParamsSchema,
+  ProjectParamsSchema,
+  ProjectsQuerySchema,
+  ProjectTokenParamsSchema,
+  ProbeActivateBodySchema,
+  ProbeDeactivateBodySchema,
+  RequestEmailCodeBodySchema,
+  ServicesQuerySchema,
+  TokenListQuerySchema,
+  UpdateAlertBodySchema,
+  UpdateOrganizationMemberRoleBodySchema,
+  UpdateProjectBodySchema,
+  UpdateWebhookBodySchema,
+  UpdateWeeklyReportChannelBodySchema,
+  VerifyEmailCodeBodySchema,
+  WebhookDeliveriesParamsSchema,
+  WebhookDeliveriesQuerySchema,
+  WebhookDeliveryRetryParamsSchema,
+  WebhookParamsSchema,
+  WebhooksQuerySchema,
+  WebhookTestBodySchema,
+  WeeklyReportChannelParamsSchema,
+  WeeklyReportChannelsQuerySchema,
+} from "./schemas.js";
+
+type JsonSchemaDocument = Record<string, unknown>;
+type SecurityRequirement = Record<string, []>;
+
+type SchemaComponent = {
+  name: string;
+  schema: unknown;
+};
+
+type SchemaSpec =
+  | SchemaComponent
+  | {
+      oneOf: SchemaComponent[];
+    };
+
+type ResponseSpec = {
+  description: string;
+  schema?: SchemaSpec;
+  headers?: Record<string, { description: string; schema: unknown }>;
+};
+
+type OperationSpec = {
+  method: "get" | "post" | "patch" | "delete";
+  path: string;
+  operationId: string;
+  summary: string;
+  tags: string[];
+  security?: SecurityRequirement[];
+  params?: unknown;
+  query?: unknown;
+  requestBody?: SchemaComponent;
+  responses: Record<string, ResponseSpec>;
+};
+
+const browserSessionSecurity: SecurityRequirement = { browserSession: [] };
+const memberBearerTokenSecurity: SecurityRequirement = { memberBearerToken: [] };
+const projectBearerTokenSecurity: SecurityRequirement = { projectBearerToken: [] };
+
+const anyMemberAuth = [browserSessionSecurity, memberBearerTokenSecurity];
+const browserSessionAuth = [browserSessionSecurity];
+const memberBearerAuth = [memberBearerTokenSecurity];
+const projectBearerAuth = [projectBearerTokenSecurity];
+
+const ApiErrorSchema = z.object({ error: z.string() }).strict();
+const SuccessResponseSchema = z.object({ success: z.boolean() }).strict();
+const BillingLinkResponseSchema = z.object({ url: z.string().url() }).strict();
+const BundleFailureStatusSchema = z.object({ status: z.literal("failed"), reason: z.string() }).strict();
+const OrganizationInviteMembershipSchema = z
+  .object({
+    user_id: z.string(),
+    organization_id: z.string(),
+    role: z.enum(["owner", "member"]),
+  })
+  .strict();
+const AcceptInviteResponseSchema = z.object({ membership: OrganizationInviteMembershipSchema }).strict();
+const WebSessionSchema = z
+  .object({
+    session_id: z.string(),
+    user_id: z.string(),
+    email: z.string().email(),
+    email_verified_at: z.string().datetime().nullable(),
+    organization_id: z.string(),
+    organization_plan: z.enum(["free", "solo", "team"]),
+    role: z.enum(["owner", "member"]),
+    created_at: z.string().datetime(),
+    expires_at: z.string().datetime(),
+    revoked_at: z.string().datetime().nullable(),
+    csrf_token: z.string(),
+    auth_methods: z
+      .object({
+        email: z.boolean(),
+        github: z.boolean(),
+      })
+      .strict(),
+  })
+  .strict();
+const SessionResponseSchema = z.object({ session: WebSessionSchema.nullable() }).strict();
+const AccountStoredArtifactSchema = z
+  .object({
+    key: z.string(),
+    content: z.unknown(),
+  })
+  .strict();
+const AccountExportResponseSchema = z
+  .object({
+    exported_at: z.string().datetime(),
+    user: z.record(z.string(), z.unknown()),
+    organization: z.record(z.string(), z.unknown()),
+    members: z.array(z.record(z.string(), z.unknown())),
+    invites: z.array(z.record(z.string(), z.unknown())),
+    member_tokens: z.array(z.record(z.string(), z.unknown())),
+    projects: z.array(z.record(z.string(), z.unknown())),
+    project_tokens: z.array(z.record(z.string(), z.unknown())),
+    capture_policies: z.array(z.record(z.string(), z.unknown())),
+    services: z.array(z.record(z.string(), z.unknown())),
+    deployments: z.array(z.record(z.string(), z.unknown())),
+    processed_events: z.array(z.record(z.string(), z.unknown())),
+    incidents: z.array(z.record(z.string(), z.unknown())),
+    incident_events: z.array(z.record(z.string(), z.unknown())),
+    bundle_generations: z.array(z.record(z.string(), z.unknown())),
+    alert_rules: z.array(z.record(z.string(), z.unknown())),
+    alert_deliveries: z.array(z.record(z.string(), z.unknown())),
+    weekly_report_channels: z.array(z.record(z.string(), z.unknown())),
+    weekly_report_deliveries: z.array(z.record(z.string(), z.unknown())),
+    agent_webhooks: z.array(z.record(z.string(), z.unknown())),
+    webhook_deliveries: z.array(z.record(z.string(), z.unknown())),
+    github_installations: z.array(z.record(z.string(), z.unknown())),
+    project_github_repos: z.array(z.record(z.string(), z.unknown())),
+    github_dispatch_rules: z.array(z.record(z.string(), z.unknown())),
+    github_dispatch_deliveries: z.array(z.record(z.string(), z.unknown())),
+    org_usage_counters: z.array(z.record(z.string(), z.unknown())),
+    processed_billing_events: z.array(z.record(z.string(), z.unknown())),
+    audit_logs: z.array(z.record(z.string(), z.unknown())),
+    artifacts: z
+      .object({
+        raw_events: z.array(AccountStoredArtifactSchema),
+        bundles: z.array(AccountStoredArtifactSchema),
+        reproductions: z.array(AccountStoredArtifactSchema),
+      })
+      .strict(),
+  })
+  .strict();
+const AccountDeletionResponseSchema = z
+  .object({
+    account: z
+      .object({
+        deleted_at: z.string().datetime(),
+        organization_id: z.string(),
+        deleted_project_ids: z.array(z.string()),
+        user_deleted: z.boolean(),
+        deleted_member_token_count: z.number().int().nonnegative(),
+      })
+      .strict(),
+  })
+  .strict();
+const OrganizationMemberSchema = z
+  .object({
+    user_id: z.string(),
+    email: z.string().email(),
+    role: z.enum(["owner", "member"]),
+    created_at: z.string().datetime(),
+  })
+  .strict();
+const OrganizationInviteSchema = z
+  .object({
+    invite_id: z.string().uuid(),
+    organization_id: z.string(),
+    email: z.string().email(),
+    role: z.literal("member"),
+    invited_by: z.string(),
+    accepted_at: z.string().datetime().nullable(),
+    expires_at: z.string().datetime(),
+    created_at: z.string().datetime(),
+  })
+  .strict();
+const OrganizationMemberListResponseSchema = z.object({ members: z.array(OrganizationMemberSchema) }).strict();
+const OrganizationMemberResponseSchema = z.object({ member: OrganizationMemberSchema }).strict();
+const OrganizationInviteListResponseSchema = z.object({ invites: z.array(OrganizationInviteSchema) }).strict();
+const OrganizationInviteResponseSchema = z.object({ invite: OrganizationInviteSchema }).strict();
+const ProjectUpdateResponseSchema = z.object({ project: DeletedProjectRecordSchema.extend({ metrics: z.object({
+  monthly_bundle_requests: z.number().int().nonnegative(),
+  monthly_raw_ingested_events: z.number().int().nonnegative(),
+  retained_bundles: z.number().int().nonnegative(),
+  monthly_alert_deliveries: z.number().int().nonnegative(),
+}).strict() }) }).strict();
+const ProbeActivationSchema = z
+  .object({
+    activation_id: z.string().uuid(),
+    label_pattern: z.string(),
+    service: z.string(),
+    environment: z.string(),
+    expires_at: z.string().datetime(),
+    trigger_expires_at: z.string().datetime(),
+  })
+  .strict();
+const ProbeActivationResponseSchema = z
+  .object({
+    activation: ProbeActivationSchema,
+    trigger_token: z.string(),
+  })
+  .strict();
+const ProbeActivationListResponseSchema = z.object({ activations: z.array(ProbeActivationSchema) }).strict();
+const ProbeDeactivationResponseSchema = z
+  .object({
+    deactivated: z.object({ activation_id: z.string().uuid(), deactivated_at: z.string().datetime() }).strict(),
+  })
+  .strict();
+const ResolvedCapturePolicySchema = z
+  .object({
+    preset: z.enum(["minimal", "balanced", "investigative"]),
+    capture_logs: z.enum(["off", "error", "warning", "info"]),
+    capture_request_events: z.enum(["off", "failures_only", "filtered", "all"]),
+    capture_breadcrumbs: z.enum(["local_only", "exception_only", "standalone"]),
+    capture_probe_events: z.enum(["buffer_only", "standalone_when_activated"]),
+  })
+  .strict();
+const CapturePolicyResponseSchema = z.object({ policy: ResolvedCapturePolicySchema }).strict();
+const SdkConfigResponseSchema = z
+  .object({
+    probes_enabled: z.boolean(),
+    remote_probes_enabled: z.boolean(),
+    active_probes: z.array(ProbeActivationSchema),
+    poll_interval_ms: z.number().int().nonnegative(),
+    capture_policy: ResolvedCapturePolicySchema,
+    trigger_token_key: z.string().optional(),
+  })
+  .strict();
+const IngestionErrorSchema = z.object({ index: z.number().int(), reason: z.string() }).strict();
+const IngestionAcceptedResponseSchema = z
+  .object({
+    accepted: z.number().int().nonnegative(),
+    rejected: z.number().int().nonnegative(),
+    errors: z.array(IngestionErrorSchema),
+    retry_after_ms: z.number().int().positive().optional(),
+    probe_directives: z
+      .object({
+        active_probes: z.array(ProbeActivationSchema),
+      })
+      .optional(),
+  })
+  .strict();
+const OpenApiIngestionRequestSchema = z.object({ events: z.array(EventEnvelopeSchema) }).strict();
+const HealthResponseSchema = z.object({ status: z.literal("ok"), version: z.string(), uptime: z.number() }).strict();
+const ReadyResponseSchema = z.object({ status: z.literal("ready") }).strict();
+const NotReadyResponseSchema = z.object({ status: z.literal("not_ready"), reason: z.string() }).strict();
+const LiveResponseSchema = z.object({ status: z.literal("live") }).strict();
+
+function component(name: string, schema: unknown): SchemaComponent {
+  return { name, schema };
+}
+
+function toJsonSchema(schema: unknown): JsonSchemaDocument {
+  const document = zodToJsonSchema(schema as never, {
+    target: "jsonSchema2019-09",
+    $refStrategy: "none",
+    definitionPath: "$defs",
+  }) as JsonSchemaDocument;
+
+  delete document["$schema"];
+  return document;
+}
+
+function buildParameters(schema: unknown, location: "path" | "query"): Array<Record<string, unknown>> {
+  const jsonSchema = toJsonSchema(schema) as {
+    properties?: Record<string, JsonSchemaDocument>;
+    required?: string[];
+  };
+  const required = new Set(jsonSchema.required ?? []);
+
+  return Object.entries(jsonSchema.properties ?? {}).map(([name, propertySchema]) => ({
+    name,
+    in: location,
+    required: location === "path" ? true : required.has(name),
+    schema: propertySchema,
+  }));
+}
+
+function resolveSchemaSpec(
+  schema: SchemaSpec,
+  components: Map<string, JsonSchemaDocument>
+): JsonSchemaDocument {
+  if ("oneOf" in schema) {
+    return {
+      oneOf: schema.oneOf.map((entry) => resolveSchemaSpec(entry, components)),
+    };
+  }
+
+  if (!components.has(schema.name)) {
+    components.set(schema.name, toJsonSchema(schema.schema));
+  }
+
+  return { $ref: `#/components/schemas/${schema.name}` };
+}
+
+function buildPublicApiOperations(): OperationSpec[] {
+  const apiError = component("ApiError", ApiErrorSchema);
+  const successResponse = component("SuccessResponse", SuccessResponseSchema);
+  const sessionResponse = component("SessionResponse", SessionResponseSchema);
+  const acceptInviteResponse = component("AcceptInviteResponse", AcceptInviteResponseSchema);
+  const accountExportResponse = component("AccountExportResponse", AccountExportResponseSchema);
+  const accountDeletionResponse = component("AccountDeletionResponse", AccountDeletionResponseSchema);
+  const ingestionRequest = component("IngestionRequest", OpenApiIngestionRequestSchema);
+  const ingestionResponse = component("IngestionAcceptedResponse", IngestionAcceptedResponseSchema);
+  const incidentListResponse = component("IncidentListResponse", IncidentsResponseSchema);
+  const incidentResponse = component("IncidentResponse", IncidentResponseSchema);
+  const bundleResponse = component("BundleDocument", BundleV1Schema);
+  const bundlePending = component("PendingStatus", z.object({ status: z.literal("pending") }).strict());
+  const bundleFailed = component("BundleFailedStatus", BundleFailureStatusSchema);
+  const reproductionResponse = component("ReproductionResponse", ReproductionResponseSchema);
+  const logsResponse = component("LogsResponse", LogsResponseSchema);
+  const servicesResponse = component("ServicesResponse", ServicesResponseSchema);
+  const memberListResponse = component("OrganizationMemberListResponse", OrganizationMemberListResponseSchema);
+  const inviteListResponse = component("OrganizationInviteListResponse", OrganizationInviteListResponseSchema);
+  const inviteResponse = component("OrganizationInviteResponse", OrganizationInviteResponseSchema);
+  const memberResponse = component("OrganizationMemberResponse", OrganizationMemberResponseSchema);
+  const projectListResponse = component("ProjectListResponse", ProjectListResponseSchema);
+  const projectCreateResponse = component("ProjectCreateResponse", ProjectCreateResponseSchema);
+  const projectUpdateResponse = component("ProjectUpdateResponse", ProjectUpdateResponseSchema);
+  const projectDeleteResponse = component("ProjectDeleteResponse", ProjectDeleteResponseSchema);
+  const billingSummaryResponse = component("BillingSummaryResponse", BillingSummaryResponseSchema);
+  const billingLinkResponse = component("BillingLinkResponse", BillingLinkResponseSchema);
+  const tokenListResponse = component("TokenListResponse", TokenListResponseSchema);
+  const tokenResponse = component("TokenResponse", TokenCreateResponseSchema);
+  const alertsResponse = component("AlertListResponse", AlertListResponseSchema);
+  const alertResponse = component("AlertResponse", AlertResponseSchema);
+  const weeklyReportChannelsResponse = component("WeeklyReportChannelListResponse", WeeklyReportChannelListResponseSchema);
+  const weeklyReportChannelResponse = component("WeeklyReportChannelResponse", WeeklyReportChannelResponseSchema);
+  const webhookListResponse = component("WebhookListResponse", WebhookListResponseSchema);
+  const webhookResponse = component("WebhookResponse", WebhookResponseSchema);
+  const webhookCreateResponse = component("WebhookCreateResponse", WebhookCreateResponseSchema);
+  const webhookDeliveriesResponse = component("WebhookDeliveriesResponse", WebhookDeliveriesResponseSchema);
+  const webhookTestResponse = component("WebhookTestResponse", WebhookTestResponseSchema);
+  const webhookRetryResponse = component("WebhookRetryResponse", RetryWebhookDeliveryResponseSchema);
+  const probeActivationResponse = component("ProbeActivationResponse", ProbeActivationResponseSchema);
+  const probeActivationListResponse = component("ProbeActivationListResponse", ProbeActivationListResponseSchema);
+  const probeDeactivationResponse = component("ProbeDeactivationResponse", ProbeDeactivationResponseSchema);
+  const capturePolicyUpdate = component("CapturePolicyUpdate", CapturePolicyUpdateSchema);
+  const capturePolicyResponse = component("CapturePolicyResponse", CapturePolicyResponseSchema);
+  const sdkConfigResponse = component("SdkConfigResponse", SdkConfigResponseSchema);
+  const healthResponse = component("HealthResponse", HealthResponseSchema);
+  const readyResponse = component("ReadyResponse", ReadyResponseSchema);
+  const notReadyResponse = component("NotReadyResponse", NotReadyResponseSchema);
+  const liveResponse = component("LiveResponse", LiveResponseSchema);
+
+  return [
+    {
+      method: "get",
+      path: "/health",
+      operationId: "getHealth",
+      summary: "Get service health",
+      tags: ["System"],
+      responses: { "200": { description: "Current health status.", schema: healthResponse } },
+    },
+    {
+      method: "get",
+      path: "/ready",
+      operationId: "getReadiness",
+      summary: "Get readiness status",
+      tags: ["System"],
+      responses: {
+        "200": { description: "Current readiness status.", schema: readyResponse },
+        "503": { description: "A required runtime dependency is unavailable.", schema: notReadyResponse }
+      },
+    },
+    {
+      method: "get",
+      path: "/live",
+      operationId: "getLiveness",
+      summary: "Get liveness status",
+      tags: ["System"],
+      responses: { "200": { description: "Current liveness status.", schema: liveResponse } },
+    },
+    {
+      method: "post",
+      path: "/v1/auth/request-code",
+      operationId: "requestEmailCode",
+      summary: "Request a one-time email code",
+      tags: ["Auth"],
+      requestBody: component("RequestEmailCodeBody", RequestEmailCodeBodySchema),
+      responses: {
+        "200": { description: "Email code request accepted.", schema: successResponse },
+        "400": { description: "Invalid request body.", schema: apiError },
+        "429": { description: "Too many auth attempts from this IP.", schema: apiError },
+        "503": { description: "Auth is not configured.", schema: apiError },
+      },
+    },
+    {
+      method: "post",
+      path: "/v1/auth/verify-code",
+      operationId: "verifyEmailCode",
+      summary: "Verify a one-time email code and create a browser session",
+      tags: ["Auth"],
+      requestBody: component("VerifyEmailCodeBody", VerifyEmailCodeBodySchema),
+      responses: {
+        "200": { description: "Browser session created.", schema: sessionResponse },
+        "400": { description: "Invalid code or request body.", schema: apiError },
+        "429": { description: "Too many auth attempts from this IP.", schema: apiError },
+        "503": { description: "Auth is not configured.", schema: apiError },
+      },
+    },
+    {
+      method: "get",
+      path: "/v1/auth/github/start",
+      operationId: "startGithubLogin",
+      summary: "Start GitHub OAuth",
+      tags: ["Auth"],
+      responses: {
+        "302": {
+          description: "Redirects to GitHub authorization.",
+          headers: {
+            Location: { description: "GitHub authorization URL.", schema: z.string().url() },
+          },
+        },
+        "503": { description: "Auth is not configured.", schema: apiError },
+      },
+    },
+    {
+      method: "get",
+      path: "/v1/auth/github/callback",
+      operationId: "completeGithubLogin",
+      summary: "Complete GitHub OAuth",
+      tags: ["Auth"],
+      query: GithubAuthCallbackQuerySchema,
+      responses: {
+        "302": {
+          description: "Redirects back to the application callback URL.",
+          headers: {
+            Location: { description: "Application redirect URL.", schema: z.string().url() },
+          },
+        },
+        "400": { description: "Invalid callback query.", schema: apiError },
+        "503": { description: "Auth is not configured.", schema: apiError },
+      },
+    },
+    {
+      method: "get",
+      path: "/v1/auth/session",
+      operationId: "getSession",
+      summary: "Resolve the current browser session",
+      tags: ["Auth"],
+      security: browserSessionAuth,
+      responses: {
+        "200": { description: "Current browser session or null when signed out.", schema: sessionResponse },
+        "503": { description: "Auth is not configured.", schema: apiError },
+      },
+    },
+    {
+      method: "post",
+      path: "/v1/auth/logout",
+      operationId: "logout",
+      summary: "Revoke the current browser session",
+      tags: ["Auth"],
+      security: browserSessionAuth,
+      responses: {
+        "200": { description: "Browser session revoked.", schema: successResponse },
+        "401": { description: "Browser session is missing or invalid.", schema: apiError },
+        "503": { description: "Auth is not configured.", schema: apiError },
+      },
+    },
+    {
+      method: "post",
+      path: "/v1/auth/accept-invite",
+      operationId: "acceptInvite",
+      summary: "Accept an organization invite",
+      tags: ["Auth"],
+      security: browserSessionAuth,
+      requestBody: component("AcceptInviteBody", AcceptInviteBodySchema),
+      responses: {
+        "200": { description: "Invite accepted.", schema: acceptInviteResponse },
+        "400": { description: "Invalid invite token or payload.", schema: apiError },
+        "401": { description: "Browser session is missing or invalid.", schema: apiError },
+        "403": { description: "Invite email does not match the signed-in account.", schema: apiError },
+        "503": { description: "Auth is not configured.", schema: apiError },
+      },
+    },
+    {
+      method: "get",
+      path: "/v1/account/export",
+      operationId: "exportAccount",
+      summary: "Export retained organization account data",
+      tags: ["Account"],
+      security: browserSessionAuth,
+      responses: {
+        "200": { description: "Account export JSON attachment.", schema: accountExportResponse },
+        "401": { description: "Browser session is missing or invalid.", schema: apiError },
+        "403": { description: "Owner access is required.", schema: apiError },
+        "404": { description: "Account export was not available.", schema: apiError },
+        "503": { description: "Account management is not configured.", schema: apiError },
+      },
+    },
+    {
+      method: "delete",
+      path: "/v1/account",
+      operationId: "deleteAccount",
+      summary: "Delete the current organization account",
+      tags: ["Account"],
+      security: browserSessionAuth,
+      requestBody: component("AccountDeleteBody", AccountDeleteBodySchema),
+      responses: {
+        "200": { description: "Account deleted.", schema: accountDeletionResponse },
+        "400": { description: "Invalid confirmation payload.", schema: apiError },
+        "401": { description: "Browser session is missing or invalid.", schema: apiError },
+        "403": { description: "Owner access is required.", schema: apiError },
+        "404": { description: "Account was not found.", schema: apiError },
+        "409": { description: "Other owner-scoped organizations still exist.", schema: apiError },
+        "503": { description: "Account management is not configured.", schema: apiError },
+      },
+    },
+    {
+      method: "post",
+      path: "/v1/events",
+      operationId: "ingestEvents",
+      summary: "Ingest batched events",
+      tags: ["Ingestion"],
+      security: projectBearerAuth,
+      requestBody: ingestionRequest,
+      responses: {
+        "202": { description: "Events accepted for processing.", schema: ingestionResponse },
+        "400": { description: "Malformed ingestion payload.", schema: ingestionResponse },
+        "401": { description: "Project token is invalid.", schema: ingestionResponse },
+        "429": {
+          description: "Rate limit or monthly ingestion quota exceeded.",
+          schema: ingestionResponse,
+          headers: {
+            "Retry-After": { description: "Seconds until the caller should retry.", schema: z.string() },
+          },
+        },
+      },
+    },
+    {
+      method: "get",
+      path: "/v1/incidents",
+      operationId: "listIncidents",
+      summary: "List incidents",
+      tags: ["Incidents"],
+      security: memberBearerAuth,
+      query: IncidentsQuerySchema,
+      responses: {
+        "200": { description: "Incident list.", schema: incidentListResponse },
+        "400": { description: "Invalid query parameters.", schema: apiError },
+        "401": { description: "Member token is invalid.", schema: apiError },
+      },
+    },
+    {
+      method: "get",
+      path: "/v1/incidents/{id}",
+      operationId: "getIncident",
+      summary: "Get a single incident",
+      tags: ["Incidents"],
+      security: memberBearerAuth,
+      params: IncidentParamsSchema,
+      responses: {
+        "200": { description: "Incident details.", schema: incidentResponse },
+        "400": { description: "Invalid incident id.", schema: apiError },
+        "401": { description: "Member token is invalid.", schema: apiError },
+        "404": { description: "Incident was not found.", schema: apiError },
+      },
+    },
+    {
+      method: "post",
+      path: "/v1/incidents/{id}/resolve",
+      operationId: "resolveIncident",
+      summary: "Resolve an incident",
+      tags: ["Incidents"],
+      security: memberBearerAuth,
+      params: IncidentParamsSchema,
+      responses: {
+        "200": { description: "Resolved incident details.", schema: incidentResponse },
+        "400": { description: "Invalid incident id.", schema: apiError },
+        "401": { description: "Member token is invalid.", schema: apiError },
+        "404": { description: "Incident was not found.", schema: apiError },
+        "500": { description: "Incident resolution is unavailable.", schema: apiError },
+      },
+    },
+    {
+      method: "post",
+      path: "/v1/incidents/{id}/reopen",
+      operationId: "reopenIncident",
+      summary: "Reopen an incident",
+      tags: ["Incidents"],
+      security: memberBearerAuth,
+      params: IncidentParamsSchema,
+      responses: {
+        "200": { description: "Reopened incident details.", schema: incidentResponse },
+        "400": { description: "Invalid incident id.", schema: apiError },
+        "401": { description: "Member token is invalid.", schema: apiError },
+        "404": { description: "Incident was not found.", schema: apiError },
+        "500": { description: "Incident reopen is unavailable.", schema: apiError },
+      },
+    },
+    {
+      method: "get",
+      path: "/v1/incidents/{id}/bundle",
+      operationId: "getBundle",
+      summary: "Get the generated bundle for an incident",
+      tags: ["Incidents"],
+      security: memberBearerAuth,
+      params: IncidentParamsSchema,
+      responses: {
+        "200": {
+          description: "Bundle document or a generation status.",
+          schema: { oneOf: [bundleResponse, bundlePending, bundleFailed] },
+        },
+        "400": { description: "Invalid incident id.", schema: apiError },
+        "401": { description: "Member token is invalid.", schema: apiError },
+        "404": { description: "Incident was not found.", schema: apiError },
+      },
+    },
+    {
+      method: "get",
+      path: "/v1/incidents/{id}/reproduction",
+      operationId: "getReproduction",
+      summary: "Get the reproduction artifact for an incident",
+      tags: ["Incidents"],
+      security: memberBearerAuth,
+      params: IncidentParamsSchema,
+      responses: {
+        "200": { description: "Reproduction artifact or a pending status.", schema: reproductionResponse },
+        "400": { description: "Invalid incident id.", schema: apiError },
+        "401": { description: "Member token is invalid.", schema: apiError },
+        "404": { description: "Incident or reproduction artifact was not found.", schema: apiError },
+      },
+    },
+    {
+      method: "get",
+      path: "/v1/logs",
+      operationId: "getLogs",
+      summary: "Query incident logs",
+      tags: ["Incidents"],
+      security: memberBearerAuth,
+      query: LogsQuerySchema,
+      responses: {
+        "200": { description: "Incident logs.", schema: logsResponse },
+        "400": { description: "Invalid query parameters.", schema: apiError },
+        "401": { description: "Member token is invalid.", schema: apiError },
+      },
+    },
+    {
+      method: "get",
+      path: "/v1/services",
+      operationId: "listServices",
+      summary: "List services for a project",
+      tags: ["Services"],
+      security: memberBearerAuth,
+      query: ServicesQuerySchema,
+      responses: {
+        "200": { description: "Project services.", schema: servicesResponse },
+        "400": { description: "Invalid query parameters.", schema: apiError },
+        "401": { description: "Member token is invalid.", schema: apiError },
+        "404": { description: "Project was not found.", schema: apiError },
+        "500": { description: "Service retrieval is unavailable.", schema: apiError },
+      },
+    },
+    {
+      method: "get",
+      path: "/v1/organization/members",
+      operationId: "listOrganizationMembers",
+      summary: "List organization members",
+      tags: ["Organization"],
+      security: anyMemberAuth,
+      responses: {
+        "200": { description: "Organization members.", schema: memberListResponse },
+        "401": { description: "Authentication is invalid.", schema: apiError },
+        "403": { description: "Owner access is required.", schema: apiError },
+        "404": { description: "Organization member management is unavailable.", schema: apiError },
+      },
+    },
+    {
+      method: "get",
+      path: "/v1/organization/members/invites",
+      operationId: "listOrganizationInvites",
+      summary: "List pending organization invites",
+      tags: ["Organization"],
+      security: anyMemberAuth,
+      responses: {
+        "200": { description: "Pending organization invites.", schema: inviteListResponse },
+        "401": { description: "Authentication is invalid.", schema: apiError },
+        "403": { description: "Owner access is required.", schema: apiError },
+        "404": { description: "Organization member management is unavailable.", schema: apiError },
+      },
+    },
+    {
+      method: "post",
+      path: "/v1/organization/members/invite",
+      operationId: "inviteOrganizationMember",
+      summary: "Invite an organization member",
+      tags: ["Organization"],
+      security: anyMemberAuth,
+      requestBody: component("CreateOrganizationInviteBody", CreateOrganizationInviteBodySchema),
+      responses: {
+        "201": { description: "Invite created.", schema: inviteResponse },
+        "400": { description: "Invalid request body.", schema: apiError },
+        "401": { description: "Authentication is invalid.", schema: apiError },
+        "403": { description: "Owner access or verified email is required.", schema: apiError },
+        "404": { description: "Organization member management is unavailable.", schema: apiError },
+        "409": { description: "Member or invite already exists.", schema: apiError },
+        "500": { description: "Unexpected invite creation failure.", schema: apiError },
+      },
+    },
+    {
+      method: "delete",
+      path: "/v1/organization/members/invites/{inviteId}",
+      operationId: "cancelOrganizationInvite",
+      summary: "Cancel an organization invite",
+      tags: ["Organization"],
+      security: anyMemberAuth,
+      params: OrganizationInviteParamsSchema,
+      responses: {
+        "200": { description: "Invite cancelled.", schema: inviteResponse },
+        "400": { description: "Invalid invite id.", schema: apiError },
+        "401": { description: "Authentication is invalid.", schema: apiError },
+        "403": { description: "Owner access or verified email is required.", schema: apiError },
+        "404": { description: "Invite was not found.", schema: apiError },
+      },
+    },
+    {
+      method: "patch",
+      path: "/v1/organization/members/{userId}",
+      operationId: "updateOrganizationMemberRole",
+      summary: "Update an organization member role",
+      tags: ["Organization"],
+      security: anyMemberAuth,
+      params: OrganizationMemberParamsSchema,
+      requestBody: component("UpdateOrganizationMemberRoleBody", UpdateOrganizationMemberRoleBodySchema),
+      responses: {
+        "200": { description: "Updated organization member.", schema: memberResponse },
+        "400": { description: "Invalid member id or payload.", schema: apiError },
+        "401": { description: "Authentication is invalid.", schema: apiError },
+        "403": { description: "Owner access is required.", schema: apiError },
+        "404": { description: "Member was not found.", schema: apiError },
+        "409": { description: "Owner role cannot be changed.", schema: apiError },
+      },
+    },
+    {
+      method: "delete",
+      path: "/v1/organization/members/{userId}",
+      operationId: "removeOrganizationMember",
+      summary: "Remove an organization member",
+      tags: ["Organization"],
+      security: anyMemberAuth,
+      params: OrganizationMemberParamsSchema,
+      responses: {
+        "200": { description: "Removed organization member.", schema: memberResponse },
+        "400": { description: "Invalid member id.", schema: apiError },
+        "401": { description: "Authentication is invalid.", schema: apiError },
+        "403": { description: "Owner access is required.", schema: apiError },
+        "404": { description: "Member was not found.", schema: apiError },
+        "409": { description: "Owner cannot be removed.", schema: apiError },
+      },
+    },
+    {
+      method: "get",
+      path: "/v1/projects",
+      operationId: "listProjects",
+      summary: "List projects",
+      tags: ["Projects"],
+      security: anyMemberAuth,
+      query: ProjectsQuerySchema,
+      responses: {
+        "200": { description: "Projects for the caller organization.", schema: projectListResponse },
+        "400": { description: "Invalid query parameters.", schema: apiError },
+        "401": { description: "Authentication is invalid.", schema: apiError },
+        "404": { description: "Projects are unavailable.", schema: apiError },
+      },
+    },
+    {
+      method: "post",
+      path: "/v1/projects",
+      operationId: "createProject",
+      summary: "Create a project",
+      tags: ["Projects"],
+      security: anyMemberAuth,
+      requestBody: component("CreateProjectBody", CreateProjectBodySchema),
+      responses: {
+        "201": { description: "Project created.", schema: projectCreateResponse },
+        "400": { description: "Invalid request body.", schema: apiError },
+        "401": { description: "Authentication is invalid.", schema: apiError },
+        "403": { description: "Owner access is required.", schema: apiError },
+        "404": { description: "Projects are unavailable.", schema: apiError },
+        "409": { description: "Project slug already exists.", schema: apiError },
+      },
+    },
+    {
+      method: "patch",
+      path: "/v1/projects/{id}",
+      operationId: "updateProject",
+      summary: "Update a project",
+      tags: ["Projects"],
+      security: anyMemberAuth,
+      params: ProjectParamsSchema,
+      requestBody: component("UpdateProjectBody", UpdateProjectBodySchema),
+      responses: {
+        "200": { description: "Updated project.", schema: projectUpdateResponse },
+        "400": { description: "Invalid project id or request body.", schema: apiError },
+        "401": { description: "Authentication is invalid.", schema: apiError },
+        "403": { description: "Owner access is required.", schema: apiError },
+        "404": { description: "Project was not found or projects are unavailable.", schema: apiError },
+        "409": { description: "Project slug is already in use.", schema: apiError },
+      },
+    },
+    {
+      method: "delete",
+      path: "/v1/projects/{id}",
+      operationId: "deleteProject",
+      summary: "Delete a project",
+      tags: ["Projects"],
+      security: anyMemberAuth,
+      params: ProjectParamsSchema,
+      responses: {
+        "200": { description: "Deleted project.", schema: projectDeleteResponse },
+        "400": { description: "Invalid project id.", schema: apiError },
+        "401": { description: "Authentication is invalid.", schema: apiError },
+        "403": { description: "Owner access is required.", schema: apiError },
+        "404": { description: "Project was not found or projects are unavailable.", schema: apiError },
+      },
+    },
+    {
+      method: "get",
+      path: "/v1/billing",
+      operationId: "getBillingSummary",
+      summary: "Get the billing summary",
+      tags: ["Billing"],
+      security: anyMemberAuth,
+      responses: {
+        "200": { description: "Billing summary.", schema: billingSummaryResponse },
+        "401": { description: "Authentication is invalid.", schema: apiError },
+        "403": { description: "Owner access is required.", schema: apiError },
+        "404": { description: "Billing was not found or is unavailable.", schema: apiError },
+      },
+    },
+    {
+      method: "post",
+      path: "/v1/billing/checkout",
+      operationId: "createBillingCheckout",
+      summary: "Create a Stripe checkout link",
+      tags: ["Billing"],
+      security: browserSessionAuth,
+      requestBody: component("BillingCheckoutBody", BillingCheckoutBodySchema),
+      responses: {
+        "200": { description: "Hosted checkout URL.", schema: billingLinkResponse },
+        "400": { description: "Invalid request body.", schema: apiError },
+        "401": { description: "Browser session is missing or invalid.", schema: apiError },
+        "403": { description: "Owner access or a verified email is required.", schema: apiError },
+        "404": { description: "Billing was not found or is unavailable.", schema: apiError },
+        "409": { description: "Requested plan change is invalid.", schema: apiError },
+        "503": { description: "Billing is not configured.", schema: apiError },
+      },
+    },
+    {
+      method: "post",
+      path: "/v1/billing/portal",
+      operationId: "createBillingPortal",
+      summary: "Create a Stripe customer portal link",
+      tags: ["Billing"],
+      security: browserSessionAuth,
+      responses: {
+        "200": { description: "Hosted billing portal URL.", schema: billingLinkResponse },
+        "401": { description: "Browser session is missing or invalid.", schema: apiError },
+        "403": { description: "Owner access or a verified email is required.", schema: apiError },
+        "404": { description: "Billing was not found or is unavailable.", schema: apiError },
+        "409": { description: "No active subscription exists.", schema: apiError },
+        "503": { description: "Billing is not configured.", schema: apiError },
+      },
+    },
+    {
+      method: "post",
+      path: "/v1/billing/capacity/increase",
+      operationId: "increaseCapacity",
+      summary: "Increase capacity immediately",
+      tags: ["Billing"],
+      security: anyMemberAuth,
+      requestBody: component("BillingCapacityBody", BillingCapacityChangeBodySchema),
+      responses: {
+        "200": { description: "Updated billing summary.", schema: billingSummaryResponse },
+        "400": { description: "Invalid request body.", schema: apiError },
+        "401": { description: "Authentication is invalid.", schema: apiError },
+        "403": { description: "Owner access or a verified email is required.", schema: apiError },
+        "404": { description: "Billing was not found or is unavailable.", schema: apiError },
+        "409": { description: "Requested capacity change is invalid.", schema: apiError },
+        "503": { description: "Billing is not configured.", schema: apiError },
+      },
+    },
+    {
+      method: "post",
+      path: "/v1/billing/capacity/scheduled-reduction",
+      operationId: "scheduleCapacityReduction",
+      summary: "Schedule a capacity reduction",
+      tags: ["Billing"],
+      security: anyMemberAuth,
+      requestBody: component("BillingCapacityBody", BillingCapacityChangeBodySchema),
+      responses: {
+        "200": { description: "Updated billing summary.", schema: billingSummaryResponse },
+        "400": { description: "Invalid request body.", schema: apiError },
+        "401": { description: "Authentication is invalid.", schema: apiError },
+        "403": { description: "Owner access or a verified email is required.", schema: apiError },
+        "404": { description: "Billing was not found or is unavailable.", schema: apiError },
+        "409": { description: "Requested capacity reduction is invalid.", schema: apiError },
+        "503": { description: "Billing is not configured.", schema: apiError },
+      },
+    },
+    {
+      method: "delete",
+      path: "/v1/billing/capacity/scheduled-reduction",
+      operationId: "cancelCapacityReduction",
+      summary: "Cancel a scheduled capacity reduction",
+      tags: ["Billing"],
+      security: anyMemberAuth,
+      responses: {
+        "200": { description: "Updated billing summary.", schema: billingSummaryResponse },
+        "401": { description: "Authentication is invalid.", schema: apiError },
+        "403": { description: "Owner access or a verified email is required.", schema: apiError },
+        "404": { description: "Billing was not found or is unavailable.", schema: apiError },
+        "409": { description: "No scheduled reduction exists.", schema: apiError },
+        "503": { description: "Billing is not configured.", schema: apiError },
+      },
+    },
+    {
+      method: "get",
+      path: "/v1/projects/{id}/tokens",
+      operationId: "listProjectTokens",
+      summary: "List project tokens",
+      tags: ["Tokens"],
+      security: memberBearerAuth,
+      params: ProjectParamsSchema,
+      query: TokenListQuerySchema,
+      responses: {
+        "200": { description: "Project tokens.", schema: tokenListResponse },
+        "400": { description: "Invalid project id or query parameters.", schema: apiError },
+        "401": { description: "Member token is invalid.", schema: apiError },
+        "404": { description: "Project was not found.", schema: apiError },
+      },
+    },
+    {
+      method: "post",
+      path: "/v1/projects/{id}/tokens",
+      operationId: "createProjectToken",
+      summary: "Create a project token",
+      tags: ["Tokens"],
+      security: memberBearerAuth,
+      params: ProjectParamsSchema,
+      requestBody: component("CreateTokenBody", CreateTokenBodySchema),
+      responses: {
+        "201": { description: "Project token created.", schema: tokenResponse },
+        "400": { description: "Invalid project id or request body.", schema: apiError },
+        "401": { description: "Member token is invalid.", schema: apiError },
+        "404": { description: "Project was not found.", schema: apiError },
+      },
+    },
+    {
+      method: "post",
+      path: "/v1/projects/{id}/tokens/{tokenId}/revoke",
+      operationId: "revokeProjectToken",
+      summary: "Revoke a project token",
+      tags: ["Tokens"],
+      security: memberBearerAuth,
+      params: ProjectTokenParamsSchema,
+      responses: {
+        "200": { description: "Revoked project token.", schema: tokenResponse },
+        "400": { description: "Invalid token id.", schema: apiError },
+        "401": { description: "Member token is invalid.", schema: apiError },
+        "404": { description: "Token was not found.", schema: apiError },
+      },
+    },
+    {
+      method: "get",
+      path: "/v1/member/tokens",
+      operationId: "listMemberTokens",
+      summary: "List member tokens",
+      tags: ["Tokens"],
+      security: memberBearerAuth,
+      query: TokenListQuerySchema,
+      responses: {
+        "200": { description: "Member tokens.", schema: tokenListResponse },
+        "400": { description: "Invalid query parameters.", schema: apiError },
+        "401": { description: "Member token is invalid.", schema: apiError },
+      },
+    },
+    {
+      method: "post",
+      path: "/v1/member/tokens",
+      operationId: "createMemberToken",
+      summary: "Create a member token",
+      tags: ["Tokens"],
+      security: anyMemberAuth,
+      requestBody: component("CreateTokenBody", CreateTokenBodySchema),
+      responses: {
+        "201": { description: "Member token created.", schema: tokenResponse },
+        "400": { description: "Invalid request body.", schema: apiError },
+        "401": { description: "Authentication is invalid.", schema: apiError },
+        "403": { description: "Verified email is required before creating the first member token.", schema: apiError },
+      },
+    },
+    {
+      method: "post",
+      path: "/v1/member/tokens/{tokenId}/revoke",
+      operationId: "revokeMemberToken",
+      summary: "Revoke a member token",
+      tags: ["Tokens"],
+      security: memberBearerAuth,
+      params: MemberTokenParamsSchema,
+      responses: {
+        "200": { description: "Revoked member token.", schema: tokenResponse },
+        "400": { description: "Invalid token id.", schema: apiError },
+        "401": { description: "Member token is invalid.", schema: apiError },
+        "404": { description: "Token was not found.", schema: apiError },
+      },
+    },
+    {
+      method: "get",
+      path: "/v1/alerts",
+      operationId: "listAlerts",
+      summary: "List alert rules",
+      tags: ["Alerts"],
+      security: anyMemberAuth,
+      query: AlertsQuerySchema,
+      responses: {
+        "200": { description: "Alert rules.", schema: alertsResponse },
+        "400": { description: "Invalid query parameters.", schema: apiError },
+        "401": { description: "Authentication is invalid.", schema: apiError },
+        "404": { description: "Project was not found.", schema: apiError },
+      },
+    },
+    {
+      method: "post",
+      path: "/v1/alerts",
+      operationId: "createAlert",
+      summary: "Create an alert rule",
+      tags: ["Alerts"],
+      security: anyMemberAuth,
+      requestBody: component("CreateAlertBody", CreateAlertBodySchema),
+      responses: {
+        "201": { description: "Alert rule created.", schema: alertResponse },
+        "400": { description: "Invalid request body.", schema: apiError },
+        "401": { description: "Authentication is invalid.", schema: apiError },
+        "404": { description: "Project was not found.", schema: apiError },
+      },
+    },
+    {
+      method: "patch",
+      path: "/v1/alerts/{id}",
+      operationId: "updateAlert",
+      summary: "Update an alert rule",
+      tags: ["Alerts"],
+      security: anyMemberAuth,
+      params: component("AlertPathParams", z.object({ id: z.string().uuid() }).strict()).schema,
+      requestBody: component("UpdateAlertBody", UpdateAlertBodySchema),
+      responses: {
+        "200": { description: "Updated alert rule.", schema: alertResponse },
+        "400": { description: "Invalid alert id or request body.", schema: apiError },
+        "401": { description: "Authentication is invalid.", schema: apiError },
+        "404": { description: "Alert was not found.", schema: apiError },
+      },
+    },
+    {
+      method: "delete",
+      path: "/v1/alerts/{id}",
+      operationId: "deleteAlert",
+      summary: "Delete an alert rule",
+      tags: ["Alerts"],
+      security: anyMemberAuth,
+      params: component("AlertPathParams", z.object({ id: z.string().uuid() }).strict()).schema,
+      responses: {
+        "204": { description: "Alert rule deleted." },
+        "400": { description: "Invalid alert id.", schema: apiError },
+        "401": { description: "Authentication is invalid.", schema: apiError },
+        "404": { description: "Alert was not found.", schema: apiError },
+      },
+    },
+    {
+      method: "get",
+      path: "/v1/weekly-report-channels",
+      operationId: "listWeeklyReportChannels",
+      summary: "List weekly report channels",
+      tags: ["Weekly Reports"],
+      security: anyMemberAuth,
+      query: WeeklyReportChannelsQuerySchema,
+      responses: {
+        "200": { description: "Weekly report channels.", schema: weeklyReportChannelsResponse },
+        "400": { description: "Invalid query parameters.", schema: apiError },
+        "401": { description: "Authentication is invalid.", schema: apiError },
+        "404": { description: "Project was not found.", schema: apiError },
+      },
+    },
+    {
+      method: "post",
+      path: "/v1/weekly-report-channels",
+      operationId: "createWeeklyReportChannel",
+      summary: "Create a weekly report channel",
+      tags: ["Weekly Reports"],
+      security: anyMemberAuth,
+      requestBody: component("CreateWeeklyReportChannelBody", CreateWeeklyReportChannelBodySchema),
+      responses: {
+        "201": { description: "Weekly report channel created.", schema: weeklyReportChannelResponse },
+        "400": { description: "Invalid request body.", schema: apiError },
+        "401": { description: "Authentication is invalid.", schema: apiError },
+        "404": { description: "Project was not found.", schema: apiError },
+      },
+    },
+    {
+      method: "patch",
+      path: "/v1/weekly-report-channels/{id}",
+      operationId: "updateWeeklyReportChannel",
+      summary: "Update a weekly report channel",
+      tags: ["Weekly Reports"],
+      security: anyMemberAuth,
+      params: WeeklyReportChannelParamsSchema,
+      requestBody: component("UpdateWeeklyReportChannelBody", UpdateWeeklyReportChannelBodySchema),
+      responses: {
+        "200": { description: "Updated weekly report channel.", schema: weeklyReportChannelResponse },
+        "400": { description: "Invalid channel id or request body.", schema: apiError },
+        "401": { description: "Authentication is invalid.", schema: apiError },
+        "404": { description: "Weekly report channel was not found.", schema: apiError },
+      },
+    },
+    {
+      method: "delete",
+      path: "/v1/weekly-report-channels/{id}",
+      operationId: "deleteWeeklyReportChannel",
+      summary: "Delete a weekly report channel",
+      tags: ["Weekly Reports"],
+      security: anyMemberAuth,
+      params: WeeklyReportChannelParamsSchema,
+      responses: {
+        "204": { description: "Weekly report channel deleted." },
+        "400": { description: "Invalid channel id.", schema: apiError },
+        "401": { description: "Authentication is invalid.", schema: apiError },
+        "404": { description: "Weekly report channel was not found.", schema: apiError },
+      },
+    },
+    {
+      method: "get",
+      path: "/v1/webhooks",
+      operationId: "listWebhooks",
+      summary: "List webhooks",
+      tags: ["Webhooks"],
+      security: anyMemberAuth,
+      query: WebhooksQuerySchema,
+      responses: {
+        "200": { description: "Webhooks for a project.", schema: webhookListResponse },
+        "400": { description: "Invalid query parameters.", schema: apiError },
+        "401": { description: "Authentication is invalid.", schema: apiError },
+        "404": { description: "Project was not found.", schema: apiError },
+      },
+    },
+    {
+      method: "post",
+      path: "/v1/webhooks",
+      operationId: "createWebhook",
+      summary: "Create a webhook",
+      tags: ["Webhooks"],
+      security: anyMemberAuth,
+      requestBody: component("CreateWebhookBody", CreateWebhookBodySchema),
+      responses: {
+        "201": { description: "Webhook created.", schema: webhookCreateResponse },
+        "400": { description: "Invalid request body.", schema: apiError },
+        "401": { description: "Authentication is invalid.", schema: apiError },
+        "404": { description: "Project was not found.", schema: apiError },
+      },
+    },
+    {
+      method: "get",
+      path: "/v1/webhooks/{id}",
+      operationId: "getWebhook",
+      summary: "Get a webhook",
+      tags: ["Webhooks"],
+      security: anyMemberAuth,
+      params: WebhookParamsSchema,
+      responses: {
+        "200": { description: "Webhook details.", schema: webhookResponse },
+        "400": { description: "Invalid webhook id.", schema: apiError },
+        "401": { description: "Authentication is invalid.", schema: apiError },
+        "404": { description: "Webhook was not found.", schema: apiError },
+      },
+    },
+    {
+      method: "patch",
+      path: "/v1/webhooks/{id}",
+      operationId: "updateWebhook",
+      summary: "Update a webhook",
+      tags: ["Webhooks"],
+      security: anyMemberAuth,
+      params: WebhookParamsSchema,
+      requestBody: component("UpdateWebhookBody", UpdateWebhookBodySchema),
+      responses: {
+        "200": { description: "Updated webhook.", schema: webhookResponse },
+        "400": { description: "Invalid webhook id or request body.", schema: apiError },
+        "401": { description: "Authentication is invalid.", schema: apiError },
+        "404": { description: "Webhook was not found.", schema: apiError },
+      },
+    },
+    {
+      method: "delete",
+      path: "/v1/webhooks/{id}",
+      operationId: "deleteWebhook",
+      summary: "Delete a webhook",
+      tags: ["Webhooks"],
+      security: anyMemberAuth,
+      params: WebhookParamsSchema,
+      responses: {
+        "204": { description: "Webhook deleted." },
+        "400": { description: "Invalid webhook id.", schema: apiError },
+        "401": { description: "Authentication is invalid.", schema: apiError },
+        "404": { description: "Webhook was not found.", schema: apiError },
+      },
+    },
+    {
+      method: "post",
+      path: "/v1/webhooks/{id}/test",
+      operationId: "testWebhook",
+      summary: "Queue a synthetic webhook delivery",
+      tags: ["Webhooks"],
+      security: anyMemberAuth,
+      params: WebhookParamsSchema,
+      requestBody: component("WebhookTestBody", WebhookTestBodySchema),
+      responses: {
+        "200": { description: "Synthetic delivery queued.", schema: webhookTestResponse },
+        "400": { description: "Invalid webhook id or request body.", schema: apiError },
+        "401": { description: "Authentication is invalid.", schema: apiError },
+        "404": { description: "Webhook was not found.", schema: apiError },
+      },
+    },
+    {
+      method: "get",
+      path: "/v1/webhooks/{id}/deliveries",
+      operationId: "listWebhookDeliveries",
+      summary: "List webhook deliveries",
+      tags: ["Webhooks"],
+      security: anyMemberAuth,
+      params: WebhookDeliveriesParamsSchema,
+      query: WebhookDeliveriesQuerySchema,
+      responses: {
+        "200": { description: "Webhook deliveries.", schema: webhookDeliveriesResponse },
+        "400": { description: "Invalid webhook id or query parameters.", schema: apiError },
+        "401": { description: "Authentication is invalid.", schema: apiError },
+        "404": { description: "Webhook was not found.", schema: apiError },
+      },
+    },
+    {
+      method: "post",
+      path: "/v1/webhooks/{id}/deliveries/{deliveryId}/retry",
+      operationId: "retryWebhookDelivery",
+      summary: "Retry a webhook delivery",
+      tags: ["Webhooks"],
+      security: anyMemberAuth,
+      params: WebhookDeliveryRetryParamsSchema,
+      responses: {
+        "200": { description: "Webhook delivery reset for retrying.", schema: webhookRetryResponse },
+        "400": { description: "Invalid webhook or delivery id.", schema: apiError },
+        "401": { description: "Authentication is invalid.", schema: apiError },
+        "404": { description: "Webhook or delivery was not found.", schema: apiError },
+      },
+    },
+    {
+      method: "post",
+      path: "/v1/projects/{id}/probes/activate",
+      operationId: "activateProbes",
+      summary: "Activate remote probes",
+      tags: ["Probes"],
+      security: memberBearerAuth,
+      params: ProjectParamsSchema,
+      requestBody: component("ProbeActivateBody", ProbeActivateBodySchema),
+      responses: {
+        "201": { description: "Probe activation created.", schema: probeActivationResponse },
+        "400": { description: "Invalid project id or request body.", schema: apiError },
+        "401": { description: "Member token is invalid.", schema: apiError },
+        "403": { description: "Remote probes are not available for the caller tier.", schema: apiError },
+        "404": { description: "Project was not found.", schema: apiError },
+        "409": { description: "Concurrent activation limit reached.", schema: apiError },
+        "429": {
+          description: "Monthly remote activation quota exceeded.",
+          schema: apiError,
+          headers: {
+            "Retry-After": { description: "Seconds until the caller should retry.", schema: z.string() },
+          },
+        },
+      },
+    },
+    {
+      method: "get",
+      path: "/v1/projects/{id}/probes",
+      operationId: "listActiveProbes",
+      summary: "List active remote probes",
+      tags: ["Probes"],
+      security: memberBearerAuth,
+      params: ProjectParamsSchema,
+      responses: {
+        "200": { description: "Active probe activations.", schema: probeActivationListResponse },
+        "400": { description: "Invalid project id.", schema: apiError },
+        "401": { description: "Member token is invalid.", schema: apiError },
+        "403": { description: "Remote probes are not available for the caller tier.", schema: apiError },
+        "404": { description: "Project was not found.", schema: apiError },
+      },
+    },
+    {
+      method: "post",
+      path: "/v1/projects/{id}/probes/deactivate",
+      operationId: "deactivateProbes",
+      summary: "Deactivate a remote probe",
+      tags: ["Probes"],
+      security: memberBearerAuth,
+      params: ProjectParamsSchema,
+      requestBody: component("ProbeDeactivateBody", ProbeDeactivateBodySchema),
+      responses: {
+        "200": { description: "Probe activation deactivated.", schema: probeDeactivationResponse },
+        "400": { description: "Invalid project id or request body.", schema: apiError },
+        "401": { description: "Member token is invalid.", schema: apiError },
+        "403": { description: "Remote probes are not available for the caller tier.", schema: apiError },
+        "404": { description: "Activation was not found.", schema: apiError },
+      },
+    },
+    {
+      method: "get",
+      path: "/v1/projects/{id}/capture-policy",
+      operationId: "getCapturePolicy",
+      summary: "Get the resolved capture policy for a project",
+      tags: ["Capture Policy"],
+      security: anyMemberAuth,
+      params: ProjectParamsSchema,
+      responses: {
+        "200": { description: "Resolved capture policy.", schema: capturePolicyResponse },
+        "400": { description: "Invalid project id.", schema: apiError },
+        "401": { description: "Authentication is invalid.", schema: apiError },
+        "404": { description: "Project was not found.", schema: apiError },
+      },
+    },
+    {
+      method: "patch",
+      path: "/v1/projects/{id}/capture-policy",
+      operationId: "updateCapturePolicy",
+      summary: "Update the capture policy for a project",
+      tags: ["Capture Policy"],
+      security: anyMemberAuth,
+      params: ProjectParamsSchema,
+      requestBody: capturePolicyUpdate,
+      responses: {
+        "200": { description: "Updated resolved capture policy.", schema: capturePolicyResponse },
+        "400": { description: "Invalid project id or request body.", schema: apiError },
+        "401": { description: "Authentication is invalid.", schema: apiError },
+        "403": { description: "Owner access is required.", schema: apiError },
+        "404": { description: "Project was not found or capture policy is unavailable.", schema: apiError },
+      },
+    },
+    {
+      method: "get",
+      path: "/v1/sdk/config",
+      operationId: "getSdkConfig",
+      summary: "Get SDK config for a project token",
+      tags: ["SDK"],
+      security: projectBearerAuth,
+      responses: {
+        "200": { description: "SDK config payload.", schema: sdkConfigResponse },
+        "304": { description: "SDK config has not changed since the provided ETag." },
+        "401": { description: "Project token is invalid.", schema: apiError },
+      },
+    },
+  ];
+}
+
+export function buildPublicOpenApiSpec(): Record<string, unknown> {
+  const components = new Map<string, JsonSchemaDocument>();
+  const operations = buildPublicApiOperations();
+  const paths: Record<string, Record<string, unknown>> = {};
+
+  for (const operation of operations) {
+    const pathItem = (paths[operation.path] ??= {});
+    const parameters = [
+      ...(operation.params === undefined ? [] : buildParameters(operation.params, "path")),
+      ...(operation.query === undefined ? [] : buildParameters(operation.query, "query")),
+    ];
+
+    pathItem[operation.method] = {
+      operationId: operation.operationId,
+      summary: operation.summary,
+      tags: operation.tags,
+      ...(operation.security === undefined ? {} : { security: operation.security }),
+      ...(parameters.length === 0 ? {} : { parameters }),
+      ...(operation.requestBody === undefined
+        ? {}
+        : {
+            requestBody: {
+              required: true,
+              content: {
+                "application/json": {
+                  schema: resolveSchemaSpec(operation.requestBody, components),
+                },
+              },
+            },
+          }),
+      responses: Object.fromEntries(
+        Object.entries(operation.responses).map(([statusCode, response]) => [
+          statusCode,
+          {
+            description: response.description,
+            ...(response.headers === undefined
+              ? {}
+              : {
+                  headers: Object.fromEntries(
+                    Object.entries(response.headers).map(([headerName, header]) => [
+                      headerName,
+                      {
+                        description: header.description,
+                        schema: toJsonSchema(header.schema),
+                      },
+                    ])
+                  ),
+                }),
+            ...(response.schema === undefined
+              ? {}
+              : {
+                  content: {
+                    "application/json": {
+                      schema: resolveSchemaSpec(response.schema, components),
+                    },
+                  },
+                }),
+          },
+        ])
+      ),
+    };
+  }
+
+  return {
+    openapi: "3.1.0",
+    info: {
+      title: "DebugBundle HTTP API",
+      version: "v1",
+      description: "Source-backed OpenAPI description for the public DebugBundle HTTP API.",
+    },
+    servers: [
+      { url: "https://api.debugbundle.com", description: "DebugBundle Cloud API" },
+    ],
+    tags: Array.from(new Set(operations.flatMap((operation) => operation.tags))).map((name) => ({ name })),
+    paths,
+    components: {
+      securitySchemes: {
+        browserSession: {
+          type: "apiKey",
+          in: "cookie",
+          name: SESSION_COOKIE_NAME,
+          description: "Browser session cookie for interactive authenticated routes.",
+        },
+        memberBearerToken: {
+          type: "http",
+          scheme: "bearer",
+          bearerFormat: "Opaque member token",
+          description: "Bearer member token used by the CLI, MCP, and automation.",
+        },
+        projectBearerToken: {
+          type: "http",
+          scheme: "bearer",
+          bearerFormat: "Opaque project token",
+          description: "Bearer project token used by ingestion and SDK config routes.",
+        },
+      },
+      schemas: Object.fromEntries(components.entries()),
+    },
+  };
+}

@@ -1,0 +1,115 @@
+{
+  "bundle_version": 1,
+  "bundle_id": "analysis_improvement_bnd_inc_fixture",
+  "bundle_type": "improvement",
+  "captured_at": "2026-03-12T00:00:00.000Z",
+  "sdk": {
+    "name": "debugbundle-cli",
+    "version": "0.1.0"
+  },
+  "project": {
+    "id": "proj_fixture",
+    "slug": "proj_fixture",
+    "environment": "production"
+  },
+  "service": {
+    "id": "svc_fixture",
+    "name": "checkout-api",
+    "runtime": "node",
+    "framework": "fastify",
+    "version": null,
+    "region": null
+  },
+  "signal": {
+    "signal_id": "evt_fixture",
+    "signal_type": "exception",
+    "severity": "high",
+    "fingerprint": "fp_fixture",
+    "first_seen_at": "2026-03-11T23:59:00.000Z",
+    "last_seen_at": "2026-03-12T00:00:00.000Z",
+    "occurrence_count": 3,
+    "source_event_types": [
+      "backend_exception",
+      "request_event"
+    ]
+  },
+  "summary": {
+    "title": "Improvement analysis for TypeError at checkout",
+    "description": "Turn the latest local DebugBundle failure evidence into a deterministic improvement plan. Reviewed 1 local bundle from .debugbundle/bundles/latest. Relevant source files: apps/api/src/checkout.ts.",
+    "likely_cause": "Start with apps/api/src/checkout.ts because it aligns with the failing service path in the local profile.",
+    "confidence": 0.68,
+    "recommended_action": "Apply the narrowest fix in apps/api/src/checkout.ts first, then run vitest run.",
+    "severity": "high",
+    "error_type": "backend_exception",
+    "error_message": "TypeError at checkout",
+    "first_application_frame": null,
+    "primary_signal": "exception",
+    "signals": {
+      "new_deploy": true,
+      "regression_suspected": false,
+      "customer_visible": false
+    }
+  },
+  "impact": {
+    "affected_users_estimate": null,
+    "affected_requests_estimate": null,
+    "business_criticality": "high",
+    "customer_visible": false,
+    "regression_suspected": false
+  },
+  "context": {
+    "error": {
+      "version": 1,
+      "name": "backend_exception",
+      "message": "TypeError at checkout",
+      "stack": "unavailable",
+      "handled": false,
+      "top_frames": []
+    },
+    "request": null,
+    "response": null,
+    "logs": null,
+    "frontend": null,
+    "environment": null,
+    "deploy": null,
+    "runtime": null,
+    "git": null,
+    "dependencies": null,
+    "probe_data": {
+      "version": 1,
+      "items": []
+    },
+    "device": null
+  },
+  "reproduction": {
+    "possible": false,
+    "confidence": 0,
+    "reason": "reproduction_not_generated",
+    "artifacts": null,
+    "feasibility_reference": null
+  },
+  "verification": {
+    "verification_type": null,
+    "synthetic": false,
+    "local_verified": false,
+    "production_verified": false
+  },
+  "links": {
+    "self": null,
+    "reproduction": null,
+    "incident": null,
+    "project": null,
+    "docs": ".agents/skills/debugbundle/assets/schemas/improvement-analysis.json"
+  },
+  "redaction": {
+    "redacted": true,
+    "fields": [],
+    "notes": null
+  },
+  "metadata": {
+    "created_at": "2026-03-12T00:00:00.000Z",
+    "updated_at": "2026-03-12T00:00:00.000Z",
+    "generator_version": "cli-analyze-v1",
+    "generation_number": 4
+  }
+}

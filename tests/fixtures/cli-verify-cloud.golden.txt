@@ -1,0 +1,7 @@
+DebugBundle cloud verification passed.
+Checks:
+- auth-state: ok - Found valid auth state.
+- passive-traffic-check: ok - Observed production traffic in incident inc_prod_123 within the last 15 minutes.
+Suggested actions:
+- Review incident inc_prod_123 if you want to inspect the latest production bundle.
+- Re-run debugbundle verify cloud after a fresh deploy or instrumentation change.

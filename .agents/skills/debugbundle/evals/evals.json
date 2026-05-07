@@ -1,0 +1,22 @@
+{
+  "schema_version": "v1",
+  "skill": "debugbundle",
+  "evaluations": [
+    {
+      "name": "incident_first_workflow",
+      "prompt": "The user reports a production checkout failure. Confirm the skill tells the agent to inspect DebugBundle artifacts first.",
+      "expected_behavior": [
+        "Check incidents before reading arbitrary source files.",
+        "Read the skill workflow before proposing a fix."
+      ]
+    },
+    {
+      "name": "profile_validation_task",
+      "prompt": "The generated profile is shallow. Confirm the skill teaches the agent how to validate and enrich it.",
+      "expected_behavior": [
+        "Read .debugbundle/profile.json.",
+        "Update validation_status when the profile has been reviewed."
+      ]
+    }
+  ]
+}

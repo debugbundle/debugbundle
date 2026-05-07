@@ -1,0 +1,783 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "debugbundle-typecheck",
+			"type": "shell",
+			"command": "make",
+			"args": [
+				"typecheck"
+			],
+			"isBackground": false,
+			"group": "test"
+		},
+		{
+			"label": "debugbundle-typecheck-2",
+			"type": "shell",
+			"command": "make",
+			"args": [
+				"typecheck"
+			],
+			"isBackground": false,
+			"group": "test"
+		},
+		{
+			"label": "debugbundle-typecheck-3",
+			"type": "shell",
+			"command": "make",
+			"args": [
+				"typecheck"
+			],
+			"isBackground": false,
+			"group": "test"
+		},
+		{
+			"label": "debugbundle-web-check-scoped-nav",
+			"type": "shell",
+			"command": "make",
+			"args": [
+				"web-check"
+			],
+			"isBackground": false,
+			"group": "test"
+		},
+		{
+			"label": "debugbundle-web-check-name-flicker",
+			"type": "shell",
+			"command": "make",
+			"args": [
+				"web-check"
+			],
+			"isBackground": false,
+			"group": "test"
+		},
+		{
+			"label": "debugbundle-web-check-name-flicker-2",
+			"type": "shell",
+			"command": "make",
+			"args": [
+				"web-check"
+			],
+			"isBackground": false,
+			"group": "test"
+		},
+		{
+			"label": "debugbundle-web-incidents-only",
+			"type": "shell",
+			"command": "docker",
+			"args": [
+				"run",
+				"--rm",
+				"-t",
+				"-v",
+				"/Users/owenfar/Developer/DebugBundle:/workspace",
+				"-w",
+				"/workspace",
+				"node:24-alpine",
+				"sh",
+				"-lc",
+				"corepack enable && corepack pnpm install --frozen-lockfile=false && corepack pnpm vitest run tests/apps/web/web-app-incidents.test.tsx"
+			],
+			"isBackground": false,
+			"group": "test"
+		},
+		{
+			"label": "debugbundle-ingestion-quota-check",
+			"type": "shell",
+			"command": "docker",
+			"args": [
+				"run",
+				"--rm",
+				"-t",
+				"-v",
+				"/Users/owenfar/Developer/DebugBundle:/workspace",
+				"-w",
+				"/workspace",
+				"node:24-alpine",
+				"sh",
+				"-lc",
+				"corepack enable && corepack pnpm install --frozen-lockfile=false && corepack pnpm vitest run tests/apps/api/api-ingestion.test.ts tests/packages/storage/postgres-metadata-store.test.ts tests/packages/storage/ingestion-metadata.test.ts && corepack pnpm typecheck"
+			],
+			"isBackground": false,
+			"group": "test"
+		},
+		{
+			"label": "debugbundle-focused-polish-and-quota",
+			"type": "shell",
+			"command": "docker",
+			"args": [
+				"run",
+				"--rm",
+				"-t",
+				"-v",
+				"/Users/owenfar/Developer/DebugBundle:/workspace",
+				"-w",
+				"/workspace",
+				"node:24-alpine",
+				"sh",
+				"-lc",
+				"corepack enable && corepack pnpm install --frozen-lockfile=false && corepack pnpm vitest run tests/apps/web/web-app-incidents.test.tsx tests/apps/api/api-ingestion.test.ts tests/packages/storage/postgres-metadata-store.test.ts tests/packages/storage/ingestion-metadata.test.ts && corepack pnpm typecheck"
+			],
+			"isBackground": false,
+			"group": "test"
+		},
+		{
+			"label": "debugbundle-focused-polish-and-quota-2",
+			"type": "shell",
+			"command": "docker",
+			"args": [
+				"run",
+				"--rm",
+				"-t",
+				"-v",
+				"/Users/owenfar/Developer/DebugBundle:/workspace",
+				"-w",
+				"/workspace",
+				"node:24-alpine",
+				"sh",
+				"-lc",
+				"corepack enable && corepack pnpm install --frozen-lockfile=false && corepack pnpm vitest run tests/apps/web/web-app-incidents.test.tsx tests/apps/api/api-ingestion.test.ts tests/packages/storage/postgres-metadata-store.test.ts tests/packages/storage/ingestion-metadata.test.ts && corepack pnpm typecheck"
+			],
+			"isBackground": false,
+			"group": "test"
+		},
+		{
+			"label": "debugbundle-focused-polish-and-quota-3",
+			"type": "shell",
+			"command": "docker",
+			"args": [
+				"run",
+				"--rm",
+				"-t",
+				"-v",
+				"/Users/owenfar/Developer/DebugBundle:/workspace",
+				"-w",
+				"/workspace",
+				"node:24-alpine",
+				"sh",
+				"-lc",
+				"corepack enable && corepack pnpm install --frozen-lockfile=false && corepack pnpm vitest run tests/apps/web/web-app-incidents.test.tsx tests/apps/api/api-ingestion.test.ts tests/packages/storage/postgres-metadata-store.test.ts tests/packages/storage/ingestion-metadata.test.ts && corepack pnpm typecheck"
+			],
+			"isBackground": false,
+			"group": "test"
+		},
+		{
+			"label": "debugbundle-public-site-tests",
+			"type": "shell",
+			"command": "docker",
+			"args": [
+				"run",
+				"--rm",
+				"-t",
+				"-v",
+				"/Users/owenfar/Developer/DebugBundle:/workspace",
+				"-w",
+				"/workspace",
+				"node:24-alpine",
+				"sh",
+				"-lc",
+				"corepack enable && corepack pnpm install --frozen-lockfile=false && corepack pnpm vitest run tests/apps/public-site/"
+			],
+			"isBackground": false,
+			"group": "test"
+		},
+		{
+			"label": "debugbundle-public-site-tests-explicit-nav",
+			"type": "shell",
+			"command": "docker",
+			"args": [
+				"run",
+				"--rm",
+				"-t",
+				"-v",
+				"/Users/owenfar/Developer/DebugBundle:/workspace",
+				"-w",
+				"/workspace",
+				"node:24-alpine",
+				"sh",
+				"-lc",
+				"corepack enable && corepack pnpm install --frozen-lockfile=false && corepack pnpm vitest run tests/apps/public-site/"
+			],
+			"isBackground": false,
+			"group": "test"
+		},
+		{
+			"label": "debugbundle-public-site-tests-interfaces-group",
+			"type": "shell",
+			"command": "docker",
+			"args": [
+				"run",
+				"--rm",
+				"-t",
+				"-v",
+				"/Users/owenfar/Developer/DebugBundle:/workspace",
+				"-w",
+				"/workspace",
+				"node:24-alpine",
+				"sh",
+				"-lc",
+				"corepack enable && corepack pnpm install --frozen-lockfile=false && corepack pnpm vitest run tests/apps/public-site/"
+			],
+			"isBackground": false,
+			"group": "test"
+		},
+		{
+			"label": "debugbundle-public-site-tests-reference-shell",
+			"type": "shell",
+			"command": "docker",
+			"args": [
+				"run",
+				"--rm",
+				"-t",
+				"-v",
+				"/Users/owenfar/Developer/DebugBundle:/workspace",
+				"-w",
+				"/workspace",
+				"node:24-alpine",
+				"sh",
+				"-lc",
+				"corepack enable && corepack pnpm install --frozen-lockfile=false && corepack pnpm vitest run tests/apps/public-site/"
+			],
+			"isBackground": false,
+			"group": "test"
+		},
+		{
+			"label": "debugbundle-typecheck-review",
+			"type": "shell",
+			"command": "make",
+			"args": [
+				"typecheck"
+			],
+			"isBackground": false,
+			"group": "test"
+		},
+		{
+			"label": "debugbundle-typecheck-final",
+			"type": "shell",
+			"command": "make",
+			"args": [
+				"typecheck"
+			],
+			"isBackground": false,
+			"group": "test"
+		},
+		{
+			"label": "debugbundle-scoped-test-lint-auth-email-storage",
+			"type": "shell",
+			"command": "docker",
+			"args": [
+				"run",
+				"--rm",
+				"-t",
+				"-v",
+				"/Users/owenfar/Developer/DebugBundle:/workspace",
+				"-w",
+				"/workspace",
+				"node:24-alpine",
+				"sh",
+				"-lc",
+				"corepack enable && corepack pnpm install --frozen-lockfile=false && corepack pnpm eslint tests/packages/auth/auth.test.ts tests/packages/email/email.test.ts tests/packages/storage/billing-sync-store.test.ts tests/packages/storage/github-store.test.ts && corepack pnpm vitest run tests/packages/auth/auth.test.ts tests/packages/email/email.test.ts tests/packages/storage/billing-sync-store.test.ts tests/packages/storage/github-store.test.ts"
+			],
+			"isBackground": false,
+			"group": "test"
+		},
+		{
+			"label": "debugbundle-scoped-test-lint-auth-email-storage-rerun",
+			"type": "shell",
+			"command": "docker",
+			"args": [
+				"run",
+				"--rm",
+				"-t",
+				"-v",
+				"/Users/owenfar/Developer/DebugBundle:/workspace",
+				"-w",
+				"/workspace",
+				"node:24-alpine",
+				"sh",
+				"-lc",
+				"corepack enable && corepack pnpm install --frozen-lockfile=false && corepack pnpm eslint tests/packages/auth/auth.test.ts tests/packages/email/email.test.ts tests/packages/storage/billing-sync-store.test.ts tests/packages/storage/github-store.test.ts && corepack pnpm vitest run tests/packages/auth/auth.test.ts tests/packages/email/email.test.ts tests/packages/storage/billing-sync-store.test.ts tests/packages/storage/github-store.test.ts"
+			],
+			"isBackground": false,
+			"group": "test"
+		},
+		{
+			"label": "debugbundle-scoped-test-lint-auth-email-storage-final",
+			"type": "shell",
+			"command": "docker",
+			"args": [
+				"run",
+				"--rm",
+				"-t",
+				"-v",
+				"/Users/owenfar/Developer/DebugBundle:/workspace",
+				"-w",
+				"/workspace",
+				"node:24-alpine",
+				"sh",
+				"-lc",
+				"corepack enable && corepack pnpm install --frozen-lockfile=false && corepack pnpm eslint tests/packages/auth/auth.test.ts tests/packages/email/email.test.ts tests/packages/storage/billing-sync-store.test.ts tests/packages/storage/github-store.test.ts && corepack pnpm vitest run tests/packages/auth/auth.test.ts tests/packages/email/email.test.ts tests/packages/storage/billing-sync-store.test.ts tests/packages/storage/github-store.test.ts"
+			],
+			"isBackground": false,
+			"group": "test"
+		},
+		{
+			"label": "debugbundle-lint-json-scan",
+			"type": "shell",
+			"command": "docker",
+			"args": [
+				"run",
+				"--rm",
+				"-t",
+				"-v",
+				"/Users/owenfar/Developer/DebugBundle:/workspace",
+				"-w",
+				"/workspace",
+				"node:24-alpine",
+				"sh",
+				"-lc",
+				"corepack enable && corepack pnpm install --frozen-lockfile=false && corepack pnpm eslint . -f json -o /workspace/.tmp-eslint.json || true"
+			],
+			"isBackground": false,
+			"group": "test"
+		},
+		{
+			"label": "debugbundle-lint-json-scan-post-ignore",
+			"type": "shell",
+			"command": "docker",
+			"args": [
+				"run",
+				"--rm",
+				"-t",
+				"-v",
+				"/Users/owenfar/Developer/DebugBundle:/workspace",
+				"-w",
+				"/workspace",
+				"node:24-alpine",
+				"sh",
+				"-lc",
+				"corepack enable && corepack pnpm install --frozen-lockfile=false && corepack pnpm eslint . -f json -o /workspace/.tmp-eslint.json || true"
+			],
+			"isBackground": false,
+			"group": "test"
+		},
+		{
+			"label": "debugbundle-web-test-fetchmock-lint",
+			"type": "shell",
+			"command": "docker",
+			"args": [
+				"run",
+				"--rm",
+				"-t",
+				"-v",
+				"/Users/owenfar/Developer/DebugBundle:/workspace",
+				"-w",
+				"/workspace",
+				"node:24-alpine",
+				"sh",
+				"-lc",
+				"corepack enable && corepack pnpm install --frozen-lockfile=false && corepack pnpm eslint tests/apps/web/web-test-helpers.ts tests/apps/web/web-app-management.test.tsx tests/apps/web/web-app-incidents.test.tsx tests/apps/web/web-app-auth.test.tsx tests/apps/web/web-app-project-capture-policy.test.tsx"
+			],
+			"isBackground": false,
+			"group": "test"
+		},
+		{
+			"label": "debugbundle-web-test-fetchmock-lint-rerun",
+			"type": "shell",
+			"command": "docker",
+			"args": [
+				"run",
+				"--rm",
+				"-t",
+				"-v",
+				"/Users/owenfar/Developer/DebugBundle:/workspace",
+				"-w",
+				"/workspace",
+				"node:24-alpine",
+				"sh",
+				"-lc",
+				"corepack enable && corepack pnpm install --frozen-lockfile=false && corepack pnpm eslint tests/apps/web/web-test-helpers.ts tests/apps/web/web-app-management.test.tsx tests/apps/web/web-app-incidents.test.tsx tests/apps/web/web-app-auth.test.tsx tests/apps/web/web-app-project-capture-policy.test.tsx"
+			],
+			"isBackground": false,
+			"group": "test"
+		},
+		{
+			"label": "debugbundle-lint-json-refresh-batch1",
+			"type": "shell",
+			"command": "docker",
+			"args": [
+				"run",
+				"--rm",
+				"-t",
+				"-v",
+				"/Users/owenfar/Developer/DebugBundle:/workspace",
+				"-w",
+				"/workspace",
+				"node:24-alpine",
+				"sh",
+				"-lc",
+				"corepack enable && corepack pnpm install --frozen-lockfile=false && corepack pnpm eslint . -f json -o /workspace/.tmp-eslint.json || true"
+			],
+			"isBackground": false,
+			"group": "test"
+		},
+		{
+			"label": "debugbundle-lint-json-refresh-batch2",
+			"type": "shell",
+			"command": "docker",
+			"args": [
+				"run",
+				"--rm",
+				"-t",
+				"-v",
+				"/Users/owenfar/Developer/DebugBundle:/workspace",
+				"-w",
+				"/workspace",
+				"node:24-alpine",
+				"sh",
+				"-lc",
+				"corepack enable && corepack pnpm install --frozen-lockfile=false && corepack pnpm eslint . -f json -o /workspace/.tmp-eslint.json || true"
+			],
+			"isBackground": false,
+			"group": "test"
+		},
+		{
+			"label": "debugbundle-hotspot-lint-github-management",
+			"type": "shell",
+			"command": "docker",
+			"args": [
+				"run",
+				"--rm",
+				"-t",
+				"-v",
+				"/Users/owenfar/Developer/DebugBundle:/workspace",
+				"-w",
+				"/workspace",
+				"node:24-alpine",
+				"sh",
+				"-lc",
+				"corepack enable && corepack pnpm install --frozen-lockfile=false && corepack pnpm eslint apps/api/src/github-app.ts apps/web/src/pages/management-pages.tsx"
+			],
+			"isBackground": false,
+			"group": "test"
+		},
+		{
+			"label": "debugbundle-lint-json-refresh-batch3",
+			"type": "shell",
+			"command": "docker",
+			"args": [
+				"run",
+				"--rm",
+				"-t",
+				"-v",
+				"/Users/owenfar/Developer/DebugBundle:/workspace",
+				"-w",
+				"/workspace",
+				"node:24-alpine",
+				"sh",
+				"-lc",
+				"corepack enable && corepack pnpm install --frozen-lockfile=false && corepack pnpm eslint . -f json -o /workspace/.tmp-eslint.json || true"
+			],
+			"isBackground": false,
+			"group": "test"
+		},
+		{
+			"label": "debugbundle-lint-json-refresh-batch4",
+			"type": "shell",
+			"command": "docker",
+			"args": [
+				"run",
+				"--rm",
+				"-t",
+				"-v",
+				"/Users/owenfar/Developer/DebugBundle:/workspace",
+				"-w",
+				"/workspace",
+				"node:24-alpine",
+				"sh",
+				"-lc",
+				"corepack enable && corepack pnpm install --frozen-lockfile=false && corepack pnpm eslint . -f json -o /workspace/.tmp-eslint.json || true"
+			],
+			"isBackground": false,
+			"group": "test"
+		},
+		{
+			"label": "debugbundle-lint-json-refresh-batch5",
+			"type": "shell",
+			"command": "docker",
+			"args": [
+				"run",
+				"--rm",
+				"-t",
+				"-v",
+				"/Users/owenfar/Developer/DebugBundle:/workspace",
+				"-w",
+				"/workspace",
+				"node:24-alpine",
+				"sh",
+				"-lc",
+				"corepack enable && corepack pnpm install --frozen-lockfile=false && corepack pnpm eslint . -f json -o /workspace/.tmp-eslint.json || true"
+			],
+			"isBackground": false,
+			"group": "test"
+		},
+		{
+			"label": "debugbundle-site-typed-content-lint",
+			"type": "shell",
+			"command": "docker",
+			"args": [
+				"run",
+				"--rm",
+				"-t",
+				"-v",
+				"/Users/owenfar/Developer/DebugBundle:/workspace",
+				"-w",
+				"/workspace",
+				"node:24-alpine",
+				"sh",
+				"-lc",
+				"corepack enable && corepack pnpm install --frozen-lockfile=false && corepack pnpm eslint site/src/content-source.ts 'site/app/(blog)/blog/[...slug]/page.tsx' 'site/app/(docs)/docs/[[...slug]]/page.tsx' site/src/components/docs-search-dialog.tsx"
+			],
+			"isBackground": false,
+			"group": "test"
+		},
+		{
+			"label": "debugbundle-lint-json-refresh-batch6",
+			"type": "shell",
+			"command": "docker",
+			"args": [
+				"run",
+				"--rm",
+				"-t",
+				"-v",
+				"/Users/owenfar/Developer/DebugBundle:/workspace",
+				"-w",
+				"/workspace",
+				"node:24-alpine",
+				"sh",
+				"-lc",
+				"corepack enable && corepack pnpm install --frozen-lockfile=false && corepack pnpm eslint . -f json -o /workspace/.tmp-eslint.json || true"
+			],
+			"isBackground": false,
+			"group": "test"
+		},
+		{
+			"label": "debugbundle-easy-batch-lint",
+			"type": "shell",
+			"command": "docker",
+			"args": [
+				"run",
+				"--rm",
+				"-t",
+				"-v",
+				"/Users/owenfar/Developer/DebugBundle:/workspace",
+				"-w",
+				"/workspace",
+				"node:24-alpine",
+				"sh",
+				"-lc",
+				"corepack enable && corepack pnpm install --frozen-lockfile=false && corepack pnpm eslint apps/web/src/react-jsx-namespace.d.ts apps/api/src/openapi.ts apps/web/src/app.tsx site/src/reference-data.ts"
+			],
+			"isBackground": false,
+			"group": "test"
+		},
+		{
+			"label": "debugbundle-easy-batch-lint-rerun",
+			"type": "shell",
+			"command": "docker",
+			"args": [
+				"run",
+				"--rm",
+				"-t",
+				"-v",
+				"/Users/owenfar/Developer/DebugBundle:/workspace",
+				"-w",
+				"/workspace",
+				"node:24-alpine",
+				"sh",
+				"-lc",
+				"corepack enable && corepack pnpm install --frozen-lockfile=false && corepack pnpm eslint apps/web/src/react-jsx-namespace.d.ts apps/api/src/openapi.ts apps/web/src/app.tsx site/src/reference-data.ts"
+			],
+			"isBackground": false,
+			"group": "test"
+		},
+		{
+			"label": "debugbundle-lint-json-refresh-batch7",
+			"type": "shell",
+			"command": "docker",
+			"args": [
+				"run",
+				"--rm",
+				"-t",
+				"-v",
+				"/Users/owenfar/Developer/DebugBundle:/workspace",
+				"-w",
+				"/workspace",
+				"node:24-alpine",
+				"sh",
+				"-lc",
+				"corepack enable && corepack pnpm install --frozen-lockfile=false && corepack pnpm eslint . -f json -o /workspace/.tmp-eslint.json || true"
+			],
+			"isBackground": false,
+			"group": "test"
+		},
+		{
+			"label": "debugbundle-tail-batch-lint",
+			"type": "shell",
+			"command": "docker",
+			"args": [
+				"run",
+				"--rm",
+				"-t",
+				"-v",
+				"/Users/owenfar/Developer/DebugBundle:/workspace",
+				"-w",
+				"/workspace",
+				"node:24-alpine",
+				"sh",
+				"-lc",
+				"corepack enable && corepack pnpm install --frozen-lockfile=false && corepack pnpm eslint apps/cli/src/process-command.ts apps/web/src/components/system/nav-user.tsx apps/web/src/lib/api.ts apps/mcp/src/retrieval-tools.ts apps/web/src/hooks/use-mobile.ts"
+			],
+			"isBackground": false,
+			"group": "test"
+		},
+		{
+			"label": "debugbundle-lint-json-refresh-batch8",
+			"type": "shell",
+			"command": "docker",
+			"args": [
+				"run",
+				"--rm",
+				"-t",
+				"-v",
+				"/Users/owenfar/Developer/DebugBundle:/workspace",
+				"-w",
+				"/workspace",
+				"node:24-alpine",
+				"sh",
+				"-lc",
+				"corepack enable && corepack pnpm install --frozen-lockfile=false && corepack pnpm eslint . -f json -o /workspace/.tmp-eslint.json || true"
+			],
+			"isBackground": false,
+			"group": "test"
+		},
+		{
+			"label": "debugbundle-small-cluster-lint",
+			"type": "shell",
+			"command": "docker",
+			"args": [
+				"run",
+				"--rm",
+				"-t",
+				"-v",
+				"/Users/owenfar/Developer/DebugBundle:/workspace",
+				"-w",
+				"/workspace",
+				"node:24-alpine",
+				"sh",
+				"-lc",
+				"corepack enable && corepack pnpm install --frozen-lockfile=false && corepack pnpm eslint apps/web/src/components/system/recent-projects-table.tsx apps/web/src/pages/incident-detail-page.tsx apps/web/src/pages/incidents-page.tsx apps/web/src/pages/project-settings-page.tsx packages/event-normalizer/src/index.ts apps/api/src/dogfooding.ts apps/cli/src/clean-command.ts apps/cli/src/connect-command.ts"
+			],
+			"isBackground": false,
+			"group": "test"
+		},
+		{
+			"label": "debugbundle-lint-json-refresh-batch9",
+			"type": "shell",
+			"command": "docker",
+			"args": [
+				"run",
+				"--rm",
+				"-t",
+				"-v",
+				"/Users/owenfar/Developer/DebugBundle:/workspace",
+				"-w",
+				"/workspace",
+				"node:24-alpine",
+				"sh",
+				"-lc",
+				"corepack enable && corepack pnpm install --frozen-lockfile=false && corepack pnpm eslint . -f json -o /workspace/.tmp-eslint.json || true"
+			],
+			"isBackground": false,
+			"group": "test"
+		},
+		{
+			"label": "debugbundle-lint-json-refresh-batch10",
+			"type": "shell",
+			"command": "docker",
+			"args": [
+				"run",
+				"--rm",
+				"-t",
+				"-v",
+				"/Users/owenfar/Developer/DebugBundle:/workspace",
+				"-w",
+				"/workspace",
+				"node:24-alpine",
+				"sh",
+				"-lc",
+				"corepack enable && corepack pnpm install --frozen-lockfile=false && corepack pnpm eslint . -f json -o /workspace/.tmp-eslint.json || true"
+			],
+			"isBackground": false,
+			"group": "test"
+		},
+		{
+			"label": "debugbundle-signup-consent-tests",
+			"type": "shell",
+			"command": "docker",
+			"args": [
+				"run",
+				"--rm",
+				"-t",
+				"-v",
+				"/Users/owenfar/Developer/DebugBundle:/workspace",
+				"-w",
+				"/workspace",
+				"node:24-alpine",
+				"sh",
+				"-lc",
+				"corepack enable && corepack pnpm install --frozen-lockfile=false && corepack pnpm vitest run tests/apps/api/api-auth.test.ts tests/packages/auth/auth.test.ts tests/packages/auth/postgres-auth-store.test.ts tests/apps/web/web-app-auth.test.tsx"
+			],
+			"isBackground": false,
+			"group": "test"
+		},
+		{
+			"label": "debugbundle-public-core-repo-contract",
+			"type": "shell",
+			"command": "docker",
+			"args": [
+				"run",
+				"--rm",
+				"-v",
+				"/Users/owenfar/Developer/DebugBundle:/workspace",
+				"-w",
+				"/workspace",
+				"node:24-alpine",
+				"sh",
+				"-lc",
+				"set -eu && corepack enable && corepack pnpm install --frozen-lockfile=false && corepack pnpm vitest run tests/infrastructure/public-core-repo.test.ts"
+			],
+			"isBackground": false,
+			"group": "test"
+		},
+		{
+			"label": "debugbundle-public-core-repo-contract-rerun",
+			"type": "shell",
+			"command": "docker",
+			"args": [
+				"run",
+				"--rm",
+				"-v",
+				"/Users/owenfar/Developer/DebugBundle:/workspace",
+				"-w",
+				"/workspace",
+				"node:24-alpine",
+				"sh",
+				"-lc",
+				"set -eu && corepack enable && corepack pnpm install --frozen-lockfile=false && corepack pnpm vitest run tests/infrastructure/public-core-repo.test.ts"
+			],
+			"isBackground": false,
+			"group": "test"
+		}
+	]
+}

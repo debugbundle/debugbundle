@@ -1,0 +1,16 @@
+{
+  "name": "@debugbundle/example-nextjs-basic",
+  "private": true,
+  "scripts": {
+    "dev": "next dev -p 3007",
+    "build": "next build",
+    "start": "next start -p 3007"
+  },
+  "dependencies": {
+    "@debugbundle/sdk-browser": "next",
+    "@debugbundle/sdk-node": "next",
+    "next": "^15.5.4",
+    "react": "^19.1.1",
+    "react-dom": "^19.1.1"
+  }
+}

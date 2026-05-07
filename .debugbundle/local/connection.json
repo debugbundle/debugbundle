@@ -1,0 +1,19 @@
+{
+  "mode": "connected",
+  "cloud_project_id": "5ea3eb3a-daa1-48e6-a866-1d667959acd3",
+  "cloud_base_url": "http://host.docker.internal:3003",
+  "environments": {
+    "local": {
+      "delivery": "local-only"
+    },
+    "development": {
+      "delivery": "local-only"
+    },
+    "staging": {
+      "delivery": "local-only"
+    },
+    "production": {
+      "delivery": "cloud-enabled"
+    }
+  }
+}

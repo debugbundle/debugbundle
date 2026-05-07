@@ -1,0 +1,249 @@
+name: Release Shared JS Packages
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Stable shared package version to publish (for example 0.1.0)
+        required: true
+        type: string
+  push:
+    tags:
+      - "shared-js-v*"
+
+permissions:
+  contents: read
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          registry-url: https://registry.npmjs.org
+
+      - name: Setup pnpm via Corepack
+        run: |
+          corepack enable
+          corepack prepare pnpm@10.32.1 --activate
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Resolve release version
+        id: release_version
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]; then
+            version="${{ inputs.version }}"
+          else
+            version="${GITHUB_REF_NAME#shared-js-v}"
+          fi
+
+          if [[ -z "$version" ]]; then
+            echo "missing_version" >&2
+            exit 1
+          fi
+
+          echo "value=$version" >> "$GITHUB_OUTPUT"
+
+      - name: Check published shared package state
+        id: published_state
+        run: |
+          node --input-type=module <<'EOF'
+          const releaseVersion = process.env.RELEASE_VERSION;
+          const githubOutput = process.env.GITHUB_OUTPUT;
+
+          if (!releaseVersion) {
+            throw new Error("missing_release_version");
+          }
+
+          if (!githubOutput) {
+            throw new Error("missing_github_output");
+          }
+
+          const packages = ["@debugbundle/shared-types", "@debugbundle/redaction"];
+          const published = [];
+
+          for (const packageName of packages) {
+            const response = await fetch(`https://registry.npmjs.org/${encodeURIComponent(packageName)}/${releaseVersion}`);
+
+            if (response.status === 404) {
+              continue;
+            }
+
+            if (!response.ok) {
+              throw new Error(`failed_to_check_${packageName.replaceAll("/", "_")}_${response.status}`);
+            }
+
+            published.push(packageName);
+          }
+
+          const state =
+            published.length === 0 ? "none" :
+            published.length === packages.length ? "all" :
+            "partial";
+
+          const { appendFileSync } = await import("node:fs");
+          appendFileSync(githubOutput, `state=${state}\n`);
+          appendFileSync(githubOutput, `published=${published.join(",")}\n`);
+          EOF
+        env:
+          RELEASE_VERSION: ${{ steps.release_version.outputs.value }}
+
+      - name: Abort on partially published shared package release
+        if: steps.published_state.outputs.state == 'partial'
+        run: |
+          echo "Release version ${{ steps.release_version.outputs.value }} is only partially published: ${{ steps.published_state.outputs.published }}" >&2
+          echo "Bump both shared package versions to a fresh stable version before retrying." >&2
+          exit 1
+
+      - name: Note already published shared package release
+        if: steps.published_state.outputs.state == 'all'
+        run: echo "Release version ${{ steps.release_version.outputs.value }} is already published for the shared JS packages; skipping publish steps."
+
+      - name: Validate shared package versions
+        run: |
+          node --input-type=module <<'EOF'
+          import { readFileSync } from "node:fs";
+
+          const expectedVersion = process.env.RELEASE_VERSION;
+          if (!expectedVersion) {
+            throw new Error("missing_release_version");
+          }
+
+          if (expectedVersion.includes("-")) {
+            throw new Error(`unexpected_prerelease_version:${expectedVersion}`);
+          }
+
+          const packageFiles = ["packages/shared-types/package.json", "packages/redaction/package.json"];
+
+          for (const packageFile of packageFiles) {
+            const packageJson = JSON.parse(readFileSync(packageFile, "utf8"));
+            if (packageJson.version !== expectedVersion) {
+              throw new Error(`${packageJson.name} version ${packageJson.version} does not match release ${expectedVersion}`);
+            }
+          }
+          EOF
+        env:
+          RELEASE_VERSION: ${{ steps.release_version.outputs.value }}
+
+      - name: Run shared package tests
+        run: pnpm vitest run tests/packages/shared-types/shared-types.test.ts tests/packages/shared-types/tier-capabilities.test.ts tests/packages/shared-types/capture-policy.test.ts tests/packages/redaction/redaction.test.ts
+
+      - name: Build shared packages
+        if: steps.published_state.outputs.state == 'none'
+        run: |
+          pnpm --filter @debugbundle/shared-types build
+          pnpm --filter @debugbundle/redaction build
+
+      - name: Prepare publish manifests
+        if: steps.published_state.outputs.state == 'none'
+        run: node scripts/prepare-shared-js-release.mjs .tmp/shared-js-publish
+
+      - name: Smoke test packed shared JS artifacts
+        if: steps.published_state.outputs.state == 'none'
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          rm -rf .tmp/shared-js-packages
+          mkdir -p .tmp/shared-js-packages
+          npm pack ./.tmp/shared-js-publish/shared-types --pack-destination .tmp/shared-js-packages
+          npm pack ./.tmp/shared-js-publish/redaction --pack-destination .tmp/shared-js-packages
+
+          tmpdir="$(mktemp -d)"
+          cat > "$tmpdir/package.json" <<'EOF'
+          {
+            "name": "debugbundle-shared-js-release-smoke",
+            "private": true,
+            "type": "module"
+          }
+          EOF
+
+          npm install --prefix "$tmpdir" --no-package-lock \
+            "$PWD/.tmp/shared-js-packages/debugbundle-shared-types-${RELEASE_VERSION}.tgz" \
+            "$PWD/.tmp/shared-js-packages/debugbundle-redaction-${RELEASE_VERSION}.tgz"
+
+          cd "$tmpdir"
+          node --input-type=module <<'EOF'
+          const sharedTypes = await import("@debugbundle/shared-types");
+          const redaction = await import("@debugbundle/redaction");
+
+          if (typeof sharedTypes.createEventEnvelope !== "function") {
+            throw new Error("shared-types export missing");
+          }
+
+          if (typeof redaction.redact !== "function") {
+            throw new Error("redaction export missing");
+          }
+          EOF
+        env:
+          RELEASE_VERSION: ${{ steps.release_version.outputs.value }}
+
+      - name: Publish shared packages
+        if: steps.published_state.outputs.state == 'none'
+        run: |
+          npm publish ./.tmp/shared-js-publish/shared-types --tag latest --access public
+          npm publish ./.tmp/shared-js-publish/redaction --tag latest --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Smoke test published shared JS packages
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          for package_name in @debugbundle/shared-types @debugbundle/redaction; do
+            for attempt in $(seq 1 30); do
+              if npm view "${package_name}@${RELEASE_VERSION}" version >/dev/null 2>&1; then
+                break
+              fi
+
+              if [[ "$attempt" == "30" ]]; then
+                echo "${package_name}@${RELEASE_VERSION} not visible on npm after propagation wait" >&2
+                npm view "${package_name}@${RELEASE_VERSION}" version
+                exit 1
+              fi
+
+              sleep 10
+            done
+
+            npm view "${package_name}@${RELEASE_VERSION}" version
+          done
+
+          tmpdir="$(mktemp -d)"
+          cat > "$tmpdir/package.json" <<'EOF'
+          {
+            "name": "debugbundle-shared-js-registry-smoke",
+            "private": true,
+            "type": "module"
+          }
+          EOF
+
+          npm install --prefix "$tmpdir" --no-package-lock \
+            "@debugbundle/shared-types@${RELEASE_VERSION}" \
+            "@debugbundle/redaction@${RELEASE_VERSION}"
+
+          cd "$tmpdir"
+          node --input-type=module <<'EOF'
+          const sharedTypes = await import("@debugbundle/shared-types");
+          const redaction = await import("@debugbundle/redaction");
+
+          if (typeof sharedTypes.createEventEnvelope !== "function") {
+            throw new Error("shared-types export missing");
+          }
+
+          if (typeof redaction.redact !== "function") {
+            throw new Error("redaction export missing");
+          }
+          EOF
+        env:
+          RELEASE_VERSION: ${{ steps.release_version.outputs.value }}

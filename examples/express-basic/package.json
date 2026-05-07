@@ -1,0 +1,12 @@
+{
+  "name": "@debugbundle/example-express-basic",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node server.mjs"
+  },
+  "dependencies": {
+    "@debugbundle/sdk-node": "next",
+    "express": "^5.1.0"
+  }
+}

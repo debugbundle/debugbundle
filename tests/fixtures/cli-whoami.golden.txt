@@ -1,0 +1,3 @@
+Authenticated: yes
+Base URL: https://api.debugbundle.com
+Token: dbundle_mem_secr...

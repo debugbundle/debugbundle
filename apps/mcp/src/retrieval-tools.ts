@@ -1,0 +1,496 @@
+import { RetrievalApiError } from "../../../packages/retrieval-client/src/index.js";
+import {
+  cacheCloudBundleArtifact,
+  cacheCloudReproductionArtifact,
+  syncCloudIncidentCacheStatus
+} from "../../cli/src/cloud-artifact-cache.js";
+import {
+  attachSourceToRecord,
+  isNotFoundRetrievalError,
+  paginateIncidents,
+  type RetrievalSource
+} from "../../cli/src/retrieval-source.js";
+import {
+  getLocalBundle,
+  getLocalIncident,
+  getLocalReproduction,
+  listLocalIncidents,
+  reopenLocalIncident,
+  readLocalConnectionConfig,
+  resolveLocalIncident
+} from "../../cli/src/local-retrieval-store.js";
+
+export const RETRIEVAL_MCP_TOOL_NAMES = ["list_incidents", "get_incident", "resolve_incident", "reopen_incident", "get_bundle", "get_reproduction", "get_logs"] as const;
+
+function mapMcpError(error: unknown): never {
+  if (error instanceof RetrievalApiError) {
+    throw new Error(`mcp_tool_error:${error.code}`);
+  }
+
+  throw new Error("mcp_tool_error:unknown_error");
+}
+
+function readBearerToken(input: Record<string, unknown>): string | null {
+  return typeof input["bearerToken"] === "string" && input["bearerToken"].length > 0 ? input["bearerToken"] : null;
+}
+
+async function requireCloudBearerToken(input: Record<string, unknown>): Promise<string> {
+  const bearerToken = readBearerToken(input);
+  if (bearerToken !== null) {
+    return bearerToken;
+  }
+
+  if ((await readLocalConnectionConfig())?.mode === "local-only") {
+    throw new RetrievalApiError(401, "local_only_project");
+  }
+
+  throw new RetrievalApiError(401, "auth_required");
+}
+
+function readSource(input: Record<string, unknown>): RetrievalSource | null {
+  if (input["source"] === "local" || input["source"] === "cloud") {
+    return input["source"];
+  }
+
+  return null;
+}
+
+async function shouldUseLocalSource(input: Record<string, unknown>): Promise<boolean> {
+  const source = readSource(input);
+  if (source === "local") {
+    return true;
+  }
+
+  if (source === "cloud") {
+    return false;
+  }
+
+  return readBearerToken(input) === null && (await readLocalConnectionConfig())?.mode === "local-only";
+}
+
+async function shouldCombineLocalAndCloudSource(input: Record<string, unknown>): Promise<boolean> {
+  if (readSource(input) !== null) {
+    return false;
+  }
+
+  return (await readLocalConnectionConfig())?.mode === "connected";
+}
+
+function readIncidentListFilters(input: Record<string, unknown>): {
+  projectId?: string;
+  environment?: string;
+  service?: string;
+  status?: string;
+  severity?: string;
+  cursor?: string;
+  limit?: number;
+} {
+  const requestInput: {
+    projectId?: string;
+    environment?: string;
+    service?: string;
+    status?: string;
+    severity?: string;
+    cursor?: string;
+    limit?: number;
+  } = {};
+
+  if (typeof input["projectId"] === "string") {
+    requestInput.projectId = input["projectId"];
+  }
+  if (typeof input["environment"] === "string") {
+    requestInput.environment = input["environment"];
+  }
+  if (typeof input["service"] === "string") {
+    requestInput.service = input["service"];
+  }
+  if (typeof input["status"] === "string") {
+    requestInput.status = input["status"];
+  }
+  if (typeof input["severity"] === "string") {
+    requestInput.severity = input["severity"];
+  }
+  if (typeof input["cursor"] === "string") {
+    requestInput.cursor = input["cursor"];
+  }
+  if (typeof input["limit"] === "number") {
+    requestInput.limit = input["limit"];
+  }
+
+  return requestInput;
+}
+
+async function listAllCloudIncidents(
+  input: Record<string, unknown>,
+  api: {
+    listIncidents(input: {
+      bearerToken: string;
+      projectId?: string;
+      environment?: string;
+      service?: string;
+      status?: string;
+      severity?: string;
+      cursor?: string;
+    }): Promise<{ incidents: unknown[]; next_cursor: string | null }>;
+  }
+): Promise<Array<Record<string, unknown> & { source: RetrievalSource }>> {
+  const filters = readIncidentListFilters(input);
+  const incidents: Array<Record<string, unknown> & { source: RetrievalSource }> = [];
+  let cursor: string | undefined;
+
+  while (true) {
+    const response = await api.listIncidents({
+      bearerToken: await requireCloudBearerToken(input),
+      ...(filters.projectId === undefined ? {} : { projectId: filters.projectId }),
+      ...(filters.environment === undefined ? {} : { environment: filters.environment }),
+      ...(filters.service === undefined ? {} : { service: filters.service }),
+      ...(filters.status === undefined ? {} : { status: filters.status }),
+      ...(filters.severity === undefined ? {} : { severity: filters.severity }),
+      ...(cursor === undefined ? {} : { cursor })
+    });
+
+    incidents.push(...response.incidents.map((incident) => attachSourceToRecord(incident as Record<string, unknown>, "cloud")));
+
+    if (response.next_cursor === null) {
+      return incidents;
+    }
+
+    cursor = response.next_cursor;
+  }
+}
+
+export function createRetrievalMcpTools(api: {
+  listIncidents(input: {
+    bearerToken: string;
+    projectId?: string;
+    environment?: string;
+    service?: string;
+    status?: string;
+    severity?: string;
+    cursor?: string;
+    limit?: number;
+  }): Promise<{ incidents: unknown[]; next_cursor: string | null }>;
+  getIncident(input: { bearerToken: string; incidentId: string }): Promise<unknown>;
+  resolveIncident(input: { bearerToken: string; incidentId: string }): Promise<unknown>;
+  reopenIncident(input: { bearerToken: string; incidentId: string }): Promise<unknown>;
+  getBundle(input: { bearerToken: string; incidentId: string }): Promise<unknown>;
+  getLogs(input: {
+    bearerToken: string;
+    incidentId: string;
+    level?: string;
+    cursor?: string;
+    limit?: number;
+  }): Promise<unknown>;
+  getReproduction(input: { bearerToken: string; incidentId: string }): Promise<unknown>;
+}): Record<(typeof RETRIEVAL_MCP_TOOL_NAMES)[number], (input: Record<string, unknown>) => Promise<unknown>> {
+  type IncidentListEntry = {
+    incident_id: string;
+    last_seen_at: string;
+  } & Record<string, unknown>;
+
+  return {
+    async list_incidents(input) {
+      try {
+        const incidentFilters = readIncidentListFilters(input);
+
+        if (await shouldUseLocalSource(input)) {
+          return await listLocalIncidents(incidentFilters);
+        }
+
+        if (await shouldCombineLocalAndCloudSource(input)) {
+          const localIncidents = await listLocalIncidents({
+            ...(incidentFilters.projectId === undefined ? {} : { projectId: incidentFilters.projectId }),
+            ...(incidentFilters.environment === undefined ? {} : { environment: incidentFilters.environment }),
+            ...(incidentFilters.service === undefined ? {} : { service: incidentFilters.service }),
+            ...(incidentFilters.status === undefined ? {} : { status: incidentFilters.status }),
+            ...(incidentFilters.severity === undefined ? {} : { severity: incidentFilters.severity })
+          });
+          const cloudIncidents = await listAllCloudIncidents(input, {
+            listIncidents: (requestInput) => api.listIncidents(requestInput)
+          });
+
+          return paginateIncidents<IncidentListEntry>(
+            [...localIncidents.incidents, ...cloudIncidents] as IncidentListEntry[],
+            {
+              ...(incidentFilters.cursor === undefined ? {} : { cursor: incidentFilters.cursor }),
+              ...(incidentFilters.limit === undefined ? {} : { limit: incidentFilters.limit })
+            }
+          );
+        }
+
+        const requestInput: {
+          bearerToken: string;
+          projectId?: string;
+          environment?: string;
+          service?: string;
+          status?: string;
+          severity?: string;
+          cursor?: string;
+          limit?: number;
+        } = {
+          bearerToken: await requireCloudBearerToken(input)
+        };
+        if (incidentFilters.projectId !== undefined) {
+          requestInput.projectId = incidentFilters.projectId;
+        }
+        if (incidentFilters.environment !== undefined) {
+          requestInput.environment = incidentFilters.environment;
+        }
+        if (incidentFilters.service !== undefined) {
+          requestInput.service = incidentFilters.service;
+        }
+        if (incidentFilters.status !== undefined) {
+          requestInput.status = incidentFilters.status;
+        }
+        if (incidentFilters.severity !== undefined) {
+          requestInput.severity = incidentFilters.severity;
+        }
+        if (incidentFilters.cursor !== undefined) {
+          requestInput.cursor = incidentFilters.cursor;
+        }
+        if (incidentFilters.limit !== undefined) {
+          requestInput.limit = incidentFilters.limit;
+        }
+
+        const incidents = await api.listIncidents(requestInput);
+        return {
+          ...incidents,
+          incidents: incidents.incidents.map((incident) => attachSourceToRecord(incident as Record<string, unknown>, "cloud"))
+        };
+      } catch (error) {
+        mapMcpError(error);
+      }
+    },
+    async get_incident(input) {
+      try {
+        if (await shouldUseLocalSource(input)) {
+          return {
+            incident: await getLocalIncident({
+              incidentId: String(input["incidentId"])
+            })
+          };
+        }
+
+        if (await shouldCombineLocalAndCloudSource(input)) {
+          try {
+            return {
+              incident: await getLocalIncident({
+                incidentId: String(input["incidentId"])
+              })
+            };
+          } catch (error) {
+            if (!isNotFoundRetrievalError(error)) {
+              throw error;
+            }
+          }
+        }
+
+        return {
+          incident: attachSourceToRecord(
+            (await api.getIncident({
+              bearerToken: await requireCloudBearerToken(input),
+              incidentId: String(input["incidentId"])
+            })) as Record<string, unknown>,
+            "cloud"
+          )
+        };
+      } catch (error) {
+        mapMcpError(error);
+      }
+    },
+    async resolve_incident(input) {
+      try {
+        if (await shouldUseLocalSource(input)) {
+          return {
+            incident: await resolveLocalIncident({
+              incidentId: String(input["incidentId"])
+            })
+          };
+        }
+
+        if (await shouldCombineLocalAndCloudSource(input)) {
+          try {
+            return {
+              incident: await resolveLocalIncident({
+                incidentId: String(input["incidentId"])
+              })
+            };
+          } catch (error) {
+            if (!isNotFoundRetrievalError(error)) {
+              throw error;
+            }
+          }
+        }
+
+        return {
+          incident: await (async () => {
+            const incident = attachSourceToRecord(
+              (await api.resolveIncident({
+                bearerToken: await requireCloudBearerToken(input),
+                incidentId: String(input["incidentId"])
+              })) as Record<string, unknown>,
+              "cloud"
+            );
+
+            await syncCloudIncidentCacheStatus({
+              incidentId: String(input["incidentId"]),
+              incident: {
+                ...(typeof incident["status"] === "string" ? { status: incident["status"] } : {}),
+                resolved_at:
+                  typeof incident["resolved_at"] === "string" || incident["resolved_at"] === null
+                    ? incident["resolved_at"]
+                    : null
+              }
+            });
+
+            return incident;
+          })()
+        };
+      } catch (error) {
+        mapMcpError(error);
+      }
+    },
+    async reopen_incident(input) {
+      try {
+        if (await shouldUseLocalSource(input)) {
+          return {
+            incident: await reopenLocalIncident({
+              incidentId: String(input["incidentId"])
+            })
+          };
+        }
+
+        if (await shouldCombineLocalAndCloudSource(input)) {
+          try {
+            return {
+              incident: await reopenLocalIncident({
+                incidentId: String(input["incidentId"])
+              })
+            };
+          } catch (error) {
+            if (!isNotFoundRetrievalError(error)) {
+              throw error;
+            }
+          }
+        }
+
+        return {
+          incident: await (async () => {
+            const incident = attachSourceToRecord(
+              (await api.reopenIncident({
+                bearerToken: await requireCloudBearerToken(input),
+                incidentId: String(input["incidentId"])
+              })) as Record<string, unknown>,
+              "cloud"
+            );
+
+            await syncCloudIncidentCacheStatus({
+              incidentId: String(input["incidentId"]),
+              incident: {
+                ...(typeof incident["status"] === "string" ? { status: incident["status"] } : {}),
+                resolved_at: null
+              }
+            });
+
+            return incident;
+          })()
+        };
+      } catch (error) {
+        mapMcpError(error);
+      }
+    },
+    async get_bundle(input) {
+      try {
+        if (await shouldUseLocalSource(input)) {
+          return await getLocalBundle({
+            incidentId: String(input["incidentId"])
+          });
+        }
+
+        if (await shouldCombineLocalAndCloudSource(input)) {
+          try {
+            return await getLocalBundle({
+              incidentId: String(input["incidentId"])
+            });
+          } catch (error) {
+            if (!isNotFoundRetrievalError(error)) {
+              throw error;
+            }
+          }
+        }
+
+        return cacheCloudBundleArtifact(
+          {
+            incidentId: String(input["incidentId"]),
+            bundle: await api.getBundle({
+              bearerToken: await requireCloudBearerToken(input),
+              incidentId: String(input["incidentId"])
+            })
+          }
+        );
+      } catch (error) {
+        mapMcpError(error);
+      }
+    },
+    async get_logs(input) {
+      try {
+        const requestInput: {
+          bearerToken: string;
+          incidentId: string;
+          level?: string;
+          cursor?: string;
+          limit?: number;
+        } = {
+          bearerToken: await requireCloudBearerToken(input),
+          incidentId: String(input["incidentId"])
+        };
+        if (typeof input["level"] === "string") {
+          requestInput.level = input["level"];
+        }
+        if (typeof input["cursor"] === "string") {
+          requestInput.cursor = input["cursor"];
+        }
+        if (typeof input["limit"] === "number") {
+          requestInput.limit = input["limit"];
+        }
+
+        return await api.getLogs(requestInput);
+      } catch (error) {
+        mapMcpError(error);
+      }
+    },
+    async get_reproduction(input) {
+      try {
+        if (await shouldUseLocalSource(input)) {
+          return await getLocalReproduction({
+            incidentId: String(input["incidentId"])
+          });
+        }
+
+        if (await shouldCombineLocalAndCloudSource(input)) {
+          try {
+            return await getLocalReproduction({
+              incidentId: String(input["incidentId"])
+            });
+          } catch (error) {
+            if (!isNotFoundRetrievalError(error)) {
+              throw error;
+            }
+          }
+        }
+
+        return cacheCloudReproductionArtifact(
+          {
+            incidentId: String(input["incidentId"]),
+            reproduction: await api.getReproduction({
+              bearerToken: await requireCloudBearerToken(input),
+              incidentId: String(input["incidentId"])
+            })
+          }
+        );
+      } catch (error) {
+        mapMcpError(error);
+      }
+    }
+  };
+}

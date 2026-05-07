@@ -1,0 +1,25 @@
+{
+  "package": "debugbundle/debugbundle",
+  "publicRepository": "https://github.com/debugbundle/debugbundle",
+  "sourceDirectory": ".",
+  "distributionRef": "debugbundle/debugbundle",
+  "requiredReleaseFiles": [
+    "package.json",
+    "pnpm-lock.yaml",
+    "README.md",
+    "LICENSE",
+    "SECURITY.md",
+    "CHANGELOG.md",
+    "CONTRIBUTING.md",
+    "CODE_OF_CONDUCT.md",
+    "sdks.json",
+    "scripts/bootstrap-sdks.sh",
+    ".github/workflows/ci.yml",
+    ".github/workflows/release-cli-package.yml",
+    ".github/workflows/release-mcp-package.yml",
+    ".github/workflows/release-shared-js-packages.yml",
+    ".github/ISSUE_TEMPLATE/bug_report.yml",
+    ".github/ISSUE_TEMPLATE/feature_request.yml",
+    ".github/PULL_REQUEST_TEMPLATE.md"
+  ]
+}

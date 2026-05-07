@@ -1,0 +1,235 @@
+services:
+  postgres:
+    image: postgres:17
+    container_name: debugbundle-postgres
+    environment:
+      POSTGRES_USER: debugbundle
+      POSTGRES_PASSWORD: debugbundle
+      POSTGRES_DB: debugbundle
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U debugbundle -d debugbundle"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  redis:
+    image: redis:7
+    container_name: debugbundle-redis
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+
+  localstack:
+    image: localstack/localstack:latest
+    container_name: debugbundle-localstack
+    environment:
+      SERVICES: s3
+      AWS_DEFAULT_REGION: us-east-1
+      DEBUG: "0"
+    volumes:
+      - localstack-data:/var/lib/localstack
+    healthcheck:
+      test: ["CMD-SHELL", "awslocal s3 ls >/dev/null 2>&1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  s3-bootstrap:
+    image: amazon/aws-cli:2.17.40
+    container_name: debugbundle-s3-bootstrap
+    restart: "no"
+    depends_on:
+      localstack:
+        condition: service_healthy
+    environment:
+      AWS_ACCESS_KEY_ID: test
+      AWS_SECRET_ACCESS_KEY: test
+      AWS_DEFAULT_REGION: us-east-1
+    entrypoint:
+      - /bin/sh
+      - -lc
+      - aws --endpoint-url=http://localstack:4566 s3api head-bucket --bucket debugbundle-raw-events >/dev/null 2>&1 || aws --endpoint-url=http://localstack:4566 s3 mb s3://debugbundle-raw-events
+    profiles:
+      - dev
+
+  db-bootstrap:
+    image: node:24-alpine
+    container_name: debugbundle-db-bootstrap
+    restart: "no"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - .:/workspace
+    working_dir: /workspace
+    environment:
+      DB_HOST: postgres
+      DB_PORT: "5432"
+      DB_USER: debugbundle
+      DB_PASSWORD: debugbundle
+      DB_NAME: debugbundle
+    command: sh -lc "corepack enable && corepack pnpm db:bootstrap"
+    profiles:
+      - dev
+
+  db-migrate:
+    image: node:24-alpine
+    container_name: debugbundle-db-migrate
+    restart: "no"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      db-bootstrap:
+        condition: service_completed_successfully
+    volumes:
+      - .:/workspace
+    working_dir: /workspace
+    environment:
+      DB_HOST: postgres
+      DB_PORT: "5432"
+      DB_USER: debugbundle
+      DB_PASSWORD: debugbundle
+      DB_NAME: debugbundle
+    command: sh -lc "corepack enable && corepack pnpm db:migrate"
+    profiles:
+      - dev
+
+  api:
+    image: node:24-alpine
+    container_name: debugbundle-api
+    depends_on:
+      postgres:
+        condition: service_healthy
+      db-bootstrap:
+        condition: service_completed_successfully
+      db-migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+      localstack:
+        condition: service_healthy
+      s3-bootstrap:
+        condition: service_completed_successfully
+    volumes:
+      - .:/workspace
+    working_dir: /workspace
+    ports:
+      - "3003:3000"
+    environment:
+      API_HOST: "0.0.0.0"
+      API_PORT: "3000"
+      APP_BASE_URL: ${APP_BASE_URL:-http://localhost:5291}
+      SES_REGION: ${SES_REGION:-us-east-1}
+      SES_FROM_EMAIL: ${SES_FROM_EMAIL:-}
+      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-}
+      STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:-}
+      STRIPE_SOLO_PRICE_ID: ${STRIPE_SOLO_PRICE_ID:-}
+      STRIPE_TEAM_PRICE_ID: ${STRIPE_TEAM_PRICE_ID:-}
+      STRIPE_SOLO_EXTRA_CAPACITY_PRICE_ID: ${STRIPE_SOLO_EXTRA_CAPACITY_PRICE_ID:-}
+      STRIPE_TEAM_EXTRA_CAPACITY_PRICE_ID: ${STRIPE_TEAM_EXTRA_CAPACITY_PRICE_ID:-}
+      STRIPE_SOLO_CHECKOUT_URL: ${STRIPE_SOLO_CHECKOUT_URL:-}
+      STRIPE_TEAM_CHECKOUT_URL: ${STRIPE_TEAM_CHECKOUT_URL:-}
+      STRIPE_CUSTOMER_PORTAL_URL: ${STRIPE_CUSTOMER_PORTAL_URL:-}
+      DEBUGBUNDLE_DOGFOOD_ENABLED: ${DEBUGBUNDLE_DOGFOOD_ENABLED:-}
+      DEBUGBUNDLE_DOGFOOD_PROJECT_TOKEN: ${DEBUGBUNDLE_DOGFOOD_PROJECT_TOKEN:-}
+      DEBUGBUNDLE_DOGFOOD_ENDPOINT: ${DEBUGBUNDLE_DOGFOOD_ENDPOINT:-}
+      DEBUGBUNDLE_DOGFOOD_SERVICE: ${DEBUGBUNDLE_DOGFOOD_SERVICE:-debugbundle-api}
+      DEBUGBUNDLE_DOGFOOD_ENVIRONMENT: ${DEBUGBUNDLE_DOGFOOD_ENVIRONMENT:-development}
+      DEBUGBUNDLE_DOGFOOD_EXPOSE_TRIGGERS: ${DEBUGBUNDLE_DOGFOOD_EXPOSE_TRIGGERS:-false}
+      DEBUGBUNDLE_DOGFOOD_CAPTURE_CONSOLE: ${DEBUGBUNDLE_DOGFOOD_CAPTURE_CONSOLE:-false}
+      DEBUGBUNDLE_PROBE_TRIGGER_SECRET: ${DEBUGBUNDLE_PROBE_TRIGGER_SECRET:-}
+      AUTH_COOKIE_SECURE: ${AUTH_COOKIE_SECURE:-false}
+      AUTH_SIGNUP_ALLOWED_EMAILS: ${AUTH_SIGNUP_ALLOWED_EMAILS:-}
+      DEV_GITHUB_MOCK_LOGIN: ${DEV_GITHUB_MOCK_LOGIN:-true}
+      DEV_GITHUB_MOCK_EMAIL: ${DEV_GITHUB_MOCK_EMAIL:-dev@debugbundle.local}
+      DB_HOST: postgres
+      DB_PORT: "5432"
+      DB_USER: debugbundle
+      DB_PASSWORD: debugbundle
+      DB_NAME: debugbundle
+      REDIS_URL: redis://redis:6379
+      S3_ENDPOINT: http://localstack:4566
+      S3_REGION: us-east-1
+      S3_BUCKET: debugbundle-raw-events
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-test}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-test}
+      AWS_SESSION_TOKEN: ${AWS_SESSION_TOKEN:-}
+      GITHUB_CLIENT_ID: ${GITHUB_CLIENT_ID:-}
+      GITHUB_CLIENT_SECRET: ${GITHUB_CLIENT_SECRET:-}
+      GITHUB_OAUTH_CALLBACK_URL: ${GITHUB_OAUTH_CALLBACK_URL:-http://localhost:5291/v1/auth/github/callback}
+      GITHUB_OAUTH_STATE_SECRET: ${GITHUB_OAUTH_STATE_SECRET:-}
+    command: sh -lc "corepack enable && corepack pnpm api:start"
+    profiles:
+      - dev
+
+  worker:
+    image: node:24-alpine
+    container_name: debugbundle-worker
+    depends_on:
+      postgres:
+        condition: service_healthy
+      db-bootstrap:
+        condition: service_completed_successfully
+      db-migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+      localstack:
+        condition: service_healthy
+      s3-bootstrap:
+        condition: service_completed_successfully
+    volumes:
+      - .:/workspace
+    working_dir: /workspace
+    environment:
+      DB_HOST: postgres
+      DB_PORT: "5432"
+      DB_USER: debugbundle
+      DB_PASSWORD: debugbundle
+      DB_NAME: debugbundle
+      REDIS_URL: redis://redis:6379
+      S3_ENDPOINT: http://localstack:4566
+      S3_REGION: us-east-1
+      S3_BUCKET: debugbundle-raw-events
+      AWS_ACCESS_KEY_ID: test
+      AWS_SECRET_ACCESS_KEY: test
+      WORKER_POLL_INTERVAL_MS: ${WORKER_POLL_INTERVAL_MS:-1000}
+      WORKER_RUN_ONCE: ${WORKER_RUN_ONCE:-0}
+    command: sh -lc "corepack enable && corepack pnpm worker:start"
+    profiles:
+      - dev
+
+  web:
+    image: node:24-alpine
+    container_name: debugbundle-web
+    depends_on:
+      - api
+    volumes:
+      - .:/workspace
+    working_dir: /workspace/apps/web
+    ports:
+      - "${WEB_PORT:-5291}:5291"
+    environment:
+      VITE_DEV_API_PROXY_TARGET: http://api:3000
+      VITE_API_URL: ${VITE_API_URL:-http://localhost:3003}
+      VITE_DEBUGBUNDLE_DOGFOOD_ENABLED: ${VITE_DEBUGBUNDLE_DOGFOOD_ENABLED:-}
+      VITE_DEBUGBUNDLE_DOGFOOD_PROJECT_TOKEN: ${VITE_DEBUGBUNDLE_DOGFOOD_PROJECT_TOKEN:-}
+      VITE_DEBUGBUNDLE_DOGFOOD_ENDPOINT: ${VITE_DEBUGBUNDLE_DOGFOOD_ENDPOINT:-}
+      VITE_DEBUGBUNDLE_DOGFOOD_SERVICE: ${VITE_DEBUGBUNDLE_DOGFOOD_SERVICE:-debugbundle-web}
+      VITE_DEBUGBUNDLE_DOGFOOD_ENVIRONMENT: ${VITE_DEBUGBUNDLE_DOGFOOD_ENVIRONMENT:-development}
+      VITE_DEBUGBUNDLE_DOGFOOD_EXPOSE_TRIGGERS: ${VITE_DEBUGBUNDLE_DOGFOOD_EXPOSE_TRIGGERS:-false}
+      VITE_DEBUGBUNDLE_DOGFOOD_CAPTURE_CONSOLE: ${VITE_DEBUGBUNDLE_DOGFOOD_CAPTURE_CONSOLE:-false}
+    command: sh -lc "corepack enable && corepack pnpm dev -- --host 0.0.0.0 --port 5291"
+    profiles:
+      - dev
+
+volumes:
+  postgres-data:
+  localstack-data:

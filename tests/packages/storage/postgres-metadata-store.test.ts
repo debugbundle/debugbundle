@@ -1,0 +1,3005 @@
+import { describe, expect, it, vi } from "vitest";
+
+import {
+  createPostgresWebhookDeliveryStore,
+  createPostgresMetadataStore,
+  type Queryable
+} from "../../../packages/storage/src/index.js";
+import { createPgError } from "../../helpers/fake-pg-error.ts";
+
+describe("postgres metadata store", () => {
+  it("should resolve project by token hash", async (): Promise<void> => {
+    const query = vi.fn().mockResolvedValue({ rows: [{ project_id: "proj_123", organization_id: "org_123", revoked_at: null, expires_at: null }] });
+    const db: Queryable = { query };
+
+    const store = createPostgresMetadataStore(db);
+    const resolved = await store.resolveProjectByTokenHash("hash_abc");
+
+    expect(resolved).toEqual({ project_id: "proj_123", organization_id: "org_123", revoked_at: null, expires_at: null });
+    expect(query).toHaveBeenCalledOnce();
+    expect(String(query.mock.calls[0]?.[0] ?? "")).toContain("o.suspended_at IS NULL");
+  });
+
+  it("should return null when token hash is unknown", async (): Promise<void> => {
+    const query = vi.fn().mockResolvedValue({ rows: [] });
+    const db: Queryable = { query };
+
+    const store = createPostgresMetadataStore(db);
+    const resolved = await store.resolveProjectByTokenHash("missing_hash");
+
+    expect(resolved).toBeNull();
+  });
+
+  it("should resolve project plan from token hash", async (): Promise<void> => {
+    const query = vi.fn().mockResolvedValue({
+      rows: [{ project_id: "proj_123", organization_id: "org_123", organization_plan: "solo", revoked_at: null, expires_at: null }]
+    });
+    const db: Queryable = { query: query as Queryable["query"] };
+    const store = createPostgresMetadataStore(db);
+
+    const resolved = await store.resolveProjectByTokenHash("hash_abc");
+
+    expect(resolved).toEqual({ project_id: "proj_123", organization_id: "org_123", organization_plan: "solo", revoked_at: null, expires_at: null });
+  });
+
+  it("should resolve member by member token hash", async (): Promise<void> => {
+    const query = vi
+      .fn()
+      .mockResolvedValue({
+        rows: [{ member_id: "mem_123", organization_id: "org_123", role: "owner", revoked_at: null, expires_at: null }]
+      });
+    const db: Queryable = { query };
+
+    const store = createPostgresMetadataStore(db);
+    const resolved = await store.resolveMemberByTokenHash("hash_member");
+
+    expect(resolved).toEqual({
+      member_id: "mem_123",
+      organization_id: "org_123",
+      role: "owner",
+      revoked_at: null,
+      expires_at: null
+    });
+    expect(query).toHaveBeenCalledOnce();
+    expect(String(query.mock.calls[0]?.[0] ?? "")).toContain("om.suspended_at IS NULL");
+    expect(String(query.mock.calls[0]?.[0] ?? "")).toContain("org.suspended_at IS NULL");
+  });
+
+  it("should list organization members with organization plan", async (): Promise<void> => {
+    const query = vi
+      .fn()
+      .mockResolvedValueOnce({ rows: [{ organization_id: "org_123", plan: "team" }] })
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            user_id: "usr_123",
+            email: "owen@example.com",
+            role: "owner",
+            created_at: "2026-03-16T00:00:00.000Z"
+          }
+        ]
+      });
+    const store = createPostgresMetadataStore({ query }) as unknown as {
+      listMembersForOrganization: (input: { organization_id: string }) => Promise<unknown>;
+    };
+
+    const members = await store.listMembersForOrganization({ organization_id: "org_123" });
+
+    expect(members).toEqual({
+      plan: "team",
+      members: [
+        {
+          user_id: "usr_123",
+          email: "owen@example.com",
+          role: "owner",
+          created_at: "2026-03-16T00:00:00.000Z"
+        }
+      ]
+    });
+  });
+
+  it("should create organization invites and map member, invite, and plan conflicts", async (): Promise<void> => {
+    const createdQuery = vi
+      .fn()
+      .mockResolvedValueOnce({ rows: [{ organization_id: "org_123", plan: "team" }] })
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            invite_id: "inv_123",
+            organization_id: "org_123",
+            email: "new@example.com",
+            role: "member",
+            invited_by: "usr_123",
+            accepted_at: null,
+            expires_at: "2026-03-23T00:00:00.000Z",
+            created_at: "2026-03-16T00:00:00.000Z"
+          }
+        ]
+      });
+    const memberExistsQuery = vi
+      .fn()
+      .mockResolvedValueOnce({ rows: [{ organization_id: "org_123", plan: "team" }] })
+      .mockResolvedValueOnce({ rows: [{ user_id: "usr_existing" }] });
+    const upgradeRequiredQuery = vi.fn().mockResolvedValueOnce({ rows: [{ organization_id: "org_123", plan: "free" }] });
+    const inviteExistsQuery = vi
+      .fn()
+      .mockResolvedValueOnce({ rows: [{ organization_id: "org_123", plan: "team" }] })
+      .mockResolvedValueOnce({ rows: [] })
+      .mockRejectedValueOnce(createPgError("23505", "invites_organization_id_email_key"));
+
+    const createdStore = createPostgresMetadataStore({ query: createdQuery }) as unknown as {
+      createInviteForOrganization: (input: {
+        organization_id: string;
+        email: string;
+        role: string;
+        invited_by_user_id: string;
+        invite_token_hash: string;
+        expires_at: string;
+      }) => Promise<unknown>;
+    };
+    const memberExistsStore = createPostgresMetadataStore({ query: memberExistsQuery }) as unknown as {
+      createInviteForOrganization: (input: {
+        organization_id: string;
+        email: string;
+        role: string;
+        invited_by_user_id: string;
+        invite_token_hash: string;
+        expires_at: string;
+      }) => Promise<unknown>;
+    };
+    const upgradeRequiredStore = createPostgresMetadataStore({ query: upgradeRequiredQuery }) as unknown as {
+      createInviteForOrganization: (input: {
+        organization_id: string;
+        email: string;
+        role: string;
+        invited_by_user_id: string;
+        invite_token_hash: string;
+        expires_at: string;
+      }) => Promise<unknown>;
+    };
+    const inviteExistsStore = createPostgresMetadataStore({ query: inviteExistsQuery }) as unknown as {
+      createInviteForOrganization: (input: {
+        organization_id: string;
+        email: string;
+        role: string;
+        invited_by_user_id: string;
+        invite_token_hash: string;
+        expires_at: string;
+      }) => Promise<unknown>;
+    };
+
+    const created = await createdStore.createInviteForOrganization({
+      organization_id: "org_123",
+      email: "new@example.com",
+      role: "member",
+      invited_by_user_id: "usr_123",
+      invite_token_hash: "invite_hash_123",
+      expires_at: "2026-03-23T00:00:00.000Z"
+    });
+    const memberExists = await memberExistsStore.createInviteForOrganization({
+      organization_id: "org_123",
+      email: "existing@example.com",
+      role: "member",
+      invited_by_user_id: "usr_123",
+      invite_token_hash: "invite_hash_456",
+      expires_at: "2026-03-23T00:00:00.000Z"
+    });
+    const upgradeRequired = await upgradeRequiredStore.createInviteForOrganization({
+      organization_id: "org_123",
+      email: "new@example.com",
+      role: "member",
+      invited_by_user_id: "usr_123",
+      invite_token_hash: "invite_hash_789",
+      expires_at: "2026-03-23T00:00:00.000Z"
+    });
+    const inviteExists = await inviteExistsStore.createInviteForOrganization({
+      organization_id: "org_123",
+      email: "pending@example.com",
+      role: "member",
+      invited_by_user_id: "usr_123",
+      invite_token_hash: "invite_hash_999",
+      expires_at: "2026-03-23T00:00:00.000Z"
+    });
+
+    expect(created).toEqual({
+      kind: "created",
+      plan: "team",
+      invite: {
+        invite_id: "inv_123",
+        organization_id: "org_123",
+        email: "new@example.com",
+        role: "member",
+        invited_by: "usr_123",
+        accepted_at: null,
+        expires_at: "2026-03-23T00:00:00.000Z",
+        created_at: "2026-03-16T00:00:00.000Z"
+      }
+    });
+    expect(memberExists).toEqual({ kind: "member_exists", plan: "team" });
+    expect(upgradeRequired).toEqual({ kind: "upgrade_required", plan: "free" });
+    expect(inviteExists).toEqual({ kind: "invite_exists", plan: "team" });
+  });
+
+  it("should list pending invites, cancel invites, and remove non-owner members", async (): Promise<void> => {
+    const listInvitesQuery = vi
+      .fn()
+      .mockResolvedValueOnce({ rows: [{ organization_id: "org_123" }] })
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            invite_id: "inv_123",
+            organization_id: "org_123",
+            email: "pending@example.com",
+            role: "member",
+            invited_by: "usr_123",
+            accepted_at: null,
+            expires_at: "2026-03-23T00:00:00.000Z",
+            created_at: "2026-03-16T00:00:00.000Z"
+          }
+        ]
+      });
+    const cancelInviteQuery = vi.fn().mockResolvedValue({
+      rows: [
+        {
+          invite_id: "inv_123",
+          organization_id: "org_123",
+          email: "pending@example.com",
+          role: "member",
+          invited_by: "usr_123",
+          accepted_at: null,
+          expires_at: "2026-03-23T00:00:00.000Z",
+          created_at: "2026-03-16T00:00:00.000Z"
+        }
+      ]
+    });
+    const removeMemberQuery = vi
+      .fn()
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            user_id: "usr_member",
+            email: "member@example.com",
+            role: "member",
+            created_at: "2026-03-16T00:00:00.000Z"
+          }
+        ]
+      })
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [{ revoked_token_count: "2" }] });
+    const ownerRemovalQuery = vi.fn().mockResolvedValue({
+      rows: [
+        {
+          user_id: "usr_owner",
+          email: "owner@example.com",
+          role: "owner",
+          created_at: "2026-03-16T00:00:00.000Z"
+        }
+      ]
+    });
+    const missingMemberQuery = vi.fn().mockResolvedValue({ rows: [] });
+    const acceptInviteQuery = vi
+      .fn()
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            invite_id: "inv_123",
+            organization_id: "org_123",
+            email: "pending@example.com",
+            role: "member"
+          }
+        ]
+      })
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            user_id: "usr_member",
+            organization_id: "org_123",
+            role: "member"
+          }
+        ]
+      })
+      .mockResolvedValueOnce({ rows: [] });
+    const mismatchedInviteQuery = vi.fn().mockResolvedValueOnce({
+      rows: [
+        {
+          invite_id: "inv_123",
+          organization_id: "org_123",
+          email: "pending@example.com",
+          role: "member"
+        }
+      ]
+    });
+    const missingInviteQuery = vi.fn().mockResolvedValueOnce({ rows: [] });
+
+    const listInvitesStore = createPostgresMetadataStore({ query: listInvitesQuery }) as unknown as {
+      listPendingInvitesForOrganization: (input: { organization_id: string; now: string }) => Promise<unknown>;
+    };
+    const cancelInviteStore = createPostgresMetadataStore({ query: cancelInviteQuery }) as unknown as {
+      cancelInviteForOrganization: (input: { organization_id: string; invite_id: string }) => Promise<unknown>;
+    };
+    const removeMemberStore = createPostgresMetadataStore({ query: removeMemberQuery }) as unknown as {
+      removeMemberFromOrganization: (input: { organization_id: string; user_id: string; revoked_at: string }) => Promise<unknown>;
+    };
+    const ownerRemovalStore = createPostgresMetadataStore({ query: ownerRemovalQuery }) as unknown as {
+      removeMemberFromOrganization: (input: { organization_id: string; user_id: string; revoked_at: string }) => Promise<unknown>;
+    };
+    const missingMemberStore = createPostgresMetadataStore({ query: missingMemberQuery }) as unknown as {
+      removeMemberFromOrganization: (input: { organization_id: string; user_id: string; revoked_at: string }) => Promise<unknown>;
+    };
+    const acceptInviteStore = createPostgresMetadataStore({ query: acceptInviteQuery }) as unknown as {
+      acceptInviteForUser: (input: {
+        invite_token_hash: string;
+        user_id: string;
+        email: string;
+        accepted_at: string;
+      }) => Promise<unknown>;
+    };
+    const mismatchedInviteStore = createPostgresMetadataStore({ query: mismatchedInviteQuery }) as unknown as {
+      acceptInviteForUser: (input: {
+        invite_token_hash: string;
+        user_id: string;
+        email: string;
+        accepted_at: string;
+      }) => Promise<unknown>;
+    };
+    const missingInviteStore = createPostgresMetadataStore({ query: missingInviteQuery }) as unknown as {
+      acceptInviteForUser: (input: {
+        invite_token_hash: string;
+        user_id: string;
+        email: string;
+        accepted_at: string;
+      }) => Promise<unknown>;
+    };
+
+    const invites = await listInvitesStore.listPendingInvitesForOrganization({
+      organization_id: "org_123",
+      now: "2026-03-16T00:00:00.000Z"
+    });
+    const canceledInvite = await cancelInviteStore.cancelInviteForOrganization({
+      organization_id: "org_123",
+      invite_id: "inv_123"
+    });
+    const removedMember = await removeMemberStore.removeMemberFromOrganization({
+      organization_id: "org_123",
+      user_id: "usr_member",
+      revoked_at: "2026-03-16T01:00:00.000Z"
+    });
+    const ownerRemoval = await ownerRemovalStore.removeMemberFromOrganization({
+      organization_id: "org_123",
+      user_id: "usr_owner",
+      revoked_at: "2026-03-16T01:00:00.000Z"
+    });
+    const missingMember = await missingMemberStore.removeMemberFromOrganization({
+      organization_id: "org_123",
+      user_id: "usr_missing",
+      revoked_at: "2026-03-16T01:00:00.000Z"
+    });
+    const acceptedInvite = await acceptInviteStore.acceptInviteForUser({
+      invite_token_hash: "invite_hash_123",
+      user_id: "usr_member",
+      email: "pending@example.com",
+      accepted_at: "2026-03-16T01:00:00.000Z"
+    });
+    const mismatchedInvite = await mismatchedInviteStore.acceptInviteForUser({
+      invite_token_hash: "invite_hash_123",
+      user_id: "usr_member",
+      email: "other@example.com",
+      accepted_at: "2026-03-16T01:00:00.000Z"
+    });
+    const missingInvite = await missingInviteStore.acceptInviteForUser({
+      invite_token_hash: "invite_hash_123",
+      user_id: "usr_member",
+      email: "pending@example.com",
+      accepted_at: "2026-03-16T01:00:00.000Z"
+    });
+
+    expect(invites).toEqual([
+      {
+        invite_id: "inv_123",
+        organization_id: "org_123",
+        email: "pending@example.com",
+        role: "member",
+        invited_by: "usr_123",
+        accepted_at: null,
+        expires_at: "2026-03-23T00:00:00.000Z",
+        created_at: "2026-03-16T00:00:00.000Z"
+      }
+    ]);
+    expect(canceledInvite).toEqual({
+      invite_id: "inv_123",
+      organization_id: "org_123",
+      email: "pending@example.com",
+      role: "member",
+      invited_by: "usr_123",
+      accepted_at: null,
+      expires_at: "2026-03-23T00:00:00.000Z",
+      created_at: "2026-03-16T00:00:00.000Z"
+    });
+    expect(removedMember).toEqual({
+      kind: "removed",
+      member: {
+        user_id: "usr_member",
+        email: "member@example.com",
+        role: "member",
+        created_at: "2026-03-16T00:00:00.000Z"
+      }
+    });
+    expect(ownerRemoval).toEqual({
+      kind: "owner_removal_forbidden",
+      member: {
+        user_id: "usr_owner",
+        email: "owner@example.com",
+        role: "owner",
+        created_at: "2026-03-16T00:00:00.000Z"
+      }
+    });
+    expect(missingMember).toBeNull();
+    expect(acceptedInvite).toEqual({
+      kind: "accepted",
+      membership: {
+        user_id: "usr_member",
+        organization_id: "org_123",
+        role: "member"
+      }
+    });
+    expect(mismatchedInvite).toEqual({ kind: "email_mismatch" });
+    expect(missingInvite).toEqual({ kind: "invalid_token" });
+  });
+
+  it("should update member roles and protect the last owner role", async (): Promise<void> => {
+    const promoteMemberQuery = vi
+      .fn()
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            user_id: "usr_member",
+            email: "member@example.com",
+            role: "member",
+            created_at: "2026-03-16T00:00:00.000Z"
+          }
+        ]
+      })
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            user_id: "usr_member",
+            email: "member@example.com",
+            role: "owner",
+            created_at: "2026-03-16T00:00:00.000Z"
+          }
+        ]
+      });
+    const demoteOwnerForbiddenQuery = vi
+      .fn()
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            user_id: "usr_owner",
+            email: "owner@example.com",
+            role: "owner",
+            created_at: "2026-03-16T00:00:00.000Z"
+          }
+        ]
+      })
+      .mockResolvedValueOnce({ rows: [{ owner_count: "1" }] });
+    const missingMemberQuery = vi.fn().mockResolvedValue({ rows: [] });
+
+    const promoteMemberStore = createPostgresMetadataStore({ query: promoteMemberQuery }) as unknown as {
+      updateMemberRoleForOrganization: (input: {
+        organization_id: string;
+        user_id: string;
+        role: "owner" | "member";
+      }) => Promise<unknown>;
+    };
+    const demoteOwnerForbiddenStore = createPostgresMetadataStore({ query: demoteOwnerForbiddenQuery }) as unknown as {
+      updateMemberRoleForOrganization: (input: {
+        organization_id: string;
+        user_id: string;
+        role: "owner" | "member";
+      }) => Promise<unknown>;
+    };
+    const missingMemberStore = createPostgresMetadataStore({ query: missingMemberQuery }) as unknown as {
+      updateMemberRoleForOrganization: (input: {
+        organization_id: string;
+        user_id: string;
+        role: "owner" | "member";
+      }) => Promise<unknown>;
+    };
+
+    const promotedMember = await promoteMemberStore.updateMemberRoleForOrganization({
+      organization_id: "org_123",
+      user_id: "usr_member",
+      role: "owner"
+    });
+    const demoteOwnerForbidden = await demoteOwnerForbiddenStore.updateMemberRoleForOrganization({
+      organization_id: "org_123",
+      user_id: "usr_owner",
+      role: "member"
+    });
+    const missingMember = await missingMemberStore.updateMemberRoleForOrganization({
+      organization_id: "org_123",
+      user_id: "usr_missing",
+      role: "member"
+    });
+
+    expect(promotedMember).toEqual({
+      kind: "updated",
+      member: {
+        user_id: "usr_member",
+        email: "member@example.com",
+        role: "owner",
+        created_at: "2026-03-16T00:00:00.000Z"
+      }
+    });
+    expect(demoteOwnerForbidden).toEqual({
+      kind: "owner_role_change_forbidden",
+      member: {
+        user_id: "usr_owner",
+        email: "owner@example.com",
+        role: "owner",
+        created_at: "2026-03-16T00:00:00.000Z"
+      }
+    });
+    expect(missingMember).toBeNull();
+  });
+
+  it("should list projects for an organization", async (): Promise<void> => {
+    const query = vi.fn().mockResolvedValue({
+      rows: [
+        {
+          project_id: "proj_123",
+          organization_id: "org_123",
+          name: "Main App",
+          slug: "main-app",
+          environment_default: "production",
+          organization_plan: "free",
+          metrics: {
+            monthly_bundle_requests: 12,
+            monthly_raw_ingested_events: 120,
+            retained_bundles: 6,
+            monthly_alert_deliveries: 4
+          },
+          created_at: "2026-03-16T00:00:00.000Z",
+          updated_at: "2026-03-16T00:00:00.000Z"
+        }
+      ]
+    });
+    const store = createPostgresMetadataStore({ query });
+
+    const projects = await store.listProjectsForOrganization({
+      organization_id: "org_123",
+      now: "2026-03-19T00:00:00.000Z",
+      limit: 10
+    });
+
+    expect(projects).toEqual([
+      {
+        project_id: "proj_123",
+        organization_id: "org_123",
+        name: "Main App",
+        slug: "main-app",
+        environment_default: "production",
+        organization_plan: "free",
+        metrics: {
+          monthly_bundle_requests: 12,
+          monthly_raw_ingested_events: 120,
+          retained_bundles: 6,
+          monthly_alert_deliveries: 4
+        },
+        created_at: "2026-03-16T00:00:00.000Z",
+        updated_at: "2026-03-16T00:00:00.000Z"
+      }
+    ]);
+  });
+
+  it("should use the billing-aligned ingested events predicate in project metrics", async (): Promise<void> => {
+    const calls: Array<{ sql: string; params: unknown[] }> = [];
+    const query = vi.fn().mockImplementation((sql: string, params: unknown[]) => {
+      calls.push({ sql, params });
+
+      if (sql.includes("to_regclass")) {
+        return { rows: [{ exists: false }] };
+      }
+
+      return {
+        rows: [
+          {
+            project_id: "proj_123",
+            organization_id: "org_123",
+            name: "Main App",
+            slug: "main-app",
+            environment_default: "production",
+            organization_plan: "free",
+            metrics: {
+              monthly_bundle_requests: 12,
+              monthly_raw_ingested_events: 120,
+              retained_bundles: 6,
+              monthly_alert_deliveries: 4
+            },
+            created_at: "2026-03-16T00:00:00.000Z",
+            updated_at: "2026-03-16T00:00:00.000Z"
+          }
+        ]
+      };
+    });
+    const store = createPostgresMetadataStore({ query });
+
+    await store.listProjectsForOrganization({
+      organization_id: "org_123",
+      now: "2026-03-19T00:00:00.000Z",
+      limit: 10
+    });
+
+    const listProjectsCall = calls.find((call) => call.sql.includes("FROM projects p"));
+    expect(listProjectsCall).toBeDefined();
+    expect(listProjectsCall!.sql).toContain("ie.event_class = 'incident_signal'");
+    expect(listProjectsCall!.sql).toContain("JOIN organizations o ON o.id = p.organization_id");
+    expect(listProjectsCall!.sql).toContain("COALESCE(o.plan, 'free') AS organization_plan");
+  });
+
+  it("should source project plans from the organization plan across project record mutations", async (): Promise<void> => {
+    const calls: string[] = [];
+    const query = vi.fn().mockImplementation((sql: string) => {
+      calls.push(sql);
+
+      if (sql.includes("WITH created_project AS")) {
+        return {
+          rows: [
+            {
+              project_id: "proj_created",
+              organization_id: "org_123",
+              name: "Created App",
+              slug: "created-app",
+              environment_default: "production",
+              organization_plan: "team",
+              metrics: {
+                monthly_bundle_requests: 0,
+                monthly_raw_ingested_events: 0,
+                retained_bundles: 0,
+                monthly_alert_deliveries: 0
+              },
+              created_at: "2026-03-16T00:00:00.000Z",
+              updated_at: "2026-03-16T00:00:00.000Z"
+            }
+          ]
+        };
+      }
+
+      if (sql.includes("WITH updated_project AS")) {
+        return {
+          rows: [
+            {
+              project_id: "proj_123",
+              organization_id: "org_123",
+              name: "Updated App",
+              slug: "updated-app",
+              environment_default: "staging",
+              organization_plan: "team",
+              metrics: {
+                monthly_bundle_requests: 0,
+                monthly_raw_ingested_events: 0,
+                retained_bundles: 0,
+                monthly_alert_deliveries: 0
+              },
+              created_at: "2026-03-16T00:00:00.000Z",
+              updated_at: "2026-03-18T00:00:00.000Z"
+            }
+          ]
+        };
+      }
+
+      if (sql.includes("WITH deleted_project AS")) {
+        return {
+          rows: [
+            {
+              project_id: "proj_123",
+              organization_id: "org_123",
+              name: "Deleted App",
+              slug: "deleted-app",
+              environment_default: "production",
+              organization_plan: "team",
+              created_at: "2026-03-16T00:00:00.000Z",
+              updated_at: "2026-03-18T00:00:00.000Z"
+            }
+          ]
+        };
+      }
+
+      if (sql.includes("to_regclass")) {
+        return { rows: [{ exists: false }] };
+      }
+
+      return { rows: [] };
+    });
+
+    const store = createPostgresMetadataStore({ query });
+
+    await store.createProjectForOrganization({
+      organization_id: "org_123",
+      name: "Created App",
+      slug: "created-app",
+      environment_default: "production"
+    });
+    await store.updateProjectForOrganization({
+      organization_id: "org_123",
+      project_id: "proj_123",
+      name: "Updated App"
+    });
+    await store.deleteProjectForOrganization({
+      organization_id: "org_123",
+      project_id: "proj_123"
+    });
+
+    const createSql = calls.find((sql) => sql.includes("WITH created_project AS"));
+    const updateSql = calls.find((sql) => sql.includes("WITH updated_project AS"));
+    const deleteSql = calls.find((sql) => sql.includes("WITH deleted_project AS"));
+
+    expect(createSql).toContain("JOIN organizations o ON o.id = cp.organization_id");
+    expect(createSql).toContain("COALESCE(o.plan, 'free') AS organization_plan");
+
+    expect(updateSql).toContain("JOIN organizations o ON o.id = up.organization_id");
+    expect(updateSql).toContain("COALESCE(o.plan, 'free') AS organization_plan");
+
+    expect(deleteSql).toContain("JOIN organizations o ON o.id = dp.organization_id");
+    expect(deleteSql).toContain("COALESCE(o.plan, 'free') AS organization_plan");
+  });
+
+  it("should create projects for an organization and map duplicate slug conflicts", async (): Promise<void> => {
+    const createdQuery = vi.fn().mockResolvedValue({
+      rows: [
+        {
+          project_id: "proj_123",
+          organization_id: "org_123",
+          name: "Main App",
+          slug: "main-app",
+          environment_default: "production",
+          organization_plan: "free",
+          metrics: {
+            monthly_bundle_requests: 0,
+            monthly_raw_ingested_events: 0,
+            retained_bundles: 0,
+            monthly_alert_deliveries: 0
+          },
+          created_at: "2026-03-16T00:00:00.000Z",
+          updated_at: "2026-03-16T00:00:00.000Z"
+        }
+      ]
+    });
+    const duplicateQuery = vi.fn().mockRejectedValue(createPgError("23505", "projects_organization_id_slug_key"));
+
+    const createdStore = createPostgresMetadataStore({ query: createdQuery });
+    const duplicateStore = createPostgresMetadataStore({ query: duplicateQuery });
+
+    const created = await createdStore.createProjectForOrganization({
+      organization_id: "org_123",
+      name: "Main App",
+      slug: "main-app",
+      environment_default: "production"
+    });
+    const duplicate = await duplicateStore.createProjectForOrganization({
+      organization_id: "org_123",
+      name: "Main App",
+      slug: "main-app",
+      environment_default: "production"
+    });
+    expect(created).toEqual({
+      project_id: "proj_123",
+      organization_id: "org_123",
+      name: "Main App",
+      slug: "main-app",
+      environment_default: "production",
+      organization_plan: "free",
+      metrics: {
+        monthly_bundle_requests: 0,
+        monthly_raw_ingested_events: 0,
+        retained_bundles: 0,
+        monthly_alert_deliveries: 0
+      },
+      created_at: "2026-03-16T00:00:00.000Z",
+      updated_at: "2026-03-16T00:00:00.000Z"
+    });
+    expect(duplicate).toBeNull();
+    expect(createdQuery).toHaveBeenCalledWith(expect.not.stringContaining("COUNT(*)::int"), expect.any(Array));
+  });
+
+  it("should update projects for an organization and map duplicate slug conflicts", async (): Promise<void> => {
+    const updatedQuery = vi.fn().mockResolvedValue({
+      rows: [
+        {
+          project_id: "proj_123",
+          organization_id: "org_123",
+          name: "Main App API",
+          slug: "main-app-api",
+          environment_default: "staging",
+          organization_plan: "free",
+          metrics: {
+            monthly_bundle_requests: 12,
+            monthly_raw_ingested_events: 120,
+            retained_bundles: 6,
+            monthly_alert_deliveries: 4
+          },
+          created_at: "2026-03-16T00:00:00.000Z",
+          updated_at: "2026-03-18T00:00:00.000Z"
+        }
+      ]
+    });
+    const duplicateQuery = vi.fn().mockRejectedValue(createPgError("23505", "projects_organization_id_slug_key"));
+
+    const updatedStore = createPostgresMetadataStore({ query: updatedQuery });
+    const duplicateStore = createPostgresMetadataStore({ query: duplicateQuery });
+
+    const updated = await updatedStore.updateProjectForOrganization({
+      organization_id: "org_123",
+      project_id: "proj_123",
+      name: "Main App API",
+      slug: "main-app-api",
+      environment_default: "staging"
+    });
+    const duplicate = await duplicateStore.updateProjectForOrganization({
+      organization_id: "org_123",
+      project_id: "proj_123",
+      slug: "main-app-api"
+    });
+
+    expect(updated).toEqual({
+      project_id: "proj_123",
+      organization_id: "org_123",
+      name: "Main App API",
+      slug: "main-app-api",
+      environment_default: "staging",
+      organization_plan: "free",
+      metrics: {
+        monthly_bundle_requests: 12,
+        monthly_raw_ingested_events: 120,
+        retained_bundles: 6,
+        monthly_alert_deliveries: 4
+      },
+      created_at: "2026-03-16T00:00:00.000Z",
+      updated_at: "2026-03-18T00:00:00.000Z"
+    });
+    expect(duplicate).toBe("slug_taken");
+  });
+
+  it("should delete projects for an organization and map missing projects", async (): Promise<void> => {
+    const deletedQuery = vi.fn().mockResolvedValue({
+      rows: [
+        {
+          project_id: "proj_123",
+          organization_id: "org_123",
+          name: "Main App",
+          slug: "main-app",
+          environment_default: "production",
+          organization_plan: "free",
+          created_at: "2026-03-16T00:00:00.000Z",
+          updated_at: "2026-03-16T00:00:00.000Z"
+        }
+      ]
+    });
+    const missingQuery = vi.fn().mockResolvedValue({ rows: [] });
+
+    const deletedStore = createPostgresMetadataStore({ query: deletedQuery });
+    const missingStore = createPostgresMetadataStore({ query: missingQuery });
+
+    const deleted = await deletedStore.deleteProjectForOrganization({
+      organization_id: "org_123",
+      project_id: "proj_123"
+    });
+    const missing = await missingStore.deleteProjectForOrganization({
+      organization_id: "org_123",
+      project_id: "proj_missing"
+    });
+
+    expect(deleted).toEqual({
+      project_id: "proj_123",
+      organization_id: "org_123",
+      name: "Main App",
+      slug: "main-app",
+      environment_default: "production",
+      organization_plan: "free",
+      created_at: "2026-03-16T00:00:00.000Z",
+      updated_at: "2026-03-16T00:00:00.000Z"
+    });
+    expect(missing).toBeNull();
+  });
+
+  it("should use existing service id when available", async (): Promise<void> => {
+    const query = vi
+      .fn()
+      .mockResolvedValueOnce({ rows: [{ id: "svc_existing" }] })
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [{ incident_id: "inc_123", matched_fields: [], status: "open", regressed_now: false }] });
+
+    const db: Queryable = { query };
+    const store = createPostgresMetadataStore(db);
+
+    await store.upsertIncident({
+      event_id: "550e8400-e29b-41d4-a716-446655440000",
+      project_id: "proj_123",
+      service_name: "checkout-api",
+      environment: "production",
+      fingerprint: "fp_123",
+      fingerprint_version: "v1",
+      title: "TypeError at /checkout",
+      severity: "high",
+      occurred_at: "2026-03-10T00:00:00.000Z"
+    });
+
+    expect(query).toHaveBeenCalledTimes(3);
+  });
+
+  it("should upsert incident using service lookup and linkage", async (): Promise<void> => {
+    const query = vi
+      .fn()
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [{ id: "svc_123" }] })
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({
+        rows: [{ incident_id: "inc_123", matched_fields: ["normalized_message"], status: "open", regressed_now: false }]
+      });
+
+    const db: Queryable = { query };
+    const store = createPostgresMetadataStore(db);
+
+    const result = await store.upsertIncident({
+      event_id: "550e8400-e29b-41d4-a716-446655440000",
+      project_id: "proj_123",
+      service_name: "checkout-api",
+      environment: "production",
+      fingerprint: "fp_123",
+      fingerprint_version: "v1",
+      title: "TypeError at /checkout",
+      severity: "high",
+      occurred_at: "2026-03-10T00:00:00.000Z"
+    });
+
+    expect(result.incident_id).toBe("inc_123");
+    expect(query).toHaveBeenCalledTimes(4);
+  });
+
+  it("should insert incident event linkage", async (): Promise<void> => {
+    const query = vi.fn().mockResolvedValue({ rows: [] });
+    const db: Queryable = { query };
+
+    const store = createPostgresMetadataStore(db);
+
+    await store.insertIncidentEvent({
+      incident_id: "inc_123",
+      event_id: "550e8400-e29b-41d4-a716-446655440000",
+      event_type: "backend_exception",
+      occurred_at: "2026-03-10T00:00:00.000Z",
+      is_sampled: true,
+      level: null
+    });
+
+    expect(query).toHaveBeenCalledOnce();
+  });
+
+  it("should list alerts for an in-scope project", async (): Promise<void> => {
+    const query = vi
+      .fn()
+      .mockResolvedValueOnce({ rows: [{ id: "proj_123" }] })
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            alert_id: "alt_123",
+            project_id: "proj_123",
+            service_id: null,
+            channel: "email",
+            condition_type: "new_incident",
+            severity_min: null,
+            config: {},
+            is_enabled: true,
+            created_at: "2026-03-15T00:00:00.000Z",
+            updated_at: "2026-03-15T00:00:00.000Z"
+          }
+        ]
+      });
+    const store = createPostgresMetadataStore({ query });
+
+    const alerts = await store.listAlertsForOrganization({
+      organization_id: "org_123",
+      project_id: "proj_123",
+      limit: 10
+    });
+
+    expect(alerts).toEqual([
+      {
+        alert_id: "alt_123",
+        project_id: "proj_123",
+        service_id: null,
+        channel: "email",
+        condition_type: "new_incident",
+        severity_min: null,
+        config: {},
+        is_enabled: true,
+        created_at: "2026-03-15T00:00:00.000Z",
+        updated_at: "2026-03-15T00:00:00.000Z"
+      }
+    ]);
+  });
+
+  it("should create, update, and delete a scoped alert", async (): Promise<void> => {
+    const query = vi
+      .fn()
+      .mockResolvedValueOnce({ rows: [{ id: "proj_123" }] })
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            alert_id: "alt_123",
+            project_id: "proj_123",
+            service_id: null,
+            channel: "email",
+            condition_type: "new_incident",
+            severity_min: null,
+            config: {},
+            is_enabled: true,
+            created_at: "2026-03-15T00:00:00.000Z",
+            updated_at: "2026-03-15T00:00:00.000Z"
+          }
+        ]
+      })
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            alert_id: "alt_123",
+            project_id: "proj_123",
+            service_id: "svc_123",
+            channel: "webhook",
+            condition_type: "severity_threshold",
+            severity_min: "high",
+            config: { target_url: "https://hooks.example.test/alerts" },
+            is_enabled: false,
+            created_at: "2026-03-15T00:00:00.000Z",
+            updated_at: "2026-03-15T00:05:00.000Z"
+          }
+        ]
+      })
+      .mockResolvedValueOnce({ rows: [{ alert_id: "alt_123" }] });
+    const store = createPostgresMetadataStore({ query });
+
+    const created = await store.createAlertForOrganization({
+      organization_id: "org_123",
+      project_id: "proj_123",
+      channel: "email",
+      condition_type: "new_incident",
+      config: {},
+      is_enabled: true
+    });
+    const updated = await store.updateAlertForOrganization({
+      organization_id: "org_123",
+      alert_id: "alt_123",
+      channel: "webhook",
+      condition_type: "severity_threshold",
+      service_id: "svc_123",
+      severity_min: "high",
+      config: { target_url: "https://hooks.example.test/alerts" },
+      is_enabled: false
+    });
+    const deleted = await store.deleteAlertForOrganization({
+      organization_id: "org_123",
+      alert_id: "alt_123"
+    });
+
+    expect(created).toEqual({
+      alert_id: "alt_123",
+      project_id: "proj_123",
+      service_id: null,
+      channel: "email",
+      condition_type: "new_incident",
+      severity_min: null,
+      config: {},
+      is_enabled: true,
+      created_at: "2026-03-15T00:00:00.000Z",
+      updated_at: "2026-03-15T00:00:00.000Z"
+    });
+    expect(updated).toEqual({
+      alert_id: "alt_123",
+      project_id: "proj_123",
+      service_id: "svc_123",
+      channel: "webhook",
+      condition_type: "severity_threshold",
+      severity_min: "high",
+      config: { target_url: "https://hooks.example.test/alerts" },
+      is_enabled: false,
+      created_at: "2026-03-15T00:00:00.000Z",
+      updated_at: "2026-03-15T00:05:00.000Z"
+    });
+    expect(deleted).toEqual({ alert_id: "alt_123" });
+  });
+
+  it("returns null for alert operations when the project scope check fails", async (): Promise<void> => {
+    const query = vi
+      .fn()
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [] });
+    const store = createPostgresMetadataStore({ query });
+
+    const listed = await store.listAlertsForOrganization({
+      organization_id: "org_123",
+      project_id: "proj_missing",
+      limit: 10
+    });
+    const created = await store.createAlertForOrganization({
+      organization_id: "org_123",
+      project_id: "proj_missing",
+      service_id: "svc_123",
+      channel: "email",
+      condition_type: "new_incident",
+      config: {},
+      is_enabled: true
+    });
+
+    expect(listed).toBeNull();
+    expect(created).toBeNull();
+  });
+
+  it("should list and create scoped project tokens", async (): Promise<void> => {
+    const query = vi
+      .fn()
+      .mockResolvedValueOnce({ rows: [{ id: "proj_123" }] })
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            token_id: "11111111-1111-4111-8111-111111111111",
+            project_id: "proj_123",
+            label: "ci",
+            created_at: "2026-03-11T00:00:00.000Z",
+            last_used_at: null,
+            revoked_at: null,
+            expires_at: null
+          }
+        ]
+      })
+      .mockResolvedValueOnce({ rows: [{ id: "proj_123" }] })
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            token_id: "22222222-2222-4222-8222-222222222222",
+            project_id: "proj_123",
+            label: "agent",
+            created_at: "2026-03-11T00:00:00.000Z",
+            last_used_at: null,
+            revoked_at: null,
+            expires_at: null
+          }
+        ]
+      });
+
+    const store = createPostgresMetadataStore({ query });
+
+    const listed = await store.listProjectTokensForOrganization({
+      organization_id: "org_123",
+      project_id: "proj_123",
+      limit: 20
+    });
+    const created = await store.createProjectTokenForOrganization({
+      organization_id: "org_123",
+      project_id: "proj_123",
+      label: "agent",
+      token_hash: "hash_abc"
+    });
+
+    expect(listed).not.toBeNull();
+    expect(listed?.[0]?.token_id).toBe("11111111-1111-4111-8111-111111111111");
+    expect(created?.token_id).toBe("22222222-2222-4222-8222-222222222222");
+    expect(String(query.mock.calls[1]?.[0] ?? "")).toContain("AND revoked_at IS NULL");
+  });
+
+  it("should return null for out-of-scope project token operations", async (): Promise<void> => {
+    const query = vi.fn().mockResolvedValue({ rows: [] });
+    const store = createPostgresMetadataStore({ query });
+
+    const listed = await store.listProjectTokensForOrganization({
+      organization_id: "org_123",
+      project_id: "proj_123",
+      limit: 20
+    });
+    const created = await store.createProjectTokenForOrganization({
+      organization_id: "org_123",
+      project_id: "proj_123",
+      label: "ci",
+      token_hash: "hash_abc"
+    });
+
+    expect(listed).toBeNull();
+    expect(created).toBeNull();
+  });
+
+  it("should revoke scoped project/member tokens and list member tokens", async (): Promise<void> => {
+    const query = vi
+      .fn()
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            token_id: "11111111-1111-4111-8111-111111111111",
+            project_id: "proj_123",
+            label: "ci",
+            created_at: "2026-03-11T00:00:00.000Z",
+            last_used_at: null,
+            revoked_at: "2026-03-11T01:00:00.000Z",
+            expires_at: null
+          }
+        ]
+      })
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            token_id: "33333333-3333-4333-8333-333333333333",
+            user_id: "usr_123",
+            organization_id: "org_123",
+            label: "cli",
+            created_at: "2026-03-11T00:00:00.000Z",
+            last_used_at: null,
+            revoked_at: null,
+            expires_at: null
+          }
+        ]
+      })
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            token_id: "33333333-3333-4333-8333-333333333333",
+            user_id: "usr_123",
+            organization_id: "org_123",
+            label: "cli",
+            created_at: "2026-03-11T00:00:00.000Z",
+            last_used_at: null,
+            revoked_at: null,
+            expires_at: null
+          }
+        ]
+      })
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            token_id: "33333333-3333-4333-8333-333333333333",
+            user_id: "usr_123",
+            organization_id: "org_123",
+            label: "cli",
+            created_at: "2026-03-11T00:00:00.000Z",
+            last_used_at: null,
+            revoked_at: "2026-03-11T01:00:00.000Z",
+            expires_at: null
+          }
+        ]
+      });
+
+    const store = createPostgresMetadataStore({ query });
+
+    const revokedProject = await store.revokeProjectTokenForOrganization({
+      organization_id: "org_123",
+      project_id: "proj_123",
+      token_id: "11111111-1111-4111-8111-111111111111",
+      revoked_at: "2026-03-11T01:00:00.000Z"
+    });
+    const listedMember = await store.listMemberTokensForOrganization({
+      organization_id: "org_123",
+      user_id: "usr_123",
+      limit: 20
+    });
+    const createdMember = await store.createMemberTokenForOrganization({
+      organization_id: "org_123",
+      user_id: "usr_123",
+      label: "cli",
+      token_hash: "hash_mem"
+    });
+    const revokedMember = await store.revokeMemberTokenForOrganization({
+      organization_id: "org_123",
+      user_id: "usr_123",
+      token_id: "33333333-3333-4333-8333-333333333333",
+      revoked_at: "2026-03-11T01:00:00.000Z"
+    });
+
+    expect(revokedProject?.revoked_at).toBe("2026-03-11T01:00:00.000Z");
+    expect(listedMember[0]?.token_id).toBe("33333333-3333-4333-8333-333333333333");
+    expect(createdMember.token_id).toBe("33333333-3333-4333-8333-333333333333");
+    expect(revokedMember?.revoked_at).toBe("2026-03-11T01:00:00.000Z");
+    expect(String(query.mock.calls[1]?.[0] ?? "")).toContain("AND revoked_at IS NULL");
+  });
+
+  it("should throw when member token insert returns no rows", async (): Promise<void> => {
+    const query = vi.fn().mockResolvedValue({ rows: [] });
+    const store = createPostgresMetadataStore({ query });
+
+    await expect(
+      store.createMemberTokenForOrganization({
+        organization_id: "org_123",
+        user_id: "usr_123",
+        label: "cli",
+        token_hash: "hash_mem"
+      })
+    ).rejects.toThrow("member_token_insert_failed");
+  });
+
+  it("should create/list/deactivate probe activations in organization scope", async (): Promise<void> => {
+    const originalSecret = process.env["DEBUGBUNDLE_PROBE_TRIGGER_SECRET"];
+    process.env["DEBUGBUNDLE_PROBE_TRIGGER_SECRET"] = "test-probe-trigger-secret-for-storage";
+    const query = vi
+      .fn()
+      .mockResolvedValueOnce({ rows: [{ id: "proj_123", organization_plan: "solo" }] })
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            activation_id: "11111111-1111-4111-8111-111111111111",
+            label_pattern: "checkout.*",
+            service: "*",
+            environment: "*",
+            expires_at: "2026-03-11T01:00:00.000Z",
+            trigger_expires_at: "2026-03-12T01:00:00.000Z"
+          }
+        ]
+      })
+      .mockResolvedValueOnce({ rows: [{ id: "proj_123", organization_plan: "solo" }] })
+      .mockResolvedValueOnce({ rows: [{ cnt: "1" }] })
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            activation_id: "11111111-1111-4111-8111-111111111111",
+            label_pattern: "checkout.*",
+            service: "*",
+            environment: "*",
+            expires_at: "2026-03-11T01:00:00.000Z",
+            trigger_expires_at: "2026-03-12T01:00:00.000Z"
+          }
+        ]
+      })
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            organization_plan: "solo",
+            activation_id: "11111111-1111-4111-8111-111111111111",
+            deactivated_at: "2026-03-11T00:10:00.000Z"
+          }
+        ]
+      });
+
+    const db: Queryable = { query: query as Queryable["query"] };
+    const store = createPostgresMetadataStore(db);
+
+    const listed = await store.listActiveProbesForProjectInOrganization({
+      organization_id: "org_123",
+      project_id: "proj_123",
+      now: "2026-03-11T00:00:00.000Z"
+    });
+    const created = await store.createProbeActivationForProjectInOrganization({
+      organization_id: "org_123",
+      project_id: "proj_123",
+      created_by_member_id: "usr_123",
+      label_pattern: "checkout.*",
+      service: "*",
+      environment: "*",
+      expires_at: "2026-03-11T01:00:00.000Z",
+      trigger_expires_at: "2026-03-12T01:00:00.000Z"
+    });
+    const deactivated = await store.deactivateProbeActivationForProjectInOrganization({
+      organization_id: "org_123",
+      project_id: "proj_123",
+      activation_id: "11111111-1111-4111-8111-111111111111",
+      deactivated_at: "2026-03-11T00:10:00.000Z"
+    });
+
+    expect(listed).toEqual({
+      organization_plan: "solo",
+      activations: [
+        {
+          activation_id: "11111111-1111-4111-8111-111111111111",
+          label_pattern: "checkout.*",
+          service: "*",
+          environment: "*",
+          expires_at: "2026-03-11T01:00:00.000Z",
+          trigger_expires_at: "2026-03-12T01:00:00.000Z"
+        }
+      ]
+    });
+    expect(created).not.toBeNull();
+    if (created === null) {
+      throw new Error("expected_probe_activation_create_result");
+    }
+    expect(created.organization_plan).toBe("solo");
+    expect(created.activation.activation_id).toBe("11111111-1111-4111-8111-111111111111");
+    expect(created.trigger_token).toMatch(/^dbundle_probe_/);
+    expect(query.mock.calls[4]?.[1]).toEqual([
+      expect.any(String),
+      "proj_123",
+      "usr_123",
+      "checkout.*",
+      "*",
+      "*",
+      expect.stringMatching(/^[0-9a-f]{64}$/),
+      "2026-03-12T01:00:00.000Z",
+      "2026-03-11T01:00:00.000Z"
+    ]);
+    expect(deactivated).toEqual({
+      organization_plan: "solo",
+      deactivated: {
+        activation_id: "11111111-1111-4111-8111-111111111111",
+        deactivated_at: "2026-03-11T00:10:00.000Z"
+      }
+    });
+
+    if (originalSecret === undefined) {
+      delete process.env["DEBUGBUNDLE_PROBE_TRIGGER_SECRET"];
+    } else {
+      process.env["DEBUGBUNDLE_PROBE_TRIGGER_SECRET"] = originalSecret;
+    }
+  });
+
+  it("should list active probes for a project", async (): Promise<void> => {
+    const query = vi.fn().mockResolvedValue({
+      rows: [
+        {
+          activation_id: "11111111-1111-4111-8111-111111111111",
+          label_pattern: "checkout.*",
+          service: "*",
+          environment: "*",
+          expires_at: "2026-03-11T01:00:00.000Z",
+          trigger_expires_at: "2026-03-12T01:00:00.000Z"
+        }
+      ]
+    });
+    const db: Queryable = { query: query as Queryable["query"] };
+    const store = createPostgresMetadataStore(db);
+
+    const activations = await store.listActiveProbesForProject({
+      project_id: "proj_123",
+      now: "2026-03-11T00:00:00.000Z"
+    });
+
+    expect(activations).toEqual([
+      {
+        activation_id: "11111111-1111-4111-8111-111111111111",
+        label_pattern: "checkout.*",
+        service: "*",
+        environment: "*",
+        expires_at: "2026-03-11T01:00:00.000Z",
+        trigger_expires_at: "2026-03-12T01:00:00.000Z"
+      }
+    ]);
+    expect(query).toHaveBeenCalledWith(expect.any(String), ["proj_123", "2026-03-11T00:00:00.000Z"]);
+  });
+
+  it("should handle out-of-scope and insert-failure probe activation branches", async (): Promise<void> => {
+    const originalSecret = process.env["DEBUGBUNDLE_PROBE_TRIGGER_SECRET"];
+    process.env["DEBUGBUNDLE_PROBE_TRIGGER_SECRET"] = "test-probe-trigger-secret-for-storage";
+    const outOfScopeQuery = vi.fn().mockResolvedValue({ rows: [] });
+    const outOfScopeDb: Queryable = { query: outOfScopeQuery as Queryable["query"] };
+    const outOfScopeStore = createPostgresMetadataStore(outOfScopeDb);
+
+    const listed = await outOfScopeStore.listActiveProbesForProjectInOrganization({
+      organization_id: "org_123",
+      project_id: "proj_123",
+      now: "2026-03-11T00:00:00.000Z"
+    });
+    const created = await outOfScopeStore.createProbeActivationForProjectInOrganization({
+      organization_id: "org_123",
+      project_id: "proj_123",
+      created_by_member_id: "usr_123",
+      label_pattern: "checkout.*",
+      service: "*",
+      environment: "*",
+      expires_at: "2026-03-11T01:00:00.000Z",
+      trigger_expires_at: "2026-03-12T01:00:00.000Z"
+    });
+    const deactivated = await outOfScopeStore.deactivateProbeActivationForProjectInOrganization({
+      organization_id: "org_123",
+      project_id: "proj_123",
+      activation_id: "11111111-1111-4111-8111-111111111111",
+      deactivated_at: "2026-03-11T00:10:00.000Z"
+    });
+
+    expect(listed).toBeNull();
+    expect(created).toBeNull();
+    expect(deactivated).toBeNull();
+
+    const insertFailureQuery = vi
+      .fn()
+      .mockResolvedValueOnce({ rows: [{ id: "proj_123", organization_plan: "solo" }] })
+      .mockResolvedValueOnce({ rows: [{ cnt: "0" }] })
+      .mockResolvedValueOnce({ rows: [] });
+    const insertFailureDb: Queryable = { query: insertFailureQuery as Queryable["query"] };
+    const insertFailureStore = createPostgresMetadataStore(insertFailureDb);
+
+    await expect(
+      insertFailureStore.createProbeActivationForProjectInOrganization({
+        organization_id: "org_123",
+        project_id: "proj_123",
+        created_by_member_id: "usr_123",
+        label_pattern: "checkout.*",
+        service: "*",
+        environment: "*",
+        expires_at: "2026-03-11T01:00:00.000Z",
+        trigger_expires_at: "2026-03-12T01:00:00.000Z"
+      })
+    ).rejects.toThrow("probe_activation_insert_failed");
+
+    if (originalSecret === undefined) {
+      delete process.env["DEBUGBUNDLE_PROBE_TRIGGER_SECRET"];
+    } else {
+      process.env["DEBUGBUNDLE_PROBE_TRIGGER_SECRET"] = originalSecret;
+    }
+  });
+
+  it("should report concurrent probe activation limits when the project is already saturated", async (): Promise<void> => {
+    const query = vi
+      .fn()
+      .mockResolvedValueOnce({ rows: [{ id: "proj_123", organization_plan: "team" }] })
+      .mockResolvedValueOnce({ rows: [{ cnt: "5" }] });
+    const store = createPostgresMetadataStore({ query });
+
+    const result = await store.createProbeActivationForProjectInOrganization({
+      organization_id: "org_123",
+      project_id: "proj_123",
+      created_by_member_id: "usr_123",
+      label_pattern: "checkout.*",
+      service: "*",
+      environment: "*",
+      expires_at: "2026-03-11T01:00:00.000Z",
+      trigger_expires_at: "2026-03-12T01:00:00.000Z"
+    });
+
+    expect(result).toEqual({
+      organization_plan: "team",
+      activation: { activation_id: "", label_pattern: "", service: "", environment: "", expires_at: "", trigger_expires_at: "" },
+      trigger_token: "",
+      concurrent_limit_exceeded: true
+    });
+  });
+
+  it("should list incident logs with optional level and cursor filters", async (): Promise<void> => {
+    const query = vi.fn().mockResolvedValue({
+      rows: [
+        {
+          event_id: "550e8400-e29b-41d4-a716-446655440000",
+          event_type: "log_event",
+          occurred_at: "2026-03-10T00:00:00.000Z",
+          is_sampled: true,
+          level: "error"
+        }
+      ]
+    });
+    const db: Queryable = { query };
+    const store = createPostgresMetadataStore(db);
+
+    const logs = await store.listIncidentLogsForOrganization({
+      organization_id: "org_123",
+      incident_id: "inc_123",
+      level: "error",
+      cursor: {
+        occurred_at: "2026-03-11T00:10:00.000Z",
+        event_id: "550e8400-e29b-41d4-a716-446655440001"
+      },
+      limit: 10
+    });
+
+    expect(logs).toEqual([
+      {
+        event_id: "550e8400-e29b-41d4-a716-446655440000",
+        event_type: "log_event",
+        occurred_at: "2026-03-10T00:00:00.000Z",
+        is_sampled: true,
+        level: "error"
+      }
+    ]);
+
+    expect(query).toHaveBeenCalledWith(expect.any(String), [
+      "inc_123",
+      "org_123",
+      "error",
+      "2026-03-11T00:10:00.000Z",
+      "550e8400-e29b-41d4-a716-446655440001",
+      10
+    ]);
+  });
+
+  it("should list incident logs without optional filters", async (): Promise<void> => {
+    const query = vi.fn().mockResolvedValue({ rows: [] });
+    const db: Queryable = { query };
+    const store = createPostgresMetadataStore(db);
+
+    const logs = await store.listIncidentLogsForOrganization({
+      organization_id: "org_123",
+      incident_id: "inc_123",
+      limit: 5
+    });
+
+    expect(logs).toEqual([]);
+    expect(query).toHaveBeenCalledWith(expect.any(String), ["inc_123", "org_123", null, null, null, 5]);
+  });
+
+  it("should throw when service creation does not return id", async (): Promise<void> => {
+    const query = vi.fn().mockResolvedValueOnce({ rows: [] }).mockResolvedValueOnce({ rows: [] });
+    const db: Queryable = { query };
+    const store = createPostgresMetadataStore(db);
+
+    await expect(
+      store.upsertIncident({
+        event_id: "550e8400-e29b-41d4-a716-446655440000",
+        project_id: "proj_123",
+        service_name: "checkout-api",
+        environment: "production",
+        fingerprint: "fp_123",
+        fingerprint_version: "v1",
+        title: "TypeError at /checkout",
+        severity: "high",
+        occurred_at: "2026-03-10T00:00:00.000Z"
+      })
+    ).rejects.toThrow("service_insert_failed");
+  });
+
+  it("should throw when incident upsert returns no rows", async (): Promise<void> => {
+    const query = vi
+      .fn()
+      .mockResolvedValueOnce({ rows: [{ id: "svc_123" }] })
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [] });
+
+    const db: Queryable = { query };
+    const store = createPostgresMetadataStore(db);
+
+    await expect(
+      store.upsertIncident({
+        event_id: "550e8400-e29b-41d4-a716-446655440000",
+        project_id: "proj_123",
+        service_name: "checkout-api",
+        environment: "production",
+        fingerprint: "fp_123",
+        fingerprint_version: "v1",
+        title: "TypeError at /checkout",
+        severity: "high",
+        occurred_at: "2026-03-10T00:00:00.000Z"
+      })
+    ).rejects.toThrow("incident_upsert_failed");
+  });
+
+  it("should surface regressed status when resolved incident is reopened", async (): Promise<void> => {
+    const query = vi
+      .fn()
+      .mockResolvedValueOnce({ rows: [{ id: "svc_123" }] })
+      .mockResolvedValueOnce({ rows: [{ id: "inc_123", status: "resolved" }] })
+      .mockResolvedValueOnce({ rows: [{ duplicate: false }] })
+      .mockResolvedValueOnce({ rows: [{ has_event_type: true, has_request_event: false }] })
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [{ incident_id: "inc_123", matched_fields: [], status: "regressed", regressed_now: true }] });
+
+    const db: Queryable = { query };
+    const store = createPostgresMetadataStore(db);
+
+    const result = await store.upsertIncident({
+      event_id: "550e8400-e29b-41d4-a716-446655440000",
+      project_id: "proj_123",
+      service_name: "checkout-api",
+      environment: "production",
+      fingerprint: "fp_123",
+      fingerprint_version: "v1",
+      title: "TypeError at /checkout",
+      severity: "high",
+      occurred_at: "2026-03-10T00:00:00.000Z"
+    });
+
+    expect(result.status).toBe("regressed");
+  });
+
+  it("should correlate recent deployment metadata when reopening a resolved incident", async (): Promise<void> => {
+    const query = vi
+      .fn()
+      .mockResolvedValueOnce({ rows: [{ id: "svc_123" }] })
+      .mockResolvedValueOnce({ rows: [{ id: "inc_123", status: "resolved" }] })
+      .mockResolvedValueOnce({ rows: [{ duplicate: false }] })
+      .mockResolvedValueOnce({ rows: [{ has_event_type: true, has_request_event: false }] })
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            deployment_id: "dep_123",
+            commit_sha: "abc123def456",
+            version: "v2.4.0",
+            branch: "main",
+            deployed_at: "2026-03-10T23:30:00.000Z",
+            minutes_since_deploy: 120
+          }
+        ]
+      })
+      .mockResolvedValueOnce({
+        rows: [{ incident_id: "inc_123", matched_fields: ["normalized_message"], status: "regressed", occurrence_count: 2 }]
+      });
+
+    const db: Queryable = { query };
+    const store = createPostgresMetadataStore(db);
+
+    const result = await store.upsertIncident({
+      event_id: "550e8400-e29b-41d4-a716-446655440000",
+      event_type: "backend_exception",
+      project_id: "proj_123",
+      service_name: "checkout-api",
+      environment: "production",
+      fingerprint: "fp_123",
+      fingerprint_version: "v1",
+      title: "TypeError at /checkout",
+      severity: "high",
+      occurred_at: "2026-03-11T01:30:00.000Z"
+    });
+
+    expect(result.regressed_now).toBe(true);
+    expect(result.regression_deploy).toEqual({
+      deployment_id: "dep_123",
+      commit_sha: "abc123def456",
+      version: "v2.4.0",
+      branch: "main",
+      deployed_at: "2026-03-10T23:30:00.000Z",
+      minutes_since_deploy: 120
+    });
+  });
+
+  it("should surface new_context_type_added when an existing incident receives a new event type", async (): Promise<void> => {
+    const query = vi
+      .fn()
+      .mockResolvedValueOnce({ rows: [{ id: "svc_123" }] })
+      .mockResolvedValueOnce({ rows: [{ id: "inc_123", status: "open" }] })
+      .mockResolvedValueOnce({ rows: [{ duplicate: false }] })
+      .mockResolvedValueOnce({ rows: [{ has_event_type: false, has_request_event: false }] })
+      .mockResolvedValueOnce({
+        rows: [{ incident_id: "inc_123", matched_fields: ["normalized_message"], status: "open", occurrence_count: 2 }]
+      });
+
+    const store = createPostgresMetadataStore({ query });
+
+    const result = await store.upsertIncident({
+      event_id: "550e8400-e29b-41d4-a716-446655440000",
+      event_type: "frontend_exception",
+      project_id: "proj_123",
+      service_name: "checkout-api",
+      environment: "production",
+      fingerprint: "fp_123",
+      fingerprint_version: "v1",
+      title: "TypeError at /checkout",
+      severity: "high",
+      occurred_at: "2026-03-10T00:00:00.000Z"
+    });
+
+    expect(result.new_context_type_added).toBe(true);
+    expect(result.reproduction_confidence_changed).toBeUndefined();
+  });
+
+  it("should surface reproduction_confidence_changed when request context is first observed", async (): Promise<void> => {
+    const query = vi
+      .fn()
+      .mockResolvedValueOnce({ rows: [{ id: "svc_123" }] })
+      .mockResolvedValueOnce({ rows: [{ id: "inc_123", status: "open" }] })
+      .mockResolvedValueOnce({ rows: [{ duplicate: false }] })
+      .mockResolvedValueOnce({ rows: [{ has_event_type: false, has_request_event: false }] })
+      .mockResolvedValueOnce({
+        rows: [{ incident_id: "inc_123", matched_fields: ["normalized_message"], status: "open", occurrence_count: 2 }]
+      });
+
+    const store = createPostgresMetadataStore({ query });
+
+    const result = await store.upsertIncident({
+      event_id: "550e8400-e29b-41d4-a716-446655440000",
+      event_type: "request_event",
+      project_id: "proj_123",
+      service_name: "checkout-api",
+      environment: "production",
+      fingerprint: "fp_123",
+      fingerprint_version: "v1",
+      title: "TypeError at /checkout",
+      severity: "high",
+      occurred_at: "2026-03-10T00:00:00.000Z"
+    });
+
+    expect(result.new_context_type_added).toBe(true);
+    expect(result.reproduction_confidence_changed).toBe(true);
+  });
+
+  it("should persist deployment rows for deploy_metadata events idempotently by source event", async (): Promise<void> => {
+    const query = vi
+      .fn()
+      .mockResolvedValueOnce({ rows: [{ id: "svc_123" }] })
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({
+        rows: [{ incident_id: "inc_123", matched_fields: ["normalized_message"], status: "open", occurrence_count: 1 }]
+      });
+
+    const db: Queryable = { query };
+    const store = createPostgresMetadataStore(db);
+
+    await store.upsertIncident({
+      event_id: "550e8400-e29b-41d4-a716-446655440000",
+      event_type: "deploy_metadata",
+      project_id: "proj_123",
+      service_name: "checkout-api",
+      environment: "production",
+      fingerprint: "fp_deploy_123",
+      fingerprint_version: "v1",
+      title: "deploy_metadata event",
+      severity: "low",
+      occurred_at: "2026-03-10T23:30:00.000Z",
+      deploy_metadata: {
+        commit_sha: "abc123def456",
+        version: "v2.4.0",
+        branch: "main",
+        deployed_at: "2026-03-10T23:30:00.000Z"
+      }
+    });
+
+    expect(query).toHaveBeenCalledWith(expect.stringContaining("INSERT INTO deployments"), expect.any(Array));
+  });
+
+  it("should surface duplicate_event when incident linkage already exists", async (): Promise<void> => {
+    const query = vi
+      .fn()
+      .mockResolvedValueOnce({ rows: [{ id: "svc_123" }] })
+      .mockResolvedValueOnce({ rows: [{ id: "inc_123", status: "open" }] })
+      .mockResolvedValueOnce({ rows: [{ duplicate: true }] })
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            incident_id: "inc_123",
+            matched_fields: ["normalized_message"],
+            status: "open",
+            occurrence_count: 4
+          }
+        ]
+      });
+
+    const db: Queryable = { query };
+    const store = createPostgresMetadataStore(db);
+
+    const result = await store.upsertIncident({
+      event_id: "550e8400-e29b-41d4-a716-446655440000",
+      project_id: "proj_123",
+      service_name: "checkout-api",
+      environment: "production",
+      fingerprint: "fp_123",
+      fingerprint_version: "v1",
+      title: "TypeError at /checkout",
+      severity: "high",
+      occurred_at: "2026-03-10T00:00:00.000Z"
+    });
+
+    expect(result.duplicate_event).toBe(true);
+    expect(result.regressed_now).toBe(false);
+  });
+
+  it("should mark incident as spiking once", async (): Promise<void> => {
+    const query = vi.fn().mockResolvedValue({ rowCount: 1, rows: [] });
+    const db: Queryable = { query };
+    const store = createPostgresMetadataStore(db);
+
+    const marked = await store.markIncidentSpiking({
+      incident_id: "inc_123",
+      detected_at: "2026-03-10T00:00:00.000Z"
+    });
+
+    expect(marked).toBe(true);
+    expect(query).toHaveBeenCalledOnce();
+  });
+
+  it("should return false when incident spiking update does not affect a row", async (): Promise<void> => {
+    const query = vi.fn().mockResolvedValue({ rowCount: 0, rows: [] });
+    const store = createPostgresMetadataStore({ query });
+
+    const marked = await store.markIncidentSpiking({
+      incident_id: "inc_123",
+      detected_at: "2026-03-10T00:00:00.000Z"
+    });
+
+    expect(marked).toBe(false);
+  });
+
+  it("should list and fetch organization-scoped incidents", async (): Promise<void> => {
+    const query = vi
+      .fn()
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            incident_id: "inc_123",
+            project_id: "proj_123",
+            project_name: "Main App",
+            service_id: "svc_123",
+            service_name: "checkout-api",
+            latest_deployment_id: null,
+            environment: "production",
+            fingerprint: "fp_123",
+            fingerprint_version: "v1",
+            title: "TypeError",
+            severity: "high",
+            status: "open",
+            first_seen_at: "2026-03-10T00:00:00.000Z",
+            last_seen_at: "2026-03-10T00:10:00.000Z",
+            occurrence_count: 3,
+            spike_detected_at: null,
+            resolved_at: null,
+            regressed_at: null,
+            matched_fields: ["normalized_message"]
+          }
+        ]
+      })
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            incident_id: "inc_123",
+            project_id: "proj_123",
+            service_id: "svc_123",
+            latest_deployment_id: null,
+            environment: "production",
+            fingerprint: "fp_123",
+            fingerprint_version: "v1",
+            title: "TypeError",
+            severity: "high",
+            status: "open",
+            first_seen_at: "2026-03-10T00:00:00.000Z",
+            last_seen_at: "2026-03-10T00:10:00.000Z",
+            occurrence_count: 3,
+            spike_detected_at: null,
+            resolved_at: null,
+            regressed_at: null,
+            matched_fields: ["normalized_message"]
+          }
+        ]
+      });
+
+    const store = createPostgresMetadataStore({ query });
+
+    const listed = await store.listIncidentsForOrganization({
+      organization_id: "org_123",
+      limit: 20
+    });
+    const fetched = await store.getIncidentForOrganization({
+      organization_id: "org_123",
+      incident_id: "inc_123"
+    });
+
+    expect(listed).toHaveLength(1);
+    expect(fetched?.incident_id).toBe("inc_123");
+  });
+
+  it("should list organization-scoped services for a project", async (): Promise<void> => {
+    const query = vi
+      .fn()
+      .mockResolvedValueOnce({
+        rows: [{ id: "proj_123" }]
+      })
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            service_id: "svc_123",
+            project_id: "proj_123",
+            name: "checkout-api",
+            runtime: "node",
+            framework: "fastify",
+            environment: "production"
+          }
+        ]
+      });
+
+    const store = createPostgresMetadataStore({ query });
+
+    const services = await store.listServicesForOrganization!({
+      organization_id: "org_123",
+      project_id: "proj_123",
+      limit: 10
+    });
+
+    expect(services).toEqual([
+      {
+        service_id: "svc_123",
+        project_id: "proj_123",
+        name: "checkout-api",
+        runtime: "node",
+        framework: "fastify",
+        environment: "production"
+      }
+    ]);
+  });
+
+  it("should return null when listing services for an out-of-scope project", async (): Promise<void> => {
+    const query = vi.fn().mockResolvedValue({ rows: [] });
+    const store = createPostgresMetadataStore({ query });
+
+    const services = await store.listServicesForOrganization!({
+      organization_id: "org_123",
+      project_id: "proj_missing",
+      limit: 10
+    });
+
+    expect(services).toBeNull();
+  });
+
+  it("should apply incident filters and cursor pagination when listing incidents", async (): Promise<void> => {
+    const query = vi.fn().mockResolvedValue({
+      rows: [
+        {
+          incident_id: "inc_123",
+          project_id: "proj_123",
+          project_name: "Main App",
+          service_id: "svc_123",
+          service_name: "checkout-api",
+          latest_deployment_id: null,
+          environment: "production",
+          fingerprint: "fp_123",
+          fingerprint_version: "v1",
+          title: "TypeError",
+          severity: "high",
+          status: "open",
+          first_seen_at: "2026-03-10T00:00:00.000Z",
+          last_seen_at: "2026-03-10T00:10:00.000Z",
+          occurrence_count: 3,
+          spike_detected_at: null,
+          resolved_at: null,
+          regressed_at: null,
+          matched_fields: ["normalized_message"]
+        }
+      ]
+    });
+
+    const store = createPostgresMetadataStore({ query });
+
+    const listed = await store.listIncidentsForOrganization({
+      organization_id: "org_123",
+      project_id: "proj_123",
+      environment: "production",
+      service: "checkout-api",
+      status: "open",
+      severity: "high",
+      limit: 10,
+      cursor: {
+        last_seen_at: "2026-03-10T00:09:00.000Z",
+        incident_id: "inc_122"
+      }
+    });
+
+    expect(listed).toHaveLength(1);
+    expect(query).toHaveBeenCalledWith(expect.stringContaining("AND i.project_id = $2"), [
+      "org_123",
+      "proj_123",
+      "production",
+      "checkout-api",
+      "open",
+      "high",
+      "2026-03-10T00:09:00.000Z",
+      "inc_122",
+      10
+    ]);
+  });
+
+  it("should resolve an organization-scoped incident idempotently", async (): Promise<void> => {
+    const query = vi.fn().mockResolvedValue({
+      rows: [
+        {
+          incident_id: "inc_123",
+          project_id: "proj_123",
+          project_name: "Main App",
+          service_id: "svc_123",
+          service_name: "checkout-api",
+          latest_deployment_id: null,
+          environment: "production",
+          fingerprint: "fp_123",
+          fingerprint_version: "v1",
+          title: "TypeError",
+          severity: "high",
+          status: "resolved",
+          first_seen_at: "2026-03-10T00:00:00.000Z",
+          last_seen_at: "2026-03-10T00:10:00.000Z",
+          occurrence_count: 3,
+          spike_detected_at: null,
+          resolved_at: "2026-03-10T00:12:00.000Z",
+          regressed_at: null,
+          matched_fields: ["normalized_message"]
+        }
+      ],
+      rowCount: 1
+    });
+
+    const store = createPostgresMetadataStore({ query });
+
+    const resolved = await store.resolveIncidentForOrganization({
+      organization_id: "org_123",
+      incident_id: "inc_123",
+      resolved_by_member_id: "usr_123",
+      resolved_at: "2026-03-10T00:12:00.000Z"
+    });
+
+    expect(resolved).toEqual({
+      incident_id: "inc_123",
+      project_id: "proj_123",
+      project_name: "Main App",
+      service_id: "svc_123",
+      service_name: "checkout-api",
+      latest_deployment_id: null,
+      environment: "production",
+      fingerprint: "fp_123",
+      fingerprint_version: "v1",
+      title: "TypeError",
+      severity: "high",
+      status: "resolved",
+      first_seen_at: "2026-03-10T00:00:00.000Z",
+      last_seen_at: "2026-03-10T00:10:00.000Z",
+      occurrence_count: 3,
+      spike_detected_at: null,
+      resolved_at: "2026-03-10T00:12:00.000Z",
+      regressed_at: null,
+      matched_fields: ["normalized_message"]
+    });
+    expect(query).toHaveBeenCalledOnce();
+    expect(query).toHaveBeenCalledWith(expect.stringContaining("UPDATE incidents"), [
+      "org_123",
+      "inc_123",
+      "usr_123",
+      "2026-03-10T00:12:00.000Z"
+    ]);
+  });
+
+  it("should reopen an organization-scoped incident clearing resolution fields", async (): Promise<void> => {
+    const query = vi.fn().mockResolvedValue({
+      rows: [
+        {
+          incident_id: "inc_123",
+          project_id: "proj_123",
+          project_name: "Main App",
+          service_id: "svc_123",
+          service_name: "checkout-api",
+          latest_deployment_id: null,
+          environment: "production",
+          fingerprint: "fp_123",
+          fingerprint_version: "v1",
+          title: "TypeError",
+          severity: "high",
+          status: "open",
+          first_seen_at: "2026-03-10T00:00:00.000Z",
+          last_seen_at: "2026-03-10T00:10:00.000Z",
+          occurrence_count: 3,
+          spike_detected_at: null,
+          resolved_at: null,
+          regressed_at: null,
+          matched_fields: ["normalized_message"]
+        }
+      ],
+      rowCount: 1
+    });
+
+    const store = createPostgresMetadataStore({ query });
+
+    const reopened = await store.reopenIncidentForOrganization({
+      organization_id: "org_123",
+      incident_id: "inc_123"
+    });
+
+    expect(reopened).toEqual({
+      incident_id: "inc_123",
+      project_id: "proj_123",
+      project_name: "Main App",
+      service_id: "svc_123",
+      service_name: "checkout-api",
+      latest_deployment_id: null,
+      environment: "production",
+      fingerprint: "fp_123",
+      fingerprint_version: "v1",
+      title: "TypeError",
+      severity: "high",
+      status: "open",
+      first_seen_at: "2026-03-10T00:00:00.000Z",
+      last_seen_at: "2026-03-10T00:10:00.000Z",
+      occurrence_count: 3,
+      spike_detected_at: null,
+      resolved_at: null,
+      regressed_at: null,
+      matched_fields: ["normalized_message"]
+    });
+    expect(query).toHaveBeenCalledOnce();
+    expect(query).toHaveBeenCalledWith(expect.stringContaining("UPDATE incidents"), [
+      "org_123",
+      "inc_123"
+    ]);
+  });
+
+  it("should persist webhook delivery intent", async (): Promise<void> => {
+    const query = vi.fn().mockResolvedValue({ rows: [] });
+    const store = createPostgresWebhookDeliveryStore({ query });
+
+    const result = await store.createDeliveryIntent({
+      webhook_id: "wh_123",
+      project_id: "proj_123",
+      incident_id: "inc_123",
+      event_type: "bundle.reopened",
+      occurred_at: "2026-03-11T00:00:00.000Z",
+      target_url: "https://hooks.example.test/debugbundle",
+      signing_secret: "secret_123",
+      payload: { incident_id: "inc_123" }
+    });
+
+    expect(result.delivery_id).toBeDefined();
+    expect(query).toHaveBeenCalledOnce();
+  });
+
+  it("should transition webhook delivery to retrying then failed across attempts", async (): Promise<void> => {
+    const query = vi
+      .fn()
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [{ webhook_id: "wh_123" }] })
+      .mockResolvedValueOnce({ rows: [{ status: "failed" }] });
+    const store = createPostgresWebhookDeliveryStore({ query });
+
+    const first = await store.markDeliveryAttempt({
+      delivery_id: "del_123",
+      attempt: 1,
+      delivered: false,
+      error_message: "timeout",
+      response_code: null
+    });
+
+    const final = await store.markDeliveryAttempt({
+      delivery_id: "del_123",
+      attempt: 6,
+      delivered: false,
+      error_message: "still down",
+      response_code: 503
+    });
+
+    expect(first).toEqual({ status: "retrying", next_attempt: 2 });
+    expect(final).toEqual({ status: "failed", next_attempt: null });
+    expect(query).toHaveBeenCalledTimes(3);
+  });
+
+  it("should disable a webhook after 50 consecutive final delivery failures", async (): Promise<void> => {
+    const query = vi
+      .fn()
+      .mockResolvedValueOnce({ rows: [{ webhook_id: "wh_123" }] })
+      .mockResolvedValueOnce({
+        rows: Array.from({ length: 50 }, () => ({ status: "failed" }))
+      })
+      .mockResolvedValueOnce({ rows: [] });
+    const store = createPostgresWebhookDeliveryStore({ query });
+
+    const result = await store.markDeliveryAttempt({
+      delivery_id: "del_123",
+      attempt: 6,
+      delivered: false,
+      error_message: "still down",
+      response_code: 503
+    });
+
+    expect(result).toEqual({
+      status: "failed",
+      next_attempt: null,
+      webhook_disabled: true,
+      webhook_id: "wh_123"
+    });
+    expect(query).toHaveBeenNthCalledWith(
+      3,
+      expect.stringContaining("UPDATE agent_webhooks"),
+      ["wh_123"]
+    );
+  });
+
+  it("should claim due webhook deliveries with incremented attempts", async (): Promise<void> => {
+    const query = vi.fn().mockResolvedValue({ rows: [{ delivery_id: "del_1", attempt: 2 }] });
+    const store = createPostgresWebhookDeliveryStore({ query });
+
+    const jobs = await store.claimDueDeliveries(20);
+
+    expect(jobs).toEqual([{ delivery_id: "del_1", attempt: 2 }]);
+    expect(query).toHaveBeenCalledOnce();
+  });
+
+  it("should list matching enabled webhooks by event and filters", async (): Promise<void> => {
+    const query = vi.fn().mockResolvedValue({
+      rows: [
+        {
+          webhook_id: "wh_1",
+          target_url: "https://hooks.example.test/one",
+          signing_secret: "secret_one",
+          filters: {
+            environment: ["production"],
+            service: ["checkout-api"],
+            severity_min: "medium"
+          }
+        },
+        {
+          webhook_id: "wh_2",
+          target_url: "https://hooks.example.test/two",
+          signing_secret: "secret_two",
+          filters: {
+            environment: ["staging"]
+          }
+        }
+      ]
+    });
+    const store = createPostgresWebhookDeliveryStore({ query });
+
+    const matches = await store.listMatchingWebhooks({
+      project_id: "proj_123",
+      event_type: "bundle.reopened",
+      environment: "production",
+      service_name: "checkout-api",
+      severity: "high"
+    });
+
+    expect(matches).toEqual([
+      {
+        webhook_id: "wh_1",
+        target_url: "https://hooks.example.test/one",
+        signing_secret: "secret_one",
+        filters: {
+          environment: ["production"],
+          service: ["checkout-api"],
+          severity_min: "medium"
+        }
+      }
+    ]);
+  });
+
+  it("should list recent deliveries for a webhook", async (): Promise<void> => {
+    const query = vi.fn().mockResolvedValue({
+      rows: [
+        {
+          delivery_id: "del_123",
+          event_type: "bundle.reopened",
+          status: "delivered",
+          attempt_count: 1,
+          next_attempt_at: null,
+          last_response_code: 200,
+          last_attempted_at: "2026-03-11T00:00:01.000Z",
+          last_error: null
+        }
+      ]
+    });
+    const store = createPostgresWebhookDeliveryStore({ query });
+
+    const deliveries = await store.listDeliveriesForWebhook("wh_123", 10);
+
+    expect(deliveries).toEqual([
+      {
+        delivery_id: "del_123",
+        event_type: "bundle.reopened",
+        status: "delivered",
+        attempt_count: 1,
+        next_attempt_at: null,
+        last_response_code: 200,
+        last_attempted_at: "2026-03-11T00:00:01.000Z",
+        last_error: null
+      }
+    ]);
+    expect(query).toHaveBeenCalledOnce();
+  });
+
+  it("should return scoped deliveries for webhook inside organization", async (): Promise<void> => {
+    const query = vi
+      .fn()
+      .mockResolvedValueOnce({ rows: [{ webhook_id: "wh_123" }] })
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            delivery_id: "del_123",
+            event_type: "bundle.reopened",
+            status: "delivered",
+            attempt_count: 1,
+            next_attempt_at: null,
+            last_response_code: 200,
+            last_attempted_at: "2026-03-11T00:00:01.000Z",
+            last_error: null
+          }
+        ]
+      });
+    const store = createPostgresWebhookDeliveryStore({ query });
+
+    const scoped = await store.listDeliveriesForWebhookInOrganization({
+      webhookId: "wh_123",
+      organizationId: "org_123",
+      limit: 10
+    });
+
+    expect(scoped).toEqual({
+      deliveries: [
+        {
+          delivery_id: "del_123",
+          event_type: "bundle.reopened",
+          status: "delivered",
+          attempt_count: 1,
+          next_attempt_at: null,
+          last_response_code: 200,
+          last_attempted_at: "2026-03-11T00:00:01.000Z",
+          last_error: null
+        }
+      ]
+    });
+    expect(query).toHaveBeenCalledTimes(2);
+  });
+
+  it("should return null scoped deliveries when webhook is outside organization", async (): Promise<void> => {
+    const query = vi.fn().mockResolvedValueOnce({ rows: [] });
+    const store = createPostgresWebhookDeliveryStore({ query });
+
+    const scoped = await store.listDeliveriesForWebhookInOrganization({
+      webhookId: "wh_123",
+      organizationId: "org_999",
+      limit: 10
+    });
+
+    expect(scoped).toBeNull();
+    expect(query).toHaveBeenCalledOnce();
+  });
+
+  it("should list webhooks for an in-scope project", async (): Promise<void> => {
+    const query = vi
+      .fn()
+      .mockResolvedValueOnce({ rows: [{ id: "proj_123" }] })
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            webhook_id: "wh_123",
+            project_id: "proj_123",
+            url: "https://hooks.example.test/debugbundle",
+            events: ["bundle.created", "bundle.updated"],
+            filters: { environment: ["production"] },
+            is_enabled: true,
+            created_at: "2026-03-15T00:00:00.000Z",
+            updated_at: "2026-03-15T00:00:00.000Z"
+          }
+        ]
+      });
+    const store = createPostgresWebhookDeliveryStore({ query });
+
+    const webhooks = await store.listWebhooksForOrganization({
+      organization_id: "org_123",
+      project_id: "proj_123",
+      limit: 10
+    });
+
+    expect(webhooks).toEqual([
+      {
+        webhook_id: "wh_123",
+        project_id: "proj_123",
+        url: "https://hooks.example.test/debugbundle",
+        events: ["bundle.created", "bundle.updated"],
+        filters: { environment: ["production"] },
+        is_enabled: true,
+        created_at: "2026-03-15T00:00:00.000Z",
+        updated_at: "2026-03-15T00:00:00.000Z"
+      }
+    ]);
+    expect(query).toHaveBeenCalledTimes(2);
+  });
+
+  it("should return null when listing webhooks for an out-of-scope project", async (): Promise<void> => {
+    const query = vi.fn().mockResolvedValueOnce({ rows: [] });
+    const store = createPostgresWebhookDeliveryStore({ query });
+
+    const webhooks = await store.listWebhooksForOrganization({
+      organization_id: "org_123",
+      project_id: "proj_123",
+      limit: 10
+    });
+
+    expect(webhooks).toBeNull();
+    expect(query).toHaveBeenCalledOnce();
+  });
+
+  it("should create, fetch, update, and delete a scoped webhook", async (): Promise<void> => {
+    const query = vi
+      .fn()
+      .mockResolvedValueOnce({ rows: [{ id: "proj_123" }] })
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            webhook_id: "wh_123",
+            project_id: "proj_123",
+            url: "https://hooks.example.test/debugbundle",
+            events: ["bundle.created"],
+            filters: { environment: ["production"] },
+            is_enabled: true,
+            created_at: "2026-03-15T00:00:00.000Z",
+            updated_at: "2026-03-15T00:00:00.000Z"
+          }
+        ]
+      })
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            webhook_id: "wh_123",
+            project_id: "proj_123",
+            url: "https://hooks.example.test/debugbundle",
+            events: ["bundle.created"],
+            filters: { environment: ["production"] },
+            is_enabled: true,
+            created_at: "2026-03-15T00:00:00.000Z",
+            updated_at: "2026-03-15T00:00:00.000Z"
+          }
+        ]
+      })
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            webhook_id: "wh_123",
+            project_id: "proj_123",
+            url: "https://hooks.example.test/updated",
+            events: ["bundle.updated"],
+            filters: { environment: ["staging"] },
+            is_enabled: false,
+            created_at: "2026-03-15T00:00:00.000Z",
+            updated_at: "2026-03-15T00:05:00.000Z"
+          }
+        ]
+      })
+      .mockResolvedValueOnce({ rows: [{ webhook_id: "wh_123" }] });
+    const store = createPostgresWebhookDeliveryStore({ query });
+
+    const created = await store.createWebhookForOrganization({
+      organization_id: "org_123",
+      project_id: "proj_123",
+      url: "https://hooks.example.test/debugbundle",
+      signing_secret: "dbundle_whsec_test",
+      events: ["bundle.created"],
+      filters: { environment: ["production"] },
+      is_enabled: true
+    });
+    const fetched = await store.getWebhookForOrganization({
+      organization_id: "org_123",
+      webhook_id: "wh_123"
+    });
+    const updated = await store.updateWebhookForOrganization({
+      organization_id: "org_123",
+      webhook_id: "wh_123",
+      url: "https://hooks.example.test/updated",
+      events: ["bundle.updated"],
+      filters: { environment: ["staging"] },
+      is_enabled: false
+    });
+    const deleted = await store.deleteWebhookForOrganization({
+      organization_id: "org_123",
+      webhook_id: "wh_123"
+    });
+
+    expect(created).toEqual({
+      webhook_id: "wh_123",
+      project_id: "proj_123",
+      url: "https://hooks.example.test/debugbundle",
+      events: ["bundle.created"],
+      filters: { environment: ["production"] },
+      is_enabled: true,
+      created_at: "2026-03-15T00:00:00.000Z",
+      updated_at: "2026-03-15T00:00:00.000Z"
+    });
+    expect(fetched).toEqual(created);
+    expect(updated).toEqual({
+      webhook_id: "wh_123",
+      project_id: "proj_123",
+      url: "https://hooks.example.test/updated",
+      events: ["bundle.updated"],
+      filters: { environment: ["staging"] },
+      is_enabled: false,
+      created_at: "2026-03-15T00:00:00.000Z",
+      updated_at: "2026-03-15T00:05:00.000Z"
+    });
+    expect(deleted).toEqual({ webhook_id: "wh_123" });
+  });
+
+  it("should persist bundle generation history when reserving bundle generation", async (): Promise<void> => {
+    const query = vi.fn().mockResolvedValue({
+      rows: [
+        {
+          generation_number: 3,
+          created_at: "2026-03-15T12:00:00.000Z",
+          updated_at: "2026-03-15T12:00:00.000Z",
+          source_event_id: "550e8400-e29b-41d4-a716-446655440000",
+          source_occurred_at: "2026-03-15T11:59:00.000Z",
+          trigger: "regression_reopen"
+        }
+      ]
+    });
+    const store = createPostgresMetadataStore({ query });
+
+    const reserved = await store.reserveBundleGeneration({
+      incident_id: "inc_123",
+      event_id: "550e8400-e29b-41d4-a716-446655440000",
+      occurred_at: "2026-03-15T11:59:00.000Z",
+      trigger: "regression_reopen"
+    });
+
+    expect(reserved).toEqual({
+      generation_number: 3,
+      created_at: "2026-03-15T12:00:00.000Z",
+      updated_at: "2026-03-15T12:00:00.000Z",
+      source_event_id: "550e8400-e29b-41d4-a716-446655440000",
+      source_occurred_at: "2026-03-15T11:59:00.000Z",
+      trigger: "regression_reopen"
+    });
+    expect(query).toHaveBeenCalledOnce();
+    expect(query.mock.calls[0]?.[0]).toContain("INSERT INTO bundle_generations");
+  });
+
+  it("should aggregate weekly project report summary from bundle history and incident activity", async (): Promise<void> => {
+    const query = vi.fn().mockResolvedValue({
+      rows: [
+        {
+          project_id: "proj_123",
+          window_start: "2026-03-09T00:00:00.000Z",
+          window_end: "2026-03-16T00:00:00.000Z",
+          failure_bundles: 3,
+          improvement_bundles: 0,
+          new_incidents: 2,
+          regressions: 1,
+          top_spiking_incidents: [
+            {
+              incident_id: "inc_123",
+              title: "Checkout failed",
+              occurrence_count: 13,
+              spike_detected_at: "2026-03-14T08:00:00.000Z"
+            }
+          ]
+        }
+      ]
+    });
+    const store = createPostgresMetadataStore({ query });
+
+    const summary = await store.getWeeklyProjectReport({
+      project_id: "proj_123",
+      window_start: "2026-03-09T00:00:00.000Z",
+      window_end: "2026-03-16T00:00:00.000Z"
+    });
+
+    expect(summary).toEqual({
+      project_id: "proj_123",
+      window_start: "2026-03-09T00:00:00.000Z",
+      window_end: "2026-03-16T00:00:00.000Z",
+      bundle_counts: {
+        failure: 3,
+        improvement: 0
+      },
+      new_incidents: 2,
+      regressions: 1,
+      top_spiking_incidents: [
+        {
+          incident_id: "inc_123",
+          title: "Checkout failed",
+          occurrence_count: 13,
+          spike_detected_at: "2026-03-14T08:00:00.000Z"
+        }
+      ]
+    });
+    expect(query).toHaveBeenCalledOnce();
+    expect(query.mock.calls[0]?.[0]).toContain("FROM bundle_generations");
+  });
+
+  it("should return null weekly project report when the project has no weekly activity", async (): Promise<void> => {
+    const query = vi.fn().mockResolvedValue({ rows: [] });
+    const store = createPostgresMetadataStore({ query });
+
+    const summary = await store.getWeeklyProjectReport({
+      project_id: "proj_123",
+      window_start: "2026-03-09T00:00:00.000Z",
+      window_end: "2026-03-16T00:00:00.000Z"
+    });
+
+    expect(summary).toBeNull();
+    expect(query).toHaveBeenCalledOnce();
+  });
+
+  it("should read webhook delivery intents and create scoped test deliveries", async (): Promise<void> => {
+    const query = vi
+      .fn()
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            delivery_id: "del_123",
+            webhook_id: "wh_123",
+            project_id: "proj_123",
+            incident_id: "inc_123",
+            event_type: "bundle.created",
+            status: "pending",
+            attempt_count: 0,
+            occurred_at: "2026-03-11T00:00:00.000Z",
+            target_url: "https://hooks.example.test/debugbundle",
+            next_attempt_at: null,
+            last_response_code: null,
+            last_attempted_at: null,
+            last_error: null,
+            payload: { ok: true },
+            signing_secret: "secret_123"
+          }
+        ]
+      })
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            webhook_id: "wh_123",
+            project_id: "proj_123",
+            target_url: "https://hooks.example.test/debugbundle",
+            signing_secret: "secret_123"
+          }
+        ]
+      })
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [] });
+    const store = createPostgresWebhookDeliveryStore({ query });
+
+    await expect(store.getDeliveryIntent("del_123")).resolves.toMatchObject({ delivery_id: "del_123" });
+    await expect(
+      store.createTestDeliveryForOrganization({
+        organization_id: "org_123",
+        webhook_id: "wh_123",
+        event_type: "verification.failed"
+      })
+    ).resolves.toMatchObject({ event_type: "verification.failed" });
+    await expect(
+      store.createTestDeliveryForOrganization({
+        organization_id: "org_123",
+        webhook_id: "wh_missing",
+        event_type: "verification.failed"
+      })
+    ).resolves.toBeNull();
+  });
+
+  it("should retry deliveries only for enabled scoped webhooks", async (): Promise<void> => {
+    const query = vi
+      .fn()
+      .mockResolvedValueOnce({ rows: [{ webhook_id: "wh_123" }] })
+      .mockResolvedValueOnce({ rows: [{ delivery_id: "del_retry", event_type: "verification.failed" }] })
+      .mockResolvedValueOnce({ rows: [] });
+    const store = createPostgresWebhookDeliveryStore({ query });
+
+    await expect(
+      store.retryDeliveryForOrganization({ organization_id: "org_123", webhook_id: "wh_123", delivery_id: "del_retry" })
+    ).resolves.toEqual({ delivery_id: "del_retry", event_type: "verification.failed" });
+    await expect(
+      store.retryDeliveryForOrganization({ organization_id: "org_123", webhook_id: "wh_missing", delivery_id: "del_retry" })
+    ).resolves.toBeNull();
+  });
+
+  it("should filter matching webhooks by bundle type and verification flags", async (): Promise<void> => {
+    const query = vi.fn().mockResolvedValue({
+      rows: [
+        {
+          webhook_id: "wh_1",
+          target_url: "https://hooks.example.test/one",
+          signing_secret: "secret_one",
+          filters: {
+            bundle_type: ["failure"],
+            verification: true
+          }
+        },
+        {
+          webhook_id: "wh_2",
+          target_url: "https://hooks.example.test/two",
+          signing_secret: "secret_two",
+          filters: {
+            bundle_type: ["improvement"],
+            verification: false
+          }
+        }
+      ]
+    });
+    const store = createPostgresWebhookDeliveryStore({ query });
+
+    const matches = await store.listMatchingWebhooks({
+      project_id: "proj_123",
+      event_type: "verification.passed",
+      environment: "production",
+      service_name: "checkout-api",
+      severity: "high",
+      bundle_type: "failure",
+      is_verification: true
+    });
+
+    expect(matches).toEqual([
+      {
+        webhook_id: "wh_1",
+        target_url: "https://hooks.example.test/one",
+        signing_secret: "secret_one",
+        filters: {
+          bundle_type: ["failure"],
+          verification: true
+        }
+      }
+    ]);
+  });
+
+  it("should list projects with weekly activity in ascending order", async (): Promise<void> => {
+    const query = vi.fn().mockResolvedValue({
+      rows: [{ project_id: "proj_123" }, { project_id: "proj_456" }]
+    });
+    const store = createPostgresMetadataStore({ query });
+
+    const projects = await store.listProjectsWithWeeklyActivity({
+      window_start: "2026-03-09T00:00:00.000Z",
+      window_end: "2026-03-16T00:00:00.000Z",
+      limit: 10
+    });
+
+    expect(projects).toEqual(["proj_123", "proj_456"]);
+  });
+
+  it("should preserve explicit matched fields during incident upsert", async (): Promise<void> => {
+    const query = vi
+      .fn()
+      .mockResolvedValueOnce({ rows: [{ id: "svc_123" }] })
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({
+        rows: [{ incident_id: "inc_123", matched_fields: ["stack_trace"], status: "open", regressed_now: false }]
+      });
+    const store = createPostgresMetadataStore({ query });
+
+    const result = await store.upsertIncident({
+      event_id: "550e8400-e29b-41d4-a716-446655440000",
+      project_id: "proj_123",
+      service_name: "checkout-api",
+      environment: "production",
+      fingerprint: "fp_123",
+      fingerprint_version: "v1",
+      title: "TypeError at /checkout",
+      severity: "high",
+      occurred_at: "2026-03-10T00:00:00.000Z",
+      matched_fields: ["stack_trace"]
+    });
+
+    expect(result.matched_fields).toEqual(["stack_trace"]);
+  });
+
+  it("should mark webhook deliveries delivered and keep failed webhooks enabled below the disable threshold", async (): Promise<void> => {
+    const deliveredQuery = vi.fn().mockResolvedValue({ rows: [] });
+    const deliveredStore = createPostgresWebhookDeliveryStore({ query: deliveredQuery });
+
+    await expect(
+      deliveredStore.markDeliveryAttempt({
+        delivery_id: "del_200",
+        attempt: 1,
+        delivered: true,
+        response_code: 200,
+        error_message: null
+      })
+    ).resolves.toEqual({ status: "delivered", next_attempt: null });
+
+    const failedQuery = vi
+      .fn()
+      .mockResolvedValueOnce({ rows: [{ webhook_id: "wh_123" }] })
+      .mockResolvedValueOnce({ rows: [{ status: "failed" }, { status: "retrying" }] });
+    const failedStore = createPostgresWebhookDeliveryStore({ query: failedQuery });
+
+    await expect(
+      failedStore.markDeliveryAttempt({
+        delivery_id: "del_500",
+        attempt: 6,
+        delivered: false,
+        error_message: "upstream_failed",
+        response_code: 500
+      })
+    ).resolves.toEqual({ status: "failed", next_attempt: null });
+  });
+
+  it("should return null bundle build context and throw when generation reservation returns no row", async (): Promise<void> => {
+    const missingContextStore = createPostgresMetadataStore({
+      query: vi.fn().mockResolvedValue({ rows: [] })
+    });
+
+    await expect(
+      missingContextStore.getBundleBuildContext({
+        project_id: "proj_123",
+        incident_id: "inc_missing"
+      })
+    ).resolves.toBeNull();
+
+    const failingReserveStore = createPostgresMetadataStore({
+      query: vi.fn().mockResolvedValue({ rows: [] })
+    });
+
+    await expect(
+      failingReserveStore.reserveBundleGeneration({
+        incident_id: "inc_123",
+        event_id: "550e8400-e29b-41d4-a716-446655440000",
+        occurred_at: "2026-03-15T11:59:00.000Z",
+        trigger: "regression_reopen"
+      })
+    ).rejects.toThrow("bundle_generation_reserve_failed");
+  });
+
+  it("should list incident event references and probe event candidates", async (): Promise<void> => {
+    const query = vi
+      .fn()
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            event_id: "550e8400-e29b-41d4-a716-446655440000",
+            event_type: "backend_exception",
+            occurred_at: "2026-03-10T00:00:00.000Z"
+          }
+        ]
+      })
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            event_id: "550e8400-e29b-41d4-a716-446655440001",
+            occurred_at: "2026-03-10T00:05:00.000Z"
+          }
+        ]
+      });
+    const store = createPostgresMetadataStore({ query });
+
+    await expect(store.listIncidentEventReferences({ incident_id: "inc_123" })).resolves.toEqual([
+      {
+        event_id: "550e8400-e29b-41d4-a716-446655440000",
+        event_type: "backend_exception",
+        occurred_at: "2026-03-10T00:00:00.000Z"
+      }
+    ]);
+    await expect(
+      store.listProbeEventCandidatesForServiceWindow({
+        project_id: "proj_123",
+        environment: "production",
+        service_name: "checkout-api",
+        window_start: "2026-03-10T00:00:00.000Z",
+        window_end: "2026-03-10T01:00:00.000Z"
+      })
+    ).resolves.toEqual([
+      {
+        event_id: "550e8400-e29b-41d4-a716-446655440001",
+        occurred_at: "2026-03-10T00:05:00.000Z"
+      }
+    ]);
+  });
+
+  it("should default missing weekly report spike lists to an empty array", async (): Promise<void> => {
+    const query = vi.fn().mockResolvedValue({
+      rows: [
+        {
+          project_id: "proj_123",
+          window_start: "2026-03-09T00:00:00.000Z",
+          window_end: "2026-03-16T00:00:00.000Z",
+          failure_bundles: 1,
+          improvement_bundles: 2,
+          new_incidents: 0,
+          regressions: 0,
+          top_spiking_incidents: null
+        }
+      ]
+    });
+    const store = createPostgresMetadataStore({ query });
+
+    await expect(
+      store.getWeeklyProjectReport({
+        project_id: "proj_123",
+        window_start: "2026-03-09T00:00:00.000Z",
+        window_end: "2026-03-16T00:00:00.000Z"
+      })
+    ).resolves.toEqual({
+      project_id: "proj_123",
+      window_start: "2026-03-09T00:00:00.000Z",
+      window_end: "2026-03-16T00:00:00.000Z",
+      bundle_counts: { failure: 1, improvement: 2 },
+      new_incidents: 0,
+      regressions: 0,
+      top_spiking_incidents: []
+    });
+  });
+
+  it("should exclude mismatched webhook filters for severity, bundle type, and verification", async (): Promise<void> => {
+    const query = vi.fn().mockResolvedValue({
+      rows: [
+        {
+          webhook_id: "wh_1",
+          target_url: "https://hooks.example.test/one",
+          signing_secret: "secret_one",
+          filters: {
+            severity_min: "critical",
+            bundle_type: ["improvement"],
+            verification: false,
+            service: ["checkout-api"]
+          }
+        }
+      ]
+    });
+    const store = createPostgresWebhookDeliveryStore({ query });
+
+    const matches = await store.listMatchingWebhooks({
+      project_id: "proj_123",
+      event_type: "verification.passed",
+      environment: "production",
+      service_name: "checkout-api",
+      severity: "high",
+      bundle_type: "failure",
+      is_verification: true
+    });
+
+    expect(matches).toEqual([]);
+  });
+});

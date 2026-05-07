@@ -1,0 +1,7 @@
+{
+  "possible": true,
+  "confidence": 0.8,
+  "reason": "request_context_available",
+  "artifacts": null,
+  "feasibility_reference": null
+}

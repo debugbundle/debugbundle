@@ -1,0 +1,17 @@
+import { describe, expect, it } from "vitest";
+
+import { RETRIEVAL_MCP_TOOL_NAMES } from "../../../apps/mcp/src/retrieval-tools.js";
+
+describe("mcp retrieval tools parity", () => {
+  it("declares retrieval tool parity", () => {
+    expect(RETRIEVAL_MCP_TOOL_NAMES).toEqual([
+      "list_incidents",
+      "get_incident",
+      "resolve_incident",
+      "reopen_incident",
+      "get_bundle",
+      "get_reproduction",
+      "get_logs"
+    ]);
+  });
+});

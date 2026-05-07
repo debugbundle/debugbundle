@@ -1,0 +1,15 @@
+{
+  "package": "@debugbundle/mcp",
+  "publicRegistry": "https://registry.npmjs.org",
+  "sourceDirectory": "apps/mcp",
+  "tagPrefix": "mcp-v",
+  "npmTag": "latest",
+  "distributionCommand": "npx @debugbundle/mcp",
+  "bin": "debugbundle-mcp",
+  "requiredReleaseFiles": [
+    "package.json",
+    "README.md",
+    "LICENSE",
+    "bin/debugbundle-mcp.js"
+  ]
+}

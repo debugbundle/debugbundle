@@ -1,0 +1,32 @@
+name: DebugBundle Agent-Capable Workflow
+
+on:
+  repository_dispatch:
+    types: [debugbundle.incident]
+
+jobs:
+  investigate:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Fetch DebugBundle context
+        id: debugbundle
+        uses: debugbundle/action@v1
+        with:
+          incident-id: ${{ github.event.client_payload.incident_id }}
+          debugbundle-token: ${{ secrets.DEBUGBUNDLE_TOKEN }}
+
+      - name: Inspect fetched files
+        run: |
+          echo "Bundle saved to ${{ steps.debugbundle.outputs.bundle-path }}"
+          echo "Reproduction saved to ${{ steps.debugbundle.outputs.reproduction-path }}"
+          echo "Reproduction status: ${{ steps.debugbundle.outputs.reproduction-status }}"
+
+      - name: Invoke repository-owned automation
+        run: |
+          echo "Run your coding agent, internal script, or reusable workflow here."
+          echo "The bundle is ready for analysis at ${{ steps.debugbundle.outputs.bundle-path }}"

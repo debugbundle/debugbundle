@@ -1,0 +1,232 @@
+services:
+  postgres:
+    image: postgres:17
+    container_name: ${CONTAINER_PREFIX:-debugbundle-selfhost}-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-debugbundle}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-debugbundle}
+      POSTGRES_DB: ${POSTGRES_DB:-debugbundle}
+    ports:
+      - "${POSTGRES_PORT:-5434}:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-debugbundle} -d ${POSTGRES_DB:-debugbundle}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  redis:
+    image: redis:7
+    container_name: ${CONTAINER_PREFIX:-debugbundle-selfhost}-redis
+    restart: unless-stopped
+    ports:
+      - "${REDIS_PORT:-6380}:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+
+  localstack:
+    image: localstack/localstack:latest
+    container_name: ${CONTAINER_PREFIX:-debugbundle-selfhost}-localstack
+    restart: unless-stopped
+    environment:
+      SERVICES: s3
+      S3_BUCKET: ${S3_BUCKET:-debugbundle-raw-events}
+      AWS_DEFAULT_REGION: ${S3_REGION:-us-east-1}
+      DEBUG: "0"
+    ports:
+      - "${LOCALSTACK_PORT:-4567}:4566"
+    volumes:
+      - localstack-data:/var/lib/localstack
+      - ./localstack-init:/etc/localstack/init/ready.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "awslocal s3api head-bucket --bucket ${S3_BUCKET:-debugbundle-raw-events} >/dev/null 2>&1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  workspace-init:
+    image: node:24-alpine
+    container_name: ${CONTAINER_PREFIX:-debugbundle-selfhost}-workspace-init
+    restart: "no"
+    working_dir: /workspace
+    volumes:
+      - ../..:/workspace
+    command: sh -lc "corepack enable && corepack pnpm install --frozen-lockfile"
+
+  db-bootstrap:
+    image: node:24-alpine
+    container_name: ${CONTAINER_PREFIX:-debugbundle-selfhost}-db-bootstrap
+    restart: "no"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      workspace-init:
+        condition: service_completed_successfully
+    working_dir: /workspace
+    volumes:
+      - ../..:/workspace
+    environment:
+      DB_HOST: postgres
+      DB_PORT: "5432"
+      DB_USER: ${POSTGRES_USER:-debugbundle}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:-debugbundle}
+      DB_NAME: ${POSTGRES_DB:-debugbundle}
+    command: sh -lc "corepack enable && corepack pnpm db:bootstrap"
+
+  db-migrate:
+    image: node:24-alpine
+    container_name: ${CONTAINER_PREFIX:-debugbundle-selfhost}-db-migrate
+    restart: "no"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      workspace-init:
+        condition: service_completed_successfully
+      db-bootstrap:
+        condition: service_completed_successfully
+    working_dir: /workspace
+    volumes:
+      - ../..:/workspace
+    environment:
+      DB_HOST: postgres
+      DB_PORT: "5432"
+      DB_USER: ${POSTGRES_USER:-debugbundle}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:-debugbundle}
+      DB_NAME: ${POSTGRES_DB:-debugbundle}
+    command: sh -lc "corepack enable && corepack pnpm db:migrate"
+
+  api:
+    image: node:24-alpine
+    container_name: ${CONTAINER_PREFIX:-debugbundle-selfhost}-api
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      localstack:
+        condition: service_healthy
+      db-bootstrap:
+        condition: service_completed_successfully
+      db-migrate:
+        condition: service_completed_successfully
+      workspace-init:
+        condition: service_completed_successfully
+    working_dir: /workspace
+    volumes:
+      - ../..:/workspace
+    ports:
+      - "${API_PORT:-3004}:3000"
+    environment:
+      SELFHOST_MODE: ${SELFHOST_MODE:-true}
+      API_HOST: 0.0.0.0
+      API_PORT: "3000"
+      APP_BASE_URL: ${APP_BASE_URL:-http://localhost:5291}
+      AUTH_COOKIE_SECURE: ${AUTH_COOKIE_SECURE:-false}
+      DEBUGBUNDLE_PROBE_TRIGGER_SECRET: ${DEBUGBUNDLE_PROBE_TRIGGER_SECRET:?DEBUGBUNDLE_PROBE_TRIGGER_SECRET is required}
+      DEV_GITHUB_MOCK_LOGIN: ${DEV_GITHUB_MOCK_LOGIN:-false}
+      DEV_GITHUB_MOCK_EMAIL: ${DEV_GITHUB_MOCK_EMAIL:-dev@debugbundle.local}
+      DB_HOST: postgres
+      DB_PORT: "5432"
+      DB_USER: ${POSTGRES_USER:-debugbundle}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:-debugbundle}
+      DB_NAME: ${POSTGRES_DB:-debugbundle}
+      REDIS_URL: redis://redis:6379
+      S3_ENDPOINT: http://localstack:4566
+      S3_REGION: ${S3_REGION:-us-east-1}
+      S3_BUCKET: ${S3_BUCKET:-debugbundle-raw-events}
+      AWS_ACCESS_KEY_ID: test
+      AWS_SECRET_ACCESS_KEY: test
+      GITHUB_CLIENT_ID: ${GITHUB_CLIENT_ID:-}
+      GITHUB_CLIENT_SECRET: ${GITHUB_CLIENT_SECRET:-}
+      GITHUB_OAUTH_CALLBACK_URL: ${GITHUB_OAUTH_CALLBACK_URL:-http://localhost:3004/v1/auth/github/callback}
+      GITHUB_OAUTH_STATE_SECRET: ${GITHUB_OAUTH_STATE_SECRET:-}
+      GITHUB_APP_ID: ${GITHUB_APP_ID:-}
+      GITHUB_APP_PRIVATE_KEY: ${GITHUB_APP_PRIVATE_KEY:-}
+      GITHUB_APP_WEBHOOK_SECRET: ${GITHUB_APP_WEBHOOK_SECRET:-}
+      GITHUB_APP_CLIENT_ID: ${GITHUB_APP_CLIENT_ID:-}
+      GITHUB_APP_CLIENT_SECRET: ${GITHUB_APP_CLIENT_SECRET:-}
+    command: sh -lc "corepack enable && corepack pnpm api:start"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:3000/ready >/dev/null"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 90s
+
+  worker:
+    image: node:24-alpine
+    container_name: ${CONTAINER_PREFIX:-debugbundle-selfhost}-worker
+    restart: unless-stopped
+    depends_on:
+      api:
+        condition: service_healthy
+      workspace-init:
+        condition: service_completed_successfully
+    working_dir: /workspace
+    volumes:
+      - ../..:/workspace
+    environment:
+      SELFHOST_MODE: ${SELFHOST_MODE:-true}
+      DB_HOST: postgres
+      DB_PORT: "5432"
+      DB_USER: ${POSTGRES_USER:-debugbundle}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:-debugbundle}
+      DB_NAME: ${POSTGRES_DB:-debugbundle}
+      REDIS_URL: redis://redis:6379
+      S3_ENDPOINT: http://localstack:4566
+      S3_REGION: ${S3_REGION:-us-east-1}
+      S3_BUCKET: ${S3_BUCKET:-debugbundle-raw-events}
+      AWS_ACCESS_KEY_ID: test
+      AWS_SECRET_ACCESS_KEY: test
+      WORKER_POLL_INTERVAL_MS: ${WORKER_POLL_INTERVAL_MS:-1000}
+      WORKER_HEALTH_PORT: ${WORKER_HEALTH_PORT:-3001}
+      WORKER_RUN_ONCE: ${WORKER_RUN_ONCE:-0}
+      GITHUB_APP_ID: ${GITHUB_APP_ID:-}
+      GITHUB_APP_PRIVATE_KEY: ${GITHUB_APP_PRIVATE_KEY:-}
+      GITHUB_APP_WEBHOOK_SECRET: ${GITHUB_APP_WEBHOOK_SECRET:-}
+      GITHUB_APP_CLIENT_ID: ${GITHUB_APP_CLIENT_ID:-}
+      GITHUB_APP_CLIENT_SECRET: ${GITHUB_APP_CLIENT_SECRET:-}
+    command: sh -lc "corepack enable && corepack pnpm worker:start"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:${WORKER_HEALTH_PORT:-3001}/ready >/dev/null"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 90s
+
+  web:
+    image: node:24-alpine
+    container_name: ${CONTAINER_PREFIX:-debugbundle-selfhost}-web
+    restart: unless-stopped
+    depends_on:
+      api:
+        condition: service_healthy
+      workspace-init:
+        condition: service_completed_successfully
+    working_dir: /workspace
+    volumes:
+      - ../..:/workspace
+    ports:
+      - "${WEB_PORT:-5291}:${WEB_PORT:-5291}"
+    environment:
+      VITE_API_URL: ${VITE_API_URL:-http://localhost:3004}
+    command: sh -lc "corepack enable && corepack pnpm --filter @debugbundle/web build && corepack pnpm --filter @debugbundle/web exec vite preview --host 0.0.0.0 --port ${WEB_PORT:-5291}"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:${WEB_PORT:-5291}/ >/dev/null"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 120s
+
+volumes:
+  postgres-data:
+  localstack-data:

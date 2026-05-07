@@ -1,0 +1,18 @@
+DebugBundle validation report.
+Status: healthy
+Checks:
+- profile-schema: ok - Validated .debugbundle/profile.json
+- connection-config: ok - Found .debugbundle/local/connection.json
+- agent-skill: ok - Found .agents/skills/debugbundle/SKILL.md
+- cli-reference: ok - Found .agents/skills/debugbundle/references/cli.md
+- mcp-reference: ok - Found .agents/skills/debugbundle/references/mcp.md
+- bundle-schema-reference: ok - Found .agents/skills/debugbundle/references/bundle-schema.md
+- profile-enrichment-reference: ok - Found .agents/skills/debugbundle/references/profile-enrichment.md
+- improvement-analysis-recipe: ok - Found .agents/skills/debugbundle/assets/schemas/improvement-analysis.json
+- performance-analysis-recipe: ok - Found .agents/skills/debugbundle/assets/schemas/performance-analysis.json
+- skill-evals: ok - Found .agents/skills/debugbundle/evals/evals.json
+- gitignore: ok - Found managed .gitignore entries
+Suggested actions:
+- Run debugbundle setup if .debugbundle/profile.json is missing.
+- Run debugbundle profile validate for field-level profile errors.
+- Run debugbundle validate --fix to recreate missing local DebugBundle stubs when safe.

@@ -1,0 +1,740 @@
+export interface Queryable {
+  query<Row extends Record<string, unknown>>(sql: string, params: unknown[]): Promise<{ rows: Row[] }>;
+}
+
+export const REQUIRED_API_TABLES = [
+  "users",
+  "sessions",
+  "email_auth_challenges",
+  "oauth_identities",
+  "organizations",
+  "organization_members",
+  "invites",
+  "projects",
+  "project_tokens",
+  "member_tokens",
+  "audit_logs",
+  "probe_activations",
+  "capture_policies",
+  "services",
+  "deployments",
+  "bundle_generations",
+  "weekly_report_channels",
+  "github_installations",
+  "project_github_repos",
+  "github_dispatch_rules",
+  "github_dispatch_deliveries",
+  "incidents",
+  "incident_events",
+  "alert_rules",
+  "agent_webhooks",
+  "webhook_deliveries",
+  "processed_billing_events"
+] as const;
+
+export const REQUIRED_WORKER_TABLES = [
+  "processed_events",
+  "services",
+  "deployments",
+  "bundle_generations",
+  "weekly_report_channels",
+  "github_installations",
+  "project_github_repos",
+  "github_dispatch_rules",
+  "github_dispatch_deliveries",
+  "incidents",
+  "incident_events",
+  "alert_rules",
+  "alert_deliveries",
+  "weekly_report_deliveries",
+  "agent_webhooks",
+  "webhook_deliveries"
+] as const;
+
+const LEGACY_SCHEMA_TABLE = "schema_migrations";
+
+const STORAGE_BOOTSTRAP_STATEMENTS = [
+  `
+    CREATE TABLE users (
+      id uuid PRIMARY KEY,
+      email text NOT NULL UNIQUE,
+      accepted_terms_at timestamptz,
+      created_at timestamptz NOT NULL DEFAULT now(),
+      updated_at timestamptz NOT NULL DEFAULT now(),
+      email_verified_at timestamptz
+    )
+  `,
+  `
+    CREATE TABLE organizations (
+      id uuid PRIMARY KEY,
+      name text NOT NULL,
+      slug text NOT NULL UNIQUE,
+      created_at timestamptz NOT NULL DEFAULT now(),
+      updated_at timestamptz NOT NULL DEFAULT now(),
+      suspended_at timestamptz,
+      plan text NOT NULL DEFAULT 'free',
+      stripe_customer_id text,
+      additional_capacity_units integer NOT NULL DEFAULT 0,
+      stripe_subscription_id text,
+      billing_state text,
+      billing_period_ends_at timestamptz,
+      last_billing_sync_at timestamptz,
+      last_billing_event_id text,
+      billing_period_starts_at timestamptz
+    )
+  `,
+  `
+    CREATE UNIQUE INDEX organizations_stripe_customer_id_key
+    ON organizations (stripe_customer_id)
+    WHERE stripe_customer_id IS NOT NULL
+  `,
+  `
+    CREATE TABLE projects (
+      id uuid PRIMARY KEY,
+      organization_id uuid REFERENCES organizations(id) ON DELETE SET NULL,
+      name text NOT NULL,
+      slug text NOT NULL,
+      environment_default text NOT NULL DEFAULT 'production',
+      created_at timestamptz NOT NULL DEFAULT now(),
+      updated_at timestamptz NOT NULL DEFAULT now(),
+      plan text NOT NULL DEFAULT 'free'
+    )
+  `,
+  `
+    CREATE UNIQUE INDEX projects_organization_id_slug_key
+    ON projects (organization_id, slug)
+    WHERE organization_id IS NOT NULL
+  `,
+  `
+    CREATE TABLE services (
+      id uuid PRIMARY KEY,
+      project_id uuid NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+      name text NOT NULL,
+      runtime text,
+      framework text,
+      environment text NOT NULL DEFAULT 'production',
+      created_at timestamptz NOT NULL DEFAULT now(),
+      updated_at timestamptz NOT NULL DEFAULT now(),
+      UNIQUE (project_id, name, environment)
+    )
+  `,
+  `
+    CREATE TABLE project_tokens (
+      id uuid PRIMARY KEY,
+      project_id uuid NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+      token_hash text UNIQUE NOT NULL,
+      label text NOT NULL,
+      last_used_at timestamptz,
+      created_at timestamptz NOT NULL DEFAULT now(),
+      revoked_at timestamptz,
+      expires_at timestamptz
+    )
+  `,
+  `
+    CREATE TABLE member_tokens (
+      id uuid PRIMARY KEY,
+      user_id uuid NOT NULL,
+      organization_id uuid NOT NULL,
+      token_hash text UNIQUE NOT NULL,
+      label text NOT NULL,
+      last_used_at timestamptz,
+      created_at timestamptz NOT NULL DEFAULT now(),
+      revoked_at timestamptz,
+      expires_at timestamptz
+    )
+  `,
+  `
+    CREATE INDEX member_tokens_org_idx
+    ON member_tokens (organization_id)
+  `,
+  `
+    CREATE TABLE audit_logs (
+      id uuid PRIMARY KEY,
+      organization_id uuid,
+      actor_user_id uuid,
+      actor_type text NOT NULL,
+      action text NOT NULL,
+      target_type text NOT NULL,
+      target_id text,
+      status text NOT NULL,
+      ip_address text,
+      metadata jsonb NOT NULL DEFAULT '{}'::jsonb,
+      occurred_at timestamptz NOT NULL,
+      created_at timestamptz NOT NULL DEFAULT now()
+    )
+  `,
+  `
+    CREATE INDEX audit_logs_organization_occurred_at_idx
+    ON audit_logs (organization_id, occurred_at DESC, created_at DESC)
+  `,
+  `
+    CREATE INDEX audit_logs_action_occurred_at_idx
+    ON audit_logs (action, occurred_at DESC, created_at DESC)
+  `,
+  `
+    CREATE TABLE organization_members (
+      id uuid PRIMARY KEY,
+      organization_id uuid NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+      user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      role text NOT NULL DEFAULT 'member',
+      suspended_at timestamptz,
+      created_at timestamptz NOT NULL DEFAULT now(),
+      UNIQUE (organization_id, user_id)
+    )
+  `,
+  `
+    CREATE INDEX organization_members_org_idx
+    ON organization_members (organization_id)
+  `,
+  `
+    CREATE INDEX organization_members_user_idx
+    ON organization_members (user_id)
+  `,
+  `
+    CREATE TABLE sessions (
+      id uuid PRIMARY KEY,
+      user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      organization_id uuid NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+      session_token_hash text UNIQUE NOT NULL,
+      created_at timestamptz NOT NULL DEFAULT now(),
+      expires_at timestamptz NOT NULL,
+      revoked_at timestamptz
+    )
+  `,
+  `
+    CREATE INDEX sessions_token_hash_idx
+    ON sessions (session_token_hash)
+  `,
+  `
+    CREATE INDEX sessions_user_org_idx
+    ON sessions (user_id, organization_id)
+  `,
+  `
+    CREATE TABLE email_auth_challenges (
+      id uuid PRIMARY KEY,
+      email text NOT NULL,
+      code_hash text NOT NULL,
+      accepted_terms_at timestamptz,
+      created_at timestamptz NOT NULL DEFAULT now(),
+      expires_at timestamptz NOT NULL,
+      used_at timestamptz
+    )
+  `,
+  `
+    CREATE INDEX email_auth_challenges_email_idx
+    ON email_auth_challenges (lower(email), created_at DESC)
+  `,
+  `
+    CREATE INDEX email_auth_challenges_code_hash_idx
+    ON email_auth_challenges (code_hash)
+  `,
+  `
+    CREATE TABLE invites (
+      id uuid PRIMARY KEY,
+      organization_id uuid NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+      email text NOT NULL,
+      role text NOT NULL DEFAULT 'member',
+      invited_by uuid REFERENCES users(id) ON DELETE SET NULL,
+      accepted_at timestamptz,
+      expires_at timestamptz NOT NULL,
+      created_at timestamptz NOT NULL DEFAULT now(),
+      invite_token_hash text,
+      UNIQUE (organization_id, email)
+    )
+  `,
+  `
+    CREATE INDEX invites_organization_id_idx
+    ON invites (organization_id, created_at DESC)
+  `,
+  `
+    CREATE UNIQUE INDEX invites_invite_token_hash_key
+    ON invites (invite_token_hash)
+    WHERE invite_token_hash IS NOT NULL
+  `,
+  `
+    CREATE TABLE oauth_identities (
+      id uuid PRIMARY KEY,
+      provider text NOT NULL,
+      provider_user_id text NOT NULL,
+      user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      created_at timestamptz NOT NULL DEFAULT now(),
+      updated_at timestamptz NOT NULL DEFAULT now(),
+      UNIQUE (provider, provider_user_id)
+    )
+  `,
+  `
+    CREATE INDEX oauth_identities_user_id_idx
+    ON oauth_identities (user_id, provider)
+  `,
+  `
+    CREATE TABLE probe_activations (
+      id uuid PRIMARY KEY,
+      project_id uuid NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+      created_by_member_id uuid NOT NULL,
+      label_pattern text NOT NULL,
+      service text NOT NULL DEFAULT '*',
+      environment text NOT NULL DEFAULT '*',
+      trigger_expires_at timestamptz NOT NULL,
+      expires_at timestamptz NOT NULL,
+      deactivated_at timestamptz,
+      created_at timestamptz NOT NULL DEFAULT now()
+    )
+  `,
+  `
+    CREATE INDEX probe_activations_project_active_idx
+    ON probe_activations (project_id, expires_at DESC)
+    WHERE deactivated_at IS NULL
+  `,
+  `
+    CREATE TABLE capture_policies (
+      project_id uuid PRIMARY KEY REFERENCES projects(id) ON DELETE CASCADE,
+      preset text NOT NULL DEFAULT 'minimal',
+      capture_logs text,
+      capture_request_events text,
+      capture_breadcrumbs text,
+      capture_probe_events text,
+      updated_at timestamptz NOT NULL DEFAULT now()
+    )
+  `,
+  `
+    CREATE TABLE deployments (
+      id uuid PRIMARY KEY,
+      project_id uuid NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+      service_id uuid REFERENCES services(id) ON DELETE SET NULL,
+      environment text NOT NULL,
+      source_event_id uuid UNIQUE NOT NULL,
+      commit_sha text,
+      version text,
+      branch text,
+      deployed_at timestamptz NOT NULL,
+      metadata jsonb NOT NULL DEFAULT '{}'::jsonb,
+      created_at timestamptz NOT NULL DEFAULT now(),
+      updated_at timestamptz NOT NULL DEFAULT now()
+    )
+  `,
+  `
+    CREATE INDEX deployments_project_service_env_deployed_idx
+    ON deployments (project_id, service_id, environment, deployed_at DESC)
+  `,
+  `
+    CREATE TABLE incidents (
+      id uuid PRIMARY KEY,
+      project_id uuid NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+      service_id uuid REFERENCES services(id) ON DELETE SET NULL,
+      environment text NOT NULL DEFAULT 'production',
+      fingerprint text NOT NULL,
+      fingerprint_version text NOT NULL DEFAULT 'v1',
+      title text NOT NULL,
+      severity text NOT NULL,
+      status text NOT NULL DEFAULT 'open',
+      first_seen_at timestamptz NOT NULL,
+      last_seen_at timestamptz NOT NULL,
+      occurrence_count integer NOT NULL DEFAULT 1,
+      matched_fields text[],
+      created_at timestamptz NOT NULL DEFAULT now(),
+      updated_at timestamptz NOT NULL DEFAULT now(),
+      regressed_at timestamptz,
+      spike_detected_at timestamptz,
+      frequency_occurrences_1m integer,
+      frequency_occurrences_5m integer,
+      frequency_occurrences_1h integer,
+      frequency_occurrences_24h integer,
+      frequency_baseline_1h_per_5m double precision,
+      frequency_spike_ratio_5m_to_1h double precision,
+      frequency_has_sufficient_baseline boolean,
+      frequency_is_spiking boolean,
+      frequency_snapshot_at timestamptz,
+      latest_deployment_id uuid REFERENCES deployments(id) ON DELETE SET NULL,
+      bundle_generation_number integer NOT NULL DEFAULT 0,
+      bundle_created_at timestamptz,
+      bundle_updated_at timestamptz,
+      bundle_source_event_id uuid,
+      bundle_source_occurred_at timestamptz,
+      bundle_trigger text,
+      bundle_failure_reason text,
+      resolved_at timestamptz,
+      resolved_by_member_id uuid REFERENCES users(id) ON DELETE SET NULL,
+      UNIQUE (project_id, environment, service_id, fingerprint)
+    )
+  `,
+  `
+    CREATE TABLE processed_events (
+      event_id uuid PRIMARY KEY,
+      project_id uuid NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+      event_type text NOT NULL,
+      fingerprint text NOT NULL,
+      normalized_message text NOT NULL,
+      processed_at timestamptz NOT NULL DEFAULT now()
+    )
+  `,
+  `
+    CREATE TABLE bundle_generations (
+      id uuid PRIMARY KEY,
+      project_id uuid NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+      incident_id uuid NOT NULL REFERENCES incidents(id) ON DELETE CASCADE,
+      bundle_type text NOT NULL,
+      generation_number integer NOT NULL,
+      source_event_id uuid NOT NULL,
+      source_occurred_at timestamptz NOT NULL,
+      trigger text NOT NULL,
+      created_at timestamptz NOT NULL,
+      updated_at timestamptz NOT NULL,
+      UNIQUE (incident_id, source_event_id)
+    )
+  `,
+  `
+    CREATE INDEX bundle_generations_project_created_idx
+    ON bundle_generations (project_id, created_at DESC, bundle_type)
+  `,
+  `
+    CREATE INDEX bundle_generations_incident_generation_idx
+    ON bundle_generations (incident_id, generation_number DESC)
+  `,
+  `
+    CREATE TABLE incident_events (
+      incident_id uuid NOT NULL REFERENCES incidents(id) ON DELETE CASCADE,
+      event_id uuid NOT NULL,
+      event_type text NOT NULL,
+      event_class text NOT NULL DEFAULT 'context_signal',
+      occurred_at timestamptz NOT NULL,
+      is_sampled boolean NOT NULL DEFAULT false,
+      level text,
+      retain_first boolean NOT NULL DEFAULT false,
+      retain_latest boolean NOT NULL DEFAULT false,
+      retain_after_deploy boolean NOT NULL DEFAULT false,
+      retain_highest_severity boolean NOT NULL DEFAULT false,
+      retain_deploy_metadata boolean NOT NULL DEFAULT false,
+      severity_rank integer NOT NULL DEFAULT 0,
+      PRIMARY KEY (incident_id, event_id)
+    )
+  `,
+  `
+    CREATE INDEX incident_events_incident_occurred_event_idx
+    ON incident_events (incident_id, occurred_at DESC, event_id DESC)
+  `,
+  `
+    CREATE INDEX incident_events_incident_level_occurred_event_idx
+    ON incident_events (incident_id, level, occurred_at DESC, event_id DESC)
+  `,
+  `
+    CREATE INDEX incident_events_incident_sampled_idx
+    ON incident_events (incident_id, is_sampled, occurred_at ASC, event_id ASC)
+  `,
+  `
+    CREATE TABLE weekly_report_channels (
+      id uuid PRIMARY KEY,
+      project_id uuid NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+      channel text NOT NULL,
+      config jsonb NOT NULL DEFAULT '{}'::jsonb,
+      schedule_day_of_week text NOT NULL,
+      schedule_hour_of_day integer NOT NULL,
+      schedule_timezone text NOT NULL,
+      is_enabled boolean NOT NULL DEFAULT true,
+      created_at timestamptz NOT NULL DEFAULT now(),
+      updated_at timestamptz NOT NULL DEFAULT now()
+    )
+  `,
+  `
+    CREATE INDEX weekly_report_channels_project_created_idx
+    ON weekly_report_channels (project_id, created_at ASC)
+  `,
+  `
+    CREATE TABLE weekly_report_deliveries (
+      id uuid PRIMARY KEY,
+      project_id uuid NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+      weekly_report_channel_id uuid REFERENCES weekly_report_channels(id) ON DELETE CASCADE,
+      window_start timestamptz NOT NULL,
+      window_end timestamptz NOT NULL,
+      channel text NOT NULL,
+      status text NOT NULL,
+      last_error text,
+      delivered_at timestamptz,
+      created_at timestamptz NOT NULL DEFAULT now(),
+      updated_at timestamptz NOT NULL DEFAULT now()
+    )
+  `,
+  `
+    CREATE INDEX weekly_report_deliveries_project_window_idx
+    ON weekly_report_deliveries (project_id, window_end DESC, channel)
+  `,
+  `
+    CREATE UNIQUE INDEX weekly_report_deliveries_channel_window_idx
+    ON weekly_report_deliveries (weekly_report_channel_id, window_start, window_end)
+    WHERE weekly_report_channel_id IS NOT NULL
+  `,
+  `
+    CREATE INDEX weekly_report_deliveries_channel_idx
+    ON weekly_report_deliveries (weekly_report_channel_id, window_end DESC)
+  `,
+  `
+    CREATE TABLE alert_rules (
+      id uuid PRIMARY KEY,
+      project_id uuid NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+      service_id uuid REFERENCES services(id) ON DELETE CASCADE,
+      channel text NOT NULL,
+      condition_type text NOT NULL,
+      severity_min text,
+      config jsonb NOT NULL DEFAULT '{}'::jsonb,
+      is_enabled boolean NOT NULL DEFAULT true,
+      created_at timestamptz NOT NULL DEFAULT now(),
+      updated_at timestamptz NOT NULL DEFAULT now()
+    )
+  `,
+  `
+    CREATE INDEX alert_rules_project_enabled_idx
+    ON alert_rules (project_id, is_enabled)
+  `,
+  `
+    CREATE TABLE alert_deliveries (
+      id uuid PRIMARY KEY,
+      alert_id uuid NOT NULL REFERENCES alert_rules(id) ON DELETE CASCADE,
+      project_id uuid NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+      incident_id uuid NOT NULL REFERENCES incidents(id) ON DELETE CASCADE,
+      condition_type text NOT NULL,
+      dedupe_key text NOT NULL,
+      channel text NOT NULL,
+      status text NOT NULL,
+      payload jsonb NOT NULL,
+      last_error text,
+      delivered_at timestamptz,
+      created_at timestamptz NOT NULL DEFAULT now(),
+      updated_at timestamptz NOT NULL DEFAULT now(),
+      UNIQUE (alert_id, incident_id, dedupe_key)
+    )
+  `,
+  `
+    CREATE INDEX alert_deliveries_project_status_idx
+    ON alert_deliveries (project_id, status, created_at DESC)
+  `,
+  `
+    CREATE TABLE agent_webhooks (
+      id uuid PRIMARY KEY,
+      project_id uuid NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+      url text NOT NULL,
+      secret_hash text NOT NULL,
+      events text[] NOT NULL,
+      filters jsonb NOT NULL DEFAULT '{}'::jsonb,
+      is_enabled boolean NOT NULL DEFAULT true,
+      created_at timestamptz NOT NULL DEFAULT now(),
+      updated_at timestamptz NOT NULL DEFAULT now()
+    )
+  `,
+  `
+    CREATE INDEX agent_webhooks_project_enabled_idx
+    ON agent_webhooks (project_id, is_enabled)
+  `,
+  `
+    CREATE TABLE webhook_deliveries (
+      id uuid PRIMARY KEY,
+      webhook_id uuid REFERENCES agent_webhooks(id) ON DELETE CASCADE,
+      project_id uuid NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+      incident_id uuid NOT NULL REFERENCES incidents(id) ON DELETE CASCADE,
+      event_type text NOT NULL,
+      target_url text NOT NULL,
+      signing_secret text NOT NULL,
+      status text NOT NULL DEFAULT 'pending',
+      attempt_count integer NOT NULL DEFAULT 0,
+      occurred_at timestamptz NOT NULL,
+      next_attempt_at timestamptz,
+      last_response_code integer,
+      last_attempted_at timestamptz,
+      last_error text,
+      payload jsonb NOT NULL,
+      created_at timestamptz NOT NULL DEFAULT now(),
+      updated_at timestamptz NOT NULL DEFAULT now()
+    )
+  `,
+  `
+    CREATE INDEX webhook_deliveries_status_next_attempt_idx
+    ON webhook_deliveries (status, next_attempt_at)
+  `,
+  `
+    CREATE TABLE processed_billing_events (
+      event_id text PRIMARY KEY,
+      event_type text NOT NULL,
+      organization_id uuid,
+      processed_at timestamptz NOT NULL DEFAULT now()
+    )
+  `,
+  `
+    CREATE TABLE github_installations (
+      id uuid PRIMARY KEY,
+      organization_id uuid NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+      installation_id bigint NOT NULL UNIQUE,
+      account_login text NOT NULL,
+      account_type text NOT NULL CHECK (account_type IN ('Organization', 'User')),
+      status text NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'suspended', 'removed')),
+      created_at timestamptz NOT NULL DEFAULT now(),
+      updated_at timestamptz NOT NULL DEFAULT now(),
+      UNIQUE (organization_id)
+    )
+  `,
+  `
+    CREATE INDEX github_installations_status_idx
+    ON github_installations (status)
+  `,
+  `
+    CREATE TABLE project_github_repos (
+      id uuid PRIMARY KEY,
+      project_id uuid NOT NULL UNIQUE REFERENCES projects(id) ON DELETE CASCADE,
+      installation_id uuid NOT NULL REFERENCES github_installations(id) ON DELETE CASCADE,
+      repo_owner text NOT NULL,
+      repo_name text NOT NULL,
+      default_branch text NOT NULL DEFAULT 'main',
+      created_at timestamptz NOT NULL DEFAULT now(),
+      updated_at timestamptz NOT NULL DEFAULT now()
+    )
+  `,
+  `
+    CREATE TABLE github_dispatch_rules (
+      id uuid PRIMARY KEY,
+      project_id uuid NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+      name text NOT NULL,
+      enabled boolean NOT NULL DEFAULT true,
+      event_types text[] NOT NULL,
+      environments text[],
+      services text[],
+      severity_min text CHECK (severity_min IN ('low', 'medium', 'high', 'critical')),
+      bundle_type text CHECK (bundle_type IN ('failure', 'improvement')),
+      incident_status text NOT NULL DEFAULT 'new_or_reopened'
+        CHECK (incident_status IN ('new_only', 'reopened_only', 'new_or_reopened')),
+      cooldown_seconds integer NOT NULL DEFAULT 300,
+      created_at timestamptz NOT NULL DEFAULT now(),
+      updated_at timestamptz NOT NULL DEFAULT now()
+    )
+  `,
+  `
+    CREATE INDEX github_dispatch_rules_project_enabled_idx
+    ON github_dispatch_rules (project_id, enabled)
+  `,
+  `
+    CREATE TABLE github_dispatch_deliveries (
+      id uuid PRIMARY KEY,
+      rule_id uuid NOT NULL REFERENCES github_dispatch_rules(id) ON DELETE CASCADE,
+      project_id uuid NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+      incident_id uuid NOT NULL,
+      incident_fingerprint text NOT NULL,
+      installation_id bigint NOT NULL,
+      repo_owner text NOT NULL,
+      repo_name text NOT NULL,
+      status text NOT NULL DEFAULT 'pending'
+        CHECK (status IN ('pending', 'retrying', 'delivered', 'failed')),
+      attempt_count integer NOT NULL DEFAULT 0,
+      next_attempt_at timestamptz,
+      last_attempt_at timestamptz,
+      last_error text,
+      github_status_code integer,
+      dispatch_payload jsonb NOT NULL DEFAULT '{}'::jsonb,
+      created_at timestamptz NOT NULL DEFAULT now(),
+      updated_at timestamptz NOT NULL DEFAULT now(),
+      dedupe_key text NOT NULL
+    )
+  `,
+  `
+    CREATE INDEX github_dispatch_deliveries_status_next_attempt_idx
+    ON github_dispatch_deliveries (status, next_attempt_at)
+  `,
+  `
+    CREATE UNIQUE INDEX github_dispatch_deliveries_rule_dedupe_key_idx
+    ON github_dispatch_deliveries (rule_id, incident_id, dedupe_key)
+  `,
+  `
+    CREATE TABLE org_usage_counters (
+      organization_id uuid NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+      period_starts_at timestamptz NOT NULL,
+      raw_ingested_events integer NOT NULL DEFAULT 0,
+      updated_at timestamptz NOT NULL DEFAULT now(),
+      PRIMARY KEY (organization_id, period_starts_at)
+    )
+  `
+] as const;
+
+export const STORAGE_BOOTSTRAP_SQL = STORAGE_BOOTSTRAP_STATEMENTS.join(";\n\n");
+
+function validateStorageBootstrapStatements(statements: readonly string[]): void {
+  if (statements.length === 0) {
+    throw new Error("storage_bootstrap_statements_empty");
+  }
+
+  const sql = statements.join("\n");
+  const forbiddenChecks: Array<{ pattern: RegExp; error: string }> = [
+    { pattern: /\b(BEGIN|COMMIT|ROLLBACK)\b/i, error: "storage_bootstrap_contains_transaction_sql" },
+    { pattern: /\bALTER\s+TABLE\b/i, error: "storage_bootstrap_contains_schema_evolution_sql" },
+    { pattern: /\bIF\s+NOT\s+EXISTS\b|\bIF\s+EXISTS\b/i, error: "storage_bootstrap_contains_schema_evolution_sql" },
+    { pattern: /\bschema_migrations\b/i, error: "storage_bootstrap_contains_legacy_schema_table" },
+    { pattern: /:legacy-/i, error: "storage_bootstrap_contains_legacy_row_suffix" }
+  ];
+
+  for (const statement of statements) {
+    if (statement.trim().length === 0) {
+      throw new Error("storage_bootstrap_statement_empty");
+    }
+  }
+
+  for (const check of forbiddenChecks) {
+    if (check.pattern.test(sql)) {
+      throw new Error(check.error);
+    }
+  }
+}
+
+async function listKnownStorageTables(db: Queryable): Promise<Set<string>> {
+  const expectedTables = Array.from(new Set([...REQUIRED_API_TABLES, ...REQUIRED_WORKER_TABLES, LEGACY_SCHEMA_TABLE]));
+  const rows = await db.query<{ table_name: string }>(
+    `
+      SELECT table_name
+      FROM information_schema.tables
+      WHERE table_schema = 'public'
+        AND table_name = ANY($1::text[])
+    `,
+    [expectedTables]
+  );
+
+  return new Set(rows.rows.map((row) => row.table_name));
+}
+
+export async function bootstrapStorageSchema(db: Queryable): Promise<{ status: "bootstrapped" | "already_bootstrapped" }> {
+  validateStorageBootstrapStatements(STORAGE_BOOTSTRAP_STATEMENTS);
+
+  const existingTables = await listKnownStorageTables(db);
+  if (existingTables.has(LEGACY_SCHEMA_TABLE)) {
+    throw new Error("storage_bootstrap_legacy_schema_detected: schema_migrations; recreate_database_required");
+  }
+
+  const requiredTables = Array.from(new Set([...REQUIRED_API_TABLES, ...REQUIRED_WORKER_TABLES]));
+  const existingRequiredTables = requiredTables.filter((tableName) => existingTables.has(tableName));
+
+  if (existingRequiredTables.length === requiredTables.length) {
+    return { status: "already_bootstrapped" };
+  }
+
+  if (existingRequiredTables.length > 0) {
+    const missingTables = requiredTables.filter((tableName) => !existingTables.has(tableName));
+    throw new Error(
+      `storage_bootstrap_partial_schema_detected: existing=${existingRequiredTables.sort().join(",")}; missing=${missingTables.sort().join(",")}`
+    );
+  }
+
+  await db.query("BEGIN", []);
+
+  try {
+    for (const statement of STORAGE_BOOTSTRAP_STATEMENTS) {
+      await db.query(statement, []);
+    }
+
+    await db.query("COMMIT", []);
+    return { status: "bootstrapped" };
+  } catch (error) {
+    try {
+      await db.query("ROLLBACK", []);
+    } catch (rollbackError) {
+      const bootstrapError = error instanceof Error ? error.message : String(error);
+      const rollbackMessage = rollbackError instanceof Error ? rollbackError.message : String(rollbackError);
+      throw new Error(
+        `storage_bootstrap_rollback_failed: bootstrap_error=${bootstrapError}; rollback_error=${rollbackMessage}`
+      );
+    }
+
+    throw new Error(`storage_bootstrap_failed: ${error instanceof Error ? error.message : String(error)}`);
+  }
+}

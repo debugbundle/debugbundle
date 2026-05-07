@@ -1,0 +1,152 @@
+import type {
+  IncidentLifecycleService,
+  IncidentRetrievalRecord,
+  WebhookEventType
+} from "./types.js";
+
+type IncidentResolutionInput = {
+  organization_id: string;
+  incident_id: string;
+  resolved_by_member_id: string;
+  resolved_at: string;
+};
+
+type IncidentReopenInput = {
+  organization_id: string;
+  incident_id: string;
+};
+
+type IncidentResolutionStore = {
+  resolveIncidentForOrganization(input: IncidentResolutionInput): Promise<IncidentRetrievalRecord | null>;
+  reopenIncidentForOrganization(input: IncidentReopenInput): Promise<IncidentRetrievalRecord | null>;
+};
+
+type IncidentLifecycleWebhookStore = {
+  listMatchingWebhooks(input: {
+    project_id: string;
+    event_type: WebhookEventType;
+    environment?: string;
+    service_name?: string;
+    severity?: "low" | "medium" | "high" | "critical";
+    bundle_type?: "failure" | "improvement";
+    is_verification?: boolean;
+  }): Promise<Array<{ webhook_id: string; target_url: string; signing_secret: string }>>;
+  createDeliveryIntent(input: {
+    webhook_id: string;
+    project_id: string;
+    incident_id: string | null;
+    event_type: WebhookEventType;
+    occurred_at: string;
+    target_url: string;
+    signing_secret: string;
+    payload: Record<string, unknown>;
+  }): Promise<{ delivery_id: string }>;
+};
+
+interface CreateIncidentLifecycleServiceInput {
+  incidentStore: IncidentResolutionStore;
+  webhookDeliveryStore: IncidentLifecycleWebhookStore;
+  fallbackTargetUrl: string | null;
+  fallbackSigningSecret: string | null;
+}
+
+function buildLifecyclePayload(eventType: WebhookEventType, incident: IncidentRetrievalRecord): Record<string, unknown> {
+  return {
+    event: eventType,
+    event_type: eventType,
+    incident_id: incident.incident_id,
+    project_id: incident.project_id,
+    occurred_at: incident.resolved_at,
+    service: incident.service_name,
+    environment: incident.environment,
+    severity: incident.severity,
+    bundle_type: "failure",
+    verification: false,
+    summary: incident.title,
+    links: {
+      bundle: `/v1/incidents/${incident.incident_id}/bundle`,
+      reproduction: `/v1/incidents/${incident.incident_id}/reproduction`
+    },
+    regression_after_deploy: false,
+    deploy_version: null,
+    deploy_commit_sha: null,
+    deploy_branch: null,
+    deploy_deployed_at: null,
+    minutes_since_deploy: null
+  };
+}
+
+async function publishResolvedWebhook(
+  input: CreateIncidentLifecycleServiceInput,
+  incident: IncidentRetrievalRecord
+): Promise<void> {
+  const resolvedAt = incident.resolved_at;
+  if (resolvedAt == null) {
+    return;
+  }
+
+  const matching = await input.webhookDeliveryStore.listMatchingWebhooks({
+    project_id: incident.project_id,
+    event_type: "bundle.resolved",
+    environment: incident.environment,
+    ...(incident.service_name !== null ? { service_name: incident.service_name } : {}),
+    severity: incident.severity,
+    bundle_type: "failure",
+    is_verification: false
+  });
+
+  const fallback =
+    input.fallbackTargetUrl !== null && input.fallbackSigningSecret !== null
+      ? [
+          {
+            webhook_id: `fallback-${incident.project_id}`,
+            target_url: input.fallbackTargetUrl,
+            signing_secret: input.fallbackSigningSecret
+          }
+        ]
+      : [];
+
+  const targets = matching.length > 0 ? matching : fallback;
+  if (targets.length === 0) {
+    return;
+  }
+
+  const payload = buildLifecyclePayload("bundle.resolved", incident);
+  for (const target of targets) {
+    await input.webhookDeliveryStore.createDeliveryIntent({
+      webhook_id: target.webhook_id,
+      project_id: incident.project_id,
+      incident_id: incident.incident_id,
+      event_type: "bundle.resolved",
+      occurred_at: resolvedAt,
+      target_url: target.target_url,
+      signing_secret: target.signing_secret,
+      payload
+    });
+  }
+}
+
+export function createIncidentLifecycleService(input: CreateIncidentLifecycleServiceInput): IncidentLifecycleService {
+  return {
+    async resolveIncidentForOrganization(resolveInput: IncidentResolutionInput): Promise<IncidentRetrievalRecord | null> {
+      const incident = await input.incidentStore.resolveIncidentForOrganization(resolveInput);
+      if (incident === null) {
+        return null;
+      }
+
+      const resolvedIncident: IncidentRetrievalRecord = incident;
+      const resolvedAt = resolvedIncident["resolved_at"];
+      const requestedResolvedAt = resolveInput["resolved_at"];
+
+      if (resolvedAt === requestedResolvedAt) {
+        await publishResolvedWebhook(input, resolvedIncident);
+      }
+
+      return resolvedIncident;
+    },
+
+    async reopenIncidentForOrganization(reopenInput: IncidentReopenInput): Promise<IncidentRetrievalRecord | null> {
+      return input.incidentStore.reopenIncidentForOrganization(reopenInput);
+    }
+  };
+}

@@ -1,0 +1,202 @@
+import { AlertTriangleIcon, ChevronRightIcon } from "lucide-react";
+import { useMemo, useState } from "react";
+import { Link } from "react-router-dom";
+
+import { CursorPaginationControls } from "../components/system/cursor-pagination-controls.js";
+import { PageHeader } from "../components/system/page-header.js";
+import { ResourceListState } from "../components/system/resource-list-state.js";
+import { SortableTableHead, toggleSort, type SortState } from "../components/system/sortable-table-head.js";
+import { Badge } from "../components/ui/badge.js";
+import { Button } from "../components/ui/button.js";
+import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card.js";
+import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "../components/ui/empty.js";
+import { Skeleton } from "../components/ui/skeleton.js";
+import { Table, TableBody, TableCell, TableHeader, TableRow } from "../components/ui/table.js";
+import { listIncidents, type IncidentRecord } from "../lib/api.js";
+import { useCursorPagination } from "../lib/use-cursor-pagination.js";
+
+export function IncidentsPage(): JSX.Element {
+  const [sort, setSort] = useState<SortState<IncidentSortField>>({
+    field: "last_seen_at",
+    direction: "desc"
+  });
+  const { items: incidents, isLoading, page, hasNextPage, goToNextPage, goToPreviousPage } = useCursorPagination(
+    async (cursor) => {
+      const response = await listIncidents(20, cursor ?? undefined);
+      return {
+        items: response.incidents,
+        nextCursor: response.nextCursor
+      };
+    },
+    []
+  );
+
+  const sortedIncidents = useMemo(() => sortIncidents(incidents, sort), [incidents, sort]);
+
+  return (
+    <div className="space-y-6">
+      <PageHeader description="Grouped incident inventory across the organization. Click an incident to view its debug bundle and reproduction artifacts." />
+
+      <Card className="min-w-0">
+        <CardHeader>
+          <CardTitle>Incident inventory</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <ResourceListState
+            items={incidents}
+            loading={
+              <div className="space-y-3">
+                <Skeleton className="h-12 w-full" />
+                <Skeleton className="h-12 w-full" />
+              </div>
+            }
+            empty={
+              <Empty>
+                <EmptyHeader>
+                  <EmptyMedia variant="icon">
+                    <AlertTriangleIcon />
+                  </EmptyMedia>
+                  <EmptyTitle>No incidents captured yet</EmptyTitle>
+                  <EmptyDescription>Incoming incidents will appear here once grouped failures are available for the organization.</EmptyDescription>
+                </EmptyHeader>
+                <EmptyContent>
+                  <Button asChild type="button" variant="outline">
+                    <Link to="/projects">
+                      Open projects
+                      <ChevronRightIcon data-icon="inline-end" />
+                    </Link>
+                  </Button>
+                </EmptyContent>
+              </Empty>
+            }
+          >
+            {() => (
+              <div className="space-y-4">
+                <Table className="min-w-[860px]">
+                  <TableHeader>
+                    <TableRow>
+                      <SortableTableHead label="Incident" field="title" sort={sort} onSortChange={(field) => setSort((current) => toggleSort(current, field))} className="w-[28%]" />
+                      <SortableTableHead label="Project" field="project_name" sort={sort} onSortChange={(field) => setSort((current) => toggleSort(current, field))} className="w-[13%]" />
+                      <SortableTableHead label="Service" field="service_name" sort={sort} onSortChange={(field) => setSort((current) => toggleSort(current, field))} className="w-[13%]" />
+                      <SortableTableHead label="Severity" field="severity" sort={sort} onSortChange={(field) => setSort((current) => toggleSort(current, field))} />
+                      <SortableTableHead label="Status" field="status" sort={sort} onSortChange={(field) => setSort((current) => toggleSort(current, field))} />
+                      <SortableTableHead label="Occurrences" field="occurrence_count" sort={sort} onSortChange={(field) => setSort((current) => toggleSort(current, field))} className="whitespace-nowrap" />
+                      <SortableTableHead label="Last seen" field="last_seen_at" sort={sort} onSortChange={(field) => setSort((current) => toggleSort(current, field))} className="text-right whitespace-nowrap" align="right" />
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {sortedIncidents.map((incident) => (
+                      <TableRow key={incident.incident_id} className="cursor-pointer">
+                        <TableCell className="align-top whitespace-normal">
+                          <Link to={`/incidents/${incident.incident_id}`} className="font-medium text-foreground hover:underline">
+                            {incident.title}
+                          </Link>
+                          <p className="mt-1 text-xs text-muted-foreground whitespace-normal break-words">{incident.matched_fields.join(", ")}</p>
+                        </TableCell>
+                        <TableCell className="text-sm text-muted-foreground whitespace-normal break-words align-middle">
+                          <Link to={`/projects/${incident.project_id}`} className="hover:underline">
+                            {incident.project_name}
+                          </Link>
+                        </TableCell>
+                        <TableCell className="text-sm text-muted-foreground whitespace-normal break-words align-middle">
+                          {formatServiceName(incident.service_name)}
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant={severityVariantMap[incident.severity]}>{incident.severity}</Badge>
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant={statusVariantMap[incident.status]}>{incident.status}</Badge>
+                        </TableCell>
+                        <TableCell className="whitespace-nowrap">{formatOccurrenceSummary(incident.occurrence_count)}</TableCell>
+                        <TableCell className="pr-3 text-right text-sm text-muted-foreground whitespace-nowrap">{formatDate(incident.last_seen_at)}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+
+                <CursorPaginationControls
+                  page={page}
+                  hasNextPage={hasNextPage}
+                  isLoading={isLoading}
+                  onPreviousPage={goToPreviousPage}
+                  onNextPage={() => void goToNextPage()}
+                />
+              </div>
+            )}
+          </ResourceListState>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+const severityVariantMap: Record<IncidentRecord["severity"], "secondary" | "warning" | "destructive"> = {
+  low: "secondary",
+  medium: "secondary",
+  high: "warning",
+  critical: "destructive"
+};
+
+const statusVariantMap: Record<IncidentRecord["status"], "secondary" | "warning" | "success"> = {
+  open: "warning",
+  resolved: "success",
+  regressed: "secondary"
+};
+
+function formatOccurrenceSummary(value: number): string {
+  return `${value} occurrence${value === 1 ? "" : "s"}`;
+}
+
+function formatDate(value: string): string {
+  return new Date(value).toLocaleString(undefined, {
+    dateStyle: "medium",
+    timeStyle: "short"
+  });
+}
+
+function formatServiceName(value: string | null): string {
+  return value ?? "Unknown service";
+}
+
+type IncidentSortField = "title" | "project_name" | "service_name" | "severity" | "status" | "occurrence_count" | "last_seen_at";
+
+function sortIncidents(incidents: IncidentRecord[] | null, sort: SortState<IncidentSortField>): IncidentRecord[] {
+  if (incidents === null) {
+    return [];
+  }
+
+  const severityRank: Record<IncidentRecord["severity"], number> = {
+    low: 0,
+    medium: 1,
+    high: 2,
+    critical: 3
+  };
+  const statusRank: Record<IncidentRecord["status"], number> = {
+    open: 0,
+    regressed: 1,
+    resolved: 2
+  };
+
+  const sorted = [...incidents].sort((left, right) => {
+    switch (sort.field) {
+      case "title":
+        return left.title.localeCompare(right.title);
+      case "project_name":
+        return left.project_name.localeCompare(right.project_name);
+      case "service_name":
+        return formatServiceName(left.service_name).localeCompare(formatServiceName(right.service_name));
+      case "severity":
+        return severityRank[left.severity] - severityRank[right.severity];
+      case "status":
+        return statusRank[left.status] - statusRank[right.status];
+      case "occurrence_count":
+        return left.occurrence_count - right.occurrence_count;
+      case "last_seen_at":
+        return new Date(left.last_seen_at).getTime() - new Date(right.last_seen_at).getTime();
+      default:
+        return 0;
+    }
+  });
+
+  return sort.direction === "asc" ? sorted : sorted.reverse();
+}

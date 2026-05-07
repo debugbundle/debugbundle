@@ -1,0 +1,323 @@
+import { BookMarkedIcon, PencilIcon, Settings2Icon, Trash2Icon } from "lucide-react";
+import { useEffect, useState } from "react";
+import { Link, useNavigate, useOutletContext } from "react-router-dom";
+import { toast } from "sonner";
+
+import { DialogFormContent } from "../components/system/dialog-form-content.js";
+import { ProjectCapturePolicyCard } from "../components/system/project-capture-policy-card.js";
+import type { ProjectContext } from "../components/system/project-layout.js";
+import { useSession } from "../lib/session.js";
+import { Button } from "../components/ui/button.js";
+import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card.js";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger
+} from "../components/ui/alert-dialog.js";
+import { Dialog } from "../components/ui/dialog.js";
+import { Field, FieldDescription, FieldGroup, FieldLabel } from "../components/ui/field.js";
+import { Input } from "../components/ui/input.js";
+import {
+  deleteProject,
+  updateProject
+} from "../lib/api.js";
+import { CUSTOM_PROJECT_ENVIRONMENT_VALUE, PROJECT_ENVIRONMENT_OPTIONS } from "../lib/project-form.js";
+
+export function ProjectSettingsPage(): JSX.Element {
+  const { project, onProjectUpdated } = useOutletContext<ProjectContext>();
+  const { session } = useSession();
+  const navigate = useNavigate();
+  const deleteConfirmationPhrase = `delete ${project.name}`;
+  const [isEditOpen, setIsEditOpen] = useState(false);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [name, setName] = useState(project.name);
+  const [slug, setSlug] = useState(project.slug);
+  const [environmentDefault, setEnvironmentDefault] = useState(project.environment_default);
+  const [customEnvironmentDefault, setCustomEnvironmentDefault] = useState("");
+  const [deleteConfirmationInput, setDeleteConfirmationInput] = useState("");
+  const [isSaving, setIsSaving] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [deleteErrorMessage, setDeleteErrorMessage] = useState<string | null>(null);
+  const selectedProjectEnvironment = PROJECT_ENVIRONMENT_OPTIONS.some((option) => option.value === environmentDefault)
+    ? environmentDefault
+    : CUSTOM_PROJECT_ENVIRONMENT_VALUE;
+
+  const canEditProject = session?.role === "owner";
+
+  useEffect(() => {
+    setName(project.name);
+    setSlug(project.slug);
+    setEnvironmentDefault(project.environment_default);
+    setCustomEnvironmentDefault(
+      PROJECT_ENVIRONMENT_OPTIONS.some((option) => option.value === project.environment_default) ? "" : project.environment_default
+    );
+  }, [project]);
+
+  useEffect(() => {
+    if (!isDeleteDialogOpen) {
+      setDeleteConfirmationInput("");
+      setDeleteErrorMessage(null);
+    }
+  }, [isDeleteDialogOpen]);
+
+
+  async function handleSaveChanges(event: React.FormEvent<HTMLFormElement>): Promise<void> {
+    event.preventDefault();
+    setIsSaving(true);
+    setErrorMessage(null);
+
+    try {
+      const updatedProject = await updateProject(project.project_id, {
+        name,
+        slug,
+        environment_default: environmentDefault
+      });
+      onProjectUpdated(updatedProject);
+      setIsEditOpen(false);
+      toast.success("Project updated.");
+    } catch (error) {
+      if (error instanceof Error && error.message === "project_slug_taken") {
+        setErrorMessage("That project slug is already in use in this organization.");
+      } else {
+        setErrorMessage("Could not save project changes.");
+        toast.error("Could not save project changes.");
+      }
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
+  async function handleDeleteProject(): Promise<void> {
+    setIsDeleting(true);
+    setDeleteErrorMessage(null);
+
+    try {
+      await deleteProject(project.project_id);
+      setIsDeleteDialogOpen(false);
+      toast.success("Project deleted.");
+      void navigate("/projects", { replace: true });
+    } catch {
+      setDeleteErrorMessage("Could not delete this project.");
+      toast.error("Could not delete this project.");
+    } finally {
+      setIsDeleting(false);
+    }
+  }
+
+  const isDeleteConfirmationMatched = deleteConfirmationInput.trim() === deleteConfirmationPhrase;
+
+  function handleProjectEnvironmentChange(value: string): void {
+    if (value === CUSTOM_PROJECT_ENVIRONMENT_VALUE) {
+      setEnvironmentDefault(customEnvironmentDefault);
+      return;
+    }
+
+    setEnvironmentDefault(value);
+  }
+
+  function handleCustomProjectEnvironmentChange(value: string): void {
+    setCustomEnvironmentDefault(value);
+    setEnvironmentDefault(value);
+  }
+
+  return (
+    <div className="grid gap-4 xl:grid-cols-[1.15fr_0.85fr]">
+      <div className="space-y-4">
+        <Card>
+          <CardHeader>
+            <CardAction>
+              <Button type="button" variant="outline" size="sm" onClick={() => setIsEditOpen(true)} disabled={!canEditProject}>
+                <PencilIcon data-icon="inline-start" />
+                Edit project
+              </Button>
+            </CardAction>
+            <CardTitle>Project details</CardTitle>
+            <CardDescription>Current project identity and editable environment defaults used across setup guidance and project metadata.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            <div className="grid gap-4 sm:grid-cols-2">
+              <DetailBlock label="Project name" value={project.name} />
+              <DetailBlock label="Project slug" value={project.slug} />
+              <DetailBlock label="Project default environment" value={project.environment_default} />
+              <DetailBlock label="Created" value={formatDate(project.created_at)} />
+              <DetailBlock label="Updated" value={formatDate(project.updated_at)} />
+            </div>
+          </CardContent>
+        </Card>
+
+        <ProjectCapturePolicyCard projectId={project.project_id} organizationPlan={project.organization_plan} canEdit={canEditProject} />
+      </div>
+
+      <div className="space-y-4">
+        <Card>
+          <CardHeader>
+            <CardTitle>Install guidance entry point</CardTitle>
+            <CardDescription>Use this page as the project-level starting point before moving into credential or automation-specific setup surfaces.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="rounded-lg border border-border/80 bg-background/60 p-4 text-sm text-muted-foreground">
+              <div className="flex items-center gap-2 font-medium text-foreground">
+                <BookMarkedIcon className="size-4" />
+                Install guidance entry point
+              </div>
+              <p className="mt-2 leading-6">
+                Start with project tokens for SDK installation, then move into alerts, webhooks, and GitHub automation once ingestion is in place. This page stays intentionally light until the dedicated install guidance slice lands.
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <Button asChild type="button" variant="outline" size="sm">
+                <Link to={`/projects/${project.project_id}/tokens`}>Open project tokens</Link>
+              </Button>
+              <Button asChild type="button" variant="outline" size="sm">
+                <Link to={`/projects/${project.project_id}/alerts`}>Open alerts</Link>
+              </Button>
+              <Button asChild type="button" variant="outline" size="sm">
+                <Link to={`/projects/${project.project_id}/webhooks`}>Open webhooks</Link>
+              </Button>
+              <Button asChild type="button" variant="outline" size="sm">
+                <Link to={`/projects/${project.project_id}/github`}>Open GitHub automation</Link>
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="border-destructive/25 bg-destructive/5">
+          <CardHeader>
+            <CardTitle>Destructive actions</CardTitle>
+            <CardDescription>High-risk actions stay visually separate so operators do not confuse project maintenance with irreversible operations.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="rounded-lg border border-destructive/25 bg-background/70 p-4 text-sm text-muted-foreground">
+              <div className="flex items-center gap-2 font-medium text-foreground">
+                <Settings2Icon className="size-4" />
+                Delete this project
+              </div>
+              <p className="mt-2 leading-6">
+                Deleting a project removes its incidents, tokens, alerts, webhooks, and related debugging data for this organization.
+              </p>
+            </div>
+            <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+              <AlertDialogTrigger asChild>
+                <Button type="button" variant="destructive" disabled={!canEditProject || isDeleting}>
+                  <Trash2Icon data-icon="inline-start" />
+                  Delete project
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Delete project</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    This permanently removes {project.name} and all project-scoped debugging history. This action cannot be undone.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <div className="space-y-3">
+                  <p className="text-sm text-muted-foreground">
+                    Type <span className="font-medium text-foreground">{deleteConfirmationPhrase}</span> to confirm.
+                  </p>
+                  <Field>
+                    <FieldLabel htmlFor="delete-project-confirmation">Confirmation phrase</FieldLabel>
+                    <Input
+                      id="delete-project-confirmation"
+                      value={deleteConfirmationInput}
+                      onChange={(event) => setDeleteConfirmationInput(event.currentTarget.value)}
+                      placeholder={deleteConfirmationPhrase}
+                      autoComplete="off"
+                      autoCapitalize="none"
+                      autoCorrect="off"
+                      spellCheck={false}
+                      disabled={isDeleting}
+                    />
+                  </Field>
+                  {deleteErrorMessage === null ? null : <p className="text-sm text-destructive">{deleteErrorMessage}</p>}
+                </div>
+                <AlertDialogFooter>
+                  <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
+                  <AlertDialogAction variant="destructive" onClick={() => void handleDeleteProject()} disabled={isDeleting || !isDeleteConfirmationMatched}>
+                    {isDeleting ? "Deleting..." : "Delete project"}
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          </CardContent>
+        </Card>
+      </div>
+
+      <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
+        <DialogFormContent
+          title="Edit project details"
+          description="Update the name, slug, and editable environment default used in setup snippets and project metadata."
+          size="lg"
+          footer={
+            <Button type="submit" disabled={isSaving || !canEditProject}>
+              {isSaving ? "Saving..." : "Save changes"}
+            </Button>
+          }
+          onSubmit={(event) => void handleSaveChanges(event)}
+        >
+            <FieldGroup>
+              <Field>
+                <FieldLabel htmlFor="edit-project-name">Project name</FieldLabel>
+                <Input id="edit-project-name" value={name} onChange={(event) => setName(event.currentTarget.value)} />
+              </Field>
+              <Field>
+                <FieldLabel htmlFor="edit-project-slug">Project slug</FieldLabel>
+                <Input id="edit-project-slug" value={slug} onChange={(event) => setSlug(event.currentTarget.value)} />
+                <FieldDescription>Lowercase letters, numbers, and single dashes only.</FieldDescription>
+              </Field>
+              <Field>
+                <FieldLabel htmlFor="edit-project-environment-default">Default environment</FieldLabel>
+                <FieldDescription>Used as the initial environment in setup snippets and project defaults. You can change it later.</FieldDescription>
+                <select
+                  id="edit-project-environment-default"
+                  className="flex h-10 w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+                  value={selectedProjectEnvironment}
+                  onChange={(event) => handleProjectEnvironmentChange(event.currentTarget.value)}
+                >
+                  {PROJECT_ENVIRONMENT_OPTIONS.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+                {selectedProjectEnvironment !== CUSTOM_PROJECT_ENVIRONMENT_VALUE ? null : (
+                  <Input
+                    id="edit-project-environment-default-custom"
+                    aria-label="Custom environment"
+                    value={customEnvironmentDefault}
+                    onChange={(event) => handleCustomProjectEnvironmentChange(event.currentTarget.value)}
+                    placeholder="preview"
+                    required
+                  />
+                )}
+              </Field>
+            </FieldGroup>
+            {errorMessage === null ? null : <p className="text-sm text-destructive">{errorMessage}</p>}
+        </DialogFormContent>
+      </Dialog>
+    </div>
+  );
+}
+
+function DetailBlock({ label, value }: { label: string; value: string }): JSX.Element {
+  return (
+    <div className="rounded-lg border border-border/80 bg-background/60 p-4">
+      <p className="text-xs font-medium uppercase tracking-[0.18em] text-muted-foreground">{label}</p>
+      <p className="mt-2 text-sm font-medium text-foreground">{value}</p>
+    </div>
+  );
+}
+
+function formatDate(value: string): string {
+  return new Intl.DateTimeFormat("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric"
+  }).format(new Date(value));
+}

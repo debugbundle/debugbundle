@@ -1,0 +1,26 @@
+name: DebugBundle Basic Triage
+
+on:
+  repository_dispatch:
+    types: [debugbundle.incident]
+
+jobs:
+  triage:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Fetch DebugBundle context
+        uses: debugbundle/action@v1
+        with:
+          incident-id: ${{ github.event.client_payload.incident_id }}
+          debugbundle-token: ${{ secrets.DEBUGBUNDLE_TOKEN }}
+
+      - name: Print the dispatch summary
+        run: |
+          echo "Event: ${{ github.event.client_payload.debugbundle_event }}"
+          echo "Incident: ${{ github.event.client_payload.incident_id }}"
+          echo "Severity: ${{ github.event.client_payload.severity }}"
+          echo "Bundle path: .debugbundle/bundles/cloud/${{ github.event.client_payload.incident_id }}.bundle.json"

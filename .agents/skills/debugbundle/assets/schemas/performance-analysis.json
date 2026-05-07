@@ -1,0 +1,20 @@
+{
+  "schema_version": "v1",
+  "analysis_type": "performance",
+  "goal": "Review the latest local DebugBundle evidence for deterministic performance improvements.",
+  "required_inputs": [
+    ".debugbundle/profile.json",
+    ".debugbundle/bundles/local/*.bundle.json",
+    "Relevant repository source files"
+  ],
+  "focus_areas": [
+    "Identify the primary latency or throughput bottleneck.",
+    "Call out the most likely constrained dependency or code path.",
+    "Recommend the smallest measurable optimization and how to verify it."
+  ],
+  "output_sections": [
+    "performance_hypothesis",
+    "optimization_plan",
+    "measurement_plan"
+  ]
+}

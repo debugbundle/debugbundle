@@ -1,0 +1,146 @@
+import { describe, expect, it, vi } from "vitest";
+
+import { createProjectManagementApi, ProjectManagementApiError, type HttpClient } from "../../../packages/project-management-client/src/index.js";
+
+describe("project-management api client", () => {
+  it("calls the project list route with an optional query", async () => {
+    const request = vi.fn<HttpClient["request"]>().mockResolvedValue({
+      status: 200,
+      body: {
+        projects: [
+          {
+            project_id: "proj_1",
+            organization_id: "org_1",
+            name: "Checkout",
+            slug: "checkout",
+            environment_default: "production",
+            organization_plan: "free",
+            metrics: {
+              monthly_bundle_requests: 1,
+              monthly_raw_ingested_events: 2,
+              retained_bundles: 3,
+              monthly_alert_deliveries: 4
+            },
+            created_at: "2026-03-21T00:00:00.000Z",
+            updated_at: "2026-03-21T00:00:00.000Z"
+          }
+        ]
+      }
+    });
+
+    const api = createProjectManagementApi({ request });
+    const projects = await api.listProjects({ bearerToken: "dbundle_mem_x", limit: 25 });
+
+    expect(projects).toHaveLength(1);
+    expect(request).toHaveBeenCalledWith({
+      method: "GET",
+      path: "/v1/projects?limit=25",
+      bearerToken: "dbundle_mem_x"
+    });
+  });
+
+  it("creates projects through the project route", async () => {
+    const request = vi.fn<HttpClient["request"]>().mockResolvedValue({
+      status: 201,
+      body: {
+        project: {
+          project_id: "proj_2",
+          organization_id: "org_1",
+          name: "Checkout",
+          slug: "checkout",
+          environment_default: "production",
+          organization_plan: "free",
+          metrics: {
+            monthly_bundle_requests: 0,
+            monthly_raw_ingested_events: 0,
+            retained_bundles: 0,
+            monthly_alert_deliveries: 0
+          },
+          created_at: "2026-03-21T00:00:00.000Z",
+          updated_at: "2026-03-21T00:00:00.000Z"
+        }
+      }
+    });
+
+    const api = createProjectManagementApi({ request });
+    const project = await api.createProject({
+      bearerToken: "dbundle_mem_x",
+      name: "Checkout",
+      slug: "checkout",
+      environmentDefault: "production"
+    });
+
+    expect(project.project_id).toBe("proj_2");
+    expect(request).toHaveBeenCalledWith({
+      method: "POST",
+      path: "/v1/projects",
+      bearerToken: "dbundle_mem_x",
+      body: {
+        name: "Checkout",
+        slug: "checkout",
+        environment_default: "production"
+      }
+    });
+  });
+
+  it("throws structured api errors", async () => {
+    const request = vi.fn<HttpClient["request"]>().mockResolvedValue({
+      status: 409,
+      body: {
+        error: "project_slug_taken"
+      }
+    });
+
+    const api = createProjectManagementApi({ request });
+
+    await expect(api.createProject({ bearerToken: "dbundle_mem_x", name: "Checkout", slug: "checkout" })).rejects.toEqual(
+      new ProjectManagementApiError(409, "project_slug_taken")
+    );
+  });
+
+  it("throws invalid_response_shape when a success payload is malformed", async () => {
+    const request = vi.fn<HttpClient["request"]>().mockResolvedValue({
+      status: 200,
+      body: {
+        projects: [{ not_a_project: true }]
+      }
+    });
+
+    const api = createProjectManagementApi({ request });
+
+    await expect(api.listProjects({ bearerToken: "dbundle_mem_x" })).rejects.toEqual(
+      new ProjectManagementApiError(200, "invalid_response_shape")
+    );
+  });
+
+  it("deletes projects through the project route", async () => {
+    const request = vi.fn<HttpClient["request"]>().mockResolvedValue({
+      status: 200,
+      body: {
+        project: {
+          project_id: "proj_2",
+          organization_id: "org_1",
+          name: "Checkout",
+          slug: "checkout",
+          environment_default: "production",
+          organization_plan: "free",
+          created_at: "2026-03-21T00:00:00.000Z",
+          updated_at: "2026-03-21T00:00:00.000Z"
+        }
+      }
+    });
+
+    const api = createProjectManagementApi({ request });
+    const project = await api.deleteProject({
+      bearerToken: "dbundle_mem_x",
+      projectId: "proj_2"
+    });
+
+    expect(project.project_id).toBe("proj_2");
+    expect(request).toHaveBeenCalledWith({
+      method: "DELETE",
+      path: "/v1/projects/proj_2",
+      bearerToken: "dbundle_mem_x"
+    });
+  });
+});

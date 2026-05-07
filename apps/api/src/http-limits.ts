@@ -1,0 +1,1 @@
+export const SMALL_REQUEST_BODY_LIMIT_BYTES = 256 * 1024;

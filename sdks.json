@@ -1,0 +1,19 @@
+{
+  "repositories": [
+    {
+      "path": "sdks/debugbundle-js",
+      "cloneUrl": "https://github.com/debugbundle/debugbundle-js.git",
+      "branch": "main"
+    },
+    {
+      "path": "sdks/debugbundle-python",
+      "cloneUrl": "https://github.com/debugbundle/debugbundle-python.git",
+      "branch": "main"
+    },
+    {
+      "path": "sdks/debugbundle-php",
+      "cloneUrl": "https://github.com/debugbundle/debugbundle-php.git",
+      "branch": "main"
+    }
+  ]
+}

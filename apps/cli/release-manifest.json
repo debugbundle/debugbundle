@@ -1,0 +1,15 @@
+{
+  "package": "@debugbundle/cli",
+  "publicRegistry": "https://registry.npmjs.org",
+  "sourceDirectory": "apps/cli",
+  "tagPrefix": "cli-v",
+  "npmTag": "latest",
+  "distributionCommand": "npm install -g @debugbundle/cli",
+  "bin": "debugbundle",
+  "requiredReleaseFiles": [
+    "package.json",
+    "README.md",
+    "LICENSE",
+    "bin/debugbundle.js"
+  ]
+}

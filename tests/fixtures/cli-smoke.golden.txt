@@ -1,0 +1,6 @@
+DebugBundle smoke check passed.
+Checks:
+- local-verification: ok - Local verification passed.
+- cloud-verification: ok - Cloud verification passed.
+Suggested actions:
+- Re-run debugbundle smoke after changing local or deployed DebugBundle configuration.

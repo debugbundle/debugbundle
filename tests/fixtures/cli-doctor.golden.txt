@@ -1,0 +1,14 @@
+DebugBundle doctor report.
+Status: healthy
+Checks:
+- profile: ok - Found .debugbundle/profile.json
+- connection-config: ok - Found .debugbundle/local/connection.json
+- agent-skill: ok - Found .agents/skills/debugbundle/SKILL.md
+- auth-state: ok - Found valid auth state.
+- project-mode: ok - Project mode is local-only.
+- profile-validation: ok - Profile validation status is agent-validated.
+- profile-freshness: ok - Profile reviewed 0 days ago.
+Suggested actions:
+- Run debugbundle setup if local scaffold files are missing.
+- Run debugbundle login to create ~/.debugbundle/auth.json.
+- Review .debugbundle/profile.json when architecture changes or the profile becomes stale.

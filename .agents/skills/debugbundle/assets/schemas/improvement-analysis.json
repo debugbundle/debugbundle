@@ -1,0 +1,20 @@
+{
+  "schema_version": "v1",
+  "analysis_type": "improvement",
+  "goal": "Turn the latest local DebugBundle failure evidence into a deterministic improvement plan.",
+  "required_inputs": [
+    ".debugbundle/profile.json",
+    ".debugbundle/bundles/local/*.bundle.json",
+    "Relevant repository source files"
+  ],
+  "focus_areas": [
+    "Identify the most likely code path to change first.",
+    "Explain why the current failure happens with the available bundle evidence.",
+    "Propose a narrow code change and the validation steps needed to confirm it."
+  ],
+  "output_sections": [
+    "root_cause_hypothesis",
+    "recommended_code_changes",
+    "validation_plan"
+  ]
+}

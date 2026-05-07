@@ -1,0 +1,4 @@
+Authenticated: yes
+Base URL: https://api.debugbundle.com
+Auth File: /tmp/auth.json
+Token: dbundle_mem_secr...

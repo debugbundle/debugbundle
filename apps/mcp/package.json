@@ -1,0 +1,34 @@
+{
+  "name": "@debugbundle/mcp",
+  "version": "0.1.0",
+  "private": false,
+  "description": "Model Context Protocol server for DebugBundle",
+  "license": "AGPL-3.0-only",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/debugbundle/debugbundle",
+    "directory": "apps/mcp"
+  },
+  "homepage": "https://debugbundle.com/docs/mcp",
+  "bugs": {
+    "url": "https://github.com/debugbundle/debugbundle/issues"
+  },
+  "keywords": ["debugbundle", "debugging", "ai-agent", "mcp", "model-context-protocol"],
+  "engines": {
+    "node": ">=24 <25"
+  },
+  "type": "module",
+  "scripts": {
+    "start": "tsx src/main.ts",
+    "build": "esbuild src/main.ts --bundle --platform=node --format=esm --target=node24 --outfile=dist/main.js",
+    "prepack": "npm run build"
+  },
+  "bin": {
+    "debugbundle-mcp": "bin/debugbundle-mcp.js"
+  },
+  "files": ["bin", "dist", "README.md", "LICENSE"],
+  "devDependencies": {
+    "esbuild": "^0.27.3",
+    "tsx": "^4.20.5"
+  }
+}

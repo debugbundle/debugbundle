@@ -1,0 +1,210 @@
+name: Release MCP
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: MCP stable version to publish (for example 0.1.0)
+        required: true
+        type: string
+  push:
+    tags:
+      - "mcp-v*"
+
+permissions:
+  contents: read
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          registry-url: https://registry.npmjs.org
+
+      - name: Setup pnpm via Corepack
+        run: |
+          corepack enable
+          corepack prepare pnpm@10.32.1 --activate
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Resolve release version
+        id: release_version
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]; then
+            version="${{ inputs.version }}"
+          else
+            version="${GITHUB_REF_NAME#mcp-v}"
+          fi
+
+          if [[ -z "$version" ]]; then
+            echo "missing_version" >&2
+            exit 1
+          fi
+
+          echo "value=$version" >> "$GITHUB_OUTPUT"
+
+      - name: Check published MCP release state
+        id: published_state
+        run: |
+          node --input-type=module <<'EOF'
+          const releaseVersion = process.env.RELEASE_VERSION;
+          const githubOutput = process.env.GITHUB_OUTPUT;
+
+          if (!releaseVersion) {
+            throw new Error("missing_release_version");
+          }
+
+          if (!githubOutput) {
+            throw new Error("missing_github_output");
+          }
+
+          const response = await fetch(`https://registry.npmjs.org/${encodeURIComponent("@debugbundle/mcp")}/${releaseVersion}`);
+
+          const { appendFileSync } = await import("node:fs");
+
+          if (response.status === 404) {
+            appendFileSync(githubOutput, "state=none\n");
+            process.exit(0);
+          }
+
+          if (!response.ok) {
+            throw new Error(`failed_to_check_mcp_${response.status}`);
+          }
+
+          appendFileSync(githubOutput, "state=all\n");
+          EOF
+        env:
+          RELEASE_VERSION: ${{ steps.release_version.outputs.value }}
+
+      - name: Note already published MCP release
+        if: steps.published_state.outputs.state == 'all'
+        run: echo "Release version ${{ steps.release_version.outputs.value }} is already published for @debugbundle/mcp; skipping publish steps."
+
+      - name: Validate MCP release manifest
+        run: |
+          node --input-type=module <<'EOF'
+          import { existsSync, readFileSync } from "node:fs";
+          import { join } from "node:path";
+
+          const expectedVersion = process.env.RELEASE_VERSION;
+          const manifest = JSON.parse(readFileSync("apps/mcp/release-manifest.json", "utf8"));
+          const packageJson = JSON.parse(readFileSync("apps/mcp/package.json", "utf8"));
+
+          if (!expectedVersion) {
+            throw new Error("missing_release_version");
+          }
+
+          if (manifest.package !== packageJson.name) {
+            throw new Error("manifest_package_mismatch");
+          }
+
+          if (manifest.sourceDirectory !== "apps/mcp") {
+            throw new Error(`unexpected_source_directory:${manifest.sourceDirectory}`);
+          }
+
+          if (manifest.tagPrefix !== "mcp-v") {
+            throw new Error(`unexpected_tag_prefix:${manifest.tagPrefix}`);
+          }
+
+          if (manifest.npmTag !== "latest") {
+            throw new Error(`unexpected_npm_tag:${manifest.npmTag}`);
+          }
+
+          if (packageJson.version !== expectedVersion) {
+            throw new Error(`package_version_mismatch:${packageJson.version}:${expectedVersion}`);
+          }
+
+          if (expectedVersion.includes("-")) {
+            throw new Error(`unexpected_prerelease_version:${expectedVersion}`);
+          }
+
+          for (const fileName of manifest.requiredReleaseFiles) {
+            if (!existsSync(join(manifest.sourceDirectory, fileName))) {
+              throw new Error(`missing_release_file:${fileName}`);
+            }
+          }
+          EOF
+        env:
+          RELEASE_VERSION: ${{ steps.release_version.outputs.value }}
+
+      - name: Run focused MCP package tests
+        run: pnpm vitest run tests/apps/mcp/mcp-workspace-package.test.ts tests/apps/mcp/mcp-stdio-server.test.ts
+
+      - name: Pack MCP artifact
+        if: steps.published_state.outputs.state == 'none'
+        run: |
+          rm -rf .tmp/mcp-release
+          mkdir -p .tmp/mcp-release
+          npm pack ./apps/mcp --pack-destination .tmp/mcp-release
+
+      - name: Smoke test packed MCP install
+        if: steps.published_state.outputs.state == 'none'
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          tmpdir="$(mktemp -d)"
+          cat > "$tmpdir/package.json" <<'EOF'
+          {
+            "name": "debugbundle-mcp-release-smoke",
+            "private": true
+          }
+          EOF
+
+          npm install --prefix "$tmpdir" --no-package-lock \
+            "$PWD/.tmp/mcp-release/debugbundle-mcp-${RELEASE_VERSION}.tgz"
+
+          node scripts/smoke-mcp-stdio.mjs "$tmpdir/node_modules/.bin/debugbundle-mcp"
+        env:
+          RELEASE_VERSION: ${{ steps.release_version.outputs.value }}
+
+      - name: Publish MCP package
+        if: steps.published_state.outputs.state == 'none'
+        run: npm publish ./apps/mcp --tag latest --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Smoke test published MCP package
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          for attempt in $(seq 1 30); do
+            if npm view "@debugbundle/mcp@${RELEASE_VERSION}" version >/dev/null 2>&1; then
+              break
+            fi
+
+            if [[ "$attempt" == "30" ]]; then
+              echo "@debugbundle/mcp@${RELEASE_VERSION} not visible on npm after propagation wait" >&2
+              npm view "@debugbundle/mcp@${RELEASE_VERSION}" version
+              exit 1
+            fi
+
+            sleep 10
+          done
+
+          npm view "@debugbundle/mcp@${RELEASE_VERSION}" version
+
+          tmpdir="$(mktemp -d)"
+          cat > "$tmpdir/package.json" <<'EOF'
+          {
+            "name": "debugbundle-mcp-registry-smoke",
+            "private": true
+          }
+          EOF
+
+          npm install --prefix "$tmpdir" --no-package-lock "@debugbundle/mcp@${RELEASE_VERSION}"
+          node scripts/smoke-mcp-stdio.mjs "$tmpdir/node_modules/.bin/debugbundle-mcp"
+        env:
+          RELEASE_VERSION: ${{ steps.release_version.outputs.value }}

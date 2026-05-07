@@ -1,0 +1,28 @@
+Completed DebugBundle setup.
+Created files:
+- .debugbundle/profile.json
+- .debugbundle/local/connection.json
+- .agents/skills/debugbundle/SKILL.md
+- .agents/skills/debugbundle/references/cli.md
+- .agents/skills/debugbundle/references/mcp.md
+- .agents/skills/debugbundle/references/bundle-schema.md
+- .agents/skills/debugbundle/references/profile-enrichment.md
+- .agents/skills/debugbundle/assets/schemas/improvement-analysis.json
+- .agents/skills/debugbundle/assets/schemas/performance-analysis.json
+- .agents/skills/debugbundle/evals/evals.json
+Ensured directories:
+- .debugbundle/local/events
+- .debugbundle/bundles/local/reproductions
+- .debugbundle/bundles/cloud
+- .agents/skills/debugbundle/references
+- .agents/skills/debugbundle/assets/schemas
+- .agents/skills/debugbundle/evals
+Updated files:
+- .gitignore
+- AGENTS.md
+Warnings:
+- Profile generated from static analysis; validate it before relying on framework or ownership details.
+Next steps:
+- Review .debugbundle/profile.json and confirm services, frameworks, and workflows.
+- Read .agents/skills/debugbundle/SKILL.md and run the Profile Validation task.
+- Run debugbundle process after local events have been captured.

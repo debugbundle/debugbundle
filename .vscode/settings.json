@@ -1,0 +1,29 @@
+{
+  "typescript.tsdk": "node_modules/typescript/lib",
+  "typescript.enablePromptUseWorkspaceTsdk": true,
+  "eslint.useFlatConfig": true,
+  "search.exclude": {
+    "**/sdks/**": true,
+    "**/.local-repos/**": true
+  },
+  "files.watcherExclude": {
+    "**/sdks/**": true,
+    "**/.local-repos/**": true
+  },
+  "intelephense.files.exclude": [
+    "**/sdks/**",
+    "**/.local-repos/**"
+  ],
+  "python.analysis.exclude": [
+    "**/sdks/**",
+    "**/.local-repos/**"
+  ],
+  "eslint.workingDirectories": [
+    {
+      "mode": "auto"
+    }
+  ],
+  "eslint.validate": [
+    "typescript"
+  ]
+}

@@ -1,0 +1,40 @@
+name: DebugBundle Issue Creation Workflow
+
+on:
+  repository_dispatch:
+    types: [debugbundle.incident]
+
+jobs:
+  create-issue:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Fetch DebugBundle context
+        uses: debugbundle/action@v1
+        with:
+          incident-id: ${{ github.event.client_payload.incident_id }}
+          debugbundle-token: ${{ secrets.DEBUGBUNDLE_TOKEN }}
+
+      - name: Open a tracking issue
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const incidentId = context.payload.client_payload.incident_id;
+            const severity = context.payload.client_payload.severity;
+            const title = context.payload.client_payload.title;
+            const bundleUrl = context.payload.client_payload.links.bundle;
+
+            await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: `[debugbundle] ${severity}: ${title}`,
+              body: [
+                `Incident: ${incidentId}`,
+                `Bundle: ${bundleUrl}`,
+                `Dispatch event: ${context.payload.client_payload.debugbundle_event}`,
+              ].join('\n'),
+            });
