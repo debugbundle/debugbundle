@@ -23,11 +23,19 @@ DebugBundle captures production failures from backend and browser applications, 
 
 ## Quick Start
 
+1. Install the SDK you need in your app: `npm install @debugbundle/sdk-node` for backend services or `npm install @debugbundle/sdk-browser` for browser apps.
+2. Initialize the SDK with your project token, service name, environment, and DebugBundle endpoint. See `examples/express-basic/`, `examples/fastify-basic/`, and `examples/nextjs-basic/` for minimal working setups.
+3. Trigger a sample error in your app, or use one of the example routes to emit an incident.
+4. Run `debugbundle setup --non-interactive` anywhere you want CLI access to the project.
+5. Inspect the captured incident with `debugbundle inspect <incident-id>`.
+
+## Local Development Stack
+
+If you are developing DebugBundle itself or validating the full hosted-parity stack locally:
+
 1. Start the local stack with `make infra-up`.
 2. Bootstrap the database and S3 bucket with `make infra-bootstrap`.
 3. Run `make dev` to bring up the API, worker, and web app.
-4. Add SDK wiring to an app or start from one of the example apps in `examples/`.
-5. Verify the end-to-end flow with `debugbundle setup --non-interactive` and `debugbundle inspect <incident-id>`.
 
 Useful local runtime notes:
 

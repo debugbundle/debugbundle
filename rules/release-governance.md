@@ -34,12 +34,29 @@ Before public release, the repository must contain these root-level files:
 4. `turbo test` (vitest run)
 5. `turbo build`
 
-**release.yml** — Runs on version tags (`v*`):
-1. Full CI pipeline
-2. Build all packages
-3. Publish to npm with `--provenance`
-4. Create GitHub Release with CHANGELOG excerpt
-5. Build and push Docker images (API, Worker, CLI)
+**release-cli-package.yml** — Runs on `cli-v*` tags or manual dispatch:
+1. Validate the CLI release manifest and version
+2. Run focused CLI package tests
+3. Pack and smoke-test the staged artifact
+4. Publish `@debugbundle/cli` to npm
+5. Smoke-test a clean install from the registry
+
+**release-mcp-package.yml** — Runs on `mcp-v*` tags or manual dispatch:
+1. Validate the MCP release manifest and version
+2. Run focused MCP package tests
+3. Pack and smoke-test the staged artifact
+4. Publish `@debugbundle/mcp` to npm
+5. Smoke-test a clean install from the registry
+
+**release-shared-js-packages.yml** — Runs on `shared-js-v*` tags or manual dispatch:
+1. Validate the shared package versions
+2. Run focused shared-package tests
+3. Build the shared packages and prepare publish manifests
+4. Pack and smoke-test staged artifacts
+5. Publish `@debugbundle/shared-types` and `@debugbundle/redaction` to npm
+6. Smoke-test clean installs from the registry
+
+The public core repository currently uses package-scoped release workflows rather than a single root `release.yml`. If a future release model introduces a monolithic tag workflow, this document must be updated in the same change.
 
 Public CI must NEVER contain deployment config, cloud credentials, or infrastructure code.
 
