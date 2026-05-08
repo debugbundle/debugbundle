@@ -9,7 +9,7 @@
     ".": "./src/index.ts"
   },
   "scripts": {
-    "build": "tsc -p tsconfig.build.json"
+    "build": "pnpm --dir ../.. exec tsc -p packages/shared-types/tsconfig.build.json"
   },
   "dependencies": {
     "zod": "^3.24.2"

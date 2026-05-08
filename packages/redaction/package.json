@@ -9,6 +9,6 @@
     ".": "./src/index.ts"
   },
   "scripts": {
-    "build": "tsc -p tsconfig.build.json"
+    "build": "pnpm --dir ../.. exec tsc -p packages/redaction/tsconfig.build.json"
   }
 }
