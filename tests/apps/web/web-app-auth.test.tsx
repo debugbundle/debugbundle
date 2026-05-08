@@ -396,7 +396,7 @@ describe("web app - auth routes", () => {
     expect(screen.getByText(/this account currently relies on github only/i)).toBeInTheDocument();
   });
 
-  it("downloads the organization account export from settings", async () => {
+  it("downloads the account export from settings", async () => {
     const user = userEvent.setup();
     const createObjectUrlMock = vi.fn(() => "blob:test-url");
     const revokeObjectUrlMock = vi.fn();
@@ -457,7 +457,7 @@ describe("web app - auth routes", () => {
     expect(revokeObjectUrlMock).toHaveBeenCalledWith("blob:test-url");
   });
 
-  it("deletes the organization account from settings and returns to the email auth screen", async () => {
+  it("deletes the account from settings and returns to the email auth screen", async () => {
     const user = userEvent.setup();
     const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
       const url = requestUrl(input);

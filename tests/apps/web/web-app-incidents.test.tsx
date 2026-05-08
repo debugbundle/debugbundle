@@ -15,6 +15,7 @@ import {
 
 afterEach(() => {
   vi.unstubAllGlobals();
+  vi.useRealTimers();
 });
 
 describe("web app — incident and project detail routes", () => {
@@ -250,6 +251,86 @@ describe("web app — incident and project detail routes", () => {
     expect(alertMock).not.toHaveBeenCalled();
   });
 
+  it("does not flash list skeletons when a project tab data request resolves before the loading delay", async () => {
+    const project = createProject();
+    const incident = createIncident({ project_id: project.project_id });
+    const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = requestUrl(input);
+
+      if (url.endsWith("/v1/auth/session")) {
+        return jsonResponse(200, { session: createSession() });
+      }
+
+      if (url.endsWith("/v1/projects") && init?.method === undefined) {
+        return jsonResponse(200, { projects: [project] });
+      }
+
+      if (url.includes("/v1/incidents") && url.includes(`project_id=${project.project_id}`)) {
+        return new Promise<Response>((resolve) => {
+          window.setTimeout(() => {
+            resolve(jsonResponse(200, { incidents: [incident], next_cursor: null }));
+          }, 100);
+        });
+      }
+
+      return jsonResponse(404, { error: "not_found" });
+    });
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    const { container } = render(<App initialEntries={[`/projects/${project.project_id}/bundles`]} />);
+
+    expect(await screen.findByText(/debug bundles/i)).toBeInTheDocument();
+    expect(container.querySelector('[data-slot="skeleton"]')).toBeNull();
+
+    await new Promise((resolve) => {
+      window.setTimeout(resolve, 75);
+    });
+
+    expect(container.querySelector('[data-slot="skeleton"]')).toBeNull();
+
+    expect(await screen.findByText(/typeerror in checkout handler/i)).toBeInTheDocument();
+    expect(container.querySelector('[data-slot="skeleton"]')).toBeNull();
+  });
+
+  it("shows list skeletons when a project tab data request exceeds the loading delay", async () => {
+    const project = createProject();
+    const incident = createIncident({ project_id: project.project_id });
+    const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = requestUrl(input);
+
+      if (url.endsWith("/v1/auth/session")) {
+        return jsonResponse(200, { session: createSession() });
+      }
+
+      if (url.endsWith("/v1/projects") && init?.method === undefined) {
+        return jsonResponse(200, { projects: [project] });
+      }
+
+      if (url.includes("/v1/incidents") && url.includes(`project_id=${project.project_id}`)) {
+        return new Promise<Response>((resolve) => {
+          window.setTimeout(() => {
+            resolve(jsonResponse(200, { incidents: [incident], next_cursor: null }));
+          }, 400);
+        });
+      }
+
+      return jsonResponse(404, { error: "not_found" });
+    });
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    const { container } = render(<App initialEntries={[`/projects/${project.project_id}/bundles`]} />);
+
+    expect(await screen.findByText(/debug bundles/i)).toBeInTheDocument();
+
+    await waitFor(() => {
+      expect(container.querySelector('[data-slot="skeleton"]')).not.toBeNull();
+    });
+
+    expect(await screen.findByText(/typeerror in checkout handler/i)).toBeInTheDocument();
+  });
+
   it("shows error state when incident is not found", async () => {
     const fetchMock = vi.fn((input: RequestInfo | URL) => {
       const url = requestUrl(input);
@@ -275,6 +356,7 @@ describe("web app — incident and project detail routes", () => {
   });
 
   it("renders the incidents page with project and service columns and clickable incident links", async () => {
+    const user = userEvent.setup();
     const project = createProject();
     const incidents = [
       createIncident({ project_id: project.project_id, project_name: project.name, service_id: "svc_123", service_name: "Checkout API" }),
@@ -298,7 +380,11 @@ describe("web app — incident and project detail routes", () => {
         return jsonResponse(200, { session: createSession() });
       }
 
-      if (url.endsWith("/v1/incidents?limit=20") && init?.method === undefined) {
+      if (url.includes("/v1/incidents?") && url.includes("limit=20") && url.includes("status=open") && init?.method === undefined) {
+        return jsonResponse(200, { incidents: [incidents[0]], next_cursor: null });
+      }
+
+      if (url.includes("/v1/incidents?") && url.includes("limit=20") && !url.includes("status=") && init?.method === undefined) {
         return jsonResponse(200, { incidents, next_cursor: "cursor_2" });
       }
 
@@ -310,7 +396,11 @@ describe("web app — incident and project detail routes", () => {
     render(<App initialEntries={["/incidents"]} />);
 
     expect(await screen.findByText(/typeerror in checkout handler/i)).toBeInTheDocument();
-    expect(screen.getByText(/database timeout during signin/i)).toBeInTheDocument();
+    expect(screen.getByRole("combobox", { name: /status/i })).toHaveValue("open");
+    expect(screen.queryByText(/database timeout during signin/i)).toBeNull();
+
+    await user.selectOptions(screen.getByRole("combobox", { name: /status/i }), "all");
+    expect(await screen.findByText(/database timeout during signin/i)).toBeInTheDocument();
 
     // Project and service columns exist
     const projectLinks = await screen.findAllByText(/main app/i);
@@ -336,11 +426,11 @@ describe("web app — incident and project detail routes", () => {
         return jsonResponse(200, { session: createSession() });
       }
 
-      if (url.endsWith("/v1/incidents?limit=20") && init?.method === undefined) {
+      if (url.includes("/v1/incidents?") && url.includes("limit=20") && url.includes("status=open") && !url.includes("cursor=") && init?.method === undefined) {
         return jsonResponse(200, { incidents: [firstIncident], next_cursor: "cursor_2" });
       }
 
-      if (url.endsWith("/v1/incidents?limit=20&cursor=cursor_2") && init?.method === undefined) {
+      if (url.includes("/v1/incidents?") && url.includes("limit=20") && url.includes("cursor=cursor_2") && url.includes("status=open") && init?.method === undefined) {
         return jsonResponse(200, { incidents: [secondIncident], next_cursor: null });
       }
 
@@ -396,6 +486,100 @@ describe("web app — incident and project detail routes", () => {
     expect(within(rows[1] as HTMLTableRowElement).getByText(/quiet failure/i)).toBeInTheDocument();
   });
 
+  it("defaults the project incidents tab to open and lets users switch the status filter", async () => {
+    const user = userEvent.setup();
+    const project = createProject();
+    const openIncident = createIncident({ project_id: project.project_id, title: "Open project incident" });
+    const resolvedIncident = createIncident({
+      incident_id: "inc_resolved_project",
+      project_id: project.project_id,
+      title: "Resolved project incident",
+      status: "resolved"
+    });
+
+    const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = requestUrl(input);
+
+      if (url.endsWith("/v1/auth/session")) {
+        return jsonResponse(200, { session: createSession() });
+      }
+
+      if (url.endsWith("/v1/projects") && init?.method === undefined) {
+        return jsonResponse(200, { projects: [project] });
+      }
+
+      if (url.endsWith(`/v1/incidents?project_id=${project.project_id}&limit=20&status=open`) && init?.method === undefined) {
+        return jsonResponse(200, { incidents: [openIncident], next_cursor: null });
+      }
+
+      if (url.endsWith(`/v1/incidents?project_id=${project.project_id}&limit=20&status=resolved`) && init?.method === undefined) {
+        return jsonResponse(200, { incidents: [resolvedIncident], next_cursor: null });
+      }
+
+      return jsonResponse(404, { error: "not_found" });
+    });
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<App initialEntries={[`/projects/${project.project_id}/incidents`]} />);
+
+    const statusFilter = await screen.findByRole("combobox", { name: /status/i });
+    expect(statusFilter).toHaveValue("open");
+    expect(await screen.findByText(/open project incident/i)).toBeInTheDocument();
+    expect(screen.queryByText(/resolved project incident/i)).toBeNull();
+
+    await user.selectOptions(statusFilter, "resolved");
+    expect(await screen.findByText(/resolved project incident/i)).toBeInTheDocument();
+    expect(screen.queryByText(/open project incident/i)).toBeNull();
+  });
+
+  it("defaults the project bundles tab to open and lets users switch the status filter", async () => {
+    const user = userEvent.setup();
+    const project = createProject();
+    const openIncident = createIncident({ project_id: project.project_id, title: "Open bundle incident" });
+    const resolvedIncident = createIncident({
+      incident_id: "inc_resolved_bundle",
+      project_id: project.project_id,
+      title: "Resolved bundle incident",
+      status: "resolved"
+    });
+
+    const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = requestUrl(input);
+
+      if (url.endsWith("/v1/auth/session")) {
+        return jsonResponse(200, { session: createSession() });
+      }
+
+      if (url.endsWith("/v1/projects") && init?.method === undefined) {
+        return jsonResponse(200, { projects: [project] });
+      }
+
+      if (url.endsWith(`/v1/incidents?project_id=${project.project_id}&limit=20&status=open`) && init?.method === undefined) {
+        return jsonResponse(200, { incidents: [openIncident], next_cursor: null });
+      }
+
+      if (url.endsWith(`/v1/incidents?project_id=${project.project_id}&limit=20&status=resolved`) && init?.method === undefined) {
+        return jsonResponse(200, { incidents: [resolvedIncident], next_cursor: null });
+      }
+
+      return jsonResponse(404, { error: "not_found" });
+    });
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<App initialEntries={[`/projects/${project.project_id}/bundles`]} />);
+
+    const statusFilter = await screen.findByRole("combobox", { name: /status/i });
+    expect(statusFilter).toHaveValue("open");
+    expect(await screen.findByText(/open bundle incident/i)).toBeInTheDocument();
+    expect(screen.queryByText(/resolved bundle incident/i)).toBeNull();
+
+    await user.selectOptions(statusFilter, "resolved");
+    expect(await screen.findByText(/resolved bundle incident/i)).toBeInTheDocument();
+    expect(screen.queryByText(/open bundle incident/i)).toBeNull();
+  });
+
   it("renders project and service names from the initial incidents response without extra name lookups", async () => {
     const project = createProject();
     const incident = createIncident({
@@ -412,7 +596,7 @@ describe("web app — incident and project detail routes", () => {
         return jsonResponse(200, { session: createSession() });
       }
 
-      if (url.endsWith("/v1/incidents?limit=20") && init?.method === undefined) {
+      if (url.includes("/v1/incidents?") && url.includes("limit=20") && url.includes("status=open") && init?.method === undefined) {
         return jsonResponse(200, { incidents: [incident], next_cursor: null });
       }
 
@@ -578,6 +762,7 @@ describe("web app — incident and project detail routes", () => {
     expect(screen.getByRole("columnheader", { name: /service/i })).toBeInTheDocument();
     expect(screen.getByText(/checkout api/i)).toBeInTheDocument();
     expect(screen.getByText(/^high$/i)).toBeInTheDocument();
+    expect(screen.getByText(/export incidents as csv/i)).toBeInTheDocument();
   });
 
   it("shows project overview with bundles tab and bundle action links", async () => {
@@ -610,7 +795,7 @@ describe("web app — incident and project detail routes", () => {
 
     // Bundles tab content should include the incident with bundle actions
     expect(await screen.findByText(/typeerror in checkout handler/i)).toBeInTheDocument();
-    expect(screen.getByText(/export incidents as csv/i)).toBeInTheDocument();
+    expect(screen.queryByText(/export incidents as csv/i)).toBeNull();
   });
 
   it("shows empty state for project incidents tab with no incidents", async () => {

@@ -1,8 +1,6 @@
 import { ArrowLeftIcon, ClipboardCopyIcon, DownloadIcon, LoaderCircleIcon } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link, Navigate, useLocation, useParams } from "react-router-dom";
-import { toast } from "sonner";
-
 import { CalloutCard } from "../components/system/callout-card.js";
 import { HighlightedCodeBlock } from "../components/system/highlighted-code-block.js";
 import { Badge } from "../components/ui/badge.js";
@@ -18,6 +16,8 @@ import {
   type BundleRecord,
   type IncidentRecord
 } from "../lib/api.js";
+import { showErrorToast, showSuccessToast } from "../lib/notify.js";
+import { useDelayedVisibility } from "../lib/use-delayed-visibility.js";
 import { cn } from "../lib/utils.js";
 
 export function IncidentDetailPage(): JSX.Element {
@@ -28,6 +28,7 @@ export function IncidentDetailPage(): JSX.Element {
   const [isResolving, setIsResolving] = useState(false);
   const backDestination = resolveIncidentBackDestination(location.pathname, projectId);
   const backLabel = resolveIncidentBackLabel(location.pathname, projectId);
+  const showIncidentLoading = useDelayedVisibility(incident === undefined);
 
   useEffect(() => {
     if (incidentId === undefined) return;
@@ -59,15 +60,17 @@ export function IncidentDetailPage(): JSX.Element {
       </div>
 
       {incident === undefined ? (
-        <div className="space-y-4">
-          <Skeleton className="h-10 w-96" />
-          <Skeleton className="h-64 w-full" />
-        </div>
+        showIncidentLoading ? (
+          <div className="space-y-4">
+            <Skeleton className="h-10 w-96" />
+            <Skeleton className="h-64 w-full" />
+          </div>
+        ) : null
       ) : error || incident === null ? (
         <CalloutCard
           eyebrow="Not found"
           title="Incident not available"
-          description="This incident could not be found in the current organization. It may have been removed or you may not have access."
+          description="This incident could not be found in the current workspace. It may have been removed or you may not have access."
           tone="warning"
         >
           <Button asChild type="button" variant="outline">
@@ -94,9 +97,9 @@ export function IncidentDetailPage(): JSX.Element {
                       try {
                         const resolved = await resolveIncident(incident.incident_id);
                         setIncident(resolved);
-                        toast.success("Incident resolved.");
+                        showSuccessToast("Incident resolved successfully.");
                       } catch {
-                        toast.error("Could not resolve incident.");
+                        showErrorToast("Could not resolve incident.");
                       } finally {
                         setIsResolving(false);
                       }
@@ -158,6 +161,7 @@ function BundleTab({ incidentId }: { incidentId: string }): JSX.Element {
   const [bundleState, setBundleState] = useState<
     { status: "loading" } | { status: "ready"; bundle: BundleRecord } | { status: "pending" | "failed" | "error" }
   >({ status: "loading" });
+  const showBundleLoading = useDelayedVisibility(bundleState.status === "loading");
 
   useEffect(() => {
     void (async () => {
@@ -171,7 +175,7 @@ function BundleTab({ incidentId }: { incidentId: string }): JSX.Element {
   }, [incidentId]);
 
   if (bundleState.status === "loading") {
-    return (
+    return showBundleLoading ? (
       <Card>
         <CardContent className="py-8">
           <div className="flex items-center gap-3 text-sm text-muted-foreground">
@@ -180,7 +184,7 @@ function BundleTab({ incidentId }: { incidentId: string }): JSX.Element {
           </div>
         </CardContent>
       </Card>
-    );
+    ) : <></>;
   }
 
   if (bundleState.status === "pending") {
@@ -235,6 +239,7 @@ function ReproductionTab({ incidentId }: { incidentId: string }): JSX.Element {
   const [reproState, setReproState] = useState<
     { status: "loading" } | { status: "ready"; reproduction: Record<string, unknown> } | { status: "pending" | "failed" | "error" }
   >({ status: "loading" });
+  const showReproductionLoading = useDelayedVisibility(reproState.status === "loading");
 
   useEffect(() => {
     void (async () => {
@@ -248,7 +253,7 @@ function ReproductionTab({ incidentId }: { incidentId: string }): JSX.Element {
   }, [incidentId]);
 
   if (reproState.status === "loading") {
-    return (
+    return showReproductionLoading ? (
       <Card>
         <CardContent className="py-8">
           <div className="flex items-center gap-3 text-sm text-muted-foreground">
@@ -257,7 +262,7 @@ function ReproductionTab({ incidentId }: { incidentId: string }): JSX.Element {
           </div>
         </CardContent>
       </Card>
-    );
+    ) : <></>;
   }
 
   if (reproState.status === "pending") {
@@ -371,9 +376,9 @@ function formatDate(value: string): string {
 async function copyToClipboard(text: string): Promise<void> {
   try {
     await navigator.clipboard.writeText(text);
-    toast.success("Copied to clipboard.");
+    showSuccessToast("Copied to clipboard successfully.");
   } catch {
-    toast.error("Could not copy to clipboard.");
+    showErrorToast("Could not copy to clipboard.");
   }
 }
 
@@ -384,7 +389,7 @@ function downloadJson(content: string, filename: string): void {
   a.download = filename;
   a.click();
   URL.revokeObjectURL(a.href);
-  toast.success(`Downloaded ${filename}.`);
+  showSuccessToast(`${filename} downloaded successfully.`);
 }
 
 function resolveIncidentBackDestination(pathname: string, projectId?: string): string {

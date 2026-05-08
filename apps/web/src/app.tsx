@@ -1,7 +1,7 @@
 import { CreditCardIcon, GalleryVerticalEndIcon, KeySquareIcon, LoaderCircleIcon, PlusIcon } from "lucide-react";
 import React, { useEffect, useState } from "react";
 import { BrowserRouter, Link, MemoryRouter, Navigate, Outlet, Route, Routes, useNavigate, useSearchParams } from "react-router-dom";
-import { Toaster, toast } from "sonner";
+import { Toaster } from "sonner";
 
 import { AppSidebar } from "./components/system/app-sidebar.js";
 import { CalloutCard } from "./components/system/callout-card.js";
@@ -45,6 +45,7 @@ import {
   type CreatedMemberToken,
   type MemberTokenRecord
 } from "./lib/api.js";
+import { showErrorToast, showSuccessToast } from "./lib/notify.js";
 import { SessionProvider, useSession } from "./lib/session.js";
 import { BillingPage } from "./pages/billing-page.js";
 import { OrganizationMembersPage, ProjectsPage, ProjectTokensPage } from "./pages/management-pages.js";
@@ -89,8 +90,8 @@ export function App({ initialEntries }: AppProps): JSX.Element {
                 path="/organization"
                 element={
                   <TeamPlanGate
-                    title="Organization workspace is available on Team"
-                    description="Shared organization views and member management are only shown for Team workspaces, so Free and Solo accounts stay focused on project-level setup."
+                    title="Shared workspace requires Team"
+                    description="Shared workspace views and member management are only available on Team. Free and Solo stay focused on project setup."
                   >
                     <OrganizationOverviewPage />
                   </TeamPlanGate>
@@ -113,7 +114,7 @@ export function App({ initialEntries }: AppProps): JSX.Element {
                 element={
                   <TeamPlanGate
                     title="Member management requires Team"
-                    description="Inviting and managing additional members is a Team-tier workflow. Upgrade the workspace before opening the organization member surface."
+                    description="Member management is a Team feature. Upgrade to open this page."
                   >
                     <OrganizationMembersPage />
                   </TeamPlanGate>
@@ -143,8 +144,8 @@ export function App({ initialEntries }: AppProps): JSX.Element {
                 path="/organization"
                 element={
                   <TeamPlanGate
-                    title="Organization workspace is available on Team"
-                    description="Shared organization views and member management are only shown for Team workspaces, so Free and Solo accounts stay focused on project-level setup."
+                    title="Shared workspace requires Team"
+                    description="Shared workspace views and member management are only available on Team. Free and Solo stay focused on project setup."
                   >
                     <OrganizationOverviewPage />
                   </TeamPlanGate>
@@ -167,7 +168,7 @@ export function App({ initialEntries }: AppProps): JSX.Element {
                 element={
                   <TeamPlanGate
                     title="Member management requires Team"
-                    description="Inviting and managing additional members is a Team-tier workflow. Upgrade the workspace before opening the organization member surface."
+                    description="Member management is a Team feature. Upgrade to open this page."
                   >
                     <OrganizationMembersPage />
                   </TeamPlanGate>
@@ -259,10 +260,10 @@ function ProtectedLayout(): JSX.Element {
     try {
       await logout();
       setSession(null);
-      toast.success("Signed out.");
+      showSuccessToast("Signed out successfully.");
       void navigate("/login", { replace: true });
     } catch {
-      toast.error("Could not sign out.");
+      showErrorToast("Could not sign out.");
     }
   }
 
@@ -392,11 +393,11 @@ function EmailAuthPage({
         await requestEmailCode({ email, accepted_terms: true });
         setStep("verify");
         setCode("");
-        toast.success("Check your email for a six-digit code.");
+        showSuccessToast("Sign-in code sent successfully.");
       } else {
         const nextSession = await verifyEmailCode({ email, code });
         setSession(nextSession);
-        toast.success("Signed in.");
+        showSuccessToast("Signed in successfully.");
         void navigate("/dashboard", { replace: true });
       }
     } catch {
@@ -413,7 +414,7 @@ function EmailAuthPage({
     try {
       await requestEmailCode({ email, accepted_terms: true });
       setCode("");
-      toast.success("A new six-digit code is on the way.");
+      showSuccessToast("New sign-in code sent successfully.");
     } catch {
       setError("We could not resend the sign-in code. Try again.");
     } finally {
@@ -458,7 +459,7 @@ function EmailAuthPage({
               eyebrow="Code sent"
               title="Check your inbox"
               description={`Enter the six-digit code we sent to ${email}.`}
-              tone="success"
+              tone="neutral"
             />
           ) : null}
           {step === "verify" ? (
@@ -634,9 +635,9 @@ function MemberTokensPage(): JSX.Element {
       });
       setLabel("");
       setIsCreateOpen(false);
-      toast.success("Member token created.");
+      showSuccessToast("Member token created successfully.");
     } catch {
-      toast.error("Could not create member token.");
+      showErrorToast("Could not create member token.");
     }
   }
 
@@ -644,9 +645,9 @@ function MemberTokensPage(): JSX.Element {
     try {
       await revokeMemberToken(tokenId);
       setTokens((current) => (current ?? []).filter((token) => token.token_id !== tokenId));
-      toast.success("Member token revoked.");
+      showSuccessToast("Member token revoked successfully.");
     } catch {
-      toast.error("Could not revoke member token.");
+      showErrorToast("Could not revoke member token.");
     }
   }
 

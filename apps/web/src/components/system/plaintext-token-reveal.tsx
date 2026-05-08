@@ -1,7 +1,7 @@
 import { CopyIcon } from "lucide-react";
 import { useState } from "react";
-import { toast } from "sonner";
 
+import { showErrorToast, showSuccessToast } from "../../lib/notify.js";
 import { Button } from "../ui/button.js";
 import { Card, CardContent, CardHeader, CardTitle } from "../ui/card.js";
 
@@ -24,17 +24,17 @@ export function PlaintextTokenReveal({
 
   async function handleCopy(): Promise<void> {
     if (typeof navigator === "undefined" || navigator.clipboard === undefined) {
-      toast.error("Clipboard is not available in this browser.");
+      showErrorToast("Clipboard is not available in this browser.");
       return;
     }
 
     try {
       await navigator.clipboard.writeText(value);
       setCopied(true);
-      toast.success("Secret copied.");
+      showSuccessToast("Secret copied successfully.");
       window.setTimeout(() => setCopied(false), 1500);
     } catch {
-      toast.error("Could not copy secret.");
+      showErrorToast("Could not copy secret.");
     }
   }
 

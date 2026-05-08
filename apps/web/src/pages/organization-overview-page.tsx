@@ -101,18 +101,18 @@ export function OrganizationOverviewPage(): JSX.Element {
   return (
     <div className="space-y-8">
       <PageHeader
-        description="Review organization identity, access scope, and the main handoff points into member and billing management from the signed-in workspace."
+        description="Review organization details, access, and links to member and billing management."
       />
 
       <div className="grid gap-4 xl:grid-cols-3">
         <Card>
           <CardHeader>
             <CardTitle>Organization identity</CardTitle>
-            <CardDescription>Current browser-session organization context and access scope.</CardDescription>
+            <CardDescription>Organization details for this signed-in session.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4 text-sm">
             <div>
-              <p className="text-muted-foreground">Organization id</p>
+              <p className="text-muted-foreground">Organization ID</p>
               <p className="font-medium">{session.organization_id}</p>
             </div>
             <div>
@@ -129,7 +129,7 @@ export function OrganizationOverviewPage(): JSX.Element {
         <Card>
           <CardHeader>
             <CardTitle>Project inventory</CardTitle>
-            <CardDescription>Organization-wide project footprint available from the browser workspace.</CardDescription>
+            <CardDescription>Projects currently available in this organization.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             {projectSummaryText === null ? <Skeleton className="h-6 w-32" /> : <p className="text-sm font-medium">{projectSummaryText}</p>}
@@ -145,20 +145,20 @@ export function OrganizationOverviewPage(): JSX.Element {
         <Card>
           <CardHeader>
             <CardTitle>Access scope</CardTitle>
-            <CardDescription>Organization management surfaces currently available to this signed-in role.</CardDescription>
+            <CardDescription>What this signed-in role can manage.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4 text-sm">
             <div className="flex items-center gap-3">
               <ShieldCheckIcon className="size-4 text-muted-foreground" />
-              <p>{session.role === "owner" ? "Owner management routes are available." : "Project and token routes remain available."}</p>
+              <p>{session.role === "owner" ? "Owner controls are available." : "Project and token routes are available."}</p>
             </div>
             <div className="flex items-center gap-3">
               <UsersRoundIcon className="size-4 text-muted-foreground" />
-              <p>{session.role === "owner" ? "Organization membership controls are enabled." : "Organization member management stays owner-scoped."}</p>
+              <p>{session.role === "owner" ? "Member management is available." : "Member management is owner-only."}</p>
             </div>
             <div className="flex items-center gap-3">
               <CreditCardIcon className="size-4 text-muted-foreground" />
-              <p>{session.role === "owner" ? "Billing management remains available from the browser session." : "Billing changes remain owner-scoped."}</p>
+              <p>{session.role === "owner" ? "Billing management is available." : "Billing changes are owner-only."}</p>
             </div>
           </CardContent>
         </Card>
@@ -168,8 +168,8 @@ export function OrganizationOverviewPage(): JSX.Element {
         {isMembersForbidden ? (
           <CalloutCard
             eyebrow="Owner scope"
-            title="Owner permissions are required to manage organization members"
-            description="Member-role callers can still review organization identity and move through project and token surfaces, but membership management stays owner-scoped."
+            title="Owner permissions are required to manage members"
+            description="Members can still review this page and use project and token routes, but member management is owner-only."
             tone="warning"
           />
         ) : (
@@ -192,7 +192,7 @@ export function OrganizationOverviewPage(): JSX.Element {
           <CalloutCard
             eyebrow="Owner scope"
             title="Owner permissions are required to manage billing"
-            description="Billing remains an owner-only browser-session surface even though the shared organization summary is visible here."
+            description="Billing stays owner-only, even though this shared summary is visible here."
             tone="warning"
           />
         ) : (
@@ -226,7 +226,7 @@ function formatActiveProjects(projectCount: number | null): string | null {
 
 function formatMembershipSummary(summary: OrganizationMembershipSummary | null): string {
   if (summary === null) {
-    return "Loading organization membership summary...";
+    return "Loading member summary...";
   }
 
   return `${summary.members} ${summary.members === 1 ? "member" : "members"} and ${summary.invites} pending ${summary.invites === 1 ? "invite" : "invites"}.`;

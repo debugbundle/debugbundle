@@ -84,12 +84,20 @@ describe("web app — management routes", () => {
   });
 
   it("shows incident inventory from the signed-in incidents route and exposes the sidebar entry", async () => {
+    const user = userEvent.setup();
     const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
       const url = requestUrl(input);
 
       if (url.endsWith("/v1/auth/session")) {
         return jsonResponse(200, {
           session: createSession()
+        });
+      }
+
+      if (url.endsWith("/v1/incidents?limit=20&status=open") && init?.method === undefined) {
+        return jsonResponse(200, {
+          incidents: [createIncident()],
+          next_cursor: null
         });
       }
 
@@ -120,20 +128,24 @@ describe("web app — management routes", () => {
 
     expect(await screen.findByRole("heading", { name: /incidents/i, level: 1 })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /incidents/i })).toHaveAttribute("href", "/incidents");
+    expect(screen.getByRole("combobox", { name: /status/i })).toHaveValue("open");
     expect(await screen.findByText(/typeerror in checkout handler/i)).toBeInTheDocument();
-    expect(await screen.findByText(/database timeout during signin/i)).toBeInTheDocument();
+    expect(screen.queryByText(/database timeout during signin/i)).toBeNull();
     expect((await screen.findAllByRole("link", { name: /main app/i })).length).toBeGreaterThan(0);
     expect((await screen.findAllByText(/^checkout-api$/i)).length).toBeGreaterThan(0);
     expect(screen.queryByText(/^proj_123$/i)).toBeNull();
     expect(screen.queryByText(/^svc_123$/i)).toBeNull();
     expect(screen.getByText(/^high$/i)).toBeInTheDocument();
-    expect(screen.getByText(/^critical$/i)).toBeInTheDocument();
-    expect(screen.getByText(/^open$/i)).toBeInTheDocument();
-    expect(screen.getByText(/^regressed$/i)).toBeInTheDocument();
-    expect(screen.getByText(/7 occurrences/i)).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /next/i })).toBeEnabled();
-    expect(screen.getByRole("button", { name: /previous/i })).toBeDisabled();
     const incidentTable = screen.getByRole("table");
+    expect(within(incidentTable).getByText(/^open$/i)).toBeInTheDocument();
+    expect(screen.getByText(/7 occurrences/i)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /next/i })).toBeNull();
+    expect(screen.queryByRole("button", { name: /previous/i })).toBeNull();
+
+    await user.selectOptions(screen.getByRole("combobox", { name: /status/i }), "all");
+    expect(await screen.findByText(/database timeout during signin/i)).toBeInTheDocument();
+    expect(screen.getByText(/^critical$/i)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /next/i })).toBeEnabled();
     expect(incidentTable.className.includes("min-w-[860px]")).toBe(true);
   });
 
@@ -208,7 +220,7 @@ describe("web app — management routes", () => {
         });
       }
 
-      if (url.endsWith("/v1/incidents?limit=20") && init?.method === undefined) {
+      if (url.endsWith("/v1/incidents?limit=20&status=open") && init?.method === undefined) {
         return jsonResponse(200, {
           incidents: [],
           next_cursor: null
@@ -698,7 +710,7 @@ describe("web app — management routes", () => {
     render(<App initialEntries={["/projects/proj_123/github"]} />);
 
     expect(await screen.findByText(/connect the github app to start automation/i)).toBeInTheDocument();
-    expect(screen.getByText(/no github app installation is connected for this organization yet/i)).toBeInTheDocument();
+    expect(screen.getByText(/no github app installation is connected to this workspace yet/i)).toBeInTheDocument();
     expect(fetchMock.mock.calls.some(([input]) => requestUrl(input).endsWith("/v1/github/repositories"))).toBe(false);
   });
 
@@ -1429,9 +1441,9 @@ describe("web app — management routes", () => {
     render(<App initialEntries={["/projects/proj_123/webhooks"]} />);
 
     expect(await screen.findByText(/no webhook endpoints yet/i)).toBeInTheDocument();
-    expect(screen.getByText(/lifecycle, verification, and automation webhook events/i)).toBeInTheDocument();
+    expect(screen.getByText(/create a webhook to send lifecycle, verification, or automation events/i)).toBeInTheDocument();
     expect(screen.getByText(/no delivery attempts yet/i)).toBeInTheDocument();
-    expect(screen.getByText(/send a signed verification event/i)).toBeInTheDocument();
+    expect(screen.getByText(/send a test webhook to create the first delivery record/i)).toBeInTheDocument();
   });
 
   it("shows project alerts and existing rule visibility from the project-scoped route", async () => {
@@ -1663,7 +1675,7 @@ describe("web app — management routes", () => {
     render(<App initialEntries={["/projects/proj_123/alerts"]} />);
 
     expect(await screen.findByText(/no alert rules yet/i)).toBeInTheDocument();
-    expect(screen.getByText(/route incident lifecycle changes into the channels/i)).toBeInTheDocument();
+    expect(screen.getByText(/create a rule to send incident events where your team will see them/i)).toBeInTheDocument();
     expect(screen.getAllByRole("button", { name: /create alert rule/i }).length).toBe(2);
   });
 
@@ -1725,7 +1737,7 @@ describe("web app — management routes", () => {
 
     render(<App initialEntries={["/organization/members"]} />);
 
-    expect(await screen.findByText(/owner permissions are required to manage organization members/i)).toBeInTheDocument();
+    expect(await screen.findByText(/owner permissions are required to manage members/i)).toBeInTheDocument();
   });
 
   it("invites a member, changes a member role, removes a member, and cancels an invite from the org members page", async () => {
@@ -1795,7 +1807,7 @@ describe("web app — management routes", () => {
     // Invite a new member
     await user.click(screen.getByRole("button", { name: /invite member/i }));
     expect((await screen.findByRole("dialog")).className.includes("sm:max-w-lg")).toBe(true);
-    expect(screen.getByText(/send an invitation to join this organization/i)).toBeInTheDocument();
+    expect(screen.getByText(/invite someone to this organization/i)).toBeInTheDocument();
     await user.type(await screen.findByLabelText(/email address/i), "newbie@example.com");
     await user.click(screen.getByRole("button", { name: /send invite/i }));
 
@@ -1928,7 +1940,7 @@ describe("web app — management routes", () => {
 
     expect(await screen.findByRole("heading", { name: /organization/i, level: 1 })).toBeInTheDocument();
     expect(await screen.findByText(/1 active project/i)).toBeInTheDocument();
-    expect(await screen.findByText(/owner permissions are required to manage organization members/i)).toBeInTheDocument();
+    expect(await screen.findByText(/owner permissions are required to manage members/i)).toBeInTheDocument();
     expect(await screen.findByText(/owner permissions are required to manage billing/i)).toBeInTheDocument();
   });
 

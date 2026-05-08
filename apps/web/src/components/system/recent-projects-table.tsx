@@ -9,10 +9,12 @@ import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTi
 import { Skeleton } from "../ui/skeleton.js";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../ui/table.js";
 import { listProjects, type ProjectRecord } from "../../lib/api.js";
+import { useDelayedVisibility } from "../../lib/use-delayed-visibility.js";
 
 export function RecentProjectsTable(): JSX.Element {
   const navigate = useNavigate();
   const [projects, setProjects] = useState<ProjectRecord[] | null>(null);
+  const showProjectsLoading = useDelayedVisibility(projects === null);
 
   useEffect(() => {
     void (async () => {
@@ -33,11 +35,13 @@ export function RecentProjectsTable(): JSX.Element {
         </CardHeader>
         <CardContent>
           {projects === null ? (
-            <div className="flex flex-col gap-3">
-              <Skeleton className="h-10 w-full" />
-              <Skeleton className="h-10 w-full" />
-              <Skeleton className="h-10 w-full" />
-            </div>
+            showProjectsLoading ? (
+              <div className="flex flex-col gap-3">
+                <Skeleton className="h-10 w-full" />
+                <Skeleton className="h-10 w-full" />
+                <Skeleton className="h-10 w-full" />
+              </div>
+            ) : null
           ) : projects.length === 0 ? (
             <Empty>
               <EmptyHeader>

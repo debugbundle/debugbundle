@@ -14,7 +14,11 @@ export function CursorPaginationControls({
   isLoading,
   onPreviousPage,
   onNextPage
-}: CursorPaginationControlsProps): JSX.Element {
+}: CursorPaginationControlsProps): JSX.Element | null {
+  if (page === 1 && !hasNextPage) {
+    return null;
+  }
+
   return (
     <div className="flex flex-col gap-3 border-t pt-4 sm:flex-row sm:items-center sm:justify-between">
       <p className="text-sm text-muted-foreground">Page {page}</p>

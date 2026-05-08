@@ -1,8 +1,6 @@
 import { ActivityIcon, PlusIcon, SendIcon } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useOutletContext } from "react-router-dom";
-import { toast } from "sonner";
-
 import { DialogFormContent } from "../components/system/dialog-form-content.js";
 import { PlaintextTokenReveal } from "../components/system/plaintext-token-reveal.js";
 import { ProjectResourceEmptyState } from "../components/system/project-resource-empty-state.js";
@@ -25,6 +23,8 @@ import {
   type WebhookEventType,
   type WebhookRecord
 } from "../lib/api.js";
+import { showErrorToast, showSuccessToast } from "../lib/notify.js";
+import { useDelayedVisibility } from "../lib/use-delayed-visibility.js";
 
 const WEBHOOK_EVENT_GROUPS: Array<{
   title: string;
@@ -80,6 +80,7 @@ type DeliveryState = Record<string, WebhookDeliveryRecord[]>;
 export function ProjectWebhooksPage(): JSX.Element {
   const { projectId } = useOutletContext<ProjectContext>();
   const [webhooks, setWebhooks] = useState<WebhookRecord[] | null>(null);
+  const showWebhooksLoading = useDelayedVisibility(webhooks === null);
   const [deliveriesByWebhook, setDeliveriesByWebhook] = useState<DeliveryState>({});
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [createdWebhook, setCreatedWebhook] = useState<CreatedWebhookRecord | null>(null);
@@ -137,9 +138,9 @@ export function ProjectWebhooksPage(): JSX.Element {
         [created.webhook_id]: []
       }));
       resetCreateWebhookForm();
-      toast.success("Webhook created.");
+      showSuccessToast("Webhook created successfully.");
     } catch {
-      toast.error("Could not create webhook.");
+      showErrorToast("Could not create webhook.");
     }
   }
 
@@ -163,9 +164,9 @@ export function ProjectWebhooksPage(): JSX.Element {
         ...current,
         [webhookId]: [delivery, ...(current[webhookId] ?? [])].slice(0, 5)
       }));
-      toast.success("Test webhook sent.");
+      showSuccessToast("Test webhook sent successfully.");
     } catch {
-      toast.error("Could not send test webhook.");
+      showErrorToast("Could not send test webhook.");
     } finally {
       setActiveTestWebhookId(null);
     }
@@ -327,7 +328,7 @@ export function ProjectWebhooksPage(): JSX.Element {
           value={createdWebhook.signing_secret}
           title="New webhook signing secret"
           regionLabel="New webhook signing secret"
-          description="This signing secret is shown once. Copy it into the receiving endpoint now so incoming webhook signatures can be verified."
+          description="This secret is shown once. Copy it now so the receiving endpoint can verify signatures."
         />
       )}
 
@@ -335,19 +336,21 @@ export function ProjectWebhooksPage(): JSX.Element {
         <Card>
           <CardHeader>
             <CardTitle>Webhook endpoints</CardTitle>
-            <CardDescription>Project-scoped outbound destinations and their current subscription footprint.</CardDescription>
+            <CardDescription>Outbound endpoints and subscribed events for this project.</CardDescription>
           </CardHeader>
           <CardContent>
             {webhooks === null ? (
-              <div className="space-y-3">
-                <Skeleton className="h-12 w-full" />
-                <Skeleton className="h-12 w-full" />
-              </div>
+              showWebhooksLoading ? (
+                <div className="space-y-3">
+                  <Skeleton className="h-12 w-full" />
+                  <Skeleton className="h-12 w-full" />
+                </div>
+              ) : null
             ) : webhooks.length === 0 ? (
               <ProjectResourceEmptyState
                 icon={ActivityIcon}
                 title="No webhook endpoints yet"
-                description="Create an outbound endpoint when you want lifecycle, verification, and automation webhook events to flow into another system."
+                description="Create a webhook to send lifecycle, verification, or automation events to another system."
                 actionLabel="Create webhook"
                 onAction={() => setIsCreateOpen(true)}
               />
@@ -392,19 +395,21 @@ export function ProjectWebhooksPage(): JSX.Element {
         <Card>
           <CardHeader>
             <CardTitle>Delivery status</CardTitle>
-            <CardDescription>Recent delivery attempts across project webhook endpoints.</CardDescription>
+            <CardDescription>Recent delivery attempts for this project's webhooks.</CardDescription>
           </CardHeader>
           <CardContent>
             {webhooks === null ? (
-              <div className="space-y-3">
-                <Skeleton className="h-12 w-full" />
-                <Skeleton className="h-12 w-full" />
-              </div>
+              showWebhooksLoading ? (
+                <div className="space-y-3">
+                  <Skeleton className="h-12 w-full" />
+                  <Skeleton className="h-12 w-full" />
+                </div>
+              ) : null
             ) : recentDeliveries.length === 0 ? (
               <ProjectResourceEmptyState
                 icon={SendIcon}
                 title="No delivery attempts yet"
-                description="Send a signed verification event after creating a webhook to confirm the endpoint is reachable and capture the first delivery record."
+                description="Send a test webhook to create the first delivery record."
               />
             ) : (
               <Table>

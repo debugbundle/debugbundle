@@ -1,8 +1,6 @@
 import { DownloadIcon, KeySquareIcon, ShieldAlertIcon, Trash2Icon } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Navigate, useNavigate } from "react-router-dom";
-import { toast } from "sonner";
-
 import { CalloutCard } from "../components/system/callout-card.js";
 import { PageHeader } from "../components/system/page-header.js";
 import {
@@ -21,6 +19,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../co
 import { Field, FieldLabel } from "../components/ui/field.js";
 import { Input } from "../components/ui/input.js";
 import { deleteAccount, exportAccountData } from "../lib/api.js";
+import { showErrorToast, showSuccessToast } from "../lib/notify.js";
 import { useSession } from "../lib/session.js";
 
 export function SettingsPage(): JSX.Element {
@@ -63,9 +62,9 @@ export function SettingsPage(): JSX.Element {
       anchor.download = filename;
       anchor.click();
       URL.revokeObjectURL(objectUrl);
-      toast.success("Account export downloaded.");
+      showSuccessToast("Account export downloaded successfully.");
     } catch {
-      toast.error("Could not download account export.");
+      showErrorToast("Could not download account export.");
     } finally {
       setIsExporting(false);
     }
@@ -89,15 +88,15 @@ export function SettingsPage(): JSX.Element {
       await deleteAccount({ email });
       setSession(null);
       setIsDeleteDialogOpen(false);
-      toast.success("Account deleted.");
+      showSuccessToast("Account deleted successfully.");
       void navigate("/login", { replace: true });
     } catch (error) {
       if (error instanceof Error && error.message === "other_owned_organizations_exist") {
-        setDeleteErrorMessage("Transfer or delete the other organizations you own before deleting this account.");
+        setDeleteErrorMessage("Transfer or delete the other workspaces you own before deleting this account.");
       } else {
         setDeleteErrorMessage("Could not delete this account.");
       }
-      toast.error("Could not delete this account.");
+      showErrorToast("Could not delete this account.");
     } finally {
       setIsDeleting(false);
     }
@@ -105,17 +104,17 @@ export function SettingsPage(): JSX.Element {
 
   return (
     <div className="space-y-8">
-      <PageHeader description="Review your active sign-in methods, account verification state, and organization-level account lifecycle controls." />
+      <PageHeader description="Review your active sign-in methods, account verification state, and account lifecycle controls." />
       <div className="grid gap-4 xl:grid-cols-[1.1fr_0.9fr]">
         <div className="space-y-4">
           <Card>
             <CardHeader>
               <CardTitle>Profile</CardTitle>
-              <CardDescription>Session-backed member identity for the current organization.</CardDescription>
+              <CardDescription>Session-backed account details for this workspace.</CardDescription>
             </CardHeader>
             <CardContent className="grid gap-4 text-sm sm:grid-cols-2">
               <DetailBlock label="Email" value={session.email} />
-              <DetailBlock label="Organization" value={session.organization_id} />
+              <DetailBlock label="Workspace" value={session.organization_id} />
               <DetailBlock label="Role" value={session.role} />
               <DetailBlock label="Session" value={session.session_id} />
             </CardContent>
@@ -140,7 +139,7 @@ export function SettingsPage(): JSX.Element {
                     eyebrow="Ready"
                     title="Verified"
                     description="This account can issue member tokens for CLI and MCP access."
-                    tone="success"
+                    tone="neutral"
                   />
                 )}
               </CardContent>
@@ -191,7 +190,7 @@ export function SettingsPage(): JSX.Element {
           <Card>
             <CardHeader>
               <CardTitle>Account data export</CardTitle>
-              <CardDescription>Download the retained data tied to this organization account.</CardDescription>
+              <CardDescription>Download the retained data tied to this account.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="rounded-lg border border-border/80 bg-background/70 p-4 text-sm text-muted-foreground">
@@ -199,10 +198,10 @@ export function SettingsPage(): JSX.Element {
                   <DownloadIcon className="size-4" />
                   Export retained data
                 </div>
-                <p className="mt-2 leading-6">Exports organization members, projects, tokens, incidents, and retained debugging artifacts as a JSON attachment.</p>
+                <p className="mt-2 leading-6">Exports retained account data, including members, projects, tokens, incidents, and debugging artifacts, as a JSON attachment.</p>
               </div>
               {!canManageOrganizationAccount ? (
-                <p className="text-sm text-muted-foreground">Only organization owners can export or delete the organization account.</p>
+                <p className="text-sm text-muted-foreground">Only owners can export or delete this account.</p>
               ) : null}
               <Button type="button" variant="outline" onClick={() => void handleExportAccountData()} disabled={!canManageOrganizationAccount || isExporting}>
                 <DownloadIcon data-icon="inline-start" />
@@ -213,8 +212,8 @@ export function SettingsPage(): JSX.Element {
 
           <Card className="border-destructive/25 bg-destructive/5">
             <CardHeader>
-              <CardTitle>Delete organization account</CardTitle>
-              <CardDescription>Irreversible removal of the current organization and its retained debugging data.</CardDescription>
+              <CardTitle>Delete account</CardTitle>
+              <CardDescription>Irreversible removal of this account and its retained debugging data.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="rounded-lg border border-destructive/25 bg-background/70 p-4 text-sm text-muted-foreground">
@@ -222,10 +221,10 @@ export function SettingsPage(): JSX.Element {
                   <ShieldAlertIcon className="size-4" />
                   Destructive operation
                 </div>
-                <p className="mt-2 leading-6">Deleting this account removes the current organization, its projects, incidents, tokens, and retained debugging artifacts. This cannot be undone.</p>
+                <p className="mt-2 leading-6">Deleting this account removes its members, projects, incidents, tokens, and retained debugging artifacts. This cannot be undone.</p>
               </div>
               {!canManageOrganizationAccount ? (
-                <p className="text-sm text-muted-foreground">Only organization owners can delete the organization account.</p>
+                <p className="text-sm text-muted-foreground">Only owners can delete this account.</p>
               ) : null}
               <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
                 <AlertDialogTrigger asChild>
@@ -236,9 +235,9 @@ export function SettingsPage(): JSX.Element {
                 </AlertDialogTrigger>
                 <AlertDialogContent>
                   <AlertDialogHeader>
-                    <AlertDialogTitle>Delete organization account</AlertDialogTitle>
+                    <AlertDialogTitle>Delete account</AlertDialogTitle>
                     <AlertDialogDescription>
-                      Type your email address to confirm permanent deletion of the current organization account and all retained project data.
+                      Type your email address to confirm permanent deletion of this account and all retained project data.
                     </AlertDialogDescription>
                   </AlertDialogHeader>
                   <div className="space-y-3">

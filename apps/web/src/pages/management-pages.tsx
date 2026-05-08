@@ -1,8 +1,6 @@
 import { FolderIcon, KeyRoundIcon, MailCheckIcon, PlusIcon } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useOutletContext } from "react-router-dom";
-import { toast } from "sonner";
-
 import { CalloutCard } from "../components/system/callout-card.js";
 import { DialogFormContent } from "../components/system/dialog-form-content.js";
 import { PageHeader } from "../components/system/page-header.js";
@@ -49,6 +47,7 @@ import {
   type ProjectRecord,
   type ProjectTokenRecord
 } from "../lib/api.js";
+import { showErrorToast, showSuccessToast } from "../lib/notify.js";
 import { CUSTOM_PROJECT_ENVIRONMENT_VALUE, PROJECT_ENVIRONMENT_OPTIONS, slugifyProjectName } from "../lib/project-form.js";
 import { useSession } from "../lib/session.js";
 
@@ -98,7 +97,7 @@ export function ProjectsPage(): JSX.Element {
       setIsCreateOpen(false);
       void navigate(`/projects/${created.project_id}`);
     } catch {
-      toast.error("Could not create project.");
+      showErrorToast("Could not create project.");
     }
   }
 
@@ -145,7 +144,7 @@ export function ProjectsPage(): JSX.Element {
             </DialogTrigger>
             <DialogFormContent
               title="Create project"
-              description="Add a new project in the current organization."
+              description="Add a new project in this workspace."
               size="lg"
               footer={<Button type="submit">Create project</Button>}
               onSubmit={(event) => void handleCreateProject(event)}
@@ -295,9 +294,9 @@ export function ProjectTokensPage(): JSX.Element {
       setTokens((current) => [...(current ?? []), { ...created, plaintext: undefined }]);
       setLabel("");
       setIsCreateOpen(false);
-      toast.success("Project token created.");
+      showSuccessToast("Project token created successfully.");
     } catch {
-      toast.error("Could not create project token.");
+      showErrorToast("Could not create project token.");
     }
   }
 
@@ -305,9 +304,9 @@ export function ProjectTokensPage(): JSX.Element {
     try {
       await revokeProjectToken(resolvedProjectId, tokenId);
       setTokens((current) => (current ?? []).filter((token) => token.token_id !== tokenId));
-      toast.success("Project token revoked.");
+      showSuccessToast("Project token revoked successfully.");
     } catch {
-      toast.error("Could not revoke project token.");
+      showErrorToast("Could not revoke project token.");
     }
   }
 
@@ -438,9 +437,9 @@ export function OrganizationMembersPage(): JSX.Element {
       setInviteEmail("");
       setInviteRole("member");
       setIsInviteOpen(false);
-      toast.success("Invitation sent.");
+      showSuccessToast("Invitation sent successfully.");
     } catch {
-      toast.error("Could not send invite.");
+      showErrorToast("Could not send invite.");
     }
   }
 
@@ -448,9 +447,9 @@ export function OrganizationMembersPage(): JSX.Element {
     try {
       const updated = await updateOrganizationMemberRole(userId, newRole);
       setMembers((current) => (current ?? []).map((m) => (m.user_id === userId ? updated : m)));
-      toast.success("Member role updated.");
+      showSuccessToast("Member role updated successfully.");
     } catch {
-      toast.error("Could not update member role.");
+      showErrorToast("Could not update member role.");
     }
   }
 
@@ -458,9 +457,9 @@ export function OrganizationMembersPage(): JSX.Element {
     try {
       await removeOrganizationMember(userId);
       setMembers((current) => (current ?? []).filter((m) => m.user_id !== userId));
-      toast.success("Member removed.");
+      showSuccessToast("Member removed successfully.");
     } catch {
-      toast.error("Could not remove member.");
+      showErrorToast("Could not remove member.");
     }
   }
 
@@ -468,16 +467,16 @@ export function OrganizationMembersPage(): JSX.Element {
     try {
       await cancelOrganizationInvite(inviteId);
       setInvites((current) => (current ?? []).filter((i) => i.invite_id !== inviteId));
-      toast.success("Invite cancelled.");
+      showSuccessToast("Invite cancelled successfully.");
     } catch {
-      toast.error("Could not cancel invite.");
+      showErrorToast("Could not cancel invite.");
     }
   }
 
   return (
     <div className="space-y-8">
       <PageHeader
-        description="Review organization membership and the pending invite queue from the browser-authenticated owner surface."
+        description="Manage members and pending invites for this organization."
         actions={
           !isForbidden ? (
             <Dialog open={isInviteOpen} onOpenChange={setIsInviteOpen}>
@@ -489,7 +488,7 @@ export function OrganizationMembersPage(): JSX.Element {
               </DialogTrigger>
               <DialogFormContent
                 title="Invite member"
-                description="Send an invitation to join this organization."
+                description="Invite someone to this organization."
                 footer={<Button type="submit">Send invite</Button>}
                 onSubmit={(event) => void handleInvite(event)}
               >
@@ -520,8 +519,8 @@ export function OrganizationMembersPage(): JSX.Element {
       {isForbidden ? (
         <CalloutCard
           eyebrow="Owner scope"
-          title="Owner permissions are required to manage organization members"
-          description="This surface is limited to organization owners. Signed-in members can continue using project and token management routes."
+          title="Owner permissions are required to manage members"
+          description="Only owners can manage members. Signed-in members can still use project and token routes."
           tone="warning"
         />
       ) : (
@@ -529,7 +528,7 @@ export function OrganizationMembersPage(): JSX.Element {
           <Card>
             <CardHeader>
               <CardTitle>Members</CardTitle>
-              <CardDescription>Current organization membership and role assignments.</CardDescription>
+              <CardDescription>Current members and roles.</CardDescription>
             </CardHeader>
             <CardContent>
               {members === null ? (
@@ -538,7 +537,7 @@ export function OrganizationMembersPage(): JSX.Element {
                   <Skeleton className="h-12 w-full" />
                 </div>
               ) : members.length === 0 ? (
-                <p className="text-sm text-muted-foreground">No members found for this organization.</p>
+                <p className="text-sm text-muted-foreground">No members found.</p>
               ) : (
                 <Table>
                   <TableHeader>
@@ -577,7 +576,7 @@ export function OrganizationMembersPage(): JSX.Element {
                                 <AlertDialogHeader>
                                   <AlertDialogTitle>Remove member</AlertDialogTitle>
                                   <AlertDialogDescription>
-                                    This will remove {member.email} from the organization immediately.
+                                    This removes {member.email} from the organization immediately.
                                   </AlertDialogDescription>
                                 </AlertDialogHeader>
                                 <AlertDialogFooter>
@@ -599,7 +598,7 @@ export function OrganizationMembersPage(): JSX.Element {
           <Card>
             <CardHeader>
               <CardTitle>Pending invites</CardTitle>
-              <CardDescription>Outstanding invitations waiting for browser-session acceptance.</CardDescription>
+              <CardDescription>Invitations waiting to be accepted.</CardDescription>
             </CardHeader>
             <CardContent>
               {invites === null ? (

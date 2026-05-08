@@ -778,6 +778,366 @@
 			],
 			"isBackground": false,
 			"group": "test"
+		},
+		{
+			"label": "debugbundle-web-copy-audit-check",
+			"type": "shell",
+			"command": "docker",
+			"args": [
+				"run",
+				"--rm",
+				"-t",
+				"-v",
+				"/Users/owenfar/Developer/DebugBundle:/workspace",
+				"-w",
+				"/workspace",
+				"node:24-alpine",
+				"sh",
+				"-lc",
+				"corepack enable && corepack pnpm install --frozen-lockfile=false && corepack pnpm vitest run tests/apps/web/web-app-incidents.test.tsx tests/apps/web/web-app-management.test.tsx"
+			],
+			"isBackground": false,
+			"group": "test"
+		},
+		{
+			"label": "debugbundle-web-copy-audit-check-rerun",
+			"type": "shell",
+			"command": "docker",
+			"args": [
+				"run",
+				"--rm",
+				"-t",
+				"-v",
+				"/Users/owenfar/Developer/DebugBundle:/workspace",
+				"-w",
+				"/workspace",
+				"node:24-alpine",
+				"sh",
+				"-lc",
+				"corepack enable && corepack pnpm install --frozen-lockfile=false && corepack pnpm vitest run tests/apps/web/web-app-incidents.test.tsx tests/apps/web/web-app-management.test.tsx"
+			],
+			"isBackground": false,
+			"group": "test"
+		},
+		{
+			"label": "debugbundle-web-copy-audit-check-final",
+			"type": "shell",
+			"command": "docker",
+			"args": [
+				"run",
+				"--rm",
+				"-t",
+				"-v",
+				"/Users/owenfar/Developer/DebugBundle:/workspace",
+				"-w",
+				"/workspace",
+				"node:24-alpine",
+				"sh",
+				"-lc",
+				"corepack enable && corepack pnpm install --frozen-lockfile=false && corepack pnpm vitest run tests/apps/web/web-app-incidents.test.tsx tests/apps/web/web-app-management.test.tsx"
+			],
+			"isBackground": false,
+			"group": "test"
+		},
+		{
+			"label": "debugbundle-web-neutral-feedback-check",
+			"type": "shell",
+			"command": "docker",
+			"args": [
+				"run",
+				"--rm",
+				"-t",
+				"-v",
+				"/Users/owenfar/Developer/DebugBundle:/workspace",
+				"-w",
+				"/workspace",
+				"node:24-alpine",
+				"sh",
+				"-lc",
+				"corepack enable && corepack pnpm install --frozen-lockfile=false && corepack pnpm vitest run tests/apps/web/web-app-auth.test.tsx tests/apps/web/web-app-incidents.test.tsx tests/apps/web/web-app-management.test.tsx"
+			],
+			"isBackground": false,
+			"group": "test"
+		},
+		{
+			"label": "debugbundle-web-toast-icon-check",
+			"type": "shell",
+			"command": "docker",
+			"args": [
+				"run",
+				"--rm",
+				"-t",
+				"-v",
+				"/Users/owenfar/Developer/DebugBundle:/workspace",
+				"-w",
+				"/workspace",
+				"node:24-alpine",
+				"sh",
+				"-lc",
+				"corepack enable && corepack pnpm install --frozen-lockfile=false && corepack pnpm vitest run tests/apps/web/web-app-auth.test.tsx tests/apps/web/web-app-incidents.test.tsx tests/apps/web/web-app-management.test.tsx"
+			],
+			"isBackground": false,
+			"group": "test"
+		},
+		{
+			"label": "debugbundle-web-toast-copy-check",
+			"type": "shell",
+			"command": "docker",
+			"args": [
+				"run",
+				"--rm",
+				"-t",
+				"-v",
+				"/Users/owenfar/Developer/DebugBundle:/workspace",
+				"-w",
+				"/workspace",
+				"node:24-alpine",
+				"sh",
+				"-lc",
+				"corepack enable && corepack pnpm install --frozen-lockfile=false && corepack pnpm vitest run tests/apps/web/web-app-auth.test.tsx tests/apps/web/web-app-incidents.test.tsx tests/apps/web/web-app-management.test.tsx"
+			],
+			"isBackground": false,
+			"group": "test"
+		},
+		{
+			"label": "debugbundle-incidents-status-filter-check",
+			"type": "shell",
+			"command": "docker",
+			"args": [
+				"run",
+				"--rm",
+				"-t",
+				"-v",
+				"/Users/owenfar/Developer/DebugBundle:/workspace",
+				"-w",
+				"/workspace",
+				"node:24-alpine",
+				"sh",
+				"-lc",
+				"corepack enable && corepack pnpm install --frozen-lockfile=false && corepack pnpm vitest run tests/apps/web/web-app-incidents.test.tsx"
+			],
+			"isBackground": false,
+			"group": "test"
+		},
+		{
+			"label": "debugbundle-incidents-status-filter-rerun",
+			"type": "shell",
+			"command": "docker",
+			"args": [
+				"run",
+				"--rm",
+				"-t",
+				"-v",
+				"/Users/owenfar/Developer/DebugBundle:/workspace",
+				"-w",
+				"/workspace",
+				"node:24-alpine",
+				"sh",
+				"-lc",
+				"corepack enable && corepack pnpm install --frozen-lockfile=false && corepack pnpm vitest run tests/apps/web/web-app-incidents.test.tsx"
+			],
+			"isBackground": false,
+			"group": "test"
+		},
+		{
+			"label": "debugbundle-incidents-status-filter-final",
+			"type": "shell",
+			"command": "docker",
+			"args": [
+				"run",
+				"--rm",
+				"-t",
+				"-v",
+				"/Users/owenfar/Developer/DebugBundle:/workspace",
+				"-w",
+				"/workspace",
+				"node:24-alpine",
+				"sh",
+				"-lc",
+				"corepack enable && corepack pnpm install --frozen-lockfile=false && corepack pnpm vitest run tests/apps/web/web-app-incidents.test.tsx"
+			],
+			"isBackground": false,
+			"group": "test"
+		},
+		{
+			"label": "debugbundle-incidents-status-filter-rootfix",
+			"type": "shell",
+			"command": "docker",
+			"args": [
+				"run",
+				"--rm",
+				"-t",
+				"-v",
+				"/Users/owenfar/Developer/DebugBundle:/workspace",
+				"-w",
+				"/workspace",
+				"node:24-alpine",
+				"sh",
+				"-lc",
+				"corepack enable && corepack pnpm install --frozen-lockfile=false && corepack pnpm vitest run tests/apps/web/web-app-incidents.test.tsx"
+			],
+			"isBackground": false,
+			"group": "test"
+		},
+		{
+			"label": "debugbundle-focused-web-polish-validation",
+			"type": "shell",
+			"command": "docker",
+			"args": [
+				"run",
+				"--rm",
+				"-t",
+				"-v",
+				"/Users/owenfar/Developer/DebugBundle:/workspace",
+				"-w",
+				"/workspace",
+				"node:24-alpine",
+				"sh",
+				"-lc",
+				"corepack enable && corepack pnpm install --frozen-lockfile=false && corepack pnpm vitest run tests/apps/web/web-app-auth.test.tsx tests/apps/web/web-app-incidents.test.tsx tests/apps/web/web-app-management.test.tsx"
+			],
+			"isBackground": false,
+			"group": "test"
+		},
+		{
+			"label": "debugbundle-focused-web-polish-validation-rerun",
+			"type": "shell",
+			"command": "docker",
+			"args": [
+				"run",
+				"--rm",
+				"-t",
+				"-v",
+				"/Users/owenfar/Developer/DebugBundle:/workspace",
+				"-w",
+				"/workspace",
+				"node:24-alpine",
+				"sh",
+				"-lc",
+				"corepack enable && corepack pnpm install --frozen-lockfile=false && corepack pnpm vitest run tests/apps/web/web-app-auth.test.tsx tests/apps/web/web-app-incidents.test.tsx tests/apps/web/web-app-management.test.tsx"
+			],
+			"isBackground": false,
+			"group": "test"
+		},
+		{
+			"label": "debugbundle-focused-web-polish-validation-final",
+			"type": "shell",
+			"command": "docker",
+			"args": [
+				"run",
+				"--rm",
+				"-t",
+				"-v",
+				"/Users/owenfar/Developer/DebugBundle:/workspace",
+				"-w",
+				"/workspace",
+				"node:24-alpine",
+				"sh",
+				"-lc",
+				"corepack enable && corepack pnpm install --frozen-lockfile=false && corepack pnpm vitest run tests/apps/web/web-app-auth.test.tsx tests/apps/web/web-app-incidents.test.tsx tests/apps/web/web-app-management.test.tsx"
+			],
+			"isBackground": false,
+			"group": "test"
+		},
+		{
+			"label": "debugbundle-management-incidents-filter-rerun",
+			"type": "shell",
+			"command": "docker",
+			"args": [
+				"run",
+				"--rm",
+				"-t",
+				"-v",
+				"/Users/owenfar/Developer/DebugBundle:/workspace",
+				"-w",
+				"/workspace",
+				"node:24-alpine",
+				"sh",
+				"-lc",
+				"corepack enable && corepack pnpm install --frozen-lockfile=false && corepack pnpm vitest run tests/apps/web/web-app-management.test.tsx"
+			],
+			"isBackground": false,
+			"group": "test"
+		},
+		{
+			"label": "debugbundle-focused-web-polish-validation-clean",
+			"type": "shell",
+			"command": "docker",
+			"args": [
+				"run",
+				"--rm",
+				"-t",
+				"-v",
+				"/Users/owenfar/Developer/DebugBundle:/workspace",
+				"-w",
+				"/workspace",
+				"node:24-alpine",
+				"sh",
+				"-lc",
+				"corepack enable && corepack pnpm install --frozen-lockfile=false && corepack pnpm vitest run tests/apps/web/web-app-auth.test.tsx tests/apps/web/web-app-incidents.test.tsx tests/apps/web/web-app-management.test.tsx"
+			],
+			"isBackground": false,
+			"group": "test"
+		},
+		{
+			"label": "debugbundle-bundles-status-filter-check",
+			"type": "shell",
+			"command": "docker",
+			"args": [
+				"run",
+				"--rm",
+				"-t",
+				"-v",
+				"/Users/owenfar/Developer/DebugBundle:/workspace",
+				"-w",
+				"/workspace",
+				"node:24-alpine",
+				"sh",
+				"-lc",
+				"corepack enable && corepack pnpm install --frozen-lockfile=false && corepack pnpm vitest run tests/apps/web/web-app-incidents.test.tsx"
+			],
+			"isBackground": false,
+			"group": "test"
+		},
+		{
+			"label": "debugbundle-project-export-placement-check",
+			"type": "shell",
+			"command": "docker",
+			"args": [
+				"run",
+				"--rm",
+				"-t",
+				"-v",
+				"/Users/owenfar/Developer/DebugBundle:/workspace",
+				"-w",
+				"/workspace",
+				"node:24-alpine",
+				"sh",
+				"-lc",
+				"corepack enable && corepack pnpm install --frozen-lockfile=false && corepack pnpm vitest run tests/apps/web/web-app-incidents.test.tsx"
+			],
+			"isBackground": false,
+			"group": "test"
+		},
+		{
+			"label": "debugbundle-pagination-visibility-check",
+			"type": "shell",
+			"command": "docker",
+			"args": [
+				"run",
+				"--rm",
+				"-t",
+				"-v",
+				"/Users/owenfar/Developer/DebugBundle:/workspace",
+				"-w",
+				"/workspace",
+				"node:24-alpine",
+				"sh",
+				"-lc",
+				"corepack enable && corepack pnpm install --frozen-lockfile=false && corepack pnpm vitest run tests/apps/web/web-app-incidents.test.tsx tests/apps/web/web-app-management.test.tsx"
+			],
+			"isBackground": false,
+			"group": "test"
 		}
 	]
 }

@@ -1,4 +1,3 @@
-import { toast } from "sonner";
 import { ActivityIcon, BugIcon, DownloadIcon, InboxIcon, PackageIcon, SirenIcon, TrendingDownIcon, TrendingUpIcon } from "lucide-react";
 import { useMemo, useState } from "react";
 import { Link, useOutletContext } from "react-router-dom";
@@ -19,6 +18,7 @@ import {
   type IncidentRecord,
   type ProjectRecord
 } from "../lib/api.js";
+import { showErrorToast, showInfoToast, showSuccessToast } from "../lib/notify.js";
 import { useCursorPagination } from "../lib/use-cursor-pagination.js";
 
 export function ProjectOverviewPage(): JSX.Element {
@@ -31,7 +31,7 @@ export function ProjectOverviewPage(): JSX.Element {
       <Card>
         <CardHeader>
           <CardTitle>Project details</CardTitle>
-          <CardDescription>Identity and the editable environment default used across setup guidance and project metadata.</CardDescription>
+          <CardDescription>Project identity and the default environment.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <DetailRow label="Slug" value={project.slug} />
@@ -112,93 +112,143 @@ function ProjectStatCards({ project }: { project: ProjectRecord }): JSX.Element 
 
 export function ProjectIncidentsPage(): JSX.Element {
   const { projectId } = useOutletContext<ProjectContext>();
+  const [statusFilter, setStatusFilter] = useState<ProjectIncidentStatusFilter>("open");
   const [sort, setSort] = useState<SortState<ProjectIncidentSortField>>({
     field: "last_seen_at",
     direction: "desc"
   });
   const { items: incidents, isLoading, page, hasNextPage, goToNextPage, goToPreviousPage } = useCursorPagination(
     async (cursor) => {
-      const response = await listProjectIncidents(projectId, 20, cursor ?? undefined);
+      const response = await listProjectIncidents(projectId, 20, cursor ?? undefined, statusFilter === "all" ? undefined : statusFilter);
       return {
         items: response.incidents,
         nextCursor: response.nextCursor
       };
     },
-    [projectId]
+    [projectId, statusFilter]
   );
   const sortedIncidents = useMemo(() => sortProjectIncidents(incidents, sort), [incidents, sort]);
 
   return (
-    <Card className="min-w-0">
-      <CardHeader>
-        <CardTitle>Project incidents</CardTitle>
-        <CardDescription>Grouped failures for this project with severity, status, and occurrence context.</CardDescription>
-      </CardHeader>
-      <CardContent>
-        <ResourceListState
-          items={incidents}
-          loading={
-            <div className="space-y-3">
-              <Skeleton className="h-12 w-full" />
-              <Skeleton className="h-12 w-full" />
-            </div>
-          }
-          empty={
-            <Empty>
-              <EmptyHeader>
-                <EmptyMedia variant="icon">
-                  <SirenIcon />
-                </EmptyMedia>
-                <EmptyTitle>No incidents for this project</EmptyTitle>
-                <EmptyDescription>Incidents will appear here once the SDK starts sending events for this project.</EmptyDescription>
-              </EmptyHeader>
-            </Empty>
-          }
-        >
-          {() => (
-            <div className="space-y-4">
-              <IncidentTable incidents={sortedIncidents} sort={sort} onSortChange={(field) => setSort((current) => toggleSort(current, field))} />
-              <CursorPaginationControls
-                page={page}
-                hasNextPage={hasNextPage}
-                isLoading={isLoading}
-                onPreviousPage={goToPreviousPage}
-                onNextPage={() => void goToNextPage()}
-              />
-            </div>
-          )}
-        </ResourceListState>
-      </CardContent>
-    </Card>
+    <div className="space-y-4">
+      <Card className="min-w-0">
+        <CardHeader className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+          <div className="space-y-1.5">
+            <CardTitle>Project incidents</CardTitle>
+            <CardDescription>Grouped failures for this project.</CardDescription>
+          </div>
+          <div className="flex items-center gap-2 sm:justify-end">
+            <label htmlFor="project-incidents-status-filter" className="text-sm font-medium text-foreground">
+              Status
+            </label>
+            <select
+              id="project-incidents-status-filter"
+              className={filterSelectClassName}
+              value={statusFilter}
+              onChange={(event) => setStatusFilter(event.currentTarget.value as ProjectIncidentStatusFilter)}
+            >
+              {INCIDENT_STATUS_FILTER_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <ResourceListState
+            items={incidents}
+            loading={
+              <div className="space-y-3">
+                <Skeleton className="h-12 w-full" />
+                <Skeleton className="h-12 w-full" />
+              </div>
+            }
+            empty={
+              <Empty>
+                <EmptyHeader>
+                  <EmptyMedia variant="icon">
+                    <SirenIcon />
+                  </EmptyMedia>
+                  <EmptyTitle>No incidents for this project</EmptyTitle>
+                  <EmptyDescription>Incidents will appear here once the SDK starts sending events for this project.</EmptyDescription>
+                </EmptyHeader>
+              </Empty>
+            }
+          >
+            {() => (
+              <div className="space-y-4">
+                <IncidentTable incidents={sortedIncidents} sort={sort} onSortChange={(field) => setSort((current) => toggleSort(current, field))} />
+                <CursorPaginationControls
+                  page={page}
+                  hasNextPage={hasNextPage}
+                  isLoading={isLoading}
+                  onPreviousPage={goToPreviousPage}
+                  onNextPage={() => void goToNextPage()}
+                />
+              </div>
+            )}
+          </ResourceListState>
+        </CardContent>
+      </Card>
+
+      {incidents !== null && incidents.length > 0 ? (
+        <div className="flex justify-end gap-2">
+          <Button variant="outline" size="sm" onClick={() => exportIncidentsAsCsv(incidents)}>
+            Export incidents as CSV
+          </Button>
+        </div>
+      ) : null}
+    </div>
   );
 }
 
 export function ProjectBundlesPage(): JSX.Element {
   const { projectId } = useOutletContext<ProjectContext>();
+  const [statusFilter, setStatusFilter] = useState<ProjectIncidentStatusFilter>("open");
   const [sort, setSort] = useState<SortState<ProjectBundleSortField>>({
     field: "last_seen_at",
     direction: "desc"
   });
   const { items: incidents, isLoading, page, hasNextPage, goToNextPage, goToPreviousPage } = useCursorPagination(
     async (cursor) => {
-      const response = await listProjectIncidents(projectId, 20, cursor ?? undefined);
+      const response = await listProjectIncidents(projectId, 20, cursor ?? undefined, statusFilter === "all" ? undefined : statusFilter);
       return {
         items: response.incidents,
         nextCursor: response.nextCursor
       };
     },
-    [projectId]
+    [projectId, statusFilter]
   );
   const sortedIncidents = useMemo(() => sortProjectBundles(incidents, sort), [incidents, sort]);
 
   return (
     <div className="space-y-4">
       <Card className="min-w-0">
-        <CardHeader>
-          <CardTitle>Debug bundles</CardTitle>
-          <CardDescription>
-            Bundles are generated per-incident. Select an incident to view or download its bundle artifact.
-          </CardDescription>
+        <CardHeader className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+          <div className="space-y-1.5">
+            <CardTitle>Debug bundles</CardTitle>
+            <CardDescription>
+              Open or download bundles for incidents in this project.
+            </CardDescription>
+          </div>
+          <div className="flex items-center gap-2 sm:justify-end">
+            <label htmlFor="project-bundles-status-filter" className="text-sm font-medium text-foreground">
+              Status
+            </label>
+            <select
+              id="project-bundles-status-filter"
+              className={filterSelectClassName}
+              value={statusFilter}
+              onChange={(event) => setStatusFilter(event.currentTarget.value as ProjectIncidentStatusFilter)}
+            >
+              {INCIDENT_STATUS_FILTER_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </div>
         </CardHeader>
         <CardContent>
           <ResourceListState
@@ -276,14 +326,6 @@ export function ProjectBundlesPage(): JSX.Element {
           </ResourceListState>
         </CardContent>
       </Card>
-
-      {incidents !== null && incidents.length > 0 ? (
-        <div className="flex justify-end gap-2">
-          <Button variant="outline" size="sm" onClick={() => exportIncidentsAsCsv(incidents)}>
-            Export incidents as CSV
-          </Button>
-        </div>
-      ) : null}
     </div>
   );
 }
@@ -362,6 +404,17 @@ function formatServiceName(value: string | null): string {
 
 type ProjectIncidentSortField = "title" | "service_name" | "severity" | "status" | "occurrence_count" | "last_seen_at";
 type ProjectBundleSortField = "title" | "severity" | "status" | "last_seen_at";
+type ProjectIncidentStatusFilter = IncidentRecord["status"] | "all";
+
+const INCIDENT_STATUS_FILTER_OPTIONS: Array<{ value: ProjectIncidentStatusFilter; label: string }> = [
+  { value: "open", label: "Open" },
+  { value: "all", label: "All statuses" },
+  { value: "resolved", label: "Resolved" },
+  { value: "regressed", label: "Regressed" }
+];
+
+const filterSelectClassName =
+  "flex h-10 min-w-40 rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:cursor-not-allowed disabled:opacity-60";
 
 function sortProjectIncidents(incidents: IncidentRecord[] | null, sort: SortState<ProjectIncidentSortField>): IncidentRecord[] {
   if (incidents === null) {
@@ -430,10 +483,10 @@ function downloadBundle(incidentId: string): void {
     .then((result) => {
       switch (result.status) {
         case "pending":
-          toast.info("Bundle is not ready yet. The worker may still be processing this incident.");
+          showInfoToast("Bundle is still processing. Try again shortly.");
           return;
         case "failed":
-          toast.error("Bundle generation failed. The artifact is not available for download.");
+          showErrorToast("Bundle generation failed. The artifact is not available for download.");
           return;
         case "ready":
           break;
@@ -445,10 +498,10 @@ function downloadBundle(incidentId: string): void {
       a.download = `bundle-${incidentId}.json`;
       a.click();
       URL.revokeObjectURL(a.href);
-      toast.success(`Downloaded bundle-${incidentId}.json.`);
+      showSuccessToast(`bundle-${incidentId}.json downloaded successfully.`);
     })
     .catch(() => {
-      toast.error("Failed to download bundle.");
+      showErrorToast("Failed to download bundle.");
     });
 }
 
@@ -464,5 +517,5 @@ function exportIncidentsAsCsv(incidents: IncidentRecord[]): void {
   a.download = "incidents-export.csv";
   a.click();
   URL.revokeObjectURL(a.href);
-  toast.success("Incidents exported as CSV.");
+  showSuccessToast("Incidents exported successfully.");
 }

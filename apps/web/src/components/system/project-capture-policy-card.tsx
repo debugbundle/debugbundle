@@ -1,7 +1,5 @@
 import { RotateCcwIcon, ShieldCheckIcon } from "lucide-react";
 import { useEffect, useState } from "react";
-import { toast } from "sonner";
-
 import {
   getProjectCapturePolicy,
   updateProjectCapturePolicy,
@@ -12,6 +10,7 @@ import {
   type CaptureRequestEvents,
   type ProjectCapturePolicy,
 } from "../../lib/api.js";
+import { showErrorToast, showSuccessToast } from "../../lib/notify.js";
 import { Button } from "../ui/button.js";
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "../ui/card.js";
 import { Field, FieldDescription, FieldGroup, FieldLabel } from "../ui/field.js";
@@ -154,9 +153,9 @@ export function ProjectCapturePolicyCard({ projectId, organizationPlan, canEdit 
       const nextDraft = buildDraft(updatedPolicy);
       setDraft(nextDraft);
       setBaselineDraft(nextDraft);
-      toast.success("Capture policy updated.");
+      showSuccessToast("Capture policy updated successfully.");
     } catch {
-      toast.error("Could not save capture policy changes.");
+      showErrorToast("Could not save capture policy changes.");
     } finally {
       setIsSaving(false);
     }

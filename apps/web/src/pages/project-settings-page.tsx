@@ -1,8 +1,6 @@
 import { BookMarkedIcon, PencilIcon, Settings2Icon, Trash2Icon } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useOutletContext } from "react-router-dom";
-import { toast } from "sonner";
-
 import { DialogFormContent } from "../components/system/dialog-form-content.js";
 import { ProjectCapturePolicyCard } from "../components/system/project-capture-policy-card.js";
 import type { ProjectContext } from "../components/system/project-layout.js";
@@ -27,6 +25,7 @@ import {
   deleteProject,
   updateProject
 } from "../lib/api.js";
+import { showErrorToast, showSuccessToast } from "../lib/notify.js";
 import { CUSTOM_PROJECT_ENVIRONMENT_VALUE, PROJECT_ENVIRONMENT_OPTIONS } from "../lib/project-form.js";
 
 export function ProjectSettingsPage(): JSX.Element {
@@ -81,13 +80,13 @@ export function ProjectSettingsPage(): JSX.Element {
       });
       onProjectUpdated(updatedProject);
       setIsEditOpen(false);
-      toast.success("Project updated.");
+      showSuccessToast("Project updated successfully.");
     } catch (error) {
       if (error instanceof Error && error.message === "project_slug_taken") {
-        setErrorMessage("That project slug is already in use in this organization.");
+        setErrorMessage("That project slug is already in use in this workspace.");
       } else {
         setErrorMessage("Could not save project changes.");
-        toast.error("Could not save project changes.");
+        showErrorToast("Could not save project changes.");
       }
     } finally {
       setIsSaving(false);
@@ -101,11 +100,11 @@ export function ProjectSettingsPage(): JSX.Element {
     try {
       await deleteProject(project.project_id);
       setIsDeleteDialogOpen(false);
-      toast.success("Project deleted.");
+      showSuccessToast("Project deleted successfully.");
       void navigate("/projects", { replace: true });
     } catch {
       setDeleteErrorMessage("Could not delete this project.");
-      toast.error("Could not delete this project.");
+      showErrorToast("Could not delete this project.");
     } finally {
       setIsDeleting(false);
     }
@@ -159,7 +158,7 @@ export function ProjectSettingsPage(): JSX.Element {
         <Card>
           <CardHeader>
             <CardTitle>Install guidance entry point</CardTitle>
-            <CardDescription>Use this page as the project-level starting point before moving into credential or automation-specific setup surfaces.</CardDescription>
+            <CardDescription>Start here before setting up tokens, alerts, webhooks, or GitHub automation.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="rounded-lg border border-border/80 bg-background/60 p-4 text-sm text-muted-foreground">
@@ -168,7 +167,7 @@ export function ProjectSettingsPage(): JSX.Element {
                 Install guidance entry point
               </div>
               <p className="mt-2 leading-6">
-                Start with project tokens for SDK installation, then move into alerts, webhooks, and GitHub automation once ingestion is in place. This page stays intentionally light until the dedicated install guidance slice lands.
+                Start with project tokens for SDK setup, then move into alerts, webhooks, and GitHub automation once ingestion is running.
               </p>
             </div>
             <div className="flex flex-wrap gap-2">
@@ -191,7 +190,7 @@ export function ProjectSettingsPage(): JSX.Element {
         <Card className="border-destructive/25 bg-destructive/5">
           <CardHeader>
             <CardTitle>Destructive actions</CardTitle>
-            <CardDescription>High-risk actions stay visually separate so operators do not confuse project maintenance with irreversible operations.</CardDescription>
+            <CardDescription>Keep destructive actions separate from routine project changes.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="rounded-lg border border-destructive/25 bg-background/70 p-4 text-sm text-muted-foreground">
@@ -200,7 +199,7 @@ export function ProjectSettingsPage(): JSX.Element {
                 Delete this project
               </div>
               <p className="mt-2 leading-6">
-                Deleting a project removes its incidents, tokens, alerts, webhooks, and related debugging data for this organization.
+                Deleting a project removes its incidents, tokens, alerts, webhooks, and related debugging data for this workspace.
               </p>
             </div>
             <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>

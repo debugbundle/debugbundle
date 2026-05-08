@@ -1,8 +1,6 @@
 import { BellRingIcon, PlusIcon, Trash2Icon } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useOutletContext } from "react-router-dom";
-import { toast } from "sonner";
-
 import { DialogFormContent } from "../components/system/dialog-form-content.js";
 import { ProjectResourceEmptyState } from "../components/system/project-resource-empty-state.js";
 import type { ProjectContext } from "../components/system/project-layout.js";
@@ -33,6 +31,8 @@ import {
   type AlertConditionType,
   type AlertRecord
 } from "../lib/api.js";
+import { showErrorToast, showSuccessToast } from "../lib/notify.js";
+import { useDelayedVisibility } from "../lib/use-delayed-visibility.js";
 
 const TEAM_ALERT_CHANNEL_OPTIONS: Array<{ value: AlertChannel; label: string }> = [
   { value: "email", label: "Email" },
@@ -64,6 +64,7 @@ const SEVERITY_OPTIONS: Array<{ value: "" | "low" | "medium" | "high" | "critica
 export function ProjectAlertsPage(): JSX.Element {
   const { project, projectId } = useOutletContext<ProjectContext>();
   const [alerts, setAlerts] = useState<AlertRecord[] | null>(null);
+  const showAlertsLoading = useDelayedVisibility(alerts === null);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [channel, setChannel] = useState<AlertChannel>("email");
   const [conditionType, setConditionType] = useState<AlertConditionType>("new_incident");
@@ -94,7 +95,7 @@ export function ProjectAlertsPage(): JSX.Element {
     const config = buildAlertConfig(channel, destinationUrl.trim());
 
     if (config === null) {
-      toast.error("Add a destination URL for this alert channel.");
+      showErrorToast("Add a destination URL for this alert channel.");
       return;
     }
 
@@ -126,9 +127,9 @@ export function ProjectAlertsPage(): JSX.Element {
       setSeverityMin("");
       setDestinationUrl("");
       setIsCreateOpen(false);
-      toast.success("Alert rule created.");
+      showSuccessToast("Alert rule created successfully.");
     } catch {
-      toast.error("Could not create alert rule.");
+      showErrorToast("Could not create alert rule.");
     }
   }
 
@@ -136,9 +137,9 @@ export function ProjectAlertsPage(): JSX.Element {
     try {
       await deleteAlert(alertId);
       setAlerts((current) => (current ?? []).filter((a) => a.alert_id !== alertId));
-      toast.success("Alert rule deleted.");
+      showSuccessToast("Alert rule deleted successfully.");
     } catch {
-      toast.error("Could not delete alert rule.");
+      showErrorToast("Could not delete alert rule.");
     }
   }
 
@@ -231,19 +232,21 @@ export function ProjectAlertsPage(): JSX.Element {
         <Card>
           <CardHeader>
             <CardTitle>Alert rules</CardTitle>
-            <CardDescription>Project-scoped rules that fan incident lifecycle changes into external channels.</CardDescription>
+            <CardDescription>Rules for sending incident events to external channels.</CardDescription>
           </CardHeader>
           <CardContent>
             {alerts === null ? (
-              <div className="space-y-3">
-                <Skeleton className="h-12 w-full" />
-                <Skeleton className="h-12 w-full" />
-              </div>
+              showAlertsLoading ? (
+                <div className="space-y-3">
+                  <Skeleton className="h-12 w-full" />
+                  <Skeleton className="h-12 w-full" />
+                </div>
+              ) : null
             ) : alerts.length === 0 ? (
               <ProjectResourceEmptyState
                 icon={BellRingIcon}
                 title="No alert rules yet"
-                description="Create a rule to route incident lifecycle changes into the channels your project team actively watches."
+                description="Create a rule to send incident events where your team will see them."
                 actionLabel="Create alert rule"
                 onAction={() => setIsCreateOpen(true)}
               />
@@ -300,16 +303,16 @@ export function ProjectAlertsPage(): JSX.Element {
         <Card>
           <CardHeader>
             <CardTitle>Alert rule guidance</CardTitle>
-            <CardDescription>Keep project automation explicit and route-specific as alert coverage expands.</CardDescription>
+            <CardDescription>Use a small set of clear rules with specific conditions and destinations.</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="rounded-lg border border-border/80 bg-background/60 p-4 text-sm text-muted-foreground">
               <div className="flex items-center gap-2 font-medium text-foreground">
                 <BellRingIcon className="size-4" />
-                Current slice scope
+                Getting started
               </div>
               <p className="mt-2 leading-6">
-                This surface focuses on project alert inventory and first-rule creation. Update, delete, and richer channel-specific configuration can layer in later slices without changing the current route model.
+                Start with the key incident events and add more rules only when they map to a clear response path.
               </p>
             </div>
           </CardContent>

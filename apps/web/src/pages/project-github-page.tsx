@@ -1,8 +1,6 @@
 import { PencilIcon, PlusIcon } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link, useOutletContext } from "react-router-dom";
-import { toast } from "sonner";
-
 import { CalloutCard } from "../components/system/callout-card.js";
 import { DialogFormContent } from "../components/system/dialog-form-content.js";
 import { GitHubMark } from "../components/system/github-mark.js";
@@ -16,6 +14,7 @@ import { Field, FieldDescription, FieldGroup, FieldLabel } from "../components/u
 import { Input } from "../components/ui/input.js";
 import { Skeleton } from "../components/ui/skeleton.js";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../components/ui/table.js";
+import { useDelayedVisibility } from "../lib/use-delayed-visibility.js";
 import {
   createProjectGitHubRule,
   deleteProjectGitHubRule,
@@ -34,6 +33,7 @@ import {
   type GitHubRepositoryRecord,
   type ProjectGitHubRepoRecord
 } from "../lib/api.js";
+import { showErrorToast, showSuccessToast } from "../lib/notify.js";
 
 interface GitHubSettingsState {
   installation: GitHubInstallationRecord | null;
@@ -56,6 +56,7 @@ export function ProjectGitHubPage(): JSX.Element {
   const { session } = useSession();
   const [githubSettings, setGitHubSettings] = useState<GitHubSettingsState | null>(null);
   const [githubErrorMessage, setGitHubErrorMessage] = useState<string | null>(null);
+  const showGitHubSettingsLoading = useDelayedVisibility(githubSettings === null && githubErrorMessage === null);
   const [retryingDeliveryId, setRetryingDeliveryId] = useState<string | null>(null);
   const [selectedRepositoryFullName, setSelectedRepositoryFullName] = useState("");
   const [isConnectingRepository, setIsConnectingRepository] = useState(false);
@@ -158,9 +159,9 @@ export function ProjectGitHubPage(): JSX.Element {
           deliveries: current.deliveries.map((entry) => (entry.delivery_id === deliveryId ? delivery : entry))
         };
       });
-      toast.success("GitHub delivery retried.");
+      showSuccessToast("GitHub delivery retried successfully.");
     } catch {
-      toast.error("Could not retry GitHub delivery.");
+      showErrorToast("Could not retry GitHub delivery.");
     } finally {
       setRetryingDeliveryId(null);
     }
@@ -190,9 +191,9 @@ export function ProjectGitHubPage(): JSX.Element {
               rules: nextRules
             }
       );
-      toast.success("GitHub repository connected.");
+      showSuccessToast("GitHub repository connected successfully.");
     } catch {
-      toast.error("Could not connect the GitHub repository.");
+      showErrorToast("Could not connect the GitHub repository.");
     } finally {
       setIsConnectingRepository(false);
     }
@@ -204,9 +205,9 @@ export function ProjectGitHubPage(): JSX.Element {
     try {
       await removeProjectGitHubRepo(project.project_id);
       setGitHubSettings((current) => (current === null ? current : { ...current, repo: null, rules: [], deliveries: [] }));
-      toast.success("GitHub repository removed.");
+      showSuccessToast("GitHub repository removed successfully.");
     } catch {
-      toast.error("Could not remove the GitHub repository.");
+      showErrorToast("Could not remove the GitHub repository.");
     } finally {
       setIsRemovingRepository(false);
     }
@@ -217,7 +218,7 @@ export function ProjectGitHubPage(): JSX.Element {
 
     const cooldownSeconds = Number.parseInt(ruleCooldownSeconds, 10);
     if (Number.isNaN(cooldownSeconds)) {
-      toast.error("Cooldown seconds must be a valid number.");
+      showErrorToast("Cooldown seconds must be a valid number.");
       return;
     }
 
@@ -237,7 +238,7 @@ export function ProjectGitHubPage(): JSX.Element {
       if (editingRuleId === null) {
         const createdRule = await createProjectGitHubRule(project.project_id, payload);
         setGitHubSettings((current) => (current === null ? current : { ...current, rules: [...current.rules, createdRule] }));
-        toast.success("GitHub dispatch rule created.");
+        showSuccessToast("GitHub dispatch rule created successfully.");
       } else {
         const updatedRule = await updateProjectGitHubRule(project.project_id, editingRuleId, payload);
         setGitHubSettings((current) =>
@@ -245,12 +246,12 @@ export function ProjectGitHubPage(): JSX.Element {
             ? current
             : { ...current, rules: current.rules.map((rule) => (rule.rule_id === editingRuleId ? updatedRule : rule)) }
         );
-        toast.success("GitHub dispatch rule updated.");
+        showSuccessToast("GitHub dispatch rule updated successfully.");
       }
 
       setIsCreateRuleOpen(false);
     } catch {
-      toast.error(editingRuleId === null ? "Could not create the GitHub dispatch rule." : "Could not update the GitHub dispatch rule.");
+      showErrorToast(editingRuleId === null ? "Could not create the GitHub dispatch rule." : "Could not update the GitHub dispatch rule.");
     }
   }
 
@@ -286,9 +287,9 @@ export function ProjectGitHubPage(): JSX.Element {
       setGitHubSettings((current) =>
         current === null ? current : { ...current, rules: current.rules.filter((rule) => rule.rule_id !== ruleId) }
       );
-      toast.success("GitHub dispatch rule deleted.");
+      showSuccessToast("GitHub dispatch rule deleted successfully.");
     } catch {
-      toast.error("Could not delete the GitHub dispatch rule.");
+      showErrorToast("Could not delete the GitHub dispatch rule.");
     } finally {
       setActiveRuleDeleteId(null);
     }
@@ -306,7 +307,7 @@ export function ProjectGitHubPage(): JSX.Element {
             <CalloutCard
               eyebrow="Paid plan"
               title="Upgrade to Solo or Team to connect GitHub automation"
-              description="GitHub automation is reserved for paid organizations. Upgrade before connecting a repository, creating dispatch rules, or retrying failed deliveries from this project."
+              description="GitHub automation is available on paid plans. Upgrade before connecting a repository, creating dispatch rules, or retrying failed deliveries from this project."
               tone="neutral"
             >
               <div className="flex flex-wrap gap-2">
@@ -323,16 +324,18 @@ export function ProjectGitHubPage(): JSX.Element {
               tone="warning"
             />
           ) : githubSettings === null ? (
-            <div className="space-y-3">
-              <Skeleton className="h-16 w-full" />
-              <Skeleton className="h-12 w-full" />
-              <Skeleton className="h-28 w-full" />
-            </div>
+            showGitHubSettingsLoading ? (
+              <div className="space-y-3">
+                <Skeleton className="h-16 w-full" />
+                <Skeleton className="h-12 w-full" />
+                <Skeleton className="h-28 w-full" />
+              </div>
+            ) : null
           ) : githubSettings.installation === null ? (
             <CalloutCard
               eyebrow="Setup required"
               title="Connect the GitHub App to start automation"
-              description="No GitHub App installation is connected for this organization yet. Complete the GitHub App install flow first, then return here to assign a repository and manage dispatch rules."
+              description="No GitHub App installation is connected to this workspace yet. Complete the install flow, then return here to assign a repository and manage dispatch rules."
               tone="neutral"
             />
           ) : (

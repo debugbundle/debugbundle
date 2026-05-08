@@ -1,7 +1,5 @@
 import { CreditCardIcon } from "lucide-react";
 import { useEffect, useState } from "react";
-import { toast } from "sonner";
-
 import { CalloutCard } from "../components/system/callout-card.js";
 import { PageHeader } from "../components/system/page-header.js";
 import { PlanBadge } from "../components/system/plan-badge.js";
@@ -21,6 +19,8 @@ import {
   startBillingCheckout,
   type BillingSummaryRecord
 } from "../lib/api.js";
+import { showErrorToast, showSuccessToast } from "../lib/notify.js";
+import { useDelayedVisibility } from "../lib/use-delayed-visibility.js";
 import { useSession } from "../lib/session.js";
 
 interface CapacityDialogProps {
@@ -62,14 +62,14 @@ function CapacityDialog(props: CapacityDialogProps): JSX.Element {
     try {
       const nextBilling = await increaseBillingCapacity(parsedIncreaseTarget);
       props.onBillingChange(nextBilling);
-      toast.success("Allowance capacity increased.");
+      showSuccessToast("Allowance capacity increased successfully.");
     } catch (error) {
       if (error instanceof Error && error.message === "pending_capacity_reduction_exists") {
-        toast.error("Cancel the scheduled reduction before adding more capacity units.");
+        showErrorToast("Cancel the scheduled reduction before adding more capacity units.");
       } else if (error instanceof Error && error.message === "invalid_target_quantity") {
-        toast.error("Choose a unit count above your current purchased quantity.");
+        showErrorToast("Choose a unit count above your current purchased quantity.");
       } else {
-        toast.error("Could not update allowance capacity right now.");
+        showErrorToast("Could not update allowance capacity right now.");
       }
     } finally {
       setActiveAction(null);
@@ -86,12 +86,12 @@ function CapacityDialog(props: CapacityDialogProps): JSX.Element {
     try {
       const nextBilling = await scheduleBillingCapacityReduction(parsedReductionTarget);
       props.onBillingChange(nextBilling);
-      toast.success("Capacity reduction scheduled for the next renewal.");
+      showSuccessToast("Capacity reduction scheduled successfully.");
     } catch (error) {
       if (error instanceof Error && error.message === "invalid_target_quantity") {
-        toast.error("Choose a unit count below your current purchased quantity.");
+        showErrorToast("Choose a unit count below your current purchased quantity.");
       } else {
-        toast.error("Could not schedule the capacity reduction.");
+        showErrorToast("Could not schedule the capacity reduction.");
       }
     } finally {
       setActiveAction(null);
@@ -104,9 +104,9 @@ function CapacityDialog(props: CapacityDialogProps): JSX.Element {
     try {
       const nextBilling = await cancelBillingCapacityReduction();
       props.onBillingChange(nextBilling);
-      toast.success("Scheduled capacity reduction cancelled.");
+      showSuccessToast("Scheduled capacity reduction cancelled successfully.");
     } catch {
-      toast.error("Could not cancel the scheduled reduction.");
+      showErrorToast("Could not cancel the scheduled reduction.");
     } finally {
       setActiveAction(null);
     }
@@ -266,6 +266,7 @@ export function BillingPage(): JSX.Element {
   const [activeCheckoutPlan, setActiveCheckoutPlan] = useState<"solo" | "team" | null>(null);
   const [isOpeningPortal, setIsOpeningPortal] = useState(false);
   const [isCapacityDialogOpen, setIsCapacityDialogOpen] = useState(false);
+  const showBillingLoading = useDelayedVisibility(billing === null && !isForbidden);
 
   useEffect(() => {
     void (async () => {
@@ -290,7 +291,7 @@ export function BillingPage(): JSX.Element {
       const url = await startBillingCheckout(targetPlan);
       window.location.assign(url);
     } catch {
-      toast.error("Billing checkout is unavailable right now.");
+      showErrorToast("Billing checkout is unavailable right now.");
     } finally {
       setActiveCheckoutPlan(null);
     }
@@ -303,7 +304,7 @@ export function BillingPage(): JSX.Element {
       const url = await openBillingPortal();
       window.location.assign(url);
     } catch {
-      toast.error("Subscription management is unavailable right now.");
+      showErrorToast("Subscription management is unavailable right now.");
     } finally {
       setIsOpeningPortal(false);
     }
@@ -320,21 +321,23 @@ export function BillingPage(): JSX.Element {
         <CalloutCard
           eyebrow="Owner scope"
           title="Owner permissions are required to manage billing"
-          description="Members can keep using incidents, projects, tokens, and organization read surfaces, but billing stays owner-scoped."
+          description="Members can keep using incidents, projects, and tokens, but billing stays owner-only."
           tone="warning"
         />
       ) : billing === null ? (
-        <div className="space-y-4">
-          <Skeleton className="h-28 w-full" />
-          <Skeleton className="h-48 w-full" />
-        </div>
+        showBillingLoading ? (
+          <div className="space-y-4">
+            <Skeleton className="h-28 w-full" />
+            <Skeleton className="h-48 w-full" />
+          </div>
+        ) : null
       ) : (
         <>
           {!canChangeBilling ? (
             <CalloutCard
               eyebrow="Verification required"
               title="Verify your email before enabling billing changes"
-              description="You can review plan and allowance details now, but Stripe-hosted upgrade and subscription changes stay disabled until email sign-in verification is complete. Sign in again with a fresh code if this session is still unverified."
+              description="You can review billing now, but upgrades and subscription changes stay disabled until your email is verified."
               tone="warning"
             />
           ) : null}
@@ -343,7 +346,7 @@ export function BillingPage(): JSX.Element {
             <Card>
               <CardHeader>
                 <CardTitle>Current plan</CardTitle>
-                <CardDescription>Plan entitlement and shared allowance capacity for this account.</CardDescription>
+                <CardDescription>Current plan and allowance capacity for this account.</CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
                 <div className="flex flex-wrap items-center justify-between gap-4">
@@ -389,13 +392,13 @@ export function BillingPage(): JSX.Element {
                 <div className="grid gap-4 md:grid-cols-2">
                   <CalloutCard
                     eyebrow="Allowance units"
-                    title="Capacity expands shared hosted allowance"
-                    description={`Projects stay unlimited. This account currently has ${formatActiveProjectCount(billing.active_projects)}. Included and purchased units expand the shared monthly allowance pool.`}
+                    title="Allowance capacity"
+                    description={`Projects stay unlimited. This account currently has ${formatActiveProjectCount(billing.active_projects)}. Included and purchased units expand the shared monthly allowance.`}
                     tone="neutral"
                   />
                   <CalloutCard
                     eyebrow="Usage window"
-                    title="Shared account allowance"
+                    title="Billing window"
                     description={`Current window: ${formatDate(billing.usage_window.starts_at)} to ${formatDate(billing.usage_window.ends_at)}.`}
                     tone="neutral"
                   />
@@ -405,7 +408,7 @@ export function BillingPage(): JSX.Element {
                   <CalloutCard
                     eyebrow="Scheduled reduction"
                     title={`Dropping to ${pendingReduction.total} total units on ${formatDate(pendingReduction.effective_at)}`}
-                    description={`Project availability stays unlimited. After renewal, you will keep ${pendingReduction.additional_purchased} purchased units and the shared allowance pool will shrink accordingly.`}
+                    description={`Projects stay unlimited. After renewal, you will keep ${pendingReduction.additional_purchased} purchased units and the shared allowance will shrink.`}
                     tone="neutral"
                   />
                 )}
@@ -416,7 +419,7 @@ export function BillingPage(): JSX.Element {
               <CardHeader className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                 <div className="space-y-1.5">
                   <CardTitle>Allowance capacity</CardTitle>
-                  <CardDescription>Included and purchased units determine the size of the pooled hosted allowance.</CardDescription>
+                  <CardDescription>Included and purchased units set the size of the hosted allowance.</CardDescription>
                 </div>
                 {billing.plan === "free" ? null : (
                   <CapacityDialog
@@ -458,7 +461,7 @@ export function BillingPage(): JSX.Element {
           <Card>
             <CardHeader>
               <CardTitle>Allowance usage</CardTitle>
-              <CardDescription>Shared monthly usage pooled across the full account.</CardDescription>
+              <CardDescription>Monthly usage across the full account.</CardDescription>
             </CardHeader>
             <CardContent className="grid gap-5 lg:grid-cols-2">
               <UsageMeter
@@ -471,25 +474,25 @@ export function BillingPage(): JSX.Element {
                 label="Raw ingested events"
                 used={billing.allowances.monthly_raw_ingested_events.used}
                 limit={billing.allowances.monthly_raw_ingested_events.limit}
-                description="Accepted event volume contributing to the shared hosted allowance."
+                description="Accepted event volume counting against the shared allowance."
               />
               <UsageMeter
                 label="Retained bundles"
                 used={billing.allowances.retained_bundle_cap.used}
                 limit={billing.allowances.retained_bundle_cap.limit}
-                description="Current retained bundle inventory across the account."
+                description="Current retained bundle inventory for the account."
               />
               <UsageMeter
                 label="Remote activations"
                 used={billing.allowances.monthly_remote_activations.used}
                 limit={billing.allowances.monthly_remote_activations.limit}
-                description="Remote probe activations issued in the current month."
+                description="Remote probe activations issued this month."
               />
               <UsageMeter
                 label="Alert deliveries"
                 used={billing.allowances.monthly_alert_deliveries.used}
                 limit={billing.allowances.monthly_alert_deliveries.limit}
-                description="Alert fanout volume delivered during the current month."
+                description="Alert deliveries sent this month."
               />
             </CardContent>
           </Card>

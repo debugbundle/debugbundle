@@ -1225,7 +1225,12 @@ function isArtifactPendingOrFailedResponse(value: unknown): value is { status: "
   return status === "pending" || status === "failed";
 }
 
-export async function listProjectIncidents(projectId: string, limit = 50, cursor?: string): Promise<{ incidents: IncidentRecord[]; nextCursor: string | null }> {
+export async function listProjectIncidents(
+  projectId: string,
+  limit = 50,
+  cursor?: string,
+  status?: IncidentRecord["status"]
+): Promise<{ incidents: IncidentRecord[]; nextCursor: string | null }> {
   const searchParams = new URLSearchParams({
     project_id: projectId,
     limit: String(limit)
@@ -1233,6 +1238,9 @@ export async function listProjectIncidents(projectId: string, limit = 50, cursor
 
   if (cursor !== undefined) {
     searchParams.set("cursor", cursor);
+  }
+  if (status !== undefined) {
+    searchParams.set("status", status);
   }
 
   const body = await readJson<{ incidents: IncidentRecord[]; next_cursor: string | null }>(

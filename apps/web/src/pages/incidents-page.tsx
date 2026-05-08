@@ -16,30 +16,52 @@ import { listIncidents, type IncidentRecord } from "../lib/api.js";
 import { useCursorPagination } from "../lib/use-cursor-pagination.js";
 
 export function IncidentsPage(): JSX.Element {
+  const [statusFilter, setStatusFilter] = useState<IncidentStatusFilter>("open");
   const [sort, setSort] = useState<SortState<IncidentSortField>>({
     field: "last_seen_at",
     direction: "desc"
   });
   const { items: incidents, isLoading, page, hasNextPage, goToNextPage, goToPreviousPage } = useCursorPagination(
     async (cursor) => {
-      const response = await listIncidents(20, cursor ?? undefined);
+      const response = await listIncidents({
+        limit: 20,
+        ...(cursor === null ? {} : { cursor }),
+        ...(statusFilter === "all" ? {} : { status: statusFilter })
+      });
       return {
         items: response.incidents,
         nextCursor: response.nextCursor
       };
     },
-    []
+    [statusFilter]
   );
 
   const sortedIncidents = useMemo(() => sortIncidents(incidents, sort), [incidents, sort]);
 
   return (
     <div className="space-y-6">
-      <PageHeader description="Grouped incident inventory across the organization. Click an incident to view its debug bundle and reproduction artifacts." />
+      <PageHeader description="Grouped incident inventory across this workspace. Open any incident to view its debug bundle and reproduction artifacts." />
 
       <Card className="min-w-0">
-        <CardHeader>
+        <CardHeader className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <CardTitle>Incident inventory</CardTitle>
+          <div className="flex items-center gap-2 sm:justify-end">
+            <label htmlFor="workspace-incidents-status-filter" className="text-sm font-medium text-foreground">
+              Status
+            </label>
+            <select
+              id="workspace-incidents-status-filter"
+              className={filterSelectClassName}
+              value={statusFilter}
+              onChange={(event) => setStatusFilter(event.currentTarget.value as IncidentStatusFilter)}
+            >
+              {INCIDENT_STATUS_FILTER_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </div>
         </CardHeader>
         <CardContent>
           <ResourceListState
@@ -57,7 +79,7 @@ export function IncidentsPage(): JSX.Element {
                     <AlertTriangleIcon />
                   </EmptyMedia>
                   <EmptyTitle>No incidents captured yet</EmptyTitle>
-                  <EmptyDescription>Incoming incidents will appear here once grouped failures are available for the organization.</EmptyDescription>
+                    <EmptyDescription>Incoming incidents will appear here once grouped failures are available for this workspace.</EmptyDescription>
                 </EmptyHeader>
                 <EmptyContent>
                   <Button asChild type="button" variant="outline">
@@ -159,6 +181,17 @@ function formatServiceName(value: string | null): string {
 }
 
 type IncidentSortField = "title" | "project_name" | "service_name" | "severity" | "status" | "occurrence_count" | "last_seen_at";
+type IncidentStatusFilter = IncidentRecord["status"] | "all";
+
+const INCIDENT_STATUS_FILTER_OPTIONS: Array<{ value: IncidentStatusFilter; label: string }> = [
+  { value: "open", label: "Open" },
+  { value: "all", label: "All statuses" },
+  { value: "resolved", label: "Resolved" },
+  { value: "regressed", label: "Regressed" }
+];
+
+const filterSelectClassName =
+  "flex h-10 min-w-40 rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:cursor-not-allowed disabled:opacity-60";
 
 function sortIncidents(incidents: IncidentRecord[] | null, sort: SortState<IncidentSortField>): IncidentRecord[] {
   if (incidents === null) {

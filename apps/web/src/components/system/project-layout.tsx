@@ -108,7 +108,7 @@ export function ProjectLayout(): JSX.Element {
     return (
       <CalloutCard
         eyebrow="Project not found"
-        title="This project is not available in the current organization"
+        title="This project is not available in the current workspace"
         description="Return to the projects inventory and choose a project that is visible to the signed-in account."
         tone="warning"
       >
