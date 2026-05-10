@@ -143,6 +143,60 @@ describe("web app - auth routes", () => {
     expect(await screen.findByText(/bundle requests/i)).toBeInTheDocument();
   });
 
+  it("validates the email field before requesting a code", async () => {
+    const user = userEvent.setup();
+    const fetchMock = vi.fn((input: RequestInfo | URL) => {
+      if (requestUrl(input).endsWith("/v1/auth/session")) {
+        return jsonResponse(401, { error: "invalid_session" });
+      }
+
+      return jsonResponse(200, { success: true });
+    });
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<App initialEntries={["/login"]} />);
+
+    const emailInput = await screen.findByLabelText(/email address/i);
+    await user.click(screen.getByRole("button", { name: /email me a code/i }));
+
+    expect(emailInput).toHaveAttribute("aria-invalid", "true");
+    expect(screen.getByText(/enter your email address to receive a sign-in code/i)).toBeInTheDocument();
+    expect(fetchMock.mock.calls.some(([input]) => requestUrl(input).endsWith("/v1/auth/request-code"))).toBe(false);
+  });
+
+  it("validates the verification code before submitting", async () => {
+    const user = userEvent.setup();
+    const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = requestUrl(input);
+
+      if (url.endsWith("/v1/auth/session")) {
+        return jsonResponse(401, { error: "invalid_session" });
+      }
+
+      if (url.endsWith("/v1/auth/request-code")) {
+        expect(init?.body).toBe(JSON.stringify({ email: "owen@example.com", accepted_terms: true }));
+        return jsonResponse(200, { success: true });
+      }
+
+      return jsonResponse(200, { success: true });
+    });
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<App initialEntries={["/login"]} />);
+
+    await user.type(await screen.findByLabelText(/email address/i), "owen@example.com");
+    await user.click(screen.getByRole("button", { name: /email me a code/i }));
+
+    const codeInput = await screen.findByLabelText(/six-digit code/i);
+    await user.click(screen.getByRole("button", { name: /continue with code/i }));
+
+    expect(codeInput).toHaveAttribute("aria-invalid", "true");
+    expect(screen.getByText(/enter the six-digit code from your email/i)).toBeInTheDocument();
+    expect(fetchMock.mock.calls.some(([input]) => requestUrl(input).endsWith("/v1/auth/verify-code"))).toBe(false);
+  });
+
   it("shows documentation in the user menu and removes the duplicate settings entry", async () => {
     const user = userEvent.setup();
     const fetchMock = vi.fn((input: RequestInfo | URL) => {

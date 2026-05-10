@@ -312,7 +312,7 @@ export function ProjectGitHubPage(): JSX.Element {
             >
               <div className="flex flex-wrap gap-2">
                 <Button asChild type="button" variant="outline" size="sm">
-                  <Link to="/settings/billing">Open billing</Link>
+                  <Link to="/billing">Open billing</Link>
                 </Button>
               </div>
             </CalloutCard>

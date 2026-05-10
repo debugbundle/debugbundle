@@ -64,7 +64,9 @@ The API must be configured with:
 | `STRIPE_SOLO_EXTRA_CAPACITY_PRICE_ID` | Price ID for Solo extra capacity |
 | `STRIPE_TEAM_EXTRA_CAPACITY_PRICE_ID` | Price ID for Team extra capacity |
 
-Legacy static URL variables (`STRIPE_SOLO_CHECKOUT_URL`, `STRIPE_TEAM_CHECKOUT_URL`, `STRIPE_CUSTOMER_PORTAL_URL`) will be replaced by dynamic session creation using the Stripe SDK.
+Hosted production deploys must source these values from `debugbundle-cloud` GitHub Actions secrets and merge them into the runtime env during deploy rather than relying on one manually maintained host-only `.env`.
+
+Legacy static URL variables (`STRIPE_SOLO_CHECKOUT_URL`, `STRIPE_TEAM_CHECKOUT_URL`, `STRIPE_CUSTOMER_PORTAL_URL`) remain local/manual fallback scaffolding only and must not be the hosted production path.
 
 ### 2.4 Price-to-Plan Mapping
 
@@ -120,12 +122,14 @@ Organizations on the `free` plan have:
 
 ### 4.1 Current State (Pre-Production)
 
-The current implementation uses static Stripe URLs from environment variables:
+The current implementation creates Stripe Checkout and portal sessions dynamically whenever the Stripe SDK is fully configured with secret and price-id env vars.
+
+Static fallback URLs still exist as a development scaffold when Stripe credentials are intentionally absent:
 - `STRIPE_SOLO_CHECKOUT_URL` → static Payment Link or Checkout URL for Solo
 - `STRIPE_TEAM_CHECKOUT_URL` → static Payment Link or Checkout URL for Team
 - `STRIPE_CUSTOMER_PORTAL_URL` → static portal link
 
-This is a development scaffold. Static URLs cannot carry the `organization_id` to Stripe, so the webhook handler cannot reliably link the resulting customer back to the correct organization.
+Those fallback URLs cannot carry the `organization_id` to Stripe, so hosted production must use dynamic session creation instead of relying on static links.
 
 ### 4.2 Production Target: Dynamic Checkout Sessions
 

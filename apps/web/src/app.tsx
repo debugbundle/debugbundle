@@ -1,5 +1,5 @@
 import { CreditCardIcon, GalleryVerticalEndIcon, KeySquareIcon, LoaderCircleIcon, PlusIcon } from "lucide-react";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { BrowserRouter, Link, MemoryRouter, Navigate, Outlet, Route, Routes, useNavigate, useSearchParams } from "react-router-dom";
 import { Toaster } from "sonner";
 
@@ -29,8 +29,9 @@ import { Button } from "./components/ui/button.js";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./components/ui/card.js";
 import { Dialog, DialogTrigger } from "./components/ui/dialog.js";
 import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "./components/ui/empty.js";
-import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from "./components/ui/field.js";
+import { Field, FieldDescription, FieldGroup, FieldLabel } from "./components/ui/field.js";
 import { Input } from "./components/ui/input.js";
+import { Notice } from "./components/ui/notice.js";
 import { Separator } from "./components/ui/separator.js";
 import { Skeleton } from "./components/ui/skeleton.js";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "./components/ui/table.js";
@@ -69,6 +70,57 @@ const PRIVACY_POLICY_URL = "https://debugbundle.com/privacy";
 
 interface AppProps {
   initialEntries?: string[];
+}
+
+type AuthStep = "request" | "verify";
+
+interface AuthFieldErrors {
+  email?: string;
+  code?: string;
+}
+
+interface AuthRequestError {
+  title: string;
+  description: string;
+}
+
+function validateEmailAddress(value: string): string | undefined {
+  if (value.length === 0) {
+    return "Enter your email address to receive a sign-in code.";
+  }
+
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) {
+    return "Enter a valid email address so we can send your code.";
+  }
+
+  return undefined;
+}
+
+function validateVerificationCode(value: string): string | undefined {
+  if (value.length === 0) {
+    return "Enter the six-digit code from your email.";
+  }
+
+  if (!/^\d{6}$/.test(value)) {
+    return "Enter all six digits from the code we sent you.";
+  }
+
+  return undefined;
+}
+
+function getAuthFieldErrors(step: AuthStep, email: string, code: string): AuthFieldErrors {
+  const emailError = validateEmailAddress(email);
+  const codeError = step === "verify" ? validateVerificationCode(code) : undefined;
+
+  return {
+    ...(emailError === undefined ? {} : { email: emailError }),
+    ...(codeError === undefined ? {} : { code: codeError })
+  };
+}
+
+function omitAuthFieldError(errors: AuthFieldErrors, field: keyof AuthFieldErrors): AuthFieldErrors {
+  const { [field]: _removed, ...remaining } = errors;
+  return remaining;
 }
 
 export function App({ initialEntries }: AppProps): JSX.Element {
@@ -322,7 +374,7 @@ function AuthLayout({
         </Card>
 
         <FieldDescription className="px-6 text-center text-balance">
-          By clicking continue, you agree to our{" "}
+          By continuing, you agree to our{" "}
           <a href={TERMS_OF_SERVICE_URL} className="underline underline-offset-4 hover:text-foreground" target="_blank" rel="noreferrer">
             Terms of Service
           </a>{" "}
@@ -373,50 +425,105 @@ function EmailAuthPage({
 }): JSX.Element {
   const { session, setSession } = useSession();
   const navigate = useNavigate();
+  const emailInputRef = useRef<HTMLInputElement>(null);
+  const codeInputRef = useRef<HTMLInputElement>(null);
   const [email, setEmail] = useState("");
   const [code, setCode] = useState("");
-  const [step, setStep] = useState<"request" | "verify">("request");
-  const [error, setError] = useState<string | null>(null);
+  const [step, setStep] = useState<AuthStep>("request");
+  const [fieldErrors, setFieldErrors] = useState<AuthFieldErrors>({});
+  const [requestError, setRequestError] = useState<AuthRequestError | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   if (session !== null) {
     return <Navigate replace to="/dashboard" />;
   }
 
+  function focusFirstInvalidField(errors: AuthFieldErrors): void {
+    if (errors.email !== undefined) {
+      emailInputRef.current?.focus();
+      return;
+    }
+
+    if (errors.code !== undefined) {
+      codeInputRef.current?.focus();
+    }
+  }
+
+  function clearFieldError(field: keyof AuthFieldErrors): void {
+    setFieldErrors((current) => (current[field] === undefined ? current : omitAuthFieldError(current, field)));
+  }
+
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>): Promise<void> {
     event.preventDefault();
-    setError(null);
+    const normalizedEmail = email.trim();
+    const normalizedCode = code.trim();
+    const nextFieldErrors = getAuthFieldErrors(step, normalizedEmail, normalizedCode);
+
+    setFieldErrors(nextFieldErrors);
+    setRequestError(null);
+    setEmail(normalizedEmail);
+    setCode(normalizedCode);
+
+    if (nextFieldErrors.email !== undefined || nextFieldErrors.code !== undefined) {
+      focusFirstInvalidField(nextFieldErrors);
+      return;
+    }
+
     setIsSubmitting(true);
 
     try {
       if (step === "request") {
-        await requestEmailCode({ email, accepted_terms: true });
+        await requestEmailCode({ email: normalizedEmail, accepted_terms: true });
         setStep("verify");
         setCode("");
         showSuccessToast("Sign-in code sent successfully.");
       } else {
-        const nextSession = await verifyEmailCode({ email, code });
+        const nextSession = await verifyEmailCode({ email: normalizedEmail, code: normalizedCode });
         setSession(nextSession);
         showSuccessToast("Signed in successfully.");
         void navigate("/dashboard", { replace: true });
       }
     } catch {
-      setError(step === "request" ? "We could not send a sign-in code. Try again." : "That code is invalid or expired. Request a new code and try again.");
+      setRequestError(
+        step === "request"
+          ? {
+              title: "Code could not be sent",
+              description: "We could not send a sign-in code right now. Check the address and try again."
+            }
+          : {
+              title: "Code was not accepted",
+              description: "That code is invalid or expired. Request a new code and try again."
+            }
+      );
     } finally {
       setIsSubmitting(false);
     }
   }
 
   async function handleResendCode(): Promise<void> {
-    setError(null);
+    const normalizedEmail = email.trim();
+    const nextFieldErrors = getAuthFieldErrors("request", normalizedEmail, code);
+
+    setFieldErrors(nextFieldErrors);
+    setRequestError(null);
+    setEmail(normalizedEmail);
+
+    if (nextFieldErrors.email !== undefined) {
+      focusFirstInvalidField(nextFieldErrors);
+      return;
+    }
+
     setIsSubmitting(true);
 
     try {
-      await requestEmailCode({ email, accepted_terms: true });
+      await requestEmailCode({ email: normalizedEmail, accepted_terms: true });
       setCode("");
       showSuccessToast("New sign-in code sent successfully.");
     } catch {
-      setError("We could not resend the sign-in code. Try again.");
+      setRequestError({
+        title: "Code could not be resent",
+        description: "We could not resend the sign-in code right now. Try again in a moment."
+      });
     } finally {
       setIsSubmitting(false);
     }
@@ -425,8 +532,13 @@ function EmailAuthPage({
   function handleUseDifferentEmail(): void {
     setStep("request");
     setCode("");
-    setError(null);
+    setFieldErrors({});
+    setRequestError(null);
   }
+
+  const emailErrorId = fieldErrors.email === undefined ? undefined : "email-auth-email-error";
+  const codeErrorId = fieldErrors.code === undefined ? undefined : "email-auth-code-error";
+  const requestErrorId = requestError === null ? undefined : "email-auth-request-error";
 
   return (
     <AuthLayout title={title} heading={heading} description={description}>
@@ -436,23 +548,34 @@ function EmailAuthPage({
             <GithubLink />
           </Field>
           <AuthMethodDivider />
-          <Field>
+          <div className="space-y-1">
+            <p className="text-sm font-medium">Continue with email</p>
+            <FieldDescription>We&apos;ll send a six-digit code so you can sign in without a password.</FieldDescription>
+          </div>
+          <Field data-invalid={fieldErrors.email !== undefined || undefined}>
             <FieldLabel htmlFor="email-auth-email">
               Email<span className="sr-only"> address</span>
             </FieldLabel>
             <Input
+              ref={emailInputRef}
               id="email-auth-email"
               type="email"
               autoComplete="email"
               value={email}
+              aria-invalid={fieldErrors.email !== undefined || undefined}
+              aria-describedby={emailErrorId}
               disabled={step === "verify"}
-              onChange={(event) => setEmail(event.currentTarget.value)}
+              onChange={(event) => {
+                setEmail(event.currentTarget.value);
+                clearFieldError("email");
+                setRequestError(null);
+              }}
             />
-            {step === "request" ? (
-              <FieldDescription>
-                We&apos;ll email you a six-digit code.
-              </FieldDescription>
-            ) : null}
+            {fieldErrors.email === undefined ? null : (
+              <Notice id={emailErrorId} tone="destructive">
+                {fieldErrors.email}
+              </Notice>
+            )}
           </Field>
           {step === "verify" ? (
             <CalloutCard
@@ -463,21 +586,37 @@ function EmailAuthPage({
             />
           ) : null}
           {step === "verify" ? (
-            <Field>
+            <Field data-invalid={fieldErrors.code !== undefined || undefined}>
               <FieldLabel htmlFor="email-auth-code">Six-digit code</FieldLabel>
               <Input
+                ref={codeInputRef}
                 id="email-auth-code"
                 inputMode="numeric"
                 autoComplete="one-time-code"
                 value={code}
-                onChange={(event) => setCode(event.currentTarget.value.replace(/\D+/g, "").slice(0, 6))}
+                aria-invalid={fieldErrors.code !== undefined || undefined}
+                aria-describedby={codeErrorId}
+                onChange={(event) => {
+                  setCode(event.currentTarget.value.replace(/\D+/g, "").slice(0, 6));
+                  clearFieldError("code");
+                  setRequestError(null);
+                }}
               />
               <FieldDescription>Codes expire quickly. Request a new one if you switch emails or wait too long.</FieldDescription>
+              {fieldErrors.code === undefined ? null : (
+                <Notice id={codeErrorId} tone="destructive">
+                  {fieldErrors.code}
+                </Notice>
+              )}
             </Field>
           ) : null}
-          {error === null ? null : <FieldError>{error}</FieldError>}
+          {requestError === null ? null : (
+            <Notice id={requestErrorId} tone="destructive" title={requestError.title}>
+              {requestError.description}
+            </Notice>
+          )}
           <Field>
-            <Button type="submit" className="w-full" disabled={isSubmitting}>
+            <Button type="submit" className="w-full" disabled={isSubmitting} aria-describedby={requestErrorId}>
               {isSubmitting ? <LoaderCircleIcon className="animate-spin" /> : null}
               {step === "request" ? "Email me a code" : "Continue with code"}
             </Button>
@@ -505,11 +644,11 @@ function LoginPage(): JSX.Element {
   return (
     <EmailAuthPage
       title="Continue to DebugBundle"
-      heading="Continue with email"
-      description="Use a one-time email code for browser access."
-      alternatePrompt="Need the signup route instead?"
+      heading="Continue to DebugBundle"
+      description="Choose a login option below to access your account."
+      alternatePrompt="Don't have an account?"
       alternateLinkHref="/signup"
-      alternateLinkLabel="Open sign up"
+      alternateLinkLabel="Sign up here"
     />
   );
 }
@@ -518,11 +657,11 @@ function SignupPage(): JSX.Element {
   return (
     <EmailAuthPage
       title="Create your DebugBundle account"
-      heading="Continue with email"
-      description="Use a one-time email code to join the private launch and start a browser session."
-      alternatePrompt="Already have an account route handy?"
+      heading="Create your DebugBundle account"
+      description="Choose a sign up option below to create your account."
+      alternatePrompt="Already have an account?"
       alternateLinkHref="/login"
-      alternateLinkLabel="Open login"
+      alternateLinkLabel="Login here"
     />
   );
 }

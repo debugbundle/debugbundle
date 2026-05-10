@@ -745,6 +745,33 @@ describe("web app — management routes", () => {
     expect(screen.getByText(/set github_app_id, github_app_private_key, and github_app_webhook_secret/i)).toBeInTheDocument();
   });
 
+  it("routes free-plan github automation upsells to billing", async () => {
+    const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = requestUrl(input);
+
+      if (url.endsWith("/v1/auth/session")) {
+        return jsonResponse(200, {
+          session: createSession({ organization_plan: "free" })
+        });
+      }
+
+      if (url.endsWith("/v1/projects") && init?.method === undefined) {
+        return jsonResponse(200, {
+          projects: [createProject({ organization_plan: "free" })]
+        });
+      }
+
+      return jsonResponse(404, { error: "not_found" });
+    });
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<App initialEntries={["/projects/proj_123/github"]} />);
+
+    expect(await screen.findByText(/upgrade to solo or team to connect github automation/i)).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /open billing/i })).toHaveAttribute("href", "/billing");
+  });
+
   it("lets owners connect and remove a github repository from the project github page", async () => {
     const user = userEvent.setup();
     const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
