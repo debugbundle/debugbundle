@@ -74,6 +74,10 @@ function buildGitHubHeaders(authorization: string): HeadersInit {
   };
 }
 
+function normalizeGitHubPrivateKey(value: string): string {
+  return value.includes("\\n") ? value.replace(/\\n/g, "\n") : value;
+}
+
 export interface GitHubAppClient {
   getInstallation(input: { installationId: number }): Promise<{
     installation_id: number;
@@ -209,7 +213,7 @@ export function createGitHubAppClientFromEnv(env: Record<string, string | undefi
 
   return createGitHubAppClient({
     appId,
-    privateKey,
+    privateKey: normalizeGitHubPrivateKey(privateKey),
     webhookSecret,
     ...(apiBaseUrl ? { apiBaseUrl } : {})
   });

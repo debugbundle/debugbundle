@@ -457,6 +457,10 @@ function buildGitHubAppJwt(appId: string, privateKeyPem: string, now: Date): str
   return `${signingInput}.${signature.toString("base64url")}`;
 }
 
+function normalizeGitHubPrivateKey(value: string): string {
+  return value.includes("\\n") ? value.replace(/\\n/g, "\n") : value;
+}
+
 export function createGitHubDispatchTransport(input: {
   appId: string;
   privateKey: string;
@@ -468,6 +472,7 @@ export function createGitHubDispatchTransport(input: {
   const fetchImpl = input.fetchImpl ?? fetch;
   const now = input.now ?? (() => new Date());
   const createAppJwt = input.createAppJwt ?? buildGitHubAppJwt;
+  const normalizedPrivateKey = normalizeGitHubPrivateKey(input.privateKey);
 
   async function getInstallationToken(installationId: number): Promise<string> {
     const cacheKey = `github-installation-token:${installationId}`;
@@ -480,7 +485,7 @@ export function createGitHubDispatchTransport(input: {
       method: "POST",
       headers: {
         accept: "application/vnd.github+json",
-        authorization: `Bearer ${createAppJwt(input.appId, input.privateKey, now())}`,
+        authorization: `Bearer ${createAppJwt(input.appId, normalizedPrivateKey, now())}`,
         "x-github-api-version": "2022-11-28",
         "user-agent": "DebugBundle/0.1"
       }

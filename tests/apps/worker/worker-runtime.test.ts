@@ -538,6 +538,59 @@ describe("worker runtime", () => {
     expect(redisQuitMock).toHaveBeenCalledTimes(2);
   });
 
+  it("should normalize escaped github app private keys before requesting installation tokens", async (): Promise<void> => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: vi.fn().mockResolvedValue({ token: "ghs_test" })
+    });
+    const createAppJwt = vi.fn().mockReturnValue("jwt_escaped");
+
+    const transport = createGitHubDispatchTransport({
+      appId: "123",
+      privateKey: "-----BEGIN RSA PRIVATE KEY-----\\nabc\\n-----END RSA PRIVATE KEY-----",
+      tokenCache: {
+        get: vi.fn().mockResolvedValue(null),
+        set: vi.fn().mockResolvedValue(undefined)
+      },
+      fetchImpl: fetchMock,
+      now: () => new Date("2026-03-11T00:00:00.000Z"),
+      createAppJwt
+    });
+
+    await expect(
+      transport.deliver({
+        delivery_id: "gdd_escaped",
+        installation_id: 99,
+        repo_owner: "debugbundle",
+        repo_name: "app",
+        dispatch_payload: {
+          debugbundle_event: "bundle.created",
+          incident_id: "inc_123",
+          project_id: "proj_123",
+          bundle_type: "failure",
+          bundle_version: 3,
+          severity: "high",
+          service: "checkout-api",
+          environment: "production",
+          title: "TypeError in checkout",
+          occurrence_count: 12,
+          first_seen_at: "2026-03-10T23:00:00.000Z",
+          links: {
+            bundle: "/v1/incidents/inc_123/bundle",
+            reproduction: "/v1/incidents/inc_123/reproduction",
+            dashboard: "/incidents/inc_123"
+          }
+        }
+      })
+    ).resolves.toBeUndefined();
+
+    expect(createAppJwt).toHaveBeenCalledWith(
+      "123",
+      "-----BEGIN RSA PRIVATE KEY-----\nabc\n-----END RSA PRIVATE KEY-----",
+      new Date("2026-03-11T00:00:00.000Z")
+    );
+  });
+
   it("should run group-incident processor when normalize queue has no work", async (): Promise<void> => {
     poolQueryMock.mockResolvedValueOnce({
       rows: [
