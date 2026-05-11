@@ -163,7 +163,7 @@ describe("api probe routes", () => {
       capture_policy: {
         preset: "minimal",
         capture_logs: "error",
-        capture_request_events: "off",
+        capture_request_events: "failures_only",
         capture_breadcrumbs: "local_only",
         capture_probe_events: "buffer_only"
       }
