@@ -72,6 +72,7 @@ export function ProjectGitHubPage(): JSX.Element {
   const [githubSettings, setGitHubSettings] = useState<GitHubSettingsState | null>(null);
   const [githubErrorMessage, setGitHubErrorMessage] = useState<string | null>(null);
   const showGitHubSettingsLoading = useDelayedVisibility(githubSettings === null && githubErrorMessage === null);
+  const [githubSettingsReloadKey, setGitHubSettingsReloadKey] = useState(0);
   const [retryingDeliveryId, setRetryingDeliveryId] = useState<string | null>(null);
   const [selectedRepositoryFullName, setSelectedRepositoryFullName] = useState("");
   const [isConnectingRepository, setIsConnectingRepository] = useState(false);
@@ -137,10 +138,7 @@ export function ProjectGitHubPage(): JSX.Element {
           return;
         }
 
-        const installUrlPromise =
-          installation.status === "suspended" || installation.status === "removed"
-            ? loadOptionalGitHubInstallUrl(project.project_id)
-            : Promise.resolve({ installUrl: null, installUrlLoadFailed: false });
+        const installUrlPromise = loadOptionalGitHubInstallUrl(project.project_id);
         const [repo, rules, deliveries] = await Promise.all([
           getProjectGitHubRepo(project.project_id),
           listProjectGitHubRules(project.project_id),
@@ -167,7 +165,7 @@ export function ProjectGitHubPage(): JSX.Element {
     return () => {
       cancelled = true;
     };
-  }, [githubAutomationEnabled, project.project_id]);
+  }, [githubAutomationEnabled, githubSettingsReloadKey, project.project_id]);
 
   useEffect(() => {
     if (githubSettings === null) {
@@ -204,6 +202,10 @@ export function ProjectGitHubPage(): JSX.Element {
     } finally {
       setRetryingDeliveryId(null);
     }
+  }
+
+  function handleRefreshGitHubSettings(): void {
+    setGitHubSettingsReloadKey((current) => current + 1);
   }
 
   async function handleConnectRepository(): Promise<void> {
@@ -421,7 +423,7 @@ export function ProjectGitHubPage(): JSX.Element {
               <div className="rounded-lg border border-border/80 bg-background/60 p-4">
                 <div className="flex items-center gap-2 font-medium text-foreground">
                   <GitHubMark className="size-4" />
-                  Connected repository
+                  Repository connected to this project
                 </div>
                 <p className="mt-2 text-sm text-muted-foreground">
                   {githubSettings.repo === null
@@ -436,8 +438,14 @@ export function ProjectGitHubPage(): JSX.Element {
                 )}
                 {!canEditProject ? null : (
                   <div className="mt-4 space-y-3">
+                    <p className="text-sm text-muted-foreground">
+                      Choose one repository from the repos currently granted to this GitHub App installation. To change
+                      which repos appear here, update the installation in GitHub and then refresh this page.
+                    </p>
                     <Field>
-                      <FieldLabel htmlFor="github-repository-select">Available repositories</FieldLabel>
+                      <FieldLabel htmlFor="github-repository-select">
+                        Repositories accessible to this GitHub App installation
+                      </FieldLabel>
                       <select
                         id="github-repository-select"
                         className="flex h-10 w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
@@ -452,6 +460,12 @@ export function ProjectGitHubPage(): JSX.Element {
                         ))}
                       </select>
                     </Field>
+                    {githubSettings.repositories.length === 0 ? (
+                      <p className="text-sm text-muted-foreground">
+                        No repositories are currently available to this installation. Add one in GitHub, then refresh
+                        this page.
+                      </p>
+                    ) : null}
                     <div className="flex flex-wrap gap-2">
                       <Button
                         type="button"
@@ -459,7 +473,7 @@ export function ProjectGitHubPage(): JSX.Element {
                         disabled={selectedRepositoryFullName.trim() === "" || isConnectingRepository || isRemovingRepository}
                         onClick={() => void handleConnectRepository()}
                       >
-                        {isConnectingRepository ? "Connecting..." : "Connect repository"}
+                        {isConnectingRepository ? "Connecting..." : "Connect to this project"}
                       </Button>
                       {githubSettings.repo === null ? null : (
                         <Button
@@ -469,7 +483,21 @@ export function ProjectGitHubPage(): JSX.Element {
                           disabled={isConnectingRepository || isRemovingRepository}
                           onClick={() => void handleRemoveRepository()}
                         >
-                          {isRemovingRepository ? "Removing..." : "Remove repository"}
+                          {isRemovingRepository ? "Disconnecting..." : "Disconnect from this project"}
+                        </Button>
+                      )}
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        disabled={isConnectingRepository || isRemovingRepository}
+                        onClick={handleRefreshGitHubSettings}
+                      >
+                        Refresh list
+                      </Button>
+                      {githubSettings.installUrl === null ? null : (
+                        <Button asChild type="button" variant="ghost" size="sm">
+                          <a href={githubSettings.installUrl}>Manage repositories in GitHub</a>
                         </Button>
                       )}
                     </div>

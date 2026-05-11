@@ -553,6 +553,12 @@ describe("web app — management routes", () => {
         });
       }
 
+      if (url.includes("/v1/github/app/install-url") && init?.method === undefined) {
+        return jsonResponse(200, {
+          install_url: "https://github.com/apps/debugbundle-automation/installations/new"
+        });
+      }
+
       if (url.endsWith("/v1/github/repositories") && init?.method === undefined) {
         return jsonResponse(200, {
           repositories: [createGitHubRepository()]
@@ -597,6 +603,10 @@ describe("web app — management routes", () => {
     expect((await screen.findAllByText(/debugbundle\/app/i)).length).toBeGreaterThan(0);
     expect(screen.getAllByText(/high severity incidents/i).length).toBeGreaterThan(0);
     expect(screen.getByText(/repository not found/i)).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /manage repositories in github/i })).toHaveAttribute(
+      "href",
+      "https://github.com/apps/debugbundle-automation/installations/new"
+    );
 
     await user.click(screen.getByRole("button", { name: /retry delivery/i }));
 
@@ -877,6 +887,12 @@ describe("web app — management routes", () => {
         });
       }
 
+      if (url.includes("/v1/github/app/install-url") && init?.method === undefined) {
+        return jsonResponse(200, {
+          install_url: "https://github.com/apps/debugbundle-automation/installations/new"
+        });
+      }
+
       if (url.endsWith("/v1/github/repositories") && init?.method === undefined) {
         return jsonResponse(200, {
           repositories: [createGitHubRepository(), createGitHubRepository({ id: 2, name: "worker", full_name: "debugbundle/worker" })]
@@ -914,13 +930,18 @@ describe("web app — management routes", () => {
     render(<App initialEntries={["/projects/proj_123/github"]} />);
 
     expect(await screen.findByText(/no github repository is assigned to this project yet/i)).toBeInTheDocument();
+    expect(screen.getByText(/choose one repository from the repos currently granted/i)).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /manage repositories in github/i })).toHaveAttribute(
+      "href",
+      "https://github.com/apps/debugbundle-automation/installations/new"
+    );
 
-    await user.selectOptions(screen.getByLabelText(/available repositories/i), "debugbundle/worker");
-    await user.click(screen.getByRole("button", { name: /connect repository/i }));
+    await user.selectOptions(screen.getByLabelText(/repositories accessible to this github app installation/i), "debugbundle/worker");
+    await user.click(screen.getByRole("button", { name: /connect to this project/i }));
 
     expect((await screen.findAllByText(/debugbundle\/worker/i)).length).toBeGreaterThan(0);
 
-    await user.click(screen.getByRole("button", { name: /remove repository/i }));
+    await user.click(screen.getByRole("button", { name: /disconnect from this project/i }));
 
     await waitFor(() => {
       expect(
@@ -932,6 +953,72 @@ describe("web app — management routes", () => {
     });
 
     expect(await screen.findByText(/no github repository is assigned to this project yet/i)).toBeInTheDocument();
+  });
+
+  it("refreshes the accessible repository list after github-side installation changes", async () => {
+    const user = userEvent.setup();
+    let repositoryListRequestCount = 0;
+    const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = requestUrl(input);
+
+      if (url.endsWith("/v1/auth/session")) {
+        return jsonResponse(200, { session: createSession() });
+      }
+
+      if (url.endsWith("/v1/projects") && init?.method === undefined) {
+        return jsonResponse(200, {
+          projects: [createProject({ organization_plan: "team" })]
+        });
+      }
+
+      if (url.endsWith("/v1/github/installation") && init?.method === undefined) {
+        return jsonResponse(200, {
+          installation: createGitHubInstallation()
+        });
+      }
+
+      if (url.includes("/v1/github/app/install-url") && init?.method === undefined) {
+        return jsonResponse(200, {
+          install_url: "https://github.com/apps/debugbundle-automation/installations/new"
+        });
+      }
+
+      if (url.endsWith("/v1/github/repositories") && init?.method === undefined) {
+        repositoryListRequestCount += 1;
+
+        return jsonResponse(200, {
+          repositories:
+            repositoryListRequestCount === 1
+              ? [createGitHubRepository()]
+              : [createGitHubRepository(), createGitHubRepository({ id: 2, name: "worker", full_name: "debugbundle/worker" })]
+        });
+      }
+
+      if (url.endsWith("/v1/projects/proj_123/github/repo") && init?.method === undefined) {
+        return jsonResponse(200, { repo: null });
+      }
+
+      if (url.endsWith("/v1/projects/proj_123/github/rules") && init?.method === undefined) {
+        return jsonResponse(200, { rules: [] });
+      }
+
+      if (url.endsWith("/v1/projects/proj_123/github/deliveries?limit=20") && init?.method === undefined) {
+        return jsonResponse(200, { deliveries: [] });
+      }
+
+      return jsonResponse(404, { error: "not_found" });
+    });
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<App initialEntries={["/projects/proj_123/github"]} />);
+
+    expect(await screen.findByText(/no github repository is assigned to this project yet/i)).toBeInTheDocument();
+    expect(screen.queryByRole("option", { name: "debugbundle/worker" })).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: /refresh list/i }));
+
+    expect(await screen.findByRole("option", { name: "debugbundle/worker" })).toBeInTheDocument();
   });
 
   it("lets owners create and delete a github dispatch rule from the project github page", async () => {
