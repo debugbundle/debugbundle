@@ -380,7 +380,7 @@ export function ProjectGitHubPage(): JSX.Element {
               {githubSettings.installUrl === null ? null : (
                 <div className="flex flex-wrap gap-2">
                   <Button asChild type="button" variant="outline" size="sm">
-                    <a href={githubSettings.installUrl} target="_blank" rel="noreferrer">
+                    <a href={githubSettings.installUrl}>
                       Install GitHub App
                     </a>
                   </Button>
@@ -404,7 +404,7 @@ export function ProjectGitHubPage(): JSX.Element {
                   {githubSettings.installUrl === null ? null : (
                     <div className="flex flex-wrap gap-2">
                       <Button asChild type="button" variant="outline" size="sm">
-                        <a href={githubSettings.installUrl} target="_blank" rel="noreferrer">
+                        <a href={githubSettings.installUrl}>
                           Reconnect GitHub App
                         </a>
                       </Button>
