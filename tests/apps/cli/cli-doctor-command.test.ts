@@ -239,6 +239,74 @@ describe("cli doctor command", () => {
     expect(parsed.errors).toEqual([]);
   });
 
+  it("returns a deterministic privacy preview when --privacy is enabled", async () => {
+    const rootDirectory = await createDoctorFixtureRepository();
+
+    await setupCommand(
+      {},
+      {
+        cwd: () => rootDirectory,
+        now: () => new Date("2026-03-14T00:00:00.000Z")
+      }
+    );
+
+    await markProfileAgentValidated(rootDirectory);
+
+    const result = await doctorCommand(
+      {
+        json: true,
+        privacy: true
+      },
+      {
+        cwd: () => rootDirectory,
+        now: () => new Date("2026-03-14T00:00:00.000Z"),
+        readAuthState: vi.fn().mockResolvedValue({
+          bearer_token: "dbundle_mem_secret_token",
+          base_url: "https://api.debugbundle.com"
+        })
+      }
+    );
+
+    expect(result.exitCode).toBe(0);
+    expect(JSON.parse(result.output)).toMatchObject({
+      status: "healthy",
+      privacy_preview: {
+        sample_event_type: "request_event",
+        sample_event_class: "incident_signal",
+        sample_can_create_incident: true,
+        redacted_fields: [
+          "headers.authorization",
+          "headers.cookie",
+          "body.password",
+          "body.card_number",
+          "body.otp"
+        ],
+        omitted_fields: [],
+        retained_metadata: {
+          service: "checkout-api",
+          environment: "production",
+          method: "POST",
+          route_template: "/checkout/:orderId",
+          response_status: 503
+        },
+        incident_rule: "request_event with response_status >= 500 is classified as an incident_signal",
+        redacted_sample: {
+          payload: {
+            headers: {
+              authorization: "[REDACTED]",
+              cookie: "[REDACTED]"
+            },
+            body: {
+              password: "[REDACTED]",
+              card_number: "[REDACTED]",
+              otp: "[REDACTED]"
+            }
+          }
+        }
+      }
+    });
+  });
+
   it("validates connected API reachability and member-token auth for self-hosted base URLs", async () => {
     const rootDirectory = await createDoctorFixtureRepository();
 

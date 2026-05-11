@@ -117,7 +117,7 @@ export function createMcpServer(input: { tools: ToolRegistry }): {
             },
             serverInfo: {
               name: "@debugbundle/mcp",
-              version: "0.1.0"
+              version: "0.1.1"
             }
           }
         };

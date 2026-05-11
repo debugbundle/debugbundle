@@ -307,8 +307,9 @@ Current API implementation scope (Phase 1 continuation):
 - `GET /v1/incidents/{id}/context` response body: `IncidentContextRecord`
 - `POST /v1/incidents/{id}/resolve` response body: `{ incident: IncidentRetrievalRecord }`
 - `IncidentRetrievalRecord` fields: `incident_id`, `project_id`, `project_name`, `service_id`, `service_name`, `latest_deployment_id`, `environment`, `fingerprint`, `fingerprint_version`, `title`, `severity`, `status`, `first_seen_at`, `last_seen_at`, `occurrence_count`, `spike_detected_at`, `resolved_at`, `regressed_at`, `matched_fields`, `incident_reason`
-- `IncidentContextRecord` fields: `incident`, `incident_reason`, `primary_signal`, `bundle`, `reproduction`, `logs`, `deploy`, `grouping`, `redaction`, `suggested_next_checks`
+- `IncidentContextRecord` fields: `incident`, `incident_reason`, `primary_signal`, `bundle`, `reproduction`, `logs`, `deploy`, `grouping`, `visibility`, `redaction`, `suggested_next_checks`
 - `primary_signal` summarizes the current incident's primary failing signal without requiring an LLM call. `logs.source` is one of `retrieval`, `bundle_context`, or `none`. `bundle` and `reproduction` use deterministic artifact states: `ready`, `pending`, or `failed`.
+- `visibility` explains four operator-facing behaviors directly in retrieval output: how repeated failures group into the current fingerprint, when bundle regeneration occurs (including current precedence), how spike detection differs from incident creation, and how webhook/GitHub cooldown windows suppress repeated lifecycle notifications.
 - `incident_reason` is deterministically derived from the incident's primary `incident_signal` metadata. Current kinds: `backend_exception`, `frontend_exception`, `request_failure_5xx`, `error_log`. Example:
 
 ```json
@@ -1470,7 +1471,7 @@ Current local CLI behavior: read-path commands and token-management commands reu
 ```
 debugbundle setup [--non-interactive] [--json]
 debugbundle connect [--auth-file <path>] [--json]
-debugbundle doctor [--check-relay] [--json]
+debugbundle doctor [--check-relay] [--privacy] [--json]
 debugbundle validate [--fix] [--json]
 debugbundle ingest <file> --format <debugbundle-ndjson|php-error|apache-error> [--json]
 debugbundle watch --log <file> --format <debugbundle-ndjson|php-error|apache-error> [--json]
@@ -1482,7 +1483,7 @@ Current local CLI setup behavior: `debugbundle setup [--non-interactive] [--json
 
 Current local CLI connect behavior: `debugbundle connect` upgrades a local-only project to cloud-connected mode by reusing stored member auth, selecting or creating a cloud project from `.debugbundle/profile.json`, minting a new project token, and updating `.debugbundle/local/connection.json` to enable production cloud delivery while leaving `local`, `development`, and `staging` local-only by default. Existing local events and local incident state are NOT uploaded or rewritten.
 
-Current local CLI doctor behavior validates the generated `.debugbundle/` scaffold, checks whether local CLI auth state is present and valid, and warns when `.debugbundle/profile.json` has a `debugbundle.last_reviewed_at` older than 30 days. `--check-relay` additionally inspects `.debugbundle/local/browser-relay-spool/` for undelivered spool files and reports their count and age. Delivered relay spool entries are tracked by `.events.json.delivered` sidecars written after successful cloud forwarding; files without that marker are treated as undelivered. Connected-mode cloud cache retention is maintained both opportunistically during explicit cloud cache activity and explicitly through the first shipped `debugbundle clean` path.
+Current local CLI doctor behavior validates the generated `.debugbundle/` scaffold, checks whether local CLI auth state is present and valid, and warns when `.debugbundle/profile.json` has a `debugbundle.last_reviewed_at` older than 30 days. `--check-relay` additionally inspects `.debugbundle/local/browser-relay-spool/` for undelivered spool files and reports their count and age. `--privacy` adds a deterministic first-run redaction preview built from a representative `request_event` with `response_status: 503`, showing the redacted field paths, omitted field paths (currently empty by default because default redaction replaces sensitive values in-place), retained incident-relevant metadata, a redacted sample payload, and whether the sample would create an incident. Delivered relay spool entries are tracked by `.events.json.delivered` sidecars written after successful cloud forwarding; files without that marker are treated as undelivered. Connected-mode cloud cache retention is maintained both opportunistically during explicit cloud cache activity and explicitly through the first shipped `debugbundle clean` path.
 
 Current local CLI validate behavior checks the generated DebugBundle local files and validates `.debugbundle/profile.json` against the v1 profile schema. `--fix` safely recreates missing generated files (`.agents/skills/debugbundle/SKILL.md`, `.debugbundle/local/connection.json`) when they are absent, without overwriting existing files. It does not delete cached cloud artifacts; cache pruning now lives in `debugbundle clean` plus the existing opportunistic connected-mode cache maintenance path.
 
@@ -1748,10 +1749,10 @@ debugbundle_verify_cloud      → same result as `debugbundle verify cloud --jso
 debugbundle_smoke             → same result as `debugbundle smoke --json`
 ```
 
-Current MCP setup/verification behavior is a thin adapter over the existing CLI command modules in `apps/cli/src/`. The MCP wrappers force JSON mode, parse the CLI JSON output, and return the same machine-readable payloads to agents without adding extra business logic.
+Current MCP setup/verification behavior is a thin adapter over the existing CLI command modules in `apps/cli/src/`. The MCP wrappers force JSON mode, parse the CLI JSON output, and return the same machine-readable payloads to agents without adding extra business logic. `doctor` accepts `privacy: true` to mirror `debugbundle doctor --privacy --json`, including the same deterministic privacy preview payload.
 
 Current MCP setup/verification input shape:
-- `doctor`: optional `authFilePath`
+- `doctor`: optional `authFilePath`, `privacy`
 - `validate`: optional `fix`
 - `verify_local`: no required inputs
 - `verify_cloud`: required `projectId`, optional `service`, `environment`, `maxAgeMinutes`, `trigger5xx`, `authFilePath`

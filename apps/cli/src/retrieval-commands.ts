@@ -116,6 +116,14 @@ function formatObjectOutput(payload: unknown): string {
 
 function formatIncidentContextDetail(context: IncidentContextRecord): string {
   const incidentSource = context.incident["source"];
+  const visibility = typeof context.visibility === "object" && context.visibility !== null && !Array.isArray(context.visibility)
+    ? (context.visibility as {
+        grouping?: unknown;
+        bundle_regeneration?: unknown;
+        spike_detection?: unknown;
+        notification_cooldown?: unknown;
+      })
+    : null;
   const lines = [
     `Incident: ${context.incident.incident_id}`,
     ...(typeof incidentSource === "string" ? [`Source: ${incidentSource}`] : []),
@@ -149,6 +157,18 @@ function formatIncidentContextDetail(context: IncidentContextRecord): string {
     lines.push(
       `Deploy: ${context.deploy.deploy_version ?? "unknown"} (${context.deploy.commit_sha ?? "unknown"})`
     );
+  }
+  if (typeof visibility?.grouping === "string") {
+    lines.push(`Grouping visibility: ${visibility.grouping}`);
+  }
+  if (typeof visibility?.bundle_regeneration === "string") {
+    lines.push(`Bundle regeneration: ${visibility.bundle_regeneration}`);
+  }
+  if (typeof visibility?.spike_detection === "string") {
+    lines.push(`Spike detection: ${visibility.spike_detection}`);
+  }
+  if (typeof visibility?.notification_cooldown === "string") {
+    lines.push(`Notification cooldown: ${visibility.notification_cooldown}`);
   }
   if (context.redaction !== null) {
     lines.push(`Redaction: ${context.redaction.redacted ? "redacted" : "not_redacted"}`);

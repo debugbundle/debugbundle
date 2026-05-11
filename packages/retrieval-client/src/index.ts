@@ -104,6 +104,15 @@ export const IncidentContextGroupingSchema = z
   })
   .strict();
 
+export const IncidentContextVisibilitySchema = z
+  .object({
+    grouping: z.string(),
+    bundle_regeneration: z.string(),
+    spike_detection: z.string(),
+    notification_cooldown: z.string()
+  })
+  .strict();
+
 export const IncidentContextRedactionSchema = z
   .object({
     redacted: z.boolean(),
@@ -147,6 +156,7 @@ export const IncidentContextSchema = z
     logs: IncidentContextLogsSchema,
     deploy: IncidentContextDeploySchema,
     grouping: IncidentContextGroupingSchema,
+    visibility: IncidentContextVisibilitySchema,
     redaction: IncidentContextRedactionSchema.nullable(),
     suggested_next_checks: z.array(z.string())
   })

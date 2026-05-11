@@ -26,6 +26,7 @@ export function parseArgv(argv: string[]): ParsedArgv {
       token === "--fix"
       || token === "--json"
       || token === "--check-relay"
+        || token === "--privacy"
       || token === "--help"
       || token === "--non-interactive"
       || token === "--local"

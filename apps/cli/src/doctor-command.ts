@@ -3,6 +3,9 @@ import { join } from "node:path";
 
 import { z } from "zod";
 
+import { classifyEvent } from "../../../packages/event-normalizer/src/index.js";
+import { redact, type JsonValue } from "../../../packages/redaction/src/index.js";
+import { createEventEnvelope } from "../../../packages/shared-types/src/index.js";
 import { CliAuthStateError, readCliAuthState } from "./auth-state.js";
 import type { CliAuthState } from "./auth-state.js";
 import { ConnectionConfigSchema } from "./connection-config.js";
@@ -27,6 +30,25 @@ type DoctorCheck = {
   name: string;
   status: "ok" | "warning" | "missing" | "error";
   message: string;
+};
+
+type DoctorPrivacyPreview = {
+  sample_event_type: "request_event";
+  sample_event_class: "incident_signal" | "context_signal" | "operational_signal";
+  sample_can_create_incident: boolean;
+  incident_rule: string;
+  redacted_fields: string[];
+  omitted_fields: string[];
+  retained_metadata: {
+    service: string;
+    environment: string;
+    method: string;
+    route_template: string;
+    response_status: number;
+  };
+  redacted_sample: {
+    payload: JsonValue;
+  };
 };
 
 const ProfileSchema = z.object({
@@ -80,26 +102,119 @@ function resolveOverallStatus(checks: DoctorCheck[]): "healthy" | "warning" | "e
   return "healthy";
 }
 
-function formatDoctorOutput(status: "healthy" | "warning" | "error", checks: DoctorCheck[]): string {
+function formatDoctorOutput(status: "healthy" | "warning" | "error", checks: DoctorCheck[], privacyPreview?: DoctorPrivacyPreview): string {
   return [
     "DebugBundle doctor report.",
     `Status: ${status}`,
     "Checks:",
     ...checks.map((check) => `- ${check.name}: ${check.status} - ${check.message}`),
+    ...(privacyPreview === undefined
+      ? []
+      : [
+          "Privacy preview:",
+          `- sample_event_type: ${privacyPreview.sample_event_type}`,
+          `- sample_event_class: ${privacyPreview.sample_event_class}`,
+          `- sample_can_create_incident: ${privacyPreview.sample_can_create_incident ? "yes" : "no"}`,
+          `- incident_rule: ${privacyPreview.incident_rule}`,
+          `- redacted_fields: ${privacyPreview.redacted_fields.join(", ")}`,
+          `- omitted_fields: ${privacyPreview.omitted_fields.length === 0 ? "none" : privacyPreview.omitted_fields.join(", ")}`,
+          `- retained_metadata: service=${privacyPreview.retained_metadata.service}, environment=${privacyPreview.retained_metadata.environment}, method=${privacyPreview.retained_metadata.method}, route_template=${privacyPreview.retained_metadata.route_template}, response_status=${privacyPreview.retained_metadata.response_status}`,
+          "Redacted sample:",
+          ...JSON.stringify(privacyPreview.redacted_sample, null, 2)
+            .split("\n")
+            .map((line) => `  ${line}`)
+        ]),
     "Suggested actions:",
     ...SUGGESTED_ACTIONS.map((action) => `- ${action}`)
   ].join("\n");
 }
 
-function buildDoctorJsonOutput(checks: DoctorCheck[]): string {
+function buildDoctorJsonOutput(checks: DoctorCheck[], privacyPreview?: DoctorPrivacyPreview): string {
   return JSON.stringify({
     status: resolveOverallStatus(checks),
     checks,
     warnings: checks.filter((check) => check.status === "warning" || check.status === "missing").map((check) => check.message),
     errors: checks.filter((check) => check.status === "error").map((check) => check.message),
+    ...(privacyPreview === undefined ? {} : { privacy_preview: privacyPreview }),
     suggested_actions: [...SUGGESTED_ACTIONS],
     auto_fix_available: false
   });
+}
+
+function buildPrivacyPreview(): DoctorPrivacyPreview {
+  const sampleEvent = createEventEnvelope({
+    schema_version: "2026-03-01",
+    event_id: "11111111-1111-4111-8111-111111111111",
+    event_type: "request_event",
+    sdk_name: "debugbundle-node",
+    sdk_version: "0.1.0",
+    service: {
+      name: "checkout-api",
+      runtime: "node",
+      framework: "fastify",
+      environment: "production"
+    },
+    occurred_at: "2026-03-14T00:00:00.000Z",
+    correlation: {
+      request_id: "req_preview_123",
+      trace_id: "trace_preview_123",
+      session_id: null,
+      user_id_hash: "usr_preview_hash"
+    },
+    payload: {
+      method: "POST",
+      path: "/checkout/ord_preview_123",
+      query: {
+        step: "payment"
+      },
+      headers: {
+        authorization: "Bearer dbundle_project_secret_preview",
+        cookie: "session=preview_cookie",
+        "content-type": "application/json"
+      },
+      body: {
+        password: "preview-password",
+        card_number: "4242424242424242",
+        otp: "123456",
+        email: "alice@example.com"
+      },
+      response_status: 503,
+      duration_ms: 842,
+      route_template: "/checkout/:orderId",
+      response_headers: {
+        "content-type": "application/json"
+      },
+      response_body: {
+        error: "upstream timeout"
+      }
+    }
+  });
+
+  if (sampleEvent.event_type !== "request_event") {
+    throw new Error("invalid_privacy_preview_sample_event");
+  }
+
+  const { redacted, redacted_fields } = redact(sampleEvent.payload as JsonValue);
+  const sampleEventClass = classifyEvent(sampleEvent.event_type, undefined, undefined, sampleEvent.payload as Record<string, unknown>);
+
+  return {
+    sample_event_type: sampleEvent.event_type,
+    sample_event_class: sampleEventClass,
+    sample_can_create_incident: sampleEventClass === "incident_signal",
+    incident_rule: "request_event with response_status >= 500 is classified as an incident_signal",
+    redacted_fields,
+    omitted_fields: [],
+    retained_metadata: {
+      service: sampleEvent.service.name,
+      environment: sampleEvent.service.environment,
+      method: sampleEvent.payload.method,
+      route_template: sampleEvent.payload.route_template ?? sampleEvent.payload.path,
+      response_status: sampleEvent.payload.response_status
+    },
+    redacted_sample: {
+      payload: redacted
+    }
+  };
 }
 
 async function buildFileCheck(rootDirectory: string, name: string, filePath: string, stat: StatReader): Promise<DoctorCheck> {
@@ -484,7 +599,7 @@ async function buildRelaySpoolCheck(
 }
 
 export async function doctorCommand(
-  input: { json?: boolean; authFilePath?: string; checkRelay?: boolean },
+  input: { json?: boolean; authFilePath?: string; checkRelay?: boolean; privacy?: boolean },
   dependencies: DoctorCommandDependencies = {}
 ): Promise<CliCommandResult> {
   const cwd = dependencies.cwd ?? (() => process.cwd());
@@ -517,9 +632,12 @@ export async function doctorCommand(
     buildProfileFreshnessCheck(profile, currentTime),
     ...(input.checkRelay === true ? [await buildRelaySpoolCheck(rootDirectory, currentTime, { readdir, stat })] : [])
   ] satisfies DoctorCheck[];
+  const privacyPreview = input.privacy === true ? buildPrivacyPreview() : undefined;
 
   return {
     exitCode: 0,
-    output: input.json ? buildDoctorJsonOutput(checks) : formatDoctorOutput(resolveOverallStatus(checks), checks)
+    output: input.json
+      ? buildDoctorJsonOutput(checks, privacyPreview)
+      : formatDoctorOutput(resolveOverallStatus(checks), checks, privacyPreview)
   };
 }

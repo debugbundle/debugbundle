@@ -89,6 +89,7 @@ export const MCP_TOOL_CATALOG = [
     description: 'Run local DebugBundle environment diagnostics.',
     inputSchema: z.object({
       authFilePath: z.string().optional(),
+      privacy: z.boolean().optional(),
     }),
   },
   {

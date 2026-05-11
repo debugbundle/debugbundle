@@ -45,6 +45,7 @@ export function createSetupMcpTools(commands: {
       return runJsonCommand(() =>
         commands.doctorCommand({
           ...(typeof input["authFilePath"] === "string" ? { authFilePath: input["authFilePath"] } : {}),
+          ...(input["privacy"] === true ? { privacy: true } : {}),
           json: true
         })
       );

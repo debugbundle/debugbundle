@@ -98,13 +98,15 @@ export async function runCli(argv: string[], dependencies: CliDependencies = {})
     const command = requirePositional(parsedArgv, 0, "command");
 
     if (command === "doctor") {
-      expectNoUnknownOptions(parsedArgv, ["check-relay", "json"]);
+      expectNoUnknownOptions(parsedArgv, ["check-relay", "json", "privacy"]);
       ensureNoExtraPositionals(parsedArgv, 1);
 
       const checkRelay = readBooleanOption(parsedArgv, "check-relay");
       const json = readBooleanOption(parsedArgv, "json");
+      const privacy = readBooleanOption(parsedArgv, "privacy");
       return await (dependencies.doctorCommand ?? defaultDoctorCommand)({
         ...(checkRelay === true ? { checkRelay: true } : {}),
+        ...(privacy === true ? { privacy: true } : {}),
         ...(json === true ? { json: true } : {})
       });
     }

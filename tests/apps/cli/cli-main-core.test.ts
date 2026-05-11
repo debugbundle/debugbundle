@@ -408,6 +408,30 @@ describe("cli main core routing", () => {
     });
   });
 
+  it("routes doctor --privacy arguments into the doctor command", async () => {
+    const doctorCommand = vi.fn().mockResolvedValue({
+      exitCode: 0,
+      output: "doctor-privacy"
+    });
+
+    const result = await runCli([
+      "doctor",
+      "--privacy",
+      "--json"
+    ], {
+      doctorCommand
+    });
+
+    expect(doctorCommand).toHaveBeenCalledWith({
+      privacy: true,
+      json: true
+    });
+    expect(result).toEqual({
+      exitCode: 0,
+      output: "doctor-privacy"
+    });
+  });
+
   it("routes setup arguments into the setup command", async () => {
     const setupCommand = vi.fn().mockResolvedValue({
       exitCode: 0,

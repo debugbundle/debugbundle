@@ -47,7 +47,8 @@ describe("mcp setup tools", () => {
 
     await expect(
       tools.doctor({
-        authFilePath: "/tmp/auth.json"
+        authFilePath: "/tmp/auth.json",
+        privacy: true
       })
     ).resolves.toEqual({
       status: "healthy",
@@ -59,6 +60,7 @@ describe("mcp setup tools", () => {
     });
     expect(doctorCommand).toHaveBeenCalledWith({
       authFilePath: "/tmp/auth.json",
+      privacy: true,
       json: true
     });
 

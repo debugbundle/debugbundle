@@ -34,6 +34,7 @@ export interface IncidentContextIncidentRecord extends Record<string, unknown> {
   title: string;
   severity: string;
   status: string;
+  spike_detected_at?: string | null;
   service_name: string | null;
   environment: string;
   fingerprint: string;
@@ -64,6 +65,13 @@ export interface IncidentContextGroupingRecord extends Record<string, unknown> {
   matched_fields: string[];
 }
 
+export interface IncidentContextVisibilityRecord extends Record<string, unknown> {
+  grouping: string;
+  bundle_regeneration: string;
+  spike_detection: string;
+  notification_cooldown: string;
+}
+
 export interface IncidentContextRedactionRecord extends Record<string, unknown> {
   redacted: boolean;
   fields: string[];
@@ -79,6 +87,7 @@ export interface IncidentContextRecord extends Record<string, unknown> {
   logs: IncidentContextLogsRecord;
   deploy: IncidentContextDeployRecord;
   grouping: IncidentContextGroupingRecord;
+  visibility: IncidentContextVisibilityRecord;
   redaction: IncidentContextRedactionRecord | null;
   suggested_next_checks: string[];
 }
@@ -202,6 +211,30 @@ function buildRedactionRecord(bundleBody: unknown): IncidentContextRedactionReco
   };
 }
 
+function buildVisibilityRecord(input: {
+  incident: IncidentContextIncidentRecord;
+  bundle: IncidentContextArtifactRecord;
+  primarySignal: IncidentContextPrimarySignalRecord;
+}): IncidentContextVisibilityRecord {
+  const routeTarget = input.primarySignal.route_template ?? input.primarySignal.request_path;
+  const matchedFields = input.incident.matched_fields.length === 0 ? "none" : input.incident.matched_fields.join(", ");
+  const grouping =
+    input.primarySignal.kind === "request_failure_5xx" && input.primarySignal.request_method !== null && routeTarget !== null
+      ? `Repeated 5xx request failures with the same normalized route template, request method, response status, service, and environment reuse this incident fingerprint. This incident currently groups ${input.primarySignal.request_method} ${routeTarget} with matched fields ${matchedFields}.`
+      : `This incident groups repeated failures by fingerprint version ${input.incident.fingerprint_version} inside the service and environment boundary, with matched fields ${matchedFields}.`;
+  const spikeLead =
+    input.incident.spike_detected_at === undefined || input.incident.spike_detected_at === null
+      ? "This incident is not currently marked as spiking."
+      : `This incident was marked as spiking at ${input.incident.spike_detected_at}.`;
+
+  return {
+    grouping,
+    bundle_regeneration: `Bundle status is ${input.bundle.status}. New incidents create a bundle immediately, while regeneration currently prioritizes regression reopen, then deploy metadata, reproduction-confidence changes, and finally new context updates.`,
+    spike_detection: `${spikeLead} Spike detection is evaluated after grouping and only marks an existing incident when short-term frequency has sufficient baseline and exceeds the spike threshold.`,
+    notification_cooldown: "Webhook and GitHub lifecycle notifications use per-rule cooldown windows to suppress repeated bundle.reopened or incident.spike_detected deliveries for the same incident/event fingerprint."
+  };
+}
+
 function buildSuggestedNextChecks(input: {
   incident: IncidentContextIncidentRecord;
   bundle: IncidentContextArtifactRecord;
@@ -263,6 +296,11 @@ export function buildIncidentContextRecord(input: {
   const primarySignal = buildPrimarySignal(input.incident, incidentReason, bundleBody);
   const logs = buildLogsRecord(bundleBody, input.logs);
   const deploy = buildDeployRecord(input.incident, bundleBody);
+  const visibility = buildVisibilityRecord({
+    incident: input.incident,
+    bundle: input.bundle,
+    primarySignal
+  });
   const redaction = buildRedactionRecord(bundleBody);
 
   return {
@@ -278,6 +316,7 @@ export function buildIncidentContextRecord(input: {
       fingerprint_version: input.incident.fingerprint_version,
       matched_fields: input.incident.matched_fields
     },
+    visibility,
     redaction,
     suggested_next_checks: buildSuggestedNextChecks({
       incident: input.incident,
