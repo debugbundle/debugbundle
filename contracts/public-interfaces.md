@@ -63,7 +63,7 @@ Every capability must be available through all applicable interfaces. Operations
 | Doctor | — | `doctor` | `doctor` | CLI/MCP-only (local env) |
 | Validate | — | `validate [--fix]` | `validate` | CLI/MCP-only (local env) |
 | Verify local | — | `verify local` | `verify_local` | CLI/MCP-only (local env) |
-| Verify cloud | — | `verify cloud` | `verify_cloud` | Uses API internally |
+| Verify cloud | — | `verify cloud` | `verify_cloud` | Uses API internally; `--trigger-5xx`/`trigger5xx` actively proves hosted 5xx incident creation |
 | Smoke test | — | `smoke` | `smoke` | CLI/MCP-only |
 | Login | — | `login` | — | CLI-only (stores member-token auth state locally) |
 | Setup project | — | `setup` | — | CLI-only (local scaffold generation and relay scaffolding) |
@@ -297,13 +297,26 @@ Current API implementation scope (Phase 7 continuation): `GET /v1/incidents` sup
 
 **Query params (logs):** `incident_id` (required), `level`, `limit`, `cursor`
 
-**Incident response fields include:** `id`, `project_id`, `project_name`, `service_id`, `service_name`, `environment`, `fingerprint`, `fingerprint_version`, `title`, `severity`, `status`, `first_seen_at`, `last_seen_at`, `occurrence_count`, `affected_users_estimate`, `spike_detected_at`, `resolved_at`, `regressed_at`, `matched_fields`
+**Incident response fields include:** `id`, `project_id`, `project_name`, `service_id`, `service_name`, `environment`, `fingerprint`, `fingerprint_version`, `title`, `severity`, `status`, `first_seen_at`, `last_seen_at`, `occurrence_count`, `affected_users_estimate`, `spike_detected_at`, `resolved_at`, `regressed_at`, `matched_fields`, `incident_reason`
 
 Current API implementation scope (Phase 1 continuation):
 - `GET /v1/incidents` response body: `{ incidents: IncidentRetrievalRecord[], next_cursor: string | null }`
 - `GET /v1/incidents/{id}` response body: `{ incident: IncidentRetrievalRecord }`
 - `POST /v1/incidents/{id}/resolve` response body: `{ incident: IncidentRetrievalRecord }`
-- `IncidentRetrievalRecord` fields: `incident_id`, `project_id`, `project_name`, `service_id`, `service_name`, `latest_deployment_id`, `environment`, `fingerprint`, `fingerprint_version`, `title`, `severity`, `status`, `first_seen_at`, `last_seen_at`, `occurrence_count`, `spike_detected_at`, `resolved_at`, `regressed_at`, `matched_fields`
+- `IncidentRetrievalRecord` fields: `incident_id`, `project_id`, `project_name`, `service_id`, `service_name`, `latest_deployment_id`, `environment`, `fingerprint`, `fingerprint_version`, `title`, `severity`, `status`, `first_seen_at`, `last_seen_at`, `occurrence_count`, `spike_detected_at`, `resolved_at`, `regressed_at`, `matched_fields`, `incident_reason`
+- `incident_reason` is deterministically derived from the incident's primary `incident_signal` metadata. Current kinds: `backend_exception`, `frontend_exception`, `request_failure_5xx`, `error_log`. Example:
+
+```json
+{
+  "incident_reason": {
+    "kind": "request_failure_5xx",
+    "description": "request_event matched the 5xx request incident rule",
+    "event_type": "request_event",
+    "event_class": "incident_signal",
+    "matched_policy": "5xx request failures bypass capture_request_events suppression"
+  }
+}
+```
 - `GET /v1/incidents/{id}/bundle` response body: artifact JSON when present; `{ "status": "pending" }` when artifact is missing; `{ "status": "failed", "reason": "..." }` when artifact is unreadable/invalid
 - `GET /v1/incidents/{id}/reproduction` response body: artifact JSON when present; `{ "status": "pending" }` while the reproduction artifact is not yet available; `404 { "error": "reproduction_not_found" }` on non-not-found artifact read failures
 - `GET /v1/logs` requires `incident_id` and supports `level`, `cursor`, `limit` (1-100, default 20); response body: `{ logs: [{ event_id, event_type, occurred_at, is_sampled, level }], next_cursor }`
@@ -1483,13 +1496,32 @@ Current local CLI process behavior is `debugbundle process [--json]`. It reads b
 ### 2.3 Verification Commands
 ```
 debugbundle verify local [--json]
-debugbundle verify cloud [--json]
+debugbundle verify cloud --project-id <id> [--trigger-5xx] [--service <name>] [--environment <name>] [--max-age-minutes <n>] [--auth-file <path>] [--json]
 debugbundle smoke [--json]
 ```
 
 Current local CLI verify behavior is `debugbundle verify local [--json]`. It validates `.debugbundle/profile.json`, synthesizes a local incident-signal batch in `.debugbundle/local/events/`, runs the existing local `debugbundle process` pipeline, confirms that local incident state now contains the synthetic incident, and reads the generated local bundle artifact from `.debugbundle/bundles/local/`. No cloud auth, member token, or project token is required.
 
-Current cloud CLI verify behavior is `debugbundle verify cloud --project-id <id> [--service <name>] [--environment <name>] [--max-age-minutes <n>] [--auth-file <path>] [--json]`. It reuses stored member auth, performs passive verification through the retrieval API, and confirms that the latest incident matching the requested project/service/environment filters has a `last_seen_at` inside the verification window (default `15` minutes). The current scaffold defaults `environment` to `production`, returns setup-style JSON output, and reports auth/config failures separately from passive verification failures.
+Cloud CLI verify behavior is `debugbundle verify cloud --project-id <id> [--trigger-5xx] [--service <name>] [--environment <name>] [--max-age-minutes <n>] [--auth-file <path>] [--json]`. Without `--trigger-5xx`, it reuses stored member auth, performs passive verification through the retrieval API, and confirms that the latest incident matching the requested project/service/environment filters has a `last_seen_at` inside the verification window (default `15` minutes). With `--trigger-5xx`, it creates a temporary verification project token, sends a synthetic `request_event` with `response_status: 503` through the real `POST /v1/events` ingestion endpoint, revokes the temporary token, polls incident retrieval, and fetches bundle status. The synthetic event is marked with verification headers/path/body while still using the same ingestion, processing, grouping, bundle, and retrieval path as a real request failure. The current scaffold defaults `environment` to `production`, returns setup-style JSON output, and reports auth/config failures separately from passive or active verification failures.
+
+Active `verify cloud --trigger-5xx --json` includes a `verification` object:
+
+```json
+{
+  "mode": "active_5xx",
+  "accepted_event_count": 1,
+  "incident_id": "inc_123",
+  "bundle_status": "ready | pending | unknown",
+  "classification_reason": {
+    "kind": "request_failure_5xx",
+    "description": "request_event response_status=503 matched the 5xx request incident rule",
+    "event_type": "request_event",
+    "event_class": "incident_signal",
+    "matched_policy": "5xx request failures bypass capture_request_events suppression"
+  },
+  "suggested_next_command": "debugbundle inspect inc_123 --source cloud"
+}
+```
 
 Current smoke CLI behavior is `debugbundle smoke --project-id <id> [--service <name>] [--environment <name>] [--max-age-minutes <n>] [--auth-file <path>] [--json]`. It is a lightweight orchestration layer over the current local and cloud verification commands: it runs both deterministically, summarizes them as `local-verification` and `cloud-verification` checks, aggregates child warnings/errors, and returns the shared setup/verification JSON schema. Exit-code precedence is preserved for validation (`4`) and auth/config (`2`) failures surfaced by either child verification path.
 
@@ -1717,7 +1749,7 @@ Current MCP setup/verification input shape:
 - `doctor`: optional `authFilePath`
 - `validate`: optional `fix`
 - `verify_local`: no required inputs
-- `verify_cloud`: required `projectId`, optional `service`, `environment`, `maxAgeMinutes`, `authFilePath`
+- `verify_cloud`: required `projectId`, optional `service`, `environment`, `maxAgeMinutes`, `trigger5xx`, `authFilePath`
 - `smoke`: required `projectId`, optional `service`, `environment`, `maxAgeMinutes`, `authFilePath`
 
 ### 3.3 Analysis Tools

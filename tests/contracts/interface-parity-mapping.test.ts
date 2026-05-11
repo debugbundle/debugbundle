@@ -38,7 +38,7 @@ describe("retrieval parity mapping contract", () => {
     expect(contract).toContain("| Doctor | — | `doctor` | `doctor` | CLI/MCP-only (local env) |");
     expect(contract).toContain("| Validate | — | `validate [--fix]` | `validate` | CLI/MCP-only (local env) |");
     expect(contract).toContain("| Verify local | — | `verify local` | `verify_local` | CLI/MCP-only (local env) |");
-    expect(contract).toContain("| Verify cloud | — | `verify cloud` | `verify_cloud` | Uses API internally |");
+    expect(contract).toContain("| Verify cloud | — | `verify cloud` | `verify_cloud` | Uses API internally; `--trigger-5xx`/`trigger5xx` actively proves hosted 5xx incident creation |");
     expect(contract).toContain("| Smoke test | — | `smoke` | `smoke` | CLI/MCP-only |");
     expect(contract).toContain("debugbundle_doctor            → same result as `debugbundle doctor --json`");
     expect(contract).toContain("debugbundle_validate          → same result as `debugbundle validate --json`");

@@ -237,7 +237,7 @@ Last updated: 2026-03-27
 
 **FR-CLI-01:** Core commands: `login`, `whoami`, `setup`, `connect`, `ingest`, `watch`, `process`, `clean`, `incidents`, `inspect`, `resolve`, `reopen`, `bundle`, `reproduce`, `logs`, `services`, `analyze`, `token project list/create/revoke`, `token member list/create/revoke`, `webhook list/create/update/delete/test/deliveries/retry`, `alert list/create/update/delete`, `weekly-report list/create/update/delete`, `capture-policy get/set`, `project list/create/update/delete`, `probe activate/list/deactivate`, `member list/invites/invite/cancel-invite/update-role/remove`, `billing get/capacity increase/capacity schedule-reduction/capacity cancel-reduction`.
 
-**FR-CLI-02:** Setup commands: `doctor`, `validate`, `validate --fix`, `verify local`, `verify cloud`, `smoke`.
+**FR-CLI-02:** Setup commands: `doctor`, `validate`, `validate --fix`, `verify local`, `verify cloud`, `smoke`. `verify cloud --trigger-5xx` must actively prove hosted ingestion by sending a synthetic 5xx `request_event` through the real ingestion endpoint, confirming incident visibility, and reporting bundle status.
 
 **FR-CLI-03:** Profile commands: `profile validate`, `profile show`, `profile sync`.
 
@@ -269,7 +269,7 @@ Last updated: 2026-03-27
 
 **FR-MCP-02:** MCP must be a thin adapter over the same domain services used by CLI/API.
 
-**FR-MCP-03:** MCP responses must be deterministic, compact, machine-readable, redaction-aware, and consistent with CLI/API results.
+**FR-MCP-03:** MCP responses must be deterministic, compact, machine-readable, redaction-aware, and consistent with CLI/API results. `verify_cloud` must accept `trigger5xx` so agents can run the same active hosted 5xx proof path as `debugbundle verify cloud --trigger-5xx`.
 
 ### 1.11 Web App
 

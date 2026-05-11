@@ -245,7 +245,7 @@ export async function runCli(argv: string[], dependencies: CliDependencies = {})
       }
 
       if (subcommand === "cloud") {
-        expectNoUnknownOptions(parsedArgv, ["auth-file", "json", "project-id", "service", "environment", "max-age-minutes"]);
+        expectNoUnknownOptions(parsedArgv, ["auth-file", "json", "project-id", "service", "environment", "max-age-minutes", "trigger-5xx"]);
         ensureNoExtraPositionals(parsedArgv, 2);
 
         const projectId = readStringOption(parsedArgv, "project-id");
@@ -262,6 +262,7 @@ export async function runCli(argv: string[], dependencies: CliDependencies = {})
           service?: string;
           environment?: string;
           maxAgeMinutes?: number;
+          trigger5xx?: boolean;
           authFilePath?: string;
           json?: boolean;
         });
@@ -269,6 +270,9 @@ export async function runCli(argv: string[], dependencies: CliDependencies = {})
         const maxAgeMinutes = readIntegerOption(parsedArgv, "max-age-minutes");
         if (maxAgeMinutes !== undefined) {
           input.maxAgeMinutes = maxAgeMinutes;
+        }
+        if (readBooleanOption(parsedArgv, "trigger-5xx") === true) {
+          input.trigger5xx = true;
         }
 
         return await (dependencies.verifyCloudCommand ?? defaultVerifyCloudCommand)(input);

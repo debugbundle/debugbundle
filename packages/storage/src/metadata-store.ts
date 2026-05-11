@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 import { generateProbeTriggerToken } from "../../auth/src/index.js";
 import { getTierCapabilities, type TierName } from "../../shared-types/src/index.js";
 import { buildBillableIncidentEventsPredicateSql, getRequiredStringField } from "./helpers.js";
+import { deriveIncidentReasonFromSignal } from "./incident-reason.js";
 import type {
   AcceptOrganizationInviteResult,
   AlertRuleRecord,
@@ -310,6 +311,45 @@ async function getRegressionDeployCorrelation(input: {
     branch: correlation.branch,
     deployed_at: correlation.deployed_at,
     minutes_since_deploy: correlation.minutes_since_deploy
+  };
+}
+
+type IncidentRetrievalRow = IncidentRetrievalRecord & {
+  incident_reason_event_type: string | null;
+  incident_reason_event_class: string | null;
+  incident_reason_level: string | null;
+};
+
+function mapIncidentRetrievalRow(row: IncidentRetrievalRow): IncidentRetrievalRecord {
+  const incidentReason = row.incident_reason_event_type === null
+    ? null
+    : deriveIncidentReasonFromSignal({
+        event_type: row.incident_reason_event_type,
+        event_class: row.incident_reason_event_class,
+        level: row.incident_reason_level
+      });
+
+  return {
+    incident_id: row.incident_id,
+    project_id: row.project_id,
+    project_name: row.project_name,
+    service_id: row.service_id,
+    service_name: row.service_name,
+    latest_deployment_id: row.latest_deployment_id,
+    environment: row.environment,
+    fingerprint: row.fingerprint,
+    fingerprint_version: row.fingerprint_version,
+    title: row.title,
+    severity: row.severity,
+    status: row.status,
+    first_seen_at: row.first_seen_at,
+    last_seen_at: row.last_seen_at,
+    occurrence_count: row.occurrence_count,
+    spike_detected_at: row.spike_detected_at,
+    ...(row.resolved_at === undefined ? {} : { resolved_at: row.resolved_at }),
+    regressed_at: row.regressed_at,
+    matched_fields: row.matched_fields,
+    ...(incidentReason === null ? {} : { incident_reason: incidentReason })
   };
 }
 
@@ -1779,7 +1819,7 @@ export function createPostgresMetadataStore(db: Queryable): PostgresMetadataStor
       params.push(input.limit);
       const limitIndex = params.length;
 
-      const result = await db.query<IncidentRetrievalRecord>(
+      const result = await db.query<IncidentRetrievalRow>(
         `
           SELECT
             i.id AS incident_id,
@@ -1800,10 +1840,21 @@ export function createPostgresMetadataStore(db: Queryable): PostgresMetadataStor
             i.spike_detected_at::text AS spike_detected_at,
             i.resolved_at::text AS resolved_at,
             i.regressed_at::text AS regressed_at,
-            COALESCE(i.matched_fields, ARRAY[]::text[]) AS matched_fields
+            COALESCE(i.matched_fields, ARRAY[]::text[]) AS matched_fields,
+            primary_signal.event_type AS incident_reason_event_type,
+            primary_signal.event_class AS incident_reason_event_class,
+            primary_signal.level AS incident_reason_level
           FROM incidents i
           JOIN projects p ON p.id = i.project_id
           LEFT JOIN services s ON s.id = i.service_id
+          LEFT JOIN LATERAL (
+            SELECT ie.event_type, ie.event_class, ie.level
+            FROM incident_events ie
+            WHERE ie.incident_id = i.id
+              AND ie.event_class = 'incident_signal'
+            ORDER BY ie.occurred_at ASC, ie.event_id ASC
+            LIMIT 1
+          ) primary_signal ON TRUE
           WHERE ${conditions.join("\n            AND ")}
           ORDER BY i.last_seen_at DESC, i.id DESC
           LIMIT $${limitIndex}
@@ -1811,11 +1862,11 @@ export function createPostgresMetadataStore(db: Queryable): PostgresMetadataStor
         params
       );
 
-      return result.rows;
+      return result.rows.map(mapIncidentRetrievalRow);
     },
 
     async getIncidentForOrganization(input): Promise<IncidentRetrievalRecord | null> {
-      const result = await db.query<IncidentRetrievalRecord>(
+      const result = await db.query<IncidentRetrievalRow>(
         `
           SELECT
             i.id AS incident_id,
@@ -1836,10 +1887,21 @@ export function createPostgresMetadataStore(db: Queryable): PostgresMetadataStor
             i.spike_detected_at::text AS spike_detected_at,
             i.resolved_at::text AS resolved_at,
             i.regressed_at::text AS regressed_at,
-            COALESCE(i.matched_fields, ARRAY[]::text[]) AS matched_fields
+            COALESCE(i.matched_fields, ARRAY[]::text[]) AS matched_fields,
+            primary_signal.event_type AS incident_reason_event_type,
+            primary_signal.event_class AS incident_reason_event_class,
+            primary_signal.level AS incident_reason_level
           FROM incidents i
           JOIN projects p ON p.id = i.project_id
           LEFT JOIN services s ON s.id = i.service_id
+          LEFT JOIN LATERAL (
+            SELECT ie.event_type, ie.event_class, ie.level
+            FROM incident_events ie
+            WHERE ie.incident_id = i.id
+              AND ie.event_class = 'incident_signal'
+            ORDER BY ie.occurred_at ASC, ie.event_id ASC
+            LIMIT 1
+          ) primary_signal ON TRUE
           WHERE p.organization_id = $1
             AND i.id = $2
           LIMIT 1
@@ -1847,11 +1909,12 @@ export function createPostgresMetadataStore(db: Queryable): PostgresMetadataStor
         [input.organization_id, input.incident_id]
       );
 
-      return result.rows[0] ?? null;
+      const row = result.rows[0];
+      return row === undefined ? null : mapIncidentRetrievalRow(row);
     },
 
     async resolveIncidentForOrganization(input) {
-      const result = await db.query<IncidentRetrievalRecord>(
+      const result = await db.query<IncidentRetrievalRow>(
         `
           WITH updated AS (
             UPDATE incidents i
@@ -1901,19 +1964,31 @@ export function createPostgresMetadataStore(db: Queryable): PostgresMetadataStor
             updated.spike_detected_at,
             updated.resolved_at,
             updated.regressed_at,
-            updated.matched_fields
+            updated.matched_fields,
+            primary_signal.event_type AS incident_reason_event_type,
+            primary_signal.event_class AS incident_reason_event_class,
+            primary_signal.level AS incident_reason_level
           FROM updated
           JOIN projects p ON p.id = updated.project_id
           LEFT JOIN services s ON s.id = updated.service_id
+          LEFT JOIN LATERAL (
+            SELECT ie.event_type, ie.event_class, ie.level
+            FROM incident_events ie
+            WHERE ie.incident_id = updated.incident_id::uuid
+              AND ie.event_class = 'incident_signal'
+            ORDER BY ie.occurred_at ASC, ie.event_id ASC
+            LIMIT 1
+          ) primary_signal ON TRUE
         `,
         [input.organization_id, input.incident_id, input.resolved_by_member_id, input.resolved_at]
       );
 
-      return result.rows[0] ?? null;
+      const row = result.rows[0];
+      return row === undefined ? null : mapIncidentRetrievalRow(row);
     },
 
     async reopenIncidentForOrganization(input) {
-      const result = await db.query<IncidentRetrievalRecord>(
+      const result = await db.query<IncidentRetrievalRow>(
         `
           WITH updated AS (
             UPDATE incidents i
@@ -1964,15 +2039,27 @@ export function createPostgresMetadataStore(db: Queryable): PostgresMetadataStor
             updated.spike_detected_at,
             updated.resolved_at,
             updated.regressed_at,
-            updated.matched_fields
+            updated.matched_fields,
+            primary_signal.event_type AS incident_reason_event_type,
+            primary_signal.event_class AS incident_reason_event_class,
+            primary_signal.level AS incident_reason_level
           FROM updated
           JOIN projects p ON p.id = updated.project_id
           LEFT JOIN services s ON s.id = updated.service_id
+          LEFT JOIN LATERAL (
+            SELECT ie.event_type, ie.event_class, ie.level
+            FROM incident_events ie
+            WHERE ie.incident_id = updated.incident_id::uuid
+              AND ie.event_class = 'incident_signal'
+            ORDER BY ie.occurred_at ASC, ie.event_id ASC
+            LIMIT 1
+          ) primary_signal ON TRUE
         `,
         [input.organization_id, input.incident_id]
       );
 
-      return result.rows[0] ?? null;
+      const row = result.rows[0];
+      return row === undefined ? null : mapIncidentRetrievalRow(row);
     },
 
     async listServicesForOrganization(input): Promise<ServiceRetrievalRecord[] | null> {

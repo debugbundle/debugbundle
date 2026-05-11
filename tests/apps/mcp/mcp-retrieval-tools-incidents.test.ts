@@ -11,7 +11,16 @@ describe("mcp retrieval tools incidents", () => {
 
     const tools = createRetrievalMcpTools({
       listIncidents,
-      getIncident: vi.fn().mockResolvedValue({ incident_id: "inc_123" }),
+      getIncident: vi.fn().mockResolvedValue({
+        incident_id: "inc_123",
+        incident_reason: {
+          kind: "request_failure_5xx",
+          description: "request_event matched the 5xx request incident rule",
+          event_type: "request_event",
+          event_class: "incident_signal",
+          matched_policy: "5xx request failures bypass capture_request_events suppression"
+        }
+      }),
       resolveIncident: vi.fn().mockResolvedValue({ incident_id: "inc_123", status: "resolved" }),
       reopenIncident: vi.fn(),
       getBundle: vi.fn().mockResolvedValue({ bundle_version: 1 }),
@@ -47,7 +56,19 @@ describe("mcp retrieval tools incidents", () => {
     });
     await expect(
       tools.get_incident({ bearerToken: "dbundle_mem_x", source: "cloud", incidentId: "inc_123" })
-    ).resolves.toEqual({ incident: { incident_id: "inc_123", source: "cloud" } });
+    ).resolves.toEqual({
+      incident: {
+        incident_id: "inc_123",
+        incident_reason: {
+          kind: "request_failure_5xx",
+          description: "request_event matched the 5xx request incident rule",
+          event_type: "request_event",
+          event_class: "incident_signal",
+          matched_policy: "5xx request failures bypass capture_request_events suppression"
+        },
+        source: "cloud"
+      }
+    });
   });
 
   it("returns incident payload for resolve_incident", async () => {

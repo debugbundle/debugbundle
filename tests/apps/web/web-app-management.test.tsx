@@ -2191,7 +2191,7 @@ describe("web app — management routes", () => {
 
     expect(await screen.findByRole("heading", { name: /billing/i, level: 1 })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /billing/i })).toBeInTheDocument();
-    expect(screen.getAllByText(/current plan/i).length).toBeGreaterThan(0);
+    expect((await screen.findAllByText(/current plan/i)).length).toBeGreaterThan(0);
     expect(screen.getByText(/active projects/i)).toBeInTheDocument();
     expect(screen.getByText(/total allowance units/i)).toBeInTheDocument();
     expect(screen.getByText(/projects stay unlimited\. this account currently has 1 active project\./i)).toBeInTheDocument();

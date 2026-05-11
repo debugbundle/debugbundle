@@ -884,6 +884,41 @@ describe("cli main management routing", () => {
     expect(stdout).not.toHaveBeenCalled();
   });
 
+  it("uses process stdout and stderr defaults when stream handlers are omitted", async () => {
+    const stdoutWrite = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
+    const stderrWrite = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+    const previousExitCode = process.exitCode;
+
+    process.exitCode = undefined;
+
+    try {
+      await main({
+        argv: ["whoami"],
+        setExitCode: vi.fn(),
+        whoamiCommand: vi.fn().mockResolvedValue({
+          exitCode: 0,
+          output: "signed in"
+        })
+      });
+
+      await main({
+        argv: ["doctor"],
+        setExitCode: vi.fn(),
+        doctorCommand: vi.fn().mockResolvedValue({
+          exitCode: 1,
+          output: "doctor failed"
+        })
+      });
+
+      expect(stdoutWrite).toHaveBeenCalledWith("signed in\n");
+      expect(stderrWrite).toHaveBeenCalledWith("doctor failed\n");
+    } finally {
+      process.exitCode = previousExitCode;
+      stdoutWrite.mockRestore();
+      stderrWrite.mockRestore();
+    }
+  });
+
   it("routes weekly-report CRUD arguments into the stored-auth wrappers", async () => {
     const listWeeklyReportChannelsCommand = vi.fn().mockResolvedValue({ exitCode: 0, output: "weekly-list" });
     const createWeeklyReportChannelCommand = vi.fn().mockResolvedValue({ exitCode: 0, output: "weekly-create" });

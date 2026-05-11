@@ -2,6 +2,7 @@
 // External consumers continue importing from this file unchanged.
 
 export * from "./types.js";
+export * from "./incident-reason.js";
 export type {
 	BillingStore,
 	BillingSummaryRecord,

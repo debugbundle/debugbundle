@@ -123,7 +123,14 @@ describe("retrieval api client", () => {
           spike_detected_at: null,
           resolved_at: null,
           regressed_at: null,
-          matched_fields: ["fingerprint"]
+          matched_fields: ["fingerprint"],
+          incident_reason: {
+            kind: "request_failure_5xx",
+            description: "request_event matched the 5xx request incident rule",
+            event_type: "request_event",
+            event_class: "incident_signal",
+            matched_policy: "5xx request failures bypass capture_request_events suppression"
+          }
         }
       }
     });
@@ -132,6 +139,7 @@ describe("retrieval api client", () => {
     const incident = await api.getIncident({ bearerToken: "dbundle_mem_x", incidentId: "inc_123" });
 
     expect(incident.incident_id).toBe("inc_123");
+    expect(incident.incident_reason?.kind).toBe("request_failure_5xx");
     expect(request).toHaveBeenCalledWith({
       method: "GET",
       path: "/v1/incidents/inc_123",

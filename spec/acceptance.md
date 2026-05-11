@@ -303,6 +303,14 @@ Last updated: 2026-03-13
 - **When** `debugbundle verify cloud` is run
 - **Then** the system confirms that production traffic is reaching DebugBundle
 
+### AC-CLI-06a: Active Cloud 5xx Verification
+- **Given** an authenticated CLI session with access to a hosted project
+- **When** `debugbundle verify cloud --trigger-5xx --project-id <id>` is run
+- **Then** the CLI creates a short-lived verification project token, sends a synthetic `request_event` with `response_status >= 500` through `POST /v1/events`, and revokes the temporary token
+- **And** the synthetic event is clearly marked as verification data while still flowing through the normal ingestion, normalization, grouping, bundle, and retrieval path
+- **And** the command reports accepted event count, incident id, bundle status, the 5xx request classification reason, and a suggested next command
+- **And** MCP `verify_cloud` supports the same behavior with `trigger5xx: true`
+
 ### AC-CLI-07: Ingest Command
 - **Given** a local-only or connected project with a file containing newline-delimited JSON events
 - **When** `debugbundle ingest <source-file>` is run

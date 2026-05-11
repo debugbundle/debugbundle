@@ -1,5 +1,6 @@
 import type { NormalizedEvent } from "../../event-normalizer/src/index.js";
 import type { EventClass, EventEnvelope, TierName } from "../../shared-types/src/index.js";
+import type { IncidentReason } from "./incident-reason.js";
 
 export interface ObjectStorePutInput {
   key: string;
@@ -652,6 +653,7 @@ export interface IncidentRetrievalRecord extends Record<string, unknown> {
   resolved_at?: string | null;
   regressed_at: string | null;
   matched_fields: string[];
+  incident_reason?: IncidentReason;
 }
 
 export interface ResolveIncidentForOrganizationInput {

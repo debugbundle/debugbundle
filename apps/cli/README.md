@@ -19,6 +19,8 @@ npm install --save-dev @debugbundle/cli
 ```sh
 debugbundle setup --non-interactive
 debugbundle doctor
+debugbundle verify local
+debugbundle verify cloud --project-id <id> --trigger-5xx
 debugbundle process
 debugbundle incidents
 ```

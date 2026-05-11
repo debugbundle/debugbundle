@@ -153,6 +153,67 @@ describe("cli verify local command", () => {
     });
   });
 
+  it("returns the default local processing message when processing reports no work", async () => {
+    const rootDirectory = await createVerifyFixtureRepository();
+
+    await setupCommand(
+      {},
+      {
+        cwd: () => rootDirectory,
+        now: () => new Date("2026-03-14T00:00:00.000Z")
+      }
+    );
+
+    const result = await verifyLocalCommand(
+      {
+        json: true
+      },
+      {
+        cwd: () => rootDirectory,
+        processCommand: vi.fn().mockResolvedValue({
+          exitCode: 0,
+          output: JSON.stringify({
+            status: "ok",
+            processed: false,
+            files_processed: 0,
+            events_processed: 0,
+            incidents_processed: 0,
+            services: []
+          })
+        })
+      }
+    );
+
+    expect(result.exitCode).toBe(1);
+    expect(JSON.parse(result.output)).toEqual({
+      status: "error",
+      checks: [
+        {
+          name: "profile-schema",
+          status: "ok",
+          message: "Validated .debugbundle/profile.json"
+        },
+        {
+          name: "local-event-batch",
+          status: "ok",
+          message: "Wrote synthetic local event batch."
+        },
+        {
+          name: "local-processing",
+          status: "error",
+          message: "Synthetic local event batch was not processed."
+        }
+      ],
+      warnings: [],
+      errors: ["Synthetic local event batch was not processed."],
+      suggested_actions: [
+        "Run debugbundle setup if the local scaffold is missing or invalid.",
+        "Re-run debugbundle verify local after the local event pipeline is healthy."
+      ],
+      auto_fix_available: false
+    });
+  });
+
   it("returns json errors when local processing produces no incident or the local bundle read fails", async () => {
     const rootDirectory = await createVerifyFixtureRepository();
 
@@ -491,6 +552,281 @@ describe("cli verify cloud command", () => {
     });
     expect(JSON.parse(result.output)).toMatchObject({
       status: "healthy"
+    });
+  });
+
+  it("actively verifies cloud 5xx request incidents through real ingestion", async () => {
+    const createProjectToken = vi.fn().mockResolvedValue({
+      token_id: "tok_verify_123",
+      project_id: "proj_123",
+      label: "debugbundle verify cloud 20260314001000",
+      created_at: "2026-03-14T00:10:00.000Z",
+      last_used_at: null,
+      revoked_at: null,
+      expires_at: null,
+      plaintext: "dbundle_proj_verify"
+    });
+    const revokeProjectToken = vi.fn().mockResolvedValue({
+      token_id: "tok_verify_123",
+      project_id: "proj_123",
+      label: "debugbundle verify cloud 20260314001000",
+      created_at: "2026-03-14T00:10:00.000Z",
+      last_used_at: null,
+      revoked_at: "2026-03-14T00:10:01.000Z",
+      expires_at: null
+    });
+    const sendEvents = vi.fn().mockResolvedValue({ accepted: 1, rejected: 0, errors: [] });
+    const listIncidents = vi.fn().mockResolvedValue({
+      incidents: [
+        {
+          incident_id: "inc_verify_5xx",
+          last_seen_at: "2026-03-14T00:10:03.000Z",
+          incident_reason: {
+            kind: "request_failure_5xx",
+            description: "request_event matched the 5xx request incident rule",
+            event_type: "request_event",
+            event_class: "incident_signal",
+            matched_policy: "5xx request failures bypass capture_request_events suppression"
+          }
+        }
+      ],
+      next_cursor: null
+    });
+    const getBundle = vi.fn().mockResolvedValue({ bundle_version: 1 });
+
+    const result = await verifyCloudCommand(
+      {
+        projectId: "proj_123",
+        service: "checkout-api",
+        environment: "production",
+        trigger5xx: true,
+        json: true
+      },
+      {
+        now: () => new Date("2026-03-14T00:10:00.000Z"),
+        readAuthState: vi.fn().mockResolvedValue({
+          bearer_token: "dbundle_mem_secret_token",
+          base_url: "https://api.debugbundle.com"
+        }),
+        createProjectToken,
+        revokeProjectToken,
+        sendEvents,
+        listIncidents,
+        getBundle,
+        sleep: vi.fn().mockResolvedValue(undefined),
+        pollAttempts: 1
+      }
+    );
+
+    expect(result.exitCode).toBe(0);
+    expect(createProjectToken).toHaveBeenCalledWith({
+      bearerToken: "dbundle_mem_secret_token",
+      projectId: "proj_123",
+      label: "debugbundle verify cloud 20260314001000"
+    });
+    expect(sendEvents).toHaveBeenCalledWith({
+      baseUrl: "https://api.debugbundle.com",
+      projectToken: "dbundle_proj_verify",
+      events: [
+        expect.objectContaining({
+          event_type: "request_event",
+          sdk_name: "debugbundle-cli",
+          service: expect.objectContaining({
+            name: "checkout-api",
+            environment: "production"
+          }),
+          payload: expect.objectContaining({
+            method: "GET",
+            path: "/debugbundle/verify/cloud",
+            route_template: "/debugbundle/verify/cloud",
+            response_status: 503,
+            response_headers: expect.objectContaining({
+              "x-debugbundle-verification": "true"
+            })
+          })
+        })
+      ]
+    });
+    expect(revokeProjectToken).toHaveBeenCalledWith({
+      bearerToken: "dbundle_mem_secret_token",
+      projectId: "proj_123",
+      tokenId: "tok_verify_123"
+    });
+    expect(listIncidents).toHaveBeenCalledWith({
+      bearerToken: "dbundle_mem_secret_token",
+      projectId: "proj_123",
+      environment: "production",
+      service: "checkout-api",
+      limit: 5
+    });
+    expect(getBundle).toHaveBeenCalledWith({
+      bearerToken: "dbundle_mem_secret_token",
+      incidentId: "inc_verify_5xx"
+    });
+    expect(JSON.parse(result.output)).toEqual({
+      status: "healthy",
+      checks: [
+        {
+          name: "auth-state",
+          status: "ok",
+          message: "Found valid auth state."
+        },
+        {
+          name: "active-5xx-event",
+          status: "ok",
+          message: "Sent synthetic 5xx request_event through cloud ingestion."
+        },
+        {
+          name: "incident-retrieval",
+          status: "ok",
+          message: "Retrieved cloud incident inc_verify_5xx for the synthetic 5xx request."
+        },
+        {
+          name: "bundle-status",
+          status: "ok",
+          message: "Bundle for incident inc_verify_5xx is ready."
+        },
+        {
+          name: "verification-token-cleanup",
+          status: "ok",
+          message: "Revoked temporary verification project token."
+        }
+      ],
+      warnings: [],
+      errors: [],
+      suggested_actions: [
+        "Run debugbundle inspect inc_verify_5xx --source cloud to inspect why the incident fired.",
+        "Run debugbundle bundle inc_verify_5xx --source cloud to fetch the generated debug bundle."
+      ],
+      auto_fix_available: false,
+      verification: {
+        mode: "active_5xx",
+        accepted_event_count: 1,
+        incident_id: "inc_verify_5xx",
+        bundle_status: "ready",
+        classification_reason: {
+          kind: "request_failure_5xx",
+          description: "request_event matched the 5xx request incident rule",
+          event_type: "request_event",
+          event_class: "incident_signal",
+          matched_policy: "5xx request failures bypass capture_request_events suppression"
+        },
+        suggested_next_command: "debugbundle inspect inc_verify_5xx --source cloud"
+      }
+    });
+  });
+
+  it("can run active cloud verification through the default HTTP clients", async () => {
+    const fetchImpl = vi.fn()
+      .mockResolvedValueOnce({
+        status: 201,
+        text: async () => JSON.stringify({
+          token: {
+            token_id: "tok_verify_default",
+            project_id: "proj_123",
+            label: "debugbundle verify cloud default",
+            created_at: "2026-03-14T00:10:00.000Z",
+            last_used_at: null,
+            revoked_at: null,
+            expires_at: null,
+            plaintext: "dbundle_proj_default"
+          }
+        })
+      })
+      .mockResolvedValueOnce({
+        status: 202,
+        text: async () => JSON.stringify({ accepted: 1, rejected: 0, errors: [] })
+      })
+      .mockResolvedValueOnce({
+        status: 200,
+        text: async () => JSON.stringify({ incidents: [], next_cursor: null })
+      })
+      .mockResolvedValueOnce({
+        status: 200,
+        text: async () => JSON.stringify({
+          incidents: [
+            {
+              incident_id: "inc_verify_default",
+              project_id: "proj_123",
+              project_name: "Checkout",
+              service_id: null,
+              service_name: "debugbundle-verify-cloud-default",
+              latest_deployment_id: null,
+              environment: "production",
+              fingerprint: "fp_verify",
+              fingerprint_version: "v1",
+              title: "GET /debugbundle/verify/cloud failed with 503",
+              severity: "high",
+              status: "open",
+              first_seen_at: "2099-03-14T00:10:00.000Z",
+              last_seen_at: "2099-03-14T00:10:01.000Z",
+              occurrence_count: 1,
+              spike_detected_at: null,
+              resolved_at: null,
+              regressed_at: null,
+              matched_fields: ["route_template", "http_method", "http_status"]
+            }
+          ],
+          next_cursor: null
+        })
+      })
+      .mockResolvedValueOnce({
+        status: 200,
+        text: async () => JSON.stringify({ status: "pending" })
+      })
+      .mockResolvedValueOnce({
+        status: 200,
+        text: async () => JSON.stringify({
+          token: {
+            token_id: "tok_verify_default",
+            project_id: "proj_123",
+            label: "debugbundle verify cloud default",
+            created_at: "2026-03-14T00:10:00.000Z",
+            last_used_at: null,
+            revoked_at: "2099-03-14T00:10:02.000Z",
+            expires_at: null
+          }
+        })
+      });
+
+    const result = await verifyCloudCommand(
+      {
+        projectId: "proj_123",
+        trigger5xx: true,
+        json: true
+      },
+      {
+        readAuthState: vi.fn().mockResolvedValue({
+          bearer_token: "dbundle_mem_secret_token",
+          base_url: "https://api.debugbundle.com/"
+        }),
+        fetchImpl,
+        pollAttempts: 2,
+        pollIntervalMs: 0
+      }
+    );
+
+    expect(result.exitCode).toBe(0);
+    expect(fetchImpl).toHaveBeenCalledTimes(6);
+    expect(fetchImpl).toHaveBeenNthCalledWith(
+      2,
+      "https://api.debugbundle.com/v1/events",
+      expect.objectContaining({
+        method: "POST",
+        headers: expect.objectContaining({
+          authorization: "Bearer dbundle_proj_default"
+        })
+      })
+    );
+    expect(JSON.parse(result.output)).toMatchObject({
+      status: "warning",
+      warnings: ["Bundle for incident inc_verify_default is still pending."],
+      verification: {
+        mode: "active_5xx",
+        accepted_event_count: 1,
+        incident_id: "inc_verify_default",
+        bundle_status: "pending"
+      }
     });
   });
 });

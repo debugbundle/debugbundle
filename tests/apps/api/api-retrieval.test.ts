@@ -510,6 +510,83 @@ describe("api retrieval routes", () => {
     });
   });
 
+  it("should return incident_reason in incident retrieval payloads when available", async (): Promise<void> => {
+    const app = createApiServer({
+      ingestionPersistence: {
+        persistAndEnqueue: vi.fn()
+      },
+      ingestionMetadata: {
+        resolveProjectByTokenHash: vi.fn()
+      },
+      memberAuth: {
+        resolveMemberByTokenHash: vi.fn().mockResolvedValue({ member_id: "mem_123", organization_id: "org_123" })
+      },
+      tokenManagement: createTokenManagementDependency(),
+      incidentRetrieval: {
+        listIncidentsForOrganization: vi.fn().mockResolvedValue([]),
+        getIncidentForOrganization: vi.fn().mockResolvedValue({
+          incident_id: "inc_5xx",
+          project_id: "550e8400-e29b-41d4-a716-446655440000",
+          project_name: "Main App",
+          service_id: "svc_123",
+          service_name: "checkout-api",
+          latest_deployment_id: null,
+          environment: "production",
+          fingerprint: "fp_5xx",
+          fingerprint_version: "v1",
+          title: "request GET /checkout",
+          severity: "high",
+          status: "open",
+          first_seen_at: "2026-03-11T00:00:00.000Z",
+          last_seen_at: "2026-03-11T00:10:00.000Z",
+          occurrence_count: 3,
+          spike_detected_at: null,
+          resolved_at: null,
+          regressed_at: null,
+          matched_fields: ["route_template", "http_method", "http_status"],
+          incident_reason: {
+            kind: "request_failure_5xx",
+            description: "request_event matched the 5xx request incident rule",
+            event_type: "request_event",
+            event_class: "incident_signal",
+            matched_policy: "5xx request failures bypass capture_request_events suppression"
+          }
+        }),
+        listIncidentLogsForOrganization: vi.fn().mockResolvedValue([]),
+        listServicesForOrganization: vi.fn().mockResolvedValue([])
+      },
+      objectStoreReader: {
+        getObject: vi.fn()
+      },
+      webhookDelivery: {
+        listDeliveriesForWebhookInOrganization: vi.fn().mockResolvedValue({ deliveries: [] }),
+        retryDeliveryForOrganization: vi.fn().mockResolvedValue(null)
+      }
+    });
+
+    const response = await app.inject({
+      method: "GET",
+      url: "/v1/incidents/inc_5xx",
+      headers: {
+        authorization: "Bearer dbundle_mem_test"
+      }
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toEqual({
+      incident: expect.objectContaining({
+        incident_id: "inc_5xx",
+        incident_reason: {
+          kind: "request_failure_5xx",
+          description: "request_event matched the 5xx request incident rule",
+          event_type: "request_event",
+          event_class: "incident_signal",
+          matched_policy: "5xx request failures bypass capture_request_events suppression"
+        }
+      })
+    });
+  });
+
   it("should resolve an incident for an authenticated member token", async (): Promise<void> => {
     const resolveIncidentForOrganization = vi.fn().mockResolvedValue({
       incident_id: "inc_123",

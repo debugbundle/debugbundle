@@ -149,6 +149,44 @@ describe("cli retrieval commands core", () => {
     expect(result.output).toBe(incidentDetailGolden);
   });
 
+  it("renders incident reason details in inspect output when available", async () => {
+    const result = await getIncidentCommand(
+      {
+        bearerToken: "dbundle_mem_x",
+        incidentId: "inc_5xx"
+      },
+      {
+        getIncident: vi.fn().mockResolvedValue({
+          incident_id: "inc_5xx",
+          title: "Checkout 5xx",
+          severity: "high",
+          status: "open",
+          occurrence_count: 2,
+          environment: "production",
+          incident_reason: {
+            kind: "request_failure_5xx",
+            description: "request_event matched the 5xx request incident rule",
+            event_type: "request_event",
+            event_class: "incident_signal",
+            matched_policy: "5xx request failures bypass capture_request_events suppression"
+          }
+        })
+      }
+    );
+
+    expect(result.exitCode).toBe(0);
+    expect(result.output).toBe([
+      "Incident: inc_5xx",
+      "Title: Checkout 5xx",
+      "Severity: high",
+      "Status: open",
+      "Environment: production",
+      "Occurrences: 2",
+      "Reason: request_failure_5xx",
+      "Why: request_event matched the 5xx request incident rule"
+    ].join("\n"));
+  });
+
   it("renders fallback incident detail fields when optional values are absent", async () => {
     const result = await getIncidentCommand(
       {

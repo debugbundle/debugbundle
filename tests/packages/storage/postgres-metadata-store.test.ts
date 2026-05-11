@@ -1955,6 +1955,58 @@ describe("postgres metadata store", () => {
     expect(fetched?.incident_id).toBe("inc_123");
   });
 
+  it("should derive incident_reason from primary incident-signal metadata for 5xx request incidents", async (): Promise<void> => {
+    const query = vi.fn().mockResolvedValue({
+      rows: [
+        {
+          incident_id: "inc_5xx",
+          project_id: "proj_123",
+          project_name: "Main App",
+          service_id: "svc_123",
+          service_name: "checkout-api",
+          latest_deployment_id: null,
+          environment: "production",
+          fingerprint: "fp_5xx",
+          fingerprint_version: "v1",
+          title: "request GET /checkout",
+          severity: "high",
+          status: "open",
+          first_seen_at: "2026-03-10T00:00:00.000Z",
+          last_seen_at: "2026-03-10T00:10:00.000Z",
+          occurrence_count: 3,
+          spike_detected_at: null,
+          resolved_at: null,
+          regressed_at: null,
+          matched_fields: ["route_template", "http_method", "http_status"],
+          incident_reason_event_type: "request_event",
+          incident_reason_event_class: "incident_signal",
+          incident_reason_level: null
+        }
+      ]
+    });
+
+    const store = createPostgresMetadataStore({ query });
+
+    const listed = await store.listIncidentsForOrganization({
+      organization_id: "org_123",
+      limit: 20
+    });
+
+    expect(listed).toEqual([
+      expect.objectContaining({
+        incident_id: "inc_5xx",
+        incident_reason: {
+          kind: "request_failure_5xx",
+          description: "request_event matched the 5xx request incident rule",
+          event_type: "request_event",
+          event_class: "incident_signal",
+          matched_policy: "5xx request failures bypass capture_request_events suppression"
+        }
+      })
+    ]);
+    expect(query).toHaveBeenCalledWith(expect.stringContaining("FROM incident_events ie"), ["org_123", 20]);
+  });
+
   it("should list organization-scoped services for a project", async (): Promise<void> => {
     const query = vi
       .fn()

@@ -1,4 +1,5 @@
 import { RetrievalApiError } from "../../../packages/retrieval-client/src/index.js";
+import type { IncidentReason } from "../../../packages/storage/src/index.js";
 import {
   createAuthenticatedRetrievalApi,
   mapCliAuthErrorToResult,
@@ -38,6 +39,7 @@ interface IncidentLike {
   resolved_at?: string | null | undefined;
   last_seen_at?: string;
   source?: RetrievalSource;
+  incident_reason?: IncidentReason | undefined;
 }
 
 interface LogLike {
@@ -92,6 +94,12 @@ function formatIncidentDetail(incident: IncidentLike): string {
     `Status: ${incident.status}`,
     `Environment: ${incident.environment ?? "unknown"}`,
     `Occurrences: ${incident.occurrence_count ?? 0}`,
+    ...(incident.incident_reason === undefined
+      ? []
+      : [
+          `Reason: ${incident.incident_reason.kind}`,
+          `Why: ${incident.incident_reason.description}`
+        ]),
     ...(incident.resolved_at !== undefined && incident.resolved_at !== null ? [`Resolved at: ${incident.resolved_at}`] : [])
   ].join("\n");
 }

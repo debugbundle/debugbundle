@@ -1,5 +1,15 @@
 import { z } from "zod";
 
+export const IncidentReasonSchema = z
+  .object({
+    kind: z.enum(["backend_exception", "frontend_exception", "request_failure_5xx", "error_log"]),
+    description: z.string(),
+    event_type: z.enum(["backend_exception", "frontend_exception", "request_event", "log_event"]),
+    event_class: z.literal("incident_signal"),
+    matched_policy: z.string()
+  })
+  .strict();
+
 export const IncidentSchema = z
   .object({
     incident_id: z.string(),
@@ -20,7 +30,8 @@ export const IncidentSchema = z
     spike_detected_at: z.string().nullable(),
     resolved_at: z.string().nullable().optional(),
     regressed_at: z.string().nullable(),
-    matched_fields: z.array(z.string())
+    matched_fields: z.array(z.string()),
+    incident_reason: IncidentReasonSchema.optional()
   })
   .strict();
 

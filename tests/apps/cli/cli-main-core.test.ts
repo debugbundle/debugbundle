@@ -293,6 +293,7 @@ describe("cli main core routing", () => {
       "production",
       "--max-age-minutes",
       "20",
+      "--trigger-5xx",
       "--auth-file",
       "/tmp/auth.json",
       "--json"
@@ -305,6 +306,7 @@ describe("cli main core routing", () => {
       service: "checkout-api",
       environment: "production",
       maxAgeMinutes: 20,
+      trigger5xx: true,
       authFilePath: "/tmp/auth.json",
       json: true
     });

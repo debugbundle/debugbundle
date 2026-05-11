@@ -145,6 +145,7 @@ describe("mcp setup tools", () => {
         service: "checkout-api",
         environment: "production",
         maxAgeMinutes: 20,
+        trigger5xx: true,
         authFilePath: "/tmp/auth.json"
       })
     ).resolves.toEqual({
@@ -160,6 +161,7 @@ describe("mcp setup tools", () => {
       service: "checkout-api",
       environment: "production",
       maxAgeMinutes: 20,
+      trigger5xx: true,
       authFilePath: "/tmp/auth.json",
       json: true
     });

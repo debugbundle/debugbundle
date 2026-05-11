@@ -33,6 +33,7 @@ export function parseArgv(argv: string[]): ParsedArgv {
       || token === "--events"
       || token === "--bundles"
       || token === "--all"
+      || token === "--trigger-5xx"
     ) {
       options.set(token.slice(2), true);
       continue;

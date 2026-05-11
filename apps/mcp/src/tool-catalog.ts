@@ -114,6 +114,7 @@ export const MCP_TOOL_CATALOG = [
       service: z.string().optional(),
       environment: z.string().optional(),
       maxAgeMinutes: z.number().optional(),
+      trigger5xx: z.boolean().optional(),
       authFilePath: z.string().optional(),
     }),
   },
