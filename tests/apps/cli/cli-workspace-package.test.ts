@@ -46,14 +46,16 @@ describe("cli workspace package", () => {
     expect(packageJson.engines).toEqual({ node: ">=24 <25" });
     expect(packageJson.type).toBe("module");
     expect(packageJson.scripts).toMatchObject({
-      start: "tsx src/main.ts",
-      build: "esbuild src/main.ts --bundle --platform=node --format=esm --target=node24 --outfile=dist/main.js",
+      start: "tsx src/entrypoint.ts",
+      build: "esbuild src/entrypoint.ts --bundle --platform=node --format=cjs --target=node24 --external:@node-rs/argon2 --outfile=dist/main.cjs",
       prepack: "npm run build"
     });
     expect(packageJson.bin).toEqual({
       debugbundle: "bin/debugbundle.js"
     });
-    expect(packageJson.dependencies).toBeUndefined();
+    expect(packageJson.dependencies).toMatchObject({
+      "@node-rs/argon2": "^2.0.2"
+    });
     expect(packageJson.devDependencies).toMatchObject({
       esbuild: "^0.27.3",
       tsx: "^4.20.5"
@@ -64,8 +66,9 @@ describe("cli workspace package", () => {
   it("keeps the published bin wrapper portable outside the monorepo", () => {
     const binWrapper = readFileSync(new URL("../../../apps/cli/bin/debugbundle.js", import.meta.url), "utf8");
 
-    expect(binWrapper).toContain('resolve(packageRoot, "dist/main.js")');
-    expect(binWrapper).toContain("await main()");
+    expect(binWrapper).toContain('resolve(packageRoot, "dist/main.cjs")');
+    expect(binWrapper).toContain("createRequire");
+    expect(binWrapper).toContain("require(mainPath)");
     expect(binWrapper).not.toContain("tsx");
     expect(binWrapper).not.toContain("node_modules/tsx");
     expect(binWrapper).not.toContain("../../..");

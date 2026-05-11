@@ -125,6 +125,10 @@ importers:
         version: 4.1.2(@types/node@24.12.0)(jsdom@26.1.0)(msw@2.12.14(@types/node@24.12.0)(typescript@6.0.2))(vite@8.0.4(@emnapi/core@1.9.0)(@emnapi/runtime@1.9.2)(@types/node@24.12.0)(esbuild@0.27.3)(jiti@2.6.1)(tsx@4.21.0))
 
   apps/cli:
+    dependencies:
+      '@node-rs/argon2':
+        specifier: ^2.0.2
+        version: 2.0.2
     devDependencies:
       esbuild:
         specifier: ^0.27.3
@@ -134,6 +138,10 @@ importers:
         version: 4.21.0
 
   apps/mcp:
+    dependencies:
+      '@node-rs/argon2':
+        specifier: ^2.0.2
+        version: 2.0.2
     devDependencies:
       esbuild:
         specifier: ^0.27.3
@@ -603,9 +611,6 @@ packages:
 
   '@emnapi/core@1.9.0':
     resolution: {integrity: sha512-0DQ98G9ZQZOxfUcQn1waV2yS8aWdZ6kJMbYCJB3oUBecjWYO1fqJ+a1DRfPF3O5JEkwqwP1A9QEN/9mYm2Yd0w==}
-
-  '@emnapi/runtime@1.9.0':
-    resolution: {integrity: sha512-QN75eB0IH2ywSpRpNddCRfQIhmJYBCJ1x5Lb3IscKAL8bMnVAKnRg8dCoXbHzVLLH7P38N2Z3mtulB7W0J0FKw==}
 
   '@emnapi/runtime@1.9.2':
     resolution: {integrity: sha512-3U4+MIWHImeyu1wnmVygh5WlgfYDtyf0k8AbLhMFxOipihf6nrWC4syIm/SwEeec0mNSafiiNnMJwbza/Is6Lw==}
@@ -5345,11 +5350,6 @@ snapshots:
       tslib: 2.8.1
     optional: true
 
-  '@emnapi/runtime@1.9.0':
-    dependencies:
-      tslib: 2.8.1
-    optional: true
-
   '@emnapi/runtime@1.9.2':
     dependencies:
       tslib: 2.8.1
@@ -5630,7 +5630,7 @@ snapshots:
   '@napi-rs/wasm-runtime@0.2.12':
     dependencies:
       '@emnapi/core': 1.9.0
-      '@emnapi/runtime': 1.9.0
+      '@emnapi/runtime': 1.9.2
       '@tybys/wasm-util': 0.10.1
     optional: true
 

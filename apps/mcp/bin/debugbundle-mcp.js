@@ -1,10 +1,11 @@
 #!/usr/bin/env node
+import { createRequire } from "node:module";
 import { dirname, resolve } from "node:path";
-import { fileURLToPath, pathToFileURL } from "node:url";
+import { fileURLToPath } from "node:url";
 
+const require = createRequire(import.meta.url);
 const binDirectory = dirname(fileURLToPath(import.meta.url));
 const packageRoot = resolve(binDirectory, "..");
-const mainPath = resolve(packageRoot, "dist/main.js");
-const { main } = await import(pathToFileURL(mainPath).href);
+const mainPath = resolve(packageRoot, "dist/main.cjs");
 
-await main();
+require(mainPath);

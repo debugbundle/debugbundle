@@ -1,5 +1,3 @@
-import { pathToFileURL } from "node:url";
-
 import { analyzeCommand as defaultAnalyzeCommand } from "./analyze-command.js";
 import { cleanCommand as defaultCleanCommand } from "./clean-command.js";
 import { connectCommand as defaultConnectCommand } from "./connect-command.js";
@@ -600,8 +598,4 @@ export async function main(dependencies: MainDependencies = {}): Promise<void> {
   }
 
   setExitCode(result.exitCode);
-}
-
-if (process.argv[1] !== undefined && import.meta.url === pathToFileURL(process.argv[1]).href) {
-  void main();
 }
