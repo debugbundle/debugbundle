@@ -202,6 +202,7 @@ export interface ApiDependencies {
     }): Promise<UpdateOrganizationMemberRoleResult | null>;
   } | undefined;
   githubManagement?: {
+    getInstallUrl(): Promise<string>;
     getInstallationForOrganization(input: { organization_id: string }): Promise<GitHubInstallationRecord | null>;
     disconnectInstallationForOrganization(input: { organization_id: string }): Promise<boolean>;
     listRepositoriesForOrganization(input: {

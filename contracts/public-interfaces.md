@@ -82,6 +82,7 @@ Every capability must be available through all applicable interfaces. Operations
 | Get capture policy | `GET /v1/projects/{id}/capture-policy` | `capture-policy get` | `get_capture_policy` | Browser Session or Member Token |
 | Update capture policy | `PATCH /v1/projects/{id}/capture-policy` | `capture-policy set` | `update_capture_policy` | Browser Session or Member Token, owner only |
 | SDK config | `GET /v1/sdk/config` | — | — | SDK-only (project token, includes resolved capture policy) |
+| Get GitHub App install URL | `GET /v1/github/app/install-url` | — | — | Browser Session or Member Token, Solo+ only; web convenience route for the install/reconnect CTA |
 | Get GitHub installation | `GET /v1/github/installation` | `github status` | `get_github_status` | Browser Session or Member Token, Solo+ only |
 | Disconnect GitHub installation | `DELETE /v1/github/installation` | — | — | Web/API only; mirrors web-initiated installation flow |
 | List GitHub repositories | `GET /v1/github/repositories` | `github repos` | `list_github_repositories` | Browser Session or Member Token, Solo+ only |
@@ -1254,6 +1255,7 @@ The webhook endpoint handles `installation.created`, `installation.deleted`, `in
 
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
+| GET | `/v1/github/app/install-url` | Browser Session or Member Token | Get the GitHub App installation URL used by the web install/reconnect CTA |
 | GET | `/v1/github/installation` | Browser Session or Member Token | Get current org's GitHub App installation status |
 | DELETE | `/v1/github/installation` | Browser Session or Member Token (owner only) | Disconnect GitHub installation |
 | GET | `/v1/github/repositories` | Browser Session or Member Token | List repositories available to the installation |

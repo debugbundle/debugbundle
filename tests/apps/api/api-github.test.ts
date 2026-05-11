@@ -14,7 +14,7 @@ function createServer(overrides: {
   memberAuth?: MemberAuthDependency;
   webAuth?: Partial<WebAuthDependency>;
   billingManagement?: Partial<BillingManagementDependency>;
-  githubManagement?: GitHubManagementDependency;
+  githubManagement?: Partial<GitHubManagementDependency>;
   authRateLimiter?: ApiServerDependencies["authRateLimiter"];
 } = {}) {
   return createApiServer({
@@ -80,6 +80,7 @@ function createServer(overrides: {
     githubManagement:
       overrides.githubManagement ??
       mockedObject<NonNullable<ApiServerDependencies["githubManagement"]>>({
+        getInstallUrl: vi.fn().mockResolvedValue("https://github.com/apps/debugbundle-automation/installations/new"),
         getInstallationForOrganization: vi.fn().mockResolvedValue({
           id: "ghi_1",
           installation_id: 123,
@@ -120,7 +121,8 @@ function createServer(overrides: {
           updated_at: "2026-03-26T00:00:00.000Z"
         }),
         verifyWebhookSignature: vi.fn().mockReturnValue(true),
-        processWebhook: vi.fn().mockResolvedValue(undefined)
+        processWebhook: vi.fn().mockResolvedValue(undefined),
+        ...overrides.githubManagement
       })
   });
 }
@@ -166,6 +168,25 @@ describe("api github routes", () => {
     expect(response.statusCode).toBe(200);
     expect(response.json().installation.account_login).toBe("debugbundle");
     expect(githubManagement.getInstallationForOrganization).toHaveBeenCalledWith({ organization_id: "org_123" });
+  });
+
+  it("returns the GitHub App install URL for authenticated callers on solo tiers", async () => {
+    const githubManagement = {
+      getInstallUrl: vi.fn().mockResolvedValue("https://github.com/apps/debugbundle-automation/installations/new")
+    };
+    const app = createServer({ githubManagement });
+
+    const response = await app.inject({
+      method: "GET",
+      url: "/v1/github/app/install-url",
+      headers: {
+        authorization: "Bearer dbundle_mem_test"
+      }
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toEqual({ install_url: "https://github.com/apps/debugbundle-automation/installations/new" });
+    expect(githubManagement.getInstallUrl).toHaveBeenCalledTimes(1);
   });
 
   it("rejects github installation routes when the organization tier lacks access", async () => {

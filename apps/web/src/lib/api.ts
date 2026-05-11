@@ -261,6 +261,10 @@ export interface GitHubInstallationRecord {
   updated_at: string;
 }
 
+interface GitHubInstallUrlResponse {
+  install_url: string;
+}
+
 export interface GitHubRepositoryRecord {
   id: number;
   owner: string;
@@ -810,6 +814,16 @@ export async function getGitHubInstallation(): Promise<GitHubInstallationRecord 
 
     throw error;
   }
+}
+
+export async function getGitHubInstallUrl(): Promise<string> {
+  const body = await readJson<GitHubInstallUrlResponse>(
+    await fetch(`${API_BASE}/v1/github/app/install-url`, {
+      credentials: "include"
+    })
+  );
+
+  return body.install_url;
 }
 
 export async function listGitHubRepositories(): Promise<GitHubRepositoryRecord[]> {

@@ -58,6 +58,22 @@ function mapGithubManagementError(error: string): { status: number; body: { erro
 }
 
 export function registerGitHubRoutes(app: FastifyInstance, dependencies: ApiDependencies): void {
+  app.get("/v1/github/app/install-url", async (request, reply) => {
+    const member = await requireRateLimitedMemberAuth(request, reply, dependencies, "management-read");
+    if (member === null) {
+      return;
+    }
+    if (dependencies.githubManagement === undefined) {
+      return reply.status(503).send({ error: "github_not_configured" });
+    }
+    if (!(await ensureGitHubAutomationEnabled(dependencies, member.organization_id))) {
+      return reply.status(403).send({ error: "upgrade_required" });
+    }
+
+    const install_url = await dependencies.githubManagement.getInstallUrl();
+    return reply.status(200).send({ install_url });
+  });
+
   app.get("/v1/github/installation", async (request, reply) => {
     const member = await requireRateLimitedMemberAuth(request, reply, dependencies, "management-read");
     if (member === null) {

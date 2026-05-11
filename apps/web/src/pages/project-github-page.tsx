@@ -18,6 +18,7 @@ import { useDelayedVisibility } from "../lib/use-delayed-visibility.js";
 import {
   createProjectGitHubRule,
   deleteProjectGitHubRule,
+  getGitHubInstallUrl,
   getGitHubInstallation,
   getProjectGitHubRepo,
   listGitHubRepositories,
@@ -37,6 +38,7 @@ import { showErrorToast, showSuccessToast } from "../lib/notify.js";
 
 interface GitHubSettingsState {
   installation: GitHubInstallationRecord | null;
+  installUrl: string | null;
   repositories: GitHubRepositoryRecord[];
   repo: ProjectGitHubRepoRecord | null;
   rules: GitHubDispatchRuleRecord[];
@@ -103,6 +105,10 @@ export function ProjectGitHubPage(): JSX.Element {
 
       try {
         const installation = await getGitHubInstallation();
+        const installUrl =
+          installation === null || installation.status === "suspended" || installation.status === "removed"
+            ? await getGitHubInstallUrl()
+            : null;
         const [repo, rules, deliveries] = await Promise.all([
           getProjectGitHubRepo(project.project_id),
           listProjectGitHubRules(project.project_id),
@@ -115,7 +121,7 @@ export function ProjectGitHubPage(): JSX.Element {
           return;
         }
 
-        setGitHubSettings({ installation, repositories, repo, rules, deliveries });
+        setGitHubSettings({ installation, installUrl, repositories, repo, rules, deliveries });
       } catch (error) {
         if (cancelled) {
           return;
@@ -337,7 +343,17 @@ export function ProjectGitHubPage(): JSX.Element {
               title="Connect the GitHub App to start automation"
               description="No GitHub App installation is connected to this workspace yet. Complete the install flow, then return here to assign a repository and manage dispatch rules."
               tone="neutral"
-            />
+            >
+              {githubSettings.installUrl === null ? null : (
+                <div className="flex flex-wrap gap-2">
+                  <Button asChild type="button" variant="outline" size="sm">
+                    <a href={githubSettings.installUrl} target="_blank" rel="noreferrer">
+                      Install GitHub App
+                    </a>
+                  </Button>
+                </div>
+              )}
+            </CalloutCard>
           ) : (
             <>
               {githubSettings.installation?.status === "suspended" || githubSettings.installation?.status === "removed" ? (
@@ -346,7 +362,17 @@ export function ProjectGitHubPage(): JSX.Element {
                   title="GitHub connection lost"
                   description="Dispatches are paused until the installation is active again. Reconnect the GitHub App in the linked account before expecting new automation deliveries."
                   tone="warning"
-                />
+                >
+                  {githubSettings.installUrl === null ? null : (
+                    <div className="flex flex-wrap gap-2">
+                      <Button asChild type="button" variant="outline" size="sm">
+                        <a href={githubSettings.installUrl} target="_blank" rel="noreferrer">
+                          Reconnect GitHub App
+                        </a>
+                      </Button>
+                    </div>
+                  )}
+                </CalloutCard>
               ) : null}
 
               <div className="rounded-lg border border-border/80 bg-background/60 p-4">

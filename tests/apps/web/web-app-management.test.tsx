@@ -635,6 +635,12 @@ describe("web app — management routes", () => {
         });
       }
 
+      if (url.endsWith("/v1/github/app/install-url") && init?.method === undefined) {
+        return jsonResponse(200, {
+          install_url: "https://github.com/apps/debugbundle-automation/installations/new"
+        });
+      }
+
       if (url.endsWith("/v1/github/repositories") && init?.method === undefined) {
         return jsonResponse(200, {
           repositories: [createGitHubRepository()]
@@ -668,6 +674,10 @@ describe("web app — management routes", () => {
 
     expect(await screen.findByText(/github connection lost/i)).toBeInTheDocument();
     expect(screen.getByText(/dispatches are paused until the installation is active again/i)).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /reconnect github app/i })).toHaveAttribute(
+      "href",
+      "https://github.com/apps/debugbundle-automation/installations/new"
+    );
   });
 
   it("shows setup guidance when no github installation is connected yet", async () => {
@@ -688,6 +698,12 @@ describe("web app — management routes", () => {
 
       if (url.endsWith("/v1/github/installation") && init?.method === undefined) {
         return jsonResponse(404, { error: "installation_not_found" });
+      }
+
+      if (url.endsWith("/v1/github/app/install-url") && init?.method === undefined) {
+        return jsonResponse(200, {
+          install_url: "https://github.com/apps/debugbundle-automation/installations/new"
+        });
       }
 
       if (url.endsWith("/v1/projects/proj_123/github/repo") && init?.method === undefined) {
@@ -711,6 +727,10 @@ describe("web app — management routes", () => {
 
     expect(await screen.findByText(/connect the github app to start automation/i)).toBeInTheDocument();
     expect(screen.getByText(/no github app installation is connected to this workspace yet/i)).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /install github app/i })).toHaveAttribute(
+      "href",
+      "https://github.com/apps/debugbundle-automation/installations/new"
+    );
     expect(fetchMock.mock.calls.some(([input]) => requestUrl(input).endsWith("/v1/github/repositories"))).toBe(false);
   });
 

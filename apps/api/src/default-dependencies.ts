@@ -1244,6 +1244,7 @@ export function createApiDependencies(input: CreateApiDependenciesInput): {
       ? {}
       : {
           githubManagement: {
+            getInstallUrl: () => githubAppClient.getInstallUrl(),
             getInstallationForOrganization: (input) => githubStore.getGitHubInstallationForOrganization(input),
             disconnectInstallationForOrganization: (input) => githubStore.deleteGitHubInstallationForOrganization(input),
             async listRepositoriesForOrganization(requestInput) {

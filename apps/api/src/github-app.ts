@@ -44,6 +44,12 @@ const GitHubInstallationRepositoriesResponseSchema = z
   })
   .strict();
 
+const GitHubAppResponseSchema = z
+  .object({
+    slug: z.string().min(1)
+  })
+  .strict();
+
 function encodeBase64Url(value: string): string {
   return Buffer.from(value, "utf8").toString("base64url");
 }
@@ -79,6 +85,7 @@ function normalizeGitHubPrivateKey(value: string): string {
 }
 
 export interface GitHubAppClient {
+  getInstallUrl(): Promise<string>;
   getInstallation(input: { installationId: number }): Promise<{
     installation_id: number;
     account_login: string;
@@ -143,6 +150,20 @@ export function createGitHubAppClient(
   }
 
   return {
+    async getInstallUrl() {
+      const appJwt = buildGitHubAppJwt(config.appId, config.privateKey, now());
+      const data = await requestJson(
+        "/app",
+        {
+          method: "GET",
+          headers: buildGitHubHeaders(`Bearer ${appJwt}`)
+        },
+        GitHubAppResponseSchema
+      );
+
+      return `https://github.com/apps/${encodeURIComponent(data.slug)}/installations/new`;
+    },
+
     async getInstallation(input) {
       const appJwt = buildGitHubAppJwt(config.appId, config.privateKey, now());
       const data = await requestJson(
