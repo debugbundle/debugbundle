@@ -786,6 +786,11 @@ export interface ProbeEventCandidateReference {
   occurred_at: string;
 }
 
+export interface LogEventCandidateReference {
+  event_id: string;
+  occurred_at: string;
+}
+
 export interface BundleBuildContextStore {
   getBundleBuildContext(input: { project_id: string; incident_id: string }): Promise<BundleBuildContext | null>;
   hasBundleGenerationForSourceEvent?(input: { incident_id: string; event_id: string }): Promise<boolean>;
@@ -815,6 +820,13 @@ export interface BundleBuildContextStore {
     window_start: string;
     window_end: string;
   }): Promise<ProbeEventCandidateReference[]>;
+  listLogEventCandidatesForServiceWindow(input: {
+    project_id: string;
+    service_name: string;
+    environment: string;
+    window_start: string;
+    window_end: string;
+  }): Promise<LogEventCandidateReference[]>;
 }
 
 export interface WeeklyReportTopSpikingIncident {

@@ -18,14 +18,14 @@ importers:
         specifier: workspace:*
         version: link:packages/auth
       '@debugbundle/redaction':
-        specifier: 0.1.0
-        version: 0.1.0
+        specifier: 0.1.1
+        version: 0.1.1
       '@debugbundle/sdk-node':
-        specifier: 0.1.0
-        version: 0.1.0
+        specifier: 0.1.1
+        version: 0.1.1
       '@debugbundle/shared-types':
-        specifier: 0.1.0
-        version: 0.1.0
+        specifier: 0.1.1
+        version: 0.1.1
       '@node-rs/argon2':
         specifier: ^2.0.2
         version: 2.0.2
@@ -590,14 +590,20 @@ packages:
   '@debugbundle/redaction@0.1.0':
     resolution: {integrity: sha512-q+g0BNToivk+ujEuVwaIb3MsqdUkYUvNUvzgqD3x6b2fPhwpfrxke9Z8rcLEQYrnC6Vqf0PP1dlJdecHINlHtw==}
 
+  '@debugbundle/redaction@0.1.1':
+    resolution: {integrity: sha512-0K0OEhTHP1Y3azZSQfkfzGyHPCs1cfoTwWysTXZyyPSkKvBe3p5ngG3oeGCq3TYTKu5Vf4IsplDytwnsnytvbg==}
+
   '@debugbundle/sdk-browser@0.1.0':
     resolution: {integrity: sha512-KIIrp5sdXzeytHtnS0oCt9g+rGstNRJ32w6ytXJLLHdvYUB6G2sWC5B0Sv/IEQKJy8sJrrEm1nFz0ekVD0fCtA==}
 
-  '@debugbundle/sdk-node@0.1.0':
-    resolution: {integrity: sha512-ww04rdKBfChnH+SxhwitStjvO/kvzqPMFK9dIxHQw4EXOyiHZ2ndvIq+dWcZWBHRkXM/vvbGHSNJY8+uRdYutQ==}
+  '@debugbundle/sdk-node@0.1.1':
+    resolution: {integrity: sha512-91WEVn24qrzRyBj4IwBfVGVH/6S6L6CfH0X2RGVk3dGlNtVyRSZfB+Drbn3IKRIQ2C1eKa4FBX5WqiA2Ha/N7Q==}
 
   '@debugbundle/shared-types@0.1.0':
     resolution: {integrity: sha512-s3+IiKMBjiic/JEMOUvadjoSiJycR28CZjB2drOBwdkrt+V2vnq+eTaeADAC+igDNvC/qxDG1rmNDSCzGA0stg==}
+
+  '@debugbundle/shared-types@0.1.1':
+    resolution: {integrity: sha512-wduMHiwaE7GeuEXT/fBDa1jAiUpx7rZEnPBjuTW6nv4IFENpb9aht4AHELgySWHnPNv8VgzRqDKcM04b5tspug==}
 
   '@dotenvx/dotenvx@1.60.0':
     resolution: {integrity: sha512-zWepVRNan/5gCALiT/QCHVsmxvq81xenBqGRyoTUy+ClJ+Mgs+tTJ6h4f65nqs8ijVFe6xg4lIQAIwe+HfgWXg==}
@@ -5312,18 +5318,24 @@ snapshots:
 
   '@debugbundle/redaction@0.1.0': {}
 
+  '@debugbundle/redaction@0.1.1': {}
+
   '@debugbundle/sdk-browser@0.1.0':
     dependencies:
       '@debugbundle/redaction': 0.1.0
       '@debugbundle/shared-types': 0.1.0
 
-  '@debugbundle/sdk-node@0.1.0':
+  '@debugbundle/sdk-node@0.1.1':
     dependencies:
-      '@debugbundle/redaction': 0.1.0
-      '@debugbundle/shared-types': 0.1.0
+      '@debugbundle/redaction': 0.1.1
+      '@debugbundle/shared-types': 0.1.1
       zod: 3.25.76
 
   '@debugbundle/shared-types@0.1.0':
+    dependencies:
+      zod: 3.25.76
+
+  '@debugbundle/shared-types@0.1.1':
     dependencies:
       zod: 3.25.76
 

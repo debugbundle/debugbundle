@@ -165,6 +165,46 @@ export function createBundleWithForwardedRequestContext(): BundleV1 {
   });
 }
 
+export function createBundleWithNoisyBrowserHeadersRequestContext(): BundleV1 {
+  return withRequest((request) => {
+  request.method = "POST";
+  request.path = "/v1/github/app/install-url";
+  request.route_template = "/v1/github/app/install-url";
+  request.query = {
+    from: "dashboard"
+  };
+  request.headers = {
+    accept: "application/json",
+    "accept-encoding": "gzip, deflate, br, zstd",
+    "accept-language": "en-US,en;q=0.9",
+    authorization: "[REDACTED]",
+    "cache-control": "max-age=0",
+    connection: "keep-alive",
+    "content-length": "17",
+    "content-type": "application/json",
+    cookie: "[REDACTED]",
+    host: "api.internal.local",
+    origin: "https://app.debugbundle.com",
+    priority: "u=1, i",
+    "sec-ch-ua": '"Chromium";v="123"',
+    "sec-ch-ua-mobile": "?0",
+    "sec-ch-ua-platform": '"macOS"',
+    "sec-fetch-dest": "empty",
+    "sec-fetch-mode": "cors",
+    "sec-fetch-site": "same-site",
+    "user-agent": "Mozilla/5.0",
+    "x-debugbundle-trace-id": "trace_install_url",
+    "x-forwarded-host": "api.debugbundle.com",
+    "x-forwarded-proto": "https",
+    "x-request-id": "req_install_url"
+  };
+  request.body = {
+    installation_id: "123"
+  };
+
+  });
+}
+
 export function createBundleWithPlainTextRequestBody(): BundleV1 {
   return withRequest((request) => {
   request.method = "PUT";

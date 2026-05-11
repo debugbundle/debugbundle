@@ -21,6 +21,46 @@ function sortRecordEntries(record: Record<string, unknown>): Array<[string, unkn
   return Object.entries(record).sort(([left], [right]) => left.localeCompare(right));
 }
 
+const REPLAY_HEADER_PRIORITY = [
+  "authorization",
+  "cookie",
+  "accept",
+  "content-type",
+  "origin",
+  "accept-language",
+  "access-control-request-method",
+  "access-control-request-headers",
+  "x-request-id",
+  "x-correlation-id",
+  "x-debugbundle-trace-id"
+];
+
+const DROPPED_REPLAY_HEADERS = new Set([
+  "host",
+  "x-forwarded-host",
+  "x-forwarded-proto",
+  "connection",
+  "keep-alive",
+  "transfer-encoding",
+  "upgrade",
+  "te",
+  "trailer",
+  "proxy-connection",
+  "accept-encoding",
+  "content-length",
+  "cache-control",
+  "pragma",
+  "priority",
+  "sec-ch-ua",
+  "sec-ch-ua-mobile",
+  "sec-ch-ua-platform",
+  "sec-fetch-dest",
+  "sec-fetch-mode",
+  "sec-fetch-site",
+  "sec-fetch-user",
+  "user-agent"
+]);
+
 function serializeScalarValue(value: unknown): string {
   if (typeof value === "string") {
     return value;
@@ -123,15 +163,31 @@ function buildStructuredReplayQuery(query: Record<string, unknown>): Record<stri
 }
 
 function buildReplayHeaders(headers: Record<string, unknown>): Record<string, unknown> {
-  return Object.fromEntries(
-    sortRecordEntries(headers)
-      .filter(([headerName]) => !["host", "x-forwarded-host", "x-forwarded-proto"].includes(headerName.toLowerCase()))
-      .map(([headerName, headerValue]) => [headerName, normalizeHeaderValue(headerValue)])
-  );
+  const entries = sortRecordEntries(headers)
+    .filter(([headerName]) => !DROPPED_REPLAY_HEADERS.has(headerName.toLowerCase()))
+    .map(([headerName, headerValue]) => [headerName, normalizeHeaderValue(headerValue)] as [string, unknown]);
+
+  entries.sort(([left], [right]) => {
+    const leftPriority = REPLAY_HEADER_PRIORITY.indexOf(left.toLowerCase());
+    const rightPriority = REPLAY_HEADER_PRIORITY.indexOf(right.toLowerCase());
+    if (leftPriority !== -1 || rightPriority !== -1) {
+      if (leftPriority === -1) {
+        return 1;
+      }
+      if (rightPriority === -1) {
+        return -1;
+      }
+      return leftPriority - rightPriority;
+    }
+
+    return left.localeCompare(right);
+  });
+
+  return Object.fromEntries(entries);
 }
 
 function expandHeaderValues(headers: Record<string, unknown>): Array<[string, string]> {
-  return sortRecordEntries(headers).flatMap(([headerName, headerValue]) => {
+  return Object.entries(headers).flatMap(([headerName, headerValue]) => {
     if (Array.isArray(headerValue)) {
       return headerValue.map((item): [string, string] => [headerName, serializeScalarValue(item)]);
     }

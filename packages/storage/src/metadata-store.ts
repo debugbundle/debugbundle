@@ -13,6 +13,7 @@ import type {
   DemotedIncidentEventReference,
   DeleteAlertResult,
   IncidentEventReference,
+  LogEventCandidateReference,
   IncidentLogRecord,
   IncidentRetrievalRecord,
   InsertIncidentEventInput,
@@ -2408,6 +2409,30 @@ export function createPostgresMetadataStore(db: Queryable): PostgresMetadataStor
             AND i.environment = $2
             AND COALESCE(s.name, 'unknown') = $3
             AND ie.event_type = 'probe_event'
+            AND ie.occurred_at >= $4::timestamptz
+            AND ie.occurred_at <= $5::timestamptz
+          ORDER BY ie.occurred_at ASC, ie.event_id ASC
+        `,
+        [input.project_id, input.environment, input.service_name, input.window_start, input.window_end]
+      );
+
+      return result.rows;
+    },
+
+    async listLogEventCandidatesForServiceWindow(input): Promise<LogEventCandidateReference[]> {
+      const result = await db.query<LogEventCandidateReference & Record<string, unknown>>(
+        `
+          SELECT
+            ie.event_id,
+            ie.occurred_at::text AS occurred_at
+          FROM incident_events ie
+          JOIN incidents i ON i.id = ie.incident_id
+          LEFT JOIN services s ON s.id = i.service_id
+          WHERE i.project_id = $1
+            AND i.environment = $2
+            AND COALESCE(s.name, 'unknown') = $3
+            AND ie.event_type = 'log_event'
+            AND ie.is_sampled = true
             AND ie.occurred_at >= $4::timestamptz
             AND ie.occurred_at <= $5::timestamptz
           ORDER BY ie.occurred_at ASC, ie.event_id ASC

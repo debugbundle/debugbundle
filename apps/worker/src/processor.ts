@@ -144,6 +144,7 @@ export interface BuildBundleWorkerDependencies {
         BundleBuildContextStore,
         | "listIncidentEventReferences"
         | "listProbeEventCandidatesForServiceWindow"
+        | "listLogEventCandidatesForServiceWindow"
         | "hasBundleGenerationForSourceEvent"
         | "markBundleGenerationFailure"
         | "pruneRetainedIncidentsForProject"
@@ -1052,6 +1053,96 @@ async function collectProbeDataItems(input: {
   });
 }
 
+function addNonEmptyCorrelationValue(target: Set<string>, value: string | null | undefined): void {
+  if (typeof value === "string" && value.length > 0) {
+    target.add(value);
+  }
+}
+
+async function collectCorrelatedLogEnvelopes(input: {
+  dependencies: BuildBundleWorkerDependencies;
+  incident: BundleBuildContext;
+  incidentEnvelopes: LoadedIncidentEnvelope[];
+}): Promise<LoadedIncidentEnvelope[]> {
+  if (
+    input.dependencies.incidentStore.listLogEventCandidatesForServiceWindow === undefined ||
+    input.dependencies.objectStore.getObject === undefined
+  ) {
+    return [];
+  }
+
+  const existingEventIds = new Set(input.incidentEnvelopes.map((incidentEnvelope) => incidentEnvelope.eventId));
+  const requestIds = new Set<string>();
+  const traceIds = new Set<string>();
+  for (const incidentEnvelope of input.incidentEnvelopes) {
+    if (incidentEnvelope.envelope.event_type === "log_event") {
+      continue;
+    }
+
+    addNonEmptyCorrelationValue(requestIds, incidentEnvelope.envelope.correlation?.request_id);
+    addNonEmptyCorrelationValue(traceIds, incidentEnvelope.envelope.correlation?.trace_id);
+  }
+
+  if (requestIds.size === 0 && traceIds.size === 0) {
+    return [];
+  }
+
+  const windowStart = new Date(new Date(input.incident.first_seen_at).getTime() - 5 * 60 * 1000).toISOString();
+  const windowEnd = new Date(new Date(input.incident.last_seen_at).getTime() + 5 * 60 * 1000).toISOString();
+  const candidates = await input.dependencies.incidentStore.listLogEventCandidatesForServiceWindow({
+    project_id: input.incident.project_id,
+    service_name: input.incident.service_name,
+    environment: input.incident.environment,
+    window_start: windowStart,
+    window_end: windowEnd
+  });
+
+  const envelopes: LoadedIncidentEnvelope[] = [];
+  for (const candidate of candidates) {
+    if (existingEventIds.has(candidate.event_id)) {
+      continue;
+    }
+
+    const key = buildRawEventObjectKey({
+      projectId: input.incident.project_id,
+      occurredAt: new Date(candidate.occurred_at),
+      eventId: candidate.event_id
+    });
+
+    try {
+      const rawBody = await input.dependencies.objectStore.getObject({ key });
+      const envelope = parseEventEnvelopeFromRaw(rawBody);
+      if (envelope === null || envelope.event_type !== "log_event") {
+        continue;
+      }
+
+      const requestId = envelope.correlation?.request_id;
+      const traceId = envelope.correlation?.trace_id;
+      const matchesRequest = typeof requestId === "string" && requestIds.has(requestId);
+      const matchesTrace = typeof traceId === "string" && traceIds.has(traceId);
+      if (!matchesRequest && !matchesTrace) {
+        continue;
+      }
+
+      envelopes.push({
+        eventId: candidate.event_id,
+        eventType: "log_event",
+        occurredAt: candidate.occurred_at,
+        envelope
+      });
+    } catch {
+      // Ignore unreadable log candidates so bundle generation remains resilient.
+    }
+  }
+
+  return envelopes.sort((left, right) => {
+    if (left.occurredAt === right.occurredAt) {
+      return left.eventId.localeCompare(right.eventId);
+    }
+    return left.occurredAt.localeCompare(right.occurredAt);
+  });
+}
+
 export async function processNextBuildBundleJob(
   dependencies: BuildBundleWorkerDependencies
 ): Promise<WorkerProcessResult> {
@@ -1105,6 +1196,11 @@ export async function processNextBuildBundleJob(
       incidentId: incident.incident_id,
       projectId: incident.project_id
     });
+    const correlatedLogEnvelopes = await collectCorrelatedLogEnvelopes({
+      dependencies,
+      incident,
+      incidentEnvelopes
+    });
     const probeDataItems = await collectProbeDataItems({
       dependencies,
       incident,
@@ -1126,7 +1222,7 @@ export async function processNextBuildBundleJob(
         source_event_id: bundleMetadata.source_event_id,
         source_occurred_at: bundleMetadata.source_occurred_at
       },
-      sourceEnvelopes: incidentEnvelopes.map((incidentEnvelope) => incidentEnvelope.envelope),
+      sourceEnvelopes: [...incidentEnvelopes, ...correlatedLogEnvelopes].map((incidentEnvelope) => incidentEnvelope.envelope),
       probeDataItems: probeDataItems
     });
 

@@ -12,6 +12,7 @@ import {
   createBundleWithJsonArrayRequestBody,
   createBundleWithJsonScalarRequestBody,
   createBundleWithMultilineControlCharacterRequestContext,
+  createBundleWithNoisyBrowserHeadersRequestContext,
   createBundleWithPlainTextRequestBody,
   createBundleWithRedactedRepeatedNumericDecimalQueryArrayRequestContext,
   createBundleWithRedactedRepeatedSignedDecimalStringLiteralQueryArrayRequestContext,
@@ -68,6 +69,34 @@ describe("repro-engine replay semantics", () => {
         }
       },
       feasibility_reference: null
+    });
+  });
+
+  it("should filter noisy browser transport headers while preserving replay-relevant context", (): void => {
+    const reproduction = buildReproduction(createBundleWithNoisyBrowserHeadersRequestContext());
+
+    expect(reproduction.artifacts?.curl).toBe(
+      "curl -X POST 'https://api.debugbundle.com/v1/github/app/install-url?from=dashboard' -H 'authorization: [REDACTED]' -H 'cookie: [REDACTED]' -H 'accept: application/json' -H 'content-type: application/json' -H 'origin: https://app.debugbundle.com' -H 'accept-language: en-US,en;q=0.9' -H 'x-request-id: req_install_url' -H 'x-debugbundle-trace-id: trace_install_url' --data-raw '{\"installation_id\":\"123\"}'"
+    );
+    expect(reproduction.artifacts?.httpie).toBe(
+      "printf '%s' '{\"installation_id\":\"123\"}' | http POST 'https://api.debugbundle.com/v1/github/app/install-url?from=dashboard' 'authorization:[REDACTED]' 'cookie:[REDACTED]' 'accept:application/json' 'content-type:application/json' 'origin:https://app.debugbundle.com' 'accept-language:en-US,en;q=0.9' 'x-request-id:req_install_url' 'x-debugbundle-trace-id:trace_install_url'"
+    );
+    expect(reproduction.artifacts?.json_spec).toEqual({
+      method: "POST",
+      url: "https://api.debugbundle.com/v1/github/app/install-url?from=dashboard",
+      headers: {
+        authorization: "[REDACTED]",
+        cookie: "[REDACTED]",
+        accept: "application/json",
+        "content-type": "application/json",
+        origin: "https://app.debugbundle.com",
+        "accept-language": "en-US,en;q=0.9",
+        "x-request-id": "req_install_url",
+        "x-debugbundle-trace-id": "trace_install_url"
+      },
+      body: {
+        installation_id: "123"
+      }
     });
   });
 
@@ -449,6 +478,7 @@ describe("repro-engine replay semantics", () => {
     expect(stringLiteralArtifacts.json_spec.url).toBe(
       "https://example.invalid/imports/query-redaction?mode=redacted-query-array-string-literals&scope=%5BREDACTED%5D+tier&scope=1&scope=true&token=%5BREDACTED%5D&token=0&token=false&token=%5BREDACTED%5D+fallback"
     );
+
     expect(stringLiteralArtifacts.json_spec.query).toEqual({
       mode: "redacted-query-array-string-literals",
       scope: ["[REDACTED] tier", "1", "true"],
