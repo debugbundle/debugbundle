@@ -105,10 +105,10 @@ export function ProjectGitHubPage(): JSX.Element {
 
       try {
         const installation = await getGitHubInstallation();
-        const installUrl =
+        const installUrlPromise =
           installation === null || installation.status === "suspended" || installation.status === "removed"
-            ? await getGitHubInstallUrl()
-            : null;
+            ? getGitHubInstallUrl().catch(() => null)
+            : Promise.resolve<string | null>(null);
         const [repo, rules, deliveries] = await Promise.all([
           getProjectGitHubRepo(project.project_id),
           listProjectGitHubRules(project.project_id),
@@ -116,6 +116,7 @@ export function ProjectGitHubPage(): JSX.Element {
         ]);
         const repositories =
           installation !== null && installation.status === "active" ? await listGitHubRepositories() : [];
+        const installUrl = await installUrlPromise;
 
         if (cancelled) {
           return;

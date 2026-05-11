@@ -734,6 +734,54 @@ describe("web app — management routes", () => {
     expect(fetchMock.mock.calls.some(([input]) => requestUrl(input).endsWith("/v1/github/repositories"))).toBe(false);
   });
 
+  it("keeps showing setup guidance when the install-url helper route is unavailable", async () => {
+    const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = requestUrl(input);
+
+      if (url.endsWith("/v1/auth/session")) {
+        return jsonResponse(200, {
+          session: createSession()
+        });
+      }
+
+      if (url.endsWith("/v1/projects") && init?.method === undefined) {
+        return jsonResponse(200, {
+          projects: [createProject({ organization_plan: "team" })]
+        });
+      }
+
+      if (url.endsWith("/v1/github/installation") && init?.method === undefined) {
+        return jsonResponse(404, { error: "installation_not_found" });
+      }
+
+      if (url.endsWith("/v1/github/app/install-url") && init?.method === undefined) {
+        return jsonResponse(404, { error: "not_found" });
+      }
+
+      if (url.endsWith("/v1/projects/proj_123/github/repo") && init?.method === undefined) {
+        return jsonResponse(404, { error: "repo_not_found" });
+      }
+
+      if (url.endsWith("/v1/projects/proj_123/github/rules") && init?.method === undefined) {
+        return jsonResponse(200, { rules: [] });
+      }
+
+      if (url.endsWith("/v1/projects/proj_123/github/deliveries?limit=20") && init?.method === undefined) {
+        return jsonResponse(200, { deliveries: [] });
+      }
+
+      return jsonResponse(404, { error: "not_found" });
+    });
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<App initialEntries={["/projects/proj_123/github"]} />);
+
+    expect(await screen.findByText(/connect the github app to start automation/i)).toBeInTheDocument();
+    expect(screen.getByText(/no github app installation is connected to this workspace yet/i)).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: /install github app/i })).not.toBeInTheDocument();
+  });
+
   it("shows a specific message when github automation is not configured on the api", async () => {
     const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
       const url = requestUrl(input);
