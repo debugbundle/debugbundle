@@ -1422,7 +1422,7 @@ export function createApiDependencies(input: CreateApiDependenciesInput): {
                   project_id: requestInput.project_id,
                   name: "Default triage rule",
                   enabled: true,
-                  event_types: ["incident_created", "incident_reopened"],
+                  event_types: ["bundle.created", "bundle.reopened"],
                   environments: [],
                   services: [],
                   severity_min: "high",

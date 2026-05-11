@@ -332,6 +332,29 @@ describe("api github routes", () => {
     });
   });
 
+  it("returns a null project repo when no repository is assigned yet", async () => {
+    const projectId = "00000000-0000-4000-8000-000000000001";
+    const githubManagement = {
+      getProjectRepoForOrganization: vi.fn().mockResolvedValue(null)
+    };
+    const app = createServer({ githubManagement });
+
+    const response = await app.inject({
+      method: "GET",
+      url: `/v1/projects/${projectId}/github/repo`,
+      headers: {
+        authorization: "Bearer dbundle_mem_test"
+      }
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toEqual({ repo: null });
+    expect(githubManagement.getProjectRepoForOrganization).toHaveBeenCalledWith({
+      organization_id: "org_123",
+      project_id: projectId
+    });
+  });
+
   it("rejects github installation callbacks with invalid signed state", async () => {
     vi.stubEnv("GITHUB_APP_STATE_SECRET", "github-app-state-secret");
     const githubManagement = {

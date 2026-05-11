@@ -303,9 +303,6 @@ export function registerGitHubRoutes(app: FastifyInstance, dependencies: ApiDepe
       organization_id: member.organization_id,
       project_id: parsedParams.data.id
     });
-    if (repo === null) {
-      return reply.status(404).send({ error: "repo_not_found" });
-    }
 
     return reply.status(200).send({ repo });
   });

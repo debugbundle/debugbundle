@@ -707,7 +707,7 @@ describe("web app — management routes", () => {
       }
 
       if (url.endsWith("/v1/projects/proj_123/github/repo") && init?.method === undefined) {
-        return jsonResponse(404, { error: "repo_not_found" });
+        return jsonResponse(200, { repo: null });
       }
 
       if (url.endsWith("/v1/projects/proj_123/github/rules") && init?.method === undefined) {
@@ -767,7 +767,7 @@ describe("web app — management routes", () => {
       }
 
       if (url.endsWith("/v1/projects/proj_123/github/repo") && init?.method === undefined) {
-        return jsonResponse(404, { error: "repo_not_found" });
+        return jsonResponse(200, { repo: null });
       }
 
       if (url.endsWith("/v1/projects/proj_123/github/rules") && init?.method === undefined) {
@@ -880,7 +880,7 @@ describe("web app — management routes", () => {
       }
 
       if (url.endsWith("/v1/projects/proj_123/github/repo") && init?.method === undefined) {
-        return jsonResponse(404, { error: "repo_not_found" });
+        return jsonResponse(200, { repo: null });
       }
 
       if (url.endsWith("/v1/projects/proj_123/github/rules") && init?.method === undefined) {

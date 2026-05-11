@@ -837,21 +837,13 @@ export async function listGitHubRepositories(): Promise<GitHubRepositoryRecord[]
 }
 
 export async function getProjectGitHubRepo(projectId: string): Promise<ProjectGitHubRepoRecord | null> {
-  try {
-    const body = await readJson<{ repo: ProjectGitHubRepoRecord }>(
-      await fetch(`${API_BASE}/v1/projects/${projectId}/github/repo`, {
-        credentials: "include"
-      })
-    );
+  const body = await readJson<{ repo: ProjectGitHubRepoRecord | null }>(
+    await fetch(`${API_BASE}/v1/projects/${projectId}/github/repo`, {
+      credentials: "include"
+    })
+  );
 
-    return body.repo;
-  } catch (error) {
-    if (error instanceof Error && error.message === "repo_not_found") {
-      return null;
-    }
-
-    throw error;
-  }
+  return body.repo;
 }
 
 export async function listProjectGitHubRules(projectId: string): Promise<GitHubDispatchRuleRecord[]> {

@@ -1325,6 +1325,13 @@ When no GitHub App installation is connected yet, the route returns:
 }
 ```
 
+When no repository is assigned to the project yet, the route returns:
+```json
+{
+  "repo": null
+}
+```
+
 **Dispatch rule management:**
 
 | Method | Path | Auth | Description |
@@ -1416,7 +1423,6 @@ When no GitHub App installation is connected yet, the route returns:
 - `403 { "error": "forbidden" }` — non-owner caller for write operations
 - `403 { "error": "upgrade_required" }` — Free-tier project
 - `404 { "error": "installation_not_found" }` — no active GitHub installation for the organization
-- `404 { "error": "repo_not_found" }` — no repo assigned to the project
 - `404 { "error": "rule_not_found" }` — dispatch rule not found
 - `404 { "error": "delivery_not_found" }` — delivery not found
 - `409 { "error": "installation_suspended" }` — installation is suspended
