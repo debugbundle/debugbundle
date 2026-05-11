@@ -63,6 +63,32 @@ const InlineProbeDataSchema = z
   })
   .strict();
 
+const RuntimeMemoryStatsSchema = z
+  .object({
+    rss: z.number().nonnegative().nullable(),
+    heap_total: z.number().nonnegative().nullable(),
+    heap_used: z.number().nonnegative().nullable(),
+    external: z.number().nonnegative().nullable(),
+    peak: z.number().nonnegative().nullable()
+  })
+  .strict();
+
+const BackendRuntimePayloadSchema = z
+  .object({
+    version: z.string().min(1),
+    platform: z.string().min(1).nullable().optional(),
+    arch: z.string().min(1).nullable().optional(),
+    pid: z.number().int().nonnegative().nullable().optional(),
+    cwd: z.string().min(1).nullable().optional(),
+    uptime_sec: z.number().nonnegative().nullable().optional(),
+    hostname: z.string().min(1).nullable().optional(),
+    thread_id: z.union([z.string(), z.number()]).nullable().optional(),
+    framework_version: z.string().min(1).nullable().optional(),
+    memory: RuntimeMemoryStatsSchema.nullable().optional(),
+    framework_extras: z.record(z.string(), z.unknown()).nullable().optional()
+  })
+  .strict();
+
 const BackendExceptionPayloadSchema = z
   .object({
     name: z.string().min(1),
@@ -81,9 +107,7 @@ const BackendExceptionPayloadSchema = z
       headers: z.record(z.string(), z.unknown()).optional(),
       body: z.unknown().optional()
     }),
-    runtime: z.object({
-      version: z.string().min(1)
-    }),
+    runtime: BackendRuntimePayloadSchema,
     probe_data: InlineProbeDataSchema.optional()
   })
   .strict();
@@ -421,13 +445,7 @@ const ContextDeploySchema = z.object({
   regression_window: z.boolean().nullable()
 });
 
-const MemoryStatsSchema = z.object({
-  rss: z.number().nonnegative().nullable(),
-  heap_total: z.number().nonnegative().nullable(),
-  heap_used: z.number().nonnegative().nullable(),
-  external: z.number().nonnegative().nullable(),
-  peak: z.number().nonnegative().nullable()
-});
+const MemoryStatsSchema = RuntimeMemoryStatsSchema;
 
 const ContextRuntimeSchema = z.object({
   version: z.literal(1),

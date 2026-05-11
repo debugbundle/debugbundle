@@ -449,6 +449,165 @@ describe("bundle-engine", () => {
     expect(bundle.context.device?.browser.name).toBe("Chrome");
   });
 
+  it("should enrich backend exception bundles with agent-ready context from existing fields", (): void => {
+    const bundle = buildBundle({
+      job: {
+        trigger: "occurrence_threshold"
+      },
+      incident: {
+        incident_id: "75f07eaf-e1ad-4a8a-abb2-2f2f030e6c37",
+        project_id: "proj_debugbundle_api",
+        service_id: "svc_debugbundle_api",
+        service_name: "debugbundle-api",
+        service_runtime: "node",
+        service_framework: "fastify",
+        environment: "production",
+        fingerprint: "fp_github_install_url",
+        title: "github_api_invalid_response",
+        severity: "high",
+        first_seen_at: "2026-05-11T16:02:29.716Z",
+        last_seen_at: "2026-05-11T16:02:29.716Z",
+        occurrence_count: 1,
+        source_event_types: ["backend_exception"]
+      },
+      bundleMetadata: {
+        generation_number: 1,
+        created_at: "2026-05-11T16:02:29.716Z",
+        updated_at: "2026-05-11T16:02:29.716Z",
+        source_event_id: "00000000-0000-4000-8000-000000000501",
+        source_occurred_at: "2026-05-11T16:02:29.716Z"
+      },
+      linkBaseUrls: {
+        api: "https://api.debugbundle.com",
+        app: "https://app.debugbundle.com",
+        docs: "https://debugbundle.com/docs"
+      },
+      configuredDeploy: {
+        commit_sha: "efae41568986daaf8c54777ca8e63d838a4c319f",
+        deploy_version: "efae41568986",
+        branch: "main",
+        deployed_at: "2026-05-11T16:20:00.000Z",
+        repo: "debugbundle/debugbundle"
+      },
+      sourceEnvelopes: [
+        createEventEnvelope({
+          event_id: "00000000-0000-4000-8000-000000000501",
+          event_type: "backend_exception",
+          occurred_at: "2026-05-11T16:02:29.716Z",
+          service: {
+            name: "debugbundle-api",
+            environment: "production",
+            runtime: "node",
+            framework: "fastify"
+          },
+          payload: {
+            name: "Error",
+            message: "github_api_invalid_response",
+            stack:
+              "Error: github_api_invalid_response\n" +
+              "    at requestJson (apps/api/src/github-app.ts:42:11)\n" +
+              "    at getInstallUrl (apps/api/src/github-app.ts:88:18)\n" +
+              "    at handler (apps/api/src/routes/github.ts:53:27)",
+            handled: false,
+            request: {
+              method: "GET",
+              path: "/v1/github/app/install-url",
+              query: {},
+              headers: {
+                cookie: "[REDACTED]",
+                authorization: "[REDACTED]",
+                accept: "application/json"
+              },
+              body: null
+            },
+            response: {
+              status_code: 500,
+              body: {
+                error: "internal_server_error"
+              }
+            },
+            runtime: {
+              version: "24.0.0",
+              platform: "linux",
+              arch: "arm64",
+              pid: 123,
+              cwd: "/srv/debugbundle",
+              uptime_sec: 456.7,
+              hostname: "api-host-1",
+              memory: {
+                rss: 120000000,
+                heap_total: 64000000,
+                heap_used: 32000000,
+                external: 1000000,
+                peak: null
+              }
+            }
+          }
+        })
+      ],
+      probeDataItems: []
+    });
+
+    expect(bundle.context.request?.route_template).toBe("/v1/github/app/install-url");
+    expect(bundle.context.dependencies).toEqual({
+      version: 1,
+      items: [
+        {
+          name: "github_api",
+          status: "failed",
+          notes: "GitHub API returned an unexpected response shape while handling GET /v1/github/app/install-url."
+        }
+      ]
+    });
+    expect(bundle.summary.likely_cause).toContain("GitHub API returned a response that did not match the expected schema");
+    expect(bundle.summary.recommended_action).toContain("Inspect the GitHub API response handling");
+    expect(bundle.summary.confidence).toBeGreaterThan(0.5);
+    expect(bundle.context.deploy).toEqual({
+      version: 1,
+      commit_sha: "efae41568986daaf8c54777ca8e63d838a4c319f",
+      deploy_version: "efae41568986",
+      branch: "main",
+      deployed_at: "2026-05-11T16:20:00.000Z",
+      regression_window: false
+    });
+    expect(bundle.context.git).toEqual({
+      version: 1,
+      commit: "efae41568986daaf8c54777ca8e63d838a4c319f",
+      commit_short: "efae415",
+      branch: "main",
+      repo: "debugbundle/debugbundle",
+      dirty: false,
+      source: "env"
+    });
+    expect(bundle.context.runtime).toMatchObject({
+      version: 1,
+      name: "node",
+      runtime_version: "24.0.0",
+      platform: "linux",
+      arch: "arm64",
+      pid: 123,
+      cwd: "/srv/debugbundle",
+      uptime_sec: 456.7,
+      hostname: "api-host-1",
+      memory: {
+        rss: 120000000,
+        heap_total: 64000000,
+        heap_used: 32000000,
+        external: 1000000,
+        peak: null
+      }
+    });
+    expect(bundle.links).toEqual({
+      self: "https://api.debugbundle.com/v1/incidents/75f07eaf-e1ad-4a8a-abb2-2f2f030e6c37/bundle",
+      reproduction: "https://api.debugbundle.com/v1/incidents/75f07eaf-e1ad-4a8a-abb2-2f2f030e6c37/reproduction",
+      incident: "https://app.debugbundle.com/incidents/75f07eaf-e1ad-4a8a-abb2-2f2f030e6c37",
+      project: "https://app.debugbundle.com/projects/proj_debugbundle_api",
+      docs: "https://debugbundle.com/docs/bundles"
+    });
+    expect(bundle.redaction.fields).toEqual(["context.request.headers.authorization", "context.request.headers.cookie"]);
+    expect(bundle.redaction.notes).toBe("Sensitive bundle fields were redacted before storage.");
+  });
+
   it("should fallback service runtime/framework to null when only probe events exist", (): void => {
     const bundle = buildBundle({
       job: {

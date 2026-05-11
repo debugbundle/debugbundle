@@ -1290,6 +1290,7 @@ describe("api default dependencies", () => {
     createPostgresGitHubStoreMock.mockReturnValue(githubStore);
 
     const githubAppClient = {
+      getInstallUrl: vi.fn().mockResolvedValue("https://github.com/apps/debugbundle-automation/installations/new"),
       getInstallation: vi.fn().mockResolvedValue({
         installation_id: 42,
         account_login: "testorg",
@@ -1371,6 +1372,7 @@ describe("api default dependencies", () => {
     createPostgresGitHubStoreMock.mockReturnValue(githubStore);
 
     const githubAppClient = {
+      getInstallUrl: vi.fn().mockResolvedValue("https://github.com/apps/debugbundle-automation/installations/new"),
       getInstallation: vi.fn().mockResolvedValue({
         installation_id: 42,
         account_login: "testorg",
@@ -1984,6 +1986,7 @@ describe("api default dependencies", () => {
 
   it("should map github installation and retry failure states", async (): Promise<void> => {
     const githubAppClient = {
+      getInstallUrl: vi.fn().mockResolvedValue("https://github.com/apps/debugbundle-automation/installations/new"),
       getInstallation: vi.fn(),
       listRepositories: vi.fn().mockResolvedValue([
         { id: 1, owner: "debugbundle", name: "app", full_name: "debugbundle/app", default_branch: "main", private: false }
@@ -2111,6 +2114,7 @@ describe("api default dependencies", () => {
       incrementOrgUsageCounter: vi.fn()
     });
     const githubAppClient = {
+      getInstallUrl: vi.fn().mockResolvedValue("https://github.com/apps/debugbundle-automation/installations/new"),
       getInstallation: vi.fn().mockResolvedValue({
         installation_id: 42,
         account_login: "debugbundle",
@@ -2283,6 +2287,7 @@ describe("api default dependencies", () => {
     };
     createPostgresGitHubStoreMock.mockReturnValueOnce(githubStore);
     const githubAppClient = {
+      getInstallUrl: vi.fn().mockResolvedValue("https://github.com/apps/debugbundle-automation/installations/new"),
       getInstallation: vi.fn(),
       listRepositories: vi.fn().mockResolvedValue([
         { id: 1, owner: "debugbundle", name: "app", full_name: "debugbundle/app", default_branch: "main", private: false }

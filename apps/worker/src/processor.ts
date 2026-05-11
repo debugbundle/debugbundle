@@ -9,7 +9,7 @@ import {
   normalizeEvent,
   validateEvent
 } from "../../../packages/event-normalizer/src/index.js";
-import { buildBundle } from "../../../packages/bundle-engine/src/index.js";
+import { buildBundle, type BuildBundleInput } from "../../../packages/bundle-engine/src/index.js";
 import { buildReproduction } from "../../../packages/repro-engine/src/index.js";
 import type {
   AlertConditionType,
@@ -48,6 +48,8 @@ import {
   buildReproductionObjectKey
 } from "../../../packages/storage/src/index.js";
 import { BundleV1Schema, type BundleV1, type EventEnvelope } from "../../../packages/shared-types/src/index.js";
+
+type BundleLinkBaseUrls = NonNullable<BuildBundleInput["linkBaseUrls"]>;
 
 export interface WorkerQueue {
   dequeue(jobName: "normalize-events"): Promise<NormalizeEventsJob | null>;
@@ -135,6 +137,7 @@ export interface GroupIncidentWorkerDependencies {
 export interface BuildBundleWorkerDependencies {
   queue: WorkerQueue;
   logger?: Pick<RuntimeLogger, "error">;
+  env?: Record<string, string | undefined>;
   incidentStore: Pick<BundleBuildContextStore, "getBundleBuildContext" | "reserveBundleGeneration"> &
     Partial<
       Pick<
@@ -148,6 +151,61 @@ export interface BuildBundleWorkerDependencies {
     >;
   objectStore: ObjectStoreClient & Partial<ObjectStoreReader>;
   billingStore?: Pick<BillingStore, "getBillingSummaryForProject">;
+}
+
+function normalizeWorkerBaseUrl(value: string | undefined): string | null {
+  const trimmed = value?.trim();
+  if (trimmed === undefined || trimmed.length === 0) {
+    return null;
+  }
+
+  return trimmed.replace(/\/+$/, "");
+}
+
+function appendUrlPath(baseUrl: string, path: string): string {
+  return baseUrl.endsWith(path) ? baseUrl : `${baseUrl}${path}`;
+}
+
+function buildWorkerBundleLinkBaseUrls(env: Record<string, string | undefined>): BundleLinkBaseUrls {
+  const publicSiteBaseUrl = normalizeWorkerBaseUrl(env["PUBLIC_SITE_URL"]);
+  const docsBaseUrl = normalizeWorkerBaseUrl(env["DEBUGBUNDLE_DOCS_URL"]) ?? (publicSiteBaseUrl !== null ? appendUrlPath(publicSiteBaseUrl, "/docs") : null);
+
+  return {
+    api: normalizeWorkerBaseUrl(env["DEBUGBUNDLE_API_URL"] ?? env["API_BASE_URL"] ?? env["VITE_API_URL"]),
+    app: normalizeWorkerBaseUrl(env["APP_BASE_URL"]),
+    docs: docsBaseUrl
+  };
+}
+
+function firstConfiguredValue(env: Record<string, string | undefined>, keys: string[]): string | null {
+  for (const key of keys) {
+    const value = normalizeWorkerBaseUrl(env[key]);
+    if (value !== null) {
+      return value;
+    }
+  }
+
+  return null;
+}
+
+function buildWorkerBundleConfiguredDeploy(env: Record<string, string | undefined>): BuildBundleInput["configuredDeploy"] | undefined {
+  const commitSha = firstConfiguredValue(env, ["DEBUGBUNDLE_DEPLOY_COMMIT", "DEBUGBUNDLE_GIT_COMMIT", "GITHUB_SHA", "COMMIT_SHA"]);
+  const deployVersion = firstConfiguredValue(env, ["DEBUGBUNDLE_DEPLOY_VERSION", "RELEASE_VERSION", "APP_VERSION"]);
+  const branch = firstConfiguredValue(env, ["DEBUGBUNDLE_DEPLOY_BRANCH", "DEBUGBUNDLE_GIT_BRANCH", "GITHUB_REF_NAME", "BRANCH"]);
+  const deployedAt = firstConfiguredValue(env, ["DEBUGBUNDLE_DEPLOYED_AT", "DEPLOYED_AT"]);
+  const repo = firstConfiguredValue(env, ["DEBUGBUNDLE_GIT_REPO", "GITHUB_REPOSITORY"]);
+
+  if (commitSha === null && deployVersion === null && branch === null && deployedAt === null && repo === null) {
+    return undefined;
+  }
+
+  return {
+    commit_sha: commitSha,
+    deploy_version: deployVersion,
+    branch,
+    deployed_at: deployedAt,
+    repo
+  };
 }
 
 export interface LifecycleWebhookTransport {
@@ -1052,11 +1110,15 @@ export async function processNextBuildBundleJob(
       incident,
       incidentEnvelopes
     });
+    const workerEnv = dependencies.env ?? process.env;
+    const configuredDeploy = buildWorkerBundleConfiguredDeploy(workerEnv);
     const bundle = buildBundle({
       job: {
         trigger: bundleMetadata.trigger
       },
       incident,
+      linkBaseUrls: buildWorkerBundleLinkBaseUrls(workerEnv),
+      ...(configuredDeploy === undefined ? {} : { configuredDeploy }),
       bundleMetadata: {
         generation_number: bundleMetadata.generation_number,
         created_at: bundleMetadata.created_at,

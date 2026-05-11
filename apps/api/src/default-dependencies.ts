@@ -529,6 +529,7 @@ export function createApiDependencies(input: CreateApiDependenciesInput): {
     | "updateMemberRoleForOrganization"
   >;
   githubManagement?: {
+    getInstallUrl(): Promise<string>;
     getInstallationForOrganization(input: { organization_id: string }): Promise<import("../../../packages/storage/src/index.js").GitHubInstallationRecord | null>;
     disconnectInstallationForOrganization(input: { organization_id: string }): Promise<boolean>;
     listRepositoriesForOrganization(input: {

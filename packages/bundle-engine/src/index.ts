@@ -1,4 +1,5 @@
 import { BundleV1Schema, type BundleV1, type EventEnvelope } from "../../shared-types/src/index.js";
+import { redact, type JsonValue } from "../../redaction/src/index.js";
 import type { BundleBuildContext, BuildBundleJob } from "../../storage/src/index.js";
 
 export interface BundleProbeDataItem {
@@ -11,6 +12,18 @@ export interface BundleProbeDataItem {
 export interface BuildBundleInput {
   job: Pick<BuildBundleJob, "trigger">;
   incident: BundleBuildContext;
+  linkBaseUrls?: {
+    api?: string | null;
+    app?: string | null;
+    docs?: string | null;
+  };
+  configuredDeploy?: {
+    commit_sha?: string | null;
+    deploy_version?: string | null;
+    branch?: string | null;
+    deployed_at?: string | null;
+    repo?: string | null;
+  };
   bundleMetadata: {
     generation_number: number;
     created_at: string;
@@ -28,6 +41,25 @@ type RequestEventEnvelope = Extract<EventEnvelope, { event_type: "request_event"
 type LogEventEnvelope = Extract<EventEnvelope, { event_type: "log_event" }>;
 type FrontendBreadcrumbEnvelope = Extract<EventEnvelope, { event_type: "frontend_breadcrumb" }>;
 type DeployMetadataEnvelope = Extract<EventEnvelope, { event_type: "deploy_metadata" }>;
+type BundleErrorContext = Exclude<BundleV1["context"]["error"], null | undefined>;
+type BundleRequestContext = Exclude<BundleV1["context"]["request"], null | undefined>;
+type BundleResponseContext = Exclude<BundleV1["context"]["response"], null | undefined>;
+type BundleDependenciesContext = Exclude<BundleV1["context"]["dependencies"], null | undefined>;
+type BundleRuntimeMemory = NonNullable<Exclude<BundleV1["context"]["runtime"], null | undefined>["memory"]>;
+type BackendRuntimePayload = BackendExceptionEnvelope["payload"]["runtime"] & {
+  platform?: string | null;
+  arch?: string | null;
+  pid?: number | null;
+  cwd?: string | null;
+  uptime_sec?: number | null;
+  hostname?: string | null;
+  thread_id?: string | number | null;
+  framework_version?: string | null;
+  memory?: BundleRuntimeMemory | null;
+  framework_extras?: Record<string, unknown> | null;
+};
+
+const DYNAMIC_SEGMENT_PATTERN = /^(?:\d+|[0-9a-f]{8}-[0-9a-f-]{27}|[A-Za-z0-9_-]{24,})$/;
 
 function toIsoTimestamp(value: string): string {
   return new Date(value).toISOString();
@@ -138,7 +170,53 @@ function extractTopFrames(stack: string): string[] {
     .slice(0, 3);
 }
 
-function deriveFirstApplicationFrame(errorContext: BundleV1["context"]["error"]): BundleV1["summary"]["first_application_frame"] {
+function decodeRouteSegment(segment: string): string {
+  try {
+    return decodeURIComponent(segment);
+  } catch {
+    return segment.replace(/%([0-9A-Fa-f]{2})/g, (_match, hexByte: string) =>
+      String.fromCharCode(parseInt(hexByte, 16))
+    );
+  }
+}
+
+function isDynamicRouteSegment(segment: string): boolean {
+  if (DYNAMIC_SEGMENT_PATTERN.test(segment)) {
+    return true;
+  }
+
+  const decodedSegment = decodeRouteSegment(segment);
+  if (decodedSegment.includes("/")) {
+    return true;
+  }
+
+  if (decodedSegment !== segment && DYNAMIC_SEGMENT_PATTERN.test(decodedSegment)) {
+    return true;
+  }
+
+  const strippedMalformedPercent = decodedSegment.replace(/%+/g, "");
+  return strippedMalformedPercent !== decodedSegment && DYNAMIC_SEGMENT_PATTERN.test(strippedMalformedPercent);
+}
+
+function normalizeRouteTemplate(path: string | null): string | null {
+  if (path === null || path.length === 0) {
+    return null;
+  }
+
+  const pathWithoutQueryOrFragment = path.split(/[?#]/, 1)[0] ?? "";
+  if (pathWithoutQueryOrFragment.length === 0) {
+    return "/";
+  }
+
+  const normalizedSegments = pathWithoutQueryOrFragment
+    .split("/")
+    .filter((segment) => segment.length > 0)
+    .map((segment) => (isDynamicRouteSegment(segment) ? "{param}" : segment));
+
+  return normalizedSegments.length === 0 ? "/" : `/${normalizedSegments.join("/")}`;
+}
+
+function deriveFirstApplicationFrame(errorContext: BundleErrorContext | null): BundleV1["summary"]["first_application_frame"] {
   const firstFrame = errorContext?.top_frames[0];
   if (firstFrame === undefined) {
     return null;
@@ -172,7 +250,7 @@ function buildErrorContext(
   envelopes: EventEnvelope[],
   incident: BundleBuildContext,
   primarySignalEnvelope: EventEnvelope | null
-): BundleV1["context"]["error"] {
+): BundleErrorContext | null {
   if (primarySignalEnvelope !== null && isBackendExceptionEnvelope(primarySignalEnvelope)) {
     return {
       version: 1,
@@ -231,7 +309,7 @@ function buildErrorContext(
   };
 }
 
-function buildRequestContext(envelopes: EventEnvelope[]): BundleV1["context"]["request"] {
+function buildRequestContext(envelopes: EventEnvelope[]): BundleRequestContext | null {
   const requestEvent = selectLatestEnvelopeByType(envelopes, isRequestEventEnvelope);
   if (requestEvent !== null) {
     return {
@@ -255,7 +333,7 @@ function buildRequestContext(envelopes: EventEnvelope[]): BundleV1["context"]["r
     version: 1,
     method: exceptionEvent.payload.request.method,
     path: exceptionEvent.payload.request.path,
-    route_template: null,
+    route_template: normalizeRouteTemplate(exceptionEvent.payload.request.path),
     query: exceptionEvent.payload.request.query,
     headers: exceptionEvent.payload.request.headers,
     body: exceptionEvent.payload.request.body ?? null,
@@ -263,7 +341,167 @@ function buildRequestContext(envelopes: EventEnvelope[]): BundleV1["context"]["r
   };
 }
 
-function buildResponseContext(envelopes: EventEnvelope[]): BundleV1["context"]["response"] {
+function titleCaseWord(value: string): string {
+  if (value.toLowerCase() === "github") {
+    return "GitHub";
+  }
+
+  if (value.toLowerCase() === "api") {
+    return "API";
+  }
+
+  return `${value.slice(0, 1).toUpperCase()}${value.slice(1)}`;
+}
+
+function formatDependencyName(name: string): string {
+  return name.split("_").filter((part) => part.length > 0).map(titleCaseWord).join(" ");
+}
+
+function inferDependencyName(text: string): string | null {
+  const match = /\b([a-z][a-z0-9]*_api)_(?:invalid_response|error|failure|failed|unavailable|timeout)\b/.exec(text);
+  return match?.[1] ?? null;
+}
+
+function buildDependenciesContext(
+  incident: BundleBuildContext,
+  errorContext: BundleErrorContext | null,
+  requestContext: BundleRequestContext | null
+): BundleDependenciesContext | null {
+  if (errorContext === null) {
+    return null;
+  }
+
+  const text = `${incident.title} ${errorContext.name} ${errorContext.message}`.toLowerCase();
+  const dependencyName = inferDependencyName(text);
+  if (dependencyName === null) {
+    return null;
+  }
+
+  const displayName = formatDependencyName(dependencyName);
+  const route = requestContext?.route_template ?? requestContext?.path ?? null;
+  const requestDescription = requestContext !== null ? `${requestContext.method} ${route ?? requestContext.path}` : "the failing request";
+  const invalidResponse = text.includes("invalid_response");
+
+  return {
+    version: 1,
+    items: [
+      {
+        name: dependencyName,
+        status: "failed",
+        notes: invalidResponse
+          ? `${displayName} returned an unexpected response shape while handling ${requestDescription}.`
+          : `${displayName} failed while handling ${requestDescription}.`
+      }
+    ]
+  };
+}
+
+function buildSummaryGuidance(input: {
+  errorContext: BundleErrorContext | null;
+  requestContext: BundleRequestContext | null;
+  responseContext: BundleResponseContext | null;
+  dependenciesContext: BundleDependenciesContext | null;
+  firstApplicationFrame: BundleV1["summary"]["first_application_frame"];
+}): Pick<BundleV1["summary"], "likely_cause" | "confidence" | "recommended_action"> {
+  if (input.errorContext === null) {
+    return {
+      likely_cause: null,
+      confidence: 0,
+      recommended_action: null
+    };
+  }
+
+  const route = input.requestContext?.route_template ?? input.requestContext?.path ?? null;
+  const requestDescription = input.requestContext !== null ? `${input.requestContext.method} ${route ?? input.requestContext.path}` : null;
+  const firstDependency = input.dependenciesContext?.items[0] ?? null;
+  const dependencyDisplayName = firstDependency !== null ? formatDependencyName(firstDependency.name) : null;
+  const firstFrame = input.firstApplicationFrame;
+  const frameDescription = firstFrame?.file !== null && firstFrame?.file !== undefined ? ` in ${firstFrame.file}` : "";
+  const invalidResponse = input.errorContext.message.toLowerCase().includes("invalid_response");
+
+  let likelyCause: string | null = null;
+  let recommendedAction: string | null = null;
+
+  if (firstDependency !== null && dependencyDisplayName !== null && requestDescription !== null && invalidResponse) {
+    likelyCause = `${dependencyDisplayName} returned a response that did not match the expected schema while handling ${requestDescription}.`;
+    recommendedAction = `Inspect the ${dependencyDisplayName} response handling${frameDescription}, including schema validation and sanitized upstream response shape.`;
+  } else if (firstDependency !== null && dependencyDisplayName !== null && requestDescription !== null) {
+    likelyCause = `${dependencyDisplayName} failed while handling ${requestDescription}.`;
+    recommendedAction = `Inspect the ${dependencyDisplayName} call path${frameDescription} and compare the captured dependency notes with upstream status.`;
+  } else if (requestDescription !== null) {
+    likelyCause = `${input.errorContext.name} occurred while handling ${requestDescription}${frameDescription}.`;
+    recommendedAction = `Inspect the first application frame${frameDescription} and the captured request/response context.`;
+  } else if (firstFrame !== null) {
+    likelyCause = `${input.errorContext.name} originated from the first captured application frame${frameDescription}.`;
+    recommendedAction = `Inspect the first application frame${frameDescription} and surrounding error handling.`;
+  }
+
+  if (likelyCause === null || recommendedAction === null) {
+    return {
+      likely_cause: null,
+      confidence: 0,
+      recommended_action: null
+    };
+  }
+
+  let confidence = 0.25;
+  if (input.requestContext !== null) confidence += 0.15;
+  if (input.responseContext !== null) confidence += 0.1;
+  if (firstFrame !== null && firstFrame.file !== null) confidence += 0.1;
+  if (firstDependency !== null) confidence += 0.1;
+  if (input.errorContext.message.length > 0) confidence += 0.05;
+
+  return {
+    likely_cause: likelyCause,
+    confidence: Math.min(0.8, Number(confidence.toFixed(2))),
+    recommended_action: recommendedAction
+  };
+}
+
+function normalizeBaseUrl(value: string | null | undefined): string | null {
+  const trimmed = value?.trim();
+  if (trimmed === undefined || trimmed.length === 0) {
+    return null;
+  }
+
+  return trimmed.replace(/\/+$/, "");
+}
+
+function buildLinks(
+  incident: BundleBuildContext,
+  linkBaseUrls: BuildBundleInput["linkBaseUrls"]
+): BundleV1["links"] {
+  const apiBaseUrl = normalizeBaseUrl(linkBaseUrls?.api);
+  const appBaseUrl = normalizeBaseUrl(linkBaseUrls?.app);
+  const docsBaseUrl = normalizeBaseUrl(linkBaseUrls?.docs);
+  const incidentPath = `/v1/incidents/${encodeURIComponent(incident.incident_id)}`;
+  const appIncidentPath = `/incidents/${encodeURIComponent(incident.incident_id)}`;
+  const appProjectPath = `/projects/${encodeURIComponent(incident.project_id)}`;
+
+  return {
+    self: apiBaseUrl !== null ? `${apiBaseUrl}${incidentPath}/bundle` : null,
+    reproduction: apiBaseUrl !== null ? `${apiBaseUrl}${incidentPath}/reproduction` : null,
+    incident: appBaseUrl !== null ? `${appBaseUrl}${appIncidentPath}` : null,
+    project: appBaseUrl !== null ? `${appBaseUrl}${appProjectPath}` : null,
+    docs: docsBaseUrl !== null ? `${docsBaseUrl}/bundles` : null
+  };
+}
+
+function applyBundleRedaction(candidate: unknown): unknown {
+  const redactionResult = redact(candidate as JsonValue);
+  const fields = [...new Set(redactionResult.redacted_fields)].sort();
+  const redactedBundle = redactionResult.redacted as Record<string, unknown>;
+
+  redactedBundle["redaction"] = {
+    redacted: true,
+    fields,
+    notes: fields.length > 0 ? "Sensitive bundle fields were redacted before storage." : null
+  };
+
+  return redactedBundle;
+}
+
+function buildResponseContext(envelopes: EventEnvelope[]): BundleResponseContext | null {
   const requestEvent = selectLatestEnvelopeByType(envelopes, isRequestEventEnvelope);
   if (requestEvent !== null) {
     const context: NonNullable<BundleV1["context"]["response"]> = {
@@ -449,19 +687,35 @@ function buildFrontendContext(envelopes: EventEnvelope[]): BundleV1["context"]["
 
 function buildDeployContext(
   envelopes: EventEnvelope[],
-  trigger: BuildBundleJob["trigger"]
+  trigger: BuildBundleJob["trigger"],
+  configuredDeploy: BuildBundleInput["configuredDeploy"]
 ): BundleV1["context"]["deploy"] {
   const envelope = selectLatestEnvelopeByType(envelopes, isDeployMetadataEnvelope);
-  if (envelope === null) {
+  if (envelope !== null) {
+    return {
+      version: 1,
+      commit_sha: envelope.payload.commit_sha,
+      deploy_version: envelope.payload.version,
+      branch: envelope.payload.branch,
+      deployed_at: toIsoTimestamp(envelope.payload.deployed_at),
+      regression_window: trigger === "regression_reopen"
+    };
+  }
+
+  const commitSha = configuredDeploy?.commit_sha ?? null;
+  const deployVersion = configuredDeploy?.deploy_version ?? null;
+  const branch = configuredDeploy?.branch ?? null;
+  const deployedAt = configuredDeploy?.deployed_at ?? null;
+  if (commitSha === null && deployVersion === null && branch === null && deployedAt === null) {
     return null;
   }
 
   return {
     version: 1,
-    commit_sha: envelope.payload.commit_sha,
-    deploy_version: envelope.payload.version,
-    branch: envelope.payload.branch,
-    deployed_at: toIsoTimestamp(envelope.payload.deployed_at),
+    commit_sha: commitSha,
+    deploy_version: deployVersion,
+    branch,
+    deployed_at: deployedAt === null ? null : toIsoTimestamp(deployedAt),
     regression_window: trigger === "regression_reopen"
   };
 }
@@ -474,28 +728,48 @@ function buildRuntimeContext(
     return null;
   }
 
+  const runtime = backendException.payload.runtime as BackendRuntimePayload;
+
   return {
     version: 1,
     name: backendException.service.runtime ?? "unknown",
-    runtime_version: backendException.payload.runtime.version,
-    platform: null,
-    arch: null,
-    pid: null,
-    cwd: null,
-    uptime_sec: null,
-    hostname: null,
-    thread_id: null,
+    runtime_version: runtime.version,
+    platform: runtime.platform ?? null,
+    arch: runtime.arch ?? null,
+    pid: runtime.pid ?? null,
+    cwd: runtime.cwd ?? null,
+    uptime_sec: runtime.uptime_sec ?? null,
+    hostname: runtime.hostname ?? null,
+    thread_id: runtime.thread_id ?? null,
     framework: backendException.service.framework ?? null,
-    framework_version: null,
-    memory: null,
-    framework_extras: null
+    framework_version: runtime.framework_version ?? null,
+    memory: runtime.memory ?? null,
+    framework_extras: runtime.framework_extras ?? null
   };
 }
 
-function buildGitContext(envelopes: EventEnvelope[]): BundleV1["context"]["git"] {
+function buildGitContext(
+  envelopes: EventEnvelope[],
+  configuredDeploy: BuildBundleInput["configuredDeploy"]
+): BundleV1["context"]["git"] {
   const deployEnvelope = selectLatestEnvelopeByType(envelopes, isDeployMetadataEnvelope);
   if (deployEnvelope === null) {
-    return null;
+    const commit = configuredDeploy?.commit_sha ?? null;
+    const branch = configuredDeploy?.branch ?? null;
+    const repo = configuredDeploy?.repo ?? null;
+    if (commit === null && branch === null && repo === null) {
+      return null;
+    }
+
+    return {
+      version: 1,
+      commit,
+      commit_short: commit === null ? null : commit.slice(0, 7),
+      branch,
+      repo,
+      dirty: false,
+      source: "env"
+    };
   }
 
   return {
@@ -503,7 +777,7 @@ function buildGitContext(envelopes: EventEnvelope[]): BundleV1["context"]["git"]
     commit: deployEnvelope.payload.commit_sha,
     commit_short: deployEnvelope.payload.commit_sha.slice(0, 7),
     branch: deployEnvelope.payload.branch,
-    repo: null,
+    repo: configuredDeploy?.repo ?? null,
     dirty: false,
     source: "env"
   };
@@ -549,10 +823,11 @@ export function buildBundle(input: BuildBundleInput): BundleV1 {
   const responseContext = buildResponseContext(sourceEnvelopes);
   const logsContext = buildLogsContext(sourceEnvelopes);
   const frontendContext = buildFrontendContext(sourceEnvelopes);
-  const deployContext = buildDeployContext(sourceEnvelopes, input.job.trigger);
+  const deployContext = buildDeployContext(sourceEnvelopes, input.job.trigger, input.configuredDeploy);
   const runtimeContext = buildRuntimeContext(sourceEnvelopes);
-  const gitContext = buildGitContext(sourceEnvelopes);
+  const gitContext = buildGitContext(sourceEnvelopes, input.configuredDeploy);
   const deviceContext = buildDeviceContext(sourceEnvelopes);
+  const dependenciesContext = buildDependenciesContext(input.incident, errorContext, requestContext);
   const primarySignalType =
     primarySignalEnvelope !== null
       ? mapSignalType(primarySignalEnvelope.event_type)
@@ -573,8 +848,16 @@ export function buildBundle(input: BuildBundleInput): BundleV1 {
     selectLatestEnvelope(sourceEnvelopes, (envelope) => envelope.event_type !== "probe_event")?.service.framework ??
     null;
   const customerVisible = frontendContext !== null;
+  const firstApplicationFrame = deriveFirstApplicationFrame(errorContext);
+  const summaryGuidance = buildSummaryGuidance({
+    errorContext,
+    requestContext,
+    responseContext,
+    dependenciesContext,
+    firstApplicationFrame
+  });
 
-  return BundleV1Schema.parse({
+  const candidate = {
     bundle_version: 1,
     bundle_id: `bnd_${input.incident.incident_id}`,
     bundle_type: "failure",
@@ -609,13 +892,13 @@ export function buildBundle(input: BuildBundleInput): BundleV1 {
     summary: {
       title: input.incident.title,
       description: `Deterministic bundle generated from ${input.job.trigger}`,
-      likely_cause: null,
-      confidence: 0,
-      recommended_action: null,
+      likely_cause: summaryGuidance.likely_cause,
+      confidence: summaryGuidance.confidence,
+      recommended_action: summaryGuidance.recommended_action,
       severity: input.incident.severity,
       error_type: primarySourceEvent,
       error_message: errorContext?.message ?? input.incident.title,
-      first_application_frame: deriveFirstApplicationFrame(errorContext),
+      first_application_frame: firstApplicationFrame,
       primary_signal: primarySignalType,
       signals: {
         new_deploy: input.job.trigger === "deploy_metadata",
@@ -640,7 +923,7 @@ export function buildBundle(input: BuildBundleInput): BundleV1 {
       deploy: deployContext,
       runtime: runtimeContext,
       git: gitContext,
-      dependencies: null,
+      dependencies: dependenciesContext,
       probe_data: {
         version: 1,
         items: input.probeDataItems
@@ -661,11 +944,7 @@ export function buildBundle(input: BuildBundleInput): BundleV1 {
       production_verified: false
     },
     links: {
-      self: null,
-      reproduction: null,
-      incident: null,
-      project: null,
-      docs: null
+      ...buildLinks(input.incident, input.linkBaseUrls)
     },
     redaction: {
       redacted: true,
@@ -678,5 +957,7 @@ export function buildBundle(input: BuildBundleInput): BundleV1 {
       generator_version: "worker-build-bundle-v2",
       generation_number: input.bundleMetadata.generation_number
     }
-  });
+  };
+
+  return BundleV1Schema.parse(applyBundleRedaction(candidate));
 }

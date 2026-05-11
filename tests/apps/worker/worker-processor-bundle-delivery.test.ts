@@ -308,6 +308,16 @@ describe("worker processor \u2013 bundle, delivery & sampling", () => {
 
     const result = await processNextBuildBundleJob({
       queue,
+      env: {
+        DEBUGBUNDLE_API_URL: "https://api.debugbundle.test/",
+        APP_BASE_URL: "https://app.debugbundle.test/",
+        PUBLIC_SITE_URL: "https://debugbundle.test",
+        DEBUGBUNDLE_DEPLOY_COMMIT: "efae41568986daaf8c54777ca8e63d838a4c319f",
+        DEBUGBUNDLE_DEPLOY_VERSION: "efae41568986",
+        DEBUGBUNDLE_DEPLOY_BRANCH: "main",
+        DEBUGBUNDLE_DEPLOYED_AT: "2026-03-12T00:00:00.000Z",
+        DEBUGBUNDLE_GIT_REPO: "debugbundle/debugbundle"
+      },
       incidentStore: {
         getBundleBuildContext,
         reserveBundleGeneration: vi.fn().mockResolvedValue(createReservedBundleGeneration({ generation_number: 1 }))
@@ -346,6 +356,16 @@ describe("worker processor \u2013 bundle, delivery & sampling", () => {
           trigger: "occurrence_threshold"
         })
       },
+      env: {
+        DEBUGBUNDLE_API_URL: "https://api.debugbundle.test/",
+        APP_BASE_URL: "https://app.debugbundle.test/",
+        PUBLIC_SITE_URL: "https://debugbundle.test",
+        DEBUGBUNDLE_DEPLOY_COMMIT: "efae41568986daaf8c54777ca8e63d838a4c319f",
+        DEBUGBUNDLE_DEPLOY_VERSION: "efae41568986",
+        DEBUGBUNDLE_DEPLOY_BRANCH: "main",
+        DEBUGBUNDLE_DEPLOYED_AT: "2026-03-12T00:00:00.000Z",
+        DEBUGBUNDLE_GIT_REPO: "debugbundle/debugbundle"
+      },
       incidentStore: {
         getBundleBuildContext,
         reserveBundleGeneration: vi.fn().mockResolvedValue(createReservedBundleGeneration({ generation_number: 1 }))
@@ -372,7 +392,31 @@ describe("worker processor \u2013 bundle, delivery & sampling", () => {
     expect(parsed.context.error?.message).toBe("TypeError at checkout");
     expect(parsed.summary.signals.new_deploy).toBe(false);
     expect(parsed.summary.signals.regression_suspected).toBe(false);
+    expect(parsed.context.deploy).toEqual({
+      version: 1,
+      commit_sha: "efae41568986daaf8c54777ca8e63d838a4c319f",
+      deploy_version: "efae41568986",
+      branch: "main",
+      deployed_at: "2026-03-12T00:00:00.000Z",
+      regression_window: false
+    });
+    expect(parsed.context.git).toEqual({
+      version: 1,
+      commit: "efae41568986daaf8c54777ca8e63d838a4c319f",
+      commit_short: "efae415",
+      branch: "main",
+      repo: "debugbundle/debugbundle",
+      dirty: false,
+      source: "env"
+    });
     expect(parsed.context.probe_data).toEqual({ version: 1, items: [] });
+    expect(parsed.links).toEqual({
+      self: "https://api.debugbundle.test/v1/incidents/inc_123/bundle",
+      reproduction: "https://api.debugbundle.test/v1/incidents/inc_123/reproduction",
+      incident: "https://app.debugbundle.test/incidents/inc_123",
+      project: "https://app.debugbundle.test/projects/proj_123",
+      docs: "https://debugbundle.test/docs/bundles"
+    });
   });
 
   it("should suppress duplicate build-reproduction enqueue on deterministic build-bundle replay", async (): Promise<void> => {
@@ -955,6 +999,7 @@ describe("worker processor \u2013 bundle, delivery & sampling", () => {
           trigger: "deploy_metadata"
         })
       },
+      env: {},
       incidentStore: {
         getBundleBuildContext,
         reserveBundleGeneration: vi.fn().mockResolvedValue(
@@ -989,6 +1034,7 @@ describe("worker processor \u2013 bundle, delivery & sampling", () => {
           trigger: "deploy_metadata"
         })
       },
+      env: {},
       incidentStore: {
         getBundleBuildContext: vi.fn().mockResolvedValue({
           incident_id: "inc_fixture",

@@ -77,9 +77,7 @@ function createServer(overrides: {
       cancelCapacityReduction: vi.fn(),
       ...overrides.billingManagement
     }),
-    githubManagement:
-      overrides.githubManagement ??
-      mockedObject<NonNullable<ApiServerDependencies["githubManagement"]>>({
+    githubManagement: mockedObject<NonNullable<ApiServerDependencies["githubManagement"]>>({
         getInstallUrl: vi.fn().mockResolvedValue("https://github.com/apps/debugbundle-automation/installations/new"),
         getInstallationForOrganization: vi.fn().mockResolvedValue({
           id: "ghi_1",
@@ -122,8 +120,8 @@ function createServer(overrides: {
         }),
         verifyWebhookSignature: vi.fn().mockReturnValue(true),
         processWebhook: vi.fn().mockResolvedValue(undefined),
-        ...overrides.githubManagement
-      })
+      ...overrides.githubManagement
+    })
   });
 }
 

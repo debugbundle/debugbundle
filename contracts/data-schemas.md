@@ -519,9 +519,23 @@ Common wrapper for all SDK events:
   "handled": "boolean",
   "request": { "method": "string", "path": "string", "query": {}, "headers": {}, "body": {} },
   "response": { "status_code": 0, "headers": {}, "body": {} },
-  "runtime": { "version": "string" }
+  "runtime": {
+    "version": "string",
+    "platform": "string | null, optional",
+    "arch": "string | null, optional",
+    "pid": "number | null, optional",
+    "cwd": "string | null, optional",
+    "uptime_sec": "number | null, optional",
+    "hostname": "string | null, optional",
+    "thread_id": "string | number | null, optional",
+    "framework_version": "string | null, optional",
+    "memory": "{ rss, heap_total, heap_used, external, peak } | null, optional",
+    "framework_extras": "object | null, optional"
+  }
 }
 ```
+
+Backend SDKs should fill the optional runtime fields from safe process facts when available. SDKs must not include environment variables in this block.
 
 ### 3.2 `request_event`
 ```json
