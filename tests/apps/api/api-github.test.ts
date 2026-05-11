@@ -168,6 +168,25 @@ describe("api github routes", () => {
     expect(githubManagement.getInstallationForOrganization).toHaveBeenCalledWith({ organization_id: "org_123" });
   });
 
+  it("returns a null installation when no github app is connected yet", async () => {
+    const githubManagement = {
+      getInstallationForOrganization: vi.fn().mockResolvedValue(null)
+    };
+    const app = createServer({ githubManagement });
+
+    const response = await app.inject({
+      method: "GET",
+      url: "/v1/github/installation",
+      headers: {
+        authorization: "Bearer dbundle_mem_test"
+      }
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toEqual({ installation: null });
+    expect(githubManagement.getInstallationForOrganization).toHaveBeenCalledWith({ organization_id: "org_123" });
+  });
+
   it("returns the GitHub App install URL for authenticated callers on solo tiers", async () => {
     const githubManagement = {
       getInstallUrl: vi.fn().mockResolvedValue("https://github.com/apps/debugbundle-automation/installations/new")
@@ -259,9 +278,27 @@ describe("api github routes", () => {
         repo: "app"
       }
     });
+    const installUrlResponse = await app.inject({
+      method: "GET",
+      url: `/v1/github/app/install-url?return_to=${encodeURIComponent(`/projects/${projectId}/github`)}`,
+      headers: {
+        authorization: "Bearer dbundle_mem_test"
+      },
+      cookies: {
+        [SESSION_COOKIE_NAME]: "dbundle_session"
+      }
+    });
+    const installUrl = new URL(installUrlResponse.json().install_url);
+    const installState = installUrl.searchParams.get("state");
+
+    expect(installUrlResponse.statusCode).toBe(200);
+    expect(installUrl.origin).toBe("https://github.com");
+    expect(installUrl.pathname).toBe("/apps/debugbundle-automation/installations/new");
+    expect(installState).toEqual(expect.any(String));
+
     const callbackResponse = await app.inject({
       method: "GET",
-      url: "/v1/github/app/callback?installation_id=123&setup_action=install",
+      url: `/v1/github/app/callback?installation_id=123&state=${encodeURIComponent(installState ?? "")}`,
       cookies: {
         [SESSION_COOKIE_NAME]: "dbundle_session"
       }
@@ -276,10 +313,39 @@ describe("api github routes", () => {
       repo: "app"
     });
     expect(callbackResponse.statusCode).toBe(302);
+    expect(callbackResponse.headers.location).toBe(`http://localhost:5291/projects/${projectId}/github`);
     expect(githubManagement.completeGithubInstallationForOrganization).toHaveBeenCalledWith({
       organization_id: "org_123",
       installation_id: 123
     });
+  });
+
+  it("rejects github installation callbacks with invalid signed state", async () => {
+    const githubManagement = {
+      completeGithubInstallationForOrganization: vi.fn()
+    };
+    const app = createServer({
+      githubManagement,
+      webAuth: {
+        resolveSessionByToken: vi.fn().mockResolvedValue({
+          session_id: "ses_123",
+          user_id: "usr_123",
+          organization_id: "org_123"
+        })
+      }
+    });
+
+    const response = await app.inject({
+      method: "GET",
+      url: "/v1/github/app/callback?installation_id=123&state=not-a-valid-state",
+      cookies: {
+        [SESSION_COOKIE_NAME]: "dbundle_session"
+      }
+    });
+
+    expect(response.statusCode).toBe(400);
+    expect(response.json()).toEqual({ error: "invalid_state" });
+    expect(githubManagement.completeGithubInstallationForOrganization).not.toHaveBeenCalled();
   });
 
   it("blocks non-owner members from github mutation routes", async () => {

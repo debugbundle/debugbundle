@@ -47,9 +47,12 @@ interface GitHubSettingsState {
   deliveries: GitHubDispatchDeliveryRecord[];
 }
 
-async function loadOptionalGitHubInstallUrl(): Promise<{ installUrl: string | null; installUrlLoadFailed: boolean }> {
+async function loadOptionalGitHubInstallUrl(projectId: string): Promise<{ installUrl: string | null; installUrlLoadFailed: boolean }> {
   try {
-    return { installUrl: await getGitHubInstallUrl(), installUrlLoadFailed: false };
+    return {
+      installUrl: await getGitHubInstallUrl(`/projects/${projectId}/github`),
+      installUrlLoadFailed: false
+    };
   } catch {
     return { installUrl: null, installUrlLoadFailed: true };
   }
@@ -117,7 +120,7 @@ export function ProjectGitHubPage(): JSX.Element {
         const installation = await getGitHubInstallation();
 
         if (installation === null) {
-          const installUrlState = await loadOptionalGitHubInstallUrl();
+          const installUrlState = await loadOptionalGitHubInstallUrl(project.project_id);
 
           if (cancelled) {
             return;
@@ -136,7 +139,7 @@ export function ProjectGitHubPage(): JSX.Element {
 
         const installUrlPromise =
           installation.status === "suspended" || installation.status === "removed"
-            ? loadOptionalGitHubInstallUrl()
+            ? loadOptionalGitHubInstallUrl(project.project_id)
             : Promise.resolve({ installUrl: null, installUrlLoadFailed: false });
         const [repo, rules, deliveries] = await Promise.all([
           getProjectGitHubRepo(project.project_id),

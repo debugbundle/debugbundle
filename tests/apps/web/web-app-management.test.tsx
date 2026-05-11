@@ -635,7 +635,7 @@ describe("web app — management routes", () => {
         });
       }
 
-      if (url.endsWith("/v1/github/app/install-url") && init?.method === undefined) {
+      if (url.includes("/v1/github/app/install-url") && init?.method === undefined) {
         return jsonResponse(200, {
           install_url: "https://github.com/apps/debugbundle-automation/installations/new"
         });
@@ -697,10 +697,10 @@ describe("web app — management routes", () => {
       }
 
       if (url.endsWith("/v1/github/installation") && init?.method === undefined) {
-        return jsonResponse(404, { error: "installation_not_found" });
+        return jsonResponse(200, { installation: null });
       }
 
-      if (url.endsWith("/v1/github/app/install-url") && init?.method === undefined) {
+      if (url.includes("/v1/github/app/install-url") && init?.method === undefined) {
         return jsonResponse(200, {
           install_url: "https://github.com/apps/debugbundle-automation/installations/new"
         });
@@ -731,6 +731,11 @@ describe("web app — management routes", () => {
       "href",
       "https://github.com/apps/debugbundle-automation/installations/new"
     );
+    expect(
+      fetchMock.mock.calls.some(([input]) =>
+        requestUrl(input).includes("/v1/github/app/install-url?return_to=%2Fprojects%2Fproj_123%2Fgithub")
+      )
+    ).toBe(true);
     expect(fetchMock.mock.calls.some(([input]) => requestUrl(input).endsWith("/v1/github/repositories"))).toBe(false);
     expect(fetchMock.mock.calls.some(([input]) => requestUrl(input).endsWith("/v1/projects/proj_123/github/repo"))).toBe(false);
     expect(fetchMock.mock.calls.some(([input]) => requestUrl(input).endsWith("/v1/projects/proj_123/github/rules"))).toBe(false);
@@ -754,10 +759,10 @@ describe("web app — management routes", () => {
       }
 
       if (url.endsWith("/v1/github/installation") && init?.method === undefined) {
-        return jsonResponse(404, { error: "installation_not_found" });
+        return jsonResponse(200, { installation: null });
       }
 
-      if (url.endsWith("/v1/github/app/install-url") && init?.method === undefined) {
+      if (url.includes("/v1/github/app/install-url") && init?.method === undefined) {
         return jsonResponse(404, { error: "not_found" });
       }
 

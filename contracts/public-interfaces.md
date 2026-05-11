@@ -82,7 +82,7 @@ Every capability must be available through all applicable interfaces. Operations
 | Get capture policy | `GET /v1/projects/{id}/capture-policy` | `capture-policy get` | `get_capture_policy` | Browser Session or Member Token |
 | Update capture policy | `PATCH /v1/projects/{id}/capture-policy` | `capture-policy set` | `update_capture_policy` | Browser Session or Member Token, owner only |
 | SDK config | `GET /v1/sdk/config` | — | — | SDK-only (project token, includes resolved capture policy) |
-| Get GitHub App install URL | `GET /v1/github/app/install-url` | — | — | Browser Session or Member Token, Solo+ only; web convenience route for the install/reconnect CTA |
+| Get GitHub App install URL | `GET /v1/github/app/install-url` | — | — | Browser Session or Member Token, Solo+ only; web convenience route for the install/reconnect CTA, optionally signed with a return path |
 | Get GitHub installation | `GET /v1/github/installation` | `github status` | `get_github_status` | Browser Session or Member Token, Solo+ only |
 | Disconnect GitHub installation | `DELETE /v1/github/installation` | — | — | Web/API only; mirrors web-initiated installation flow |
 | List GitHub repositories | `GET /v1/github/repositories` | `github repos` | `list_github_repositories` | Browser Session or Member Token, Solo+ only |
@@ -96,7 +96,7 @@ Every capability must be available through all applicable interfaces. Operations
 | Delete dispatch rule | `DELETE /v1/projects/{id}/github/rules/{ruleId}` | `github rules delete` | `delete_github_dispatch_rule` | Browser Session or Member Token, owner only, Solo+ only |
 | List dispatch deliveries | `GET /v1/projects/{id}/github/deliveries` | `github deliveries` | `list_github_deliveries` | Browser Session or Member Token, Solo+ only |
 | Retry dispatch delivery | `POST /v1/projects/{id}/github/deliveries/{id}/retry` | `github deliveries retry` | `retry_github_delivery` | Browser Session or Member Token, Solo+ only |
-| GitHub App callback | `GET /v1/github/app/callback` | — | — | OAuth callback after GitHub App installation |
+| GitHub App callback | `GET /v1/github/app/callback` | — | — | GitHub App setup URL / post-install redirect handler |
 | GitHub App webhook | `POST /v1/github/app/webhook` | — | — | Installation lifecycle events (HMAC-verified) |
 
 ---
@@ -1244,10 +1244,10 @@ SDKs must respect the server-side capture policy. Events that violate the policy
 
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
-| GET | `/v1/github/app/callback` | None | OAuth callback after GitHub App installation |
+| GET | `/v1/github/app/callback` | None | GitHub App setup URL / post-install redirect handler |
 | POST | `/v1/github/app/webhook` | GitHub App webhook secret (HMAC-SHA256) | Installation lifecycle events |
 
-The callback endpoint completes the App installation flow: validates the `installation_id` and `setup_action`, records the installation in `github_installations`, and redirects the user back into the DebugBundle web app so they can continue setup from the project GitHub tab.
+The setup callback endpoint completes the App installation flow: validates the `installation_id`, accepts GitHub's optional `setup_action`, records the installation in `github_installations`, validates a signed install `state` when present, and redirects the user back into the DebugBundle web app so they can continue setup from the originating project GitHub tab.
 
 The webhook endpoint handles `installation.created`, `installation.deleted`, `installation.suspend`, and `installation.unsuspend` events. All payloads are verified with HMAC-SHA256 using `GITHUB_APP_WEBHOOK_SECRET`.
 
@@ -1275,6 +1275,13 @@ The webhook endpoint handles `installation.created`, `installation.deleted`, `in
     "created_at": "ISO8601",
     "updated_at": "ISO8601"
   }
+}
+```
+
+When no GitHub App installation is connected yet, the route returns:
+```json
+{
+  "installation": null
 }
 ```
 

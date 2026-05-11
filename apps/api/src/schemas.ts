@@ -51,7 +51,14 @@ export const GithubMockAuthorizeQuerySchema = z
 export const GitHubAppCallbackQuerySchema = z
   .object({
     installation_id: z.coerce.number().int().positive(),
-    setup_action: z.enum(["install", "update", "request"])
+    setup_action: z.enum(["install", "update", "request"]).optional(),
+    state: z.string().min(1).optional()
+  })
+  .passthrough();
+
+export const GitHubAppInstallUrlQuerySchema = z
+  .object({
+    return_to: z.string().min(1).optional()
   })
   .strict();
 

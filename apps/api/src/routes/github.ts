@@ -1,10 +1,14 @@
+import { createHmac, timingSafeEqual } from "node:crypto";
+
 import type { FastifyInstance } from "fastify";
 
+import { readCookieValue, SESSION_COOKIE_NAME } from "../../../../packages/auth/src/index.js";
 import { getTierCapabilities } from "../../../../packages/shared-types/src/index.js";
 import type { ApiDependencies } from "../api-types.js";
 import { requireRateLimitedMemberAuth, requireRateLimitedOwnerMemberAuth, resolveBrowserSession } from "../api-helpers.js";
 import {
   GitHubAppCallbackQuerySchema,
+  GitHubAppInstallUrlQuerySchema,
   GitHubDispatchDeliveriesQuerySchema,
   GitHubDispatchDeliveryRetryParamsSchema,
   GitHubDispatchRuleBodySchema,
@@ -16,6 +20,56 @@ import {
 
 function resolveAppRedirectBaseUrl(): string {
   return (process.env["APP_BASE_URL"] ?? "http://localhost:5291").replace(/\/+$/, "");
+}
+
+function normalizeGitHubInstallReturnPath(value: string | undefined): string | null {
+  if (typeof value !== "string") {
+    return null;
+  }
+
+  const normalized = value.trim();
+  if (!normalized.startsWith("/") || normalized.startsWith("//")) {
+    return null;
+  }
+
+  return normalized;
+}
+
+function buildGitHubInstallState(sessionToken: string, returnTo: string): string {
+  const payload = Buffer.from(JSON.stringify({ return_to: returnTo }), "utf8").toString("base64url");
+  const signature = createHmac("sha256", sessionToken).update(payload).digest("base64url");
+  return `${payload}.${signature}`;
+}
+
+function readGitHubInstallState(state: string, sessionToken: string): string | null {
+  const [payload, signature, ...rest] = state.split(".");
+  if (payload === undefined || signature === undefined || rest.length > 0) {
+    return null;
+  }
+
+  const expectedSignature = createHmac("sha256", sessionToken).update(payload).digest("base64url");
+  const providedBuffer = Buffer.from(signature, "utf8");
+  const expectedBuffer = Buffer.from(expectedSignature, "utf8");
+  if (providedBuffer.length !== expectedBuffer.length) {
+    return null;
+  }
+  if (!timingSafeEqual(providedBuffer, expectedBuffer)) {
+    return null;
+  }
+
+  let parsedPayload: unknown;
+  try {
+    parsedPayload = JSON.parse(Buffer.from(payload, "base64url").toString("utf8"));
+  } catch {
+    return null;
+  }
+
+  if (typeof parsedPayload !== "object" || parsedPayload === null) {
+    return null;
+  }
+
+  const returnTo = (parsedPayload as { return_to?: unknown }).return_to;
+  return normalizeGitHubInstallReturnPath(typeof returnTo === "string" ? returnTo : undefined);
 }
 
 async function ensureGitHubAutomationEnabled(
@@ -70,8 +124,20 @@ export function registerGitHubRoutes(app: FastifyInstance, dependencies: ApiDepe
       return reply.status(403).send({ error: "upgrade_required" });
     }
 
-    const install_url = await dependencies.githubManagement.getInstallUrl();
-    return reply.status(200).send({ install_url });
+    const parsedQuery = GitHubAppInstallUrlQuerySchema.safeParse(request.query);
+    if (!parsedQuery.success) {
+      return reply.status(400).send({ error: "invalid_query" });
+    }
+
+    const sessionToken = readCookieValue(request.headers.cookie, SESSION_COOKIE_NAME);
+    const returnTo = normalizeGitHubInstallReturnPath(parsedQuery.data.return_to);
+    const installUrl = new URL(await dependencies.githubManagement.getInstallUrl());
+
+    if (sessionToken !== null && returnTo !== null) {
+      installUrl.searchParams.set("state", buildGitHubInstallState(sessionToken, returnTo));
+    }
+
+    return reply.status(200).send({ install_url: installUrl.toString() });
   });
 
   app.get("/v1/github/installation", async (request, reply) => {
@@ -89,10 +155,6 @@ export function registerGitHubRoutes(app: FastifyInstance, dependencies: ApiDepe
     const installation = await dependencies.githubManagement.getInstallationForOrganization({
       organization_id: member.organization_id
     });
-    if (installation === null) {
-      return reply.status(404).send({ error: "installation_not_found" });
-    }
-
     return reply.status(200).send({ installation });
   });
 
@@ -525,9 +587,24 @@ export function registerGitHubRoutes(app: FastifyInstance, dependencies: ApiDepe
       return reply.status(503).send({ error: "github_not_configured" });
     }
 
+    const sessionToken = readCookieValue(request.headers.cookie, SESSION_COOKIE_NAME);
     const session = await resolveBrowserSession(request.headers.cookie, dependencies);
     if (session === null) {
       return reply.status(401).send({ error: "invalid_session" });
+    }
+
+    let redirectPath = "/projects";
+    if (parsedQuery.data.state !== undefined) {
+      if (sessionToken === null) {
+        return reply.status(400).send({ error: "invalid_state" });
+      }
+
+      const returnTo = readGitHubInstallState(parsedQuery.data.state, sessionToken);
+      if (returnTo === null) {
+        return reply.status(400).send({ error: "invalid_state" });
+      }
+
+      redirectPath = returnTo;
     }
 
     const installation = await dependencies.githubManagement.completeGithubInstallationForOrganization({
@@ -538,7 +615,7 @@ export function registerGitHubRoutes(app: FastifyInstance, dependencies: ApiDepe
       return reply.status(503).send({ error: "github_not_configured" });
     }
 
-    return reply.redirect(`${resolveAppRedirectBaseUrl()}/projects?github=connected`);
+    return reply.redirect(`${resolveAppRedirectBaseUrl()}${redirectPath}`);
   });
 
   app.register((scope) => {

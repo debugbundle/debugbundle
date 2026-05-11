@@ -799,28 +799,28 @@ export async function listProjectWebhooks(projectId: string, limit = 20): Promis
 }
 
 export async function getGitHubInstallation(): Promise<GitHubInstallationRecord | null> {
-  try {
-    const body = await readJson<{ installation: GitHubInstallationRecord }>(
-      await fetch(`${API_BASE}/v1/github/installation`, {
-        credentials: "include"
-      })
-    );
-
-    return body.installation;
-  } catch (error) {
-    if (error instanceof Error && error.message === "installation_not_found") {
-      return null;
-    }
-
-    throw error;
-  }
-}
-
-export async function getGitHubInstallUrl(): Promise<string> {
-  const body = await readJson<GitHubInstallUrlResponse>(
-    await fetch(`${API_BASE}/v1/github/app/install-url`, {
+  const body = await readJson<{ installation: GitHubInstallationRecord | null }>(
+    await fetch(`${API_BASE}/v1/github/installation`, {
       credentials: "include"
     })
+  );
+
+  return body.installation;
+}
+
+export async function getGitHubInstallUrl(returnTo?: string): Promise<string> {
+  const searchParams = new URLSearchParams();
+  if (returnTo !== undefined) {
+    searchParams.set("return_to", returnTo);
+  }
+
+  const body = await readJson<GitHubInstallUrlResponse>(
+    await fetch(
+      `${API_BASE}/v1/github/app/install-url${searchParams.size === 0 ? "" : `?${searchParams.toString()}`}`,
+      {
+        credentials: "include"
+      }
+    )
   );
 
   return body.install_url;
