@@ -619,7 +619,7 @@ function EmailAuthPage({
           <Field>
             <Button type="submit" className="w-full" disabled={isSubmitting} aria-describedby={requestErrorId}>
               {isSubmitting ? <LoaderCircleIcon className="animate-spin" /> : null}
-              {step === "request" ? "Email me a code" : "Continue with code"}
+              {step === "request" ? "Send code" : "Send code"}
             </Button>
             {step === "verify" ? (
               <div className="mt-3 flex flex-col gap-3 sm:flex-row">

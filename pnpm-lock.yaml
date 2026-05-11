@@ -18,14 +18,14 @@ importers:
         specifier: workspace:*
         version: link:packages/auth
       '@debugbundle/redaction':
-        specifier: 0.1.1
-        version: 0.1.1
+        specifier: 0.1.2
+        version: 0.1.2
       '@debugbundle/sdk-node':
-        specifier: 0.1.1
-        version: 0.1.1
+        specifier: 0.1.2
+        version: 0.1.2
       '@debugbundle/shared-types':
-        specifier: 0.1.1
-        version: 0.1.1
+        specifier: 0.1.2
+        version: 0.1.2
       '@node-rs/argon2':
         specifier: ^2.0.2
         version: 2.0.2
@@ -153,8 +153,8 @@ importers:
   apps/web:
     dependencies:
       '@debugbundle/sdk-browser':
-        specifier: 0.1.0
-        version: 0.1.0
+        specifier: 0.1.2
+        version: 0.1.2
       '@fontsource-variable/geist':
         specifier: ^5.2.8
         version: 5.2.8
@@ -587,23 +587,17 @@ packages:
     resolution: {integrity: sha512-Vd/9EVDiu6PPJt9yAh6roZP6El1xHrdvIVGjyBsHR0RYwNHgL7FJPyIIW4fANJNG6FtyZfvlRPpFI4ZM/lubvw==}
     engines: {node: '>=18'}
 
-  '@debugbundle/redaction@0.1.0':
-    resolution: {integrity: sha512-q+g0BNToivk+ujEuVwaIb3MsqdUkYUvNUvzgqD3x6b2fPhwpfrxke9Z8rcLEQYrnC6Vqf0PP1dlJdecHINlHtw==}
+  '@debugbundle/redaction@0.1.2':
+    resolution: {integrity: sha512-j8EgC1cT3zYccgq53RG9ohSO574Hmsu/zGNXjKVeiDsCB8rkIrz7AYkP87GZWM8ak5zXOz9f2n1JB5wtoppBQg==}
 
-  '@debugbundle/redaction@0.1.1':
-    resolution: {integrity: sha512-0K0OEhTHP1Y3azZSQfkfzGyHPCs1cfoTwWysTXZyyPSkKvBe3p5ngG3oeGCq3TYTKu5Vf4IsplDytwnsnytvbg==}
+  '@debugbundle/sdk-browser@0.1.2':
+    resolution: {integrity: sha512-vBE0bCQLoW8Ec3VLWL1tSFfu1wiD+sWks6cIjIa0bfxLgifmwHiE3ch95+2PEQ1Pa+LX3wPz0T6UTbA+J0Oghw==}
 
-  '@debugbundle/sdk-browser@0.1.0':
-    resolution: {integrity: sha512-KIIrp5sdXzeytHtnS0oCt9g+rGstNRJ32w6ytXJLLHdvYUB6G2sWC5B0Sv/IEQKJy8sJrrEm1nFz0ekVD0fCtA==}
+  '@debugbundle/sdk-node@0.1.2':
+    resolution: {integrity: sha512-DPXAo8JHNURNAh89ECqoo7s/zdJAdw9otRPmO1rybkQKn98jzqkI1iwifdY8mcbko+WpnB3too/1HXAUiPbIag==}
 
-  '@debugbundle/sdk-node@0.1.1':
-    resolution: {integrity: sha512-91WEVn24qrzRyBj4IwBfVGVH/6S6L6CfH0X2RGVk3dGlNtVyRSZfB+Drbn3IKRIQ2C1eKa4FBX5WqiA2Ha/N7Q==}
-
-  '@debugbundle/shared-types@0.1.0':
-    resolution: {integrity: sha512-s3+IiKMBjiic/JEMOUvadjoSiJycR28CZjB2drOBwdkrt+V2vnq+eTaeADAC+igDNvC/qxDG1rmNDSCzGA0stg==}
-
-  '@debugbundle/shared-types@0.1.1':
-    resolution: {integrity: sha512-wduMHiwaE7GeuEXT/fBDa1jAiUpx7rZEnPBjuTW6nv4IFENpb9aht4AHELgySWHnPNv8VgzRqDKcM04b5tspug==}
+  '@debugbundle/shared-types@0.1.2':
+    resolution: {integrity: sha512-kM9G8R+aHDWrK2wD9CBXeJIVVLkop7OIvxKleIZRj7BpvQhP6JZXbEeZBVAgFwQEGIh6bHwvO2HjDsO8UOgZKQ==}
 
   '@dotenvx/dotenvx@1.60.0':
     resolution: {integrity: sha512-zWepVRNan/5gCALiT/QCHVsmxvq81xenBqGRyoTUy+ClJ+Mgs+tTJ6h4f65nqs8ijVFe6xg4lIQAIwe+HfgWXg==}
@@ -5316,26 +5310,20 @@ snapshots:
 
   '@csstools/css-tokenizer@3.0.4': {}
 
-  '@debugbundle/redaction@0.1.0': {}
+  '@debugbundle/redaction@0.1.2': {}
 
-  '@debugbundle/redaction@0.1.1': {}
-
-  '@debugbundle/sdk-browser@0.1.0':
+  '@debugbundle/sdk-browser@0.1.2':
     dependencies:
-      '@debugbundle/redaction': 0.1.0
-      '@debugbundle/shared-types': 0.1.0
+      '@debugbundle/redaction': 0.1.2
+      '@debugbundle/shared-types': 0.1.2
 
-  '@debugbundle/sdk-node@0.1.1':
+  '@debugbundle/sdk-node@0.1.2':
     dependencies:
-      '@debugbundle/redaction': 0.1.1
-      '@debugbundle/shared-types': 0.1.1
+      '@debugbundle/redaction': 0.1.2
+      '@debugbundle/shared-types': 0.1.2
       zod: 3.25.76
 
-  '@debugbundle/shared-types@0.1.0':
-    dependencies:
-      zod: 3.25.76
-
-  '@debugbundle/shared-types@0.1.1':
+  '@debugbundle/shared-types@0.1.2':
     dependencies:
       zod: 3.25.76
 

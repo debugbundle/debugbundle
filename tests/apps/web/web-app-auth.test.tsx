@@ -133,12 +133,12 @@ describe("web app - auth routes", () => {
     render(<App initialEntries={["/login"]} />);
 
     await user.type(await screen.findByLabelText(/email address/i), "owen@example.com");
-    await user.click(screen.getByRole("button", { name: /email me a code/i }));
+    await user.click(screen.getByRole("button", { name: /^send code$/i }));
 
     expect(await screen.findByLabelText(/six-digit code/i)).toBeInTheDocument();
 
     await user.type(screen.getByLabelText(/six-digit code/i), "123456");
-    await user.click(screen.getByRole("button", { name: /continue with code/i }));
+    await user.click(screen.getByRole("button", { name: /^send code$/i }));
 
     expect(await screen.findByText(/bundle requests/i)).toBeInTheDocument();
   });
@@ -158,7 +158,7 @@ describe("web app - auth routes", () => {
     render(<App initialEntries={["/login"]} />);
 
     const emailInput = await screen.findByLabelText(/email address/i);
-    await user.click(screen.getByRole("button", { name: /email me a code/i }));
+    await user.click(screen.getByRole("button", { name: /^send code$/i }));
 
     expect(emailInput).toHaveAttribute("aria-invalid", "true");
     expect(screen.getByText(/enter your email address to receive a sign-in code/i)).toBeInTheDocument();
@@ -187,10 +187,10 @@ describe("web app - auth routes", () => {
     render(<App initialEntries={["/login"]} />);
 
     await user.type(await screen.findByLabelText(/email address/i), "owen@example.com");
-    await user.click(screen.getByRole("button", { name: /email me a code/i }));
+    await user.click(screen.getByRole("button", { name: /^send code$/i }));
 
     const codeInput = await screen.findByLabelText(/six-digit code/i);
-    await user.click(screen.getByRole("button", { name: /continue with code/i }));
+    await user.click(screen.getByRole("button", { name: /^send code$/i }));
 
     expect(codeInput).toHaveAttribute("aria-invalid", "true");
     expect(screen.getByText(/enter the six-digit code from your email/i)).toBeInTheDocument();
@@ -273,9 +273,9 @@ describe("web app - auth routes", () => {
     expect(screen.getByRole("link", { name: /privacy policy/i }).getAttribute("href")).toBe("https://debugbundle.com/privacy");
 
     await user.type(screen.getByLabelText(/email address/i), "owen@example.com");
-    await user.click(screen.getByRole("button", { name: /email me a code/i }));
+    await user.click(screen.getByRole("button", { name: /^send code$/i }));
     await user.type(await screen.findByLabelText(/six-digit code/i), "654321");
-    await user.click(screen.getByRole("button", { name: /continue with code/i }));
+    await user.click(screen.getByRole("button", { name: /^send code$/i }));
 
     expect(await screen.findByText(/bundle requests/i)).toBeInTheDocument();
   });
