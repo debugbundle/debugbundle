@@ -639,9 +639,23 @@ describe("worker runtime", () => {
     processNextGroupIncidentJobMock.mockResolvedValueOnce({ processed: false, reason: "no_jobs" });
     processNextBuildBundleJobMock.mockResolvedValueOnce({ processed: true });
 
-    await runWorkerFromEnv({ WORKER_RUN_ONCE: "1" });
+    await runWorkerFromEnv({
+      WORKER_RUN_ONCE: "1",
+      DEBUGBUNDLE_API_URL: "https://api.debugbundle.test",
+      APP_BASE_URL: "https://app.debugbundle.test",
+      PUBLIC_SITE_URL: "https://debugbundle.test"
+    });
 
     expect(processNextBuildBundleJobMock).toHaveBeenCalledOnce();
+    expect(processNextBuildBundleJobMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        env: expect.objectContaining({
+          DEBUGBUNDLE_API_URL: "https://api.debugbundle.test",
+          APP_BASE_URL: "https://app.debugbundle.test",
+          PUBLIC_SITE_URL: "https://debugbundle.test"
+        })
+      })
+    );
     expect(processNextBuildReproductionJobMock).not.toHaveBeenCalled();
     expect(processNextDeliverWebhookJobMock).not.toHaveBeenCalled();
   });

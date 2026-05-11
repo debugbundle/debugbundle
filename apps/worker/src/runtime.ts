@@ -1244,6 +1244,7 @@ export async function runWorkerFromEnv(envInput: Record<string, string | undefin
             processNextBuildBundleJob({
               queue,
               logger,
+              env: envInput,
               incidentStore,
               objectStore,
               billingStore
