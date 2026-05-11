@@ -2528,7 +2528,9 @@ describe("worker processor \u2013 bundle, delivery & sampling", () => {
         dispatch_payload: {
           debugbundle_event: "bundle.created",
           incident_id: "inc_123",
-          project_id: "proj_123"
+          debugbundle: {
+            project_id: "proj_123"
+          }
         }
       }),
       markGitHubDispatchDeliveryAttempt: vi.fn().mockResolvedValue({ status: "delivered", next_attempt: null })
@@ -2578,7 +2580,9 @@ describe("worker processor \u2013 bundle, delivery & sampling", () => {
         dispatch_payload: {
           debugbundle_event: "bundle.created",
           incident_id: "inc_123",
-          project_id: "proj_123"
+          debugbundle: {
+            project_id: "proj_123"
+          }
         }
       }),
       markGitHubDispatchDeliveryAttempt: vi.fn().mockResolvedValue({ status: "retrying", next_attempt: 2 })
@@ -2628,7 +2632,9 @@ describe("worker processor \u2013 bundle, delivery & sampling", () => {
         dispatch_payload: {
           debugbundle_event: "bundle.created",
           incident_id: "inc_123",
-          project_id: "proj_123"
+          debugbundle: {
+            project_id: "proj_123"
+          }
         }
       }),
       markGitHubDispatchDeliveryAttempt: vi.fn().mockResolvedValue({ status: "retrying", next_attempt: 2 })

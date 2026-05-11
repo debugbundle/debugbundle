@@ -1434,26 +1434,28 @@ When no repository is assigned to the project yet, the route returns:
 {
   "debugbundle_event": "bundle.created",
   "incident_id": "inc_abc123",
-  "project_id": "proj_xyz789",
   "bundle_type": "failure",
   "bundle_version": 3,
   "severity": "high",
   "service": "checkout-api",
   "environment": "production",
   "title": "TypeError: Cannot read property 'id' of undefined",
-  "occurrence_count": 12,
-  "first_seen_at": "2026-03-20T14:30:00Z",
   "links": {
     "bundle": "https://api.debugbundle.com/v1/incidents/inc_abc123/bundle",
     "reproduction": "https://api.debugbundle.com/v1/incidents/inc_abc123/reproduction",
     "dashboard": "https://app.debugbundle.com/incidents/inc_abc123"
   },
-  "dispatch_id": "dsp_delivery123",
-  "dispatched_at": "2026-03-25T10:00:00Z"
+  "debugbundle": {
+    "project_id": "proj_xyz789",
+    "occurrence_count": 12,
+    "first_seen_at": "2026-03-20T14:30:00Z",
+    "dispatch_id": "dsp_delivery123",
+    "dispatched_at": "2026-03-25T10:00:00Z"
+  }
 }
 ```
 
-The `event_type` on the `repository_dispatch` is always `debugbundle.incident`. The specific lifecycle event is in `debugbundle_event` inside `client_payload`. `dispatch_id` is globally unique per delivery attempt for workflow deduplication.
+The `event_type` on the `repository_dispatch` is always `debugbundle.incident`. The specific lifecycle event is in `debugbundle_event` inside `client_payload`, and delivery metadata lives under `client_payload.debugbundle`. `dispatch_id` is globally unique per delivery attempt for workflow deduplication.
 
 Reference action distribution: external repositories consume `debugbundle/action@v1`. The action lives in the dedicated public `debugbundle/action` repository and fetches the bundle and reproduction artifact into `.debugbundle/bundles/cloud/` using `incident-id`, `debugbundle-token`, optional `api-base-url`, and optional `workspace-root` inputs.
 

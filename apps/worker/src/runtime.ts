@@ -344,19 +344,21 @@ export function createGitHubDispatchPublisher(input: CreateGitHubDispatchPublish
           dispatch_payload: {
             debugbundle_event: event.event_type,
             incident_id: event.incident_id,
-            project_id: event.project_id,
             bundle_type: event.bundle_type ?? "failure",
             bundle_version: event.bundle_version ?? 1,
             severity: event.severity,
             service: event.service_name,
             environment: event.environment,
             title: event.title ?? null,
-            occurrence_count: event.occurrence_count ?? 1,
-            first_seen_at: event.first_seen_at ?? event.occurred_at,
             links: {
               bundle: `/v1/incidents/${event.incident_id}/bundle`,
               reproduction: `/v1/incidents/${event.incident_id}/reproduction`,
               dashboard: `/incidents/${event.incident_id}`
+            },
+            debugbundle: {
+              project_id: event.project_id,
+              occurrence_count: event.occurrence_count ?? 1,
+              first_seen_at: event.first_seen_at ?? event.occurred_at
             }
           }
         });
@@ -519,8 +521,14 @@ export function createGitHubDispatchTransport(input: {
           event_type: "debugbundle.incident",
           client_payload: {
             ...event.dispatch_payload,
-            dispatch_id: event.delivery_id,
-            dispatched_at: now().toISOString()
+            debugbundle: {
+              ...(typeof event.dispatch_payload["debugbundle"] === "object" &&
+              event.dispatch_payload["debugbundle"] !== null
+                ? event.dispatch_payload["debugbundle"]
+                : {}),
+              dispatch_id: event.delivery_id,
+              dispatched_at: now().toISOString()
+            }
           }
         })
       });

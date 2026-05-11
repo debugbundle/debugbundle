@@ -566,19 +566,21 @@ describe("worker runtime", () => {
         dispatch_payload: {
           debugbundle_event: "bundle.created",
           incident_id: "inc_123",
-          project_id: "proj_123",
           bundle_type: "failure",
           bundle_version: 3,
           severity: "high",
           service: "checkout-api",
           environment: "production",
           title: "TypeError in checkout",
-          occurrence_count: 12,
-          first_seen_at: "2026-03-10T23:00:00.000Z",
           links: {
             bundle: "/v1/incidents/inc_123/bundle",
             reproduction: "/v1/incidents/inc_123/reproduction",
             dashboard: "/incidents/inc_123"
+          },
+          debugbundle: {
+            project_id: "proj_123",
+            occurrence_count: 12,
+            first_seen_at: "2026-03-10T23:00:00.000Z"
           }
         }
       })
@@ -1006,19 +1008,21 @@ describe("worker runtime", () => {
         dispatch_payload: {
           debugbundle_event: "bundle.created",
           incident_id: "inc_123",
-          project_id: "proj_123",
           bundle_type: "failure",
           bundle_version: 3,
           severity: "high",
           service: "checkout-api",
           environment: "production",
           title: "TypeError in checkout",
-          occurrence_count: 12,
-          first_seen_at: "2026-03-10T23:00:00.000Z",
           links: {
             bundle: "/v1/incidents/inc_123/bundle",
             reproduction: "/v1/incidents/inc_123/reproduction",
             dashboard: "/incidents/inc_123"
+          },
+          debugbundle: {
+            project_id: "proj_123",
+            occurrence_count: 12,
+            first_seen_at: "2026-03-10T23:00:00.000Z"
           }
         }
       })
@@ -1293,19 +1297,21 @@ describe("worker runtime", () => {
       dispatch_payload: {
         debugbundle_event: "bundle.created",
         incident_id: "inc_123",
-        project_id: "proj_123",
         bundle_type: "failure",
         bundle_version: 3,
         severity: "high",
         service: "checkout-api",
         environment: "production",
         title: "TypeError in checkout",
-        occurrence_count: 12,
-        first_seen_at: "2026-03-10T23:00:00.000Z",
         links: {
           bundle: "/v1/incidents/inc_123/bundle",
           reproduction: "/v1/incidents/inc_123/reproduction",
           dashboard: "/incidents/inc_123"
+        },
+        debugbundle: {
+          project_id: "proj_123",
+          occurrence_count: 12,
+          first_seen_at: "2026-03-10T23:00:00.000Z"
         }
       }
     });
@@ -1318,19 +1324,21 @@ describe("worker runtime", () => {
       dispatch_payload: {
         debugbundle_event: "bundle.reopened",
         incident_id: "inc_456",
-        project_id: "proj_123",
         bundle_type: "failure",
         bundle_version: 4,
         severity: "critical",
         service: "checkout-api",
         environment: "production",
         title: "Checkout regressed",
-        occurrence_count: 25,
-        first_seen_at: "2026-03-10T21:00:00.000Z",
         links: {
           bundle: "/v1/incidents/inc_456/bundle",
           reproduction: "/v1/incidents/inc_456/reproduction",
           dashboard: "/incidents/inc_456"
+        },
+        debugbundle: {
+          project_id: "proj_123",
+          occurrence_count: 25,
+          first_seen_at: "2026-03-10T21:00:00.000Z"
         }
       }
     });
@@ -1345,11 +1353,27 @@ describe("worker runtime", () => {
         body: expect.stringContaining('"dispatch_id":"gdd_2"')
       })
     );
-    expect(fetchMock.mock.calls[2]?.[1]).toEqual(
+    const dispatchedRequest = fetchMock.mock.calls[2]?.[1];
+    expect(dispatchedRequest).toEqual(
       expect.objectContaining({
         body: expect.stringContaining('"debugbundle_event":"bundle.reopened"')
       })
     );
+    const dispatchedBody = JSON.parse(String(dispatchedRequest?.body)) as {
+      client_payload: Record<string, unknown>;
+    };
+    expect(Object.keys(dispatchedBody.client_payload)).toHaveLength(10);
+    expect(dispatchedBody.client_payload).toMatchObject({
+      debugbundle_event: "bundle.reopened",
+      incident_id: "inc_456",
+      debugbundle: {
+        project_id: "proj_123",
+        occurrence_count: 25,
+        first_seen_at: "2026-03-10T21:00:00.000Z",
+        dispatch_id: "gdd_2",
+        dispatched_at: "2026-03-11T00:00:00.000Z"
+      }
+    });
   });
 
   it("should surface github Retry-After headers from dispatch transport failures", async (): Promise<void> => {
@@ -1388,8 +1412,10 @@ describe("worker runtime", () => {
         dispatch_payload: {
           debugbundle_event: "bundle.created",
           incident_id: "inc_123",
-          project_id: "proj_123",
-          bundle_version: 3
+          bundle_version: 3,
+          debugbundle: {
+            project_id: "proj_123"
+          }
         }
       })
     ).rejects.toMatchObject({

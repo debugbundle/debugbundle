@@ -362,7 +362,9 @@ describe("github store", () => {
       dispatch_payload: {
         debugbundle_event: "bundle.created",
         incident_id: "inc_123",
-        project_id: "proj_123"
+        debugbundle: {
+          project_id: "proj_123"
+        }
       }
     });
     const markResult = await store.markGitHubDispatchDeliveryAttempt({
@@ -558,7 +560,9 @@ describe("github store", () => {
       dispatch_payload: {
         debugbundle_event: "bundle.created",
         incident_id: "inc_123",
-        project_id: "proj_123",
+        debugbundle: {
+          project_id: "proj_123"
+        },
         bundle_version: 3
       }
     });
@@ -575,7 +579,9 @@ describe("github store", () => {
       dispatch_payload: {
         debugbundle_event: "bundle.created",
         incident_id: "inc_123",
-        project_id: "proj_123",
+        debugbundle: {
+          project_id: "proj_123"
+        },
         bundle_version: 4
       }
     });
