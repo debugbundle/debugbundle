@@ -1,7 +1,7 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { createApiServer } from "../../../apps/api/src/server.ts";
-import { SESSION_COOKIE_NAME } from "../../../packages/auth/src/index.js";
+import { GITHUB_APP_INSTALL_STATE_COOKIE_NAME, SESSION_COOKIE_NAME } from "../../../packages/auth/src/index.js";
 import { mockedObject, type MockedMethods } from "../../helpers/vitest.ts";
 
 type ApiServerDependencies = Parameters<typeof createApiServer>[0];
@@ -125,6 +125,10 @@ function createServer(overrides: {
   });
 }
 
+afterEach(() => {
+  vi.unstubAllEnvs();
+});
+
 describe("api github routes", () => {
   it("lists installation status for authenticated callers on solo tiers", async () => {
     const githubManagement = {
@@ -188,6 +192,7 @@ describe("api github routes", () => {
   });
 
   it("returns the GitHub App install URL for authenticated callers on solo tiers", async () => {
+    vi.stubEnv("GITHUB_APP_STATE_SECRET", "github-app-state-secret");
     const githubManagement = {
       getInstallUrl: vi.fn().mockResolvedValue("https://github.com/apps/debugbundle-automation/installations/new")
     };
@@ -202,8 +207,12 @@ describe("api github routes", () => {
     });
 
     expect(response.statusCode).toBe(200);
-    expect(response.json()).toEqual({ install_url: "https://github.com/apps/debugbundle-automation/installations/new" });
+    const installUrl = new URL(response.json().install_url);
+    expect(installUrl.origin).toBe("https://github.com");
+    expect(installUrl.pathname).toBe("/apps/debugbundle-automation/installations/new");
+    expect(installUrl.searchParams.get("state")).toEqual(expect.any(String));
     expect(githubManagement.getInstallUrl).toHaveBeenCalledTimes(1);
+    expect(String(response.headers["set-cookie"])).toContain(`${GITHUB_APP_INSTALL_STATE_COOKIE_NAME}=`);
   });
 
   it("rejects github installation routes when the organization tier lacks access", async () => {
@@ -228,6 +237,7 @@ describe("api github routes", () => {
   });
 
   it("sets project repo assignments and completes installation callbacks", async () => {
+    vi.stubEnv("GITHUB_APP_STATE_SECRET", "github-app-state-secret");
     const projectId = "00000000-0000-4000-8000-000000000001";
     const githubManagement = {
       getInstallationForOrganization: vi.fn(),
@@ -295,12 +305,13 @@ describe("api github routes", () => {
     expect(installUrl.origin).toBe("https://github.com");
     expect(installUrl.pathname).toBe("/apps/debugbundle-automation/installations/new");
     expect(installState).toEqual(expect.any(String));
+    expect(String(installUrlResponse.headers["set-cookie"])).toContain(`${GITHUB_APP_INSTALL_STATE_COOKIE_NAME}=`);
 
     const callbackResponse = await app.inject({
       method: "GET",
       url: `/v1/github/app/callback?installation_id=123&state=${encodeURIComponent(installState ?? "")}`,
       cookies: {
-        [SESSION_COOKIE_NAME]: "dbundle_session"
+        [GITHUB_APP_INSTALL_STATE_COOKIE_NAME]: installState ?? ""
       }
     });
 
@@ -314,6 +325,7 @@ describe("api github routes", () => {
     });
     expect(callbackResponse.statusCode).toBe(302);
     expect(callbackResponse.headers.location).toBe(`http://localhost:5291/projects/${projectId}/github`);
+    expect(String(callbackResponse.headers["set-cookie"])).toContain(`${GITHUB_APP_INSTALL_STATE_COOKIE_NAME}=;`);
     expect(githubManagement.completeGithubInstallationForOrganization).toHaveBeenCalledWith({
       organization_id: "org_123",
       installation_id: 123
@@ -321,6 +333,7 @@ describe("api github routes", () => {
   });
 
   it("rejects github installation callbacks with invalid signed state", async () => {
+    vi.stubEnv("GITHUB_APP_STATE_SECRET", "github-app-state-secret");
     const githubManagement = {
       completeGithubInstallationForOrganization: vi.fn()
     };
@@ -339,7 +352,7 @@ describe("api github routes", () => {
       method: "GET",
       url: "/v1/github/app/callback?installation_id=123&state=not-a-valid-state",
       cookies: {
-        [SESSION_COOKIE_NAME]: "dbundle_session"
+        [GITHUB_APP_INSTALL_STATE_COOKIE_NAME]: "not-a-valid-state"
       }
     });
 

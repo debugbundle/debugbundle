@@ -1,11 +1,16 @@
-import { createHmac, timingSafeEqual } from "node:crypto";
+import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 
 import type { FastifyInstance } from "fastify";
 
-import { readCookieValue, SESSION_COOKIE_NAME } from "../../../../packages/auth/src/index.js";
+import {
+  buildClearedGitHubAppInstallStateCookie,
+  buildGitHubAppInstallStateCookie,
+  GITHUB_APP_INSTALL_STATE_COOKIE_NAME,
+  readCookieValue
+} from "../../../../packages/auth/src/index.js";
 import { getTierCapabilities } from "../../../../packages/shared-types/src/index.js";
 import type { ApiDependencies } from "../api-types.js";
-import { requireRateLimitedMemberAuth, requireRateLimitedOwnerMemberAuth, resolveBrowserSession } from "../api-helpers.js";
+import { requireRateLimitedMemberAuth, requireRateLimitedOwnerMemberAuth } from "../api-helpers.js";
 import {
   GitHubAppCallbackQuerySchema,
   GitHubAppInstallUrlQuerySchema,
@@ -22,6 +27,24 @@ function resolveAppRedirectBaseUrl(): string {
   return (process.env["APP_BASE_URL"] ?? "http://localhost:5291").replace(/\/+$/, "");
 }
 
+function shouldUseSecureCookies(): boolean {
+  return process.env["AUTH_COOKIE_SECURE"] !== "false";
+}
+
+function resolveGitHubAppInstallStateSecret(): string | null {
+  const appSecret = process.env["GITHUB_APP_STATE_SECRET"]?.trim();
+  if (appSecret !== undefined && appSecret.length > 0) {
+    return appSecret;
+  }
+
+  const oauthSecret = process.env["GITHUB_OAUTH_STATE_SECRET"]?.trim();
+  if (oauthSecret !== undefined && oauthSecret.length > 0) {
+    return oauthSecret;
+  }
+
+  return null;
+}
+
 function normalizeGitHubInstallReturnPath(value: string | undefined): string | null {
   if (typeof value !== "string") {
     return null;
@@ -35,19 +58,39 @@ function normalizeGitHubInstallReturnPath(value: string | undefined): string | n
   return normalized;
 }
 
-function buildGitHubInstallState(sessionToken: string, returnTo: string): string {
-  const payload = Buffer.from(JSON.stringify({ return_to: returnTo }), "utf8").toString("base64url");
-  const signature = createHmac("sha256", sessionToken).update(payload).digest("base64url");
-  return `${payload}.${signature}`;
+function buildGitHubInstallState(input: {
+  organizationId: string;
+  returnTo: string;
+  secret: string;
+  now?: Date;
+  lifetimeMs?: number;
+}): { token: string; expires_at: string } {
+  const now = input.now ?? new Date();
+  const expiresAt = new Date(now.getTime() + (input.lifetimeMs ?? 10 * 60 * 1000)).toISOString();
+  const payload = Buffer.from(
+    JSON.stringify({
+      nonce: randomBytes(16).toString("hex"),
+      organization_id: input.organizationId,
+      return_to: input.returnTo,
+      expires_at: expiresAt
+    }),
+    "utf8"
+  ).toString("base64url");
+  const signature = createHmac("sha256", input.secret).update(payload).digest("base64url");
+  return { token: `${payload}.${signature}`, expires_at: expiresAt };
 }
 
-function readGitHubInstallState(state: string, sessionToken: string): string | null {
+function readGitHubInstallState(
+  state: string,
+  secret: string,
+  now: Date = new Date()
+): { organization_id: string; return_to: string } | null {
   const [payload, signature, ...rest] = state.split(".");
   if (payload === undefined || signature === undefined || rest.length > 0) {
     return null;
   }
 
-  const expectedSignature = createHmac("sha256", sessionToken).update(payload).digest("base64url");
+  const expectedSignature = createHmac("sha256", secret).update(payload).digest("base64url");
   const providedBuffer = Buffer.from(signature, "utf8");
   const expectedBuffer = Buffer.from(expectedSignature, "utf8");
   if (providedBuffer.length !== expectedBuffer.length) {
@@ -68,8 +111,31 @@ function readGitHubInstallState(state: string, sessionToken: string): string | n
     return null;
   }
 
-  const returnTo = (parsedPayload as { return_to?: unknown }).return_to;
-  return normalizeGitHubInstallReturnPath(typeof returnTo === "string" ? returnTo : undefined);
+  const payloadRecord = parsedPayload as {
+    organization_id?: unknown;
+    return_to?: unknown;
+    expires_at?: unknown;
+  };
+  const returnTo = normalizeGitHubInstallReturnPath(
+    typeof payloadRecord.return_to === "string" ? payloadRecord.return_to : undefined
+  );
+  if (returnTo === null) {
+    return null;
+  }
+  if (typeof payloadRecord.organization_id !== "string" || payloadRecord.organization_id.length === 0) {
+    return null;
+  }
+  if (typeof payloadRecord.expires_at !== "string" || Number.isNaN(Date.parse(payloadRecord.expires_at))) {
+    return null;
+  }
+  if (Date.parse(payloadRecord.expires_at) <= now.getTime()) {
+    return null;
+  }
+
+  return {
+    organization_id: payloadRecord.organization_id,
+    return_to: returnTo
+  };
 }
 
 async function ensureGitHubAutomationEnabled(
@@ -129,14 +195,24 @@ export function registerGitHubRoutes(app: FastifyInstance, dependencies: ApiDepe
       return reply.status(400).send({ error: "invalid_query" });
     }
 
-    const sessionToken = readCookieValue(request.headers.cookie, SESSION_COOKIE_NAME);
-    const returnTo = normalizeGitHubInstallReturnPath(parsedQuery.data.return_to);
-    const installUrl = new URL(await dependencies.githubManagement.getInstallUrl());
-
-    if (sessionToken !== null && returnTo !== null) {
-      installUrl.searchParams.set("state", buildGitHubInstallState(sessionToken, returnTo));
+    const stateSecret = resolveGitHubAppInstallStateSecret();
+    if (stateSecret === null) {
+      return reply.status(503).send({ error: "github_not_configured" });
     }
 
+    const returnTo = normalizeGitHubInstallReturnPath(parsedQuery.data.return_to) ?? "/projects";
+    const installState = buildGitHubInstallState({
+      organizationId: member.organization_id,
+      returnTo,
+      secret: stateSecret
+    });
+    const installUrl = new URL(await dependencies.githubManagement.getInstallUrl());
+    installUrl.searchParams.set("state", installState.token);
+
+    reply.header(
+      "Set-Cookie",
+      buildGitHubAppInstallStateCookie(installState.token, installState.expires_at, { secure: shouldUseSecureCookies() })
+    );
     return reply.status(200).send({ install_url: installUrl.toString() });
   });
 
@@ -587,35 +663,29 @@ export function registerGitHubRoutes(app: FastifyInstance, dependencies: ApiDepe
       return reply.status(503).send({ error: "github_not_configured" });
     }
 
-    const sessionToken = readCookieValue(request.headers.cookie, SESSION_COOKIE_NAME);
-    const session = await resolveBrowserSession(request.headers.cookie, dependencies);
-    if (session === null) {
-      return reply.status(401).send({ error: "invalid_session" });
+    const stateSecret = resolveGitHubAppInstallStateSecret();
+    const stateCookie = readCookieValue(request.headers.cookie, GITHUB_APP_INSTALL_STATE_COOKIE_NAME);
+    if (stateSecret === null || parsedQuery.data.state === undefined || stateCookie === null || stateCookie !== parsedQuery.data.state) {
+      reply.header("Set-Cookie", buildClearedGitHubAppInstallStateCookie({ secure: shouldUseSecureCookies() }));
+      return reply.status(400).send({ error: "invalid_state" });
     }
 
-    let redirectPath = "/projects";
-    if (parsedQuery.data.state !== undefined) {
-      if (sessionToken === null) {
-        return reply.status(400).send({ error: "invalid_state" });
-      }
-
-      const returnTo = readGitHubInstallState(parsedQuery.data.state, sessionToken);
-      if (returnTo === null) {
-        return reply.status(400).send({ error: "invalid_state" });
-      }
-
-      redirectPath = returnTo;
+    const installState = readGitHubInstallState(parsedQuery.data.state, stateSecret);
+    if (installState === null) {
+      reply.header("Set-Cookie", buildClearedGitHubAppInstallStateCookie({ secure: shouldUseSecureCookies() }));
+      return reply.status(400).send({ error: "invalid_state" });
     }
 
     const installation = await dependencies.githubManagement.completeGithubInstallationForOrganization({
-      organization_id: session.organization_id,
+      organization_id: installState.organization_id,
       installation_id: parsedQuery.data.installation_id
     });
     if (installation === "github_not_configured") {
       return reply.status(503).send({ error: "github_not_configured" });
     }
 
-    return reply.redirect(`${resolveAppRedirectBaseUrl()}${redirectPath}`);
+    reply.header("Set-Cookie", buildClearedGitHubAppInstallStateCookie({ secure: shouldUseSecureCookies() }));
+    return reply.redirect(`${resolveAppRedirectBaseUrl()}${installState.return_to}`);
   });
 
   app.register((scope) => {

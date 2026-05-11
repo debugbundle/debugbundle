@@ -7,6 +7,7 @@ export const MEMBER_TOKEN_PREFIX = "dbundle_mem_";
 export const PROBE_TRIGGER_TOKEN_PREFIX = "dbundle_probe_";
 export const SESSION_COOKIE_NAME = "dbundle_session";
 export const GITHUB_OAUTH_STATE_COOKIE_NAME = "dbundle_github_oauth_state";
+export const GITHUB_APP_INSTALL_STATE_COOKIE_NAME = "dbundle_github_app_install_state";
 
 const ORGANIZATION_INVITE_TOKEN_PREFIX = "dbundle_invite_";
 type Argon2Algorithm = NonNullable<Argon2Options["algorithm"]>;
@@ -452,6 +453,14 @@ export function buildGithubOauthStateCookie(state: string, expiresAt: string, op
 
 export function buildClearedGithubOauthStateCookie(options: CookieOptions = {}): string {
   return `${GITHUB_OAUTH_STATE_COOKIE_NAME}=; ${buildCookieAttributes({ sameSite: "Lax", secure: options.secure })}; Expires=${new Date(0).toUTCString()}; Max-Age=0`;
+}
+
+export function buildGitHubAppInstallStateCookie(state: string, expiresAt: string, options: CookieOptions = {}): string {
+  return `${GITHUB_APP_INSTALL_STATE_COOKIE_NAME}=${encodeURIComponent(state)}; ${buildCookieAttributes({ sameSite: "Lax", secure: options.secure })}; Expires=${new Date(expiresAt).toUTCString()}`;
+}
+
+export function buildClearedGitHubAppInstallStateCookie(options: CookieOptions = {}): string {
+  return `${GITHUB_APP_INSTALL_STATE_COOKIE_NAME}=; ${buildCookieAttributes({ sameSite: "Lax", secure: options.secure })}; Expires=${new Date(0).toUTCString()}; Max-Age=0`;
 }
 
 export function readCookieValue(cookieHeader: string | undefined, cookieName: string): string | null {
