@@ -587,6 +587,19 @@ export async function startBillingCheckout(targetPlan: "solo" | "team"): Promise
   return body.url;
 }
 
+export async function confirmBillingCheckout(sessionId: string): Promise<BillingSummaryRecord> {
+  const body = await readJson<{ billing: BillingSummaryRecord }>(
+    await fetch(`${API_BASE}/v1/billing/checkout/confirm`, {
+      method: "POST",
+      credentials: "include",
+      headers: buildBrowserSessionHeaders(true),
+      body: JSON.stringify({ session_id: sessionId })
+    })
+  );
+
+  return body.billing;
+}
+
 export async function openBillingPortal(): Promise<string> {
   const body = await readJson<{ url: string }>(
     await fetch(`${API_BASE}/v1/billing/portal`, {

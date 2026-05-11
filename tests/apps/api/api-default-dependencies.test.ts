@@ -785,7 +785,8 @@ describe("api default dependencies", () => {
       expect.objectContaining({
         client_reference_id: "org_123",
         customer_email: "owner@example.com",
-        line_items: [{ price: "price_solo", quantity: 1 }]
+        line_items: [{ price: "price_solo", quantity: 1 }],
+        success_url: expect.stringContaining("session_id={CHECKOUT_SESSION_ID}")
       })
     );
     expect(db.query).toHaveBeenCalledWith(

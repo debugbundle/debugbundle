@@ -446,6 +446,12 @@ export const BillingCheckoutBodySchema = z
   })
   .strict();
 
+export const BillingCheckoutConfirmBodySchema = z
+  .object({
+    session_id: z.string().min(1).max(255)
+  })
+  .strict();
+
 export const BillingCapacityChangeBodySchema = z
   .object({
     target_additional_capacity_units: z.coerce.number().int().min(0).max(1000)

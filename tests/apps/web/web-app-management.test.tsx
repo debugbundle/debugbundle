@@ -2201,6 +2201,63 @@ describe("web app — management routes", () => {
     expect(locationAssign).toHaveBeenCalledWith("https://billing.stripe.com/checkout/solo");
   });
 
+  it("confirms billing and shows a success dialog after a successful Stripe checkout return", async () => {
+    const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = requestUrl(input);
+
+      if (url.endsWith("/v1/auth/session")) {
+        return jsonResponse(200, {
+          session: createSession()
+        });
+      }
+
+      if (url.endsWith("/v1/billing") && init?.method === undefined) {
+        return jsonResponse(200, {
+          billing: createBillingSummary()
+        });
+      }
+
+      if (url.endsWith("/v1/billing/checkout/confirm") && init?.method === "POST") {
+        expect(init.credentials).toBe("include");
+        expect(init.body).toBe(JSON.stringify({ session_id: "cs_test_123" }));
+
+        return jsonResponse(200, {
+          billing: createBillingSummary({
+            plan: "solo",
+            stripe_customer_id: "cus_123",
+            capacity_units: {
+              total: 2,
+              included: 2,
+              additional_purchased: 0,
+              pending_reduction: null
+            }
+          })
+        });
+      }
+
+      return jsonResponse(404, { error: "not_found" });
+    });
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<App initialEntries={["/billing?checkout=success&session_id=cs_test_123"]} />);
+
+    expect(await screen.findByRole("heading", { name: /billing/i, level: 1 })).toBeInTheDocument();
+
+    await waitFor(() => {
+      expect(screen.getByText(/^solo$/i)).toBeInTheDocument();
+    });
+
+    expect(screen.getByRole("dialog", { name: /solo is active/i })).toBeInTheDocument();
+    expect(screen.getByText(/new tier is available across this account/i)).toBeInTheDocument();
+
+    expect(
+      fetchMock.mock.calls.filter(([input, requestInit]) => {
+        return requestUrl(input).endsWith("/v1/billing/checkout/confirm") && requestInit?.method === "POST";
+      }).length
+    ).toBe(1);
+  });
+
   it("shows verification and owner gates on the billing surface", async () => {
     const ownerFetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
       const url = requestUrl(input);

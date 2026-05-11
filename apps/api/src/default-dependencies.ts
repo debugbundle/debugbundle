@@ -1,6 +1,7 @@
 import { gunzipSync } from "node:zlib";
 
 import { Pool } from "pg";
+import type Stripe from "stripe";
 
 import {
   createGitHubOAuthClient,
@@ -63,7 +64,13 @@ import {
 } from "./billing-slot-management.js";
 import { createEnvBillingLinkProvider } from "./billing-links.js";
 import { createGitHubAppClientFromEnv, type GitHubAppClient } from "./github-app.js";
-import { createStripeConfig, type StripeConfig } from "./stripe-config.js";
+import {
+  createStripeConfig,
+  deriveBillingState,
+  derivePlanFromSubscriptionItems,
+  isEntitlementEligible,
+  type StripeConfig
+} from "./stripe-config.js";
 
 export interface CreateApiDependenciesInput {
   objectStore: ObjectStoreClient & ObjectStoreReader & ObjectStorePrefixDeleter;
@@ -141,6 +148,89 @@ function getStringField(record: Record<string, unknown>, field: string): string 
 
 function getBooleanField(record: Record<string, unknown>, field: string): boolean {
   return record[field] === true;
+}
+
+function readUnixTimestampField(source: unknown, key: string): number | null {
+  if (typeof source !== "object" || source === null) {
+    return null;
+  }
+
+  const value = (source as Record<string, unknown>)[key];
+  return typeof value === "number" ? value : null;
+}
+
+function readSubscriptionInvoiceLinePeriod(source: unknown): { start: number | null; end: number | null } {
+  if (typeof source !== "object" || source === null) {
+    return { start: null, end: null };
+  }
+
+  const lines = (source as Record<string, unknown>)["lines"];
+  if (typeof lines !== "object" || lines === null) {
+    return { start: null, end: null };
+  }
+
+  const data = (lines as Record<string, unknown>)["data"];
+  if (!Array.isArray(data)) {
+    return { start: null, end: null };
+  }
+
+  for (const line of data) {
+    if (typeof line !== "object" || line === null) {
+      continue;
+    }
+
+    const period = (line as Record<string, unknown>)["period"];
+    if (typeof period !== "object" || period === null) {
+      continue;
+    }
+
+    const start = readUnixTimestampField(period, "start");
+    const end = readUnixTimestampField(period, "end");
+    if (start !== null || end !== null) {
+      return { start, end };
+    }
+  }
+
+  return { start: null, end: null };
+}
+
+function resolveStripeSubscriptionBillingPeriod(subscription: Stripe.Subscription): {
+  starts_at: string | null;
+  ends_at: string | null;
+} {
+  const currentPeriodStart = readUnixTimestampField(subscription, "current_period_start");
+  const currentPeriodEnd = readUnixTimestampField(subscription, "current_period_end");
+  const latestInvoice = typeof subscription.latest_invoice !== "string" && subscription.latest_invoice !== null
+    ? subscription.latest_invoice
+    : null;
+  const latestInvoiceLinePeriod = readSubscriptionInvoiceLinePeriod(latestInvoice);
+  const latestInvoicePeriodStart = readUnixTimestampField(latestInvoice, "period_start");
+  const latestInvoicePeriodEnd = readUnixTimestampField(latestInvoice, "period_end");
+
+  let startsAt = currentPeriodStart !== null ? new Date(currentPeriodStart * 1000).toISOString() : null;
+  let endsAt = currentPeriodEnd !== null ? new Date(currentPeriodEnd * 1000).toISOString() : null;
+
+  if (startsAt === null) {
+    if (latestInvoiceLinePeriod.start !== null) {
+      startsAt = new Date(latestInvoiceLinePeriod.start * 1000).toISOString();
+    } else if (latestInvoicePeriodStart !== null) {
+      startsAt = new Date(latestInvoicePeriodStart * 1000).toISOString();
+    }
+  }
+
+  if (endsAt === null) {
+    if (latestInvoiceLinePeriod.end !== null) {
+      endsAt = new Date(latestInvoiceLinePeriod.end * 1000).toISOString();
+    } else if (latestInvoicePeriodEnd !== null) {
+      endsAt = new Date(latestInvoicePeriodEnd * 1000).toISOString();
+    }
+  }
+
+  if (startsAt !== null && endsAt !== null && startsAt >= endsAt) {
+    return { starts_at: null, ends_at: null };
+  }
+
+  return { starts_at: startsAt, ends_at: endsAt };
 }
 
 async function readStoredJsonArtifact(
@@ -405,6 +495,11 @@ export function createApiDependencies(input: CreateApiDependenciesInput): {
       current_plan: "free" | "solo" | "team";
       target_plan: "solo" | "team";
     }): Promise<{ url: string } | null>;
+    confirmCheckoutSession(input: {
+      organization_id: string;
+      session_id: string;
+      now: string;
+    }): Promise<BillingSummaryRecord | "billing_not_configured" | "billing_not_found" | "checkout_session_not_found" | "checkout_not_complete" | "billing_service_error">;
     createPortalLink(input: {
       organization_id: string;
       current_plan: "solo" | "team";
@@ -866,7 +961,7 @@ export function createApiDependencies(input: CreateApiDependenciesInput): {
             client_reference_id: checkoutInput.organization_id,
             metadata: { organization_id: checkoutInput.organization_id },
             line_items: [{ price: priceId, quantity: 1 }],
-            success_url: `${process.env["APP_BASE_URL"] ?? "http://localhost:3000"}/billing?checkout=success`,
+            success_url: `${process.env["APP_BASE_URL"] ?? "http://localhost:3000"}/billing?checkout=success&session_id={CHECKOUT_SESSION_ID}`,
             cancel_url: `${process.env["APP_BASE_URL"] ?? "http://localhost:3000"}/billing?checkout=canceled`,
             allow_promotion_codes: true,
             subscription_data: {
@@ -891,6 +986,90 @@ export function createApiDependencies(input: CreateApiDependenciesInput): {
         // Fallback to static URLs for development
         const url = billingLinks.createCheckoutUrl({ target_plan: checkoutInput.target_plan });
         return Promise.resolve(url === null ? null : { url });
+      },
+      confirmCheckoutSession: async (confirmInput) => {
+        if (input.stripeConfig === undefined) {
+          return "billing_not_configured";
+        }
+
+        let session: Stripe.Checkout.Session;
+        try {
+          session = await input.stripeConfig.client.checkout.sessions.retrieve(confirmInput.session_id, {
+            expand: ["subscription", "subscription.items.data", "subscription.latest_invoice"]
+          });
+        } catch {
+          return "checkout_session_not_found";
+        }
+
+        const sessionOrganizationId = session.client_reference_id ?? session.metadata?.["organization_id"] ?? null;
+        if (sessionOrganizationId !== confirmInput.organization_id) {
+          return "checkout_session_not_found";
+        }
+
+        if (session.status !== "complete") {
+          return "checkout_not_complete";
+        }
+
+        const subscriptionId = typeof session.subscription === "string" ? session.subscription : session.subscription?.id;
+        if (subscriptionId === undefined) {
+          return "checkout_not_complete";
+        }
+
+        let subscription: Stripe.Subscription;
+        try {
+          if (typeof session.subscription === "string") {
+            subscription = await input.stripeConfig.client.subscriptions.retrieve(subscriptionId, {
+              expand: ["items.data", "latest_invoice"]
+            });
+          } else if (session.subscription !== null) {
+            subscription = session.subscription;
+          } else {
+            return "checkout_not_complete";
+          }
+        } catch {
+          return "billing_service_error";
+        }
+
+        const customerId = typeof session.customer === "string" ? session.customer : session.customer?.id;
+        if (customerId === undefined) {
+          return "checkout_not_complete";
+        }
+
+        const { plan, extraCapacityQuantity } = derivePlanFromSubscriptionItems(
+          subscription.items.data,
+          input.stripeConfig.priceMap
+        );
+        const billingState = deriveBillingState(subscription.status);
+        const effectivePlan = isEntitlementEligible(billingState, "plan") ? plan : "free";
+        const effectiveExtraCapacity = isEntitlementEligible(billingState, "extra_capacity") ? extraCapacityQuantity : 0;
+        const period = effectivePlan === "free"
+          ? { starts_at: null, ends_at: null }
+          : resolveStripeSubscriptionBillingPeriod(subscription);
+
+        try {
+          await billingSyncStore.linkStripeCustomer(confirmInput.organization_id, customerId, subscription.id);
+          await billingSyncStore.updateEntitlements({
+            organization_id: confirmInput.organization_id,
+            plan: effectivePlan,
+            additional_capacity_units: effectiveExtraCapacity,
+            billing_state: billingState,
+            stripe_customer_id: customerId,
+            stripe_subscription_id: subscription.id,
+            billing_period_starts_at: period.starts_at,
+            billing_period_ends_at: period.ends_at,
+            last_billing_sync_at: confirmInput.now,
+            last_billing_event_id: `checkout_session:${session.id}`
+          });
+        } catch {
+          return "billing_service_error";
+        }
+
+        const billing = await getProjectedBillingSummary({
+          organization_id: confirmInput.organization_id,
+          now: confirmInput.now
+        });
+
+        return billing ?? "billing_not_found";
       },
       createPortalLink: async (portalInput: {
         organization_id: string;

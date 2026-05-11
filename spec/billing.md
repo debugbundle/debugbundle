@@ -161,6 +161,8 @@ The existing `POST /v1/billing/checkout` route must be updated to:
 4. Return the Checkout Session URL to the frontend
 5. Handle errors (Stripe API failure → `503 billing_service_error`)
 
+The dynamic Checkout Session success URL must include Stripe's `{CHECKOUT_SESSION_ID}` placeholder, for example `/billing?checkout=success&session_id={CHECKOUT_SESSION_ID}`. On return, the web app calls `POST /v1/billing/checkout/confirm` with that session ID. The API retrieves the Checkout Session and subscription from Stripe, verifies the session belongs to the authenticated organization via `client_reference_id` or `metadata.organization_id`, and syncs the derived billing snapshot from Stripe before returning the updated billing summary. This confirmation path is a user-return recovery path; Stripe webhooks remain the authoritative asynchronous source of truth for ongoing lifecycle changes.
+
 ### 4.4 Portal Route Changes
 
 The existing `POST /v1/billing/portal` route must be updated to:
@@ -275,6 +277,8 @@ This route must:
 9. Return `200` on success, `400` on signature failure
 
 This route must NOT require a browser session or member token. It is a server-to-server Stripe callback.
+
+Hosted Stripe accounts must have a webhook endpoint configured for `https://api.debugbundle.com/v1/billing/stripe-webhook` with at least the events listed in §5.3. The endpoint signing secret must match `STRIPE_WEBHOOK_SECRET` in the hosted API runtime environment.
 
 ### 5.6 Idempotency
 

@@ -509,12 +509,13 @@ All update fields are optional, but at least one field must be present.
 |--------|------|------|-------------|
 | GET | `/v1/billing` | Browser Session or Member Token (owner only) | Return billing summary, plan state, and allowance usage for the current organization |
 | POST | `/v1/billing/checkout` | Browser Session (verified owner only) | Create a Stripe-hosted checkout session URL for an allowed upgrade target |
+| POST | `/v1/billing/checkout/confirm` | Browser Session (owner only) | Verify a returned Stripe Checkout Session and sync the organization billing snapshot from Stripe |
 | POST | `/v1/billing/portal` | Browser Session (verified owner only) | Create a Stripe-hosted customer-portal session URL for an active paid plan |
 | POST | `/v1/billing/capacity/increase` | Browser Session or Member Token (verified owner only) | Immediately increase additional allowance-capacity units via Stripe subscription update with proration |
 | POST | `/v1/billing/capacity/scheduled-reduction` | Browser Session or Member Token (verified owner only) | Schedule an allowance-capacity reduction to take effect at the next billing-period boundary via Stripe subscription schedule |
 | DELETE | `/v1/billing/capacity/scheduled-reduction` | Browser Session or Member Token (verified owner only) | Cancel a pending scheduled allowance-capacity reduction, releasing the Stripe subscription schedule |
 
-Billing summary and allowance-capacity management routes accept both browser session and owner-scoped member tokens. Checkout and portal routes are browser-session-only interactive surfaces. Stripe checkout sessions are created dynamically with `client_reference_id` = `organization_id`.
+Billing summary and allowance-capacity management routes accept both browser session and owner-scoped member tokens. Checkout, checkout confirmation, and portal routes are browser-session-only interactive surfaces. Stripe checkout sessions are created dynamically with `client_reference_id` = `organization_id`; the success URL includes Stripe's `{CHECKOUT_SESSION_ID}` placeholder so the web app can ask the API to verify the returned Checkout Session and sync the account immediately.
 
 **Billing summary response shape:**
 ```json
@@ -589,6 +590,15 @@ Billing summary and allowance-capacity management routes accept both browser ses
 }
 ```
 
+**Checkout confirmation request:**
+```json
+{
+  "session_id": "cs_test_123"
+}
+```
+
+Checkout confirmation returns the standard billing summary response after the API retrieves and verifies the Stripe Checkout Session and subscription. The route must only apply the session when its `client_reference_id` or `metadata.organization_id` matches the authenticated browser session organization.
+
 **Capacity increase request:**
 ```json
 {
@@ -616,8 +626,9 @@ Billing summary and allowance-capacity management routes accept both browser ses
 - Missing billing record for organization: `404 { "error": "billing_not_found" }`
 - Invalid checkout payload: `400 { "error": "invalid_payload" }`
 - Invalid upgrade target for current plan: `409 { "error": "invalid_plan_change" }`
+- Checkout confirmation could not find or use the returned session: `404 { "error": "checkout_session_not_found" }` or `409 { "error": "checkout_not_complete" }`
 - Portal requested for free plan: `409 { "error": "no_active_subscription" }`
-- Stripe not configured: `503 { "error": "billing_not_configured" }`
+- Stripe not configured or temporarily unavailable: `503 { "error": "billing_not_configured" }` or `503 { "error": "billing_service_error" }`
 - Capacity-management error (free plan, invalid target, pending reduction conflict): `409` with descriptive error code
 
 ### 1.3d Token Management

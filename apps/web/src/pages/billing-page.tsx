@@ -1,5 +1,6 @@
-import { CreditCardIcon } from "lucide-react";
-import { useEffect, useState } from "react";
+import { CheckCircle2Icon, CreditCardIcon, InfoIcon, LoaderCircleIcon, XCircleIcon } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { CalloutCard } from "../components/system/callout-card.js";
 import { PageHeader } from "../components/system/page-header.js";
 import { PlanBadge } from "../components/system/plan-badge.js";
@@ -12,6 +13,7 @@ import { Input } from "../components/ui/input.js";
 import { Skeleton } from "../components/ui/skeleton.js";
 import {
   cancelBillingCapacityReduction,
+  confirmBillingCheckout,
   getBillingSummary,
   increaseBillingCapacity,
   openBillingPortal,
@@ -22,6 +24,93 @@ import {
 import { showErrorToast, showSuccessToast } from "../lib/notify.js";
 import { useDelayedVisibility } from "../lib/use-delayed-visibility.js";
 import { useSession } from "../lib/session.js";
+
+interface PendingBillingCheckout {
+  previousPlan: BillingSummaryRecord["plan"];
+  targetPlan: "solo" | "team";
+}
+
+const BILLING_CHECKOUT_STORAGE_KEY = "debugbundle.billing.checkout";
+const BILLING_CHECKOUT_POLL_INTERVAL_MS = 250;
+const BILLING_CHECKOUT_MAX_POLL_ATTEMPTS = 6;
+
+type CheckoutReturnStatus = "syncing" | "success" | "delayed" | "canceled" | "error";
+
+interface CheckoutReturnDialogState {
+  status: CheckoutReturnStatus;
+  plan?: BillingSummaryRecord["plan"];
+}
+
+function readPendingBillingCheckout(): PendingBillingCheckout | null {
+  if (typeof window === "undefined") {
+    return null;
+  }
+
+  const rawValue = window.sessionStorage.getItem(BILLING_CHECKOUT_STORAGE_KEY);
+  if (rawValue === null) {
+    return null;
+  }
+
+  try {
+    const parsedValue = JSON.parse(rawValue) as Partial<PendingBillingCheckout>;
+    if (
+      (parsedValue.previousPlan === "free" || parsedValue.previousPlan === "solo" || parsedValue.previousPlan === "team") &&
+      (parsedValue.targetPlan === "solo" || parsedValue.targetPlan === "team")
+    ) {
+      return {
+        previousPlan: parsedValue.previousPlan,
+        targetPlan: parsedValue.targetPlan
+      };
+    }
+  } catch {
+    return null;
+  }
+
+  return null;
+}
+
+function writePendingBillingCheckout(checkout: PendingBillingCheckout): void {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  window.sessionStorage.setItem(BILLING_CHECKOUT_STORAGE_KEY, JSON.stringify(checkout));
+}
+
+function clearPendingBillingCheckout(): void {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  window.sessionStorage.removeItem(BILLING_CHECKOUT_STORAGE_KEY);
+}
+
+function billingReflectsCheckout(
+  billing: BillingSummaryRecord,
+  pendingCheckout: PendingBillingCheckout | null,
+  baseline: BillingSummaryRecord | null
+): boolean {
+  if (pendingCheckout !== null) {
+    return billing.plan === pendingCheckout.targetPlan;
+  }
+
+  if (baseline === null) {
+    return false;
+  }
+
+  return billing.plan !== baseline.plan || billing.stripe_customer_id !== baseline.stripe_customer_id;
+}
+
+function formatPlanName(plan: BillingSummaryRecord["plan"]): string {
+  switch (plan) {
+    case "solo":
+      return "Solo";
+    case "team":
+      return "Team";
+    default:
+      return "Free";
+  }
+}
 
 interface CapacityDialogProps {
   billing: BillingSummaryRecord;
@@ -259,38 +348,246 @@ function CapacityDialog(props: CapacityDialogProps): JSX.Element {
   );
 }
 
+function CheckoutReturnDialog(props: {
+  state: CheckoutReturnDialogState | null;
+  onOpenChange(open: boolean): void;
+}): JSX.Element | null {
+  const state = props.state;
+  if (state === null) {
+    return null;
+  }
+
+  const iconClassName = "size-5";
+  const content = (() => {
+    switch (state.status) {
+      case "syncing":
+        return {
+          icon: <LoaderCircleIcon className={`${iconClassName} animate-spin`} aria-hidden="true" />,
+          title: "Confirming your subscription",
+          description: "Stripe accepted the payment. DebugBundle is verifying the Checkout Session and updating your account.",
+          primary: "This usually finishes in a few seconds."
+        };
+      case "success":
+        return {
+          icon: <CheckCircle2Icon className={iconClassName} aria-hidden="true" />,
+          title: `${formatPlanName(state.plan ?? "free")} is active`,
+          description: "Your billing state is updated and the new tier is available across this account.",
+          primary: "You can keep working with the updated allowances now."
+        };
+      case "delayed":
+        return {
+          icon: <InfoIcon className={iconClassName} aria-hidden="true" />,
+          title: "Payment received",
+          description: "Stripe accepted the payment, but the subscription update has not reached DebugBundle yet.",
+          primary: "Keep this page open and refresh billing in a moment. If the tier still does not change, the Stripe webhook needs attention."
+        };
+      case "canceled":
+        return {
+          icon: <XCircleIcon className={iconClassName} aria-hidden="true" />,
+          title: "Checkout canceled",
+          description: "No payment was completed and your plan has not changed.",
+          primary: "You can start checkout again whenever you are ready."
+        };
+      case "error":
+        return {
+          icon: <InfoIcon className={iconClassName} aria-hidden="true" />,
+          title: "Could not confirm billing yet",
+          description: "Stripe redirected back successfully, but DebugBundle could not verify the Checkout Session right now.",
+          primary: "Your payment may still be valid. Refresh billing shortly, or check the Stripe webhook configuration."
+        };
+    }
+  })();
+
+  return (
+    <Dialog open={state !== null} onOpenChange={props.onOpenChange}>
+      <DialogContent size="md">
+        <DialogHeader>
+          <div className="flex items-start gap-3">
+            <div className="mt-0.5 flex size-9 shrink-0 items-center justify-center rounded-full bg-muted text-foreground">
+              {content.icon}
+            </div>
+            <div className="space-y-2">
+              <DialogTitle>{content.title}</DialogTitle>
+              <DialogDescription>{content.description}</DialogDescription>
+            </div>
+          </div>
+        </DialogHeader>
+
+        <div className="rounded-lg border bg-muted/40 p-4 text-sm text-muted-foreground">
+          {content.primary}
+        </div>
+
+        {state.status === "syncing" ? null : <DialogFooter showCloseButton />}
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 export function BillingPage(): JSX.Element {
-  const { session } = useSession();
+  const { session, refreshSession } = useSession();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [billing, setBilling] = useState<BillingSummaryRecord | null>(null);
   const [isForbidden, setIsForbidden] = useState(false);
   const [activeCheckoutPlan, setActiveCheckoutPlan] = useState<"solo" | "team" | null>(null);
   const [isOpeningPortal, setIsOpeningPortal] = useState(false);
   const [isCapacityDialogOpen, setIsCapacityDialogOpen] = useState(false);
+  const [checkoutReturnDialog, setCheckoutReturnDialog] = useState<CheckoutReturnDialogState | null>(null);
+  const handledCheckoutReturnKey = useRef<string | null>(null);
   const showBillingLoading = useDelayedVisibility(billing === null && !isForbidden);
+  const checkoutStatus = searchParams.get("checkout");
+  const checkoutSessionId = searchParams.get("session_id");
 
   useEffect(() => {
-    void (async () => {
+    if (checkoutStatus === null) {
+      handledCheckoutReturnKey.current = null;
+    } else {
+      const checkoutReturnKey = `${checkoutStatus}:${checkoutSessionId ?? ""}`;
+      if (handledCheckoutReturnKey.current === checkoutReturnKey) {
+        return;
+      }
+
+      handledCheckoutReturnKey.current = checkoutReturnKey;
+    }
+
+    let cancelled = false;
+    let pollTimer: ReturnType<typeof setTimeout> | undefined;
+
+    const clearCheckoutReturn = (): void => {
+      clearPendingBillingCheckout();
+      setSearchParams((currentParams) => {
+        const nextParams = new URLSearchParams(currentParams);
+        nextParams.delete("checkout");
+        nextParams.delete("session_id");
+        return nextParams;
+      }, { replace: true });
+    };
+
+    const loadBillingSummary = async (): Promise<BillingSummaryRecord | null> => {
       try {
         const nextBilling = await getBillingSummary();
+        if (cancelled) {
+          return null;
+        }
+
         setBilling(nextBilling);
+        setIsForbidden(false);
+        return nextBilling;
       } catch (error) {
+        if (cancelled) {
+          return null;
+        }
+
         if (error instanceof Error && error.message === "forbidden") {
           setIsForbidden(true);
-          return;
+          return null;
         }
 
         throw error;
       }
+    };
+
+    const pendingCheckout = checkoutStatus === "success" ? readPendingBillingCheckout() : null;
+
+    const completeCheckoutReturn = async (nextBilling: BillingSummaryRecord): Promise<void> => {
+      setBilling(nextBilling);
+      await refreshSession();
+      if (cancelled) {
+        return;
+      }
+
+      setCheckoutReturnDialog({ status: "success", plan: nextBilling.plan });
+      clearCheckoutReturn();
+    };
+
+    const pollForCheckoutUpdate = async (baseline: BillingSummaryRecord, attemptsRemaining: number): Promise<void> => {
+      const nextBilling = await loadBillingSummary();
+      if (cancelled || nextBilling === null) {
+        clearCheckoutReturn();
+        return;
+      }
+
+      if (billingReflectsCheckout(nextBilling, pendingCheckout, baseline)) {
+        await completeCheckoutReturn(nextBilling);
+        return;
+      }
+
+      if (attemptsRemaining <= 0) {
+        setCheckoutReturnDialog({ status: "delayed" });
+        clearCheckoutReturn();
+        return;
+      }
+
+      pollTimer = setTimeout(() => {
+        void pollForCheckoutUpdate(baseline, attemptsRemaining - 1);
+      }, BILLING_CHECKOUT_POLL_INTERVAL_MS);
+    };
+
+    void (async () => {
+      const initialBilling = await loadBillingSummary();
+      if (cancelled || checkoutStatus === null) {
+        return;
+      }
+
+      if (checkoutStatus === "canceled") {
+        setCheckoutReturnDialog({ status: "canceled" });
+        clearCheckoutReturn();
+        return;
+      }
+
+      if (checkoutStatus !== "success" || initialBilling === null) {
+        clearCheckoutReturn();
+        return;
+      }
+
+      setCheckoutReturnDialog({ status: "syncing" });
+
+      if (checkoutSessionId !== null) {
+        try {
+          const confirmedBilling = await confirmBillingCheckout(checkoutSessionId);
+          if (cancelled) {
+            return;
+          }
+
+          await completeCheckoutReturn(confirmedBilling);
+          return;
+        } catch {
+          if (cancelled) {
+            return;
+          }
+        }
+      }
+
+      if (billingReflectsCheckout(initialBilling, pendingCheckout, null)) {
+        await completeCheckoutReturn(initialBilling);
+        return;
+      }
+
+      await pollForCheckoutUpdate(initialBilling, BILLING_CHECKOUT_MAX_POLL_ATTEMPTS);
     })();
-  }, []);
+
+    return () => {
+      cancelled = true;
+      if (pollTimer !== undefined) {
+        clearTimeout(pollTimer);
+      }
+    };
+  }, [checkoutSessionId, checkoutStatus, refreshSession, setSearchParams]);
 
   async function handleCheckout(targetPlan: "solo" | "team"): Promise<void> {
     setActiveCheckoutPlan(targetPlan);
+
+    if (billing !== null) {
+      writePendingBillingCheckout({
+        previousPlan: billing.plan,
+        targetPlan
+      });
+    }
 
     try {
       const url = await startBillingCheckout(targetPlan);
       window.location.assign(url);
     } catch {
+      clearPendingBillingCheckout();
       showErrorToast("Billing checkout is unavailable right now.");
     } finally {
       setActiveCheckoutPlan(null);
@@ -315,6 +612,12 @@ export function BillingPage(): JSX.Element {
 
   return (
     <div className="space-y-8">
+      <CheckoutReturnDialog state={checkoutReturnDialog} onOpenChange={(open) => {
+        if (!open) {
+          setCheckoutReturnDialog(null);
+        }
+      }} />
+
       <PageHeader description="" />
 
       {isForbidden ? (

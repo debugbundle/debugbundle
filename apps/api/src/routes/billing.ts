@@ -3,7 +3,7 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import type { ApiDependencies } from "../api-types.js";
 import { recordAuditLog } from "../audit-logging.js";
 import { enforceRequestRateLimit, requireOwnerMemberAuth, resolveBrowserSession } from "../api-helpers.js";
-import { BillingCheckoutBodySchema, BillingCapacityChangeBodySchema } from "../schemas.js";
+import { BillingCheckoutBodySchema, BillingCheckoutConfirmBodySchema, BillingCapacityChangeBodySchema } from "../schemas.js";
 
 async function requireOwnerBillingPrincipal(
   request: FastifyRequest,
@@ -225,6 +225,83 @@ export function registerBillingRoutes(app: FastifyInstance, dependencies: ApiDep
     });
 
     return reply.status(200).send(checkout);
+  });
+
+  app.post("/v1/billing/checkout/confirm", async (request, reply) => {
+    const session = await resolveBrowserSession(request.headers.cookie, dependencies);
+    if (session === null) {
+      return reply.status(401).send({ error: "invalid_session" });
+    }
+    if (session.role !== "owner") {
+      return reply.status(403).send({ error: "forbidden" });
+    }
+    if (
+      !(await enforceRequestRateLimit(request, reply, dependencies, {
+        bucket: "management-write",
+        subject: `member:${session.user_id}`
+      }))
+    ) {
+      return;
+    }
+    if (dependencies.billingManagement?.confirmCheckoutSession === undefined) {
+      return reply.status(404).send({ error: "billing_not_available" });
+    }
+
+    const parsedBody = BillingCheckoutConfirmBodySchema.safeParse(request.body);
+    if (!parsedBody.success) {
+      return reply.status(400).send({ error: "invalid_payload" });
+    }
+
+    const result = await dependencies.billingManagement.confirmCheckoutSession({
+      organization_id: session.organization_id,
+      session_id: parsedBody.data.session_id,
+      now: new Date().toISOString()
+    });
+
+    if (typeof result === "string") {
+      const statusCode = result === "billing_not_configured" || result === "billing_service_error"
+        ? 503
+        : result === "billing_not_found" || result === "checkout_session_not_found"
+          ? 404
+          : 409;
+
+      await recordAuditLog(dependencies.auditLogging, {
+        organization_id: session.organization_id,
+        actor_user_id: session.user_id,
+        actor_type: "browser_session",
+        action: "billing.checkout.confirm",
+        target_type: "billing_checkout",
+        target_id: parsedBody.data.session_id,
+        status: "failure",
+        ip_address: request.ip,
+        metadata: {
+          reason: result
+        }
+      });
+
+      return reply.status(statusCode).send({ error: result });
+    }
+
+    await recordAuditLog(dependencies.auditLogging, {
+      organization_id: session.organization_id,
+      actor_user_id: session.user_id,
+      actor_type: "browser_session",
+      action: "billing.checkout.confirm",
+      target_type: "billing_checkout",
+      target_id: parsedBody.data.session_id,
+      status: "success",
+      ip_address: request.ip,
+      metadata: {
+        plan: result.plan
+      }
+    });
+
+    return reply.status(200).send({
+      billing: {
+        ...result,
+        email_verification_required: session.email_verified_at === null
+      }
+    });
   });
 
   app.post("/v1/billing/portal", async (request, reply) => {

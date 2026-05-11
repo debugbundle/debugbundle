@@ -1100,6 +1100,80 @@ describe("api billing routes", () => {
     expect(createAuditLog).toHaveBeenCalledTimes(6);
   });
 
+  it("should confirm a returned Stripe checkout session and return the updated billing summary", async (): Promise<void> => {
+    const confirmCheckoutSession = vi.fn().mockResolvedValue({
+      plan: "solo",
+      stripe_customer_id: "cus_123",
+      active_projects: 1,
+      capacity_units: {
+        total: 2,
+        included: 2,
+        additional_purchased: 0,
+        pending_reduction: null
+      },
+      usage_window: {
+        starts_at: "2026-05-10T22:14:57.000Z",
+        ends_at: "2026-06-10T22:14:57.000Z"
+      },
+      allowances: {
+        monthly_bundle_requests: { used: 0, limit: 500 },
+        monthly_raw_ingested_events: { used: 0, limit: 4000 },
+        retained_bundle_cap: { used: 0, limit: 500 },
+        monthly_remote_activations: { used: 0, limit: 50 },
+        monthly_alert_deliveries: { used: 0, limit: 100 }
+      }
+    });
+    const billingManagement = mockedObject<BillingManagementDependency>({
+      getBillingSummaryForOrganization: vi.fn().mockResolvedValue(null),
+      createCheckoutLink: vi.fn().mockResolvedValue(null),
+      confirmCheckoutSession,
+      createPortalLink: vi.fn().mockResolvedValue(null),
+      increaseCapacity: vi.fn().mockResolvedValue(null),
+      scheduleCapacityReduction: vi.fn().mockResolvedValue(null),
+      cancelCapacityReduction: vi.fn().mockResolvedValue(null)
+    });
+    const app = createServer({
+      webAuth: {
+        resolveSessionByToken: vi.fn().mockResolvedValue({
+          user_id: "usr_123",
+          email: "owner@example.com",
+          organization_id: "org_123",
+          email_verified_at: "2026-03-17T00:00:00.000Z",
+          role: "owner"
+        })
+      },
+      billingManagement
+    });
+
+    const response = await app.inject({
+      method: "POST",
+      url: "/v1/billing/checkout/confirm",
+      cookies: {
+        [SESSION_COOKIE_NAME]: "session-secret"
+      },
+      headers: {
+        "x-csrf-token": buildCsrfToken("session-secret")
+      },
+      payload: {
+        session_id: "cs_test_123"
+      }
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(confirmCheckoutSession).toHaveBeenCalledWith({
+      organization_id: "org_123",
+      session_id: "cs_test_123",
+      now: expect.any(String)
+    });
+    expect(response.json()).toEqual({
+      billing: expect.objectContaining({
+        email_verification_required: false,
+        plan: "solo",
+        stripe_customer_id: "cus_123"
+      })
+    });
+  });
+
   it("should map allowance-capacity route failure statuses", async (): Promise<void> => {
     const billingManagement = {
       getBillingSummaryForOrganization: vi.fn().mockResolvedValue(null),

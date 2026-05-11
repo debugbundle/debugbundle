@@ -146,6 +146,11 @@ export interface ApiDependencies {
       current_plan: "free" | "solo" | "team";
       target_plan: "solo" | "team";
     }): Promise<{ url: string } | null>;
+    confirmCheckoutSession?(input: {
+      organization_id: string;
+      session_id: string;
+      now: string;
+    }): Promise<BillingSummaryRecord | "billing_not_configured" | "billing_not_found" | "checkout_session_not_found" | "checkout_not_complete" | "billing_service_error">;
     createPortalLink(input: {
       organization_id: string;
       current_plan: "solo" | "team";
