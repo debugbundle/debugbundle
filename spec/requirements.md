@@ -431,8 +431,8 @@ All eight canonical event types (FR-SDK-05) are assigned to one of three event c
 
 | Event Class | Event Types | Purpose |
 |---|---|---|
-| **A — Incident Signals** | `backend_exception`, `frontend_exception`, qualifying `log_event` (warning+ with incident-eligible grouping) | Events that create or materially update incidents. The primary product value. |
-| **B — Context Signals** | `request_event` (as request snapshot), `frontend_breadcrumb`, non-incident-eligible `log_event`, `deploy_metadata`, probe data flushed alongside errors | Events that enrich an incident but do not independently create one. Context travels with the incident. |
+| **A — Incident Signals** | `backend_exception`, `frontend_exception`, qualifying `log_event` (`error`/`fatal`/`critical`), first-party `request_event` with `response_status >= 500` | Events that create or materially update incidents. The primary product value. |
+| **B — Context Signals** | Non-5xx `request_event` (as request snapshot), `frontend_breadcrumb`, non-incident-eligible `log_event`, `deploy_metadata`, probe data flushed alongside errors | Events that enrich an incident but do not independently create one. Context travels with the incident. |
 | **C — Operational Signals** | `error_suppressed`, standalone `probe_event` | Events that exist to operate the platform, not to represent user-facing failures. |
 
 **FR-EVT-01:** Every event persisted through ingestion must carry an `event_class` classification (`incident_signal`, `context_signal`, or `operational_signal`). Classification is determined at the worker normalization stage based on event type and project capture policy.
@@ -447,7 +447,7 @@ All eight canonical event types (FR-SDK-05) are assigned to one of three event c
 
 | Preset | Goal | Exceptions | Logs | Request Events | Breadcrumbs | Probe Events |
 |---|---|---|---|---|---|---|
-| `minimal` | Protect quota, capture only real failures | On | Warning+ only | Off standalone; attach as incident context only | Local ring buffer + exception flush only | Buffer-only |
+| `minimal` | Protect quota, capture only real failures | On | Error+ only | 5xx failure requests only | Local ring buffer + exception flush only | Buffer-only |
 | `balanced` | Default hosted behavior | On | Warning+ | 5xx and selected failures only | Local ring buffer + exception flush only | Paid-tier only |
 | `investigative` | Short-term deep debugging | On | Info+ | On with filters | Optional standalone | Paid-tier only |
 
@@ -463,7 +463,9 @@ Advanced controls are optional. When unset, the preset's defaults apply. The `ca
 
 **FR-EVT-07:** SDKs must respect the project capture policy. The `GET /v1/sdk/config` response must include the resolved capture policy so SDKs can gate event emission client-side. When the SDK's local config conflicts with the server-side policy, the more restrictive setting wins.
 
-**FR-EVT-08:** The ingestion API must enforce plan-level capture rules server-side. If a project sends event types disallowed by its capture policy (e.g., standalone `request_event` on a `minimal` Free project), the API must reject those events with a structured reason (`capture_policy_rejected`) rather than silently accepting and billing them.
+**FR-EVT-08:** The ingestion API must enforce plan-level capture rules server-side. If a project sends event types disallowed by its capture policy (e.g., non-5xx standalone `request_event` on a `minimal` Free project), the API must reject those events with a structured reason (`capture_policy_rejected`) rather than silently accepting and billing them. First-party 5xx `request_event` payloads are incident-critical and must be accepted under every preset/override.
+
+**FR-EVT-08a:** Browser SDK network capture must promote first-party `fetch`/`XMLHttpRequest` responses with `response_status >= 500` to standalone `request_event` payloads while still retaining the corresponding `network_request` breadcrumb for timeline context. First-party means same-origin/relative URL or a URL matched by trace-propagation allowlist. 4xx browser network responses remain breadcrumb/context captures unless separately reported through an explicit request-event API.
 
 #### Surfacing Rules
 
@@ -475,12 +477,12 @@ Advanced controls are optional. When unset, the preset's defaults apply. The `ca
 #### Free Tier Default Policy (Canonical)
 
 **FR-EVT-10:** The canonical Free tier capture policy is:
-- Incident creation: `backend_exception`, `frontend_exception`, and qualifying warning+ `log_event` only.
-- Standalone `request_event` ingestion: Off by default.
+- Incident creation: `backend_exception`, `frontend_exception`, qualifying `error`/`fatal`/`critical` `log_event`, and first-party 5xx `request_event`.
+- Standalone `request_event` ingestion: 5xx failures only by default; non-5xx request snapshots are rejected unless policy is widened.
 - Request context capture: Keep request snapshot attached to exception incidents as context.
 - Standalone `frontend_breadcrumb` ingestion: Off by default.
 - Breadcrumb handling: Local ring buffer only, shipped with `frontend_exception` (existing FR-SDK-24 default).
-- `log_event` handling: Warning+ only with conservative rate limits.
+- `log_event` handling: Error+ only with conservative rate limits.
 - `deploy_metadata` handling: On, excluded from primary event billing.
 - `error_suppressed` handling: On, excluded from primary event billing.
 - `probe_event` handling: Buffer-only on Free; no standalone probe ingestion.
@@ -493,7 +495,7 @@ This ensures Free behaves as **failure-first, not telemetry-first**.
 
 **FR-REL-01:** The Node.js SDK must provide a browser relay handler as subpath exports (`@debugbundle/sdk-node/relay`, `@debugbundle/sdk-node/relay/express`, `@debugbundle/sdk-node/relay/fastify`, `@debugbundle/sdk-node/relay/nextjs`) that accepts browser-originated events via a same-origin `POST /debugbundle/browser` endpoint on the user's own backend.
 
-**FR-REL-02:** The relay handler must validate incoming payloads against a strict schema, accepting only known browser event types: `frontend_exception`, `error_suppressed`, `frontend_breadcrumb`, `probe_event`. Unknown event types and unknown fields must be rejected/stripped.
+**FR-REL-02:** The relay handler must validate incoming payloads against a strict schema, accepting only known browser event types: `frontend_exception`, `error_suppressed`, `frontend_breadcrumb`, `request_event`, `probe_event`. Unknown event types and unknown fields must be rejected/stripped.
 
 **FR-REL-03:** The relay handler must enforce origin validation by checking the `Origin` header (fallback: `Referer`) against a configurable allowlist. Default: same-origin derived from the request's `Host` header. Requests with missing or non-matching origins must be rejected with `403`.
 

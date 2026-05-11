@@ -781,6 +781,76 @@ describe("worker processor \u2013 normalize-events", () => {
     );
   });
 
+  it("should classify 5xx request_event as incident_signal with high severity", async (): Promise<void> => {
+    const event = createEventEnvelope({
+      event_type: "request_event",
+      service: { name: "api", environment: "production", runtime: "node", framework: "fastify" },
+      payload: {
+        method: "POST",
+        path: "/v1/billing/checkout",
+        query: {},
+        headers: {},
+        response_status: 503,
+        duration_ms: 42
+      }
+    });
+
+    const queue = {
+      enqueue: vi.fn().mockResolvedValue(undefined),
+      dequeue: vi.fn().mockResolvedValue({
+        project_id: "proj_1",
+        event_id: event.event_id,
+        object_key: "raw-events/proj_1/file.json.gz"
+      })
+    };
+
+    await processNextNormalizeEventsJob({
+      queue,
+      objectStore: { getObject: vi.fn().mockResolvedValue(gzipSync(Buffer.from(JSON.stringify(event), "utf8"))) },
+      processedEventStore: { upsertProcessedEvent: vi.fn().mockResolvedValue(undefined) }
+    });
+
+    expect(queue.enqueue).toHaveBeenCalledWith(
+      "group-incident",
+      expect.objectContaining({ event_class: "incident_signal", severity: "high" })
+    );
+  });
+
+  it("should classify non-5xx request_event as context_signal with low severity", async (): Promise<void> => {
+    const event = createEventEnvelope({
+      event_type: "request_event",
+      service: { name: "api", environment: "production", runtime: "node", framework: "fastify" },
+      payload: {
+        method: "GET",
+        path: "/v1/billing/checkout",
+        query: {},
+        headers: {},
+        response_status: 404,
+        duration_ms: 12
+      }
+    });
+
+    const queue = {
+      enqueue: vi.fn().mockResolvedValue(undefined),
+      dequeue: vi.fn().mockResolvedValue({
+        project_id: "proj_1",
+        event_id: event.event_id,
+        object_key: "raw-events/proj_1/file.json.gz"
+      })
+    };
+
+    await processNextNormalizeEventsJob({
+      queue,
+      objectStore: { getObject: vi.fn().mockResolvedValue(gzipSync(Buffer.from(JSON.stringify(event), "utf8"))) },
+      processedEventStore: { upsertProcessedEvent: vi.fn().mockResolvedValue(undefined) }
+    });
+
+    expect(queue.enqueue).toHaveBeenCalledWith(
+      "group-incident",
+      expect.objectContaining({ event_class: "context_signal", severity: "low" })
+    );
+  });
+
   it("should classify log_event with info level as context_signal", async (): Promise<void> => {
     const event = createEventEnvelope({
       event_type: "log_event",

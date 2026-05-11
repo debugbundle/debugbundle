@@ -777,6 +777,8 @@ If CLI says something is healthy and MCP says something different, that is a pro
 - **When** a `200 OK` response, a `404 Not Found`, and a `500 Internal Server Error` occur
 - **Then** only the 404 and 500 responses are added to the breadcrumb ring buffer
 - **And** the 200 response is silently excluded
+- **And** if the 500 response is first-party, the browser SDK also emits a standalone `request_event`
+- **And** if the 500 response is third-party and not trace-allowlisted, it remains breadcrumb-only context
 
 ### AC-BRW-06: Session Sampling Coherence
 - **Given** a browser SDK with `sessionSampleRate: 0.5`
@@ -995,7 +997,8 @@ If CLI says something is healthy and MCP says something different, that is a pro
 - **And** `frontend_exception` → `incident_signal`
 - **And** `log_event` with `level` in (`error`, `fatal`, `critical`) → `incident_signal`
 - **And** `log_event` with `level` below `error` → `context_signal`
-- **And** `request_event` → `context_signal`
+- **And** `request_event` with `response_status >= 500` → `incident_signal`
+- **And** `request_event` below 500 → `context_signal`
 - **And** `frontend_breadcrumb` → `context_signal`
 - **And** `deploy_metadata` → `context_signal`
 - **And** `error_suppressed` → `operational_signal`
@@ -1040,11 +1043,18 @@ If CLI says something is healthy and MCP says something different, that is a pro
 - **And** the SDK uses these controls to filter events before sending
 
 ### AC-EVT-08: Ingestion Enforces Capture Policy Server-Side
-- **Given** a project with preset `minimal` (which sets `capture_request_events: "off"`)
-- **When** an SDK sends a `request_event` to `POST /v1/events`
+- **Given** a project with preset `minimal` (which sets `capture_request_events: "failures_only"`)
+- **When** an SDK sends a `request_event` with `response_status: 200` to `POST /v1/events`
 - **Then** the event is rejected with reason `capture_policy_rejected`
 - **And** the accepted count does not include rejected events
 - **And** rejected events are not persisted to S3
+
+### AC-EVT-08a: Ingestion Always Accepts 5xx Request Failures
+- **Given** a project with any capture preset or `capture_request_events` override
+- **When** an SDK sends a `request_event` with `response_status >= 500` to `POST /v1/events`
+- **Then** the event is accepted
+- **And** worker normalization classifies it as `incident_signal`
+- **And** the incident bundle primary signal can be `request_failure`
 
 ### AC-EVT-09: SDK Local Capture Policy Enforcement
 - **Given** an SDK initialized with a project whose capture policy sets `capture_logs: "error"`

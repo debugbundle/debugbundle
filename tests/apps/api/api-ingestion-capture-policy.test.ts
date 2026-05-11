@@ -100,7 +100,7 @@ function makeBackendException(): EventEnvelope {
 }
 
 describe("ingestion capture policy enforcement", () => {
-  it("should reject request_event on a minimal policy project (capture_request_events=off)", async (): Promise<void> => {
+  it("should reject non-critical request_event on a minimal policy project", async (): Promise<void> => {
     const persistAndEnqueue = vi.fn().mockResolvedValue({ object_key: "raw-events/p/k.json.gz" });
     const capturePolicyManagement = {
       getCapturePolicyForProject: vi.fn().mockResolvedValue({
@@ -131,6 +131,39 @@ describe("ingestion capture policy enforcement", () => {
       errors: [{ index: 0, reason: "capture_policy_rejected" }]
     });
     expect(persistAndEnqueue).not.toHaveBeenCalled();
+  });
+
+  it("should accept 5xx request_event on a minimal policy project", async (): Promise<void> => {
+    const persistAndEnqueue = vi.fn().mockResolvedValue({ object_key: "raw-events/p/k.json.gz" });
+    const capturePolicyManagement = {
+      getCapturePolicyForProject: vi.fn().mockResolvedValue({
+        project_id: "proj_123",
+        preset: "minimal",
+        capture_logs: null,
+        capture_request_events: null,
+        capture_breadcrumbs: null,
+        capture_probe_events: null,
+        updated_at: "2026-03-01T00:00:00.000Z"
+      }),
+      upsertCapturePolicyForProject: vi.fn()
+    };
+
+    const app = createApiServer(createBaseDependencies({ persistAndEnqueue, capturePolicyManagement }));
+
+    const response = await app.inject({
+      method: "POST",
+      url: "/v1/events",
+      headers: { authorization: "Bearer dbundle_proj_test" },
+      payload: { events: [makeRequestEvent(503)] }
+    });
+
+    expect(response.statusCode).toBe(202);
+    expect(response.json()).toMatchObject({
+      accepted: 1,
+      rejected: 0,
+      errors: []
+    });
+    expect(persistAndEnqueue).toHaveBeenCalledTimes(1);
   });
 
   it("should accept backend_exception even on minimal policy", async (): Promise<void> => {
@@ -278,16 +311,16 @@ describe("ingestion capture policy enforcement", () => {
       method: "POST",
       url: "/v1/events",
       headers: { authorization: "Bearer dbundle_proj_test" },
-      payload: { events: [makeRequestEvent(200), makeBackendException()] }
+      payload: { events: [makeRequestEvent(200), makeRequestEvent(500), makeBackendException()] }
     });
 
     expect(response.statusCode).toBe(202);
     expect(response.json()).toMatchObject({
-      accepted: 1,
+      accepted: 2,
       rejected: 1,
       errors: [{ index: 0, reason: "capture_policy_rejected" }]
     });
-    expect(persistAndEnqueue).toHaveBeenCalledTimes(1);
+    expect(persistAndEnqueue).toHaveBeenCalledTimes(2);
   });
 
   it("should use balanced defaults for solo projects when no policy row exists", async (): Promise<void> => {

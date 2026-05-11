@@ -221,6 +221,11 @@ export function fingerprint(event: NormalizedEvent): string {
 
 const INCIDENT_LOG_LEVELS = new Set(["error", "fatal", "critical"]);
 
+function getRequestResponseStatus(payload?: Record<string, unknown>): number | null {
+  const status = payload?.["response_status"];
+  return typeof status === "number" && Number.isFinite(status) ? status : null;
+}
+
 /**
  * Classify an event into one of three event classes:
  * - incident_signal: failure events that create/update incidents and count toward Free billing
@@ -231,6 +236,7 @@ export function classifyEvent(
   eventType: string,
   logLevel?: string,
   probeActivationId?: string | null,
+  payload?: Record<string, unknown>,
 ): EventClass {
   switch (eventType) {
     case "backend_exception":
@@ -243,7 +249,14 @@ export function classifyEvent(
       }
       return "context_signal";
 
-    case "request_event":
+    case "request_event": {
+      const responseStatus = getRequestResponseStatus(payload);
+      if (responseStatus !== null && responseStatus >= 500) {
+        return "incident_signal";
+      }
+      return "context_signal";
+    }
+
     case "frontend_breadcrumb":
     case "deploy_metadata":
       return "context_signal";

@@ -119,7 +119,8 @@ function getAuthFieldErrors(step: AuthStep, email: string, code: string): AuthFi
 }
 
 function omitAuthFieldError(errors: AuthFieldErrors, field: keyof AuthFieldErrors): AuthFieldErrors {
-  const { [field]: _removed, ...remaining } = errors;
+  const remaining = { ...errors };
+  delete remaining[field];
   return remaining;
 }
 

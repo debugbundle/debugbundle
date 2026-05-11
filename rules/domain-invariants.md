@@ -179,7 +179,7 @@ The billing store must enforce event class separation when computing `monthly_ra
 - **Paid plans (Solo, Team):** Class A and Class B events count. Class C events (`error_suppressed`, standalone `probe_event`) are excluded on all tiers.
 - No event may change class after normalization. The `event_class` assigned during worker normalization is immutable for billing purposes.
 
-This invariant ensures that passive telemetry (request events, deploy metadata, operational aggregates) never silently consumes a Free user's primary error-capture budget.
+This invariant ensures that passive telemetry (non-5xx request events, deploy metadata, operational aggregates) never silently consumes a Free user's primary error-capture budget, while first-party 5xx request failures are deliberately treated as Class A incident signals.
 
 **Enforcement:** Billing query tests must verify that Free-tier usage counts exclude Class B and Class C events. Integration tests must confirm that identical ingestion payloads produce different billing counts on Free vs. paid plans.
 
@@ -191,7 +191,7 @@ The ingestion API must reject events that violate the project's resolved capture
 
 SDKs should gate event emission client-side to minimize rejected traffic, but the server is the authoritative enforcement point. A well-behaved SDK + server pair should produce zero policy rejections under normal operation.
 
-**Enforcement:** Integration tests must verify that standalone `request_event` payloads are rejected on a Free project with `minimal` preset, and accepted on a paid project with `balanced` preset.
+**Enforcement:** Integration tests must verify that non-5xx standalone `request_event` payloads are rejected on a Free project with `minimal` preset, first-party 5xx `request_event` payloads are accepted under every preset/override, and paid projects with `balanced` preset accept 5xx request failures by default.
 
 ---
 

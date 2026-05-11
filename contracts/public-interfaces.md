@@ -1208,8 +1208,8 @@ Response `200`: same shape as GET response with updated values.
   "poll_interval_ms": 60000,
   "capture_policy": {
     "preset": "minimal",
-    "capture_logs": "warning",
-    "capture_request_events": "off",
+    "capture_logs": "error",
+    "capture_request_events": "failures_only",
     "capture_breadcrumbs": "local_only",
     "capture_probe_events": "buffer_only"
   }

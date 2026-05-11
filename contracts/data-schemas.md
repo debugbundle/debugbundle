@@ -497,8 +497,8 @@ Common wrapper for all SDK events:
 |------------|---------------------|-------|
 | `backend_exception` | `incident_signal` | Always |
 | `frontend_exception` | `incident_signal` | Always |
-| `log_event` | `incident_signal` or `context_signal` | `incident_signal` when severity qualifies (`warning`+) and grouping rules match; `context_signal` otherwise |
-| `request_event` | `context_signal` | Enriches incidents but does not create them |
+| `log_event` | `incident_signal` or `context_signal` | `incident_signal` when `level` is `error`, `fatal`, or `critical`; `context_signal` otherwise |
+| `request_event` | `incident_signal` or `context_signal` | `incident_signal` when `response_status >= 500`; `context_signal` otherwise |
 | `frontend_breadcrumb` | `context_signal` | Journey context for exceptions |
 | `deploy_metadata` | `context_signal` | Release correlation |
 | `error_suppressed` | `operational_signal` | Platform operations only |
@@ -917,8 +917,8 @@ One row per project. Created on project creation with tier-appropriate defaults 
 
 | Preset | capture_logs | capture_request_events | capture_breadcrumbs | capture_probe_events |
 |--------|-------------|----------------------|--------------------|--------------------|
-| `minimal` | `warning` | `off` | `local_only` | `buffer_only` |
-| `balanced` | `warning` | `failures_only` | `exception_only` | `standalone_when_activated` |
+| `minimal` | `error` | `failures_only` | `local_only` | `buffer_only` |
+| `balanced` | `warning` | `failures_only` | `exception_only` | `buffer_only` |
 | `investigative` | `info` | `all` | `standalone` | `standalone_when_activated` |
 
 **Resolved policy:** For each control, use the explicit override if non-null, otherwise the preset default. This resolved policy is served via `GET /v1/sdk/config` and `GET /v1/projects/{id}/capture-policy`.

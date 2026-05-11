@@ -35,7 +35,14 @@ describe("classifyEvent", () => {
     expect(classifyEvent("log_event")).toBe("context_signal");
   });
 
-  it("classifies request_event as context_signal", () => {
+  it("classifies 5xx request_event as incident_signal", () => {
+    expect(classifyEvent("request_event", undefined, undefined, { response_status: 500 })).toBe("incident_signal");
+    expect(classifyEvent("request_event", undefined, undefined, { response_status: 503 })).toBe("incident_signal");
+  });
+
+  it("classifies non-5xx request_event as context_signal", () => {
+    expect(classifyEvent("request_event", undefined, undefined, { response_status: 404 })).toBe("context_signal");
+    expect(classifyEvent("request_event", undefined, undefined, { response_status: 200 })).toBe("context_signal");
     expect(classifyEvent("request_event")).toBe("context_signal");
   });
 

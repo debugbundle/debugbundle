@@ -6,6 +6,17 @@ The format is based on Keep a Changelog and this project follows Semantic Versio
 
 ## [Unreleased]
 
+## [0.1.1] - 2026-05-11
+
+### Changed
+
+- Promoted `request_event` payloads with `response_status >= 500` to incident signals across ingestion, normalization, worker grouping, SDK capture policy, and public contracts.
+- Updated the canonical minimal/balanced capture-policy defaults so 5xx request failures are captured by default while non-5xx request events remain context-only unless policy is widened.
+
+### Fixed
+
+- Prevented non-incident signals that reach the worker grouping queue from creating or updating incidents.
+
 ## [0.1.0] - 2026-05-07
 
 ### Added

@@ -303,12 +303,16 @@ async function enqueueAlertEvaluation(
   }
 }
 
-function inferSeverity(eventType: string): "low" | "medium" | "high" | "critical" {
-  if (eventType === "backend_exception" || eventType === "frontend_exception") {
+function inferSeverity(event: EventEnvelope): "low" | "medium" | "high" | "critical" {
+  if (event.event_type === "request_event" && event.payload.response_status >= 500) {
     return "high";
   }
 
-  if (eventType === "error_suppressed") {
+  if (event.event_type === "backend_exception" || event.event_type === "frontend_exception") {
+    return "high";
+  }
+
+  if (event.event_type === "error_suppressed") {
     return "medium";
   }
 
@@ -352,7 +356,8 @@ export async function processNextNormalizeEventsJob(
     event_class: classifyEvent(
       validated.data.event_type,
       validated.data.event_type === "log_event" ? validated.data.payload?.level : undefined,
-      validated.data.event_type === "probe_event" ? validated.data.payload?.activation_id : undefined
+      validated.data.event_type === "probe_event" ? validated.data.payload?.activation_id : undefined,
+      validated.data.payload as Record<string, unknown>
     ),
     service_name: validated.data.service.name,
     environment: validated.data.service.environment,
@@ -361,7 +366,7 @@ export async function processNextNormalizeEventsJob(
     normalized_message: normalized.normalized_message,
     matched_fields: inferMatchedFields(normalized),
     occurred_at: validated.data.occurred_at,
-    severity: inferSeverity(validated.data.event_type),
+    severity: inferSeverity(validated.data),
     ...(validated.data.event_type === "deploy_metadata"
       ? {
           deploy_metadata: {
@@ -383,6 +388,10 @@ export async function processNextGroupIncidentJob(
   const job = await dependencies.queue.dequeue("group-incident");
   if (job === null) {
     return { processed: false, reason: "no_jobs" };
+  }
+
+  if (job.event_class !== undefined && job.event_class !== "incident_signal") {
+    return { processed: true, reason: "non_incident_signal" };
   }
 
   const incident = await dependencies.incidentStore.upsertIncident({

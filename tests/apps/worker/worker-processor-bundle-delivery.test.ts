@@ -200,6 +200,48 @@ describe("worker processor \u2013 bundle, delivery & sampling", () => {
     expect(result).toEqual({ processed: false, reason: "no_jobs" });
   });
 
+  it("should skip non-incident signals before incident upsert", async (): Promise<void> => {
+    const upsertIncident = vi.fn();
+    const insertIncidentEvent = vi.fn();
+    const recordOccurrence = vi.fn();
+    const publish = vi.fn();
+
+    const result = await processNextGroupIncidentJob({
+      queue: {
+        enqueue: vi.fn(),
+        dequeue: vi.fn().mockResolvedValue({
+          project_id: "proj_123",
+          event_id: "evt_context",
+          event_type: "request_event",
+          event_class: "context_signal",
+          service_name: "checkout-api",
+          environment: "production",
+          fingerprint: "fp_context",
+          normalized_message: "GET /health returned 404",
+          occurred_at: "2026-03-12T00:00:00.000Z",
+          severity: "low"
+        })
+      },
+      incidentStore: {
+        upsertIncident,
+        insertIncidentEvent,
+        markIncidentSpiking: vi.fn()
+      },
+      frequencyCounter: {
+        recordOccurrence
+      },
+      lifecycleWebhookPublisher: {
+        publish
+      }
+    });
+
+    expect(result).toEqual({ processed: true, reason: "non_incident_signal" });
+    expect(upsertIncident).not.toHaveBeenCalled();
+    expect(insertIncidentEvent).not.toHaveBeenCalled();
+    expect(recordOccurrence).not.toHaveBeenCalled();
+    expect(publish).not.toHaveBeenCalled();
+  });
+
   it("should return no_jobs when build-bundle queue is empty", async (): Promise<void> => {
     const result = await processNextBuildBundleJob({
       queue: {

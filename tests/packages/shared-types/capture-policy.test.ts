@@ -53,10 +53,10 @@ describe("preset defaults", () => {
     expect(Object.keys(PRESET_DEFAULTS)).toEqual(["minimal", "balanced", "investigative"]);
   });
 
-  it("minimal preset captures only errors and buffers probes", () => {
+  it("minimal preset captures incident signals and buffers probes", () => {
     expect(PRESET_DEFAULTS.minimal).toEqual({
       capture_logs: "error",
-      capture_request_events: "off",
+      capture_request_events: "failures_only",
       capture_breadcrumbs: "local_only",
       capture_probe_events: "buffer_only",
     });
@@ -231,19 +231,27 @@ describe("shouldCaptureEvent", () => {
     expect(shouldCaptureEvent(investigative, "log_event", { level: "debug" })).toBe(true);
   });
 
-  it("rejects all request_event when capture_request_events is off", () => {
-    // minimal preset has capture_request_events: "off"
-    expect(shouldCaptureEvent(minimal, "request_event", { response_status: 500 })).toBe(false);
+  it("always accepts 5xx request_event as incident-critical", () => {
+    expect(shouldCaptureEvent({ ...minimal, capture_request_events: "off" }, "request_event", { response_status: 500 })).toBe(true);
+    expect(shouldCaptureEvent({ ...minimal, capture_request_events: "off" }, "request_event", { response_status: 503 })).toBe(true);
     expect(shouldCaptureEvent(minimal, "request_event", { response_status: 200 })).toBe(false);
   });
 
-  it("accepts only failed requests when capture_request_events is failures_only", () => {
+  it("accepts only server-failed requests when capture_request_events is failures_only", () => {
     // balanced preset has capture_request_events: "failures_only"
     expect(shouldCaptureEvent(balanced, "request_event", { response_status: 500 })).toBe(true);
-    expect(shouldCaptureEvent(balanced, "request_event", { response_status: 404 })).toBe(true);
-    expect(shouldCaptureEvent(balanced, "request_event", { response_status: 400 })).toBe(true);
+    expect(shouldCaptureEvent(balanced, "request_event", { response_status: 404 })).toBe(false);
+    expect(shouldCaptureEvent(balanced, "request_event", { response_status: 400 })).toBe(false);
     expect(shouldCaptureEvent(balanced, "request_event", { response_status: 200 })).toBe(false);
     expect(shouldCaptureEvent(balanced, "request_event", { response_status: 302 })).toBe(false);
+  });
+
+  it("treats filtered request_event capture as server-failed only until filters exist", () => {
+    const filtered = { ...balanced, capture_request_events: "filtered" as const };
+
+    expect(shouldCaptureEvent(filtered, "request_event", { response_status: 500 })).toBe(true);
+    expect(shouldCaptureEvent(filtered, "request_event", { response_status: 404 })).toBe(false);
+    expect(shouldCaptureEvent(filtered, "request_event", { response_status: 200 })).toBe(false);
   });
 
   it("accepts all requests when capture_request_events is all", () => {

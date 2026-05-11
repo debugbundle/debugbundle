@@ -95,7 +95,7 @@ export type CapturePolicyUpdate = z.infer<typeof CapturePolicyUpdateSchema>;
 export const PRESET_DEFAULTS: Record<CapturePreset, Omit<ResolvedCapturePolicy, "preset">> = {
   minimal: {
     capture_logs: "error",
-    capture_request_events: "off",
+    capture_request_events: "failures_only",
     capture_breadcrumbs: "local_only",
     capture_probe_events: "buffer_only",
   },
@@ -199,12 +199,16 @@ export function shouldCaptureEvent(
     }
 
     case "request_event": {
+      const status = typeof payload["response_status"] === "number" ? payload["response_status"] : 0;
+      if (status >= 500) return true;
       if (policy.capture_request_events === "off") return false;
       if (policy.capture_request_events === "failures_only") {
-        const status = typeof payload["response_status"] === "number" ? payload["response_status"] : 0;
-        return status >= 400;
+        return false;
       }
-      return true; // "filtered" | "all"
+      if (policy.capture_request_events === "filtered") {
+        return false;
+      }
+      return true; // "all"
     }
 
     case "frontend_breadcrumb":

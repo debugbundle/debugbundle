@@ -399,7 +399,7 @@ function CheckoutReturnDialog(props: {
   })();
 
   return (
-    <Dialog open={state !== null} onOpenChange={props.onOpenChange}>
+    <Dialog open={state !== null} onOpenChange={(open) => props.onOpenChange(open)}>
       <DialogContent size="md">
         <DialogHeader>
           <div className="flex items-start gap-3">
