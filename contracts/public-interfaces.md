@@ -1,7 +1,7 @@
 # Public Interfaces — DebugBundle
 
 Version: v1
-Last updated: 2026-04-06
+Last updated: 2026-05-11
 
 ---
 
@@ -23,6 +23,7 @@ Every capability must be available through all applicable interfaces. Operations
 | Ingest events | `POST /v1/events` | — | — | SDK-only (project token) |
 | List incidents | `GET /v1/incidents` | `incidents` | `list_incidents` | |
 | Get incident | `GET /v1/incidents/{id}` | `inspect` | `get_incident` | |
+| Get incident context | `GET /v1/incidents/{id}/context` | `explain` | `get_incident_context` | Deterministic one-call incident explanation context aggregation |
 | Resolve incident | `POST /v1/incidents/{id}/resolve` | `resolve` | `resolve_incident` | Explicit user action |
 | Reopen incident | `POST /v1/incidents/{id}/reopen` | `reopen` | `reopen_incident` | Cloud incidents use the API route; local incidents still reopen directly from `.debugbundle/local/state.json` |
 | Get bundle | `GET /v1/incidents/{id}/bundle` | `bundle` | `get_bundle` | |
@@ -286,6 +287,7 @@ Rate-limited responses also include `Retry-After: <seconds>` so SDKs can back of
 |--------|------|------|-------------|
 | GET | `/v1/incidents` | Browser Session or Member Token | List incidents (filterable) |
 | GET | `/v1/incidents/{id}` | Browser Session or Member Token | Get incident metadata |
+| GET | `/v1/incidents/{id}/context` | Browser Session or Member Token | Get deterministic one-call incident explanation context |
 | POST | `/v1/incidents/{id}/resolve` | Browser Session or Member Token | Explicitly resolve an incident |
 | GET | `/v1/incidents/{id}/bundle` | Browser Session or Member Token | Get debug bundle |
 | GET | `/v1/incidents/{id}/reproduction` | Browser Session or Member Token | Get reproduction artifact |
@@ -302,8 +304,11 @@ Current API implementation scope (Phase 7 continuation): `GET /v1/incidents` sup
 Current API implementation scope (Phase 1 continuation):
 - `GET /v1/incidents` response body: `{ incidents: IncidentRetrievalRecord[], next_cursor: string | null }`
 - `GET /v1/incidents/{id}` response body: `{ incident: IncidentRetrievalRecord }`
+- `GET /v1/incidents/{id}/context` response body: `IncidentContextRecord`
 - `POST /v1/incidents/{id}/resolve` response body: `{ incident: IncidentRetrievalRecord }`
 - `IncidentRetrievalRecord` fields: `incident_id`, `project_id`, `project_name`, `service_id`, `service_name`, `latest_deployment_id`, `environment`, `fingerprint`, `fingerprint_version`, `title`, `severity`, `status`, `first_seen_at`, `last_seen_at`, `occurrence_count`, `spike_detected_at`, `resolved_at`, `regressed_at`, `matched_fields`, `incident_reason`
+- `IncidentContextRecord` fields: `incident`, `incident_reason`, `primary_signal`, `bundle`, `reproduction`, `logs`, `deploy`, `grouping`, `redaction`, `suggested_next_checks`
+- `primary_signal` summarizes the current incident's primary failing signal without requiring an LLM call. `logs.source` is one of `retrieval`, `bundle_context`, or `none`. `bundle` and `reproduction` use deterministic artifact states: `ready`, `pending`, or `failed`.
 - `incident_reason` is deterministically derived from the incident's primary `incident_signal` metadata. Current kinds: `backend_exception`, `frontend_exception`, `request_failure_5xx`, `error_log`. Example:
 
 ```json

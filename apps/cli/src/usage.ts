@@ -17,6 +17,7 @@ export const CLI_USAGE_LINES = [
   '  debugbundle whoami [--auth-file <path>] [--json]',
   '  debugbundle incidents [--source <local|cloud>] [--project-id <id>] [--environment <name>] [--service <name>] [--status <status>] [--severity <severity>] [--cursor <cursor>] [--limit <n>] [--auth-file <path>] [--json]',
   '  debugbundle inspect <incident-id> [--source <local|cloud>] [--auth-file <path>] [--json]',
+  '  debugbundle explain <incident-id> [--source <local|cloud>] [--auth-file <path>] [--json]',
   '  debugbundle resolve <incident-id> [--source <local|cloud>] [--auth-file <path>] [--json]',
   '  debugbundle reopen <incident-id> [--source <local|cloud>] [--auth-file <path>] [--json]',
   '  debugbundle bundle <incident-id> [--source <local|cloud>] [--auth-file <path>] [--json]',

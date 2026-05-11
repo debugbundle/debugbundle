@@ -13,6 +13,7 @@ describe("mcp retrieval tools local mode", () => {
       const tools = createRetrievalMcpTools({
         listIncidents: vi.fn().mockRejectedValue(new Error("should_not_call_cloud")),
         getIncident: vi.fn().mockRejectedValue(new Error("should_not_call_cloud")),
+        getIncidentContext: vi.fn().mockRejectedValue(new Error("should_not_call_cloud")),
         resolveIncident: vi.fn().mockRejectedValue(new Error("should_not_call_cloud")),
         reopenIncident: vi.fn().mockRejectedValue(new Error("should_not_call_cloud")),
         getBundle: vi.fn().mockRejectedValue(new Error("should_not_call_cloud")),
@@ -43,6 +44,18 @@ describe("mcp retrieval tools local mode", () => {
         })
       });
 
+      await expect(tools.get_incident_context({ incidentId: openIncident.incidentId })).resolves.toEqual(
+        expect.objectContaining({
+          incident: expect.objectContaining({
+            incident_id: openIncident.incidentId,
+            source: "local"
+          }),
+          bundle: expect.objectContaining({
+            status: "ready"
+          })
+        })
+      );
+
       await expect(tools.get_bundle({ incidentId: openIncident.incidentId })).resolves.toEqual({
         bundle_version: 1,
         incident_id: openIncident.incidentId,
@@ -68,6 +81,7 @@ describe("mcp retrieval tools local mode", () => {
       const tools = createRetrievalMcpTools({
         listIncidents: vi.fn().mockRejectedValue(new Error("should_not_call_cloud")),
         getIncident: vi.fn().mockRejectedValue(new Error("should_not_call_cloud")),
+        getIncidentContext: vi.fn().mockRejectedValue(new Error("should_not_call_cloud")),
         resolveIncident: vi.fn().mockRejectedValue(new Error("should_not_call_cloud")),
         reopenIncident: vi.fn().mockRejectedValue(new Error("should_not_call_cloud")),
         getBundle: vi.fn().mockRejectedValue(new Error("should_not_call_cloud")),
@@ -102,6 +116,7 @@ describe("mcp retrieval tools local mode", () => {
       const tools = createRetrievalMcpTools({
         listIncidents: vi.fn().mockRejectedValue(new Error("should_not_call_cloud")),
         getIncident: vi.fn().mockRejectedValue(new Error("should_not_call_cloud")),
+        getIncidentContext: vi.fn().mockRejectedValue(new Error("should_not_call_cloud")),
         resolveIncident: vi.fn().mockRejectedValue(new Error("should_not_call_cloud")),
         reopenIncident: vi.fn().mockRejectedValue(new Error("should_not_call_cloud")),
         getBundle: vi.fn().mockRejectedValue(new Error("should_not_call_cloud")),

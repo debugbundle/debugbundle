@@ -69,6 +69,89 @@ export const IncidentResponseSchema = z
   })
   .strict();
 
+export const IncidentContextArtifactSchema = z
+  .object({
+    status: z.enum(["ready", "pending", "failed"]),
+    body: z.unknown().optional(),
+    reason: z.string().nullable().optional()
+  })
+  .strict();
+
+export const IncidentContextLogsSchema = z
+  .object({
+    source: z.enum(["retrieval", "bundle_context", "none"]),
+    items: z.array(z.unknown()),
+    next_cursor: z.string().nullable()
+  })
+  .strict();
+
+export const IncidentContextDeploySchema = z
+  .object({
+    latest_deployment_id: z.string().nullable(),
+    commit_sha: z.string().nullable(),
+    deploy_version: z.string().nullable(),
+    branch: z.string().nullable(),
+    deployed_at: z.string().nullable(),
+    regression_window: z.boolean().nullable()
+  })
+  .strict();
+
+export const IncidentContextGroupingSchema = z
+  .object({
+    fingerprint: z.string(),
+    fingerprint_version: z.string(),
+    matched_fields: z.array(z.string())
+  })
+  .strict();
+
+export const IncidentContextRedactionSchema = z
+  .object({
+    redacted: z.boolean(),
+    fields: z.array(z.string()),
+    notes: z.string().nullable()
+  })
+  .strict();
+
+export const IncidentContextPrimarySignalSchema = z
+  .object({
+    kind: IncidentReasonSchema.shape.kind.nullable(),
+    event_type: z.string().nullable(),
+    event_class: z.string().nullable(),
+    description: z.string(),
+    severity: z.string(),
+    service_name: z.string().nullable(),
+    environment: z.string(),
+    error_type: z.string().nullable(),
+    error_message: z.string().nullable(),
+    request_method: z.string().nullable(),
+    request_path: z.string().nullable(),
+    route_template: z.string().nullable(),
+    response_status: z.number().nullable(),
+    first_application_frame: z
+      .object({
+        file: z.string().nullable(),
+        line: z.number().nullable(),
+        function: z.string().nullable()
+      })
+      .nullable()
+  })
+  .strict();
+
+export const IncidentContextSchema = z
+  .object({
+    incident: IncidentSchema,
+    incident_reason: IncidentReasonSchema.nullable(),
+    primary_signal: IncidentContextPrimarySignalSchema,
+    bundle: IncidentContextArtifactSchema,
+    reproduction: IncidentContextArtifactSchema,
+    logs: IncidentContextLogsSchema,
+    deploy: IncidentContextDeploySchema,
+    grouping: IncidentContextGroupingSchema,
+    redaction: IncidentContextRedactionSchema.nullable(),
+    suggested_next_checks: z.array(z.string())
+  })
+  .strict();
+
 export const ServicesResponseSchema = z
   .object({
     services: z.array(ServiceSchema)
@@ -191,6 +274,7 @@ export function createRetrievalApi(client: HttpClient): {
     limit?: number;
   }): Promise<{ incidents: Array<z.infer<typeof IncidentSchema>>; next_cursor: string | null }>;
   getIncident(input: { bearerToken: string; incidentId: string }): Promise<z.infer<typeof IncidentSchema>>;
+  getIncidentContext(input: { bearerToken: string; incidentId: string }): Promise<z.infer<typeof IncidentContextSchema>>;
   resolveIncident(input: { bearerToken: string; incidentId: string }): Promise<z.infer<typeof IncidentSchema>>;
   reopenIncident(input: { bearerToken: string; incidentId: string }): Promise<z.infer<typeof IncidentSchema>>;
   getBundle(input: { bearerToken: string; incidentId: string }): Promise<z.infer<typeof PendingStatusSchema> | z.infer<typeof BundleSchema>>;
@@ -255,6 +339,16 @@ export function createRetrievalApi(client: HttpClient): {
       );
 
       return parsed.incident;
+    },
+    async getIncidentContext(input) {
+      return await expectParsed(
+        client.request({
+          method: "GET",
+          path: `/v1/incidents/${input.incidentId}/context`,
+          bearerToken: input.bearerToken
+        }),
+        IncidentContextSchema
+      );
     },
     async resolveIncident(input) {
       const parsed = await expectParsed(

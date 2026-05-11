@@ -12,6 +12,7 @@ import { processCommand as defaultProcessCommand } from "./process-command.js";
 import { profileValidateCommand as defaultProfileValidateCommand } from "./profile-command.js";
 import {
   getBundleWithAuthCommand as defaultGetBundleCommand,
+  getIncidentContextWithAuthCommand as defaultGetIncidentContextCommand,
   getIncidentWithAuthCommand as defaultGetIncidentCommand,
   getLogsWithAuthCommand as defaultGetLogsCommand,
   getReproductionWithAuthCommand as defaultGetReproductionCommand,
@@ -46,6 +47,7 @@ export type CliDependencies = ManagementCommandDependencies & {
   verifyCloudCommand?: typeof defaultVerifyCloudCommand;
   whoamiCommand?: typeof defaultWhoamiCommand;
   listIncidentsCommand?: typeof defaultListIncidentsCommand;
+  getIncidentContextCommand?: typeof defaultGetIncidentContextCommand;
   getIncidentCommand?: typeof defaultGetIncidentCommand;
   resolveIncidentCommand?: typeof defaultResolveIncidentCommand;
   reopenIncidentCommand?: typeof defaultReopenIncidentCommand;
@@ -400,6 +402,19 @@ export async function runCli(argv: string[], dependencies: CliDependencies = {})
         input.source = source;
       }
       return await (dependencies.getIncidentCommand ?? defaultGetIncidentCommand)(input);
+    }
+
+    if (command === "explain") {
+      expectNoUnknownOptions(parsedArgv, ["auth-file", "json", "source"]);
+      ensureNoExtraPositionals(parsedArgv, 2);
+      const input = appendCommonAuthOptions(parsedArgv, {
+        incidentId: requirePositional(parsedArgv, 1, "incident-id")
+      } as { incidentId: string; authFilePath?: string; json?: boolean; source?: "local" | "cloud" });
+      const source = readRetrievalSource(parsedArgv);
+      if (source !== undefined) {
+        input.source = source;
+      }
+      return await (dependencies.getIncidentContextCommand ?? defaultGetIncidentContextCommand)(input);
     }
 
     if (command === "resolve") {

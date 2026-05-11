@@ -15,6 +15,7 @@ describe("mcp retrieval tools auth and error handling", () => {
       const tools = createRetrievalMcpTools({
         listIncidents: vi.fn(),
         getIncident: vi.fn(),
+        getIncidentContext: vi.fn(),
         resolveIncident: vi.fn(),
         reopenIncident: vi.fn(),
         getBundle: vi.fn(),
@@ -38,6 +39,7 @@ describe("mcp retrieval tools auth and error handling", () => {
       const tools = createRetrievalMcpTools({
         listIncidents: vi.fn(),
         getIncident: vi.fn(),
+        getIncidentContext: vi.fn(),
         resolveIncident: vi.fn(),
         reopenIncident: vi.fn(),
         getBundle: vi.fn(),
@@ -87,6 +89,7 @@ describe("mcp retrieval tools auth and error handling", () => {
       const tools = createRetrievalMcpTools({
         listIncidents,
         getIncident: vi.fn(),
+        getIncidentContext: vi.fn(),
         resolveIncident: vi.fn(),
         reopenIncident: vi.fn(),
         getBundle: vi.fn(),
@@ -140,6 +143,7 @@ describe("mcp retrieval tools auth and error handling", () => {
       const tools = createRetrievalMcpTools({
         listIncidents: vi.fn(),
         getIncident: vi.fn(),
+        getIncidentContext: vi.fn(),
         resolveIncident: vi.fn(),
         reopenIncident: vi.fn(),
         getBundle: vi.fn(),
@@ -180,6 +184,7 @@ describe("mcp retrieval tools auth and error handling", () => {
       const tools = createRetrievalMcpTools({
         listIncidents: vi.fn(),
         getIncident: vi.fn(),
+        getIncidentContext: vi.fn(),
         resolveIncident: vi.fn(),
         reopenIncident,
         getBundle: vi.fn(),

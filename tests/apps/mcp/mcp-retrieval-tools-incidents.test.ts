@@ -21,6 +21,63 @@ describe("mcp retrieval tools incidents", () => {
           matched_policy: "5xx request failures bypass capture_request_events suppression"
         }
       }),
+      getIncidentContext: vi.fn().mockResolvedValue({
+        incident: {
+          incident_id: "inc_123",
+          fingerprint: "fp_123",
+          fingerprint_version: "v1",
+          matched_fields: ["route_template"]
+        },
+        incident_reason: {
+          kind: "request_failure_5xx",
+          description: "request_event matched the 5xx request incident rule",
+          event_type: "request_event",
+          event_class: "incident_signal",
+          matched_policy: "5xx request failures bypass capture_request_events suppression"
+        },
+        primary_signal: {
+          kind: "request_failure_5xx",
+          event_type: "request_event",
+          event_class: "incident_signal",
+          description: "request_event matched the 5xx request incident rule",
+          severity: "high",
+          service_name: "checkout-api",
+          environment: "production",
+          error_type: null,
+          error_message: null,
+          request_method: "POST",
+          request_path: "/checkout",
+          route_template: "/checkout",
+          response_status: 503,
+          first_application_frame: null
+        },
+        bundle: {
+          status: "ready"
+        },
+        reproduction: {
+          status: "pending"
+        },
+        logs: {
+          source: "retrieval",
+          items: [],
+          next_cursor: null
+        },
+        deploy: {
+          latest_deployment_id: null,
+          commit_sha: null,
+          deploy_version: null,
+          branch: null,
+          deployed_at: null,
+          regression_window: null
+        },
+        grouping: {
+          fingerprint: "fp_123",
+          fingerprint_version: "v1",
+          matched_fields: ["route_template"]
+        },
+        redaction: null,
+        suggested_next_checks: []
+      }),
       resolveIncident: vi.fn().mockResolvedValue({ incident_id: "inc_123", status: "resolved" }),
       reopenIncident: vi.fn(),
       getBundle: vi.fn().mockResolvedValue({ bundle_version: 1 }),
@@ -69,6 +126,19 @@ describe("mcp retrieval tools incidents", () => {
         source: "cloud"
       }
     });
+    await expect(
+      tools.get_incident_context({ bearerToken: "dbundle_mem_x", source: "cloud", incidentId: "inc_123" })
+    ).resolves.toEqual(
+      expect.objectContaining({
+        incident: expect.objectContaining({
+          incident_id: "inc_123",
+          source: "cloud"
+        }),
+        primary_signal: expect.objectContaining({
+          response_status: 503
+        })
+      })
+    );
   });
 
   it("returns incident payload for resolve_incident", async () => {
@@ -81,6 +151,49 @@ describe("mcp retrieval tools incidents", () => {
     const tools = createRetrievalMcpTools({
       listIncidents: vi.fn().mockResolvedValue({ incidents: [], next_cursor: null }),
       getIncident: vi.fn().mockResolvedValue({ incident_id: "inc_123" }),
+      getIncidentContext: vi.fn().mockResolvedValue({
+        incident: {
+          incident_id: "inc_123",
+          fingerprint: "fp_123",
+          fingerprint_version: "v1",
+          matched_fields: []
+        },
+        incident_reason: null,
+        primary_signal: {
+          kind: null,
+          event_type: "backend_exception",
+          event_class: "incident_signal",
+          description: "Primary signal for incident inc_123",
+          severity: "high",
+          service_name: null,
+          environment: "production",
+          error_type: null,
+          error_message: null,
+          request_method: null,
+          request_path: null,
+          route_template: null,
+          response_status: null,
+          first_application_frame: null
+        },
+        bundle: { status: "pending" },
+        reproduction: { status: "pending" },
+        logs: { source: "none", items: [], next_cursor: null },
+        deploy: {
+          latest_deployment_id: null,
+          commit_sha: null,
+          deploy_version: null,
+          branch: null,
+          deployed_at: null,
+          regression_window: null
+        },
+        grouping: {
+          fingerprint: "fp_123",
+          fingerprint_version: "v1",
+          matched_fields: []
+        },
+        redaction: null,
+        suggested_next_checks: []
+      }),
       resolveIncident,
       reopenIncident: vi.fn(),
       getBundle: vi.fn().mockResolvedValue({ bundle_version: 1 }),

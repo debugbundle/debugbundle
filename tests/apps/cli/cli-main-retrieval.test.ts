@@ -86,8 +86,9 @@ describe("cli main retrieval routing", () => {
     expect(servicesResult.exitCode).toBe(0);
   });
 
-  it("routes inspect, reproduce, logs, and whoami commands", async () => {
+  it("routes inspect, explain, reproduce, logs, and whoami commands", async () => {
     const getIncidentCommand = vi.fn().mockResolvedValue({ exitCode: 0, output: "incident" });
+    const getIncidentContextCommand = vi.fn().mockResolvedValue({ exitCode: 0, output: "context" });
     const resolveIncidentCommand = vi.fn().mockResolvedValue({ exitCode: 0, output: "resolved" });
     const reopenIncidentCommand = vi.fn().mockResolvedValue({ exitCode: 0, output: "reopened" });
     const getReproductionCommand = vi.fn().mockResolvedValue({ exitCode: 0, output: "reproduction" });
@@ -104,6 +105,18 @@ describe("cli main retrieval routing", () => {
       "--json"
     ], {
       getIncidentCommand
+    });
+
+    const explainResult = await runCli([
+      "explain",
+      "inc_123",
+      "--source",
+      "cloud",
+      "--auth-file",
+      "/tmp/auth.json",
+      "--json"
+    ], {
+      getIncidentContextCommand
     });
 
     const resolveResult = await runCli([
@@ -165,6 +178,12 @@ describe("cli main retrieval routing", () => {
       authFilePath: "/tmp/auth.json",
       json: true
     });
+    expect(getIncidentContextCommand).toHaveBeenCalledWith({
+      incidentId: "inc_123",
+      source: "cloud",
+      authFilePath: "/tmp/auth.json",
+      json: true
+    });
     expect(resolveIncidentCommand).toHaveBeenCalledWith({
       incidentId: "inc_123",
       source: "local",
@@ -193,6 +212,7 @@ describe("cli main retrieval routing", () => {
       json: true
     });
     expect(inspectResult.exitCode).toBe(0);
+    expect(explainResult.exitCode).toBe(0);
     expect(resolveResult.exitCode).toBe(0);
     expect(reopenResult.exitCode).toBe(0);
     expect(reproduceResult.exitCode).toBe(0);

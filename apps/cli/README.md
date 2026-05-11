@@ -23,6 +23,7 @@ debugbundle verify local
 debugbundle verify cloud --project-id <id> --trigger-5xx
 debugbundle process
 debugbundle incidents
+debugbundle explain <incident-id> --source cloud
 ```
 
 ## Configuration

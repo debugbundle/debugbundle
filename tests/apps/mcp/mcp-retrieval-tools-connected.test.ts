@@ -40,6 +40,7 @@ describe("mcp retrieval tools connected mode", () => {
       const tools = createRetrievalMcpTools({
         listIncidents,
         getIncident: vi.fn(),
+        getIncidentContext: vi.fn(),
         resolveIncident: vi.fn(),
         reopenIncident: vi.fn(),
         getBundle: vi.fn(),
@@ -91,6 +92,57 @@ describe("mcp retrieval tools connected mode", () => {
       regressed_at: null,
       matched_fields: ["message"]
     });
+    const getIncidentContext = vi.fn().mockResolvedValue({
+      incident: {
+        incident_id: "inc_cloud_prod",
+        fingerprint: "fp_cloud",
+        fingerprint_version: "1",
+        matched_fields: ["message"]
+      },
+      incident_reason: null,
+      primary_signal: {
+        kind: null,
+        event_type: "backend_exception",
+        event_class: "incident_signal",
+        description: "Primary signal for incident inc_cloud_prod",
+        severity: "critical",
+        service_name: "checkout-api",
+        environment: "production",
+        error_type: "TypeError",
+        error_message: "boom",
+        request_method: null,
+        request_path: null,
+        route_template: null,
+        response_status: null,
+        first_application_frame: null
+      },
+      bundle: {
+        status: "pending"
+      },
+      reproduction: {
+        status: "pending"
+      },
+      logs: {
+        source: "none",
+        items: [],
+        next_cursor: null
+      },
+      deploy: {
+        latest_deployment_id: null,
+        commit_sha: null,
+        deploy_version: null,
+        branch: null,
+        deployed_at: null,
+        regression_window: null
+      },
+      grouping: {
+        fingerprint: "fp_cloud",
+        fingerprint_version: "1",
+        matched_fields: ["message"]
+      },
+      redaction: null,
+      suggested_next_checks: []
+    });
 
     const cwdSpy = vi.spyOn(process, "cwd").mockReturnValue(rootDirectory);
 
@@ -99,6 +151,7 @@ describe("mcp retrieval tools connected mode", () => {
       const tools = createRetrievalMcpTools({
         listIncidents: vi.fn().mockResolvedValue({ incidents: [], next_cursor: null }),
         getIncident,
+        getIncidentContext,
         resolveIncident: vi.fn(),
         reopenIncident: vi.fn(),
         getBundle: vi.fn(),
@@ -120,8 +173,35 @@ describe("mcp retrieval tools connected mode", () => {
         })
       });
 
+      await expect(
+        tools.get_incident_context({ bearerToken: "dbundle_mem_x", incidentId: openIncident.incidentId })
+      ).resolves.toEqual(
+        expect.objectContaining({
+          incident: expect.objectContaining({
+            incident_id: openIncident.incidentId,
+            source: "local"
+          })
+        })
+      );
+
+      await expect(
+        tools.get_incident_context({ bearerToken: "dbundle_mem_x", incidentId: "inc_cloud_prod" })
+      ).resolves.toEqual(
+        expect.objectContaining({
+          incident: expect.objectContaining({
+            incident_id: "inc_cloud_prod",
+            source: "cloud"
+          })
+        })
+      );
+
       expect(getIncident).toHaveBeenCalledTimes(1);
       expect(getIncident).toHaveBeenCalledWith({
+        bearerToken: "dbundle_mem_x",
+        incidentId: "inc_cloud_prod"
+      });
+      expect(getIncidentContext).toHaveBeenCalledTimes(1);
+      expect(getIncidentContext).toHaveBeenCalledWith({
         bearerToken: "dbundle_mem_x",
         incidentId: "inc_cloud_prod"
       });

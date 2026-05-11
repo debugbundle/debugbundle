@@ -1,10 +1,12 @@
 import { RetrievalApiError } from "../../../packages/retrieval-client/src/index.js";
+import { buildIncidentContextRecord } from "../../../packages/storage/src/index.js";
 import {
   cacheCloudBundleArtifact,
   cacheCloudReproductionArtifact,
   syncCloudIncidentCacheStatus
 } from "../../cli/src/cloud-artifact-cache.js";
 import {
+  attachSourceToIncidentContext,
   attachSourceToRecord,
   isNotFoundRetrievalError,
   paginateIncidents,
@@ -20,7 +22,16 @@ import {
   resolveLocalIncident
 } from "../../cli/src/local-retrieval-store.js";
 
-export const RETRIEVAL_MCP_TOOL_NAMES = ["list_incidents", "get_incident", "resolve_incident", "reopen_incident", "get_bundle", "get_reproduction", "get_logs"] as const;
+export const RETRIEVAL_MCP_TOOL_NAMES = [
+  "list_incidents",
+  "get_incident",
+  "get_incident_context",
+  "resolve_incident",
+  "reopen_incident",
+  "get_bundle",
+  "get_reproduction",
+  "get_logs"
+] as const;
 
 function mapMcpError(error: unknown): never {
   if (error instanceof RetrievalApiError) {
@@ -159,6 +170,56 @@ async function listAllCloudIncidents(
   }
 }
 
+async function readLocalIncidentContext(input: { incidentId: string }): Promise<Record<string, unknown>> {
+  const incident = await getLocalIncident({
+    incidentId: input.incidentId
+  });
+
+  let bundle: {
+    status: "ready" | "pending" | "failed";
+    body?: unknown;
+    reason?: string | null;
+  };
+  try {
+    bundle = {
+      status: "ready",
+      body: await getLocalBundle({
+        incidentId: input.incidentId
+      })
+    };
+  } catch (error) {
+    bundle = {
+      status: "failed",
+      reason: error instanceof Error ? error.message : String(error)
+    };
+  }
+
+  let reproduction: {
+    status: "ready" | "pending" | "failed";
+    body?: unknown;
+    reason?: string | null;
+  };
+  try {
+    reproduction = {
+      status: "ready",
+      body: await getLocalReproduction({
+        incidentId: input.incidentId
+      })
+    };
+  } catch (error) {
+    reproduction = {
+      status: "failed",
+      reason: error instanceof Error ? error.message : String(error)
+    };
+  }
+
+  return buildIncidentContextRecord({
+    incident,
+    bundle,
+    reproduction
+  }) as Record<string, unknown>;
+}
+
 export function createRetrievalMcpTools(api: {
   listIncidents(input: {
     bearerToken: string;
@@ -171,6 +232,7 @@ export function createRetrievalMcpTools(api: {
     limit?: number;
   }): Promise<{ incidents: unknown[]; next_cursor: string | null }>;
   getIncident(input: { bearerToken: string; incidentId: string }): Promise<unknown>;
+  getIncidentContext(input: { bearerToken: string; incidentId: string }): Promise<unknown>;
   resolveIncident(input: { bearerToken: string; incidentId: string }): Promise<unknown>;
   reopenIncident(input: { bearerToken: string; incidentId: string }): Promise<unknown>;
   getBundle(input: { bearerToken: string; incidentId: string }): Promise<unknown>;
@@ -294,6 +356,39 @@ export function createRetrievalMcpTools(api: {
             "cloud"
           )
         };
+      } catch (error) {
+        mapMcpError(error);
+      }
+    },
+    async get_incident_context(input) {
+      try {
+        if (await shouldUseLocalSource(input)) {
+          return await readLocalIncidentContext({
+            incidentId: String(input["incidentId"])
+          });
+        }
+
+        if (await shouldCombineLocalAndCloudSource(input)) {
+          try {
+            return await readLocalIncidentContext({
+              incidentId: String(input["incidentId"])
+            });
+          } catch (error) {
+            if (!isNotFoundRetrievalError(error)) {
+              throw error;
+            }
+          }
+        }
+
+        return attachSourceToIncidentContext(
+          (await api.getIncidentContext({
+            bearerToken: await requireCloudBearerToken(input),
+            incidentId: String(input["incidentId"])
+          })) as {
+            incident: Record<string, unknown>;
+          } & Record<string, unknown>,
+          "cloud"
+        );
       } catch (error) {
         mapMcpError(error);
       }

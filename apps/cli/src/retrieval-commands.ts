@@ -1,5 +1,10 @@
 import { RetrievalApiError } from "../../../packages/retrieval-client/src/index.js";
-import type { IncidentReason } from "../../../packages/storage/src/index.js";
+import {
+  buildIncidentContextRecord,
+  type IncidentContextArtifactRecord,
+  type IncidentContextRecord,
+  type IncidentReason
+} from "../../../packages/storage/src/index.js";
 import {
   createAuthenticatedRetrievalApi,
   mapCliAuthErrorToResult,
@@ -22,6 +27,7 @@ import {
   type LocalRetrievalStoreDependencies
 } from "./local-retrieval-store.js";
 import {
+  attachSourceToIncidentContext,
   attachSourceToRecord,
   isNotFoundRetrievalError,
   paginateIncidents,
@@ -106,6 +112,56 @@ function formatIncidentDetail(incident: IncidentLike): string {
 
 function formatObjectOutput(payload: unknown): string {
   return JSON.stringify(payload, null, 2);
+}
+
+function formatIncidentContextDetail(context: IncidentContextRecord): string {
+  const incidentSource = context.incident["source"];
+  const lines = [
+    `Incident: ${context.incident.incident_id}`,
+    ...(typeof incidentSource === "string" ? [`Source: ${incidentSource}`] : []),
+    `Title: ${context.incident.title}`,
+    `Severity: ${context.incident.severity}`,
+    `Status: ${context.incident.status}`,
+    `Reason: ${context.incident_reason?.kind ?? "unknown"}`,
+    `Why: ${context.primary_signal.description}`,
+    `Primary signal: ${context.primary_signal.event_type ?? "unknown"}`,
+    `Bundle: ${context.bundle.status}`,
+    `Reproduction: ${context.reproduction.status}`,
+    `Logs: ${context.logs.source} (${context.logs.items.length})`,
+    `Fingerprint: ${context.grouping.fingerprint}`,
+    `Matched fields: ${context.grouping.matched_fields.join(", ")}`
+  ];
+
+  if (context.primary_signal.request_method !== null || context.primary_signal.response_status !== null) {
+    lines.push(
+      `Request: ${context.primary_signal.request_method ?? "unknown"} ${context.primary_signal.route_template ?? context.primary_signal.request_path ?? "unknown"}`
+    );
+    lines.push(`Response status: ${context.primary_signal.response_status ?? "unknown"}`);
+  }
+
+  if (context.primary_signal.error_type !== null) {
+    lines.push(`Error type: ${context.primary_signal.error_type}`);
+  }
+  if (context.primary_signal.error_message !== null) {
+    lines.push(`Error message: ${context.primary_signal.error_message}`);
+  }
+  if (context.deploy.commit_sha !== null || context.deploy.deploy_version !== null) {
+    lines.push(
+      `Deploy: ${context.deploy.deploy_version ?? "unknown"} (${context.deploy.commit_sha ?? "unknown"})`
+    );
+  }
+  if (context.redaction !== null) {
+    lines.push(`Redaction: ${context.redaction.redacted ? "redacted" : "not_redacted"}`);
+    if (context.redaction.fields.length > 0) {
+      lines.push(`Redacted fields: ${context.redaction.fields.join(", ")}`);
+    }
+  }
+  if (context.suggested_next_checks.length > 0) {
+    lines.push("Suggested next checks:");
+    lines.push(...context.suggested_next_checks.map((item) => `- ${item}`));
+  }
+
+  return lines.join("\n");
 }
 
 function formatLogsTable(logs: LogLike[]): string {
@@ -498,6 +554,117 @@ export async function getIncidentCommand(
   } catch (error) {
     return { exitCode: mapErrorToExitCode(error), output: error instanceof Error ? error.message : String(error) };
   }
+}
+
+async function readLocalIncidentContext(
+  input: { incidentId: string },
+  dependencies?: AuthenticatedRetrievalDependencies
+): Promise<IncidentContextRecord> {
+  const incident = await getLocalIncident({ incidentId: input.incidentId }, dependencies);
+
+  let bundle: IncidentContextArtifactRecord;
+  try {
+    bundle = {
+      status: "ready",
+      body: await getLocalBundle({ incidentId: input.incidentId }, dependencies)
+    };
+  } catch (error) {
+    bundle = {
+      status: "failed",
+      reason: error instanceof Error ? error.message : String(error)
+    };
+  }
+
+  let reproduction: IncidentContextArtifactRecord;
+  try {
+    reproduction = {
+      status: "ready",
+      body: await getLocalReproduction({ incidentId: input.incidentId }, dependencies)
+    };
+  } catch (error) {
+    reproduction = {
+      status: "failed",
+      reason: error instanceof Error ? error.message : String(error)
+    };
+  }
+
+  return buildIncidentContextRecord({
+    incident,
+    bundle,
+    reproduction
+  });
+}
+
+export async function getIncidentContextCommand(
+  input: { bearerToken: string; incidentId: string; json?: boolean },
+  api: { getIncidentContext(input: { bearerToken: string; incidentId: string }): Promise<IncidentContextRecord> }
+): Promise<CliCommandResult> {
+  try {
+    const context = await api.getIncidentContext({
+      bearerToken: input.bearerToken,
+      incidentId: input.incidentId
+    });
+
+    return {
+      exitCode: 0,
+      output: input.json ? JSON.stringify(context) : formatIncidentContextDetail(context)
+    };
+  } catch (error) {
+    return { exitCode: mapErrorToExitCode(error), output: error instanceof Error ? error.message : String(error) };
+  }
+}
+
+export async function getIncidentContextWithAuthCommand(
+  input: { authFilePath?: string; incidentId: string; source?: RetrievalSource; json?: boolean },
+  dependencies?: AuthenticatedRetrievalDependencies
+): Promise<CliCommandResult> {
+  if (await shouldUseLocalRetrieval(input.source, dependencies)) {
+    try {
+      const context = await readLocalIncidentContext({ incidentId: input.incidentId }, dependencies);
+      return {
+        exitCode: 0,
+        output: input.json ? JSON.stringify(context) : formatIncidentContextDetail(context)
+      };
+    } catch (error) {
+      return mapErrorToResult(error);
+    }
+  }
+
+  if (await shouldCombineLocalAndCloudRetrieval(input.source, dependencies)) {
+    try {
+      const context = await readLocalIncidentContext({ incidentId: input.incidentId }, dependencies);
+      return {
+        exitCode: 0,
+        output: input.json ? JSON.stringify(context) : formatIncidentContextDetail(context)
+      };
+    } catch (error) {
+      if (!isNotFoundRetrievalError(error)) {
+        return mapErrorToResult(error);
+      }
+    }
+  }
+
+  return runAuthenticatedCliCommand(input, {
+    createApi: createAuthenticatedRetrievalApi,
+    dependencies,
+    runCommand: (authState, api) =>
+      getIncidentContextCommand(
+        {
+          bearerToken: authState.bearer_token,
+          incidentId: input.incidentId,
+          ...(input.json === undefined ? {} : { json: input.json })
+        },
+        {
+          getIncidentContext: async (requestInput) =>
+            attachSourceToIncidentContext(
+              (await api.getIncidentContext(requestInput)) as IncidentContextRecord & {
+                incident: Record<string, unknown>;
+              },
+              "cloud"
+            ) as IncidentContextRecord
+        }
+      )
+  });
 }
 
 export async function getIncidentWithAuthCommand(

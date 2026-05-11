@@ -30,7 +30,7 @@ debugbundle-mcp
 }
 ```
 
-The server uses stdio transport and exposes the same DebugBundle incident, bundle, webhook, alert, token, project, member, billing, GitHub, probe, and diagnostic tools documented at https://debugbundle.com/docs/mcp. Hosted verification supports the active V1 proof path through `verify_cloud` with `trigger5xx: true`.
+The server uses stdio transport and exposes the same DebugBundle incident, incident-context, bundle, webhook, alert, token, project, member, billing, GitHub, probe, and diagnostic tools documented at https://debugbundle.com/docs/mcp. Hosted verification supports the active V1 proof path through `verify_cloud` with `trigger5xx: true`, and incident triage can start with the one-call `get_incident_context` tool.
 
 ## Authentication
 

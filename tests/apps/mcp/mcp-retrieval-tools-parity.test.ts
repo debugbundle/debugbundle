@@ -7,6 +7,7 @@ describe("mcp retrieval tools parity", () => {
     expect(RETRIEVAL_MCP_TOOL_NAMES).toEqual([
       "list_incidents",
       "get_incident",
+      "get_incident_context",
       "resolve_incident",
       "reopen_incident",
       "get_bundle",

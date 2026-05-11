@@ -28,6 +28,17 @@ export function attachSourceToPayload<T>(payload: T, source: RetrievalSource): T
   } as T;
 }
 
+export function attachSourceToIncidentContext<
+  T extends {
+    incident: Record<string, unknown>;
+  }
+>(payload: T, source: RetrievalSource): T & { incident: T["incident"] & { source: RetrievalSource } } {
+  return {
+    ...payload,
+    incident: attachSourceToRecord(payload.incident, source)
+  };
+}
+
 export function sortIncidentsDescending<T extends CursorIncidentLike>(incidents: T[]): T[] {
   return [...incidents].sort((left, right) => {
     const bySeenAt = right.last_seen_at.localeCompare(left.last_seen_at);

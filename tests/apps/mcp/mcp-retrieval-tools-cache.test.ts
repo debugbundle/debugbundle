@@ -25,6 +25,7 @@ describe("mcp retrieval tools cloud cache", () => {
       const tools = createRetrievalMcpTools({
         listIncidents: vi.fn().mockResolvedValue({ incidents: [], next_cursor: null }),
         getIncident: vi.fn(),
+        getIncidentContext: vi.fn(),
         resolveIncident: vi.fn(),
         reopenIncident: vi.fn(),
         getBundle,
@@ -104,6 +105,7 @@ describe("mcp retrieval tools cloud cache", () => {
       const tools = createRetrievalMcpTools({
         listIncidents: vi.fn().mockResolvedValue({ incidents: [], next_cursor: null }),
         getIncident: vi.fn(),
+        getIncidentContext: vi.fn(),
         resolveIncident: vi.fn().mockResolvedValue({
           incident_id: "inc_cloud_prod",
           status: "resolved",
@@ -173,6 +175,7 @@ describe("mcp retrieval tools cloud cache", () => {
       const tools = createRetrievalMcpTools({
         listIncidents: vi.fn().mockResolvedValue({ incidents: [], next_cursor: null }),
         getIncident: vi.fn(),
+        getIncidentContext: vi.fn(),
         resolveIncident: vi.fn(),
         reopenIncident: vi.fn(),
         getBundle: vi.fn().mockResolvedValue({ bundle_version: 1, incident_id: "inc_cloud_prod", status: "ready" }),

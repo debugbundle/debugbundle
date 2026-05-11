@@ -152,6 +152,12 @@ export const MCP_TOOL_CATALOG = [
     inputSchema: incidentLookupInputSchema,
   },
   {
+    name: 'get_incident_context',
+    group: 'retrieval',
+    description: 'Fetch deterministic one-call incident context for explanation and triage.',
+    inputSchema: incidentLookupInputSchema,
+  },
+  {
     name: 'resolve_incident',
     group: 'retrieval',
     description: 'Resolve an incident by incident id.',

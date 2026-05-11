@@ -147,6 +147,113 @@ describe("retrieval api client", () => {
     });
   });
 
+  it("calls incident context route", async () => {
+    const request = vi.fn<HttpClient["request"]>().mockResolvedValue({
+      status: 200,
+      body: {
+        incident: {
+          incident_id: "inc_123",
+          project_id: "proj_123",
+          project_name: "Main App",
+          service_id: "svc_123",
+          service_name: "checkout-api",
+          latest_deployment_id: "dep_123",
+          environment: "production",
+          fingerprint: "fp_123",
+          fingerprint_version: "v1",
+          title: "Checkout 5xx",
+          severity: "high",
+          status: "open",
+          first_seen_at: "2026-03-11T00:00:00.000Z",
+          last_seen_at: "2026-03-11T00:10:00.000Z",
+          occurrence_count: 3,
+          spike_detected_at: null,
+          resolved_at: null,
+          regressed_at: null,
+          matched_fields: ["route_template"],
+          incident_reason: {
+            kind: "request_failure_5xx",
+            description: "request_event matched the 5xx request incident rule",
+            event_type: "request_event",
+            event_class: "incident_signal",
+            matched_policy: "5xx request failures bypass capture_request_events suppression"
+          }
+        },
+        incident_reason: {
+          kind: "request_failure_5xx",
+          description: "request_event matched the 5xx request incident rule",
+          event_type: "request_event",
+          event_class: "incident_signal",
+          matched_policy: "5xx request failures bypass capture_request_events suppression"
+        },
+        primary_signal: {
+          kind: "request_failure_5xx",
+          event_type: "request_event",
+          event_class: "incident_signal",
+          description: "request_event matched the 5xx request incident rule",
+          severity: "high",
+          service_name: "checkout-api",
+          environment: "production",
+          error_type: null,
+          error_message: null,
+          request_method: "POST",
+          request_path: "/checkout",
+          route_template: "/checkout",
+          response_status: 503,
+          first_application_frame: {
+            file: "src/routes/checkout.ts",
+            line: 41,
+            function: "handleCheckout"
+          }
+        },
+        bundle: {
+          status: "ready",
+          body: {
+            bundle_version: 1
+          }
+        },
+        reproduction: {
+          status: "pending"
+        },
+        logs: {
+          source: "retrieval",
+          items: [],
+          next_cursor: null
+        },
+        deploy: {
+          latest_deployment_id: "dep_123",
+          commit_sha: "abc123",
+          deploy_version: "2026.03.11.1",
+          branch: "main",
+          deployed_at: "2026-03-11T00:00:00.000Z",
+          regression_window: true
+        },
+        grouping: {
+          fingerprint: "fp_123",
+          fingerprint_version: "v1",
+          matched_fields: ["route_template"]
+        },
+        redaction: {
+          redacted: true,
+          fields: ["request.headers.authorization"],
+          notes: "sensitive headers removed"
+        },
+        suggested_next_checks: ["Inspect the POST /checkout handler behind this 5xx path."]
+      }
+    });
+
+    const api = createRetrievalApi({ request });
+    const context = await api.getIncidentContext({ bearerToken: "dbundle_mem_x", incidentId: "inc_123" });
+
+    expect(context.primary_signal.response_status).toBe(503);
+    expect(context.grouping.matched_fields).toEqual(["route_template"]);
+    expect(request).toHaveBeenCalledWith({
+      method: "GET",
+      path: "/v1/incidents/inc_123/context",
+      bearerToken: "dbundle_mem_x"
+    });
+  });
+
   it("calls incident resolve route", async () => {
     const request = vi.fn<HttpClient["request"]>().mockResolvedValue({
       status: 200,

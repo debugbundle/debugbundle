@@ -105,6 +105,214 @@ function createServer(overrides: { authRateLimiter?: Partial<AuthRateLimiterDepe
 }
 
 describe("api retrieval routes", () => {
+  it("should return deterministic one-call incident context", async (): Promise<void> => {
+    const projectId = "550e8400-e29b-41d4-a716-446655440000";
+    const incidentRecord = {
+      incident_id: "inc_123",
+      project_id: projectId,
+      project_name: "Main App",
+      service_id: "svc_123",
+      service_name: "checkout-api",
+      latest_deployment_id: "dep_123",
+      environment: "production",
+      fingerprint: "fp_123",
+      fingerprint_version: "v1",
+      title: "Checkout 5xx",
+      severity: "high" as const,
+      status: "open" as const,
+      first_seen_at: "2026-03-11T00:00:00.000Z",
+      last_seen_at: "2026-03-11T00:10:00.000Z",
+      occurrence_count: 3,
+      spike_detected_at: null,
+      resolved_at: null,
+      regressed_at: null,
+      matched_fields: ["route_template"],
+      incident_reason: {
+        kind: "request_failure_5xx" as const,
+        description: "request_event matched the 5xx request incident rule",
+        event_type: "request_event" as const,
+        event_class: "incident_signal" as const,
+        matched_policy: "5xx request failures bypass capture_request_events suppression"
+      }
+    };
+
+    const app = createApiServer({
+      ingestionPersistence: {
+        persistAndEnqueue: vi.fn()
+      },
+      ingestionMetadata: {
+        resolveProjectByTokenHash: vi.fn()
+      },
+      memberAuth: {
+        resolveMemberByTokenHash: vi.fn().mockResolvedValue({ member_id: "mem_123", organization_id: "org_123" })
+      },
+      tokenManagement: createTokenManagementDependency(),
+      incidentRetrieval: {
+        listIncidentsForOrganization: vi.fn().mockResolvedValue([]),
+        getIncidentForOrganization: vi.fn().mockResolvedValue(incidentRecord),
+        listIncidentLogsForOrganization: vi.fn().mockResolvedValue([
+          {
+            event_id: "evt_123",
+            event_type: "log_event",
+            occurred_at: "2026-03-11T00:10:00.000Z",
+            is_sampled: true,
+            level: "error"
+          }
+        ]),
+        listServicesForOrganization: vi.fn().mockResolvedValue([])
+      },
+      objectStoreReader: {
+        getObject: vi
+          .fn()
+          .mockResolvedValueOnce(
+            gzipSync(
+              Buffer.from(
+                JSON.stringify({
+                  bundle_version: 1,
+                  summary: {
+                    primary_signal: "request_event",
+                    error_type: "UpstreamTimeout",
+                    error_message: "checkout upstream timed out",
+                    first_application_frame: {
+                      file: "src/routes/checkout.ts",
+                      line: 41,
+                      function: "handleCheckout"
+                    }
+                  },
+                  signal: {
+                    severity: "high"
+                  },
+                  context: {
+                    request: {
+                      method: "POST",
+                      path: "/checkout",
+                      route_template: "/checkout"
+                    },
+                    response: {
+                      status_code: 503
+                    },
+                    deploy: {
+                      commit_sha: "abc123",
+                      deploy_version: "2026.03.11.1",
+                      branch: "main",
+                      deployed_at: "2026-03-11T00:00:00.000Z",
+                      regression_window: true
+                    }
+                  },
+                  redaction: {
+                    redacted: true,
+                    fields: ["request.headers.authorization"],
+                    notes: "sensitive headers removed"
+                  }
+                }),
+                "utf8"
+              )
+            )
+          )
+          .mockResolvedValueOnce(
+            gzipSync(
+              Buffer.from(
+                JSON.stringify({
+                  possible: true,
+                  confidence: 0.8,
+                  reason: "request_context_available"
+                }),
+                "utf8"
+              )
+            )
+          )
+      },
+      webhookDelivery: {
+        listDeliveriesForWebhookInOrganization: vi.fn().mockResolvedValue({ deliveries: [] }),
+        retryDeliveryForOrganization: vi.fn().mockResolvedValue(null)
+      }
+    });
+
+    const response = await app.inject({
+      method: "GET",
+      url: "/v1/incidents/inc_123/context",
+      headers: {
+        authorization: "Bearer dbundle_mem_test"
+      }
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toEqual({
+      incident: incidentRecord,
+      incident_reason: incidentRecord.incident_reason,
+      primary_signal: {
+        kind: "request_failure_5xx",
+        event_type: "request_event",
+        event_class: "incident_signal",
+        description: "request_event matched the 5xx request incident rule",
+        severity: "high",
+        service_name: "checkout-api",
+        environment: "production",
+        error_type: "UpstreamTimeout",
+        error_message: "checkout upstream timed out",
+        request_method: "POST",
+        request_path: "/checkout",
+        route_template: "/checkout",
+        response_status: 503,
+        first_application_frame: {
+          file: "src/routes/checkout.ts",
+          line: 41,
+          function: "handleCheckout"
+        }
+      },
+      bundle: {
+        status: "ready",
+        body: expect.objectContaining({
+          bundle_version: 1
+        })
+      },
+      reproduction: {
+        status: "ready",
+        body: {
+          possible: true,
+          confidence: 0.8,
+          reason: "request_context_available"
+        }
+      },
+      logs: {
+        source: "retrieval",
+        items: [
+          {
+            event_id: "evt_123",
+            event_type: "log_event",
+            occurred_at: "2026-03-11T00:10:00.000Z",
+            is_sampled: true,
+            level: "error"
+          }
+        ],
+        next_cursor: null
+      },
+      deploy: {
+        latest_deployment_id: "dep_123",
+        commit_sha: "abc123",
+        deploy_version: "2026.03.11.1",
+        branch: "main",
+        deployed_at: "2026-03-11T00:00:00.000Z",
+        regression_window: true
+      },
+      grouping: {
+        fingerprint: "fp_123",
+        fingerprint_version: "v1",
+        matched_fields: ["route_template"]
+      },
+      redaction: {
+        redacted: true,
+        fields: ["request.headers.authorization"],
+        notes: "sensitive headers removed"
+      },
+      suggested_next_checks: [
+        "Inspect the POST /checkout handler behind this 5xx path.",
+        "Start with src/routes/checkout.ts:41 from the first application frame.",
+        "Compare this incident against the most recent deploy and recent regressions."
+      ]
+    });
+  });
+
   it("should reject services listing when member authorization header is missing", async (): Promise<void> => {
     const app = createServer();
 

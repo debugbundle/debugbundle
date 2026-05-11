@@ -1,7 +1,12 @@
 import { gunzipSync } from "node:zlib";
 import type { FastifyInstance } from "fastify";
 
-import { buildBundleObjectKey, buildReproductionObjectKey } from "../../../../packages/storage/src/index.js";
+import {
+  buildBundleObjectKey,
+  buildIncidentContextRecord,
+  buildReproductionObjectKey,
+  type IncidentContextArtifactRecord
+} from "../../../../packages/storage/src/index.js";
 import type { ApiDependencies } from "../api-types.js";
 import {
   isObjectNotFoundError,
@@ -10,6 +15,81 @@ import {
   requireRateLimitedMemberAuth
 } from "../api-helpers.js";
 import { IncidentParamsSchema, IncidentsQuerySchema, LogsQuerySchema } from "../schemas.js";
+
+async function readBundleArtifactForIncident(input: {
+  dependencies: ApiDependencies;
+  organizationId: string;
+  incidentId: string;
+  projectId: string;
+}): Promise<IncidentContextArtifactRecord> {
+  const key = buildBundleObjectKey(input.projectId, input.incidentId);
+
+  try {
+    const compressed = await input.dependencies.objectStoreReader.getObject({ key });
+    return {
+      status: "ready",
+      body: JSON.parse(gunzipSync(compressed).toString("utf8"))
+    };
+  } catch (error) {
+    if (isObjectNotFoundError(error)) {
+      const failureReason = await input.dependencies.incidentRetrieval.getBundleFailureReasonForOrganization?.({
+        organization_id: input.organizationId,
+        incident_id: input.incidentId
+      });
+
+      if (failureReason === "monthly_quota_exceeded") {
+        return {
+          status: "failed",
+          reason: failureReason
+        };
+      }
+
+      if (input.dependencies.bundleRegeneration !== undefined) {
+        await input.dependencies.bundleRegeneration.requestRegeneration({
+          organization_id: input.organizationId,
+          project_id: input.projectId,
+          incident_id: input.incidentId
+        });
+      }
+
+      return {
+        status: "pending"
+      };
+    }
+
+    return {
+      status: "failed",
+      reason: "bundle_artifact_unavailable"
+    };
+  }
+}
+
+async function readReproductionArtifactForIncident(input: {
+  dependencies: ApiDependencies;
+  incidentId: string;
+  projectId: string;
+}): Promise<IncidentContextArtifactRecord> {
+  const key = buildReproductionObjectKey(input.projectId, input.incidentId);
+
+  try {
+    const compressed = await input.dependencies.objectStoreReader.getObject({ key });
+    return {
+      status: "ready",
+      body: JSON.parse(gunzipSync(compressed).toString("utf8"))
+    };
+  } catch (error) {
+    if (isObjectNotFoundError(error)) {
+      return {
+        status: "pending"
+      };
+    }
+
+    return {
+      status: "failed",
+      reason: "reproduction_artifact_unavailable"
+    };
+  }
+}
 
 export function registerIncidentRoutes(app: FastifyInstance, dependencies: ApiDependencies): void {
   app.get("/v1/incidents", async (request, reply) => {
@@ -104,6 +184,62 @@ export function registerIncidentRoutes(app: FastifyInstance, dependencies: ApiDe
     return reply.status(200).send({
       incident
     });
+  });
+
+  app.get("/v1/incidents/:id/context", async (request, reply) => {
+    const member = await requireRateLimitedMemberAuth(request, reply, dependencies, "retrieval-read");
+    if (member === null) {
+      return;
+    }
+
+    const parsedParams = IncidentParamsSchema.safeParse(request.params);
+    if (!parsedParams.success) {
+      return reply.status(400).send({
+        error: "invalid_incident_id"
+      });
+    }
+
+    const incident = await dependencies.incidentRetrieval.getIncidentForOrganization({
+      organization_id: member.organization_id,
+      incident_id: parsedParams.data.id
+    });
+
+    if (incident === null) {
+      return reply.status(404).send({
+        error: "incident_not_found"
+      });
+    }
+
+    const [bundle, reproduction, logs] = await Promise.all([
+      readBundleArtifactForIncident({
+        dependencies,
+        organizationId: member.organization_id,
+        incidentId: incident.incident_id,
+        projectId: incident.project_id
+      }),
+      readReproductionArtifactForIncident({
+        dependencies,
+        incidentId: incident.incident_id,
+        projectId: incident.project_id
+      }),
+      dependencies.incidentRetrieval.listIncidentLogsForOrganization({
+        organization_id: member.organization_id,
+        incident_id: incident.incident_id,
+        limit: 20
+      })
+    ]);
+
+    return reply.status(200).send(
+      buildIncidentContextRecord({
+        incident,
+        bundle,
+        reproduction,
+        logs: {
+          logs,
+          next_cursor: null
+        }
+      })
+    );
   });
 
   app.post("/v1/incidents/:id/resolve", async (request, reply) => {

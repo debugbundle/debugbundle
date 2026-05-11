@@ -8,6 +8,8 @@ import {
   getBundleCommand,
   getBundleWithAuthCommand,
   getIncidentCommand,
+  getIncidentContextCommand,
+  getIncidentContextWithAuthCommand,
   getIncidentWithAuthCommand,
   getLogsCommand,
   getReproductionCommand,
@@ -184,6 +186,116 @@ describe("cli retrieval commands core", () => {
       "Occurrences: 2",
       "Reason: request_failure_5xx",
       "Why: request_event matched the 5xx request incident rule"
+    ].join("\n"));
+  });
+
+  it("renders incident context detail in human mode", async () => {
+    const result = await getIncidentContextCommand(
+      {
+        bearerToken: "dbundle_mem_x",
+        incidentId: "inc_5xx"
+      },
+      {
+        getIncidentContext: vi.fn().mockResolvedValue({
+          incident: {
+            incident_id: "inc_5xx",
+            title: "Checkout 5xx",
+            severity: "high",
+            status: "open",
+            source: "cloud",
+            fingerprint: "fp_checkout",
+            fingerprint_version: "v1",
+            matched_fields: ["route_template"]
+          },
+          incident_reason: {
+            kind: "request_failure_5xx",
+            description: "request_event matched the 5xx request incident rule",
+            event_type: "request_event",
+            event_class: "incident_signal",
+            matched_policy: "5xx request failures bypass capture_request_events suppression"
+          },
+          primary_signal: {
+            kind: "request_failure_5xx",
+            event_type: "request_event",
+            event_class: "incident_signal",
+            description: "request_event matched the 5xx request incident rule",
+            severity: "high",
+            service_name: "checkout-api",
+            environment: "production",
+            error_type: "TypeError",
+            error_message: "boom",
+            request_method: "POST",
+            request_path: "/checkout",
+            route_template: "/checkout",
+            response_status: 503,
+            first_application_frame: {
+              file: "src/routes/checkout.ts",
+              line: 41,
+              function: "handleCheckout"
+            }
+          },
+          bundle: {
+            status: "ready"
+          },
+          reproduction: {
+            status: "pending"
+          },
+          logs: {
+            source: "retrieval",
+            items: [{ event_id: "evt_123" }],
+            next_cursor: null
+          },
+          deploy: {
+            latest_deployment_id: "dep_123",
+            commit_sha: "abc123",
+            deploy_version: "2026.03.11.1",
+            branch: "main",
+            deployed_at: "2026-03-11T00:00:00.000Z",
+            regression_window: true
+          },
+          grouping: {
+            fingerprint: "fp_checkout",
+            fingerprint_version: "v1",
+            matched_fields: ["route_template"]
+          },
+          redaction: {
+            redacted: true,
+            fields: ["request.headers.authorization"],
+            notes: null
+          },
+          suggested_next_checks: [
+            "Inspect the POST /checkout handler behind this 5xx path.",
+            "Start with src/routes/checkout.ts:41 from the first application frame."
+          ]
+        })
+      }
+    );
+
+    expect(result.exitCode).toBe(0);
+    expect(result.output).toBe([
+      "Incident: inc_5xx",
+      "Source: cloud",
+      "Title: Checkout 5xx",
+      "Severity: high",
+      "Status: open",
+      "Reason: request_failure_5xx",
+      "Why: request_event matched the 5xx request incident rule",
+      "Primary signal: request_event",
+      "Bundle: ready",
+      "Reproduction: pending",
+      "Logs: retrieval (1)",
+      "Fingerprint: fp_checkout",
+      "Matched fields: route_template",
+      "Request: POST /checkout",
+      "Response status: 503",
+      "Error type: TypeError",
+      "Error message: boom",
+      "Deploy: 2026.03.11.1 (abc123)",
+      "Redaction: redacted",
+      "Redacted fields: request.headers.authorization",
+      "Suggested next checks:",
+      "- Inspect the POST /checkout handler behind this 5xx path.",
+      "- Start with src/routes/checkout.ts:41 from the first application frame."
     ].join("\n"));
   });
 
@@ -452,6 +564,7 @@ describe("cli retrieval commands core", () => {
     const createApi = vi.fn().mockReturnValue({
       listIncidents,
       getIncident: vi.fn(),
+      getIncidentContext: vi.fn(),
       getBundle: vi.fn(),
       listLogs: vi.fn(),
       getReproduction: vi.fn(),
@@ -500,6 +613,7 @@ describe("cli retrieval commands core", () => {
     const createApi = vi.fn().mockReturnValue({
       listIncidents: vi.fn(),
       getIncident: vi.fn(),
+      getIncidentContext: vi.fn(),
       resolveIncident,
       getBundle: vi.fn(),
       listLogs: vi.fn(),
@@ -553,6 +667,7 @@ describe("cli retrieval commands core", () => {
     const createApi = vi.fn().mockReturnValue({
       listIncidents,
       getIncident: vi.fn(),
+      getIncidentContext: vi.fn(),
       getBundle,
       listLogs: vi.fn(),
       getReproduction: vi.fn(),
@@ -673,6 +788,39 @@ describe("cli retrieval commands core", () => {
     });
   });
 
+  it("reads local incident context without auth when the project is local-only", async () => {
+    const { rootDirectory, openIncident } = await createLocalRetrievalFixture();
+
+    const result = await getIncidentContextWithAuthCommand(
+      {
+        incidentId: openIncident.incidentId,
+        json: true
+      },
+      {
+        cwd: () => rootDirectory
+      }
+    );
+
+    expect(result.exitCode).toBe(0);
+    expect(JSON.parse(result.output)).toEqual(
+      expect.objectContaining({
+        incident: expect.objectContaining({
+          incident_id: openIncident.incidentId,
+          source: "local"
+        }),
+        bundle: expect.objectContaining({
+          status: "ready"
+        }),
+        reproduction: expect.objectContaining({
+          status: "ready"
+        }),
+        grouping: expect.objectContaining({
+          fingerprint: "fp_checkout"
+        })
+      })
+    );
+  });
+
   it("resolves and reopens local incidents without auth when the project is local-only", async () => {
     const { rootDirectory, openIncident, resolvedIncident } = await createLocalRetrievalFixture();
 
@@ -774,6 +922,7 @@ describe("cli retrieval commands core", () => {
     const createApi = vi.fn().mockReturnValue({
       listIncidents,
       getIncident: vi.fn(),
+      getIncidentContext: vi.fn(),
       resolveIncident: vi.fn(),
       getBundle: vi.fn(),
       listLogs: vi.fn(),
@@ -811,6 +960,106 @@ describe("cli retrieval commands core", () => {
       ]),
       next_cursor: null
     });
+  });
+
+  it("annotates cloud incident context with source in authenticated mode", async () => {
+    const readAuthState = vi.fn().mockResolvedValue({
+      bearer_token: "dbundle_mem_saved",
+      base_url: "https://selfhost.debugbundle.test"
+    });
+    const httpClient = { request: vi.fn() };
+    const createHttpClient = vi.fn().mockReturnValue(httpClient);
+    const getIncidentContext = vi.fn().mockResolvedValue({
+      incident: {
+        incident_id: "inc_cloud_prod",
+        title: "Cloud checkout failure",
+        severity: "critical",
+        status: "open",
+        fingerprint: "fp_cloud",
+        fingerprint_version: "1",
+        matched_fields: ["message"]
+      },
+      incident_reason: null,
+      primary_signal: {
+        kind: null,
+        event_type: "backend_exception",
+        event_class: "incident_signal",
+        description: "Primary signal for incident inc_cloud_prod",
+        severity: "critical",
+        service_name: "checkout-api",
+        environment: "production",
+        error_type: "TypeError",
+        error_message: "boom",
+        request_method: null,
+        request_path: null,
+        route_template: null,
+        response_status: null,
+        first_application_frame: null
+      },
+      bundle: {
+        status: "pending"
+      },
+      reproduction: {
+        status: "pending"
+      },
+      logs: {
+        source: "none",
+        items: [],
+        next_cursor: null
+      },
+      deploy: {
+        latest_deployment_id: null,
+        commit_sha: null,
+        deploy_version: null,
+        branch: null,
+        deployed_at: null,
+        regression_window: null
+      },
+      grouping: {
+        fingerprint: "fp_cloud",
+        fingerprint_version: "1",
+        matched_fields: ["message"]
+      },
+      redaction: null,
+      suggested_next_checks: []
+    });
+    const createApi = vi.fn().mockReturnValue({
+      listIncidents: vi.fn(),
+      getIncident: vi.fn(),
+      getIncidentContext,
+      resolveIncident: vi.fn(),
+      getBundle: vi.fn(),
+      listLogs: vi.fn(),
+      getReproduction: vi.fn(),
+      listServices: vi.fn()
+    });
+
+    const result = await getIncidentContextWithAuthCommand(
+      {
+        authFilePath: "/tmp/auth.json",
+        incidentId: "inc_cloud_prod",
+        source: "cloud",
+        json: true
+      },
+      {
+        readAuthState,
+        createHttpClient,
+        createApi
+      }
+    );
+
+    expect(getIncidentContext).toHaveBeenCalledWith({
+      bearerToken: "dbundle_mem_saved",
+      incidentId: "inc_cloud_prod"
+    });
+    expect(JSON.parse(result.output)).toEqual(
+      expect.objectContaining({
+        incident: expect.objectContaining({
+          incident_id: "inc_cloud_prod",
+          source: "cloud"
+        })
+      })
+    );
   });
 
 });
