@@ -13,15 +13,12 @@ const GitHubInstallationResponseSchema = z
         login: z.string().min(1),
         type: z.enum(["Organization", "User"])
       })
-      .strict()
-  })
-  .strict();
+  });
 
 const GitHubInstallationAccessTokenResponseSchema = z
   .object({
     token: z.string().min(1)
-  })
-  .strict();
+  });
 
 const GitHubInstallationRepositoriesResponseSchema = z
   .object({
@@ -37,18 +34,14 @@ const GitHubInstallationRepositoriesResponseSchema = z
             .object({
               login: z.string().min(1)
             })
-            .strict()
         })
-        .strict()
     )
-  })
-  .strict();
+  });
 
 const GitHubAppResponseSchema = z
   .object({
     slug: z.string().min(1)
-  })
-  .strict();
+  });
 
 function encodeBase64Url(value: string): string {
   return Buffer.from(value, "utf8").toString("base64url");

@@ -12,6 +12,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../co
 import { Dialog } from "../components/ui/dialog.js";
 import { Field, FieldDescription, FieldGroup, FieldLabel } from "../components/ui/field.js";
 import { Input } from "../components/ui/input.js";
+import { Notice } from "../components/ui/notice.js";
 import { Skeleton } from "../components/ui/skeleton.js";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../components/ui/table.js";
 import { useDelayedVisibility } from "../lib/use-delayed-visibility.js";
@@ -39,10 +40,19 @@ import { showErrorToast, showSuccessToast } from "../lib/notify.js";
 interface GitHubSettingsState {
   installation: GitHubInstallationRecord | null;
   installUrl: string | null;
+  installUrlLoadFailed: boolean;
   repositories: GitHubRepositoryRecord[];
   repo: ProjectGitHubRepoRecord | null;
   rules: GitHubDispatchRuleRecord[];
   deliveries: GitHubDispatchDeliveryRecord[];
+}
+
+async function loadOptionalGitHubInstallUrl(): Promise<{ installUrl: string | null; installUrlLoadFailed: boolean }> {
+  try {
+    return { installUrl: await getGitHubInstallUrl(), installUrlLoadFailed: false };
+  } catch {
+    return { installUrl: null, installUrlLoadFailed: true };
+  }
 }
 
 function mapGitHubLoadErrorMessage(error: unknown): string {
@@ -105,10 +115,29 @@ export function ProjectGitHubPage(): JSX.Element {
 
       try {
         const installation = await getGitHubInstallation();
+
+        if (installation === null) {
+          const installUrlState = await loadOptionalGitHubInstallUrl();
+
+          if (cancelled) {
+            return;
+          }
+
+          setGitHubSettings({
+            installation,
+            ...installUrlState,
+            repositories: [],
+            repo: null,
+            rules: [],
+            deliveries: []
+          });
+          return;
+        }
+
         const installUrlPromise =
-          installation === null || installation.status === "suspended" || installation.status === "removed"
-            ? getGitHubInstallUrl().catch(() => null)
-            : Promise.resolve<string | null>(null);
+          installation.status === "suspended" || installation.status === "removed"
+            ? loadOptionalGitHubInstallUrl()
+            : Promise.resolve({ installUrl: null, installUrlLoadFailed: false });
         const [repo, rules, deliveries] = await Promise.all([
           getProjectGitHubRepo(project.project_id),
           listProjectGitHubRules(project.project_id),
@@ -116,13 +145,13 @@ export function ProjectGitHubPage(): JSX.Element {
         ]);
         const repositories =
           installation !== null && installation.status === "active" ? await listGitHubRepositories() : [];
-        const installUrl = await installUrlPromise;
+        const installUrlState = await installUrlPromise;
 
         if (cancelled) {
           return;
         }
 
-        setGitHubSettings({ installation, installUrl, repositories, repo, rules, deliveries });
+        setGitHubSettings({ installation, ...installUrlState, repositories, repo, rules, deliveries });
       } catch (error) {
         if (cancelled) {
           return;
@@ -354,6 +383,11 @@ export function ProjectGitHubPage(): JSX.Element {
                   </Button>
                 </div>
               )}
+              {githubSettings.installUrlLoadFailed ? (
+                <Notice tone="warning" title="GitHub install link unavailable">
+                  The GitHub App install link could not be loaded. Refresh this tab after the API connection is restored.
+                </Notice>
+              ) : null}
             </CalloutCard>
           ) : (
             <>
@@ -373,6 +407,11 @@ export function ProjectGitHubPage(): JSX.Element {
                       </Button>
                     </div>
                   )}
+                  {githubSettings.installUrlLoadFailed ? (
+                    <Notice tone="warning" title="GitHub reconnect link unavailable">
+                      The GitHub App reconnect link could not be loaded. Refresh this tab after the API connection is restored.
+                    </Notice>
+                  ) : null}
                 </CalloutCard>
               ) : null}
 

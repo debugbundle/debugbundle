@@ -732,9 +732,12 @@ describe("web app — management routes", () => {
       "https://github.com/apps/debugbundle-automation/installations/new"
     );
     expect(fetchMock.mock.calls.some(([input]) => requestUrl(input).endsWith("/v1/github/repositories"))).toBe(false);
+    expect(fetchMock.mock.calls.some(([input]) => requestUrl(input).endsWith("/v1/projects/proj_123/github/repo"))).toBe(false);
+    expect(fetchMock.mock.calls.some(([input]) => requestUrl(input).endsWith("/v1/projects/proj_123/github/rules"))).toBe(false);
+    expect(fetchMock.mock.calls.some(([input]) => requestUrl(input).endsWith("/v1/projects/proj_123/github/deliveries?limit=20"))).toBe(false);
   });
 
-  it("keeps showing setup guidance when the install-url helper route is unavailable", async () => {
+  it("keeps setup actionable and explicit when the install-url helper route is unavailable", async () => {
     const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
       const url = requestUrl(input);
 
@@ -779,7 +782,11 @@ describe("web app — management routes", () => {
 
     expect(await screen.findByText(/connect the github app to start automation/i)).toBeInTheDocument();
     expect(screen.getByText(/no github app installation is connected to this workspace yet/i)).toBeInTheDocument();
+    expect(screen.getByText(/the github app install link could not be loaded/i)).toBeInTheDocument();
     expect(screen.queryByRole("link", { name: /install github app/i })).not.toBeInTheDocument();
+    expect(fetchMock.mock.calls.some(([input]) => requestUrl(input).endsWith("/v1/projects/proj_123/github/repo"))).toBe(false);
+    expect(fetchMock.mock.calls.some(([input]) => requestUrl(input).endsWith("/v1/projects/proj_123/github/rules"))).toBe(false);
+    expect(fetchMock.mock.calls.some(([input]) => requestUrl(input).endsWith("/v1/projects/proj_123/github/deliveries?limit=20"))).toBe(false);
   });
 
   it("shows a specific message when github automation is not configured on the api", async () => {
