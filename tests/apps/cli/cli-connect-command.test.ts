@@ -285,6 +285,84 @@ describe("cli connect command", () => {
     });
   });
 
+  it("runs interactive login and resumes connect when auth state is missing", async () => {
+    const rootDirectory = await createConnectFixtureRepository();
+    const readAuthState = vi
+      .fn()
+      .mockRejectedValueOnce(new CliAuthStateError("auth_state_missing", "Not logged in."))
+      .mockResolvedValueOnce({
+        bearer_token: "dbundle_mem_secret",
+        base_url: "https://api.debugbundle.com"
+      });
+    const loginCommand = vi.fn().mockResolvedValue({
+      exitCode: 0,
+      output: "Authenticated: yes"
+    });
+
+    const result = await connectCommand(
+      {},
+      {
+        cwd: () => rootDirectory,
+        isInteractiveTerminal: vi.fn().mockReturnValue(true),
+        loginCommand,
+        readAuthState,
+        createProjectManagementApi: vi.fn().mockReturnValue({
+          listProjects: vi.fn().mockResolvedValue([
+            {
+              project_id: "proj_cloud_existing",
+              organization_id: "org_1",
+              name: "Checkout App",
+              slug: "checkout-app",
+              environment_default: "production",
+              plan: "free",
+              metrics: {
+                monthly_bundle_requests: 0,
+                monthly_raw_ingested_events: 0,
+                retained_bundles: 0,
+                monthly_alert_deliveries: 0
+              },
+              created_at: "2026-03-21T00:00:00.000Z",
+              updated_at: "2026-03-21T00:00:00.000Z"
+            }
+          ]),
+          createProject: vi.fn()
+        }),
+        createTokenManagementApi: vi.fn().mockReturnValue({
+          createProjectToken: vi.fn().mockResolvedValue({
+            token_id: "ptok_1",
+            plaintext: "dbundle_proj_secret"
+          })
+        })
+      }
+    );
+
+    expect(loginCommand).toHaveBeenCalledWith({});
+    expect(result.exitCode).toBe(0);
+    expect(result.output).toContain("Connected DebugBundle project to cloud.");
+  });
+
+  it("returns the interactive login failure when auth bootstrap is cancelled", async () => {
+    const rootDirectory = await createConnectFixtureRepository();
+
+    const result = await connectCommand(
+      {},
+      {
+        cwd: () => rootDirectory,
+        isInteractiveTerminal: vi.fn().mockReturnValue(true),
+        loginCommand: vi.fn().mockResolvedValue({
+          exitCode: 4,
+          output: "Authentication cancelled."
+        }),
+        readAuthState: vi.fn().mockRejectedValue(new CliAuthStateError("auth_state_missing", "Not logged in."))
+      }
+    );
+
+    expect(result).toEqual({
+      exitCode: 4,
+      output: "Authentication cancelled."
+    });
+  });
+
   it("returns early with success when the project is already connected", async () => {
     const rootDirectory = await createConnectFixtureRepository();
 

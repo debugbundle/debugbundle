@@ -481,6 +481,13 @@ If CLI says something is healthy and MCP says something different, that is a pro
 - **And** DebugBundle issues a normal member token without additional browser interaction
 - **And** the existing browser and email-code flows remain unchanged
 
+### AC-AUTH-10: Interactive Login Chooser
+- **Given** a user runs `debugbundle login` in an interactive terminal with no explicit auth flags
+- **When** the CLI prompts for an auth method and the user chooses GitHub auto mode, GitHub device flow, or manual member-token entry
+- **Then** the CLI completes the chosen bootstrap path
+- **And** it persists the resulting member-token auth state to `~/.debugbundle/auth.json`
+- **And** `--json` mode does not prompt and instead returns a validation error when no auth mode was supplied
+
 ---
 
 ## 11. Self-Host Acceptance
@@ -758,6 +765,13 @@ If CLI says something is healthy and MCP says something different, that is a pro
 - **Then** connection config is updated without uploading existing local events
 - **And** cloud transport is enabled for selected environments
 - **And** existing local incidents remain untouched in `state.json`
+
+### AC-ONB-06a: Missing-Auth Connect Recovery
+- **Given** a local-only project and no `~/.debugbundle/auth.json`
+- **When** `debugbundle connect` is run in an interactive terminal
+- **Then** the CLI prompts for login first
+- **And** after successful authentication it resumes the connection workflow automatically
+- **And** in `--json` or non-interactive mode it does not prompt and instead returns actionable auth guidance
 
 ### AC-ONB-07: Gitignore Management
 - **Given** `debugbundle setup` runs

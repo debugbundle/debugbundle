@@ -12,6 +12,8 @@ import { createTokenManagementApi, TokenManagementApiError, type HttpClient as T
 import { CliAuthStateError, readCliAuthState, type CliAuthState } from "./auth-state.js";
 import { createCliHttpClient } from "./auth-context.js";
 import { readConnectionConfig, type ConnectionConfig } from "./connection-config.js";
+import { isInteractiveTerminal } from "./interactive-auth.js";
+import { loginCommand as defaultLoginCommand } from "./login-command.js";
 import { CONNECTION_FILE_PATH, PROFILE_FILE_PATH } from "./local-scaffold.js";
 import { validateProfile } from "./profile-validation.js";
 import type { CliCommandResult } from "./token-commands.js";
@@ -42,6 +44,8 @@ type ConnectCommandDependencies = {
   createProjectManagementApi?: typeof createProjectManagementApi;
   createTokenManagementApi?: typeof createTokenManagementApi;
   fetchImpl?: typeof fetch;
+  isInteractiveTerminal?: () => boolean;
+  loginCommand?: typeof defaultLoginCommand;
 };
 
 const ProfileNameSchema = z
@@ -174,6 +178,7 @@ export async function connectCommand(
   });
   const createProjectApi = dependencies.createProjectManagementApi ?? createProjectManagementApi;
   const createTokenApi = dependencies.createTokenManagementApi ?? createTokenManagementApi;
+  const loginCommand = dependencies.loginCommand ?? defaultLoginCommand;
   const rootDirectory = cwd();
 
   const initialChecks: ConnectCheck[] = [];
@@ -240,7 +245,30 @@ export async function connectCommand(
   });
 
   try {
-    const authState = await readAuthState({ ...(input.authFilePath === undefined ? {} : { authFilePath: input.authFilePath }) });
+    let authState: CliAuthState;
+    try {
+      authState = await readAuthState({ ...(input.authFilePath === undefined ? {} : { authFilePath: input.authFilePath }) });
+    } catch (error) {
+      const shouldAttemptInteractiveLogin =
+        error instanceof CliAuthStateError &&
+        error.code === "auth_state_missing" &&
+        input.json !== true &&
+        (dependencies.isInteractiveTerminal ?? isInteractiveTerminal)();
+
+      if (!shouldAttemptInteractiveLogin) {
+        throw error;
+      }
+
+      const loginResult = await loginCommand({
+        ...(input.authFilePath === undefined ? {} : { authFilePath: input.authFilePath })
+      });
+      if (loginResult.exitCode !== 0) {
+        return loginResult;
+      }
+
+      authState = await readAuthState({ ...(input.authFilePath === undefined ? {} : { authFilePath: input.authFilePath }) });
+    }
+
     const httpClient = createHttpClient({ baseUrl: authState.base_url });
     const projectApi = createProjectApi(httpClient);
     const tokenApi = createTokenApi(httpClient);
@@ -359,7 +387,7 @@ export async function connectCommand(
             }
           ], [
             exitCode === 2
-              ? "Run debugbundle login --github, debugbundle login --github-device, or debugbundle login <dbundle_mem_...> before connecting the project to cloud."
+              ? "Run debugbundle login to choose an auth flow, or use debugbundle login --github, debugbundle login --github-device, or debugbundle login <dbundle_mem_...> before connecting the project to cloud."
               : "Resolve the cloud API error and retry debugbundle connect."
           ])
         : `DebugBundle connect failed.\n- ${message}`

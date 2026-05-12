@@ -3,7 +3,6 @@ import { createHmac, randomBytes } from "node:crypto";
 import { DEFAULT_GITHUB_AUTHORIZE_URL, type GitHubOAuthConfig } from "./github-auth-client.js";
 import { resolveGitHubAccountForIdentity } from "./github-account-linking.js";
 import {
-  GITHUB_OAUTH_STATE_COOKIE_NAME,
   ORGANIZATION_INVITE_TOKEN_PREFIX,
   type AcceptOrganizationInviteStoreResult,
   type AuthEmailSender,

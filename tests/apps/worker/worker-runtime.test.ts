@@ -620,6 +620,9 @@ describe("worker runtime", () => {
     const jwt = buildGitHubAppJwt("123", privateKeyPem, now);
     const [encodedHeader, encodedPayload, signature] = jwt.split(".");
 
+    if (encodedHeader === undefined || encodedPayload === undefined || signature === undefined) {
+      throw new Error("github_app_jwt_segments_missing");
+    }
     expect(signature.length).toBeGreaterThan(0);
     expect(JSON.parse(Buffer.from(encodedHeader, "base64url").toString("utf8"))).toEqual({ alg: "RS256", typ: "JWT" });
     expect(JSON.parse(Buffer.from(encodedPayload, "base64url").toString("utf8"))).toEqual({

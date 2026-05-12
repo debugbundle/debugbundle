@@ -3,8 +3,8 @@
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import { userEvent } from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import * as routerDom from "../../../node_modules/.pnpm/node_modules/react-router-dom";
-import { MemoryRouter } from "../../../node_modules/.pnpm/node_modules/react-router-dom";
+import * as routerDom from "../../../node_modules/.pnpm/node_modules/react-router-dom/dist/index.js";
+import { MemoryRouter } from "../../../node_modules/.pnpm/node_modules/react-router-dom/dist/index.js";
 
 import {
   CapacityDialog,

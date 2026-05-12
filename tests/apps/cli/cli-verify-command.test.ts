@@ -371,7 +371,7 @@ describe("cli verify cloud command", () => {
       warnings: [],
       errors: ["Not logged in."],
       suggested_actions: [
-        "Run debugbundle login --github, debugbundle login --github-device, or debugbundle login <dbundle_mem_...> to create ~/.debugbundle/auth.json before verifying cloud traffic.",
+        "Run debugbundle login to choose an auth flow, or use debugbundle login --github, debugbundle login --github-device, or debugbundle login <dbundle_mem_...> to create ~/.debugbundle/auth.json before verifying cloud traffic.",
         "Generate a live cloud request, then re-run debugbundle verify cloud with the correct project and service filters."
       ],
       auto_fix_available: false
@@ -421,7 +421,7 @@ describe("cli verify cloud command", () => {
       warnings: [],
       errors: ["Latest production incident inc_prod_123 is older than the 15 minute verification window."],
       suggested_actions: [
-        "Run debugbundle login --github, debugbundle login --github-device, or debugbundle login <dbundle_mem_...> to create ~/.debugbundle/auth.json before verifying cloud traffic.",
+        "Run debugbundle login to choose an auth flow, or use debugbundle login --github, debugbundle login --github-device, or debugbundle login <dbundle_mem_...> to create ~/.debugbundle/auth.json before verifying cloud traffic.",
         "Generate a live cloud request, then re-run debugbundle verify cloud with the correct project and service filters."
       ],
       auto_fix_available: false

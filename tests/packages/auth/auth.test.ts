@@ -5,7 +5,6 @@ import {
   MEMBER_TOKEN_PREFIX,
   PROJECT_TOKEN_PREFIX,
   SESSION_COOKIE_NAME,
-  createGitHubOAuthClient,
   buildClearedGithubOauthStateCookie,
   buildClearedSessionCookie,
   buildGithubOauthStateCookie,

@@ -18,7 +18,7 @@ import {
   testProjectWebhook,
   verifyEmailCode
 } from "../../../apps/web/src/lib/api.ts";
-import { createBillingSummary, createSession } from "./web-test-helpers.js";
+import { createSession } from "./web-test-helpers.js";
 
 afterEach(() => {
   resetBrowserSessionClientState();

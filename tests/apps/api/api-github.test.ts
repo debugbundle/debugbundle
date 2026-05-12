@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { z } from "zod";
 
 import { createApiServer } from "../../../apps/api/src/server.ts";
 import { GITHUB_APP_INSTALL_STATE_COOKIE_NAME, SESSION_COOKIE_NAME } from "../../../packages/auth/src/index.js";
@@ -9,6 +10,10 @@ type MemberAuthDependency = MockedMethods<ApiServerDependencies["memberAuth"]>;
 type WebAuthDependency = MockedMethods<NonNullable<ApiServerDependencies["webAuth"]>>;
 type BillingManagementDependency = MockedMethods<NonNullable<ApiServerDependencies["billingManagement"]>>;
 type GitHubManagementDependency = MockedMethods<NonNullable<ApiServerDependencies["githubManagement"]>>;
+
+const InstallUrlResponseSchema = z.object({
+  install_url: z.string().url()
+});
 
 function createServer(overrides: {
   memberAuth?: MemberAuthDependency;
@@ -207,7 +212,8 @@ describe("api github routes", () => {
     });
 
     expect(response.statusCode).toBe(200);
-    const installUrl = new URL(response.json().install_url);
+    const responseBody = InstallUrlResponseSchema.parse(response.json());
+    const installUrl = new URL(responseBody.install_url);
     expect(installUrl.origin).toBe("https://github.com");
     expect(installUrl.pathname).toBe("/apps/debugbundle-automation/installations/new");
     expect(installUrl.searchParams.get("state")).toEqual(expect.any(String));
@@ -298,12 +304,13 @@ describe("api github routes", () => {
         [SESSION_COOKIE_NAME]: "dbundle_session"
       }
     });
-    const installUrl = new URL(installUrlResponse.json().install_url);
-    const installState = installUrl.searchParams.get("state");
+    const installUrlResponseBody = InstallUrlResponseSchema.parse(installUrlResponse.json());
+    const installUrlFromResponse = new URL(installUrlResponseBody.install_url);
+    const installState = installUrlFromResponse.searchParams.get("state");
 
     expect(installUrlResponse.statusCode).toBe(200);
-    expect(installUrl.origin).toBe("https://github.com");
-    expect(installUrl.pathname).toBe("/apps/debugbundle-automation/installations/new");
+    expect(installUrlFromResponse.origin).toBe("https://github.com");
+    expect(installUrlFromResponse.pathname).toBe("/apps/debugbundle-automation/installations/new");
     expect(installState).toEqual(expect.any(String));
     expect(String(installUrlResponse.headers["set-cookie"])).toContain(`${GITHUB_APP_INSTALL_STATE_COOKIE_NAME}=`);
 

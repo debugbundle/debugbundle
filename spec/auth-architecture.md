@@ -208,10 +208,12 @@ This is the primary bootstrap flow for V1.
 
 ### 6.2 CLI Auth Flow
 
-1. User or agent obtains a member token.
-2. `debugbundle login` stores local auth state.
-3. CLI commands call the API with that token.
-4. The API resolves member identity, organization access, and role permissions.
+1. User or agent runs `debugbundle login`.
+2. If an explicit auth mode or token was provided, the CLI uses it directly.
+3. If no auth mode was provided and the session is interactive, the CLI prompts for GitHub auto mode, explicit GitHub device flow, or manual member-token entry.
+4. `debugbundle login` stores local auth state.
+5. CLI commands call the API with that token.
+6. The API resolves member identity, organization access, and role permissions.
 
 ### 6.2a GitHub Device Bootstrap Flow
 
@@ -229,6 +231,14 @@ This is the primary bootstrap flow for V1.
 3. CLI sends that GitHub access token to DebugBundle.
 4. DebugBundle verifies the GitHub identity, links or creates the user account, and issues a normal member token.
 5. CLI stores the member token in local auth state.
+
+### 6.2c Connect-Time Auth Recovery
+
+1. User or agent runs `debugbundle connect`.
+2. If local member auth is already present, connect proceeds normally.
+3. If auth is missing and the terminal is interactive, `connect` invokes the same `debugbundle login` bootstrap flow first.
+4. After successful login, `connect` resumes project selection/creation and project-token issuance.
+5. In non-interactive or `--json` mode, `connect` does not prompt and instead returns actionable auth guidance.
 
 ### 6.3 MCP Auth Flow
 

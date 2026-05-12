@@ -18,12 +18,12 @@ describe("api openapi spec", () => {
       memberBearerToken: { type: "http", scheme: "bearer" },
       projectBearerToken: { type: "http", scheme: "bearer" }
     });
-    expect(document.paths?.["/v1/auth/github/device/start"]?.post?.operationId).toBe("startGithubDeviceLogin");
-    expect(document.paths?.["/v1/auth/github/device/poll"]?.post?.operationId).toBe("pollGithubDeviceLogin");
-    expect(document.paths?.["/v1/auth/github/device/claim"]?.post?.operationId).toBe("claimGithubDeviceLogin");
-    expect(document.paths?.["/v1/auth/github/token/exchange"]?.post?.operationId).toBe("exchangeGithubAccessToken");
-    expect(document.paths?.["/v1/auth/logout"]?.post?.security).toEqual([{ browserSession: [] }]);
-    expect(document.paths?.["/v1/auth/github/start"]?.get?.responses).toHaveProperty("302");
-    expect(document.paths?.["/v1/projects/{id}/tokens"]?.get?.responses).toHaveProperty("200");
+    expect(document.paths?.["/v1/auth/github/device/start"]?.["post"]?.operationId).toBe("startGithubDeviceLogin");
+    expect(document.paths?.["/v1/auth/github/device/poll"]?.["post"]?.operationId).toBe("pollGithubDeviceLogin");
+    expect(document.paths?.["/v1/auth/github/device/claim"]?.["post"]?.operationId).toBe("claimGithubDeviceLogin");
+    expect(document.paths?.["/v1/auth/github/token/exchange"]?.["post"]?.operationId).toBe("exchangeGithubAccessToken");
+    expect(document.paths?.["/v1/auth/logout"]?.["post"]?.security).toEqual([{ browserSession: [] }]);
+    expect(document.paths?.["/v1/auth/github/start"]?.["get"]?.responses).toHaveProperty("302");
+    expect(document.paths?.["/v1/projects/{id}/tokens"]?.["get"]?.responses).toHaveProperty("200");
   });
 });

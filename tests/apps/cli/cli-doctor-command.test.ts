@@ -185,7 +185,7 @@ describe("cli doctor command", () => {
       errors: [],
       suggested_actions: [
         "Run debugbundle setup if local scaffold files are missing.",
-        "Run debugbundle login --github, debugbundle login --github-device, or debugbundle login <dbundle_mem_...> to create ~/.debugbundle/auth.json.",
+        "Run debugbundle login to choose an auth flow, or use debugbundle login --github, debugbundle login --github-device, or debugbundle login <dbundle_mem_...> to create ~/.debugbundle/auth.json.",
         "Review .debugbundle/profile.json when architecture changes or the profile becomes stale."
       ],
       auto_fix_available: false

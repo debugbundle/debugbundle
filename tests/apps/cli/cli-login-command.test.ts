@@ -69,6 +69,96 @@ describe("cli login command", () => {
     expect(result.output).toBe("Invalid member token.");
   });
 
+  it("prompts for an auth flow when login is run without an explicit mode", async () => {
+    const writeAuthState = vi.fn().mockResolvedValue("/tmp/auth.json");
+
+    const result = await loginCommand(
+      {
+        authFilePath: "/tmp/auth.json"
+      },
+      {
+        isInteractiveTerminal: vi.fn().mockReturnValue(true),
+        promptForInteractiveLogin: vi.fn().mockResolvedValue({ kind: "github" }),
+        readGitHubAccessToken: vi.fn().mockResolvedValue("gho_123"),
+        fetchImpl: vi.fn().mockResolvedValue({
+          status: 200,
+          text: async () => JSON.stringify({
+            token: {
+              token_id: "tok_123",
+              user_id: "usr_123",
+              organization_id: "org_123",
+              label: "GitHub bootstrap",
+              created_at: "2026-03-16T00:00:00.000Z",
+              last_used_at: null,
+              revoked_at: null,
+              expires_at: null,
+              plaintext: "dbundle_mem_secret_token"
+            }
+          })
+        } as Response),
+        writeAuthState
+      }
+    );
+
+    expect(result.exitCode).toBe(0);
+    expect(writeAuthState).toHaveBeenCalledWith({
+      authFilePath: "/tmp/auth.json",
+      authState: {
+        bearer_token: "dbundle_mem_secret_token",
+        base_url: "https://api.debugbundle.com"
+      }
+    });
+  });
+
+  it("accepts a prompted member token when login is run interactively", async () => {
+    const result = await loginCommand(
+      {},
+      {
+        isInteractiveTerminal: vi.fn().mockReturnValue(true),
+        promptForInteractiveLogin: vi.fn().mockResolvedValue({
+          kind: "member-token",
+          bearerToken: "dbundle_mem_prompted_token"
+        }),
+        writeAuthState: vi.fn().mockResolvedValue("/tmp/auth.json")
+      }
+    );
+
+    expect(result.exitCode).toBe(0);
+    expect(result.output).toContain("Token: dbundle_mem_prom...");
+  });
+
+  it("returns a cancellation result when the interactive login prompt is aborted", async () => {
+    const result = await loginCommand(
+      {},
+      {
+        isInteractiveTerminal: vi.fn().mockReturnValue(true),
+        promptForInteractiveLogin: vi.fn().mockResolvedValue({ kind: "cancel" })
+      }
+    );
+
+    expect(result).toEqual({
+      exitCode: 4,
+      output: "Authentication cancelled."
+    });
+  });
+
+  it("keeps plain login non-interactive for json output", async () => {
+    const result = await loginCommand(
+      {
+        json: true
+      },
+      {
+        isInteractiveTerminal: vi.fn().mockReturnValue(true),
+        promptForInteractiveLogin: vi.fn()
+      }
+    );
+
+    expect(result).toEqual({
+      exitCode: 4,
+      output: "Provide either a member token or one of --github, --github-cli, or --github-device."
+    });
+  });
+
   it("supports GitHub CLI bootstrap when gh is already authenticated", async () => {
     const writeAuthState = vi.fn().mockResolvedValue("/tmp/auth.json");
     const reportProgress = vi.fn();

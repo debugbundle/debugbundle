@@ -108,7 +108,7 @@ describe("storage schema migrations", () => {
     const mutatedMigrations = STORAGE_SCHEMA_MIGRATIONS as unknown as Array<{
       id: string;
       description: string;
-      statements: string[];
+      statements: readonly string[];
       checksum: string;
     }>;
 

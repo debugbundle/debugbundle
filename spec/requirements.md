@@ -247,6 +247,10 @@ Last updated: 2026-03-27
 
 **FR-CLI-06:** CLI auth must support three bootstrap paths that all converge on the same stored member-token state in `~/.debugbundle/auth.json`: (a) direct member-token login, (b) GitHub device flow via `debugbundle login --github` / `--github-device`, and (c) GitHub CLI token bootstrap via `debugbundle login --github-cli` when `gh` is already authenticated. No dashboard dependency for daily operations.
 
+**FR-CLI-06a:** `debugbundle login` with no explicit auth mode must offer an interactive auth chooser in TTY sessions, covering GitHub auto mode, explicit GitHub device flow, and manual member-token entry. When `--json` is used or the terminal is non-interactive, `debugbundle login` must remain explicit and fail with a validation error instead of prompting.
+
+**FR-CLI-06b:** `debugbundle connect` must detect missing local member auth and, in interactive TTY sessions, invoke the same login bootstrap before resuming the connection workflow. In non-interactive or `--json` mode it must not prompt and must fail with actionable auth guidance.
+
 **FR-CLI-07:** `doctor` must detect installed SDKs across project runtimes and report coverage (which runtimes are instrumented, which are missing).
 
 **FR-CLI-08:** Setup follows a four-stage lifecycle: Discover (detect language, framework, deployment target) → Configure (install SDK, add config, register project) → Validate (check local correctness) → Verify (prove end-to-end works).

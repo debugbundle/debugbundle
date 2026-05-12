@@ -12,6 +12,7 @@ export const CLI_USAGE_LINES = [
   '  debugbundle verify local [--json]',
   '  debugbundle verify cloud --project-id <id> [--trigger-5xx] [--service <name>] [--environment <name>] [--max-age-minutes <n>] [--auth-file <path>] [--json]',
   '  debugbundle smoke --project-id <id> [--service <name>] [--environment <name>] [--max-age-minutes <n>] [--auth-file <path>] [--json]',
+  '  debugbundle login [--base-url <url>] [--auth-file <path>] [--json]',
   '  debugbundle login <member-token> [--base-url <url>] [--auth-file <path>] [--json]',
   '  debugbundle login --github [--label <label>] [--base-url <url>] [--auth-file <path>] [--json]',
   '  debugbundle login --github-cli [--label <label>] [--base-url <url>] [--auth-file <path>] [--json]',

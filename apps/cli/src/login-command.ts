@@ -5,6 +5,7 @@ import { z } from "zod";
 
 import { buildTokenPreview, persistCliAuthState } from "./auth-state.js";
 import type { CliAuthState } from "./auth-state.js";
+import { isInteractiveTerminal, promptForInteractiveLoginSelection, type InteractiveLoginSelection } from "./interactive-auth.js";
 import type { CliCommandResult } from "./token-commands.js";
 
 const execFile = promisify(execFileFromNode);
@@ -119,6 +120,27 @@ class LoginApiError extends Error {
 
 type LoginMode = "token" | "github" | "github-cli" | "github-device";
 
+type LoginCommandInput = {
+  authFilePath?: string;
+  bearerToken?: string;
+  baseUrl?: string;
+  json?: boolean;
+  github?: boolean;
+  githubCli?: boolean;
+  githubDevice?: boolean;
+  label?: string;
+};
+
+type LoginCommandDependencies = {
+  fetchImpl?: typeof fetch;
+  writeAuthState?: (input: { authFilePath?: string; authState: CliAuthState }) => Promise<string | void>;
+  readGitHubAccessToken?: () => Promise<string | null>;
+  sleep?: (ms: number) => Promise<void>;
+  reportProgress?: (text: string) => void;
+  isInteractiveTerminal?: () => boolean;
+  promptForInteractiveLogin?: () => Promise<InteractiveLoginSelection>;
+};
+
 function normalizeBaseUrl(baseUrl: string): string {
   return baseUrl.endsWith("/") ? baseUrl.slice(0, -1) : baseUrl;
 }
@@ -148,6 +170,51 @@ function resolveLoginMode(input: z.infer<typeof LoginCommandInputSchema>): Login
   }
 
   return "github";
+}
+
+function hasExplicitLoginMode(input: LoginCommandInput): boolean {
+  return input.bearerToken !== undefined || input.github === true || input.githubCli === true || input.githubDevice === true;
+}
+
+async function maybePromptForLoginInput(
+  input: LoginCommandInput,
+  dependencies?: LoginCommandDependencies
+): Promise<LoginCommandInput | CliCommandResult> {
+  if (hasExplicitLoginMode(input) || input.json === true) {
+    return input;
+  }
+
+  const interactive = (dependencies?.isInteractiveTerminal ?? isInteractiveTerminal)();
+  if (!interactive) {
+    return input;
+  }
+
+  const selection = await (dependencies?.promptForInteractiveLogin ?? promptForInteractiveLoginSelection)();
+  if (selection.kind === "cancel") {
+    return {
+      exitCode: 4,
+      output: "Authentication cancelled."
+    };
+  }
+
+  if (selection.kind === "member-token") {
+    return {
+      ...input,
+      bearerToken: selection.bearerToken
+    };
+  }
+
+  if (selection.kind === "github-device") {
+    return {
+      ...input,
+      githubDevice: true
+    };
+  }
+
+  return {
+    ...input,
+    github: true
+  };
 }
 
 function mapInputValidationError(parsedInput: z.SafeParseError<unknown>): string {
@@ -372,7 +439,7 @@ function formatPersistedSuccess(
 }
 
 function buildProgressReporter(
-  dependency?: ((text: string) => void) | undefined
+  dependency?: (text: string) => void
 ): (text: string) => void {
   if (dependency !== undefined) {
     return dependency;
@@ -386,31 +453,21 @@ function buildProgressReporter(
 export { persistCliAuthState } from "./auth-state.js";
 
 export async function loginCommand(
-  input: {
-    authFilePath?: string;
-    bearerToken?: string;
-    baseUrl?: string;
-    json?: boolean;
-    github?: boolean;
-    githubCli?: boolean;
-    githubDevice?: boolean;
-    label?: string;
-  },
-  dependencies?: {
-    fetchImpl?: typeof fetch;
-    writeAuthState?: (input: { authFilePath?: string; authState: CliAuthState }) => Promise<string | void>;
-    readGitHubAccessToken?: () => Promise<string | null>;
-    sleep?: (ms: number) => Promise<void>;
-    reportProgress?: (text: string) => void;
-  }
+  input: LoginCommandInput,
+  dependencies?: LoginCommandDependencies
 ): Promise<CliCommandResult> {
+  const promptedInput = await maybePromptForLoginInput(input, dependencies);
+  if ("exitCode" in promptedInput) {
+    return promptedInput;
+  }
+
   const parsedInput = LoginCommandInputSchema.safeParse({
-    bearerToken: input.bearerToken,
-    baseUrl: input.baseUrl ?? DEFAULT_BASE_URL,
-    github: input.github,
-    githubCli: input.githubCli,
-    githubDevice: input.githubDevice,
-    label: input.label ?? DEFAULT_GITHUB_BOOTSTRAP_LABEL
+    bearerToken: promptedInput.bearerToken,
+    baseUrl: promptedInput.baseUrl ?? DEFAULT_BASE_URL,
+    github: promptedInput.github,
+    githubCli: promptedInput.githubCli,
+    githubDevice: promptedInput.githubDevice,
+    label: promptedInput.label ?? DEFAULT_GITHUB_BOOTSTRAP_LABEL
   });
 
   if (!parsedInput.success) {
@@ -435,14 +492,14 @@ export async function loginCommand(
       }
 
       return await formatPersistedSuccess(
-        {
-          baseUrl: normalizedInput.baseUrl,
-          bearerToken: normalizedInput.bearerToken!,
-          ...(input.json === undefined ? {} : { json: input.json }),
-          ...(input.authFilePath === undefined ? {} : { authFilePath: input.authFilePath })
-        },
-        { writeAuthState }
-      );
+          {
+            baseUrl: normalizedInput.baseUrl,
+            bearerToken: normalizedInput.bearerToken!,
+            ...(promptedInput.json === undefined ? {} : { json: promptedInput.json }),
+            ...(promptedInput.authFilePath === undefined ? {} : { authFilePath: promptedInput.authFilePath })
+          },
+          { writeAuthState }
+        );
     }
 
     const readGitHubAccessToken = dependencies?.readGitHubAccessToken ?? readGitHubAccessTokenFromGh;
@@ -469,8 +526,8 @@ export async function loginCommand(
             {
               baseUrl: normalizedInput.baseUrl,
               bearerToken: exchanged.token.plaintext,
-              ...(input.json === undefined ? {} : { json: input.json }),
-              ...(input.authFilePath === undefined ? {} : { authFilePath: input.authFilePath })
+              ...(promptedInput.json === undefined ? {} : { json: promptedInput.json }),
+              ...(promptedInput.authFilePath === undefined ? {} : { authFilePath: promptedInput.authFilePath })
             },
             { writeAuthState }
           );
@@ -540,8 +597,8 @@ export async function loginCommand(
           {
             baseUrl: normalizedInput.baseUrl,
             bearerToken: claimed.token.plaintext,
-            ...(input.json === undefined ? {} : { json: input.json }),
-            ...(input.authFilePath === undefined ? {} : { authFilePath: input.authFilePath })
+            ...(promptedInput.json === undefined ? {} : { json: promptedInput.json }),
+            ...(promptedInput.authFilePath === undefined ? {} : { authFilePath: promptedInput.authFilePath })
           },
           { writeAuthState }
         );

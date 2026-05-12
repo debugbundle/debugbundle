@@ -533,6 +533,25 @@ describe("cli main core routing", () => {
     });
   });
 
+  it("routes bare login into the login command for interactive mode selection", async () => {
+    const loginCommand = vi.fn().mockResolvedValue({
+      exitCode: 0,
+      output: "interactive login"
+    });
+
+    const result = await runCli([
+      "login"
+    ], {
+      loginCommand
+    });
+
+    expect(loginCommand).toHaveBeenCalledWith({});
+    expect(result).toEqual({
+      exitCode: 0,
+      output: "interactive login"
+    });
+  });
+
   it("routes GitHub login arguments into the login command", async () => {
     const loginCommand = vi.fn().mockResolvedValue({
       exitCode: 0,

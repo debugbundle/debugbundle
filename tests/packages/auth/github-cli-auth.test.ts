@@ -15,7 +15,7 @@ function createStore(overrides: Partial<GitHubCliAuthStore> = {}): GitHubCliAuth
       role: "owner",
       created_user: false,
     }),
-    createGitHubDeviceAuthorization: vi.fn().mockImplementation(async (input) => ({
+    createGitHubDeviceAuthorization: vi.fn().mockImplementation(async (input: Parameters<GitHubCliAuthStore["createGitHubDeviceAuthorization"]>[0]) => ({
       ...input,
       completed_at: null,
       claimed_at: null,
