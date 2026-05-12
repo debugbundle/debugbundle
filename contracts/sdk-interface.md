@@ -414,7 +414,7 @@ The browser SDK injects a `X-DebugBundle-Trace-Id` header (UUID v4) into all out
 
 Backend SDKs should include safe runtime facts in `backend_exception.payload.runtime` when the host language exposes them without reading environment variables or secrets. The common optional fields are `platform`, `arch`, `pid`, `cwd`, `uptime_sec`, `hostname`, `thread_id`, `framework_version`, `memory`, and `framework_extras`; unavailable values may be omitted or set to `null`.
 
-Current package scope: `@debugbundle/sdk-node` captures the full safe process-fact set. Python and PHP currently emit runtime version and request/framework context; adding the fuller safe process-fact set to those SDKs is a parity follow-up under the same contract.
+Current package scope: `@debugbundle/sdk-node`, `debugbundle-python`, and `debugbundle/sdk-php` capture safe backend process facts while excluding environment variables.
 Incidents use `trace_id` to link frontend breadcrumbs to backend exceptions. This enables the bundle to include the full user journey (frontend actions → backend failure) in a single debug context.
 
 | Behavior | Rule |
