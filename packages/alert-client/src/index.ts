@@ -132,7 +132,7 @@ export function createAlertApi(client: HttpClient): {
     channel: AlertChannel;
     conditionType: AlertConditionType;
     severityMin?: "low" | "medium" | "high" | "critical";
-    config?: Record<string, unknown>;
+    config: Record<string, unknown>;
     isEnabled?: boolean;
   }): Promise<AlertRecord>;
   updateAlert(input: {
@@ -165,12 +165,13 @@ export function createAlertApi(client: HttpClient): {
         channel: AlertChannel;
         condition_type: AlertConditionType;
         severity_min?: "low" | "medium" | "high" | "critical";
-        config?: Record<string, unknown>;
+        config: Record<string, unknown>;
         is_enabled?: boolean;
       } = {
         project_id: input.projectId,
         channel: input.channel,
-        condition_type: input.conditionType
+        condition_type: input.conditionType,
+        config: input.config
       };
 
       if (input.serviceId !== undefined) {
@@ -178,9 +179,6 @@ export function createAlertApi(client: HttpClient): {
       }
       if (input.severityMin !== undefined) {
         body.severity_min = input.severityMin;
-      }
-      if (input.config !== undefined) {
-        body.config = input.config;
       }
       if (input.isEnabled !== undefined) {
         body.is_enabled = input.isEnabled;

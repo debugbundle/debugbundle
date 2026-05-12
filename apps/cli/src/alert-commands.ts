@@ -98,7 +98,7 @@ export async function createAlertCommand(
     channel: AlertChannel;
     conditionType: AlertConditionType;
     severityMin?: "low" | "medium" | "high" | "critical";
-    config?: Record<string, unknown>;
+    config: Record<string, unknown>;
     isEnabled?: boolean;
     json?: boolean;
   },
@@ -110,7 +110,7 @@ export async function createAlertCommand(
       channel: AlertChannel;
       conditionType: AlertConditionType;
       severityMin?: "low" | "medium" | "high" | "critical";
-      config?: Record<string, unknown>;
+      config: Record<string, unknown>;
       isEnabled?: boolean;
     }): Promise<AlertRecord>;
   }
@@ -123,22 +123,20 @@ export async function createAlertCommand(
       channel: AlertChannel;
       conditionType: AlertConditionType;
       severityMin?: "low" | "medium" | "high" | "critical";
-      config?: Record<string, unknown>;
+      config: Record<string, unknown>;
       isEnabled?: boolean;
     } = {
       bearerToken: input.bearerToken,
       projectId: input.projectId,
       channel: input.channel,
-      conditionType: input.conditionType
+      conditionType: input.conditionType,
+      config: input.config
     };
     if (input.serviceId !== undefined) {
       requestInput.serviceId = input.serviceId;
     }
     if (input.severityMin !== undefined) {
       requestInput.severityMin = input.severityMin;
-    }
-    if (input.config !== undefined) {
-      requestInput.config = input.config;
     }
     if (input.isEnabled !== undefined) {
       requestInput.isEnabled = input.isEnabled;
@@ -162,7 +160,7 @@ export async function createAlertWithAuthCommand(
     channel: AlertChannel;
     conditionType: AlertConditionType;
     severityMin?: "low" | "medium" | "high" | "critical";
-    config?: Record<string, unknown>;
+    config: Record<string, unknown>;
     isEnabled?: boolean;
     json?: boolean;
   },
@@ -179,23 +177,21 @@ export async function createAlertWithAuthCommand(
         channel: AlertChannel;
         conditionType: AlertConditionType;
         severityMin?: "low" | "medium" | "high" | "critical";
-        config?: Record<string, unknown>;
+        config: Record<string, unknown>;
         isEnabled?: boolean;
         json?: boolean;
       } = {
         bearerToken: authState.bearer_token,
         projectId: input.projectId,
         channel: input.channel,
-        conditionType: input.conditionType
+        conditionType: input.conditionType,
+        config: input.config
       };
       if (input.serviceId !== undefined) {
         commandInput.serviceId = input.serviceId;
       }
       if (input.severityMin !== undefined) {
         commandInput.severityMin = input.severityMin;
-      }
-      if (input.config !== undefined) {
-        commandInput.config = input.config;
       }
       if (input.isEnabled !== undefined) {
         commandInput.isEnabled = input.isEnabled;

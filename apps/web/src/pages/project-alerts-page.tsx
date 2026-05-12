@@ -32,6 +32,7 @@ import {
   type AlertRecord
 } from "../lib/api.js";
 import { showErrorToast, showSuccessToast } from "../lib/notify.js";
+import { useSession } from "../lib/session.js";
 import { useDelayedVisibility } from "../lib/use-delayed-visibility.js";
 
 const TEAM_ALERT_CHANNEL_OPTIONS: Array<{ value: AlertChannel; label: string }> = [
@@ -63,12 +64,14 @@ const SEVERITY_OPTIONS: Array<{ value: "" | "low" | "medium" | "high" | "critica
 
 export function ProjectAlertsPage(): JSX.Element {
   const { project, projectId } = useOutletContext<ProjectContext>();
+  const { session } = useSession();
   const [alerts, setAlerts] = useState<AlertRecord[] | null>(null);
   const showAlertsLoading = useDelayedVisibility(alerts === null);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [channel, setChannel] = useState<AlertChannel>("email");
   const [conditionType, setConditionType] = useState<AlertConditionType>("new_incident");
   const [severityMin, setSeverityMin] = useState<"" | "low" | "medium" | "high" | "critical">("");
+  const [emailRecipient, setEmailRecipient] = useState("");
   const [destinationUrl, setDestinationUrl] = useState("");
   const channelOptions = project.organization_plan === "team" ? TEAM_ALERT_CHANNEL_OPTIONS : STANDARD_ALERT_CHANNEL_OPTIONS;
 
@@ -89,13 +92,33 @@ export function ProjectAlertsPage(): JSX.Element {
     setChannel(channelOptions[0]?.value ?? "email");
   }, [channel, channelOptions]);
 
+  function resetCreateForm(nextChannel: AlertChannel = "email"): void {
+    setChannel(nextChannel);
+    setConditionType("new_incident");
+    setSeverityMin("");
+    setEmailRecipient(session?.email ?? "");
+    setDestinationUrl("");
+  }
+
+  function handleCreateOpenChange(nextOpen: boolean): void {
+    setIsCreateOpen(nextOpen);
+
+    if (nextOpen) {
+      resetCreateForm();
+    }
+  }
+
   async function handleCreateAlert(event: React.FormEvent<HTMLFormElement>): Promise<void> {
     event.preventDefault();
 
-    const config = buildAlertConfig(channel, destinationUrl.trim());
+    const config = buildAlertConfig({
+      channel,
+      emailRecipient: emailRecipient.trim(),
+      destinationUrl: destinationUrl.trim()
+    });
 
     if (config === null) {
-      showErrorToast("Add a destination URL for this alert channel.");
+      showErrorToast(channel === "email" ? "Enter a valid recipient email address." : "Add a destination URL for this alert channel.");
       return;
     }
 
@@ -122,10 +145,7 @@ export function ProjectAlertsPage(): JSX.Element {
       const created = await createProjectAlert(createPayload);
 
       setAlerts((current) => [...(current ?? []), created]);
-      setChannel("email");
-      setConditionType("new_incident");
-      setSeverityMin("");
-      setDestinationUrl("");
+      resetCreateForm();
       setIsCreateOpen(false);
       showSuccessToast("Alert rule created successfully.");
     } catch {
@@ -147,7 +167,7 @@ export function ProjectAlertsPage(): JSX.Element {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <div />
-        <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
+        <Dialog open={isCreateOpen} onOpenChange={handleCreateOpenChange}>
           <DialogTrigger asChild>
             <Button type="button">
               <PlusIcon data-icon="inline-start" />
@@ -177,7 +197,22 @@ export function ProjectAlertsPage(): JSX.Element {
                     </select>
                     <FieldDescription>{describeAlertChannel(channel)}</FieldDescription>
                   </Field>
-                  {channel === "email" ? null : (
+                  {channel === "email" ? (
+                    <Field>
+                      <FieldLabel htmlFor="project-alert-email-recipient">Recipient email</FieldLabel>
+                      <FieldDescription>Send this alert to a single email address. Create additional alert rules if multiple people should receive it.</FieldDescription>
+                      <Input
+                        id="project-alert-email-recipient"
+                        type="email"
+                        inputMode="email"
+                        autoComplete="email"
+                        placeholder={session?.email ?? "oncall@example.com"}
+                        value={emailRecipient}
+                        onChange={(event) => setEmailRecipient(event.currentTarget.value)}
+                        required
+                      />
+                    </Field>
+                  ) : (
                     <Field>
                       <FieldLabel htmlFor="project-alert-destination">{getDestinationLabel(channel)}</FieldLabel>
                       <FieldDescription>{getDestinationDescription(channel)}</FieldDescription>
@@ -322,25 +357,39 @@ export function ProjectAlertsPage(): JSX.Element {
   );
 }
 
-function formatAlertChannel(channel: AlertChannel): string {
+export function formatAlertChannel(channel: AlertChannel): string {
   return TEAM_ALERT_CHANNEL_OPTIONS.find((option) => option.value === channel)?.label ?? channel;
 }
 
-function formatAlertCondition(conditionType: AlertConditionType): string {
+export function formatAlertCondition(conditionType: AlertConditionType): string {
   return ALERT_CONDITION_OPTIONS.find((option) => option.value === conditionType)?.label ?? conditionType;
 }
 
-function formatSeverity(severity: "low" | "medium" | "high" | "critical"): string {
+export function formatSeverity(severity: "low" | "medium" | "high" | "critical"): string {
   return SEVERITY_OPTIONS.find((option) => option.value === severity)?.label ?? severity;
 }
 
-function buildAlertConfig(channel: AlertChannel, destinationUrl: string): Record<string, unknown> | null {
+export function buildAlertConfig(input: {
+  channel: AlertChannel;
+  emailRecipient: string;
+  destinationUrl: string;
+}): Record<string, unknown> | null {
+  const { channel, emailRecipient, destinationUrl } = input;
+
   if (channel === "email") {
-    return {};
+    return validateAlertRecipientEmail(emailRecipient) === undefined
+      ? { to: emailRecipient }
+      : null;
   }
 
   if (destinationUrl.length === 0) {
     return null;
+  }
+
+  if (channel === "webhook") {
+    return {
+      target_url: destinationUrl
+    };
   }
 
   return {
@@ -348,7 +397,7 @@ function buildAlertConfig(channel: AlertChannel, destinationUrl: string): Record
   };
 }
 
-function describeAlertChannel(channel: AlertChannel): string {
+export function describeAlertChannel(channel: AlertChannel): string {
   if (channel === "webhook") {
     return "Send only matched alert notifications to a dedicated endpoint. This is separate from the Webhooks tab, which delivers signed lifecycle events.";
   }
@@ -361,10 +410,10 @@ function describeAlertChannel(channel: AlertChannel): string {
     return "Post matched alert notifications into a Discord channel via a webhook URL.";
   }
 
-  return "Email alerts use the account email flow and do not need an extra destination URL here.";
+  return "Send matched alert notifications to a single email recipient. Create additional alert rules if multiple people should receive email.";
 }
 
-function getDestinationLabel(channel: AlertChannel): string {
+export function getDestinationLabel(channel: AlertChannel): string {
   if (channel === "slack") {
     return "Slack webhook URL";
   }
@@ -376,7 +425,7 @@ function getDestinationLabel(channel: AlertChannel): string {
   return "Webhook endpoint URL";
 }
 
-function getDestinationDescription(channel: AlertChannel): string {
+export function getDestinationDescription(channel: AlertChannel): string {
   if (channel === "slack") {
     return "Paste the Slack incoming webhook URL that should receive this alert rule.";
   }
@@ -386,4 +435,16 @@ function getDestinationDescription(channel: AlertChannel): string {
   }
 
   return "Matched alert events will be POSTed to this URL. Use the Webhooks tab for signed lifecycle webhook fanout.";
+}
+
+export function validateAlertRecipientEmail(value: string): string | undefined {
+  if (value.length === 0) {
+    return "Enter the email address that should receive this alert.";
+  }
+
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) {
+    return "Enter a valid email address for this alert.";
+  }
+
+  return undefined;
 }

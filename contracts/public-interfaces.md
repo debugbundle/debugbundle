@@ -20,6 +20,10 @@ Every capability must be available through all applicable interfaces. Operations
 | Accept invite | `POST /v1/auth/accept-invite` | — | — | Browser session only |
 | GitHub sign-in start | `GET /v1/auth/github/start` | — | — | Browser redirect entry point only |
 | GitHub sign-in callback | `GET /v1/auth/github/callback` | — | — | Browser redirect callback only |
+| GitHub device auth start | `POST /v1/auth/github/device/start` | — | — | CLI/browserless bootstrap helper |
+| GitHub device auth poll | `POST /v1/auth/github/device/poll` | — | — | CLI/browserless bootstrap helper |
+| GitHub device auth claim | `POST /v1/auth/github/device/claim` | — | — | Issues the member token after approval |
+| GitHub token exchange | `POST /v1/auth/github/token/exchange` | — | — | Exchanges an existing GitHub access token, including `gh auth token`, for a member token |
 | Ingest events | `POST /v1/events` | — | — | SDK-only (project token) |
 | List incidents | `GET /v1/incidents` | `incidents` | `list_incidents` | |
 | Get incident | `GET /v1/incidents/{id}` | `inspect` | `get_incident` | |
@@ -66,7 +70,7 @@ Every capability must be available through all applicable interfaces. Operations
 | Verify local | — | `verify local` | `verify_local` | CLI/MCP-only (local env) |
 | Verify cloud | — | `verify cloud` | `verify_cloud` | Uses API internally; `--trigger-5xx`/`trigger5xx` actively proves hosted 5xx incident creation |
 | Smoke test | — | `smoke` | `smoke` | CLI/MCP-only |
-| Login | — | `login` | — | CLI-only (stores member-token auth state locally) |
+| Login | — | `login` | — | CLI-only (stores member-token auth state locally; supports member-token, GitHub device, and `gh` bootstrap modes) |
 | Setup project | — | `setup` | — | CLI-only (local scaffold generation and relay scaffolding) |
 | Ingest local logs | — | `ingest` | — | CLI-only (local log parser pipeline) |
 | Watch local logs | — | `watch` | — | CLI-only (local log tail pipeline) |
@@ -129,8 +133,12 @@ Stripe checkout and customer-portal billing routes remain browser-session-only i
 | POST | `/v1/auth/accept-invite` | Browser Session | Accept a pending organization invite for the current signed-in user |
 | GET | `/v1/auth/github/start` | None | Start GitHub OAuth and set transient state cookie |
 | GET | `/v1/auth/github/callback` | None | Complete GitHub OAuth, issue browser session, and redirect back to the app |
+| POST | `/v1/auth/github/device/start` | None | Start GitHub device flow and return the verification URL/code |
+| POST | `/v1/auth/github/device/poll` | None | Poll GitHub device-flow progress through DebugBundle |
+| POST | `/v1/auth/github/device/claim` | None | Claim the issued member token after device approval completes |
+| POST | `/v1/auth/github/token/exchange` | None | Exchange an existing GitHub access token for a DebugBundle member token |
 
-Browser-auth endpoints exist for the SPA bootstrap flow. They are intentionally not exposed as CLI or MCP operations in V1.
+Browser-session bootstrap endpoints exist for the SPA flow only. The separate GitHub CLI bootstrap endpoints are API-backed helpers used by `debugbundle login --github*`, while MCP still reuses the member-token auth state established by the CLI.
 
 `GET /v1/auth/session` returns either `session: null` or a session object with `auth_methods.email`, `auth_methods.github`, and `csrf_token`. Browser-session mutations continue to use `csrf_token` from the same session payload.
 
@@ -155,6 +163,8 @@ Browser-auth endpoints exist for the SPA bootstrap flow. They are intentionally 
 ```
 
 GitHub sign-in preserves the same first-party browser-session model as email-code auth. The start endpoint redirects to GitHub and sets a transient `SameSite=Lax` OAuth state cookie; the callback validates that state, links or creates the user account through `oauth_identities`, issues the normal session cookie, clears the transient OAuth cookie, and redirects back to the app callback URL.
+
+The CLI bootstrap flow is additive and issues the same member-token credential used by normal CLI/MCP auth. `POST /v1/auth/github/device/start` plus `poll`/`claim` implement the official GitHub device flow. `POST /v1/auth/github/token/exchange` accepts an already-authenticated GitHub access token such as the output of `gh auth token`.
 
 `GET /v1/account/export` returns a JSON attachment covering the retained organization-account record set, including members, projects, tokens, incidents, audit logs, billing-processing rows, and retained raw-event, bundle, and reproduction artifacts when present in object storage.
 
@@ -720,27 +730,30 @@ Checkout confirmation returns the standard billing summary response after the AP
   "condition_type": "severity_threshold",
   "severity_min": "high",
   "config": {
-    "to": ["oncall@example.com"]
+    "to": "oncall@example.com"
   },
   "is_enabled": true
 }
 ```
 
-`service_id`, `severity_min`, and `config` are optional on create. `config` defaults to `{}` and `is_enabled` defaults to `true`.
+`service_id` and `severity_min` are optional on create, and `is_enabled` defaults to `true`.
+For `channel: "email"`, `config.to` is required and must be a single recipient email address. Create additional alert rules if multiple people should receive email notifications.
 
 **Update alert request:**
 ```json
 {
+  "channel": "webhook",
   "service_id": null,
   "severity_min": null,
   "config": {
-    "channel": "eng-alerts"
+    "target_url": "https://hooks.example.test/alerts"
   },
   "is_enabled": false
 }
 ```
 
 Update requests must include at least one field. `service_id`, `severity_min`, and `config` accept `null` to clear the stored value.
+When updating channel-specific `config`, include the `channel` in the same request so validation can apply the correct config schema.
 
 **Alert response:**
 ```json
@@ -753,7 +766,7 @@ Update requests must include at least one field. `service_id`, `severity_min`, a
     "condition_type": "severity_threshold",
     "severity_min": "high",
     "config": {
-      "to": ["oncall@example.com"]
+      "to": "oncall@example.com"
     },
     "is_enabled": true,
     "created_at": "ISO8601",
@@ -791,7 +804,7 @@ Current API implementation scope (Phase 10 alert CRUD slice):
 - `DELETE /v1/alerts/{id}` returns `204` on success.
 - Worker-side alert evaluation now enqueues internal `evaluate-alerts` jobs from real incident transitions for `new_incident`, `severity_threshold`, `incident_regressed`, `regression_after_deploy`, and `error_spike` conditions.
 - Matching alert evaluations persist one internal `alert_deliveries` row per `alert_id + incident_id + dedupe_key` before delivery so duplicate worker replays stay idempotent.
-- Current concrete delivery transport is implemented for `channel: "webhook"` using `config.target_url` or `config.url`. Other stored channel types remain CRUD-valid but the current worker records a failed delivery with `alert_channel_not_supported:<channel>` until those transports ship.
+- Delivery transport is implemented for `channel: "email"`, `channel: "slack"`, `channel: "discord"`, and `channel: "webhook"`. Email requires `config.to` as a single recipient address; Slack and Discord require `config.webhook_url`; webhook requires `config.target_url`.
 - Authorization failure: `401 { "error": "invalid_member_token" }`
 - Invalid list query: `400 { "error": "invalid_query" }`
 - Invalid alert ID: `400 { "error": "invalid_alert_id" }`
@@ -1586,12 +1599,12 @@ Current local CLI retrieval limitation: `debugbundle logs` still requires the au
 ### 2.5 Alert Commands
 ```
 debugbundle alert list --project-id <id> [--limit <n>] [--auth-file <path>] [--json]
-debugbundle alert create --project-id <id> --channel <channel> --condition <condition> [--service-id <id>] [--severity-min <level>] [--config-json <json>] [--is-enabled <true|false>] [--auth-file <path>] [--json]
+debugbundle alert create --project-id <id> --channel <channel> --condition <condition> [--service-id <id>] [--severity-min <level>] --config-json <json> [--is-enabled <true|false>] [--auth-file <path>] [--json]
 debugbundle alert update <id> [--service-id <id|null>] [--channel <channel>] [--condition <condition>] [--severity-min <level|null>] [--config-json <json|null>] [--is-enabled <true|false>] [--auth-file <path>] [--json]
 debugbundle alert delete <id> [--auth-file <path>] [--json]
 ```
 
-Current alert CLI behavior is a thin adapter over the alert HTTP client in `packages/alert-client`, reusing stored member auth after `debugbundle login` and forwarding JSON output without duplicating transport logic. `--config-json` accepts any JSON value; `null` clears stored update fields for `service_id`, `severity_min`, or `config`.
+Current alert CLI behavior is a thin adapter over the alert HTTP client in `packages/alert-client`, reusing stored member auth after `debugbundle login` and forwarding JSON output without duplicating transport logic. `alert create` requires `--config-json` with a channel-specific object, and `alert update` accepts `null` clears for `service_id`, `severity_min`, or `config`.
 
 ### 2.6 Webhook Commands
 ```

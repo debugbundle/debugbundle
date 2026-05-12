@@ -45,6 +45,37 @@ export const STORAGE_SCHEMA_MIGRATIONS = [
       "ALTER TABLE organizations ADD COLUMN IF NOT EXISTS suspended_at timestamptz",
       "ALTER TABLE organization_members ADD COLUMN IF NOT EXISTS suspended_at timestamptz"
     ]
+  }),
+  defineStorageSchemaMigration({
+    id: "202605120001_add_github_device_authorizations",
+    description: "Add persisted GitHub CLI bootstrap state for device-flow login.",
+    statements: [
+      `
+        CREATE TABLE IF NOT EXISTS github_device_authorizations (
+          id uuid PRIMARY KEY,
+          device_code text NOT NULL UNIQUE,
+          user_code text NOT NULL,
+          verification_uri text NOT NULL,
+          interval_seconds integer NOT NULL,
+          expires_at timestamptz NOT NULL,
+          accepted_terms_at timestamptz,
+          created_at timestamptz NOT NULL DEFAULT now(),
+          completed_at timestamptz,
+          claimed_at timestamptz,
+          terminal_error text,
+          user_id uuid REFERENCES users(id) ON DELETE SET NULL,
+          organization_id uuid REFERENCES organizations(id) ON DELETE SET NULL
+        )
+      `,
+      `
+        CREATE INDEX IF NOT EXISTS github_device_authorizations_user_code_idx
+        ON github_device_authorizations (user_code, created_at DESC)
+      `,
+      `
+        CREATE INDEX IF NOT EXISTS github_device_authorizations_expires_at_idx
+        ON github_device_authorizations (expires_at)
+      `
+    ]
   })
 ] as const;
 

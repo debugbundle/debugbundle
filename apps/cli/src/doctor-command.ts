@@ -73,7 +73,7 @@ const RELAY_SPOOL_EVENT_SUFFIX = ".events.json";
 
 const SUGGESTED_ACTIONS = [
   "Run debugbundle setup if local scaffold files are missing.",
-  "Run debugbundle login to create ~/.debugbundle/auth.json.",
+  "Run debugbundle login --github, debugbundle login --github-device, or debugbundle login <dbundle_mem_...> to create ~/.debugbundle/auth.json.",
   "Review .debugbundle/profile.json when architecture changes or the profile becomes stale."
 ] as const;
 

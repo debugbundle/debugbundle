@@ -467,6 +467,20 @@ If CLI says something is healthy and MCP says something different, that is a pro
 - **Then** the browser receives a secure session cookie
 - **And** the SPA does not require a browser-stored member token for routine interactive use
 
+### AC-AUTH-08: GitHub Device Bootstrap
+- **Given** a user runs `debugbundle login --github`
+- **When** the CLI shows a GitHub device URL and code, the user approves the OAuth app in a browser, and the CLI continues polling
+- **Then** DebugBundle issues a normal member token
+- **And** the CLI stores it in `~/.debugbundle/auth.json`
+- **And** later CLI and MCP commands reuse that same stored member-token auth state
+
+### AC-AUTH-09: GitHub CLI Fast Path
+- **Given** `gh` is already authenticated on the machine
+- **When** the user or agent runs `debugbundle login --github-cli`
+- **Then** DebugBundle verifies the GitHub identity from that access token
+- **And** DebugBundle issues a normal member token without additional browser interaction
+- **And** the existing browser and email-code flows remain unchanged
+
 ---
 
 ## 11. Self-Host Acceptance

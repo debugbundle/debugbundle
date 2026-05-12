@@ -245,7 +245,7 @@ Last updated: 2026-03-27
 
 **FR-CLI-05:** Exit codes: 0 (success), 1 (general failure), 2 (auth/config error), 3 (resource not found), 4 (validation error).
 
-**FR-CLI-06:** V1 auth via member token: user creates token in web app, runs `debugbundle login`, token stored in `~/.debugbundle/auth.json`. Device code flow deferred to V2. No dashboard dependency for daily operations.
+**FR-CLI-06:** CLI auth must support three bootstrap paths that all converge on the same stored member-token state in `~/.debugbundle/auth.json`: (a) direct member-token login, (b) GitHub device flow via `debugbundle login --github` / `--github-device`, and (c) GitHub CLI token bootstrap via `debugbundle login --github-cli` when `gh` is already authenticated. No dashboard dependency for daily operations.
 
 **FR-CLI-07:** `doctor` must detect installed SDKs across project runtimes and report coverage (which runtimes are instrumented, which are missing).
 
@@ -326,6 +326,10 @@ See `/spec/billing.md` and `/spec/system-emails.md` for the detailed source-of-t
 **FR-AUTH-11:** Member-authorized API operations must accept either a valid browser session or a valid member token. After principal resolution, both auth paths must run through the same authorization and domain logic.
 
 **FR-AUTH-12:** CLI and MCP must reuse member-token auth through the API. The SPA must use cookie-backed sessions. SDK ingestion must use project tokens only.
+
+**FR-AUTH-13:** GitHub CLI bootstrap must be additive, not a replacement for browser auth. The existing email-code and browser GitHub session flows remain the primary interactive path for humans without GitHub accounts or without local CLI access.
+
+**FR-AUTH-14:** GitHub device flow must be server-mediated: the CLI talks to DebugBundle, DebugBundle talks to GitHub, and successful approval must result in a normal DebugBundle member token issuance rather than a separate credential type.
 
 ### 1.13 Email System
 

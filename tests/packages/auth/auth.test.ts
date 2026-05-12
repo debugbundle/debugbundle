@@ -5,6 +5,7 @@ import {
   MEMBER_TOKEN_PREFIX,
   PROJECT_TOKEN_PREFIX,
   SESSION_COOKIE_NAME,
+  createGitHubOAuthClient,
   buildClearedGithubOauthStateCookie,
   buildClearedSessionCookie,
   buildGithubOauthStateCookie,
@@ -25,6 +26,36 @@ import {
   validateProjectToken,
   verifyPassword
 } from "../../../packages/auth/src/index.js";
+import type { GitHubOAuthClient } from "../../../packages/auth/src/index.js";
+
+function createGitHubOAuthClientMock(overrides: {
+  exchangeCodeForIdentity?: GitHubOAuthClient["exchangeCodeForIdentity"];
+} = {}): GitHubOAuthClient {
+  const exchangeCodeForIdentity =
+    overrides.exchangeCodeForIdentity ??
+    (async (): Promise<null> => null);
+
+  return {
+    exchangeCodeForIdentity,
+    async resolveIdentityFromAccessToken() {
+      return {
+        ok: false,
+        error: "token_invalid"
+      };
+    },
+    async beginDeviceAuthorization() {
+      return {
+        ok: false,
+        error: "device_flow_disabled"
+      };
+    },
+    async pollDeviceAuthorization() {
+      return {
+        status: "provider_error"
+      };
+    }
+  };
+}
 
 describe("auth token primitives", () => {
   it("generates project and member tokens with canonical prefixes", (): void => {
@@ -54,6 +85,35 @@ describe("auth token primitives", () => {
 
     expect(project).toEqual({ ok: true, context: { project_id: "proj_123" } });
     expect(member).toEqual({ ok: true, context: { member_id: "mem_123", organization_id: "org_123" } });
+  });
+
+  it("rejects invalid, expired, and revoked token contexts", async (): Promise<void> => {
+    await expect(validateProjectToken("wrong-prefix", () => Promise.resolve({ project_id: "proj_123" }))).resolves.toEqual({
+      ok: false,
+      error: "invalid_token",
+    });
+    await expect(validateMemberToken("dbundle_mem_missing", () => Promise.resolve(null))).resolves.toEqual({
+      ok: false,
+      error: "invalid_token",
+    });
+    await expect(
+      validateMemberToken("dbundle_mem_revoked", () =>
+        Promise.resolve({ member_id: "mem_123", organization_id: "org_123", revoked_at: "2026-03-16T00:00:00.000Z" })
+      )
+    ).resolves.toEqual({
+      ok: false,
+      error: "token_revoked",
+    });
+    await expect(
+      validateMemberToken(
+        "dbundle_mem_expired",
+        () => Promise.resolve({ member_id: "mem_123", organization_id: "org_123", expires_at: "2026-03-16T00:00:00.000Z" }),
+        { now: new Date("2026-03-16T00:00:01.000Z") }
+      )
+    ).resolves.toEqual({
+      ok: false,
+      error: "token_expired",
+    });
   });
 
   it("enforces project and member token route guards", async (): Promise<void> => {
@@ -127,6 +187,15 @@ describe("auth email-code and session primitives", () => {
     expect(validateGithubOauthState(`${payloadSegment}.short`, { now, secret: "github-oauth-secret" })).toBe(false);
     expect(validateGithubOauthState(`${payloadSegment}.tampered-signature-value`, { now, secret: "github-oauth-secret" })).toBe(false);
     expect(validateGithubOauthState(state.token, { now, secret: "wrong-secret" })).toBe(false);
+  });
+
+  it("rejects malformed github oauth state payloads and malformed cookie reads", () => {
+    expect(validateGithubOauthState("missing-separator", { secret: "github-oauth-secret" })).toBe(false);
+
+    const malformedPayload = `${Buffer.from(JSON.stringify({ nonce: "abc", expires_at: "2026-03-17T00:10:00.000Z", accepted_terms_at: 123 }), "utf8").toString("base64url")}.sig`;
+    expect(validateGithubOauthState(malformedPayload, { secret: "github-oauth-secret" })).toBe(false);
+    expect(readBearerToken("Bearer")).toBeNull();
+    expect(readCookieValue("theme=light; broken-entry", SESSION_COOKIE_NAME)).toBeNull();
   });
 
   it("requests an email code for allowlisted addresses and sends the OTP email", async (): Promise<void> => {
@@ -239,7 +308,7 @@ describe("auth email-code and session primitives", () => {
       organization_id: "org_123",
       role: "owner",
       created_at: now.toISOString(),
-      expires_at: "2026-03-16T04:00:00.000Z",
+      expires_at: "2026-03-23T00:00:00.000Z",
       revoked_at: null,
       has_email_auth: true,
       has_github_oauth: false
@@ -358,7 +427,7 @@ describe("auth email-code and session primitives", () => {
       organization_id: "org_123",
       role: "owner",
       created_at: now.toISOString(),
-      expires_at: "2026-03-16T04:00:00.000Z",
+      expires_at: "2026-03-23T00:00:00.000Z",
       revoked_at: null,
       has_email_auth: true,
       has_github_oauth: true
@@ -455,9 +524,7 @@ describe("auth email-code and session primitives", () => {
           appRedirectUrl: "http://localhost:5291/auth/github/callback",
           authorizeUrl: "http://localhost:5291/v1/auth/github/mock-authorize",
           stateSecret: "github-oauth-secret",
-          client: {
-            exchangeCodeForIdentity: vi.fn()
-          }
+          client: createGitHubOAuthClientMock()
         }
       }
     );
@@ -490,7 +557,7 @@ describe("auth email-code and session primitives", () => {
       organization_id: "org_123",
       role: "owner",
       created_at: "2026-03-17T00:00:00.000Z",
-      expires_at: "2026-03-17T04:00:00.000Z",
+      expires_at: "2026-03-24T00:00:00.000Z",
       revoked_at: null,
       has_email_auth: true,
       has_github_oauth: true
@@ -530,9 +597,7 @@ describe("auth email-code and session primitives", () => {
           callbackUrl: "http://localhost:5291/v1/auth/github/callback",
           appRedirectUrl: "http://localhost:5291/auth/github/callback",
           stateSecret: "github-oauth-secret",
-          client: {
-            exchangeCodeForIdentity
-          }
+          client: createGitHubOAuthClientMock({ exchangeCodeForIdentity })
         }
       }
     );
@@ -595,9 +660,7 @@ describe("auth email-code and session primitives", () => {
           callbackUrl: "http://localhost:5291/v1/auth/github/callback",
           appRedirectUrl: "http://localhost:5291/auth/github/callback",
           stateSecret: "github-oauth-secret",
-          client: {
-            exchangeCodeForIdentity
-          }
+          client: createGitHubOAuthClientMock({ exchangeCodeForIdentity })
         }
       }
     );
@@ -661,9 +724,7 @@ describe("auth email-code and session primitives", () => {
           callbackUrl: "http://localhost:5291/v1/auth/github/callback",
           appRedirectUrl: "http://localhost:5291/auth/github/callback",
           stateSecret: "github-oauth-secret",
-          client: {
-            exchangeCodeForIdentity
-          }
+          client: createGitHubOAuthClientMock({ exchangeCodeForIdentity })
         }
       }
     );
@@ -686,5 +747,128 @@ describe("auth email-code and session primitives", () => {
       error: "account_suspended",
       redirect_url: "http://localhost:5291/auth/github/callback?error=account_suspended"
     });
+  });
+
+  it("handles provider-not-configured, invalid-state, invite, and session-resolution edge cases", async (): Promise<void> => {
+    const noGithubService = createWebSessionAuthService({
+      findUserAccountByEmail: vi.fn(),
+      createUserAccount: vi.fn(),
+      createSession: vi.fn(),
+      resolveSessionByTokenHash: vi.fn().mockResolvedValue(null),
+      revokeSessionByTokenHash: vi.fn().mockResolvedValue(true),
+      revokeOtherSessionsForUser: vi.fn().mockResolvedValue(0),
+      markUserEmailVerified: vi.fn(),
+      replaceEmailAuthChallenge: vi.fn(),
+      consumeEmailAuthChallenge: vi.fn(),
+      upsertGitHubUserAccount: vi.fn(),
+      acceptOrganizationInvite: vi.fn(),
+    });
+
+    await expect(noGithubService.beginGithubAuth()).resolves.toEqual({ ok: false, error: "provider_not_configured" });
+    await expect(
+      noGithubService.completeGithubAuth({ code: "oauth-code", state: "state", stateCookieValue: "state" })
+    ).resolves.toEqual({ ok: false, error: "provider_not_configured" });
+
+    const expiredInviteService = createWebSessionAuthService(
+      {
+        findUserAccountByEmail: vi.fn(),
+        createUserAccount: vi.fn(),
+        createSession: vi.fn(),
+        resolveSessionByTokenHash: vi.fn().mockResolvedValue({
+          session_id: "ses_123",
+          user_id: "usr_123",
+          email: "owen@example.com",
+          email_verified_at: "2026-03-17T00:00:00.000Z",
+          organization_id: "org_123",
+          role: "owner",
+          created_at: "2026-03-17T00:00:00.000Z",
+          expires_at: "2026-03-16T00:00:00.000Z",
+          revoked_at: null,
+        }),
+        revokeSessionByTokenHash: vi.fn().mockResolvedValue(true),
+        revokeOtherSessionsForUser: vi.fn().mockResolvedValue(0),
+        markUserEmailVerified: vi.fn(),
+        replaceEmailAuthChallenge: vi.fn(),
+        consumeEmailAuthChallenge: vi.fn(),
+        upsertGitHubUserAccount: vi.fn(),
+        acceptOrganizationInvite: vi.fn(),
+      },
+      {
+        githubOAuth: {
+          clientId: "debugbundle-dev-mock-github",
+          callbackUrl: "http://localhost:5291/v1/auth/github/callback",
+          appRedirectUrl: "http://localhost:5291/auth/github/callback",
+          stateSecret: "github-oauth-secret",
+          client: createGitHubOAuthClientMock(),
+        },
+      }
+    );
+
+    const inviteService = createWebSessionAuthService(
+      {
+        findUserAccountByEmail: vi.fn(),
+        createUserAccount: vi.fn(),
+        createSession: vi.fn(),
+        resolveSessionByTokenHash: vi
+          .fn()
+          .mockResolvedValueOnce(null)
+          .mockResolvedValue({
+            session_id: "ses_123",
+            user_id: "usr_123",
+            email: "owen@example.com",
+            email_verified_at: "2026-03-17T00:00:00.000Z",
+            organization_id: "org_123",
+            role: "owner",
+            created_at: "2026-03-17T00:00:00.000Z",
+            expires_at: "2026-03-23T00:00:00.000Z",
+            revoked_at: null,
+          }),
+        revokeSessionByTokenHash: vi.fn().mockResolvedValue(true),
+        revokeOtherSessionsForUser: vi.fn().mockResolvedValue(0),
+        markUserEmailVerified: vi.fn(),
+        replaceEmailAuthChallenge: vi.fn(),
+        consumeEmailAuthChallenge: vi.fn(),
+        upsertGitHubUserAccount: vi.fn(),
+        acceptOrganizationInvite: vi
+          .fn()
+          .mockResolvedValueOnce({ kind: "email_mismatch" })
+          .mockResolvedValueOnce({ kind: "accepted", membership: { user_id: "usr_123", organization_id: "org_123", role: "member" } }),
+      },
+      {
+        githubOAuth: {
+          clientId: "debugbundle-dev-mock-github",
+          callbackUrl: "http://localhost:5291/v1/auth/github/callback",
+          appRedirectUrl: "http://localhost:5291/auth/github/callback",
+          stateSecret: "github-oauth-secret",
+          client: createGitHubOAuthClientMock(),
+        },
+      }
+    );
+
+    await expect(inviteService.acceptInviteForSession("session-secret", { token: "dbundle_invite_test", now: new Date("2026-03-17T00:00:00.000Z") })).resolves.toEqual({
+      ok: false,
+      error: "invalid_session",
+    });
+    await expect(expiredInviteService.acceptInviteForSession("session-secret", { token: "dbundle_invite_test", now: new Date("2026-03-16T00:00:01.000Z") })).resolves.toEqual({
+      ok: false,
+      error: "invalid_session",
+    });
+    await expect(inviteService.acceptInviteForSession("session-secret", { token: "not-an-invite", now: new Date("2026-03-17T00:00:00.000Z") })).resolves.toEqual({
+      ok: false,
+      error: "invalid_token",
+    });
+    await expect(inviteService.acceptInviteForSession("session-secret", { token: "dbundle_invite_test", now: new Date("2026-03-17T00:00:00.000Z") })).resolves.toEqual({
+      ok: false,
+      error: "invite_email_mismatch",
+    });
+    await expect(inviteService.acceptInviteForSession("session-secret", { token: "dbundle_invite_test", now: new Date("2026-03-17T00:00:00.000Z") })).resolves.toEqual({
+      ok: true,
+      membership: { user_id: "usr_123", organization_id: "org_123", role: "member" },
+    });
+
+    await expect(inviteService.resolveSessionByToken("session-secret", { now: new Date("2026-03-17T00:00:00.000Z") })).resolves.toMatchObject({
+      session_id: "ses_123",
+    });
+    await expect(inviteService.revokeSessionByToken("session-secret", { now: new Date("2026-03-17T00:30:00.000Z") })).resolves.toBe(true);
   });
 });

@@ -39,7 +39,7 @@ Authentication responses must not reveal whether an account exists. Signup, forg
 Password creation (signup, reset, change) must enforce: minimum 12 characters, at least one lowercase, one uppercase, and one digit or symbol. Login accepts any existing credential without retroactive enforcement.
 
 ### SEC-08: Session Lifetime Bounds
-Default session lifetime must not exceed 4 hours. Changes to session lifetime require explicit rationale and security review.
+Default browser-session lifetime must not exceed 7 days. Changes to session lifetime require explicit rationale and security review.
 
 ### SEC-09: Constant-Time Security Comparisons
 All security-sensitive string comparisons (token validation, HMAC verification, OAuth state, CSRF tokens, trigger-token signatures) must use constant-time comparison (`crypto.timingSafeEqual` in Node, `crypto.subtle.verify` in browser). Never use `===` for secrets.

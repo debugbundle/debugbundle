@@ -14,6 +14,7 @@ const API_TABLE_ROWS = [
   { table_name: "projects" },
   { table_name: "project_tokens" },
   { table_name: "member_tokens" },
+  { table_name: "github_device_authorizations" },
   { table_name: "probe_activations" },
   { table_name: "services" },
   { table_name: "deployments" },

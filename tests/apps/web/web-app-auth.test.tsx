@@ -5,7 +5,7 @@ import { userEvent } from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { App } from "../../../apps/web/src/app.tsx";
-import { buildApiUrl, resolveApiBaseUrl } from "../../../apps/web/src/lib/api.ts";
+import { buildApiUrl, resetBrowserSessionClientState, resolveApiBaseUrl } from "../../../apps/web/src/lib/api.ts";
 import { resolveDocumentationUrl } from "../../../apps/web/src/lib/external-links.ts";
 import {
   createBillingSummary,
@@ -17,6 +17,7 @@ import {
 
 afterEach(() => {
   cleanup();
+  resetBrowserSessionClientState();
   vi.unstubAllEnvs();
   vi.unstubAllGlobals();
   vi.restoreAllMocks();
@@ -88,6 +89,76 @@ describe("web app - auth routes", () => {
 
     expect(screen.getByText(/^or$/i)).toBeInTheDocument();
     expect(githubLink.compareDocumentPosition(emailInput) & Node.DOCUMENT_POSITION_FOLLOWING).not.toBe(0);
+  });
+
+  it("redirects to login with a toast when a protected request returns invalid_session", async () => {
+    const fetchMock = vi.fn((input: RequestInfo | URL) => {
+      const url = requestUrl(input);
+
+      if (url.endsWith("/v1/auth/session")) {
+        return jsonResponse(200, {
+          session: createSession()
+        });
+      }
+
+      if (url.endsWith("/v1/billing")) {
+        return jsonResponse(401, { error: "invalid_session" });
+      }
+
+      return jsonResponse(404, { error: "not_found" });
+    });
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<App initialEntries={["/billing"]} />);
+
+    expect(await screen.findByRole("heading", { name: /continue to debugbundle/i })).toBeInTheDocument();
+    expect(await screen.findByText(/your session expired\. please sign in again\./i)).toBeInTheDocument();
+  });
+
+  it("redirects unknown signed-out routes back to login", async () => {
+    const fetchMock = vi.fn((input: RequestInfo | URL) => {
+      if (requestUrl(input).endsWith("/v1/auth/session")) {
+        return jsonResponse(401, { error: "invalid_session" });
+      }
+
+      return jsonResponse(404, { error: "not_found" });
+    });
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<App initialEntries={["/does-not-exist"]} />);
+
+    expect(await screen.findByRole("heading", { name: /continue to debugbundle/i })).toBeInTheDocument();
+  });
+
+  it("gates team-only organization routes for solo plans", async () => {
+    const fetchMock = vi.fn((input: RequestInfo | URL) => {
+      const url = requestUrl(input);
+
+      if (url.endsWith("/v1/auth/session")) {
+        return jsonResponse(200, {
+          session: createSession({ organization_plan: "solo" })
+        });
+      }
+
+      if (url.endsWith("/v1/billing")) {
+        return jsonResponse(200, { billing: createBillingSummary({ plan: "solo" }) });
+      }
+
+      if (url.endsWith("/v1/projects")) {
+        return jsonResponse(200, { projects: [] });
+      }
+
+      return jsonResponse(200, { tokens: [] });
+    });
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<App initialEntries={["/organization"]} />);
+
+    expect(await screen.findByText(/shared workspace requires team/i)).toBeInTheDocument();
+    expect(screen.getByText(/shared workspace views and member management are only available on team/i)).toBeInTheDocument();
   });
 
   it("requests and verifies an email code from the login screen before landing on the dashboard", async () => {
@@ -299,6 +370,24 @@ describe("web app - auth routes", () => {
     expect(screen.getByRole("link", { name: /back to login/i })).toBeInTheDocument();
   });
 
+  it("shows a recoverable GitHub auth callback state when no browser session is created", async () => {
+    const fetchMock = vi.fn((input: RequestInfo | URL) => {
+      if (requestUrl(input).endsWith("/v1/auth/session")) {
+        return jsonResponse(401, { error: "invalid_session" });
+      }
+
+      return jsonResponse(200, { success: true });
+    });
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<App initialEntries={["/auth/github/callback"]} />);
+
+    expect(await screen.findByText(/no active browser session was created/i)).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /continue with github/i })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /back to login/i })).toBeInTheDocument();
+  });
+
   it("blocks first member-token creation for unverified sessions", async () => {
     const fetchMock = vi.fn((input: RequestInfo | URL) => {
       const url = requestUrl(input);
@@ -412,6 +501,38 @@ describe("web app - auth routes", () => {
     expect(screen.getByText(/^Email code$/i)).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /change password/i })).toBeNull();
     expect(screen.getByText(/one-time code sign-in/i)).toBeInTheDocument();
+  });
+
+  it("supports resending codes and switching back to the email step", async () => {
+    const user = userEvent.setup();
+    const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = requestUrl(input);
+
+      if (url.endsWith("/v1/auth/session")) {
+        return jsonResponse(401, { error: "invalid_session" });
+      }
+
+      if (url.endsWith("/v1/auth/request-code")) {
+        expect(init?.body).toBe(JSON.stringify({ email: "owen@example.com", accepted_terms: true }));
+        return jsonResponse(200, { success: true });
+      }
+
+      return jsonResponse(200, { success: true });
+    });
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<App initialEntries={["/login"]} />);
+
+    await user.type(await screen.findByLabelText(/email address/i), "owen@example.com");
+    await user.click(screen.getByRole("button", { name: /^send code$/i }));
+    expect(await screen.findByLabelText(/six-digit code/i)).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: /resend code/i }));
+    await user.click(screen.getByRole("button", { name: /use a different email/i }));
+
+    expect(screen.queryByLabelText(/six-digit code/i)).toBeNull();
+    expect(fetchMock.mock.calls.filter(([input]) => requestUrl(input).endsWith("/v1/auth/request-code"))).toHaveLength(2);
   });
 
   it("shows GitHub-only settings copy when email auth is unavailable", async () => {
@@ -556,6 +677,53 @@ describe("web app - auth routes", () => {
     const dialog = await screen.findByRole("alertdialog");
     await user.type(within(dialog).getByLabelText(/confirm email address/i), "owen@example.com");
     await user.click(within(dialog).getAllByRole("button", { name: /delete account/i })[0] as HTMLButtonElement);
+
+    expect(await screen.findByRole("heading", { name: /continue to debugbundle/i })).toBeInTheDocument();
+  });
+
+  it("signs out from the authenticated shell and revokes member tokens", async () => {
+    const user = userEvent.setup();
+    const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = requestUrl(input);
+
+      if (url.endsWith("/v1/auth/session")) {
+        return jsonResponse(200, { session: createSession() });
+      }
+
+      if (url.endsWith("/v1/member/tokens") && init?.method === undefined) {
+        return jsonResponse(200, { tokens: [createMemberTokenRecord()] });
+      }
+
+      if (url.endsWith("/v1/member/tokens/tok_123/revoke") && init?.method === "POST") {
+        return jsonResponse(200, { token: { token_id: "tok_123" } });
+      }
+
+      if (url.endsWith("/v1/auth/logout") && init?.method === "POST") {
+        return jsonResponse(200, { success: true });
+      }
+
+      return jsonResponse(404, { error: "not_found" });
+    });
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<App initialEntries={["/member-tokens"]} />);
+
+    expect(await screen.findByRole("heading", { name: /member tokens/i })).toBeInTheDocument();
+    await user.click(await screen.findByRole("button", { name: /^revoke$/i }));
+    await user.click(await screen.findByRole("button", { name: /revoke token/i }));
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith(
+        expect.stringMatching(/\/v1\/member\/tokens\/tok_123\/revoke$/),
+        expect.objectContaining({ method: "POST" })
+      );
+    });
+    await waitFor(() => {
+      expect(screen.queryByRole("alertdialog")).toBeNull();
+    });
+
+    await user.click(screen.getByRole("button", { name: /owen@example.com/i }));
+    await user.click(await screen.findByRole("menuitem", { name: /log out/i }));
 
     expect(await screen.findByRole("heading", { name: /continue to debugbundle/i })).toBeInTheDocument();
   });

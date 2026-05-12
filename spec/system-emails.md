@@ -65,6 +65,7 @@ User-configured alert notifications (not system-triggered):
 
 These are driven by user-created alert rules, not system lifecycle events.
 The alert delivery system already supports email as a channel type.
+Email alert rules require one explicit recipient address per rule in v1.
 They are listed here for completeness but follow a different trigger model.
 
 See `apps/worker/src/runtime.ts` alert delivery for implementation.

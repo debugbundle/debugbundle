@@ -526,4 +526,230 @@ describe("cli connect command", () => {
       ])
     });
   });
+
+  it("surfaces generic cloud API failures with the retry suggestion", async () => {
+    const rootDirectory = await createConnectFixtureRepository();
+
+    const result = await connectCommand(
+      {
+        json: true
+      },
+      {
+        cwd: () => rootDirectory,
+        readAuthState: vi.fn().mockResolvedValue({
+          bearer_token: "dbundle_mem_secret",
+          base_url: "https://api.debugbundle.com"
+        }),
+        createProjectManagementApi: vi.fn().mockReturnValue({
+          listProjects: vi.fn().mockRejectedValue(new Error("upstream_timeout")),
+          createProject: vi.fn()
+        }),
+        createTokenManagementApi: vi.fn().mockReturnValue({
+          createProjectToken: vi.fn()
+        })
+      }
+    );
+
+    expect(result.exitCode).toBe(1);
+    expect(JSON.parse(result.output)).toMatchObject({
+      status: "error",
+      errors: ["upstream_timeout"],
+      suggested_actions: ["Resolve the cloud API error and retry debugbundle connect."]
+    });
+  });
+
+  it("handles invalid derived slugs and missing plaintext project tokens", async () => {
+    const namelessRoot = await createConnectFixtureRepository();
+    const existingProfile = JSON.parse(await readFile(join(namelessRoot, ".debugbundle", "profile.json"), "utf8")) as {
+      project: { name: string };
+    };
+    existingProfile.project.name = "!!!";
+    await writeFile(join(namelessRoot, ".debugbundle", "profile.json"), `${JSON.stringify(existingProfile, null, 2)}\n`, "utf8");
+
+    const invalidSlug = await connectCommand(
+      { json: true },
+      {
+        cwd: () => namelessRoot,
+        readAuthState: vi.fn().mockResolvedValue({
+          bearer_token: "dbundle_mem_secret",
+          base_url: "https://api.debugbundle.com"
+        }),
+        createProjectManagementApi: vi.fn().mockReturnValue({ listProjects: vi.fn().mockResolvedValue([]), createProject: vi.fn() }),
+        createTokenManagementApi: vi.fn().mockReturnValue({ createProjectToken: vi.fn() })
+      }
+    );
+
+    const tokenlessRoot = await createConnectFixtureRepository();
+    const missingPlaintext = await connectCommand(
+      { json: true },
+      {
+        cwd: () => tokenlessRoot,
+        readAuthState: vi.fn().mockResolvedValue({
+          bearer_token: "dbundle_mem_secret",
+          base_url: "https://api.debugbundle.com"
+        }),
+        createProjectManagementApi: vi.fn().mockReturnValue({
+          listProjects: vi.fn().mockResolvedValue([
+            {
+              project_id: "proj_cloud_existing",
+              organization_id: "org_1",
+              name: "Checkout App",
+              slug: "checkout-app",
+              environment_default: "production",
+              plan: "free",
+              metrics: {
+                monthly_bundle_requests: 0,
+                monthly_raw_ingested_events: 0,
+                retained_bundles: 0,
+                monthly_alert_deliveries: 0
+              },
+              created_at: "2026-03-21T00:00:00.000Z",
+              updated_at: "2026-03-21T00:00:00.000Z"
+            }
+          ]),
+          createProject: vi.fn()
+        }),
+        createTokenManagementApi: vi.fn().mockReturnValue({
+          createProjectToken: vi.fn().mockResolvedValue({ token_id: "ptok_1", plaintext: "" })
+        })
+      }
+    );
+
+    expect(JSON.parse(invalidSlug.output)).toMatchObject({
+      status: "error",
+      errors: ["Cannot derive a cloud project slug from .debugbundle/profile.json project.name."]
+    });
+    expect(JSON.parse(missingPlaintext.output)).toMatchObject({
+      status: "error",
+      errors: ["Project token creation did not return plaintext credentials."]
+    });
+  });
+
+  it("returns a validation failure when the local connection config is malformed", async () => {
+    const rootDirectory = await createConnectFixtureRepository();
+
+    await writeFile(join(rootDirectory, ".debugbundle", "local", "connection.json"), "{bad-json}\n", "utf8");
+
+    const result = await connectCommand(
+      {
+        json: true
+      },
+      {
+        cwd: () => rootDirectory
+      }
+    );
+
+    expect(result.exitCode).toBe(4);
+    expect(JSON.parse(result.output)).toMatchObject({
+      status: "error",
+      checks: expect.arrayContaining([
+        {
+          name: "connection-config",
+          status: "error",
+          message: "Invalid .debugbundle/local/connection.json"
+        }
+      ])
+    });
+  });
+
+  it("uses the default auth state and HTTP client wiring when an auth file path is provided", async () => {
+    const rootDirectory = await createConnectFixtureRepository();
+    const authFilePath = join(rootDirectory, ".debugbundle", "auth.json");
+
+    await writeFile(
+      authFilePath,
+      `${JSON.stringify({ bearer_token: "dbundle_mem_secret", base_url: "https://api.debugbundle.com/" }, null, 2)}\n`,
+      "utf8"
+    );
+
+    const createProjectManagementApi = vi.fn().mockReturnValue({
+      listProjects: vi.fn().mockResolvedValue([
+        {
+          project_id: "proj_cloud_existing",
+          organization_id: "org_1",
+          name: "Checkout App",
+          slug: "checkout-app",
+          environment_default: "production",
+          plan: "free",
+          metrics: {
+            monthly_bundle_requests: 0,
+            monthly_raw_ingested_events: 0,
+            retained_bundles: 0,
+            monthly_alert_deliveries: 0
+          },
+          created_at: "2026-03-21T00:00:00.000Z",
+          updated_at: "2026-03-21T00:00:00.000Z"
+        }
+      ]),
+      createProject: vi.fn()
+    });
+    const createTokenManagementApi = vi.fn().mockReturnValue({
+      createProjectToken: vi.fn().mockResolvedValue({
+        token_id: "ptok_default_auth",
+        plaintext: "dbundle_proj_secret"
+      })
+    });
+
+    vi.spyOn(process, "cwd").mockReturnValue(rootDirectory);
+
+    const result = await connectCommand(
+      {
+        authFilePath,
+        json: true
+      },
+      {
+        fetchImpl: vi.fn(),
+        createProjectManagementApi,
+        createTokenManagementApi
+      }
+    );
+
+    expect(result.exitCode).toBe(0);
+    expect(createProjectManagementApi).toHaveBeenCalledWith(
+      expect.objectContaining({
+        request: expect.any(Function)
+      })
+    );
+    expect(createTokenManagementApi).toHaveBeenCalledWith(
+      expect.objectContaining({
+        request: expect.any(Function)
+      })
+    );
+    expect(JSON.parse(result.output)).toMatchObject({
+      status: "healthy",
+      checks: expect.arrayContaining([
+        {
+          name: "cloud-project",
+          status: "ok",
+          message: "Selected cloud project proj_cloud_existing (checkout-app)."
+        }
+      ])
+    });
+    expect(JSON.parse(await readFile(join(rootDirectory, ".debugbundle", "local", "connection.json"), "utf8"))).toMatchObject({
+      cloud_base_url: "https://api.debugbundle.com/"
+    });
+  });
+
+  it("surfaces invalid profile name schema errors in human output", async () => {
+    const rootDirectory = await createConnectFixtureRepository();
+    const existingProfile = JSON.parse(await readFile(join(rootDirectory, ".debugbundle", "profile.json"), "utf8")) as {
+      project: Record<string, unknown>;
+    };
+
+    existingProfile.project = {};
+
+    await writeFile(join(rootDirectory, ".debugbundle", "profile.json"), `${JSON.stringify(existingProfile, null, 2)}\n`, "utf8");
+
+    const result = await connectCommand(
+      {},
+      {
+        cwd: () => rootDirectory
+      }
+    );
+
+    expect(result.exitCode).toBe(4);
+    expect(result.output).toContain("DebugBundle connect failed.");
+    expect(result.output).toContain("project.name: Required");
+    expect(result.output).toContain("project.repo_url: Required");
+  });
 });

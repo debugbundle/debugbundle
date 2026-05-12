@@ -176,8 +176,8 @@ export function registerAlertRoutes(app: FastifyInstance, dependencies: ApiDepen
         updateInput.severity_min = severityMin;
       }
     }
-    if (Object.prototype.hasOwnProperty.call(parsedBody.data, "config")) {
-      const config = parsedBody.data.config;
+    if ("config" in parsedBody.data) {
+      const { config } = parsedBody.data;
       if (config !== undefined) {
         updateInput.config = config;
       }

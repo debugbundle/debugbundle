@@ -338,6 +338,51 @@ export function buildApiUrl(path: string, env: WebApiEnv = import.meta.env): str
 
 const API_BASE = resolveApiBaseUrl();
 let browserSessionCsrfToken: string | null = null;
+let browserSessionInvalidated = false;
+const browserSessionInvalidationListeners = new Set<() => void>();
+
+export class InvalidSessionError extends Error {
+  constructor() {
+    super("invalid_session");
+    this.name = "InvalidSessionError";
+  }
+}
+
+export function isInvalidSessionError(error: unknown): error is InvalidSessionError {
+  return error instanceof InvalidSessionError || (error instanceof Error && error.message === "invalid_session");
+}
+
+function clearBrowserSessionState(): void {
+  browserSessionCsrfToken = null;
+}
+
+function invalidateBrowserSession(): void {
+  clearBrowserSessionState();
+
+  if (browserSessionInvalidated) {
+    return;
+  }
+
+  browserSessionInvalidated = true;
+
+  for (const listener of browserSessionInvalidationListeners) {
+    listener();
+  }
+}
+
+export function subscribeToBrowserSessionInvalidation(listener: () => void): () => void {
+  browserSessionInvalidationListeners.add(listener);
+
+  return () => {
+    browserSessionInvalidationListeners.delete(listener);
+  };
+}
+
+export function resetBrowserSessionClientState(): void {
+  clearBrowserSessionState();
+  browserSessionInvalidated = false;
+  browserSessionInvalidationListeners.clear();
+}
 
 function parseAttachmentFilename(contentDisposition: string | null): string | null {
   if (contentDisposition === null) {
@@ -368,6 +413,12 @@ function normalizeProjectRecord(project: Omit<ProjectRecord, "metrics"> & { metr
 async function readJson<T>(response: Response): Promise<T> {
   if (!response.ok) {
     const body = (await response.json().catch(() => null)) as { error?: string } | null;
+
+    if (response.status === 401 && body?.error === "invalid_session") {
+      invalidateBrowserSession();
+      throw new InvalidSessionError();
+    }
+
     throw new Error(body?.error ?? `request_failed_${response.status}`);
   }
 
@@ -375,6 +426,10 @@ async function readJson<T>(response: Response): Promise<T> {
 }
 
 function rememberSession<T extends SessionRecord | null>(session: T): T {
+  if (session !== null) {
+    browserSessionInvalidated = false;
+  }
+
   browserSessionCsrfToken = session?.csrf_token ?? null;
   return session;
 }
@@ -399,7 +454,7 @@ export async function getSession(): Promise<SessionRecord | null> {
   });
 
   if (response.status === 401) {
-    browserSessionCsrfToken = null;
+    clearBrowserSessionState();
     return null;
   }
 
@@ -436,14 +491,18 @@ export async function verifyEmailCode(payload: { email: string; code: string }):
 }
 
 export async function logout(): Promise<void> {
-  await readJson(
-    await fetch(`${API_BASE}/v1/auth/logout`, {
-      method: "POST",
-      credentials: "include",
-      headers: buildBrowserSessionHeaders()
-    })
-  );
-  browserSessionCsrfToken = null;
+  const response = await fetch(`${API_BASE}/v1/auth/logout`, {
+    method: "POST",
+    credentials: "include",
+    headers: buildBrowserSessionHeaders()
+  });
+
+  if (response.status !== 401) {
+    await readJson(response);
+  }
+
+  clearBrowserSessionState();
+  browserSessionInvalidated = false;
 }
 
 export async function exportAccountData(): Promise<{ blob: Blob; filename: string }> {
@@ -472,7 +531,8 @@ export async function deleteAccount(payload: { email: string }): Promise<Deleted
     })
   );
 
-  browserSessionCsrfToken = null;
+  clearBrowserSessionState();
+  browserSessionInvalidated = false;
   return body.account;
 }
 
@@ -760,7 +820,7 @@ export async function createProjectAlert(payload: {
   channel: AlertChannel;
   condition_type: AlertConditionType;
   severity_min?: "low" | "medium" | "high" | "critical";
-  config?: Record<string, unknown>;
+  config: Record<string, unknown>;
   is_enabled?: boolean;
 }): Promise<AlertRecord> {
   const body = await readJson<{ alert: AlertRecord }>(
@@ -774,7 +834,7 @@ export async function createProjectAlert(payload: {
         channel: payload.channel,
         condition_type: payload.condition_type,
         severity_min: payload.severity_min,
-        config: payload.config ?? {},
+        config: payload.config,
         is_enabled: payload.is_enabled ?? true
       })
     })

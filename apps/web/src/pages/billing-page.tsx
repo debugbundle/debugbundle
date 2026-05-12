@@ -15,6 +15,7 @@ import {
   cancelBillingCapacityReduction,
   confirmBillingCheckout,
   getBillingSummary,
+  isInvalidSessionError,
   increaseBillingCapacity,
   openBillingPortal,
   scheduleBillingCapacityReduction,
@@ -41,7 +42,7 @@ interface CheckoutReturnDialogState {
   plan?: BillingSummaryRecord["plan"];
 }
 
-function readPendingBillingCheckout(): PendingBillingCheckout | null {
+export function readPendingBillingCheckout(): PendingBillingCheckout | null {
   if (typeof window === "undefined") {
     return null;
   }
@@ -69,7 +70,7 @@ function readPendingBillingCheckout(): PendingBillingCheckout | null {
   return null;
 }
 
-function writePendingBillingCheckout(checkout: PendingBillingCheckout): void {
+export function writePendingBillingCheckout(checkout: PendingBillingCheckout): void {
   if (typeof window === "undefined") {
     return;
   }
@@ -77,7 +78,7 @@ function writePendingBillingCheckout(checkout: PendingBillingCheckout): void {
   window.sessionStorage.setItem(BILLING_CHECKOUT_STORAGE_KEY, JSON.stringify(checkout));
 }
 
-function clearPendingBillingCheckout(): void {
+export function clearPendingBillingCheckout(): void {
   if (typeof window === "undefined") {
     return;
   }
@@ -85,7 +86,7 @@ function clearPendingBillingCheckout(): void {
   window.sessionStorage.removeItem(BILLING_CHECKOUT_STORAGE_KEY);
 }
 
-function billingReflectsCheckout(
+export function billingReflectsCheckout(
   billing: BillingSummaryRecord,
   pendingCheckout: PendingBillingCheckout | null,
   baseline: BillingSummaryRecord | null
@@ -101,7 +102,7 @@ function billingReflectsCheckout(
   return billing.plan !== baseline.plan || billing.stripe_customer_id !== baseline.stripe_customer_id;
 }
 
-function formatPlanName(plan: BillingSummaryRecord["plan"]): string {
+export function formatPlanName(plan: BillingSummaryRecord["plan"]): string {
   switch (plan) {
     case "solo":
       return "Solo";
@@ -120,7 +121,7 @@ interface CapacityDialogProps {
   onBillingChange(nextBilling: BillingSummaryRecord): void;
 }
 
-function CapacityDialog(props: CapacityDialogProps): JSX.Element {
+export function CapacityDialog(props: CapacityDialogProps): JSX.Element {
   const [increaseTarget, setIncreaseTarget] = useState(String(props.billing.capacity_units.additional_purchased + 1));
   const [reductionTarget, setReductionTarget] = useState(String(Math.max(props.billing.capacity_units.additional_purchased - 1, 0)));
   const [activeAction, setActiveAction] = useState<"increase" | "reduce" | "cancel" | null>(null);
@@ -348,7 +349,7 @@ function CapacityDialog(props: CapacityDialogProps): JSX.Element {
   );
 }
 
-function CheckoutReturnDialog(props: {
+export function CheckoutReturnDialog(props: {
   state: CheckoutReturnDialogState | null;
   onOpenChange(open: boolean): void;
 }): JSX.Element | null {
@@ -479,6 +480,10 @@ export function BillingPage(): JSX.Element {
 
         if (error instanceof Error && error.message === "forbidden") {
           setIsForbidden(true);
+          return null;
+        }
+
+        if (isInvalidSessionError(error)) {
           return null;
         }
 
@@ -805,7 +810,7 @@ export function BillingPage(): JSX.Element {
   );
 }
 
-function formatDate(value: string): string {
+export function formatDate(value: string): string {
   return new Intl.DateTimeFormat(undefined, {
     month: "short",
     day: "numeric",
@@ -813,10 +818,10 @@ function formatDate(value: string): string {
   }).format(new Date(value));
 }
 
-function formatActiveProjectCount(value: number): string {
+export function formatActiveProjectCount(value: number): string {
   return `${value} active ${value === 1 ? "project" : "projects"}`;
 }
 
-function formatAllowanceUnitCount(value: number): string {
+export function formatAllowanceUnitCount(value: number): string {
   return `${value} allowance ${value === 1 ? "unit" : "units"}`;
 }

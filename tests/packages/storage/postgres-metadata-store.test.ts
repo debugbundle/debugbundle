@@ -989,7 +989,7 @@ describe("postgres metadata store", () => {
             channel: "email",
             condition_type: "new_incident",
             severity_min: null,
-            config: {},
+            config: { to: "owner@example.com" },
             is_enabled: true,
             created_at: "2026-03-15T00:00:00.000Z",
             updated_at: "2026-03-15T00:00:00.000Z"
@@ -1012,7 +1012,7 @@ describe("postgres metadata store", () => {
         channel: "email",
         condition_type: "new_incident",
         severity_min: null,
-        config: {},
+        config: { to: "owner@example.com" },
         is_enabled: true,
         created_at: "2026-03-15T00:00:00.000Z",
         updated_at: "2026-03-15T00:00:00.000Z"
@@ -1033,7 +1033,7 @@ describe("postgres metadata store", () => {
             channel: "email",
             condition_type: "new_incident",
             severity_min: null,
-            config: {},
+            config: { to: "owner@example.com" },
             is_enabled: true,
             created_at: "2026-03-15T00:00:00.000Z",
             updated_at: "2026-03-15T00:00:00.000Z"
@@ -1064,7 +1064,7 @@ describe("postgres metadata store", () => {
       project_id: "proj_123",
       channel: "email",
       condition_type: "new_incident",
-      config: {},
+      config: { to: "owner@example.com" },
       is_enabled: true
     });
     const updated = await store.updateAlertForOrganization({
@@ -1089,7 +1089,7 @@ describe("postgres metadata store", () => {
       channel: "email",
       condition_type: "new_incident",
       severity_min: null,
-      config: {},
+      config: { to: "owner@example.com" },
       is_enabled: true,
       created_at: "2026-03-15T00:00:00.000Z",
       updated_at: "2026-03-15T00:00:00.000Z"
@@ -1127,7 +1127,7 @@ describe("postgres metadata store", () => {
       service_id: "svc_123",
       channel: "email",
       condition_type: "new_incident",
-      config: {},
+      config: { to: "owner@example.com" },
       is_enabled: true
     });
 

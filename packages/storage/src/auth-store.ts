@@ -1,10 +1,19 @@
 import { randomUUID } from "node:crypto";
 
-import type { EmailAuthChallengeStore, GitHubUserAccountInput, WebSessionAuthStore, WebSessionRecord, WebUserAccount } from "../../auth/src/index.js";
+import type {
+  EmailAuthChallengeStore,
+  GitHubCliAuthStore,
+  GitHubDeviceAuthorizationRecord,
+  GitHubUserAccountInput,
+  IssuedMemberTokenRecord,
+  WebSessionAuthStore,
+  WebSessionRecord,
+  WebUserAccount
+} from "../../auth/src/index.js";
 
 import type { Queryable } from "./types.js";
 
-type PostgresAuthStore = WebSessionAuthStore & EmailAuthChallengeStore;
+type PostgresAuthStore = WebSessionAuthStore & EmailAuthChallengeStore & GitHubCliAuthStore;
 
 function mapUserAccountRow(row: Record<string, unknown>): WebUserAccount {
   return {
@@ -29,6 +38,37 @@ function mapSessionRow(row: Record<string, unknown>): WebSessionRecord {
     revoked_at: (row["revoked_at"] as string | null) ?? null,
     has_email_auth: row["has_email_auth"] === true,
     has_github_oauth: row["has_github_oauth"] === true
+  };
+}
+
+function mapIssuedMemberTokenRow(row: Record<string, unknown>): IssuedMemberTokenRecord {
+  return {
+    token_id: String(row["token_id"]),
+    user_id: String(row["user_id"]),
+    organization_id: String(row["organization_id"]),
+    label: String(row["label"]),
+    created_at: String(row["created_at"]),
+    last_used_at: (row["last_used_at"] as string | null) ?? null,
+    revoked_at: (row["revoked_at"] as string | null) ?? null,
+    expires_at: (row["expires_at"] as string | null) ?? null
+  };
+}
+
+function mapGitHubDeviceAuthorizationRow(row: Record<string, unknown>): GitHubDeviceAuthorizationRecord {
+  return {
+    request_id: String(row["request_id"]),
+    device_code: String(row["device_code"]),
+    user_code: String(row["user_code"]),
+    verification_uri: String(row["verification_uri"]),
+    interval_seconds: Number(row["interval_seconds"]),
+    expires_at: String(row["expires_at"]),
+    accepted_terms_at: (row["accepted_terms_at"] as string | null) ?? null,
+    created_at: String(row["created_at"]),
+    completed_at: (row["completed_at"] as string | null) ?? null,
+    claimed_at: (row["claimed_at"] as string | null) ?? null,
+    terminal_error: (row["terminal_error"] as string | null) ?? null,
+    user_id: (row["user_id"] as string | null) ?? null,
+    organization_id: (row["organization_id"] as string | null) ?? null
   };
 }
 
@@ -406,6 +446,254 @@ export function createPostgresAuthStore(db: Queryable): PostgresAuthStore {
         role: account["role"] === "owner" ? "owner" : "member",
         created_user: createdUser
       };
+    },
+
+    async createGitHubDeviceAuthorization(input) {
+      const result = await db.query<Record<string, unknown>>(
+        `
+          INSERT INTO github_device_authorizations (
+            id,
+            device_code,
+            user_code,
+            verification_uri,
+            interval_seconds,
+            expires_at,
+            accepted_terms_at,
+            created_at
+          )
+          VALUES ($1, $2, $3, $4, $5, $6::timestamptz, $7::timestamptz, $8::timestamptz)
+          RETURNING
+            id AS request_id,
+            device_code,
+            user_code,
+            verification_uri,
+            interval_seconds,
+            expires_at::text AS expires_at,
+            accepted_terms_at::text AS accepted_terms_at,
+            created_at::text AS created_at,
+            completed_at::text AS completed_at,
+            claimed_at::text AS claimed_at,
+            terminal_error,
+            user_id::text AS user_id,
+            organization_id::text AS organization_id
+        `,
+        [
+          input.request_id,
+          input.device_code,
+          input.user_code,
+          input.verification_uri,
+          input.interval_seconds,
+          input.expires_at,
+          input.accepted_terms_at,
+          input.created_at
+        ]
+      );
+
+      const row = result.rows[0];
+      if (row === undefined) {
+        throw new Error("github_device_authorization_insert_failed");
+      }
+
+      return mapGitHubDeviceAuthorizationRow(row);
+    },
+
+    async getGitHubDeviceAuthorization(requestId) {
+      const result = await db.query<Record<string, unknown>>(
+        `
+          SELECT
+            id AS request_id,
+            device_code,
+            user_code,
+            verification_uri,
+            interval_seconds,
+            expires_at::text AS expires_at,
+            accepted_terms_at::text AS accepted_terms_at,
+            created_at::text AS created_at,
+            completed_at::text AS completed_at,
+            claimed_at::text AS claimed_at,
+            terminal_error,
+            user_id::text AS user_id,
+            organization_id::text AS organization_id
+          FROM github_device_authorizations
+          WHERE id = $1
+          LIMIT 1
+        `,
+        [requestId]
+      );
+
+      const row = result.rows[0];
+      return row === undefined ? null : mapGitHubDeviceAuthorizationRow(row);
+    },
+
+    async completeGitHubDeviceAuthorization(input) {
+      const result = await db.query<Record<string, unknown>>(
+        `
+          UPDATE github_device_authorizations
+          SET user_id = $2,
+              organization_id = $3,
+              completed_at = $4::timestamptz,
+              terminal_error = NULL
+          WHERE id = $1
+            AND claimed_at IS NULL
+            AND terminal_error IS NULL
+            AND completed_at IS NULL
+          RETURNING id AS request_id
+        `,
+        [input.request_id, input.user_id, input.organization_id, input.completed_at]
+      );
+
+      return result.rows[0] !== undefined;
+    },
+
+    async setGitHubDeviceAuthorizationTerminalError(input) {
+      const result = await db.query<Record<string, unknown>>(
+        `
+          UPDATE github_device_authorizations
+          SET terminal_error = $2
+          WHERE id = $1
+            AND claimed_at IS NULL
+            AND completed_at IS NULL
+          RETURNING id AS request_id
+        `,
+        [input.request_id, input.terminal_error]
+      );
+
+      return result.rows[0] !== undefined;
+    },
+
+    async claimGitHubDeviceAuthorizationMemberToken(input) {
+      await db.query("BEGIN", []);
+
+      try {
+        const authorizationResult = await db.query<Record<string, unknown>>(
+          `
+            SELECT
+              id AS request_id,
+              user_id::text AS user_id,
+              organization_id::text AS organization_id,
+              expires_at::text AS expires_at,
+              completed_at::text AS completed_at,
+              claimed_at::text AS claimed_at,
+              terminal_error
+            FROM github_device_authorizations
+            WHERE id = $1
+            FOR UPDATE
+          `,
+          [input.request_id]
+        );
+
+        const authorization = authorizationResult.rows[0];
+        if (authorization === undefined) {
+          await db.query("COMMIT", []);
+          return "not_found";
+        }
+        if ((authorization["claimed_at"] as string | null) !== null) {
+          await db.query("COMMIT", []);
+          return "claimed";
+        }
+        if ((authorization["terminal_error"] as string | null) !== null) {
+          await db.query("COMMIT", []);
+          return "terminal_error";
+        }
+        if ((authorization["completed_at"] as string | null) === null) {
+          const expiresAt = Date.parse(String(authorization["expires_at"]));
+          if (!Number.isNaN(expiresAt) && expiresAt <= Date.parse(input.claimed_at)) {
+            await db.query("COMMIT", []);
+            return "expired";
+          }
+          await db.query("COMMIT", []);
+          return "pending";
+        }
+
+        const insertResult = await db.query<Record<string, unknown>>(
+          `
+            INSERT INTO member_tokens (
+              id,
+              user_id,
+              organization_id,
+              token_hash,
+              label,
+              created_at
+            )
+            VALUES ($1, $2::uuid, $3::uuid, $4, $5, $6::timestamptz)
+            RETURNING
+              id AS token_id,
+              user_id::text AS user_id,
+              organization_id::text AS organization_id,
+              label,
+              created_at::text AS created_at,
+              last_used_at::text AS last_used_at,
+              revoked_at::text AS revoked_at,
+              expires_at::text AS expires_at
+          `,
+          [
+            input.token_id,
+            authorization["user_id"],
+            authorization["organization_id"],
+            input.token_hash,
+            input.label,
+            input.claimed_at
+          ]
+        );
+
+        const insertedToken = insertResult.rows[0];
+        if (insertedToken === undefined) {
+          throw new Error("github_device_authorization_member_token_insert_failed");
+        }
+
+        await db.query<Record<string, unknown>>(
+          `
+            UPDATE github_device_authorizations
+            SET claimed_at = $2::timestamptz
+            WHERE id = $1
+          `,
+          [input.request_id, input.claimed_at]
+        );
+
+        await db.query("COMMIT", []);
+        return mapIssuedMemberTokenRow(insertedToken);
+      } catch (error) {
+        try {
+          await db.query("ROLLBACK", []);
+        } catch {
+          // ignore rollback error here so the caller gets the primary failure
+        }
+
+        throw error;
+      }
+    },
+
+    async issueMemberTokenForUser(input) {
+      const result = await db.query<Record<string, unknown>>(
+        `
+          INSERT INTO member_tokens (
+            id,
+            user_id,
+            organization_id,
+            token_hash,
+            label,
+            created_at
+          )
+          VALUES ($1, $2::uuid, $3::uuid, $4, $5, $6::timestamptz)
+          RETURNING
+            id AS token_id,
+            user_id::text AS user_id,
+            organization_id::text AS organization_id,
+            label,
+            created_at::text AS created_at,
+            last_used_at::text AS last_used_at,
+            revoked_at::text AS revoked_at,
+            expires_at::text AS expires_at
+        `,
+        [input.token_id, input.user_id, input.organization_id, input.token_hash, input.label, input.created_at]
+      );
+
+      const row = result.rows[0];
+      if (row === undefined) {
+        throw new Error("member_token_issue_failed");
+      }
+
+      return mapIssuedMemberTokenRow(row);
     },
 
     async replaceEmailAuthChallenge(input) {

@@ -213,6 +213,23 @@ This is the primary bootstrap flow for V1.
 3. CLI commands call the API with that token.
 4. The API resolves member identity, organization access, and role permissions.
 
+### 6.2a GitHub Device Bootstrap Flow
+
+1. User or agent runs `debugbundle login --github` or `debugbundle login --github-device`.
+2. DebugBundle starts a GitHub device authorization through the API and returns a verification URL plus short user code.
+3. User approves the DebugBundle OAuth app in any browser.
+4. CLI polls DebugBundle until approval completes.
+5. DebugBundle links or creates the user account, issues a normal member token, and returns it once.
+6. CLI stores the member token in local auth state.
+
+### 6.2b GitHub CLI Bootstrap Flow
+
+1. User or agent runs `debugbundle login --github-cli` or the auto mode `debugbundle login --github`.
+2. CLI reads an existing `gh auth token` from the local machine when available.
+3. CLI sends that GitHub access token to DebugBundle.
+4. DebugBundle verifies the GitHub identity, links or creates the user account, and issues a normal member token.
+5. CLI stores the member token in local auth state.
+
 ### 6.3 MCP Auth Flow
 
 1. MCP starts locally.

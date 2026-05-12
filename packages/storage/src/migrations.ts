@@ -6,6 +6,7 @@ export const REQUIRED_API_TABLES = [
   "users",
   "sessions",
   "email_auth_challenges",
+  "github_device_authorizations",
   "oauth_identities",
   "organizations",
   "organization_members",
@@ -227,6 +228,31 @@ const STORAGE_BOOTSTRAP_STATEMENTS = [
   `
     CREATE INDEX email_auth_challenges_code_hash_idx
     ON email_auth_challenges (code_hash)
+  `,
+  `
+    CREATE TABLE github_device_authorizations (
+      id uuid PRIMARY KEY,
+      device_code text NOT NULL UNIQUE,
+      user_code text NOT NULL,
+      verification_uri text NOT NULL,
+      interval_seconds integer NOT NULL,
+      expires_at timestamptz NOT NULL,
+      accepted_terms_at timestamptz,
+      created_at timestamptz NOT NULL DEFAULT now(),
+      completed_at timestamptz,
+      claimed_at timestamptz,
+      terminal_error text,
+      user_id uuid REFERENCES users(id) ON DELETE SET NULL,
+      organization_id uuid REFERENCES organizations(id) ON DELETE SET NULL
+    )
+  `,
+  `
+    CREATE INDEX github_device_authorizations_user_code_idx
+    ON github_device_authorizations (user_code, created_at DESC)
+  `,
+  `
+    CREATE INDEX github_device_authorizations_expires_at_idx
+    ON github_device_authorizations (expires_at)
   `,
   `
     CREATE TABLE invites (

@@ -4,9 +4,11 @@ import { Pool } from "pg";
 import type Stripe from "stripe";
 
 import {
+  createGitHubCliAuthService,
   createGitHubOAuthClient,
   createWebSessionAuthService,
   type AuthEmailSender,
+  type GitHubCliAuthService,
   type GitHubOAuthConfig,
   type WebSessionAuthService
 } from "../../../packages/auth/src/index.js";
@@ -100,11 +102,11 @@ export interface BillingEmailService {
   send(message: EmailMessage): Promise<void>;
 }
 
-function stripTrailingSlash(value: string): string {
+export function stripTrailingSlash(value: string): string {
   return value.replace(/\/+$/, "");
 }
 
-function readNonEmptyEnv(env: Record<string, string | undefined>, key: string): string | undefined {
+export function readNonEmptyEnv(env: Record<string, string | undefined>, key: string): string | undefined {
   const value = env[key];
   if (value === undefined) {
     return undefined;
@@ -114,7 +116,7 @@ function readNonEmptyEnv(env: Record<string, string | undefined>, key: string): 
   return trimmed.length > 0 ? trimmed : undefined;
 }
 
-function readCsvEnv(env: Record<string, string | undefined>, key: string): string[] | undefined {
+export function readCsvEnv(env: Record<string, string | undefined>, key: string): string[] | undefined {
   const value = readNonEmptyEnv(env, key);
   if (value === undefined) {
     return undefined;
@@ -133,7 +135,7 @@ const DEV_GITHUB_MOCK_USER_ID = "debugbundle-dev-mock-user";
 const DEV_GITHUB_MOCK_EMAIL = "dev@debugbundle.local";
 const BUNDLE_REGENERATION_LEASE_TTL_SECONDS = 30;
 
-function normalizeBillingPlan(plan: string | null | undefined): "free" | "solo" | "team" {
+export function normalizeBillingPlan(plan: string | null | undefined): "free" | "solo" | "team" {
   if (plan === "solo" || plan === "team") {
     return plan;
   }
@@ -141,16 +143,16 @@ function normalizeBillingPlan(plan: string | null | undefined): "free" | "solo" 
   return "free";
 }
 
-function getStringField(record: Record<string, unknown>, field: string): string | null {
+export function getStringField(record: Record<string, unknown>, field: string): string | null {
   const value = record[field];
   return typeof value === "string" ? value : null;
 }
 
-function getBooleanField(record: Record<string, unknown>, field: string): boolean {
+export function getBooleanField(record: Record<string, unknown>, field: string): boolean {
   return record[field] === true;
 }
 
-function readUnixTimestampField(source: unknown, key: string): number | null {
+export function readUnixTimestampField(source: unknown, key: string): number | null {
   if (typeof source !== "object" || source === null) {
     return null;
   }
@@ -159,7 +161,7 @@ function readUnixTimestampField(source: unknown, key: string): number | null {
   return typeof value === "number" ? value : null;
 }
 
-function readSubscriptionInvoiceLinePeriod(source: unknown): { start: number | null; end: number | null } {
+export function readSubscriptionInvoiceLinePeriod(source: unknown): { start: number | null; end: number | null } {
   if (typeof source !== "object" || source === null) {
     return { start: null, end: null };
   }
@@ -194,7 +196,7 @@ function readSubscriptionInvoiceLinePeriod(source: unknown): { start: number | n
   return { start: null, end: null };
 }
 
-function resolveStripeSubscriptionBillingPeriod(subscription: Stripe.Subscription): {
+export function resolveStripeSubscriptionBillingPeriod(subscription: Stripe.Subscription): {
   starts_at: string | null;
   ends_at: string | null;
 } {
@@ -365,6 +367,46 @@ function createGithubOAuthConfigFromEnv(env: Record<string, string | undefined>)
           github_user_id: DEV_GITHUB_MOCK_USER_ID,
           email: env["DEV_GITHUB_MOCK_EMAIL"] ?? DEV_GITHUB_MOCK_EMAIL
         });
+      },
+      resolveIdentityFromAccessToken: ({ access_token }) => {
+        if (access_token !== DEV_GITHUB_MOCK_CODE) {
+          return Promise.resolve({
+            ok: false as const,
+            error: "token_invalid" as const
+          });
+        }
+
+        return Promise.resolve({
+          ok: true as const,
+          identity: {
+            github_user_id: DEV_GITHUB_MOCK_USER_ID,
+            email: env["DEV_GITHUB_MOCK_EMAIL"] ?? DEV_GITHUB_MOCK_EMAIL
+          }
+        });
+      },
+      beginDeviceAuthorization: () =>
+        Promise.resolve({
+          ok: true as const,
+          device_code: DEV_GITHUB_MOCK_CODE,
+          user_code: "MOCK-CODE",
+          verification_uri: `${normalizedAppBaseUrl}/v1/auth/github/mock-authorize`,
+          expires_in: 900,
+          interval: 5
+        }),
+      pollDeviceAuthorization: ({ device_code }) => {
+        if (device_code !== DEV_GITHUB_MOCK_CODE) {
+          return Promise.resolve({
+            status: "provider_error" as const
+          });
+        }
+
+        return Promise.resolve({
+          status: "approved" as const,
+          identity: {
+            github_user_id: DEV_GITHUB_MOCK_USER_ID,
+            email: env["DEV_GITHUB_MOCK_EMAIL"] ?? DEV_GITHUB_MOCK_EMAIL
+          }
+        });
       }
     }
   };
@@ -469,6 +511,10 @@ export function createApiDependencies(input: CreateApiDependenciesInput): {
     | "acceptInviteForSession"
     | "resolveSessionByToken"
     | "revokeSessionByToken"
+  >;
+  githubCliAuth: Pick<
+    GitHubCliAuthService,
+    "beginDeviceAuth" | "pollDeviceAuth" | "claimDeviceAuth" | "exchangeGitHubAccessToken"
   >;
   inviteEmails?: Pick<AuthEmailSender, "sendOrganizationInviteEmail">;
   billingEmails?: BillingEmailService;
@@ -714,6 +760,10 @@ export function createApiDependencies(input: CreateApiDependenciesInput): {
       ...(input.githubOAuth === undefined ? {} : { githubOAuth: input.githubOAuth })
     }
   );
+  const githubCliAuth = createGitHubCliAuthService(authStore, {
+    ...(signupEmailAllowlist === undefined ? {} : { signupEmailAllowlist }),
+    ...(input.githubOAuth === undefined ? {} : { githubOAuth: input.githubOAuth })
+  });
   const webhookDelivery = createPostgresWebhookDeliveryStore(input.db);
   const incidentLifecycle = createIncidentLifecycleService({
     incidentStore: metadataStore,
@@ -882,6 +932,7 @@ export function createApiDependencies(input: CreateApiDependenciesInput): {
     auditLogging: auditLogStore,
     memberAuth,
     webAuth,
+    githubCliAuth,
     ...(inviteEmails === undefined ? {} : { inviteEmails }),
     ...(input.billingEmails === undefined ? {} : { billingEmails: input.billingEmails }),
     tokenManagement: {
@@ -1618,6 +1669,10 @@ export function createApiDependenciesFromEnv(env: Record<string, string | undefi
     | "acceptInviteForSession"
     | "resolveSessionByToken"
     | "revokeSessionByToken"
+  >;
+  githubCliAuth: Pick<
+    GitHubCliAuthService,
+    "beginDeviceAuth" | "pollDeviceAuth" | "claimDeviceAuth" | "exchangeGitHubAccessToken"
   >;
   inviteEmails?: Pick<AuthEmailSender, "sendOrganizationInviteEmail">;
   billingEmails?: BillingEmailService;

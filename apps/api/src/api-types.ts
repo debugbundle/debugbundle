@@ -1,5 +1,5 @@
 import type { CapturePolicyRecord, CapturePolicyUpdate, EventEnvelope } from "../../../packages/shared-types/src/index.js";
-import type { AuthEmailSender, WebSessionAuthService } from "../../../packages/auth/src/index.js";
+import type { AuthEmailSender, GitHubCliAuthService, WebSessionAuthService } from "../../../packages/auth/src/index.js";
 import type {
   AccountDataExportRecord,
   AuditLogStore,
@@ -52,6 +52,10 @@ export interface ApiDependencies {
     | "acceptInviteForSession"
     | "resolveSessionByToken"
     | "revokeSessionByToken"
+  > | undefined;
+  githubCliAuth?: Pick<
+    GitHubCliAuthService,
+    "beginDeviceAuth" | "pollDeviceAuth" | "claimDeviceAuth" | "exchangeGitHubAccessToken"
   > | undefined;
   inviteEmails?: Pick<AuthEmailSender, "sendOrganizationInviteEmail">;
   tokenManagement: {

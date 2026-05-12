@@ -17,13 +17,18 @@ import { SMALL_REQUEST_BODY_LIMIT_BYTES } from "../http-limits.js";
 import {
   AcceptInviteBodySchema,
   GithubAuthCallbackQuerySchema,
+  GithubDeviceClaimBodySchema,
+  GithubDevicePollBodySchema,
+  GithubDeviceStartBodySchema,
   GithubMockAuthorizeQuerySchema,
+  GithubTokenExchangeBodySchema,
   RequestEmailCodeBodySchema,
   VerifyEmailCodeBodySchema
 } from "../schemas.js";
 
 const DEV_GITHUB_MOCK_CODE = "debugbundle-dev-mock-code";
 const AUTH_RATE_LIMIT_PER_MINUTE = 10;
+const DEFAULT_GITHUB_BOOTSTRAP_LABEL = "GitHub bootstrap";
 
 function toRetryAfterSeconds(retryAfterMs: number): string {
   return String(Math.max(1, Math.ceil(retryAfterMs / 1_000)));
@@ -41,6 +46,96 @@ function assertDevGithubMockNotEnabledInProduction(): void {
   if (process.env["NODE_ENV"] === "production" && isDevGithubMockEnabled()) {
     throw new Error("dev_github_mock_login_not_allowed_in_production");
   }
+}
+
+function buildIssuedMemberTokenResponse(token: {
+  token_id: string;
+  user_id: string;
+  organization_id: string;
+  label: string;
+  created_at: string;
+  last_used_at: string | null;
+  revoked_at: string | null;
+  expires_at: string | null;
+  plaintext: string;
+}): {
+  token: {
+    token_id: string;
+    user_id: string;
+    organization_id: string;
+    label: string;
+    created_at: string;
+    last_used_at: string | null;
+    revoked_at: string | null;
+    expires_at: string | null;
+    plaintext: string;
+  };
+} {
+  return {
+    token
+  };
+}
+
+async function recordGitHubBootstrapSuccess(
+  dependencies: ApiDependencies,
+  request: FastifyRequest,
+  input: {
+    user_id: string;
+    organization_id: string;
+    token_id: string;
+    created_user: boolean;
+    authentication_method: "github_device" | "github_cli";
+    email?: string;
+  }
+): Promise<void> {
+  if (input.created_user) {
+    await recordAuditLog(dependencies.auditLogging, {
+      organization_id: input.organization_id,
+      actor_user_id: input.user_id,
+      actor_type: "anonymous",
+      action: "auth.signup",
+      target_type: "user",
+      target_id: input.user_id,
+      status: "success",
+      ip_address: request.ip,
+      metadata: {
+        created_user: true,
+        authentication_method: input.authentication_method,
+        acceptance_source: "clickwrap",
+        ...(input.email === undefined ? {} : { email_hash: hashAuditIdentifier(input.email) })
+      }
+    });
+  }
+
+  await Promise.all([
+    recordAuditLog(dependencies.auditLogging, {
+      organization_id: input.organization_id,
+      actor_user_id: input.user_id,
+      actor_type: "anonymous",
+      action: "auth.login",
+      target_type: "member_token",
+      target_id: input.token_id,
+      status: "success",
+      ip_address: request.ip,
+      metadata: {
+        authentication_method: input.authentication_method
+      }
+    }),
+    recordAuditLog(dependencies.auditLogging, {
+      organization_id: input.organization_id,
+      actor_user_id: input.user_id,
+      actor_type: "anonymous",
+      action: "token.member.create",
+      target_type: "member_token",
+      target_id: input.token_id,
+      status: "success",
+      ip_address: request.ip,
+      metadata: {
+        authentication_method: input.authentication_method,
+        bootstrap: true
+      }
+    })
+  ]);
 }
 
 function buildSessionResponse(
@@ -391,6 +486,216 @@ export function registerAuthRoutes(app: FastifyInstance, dependencies: ApiDepend
       buildClearedGithubOauthStateCookie({ secure: shouldUseSecureCookies() })
     ]);
     return reply.redirect(completed.redirect_url);
+  });
+
+  app.post("/v1/auth/github/device/start", { bodyLimit: SMALL_REQUEST_BODY_LIMIT_BYTES }, async (request, reply) => {
+    if (!(await enforceAuthRateLimit(request, reply, dependencies))) {
+      return;
+    }
+
+    if (dependencies.githubCliAuth === undefined) {
+      return reply.status(503).send({
+        error: "auth_not_configured"
+      });
+    }
+
+    const parsedBody = GithubDeviceStartBodySchema.safeParse(request.body);
+    if (!parsedBody.success) {
+      return reply.status(400).send({
+        error: "invalid_payload"
+      });
+    }
+
+    const now = new Date();
+    const started = await dependencies.githubCliAuth.beginDeviceAuth({
+      accepted_terms_at: now.toISOString(),
+      now
+    });
+
+    if (!started.ok) {
+      return reply.status(503).send({
+        error:
+          started.error === "device_flow_disabled"
+            ? "github_device_flow_disabled"
+            : started.error === "provider_error"
+              ? "github_oauth_unavailable"
+              : "auth_not_configured"
+      });
+    }
+
+    return reply.status(200).send({
+      request_id: started.request_id,
+      user_code: started.user_code,
+      verification_uri: started.verification_uri,
+      interval_seconds: started.interval_seconds,
+      expires_at: started.expires_at
+    });
+  });
+
+  app.post("/v1/auth/github/device/poll", { bodyLimit: SMALL_REQUEST_BODY_LIMIT_BYTES }, async (request, reply) => {
+    if (!(await enforceAuthRateLimit(request, reply, dependencies))) {
+      return;
+    }
+
+    if (dependencies.githubCliAuth === undefined) {
+      return reply.status(503).send({
+        error: "auth_not_configured"
+      });
+    }
+
+    const parsedBody = GithubDevicePollBodySchema.safeParse(request.body);
+    if (!parsedBody.success) {
+      return reply.status(400).send({
+        error: "invalid_payload"
+      });
+    }
+
+    const polled = await dependencies.githubCliAuth.pollDeviceAuth({
+      request_id: parsedBody.data.request_id,
+      now: new Date()
+    });
+
+    if (!polled.ok) {
+      return reply.status(polled.error === "request_not_found" ? 404 : 503).send({
+        error: polled.error === "request_not_found" ? "github_device_request_not_found" : "auth_not_configured"
+      });
+    }
+
+    if (polled.status === "pending") {
+      return reply.status(200).send({
+        status: polled.status,
+        interval_seconds: polled.interval_seconds,
+        expires_at: polled.expires_at
+      });
+    }
+
+    if (polled.status === "approved" || polled.status === "claimed") {
+      return reply.status(200).send({
+        status: polled.status,
+        expires_at: polled.expires_at
+      });
+    }
+
+    if (polled.status === "denied" || polled.status === "expired" || polled.status === "rejected") {
+      return reply.status(200).send({
+        status: polled.status,
+        reason: polled.reason,
+        expires_at: polled.expires_at
+      });
+    }
+
+    return reply.status(500).send({
+      error: "internal_error"
+    });
+  });
+
+  app.post("/v1/auth/github/device/claim", { bodyLimit: SMALL_REQUEST_BODY_LIMIT_BYTES }, async (request, reply) => {
+    if (!(await enforceAuthRateLimit(request, reply, dependencies))) {
+      return;
+    }
+
+    if (dependencies.githubCliAuth === undefined) {
+      return reply.status(503).send({
+        error: "auth_not_configured"
+      });
+    }
+
+    const parsedBody = GithubDeviceClaimBodySchema.safeParse(request.body);
+    if (!parsedBody.success) {
+      return reply.status(400).send({
+        error: "invalid_payload"
+      });
+    }
+
+    const claimed = await dependencies.githubCliAuth.claimDeviceAuth({
+      request_id: parsedBody.data.request_id,
+      label: parsedBody.data.label,
+      now: new Date()
+    });
+
+    if (!claimed.ok) {
+      const statusCode = claimed.error === "request_not_found" ? 404 : claimed.error === "provider_not_configured" ? 503 : 409;
+      const error =
+        claimed.error === "request_not_found"
+          ? "github_device_request_not_found"
+          : claimed.error === "provider_not_configured"
+            ? "auth_not_configured"
+            : claimed.error === "pending"
+              ? "github_device_auth_pending"
+              : claimed.error === "expired"
+                ? "github_device_auth_expired"
+                : claimed.error === "claimed"
+                  ? "github_device_auth_claimed"
+                  : "github_device_auth_rejected";
+
+      return reply.status(statusCode).send({ error });
+    }
+
+    await recordGitHubBootstrapSuccess(dependencies, request, {
+      user_id: claimed.token.user_id,
+      organization_id: claimed.token.organization_id,
+      token_id: claimed.token.token_id,
+      created_user: false,
+      authentication_method: "github_device"
+    });
+
+    return reply.status(200).send(buildIssuedMemberTokenResponse(claimed.token));
+  });
+
+  app.post("/v1/auth/github/token/exchange", { bodyLimit: SMALL_REQUEST_BODY_LIMIT_BYTES }, async (request, reply) => {
+    if (!(await enforceAuthRateLimit(request, reply, dependencies))) {
+      return;
+    }
+
+    if (dependencies.githubCliAuth === undefined) {
+      return reply.status(503).send({
+        error: "auth_not_configured"
+      });
+    }
+
+    const parsedBody = GithubTokenExchangeBodySchema.safeParse(request.body);
+    if (!parsedBody.success) {
+      return reply.status(400).send({
+        error: "invalid_payload"
+      });
+    }
+
+    const exchanged = await dependencies.githubCliAuth.exchangeGitHubAccessToken({
+      github_access_token: parsedBody.data.github_access_token,
+      label: parsedBody.data.label || DEFAULT_GITHUB_BOOTSTRAP_LABEL,
+      accepted_terms_at: new Date().toISOString(),
+      now: new Date()
+    });
+
+    if (!exchanged.ok) {
+      const statusCode =
+        exchanged.error === "provider_not_configured"
+          ? 503
+          : exchanged.error === "oauth_exchange_failed"
+            ? 401
+            : exchanged.error === "account_signup_disabled" || exchanged.error === "account_suspended"
+              ? 403
+              : 400;
+
+      const error =
+        exchanged.error === "provider_not_configured"
+          ? "auth_not_configured"
+          : exchanged.error === "oauth_exchange_failed"
+            ? "invalid_github_token"
+            : exchanged.error;
+
+      return reply.status(statusCode).send({ error });
+    }
+
+    await recordGitHubBootstrapSuccess(dependencies, request, {
+      user_id: exchanged.token.user_id,
+      organization_id: exchanged.token.organization_id,
+      token_id: exchanged.token.token_id,
+      created_user: exchanged.created_user,
+      authentication_method: "github_cli"
+    });
+
+    return reply.status(200).send(buildIssuedMemberTokenResponse(exchanged.token));
   });
 
   app.post("/v1/auth/accept-invite", { bodyLimit: SMALL_REQUEST_BODY_LIMIT_BYTES }, async (request, reply) => {

@@ -44,6 +44,10 @@ const apiRequestTimeouts = new WeakMap<object, NodeJS.Timeout>();
 const CSRF_EXEMPT_ROUTE_KEYS = new Set([
   "POST /v1/auth/request-code",
   "POST /v1/auth/verify-code",
+  "POST /v1/auth/github/device/start",
+  "POST /v1/auth/github/device/poll",
+  "POST /v1/auth/github/device/claim",
+  "POST /v1/auth/github/token/exchange",
   "POST /debugbundle/browser"
 ]);
 

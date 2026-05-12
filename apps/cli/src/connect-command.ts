@@ -359,7 +359,7 @@ export async function connectCommand(
             }
           ], [
             exitCode === 2
-              ? "Run debugbundle login before connecting the project to cloud."
+              ? "Run debugbundle login --github, debugbundle login --github-device, or debugbundle login <dbundle_mem_...> before connecting the project to cloud."
               : "Resolve the cloud API error and retry debugbundle connect."
           ])
         : `DebugBundle connect failed.\n- ${message}`

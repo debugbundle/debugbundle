@@ -19,7 +19,7 @@ export function createAlertMcpTools(api: {
     channel: string;
     conditionType: string;
     severityMin?: string;
-    config?: Record<string, unknown>;
+    config: Record<string, unknown>;
     isEnabled?: boolean;
   }): Promise<unknown>;
   updateAlert(input: {
@@ -60,22 +60,20 @@ export function createAlertMcpTools(api: {
           channel: string;
           conditionType: string;
           severityMin?: string;
-          config?: Record<string, unknown>;
+          config: Record<string, unknown>;
           isEnabled?: boolean;
         } = {
           bearerToken: String(input["bearerToken"]),
           projectId: String(input["projectId"]),
           channel: String(input["channel"]),
-          conditionType: String(input["conditionType"])
+          conditionType: String(input["conditionType"]),
+          config: input["config"] as Record<string, unknown>
         };
         if (typeof input["serviceId"] === "string") {
           requestInput.serviceId = input["serviceId"];
         }
         if (typeof input["severityMin"] === "string") {
           requestInput.severityMin = input["severityMin"];
-        }
-        if (typeof input["config"] === "object" && input["config"] !== null) {
-          requestInput.config = input["config"] as Record<string, unknown>;
         }
         if (typeof input["isEnabled"] === "boolean") {
           requestInput.isEnabled = input["isEnabled"];

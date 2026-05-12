@@ -1,3 +1,5 @@
+import { gzipSync } from "node:zlib";
+
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const {
@@ -12,9 +14,11 @@ const {
   createPostgresAuditLogStoreMock,
   createPostgresAuthStoreMock,
   createPostgresBillingStoreMock,
+  createPostgresBillingSyncStoreMock,
   createPostgresCapturePolicyStoreMock,
   createMemberAuthServiceMock,
   createGitHubOAuthClientMock,
+  createGitHubCliAuthServiceMock,
   createWebSessionAuthServiceMock,
   createIngestionPersistenceServiceMock,
   createPostgresMetadataStoreMock,
@@ -39,9 +43,11 @@ const {
   createPostgresAuditLogStoreMock: vi.fn(),
   createPostgresAuthStoreMock: vi.fn(),
   createPostgresBillingStoreMock: vi.fn(),
+  createPostgresBillingSyncStoreMock: vi.fn(),
   createPostgresCapturePolicyStoreMock: vi.fn(),
   createMemberAuthServiceMock: vi.fn(),
   createGitHubOAuthClientMock: vi.fn(),
+  createGitHubCliAuthServiceMock: vi.fn(),
   createWebSessionAuthServiceMock: vi.fn(),
   createIngestionPersistenceServiceMock: vi.fn(),
   createPostgresMetadataStoreMock: vi.fn(),
@@ -68,6 +74,9 @@ vi.mock("pg", () => {
 });
 
 vi.mock("../../../packages/storage/src/index.js", () => ({
+  buildRawEventObjectKey: ({ projectId, eventId }: { projectId: string; eventId: string }) => `events/${projectId}/${eventId}.json.gz`,
+  buildBundleObjectKey: (projectId: string, incidentId: string) => `bundles/${projectId}/${incidentId}.json.gz`,
+  buildReproductionObjectKey: (projectId: string, incidentId: string) => `reproductions/${projectId}/${incidentId}.json.gz`,
   buildBundleRegenerationLeaseKey: (incidentId: string) => `leases:bundle-regeneration:${incidentId}`,
   createRedisQueueClient: createRedisQueueClientMock,
   createRedisIncidentFrequencyCounter: createRedisIncidentFrequencyCounterMock,
@@ -87,19 +96,12 @@ vi.mock("../../../packages/storage/src/index.js", () => ({
   createPostgresGitHubStore: createPostgresGitHubStoreMock,
   createIngestionMetadataService: createIngestionMetadataServiceMock,
   createIncidentLifecycleService: createIncidentLifecycleServiceMock,
-  createPostgresBillingSyncStore: vi.fn().mockReturnValue({
-    isEventProcessed: vi.fn(),
-    markEventProcessed: vi.fn(),
-    updateEntitlements: vi.fn(),
-    resolveOrganizationByStripeCustomerId: vi.fn(),
-    linkStripeCustomer: vi.fn(),
-    revokeEntitlements: vi.fn(),
-    updateBillingState: vi.fn()
-  })
+  createPostgresBillingSyncStore: createPostgresBillingSyncStoreMock,
 }));
 
 vi.mock("../../../packages/auth/src/index.js", () => ({
   createGitHubOAuthClient: createGitHubOAuthClientMock,
+  createGitHubCliAuthService: createGitHubCliAuthServiceMock,
   createWebSessionAuthService: createWebSessionAuthServiceMock
 }));
 
@@ -109,7 +111,17 @@ vi.mock("../../../packages/email/src/index.js", () => ({
   renderOrganizationInviteEmail: renderOrganizationInviteEmailMock
 }));
 
-import { createApiDependencies, createApiDependenciesFromEnv } from "../../../apps/api/src/default-dependencies.ts";
+import {
+  createApiDependencies,
+  createApiDependenciesFromEnv,
+  getBooleanField,
+  getStringField,
+  normalizeBillingPlan,
+  readCsvEnv,
+  readSubscriptionInvoiceLinePeriod,
+  readUnixTimestampField,
+  resolveStripeSubscriptionBillingPeriod
+} from "../../../apps/api/src/default-dependencies.ts";
 
 describe("api default dependencies", () => {
   beforeEach(() => {
@@ -123,9 +135,11 @@ describe("api default dependencies", () => {
     createPostgresAuditLogStoreMock.mockReset();
     createPostgresAuthStoreMock.mockReset();
     createPostgresBillingStoreMock.mockReset();
+    createPostgresBillingSyncStoreMock.mockReset();
     createPostgresCapturePolicyStoreMock.mockReset();
     createMemberAuthServiceMock.mockReset();
     createGitHubOAuthClientMock.mockReset();
+    createGitHubCliAuthServiceMock.mockReset();
     createWebSessionAuthServiceMock.mockReset();
     createIngestionPersistenceServiceMock.mockReset();
     createPostgresMetadataStoreMock.mockReset();
@@ -159,13 +173,33 @@ describe("api default dependencies", () => {
       getBillingSummaryForOrganization: vi.fn(),
       getBillingSummaryForProject: vi.fn()
     });
+    createPostgresBillingSyncStoreMock.mockReturnValue({
+      isEventProcessed: vi.fn(),
+      markEventProcessed: vi.fn(),
+      updateEntitlements: vi.fn(),
+      resolveOrganizationByStripeCustomerId: vi.fn(),
+      linkStripeCustomer: vi.fn(),
+      revokeEntitlements: vi.fn(),
+      updateBillingState: vi.fn()
+    });
     createPostgresCapturePolicyStoreMock.mockReturnValue({
       getCapturePolicyByProjectId: vi.fn(),
       upsertCapturePolicy: vi.fn(),
       createDefaultCapturePolicy: vi.fn()
     });
     createMemberAuthServiceMock.mockReturnValue({ resolveMemberByTokenHash: vi.fn() });
-    createGitHubOAuthClientMock.mockReturnValue({ exchangeCodeForIdentity: vi.fn() });
+    createGitHubOAuthClientMock.mockReturnValue({
+      exchangeCodeForIdentity: vi.fn(),
+      resolveIdentityFromAccessToken: vi.fn(),
+      beginDeviceAuthorization: vi.fn(),
+      pollDeviceAuthorization: vi.fn()
+    });
+    createGitHubCliAuthServiceMock.mockReturnValue({
+      beginDeviceAuth: vi.fn(),
+      pollDeviceAuth: vi.fn(),
+      claimDeviceAuth: vi.fn(),
+      exchangeGitHubAccessToken: vi.fn()
+    });
     createWebSessionAuthServiceMock.mockReturnValue({
       requestEmailCode: vi.fn(),
       verifyEmailCode: vi.fn(),
@@ -237,6 +271,98 @@ describe("api default dependencies", () => {
       resolveProjectByTokenHash: vi.fn(),
       persistEventMetadata: vi.fn()
     });
+  });
+
+  it("normalizes env csv values and billing plans", () => {
+    expect(readCsvEnv({ CORS_ORIGINS: undefined }, "CORS_ORIGINS")).toBeUndefined();
+    expect(readCsvEnv({ CORS_ORIGINS: " , https://app.test ,, https://admin.test " }, "CORS_ORIGINS")).toEqual([
+      "https://app.test",
+      "https://admin.test"
+    ]);
+    expect(readCsvEnv({ CORS_ORIGINS: " , , " }, "CORS_ORIGINS")).toBeUndefined();
+
+    expect(normalizeBillingPlan("solo")).toBe("solo");
+    expect(normalizeBillingPlan("team")).toBe("team");
+    expect(normalizeBillingPlan("anything-else")).toBe("free");
+    expect(normalizeBillingPlan(null)).toBe("free");
+  });
+
+  it("reads string, boolean, and unix timestamp fields safely", () => {
+    expect(getStringField({ customer_id: "cus_123" }, "customer_id")).toBe("cus_123");
+    expect(getStringField({ customer_id: 42 }, "customer_id")).toBeNull();
+    expect(getBooleanField({ email_verification_required: true }, "email_verification_required")).toBe(true);
+    expect(getBooleanField({ email_verification_required: "true" }, "email_verification_required")).toBe(false);
+
+    expect(readUnixTimestampField(null, "start")).toBeNull();
+    expect(readUnixTimestampField({ start: "123" }, "start")).toBeNull();
+    expect(readUnixTimestampField({ start: 123 }, "start")).toBe(123);
+  });
+
+  it("reads invoice line periods and resolves stripe billing windows from fallback fields", () => {
+    expect(readSubscriptionInvoiceLinePeriod(null)).toEqual({ start: null, end: null });
+    expect(readSubscriptionInvoiceLinePeriod({ lines: null })).toEqual({ start: null, end: null });
+    expect(readSubscriptionInvoiceLinePeriod({ lines: { data: null } })).toEqual({ start: null, end: null });
+    expect(readSubscriptionInvoiceLinePeriod({ lines: { data: [{ period: null }] } })).toEqual({ start: null, end: null });
+    expect(readSubscriptionInvoiceLinePeriod({ lines: { data: [{ period: { start: 100, end: 200 } }] } })).toEqual({
+      start: 100,
+      end: 200
+    });
+
+    expect(
+      resolveStripeSubscriptionBillingPeriod({
+        current_period_start: null,
+        current_period_end: null,
+        latest_invoice: {
+          lines: {
+            data: [
+              {
+                period: {
+                  start: 1710000000,
+                  end: 1712592000
+                }
+              }
+            ]
+          },
+          period_start: null,
+          period_end: null
+        }
+      } as never)
+    ).toEqual({
+      starts_at: new Date(1710000000 * 1000).toISOString(),
+      ends_at: new Date(1712592000 * 1000).toISOString()
+    });
+
+    expect(
+      resolveStripeSubscriptionBillingPeriod({
+        current_period_start: null,
+        current_period_end: null,
+        latest_invoice: {
+          lines: {
+            data: [
+              {
+                period: {
+                  start: null,
+                  end: null
+                }
+              }
+            ]
+          },
+          period_start: 1710000000,
+          period_end: 1712592000
+        }
+      } as never)
+    ).toEqual({
+      starts_at: new Date(1710000000 * 1000).toISOString(),
+      ends_at: new Date(1712592000 * 1000).toISOString()
+    });
+
+    expect(
+      resolveStripeSubscriptionBillingPeriod({
+        current_period_start: 1712592000,
+        current_period_end: 1710000000,
+        latest_invoice: "in_123"
+      } as never)
+    ).toEqual({ starts_at: null, ends_at: null });
   });
 
   it("should compose ingestion services from object store, queue, and db", async (): Promise<void> => {
@@ -469,7 +595,7 @@ describe("api default dependencies", () => {
       project_id: "proj_123",
       channel: "email",
       condition_type: "new_incident",
-      config: {},
+      config: { to: "owner@example.com" },
       is_enabled: true
     });
     void deps.alertManagement.updateAlertForOrganization({
@@ -706,7 +832,7 @@ describe("api default dependencies", () => {
       project_id: "proj_123",
       channel: "email",
       condition_type: "new_incident",
-      config: {},
+      config: { to: "owner@example.com" },
       is_enabled: true
     });
     expect(metadataStore.updateAlertForOrganization).toHaveBeenCalledWith({
@@ -1106,7 +1232,12 @@ describe("api default dependencies", () => {
         callbackUrl: string;
         appRedirectUrl: string;
         stateSecret: string;
-        client: { exchangeCodeForIdentity: ReturnType<typeof vi.fn> };
+        client: {
+          exchangeCodeForIdentity: ReturnType<typeof vi.fn>;
+          resolveIdentityFromAccessToken: ReturnType<typeof vi.fn>;
+          beginDeviceAuthorization: ReturnType<typeof vi.fn>;
+          pollDeviceAuthorization: ReturnType<typeof vi.fn>;
+        };
       };
     };
     expect(serviceOptions.githubOAuth).toEqual({
@@ -1114,7 +1245,12 @@ describe("api default dependencies", () => {
       callbackUrl: "https://api.debugbundle.test/v1/auth/github/callback",
       appRedirectUrl: "https://app.debugbundle.test/auth/github/callback",
       stateSecret: "github-oauth-secret",
-      client: { exchangeCodeForIdentity: expect.any(Function) }
+      client: {
+        exchangeCodeForIdentity: expect.any(Function),
+        resolveIdentityFromAccessToken: expect.any(Function),
+        beginDeviceAuthorization: expect.any(Function),
+        pollDeviceAuthorization: expect.any(Function)
+      }
     });
   });
 
@@ -1187,6 +1323,191 @@ describe("api default dependencies", () => {
 
     expect(serviceOptions.githubOAuth?.clientId).toBe("debugbundle-dev-mock-github");
     expect(serviceOptions.githubOAuth?.authorizeUrl).toBe("http://localhost:5291/v1/auth/github/mock-authorize");
+  });
+
+  it("should expose the dev mock github device and token helpers when enabled", async (): Promise<void> => {
+    createApiDependenciesFromEnv({
+      APP_BASE_URL: "http://localhost:5291",
+      DEV_GITHUB_MOCK_LOGIN: "true",
+      DEV_GITHUB_MOCK_EMAIL: "device-mock@example.com"
+    });
+
+    const serviceOptions = createWebSessionAuthServiceMock.mock.calls.at(-1)?.[1] as {
+      githubOAuth?: {
+        client: {
+          resolveIdentityFromAccessToken(input: { access_token: string }): Promise<unknown>;
+          beginDeviceAuthorization(): Promise<unknown>;
+          pollDeviceAuthorization(input: { device_code: string }): Promise<unknown>;
+        };
+      };
+    };
+
+    await expect(
+      serviceOptions.githubOAuth?.client.resolveIdentityFromAccessToken({
+        access_token: "debugbundle-dev-mock-code"
+      })
+    ).resolves.toEqual({
+      ok: true,
+      identity: {
+        github_user_id: "debugbundle-dev-mock-user",
+        email: "device-mock@example.com"
+      }
+    });
+    await expect(
+      serviceOptions.githubOAuth?.client.resolveIdentityFromAccessToken({
+        access_token: "invalid-token"
+      })
+    ).resolves.toEqual({
+      ok: false,
+      error: "token_invalid"
+    });
+    await expect(serviceOptions.githubOAuth?.client.beginDeviceAuthorization()).resolves.toEqual({
+      ok: true,
+      device_code: "debugbundle-dev-mock-code",
+      user_code: "MOCK-CODE",
+      verification_uri: "http://localhost:5291/v1/auth/github/mock-authorize",
+      expires_in: 900,
+      interval: 5
+    });
+    await expect(
+      serviceOptions.githubOAuth?.client.pollDeviceAuthorization({
+        device_code: "debugbundle-dev-mock-code"
+      })
+    ).resolves.toEqual({
+      status: "approved",
+      identity: {
+        github_user_id: "debugbundle-dev-mock-user",
+        email: "device-mock@example.com"
+      }
+    });
+    await expect(
+      serviceOptions.githubOAuth?.client.pollDeviceAuthorization({
+        device_code: "wrong-code"
+      })
+    ).resolves.toEqual({
+      status: "provider_error"
+    });
+  });
+
+  it("should enrich account exports with stored artifacts and error fallbacks", async (): Promise<void> => {
+    createPostgresAccountStoreMock.mockReturnValue({
+      exportAccountForOrganization: vi.fn().mockResolvedValue({
+        exported_at: "2026-03-20T00:00:00.000Z",
+        user: { user_id: "usr_123" },
+        organization: { organization_id: "org_123" },
+        members: [],
+        invites: [],
+        member_tokens: [],
+        projects: [],
+        project_tokens: [],
+        capture_policies: [],
+        services: [],
+        deployments: [],
+        processed_events: [],
+        incidents: [{ incident_id: "inc_123", project_id: "proj_123" }],
+        incident_events: [
+          {
+            event_id: "evt_123",
+            project_id: "proj_123",
+            occurred_at: "2026-03-20T00:00:00.000Z",
+            is_sampled: true
+          }
+        ],
+        bundle_generations: [],
+        stored_artifacts: [],
+        audit_logs: [],
+        alert_rules: [],
+        alert_deliveries: [],
+        weekly_report_channels: [],
+        weekly_report_deliveries: [],
+        webhooks: [],
+        webhook_deliveries: []
+      }),
+      deleteAccountForOrganization: vi.fn()
+    });
+
+    const objectStore = {
+      putObject: vi.fn(),
+      getObject: vi
+        .fn()
+        .mockResolvedValueOnce(gzipSync(Buffer.from(JSON.stringify({ event: "raw" }))))
+        .mockResolvedValueOnce(Buffer.from("invalid-gzip"))
+        .mockRejectedValueOnce(new Error("s3_object_not_found")),
+      deleteObjectsByPrefix: vi.fn()
+    };
+    const deps = createApiDependencies({
+      objectStore,
+      queue: { enqueue: vi.fn() },
+      db: { query: vi.fn() }
+    });
+
+    await expect(
+      deps.accountManagement.exportAccountForOrganization({
+        organization_id: "org_123",
+        user_id: "usr_123",
+        exported_at: "2026-03-20T00:00:00.000Z"
+      })
+    ).resolves.toMatchObject({
+      artifacts: {
+        raw_events: [{ content: { event: "raw" } }],
+        bundles: [{ content: { error: "artifact_invalid" } }],
+        reproductions: [{ content: { error: "artifact_not_found" } }]
+      }
+    });
+  });
+
+  it("should return github installation status branches before listing repositories", async (): Promise<void> => {
+    const githubStore = {
+      getGitHubInstallationForOrganization: vi
+        .fn()
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce({ installation_id: 1, status: "suspended" })
+        .mockResolvedValueOnce({ installation_id: 1, status: "removed" })
+        .mockResolvedValueOnce({ installation_id: 42, status: "active" }),
+      deleteGitHubInstallationForOrganization: vi.fn(),
+      getProjectGitHubRepoForOrganization: vi.fn(),
+      listProjectGitHubDeliveriesForOrganization: vi.fn(),
+      retryProjectGitHubDeliveryForOrganization: vi.fn(),
+      listProjectGitHubRulesForOrganization: vi.fn(),
+      getProjectGitHubRuleForOrganization: vi.fn(),
+      createProjectGitHubRuleForOrganization: vi.fn(),
+      updateProjectGitHubRuleForOrganization: vi.fn(),
+      deleteProjectGitHubRuleForOrganization: vi.fn(),
+      setProjectGitHubRepoForOrganization: vi.fn(),
+      removeProjectGitHubRepoForOrganization: vi.fn()
+    };
+    createPostgresGitHubStoreMock.mockReturnValue(githubStore);
+    const listRepositories = vi.fn().mockResolvedValue([{ id: 1, full_name: "debugbundle/app" }]);
+
+    const deps = createApiDependencies({
+      objectStore: {
+        putObject: vi.fn(),
+        getObject: vi.fn(),
+        deleteObjectsByPrefix: vi.fn()
+      },
+      queue: { enqueue: vi.fn() },
+      db: { query: vi.fn() },
+      githubAppClient: {
+        getInstallUrl: vi.fn(),
+        listRepositories,
+        retryDelivery: vi.fn(),
+        getInstallationClient: vi.fn()
+      } as never
+    });
+
+    await expect(deps.githubManagement?.listRepositoriesForOrganization({ organization_id: "org_123" })).resolves.toBe(
+      "installation_not_found"
+    );
+    await expect(deps.githubManagement?.listRepositoriesForOrganization({ organization_id: "org_123" })).resolves.toBe(
+      "installation_suspended"
+    );
+    await expect(deps.githubManagement?.listRepositoriesForOrganization({ organization_id: "org_123" })).resolves.toBe(
+      "installation_removed"
+    );
+    await expect(deps.githubManagement?.listRepositoriesForOrganization({ organization_id: "org_123" })).resolves.toEqual([
+      { id: 1, full_name: "debugbundle/app" }
+    ]);
+    expect(listRepositories).toHaveBeenCalledWith({ installationId: 42 });
   });
 
   it("should enqueue webhook test deliveries and support the null branch", async (): Promise<void> => {
@@ -1746,6 +2067,494 @@ describe("api default dependencies", () => {
       })
     ).resolves.toEqual(summary);
     expect(subscriptionRetrieve).not.toHaveBeenCalled();
+  });
+
+  it("should map checkout confirmation failure branches before syncing entitlements", async (): Promise<void> => {
+    const billingSyncStore = {
+      isEventProcessed: vi.fn(),
+      markEventProcessed: vi.fn(),
+      updateEntitlements: vi.fn(),
+      resolveOrganizationByStripeCustomerId: vi.fn(),
+      linkStripeCustomer: vi.fn(),
+      revokeEntitlements: vi.fn(),
+      updateBillingState: vi.fn()
+    };
+    const billingStore = {
+      getBillingSummaryForOrganization: vi.fn().mockResolvedValue({
+        plan: "solo",
+        stripe_customer_id: "cus_123",
+        active_projects: 2,
+        capacity_units: {
+          total: 2,
+          included: 2,
+          additional_purchased: 0,
+          pending_reduction: null
+        },
+        usage_window: {
+          starts_at: "2026-01-01T00:00:00.000Z",
+          ends_at: "2026-02-01T00:00:00.000Z"
+        },
+        allowances: {
+          monthly_bundle_requests: { used: 20, limit: 1000 },
+          monthly_raw_ingested_events: { used: 200, limit: 8000 },
+          retained_bundle_cap: { used: 5, limit: 600 },
+          monthly_remote_activations: { used: 1, limit: 100 },
+          monthly_alert_deliveries: { used: 3, limit: 300 }
+        }
+      }),
+      getBillingSummaryForProject: vi.fn(),
+      incrementOrgUsageCounter: vi.fn()
+    };
+    const makeDeps = (overrides: {
+      retrieveSession?: ReturnType<typeof vi.fn>;
+      retrieveSubscription?: ReturnType<typeof vi.fn>;
+    }) => {
+      createPostgresBillingSyncStoreMock.mockReturnValueOnce(billingSyncStore);
+      createPostgresBillingStoreMock.mockReturnValueOnce(billingStore);
+
+      return createApiDependencies({
+        objectStore: {
+          putObject: vi.fn(),
+          getObject: vi.fn(),
+          deleteObjectsByPrefix: vi.fn()
+        },
+        queue: {
+          enqueue: vi.fn()
+        },
+        db: {
+          query: vi.fn().mockResolvedValue({ rows: [{ stripe_customer_id: "cus_123" }] })
+        },
+        stripeConfig: {
+          client: {
+            subscriptions: {
+              retrieve: overrides.retrieveSubscription ?? vi.fn(),
+              update: vi.fn()
+            },
+            subscriptionSchedules: {
+              create: vi.fn(),
+              retrieve: vi.fn(),
+              update: vi.fn(),
+              release: vi.fn()
+            },
+            checkout: {
+              sessions: {
+                create: vi.fn(),
+                retrieve: overrides.retrieveSession ?? vi.fn()
+              }
+            },
+            billingPortal: {
+              sessions: {
+                create: vi.fn()
+              }
+            }
+          },
+          webhookSecret: "whsec_test",
+          priceMap: new Map([
+            ["price_solo", { plan: "solo", type: "plan" }],
+            ["price_team", { plan: "team", type: "plan" }],
+            ["price_solo_capacity", { plan: "solo", type: "extra_capacity" }],
+            ["price_team_capacity", { plan: "team", type: "extra_capacity" }]
+          ]),
+          soloPriceId: "price_solo",
+          teamPriceId: "price_team",
+          soloExtraCapacityPriceId: "price_solo_capacity",
+          teamExtraCapacityPriceId: "price_team_capacity"
+        } as never
+      });
+    };
+
+    const sessionMissingDeps = makeDeps({
+      retrieveSession: vi.fn().mockRejectedValue(new Error("missing_session"))
+    });
+    const wrongOrgDeps = makeDeps({
+      retrieveSession: vi.fn().mockResolvedValue({
+        id: "cs_wrong_org",
+        status: "complete",
+        client_reference_id: "org_other",
+        customer: "cus_123",
+        subscription: "sub_123"
+      })
+    });
+    const incompleteDeps = makeDeps({
+      retrieveSession: vi.fn().mockResolvedValue({
+        id: "cs_open",
+        status: "open",
+        client_reference_id: "org_123",
+        customer: "cus_123",
+        subscription: "sub_123"
+      })
+    });
+    const missingCustomerDeps = makeDeps({
+      retrieveSession: vi.fn().mockResolvedValue({
+        id: "cs_missing_customer",
+        status: "complete",
+        client_reference_id: "org_123",
+        customer: null,
+        subscription: {
+          id: "sub_123",
+          status: "active",
+          items: { data: [] },
+          latest_invoice: null
+        }
+      })
+    });
+    const subscriptionFailureDeps = makeDeps({
+      retrieveSession: vi.fn().mockResolvedValue({
+        id: "cs_sub_failure",
+        status: "complete",
+        client_reference_id: "org_123",
+        customer: "cus_123",
+        subscription: "sub_123"
+      }),
+      retrieveSubscription: vi.fn().mockRejectedValue(new Error("stripe_down"))
+    });
+
+    await expect(
+      sessionMissingDeps.billingManagement.confirmCheckoutSession({
+        organization_id: "org_123",
+        session_id: "cs_missing",
+        now: "2026-03-23T12:00:00.000Z"
+      })
+    ).resolves.toBe("checkout_session_not_found");
+    await expect(
+      wrongOrgDeps.billingManagement.confirmCheckoutSession({
+        organization_id: "org_123",
+        session_id: "cs_wrong_org",
+        now: "2026-03-23T12:00:00.000Z"
+      })
+    ).resolves.toBe("checkout_session_not_found");
+    await expect(
+      incompleteDeps.billingManagement.confirmCheckoutSession({
+        organization_id: "org_123",
+        session_id: "cs_open",
+        now: "2026-03-23T12:00:00.000Z"
+      })
+    ).resolves.toBe("checkout_not_complete");
+    await expect(
+      missingCustomerDeps.billingManagement.confirmCheckoutSession({
+        organization_id: "org_123",
+        session_id: "cs_missing_customer",
+        now: "2026-03-23T12:00:00.000Z"
+      })
+    ).resolves.toBe("checkout_not_complete");
+    await expect(
+      subscriptionFailureDeps.billingManagement.confirmCheckoutSession({
+        organization_id: "org_123",
+        session_id: "cs_sub_failure",
+        now: "2026-03-23T12:00:00.000Z"
+      })
+    ).resolves.toBe("billing_service_error");
+
+    expect(billingSyncStore.linkStripeCustomer).not.toHaveBeenCalled();
+    expect(billingSyncStore.updateEntitlements).not.toHaveBeenCalled();
+  });
+
+  it("should confirm checkout sessions using invoice line periods when Stripe omits current subscription periods", async (): Promise<void> => {
+    const startsAt = new Date("2026-03-23T00:00:00.000Z");
+    const endsAt = new Date("2026-04-23T00:00:00.000Z");
+    const subscription = {
+      id: "sub_123",
+      status: "active",
+      items: {
+        data: [
+          {
+            id: "si_plan",
+            price: {
+              id: "price_solo",
+              recurring: {
+                interval: "month",
+                interval_count: 1
+              }
+            },
+            quantity: 1
+          }
+        ]
+      },
+      latest_invoice: {
+        lines: {
+          data: [
+            {
+              period: {
+                start: Math.floor(startsAt.getTime() / 1000),
+                end: Math.floor(endsAt.getTime() / 1000)
+              }
+            }
+          ]
+        }
+      }
+    };
+    const subscriptionRetrieve = vi.fn().mockResolvedValue(subscription);
+    const billingSyncStore = {
+      isEventProcessed: vi.fn(),
+      markEventProcessed: vi.fn(),
+      updateEntitlements: vi.fn(),
+      resolveOrganizationByStripeCustomerId: vi.fn(),
+      linkStripeCustomer: vi.fn(),
+      revokeEntitlements: vi.fn(),
+      updateBillingState: vi.fn()
+    };
+    createPostgresBillingSyncStoreMock.mockReturnValueOnce(billingSyncStore);
+    const billingStore = {
+      getBillingSummaryForOrganization: vi.fn().mockResolvedValue({
+        plan: "solo",
+        stripe_customer_id: "cus_123",
+        active_projects: 2,
+        capacity_units: {
+          total: 2,
+          included: 2,
+          additional_purchased: 0,
+          pending_reduction: null
+        },
+        usage_window: {
+          starts_at: "2026-01-01T00:00:00.000Z",
+          ends_at: "2026-02-01T00:00:00.000Z"
+        },
+        allowances: {
+          monthly_bundle_requests: { used: 20, limit: 1000 },
+          monthly_raw_ingested_events: { used: 200, limit: 8000 },
+          retained_bundle_cap: { used: 5, limit: 600 },
+          monthly_remote_activations: { used: 1, limit: 100 },
+          monthly_alert_deliveries: { used: 3, limit: 300 }
+        }
+      }),
+      getBillingSummaryForProject: vi.fn(),
+      incrementOrgUsageCounter: vi.fn()
+    };
+    createPostgresBillingStoreMock.mockReturnValueOnce(billingStore);
+
+    const db = {
+      query: vi.fn().mockResolvedValue({
+        rows: [
+          {
+            plan: "solo",
+            stripe_customer_id: "cus_123",
+            stripe_subscription_id: "sub_123"
+          }
+        ]
+      })
+    };
+
+    const deps = createApiDependencies({
+      objectStore: {
+        putObject: vi.fn(),
+        getObject: vi.fn(),
+        deleteObjectsByPrefix: vi.fn()
+      },
+      queue: {
+        enqueue: vi.fn()
+      },
+      db,
+      stripeConfig: {
+        client: {
+          subscriptions: {
+            retrieve: subscriptionRetrieve,
+            update: vi.fn()
+          },
+          subscriptionSchedules: {
+            create: vi.fn(),
+            retrieve: vi.fn(),
+            update: vi.fn(),
+            release: vi.fn()
+          },
+          checkout: {
+            sessions: {
+              create: vi.fn(),
+              retrieve: vi.fn().mockResolvedValue({
+                id: "cs_123",
+                status: "complete",
+                client_reference_id: "org_123",
+                customer: "cus_123",
+                subscription
+              })
+            }
+          },
+          billingPortal: {
+            sessions: {
+              create: vi.fn()
+            }
+          }
+        },
+        webhookSecret: "whsec_test",
+        priceMap: new Map([
+          ["price_solo", { plan: "solo", type: "plan" }],
+          ["price_team", { plan: "team", type: "plan" }],
+          ["price_solo_capacity", { plan: "solo", type: "extra_capacity" }],
+          ["price_team_capacity", { plan: "team", type: "extra_capacity" }]
+        ]),
+        soloPriceId: "price_solo",
+        teamPriceId: "price_team",
+        soloExtraCapacityPriceId: "price_solo_capacity",
+        teamExtraCapacityPriceId: "price_team_capacity"
+      } as never
+    });
+
+    await expect(
+      deps.billingManagement.confirmCheckoutSession({
+        organization_id: "org_123",
+        session_id: "cs_123",
+        now: "2026-03-23T12:00:00.000Z"
+      })
+    ).resolves.toEqual(expect.objectContaining({ plan: "solo" }));
+
+    expect(billingSyncStore.updateEntitlements).toHaveBeenCalledWith(
+      expect.objectContaining({
+        billing_period_starts_at: startsAt.toISOString(),
+        billing_period_ends_at: endsAt.toISOString()
+      })
+    );
+  });
+
+  it("should clear invalid Stripe billing periods when checkout confirmation resolves a reversed invoice window", async (): Promise<void> => {
+    const subscription = {
+      id: "sub_123",
+      status: "active",
+      items: {
+        data: [
+          {
+            id: "si_plan",
+            price: {
+              id: "price_solo",
+              recurring: {
+                interval: "month",
+                interval_count: 1
+              }
+            },
+            quantity: 1
+          }
+        ]
+      },
+      latest_invoice: {
+        lines: {
+          data: [
+            {
+              period: {
+                start: 1_772_668_800,
+                end: 1_772_582_400
+              }
+            }
+          ]
+        }
+      }
+    };
+    const subscriptionRetrieve = vi.fn().mockResolvedValue(subscription);
+    const billingSyncStore = {
+      isEventProcessed: vi.fn(),
+      markEventProcessed: vi.fn(),
+      updateEntitlements: vi.fn(),
+      resolveOrganizationByStripeCustomerId: vi.fn(),
+      linkStripeCustomer: vi.fn(),
+      revokeEntitlements: vi.fn(),
+      updateBillingState: vi.fn()
+    };
+    createPostgresBillingSyncStoreMock.mockReturnValueOnce(billingSyncStore);
+    const billingStore = {
+      getBillingSummaryForOrganization: vi.fn().mockResolvedValue({
+        plan: "solo",
+        stripe_customer_id: "cus_123",
+        active_projects: 2,
+        capacity_units: {
+          total: 2,
+          included: 2,
+          additional_purchased: 0,
+          pending_reduction: null
+        },
+        usage_window: {
+          starts_at: "2026-01-01T00:00:00.000Z",
+          ends_at: "2026-02-01T00:00:00.000Z"
+        },
+        allowances: {
+          monthly_bundle_requests: { used: 20, limit: 1000 },
+          monthly_raw_ingested_events: { used: 200, limit: 8000 },
+          retained_bundle_cap: { used: 5, limit: 600 },
+          monthly_remote_activations: { used: 1, limit: 100 },
+          monthly_alert_deliveries: { used: 3, limit: 300 }
+        }
+      }),
+      getBillingSummaryForProject: vi.fn(),
+      incrementOrgUsageCounter: vi.fn()
+    };
+    createPostgresBillingStoreMock.mockReturnValueOnce(billingStore);
+
+    const db = {
+      query: vi.fn().mockResolvedValue({
+        rows: [
+          {
+            plan: "solo",
+            stripe_customer_id: "cus_123",
+            stripe_subscription_id: "sub_123"
+          }
+        ]
+      })
+    };
+
+    const deps = createApiDependencies({
+      objectStore: {
+        putObject: vi.fn(),
+        getObject: vi.fn(),
+        deleteObjectsByPrefix: vi.fn()
+      },
+      queue: {
+        enqueue: vi.fn()
+      },
+      db,
+      stripeConfig: {
+        client: {
+          subscriptions: {
+            retrieve: subscriptionRetrieve,
+            update: vi.fn()
+          },
+          subscriptionSchedules: {
+            create: vi.fn(),
+            retrieve: vi.fn(),
+            update: vi.fn(),
+            release: vi.fn()
+          },
+          checkout: {
+            sessions: {
+              create: vi.fn(),
+              retrieve: vi.fn().mockResolvedValue({
+                id: "cs_124",
+                status: "complete",
+                client_reference_id: "org_123",
+                customer: "cus_123",
+                subscription
+              })
+            }
+          },
+          billingPortal: {
+            sessions: {
+              create: vi.fn()
+            }
+          }
+        },
+        webhookSecret: "whsec_test",
+        priceMap: new Map([
+          ["price_solo", { plan: "solo", type: "plan" }],
+          ["price_team", { plan: "team", type: "plan" }],
+          ["price_solo_capacity", { plan: "solo", type: "extra_capacity" }],
+          ["price_team_capacity", { plan: "team", type: "extra_capacity" }]
+        ]),
+        soloPriceId: "price_solo",
+        teamPriceId: "price_team",
+        soloExtraCapacityPriceId: "price_solo_capacity",
+        teamExtraCapacityPriceId: "price_team_capacity"
+      } as never
+    });
+
+    await expect(
+      deps.billingManagement.confirmCheckoutSession({
+        organization_id: "org_123",
+        session_id: "cs_124",
+        now: "2026-03-23T12:00:00.000Z"
+      })
+    ).resolves.toEqual(expect.objectContaining({ plan: "solo" }));
+
+    expect(billingSyncStore.updateEntitlements).toHaveBeenCalledWith(
+      expect.objectContaining({
+        billing_period_starts_at: null,
+        billing_period_ends_at: null
+      })
+    );
   });
 
   it("should map slot-management edge cases through stripe-backed dependencies", async (): Promise<void> => {

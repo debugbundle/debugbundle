@@ -595,15 +595,19 @@ export function ProjectGitHubPage(): JSX.Element {
                             </TableCell>
                             <TableCell>{delivery.last_error ?? "-"}</TableCell>
                             <TableCell className="text-right">
-                              <Button
-                                type="button"
-                                variant="ghost"
-                                size="sm"
-                                disabled={retryingDeliveryId === delivery.delivery_id}
-                                onClick={() => void handleRetryDelivery(delivery.delivery_id)}
-                              >
-                                {retryingDeliveryId === delivery.delivery_id ? "Retrying..." : "Retry delivery"}
-                              </Button>
+                              {delivery.status === "failed" ? (
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="sm"
+                                  disabled={retryingDeliveryId === delivery.delivery_id}
+                                  onClick={() => void handleRetryDelivery(delivery.delivery_id)}
+                                >
+                                  {retryingDeliveryId === delivery.delivery_id ? "Retrying..." : "Retry delivery"}
+                                </Button>
+                              ) : (
+                                <span className="text-sm text-muted-foreground">-</span>
+                              )}
                             </TableCell>
                           </TableRow>
                         ))}

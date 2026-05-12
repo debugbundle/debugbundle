@@ -505,7 +505,7 @@ export const MCP_TOOL_CATALOG = [
       channel: z.string(),
       conditionType: z.string(),
       severityMin: z.string().optional(),
-      config: jsonObjectSchema.optional(),
+      config: jsonObjectSchema,
       isEnabled: z.boolean().optional(),
     }),
   },

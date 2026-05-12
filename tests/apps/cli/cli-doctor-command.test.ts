@@ -8,7 +8,7 @@ import { CliAuthStateError } from "../../../apps/cli/src/auth-state.js";
 import { doctorCommand } from "../../../apps/cli/src/doctor-command.js";
 import { setupCommand } from "../../../apps/cli/src/setup-command.js";
 
-const doctorGolden = await readFile(new URL("../../fixtures/cli-doctor.golden.txt", import.meta.url), "utf8");
+const doctorGolden = (await readFile(new URL("../../fixtures/cli-doctor.golden.txt", import.meta.url), "utf8")).trimEnd();
 
 async function createDoctorFixtureRepository(): Promise<string> {
   const rootDirectory = await mkdtemp(join(tmpdir(), "debugbundle-doctor-"));
@@ -185,7 +185,7 @@ describe("cli doctor command", () => {
       errors: [],
       suggested_actions: [
         "Run debugbundle setup if local scaffold files are missing.",
-        "Run debugbundle login to create ~/.debugbundle/auth.json.",
+        "Run debugbundle login --github, debugbundle login --github-device, or debugbundle login <dbundle_mem_...> to create ~/.debugbundle/auth.json.",
         "Review .debugbundle/profile.json when architecture changes or the profile becomes stale."
       ],
       auto_fix_available: false
@@ -475,6 +475,321 @@ describe("cli doctor command", () => {
     expect(parsed.errors).toContain("Connected API https://selfhost.debugbundle.test failed health validation (HTTP 503).");
   });
 
+  it("reports invalid incidents probe responses as doctor errors", async () => {
+    const rootDirectory = await createDoctorFixtureRepository();
+
+    await setupCommand(
+      {},
+      {
+        cwd: () => rootDirectory,
+        now: () => new Date("2026-03-14T00:00:00.000Z")
+      }
+    );
+
+    await writeFile(
+      join(rootDirectory, ".debugbundle", "local", "connection.json"),
+      `${JSON.stringify(
+        {
+          mode: "connected",
+          cloud_project_id: "proj_selfhost_1",
+          cloud_base_url: "https://selfhost.debugbundle.test",
+          environments: {
+            local: { delivery: "local-only" },
+            development: { delivery: "local-only" },
+            staging: { delivery: "local-only" },
+            production: { delivery: "cloud-enabled" }
+          }
+        },
+        null,
+        2
+      )}\n`,
+      "utf8"
+    );
+
+    const result = await doctorCommand(
+      {
+        json: true
+      },
+      {
+        cwd: () => rootDirectory,
+        now: () => new Date("2026-03-14T00:00:00.000Z"),
+        fetchImpl: vi
+          .fn()
+          .mockResolvedValueOnce({
+            status: 200,
+            text: vi.fn().mockResolvedValue('{"status":"ok","version":"0.1.0","uptime":12}')
+          })
+          .mockResolvedValueOnce({
+            status: 200,
+            text: vi.fn().mockResolvedValue('{"next_cursor":null}')
+          }),
+        readAuthState: vi.fn().mockResolvedValue({
+          bearer_token: "dbundle_mem_secret_token",
+          base_url: "https://selfhost.debugbundle.test"
+        })
+      }
+    );
+
+    expect(JSON.parse(result.output)).toMatchObject({
+      status: "error",
+      checks: expect.arrayContaining([
+        {
+          name: "connected-api",
+          status: "error",
+          message: "Connected API https://selfhost.debugbundle.test returned an invalid incidents response."
+        }
+      ]),
+      errors: ["Connected API https://selfhost.debugbundle.test returned an invalid incidents response."]
+    });
+  });
+
+  it("warns when connected api health succeeds but auth state is unavailable", async () => {
+    const rootDirectory = await createDoctorFixtureRepository();
+
+    await setupCommand(
+      {},
+      {
+        cwd: () => rootDirectory,
+        now: () => new Date("2026-03-14T00:00:00.000Z")
+      }
+    );
+
+    await writeFile(
+      join(rootDirectory, ".debugbundle", "local", "connection.json"),
+      `${JSON.stringify(
+        {
+          mode: "connected",
+          cloud_project_id: "proj_selfhost_1",
+          cloud_base_url: "https://selfhost.debugbundle.test",
+          environments: {
+            local: { delivery: "local-only" },
+            development: { delivery: "local-only" },
+            staging: { delivery: "local-only" },
+            production: { delivery: "cloud-enabled" }
+          }
+        },
+        null,
+        2
+      )}\n`,
+      "utf8"
+    );
+
+    const result = await doctorCommand(
+      {
+        json: true
+      },
+      {
+        cwd: () => rootDirectory,
+        fetchImpl: vi.fn().mockResolvedValue({
+          status: 200,
+          text: vi.fn().mockResolvedValue('{"status":"ok","version":"0.1.0","uptime":12}')
+        }),
+        readAuthState: vi.fn().mockRejectedValue(new CliAuthStateError("auth_state_missing", "Not logged in."))
+      }
+    );
+
+    expect(JSON.parse(result.output)).toMatchObject({
+      status: "warning",
+      checks: expect.arrayContaining([
+        {
+          name: "connected-api",
+          status: "warning",
+          message:
+            "Connected API https://selfhost.debugbundle.test is reachable, but member-token auth could not be verified without auth state."
+        }
+      ])
+    });
+  });
+
+  it("warns when auth state points at a different connected api base url", async () => {
+    const rootDirectory = await createDoctorFixtureRepository();
+
+    await setupCommand(
+      {},
+      {
+        cwd: () => rootDirectory,
+        now: () => new Date("2026-03-14T00:00:00.000Z")
+      }
+    );
+
+    await markProfileAgentValidated(rootDirectory);
+    await writeFile(
+      join(rootDirectory, ".debugbundle", "local", "connection.json"),
+      `${JSON.stringify(
+        {
+          mode: "connected",
+          cloud_project_id: "proj_selfhost_1",
+          cloud_base_url: "https://selfhost.debugbundle.test",
+          environments: {
+            local: { delivery: "local-only" },
+            development: { delivery: "local-only" },
+            staging: { delivery: "local-only" },
+            production: { delivery: "cloud-enabled" }
+          }
+        },
+        null,
+        2
+      )}\n`,
+      "utf8"
+    );
+
+    const fetchImpl = vi
+      .fn()
+      .mockResolvedValueOnce({
+        status: 200,
+        text: vi.fn().mockResolvedValue('{"status":"ok","version":"0.1.0","uptime":12}')
+      })
+      .mockResolvedValueOnce({
+        status: 200,
+        text: vi.fn().mockResolvedValue('{"incidents":[],"next_cursor":null}')
+      });
+
+    const result = await doctorCommand(
+      {
+        json: true
+      },
+      {
+        cwd: () => rootDirectory,
+        fetchImpl,
+        readAuthState: vi.fn().mockResolvedValue({
+          bearer_token: "dbundle_mem_secret_token",
+          base_url: "https://api.debugbundle.com"
+        })
+      }
+    );
+
+    expect(JSON.parse(result.output)).toMatchObject({
+      status: "warning",
+      checks: expect.arrayContaining([
+        {
+          name: "connected-api",
+          status: "warning",
+          message:
+            "Connected API https://api.debugbundle.com is reachable and member-token auth succeeded, but connection config expects https://selfhost.debugbundle.test."
+        }
+      ])
+    });
+  });
+
+  it("reports a missing connected api base url when neither connection nor auth provide one", async () => {
+    const rootDirectory = await createDoctorFixtureRepository();
+
+    await setupCommand(
+      {},
+      {
+        cwd: () => rootDirectory,
+        now: () => new Date("2026-03-14T00:00:00.000Z")
+      }
+    );
+
+    await writeFile(
+      join(rootDirectory, ".debugbundle", "local", "connection.json"),
+      `${JSON.stringify(
+        {
+          mode: "connected",
+          cloud_project_id: "proj_selfhost_1",
+          cloud_base_url: null,
+          environments: {
+            local: { delivery: "local-only" },
+            development: { delivery: "local-only" },
+            staging: { delivery: "local-only" },
+            production: { delivery: "cloud-enabled" }
+          }
+        },
+        null,
+        2
+      )}\n`,
+      "utf8"
+    );
+
+    const result = await doctorCommand(
+      {
+        json: true
+      },
+      {
+        cwd: () => rootDirectory,
+        readAuthState: vi.fn().mockRejectedValue(new CliAuthStateError("auth_state_missing", "Not logged in."))
+      }
+    );
+
+    expect(JSON.parse(result.output)).toMatchObject({
+      status: "warning",
+      checks: expect.arrayContaining([
+        {
+          name: "connected-api",
+          status: "missing",
+          message: "Cannot verify connected API without cloud_base_url or auth state."
+        }
+      ]),
+      warnings: expect.arrayContaining([
+        "Not logged in.",
+        "Cannot verify connected API without cloud_base_url or auth state."
+      ])
+    });
+  });
+
+  it("reports invalid health response payloads as doctor errors", async () => {
+    const rootDirectory = await createDoctorFixtureRepository();
+
+    await setupCommand(
+      {},
+      {
+        cwd: () => rootDirectory,
+        now: () => new Date("2026-03-14T00:00:00.000Z")
+      }
+    );
+
+    await writeFile(
+      join(rootDirectory, ".debugbundle", "local", "connection.json"),
+      `${JSON.stringify(
+        {
+          mode: "connected",
+          cloud_project_id: "proj_selfhost_1",
+          cloud_base_url: "https://selfhost.debugbundle.test",
+          environments: {
+            local: { delivery: "local-only" },
+            development: { delivery: "local-only" },
+            staging: { delivery: "local-only" },
+            production: { delivery: "cloud-enabled" }
+          }
+        },
+        null,
+        2
+      )}\n`,
+      "utf8"
+    );
+
+    const result = await doctorCommand(
+      {
+        json: true
+      },
+      {
+        cwd: () => rootDirectory,
+        now: () => new Date("2026-03-14T00:00:00.000Z"),
+        fetchImpl: vi.fn().mockResolvedValue({
+          status: 200,
+          text: vi.fn().mockResolvedValue('{"status":"degraded"}')
+        }),
+        readAuthState: vi.fn().mockResolvedValue({
+          bearer_token: "dbundle_mem_secret_token",
+          base_url: "https://selfhost.debugbundle.test"
+        })
+      }
+    );
+
+    expect(JSON.parse(result.output)).toMatchObject({
+      status: "error",
+      checks: expect.arrayContaining([
+        {
+          name: "connected-api",
+          status: "error",
+          message: "Connected API https://selfhost.debugbundle.test returned an invalid health response."
+        }
+      ]),
+      errors: ["Connected API https://selfhost.debugbundle.test returned an invalid health response."]
+    });
+  });
+
   it("reports malformed setup files as errors", async () => {
     const rootDirectory = await createDoctorFixtureRepository();
 
@@ -605,5 +920,174 @@ describe("cli doctor command", () => {
       message: "Profile has an invalid debugbundle.last_reviewed_at value."
     });
     expect(parsed.errors).toEqual(["Profile has an invalid debugbundle.last_reviewed_at value."]);
+  });
+
+  it("renders the privacy preview in human output using the default auth-state wiring", async () => {
+    const rootDirectory = await createDoctorFixtureRepository();
+    const authFilePath = join(rootDirectory, ".debugbundle", "auth.json");
+
+    await setupCommand(
+      {},
+      {
+        cwd: () => rootDirectory,
+        now: () => new Date("2026-03-14T00:00:00.000Z")
+      }
+    );
+
+    await markProfileAgentValidated(rootDirectory);
+    await writeFile(
+      authFilePath,
+      `${JSON.stringify({ bearer_token: "dbundle_mem_secret_token", base_url: "https://api.debugbundle.com" }, null, 2)}\n`,
+      "utf8"
+    );
+
+    vi.spyOn(process, "cwd").mockReturnValue(rootDirectory);
+
+    const result = await doctorCommand({ authFilePath, privacy: true });
+
+    expect(result.exitCode).toBe(0);
+    expect(result.output).toContain("DebugBundle doctor report.");
+    expect(result.output).toContain("Privacy preview:");
+    expect(result.output).toContain("sample_can_create_incident: yes");
+    expect(result.output).toContain("omitted_fields: none");
+    expect(result.output).toContain("Redacted sample:");
+    expect(result.output).toContain('"authorization": "[REDACTED]"');
+  });
+
+  it("reports an ok relay status when the spool directory exists but all events are delivered", async () => {
+    const rootDirectory = await createDoctorFixtureRepository();
+    const now = new Date("2026-03-14T12:00:00.000Z");
+
+    await setupCommand(
+      {},
+      {
+        cwd: () => rootDirectory,
+        now: () => now
+      }
+    );
+
+    await markProfileAgentValidated(rootDirectory);
+    await createRelaySpoolFixture(rootDirectory, now);
+    await writeFile(
+      join(rootDirectory, ".debugbundle", "local", "browser-relay-spool", "20260314-1-checkout-web.events.json.delivered"),
+      "\n",
+      "utf8"
+    );
+    await writeFile(
+      join(rootDirectory, ".debugbundle", "local", "browser-relay-spool", "20260314-2-checkout-web.events.json.delivered"),
+      "\n",
+      "utf8"
+    );
+
+    const result = await doctorCommand(
+      {
+        json: true,
+        checkRelay: true
+      },
+      {
+        cwd: () => rootDirectory,
+        now: () => now,
+        readAuthState: vi.fn().mockResolvedValue({
+          bearer_token: "dbundle_mem_secret_token",
+          base_url: "https://api.debugbundle.com"
+        })
+      }
+    );
+
+    const parsed = JSON.parse(result.output) as {
+      status: string;
+      checks: Array<{ name: string; status: string; message: string }>;
+      warnings: string[];
+      errors: string[];
+    };
+
+    expect(result.exitCode).toBe(0);
+    expect(parsed.status).toBe("healthy");
+    expect(parsed.checks[7]).toEqual({
+      name: "relay-spool",
+      status: "ok",
+      message: "No undelivered relay spool files found."
+    });
+    expect(parsed.warnings).toEqual([]);
+    expect(parsed.errors).toEqual([]);
+  });
+
+  it("reports an ok relay status when the spool directory is missing", async () => {
+    const rootDirectory = await createDoctorFixtureRepository();
+
+    await setupCommand(
+      {},
+      {
+        cwd: () => rootDirectory,
+        now: () => new Date("2026-03-14T00:00:00.000Z")
+      }
+    );
+
+    const result = await doctorCommand(
+      {
+        json: true,
+        checkRelay: true
+      },
+      {
+        cwd: () => rootDirectory,
+        now: () => new Date("2026-03-14T00:00:00.000Z"),
+        readAuthState: vi.fn().mockResolvedValue({
+          bearer_token: "dbundle_mem_secret_token",
+          base_url: "https://api.debugbundle.com"
+        })
+      }
+    );
+
+    expect(JSON.parse(result.output)).toMatchObject({
+      status: "warning",
+      checks: expect.arrayContaining([
+        {
+          name: "relay-spool",
+          status: "ok",
+          message: "No undelivered relay spool files found."
+        }
+      ])
+    });
+  });
+
+  it("reports a relay spool path that exists but is not a directory", async () => {
+    const rootDirectory = await createDoctorFixtureRepository();
+
+    await setupCommand(
+      {},
+      {
+        cwd: () => rootDirectory,
+        now: () => new Date("2026-03-14T00:00:00.000Z")
+      }
+    );
+
+    await writeFile(join(rootDirectory, ".debugbundle", "local", "browser-relay-spool"), "not-a-directory\n", "utf8");
+
+    const result = await doctorCommand(
+      {
+        json: true,
+        checkRelay: true
+      },
+      {
+        cwd: () => rootDirectory,
+        now: () => new Date("2026-03-14T00:00:00.000Z"),
+        readAuthState: vi.fn().mockResolvedValue({
+          bearer_token: "dbundle_mem_secret_token",
+          base_url: "https://api.debugbundle.com"
+        })
+      }
+    );
+
+    expect(result.exitCode).toBe(0);
+    expect(JSON.parse(result.output)).toMatchObject({
+      status: "error",
+      checks: expect.arrayContaining([
+        {
+          name: "relay-spool",
+          status: "error",
+          message: "Invalid .debugbundle/local/browser-relay-spool"
+        }
+      ])
+    });
   });
 });

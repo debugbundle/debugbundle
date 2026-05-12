@@ -295,7 +295,7 @@ describe("worker alert evaluation", () => {
             channel: "email",
             condition_type: "error_spike",
             severity_min: "high",
-            config: { to: ["alerts@example.com"] },
+            config: { to: "alerts@example.com" },
             is_enabled: true,
             created_at: "2026-03-15T00:00:00.000Z",
             updated_at: "2026-03-15T00:00:00.000Z"
@@ -401,12 +401,12 @@ describe("alert delivery transport – multi-channel", () => {
       project_id: "proj_1",
       incident_id: "inc_1",
       channel: "email",
-      config: { to: ["team@example.com", "ops@example.com"] },
+      config: { to: "team@example.com" },
       payload: { event_type: "new_incident", summary: "New crash in checkout" }
     });
 
     const emailDelivery = sendMock.mock.calls[0]?.[0];
-    expect(emailDelivery?.to).toEqual(["team@example.com", "ops@example.com"]);
+    expect(emailDelivery?.to).toEqual(["team@example.com"]);
     expect(emailDelivery?.subject).toContain("new_incident");
     expect(emailDelivery?.text).toContain("New crash in checkout");
     expect(emailDelivery?.html).toContain("new_incident");
@@ -423,7 +423,7 @@ describe("alert delivery transport – multi-channel", () => {
         project_id: "proj_1",
         incident_id: "inc_1",
         channel: "email",
-        config: { to: ["team@example.com"] },
+        config: { to: "team@example.com" },
         payload: { event_type: "new_incident", summary: "crash" }
       })
     ).rejects.toThrow("alert_email_not_configured");

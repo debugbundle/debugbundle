@@ -48,6 +48,33 @@ export const GithubMockAuthorizeQuerySchema = z
   })
   .strict();
 
+export const GithubDeviceStartBodySchema = z
+  .object({
+    accepted_terms: z.literal(true)
+  })
+  .strict();
+
+export const GithubDevicePollBodySchema = z
+  .object({
+    request_id: z.string().uuid()
+  })
+  .strict();
+
+export const GithubDeviceClaimBodySchema = z
+  .object({
+    request_id: z.string().uuid(),
+    label: z.string().min(1).max(120)
+  })
+  .strict();
+
+export const GithubTokenExchangeBodySchema = z
+  .object({
+    github_access_token: z.string().min(1),
+    label: z.string().min(1).max(120),
+    accepted_terms: z.literal(true)
+  })
+  .strict();
+
 export const GitHubAppCallbackQuerySchema = z
   .object({
     installation_id: z.coerce.number().int().positive(),
@@ -217,7 +244,29 @@ export const AlertConditionTypeSchema = z.enum([
   "regression_after_deploy"
 ]);
 
-const AlertConfigSchema = z.record(z.string(), z.unknown());
+const AlertEmailConfigSchema = z
+  .object({
+    to: z.string().email()
+  })
+  .strict();
+
+const AlertSlackConfigSchema = z
+  .object({
+    webhook_url: z.string().url().max(2000)
+  })
+  .strict();
+
+const AlertDiscordConfigSchema = z
+  .object({
+    webhook_url: z.string().url().max(2000)
+  })
+  .strict();
+
+const AlertWebhookConfigSchema = z
+  .object({
+    target_url: z.string().url().max(2000)
+  })
+  .strict();
 
 const WebhookFiltersSchema = z
   .object({
@@ -346,30 +395,93 @@ export const AlertParamsSchema = z
   })
   .strict();
 
-export const CreateAlertBodySchema = z
-  .object({
-    project_id: z.string().uuid(),
-    service_id: z.string().uuid().optional(),
-    channel: AlertChannelSchema,
-    condition_type: AlertConditionTypeSchema,
-    severity_min: z.enum(["low", "medium", "high", "critical"]).optional(),
-    config: AlertConfigSchema.default({}),
-    is_enabled: z.boolean().default(true)
-  })
-  .strict();
+const BaseCreateAlertBodySchema = {
+  project_id: z.string().uuid(),
+  service_id: z.string().uuid().optional(),
+  condition_type: AlertConditionTypeSchema,
+  severity_min: z.enum(["low", "medium", "high", "critical"]).optional(),
+  is_enabled: z.boolean().default(true)
+} as const;
 
-export const UpdateAlertBodySchema = z
-  .object({
-    service_id: z.string().uuid().nullable().optional(),
-    channel: AlertChannelSchema.optional(),
-    condition_type: AlertConditionTypeSchema.optional(),
-    severity_min: z.enum(["low", "medium", "high", "critical"]).nullable().optional(),
-    config: AlertConfigSchema.nullable().optional(),
-    is_enabled: z.boolean().optional()
-  })
-  .strict()
+export const CreateAlertBodySchema = z.discriminatedUnion("channel", [
+  z
+    .object({
+      ...BaseCreateAlertBodySchema,
+      channel: z.literal("email"),
+      config: AlertEmailConfigSchema
+    })
+    .strict(),
+  z
+    .object({
+      ...BaseCreateAlertBodySchema,
+      channel: z.literal("slack"),
+      config: AlertSlackConfigSchema
+    })
+    .strict(),
+  z
+    .object({
+      ...BaseCreateAlertBodySchema,
+      channel: z.literal("discord"),
+      config: AlertDiscordConfigSchema
+    })
+    .strict(),
+  z
+    .object({
+      ...BaseCreateAlertBodySchema,
+      channel: z.literal("webhook"),
+      config: AlertWebhookConfigSchema
+    })
+    .strict()
+]);
+
+const BaseUpdateAlertBodySchema = {
+  service_id: z.string().uuid().nullable().optional(),
+  condition_type: AlertConditionTypeSchema.optional(),
+  severity_min: z.enum(["low", "medium", "high", "critical"]).nullable().optional(),
+  is_enabled: z.boolean().optional()
+} as const;
+
+export const UpdateAlertBodySchema = z.union([
+  z
+    .object({
+      ...BaseUpdateAlertBodySchema,
+      channel: z.literal("email"),
+      config: AlertEmailConfigSchema.nullable().optional()
+    })
+    .strict(),
+  z
+    .object({
+      ...BaseUpdateAlertBodySchema,
+      channel: z.literal("slack"),
+      config: AlertSlackConfigSchema.nullable().optional()
+    })
+    .strict(),
+  z
+    .object({
+      ...BaseUpdateAlertBodySchema,
+      channel: z.literal("discord"),
+      config: AlertDiscordConfigSchema.nullable().optional()
+    })
+    .strict(),
+  z
+    .object({
+      ...BaseUpdateAlertBodySchema,
+      channel: z.literal("webhook"),
+      config: AlertWebhookConfigSchema.nullable().optional()
+    })
+    .strict(),
+  z
+    .object({
+      ...BaseUpdateAlertBodySchema,
+      channel: AlertChannelSchema.optional()
+    })
+    .strict()
+])
   .refine((value) => Object.keys(value).length > 0, {
     message: "update_requires_changes"
+  })
+  .refine((value) => !Object.prototype.hasOwnProperty.call(value, "config") || value.channel !== undefined, {
+    message: "channel_required_for_config"
   });
 
 export const IncidentsQuerySchema = z

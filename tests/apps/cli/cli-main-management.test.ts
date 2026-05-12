@@ -544,7 +544,7 @@ describe("cli main management routing", () => {
       "--severity-min",
       "high",
       "--config-json",
-      '{"to":["oncall@example.com"]}',
+      '{"to":"oncall@example.com"}',
       "--is-enabled",
       "true",
       "--json"
@@ -591,7 +591,7 @@ describe("cli main management routing", () => {
       conditionType: "severity_threshold",
       severityMin: "high",
       config: {
-        to: ["oncall@example.com"]
+        to: "oncall@example.com"
       },
       isEnabled: true,
       json: true
@@ -647,7 +647,7 @@ describe("cli main management routing", () => {
     await runCli(["profile", "validate"], { profileValidateCommand });
     await runCli(["verify", "cloud", "--project-id", "proj_123"], { verifyCloudCommand });
     await runCli(["smoke", "--project-id", "proj_123"], { smokeCommand });
-    await runCli(["login", "dbundle_mem_secret_token"], { loginCommand });
+    await runCli(["login", "--github"], { loginCommand });
     await runCli(["incidents"], { listIncidentsCommand });
     await runCli(["logs", "inc_123"], { getLogsCommand });
     await runCli(["services", "--project-id", "proj_123"], { listServicesCommand });
@@ -663,7 +663,9 @@ describe("cli main management routing", () => {
       "--channel",
       "email",
       "--condition",
-      "new_incident"
+      "new_incident",
+      "--config-json",
+      '{"to":"owner@example.com"}'
     ], { createAlertCommand });
     await runCli(["alert", "update", "al_123", "--is-enabled", "false"], { updateAlertCommand });
     await runCli(["alert", "delete", "al_123"], { deleteAlertCommand });
@@ -691,7 +693,7 @@ describe("cli main management routing", () => {
     expect(profileValidateCommand).toHaveBeenCalledWith({});
     expect(verifyCloudCommand).toHaveBeenCalledWith({ projectId: "proj_123" });
     expect(smokeCommand).toHaveBeenCalledWith({ projectId: "proj_123" });
-    expect(loginCommand).toHaveBeenCalledWith({ bearerToken: "dbundle_mem_secret_token" });
+    expect(loginCommand).toHaveBeenCalledWith({ github: true });
     expect(listIncidentsCommand).toHaveBeenCalledWith({});
     expect(getLogsCommand).toHaveBeenCalledWith({ incidentId: "inc_123" });
     expect(listServicesCommand).toHaveBeenCalledWith({ projectId: "proj_123" });
@@ -702,7 +704,10 @@ describe("cli main management routing", () => {
     expect(createAlertCommand).toHaveBeenCalledWith({
       projectId: "proj_123",
       channel: "email",
-      conditionType: "new_incident"
+      conditionType: "new_incident",
+      config: {
+        to: "owner@example.com"
+      }
     });
     expect(updateAlertCommand).toHaveBeenCalledWith({ alertId: "al_123", isEnabled: false });
     expect(deleteAlertCommand).toHaveBeenCalledWith({ alertId: "al_123" });
@@ -792,7 +797,7 @@ describe("cli main management routing", () => {
     expect(analyzeUnknownOption.output).toContain("Unknown option --unknown.");
     expect(verifyCloudMissingProject.output).toContain("Missing required option --project-id.");
     expect(smokeMissingProject.output).toContain("Missing required option --project-id.");
-    expect(loginMissingToken.output).toContain("Missing required argument <member-token>.");
+    expect(loginMissingToken.output).toContain("Provide either a member token or one of --github, --github-cli, or --github-device.");
     expect(tokenProjectMissingLabel.output).toContain("Missing required option --label.");
     expect(tokenMemberMissingLabel.output).toContain("Missing required option --label.");
     expect(webhookListMissingProject.output).toContain("Missing required option --project-id.");

@@ -314,20 +314,39 @@ export async function runCli(argv: string[], dependencies: CliDependencies = {})
     }
 
     if (command === "login") {
-      expectNoUnknownOptions(parsedArgv, ["auth-file", "base-url", "json"]);
+      expectNoUnknownOptions(parsedArgv, ["auth-file", "base-url", "json", "github", "github-cli", "github-device", "label"]);
       ensureNoExtraPositionals(parsedArgv, 2);
 
-      const input = appendCommonAuthOptions(parsedArgv, {
-        bearerToken: requirePositional(parsedArgv, 1, "member-token")
-      } as {
-        bearerToken: string;
+      const bearerToken = parsedArgv.positionals[1];
+      const input = appendCommonAuthOptions(parsedArgv, {} as {
+        bearerToken?: string;
         baseUrl?: string;
         authFilePath?: string;
         json?: boolean;
+        github?: boolean;
+        githubCli?: boolean;
+        githubDevice?: boolean;
+        label?: string;
       });
+      if (bearerToken !== undefined) {
+        input.bearerToken = bearerToken;
+      }
       const baseUrl = readStringOption(parsedArgv, "base-url");
       if (baseUrl !== undefined) {
         input.baseUrl = baseUrl;
+      }
+      if (readBooleanOption(parsedArgv, "github") === true) {
+        input.github = true;
+      }
+      if (readBooleanOption(parsedArgv, "github-cli") === true) {
+        input.githubCli = true;
+      }
+      if (readBooleanOption(parsedArgv, "github-device") === true) {
+        input.githubDevice = true;
+      }
+      const label = readStringOption(parsedArgv, "label");
+      if (label !== undefined) {
+        input.label = label;
       }
 
       return await (dependencies.loginCommand ?? defaultLoginCommand)(input);

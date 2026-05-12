@@ -1,3 +1,5 @@
+import { generateKeyPairSync } from "node:crypto";
+
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const TEST_GITHUB_PRIVATE_KEY = "test-only-github-app-private-key-not-used";
@@ -202,6 +204,7 @@ vi.mock("../../../apps/worker/src/processor.js", () => ({
   processNextDeliverWebhookJob: processNextDeliverWebhookJobMock,
   processNextDeliverGitHubDispatchJob: processNextDeliverGitHubDispatchJobMock,
   processNextGenerateWeeklyReportJob: processNextGenerateWeeklyReportJobMock,
+  AlertDeliveryError: class AlertDeliveryError extends Error {},
   GitHubDispatchDeliveryError: class GitHubDispatchDeliveryError extends Error {
     statusCode: number | null;
     retryAfterSeconds: number | null;
@@ -224,11 +227,17 @@ vi.mock("../../../apps/worker/src/processor.js", () => ({
 
 import {
   assertWorkerSchema,
+  buildGitHubAppJwt,
+  createAlertTransport,
   createGitHubDispatchPublisher,
   createGitHubDispatchTransport,
   createLifecycleWebhookTransport,
   createLifecycleWebhookPublisher,
   createWorkerHealthServer,
+  createWeeklyReportTransport,
+  encodeBase64Url,
+  getIncidentStatusForDispatchEvent,
+  normalizeGitHubPrivateKey,
   scheduleDueGitHubDispatches,
   scheduleDueWebhookDeliveries,
   scheduleRetentionCleanup,
@@ -276,6 +285,7 @@ function buildMigratedWorkerSchemaRows(sql: string): { rows: Record<string, unkn
 
 describe("worker runtime", () => {
   beforeEach(() => {
+    vi.unstubAllGlobals();
     poolQueryMock.mockReset();
     poolEndMock.mockClear();
     queueEnqueueMock.mockClear();
@@ -347,6 +357,12 @@ describe("worker runtime", () => {
 
   it("should reject invalid run-once env values", (): void => {
     expect(() => parseWorkerEnv({ WORKER_RUN_ONCE: "2" })).toThrow("worker_env_invalid");
+  });
+
+  it("should reject invalid DB SSL mode values with a targeted error", (): void => {
+    expect(() => parseWorkerEnv({ DB_SSL_MODE: "broken" })).toThrow(
+      "worker_env_invalid: DB_SSL_MODE: expected disable or require"
+    );
   });
 
   it("should treat empty optional GitHub app env vars as unset", (): void => {
@@ -591,6 +607,64 @@ describe("worker runtime", () => {
       "-----BEGIN RSA PRIVATE KEY-----\nabc\n-----END RSA PRIVATE KEY-----",
       new Date("2026-03-11T00:00:00.000Z")
     );
+  });
+
+  it("should encode github app jwt payloads with base64url segments", (): void => {
+    const { privateKey } = generateKeyPairSync("rsa", { modulusLength: 2048 });
+    const privateKeyPem = privateKey.export({ type: "pkcs1", format: "pem" }).toString();
+    const now = new Date("2026-03-11T00:00:00.000Z");
+
+    expect(encodeBase64Url("debugbundle")).toBe(Buffer.from("debugbundle", "utf8").toString("base64url"));
+    expect(normalizeGitHubPrivateKey(privateKeyPem.replace(/\n/g, "\\n"))).toBe(privateKeyPem);
+
+    const jwt = buildGitHubAppJwt("123", privateKeyPem, now);
+    const [encodedHeader, encodedPayload, signature] = jwt.split(".");
+
+    expect(signature.length).toBeGreaterThan(0);
+    expect(JSON.parse(Buffer.from(encodedHeader, "base64url").toString("utf8"))).toEqual({ alg: "RS256", typ: "JWT" });
+    expect(JSON.parse(Buffer.from(encodedPayload, "base64url").toString("utf8"))).toEqual({
+      iat: Math.floor(now.getTime() / 1000) - 30,
+      exp: Math.floor(now.getTime() / 1000) + 9 * 60,
+      iss: "123"
+    });
+  });
+
+  it("should reject github dispatch transport responses with missing installation tokens", async (): Promise<void> => {
+    const { privateKey } = generateKeyPairSync("rsa", { modulusLength: 2048 });
+    const privateKeyPem = privateKey.export({ type: "pkcs1", format: "pem" }).toString();
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: vi.fn().mockResolvedValue({})
+    });
+
+    const transport = createGitHubDispatchTransport({
+      appId: "123",
+      privateKey: privateKeyPem,
+      tokenCache: {
+        get: vi.fn().mockResolvedValue(null),
+        set: vi.fn().mockResolvedValue(undefined)
+      },
+      fetchImpl: fetchMock,
+      now: () => new Date("2026-03-11T00:00:00.000Z")
+    });
+
+    await expect(
+      transport.deliver({
+        delivery_id: "gdd_missing_token",
+        installation_id: 99,
+        repo_owner: "debugbundle",
+        repo_name: "app",
+        dispatch_payload: {
+          debugbundle_event: "bundle.created",
+          incident_id: "inc_123",
+          debugbundle: {
+            project_id: "proj_123"
+          }
+        }
+      })
+    ).rejects.toMatchObject({
+      message: "github_dispatch_token_invalid_response"
+    });
   });
 
   it("should run group-incident processor when normalize queue has no work", async (): Promise<void> => {
@@ -1029,6 +1103,85 @@ describe("worker runtime", () => {
     );
   });
 
+  it("should classify github dispatch event statuses and skip publishes during cooldown or quota limits", async (): Promise<void> => {
+    expect(getIncidentStatusForDispatchEvent("bundle.created")).toBe("new_or_reopened");
+    expect(getIncidentStatusForDispatchEvent("bundle.reopened")).toBe("new_or_reopened");
+    expect(getIncidentStatusForDispatchEvent("incident.spike_detected")).toBe("new_or_reopened");
+
+    const baseRule = {
+      rule_id: "ghr_123",
+      installation_id: 99,
+      repo_owner: "debugbundle",
+      repo_name: "app",
+      default_branch: "main",
+      cooldown_seconds: 300
+    };
+    const createGitHubDispatchDeliveryIntent = vi.fn();
+    const listMatchingGitHubDispatchRules = vi.fn().mockResolvedValue([baseRule]);
+
+    const cooldownPublisher = createGitHubDispatchPublisher({
+      githubStore: {
+        listMatchingGitHubDispatchRules,
+        hasRecentGitHubDispatch: vi.fn().mockResolvedValue(true),
+        countProjectGitHubDispatchesSince: vi.fn().mockResolvedValue(0),
+        countInstallationGitHubDispatchesSince: vi.fn().mockResolvedValue(0),
+        createGitHubDispatchDeliveryIntent
+      }
+    });
+
+    await cooldownPublisher.publish({
+      event_type: "bundle.created",
+      incident_id: "inc_123",
+      project_id: "proj_123",
+      occurred_at: "2026-03-11T00:00:00.000Z",
+      service_name: "checkout-api",
+      environment: "production",
+      severity: "high"
+    });
+
+    const projectQuotaPublisher = createGitHubDispatchPublisher({
+      githubStore: {
+        listMatchingGitHubDispatchRules,
+        hasRecentGitHubDispatch: vi.fn().mockResolvedValue(false),
+        countProjectGitHubDispatchesSince: vi.fn().mockResolvedValue(100),
+        countInstallationGitHubDispatchesSince: vi.fn().mockResolvedValue(0),
+        createGitHubDispatchDeliveryIntent
+      }
+    });
+
+    await projectQuotaPublisher.publish({
+      event_type: "bundle.created",
+      incident_id: "inc_124",
+      project_id: "proj_123",
+      occurred_at: "2026-03-11T00:00:00.000Z",
+      service_name: "checkout-api",
+      environment: "production",
+      severity: "high"
+    });
+
+    const installationQuotaPublisher = createGitHubDispatchPublisher({
+      githubStore: {
+        listMatchingGitHubDispatchRules,
+        hasRecentGitHubDispatch: vi.fn().mockResolvedValue(false),
+        countProjectGitHubDispatchesSince: vi.fn().mockResolvedValue(0),
+        countInstallationGitHubDispatchesSince: vi.fn().mockResolvedValue(4000),
+        createGitHubDispatchDeliveryIntent
+      }
+    });
+
+    await installationQuotaPublisher.publish({
+      event_type: "bundle.created",
+      incident_id: "inc_125",
+      project_id: "proj_123",
+      occurred_at: "2026-03-11T00:00:00.000Z",
+      service_name: "checkout-api",
+      environment: "production",
+      severity: "high"
+    });
+
+    expect(createGitHubDispatchDeliveryIntent).not.toHaveBeenCalled();
+  });
+
   it("should derive github dispatch dedupe keys from occurred_at when bundle version is absent", async (): Promise<void> => {
     const listMatchingGitHubDispatchRules = vi.fn().mockResolvedValue([
       {
@@ -1423,6 +1576,170 @@ describe("worker runtime", () => {
       statusCode: 429,
       retryAfterSeconds: 17
     });
+  });
+
+  it("should deliver alerts across email, slack, discord, and webhook channels", async (): Promise<void> => {
+    const emailSend = vi.fn().mockResolvedValue(undefined);
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const transport = createAlertTransport({
+      timeoutMs: 1000,
+      emailTransport: { send: emailSend }
+    });
+
+    await transport.deliver({
+      channel: "email",
+      config: { to: "alerts@example.com" },
+      payload: {}
+    } as never);
+    await transport.deliver({
+      channel: "slack",
+      config: { webhook_url: "https://hooks.slack.test/alert" },
+      payload: {}
+    } as never);
+    await transport.deliver({
+      channel: "discord",
+      config: { webhook_url: "https://discord.test/alert" },
+      payload: {}
+    } as never);
+    await transport.deliver({
+      channel: "webhook",
+      config: { target_url: "https://alerts.test/webhook" },
+      payload: { summary: "Disk alert" }
+    } as never);
+
+    expect(emailSend).toHaveBeenCalledWith(
+      expect.objectContaining({
+        to: ["alerts@example.com"],
+        subject: "[DebugBundle Alert] alert: Alert triggered"
+      })
+    );
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+  });
+
+  it("should surface alert transport configuration and delivery failures", async (): Promise<void> => {
+    const transportWithoutEmail = createAlertTransport({ timeoutMs: 1000, emailTransport: null });
+
+    await expect(
+      transportWithoutEmail.deliver({
+        channel: "email",
+        config: { to: "alerts@example.com" },
+        payload: { summary: "Broken" }
+      } as never)
+    ).rejects.toMatchObject({ message: "alert_email_not_configured" });
+
+    const emailSend = vi.fn().mockRejectedValue(new Error("smtp_down"));
+    const transport = createAlertTransport({ timeoutMs: 1000, emailTransport: { send: emailSend } });
+
+    await expect(
+      transport.deliver({
+        channel: "email",
+        config: { to: "   " },
+        payload: { summary: "Broken" }
+      } as never)
+    ).rejects.toMatchObject({ message: "alert_email_recipients_missing" });
+
+    await expect(
+      transport.deliver({
+        channel: "email",
+        config: { to: "alerts@example.com" },
+        payload: { summary: "Broken", event_type: "incident.spike_detected" }
+      } as never)
+    ).rejects.toMatchObject({ message: "alert_email_error:smtp_down" });
+
+    const abortError = new Error("timed out");
+    abortError.name = "AbortError";
+    vi.stubGlobal("fetch", vi.fn().mockRejectedValueOnce(new Error("offline")).mockRejectedValueOnce(abortError));
+
+    await expect(
+      transport.deliver({
+        channel: "slack",
+        config: { webhook_url: "https://hooks.slack.test/alert" },
+        payload: { summary: "Slack broken", event_type: "bundle.created" }
+      } as never)
+    ).rejects.toMatchObject({ message: "alert_transport_error:offline" });
+
+    await expect(
+      transport.deliver({
+        channel: "discord",
+        config: { webhook_url: "https://discord.test/alert" },
+        payload: { summary: "Discord broken", event_type: "bundle.created" }
+      } as never)
+    ).rejects.toMatchObject({ message: "alert_timeout" });
+
+    await expect(
+      transport.deliver({
+        channel: "webhook",
+        config: {},
+        payload: { summary: "Webhook broken" }
+      } as never)
+    ).rejects.toMatchObject({ message: "alert_target_url_missing" });
+
+    await expect(
+      transport.deliver({
+        channel: "pagerduty",
+        config: {},
+        payload: {}
+      } as never)
+    ).rejects.toMatchObject({ message: "alert_channel_not_supported:pagerduty" });
+  });
+
+  it("should validate weekly report email and slack delivery configuration", async (): Promise<void> => {
+    const reportEvent = {
+      channel: {
+        channel: "email",
+        config: { to: ["team@example.com"] }
+      },
+      report: {
+        project_id: "proj_123",
+        window_start: "2026-03-09T00:00:00.000Z",
+        window_end: "2026-03-16T00:00:00.000Z",
+        bundle_counts: { failure: 3, improvement: 1 },
+        new_incidents: 2,
+        regressions: 1,
+        top_spiking_incidents: []
+      }
+    };
+
+    await expect(createWeeklyReportTransport({ emailTransport: null }).deliver(reportEvent as never)).rejects.toThrow(
+      "weekly_report_email_not_configured"
+    );
+
+    await expect(
+      createWeeklyReportTransport({ emailTransport: { send: vi.fn() } }).deliver({
+        ...reportEvent,
+        channel: {
+          channel: "email",
+          config: { to: "team@example.com" }
+        }
+      } as never)
+    ).rejects.toThrow("weekly_report_email_config_invalid");
+
+    await expect(
+      createWeeklyReportTransport({ emailTransport: { send: vi.fn() } }).deliver({
+        ...reportEvent,
+        channel: {
+          channel: "slack",
+          config: {}
+        }
+      } as never)
+    ).rejects.toThrow("weekly_report_slack_config_invalid");
+
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({ ok: false, status: 503, headers: { get: vi.fn().mockReturnValue(null) } })
+    );
+
+    await expect(
+      createWeeklyReportTransport({ emailTransport: { send: vi.fn() } }).deliver({
+        ...reportEvent,
+        channel: {
+          channel: "slack",
+          config: { webhook_url: "https://hooks.slack.test/weekly" }
+        }
+      } as never)
+    ).rejects.toThrow("weekly_report_slack_http_error_503");
   });
 
   it("should enqueue one generate-weekly-report job per active project during scheduler pass", async (): Promise<void> => {

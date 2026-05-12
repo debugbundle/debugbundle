@@ -163,7 +163,7 @@ function buildCloudSuggestedActions(status: "healthy" | "warning" | "error", inc
   }
 
   return [
-    "Run debugbundle login to create ~/.debugbundle/auth.json before verifying cloud traffic.",
+    "Run debugbundle login --github, debugbundle login --github-device, or debugbundle login <dbundle_mem_...> to create ~/.debugbundle/auth.json before verifying cloud traffic.",
     "Generate a live cloud request, then re-run debugbundle verify cloud with the correct project and service filters."
   ];
 }

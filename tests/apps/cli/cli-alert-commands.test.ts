@@ -36,7 +36,7 @@ describe("cli alert commands", () => {
             channel: "email",
             condition_type: "severity_threshold",
             severity_min: "high",
-            config: {},
+            config: { to: "owner@example.com" },
             is_enabled: true,
             created_at: "2026-03-15T00:00:00.000Z",
             updated_at: "2026-03-15T00:00:00.000Z"
@@ -64,7 +64,7 @@ describe("cli alert commands", () => {
       condition_type: "severity_threshold",
       severity_min: "high",
       config: {
-        to: ["oncall@example.com"]
+        to: "oncall@example.com"
       },
       is_enabled: true,
       created_at: "2026-03-15T00:00:00.000Z",
@@ -86,7 +86,7 @@ describe("cli alert commands", () => {
         conditionType: "severity_threshold",
         severityMin: "high",
         config: {
-          to: ["oncall@example.com"]
+          to: "oncall@example.com"
         },
         json: true
       },
@@ -108,7 +108,7 @@ describe("cli alert commands", () => {
       conditionType: "severity_threshold",
       severityMin: "high",
       config: {
-        to: ["oncall@example.com"]
+        to: "oncall@example.com"
       }
     });
     expect(JSON.parse(result.output)).toEqual({
@@ -120,7 +120,7 @@ describe("cli alert commands", () => {
         condition_type: "severity_threshold",
         severity_min: "high",
         config: {
-          to: ["oncall@example.com"]
+          to: "oncall@example.com"
         },
         is_enabled: true,
         created_at: "2026-03-15T00:00:00.000Z",
@@ -149,7 +149,8 @@ describe("cli alert commands", () => {
         bearerToken: "dbundle_mem_x",
         projectId: "proj_1",
         channel: "email",
-        conditionType: "new_incident"
+        conditionType: "new_incident",
+        config: { to: "owner@example.com" }
       },
       {
         createAlert: vi.fn().mockResolvedValue({
@@ -159,7 +160,7 @@ describe("cli alert commands", () => {
           channel: "email",
           condition_type: "new_incident",
           severity_min: null,
-          config: {},
+          config: { to: "owner@example.com" },
           is_enabled: true,
           created_at: "2026-03-15T00:00:00.000Z",
           updated_at: "2026-03-15T00:00:00.000Z"
@@ -182,7 +183,7 @@ describe("cli alert commands", () => {
           channel: "email",
           condition_type: "new_incident",
           severity_min: null,
-          config: {},
+          config: { to: "owner@example.com" },
           is_enabled: false,
           created_at: "2026-03-15T00:00:00.000Z",
           updated_at: "2026-03-15T00:05:00.000Z"
@@ -209,7 +210,7 @@ describe("cli alert commands", () => {
         channel: "email",
         condition_type: "new_incident",
         severity_min: null,
-        config: {},
+        config: { to: "owner@example.com" },
         is_enabled: false,
         created_at: "2026-03-15T00:00:00.000Z",
         updated_at: "2026-03-15T00:05:00.000Z"
@@ -345,7 +346,8 @@ describe("cli alert commands", () => {
         bearerToken: "dbundle_mem_x",
         projectId: "proj_1",
         channel: "email",
-        conditionType: "new_incident"
+        conditionType: "new_incident",
+        config: { to: "owner@example.com" }
       },
       {
         createAlert: vi.fn().mockRejectedValue(new AlertApiError(400, "invalid_payload"))
@@ -421,5 +423,68 @@ describe("cli alert commands", () => {
     expect(createApi).toHaveBeenCalled();
     expect(updateResult.output).toContain("Alert updated: al_1");
     expect(JSON.parse(deleteResult.output)).toEqual({ alert: { alert_id: "al_1" } });
+  });
+
+  it("forwards the remaining optional wrapper fields for update and delete commands", async () => {
+    const readAuthState = vi.fn().mockResolvedValue({
+      bearer_token: "dbundle_mem_saved",
+      base_url: "https://selfhost.debugbundle.test"
+    });
+    const updateAlert = vi.fn().mockResolvedValue({
+      alert_id: "al_2",
+      project_id: "proj_1",
+      service_id: null,
+      channel: "webhook",
+      condition_type: "severity_threshold",
+      severity_min: null,
+      config: null,
+      is_enabled: true,
+      created_at: "2026-03-15T00:00:00.000Z",
+      updated_at: "2026-03-15T00:10:00.000Z"
+    });
+    const deleteAlert = vi.fn().mockResolvedValue({ alert_id: "al_2" });
+    const createApi = vi.fn().mockReturnValue({
+      listAlerts: vi.fn(),
+      createAlert: vi.fn(),
+      updateAlert,
+      deleteAlert
+    });
+
+    await updateAlertWithAuthCommand(
+      {
+        authFilePath: "/tmp/auth.json",
+        alertId: "al_2",
+        serviceId: null,
+        severityMin: null,
+        config: null,
+        json: true
+      },
+      {
+        readAuthState,
+        createApi
+      }
+    );
+    await deleteAlertWithAuthCommand(
+      {
+        authFilePath: "/tmp/auth.json",
+        alertId: "al_2"
+      },
+      {
+        readAuthState,
+        createApi
+      }
+    );
+
+    expect(updateAlert).toHaveBeenCalledWith({
+      bearerToken: "dbundle_mem_saved",
+      alertId: "al_2",
+      serviceId: null,
+      severityMin: null,
+      config: null
+    });
+    expect(deleteAlert).toHaveBeenCalledWith({
+      bearerToken: "dbundle_mem_saved",
+      alertId: "al_2"
+    });
   });
 });

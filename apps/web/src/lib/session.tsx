@@ -8,11 +8,17 @@ import {
   type ReactNode
 } from "react";
 
-import { getSession, type SessionRecord } from "./api.js";
+import {
+  getSession,
+  isInvalidSessionError,
+  subscribeToBrowserSessionInvalidation,
+  type SessionRecord
+} from "./api.js";
 
 interface SessionContextValue {
   session: SessionRecord | null;
   isLoading: boolean;
+  sessionInvalidationCount: number;
   refreshSession: () => Promise<SessionRecord | null>;
   setSession: (session: SessionRecord | null) => void;
 }
@@ -22,6 +28,7 @@ const SessionContext = createContext<SessionContextValue | null>(null);
 export function SessionProvider({ children }: { children: ReactNode }): JSX.Element {
   const [session, setSession] = useState<SessionRecord | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [sessionInvalidationCount, setSessionInvalidationCount] = useState(0);
   const hasBootstrappedSession = useRef(false);
 
   async function refreshSession(): Promise<SessionRecord | null> {
@@ -45,14 +52,37 @@ export function SessionProvider({ children }: { children: ReactNode }): JSX.Elem
     void refreshSession();
   }, []);
 
+  useEffect(() => {
+    return subscribeToBrowserSessionInvalidation(() => {
+      setSession(null);
+      setIsLoading(false);
+      setSessionInvalidationCount((current) => current + 1);
+    });
+  }, []);
+
+  useEffect(() => {
+    function handleUnhandledRejection(event: PromiseRejectionEvent): void {
+      if (isInvalidSessionError(event.reason)) {
+        event.preventDefault();
+      }
+    }
+
+    window.addEventListener("unhandledrejection", handleUnhandledRejection);
+
+    return () => {
+      window.removeEventListener("unhandledrejection", handleUnhandledRejection);
+    };
+  }, []);
+
   const value = useMemo(
     () => ({
       session,
       isLoading,
+      sessionInvalidationCount,
       refreshSession,
       setSession
     }),
-    [session, isLoading]
+    [session, isLoading, sessionInvalidationCount]
   );
 
   return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>;

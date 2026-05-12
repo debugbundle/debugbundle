@@ -1,10 +1,11 @@
 // @vitest-environment jsdom
 
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { userEvent } from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { App } from "../../../apps/web/src/app.tsx";
+import { resetBrowserSessionClientState } from "../../../apps/web/src/lib/api.ts";
 import {
   createAlert,
   createBillingSummary,
@@ -26,6 +27,7 @@ import {
 } from "./web-test-helpers.js";
 
 afterEach(() => {
+  resetBrowserSessionClientState();
   vi.unstubAllGlobals();
 });
 
@@ -463,6 +465,58 @@ describe("web app — management routes", () => {
     });
   });
 
+  it("revokes a project token from the project tokens page", async () => {
+    const user = userEvent.setup();
+    const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = requestUrl(input);
+
+      if (url.endsWith("/v1/auth/session")) {
+        return jsonResponse(200, {
+          session: createSession()
+        });
+      }
+
+      if (url.endsWith("/v1/projects") && init?.method === undefined) {
+        return jsonResponse(200, {
+          projects: [createProject()]
+        });
+      }
+
+      if (url.endsWith("/v1/projects/proj_123/tokens") && init?.method === undefined) {
+        return jsonResponse(200, {
+          tokens: [createProjectToken()]
+        });
+      }
+
+      if (url.endsWith("/v1/projects/proj_123/tokens/proj_tok_123/revoke") && init?.method === "POST") {
+        expect(init.credentials).toBe("include");
+        return jsonResponse(200, { success: true });
+      }
+
+      return jsonResponse(404, { error: "not_found" });
+    });
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<App initialEntries={["/projects/proj_123/tokens"]} />);
+
+    expect(await screen.findByText(/production ingest/i)).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: /^revoke$/i }));
+    await user.click(await screen.findByRole("button", { name: /revoke token/i }));
+
+    await waitFor(() => {
+      expect(
+        fetchMock.mock.calls.some(
+          ([input, init]) => requestUrl(input).endsWith("/v1/projects/proj_123/tokens/proj_tok_123/revoke") && init?.method === "POST"
+        )
+      ).toBe(true);
+    });
+
+    expect(await screen.findByText(/project token revoked successfully/i)).toBeInTheDocument();
+    expect(screen.queryByText(/production ingest/i)).toBeNull();
+  });
+
   it("shows the project token empty state with a create action", async () => {
     const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
       const url = requestUrl(input);
@@ -495,6 +549,39 @@ describe("web app — management routes", () => {
     expect(await screen.findByText(/no project tokens yet/i)).toBeInTheDocument();
     expect(screen.getByText(/connect an sdk or environment-specific deploy flow/i)).toBeInTheDocument();
     expect(screen.getAllByRole("button", { name: /create project token/i }).length).toBe(2);
+  });
+
+  it("renders used project tokens without the never-used placeholder", async () => {
+    const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = requestUrl(input);
+
+      if (url.endsWith("/v1/auth/session")) {
+        return jsonResponse(200, {
+          session: createSession()
+        });
+      }
+
+      if (url.endsWith("/v1/projects") && init?.method === undefined) {
+        return jsonResponse(200, {
+          projects: [createProject()]
+        });
+      }
+
+      if (url.endsWith("/v1/projects/proj_123/tokens") && init?.method === undefined) {
+        return jsonResponse(200, {
+          tokens: [createProjectToken({ last_used_at: "2026-04-20T11:56:12.000Z" })]
+        });
+      }
+
+      return jsonResponse(404, { error: "not_found" });
+    });
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<App initialEntries={["/projects/proj_123/tokens"]} />);
+
+    expect(await screen.findByText(/production ingest/i)).toBeInTheDocument();
+    expect(screen.queryByText(/^never$/i)).toBeNull();
   });
 
   it("shows project settings details, install-guidance framing, and destructive-actions structure", async () => {
@@ -530,7 +617,7 @@ describe("web app — management routes", () => {
     expect(screen.getByRole("button", { name: /delete project/i })).toBeDisabled();
   });
 
-  it("shows paid-tier github settings state and retries a failed delivery", async () => {
+  it("shows retry actions only for failed github deliveries and retries them", async () => {
     const user = userEvent.setup();
     const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
       const url = requestUrl(input);
@@ -579,7 +666,19 @@ describe("web app — management routes", () => {
 
       if (url.endsWith("/v1/projects/proj_123/github/deliveries?limit=20") && init?.method === undefined) {
         return jsonResponse(200, {
-          deliveries: [createGitHubDispatchDelivery()]
+          deliveries: [
+            createGitHubDispatchDelivery(),
+            createGitHubDispatchDelivery({
+              delivery_id: "gdd_456",
+              incident_id: "inc_456",
+              incident_title: "Backend timeout in worker sync",
+              status: "delivered",
+              attempt_count: 1,
+              last_attempt_at: "2026-03-26T00:20:00.000Z",
+              last_error: null,
+              github_status_code: 204
+            })
+          ]
         });
       }
 
@@ -607,8 +706,20 @@ describe("web app — management routes", () => {
       "href",
       "https://github.com/apps/debugbundle-automation/installations/new"
     );
+    const deliveriesTable = screen.getByRole("table");
+    const failedRow = within(deliveriesTable)
+      .getAllByRole("row")
+      .find((row) => within(row).queryByText(/typeerror in checkout/i) !== null);
+    const deliveredRow = within(deliveriesTable)
+      .getAllByRole("row")
+      .find((row) => within(row).queryByText(/backend timeout in worker sync/i) !== null);
 
-    await user.click(screen.getByRole("button", { name: /retry delivery/i }));
+    expect(failedRow).toBeDefined();
+    expect(deliveredRow).toBeDefined();
+    expect(within(failedRow as HTMLTableRowElement).getByRole("button", { name: /retry delivery/i })).toBeInTheDocument();
+    expect(within(deliveredRow as HTMLTableRowElement).queryByRole("button", { name: /retry delivery/i })).toBeNull();
+
+    await user.click(within(failedRow as HTMLTableRowElement).getByRole("button", { name: /retry delivery/i }));
 
     await waitFor(() => {
       expect(
@@ -1803,6 +1914,145 @@ describe("web app — management routes", () => {
     expect(screen.getByText(/critical/i)).toBeInTheDocument();
   });
 
+  it("prefills and requires a single recipient email for email alert rules", async () => {
+    const user = userEvent.setup();
+    const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = requestUrl(input);
+
+      if (url.endsWith("/v1/auth/session")) {
+        return jsonResponse(200, {
+          session: createSession({ email: "owner@example.com" })
+        });
+      }
+
+      if (url.endsWith("/v1/projects") && init?.method === undefined) {
+        return jsonResponse(200, {
+          projects: [createProject({ organization_plan: "team" })]
+        });
+      }
+
+      if (url.endsWith("/v1/alerts?project_id=proj_123&limit=20") && init?.method === undefined) {
+        return jsonResponse(200, {
+          alerts: []
+        });
+      }
+
+      if (url.endsWith("/v1/alerts") && init?.method === "POST") {
+        expect(init.body).toBe(
+          JSON.stringify({
+            project_id: "proj_123",
+            channel: "email",
+            condition_type: "new_incident",
+            config: {
+              to: "alerts@example.com"
+            },
+            is_enabled: true
+          })
+        );
+
+        return jsonResponse(201, {
+          alert: createAlert({
+            alert_id: "alert_email_789",
+            config: { to: "alerts@example.com" }
+          })
+        });
+      }
+
+      return jsonResponse(404, { error: "not_found" });
+    });
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<App initialEntries={["/projects/proj_123/alerts"]} />);
+
+    await user.click(await screen.findByRole("button", { name: /create alert rule/i }));
+
+    const recipientInput = await screen.findByLabelText(/recipient email/i);
+    expect(recipientInput).toHaveValue("owner@example.com");
+
+    await user.clear(recipientInput);
+    await user.type(recipientInput, "alerts@example.com");
+    await user.click(screen.getByRole("button", { name: /^create alert rule$/i }));
+
+    await waitFor(() => {
+      expect(screen.getByText(/email/i)).toBeInTheDocument();
+    });
+  });
+
+  it("validates missing alert webhook urls and creates webhook alert rules", async () => {
+    const user = userEvent.setup();
+    const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = requestUrl(input);
+
+      if (url.endsWith("/v1/auth/session")) {
+        return jsonResponse(200, {
+          session: createSession()
+        });
+      }
+
+      if (url.endsWith("/v1/projects") && init?.method === undefined) {
+        return jsonResponse(200, {
+          projects: [createProject({ organization_plan: "team" })]
+        });
+      }
+
+      if (url.endsWith("/v1/alerts?project_id=proj_123&limit=20") && init?.method === undefined) {
+        return jsonResponse(200, {
+          alerts: []
+        });
+      }
+
+      if (url.endsWith("/v1/alerts") && init?.method === "POST") {
+        expect(init.body).toBe(
+          JSON.stringify({
+            project_id: "proj_123",
+            channel: "webhook",
+            condition_type: "new_incident",
+            config: {
+              target_url: "https://alerts.example.test/project-webhook"
+            },
+            is_enabled: true
+          })
+        );
+
+        return jsonResponse(201, {
+          alert: createAlert({
+            alert_id: "alert_webhook_789",
+            channel: "webhook",
+            config: { target_url: "https://alerts.example.test/project-webhook" }
+          })
+        });
+      }
+
+      return jsonResponse(404, { error: "not_found" });
+    });
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<App initialEntries={["/projects/proj_123/alerts"]} />);
+
+    await user.click(await screen.findByRole("button", { name: /create alert rule/i }));
+
+    const channelSelect = await screen.findByLabelText(/channel/i);
+    await user.selectOptions(channelSelect, "webhook");
+    const destinationInput = screen.getByLabelText(/webhook endpoint url/i);
+    expect(destinationInput).toBeInTheDocument();
+
+    const createButton = screen.getByRole("button", { name: /^create alert rule$/i });
+    const createForm = createButton.closest("form");
+    expect(createForm).not.toBeNull();
+    fireEvent.submit(createForm as HTMLFormElement);
+
+    expect(await screen.findByText(/add a destination url for this alert channel/i)).toBeInTheDocument();
+
+    await user.type(destinationInput, "https://alerts.example.test/project-webhook");
+    await user.click(createButton);
+
+    await waitFor(() => {
+      expect(screen.getByText(/alert webhook/i)).toBeInTheDocument();
+    });
+  });
+
   it("limits free-project alert channels to email and alert webhook", async () => {
     const user = userEvent.setup();
     const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
@@ -2038,6 +2288,63 @@ describe("web app — management routes", () => {
         )
       ).toBe(true);
     });
+  });
+
+  it("removes a member from the organization members page", async () => {
+    const user = userEvent.setup();
+    const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = requestUrl(input);
+
+      if (url.endsWith("/v1/auth/session")) {
+        return jsonResponse(200, {
+          session: createSession()
+        });
+      }
+
+      if (url.endsWith("/v1/organization/members") && init?.method === undefined) {
+        return jsonResponse(200, {
+          members: [
+            createOrganizationMember(),
+            createOrganizationMember({ user_id: "usr_456", email: "casey@example.com", role: "member" })
+          ]
+        });
+      }
+
+      if (url.endsWith("/v1/organization/members/invites") && init?.method === undefined) {
+        return jsonResponse(200, {
+          invites: []
+        });
+      }
+
+      if (url.endsWith("/v1/organization/members/usr_456") && init?.method === "DELETE") {
+        expect(init.credentials).toBe("include");
+        return jsonResponse(200, { success: true });
+      }
+
+      return jsonResponse(404, { error: "not_found" });
+    });
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<App initialEntries={["/organization/members"]} />);
+
+    expect(await screen.findByText(/casey@example.com/i)).toBeInTheDocument();
+
+    const memberRow = screen.getByText(/casey@example.com/i).closest("tr");
+    expect(memberRow).not.toBeNull();
+    await user.click(within(memberRow as HTMLTableRowElement).getByRole("button", { name: /^remove$/i }));
+    await user.click(await screen.findByRole("button", { name: /remove member/i }));
+
+    await waitFor(() => {
+      expect(
+        fetchMock.mock.calls.some(
+          ([input, init]) => requestUrl(input).endsWith("/v1/organization/members/usr_456") && init?.method === "DELETE"
+        )
+      ).toBe(true);
+    });
+
+    expect(await screen.findByText(/member removed successfully/i)).toBeInTheDocument();
+    expect(screen.queryByText(/casey@example.com/i)).toBeNull();
   });
 
   it("shows organization overview summary with entry points into member and billing management", async () => {
@@ -2591,4 +2898,385 @@ describe("web app — management routes", () => {
     expect((await screen.findAllByText(/dropping to 2 total units/i)).length).toBeGreaterThan(0);
     expect(screen.getByRole("button", { name: /keep current units/i })).toBeInTheDocument();
   });
+
+  it("cancels a pending capacity reduction from the billing page", async () => {
+    const user = userEvent.setup();
+    const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = requestUrl(input);
+
+      if (url.endsWith("/v1/auth/session")) {
+        return jsonResponse(200, {
+          session: createSession()
+        });
+      }
+
+      if (url.endsWith("/v1/billing") && init?.method === undefined) {
+        return jsonResponse(200, {
+          billing: createBillingSummary({
+            plan: "solo",
+            stripe_customer_id: "cus_123",
+            active_projects: 3,
+            capacity_units: {
+              total: 4,
+              included: 2,
+              additional_purchased: 2,
+              pending_reduction: {
+                additional_purchased: 0,
+                total: 2,
+                effective_at: "2026-04-23T11:56:12.000Z"
+              }
+            },
+            usage_window: {
+              starts_at: "2026-03-23T11:56:12.000Z",
+              ends_at: "2026-04-23T11:56:12.000Z"
+            }
+          })
+        });
+      }
+
+      if (url.endsWith("/v1/billing/capacity/scheduled-reduction") && init?.method === "DELETE") {
+        expect(init.credentials).toBe("include");
+        return jsonResponse(200, {
+          billing: createBillingSummary({
+            plan: "solo",
+            stripe_customer_id: "cus_123",
+            active_projects: 3,
+            capacity_units: {
+              total: 4,
+              included: 2,
+              additional_purchased: 2,
+              pending_reduction: null
+            },
+            usage_window: {
+              starts_at: "2026-03-23T11:56:12.000Z",
+              ends_at: "2026-04-23T11:56:12.000Z"
+            }
+          })
+        });
+      }
+
+      return jsonResponse(404, { error: "not_found" });
+    });
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<App initialEntries={["/billing"]} />);
+
+    expect(await screen.findByText(/dropping to 2 total units/i)).toBeInTheDocument();
+
+    await user.click(await screen.findByRole("button", { name: /manage capacity/i }));
+    await user.click(screen.getByRole("button", { name: /keep current units/i }));
+
+    await waitFor(() => {
+      expect(
+        fetchMock.mock.calls.some(
+          ([input, init]) => requestUrl(input).endsWith("/v1/billing/capacity/scheduled-reduction") && init?.method === "DELETE"
+        )
+      ).toBe(true);
+    });
+
+    expect(await screen.findByText(/scheduled capacity reduction cancelled successfully/i)).toBeInTheDocument();
+    expect(screen.queryByText(/dropping to 2 total units/i)).toBeNull();
+  });
+
+  it("keeps the project create dialog open and shows an error when project creation fails", async () => {
+    const user = userEvent.setup();
+    const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = requestUrl(input);
+
+      if (url.endsWith("/v1/auth/session")) {
+        return jsonResponse(200, {
+          session: createSession()
+        });
+      }
+
+      if (url.endsWith("/v1/projects") && init?.method === undefined) {
+        return jsonResponse(200, {
+          projects: [createProject()]
+        });
+      }
+
+      if (url.endsWith("/v1/projects") && init?.method === "POST") {
+        return jsonResponse(500, { error: "project_create_failed" });
+      }
+
+      return jsonResponse(404, { error: "not_found" });
+    });
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<App initialEntries={["/projects"]} />);
+
+    await screen.findByRole("heading", { name: /projects/i, level: 1 });
+    await user.click(screen.getByRole("button", { name: /create project/i }));
+    await user.type(await screen.findByLabelText(/project name/i), "Broken Project");
+    await user.type(screen.getByLabelText(/project slug/i), "broken-project");
+    await user.click(screen.getByRole("button", { name: /^create project$/i }));
+
+    expect(await screen.findByText(/could not create project/i)).toBeInTheDocument();
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
+  });
+
+  it("shows owner-scope warnings on the organization overview when member and billing APIs forbid access", async () => {
+    const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = requestUrl(input);
+
+      if (url.endsWith("/v1/auth/session")) {
+        return jsonResponse(200, {
+          session: createSession({ organization_plan: "team", role: "owner" })
+        });
+      }
+
+      if (url.endsWith("/v1/projects") && init?.method === undefined) {
+        return jsonResponse(200, {
+          projects: [createProject({ organization_plan: "team" })]
+        });
+      }
+
+      if (url.endsWith("/v1/organization/members") && init?.method === undefined) {
+        return jsonResponse(403, { error: "forbidden" });
+      }
+
+      if (url.endsWith("/v1/organization/members/invites") && init?.method === undefined) {
+        return jsonResponse(200, { invites: [] });
+      }
+
+      if (url.endsWith("/v1/billing") && init?.method === undefined) {
+        return jsonResponse(403, { error: "forbidden" });
+      }
+
+      return jsonResponse(404, { error: "not_found" });
+    });
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<App initialEntries={["/organization"]} />);
+
+    expect(await screen.findByRole("heading", { name: /organization/i, level: 1 })).toBeInTheDocument();
+    expect(await screen.findByText(/owner permissions are required to manage members/i)).toBeInTheDocument();
+    expect(screen.getByText(/owner permissions are required to manage billing/i)).toBeInTheDocument();
+  });
+
+  it("shows a canceled checkout return dialog on the billing page without confirming checkout", async () => {
+    const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = requestUrl(input);
+
+      if (url.endsWith("/v1/auth/session")) {
+        return jsonResponse(200, {
+          session: createSession()
+        });
+      }
+
+      if (url.endsWith("/v1/billing") && init?.method === undefined) {
+        return jsonResponse(200, {
+          billing: createBillingSummary()
+        });
+      }
+
+      if (url.endsWith("/v1/billing/checkout/confirm")) {
+        throw new Error("confirm should not be called");
+      }
+
+      return jsonResponse(404, { error: "not_found" });
+    });
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<App initialEntries={["/billing?checkout=canceled"]} />);
+
+    expect(await screen.findByRole("heading", { name: /billing/i, level: 1 })).toBeInTheDocument();
+    expect(await screen.findByRole("dialog", { name: /checkout canceled/i })).toBeInTheDocument();
+    expect(screen.getByText(/no payment was completed and your plan has not changed/i)).toBeInTheDocument();
+  });
+
+  it("shows an error toast when opening the billing portal fails", async () => {
+    const user = userEvent.setup();
+    const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = requestUrl(input);
+
+      if (url.endsWith("/v1/auth/session")) {
+        return jsonResponse(200, {
+          session: createSession()
+        });
+      }
+
+      if (url.endsWith("/v1/billing") && init?.method === undefined) {
+        return jsonResponse(200, {
+          billing: createBillingSummary({
+            plan: "solo",
+            stripe_customer_id: "cus_123",
+            capacity_units: {
+              total: 2,
+              included: 2,
+              additional_purchased: 0,
+              pending_reduction: null
+            }
+          })
+        });
+      }
+
+      if (url.endsWith("/v1/billing/portal") && init?.method === "POST") {
+        return jsonResponse(500, { error: "portal_unavailable" });
+      }
+
+      return jsonResponse(404, { error: "not_found" });
+    });
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<App initialEntries={["/billing"]} />);
+
+    await screen.findByRole("heading", { name: /billing/i, level: 1 });
+    await user.click(await screen.findByRole("button", { name: /manage subscription/i }));
+
+    expect(await screen.findByText(/subscription management is unavailable right now/i)).toBeInTheDocument();
+  });
+
+  it("shows an error toast when deleting a project alert rule fails", async () => {
+    const user = userEvent.setup();
+    const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = requestUrl(input);
+
+      if (url.endsWith("/v1/auth/session")) {
+        return jsonResponse(200, {
+          session: createSession()
+        });
+      }
+
+      if (url.endsWith("/v1/projects") && init?.method === undefined) {
+        return jsonResponse(200, {
+          projects: [createProject({ organization_plan: "team" })]
+        });
+      }
+
+      if (url.endsWith("/v1/alerts?project_id=proj_123&limit=20") && init?.method === undefined) {
+        return jsonResponse(200, {
+          alerts: [createAlert()]
+        });
+      }
+
+      if (url.endsWith("/v1/alerts/alert_123") && init?.method === "DELETE") {
+        return jsonResponse(500, { error: "delete_failed" });
+      }
+
+      return jsonResponse(404, { error: "not_found" });
+    });
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<App initialEntries={["/projects/proj_123/alerts"]} />);
+
+    expect(await screen.findByText(/new incident/i)).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: /delete/i }));
+    await user.click(await screen.findByRole("button", { name: /^delete alert$/i }));
+
+    expect(await screen.findByText(/could not delete alert rule/i)).toBeInTheDocument();
+    expect(screen.getByText(/enabled/i)).toBeInTheDocument();
+  });
+
+  it("shows a billing capacity error toast when increasing units fails validation", async () => {
+    const user = userEvent.setup();
+    const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = requestUrl(input);
+
+      if (url.endsWith("/v1/auth/session")) {
+        return jsonResponse(200, {
+          session: createSession()
+        });
+      }
+
+      if (url.endsWith("/v1/billing") && init?.method === undefined) {
+        return jsonResponse(200, {
+          billing: createBillingSummary({
+            plan: "solo",
+            stripe_customer_id: "cus_123",
+            active_projects: 2,
+            capacity_units: {
+              total: 3,
+              included: 2,
+              additional_purchased: 1,
+              pending_reduction: null
+            }
+          })
+        });
+      }
+
+      if (url.endsWith("/v1/billing/capacity/increase") && init?.method === "POST") {
+        return jsonResponse(400, { error: "invalid_target_quantity" });
+      }
+
+      return jsonResponse(404, { error: "not_found" });
+    });
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<App initialEntries={["/billing"]} />);
+
+    await screen.findByRole("heading", { name: /billing/i, level: 1 });
+    await user.click(await screen.findByRole("button", { name: /manage capacity/i }));
+
+    const increaseInput = screen.getByLabelText(/^purchased extra units$/i);
+    await user.clear(increaseInput);
+    await user.type(increaseInput, "2");
+    await user.click(screen.getByRole("button", { name: /increase capacity now/i }));
+
+    expect(await screen.findByText(/choose a unit count above your current purchased quantity/i)).toBeInTheDocument();
+  });
+
+  it("renders singular organization overview summaries for one project, one member, and one allowance unit", async () => {
+    const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = requestUrl(input);
+
+      if (url.endsWith("/v1/auth/session")) {
+        return jsonResponse(200, {
+          session: createSession({ organization_plan: "team" })
+        });
+      }
+
+      if (url.endsWith("/v1/projects") && init?.method === undefined) {
+        return jsonResponse(200, {
+          projects: [createProject({ organization_plan: "team" })]
+        });
+      }
+
+      if (url.endsWith("/v1/organization/members") && init?.method === undefined) {
+        return jsonResponse(200, {
+          members: [createOrganizationMember()]
+        });
+      }
+
+      if (url.endsWith("/v1/organization/members/invites") && init?.method === undefined) {
+        return jsonResponse(200, {
+          invites: [createOrganizationInvite()]
+        });
+      }
+
+      if (url.endsWith("/v1/billing") && init?.method === undefined) {
+        return jsonResponse(200, {
+          billing: createBillingSummary({
+            plan: "solo",
+            active_projects: 1,
+            capacity_units: {
+              total: 1,
+              included: 1,
+              additional_purchased: 0,
+              pending_reduction: null
+            }
+          })
+        });
+      }
+
+      return jsonResponse(404, { error: "not_found" });
+    });
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<App initialEntries={["/organization"]} />);
+
+    expect(await screen.findByRole("heading", { name: /organization/i, level: 1 })).toBeInTheDocument();
+    expect(await screen.findByText(/^1 active project$/i)).toBeInTheDocument();
+    expect(await screen.findByText(/1 member and 1 pending invite/i)).toBeInTheDocument();
+    expect(await screen.findByText(/solo plan with 1 active project and 1 allowance unit/i)).toBeInTheDocument();
+  });
+
 });

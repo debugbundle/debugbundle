@@ -533,4 +533,31 @@ describe("cli main core routing", () => {
     });
   });
 
+  it("routes GitHub login arguments into the login command", async () => {
+    const loginCommand = vi.fn().mockResolvedValue({
+      exitCode: 0,
+      output: "logged in with github"
+    });
+
+    const result = await runCli([
+      "login",
+      "--github",
+      "--label",
+      "GitHub bootstrap",
+      "--json"
+    ], {
+      loginCommand
+    });
+
+    expect(loginCommand).toHaveBeenCalledWith({
+      github: true,
+      label: "GitHub bootstrap",
+      json: true
+    });
+    expect(result).toEqual({
+      exitCode: 0,
+      output: "logged in with github"
+    });
+  });
+
 });

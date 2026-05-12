@@ -63,4 +63,94 @@ describe("storage schema migrations", () => {
 
     await expect(assertStorageSchemaMigrationsApplied({ query } as Queryable)).rejects.toThrow("storage_schema_missing_migrations");
   });
+
+  it("should fail closed when the migration ledger is missing or has a checksum mismatch", async (): Promise<void> => {
+    const missingLedgerQuery = vi.fn().mockResolvedValueOnce({ rows: [{ relation_name: null }] });
+    const checksumMismatchQuery = vi
+      .fn()
+      .mockResolvedValueOnce({ rows: [{ relation_name: "storage_migration_ledger" }] })
+      .mockResolvedValueOnce({ rows: [{ id: STORAGE_SCHEMA_MIGRATIONS[0]?.id, checksum: "wrong" }] });
+
+    await expect(assertStorageSchemaMigrationsApplied({ query: missingLedgerQuery } as Queryable)).rejects.toThrow(
+      "storage_schema_missing_migrations"
+    );
+    await expect(assertStorageSchemaMigrationsApplied({ query: checksumMismatchQuery } as Queryable)).rejects.toThrow(
+      "storage_migration_checksum_mismatch"
+    );
+  });
+
+  it("should rollback and surface rollback failures during migration application", async (): Promise<void> => {
+    const rollbackQuery = vi
+      .fn()
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [] })
+      .mockRejectedValueOnce(new Error("statement_failed"))
+      .mockResolvedValueOnce({ rows: [] });
+    const rollbackFailureQuery = vi
+      .fn()
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [] })
+      .mockRejectedValueOnce(new Error("statement_failed"))
+      .mockRejectedValueOnce(new Error("rollback_failed"));
+
+    await expect(migrateStorageSchema({ query: rollbackQuery } as Queryable)).rejects.toThrow("statement_failed");
+    expect(rollbackQuery).toHaveBeenCalledWith("ROLLBACK", []);
+
+    await expect(migrateStorageSchema({ query: rollbackFailureQuery } as Queryable)).rejects.toThrow(
+      "storage_migration_rollback_failed"
+    );
+  });
+
+  it("should reject invalid migration metadata before touching the database", async (): Promise<void> => {
+    const originalMigrations = STORAGE_SCHEMA_MIGRATIONS.slice();
+    const mutatedMigrations = STORAGE_SCHEMA_MIGRATIONS as unknown as Array<{
+      id: string;
+      description: string;
+      statements: string[];
+      checksum: string;
+    }>;
+
+    mutatedMigrations.splice(
+      0,
+      mutatedMigrations.length,
+      {
+        ...originalMigrations[0]!,
+        id: "invalid-id"
+      },
+      {
+        ...originalMigrations[1]!,
+        statements: ["   "]
+      }
+    );
+
+    try {
+      await expect(migrateStorageSchema({ query: vi.fn() } as Queryable)).rejects.toThrow("storage_migration_invalid_id");
+
+      mutatedMigrations.splice(
+        0,
+        mutatedMigrations.length,
+        {
+          ...originalMigrations[0]!,
+          statements: []
+        }
+      );
+      await expect(assertStorageSchemaMigrationsApplied({ query: vi.fn() } as Queryable)).rejects.toThrow(
+        "storage_migration_empty"
+      );
+
+      mutatedMigrations.splice(
+        0,
+        mutatedMigrations.length,
+        originalMigrations[1]!,
+        originalMigrations[0]!
+      );
+      await expect(assertStorageSchemaMigrationsApplied({ query: vi.fn() } as Queryable)).rejects.toThrow(
+        "storage_migration_order_invalid"
+      );
+    } finally {
+      mutatedMigrations.splice(0, mutatedMigrations.length, ...originalMigrations);
+    }
+  });
 });

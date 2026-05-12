@@ -37,6 +37,7 @@ describe("mcp alert tools", () => {
         projectId: "proj_1",
         channel: "email",
         conditionType: "new_incident",
+        config: { to: "owner@example.com" },
         isEnabled: true
       })
     ).resolves.toEqual({
@@ -83,7 +84,8 @@ describe("mcp alert tools", () => {
         bearerToken: "dbundle_mem_x",
         projectId: "proj_1",
         channel: "email",
-        conditionType: "new_incident"
+        conditionType: "new_incident",
+        config: { to: "owner@example.com" }
       })
     ).rejects.toThrow("mcp_tool_error:unknown_error");
   });

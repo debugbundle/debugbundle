@@ -8,7 +8,14 @@ import { PlanBadge } from "../components/system/plan-badge.js";
 import { Button } from "../components/ui/button.js";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card.js";
 import { Skeleton } from "../components/ui/skeleton.js";
-import { getBillingSummary, listOrganizationInvites, listOrganizationMembers, listProjects, type BillingSummaryRecord } from "../lib/api.js";
+import {
+  getBillingSummary,
+  isInvalidSessionError,
+  listOrganizationInvites,
+  listOrganizationMembers,
+  listProjects,
+  type BillingSummaryRecord
+} from "../lib/api.js";
 import { useSession } from "../lib/session.js";
 
 interface OrganizationMembershipSummary {
@@ -34,10 +41,18 @@ export function OrganizationOverviewPage(): JSX.Element {
     setIsBillingForbidden(session?.role !== "owner");
 
     void (async () => {
-      const projects = await listProjects();
+      try {
+        const projects = await listProjects();
 
-      if (!isCancelled) {
-        setProjectCount(projects.length);
+        if (!isCancelled) {
+          setProjectCount(projects.length);
+        }
+      } catch (error) {
+        if (isInvalidSessionError(error)) {
+          return;
+        }
+
+        throw error;
       }
     })();
 
@@ -61,6 +76,10 @@ export function OrganizationOverviewPage(): JSX.Element {
             return;
           }
 
+          if (isInvalidSessionError(error)) {
+            return;
+          }
+
           throw error;
         }
       })();
@@ -78,6 +97,10 @@ export function OrganizationOverviewPage(): JSX.Element {
               setIsBillingForbidden(true);
             }
 
+            return;
+          }
+
+          if (isInvalidSessionError(error)) {
             return;
           }
 
@@ -216,7 +239,7 @@ export function OrganizationOverviewPage(): JSX.Element {
   );
 }
 
-function formatActiveProjects(projectCount: number | null): string | null {
+export function formatActiveProjects(projectCount: number | null): string | null {
   if (projectCount === null) {
     return null;
   }
@@ -224,7 +247,7 @@ function formatActiveProjects(projectCount: number | null): string | null {
   return `${projectCount} active ${projectCount === 1 ? "project" : "projects"}`;
 }
 
-function formatMembershipSummary(summary: OrganizationMembershipSummary | null): string {
+export function formatMembershipSummary(summary: OrganizationMembershipSummary | null): string {
   if (summary === null) {
     return "Loading member summary...";
   }
@@ -232,7 +255,7 @@ function formatMembershipSummary(summary: OrganizationMembershipSummary | null):
   return `${summary.members} ${summary.members === 1 ? "member" : "members"} and ${summary.invites} pending ${summary.invites === 1 ? "invite" : "invites"}.`;
 }
 
-function formatBillingSummary(summary: BillingSummaryRecord | null): string {
+export function formatBillingSummary(summary: BillingSummaryRecord | null): string {
   if (summary === null) {
     return "Loading billing summary...";
   }
@@ -240,6 +263,6 @@ function formatBillingSummary(summary: BillingSummaryRecord | null): string {
   return `${summary.plan} plan with ${formatActiveProjects(summary.active_projects)} and ${formatAllowanceUnits(summary.capacity_units.total)}.`;
 }
 
-function formatAllowanceUnits(unitCount: number): string {
+export function formatAllowanceUnits(unitCount: number): string {
   return `${unitCount} allowance ${unitCount === 1 ? "unit" : "units"}`;
 }

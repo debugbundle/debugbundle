@@ -57,6 +57,10 @@ import {
   CreateWebhookBodySchema,
   CreateWeeklyReportChannelBodySchema,
   GithubAuthCallbackQuerySchema,
+  GithubDeviceClaimBodySchema,
+  GithubDevicePollBodySchema,
+  GithubDeviceStartBodySchema,
+  GithubTokenExchangeBodySchema,
   IncidentParamsSchema,
   IncidentsQuerySchema,
   LogsQuerySchema,
@@ -163,6 +167,37 @@ const WebSessionSchema = z
   })
   .strict();
 const SessionResponseSchema = z.object({ session: WebSessionSchema.nullable() }).strict();
+const GithubDeviceStartResponseSchema = z
+  .object({
+    request_id: z.string().uuid(),
+    user_code: z.string(),
+    verification_uri: z.string().url(),
+    interval_seconds: z.number().int().positive(),
+    expires_at: z.string().datetime()
+  })
+  .strict();
+const GithubDevicePollResponseSchema = z.discriminatedUnion("status", [
+  z
+    .object({
+      status: z.literal("pending"),
+      interval_seconds: z.number().int().positive(),
+      expires_at: z.string().datetime()
+    })
+    .strict(),
+  z
+    .object({
+      status: z.enum(["approved", "claimed"]),
+      expires_at: z.string().datetime()
+    })
+    .strict(),
+  z
+    .object({
+      status: z.enum(["denied", "expired", "rejected"]),
+      reason: z.string(),
+      expires_at: z.string().datetime()
+    })
+    .strict()
+]);
 const AccountStoredArtifactSchema = z
   .object({
     key: z.string(),
@@ -364,6 +399,8 @@ function buildPublicApiOperations(): OperationSpec[] {
   const apiError = component("ApiError", ApiErrorSchema);
   const successResponse = component("SuccessResponse", SuccessResponseSchema);
   const sessionResponse = component("SessionResponse", SessionResponseSchema);
+  const githubDeviceStartResponse = component("GithubDeviceStartResponse", GithubDeviceStartResponseSchema);
+  const githubDevicePollResponse = component("GithubDevicePollResponse", GithubDevicePollResponseSchema);
   const acceptInviteResponse = component("AcceptInviteResponse", AcceptInviteResponseSchema);
   const accountExportResponse = component("AccountExportResponse", AccountExportResponseSchema);
   const accountDeletionResponse = component("AccountDeletionResponse", AccountDeletionResponseSchema);
@@ -499,6 +536,67 @@ function buildPublicApiOperations(): OperationSpec[] {
         "400": { description: "Invalid callback query.", schema: apiError },
         "503": { description: "Auth is not configured.", schema: apiError },
       },
+    },
+    {
+      method: "post",
+      path: "/v1/auth/github/device/start",
+      operationId: "startGithubDeviceLogin",
+      summary: "Start GitHub device login",
+      tags: ["Auth"],
+      requestBody: component("GithubDeviceStartBody", GithubDeviceStartBodySchema),
+      responses: {
+        "200": { description: "GitHub device authorization created.", schema: githubDeviceStartResponse },
+        "400": { description: "Invalid request body.", schema: apiError },
+        "429": { description: "Too many auth attempts from this IP.", schema: apiError },
+        "503": { description: "GitHub device auth is unavailable.", schema: apiError }
+      }
+    },
+    {
+      method: "post",
+      path: "/v1/auth/github/device/poll",
+      operationId: "pollGithubDeviceLogin",
+      summary: "Poll GitHub device login status",
+      tags: ["Auth"],
+      requestBody: component("GithubDevicePollBody", GithubDevicePollBodySchema),
+      responses: {
+        "200": { description: "Current GitHub device authorization status.", schema: githubDevicePollResponse },
+        "400": { description: "Invalid request body.", schema: apiError },
+        "404": { description: "Device authorization request was not found.", schema: apiError },
+        "429": { description: "Too many auth attempts from this IP.", schema: apiError },
+        "503": { description: "GitHub device auth is unavailable.", schema: apiError }
+      }
+    },
+    {
+      method: "post",
+      path: "/v1/auth/github/device/claim",
+      operationId: "claimGithubDeviceLogin",
+      summary: "Claim the member token issued by GitHub device login",
+      tags: ["Auth"],
+      requestBody: component("GithubDeviceClaimBody", GithubDeviceClaimBodySchema),
+      responses: {
+        "200": { description: "Member token issued.", schema: tokenResponse },
+        "400": { description: "Invalid request body.", schema: apiError },
+        "404": { description: "Device authorization request was not found.", schema: apiError },
+        "409": { description: "Device authorization is not claimable.", schema: apiError },
+        "429": { description: "Too many auth attempts from this IP.", schema: apiError },
+        "503": { description: "GitHub device auth is unavailable.", schema: apiError }
+      }
+    },
+    {
+      method: "post",
+      path: "/v1/auth/github/token/exchange",
+      operationId: "exchangeGithubAccessToken",
+      summary: "Exchange a GitHub access token for a DebugBundle member token",
+      tags: ["Auth"],
+      requestBody: component("GithubTokenExchangeBody", GithubTokenExchangeBodySchema),
+      responses: {
+        "200": { description: "Member token issued.", schema: tokenResponse },
+        "400": { description: "Invalid request body or missing GitHub email.", schema: apiError },
+        "401": { description: "GitHub access token is invalid.", schema: apiError },
+        "403": { description: "GitHub identity cannot bootstrap this account.", schema: apiError },
+        "429": { description: "Too many auth attempts from this IP.", schema: apiError },
+        "503": { description: "GitHub auth is unavailable.", schema: apiError }
+      }
     },
     {
       method: "get",

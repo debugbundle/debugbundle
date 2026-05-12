@@ -1,6 +1,6 @@
 import { CreditCardIcon, GalleryVerticalEndIcon, KeySquareIcon, LoaderCircleIcon, PlusIcon } from "lucide-react";
 import React, { useEffect, useRef, useState } from "react";
-import { BrowserRouter, Link, MemoryRouter, Navigate, Outlet, Route, Routes, useNavigate, useSearchParams } from "react-router-dom";
+import { BrowserRouter, Link, MemoryRouter, Navigate, Outlet, Route, Routes, useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { Toaster } from "sonner";
 
 import { AppSidebar } from "./components/system/app-sidebar.js";
@@ -46,7 +46,7 @@ import {
   type CreatedMemberToken,
   type MemberTokenRecord
 } from "./lib/api.js";
-import { showErrorToast, showSuccessToast } from "./lib/notify.js";
+import { showErrorToast, showInfoToast, showSuccessToast } from "./lib/notify.js";
 import { SessionProvider, useSession } from "./lib/session.js";
 import { BillingPage } from "./pages/billing-page.js";
 import { OrganizationMembersPage, ProjectsPage, ProjectTokensPage } from "./pages/management-pages.js";
@@ -255,13 +255,34 @@ function AppToaster(): JSX.Element {
 }
 
 function RootGate(): JSX.Element {
-  const { isLoading } = useSession();
+  const { isLoading, sessionInvalidationCount } = useSession();
+  const location = useLocation();
+  const navigate = useNavigate();
+  const lastHandledInvalidationCount = useRef(0);
+
+  useEffect(() => {
+    if (
+      sessionInvalidationCount === 0 ||
+      sessionInvalidationCount === lastHandledInvalidationCount.current ||
+      isPublicAuthPath(location.pathname)
+    ) {
+      return;
+    }
+
+    lastHandledInvalidationCount.current = sessionInvalidationCount;
+    showInfoToast("Your session expired. Please sign in again.");
+    void navigate("/login", { replace: true });
+  }, [location.pathname, navigate, sessionInvalidationCount]);
 
   if (isLoading) {
     return <LoadingScreen />;
   }
 
   return <Outlet />;
+}
+
+function isPublicAuthPath(pathname: string): boolean {
+  return pathname === "/login" || pathname === "/signup" || pathname.startsWith("/auth/github/callback");
 }
 
 function RootRedirect(): JSX.Element {

@@ -341,4 +341,470 @@ describe("postgres auth store", () => {
     expect(findUserQuery).toHaveBeenCalledWith(expect.stringContaining("WHERE lower(u.email) = $1"), ["owen@example.com"]);
     expect(findGitHubQuery).toHaveBeenCalledWith(expect.stringContaining("AND oi.provider_user_id = $1"), ["ghu_123"]);
   });
+
+  it("should persist and read github device authorization records", async (): Promise<void> => {
+    const query = vi
+      .fn()
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            request_id: "req_123",
+            device_code: "device_code_123",
+            user_code: "ABCD-EFGH",
+            verification_uri: "https://github.com/login/device",
+            interval_seconds: 5,
+            expires_at: "2026-03-17T00:10:00.000Z",
+            accepted_terms_at: "2026-03-17T00:00:00.000Z",
+            created_at: "2026-03-17T00:00:00.000Z",
+            completed_at: null,
+            claimed_at: null,
+            terminal_error: null,
+            user_id: null,
+            organization_id: null
+          }
+        ]
+      })
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            request_id: "req_123",
+            device_code: "device_code_123",
+            user_code: "ABCD-EFGH",
+            verification_uri: "https://github.com/login/device",
+            interval_seconds: 5,
+            expires_at: "2026-03-17T00:10:00.000Z",
+            accepted_terms_at: "2026-03-17T00:00:00.000Z",
+            created_at: "2026-03-17T00:00:00.000Z",
+            completed_at: null,
+            claimed_at: null,
+            terminal_error: null,
+            user_id: null,
+            organization_id: null
+          }
+        ]
+      });
+    const store = createPostgresAuthStore({ query } as Queryable) as unknown as {
+      createGitHubDeviceAuthorization: (input: {
+        request_id: string;
+        device_code: string;
+        user_code: string;
+        verification_uri: string;
+        interval_seconds: number;
+        expires_at: string;
+        accepted_terms_at: string | null;
+        created_at: string;
+      }) => Promise<unknown>;
+      getGitHubDeviceAuthorization: (requestId: string) => Promise<unknown>;
+    };
+
+    const created = await store.createGitHubDeviceAuthorization({
+      request_id: "req_123",
+      device_code: "device_code_123",
+      user_code: "ABCD-EFGH",
+      verification_uri: "https://github.com/login/device",
+      interval_seconds: 5,
+      expires_at: "2026-03-17T00:10:00.000Z",
+      accepted_terms_at: "2026-03-17T00:00:00.000Z",
+      created_at: "2026-03-17T00:00:00.000Z"
+    });
+    const fetched = await store.getGitHubDeviceAuthorization("req_123");
+
+    expect(created).toEqual({
+      request_id: "req_123",
+      device_code: "device_code_123",
+      user_code: "ABCD-EFGH",
+      verification_uri: "https://github.com/login/device",
+      interval_seconds: 5,
+      expires_at: "2026-03-17T00:10:00.000Z",
+      accepted_terms_at: "2026-03-17T00:00:00.000Z",
+      created_at: "2026-03-17T00:00:00.000Z",
+      completed_at: null,
+      claimed_at: null,
+      terminal_error: null,
+      user_id: null,
+      organization_id: null
+    });
+    expect(fetched).toEqual(created);
+    expect(String(query.mock.calls[0]?.[0] ?? "")).toContain("INSERT INTO github_device_authorizations");
+    expect(String(query.mock.calls[1]?.[0] ?? "")).toContain("FROM github_device_authorizations");
+  });
+
+  it("should return null or throw for missing github device authorization writes", async (): Promise<void> => {
+    const missingReadQuery = vi.fn().mockResolvedValue({ rows: [] });
+    const insertFailureQuery = vi.fn().mockResolvedValue({ rows: [] });
+    const missingReadStore = createPostgresAuthStore({ query: missingReadQuery } as Queryable) as unknown as {
+      getGitHubDeviceAuthorization: (requestId: string) => Promise<unknown>;
+    };
+    const insertFailureStore = createPostgresAuthStore({ query: insertFailureQuery } as Queryable) as unknown as {
+      createGitHubDeviceAuthorization: (input: {
+        request_id: string;
+        device_code: string;
+        user_code: string;
+        verification_uri: string;
+        interval_seconds: number;
+        expires_at: string;
+        accepted_terms_at: string | null;
+        created_at: string;
+      }) => Promise<unknown>;
+    };
+
+    await expect(missingReadStore.getGitHubDeviceAuthorization("missing")).resolves.toBeNull();
+    await expect(
+      insertFailureStore.createGitHubDeviceAuthorization({
+        request_id: "req_missing",
+        device_code: "device_code_missing",
+        user_code: "MISS-ING0",
+        verification_uri: "https://github.com/login/device",
+        interval_seconds: 5,
+        expires_at: "2026-03-17T00:10:00.000Z",
+        accepted_terms_at: null,
+        created_at: "2026-03-17T00:00:00.000Z"
+      })
+    ).rejects.toThrow("github_device_authorization_insert_failed");
+  });
+
+  it("should update github device authorization terminal states", async (): Promise<void> => {
+    const completeQuery = vi.fn().mockResolvedValueOnce({ rows: [{ request_id: "req_123" }] }).mockResolvedValueOnce({ rows: [] });
+    const terminalErrorQuery = vi.fn().mockResolvedValueOnce({ rows: [{ request_id: "req_123" }] }).mockResolvedValueOnce({ rows: [] });
+    const completeStore = createPostgresAuthStore({ query: completeQuery } as Queryable) as unknown as {
+      completeGitHubDeviceAuthorization: (input: {
+        request_id: string;
+        user_id: string;
+        organization_id: string;
+        completed_at: string;
+      }) => Promise<boolean>;
+    };
+    const terminalErrorStore = createPostgresAuthStore({ query: terminalErrorQuery } as Queryable) as unknown as {
+      setGitHubDeviceAuthorizationTerminalError: (input: { request_id: string; terminal_error: string }) => Promise<boolean>;
+    };
+
+    await expect(
+      completeStore.completeGitHubDeviceAuthorization({
+        request_id: "req_123",
+        user_id: "usr_123",
+        organization_id: "org_123",
+        completed_at: "2026-03-17T00:05:00.000Z"
+      })
+    ).resolves.toBe(true);
+    await expect(
+      completeStore.completeGitHubDeviceAuthorization({
+        request_id: "req_123",
+        user_id: "usr_123",
+        organization_id: "org_123",
+        completed_at: "2026-03-17T00:05:00.000Z"
+      })
+    ).resolves.toBe(false);
+
+    await expect(
+      terminalErrorStore.setGitHubDeviceAuthorizationTerminalError({
+        request_id: "req_123",
+        terminal_error: "access_denied"
+      })
+    ).resolves.toBe(true);
+    await expect(
+      terminalErrorStore.setGitHubDeviceAuthorizationTerminalError({
+        request_id: "req_123",
+        terminal_error: "expired_token"
+      })
+    ).resolves.toBe(false);
+  });
+
+  it("should claim github device authorization member tokens across terminal states", async (): Promise<void> => {
+    const makeStore = (query: Queryable["query"]) =>
+      createPostgresAuthStore({ query } as Queryable) as unknown as {
+        claimGitHubDeviceAuthorizationMemberToken: (input: {
+          request_id: string;
+          token_id: string;
+          token_hash: string;
+          label: string;
+          claimed_at: string;
+        }) => Promise<unknown>;
+      };
+
+    const notFoundStore = makeStore(vi.fn().mockResolvedValueOnce({ rows: [] }).mockResolvedValue({ rows: [] }));
+    const claimedStore = makeStore(
+      vi
+        .fn()
+        .mockResolvedValueOnce({ rows: [] })
+        .mockResolvedValueOnce({ rows: [{ request_id: "req_123", user_id: "usr_123", organization_id: "org_123", expires_at: "2026-03-17T00:10:00.000Z", completed_at: "2026-03-17T00:01:00.000Z", claimed_at: "2026-03-17T00:02:00.000Z", terminal_error: null }] })
+        .mockResolvedValue({ rows: [] })
+    );
+    const terminalErrorStore = makeStore(
+      vi
+        .fn()
+        .mockResolvedValueOnce({ rows: [] })
+        .mockResolvedValueOnce({ rows: [{ request_id: "req_123", user_id: null, organization_id: null, expires_at: "2026-03-17T00:10:00.000Z", completed_at: null, claimed_at: null, terminal_error: "access_denied" }] })
+        .mockResolvedValue({ rows: [] })
+    );
+    const expiredStore = makeStore(
+      vi
+        .fn()
+        .mockResolvedValueOnce({ rows: [] })
+        .mockResolvedValueOnce({ rows: [{ request_id: "req_123", user_id: null, organization_id: null, expires_at: "2026-03-17T00:00:00.000Z", completed_at: null, claimed_at: null, terminal_error: null }] })
+        .mockResolvedValue({ rows: [] })
+    );
+    const pendingStore = makeStore(
+      vi
+        .fn()
+        .mockResolvedValueOnce({ rows: [] })
+        .mockResolvedValueOnce({ rows: [{ request_id: "req_123", user_id: null, organization_id: null, expires_at: "2026-03-17T00:10:00.000Z", completed_at: null, claimed_at: null, terminal_error: null }] })
+        .mockResolvedValue({ rows: [] })
+    );
+    const successQuery = vi
+      .fn()
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            request_id: "req_123",
+            user_id: "usr_123",
+            organization_id: "org_123",
+            expires_at: "2026-03-17T00:10:00.000Z",
+            completed_at: "2026-03-17T00:01:00.000Z",
+            claimed_at: null,
+            terminal_error: null
+          }
+        ]
+      })
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            token_id: "tok_123",
+            user_id: "usr_123",
+            organization_id: "org_123",
+            label: "GitHub CLI",
+            created_at: "2026-03-17T00:02:00.000Z",
+            last_used_at: null,
+            revoked_at: null,
+            expires_at: null
+          }
+        ]
+      })
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [] });
+    const successStore = makeStore(successQuery);
+
+    await expect(notFoundStore.claimGitHubDeviceAuthorizationMemberToken({ request_id: "req_missing", token_id: "tok_123", token_hash: "hash", label: "GitHub CLI", claimed_at: "2026-03-17T00:02:00.000Z" })).resolves.toBe("not_found");
+    await expect(claimedStore.claimGitHubDeviceAuthorizationMemberToken({ request_id: "req_123", token_id: "tok_123", token_hash: "hash", label: "GitHub CLI", claimed_at: "2026-03-17T00:02:00.000Z" })).resolves.toBe("claimed");
+    await expect(terminalErrorStore.claimGitHubDeviceAuthorizationMemberToken({ request_id: "req_123", token_id: "tok_123", token_hash: "hash", label: "GitHub CLI", claimed_at: "2026-03-17T00:02:00.000Z" })).resolves.toBe("terminal_error");
+    await expect(expiredStore.claimGitHubDeviceAuthorizationMemberToken({ request_id: "req_123", token_id: "tok_123", token_hash: "hash", label: "GitHub CLI", claimed_at: "2026-03-17T00:02:00.000Z" })).resolves.toBe("expired");
+    await expect(pendingStore.claimGitHubDeviceAuthorizationMemberToken({ request_id: "req_123", token_id: "tok_123", token_hash: "hash", label: "GitHub CLI", claimed_at: "2026-03-17T00:02:00.000Z" })).resolves.toBe("pending");
+    await expect(successStore.claimGitHubDeviceAuthorizationMemberToken({ request_id: "req_123", token_id: "tok_123", token_hash: "hash", label: "GitHub CLI", claimed_at: "2026-03-17T00:02:00.000Z" })).resolves.toEqual({
+      token_id: "tok_123",
+      user_id: "usr_123",
+      organization_id: "org_123",
+      label: "GitHub CLI",
+      created_at: "2026-03-17T00:02:00.000Z",
+      last_used_at: null,
+      revoked_at: null,
+      expires_at: null
+    });
+    expect(String(successQuery.mock.calls[2]?.[0] ?? "")).toContain("INSERT INTO member_tokens");
+    expect(String(successQuery.mock.calls[3]?.[0] ?? "")).toContain("SET claimed_at = $2::timestamptz");
+  });
+
+  it("should rollback claim failures and issue member tokens directly", async (): Promise<void> => {
+    const failingClaimQuery = vi
+      .fn()
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            request_id: "req_123",
+            user_id: "usr_123",
+            organization_id: "org_123",
+            expires_at: "2026-03-17T00:10:00.000Z",
+            completed_at: "2026-03-17T00:01:00.000Z",
+            claimed_at: null,
+            terminal_error: null
+          }
+        ]
+      })
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [] });
+    const issueTokenQuery = vi
+      .fn()
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            token_id: "tok_456",
+            user_id: "usr_456",
+            organization_id: "org_456",
+            label: "Manual token",
+            created_at: "2026-03-17T00:02:00.000Z",
+            last_used_at: null,
+            revoked_at: null,
+            expires_at: null
+          }
+        ]
+      })
+      .mockResolvedValueOnce({ rows: [] });
+    const missingIssueQuery = vi.fn().mockResolvedValue({ rows: [] });
+    const failingClaimStore = createPostgresAuthStore({ query: failingClaimQuery } as Queryable) as unknown as {
+      claimGitHubDeviceAuthorizationMemberToken: (input: {
+        request_id: string;
+        token_id: string;
+        token_hash: string;
+        label: string;
+        claimed_at: string;
+      }) => Promise<unknown>;
+    };
+    const issueStore = createPostgresAuthStore({ query: issueTokenQuery } as Queryable) as unknown as {
+      issueMemberTokenForUser: (input: {
+        token_id: string;
+        user_id: string;
+        organization_id: string;
+        token_hash: string;
+        label: string;
+        created_at: string;
+      }) => Promise<unknown>;
+    };
+    const missingIssueStore = createPostgresAuthStore({ query: missingIssueQuery } as Queryable) as unknown as {
+      issueMemberTokenForUser: (input: {
+        token_id: string;
+        user_id: string;
+        organization_id: string;
+        token_hash: string;
+        label: string;
+        created_at: string;
+      }) => Promise<unknown>;
+    };
+
+    await expect(
+      failingClaimStore.claimGitHubDeviceAuthorizationMemberToken({
+        request_id: "req_123",
+        token_id: "tok_123",
+        token_hash: "hash",
+        label: "GitHub CLI",
+        claimed_at: "2026-03-17T00:02:00.000Z"
+      })
+    ).rejects.toThrow("github_device_authorization_member_token_insert_failed");
+    expect(failingClaimQuery).toHaveBeenCalledWith("ROLLBACK", []);
+
+    await expect(
+      issueStore.issueMemberTokenForUser({
+        token_id: "tok_456",
+        user_id: "usr_456",
+        organization_id: "org_456",
+        token_hash: "hash_456",
+        label: "Manual token",
+        created_at: "2026-03-17T00:02:00.000Z"
+      })
+    ).resolves.toEqual({
+      token_id: "tok_456",
+      user_id: "usr_456",
+      organization_id: "org_456",
+      label: "Manual token",
+      created_at: "2026-03-17T00:02:00.000Z",
+      last_used_at: null,
+      revoked_at: null,
+      expires_at: null
+    });
+    await expect(
+      missingIssueStore.issueMemberTokenForUser({
+        token_id: "tok_missing",
+        user_id: "usr_456",
+        organization_id: "org_456",
+        token_hash: "hash_missing",
+        label: "Manual token",
+        created_at: "2026-03-17T00:02:00.000Z"
+      })
+    ).rejects.toThrow("member_token_issue_failed");
+  });
+
+  it("should keep the primary claim failure when rollback also fails", async (): Promise<void> => {
+    const query = vi
+      .fn()
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            request_id: "req_123",
+            user_id: "usr_123",
+            organization_id: "org_123",
+            expires_at: "2026-03-17T00:10:00.000Z",
+            completed_at: "2026-03-17T00:01:00.000Z",
+            claimed_at: null,
+            terminal_error: null
+          }
+        ]
+      })
+      .mockResolvedValueOnce({ rows: [] })
+      .mockRejectedValueOnce(new Error("rollback_failed"));
+    const store = createPostgresAuthStore({ query } as Queryable) as unknown as {
+      claimGitHubDeviceAuthorizationMemberToken: (input: {
+        request_id: string;
+        token_id: string;
+        token_hash: string;
+        label: string;
+        claimed_at: string;
+      }) => Promise<unknown>;
+    };
+
+    await expect(
+      store.claimGitHubDeviceAuthorizationMemberToken({
+        request_id: "req_123",
+        token_id: "tok_123",
+        token_hash: "hash",
+        label: "GitHub CLI",
+        claimed_at: "2026-03-17T00:02:00.000Z"
+      })
+    ).rejects.toThrow("github_device_authorization_member_token_insert_failed");
+    expect(query).toHaveBeenCalledWith("ROLLBACK", []);
+  });
+
+  it("should map member roles for github identities and sessions", async (): Promise<void> => {
+    const query = vi
+      .fn()
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            user_id: "usr_member",
+            email: "member@example.com",
+            email_verified_at: "2026-03-17T00:00:00.000Z",
+            organization_id: "org_member",
+            role: "member"
+          }
+        ]
+      })
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            session_id: "ses_member",
+            user_id: "usr_member",
+            email: "member@example.com",
+            email_verified_at: "2026-03-17T00:00:00.000Z",
+            organization_id: "org_member",
+            role: "member",
+            created_at: "2026-03-17T00:00:00.000Z",
+            expires_at: "2026-03-17T12:00:00.000Z",
+            revoked_at: null,
+            has_email_auth: true,
+            has_github_oauth: true
+          }
+        ]
+      });
+    const store = createPostgresAuthStore({ query } as Queryable);
+
+    await expect(store.findGitHubUserAccountByProviderUserId?.("ghu_member")).resolves.toEqual({
+      user_id: "usr_member",
+      email: "member@example.com",
+      email_verified_at: "2026-03-17T00:00:00.000Z",
+      organization_id: "org_member",
+      role: "member"
+    });
+    await expect(store.resolveSessionByTokenHash("member_hash")).resolves.toEqual({
+      session_id: "ses_member",
+      user_id: "usr_member",
+      email: "member@example.com",
+      email_verified_at: "2026-03-17T00:00:00.000Z",
+      organization_id: "org_member",
+      role: "member",
+      created_at: "2026-03-17T00:00:00.000Z",
+      expires_at: "2026-03-17T12:00:00.000Z",
+      revoked_at: null,
+      has_email_auth: true,
+      has_github_oauth: true
+    });
+  });
 });

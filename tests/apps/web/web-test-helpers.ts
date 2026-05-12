@@ -416,7 +416,7 @@ export function createAlert(overrides: Partial<AlertRecord> = {}): AlertRecord {
     channel: "email",
     condition_type: "new_incident",
     severity_min: null,
-    config: {},
+    config: { to: "owen@example.com" },
     is_enabled: true,
     created_at: "2026-03-17T00:00:00.000Z",
     updated_at: "2026-03-17T00:00:00.000Z",

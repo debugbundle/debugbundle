@@ -1178,9 +1178,10 @@ export async function handleAlertCommand(parsedArgv: ParsedArgv, dependencies: M
       input.severityMin = severityMin;
     }
     const config = readJsonOption(parsedArgv, "config-json");
-    if (config !== undefined) {
-      input.config = config as Record<string, unknown>;
+    if (config === undefined || typeof config !== "object" || config === null) {
+      throw new CliInputError("Missing required option --config-json.");
     }
+    input.config = config as Record<string, unknown>;
     const isEnabled = readBooleanStringOption(parsedArgv, "is-enabled");
     if (isEnabled !== undefined) {
       input.isEnabled = isEnabled;

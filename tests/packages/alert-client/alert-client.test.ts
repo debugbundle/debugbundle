@@ -16,7 +16,7 @@ describe("alert api client", () => {
             condition_type: "severity_threshold",
             severity_min: "high",
             config: {
-              to: ["oncall@example.com"]
+              to: "oncall@example.com"
             },
             is_enabled: true,
             created_at: "2026-03-15T00:00:00.000Z",
@@ -53,7 +53,7 @@ describe("alert api client", () => {
           condition_type: "severity_threshold",
           severity_min: "high",
           config: {
-            to: ["oncall@example.com"]
+            to: "oncall@example.com"
           },
           is_enabled: true,
           created_at: "2026-03-15T00:00:00.000Z",
@@ -71,7 +71,7 @@ describe("alert api client", () => {
       conditionType: "severity_threshold",
       severityMin: "high",
       config: {
-        to: ["oncall@example.com"]
+        to: "oncall@example.com"
       },
       isEnabled: true
     });
@@ -88,7 +88,7 @@ describe("alert api client", () => {
         condition_type: "severity_threshold",
         severity_min: "high",
         config: {
-          to: ["oncall@example.com"]
+          to: "oncall@example.com"
         },
         is_enabled: true
       }
@@ -199,8 +199,104 @@ describe("alert api client", () => {
         bearerToken: "dbundle_mem_x",
         projectId: "proj_1",
         channel: "email",
-        conditionType: "new_incident"
+        conditionType: "new_incident",
+        config: { to: "owner@example.com" }
       })
     ).rejects.toEqual(new AlertApiError(500, "unknown_error"));
+  });
+
+  it("omits optional fields when alert mutations do not supply them", async () => {
+    const request = vi
+      .fn<HttpClient["request"]>()
+      .mockResolvedValueOnce({
+        status: 200,
+        body: {
+          alerts: []
+        }
+      })
+      .mockResolvedValueOnce({
+        status: 201,
+        body: {
+          alert: {
+            alert_id: "al_minimal",
+            project_id: "proj_1",
+            service_id: null,
+            channel: "email",
+            condition_type: "new_incident",
+            severity_min: null,
+            config: {
+              to: "owner@example.com"
+            },
+            is_enabled: true,
+            created_at: "2026-03-15T00:00:00.000Z",
+            updated_at: "2026-03-15T00:00:00.000Z"
+          }
+        }
+      })
+      .mockResolvedValueOnce({
+        status: 200,
+        body: {
+          alert: {
+            alert_id: "al_minimal",
+            project_id: "proj_1",
+            service_id: null,
+            channel: "email",
+            condition_type: "new_incident",
+            severity_min: null,
+            config: {
+              to: "owner@example.com"
+            },
+            is_enabled: true,
+            created_at: "2026-03-15T00:00:00.000Z",
+            updated_at: "2026-03-15T00:00:00.000Z"
+          }
+        }
+      });
+    const api = createAlertApi({ request });
+
+    await expect(api.listAlerts({ bearerToken: "dbundle_mem_x", projectId: "proj_1" })).resolves.toEqual([]);
+    await expect(
+      api.createAlert({
+        bearerToken: "dbundle_mem_x",
+        projectId: "proj_1",
+        channel: "email",
+        conditionType: "new_incident",
+        config: { to: "owner@example.com" }
+      })
+    ).resolves.toMatchObject({ alert_id: "al_minimal" });
+    await expect(
+      api.updateAlert({
+        bearerToken: "dbundle_mem_x",
+        alertId: "al_minimal",
+        isEnabled: true
+      })
+    ).resolves.toMatchObject({ alert_id: "al_minimal" });
+
+    expect(request).toHaveBeenNthCalledWith(1, {
+      method: "GET",
+      path: "/v1/alerts?project_id=proj_1",
+      bearerToken: "dbundle_mem_x"
+    });
+    expect(request).toHaveBeenNthCalledWith(2, {
+      method: "POST",
+      path: "/v1/alerts",
+      bearerToken: "dbundle_mem_x",
+      body: {
+        project_id: "proj_1",
+        channel: "email",
+        condition_type: "new_incident",
+        config: {
+          to: "owner@example.com"
+        }
+      }
+    });
+    expect(request).toHaveBeenNthCalledWith(3, {
+      method: "PATCH",
+      path: "/v1/alerts/al_minimal",
+      bearerToken: "dbundle_mem_x",
+      body: {
+        is_enabled: true
+      }
+    });
   });
 });

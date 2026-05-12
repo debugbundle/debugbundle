@@ -138,7 +138,7 @@ describe("api alert routes", () => {
           channel: "email",
           condition_type: "new_incident",
           severity_min: null,
-          config: {},
+          config: { to: "owner@example.com" },
           is_enabled: true,
           created_at: "2026-03-15T00:00:00.000Z",
           updated_at: "2026-03-15T00:00:00.000Z"
@@ -168,7 +168,7 @@ describe("api alert routes", () => {
           channel: "email",
           condition_type: "new_incident",
           severity_min: null,
-          config: {},
+          config: { to: "owner@example.com" },
           is_enabled: true,
           created_at: "2026-03-15T00:00:00.000Z",
           updated_at: "2026-03-15T00:00:00.000Z"
@@ -221,7 +221,7 @@ describe("api alert routes", () => {
         channel: "email",
         condition_type: "new_incident",
         severity_min: null,
-        config: {},
+        config: { to: "owner@example.com" },
         is_enabled: true,
         created_at: "2026-03-15T00:00:00.000Z",
         updated_at: "2026-03-15T00:00:00.000Z"
@@ -240,7 +240,8 @@ describe("api alert routes", () => {
       payload: {
         project_id: "00000000-0000-4000-8000-000000000001",
         channel: "email",
-        condition_type: "new_incident"
+        condition_type: "new_incident",
+        config: { to: "owner@example.com" }
       }
     });
 
@@ -253,7 +254,7 @@ describe("api alert routes", () => {
         channel: "email",
         condition_type: "new_incident",
         severity_min: null,
-        config: {},
+        config: { to: "owner@example.com" },
         is_enabled: true,
         created_at: "2026-03-15T00:00:00.000Z",
         updated_at: "2026-03-15T00:00:00.000Z"
@@ -279,7 +280,8 @@ describe("api alert routes", () => {
       payload: {
         project_id: "00000000-0000-4000-8000-000000000001",
         channel: "sms",
-        condition_type: "new_incident"
+        condition_type: "new_incident",
+        config: { to: "owner@example.com" }
       }
     });
     const missingProject = await app.inject({
@@ -291,12 +293,28 @@ describe("api alert routes", () => {
       payload: {
         project_id: "00000000-0000-4000-8000-000000000001",
         channel: "email",
-        condition_type: "new_incident"
+        condition_type: "new_incident",
+        config: { to: "owner@example.com" }
+      }
+    });
+    const missingRecipient = await app.inject({
+      method: "POST",
+      url: "/v1/alerts",
+      headers: {
+        authorization: "Bearer dbundle_mem_test"
+      },
+      payload: {
+        project_id: "00000000-0000-4000-8000-000000000001",
+        channel: "email",
+        condition_type: "new_incident",
+        config: {}
       }
     });
 
     expect(invalidBody.statusCode).toBe(400);
     expect(invalidBody.json()).toEqual({ error: "invalid_payload" });
+    expect(missingRecipient.statusCode).toBe(400);
+    expect(missingRecipient.json()).toEqual({ error: "invalid_payload" });
     expect(missingProject.statusCode).toBe(404);
     expect(missingProject.json()).toEqual({ error: "project_not_found" });
   });
@@ -363,12 +381,12 @@ describe("api alert routes", () => {
         target_id: "22222222-2222-4222-8222-222222222222",
         status: "success",
         occurred_at: expect.any(String),
-        metadata: {
-          update_keys: ["service_id", "channel", "condition_type", "severity_min", "config", "is_enabled"],
+        metadata: expect.objectContaining({
+          update_keys: ["service_id", "condition_type", "severity_min", "is_enabled", "channel", "config"],
           channel: "webhook",
           condition_type: "severity_threshold",
           is_enabled: false
-        }
+        })
       })
     );
   });
@@ -400,9 +418,21 @@ describe("api alert routes", () => {
         is_enabled: false
       }
     });
+    const configWithoutChannel = await app.inject({
+      method: "PATCH",
+      url: "/v1/alerts/22222222-2222-4222-8222-222222222222",
+      headers: {
+        authorization: "Bearer dbundle_mem_test"
+      },
+      payload: {
+        config: { to: "owner@example.com" }
+      }
+    });
 
     expect(invalidPayload.statusCode).toBe(400);
     expect(invalidPayload.json()).toEqual({ error: "invalid_payload" });
+    expect(configWithoutChannel.statusCode).toBe(400);
+    expect(configWithoutChannel.json()).toEqual({ error: "invalid_payload" });
     expect(notFound.statusCode).toBe(404);
     expect(notFound.json()).toEqual({ error: "alert_not_found" });
   });
@@ -418,7 +448,7 @@ describe("api alert routes", () => {
         channel: "email",
         condition_type: "new_incident",
         severity_min: null,
-        config: null,
+        config: { to: "owner@example.com" },
         is_enabled: true,
         created_at: "2026-03-15T00:00:00.000Z",
         updated_at: "2026-03-15T00:05:00.000Z"
@@ -446,6 +476,7 @@ describe("api alert routes", () => {
       payload: {
         service_id: null,
         severity_min: null,
+        channel: "email",
         config: null,
         is_enabled: true
       }
@@ -465,6 +496,7 @@ describe("api alert routes", () => {
       organization_id: "org_123",
       alert_id: "22222222-2222-4222-8222-222222222222",
       service_id: null,
+      channel: "email",
       severity_min: null,
       config: null,
       is_enabled: true
@@ -524,5 +556,54 @@ describe("api alert routes", () => {
       organization_id: "org_123",
       alert_id: "22222222-2222-4222-8222-222222222222"
     });
+  });
+
+  it("should audit create and delete failures when targets are missing", async (): Promise<void> => {
+    const createAuditLog = vi.fn().mockResolvedValue(undefined);
+    const alertManagement = {
+      listAlertsForOrganization: vi.fn().mockResolvedValue([]),
+      createAlertForOrganization: vi.fn().mockResolvedValue(null),
+      updateAlertForOrganization: vi.fn().mockResolvedValue(null),
+      deleteAlertForOrganization: vi.fn().mockResolvedValue(null)
+    };
+    const app = createServer({ alertManagement, auditLogging: { createAuditLog } });
+
+    const created = await app.inject({
+      method: "POST",
+      url: "/v1/alerts",
+      headers: {
+        authorization: "Bearer dbundle_mem_test"
+      },
+      payload: {
+        project_id: "00000000-0000-4000-8000-000000000001",
+        channel: "email",
+        condition_type: "new_incident",
+        config: { to: "owner@example.com" }
+      }
+    });
+    const deleted = await app.inject({
+      method: "DELETE",
+      url: "/v1/alerts/22222222-2222-4222-8222-222222222222",
+      headers: {
+        authorization: "Bearer dbundle_mem_test"
+      }
+    });
+
+    expect(created.statusCode).toBe(404);
+    expect(deleted.statusCode).toBe(404);
+    expect(createAuditLog).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: "alert.create",
+        status: "failure",
+        metadata: expect.objectContaining({ reason: "project_not_found" })
+      })
+    );
+    expect(createAuditLog).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: "alert.delete",
+        status: "failure",
+        metadata: { reason: "alert_not_found" }
+      })
+    );
   });
 });

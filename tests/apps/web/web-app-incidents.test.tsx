@@ -5,6 +5,7 @@ import { userEvent } from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { App } from "../../../apps/web/src/app.tsx";
+import { resetBrowserSessionClientState } from "../../../apps/web/src/lib/api.ts";
 import {
   createIncident,
   createProject,
@@ -14,6 +15,7 @@ import {
 } from "./web-test-helpers.js";
 
 afterEach(() => {
+  resetBrowserSessionClientState();
   vi.unstubAllGlobals();
   vi.useRealTimers();
 });

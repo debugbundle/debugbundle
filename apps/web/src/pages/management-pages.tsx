@@ -30,9 +30,10 @@ import { Input } from "../components/ui/input.js";
 import { Skeleton } from "../components/ui/skeleton.js";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../components/ui/table.js";
 import {
+  cancelOrganizationInvite,
   createProject,
   createProjectToken,
-  cancelOrganizationInvite,
+  isInvalidSessionError,
   inviteOrganizationMember,
   listOrganizationInvites,
   listOrganizationMembers,
@@ -69,8 +70,16 @@ export function ProjectsPage(): JSX.Element {
 
   useEffect(() => {
     void (async () => {
-      const nextProjects = await listProjects();
-      setProjects(nextProjects);
+      try {
+        const nextProjects = await listProjects();
+        setProjects(nextProjects);
+      } catch (error) {
+        if (isInvalidSessionError(error)) {
+          return;
+        }
+
+        throw error;
+      }
     })();
   }, []);
 
@@ -278,8 +287,16 @@ export function ProjectTokensPage(): JSX.Element {
 
   useEffect(() => {
     void (async () => {
-      const nextTokens = await listProjectTokens(projectId);
-      setTokens(nextTokens);
+      try {
+        const nextTokens = await listProjectTokens(projectId);
+        setTokens(nextTokens);
+      } catch (error) {
+        if (isInvalidSessionError(error)) {
+          return;
+        }
+
+        throw error;
+      }
     })();
   }, [projectId]);
 
@@ -420,6 +437,10 @@ export function OrganizationMembersPage(): JSX.Element {
       } catch (error) {
         if (error instanceof Error && error.message === "forbidden") {
           setIsForbidden(true);
+          return;
+        }
+
+        if (isInvalidSessionError(error)) {
           return;
         }
 
@@ -674,7 +695,7 @@ function formatDate(value: string): string {
 
 type ProjectSortField = "name" | "slug" | "environment_default" | "monthly_bundle_requests" | "monthly_raw_ingested_events";
 
-function sortProjects(projects: ProjectRecord[] | null, sort: SortState<ProjectSortField>): ProjectRecord[] {
+export function sortProjects(projects: ProjectRecord[] | null, sort: SortState<ProjectSortField>): ProjectRecord[] {
   if (projects === null) {
     return [];
   }

@@ -269,7 +269,7 @@ interface CreateGitHubDispatchPublisherInput {
   >;
 }
 
-function getIncidentStatusForDispatchEvent(
+export function getIncidentStatusForDispatchEvent(
   eventType: "bundle.created" | "bundle.updated" | "bundle.reopened" | "incident.spike_detected"
 ): "new_only" | "reopened_only" | "new_or_reopened" {
   if (eventType === "bundle.created") {
@@ -438,11 +438,11 @@ export function createLifecycleWebhookPublisher(input: CreateLifecycleWebhookPub
   };
 }
 
-function encodeBase64Url(value: string): string {
+export function encodeBase64Url(value: string): string {
   return Buffer.from(value, "utf8").toString("base64url");
 }
 
-function buildGitHubAppJwt(appId: string, privateKeyPem: string, now: Date): string {
+export function buildGitHubAppJwt(appId: string, privateKeyPem: string, now: Date): string {
   const issuedAtSeconds = Math.floor(now.getTime() / 1000);
   const payload = {
     iat: issuedAtSeconds - 30,
@@ -459,7 +459,7 @@ function buildGitHubAppJwt(appId: string, privateKeyPem: string, now: Date): str
   return `${signingInput}.${signature.toString("base64url")}`;
 }
 
-function normalizeGitHubPrivateKey(value: string): string {
+export function normalizeGitHubPrivateKey(value: string): string {
   return value.includes("\\n") ? value.replace(/\\n/g, "\n") : value;
 }
 
@@ -693,13 +693,9 @@ export function createAlertTransport(input: CreateAlertTransportInput): AlertDel
         }
 
         const toField = event.config["to"];
-        const recipients = Array.isArray(toField)
-          ? toField.filter((v): v is string => typeof v === "string")
-          : typeof toField === "string"
-            ? [toField]
-            : [];
+        const recipient = typeof toField === "string" ? toField.trim().toLowerCase() : "";
 
-        if (recipients.length === 0) {
+        if (recipient.length === 0) {
           throw new AlertDeliveryError("alert_email_recipients_missing");
         }
 
@@ -708,7 +704,7 @@ export function createAlertTransport(input: CreateAlertTransportInput): AlertDel
 
         try {
           await input.emailTransport.send({
-            to: recipients,
+            to: [recipient],
             subject: `[DebugBundle Alert] ${eventType}: ${summary}`,
             text: JSON.stringify(event.payload, null, 2),
             html: `<h2>${eventType}</h2><pre>${JSON.stringify(event.payload, null, 2)}</pre>`

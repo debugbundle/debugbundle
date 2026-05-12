@@ -105,15 +105,15 @@ describe("repro-engine redaction semantics", () => {
 
     expect(reproduction.artifacts).toEqual({
       curl:
-        "curl -X POST 'https://example.invalid/sessions' -H 'accept: text/plain' -H 'authorization: [REDACTED]' -H 'content-type: application/x-www-form-urlencoded' --data-raw 'email=%5BREDACTED%5D&password=%5BREDACTED%5D&tags=urgent&tags=%5BREDACTED%5D'",
+        "curl -X POST 'https://example.invalid/sessions' -H 'authorization: [REDACTED]' -H 'accept: text/plain' -H 'content-type: application/x-www-form-urlencoded' --data-raw 'email=%5BREDACTED%5D&password=%5BREDACTED%5D&tags=urgent&tags=%5BREDACTED%5D'",
       httpie:
-        "printf '%s' 'email=%5BREDACTED%5D&password=%5BREDACTED%5D&tags=urgent&tags=%5BREDACTED%5D' | http POST 'https://example.invalid/sessions' 'accept:text/plain' 'authorization:[REDACTED]' 'content-type:application/x-www-form-urlencoded'",
+        "printf '%s' 'email=%5BREDACTED%5D&password=%5BREDACTED%5D&tags=urgent&tags=%5BREDACTED%5D' | http POST 'https://example.invalid/sessions' 'authorization:[REDACTED]' 'accept:text/plain' 'content-type:application/x-www-form-urlencoded'",
       json_spec: {
         method: "POST",
         url: "https://example.invalid/sessions",
         headers: {
-          accept: "text/plain",
           authorization: "[REDACTED]",
+          accept: "text/plain",
           "content-type": "application/x-www-form-urlencoded"
         },
         body: {
