@@ -1457,6 +1457,8 @@ When no repository is assigned to the project yet, the route returns:
 
 The `event_type` on the `repository_dispatch` is always `debugbundle.incident`. The specific lifecycle event is in `debugbundle_event` inside `client_payload`, and delivery metadata lives under `client_payload.debugbundle`. `dispatch_id` is globally unique per delivery attempt for workflow deduplication.
 
+A GitHub delivery with `status: "delivered"` and `github_status_code: 204` means GitHub accepted DebugBundle's `repository_dispatch` API request. It does not mean a GitHub Actions workflow ran or completed successfully; the receiving repository must contain a matching workflow and owns its run status.
+
 Reference action distribution: external repositories consume `debugbundle/action@v1`. The action lives in the dedicated public `debugbundle/action` repository and fetches the bundle and reproduction artifact into `.debugbundle/bundles/cloud/` using `incident-id`, `debugbundle-token`, optional `api-base-url`, and optional `workspace-root` inputs.
 
 ### API Response Rules

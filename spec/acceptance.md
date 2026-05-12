@@ -1192,8 +1192,9 @@ If CLI says something is healthy and MCP says something different, that is a pro
 - **Then** the worker evaluates the matching rule
 - **And** a delivery record is persisted with status `pending`
 - **And** a `repository_dispatch` is sent to the assigned repo with `event_type: "debugbundle.incident"`
-- **And** the `client_payload` contains `debugbundle_event`, `incident_id`, `severity`, `title`, `links`, and `dispatch_id`
+- **And** the `client_payload` contains `debugbundle_event`, `incident_id`, `severity`, `title`, `links`, and a nested `debugbundle.dispatch_id`
 - **And** the delivery record status is updated to `delivered`
+- **And** `delivered` means GitHub accepted the dispatch request, not that a receiving workflow completed
 
 ### AC-GHA-06: Cooldown Enforcement
 - **Given** a dispatch rule with `cooldown_seconds: 300`
@@ -1261,7 +1262,7 @@ If CLI says something is healthy and MCP says something different, that is a pro
 - **Given** a `repository_dispatch` sent by DebugBundle
 - **When** the receiving workflow inspects `client_payload`
 - **Then** the payload matches the documented stable contract
-- **And** `dispatch_id` is globally unique per delivery attempt for deduplication
+- **And** `client_payload.debugbundle.dispatch_id` is globally unique per delivery attempt for deduplication
 
 ### AC-GHA-17: Self-Host GitHub App
 - **Given** a self-hosted DebugBundle deployment with custom `GITHUB_APP_ID` and `GITHUB_APP_PRIVATE_KEY` environment variables
