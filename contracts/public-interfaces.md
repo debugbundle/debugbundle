@@ -321,16 +321,16 @@ Current API implementation scope (Phase 1 continuation):
 - `IncidentContextRecord` fields: `incident`, `incident_reason`, `primary_signal`, `bundle`, `reproduction`, `logs`, `deploy`, `grouping`, `visibility`, `redaction`, `suggested_next_checks`
 - `primary_signal` summarizes the current incident's primary failing signal without requiring an LLM call. `logs.source` is one of `retrieval`, `bundle_context`, or `none`. `bundle` and `reproduction` use deterministic artifact states: `ready`, `pending`, or `failed`.
 - `visibility` explains four operator-facing behaviors directly in retrieval output: how repeated failures group into the current fingerprint, when bundle regeneration occurs (including current precedence), how spike detection differs from incident creation, and how webhook/GitHub cooldown windows suppress repeated lifecycle notifications.
-- `incident_reason` is deterministically derived from the incident's primary `incident_signal` metadata. Current kinds: `backend_exception`, `frontend_exception`, `request_failure_5xx`, `error_log`. Example:
+- `incident_reason` is deterministically derived from the incident's primary `incident_signal` metadata. Current kinds: `backend_exception`, `frontend_exception`, `request_failure`, `error_log`. Example:
 
 ```json
 {
   "incident_reason": {
-    "kind": "request_failure_5xx",
-    "description": "request_event matched the 5xx request incident rule",
+    "kind": "request_failure",
+    "description": "request_event matched the immediate request failure incident rule",
     "event_type": "request_event",
     "event_class": "incident_signal",
-    "matched_policy": "5xx request failures bypass capture_request_events suppression"
+    "matched_policy": "immediate request failures bypass capture_request_events suppression for the active preset"
   }
 }
 ```
@@ -1551,11 +1551,11 @@ Active `verify cloud --trigger-5xx --json` includes a `verification` object:
   "incident_id": "inc_123",
   "bundle_status": "ready | pending | unknown",
   "classification_reason": {
-    "kind": "request_failure_5xx",
-    "description": "request_event response_status=503 matched the 5xx request incident rule",
+    "kind": "request_failure",
+    "description": "request_event response_status=503 matched the immediate request failure incident rule",
     "event_type": "request_event",
     "event_class": "incident_signal",
-    "matched_policy": "5xx request failures bypass capture_request_events suppression"
+    "matched_policy": "immediate request failures bypass capture_request_events suppression for the active preset"
   },
   "suggested_next_command": "debugbundle inspect inc_123 --source cloud"
 }

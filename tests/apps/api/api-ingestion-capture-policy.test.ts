@@ -166,6 +166,39 @@ describe("ingestion capture policy enforcement", () => {
     expect(persistAndEnqueue).toHaveBeenCalledTimes(1);
   });
 
+  it("should reject 429 request_event on a minimal policy project", async (): Promise<void> => {
+    const persistAndEnqueue = vi.fn().mockResolvedValue({ object_key: "raw-events/p/k.json.gz" });
+    const capturePolicyManagement = {
+      getCapturePolicyForProject: vi.fn().mockResolvedValue({
+        project_id: "proj_123",
+        preset: "minimal",
+        capture_logs: null,
+        capture_request_events: null,
+        capture_breadcrumbs: null,
+        capture_probe_events: null,
+        updated_at: "2026-03-01T00:00:00.000Z"
+      }),
+      upsertCapturePolicyForProject: vi.fn()
+    };
+
+    const app = createApiServer(createBaseDependencies({ persistAndEnqueue, capturePolicyManagement }));
+
+    const response = await app.inject({
+      method: "POST",
+      url: "/v1/events",
+      headers: { authorization: "Bearer dbundle_proj_test" },
+      payload: { events: [makeRequestEvent(429)] }
+    });
+
+    expect(response.statusCode).toBe(202);
+    expect(response.json()).toMatchObject({
+      accepted: 0,
+      rejected: 1,
+      errors: [{ index: 0, reason: "capture_policy_rejected" }]
+    });
+    expect(persistAndEnqueue).not.toHaveBeenCalled();
+  });
+
   it("should accept backend_exception even on minimal policy", async (): Promise<void> => {
     const persistAndEnqueue = vi.fn().mockResolvedValue({ object_key: "raw-events/p/k.json.gz" });
     const capturePolicyManagement = {
@@ -267,6 +300,43 @@ describe("ingestion capture policy enforcement", () => {
       errors: [{ index: 1, reason: "capture_policy_rejected" }]
     });
     expect(persistAndEnqueue).toHaveBeenCalledTimes(1);
+  });
+
+  it("should accept immediate and anomaly-eligible request_event payloads on balanced policy", async (): Promise<void> => {
+    const persistAndEnqueue = vi.fn().mockResolvedValue({ object_key: "raw-events/p/k.json.gz" });
+    const capturePolicyManagement = {
+      getCapturePolicyForProject: vi.fn().mockResolvedValue({
+        project_id: "proj_123",
+        preset: "balanced",
+        capture_logs: null,
+        capture_request_events: null,
+        capture_breadcrumbs: null,
+        capture_probe_events: null,
+        updated_at: "2026-03-01T00:00:00.000Z"
+      }),
+      upsertCapturePolicyForProject: vi.fn()
+    };
+
+    const app = createApiServer(createBaseDependencies({
+      persistAndEnqueue,
+      capturePolicyManagement,
+      resolveProjectByTokenHash: vi.fn().mockResolvedValue({ project_id: "proj_123", organization_plan: "solo" })
+    }));
+
+    const response = await app.inject({
+      method: "POST",
+      url: "/v1/events",
+      headers: { authorization: "Bearer dbundle_proj_test" },
+      payload: { events: [makeRequestEvent(429), makeRequestEvent(409)] }
+    });
+
+    expect(response.statusCode).toBe(202);
+    expect(response.json()).toMatchObject({
+      accepted: 2,
+      rejected: 0,
+      errors: []
+    });
+    expect(persistAndEnqueue).toHaveBeenCalledTimes(2);
   });
 
   it("should reject standalone breadcrumb on minimal policy (capture_breadcrumbs=local_only)", async (): Promise<void> => {
@@ -394,5 +464,42 @@ describe("ingestion capture policy enforcement", () => {
       errors: []
     });
     expect(persistAndEnqueue).toHaveBeenCalledTimes(4);
+  });
+
+  it("should accept investigative 409 request_event as an immediate request incident status", async (): Promise<void> => {
+    const persistAndEnqueue = vi.fn().mockResolvedValue({ object_key: "raw-events/p/k.json.gz" });
+    const capturePolicyManagement = {
+      getCapturePolicyForProject: vi.fn().mockResolvedValue({
+        project_id: "proj_123",
+        preset: "investigative",
+        capture_logs: null,
+        capture_request_events: null,
+        capture_breadcrumbs: null,
+        capture_probe_events: null,
+        updated_at: "2026-03-01T00:00:00.000Z"
+      }),
+      upsertCapturePolicyForProject: vi.fn()
+    };
+
+    const app = createApiServer(createBaseDependencies({
+      persistAndEnqueue,
+      capturePolicyManagement,
+      resolveProjectByTokenHash: vi.fn().mockResolvedValue({ project_id: "proj_123", organization_plan: "team" })
+    }));
+
+    const response = await app.inject({
+      method: "POST",
+      url: "/v1/events",
+      headers: { authorization: "Bearer dbundle_proj_test" },
+      payload: { events: [makeRequestEvent(409)] }
+    });
+
+    expect(response.statusCode).toBe(202);
+    expect(response.json()).toMatchObject({
+      accepted: 1,
+      rejected: 0,
+      errors: []
+    });
+    expect(persistAndEnqueue).toHaveBeenCalledTimes(1);
   });
 });

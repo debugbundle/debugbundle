@@ -125,11 +125,11 @@ describe("retrieval api client", () => {
           regressed_at: null,
           matched_fields: ["fingerprint"],
           incident_reason: {
-            kind: "request_failure_5xx",
+            kind: "request_failure",
             description: "request_event matched the 5xx request incident rule",
             event_type: "request_event",
             event_class: "incident_signal",
-            matched_policy: "5xx request failures bypass capture_request_events suppression"
+            matched_policy: "Immediate request failure statuses bypass capture_request_events suppression"
           }
         }
       }
@@ -139,7 +139,7 @@ describe("retrieval api client", () => {
     const incident = await api.getIncident({ bearerToken: "dbundle_mem_x", incidentId: "inc_123" });
 
     expect(incident.incident_id).toBe("inc_123");
-    expect(incident.incident_reason?.kind).toBe("request_failure_5xx");
+    expect(incident.incident_reason?.kind).toBe("request_failure");
     expect(request).toHaveBeenCalledWith({
       method: "GET",
       path: "/v1/incidents/inc_123",
@@ -172,22 +172,22 @@ describe("retrieval api client", () => {
           regressed_at: null,
           matched_fields: ["route_template"],
           incident_reason: {
-            kind: "request_failure_5xx",
+            kind: "request_failure",
             description: "request_event matched the 5xx request incident rule",
             event_type: "request_event",
             event_class: "incident_signal",
-            matched_policy: "5xx request failures bypass capture_request_events suppression"
+            matched_policy: "Immediate request failure statuses bypass capture_request_events suppression"
           }
         },
         incident_reason: {
-          kind: "request_failure_5xx",
+          kind: "request_failure",
           description: "request_event matched the 5xx request incident rule",
           event_type: "request_event",
           event_class: "incident_signal",
-          matched_policy: "5xx request failures bypass capture_request_events suppression"
+          matched_policy: "Immediate request failure statuses bypass capture_request_events suppression"
         },
         primary_signal: {
-          kind: "request_failure_5xx",
+          kind: "request_failure",
           event_type: "request_event",
           event_class: "incident_signal",
           description: "request_event matched the 5xx request incident rule",
@@ -234,7 +234,7 @@ describe("retrieval api client", () => {
           matched_fields: ["route_template"]
         },
         visibility: {
-          grouping: "Repeated 5xx request failures with the same normalized route template, request method, response status, service, and environment reuse this incident fingerprint. This incident currently groups POST /checkout with matched fields route_template.",
+          grouping: "Repeated request-failure incidents with the same normalized route template, request method, response status, service, and environment reuse this incident fingerprint. This incident currently groups POST /checkout with matched fields route_template.",
           bundle_regeneration: "Bundle status is ready. New incidents create a bundle immediately, while regeneration currently prioritizes regression reopen, then deploy metadata, reproduction-confidence changes, and finally new context updates.",
           spike_detection: "This incident is not currently marked as spiking. Spike detection is evaluated after grouping and only marks an existing incident when short-term frequency has sufficient baseline and exceeds the spike threshold.",
           notification_cooldown: "Webhook and GitHub lifecycle notifications use per-rule cooldown windows to suppress repeated bundle.reopened or incident.spike_detected deliveries for the same incident/event fingerprint."

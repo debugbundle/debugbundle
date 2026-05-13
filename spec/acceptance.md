@@ -333,6 +333,7 @@ Last updated: 2026-03-13
 - **When** `debugbundle process` is run
 - **Then** events are processed locally: normalized, fingerprinted, grouped, and bundles generated
 - **And** results are stored in `.debugbundle/bundles/local/`
+- **And** `debugbundle process --preset <minimal|balanced|investigative>` reprocesses the local event set under the requested request-failure policy so immediate request failures and repeated request anomalies match that preset's classification rules
 
 ### AC-CLI-10: Clean Command
 - **Given** a project with local state and artifacts in `.debugbundle/`
@@ -1033,8 +1034,10 @@ If CLI says something is healthy and MCP says something different, that is a pro
 - **And** `frontend_exception` → `incident_signal`
 - **And** `log_event` with `level` in (`error`, `fatal`, `critical`) → `incident_signal`
 - **And** `log_event` with `level` below `error` → `context_signal`
-- **And** `request_event` with `response_status >= 500` → `incident_signal`
-- **And** `request_event` below 500 → `context_signal`
+- **And** `request_event` with `response_status >= 500` → `incident_signal` under every preset
+- **And** `request_event` with `response_status: 429` → `incident_signal` for `balanced` and `investigative`, but `context_signal` for `minimal`
+- **And** `request_event` with `response_status: 409` → `incident_signal` for `investigative`, but `context_signal` for `minimal` and `balanced`
+- **And** `request_event` outside the preset's immediate request-failure set → `context_signal`
 - **And** `frontend_breadcrumb` → `context_signal`
 - **And** `deploy_metadata` → `context_signal`
 - **And** `error_suppressed` → `operational_signal`
@@ -1092,10 +1095,39 @@ If CLI says something is healthy and MCP says something different, that is a pro
 - **And** worker normalization classifies it as `incident_signal`
 - **And** the incident bundle primary signal can be `request_failure`
 
+### AC-EVT-08b: Ingestion Accepts Preset-Specific Immediate Request Failures
+- **Given** a project with preset `balanced`
+- **When** an SDK sends a `request_event` with `response_status: 429` to `POST /v1/events`
+- **Then** the event is accepted
+- **And** worker normalization classifies it as `incident_signal`
+- **Given** a project with preset `investigative`
+- **When** an SDK sends a `request_event` with `response_status: 409` to `POST /v1/events`
+- **Then** the event is accepted even if `capture_request_events` is otherwise narrowed
+- **And** worker normalization classifies it as `incident_signal`
+
+### AC-EVT-08c: Repeated Contextual Request Failures Can Open Request Anomaly Incidents
+- **Given** a project with preset `balanced`
+- **And** repeated first-party `request_event` payloads for the same normalized route, method, service, environment, and `response_status: 404`
+- **When** the worker observes at least `20` such events in `5` minutes and the `5m/1h` ratio is at least `3.0`
+- **Then** the stored `request_event` rows remain `context_signal`
+- **And** the worker enqueues a deterministic anomaly-triggered `group-incident` job
+- **And** incident retrieval surfaces the resulting incident as `request_failure`
+- **And** the incident reason explains that repeated contextual request failures crossed the request anomaly threshold
+- **Given** a project with preset `minimal`
+- **When** the same repeated `404` pattern occurs
+- **Then** no request anomaly incident is created
+
 ### AC-EVT-09: SDK Local Capture Policy Enforcement
 - **Given** an SDK initialized with a project whose capture policy sets `capture_logs: "error"`
 - **When** the application emits a `warning`-level log
 - **Then** the SDK suppresses the log event locally (does not send it)
+
+### AC-EVT-09a: SDK Local Request Failure Promotion Uses Capture Preset
+- **Given** an SDK that has loaded `capture_policy` from `GET /v1/sdk/config`
+- **When** the effective preset is `balanced` and it observes a first-party request failure with `response_status: 429`
+- **Then** the SDK emits a standalone `request_event`
+- **And** if the effective preset is `balanced`, `capture_request_events` is `failures_only`, and the response status is anomaly-eligible such as `404` or `409`, the SDK emits a standalone `request_event` that the worker stores as `context_signal`
+- **And** if the effective preset is `investigative` and the response status is `409`, the SDK emits a standalone `request_event`
 - **And** no network request is made for the suppressed event
 
 ### AC-EVT-10: Capture Policy Interface Parity

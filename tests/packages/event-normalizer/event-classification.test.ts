@@ -40,8 +40,19 @@ describe("classifyEvent", () => {
     expect(classifyEvent("request_event", undefined, undefined, { response_status: 503 })).toBe("incident_signal");
   });
 
-  it("classifies non-5xx request_event as context_signal", () => {
+  it("classifies balanced request failure statuses below 500 as incident_signal", () => {
+    expect(classifyEvent("request_event", undefined, undefined, { response_status: 429 }, "balanced")).toBe("incident_signal");
+    expect(classifyEvent("request_event", undefined, undefined, { response_status: 408 }, "balanced")).toBe("incident_signal");
+  });
+
+  it("classifies investigative-only 409 request_event as incident_signal", () => {
+    expect(classifyEvent("request_event", undefined, undefined, { response_status: 409 }, "investigative")).toBe("incident_signal");
+  });
+
+  it("classifies non-promoted request_event as context_signal", () => {
+    expect(classifyEvent("request_event", undefined, undefined, { response_status: 429 }, "minimal")).toBe("context_signal");
     expect(classifyEvent("request_event", undefined, undefined, { response_status: 404 })).toBe("context_signal");
+    expect(classifyEvent("request_event", undefined, undefined, { response_status: 409 }, "balanced")).toBe("context_signal");
     expect(classifyEvent("request_event", undefined, undefined, { response_status: 200 })).toBe("context_signal");
     expect(classifyEvent("request_event")).toBe("context_signal");
   });

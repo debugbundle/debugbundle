@@ -5,6 +5,7 @@ import type {
   FrequencySnapshotStore,
   IncidentFrequencyCounter,
   IncidentFrequencySnapshot,
+  RequestAnomalyCounter,
 } from "./types.js";
 
 const SPIKE_THRESHOLD = 3.0;
@@ -22,6 +23,48 @@ function toUnixSeconds(isoTimestamp: string): number {
 
 function computeBaselinePerFiveMinutes(occurrences1h: number): number {
   return occurrences1h / 12;
+}
+
+async function recordFrequencyOccurrence(input: {
+  redis: Redis;
+  key: string;
+  event_id: string;
+  occurred_at: string;
+}): Promise<IncidentFrequencySnapshot> {
+  const occurredAt = toUnixSeconds(input.occurred_at);
+  const trimBefore = occurredAt - WINDOW_RETENTION_SECONDS;
+
+  const pipelineResult = await input.redis
+    .multi()
+    .zadd(input.key, "NX", occurredAt, input.event_id)
+    .zremrangebyscore(input.key, 0, trimBefore)
+    .expire(input.key, WINDOW_RETENTION_SECONDS)
+    .zcount(input.key, occurredAt - WINDOW_1M_SECONDS + 1, occurredAt)
+    .zcount(input.key, occurredAt - WINDOW_5M_SECONDS + 1, occurredAt)
+    .zcount(input.key, occurredAt - WINDOW_1H_SECONDS + 1, occurredAt)
+    .zcount(input.key, occurredAt - WINDOW_24H_SECONDS + 1, occurredAt)
+    .exec();
+
+  const counts = pipelineResult ?? [];
+  const occurrences1m = Number(counts[3]?.[1] ?? 0);
+  const occurrences5m = Number(counts[4]?.[1] ?? 0);
+  const occurrences1h = Number(counts[5]?.[1] ?? 0);
+  const occurrences24h = Number(counts[6]?.[1] ?? 0);
+  const baseline1hPer5m = computeBaselinePerFiveMinutes(occurrences1h);
+  const spikeRatio = occurrences5m / Math.max(baseline1hPer5m, 1);
+  const hasSufficientBaseline = occurrences1h >= MIN_BASELINE_1H_OCCURRENCES_FOR_SPIKE;
+  const isSpiking = hasSufficientBaseline && spikeRatio >= SPIKE_THRESHOLD;
+
+  return {
+    occurrences_1m: occurrences1m,
+    occurrences_5m: occurrences5m,
+    occurrences_1h: occurrences1h,
+    occurrences_24h: occurrences24h,
+    baseline_1h_per_5m: baseline1hPer5m,
+    spike_ratio_5m_to_1h: spikeRatio,
+    has_sufficient_baseline: hasSufficientBaseline,
+    is_spiking: isSpiking
+  };
 }
 
 export function createRedisIncidentFrequencyCounter(input: CreateRedisQueueClientInput): IncidentFrequencyCounter & { close(): Promise<void> } {
@@ -70,30 +113,14 @@ export function createRedisIncidentFrequencyCounter(input: CreateRedisQueueClien
 
   return {
     async recordOccurrence(event): Promise<IncidentFrequencySnapshot> {
-      const occurredAt = toUnixSeconds(event.occurred_at);
       const windowKey = `incident-frequency:${event.incident_id}`;
-      const trimBefore = occurredAt - WINDOW_RETENTION_SECONDS;
-
-      const pipelineResult = await redis
-        .multi()
-        .zadd(windowKey, "NX", occurredAt, event.event_id)
-        .zremrangebyscore(windowKey, 0, trimBefore)
-        .expire(windowKey, WINDOW_RETENTION_SECONDS)
-        .zcount(windowKey, occurredAt - WINDOW_1M_SECONDS + 1, occurredAt)
-        .zcount(windowKey, occurredAt - WINDOW_5M_SECONDS + 1, occurredAt)
-        .zcount(windowKey, occurredAt - WINDOW_1H_SECONDS + 1, occurredAt)
-        .zcount(windowKey, occurredAt - WINDOW_24H_SECONDS + 1, occurredAt)
-        .exec();
-
-      const counts = pipelineResult ?? [];
-      const occurrences1m = Number(counts[3]?.[1] ?? 0);
-      const occurrences5m = Number(counts[4]?.[1] ?? 0);
-      const occurrences1h = Number(counts[5]?.[1] ?? 0);
-      const occurrences24h = Number(counts[6]?.[1] ?? 0);
-      const baseline1hPer5m = computeBaselinePerFiveMinutes(occurrences1h);
-      const spikeRatio = occurrences5m / Math.max(baseline1hPer5m, 1);
-      const hasSufficientBaseline = occurrences1h >= MIN_BASELINE_1H_OCCURRENCES_FOR_SPIKE;
-      const isSpiking = hasSufficientBaseline && spikeRatio >= SPIKE_THRESHOLD;
+      const occurredAt = toUnixSeconds(event.occurred_at);
+      const snapshot = await recordFrequencyOccurrence({
+        redis,
+        key: windowKey,
+        event_id: event.event_id,
+        occurred_at: event.occurred_at
+      });
 
       if (snapshotStore !== null) {
         const lastSnapshotAt = lastSnapshotByIncidentId.get(event.incident_id);
@@ -104,30 +131,40 @@ export function createRedisIncidentFrequencyCounter(input: CreateRedisQueueClien
           await snapshotStore.persistIncidentFrequencySnapshot({
             incident_id: event.incident_id,
             occurred_at: event.occurred_at,
-            occurrences_1m: occurrences1m,
-            occurrences_5m: occurrences5m,
-            occurrences_1h: occurrences1h,
-            occurrences_24h: occurrences24h,
-            baseline_1h_per_5m: baseline1hPer5m,
-            spike_ratio_5m_to_1h: spikeRatio,
-            has_sufficient_baseline: hasSufficientBaseline,
-            is_spiking: isSpiking
+            occurrences_1m: snapshot.occurrences_1m,
+            occurrences_5m: snapshot.occurrences_5m,
+            occurrences_1h: snapshot.occurrences_1h,
+            occurrences_24h: snapshot.occurrences_24h,
+            baseline_1h_per_5m: snapshot.baseline_1h_per_5m,
+            spike_ratio_5m_to_1h: snapshot.spike_ratio_5m_to_1h,
+            has_sufficient_baseline: snapshot.has_sufficient_baseline,
+            is_spiking: snapshot.is_spiking
           });
 
           lastSnapshotByIncidentId.set(event.incident_id, occurredAt);
         }
       }
 
-      return {
-        occurrences_1m: occurrences1m,
-        occurrences_5m: occurrences5m,
-        occurrences_1h: occurrences1h,
-        occurrences_24h: occurrences24h,
-        baseline_1h_per_5m: baseline1hPer5m,
-        spike_ratio_5m_to_1h: spikeRatio,
-        has_sufficient_baseline: hasSufficientBaseline,
-        is_spiking: isSpiking
-      };
+      return snapshot;
+    },
+
+    async close(): Promise<void> {
+      await redis.quit();
+    }
+  };
+}
+
+export function createRedisRequestAnomalyCounter(input: CreateRedisQueueClientInput): RequestAnomalyCounter & { close(): Promise<void> } {
+  const redis = new Redis(input.redisUrl);
+
+  return {
+    async recordObservation(event): Promise<IncidentFrequencySnapshot> {
+      return recordFrequencyOccurrence({
+        redis,
+        key: `request-anomaly-frequency:${event.anomaly_key}`,
+        event_id: event.event_id,
+        occurred_at: event.occurred_at
+      });
     },
 
     async close(): Promise<void> {

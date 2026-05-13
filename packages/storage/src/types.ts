@@ -1,5 +1,5 @@
 import type { NormalizedEvent } from "../../event-normalizer/src/index.js";
-import type { EventClass, EventEnvelope, TierName } from "../../shared-types/src/index.js";
+import type { CapturePreset, EventClass, EventEnvelope, TierName } from "../../shared-types/src/index.js";
 import type { IncidentReason } from "./incident-reason.js";
 
 export interface ObjectStorePutInput {
@@ -63,6 +63,7 @@ export interface NormalizeEventsJob {
   project_id: string;
   event_id: string;
   object_key: string;
+  capture_preset?: CapturePreset;
 }
 
 export interface GroupIncidentJob {
@@ -70,6 +71,7 @@ export interface GroupIncidentJob {
   event_id: string;
   event_type: EventEnvelope["event_type"];
   event_class: EventClass;
+  incident_trigger?: "request_anomaly";
   service_name: string;
   environment: string;
   fingerprint: string;
@@ -155,7 +157,11 @@ export interface RetentionExpiredIncidentReference {
 }
 
 export interface IngestionPersistenceService {
-  persistAndEnqueue(event: EventEnvelope, projectId: string): Promise<{ object_key: string }>;
+  persistAndEnqueue(
+    event: EventEnvelope,
+    projectId: string,
+    options?: { capturePreset?: CapturePreset }
+  ): Promise<{ object_key: string }>;
 }
 
 export interface IngestionRateLimitResult {
@@ -1436,6 +1442,10 @@ export interface IncidentFrequencySnapshot {
 
 export interface IncidentFrequencyCounter {
   recordOccurrence(input: { incident_id: string; event_id: string; occurred_at: string }): Promise<IncidentFrequencySnapshot>;
+}
+
+export interface RequestAnomalyCounter {
+  recordObservation(input: { anomaly_key: string; event_id: string; occurred_at: string }): Promise<IncidentFrequencySnapshot>;
 }
 
 export interface FrequencySnapshotStore {

@@ -14,11 +14,11 @@ describe("mcp retrieval tools incidents", () => {
       getIncident: vi.fn().mockResolvedValue({
         incident_id: "inc_123",
         incident_reason: {
-          kind: "request_failure_5xx",
+          kind: "request_failure",
           description: "request_event matched the 5xx request incident rule",
           event_type: "request_event",
           event_class: "incident_signal",
-          matched_policy: "5xx request failures bypass capture_request_events suppression"
+          matched_policy: "Immediate request failure statuses bypass capture_request_events suppression"
         }
       }),
       getIncidentContext: vi.fn().mockResolvedValue({
@@ -29,14 +29,14 @@ describe("mcp retrieval tools incidents", () => {
           matched_fields: ["route_template"]
         },
         incident_reason: {
-          kind: "request_failure_5xx",
+          kind: "request_failure",
           description: "request_event matched the 5xx request incident rule",
           event_type: "request_event",
           event_class: "incident_signal",
-          matched_policy: "5xx request failures bypass capture_request_events suppression"
+          matched_policy: "Immediate request failure statuses bypass capture_request_events suppression"
         },
         primary_signal: {
-          kind: "request_failure_5xx",
+          kind: "request_failure",
           event_type: "request_event",
           event_class: "incident_signal",
           description: "request_event matched the 5xx request incident rule",
@@ -117,11 +117,11 @@ describe("mcp retrieval tools incidents", () => {
       incident: {
         incident_id: "inc_123",
         incident_reason: {
-          kind: "request_failure_5xx",
+          kind: "request_failure",
           description: "request_event matched the 5xx request incident rule",
           event_type: "request_event",
           event_class: "incident_signal",
-          matched_policy: "5xx request failures bypass capture_request_events suppression"
+          matched_policy: "Immediate request failure statuses bypass capture_request_events suppression"
         },
         source: "cloud"
       }

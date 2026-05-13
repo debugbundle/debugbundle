@@ -67,6 +67,30 @@ function mapAlertRuleRow(row: {
   };
 }
 
+function normalizeOrganizationPlan(value: unknown): TierName {
+  return value === "solo" ? "solo" : value === "team" ? "team" : "free";
+}
+
+function mapOptionalRow<TInput, TOutput>(row: TInput | undefined, mapper: (value: TInput) => TOutput): TOutput | null {
+  return row === undefined ? null : mapper(row);
+}
+
+function optionalFieldValue<T>(include: boolean, value: T | null | undefined): T | null {
+  if (!include) {
+    return null;
+  }
+
+  return value ?? null;
+}
+
+function optionalJsonFieldValue(include: boolean, value: Record<string, unknown> | undefined): string | null {
+  if (!include) {
+    return null;
+  }
+
+  return JSON.stringify(value ?? {});
+}
+
 function severityToRank(severity: RecordIncidentEventRetentionInput["severity"]): number {
   switch (severity) {
     case "critical":
@@ -322,12 +346,20 @@ type IncidentRetrievalRow = IncidentRetrievalRecord & {
 };
 
 function mapIncidentRetrievalRow(row: IncidentRetrievalRow): IncidentRetrievalRecord {
+  const requestAnomaly = row.matched_fields.includes("request_anomaly");
   const incidentReason = row.incident_reason_event_type === null
-    ? null
+    ? requestAnomaly
+      ? deriveIncidentReasonFromSignal({
+          event_type: "request_event",
+          event_class: "incident_signal",
+          request_anomaly: true
+        })
+      : null
     : deriveIncidentReasonFromSignal({
         event_type: row.incident_reason_event_type,
         event_class: row.incident_reason_event_class,
-        level: row.incident_reason_level
+        level: row.incident_reason_level,
+        request_anomaly: requestAnomaly && row.incident_reason_event_type === "request_event"
       });
 
   return {
@@ -1480,8 +1512,7 @@ export function createPostgresMetadataStore(db: Queryable): PostgresMetadataStor
         ]
       );
 
-      const created = result.rows[0];
-      return created === undefined ? null : mapAlertRuleRow(created);
+      return mapOptionalRow(result.rows[0], mapAlertRuleRow);
     },
 
     async updateAlertForOrganization(input): Promise<AlertRuleRecord | null> {
@@ -1533,19 +1564,18 @@ export function createPostgresMetadataStore(db: Queryable): PostgresMetadataStor
           input.alert_id,
           input.organization_id,
           hasServiceId,
-          hasServiceId ? input.service_id ?? null : null,
+          optionalFieldValue(hasServiceId, input.service_id),
           input.channel ?? null,
           input.condition_type ?? null,
           hasSeverityMin,
-          hasSeverityMin ? input.severity_min ?? null : null,
+          optionalFieldValue(hasSeverityMin, input.severity_min),
           hasConfig,
-          hasConfig ? JSON.stringify(input.config ?? {}) : null,
+          optionalJsonFieldValue(hasConfig, input.config),
           input.is_enabled ?? null
         ]
       );
 
-      const updated = result.rows[0];
-      return updated === undefined ? null : mapAlertRuleRow(updated);
+      return mapOptionalRow(result.rows[0], mapAlertRuleRow);
     },
 
     async deleteAlertForOrganization(input): Promise<DeleteAlertResult | null> {
@@ -1627,7 +1657,7 @@ export function createPostgresMetadataStore(db: Queryable): PostgresMetadataStor
       );
 
       return {
-        organization_plan: project["organization_plan"] === "solo" ? "solo" : project["organization_plan"] === "team" ? "team" : "free",
+        organization_plan: normalizeOrganizationPlan(project["organization_plan"]),
         activations: activations.rows
       };
     },
@@ -1673,7 +1703,7 @@ export function createPostgresMetadataStore(db: Queryable): PostgresMetadataStor
       const activeCount = Number(countResult.rows[0]?.cnt ?? "0");
       if (activeCount >= 5) {
         return {
-          organization_plan: project["organization_plan"] === "solo" ? "solo" : project["organization_plan"] === "team" ? "team" : "free",
+            organization_plan: normalizeOrganizationPlan(project["organization_plan"]),
           activation: { activation_id: "", label_pattern: "", service: "", environment: "", expires_at: "", trigger_expires_at: "", },
           trigger_token: "",
           concurrent_limit_exceeded: true
@@ -1734,7 +1764,7 @@ export function createPostgresMetadataStore(db: Queryable): PostgresMetadataStor
       }
 
       return {
-        organization_plan: project["organization_plan"] === "solo" ? "solo" : project["organization_plan"] === "team" ? "team" : "free",
+        organization_plan: normalizeOrganizationPlan(project["organization_plan"]),
         activation,
         trigger_token: triggerToken.plaintext
       };
@@ -1770,7 +1800,7 @@ export function createPostgresMetadataStore(db: Queryable): PostgresMetadataStor
       }
 
       return {
-        organization_plan: row["organization_plan"] === "solo" ? "solo" : row["organization_plan"] === "team" ? "team" : "free",
+        organization_plan: normalizeOrganizationPlan(row["organization_plan"]),
         deactivated: {
           activation_id: getRequiredStringField(row, "activation_id"),
           deactivated_at: getRequiredStringField(row, "deactivated_at")
@@ -1910,8 +1940,7 @@ export function createPostgresMetadataStore(db: Queryable): PostgresMetadataStor
         [input.organization_id, input.incident_id]
       );
 
-      const row = result.rows[0];
-      return row === undefined ? null : mapIncidentRetrievalRow(row);
+      return mapOptionalRow(result.rows[0], mapIncidentRetrievalRow);
     },
 
     async resolveIncidentForOrganization(input) {
@@ -1984,8 +2013,7 @@ export function createPostgresMetadataStore(db: Queryable): PostgresMetadataStor
         [input.organization_id, input.incident_id, input.resolved_by_member_id, input.resolved_at]
       );
 
-      const row = result.rows[0];
-      return row === undefined ? null : mapIncidentRetrievalRow(row);
+      return mapOptionalRow(result.rows[0], mapIncidentRetrievalRow);
     },
 
     async reopenIncidentForOrganization(input) {
@@ -2059,8 +2087,7 @@ export function createPostgresMetadataStore(db: Queryable): PostgresMetadataStor
         [input.organization_id, input.incident_id]
       );
 
-      const row = result.rows[0];
-      return row === undefined ? null : mapIncidentRetrievalRow(row);
+      return mapOptionalRow(result.rows[0], mapIncidentRetrievalRow);
     },
 
     async listServicesForOrganization(input): Promise<ServiceRetrievalRecord[] | null> {

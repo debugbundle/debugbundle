@@ -31,6 +31,7 @@ import type {
   MetadataStore,
   ObjectStoreClient,
   ObjectStoreReader,
+  RequestAnomalyCounter,
   RegressionDeployCorrelation,
   WeeklyReportChannelRecord,
   WeeklyReportChannelStore,
@@ -47,7 +48,14 @@ import {
   buildRawEventObjectKey,
   buildReproductionObjectKey
 } from "../../../packages/storage/src/index.js";
-import { BundleV1Schema, type BundleV1, type EventEnvelope } from "../../../packages/shared-types/src/index.js";
+import {
+  BundleV1Schema,
+  classifyRequestStatus,
+  getRequestAnomalyThreshold,
+  type BundleV1,
+  type EventEnvelope
+} from "../../../packages/shared-types/src/index.js";
+import { evaluateRequestAnomalyCandidate } from "./request-anomaly.js";
 
 type BundleLinkBaseUrls = NonNullable<BuildBundleInput["linkBaseUrls"]>;
 
@@ -87,6 +95,7 @@ export interface NormalizeWorkerDependencies {
   queue: WorkerQueue;
   objectStore: ObjectStoreReader;
   processedEventStore: ProcessedEventStore;
+  requestAnomalyCounter?: RequestAnomalyCounter;
 }
 
 export interface IncidentLifecycleWebhookPublisher {
@@ -362,8 +371,14 @@ async function enqueueAlertEvaluation(
   }
 }
 
-function inferSeverity(event: EventEnvelope): "low" | "medium" | "high" | "critical" {
-  if (event.event_type === "request_event" && event.payload.response_status >= 500) {
+function inferSeverity(
+  event: EventEnvelope,
+  capturePreset: "minimal" | "balanced" | "investigative" = "minimal"
+): "low" | "medium" | "high" | "critical" {
+  if (
+    event.event_type === "request_event"
+    && classifyRequestStatus({ responseStatus: event.payload.response_status, capturePreset }) === "incident_signal"
+  ) {
     return "high";
   }
 
@@ -395,6 +410,16 @@ export async function processNextNormalizeEventsJob(
 
   const normalized = normalizeEvent(validated.data);
   const computedFingerprint = fingerprint(normalized);
+  const capturePreset = job.capture_preset ?? "minimal";
+  const eventClass = classifyEvent(
+    validated.data.event_type,
+    validated.data.event_type === "log_event" ? validated.data.payload?.level : undefined,
+    validated.data.event_type === "probe_event" ? validated.data.payload?.activation_id : undefined,
+    validated.data.payload as Record<string, unknown>,
+    capturePreset
+  );
+  const matchedFields = inferMatchedFields(normalized);
+  const severity = inferSeverity(validated.data, capturePreset);
 
   const processedEvent = await dependencies.processedEventStore.upsertProcessedEvent({
     event_id: validated.data.event_id,
@@ -412,20 +437,15 @@ export async function processNextNormalizeEventsJob(
     project_id: job.project_id,
     event_id: validated.data.event_id,
     event_type: validated.data.event_type,
-    event_class: classifyEvent(
-      validated.data.event_type,
-      validated.data.event_type === "log_event" ? validated.data.payload?.level : undefined,
-      validated.data.event_type === "probe_event" ? validated.data.payload?.activation_id : undefined,
-      validated.data.payload as Record<string, unknown>
-    ),
+    event_class: eventClass,
     service_name: validated.data.service.name,
     environment: validated.data.service.environment,
     fingerprint: computedFingerprint,
     fingerprint_version: FINGERPRINT_VERSION,
     normalized_message: normalized.normalized_message,
-    matched_fields: inferMatchedFields(normalized),
+    matched_fields: matchedFields,
     occurred_at: validated.data.occurred_at,
-    severity: inferSeverity(validated.data),
+    severity,
     ...(validated.data.event_type === "deploy_metadata"
       ? {
           deploy_metadata: {
@@ -438,6 +458,26 @@ export async function processNextNormalizeEventsJob(
       : {})
   });
 
+  if (
+    dependencies.requestAnomalyCounter !== undefined &&
+    validated.data.event_type === "request_event" &&
+    eventClass === "context_signal" &&
+    getRequestAnomalyThreshold({ responseStatus: normalized.http_status, capturePreset }) !== null
+  ) {
+    const anomalyJob = await evaluateRequestAnomalyCandidate({
+      event: validated.data,
+      normalized,
+      project_id: job.project_id,
+      capture_preset: capturePreset,
+      fingerprint_version: FINGERPRINT_VERSION,
+      requestAnomalyCounter: dependencies.requestAnomalyCounter
+    });
+
+    if (anomalyJob !== null) {
+      await dependencies.queue.enqueue("group-incident", anomalyJob);
+    }
+  }
+
   return { processed: true };
 }
 
@@ -449,7 +489,7 @@ export async function processNextGroupIncidentJob(
     return { processed: false, reason: "no_jobs" };
   }
 
-  if (job.event_class !== undefined && job.event_class !== "incident_signal") {
+  if (job.event_class !== undefined && job.event_class !== "incident_signal" && job.incident_trigger !== "request_anomaly") {
     return { processed: true, reason: "non_incident_signal" };
   }
 
@@ -707,7 +747,7 @@ export async function processNextGroupIncidentJob(
     });
   }
 
-  if (incident.duplicate_event !== true) {
+  if (incident.duplicate_event !== true && job.incident_trigger !== "request_anomaly") {
     const frequency = await dependencies.frequencyCounter.recordOccurrence({
       incident_id: incident.incident_id,
       event_id: job.event_id,

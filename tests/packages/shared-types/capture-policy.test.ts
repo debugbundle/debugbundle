@@ -8,6 +8,7 @@ import {
   CapturePolicySchema,
   CapturePolicyUpdateSchema,
   PRESET_DEFAULTS,
+  getRequestAnomalyThreshold,
   resolvePolicy,
   getDefaultPreset,
   shouldCaptureEvent,
@@ -188,6 +189,33 @@ describe("getDefaultPreset", () => {
   });
 });
 
+describe("getRequestAnomalyThreshold", () => {
+  it("returns no anomaly threshold for minimal preset contextual failures", () => {
+    expect(getRequestAnomalyThreshold({ responseStatus: 404, capturePreset: "minimal" })).toBeNull();
+  });
+
+  it("returns the balanced threshold for repeated 404 request failures", () => {
+    expect(getRequestAnomalyThreshold({ responseStatus: 404, capturePreset: "balanced" })).toEqual({
+      minimum_occurrences_5m: 20,
+      minimum_ratio_5m_to_1h: 3
+    });
+  });
+
+  it("returns the higher balanced threshold for common 400-class volume", () => {
+    expect(getRequestAnomalyThreshold({ responseStatus: 400, capturePreset: "balanced" })).toEqual({
+      minimum_occurrences_5m: 50,
+      minimum_ratio_5m_to_1h: 5
+    });
+  });
+
+  it("returns the investigative threshold for repeated 409 request failures", () => {
+    expect(getRequestAnomalyThreshold({ responseStatus: 409, capturePreset: "investigative" })).toEqual({
+      minimum_occurrences_5m: 8,
+      minimum_ratio_5m_to_1h: 2
+    });
+  });
+});
+
 describe("shouldCaptureEvent", () => {
   const minimal: ResolvedCapturePolicy = { preset: "minimal", ...PRESET_DEFAULTS.minimal };
   const balanced: ResolvedCapturePolicy = { preset: "balanced", ...PRESET_DEFAULTS.balanced };
@@ -231,17 +259,21 @@ describe("shouldCaptureEvent", () => {
     expect(shouldCaptureEvent(investigative, "log_event", { level: "debug" })).toBe(true);
   });
 
-  it("always accepts 5xx request_event as incident-critical", () => {
+  it("always accepts immediate request incident statuses on minimal", () => {
     expect(shouldCaptureEvent({ ...minimal, capture_request_events: "off" }, "request_event", { response_status: 500 })).toBe(true);
     expect(shouldCaptureEvent({ ...minimal, capture_request_events: "off" }, "request_event", { response_status: 503 })).toBe(true);
+    expect(shouldCaptureEvent({ ...minimal, capture_request_events: "off" }, "request_event", { response_status: 429 })).toBe(false);
     expect(shouldCaptureEvent(minimal, "request_event", { response_status: 200 })).toBe(false);
   });
 
-  it("accepts only server-failed requests when capture_request_events is failures_only", () => {
+  it("accepts balanced immediate request incident statuses even when capture_request_events is failures_only", () => {
     // balanced preset has capture_request_events: "failures_only"
     expect(shouldCaptureEvent(balanced, "request_event", { response_status: 500 })).toBe(true);
-    expect(shouldCaptureEvent(balanced, "request_event", { response_status: 404 })).toBe(false);
-    expect(shouldCaptureEvent(balanced, "request_event", { response_status: 400 })).toBe(false);
+    expect(shouldCaptureEvent(balanced, "request_event", { response_status: 429 })).toBe(true);
+    expect(shouldCaptureEvent(balanced, "request_event", { response_status: 408 })).toBe(true);
+    expect(shouldCaptureEvent(balanced, "request_event", { response_status: 404 })).toBe(true);
+    expect(shouldCaptureEvent(balanced, "request_event", { response_status: 409 })).toBe(true);
+    expect(shouldCaptureEvent(balanced, "request_event", { response_status: 400 })).toBe(true);
     expect(shouldCaptureEvent(balanced, "request_event", { response_status: 200 })).toBe(false);
     expect(shouldCaptureEvent(balanced, "request_event", { response_status: 302 })).toBe(false);
   });
@@ -258,6 +290,7 @@ describe("shouldCaptureEvent", () => {
     // investigative preset has capture_request_events: "all"
     expect(shouldCaptureEvent(investigative, "request_event", { response_status: 200 })).toBe(true);
     expect(shouldCaptureEvent(investigative, "request_event", { response_status: 500 })).toBe(true);
+    expect(shouldCaptureEvent(investigative, "request_event", { response_status: 409 })).toBe(true);
   });
 
   it("rejects standalone breadcrumbs when capture_breadcrumbs is local_only", () => {

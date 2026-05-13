@@ -27,6 +27,7 @@ import {
   createPostgresWeeklyReportChannelStore,
   createPostgresWeeklyReportDeliveryStore,
   createRedisIncidentFrequencyCounter,
+  createRedisRequestAnomalyCounter,
   createRedisQueueClient,
   createS3ObjectStoreClient,
   type WeeklyReportChannelRecord,
@@ -1199,6 +1200,9 @@ export async function runWorkerFromEnv(envInput: Record<string, string | undefin
     redisUrl: env.REDIS_URL,
     snapshotStore: queryable
   });
+  const requestAnomalyCounter = createRedisRequestAnomalyCounter({
+    redisUrl: env.REDIS_URL
+  });
   const lifecycleWebhookPublisher = createLifecycleWebhookPublisher({
     fallbackTargetUrl: env.LIFECYCLE_WEBHOOK_TARGET_URL ?? null,
     fallbackSigningSecret: env.LIFECYCLE_WEBHOOK_SECRET ?? null,
@@ -1266,7 +1270,8 @@ export async function runWorkerFromEnv(envInput: Record<string, string | undefin
         processNextNormalizeEventsJob({
           queue,
           objectStore,
-          processedEventStore
+          processedEventStore,
+          requestAnomalyCounter
         })
       );
 
@@ -1423,6 +1428,7 @@ export async function runWorkerFromEnv(envInput: Record<string, string | undefin
       await githubTokenRedis.quit();
     }
     await frequencyCounter.close();
+    await requestAnomalyCounter.close();
     await queue.close();
     await pool.end();
   }

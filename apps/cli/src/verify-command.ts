@@ -246,7 +246,7 @@ function cloudVerificationRunId(now: Date): string {
   return now.toISOString().replace(/[-:.TZ]/g, "").slice(0, 14);
 }
 
-function requestFailure5xxReason(): IncidentReason {
+function requestFailureReason(): IncidentReason {
   const incidentReason = deriveIncidentReasonFromSignal({
     event_type: "request_event",
     event_class: "incident_signal",
@@ -254,7 +254,7 @@ function requestFailure5xxReason(): IncidentReason {
   });
 
   if (incidentReason === null) {
-    throw new Error("request_failure_5xx_reason_unavailable");
+    throw new Error("request_failure_reason_unavailable");
   }
 
   return incidentReason;
@@ -598,7 +598,7 @@ export async function verifyCloudCommand(
     const verification: CloudVerificationDetails = {
       mode: "active_5xx",
       bundle_status: "unknown",
-      classification_reason: requestFailure5xxReason()
+      classification_reason: requestFailureReason()
     };
     const errors: string[] = [];
     let exitCode = 0;
@@ -655,7 +655,7 @@ export async function verifyCloudCommand(
         if (candidate !== undefined) {
           incidentId = candidate.incident_id;
           verification.incident_id = candidate.incident_id;
-          verification.classification_reason = candidate.incident_reason ?? requestFailure5xxReason();
+          verification.classification_reason = candidate.incident_reason ?? requestFailureReason();
           break;
         }
 

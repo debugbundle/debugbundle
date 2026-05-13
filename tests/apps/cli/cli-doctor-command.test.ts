@@ -289,7 +289,8 @@ describe("cli doctor command", () => {
           route_template: "/checkout/:orderId",
           response_status: 503
         },
-        incident_rule: "request_event with response_status >= 500 is classified as an incident_signal",
+        incident_rule:
+          "request_event incident classification follows the resolved capture preset: 5xx always create incidents, balanced also promotes 408/423/424/425/429, and investigative also promotes 409.",
         redacted_sample: {
           payload: {
             headers: {

@@ -46,6 +46,15 @@ export const CaptureProbeEventsValues = ["buffer_only", "standalone_when_activat
 export const CaptureProbeEventsSchema = z.enum(CaptureProbeEventsValues);
 export type CaptureProbeEvents = z.infer<typeof CaptureProbeEventsSchema>;
 
+export const RequestSignalClassificationValues = ["incident_signal", "context_signal"] as const;
+export const RequestSignalClassificationSchema = z.enum(RequestSignalClassificationValues);
+export type RequestSignalClassification = z.infer<typeof RequestSignalClassificationSchema>;
+
+export interface RequestAnomalyThreshold {
+  minimum_occurrences_5m: number;
+  minimum_ratio_5m_to_1h: number;
+}
+
 // ---------------------------------------------------------------------------
 // Resolved Capture Policy (all controls have concrete values)
 // ---------------------------------------------------------------------------
@@ -167,6 +176,84 @@ const CAPTURE_LOGS_THRESHOLD: Record<CaptureLogs, number | null> = {
   info: 0,
 };
 
+const BALANCED_IMMEDIATE_REQUEST_STATUSES = new Set([408, 423, 424, 425, 429]);
+const INVESTIGATIVE_IMMEDIATE_REQUEST_STATUSES = new Set([...BALANCED_IMMEDIATE_REQUEST_STATUSES, 409]);
+const BALANCED_STANDARD_ANOMALY_STATUSES = new Set([401, 403, 404, 409, 422]);
+const BALANCED_HIGH_VOLUME_ANOMALY_STATUSES = new Set([400, 410]);
+const INVESTIGATIVE_ANOMALY_STATUSES = new Set([...BALANCED_STANDARD_ANOMALY_STATUSES, ...BALANCED_HIGH_VOLUME_ANOMALY_STATUSES]);
+
+export function classifyRequestStatus(input: {
+  responseStatus: number | null;
+  capturePreset: CapturePreset;
+}): RequestSignalClassification {
+  const { responseStatus, capturePreset } = input;
+
+  if (responseStatus === null || !Number.isFinite(responseStatus)) {
+    return "context_signal";
+  }
+
+  if (responseStatus >= 500) {
+    return "incident_signal";
+  }
+
+  if (capturePreset === "investigative") {
+    return INVESTIGATIVE_IMMEDIATE_REQUEST_STATUSES.has(responseStatus) ? "incident_signal" : "context_signal";
+  }
+
+  if (capturePreset === "balanced") {
+    return BALANCED_IMMEDIATE_REQUEST_STATUSES.has(responseStatus) ? "incident_signal" : "context_signal";
+  }
+
+  return "context_signal";
+}
+
+export function isImmediateRequestIncident(input: {
+  responseStatus: number | null;
+  capturePreset: CapturePreset;
+}): boolean {
+  return classifyRequestStatus(input) === "incident_signal";
+}
+
+export function getRequestAnomalyThreshold(input: {
+  responseStatus: number | null;
+  capturePreset: CapturePreset;
+}): RequestAnomalyThreshold | null {
+  const { responseStatus, capturePreset } = input;
+
+  if (responseStatus === null || !Number.isFinite(responseStatus) || responseStatus < 400 || responseStatus >= 500) {
+    return null;
+  }
+
+  if (capturePreset === "minimal") {
+    return null;
+  }
+
+  if (capturePreset === "investigative") {
+    return INVESTIGATIVE_ANOMALY_STATUSES.has(responseStatus)
+      ? {
+          minimum_occurrences_5m: 8,
+          minimum_ratio_5m_to_1h: 2.0
+        }
+      : null;
+  }
+
+  if (BALANCED_STANDARD_ANOMALY_STATUSES.has(responseStatus)) {
+    return {
+      minimum_occurrences_5m: 20,
+      minimum_ratio_5m_to_1h: 3.0
+    };
+  }
+
+  if (BALANCED_HIGH_VOLUME_ANOMALY_STATUSES.has(responseStatus)) {
+    return {
+      minimum_occurrences_5m: 50,
+      minimum_ratio_5m_to_1h: 5.0
+    };
+  }
+
+  return null;
+}
+
 /**
  * Determine whether a given event should be captured (accepted) under the
  * provided resolved capture policy.
@@ -199,11 +286,13 @@ export function shouldCaptureEvent(
     }
 
     case "request_event": {
-      const status = typeof payload["response_status"] === "number" ? payload["response_status"] : 0;
-      if (status >= 500) return true;
+      const status = typeof payload["response_status"] === "number" ? payload["response_status"] : null;
+      if (isImmediateRequestIncident({ responseStatus: status, capturePreset: policy.preset })) {
+        return true;
+      }
       if (policy.capture_request_events === "off") return false;
       if (policy.capture_request_events === "failures_only") {
-        return false;
+        return getRequestAnomalyThreshold({ responseStatus: status, capturePreset: policy.preset }) !== null;
       }
       if (policy.capture_request_events === "filtered") {
         return false;

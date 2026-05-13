@@ -82,7 +82,13 @@ vi.mock("ioredis", () => {
   };
 });
 
-import { createRedisIncidentFrequencyCounter, createRedisQueueClient, createS3ObjectStoreClient, deleteProjectObjects } from "../../../packages/storage/src/index.js";
+import {
+  createRedisIncidentFrequencyCounter,
+  createRedisQueueClient,
+  createRedisRequestAnomalyCounter,
+  createS3ObjectStoreClient,
+  deleteProjectObjects
+} from "../../../packages/storage/src/index.js";
 
 describe("storage adapters", () => {
   beforeEach(() => {
@@ -721,6 +727,43 @@ describe("storage adapters", () => {
       has_sufficient_baseline: false,
       is_spiking: false
     });
+
+    await counter.close();
+  });
+
+  it("should store request anomaly observations under the request-anomaly keyspace", async (): Promise<void> => {
+    const redisChain = {
+      zadd: vi.fn().mockReturnThis(),
+      zremrangebyscore: vi.fn().mockReturnThis(),
+      expire: vi.fn().mockReturnThis(),
+      zcount: vi.fn().mockReturnThis(),
+      exec: vi.fn().mockResolvedValue([
+        [null, 1],
+        [null, 0],
+        [null, 1],
+        [null, 2],
+        [null, 24],
+        [null, 60],
+        [null, 240]
+      ])
+    };
+
+    redisMultiMock = vi.fn().mockReturnValue(redisChain);
+
+    const counter = createRedisRequestAnomalyCounter({ redisUrl: "redis://redis:6379" });
+
+    await counter.recordObservation({
+      anomaly_key: "proj_1:balanced:api:production:GET:/checkout/:id:404",
+      event_id: "evt_anom_1",
+      occurred_at: "2026-03-10T12:00:00.000Z"
+    });
+
+    expect(redisChain.zadd).toHaveBeenCalledWith(
+      "request-anomaly-frequency:proj_1:balanced:api:production:GET:/checkout/:id:404",
+      "NX",
+      1773144000,
+      "evt_anom_1"
+    );
 
     await counter.close();
   });

@@ -16,6 +16,7 @@ import {
   type BundleRecord,
   type IncidentRecord
 } from "../lib/api.js";
+import { formatIncidentMatchedFields } from "../lib/incident-copy.js";
 import { showErrorToast, showSuccessToast } from "../lib/notify.js";
 import { useDelayedVisibility } from "../lib/use-delayed-visibility.js";
 import { cn } from "../lib/utils.js";
@@ -82,7 +83,7 @@ export function IncidentDetailPage(): JSX.Element {
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <div className="space-y-1">
               <h2 className="text-xl font-semibold">{incident.title}</h2>
-              <p className="text-sm text-muted-foreground">{incident.matched_fields.join(", ")}</p>
+              <p className="text-sm text-muted-foreground">{formatIncidentMatchedFields(incident.matched_fields)}</p>
             </div>
             <div className="flex items-center gap-2">
               {incident.status !== "resolved" ? (

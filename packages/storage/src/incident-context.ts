@@ -218,9 +218,12 @@ function buildVisibilityRecord(input: {
 }): IncidentContextVisibilityRecord {
   const routeTarget = input.primarySignal.route_template ?? input.primarySignal.request_path;
   const matchedFields = input.incident.matched_fields.length === 0 ? "none" : input.incident.matched_fields.join(", ");
+  const isRequestAnomaly = input.incident.matched_fields.includes("request_anomaly");
   const grouping =
-    input.primarySignal.kind === "request_failure_5xx" && input.primarySignal.request_method !== null && routeTarget !== null
-      ? `Repeated 5xx request failures with the same normalized route template, request method, response status, service, and environment reuse this incident fingerprint. This incident currently groups ${input.primarySignal.request_method} ${routeTarget} with matched fields ${matchedFields}.`
+    input.primarySignal.kind === "request_failure" && input.primarySignal.request_method !== null && routeTarget !== null
+      ? isRequestAnomaly
+        ? `Repeated request-anomaly incidents with the same normalized route template, request method, response status, service, and environment reuse this incident fingerprint once the anomaly threshold fires. This incident currently groups ${input.primarySignal.request_method} ${routeTarget} with matched fields ${matchedFields}.`
+        : `Repeated request-failure incidents with the same normalized route template, request method, response status, service, and environment reuse this incident fingerprint. This incident currently groups ${input.primarySignal.request_method} ${routeTarget} with matched fields ${matchedFields}.`
       : `This incident groups repeated failures by fingerprint version ${input.incident.fingerprint_version} inside the service and environment boundary, with matched fields ${matchedFields}.`;
   const spikeLead =
     input.incident.spike_detected_at === undefined || input.incident.spike_detected_at === null
@@ -244,6 +247,7 @@ function buildSuggestedNextChecks(input: {
   deploy: IncidentContextDeployRecord;
 }): string[] {
   const suggestions: string[] = [];
+  const isRequestAnomaly = input.incident.matched_fields.includes("request_anomaly");
 
   if (input.bundle.status === "pending") {
     suggestions.push("Wait for bundle generation to finish, then rerun the incident context command.");
@@ -253,12 +257,14 @@ function buildSuggestedNextChecks(input: {
 
   const routeTarget = input.primarySignal.route_template ?? input.primarySignal.request_path;
   if (
+    input.primarySignal.kind === "request_failure" &&
     input.primarySignal.request_method !== null &&
-    input.primarySignal.response_status !== null &&
-    input.primarySignal.response_status >= 500
+    routeTarget !== null
   ) {
     suggestions.push(
-      `Inspect the ${input.primarySignal.request_method} ${routeTarget ?? "request"} handler behind this 5xx path.`
+      isRequestAnomaly
+        ? `Inspect the ${input.primarySignal.request_method} ${routeTarget} handler behind this repeated request-anomaly path.`
+        : `Inspect the ${input.primarySignal.request_method} ${routeTarget} handler behind this request-failure path.`
     );
   }
 

@@ -76,6 +76,31 @@ describe("cli main core routing", () => {
     });
   });
 
+  it("routes process preset arguments into the process command", async () => {
+    const processCommand = vi.fn().mockResolvedValue({
+      exitCode: 0,
+      output: "processed-preset"
+    });
+
+    const result = await runCli([
+      "process",
+      "--preset",
+      "balanced",
+      "--json"
+    ], {
+      processCommand
+    });
+
+    expect(processCommand).toHaveBeenCalledWith({
+      json: true,
+      preset: "balanced"
+    });
+    expect(result).toEqual({
+      exitCode: 0,
+      output: "processed-preset"
+    });
+  });
+
   it("routes ingest arguments into the ingest command", async () => {
     const ingestCommand = vi.fn().mockResolvedValue({
       exitCode: 0,

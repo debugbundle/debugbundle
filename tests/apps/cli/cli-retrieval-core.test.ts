@@ -1,4 +1,6 @@
 import { readFileSync } from "node:fs";
+import { writeFile } from "node:fs/promises";
+import { join } from "node:path";
 
 import { describe, expect, it, vi } from "vitest";
 
@@ -166,11 +168,11 @@ describe("cli retrieval commands core", () => {
           occurrence_count: 2,
           environment: "production",
           incident_reason: {
-            kind: "request_failure_5xx",
+            kind: "request_failure",
             description: "request_event matched the 5xx request incident rule",
             event_type: "request_event",
             event_class: "incident_signal",
-            matched_policy: "5xx request failures bypass capture_request_events suppression"
+            matched_policy: "Immediate request failure statuses bypass capture_request_events suppression"
           }
         })
       }
@@ -184,7 +186,7 @@ describe("cli retrieval commands core", () => {
       "Status: open",
       "Environment: production",
       "Occurrences: 2",
-      "Reason: request_failure_5xx",
+      "Reason: request_failure",
       "Why: request_event matched the 5xx request incident rule"
     ].join("\n"));
   });
@@ -208,14 +210,14 @@ describe("cli retrieval commands core", () => {
             matched_fields: ["route_template"]
           },
           incident_reason: {
-            kind: "request_failure_5xx",
+            kind: "request_failure",
             description: "request_event matched the 5xx request incident rule",
             event_type: "request_event",
             event_class: "incident_signal",
-            matched_policy: "5xx request failures bypass capture_request_events suppression"
+            matched_policy: "Immediate request failure statuses bypass capture_request_events suppression"
           },
           primary_signal: {
-            kind: "request_failure_5xx",
+            kind: "request_failure",
             event_type: "request_event",
             event_class: "incident_signal",
             description: "request_event matched the 5xx request incident rule",
@@ -259,7 +261,7 @@ describe("cli retrieval commands core", () => {
             matched_fields: ["route_template"]
           },
           visibility: {
-            grouping: "Repeated 5xx request failures with the same normalized route template, request method, response status, service, and environment reuse this incident fingerprint. This incident currently groups POST /checkout with matched fields route_template.",
+            grouping: "Repeated request-failure incidents with the same normalized route template, request method, response status, service, and environment reuse this incident fingerprint. This incident currently groups POST /checkout with matched fields route_template.",
             bundle_regeneration: "Bundle status is ready. New incidents create a bundle immediately, while regeneration currently prioritizes regression reopen, then deploy metadata, reproduction-confidence changes, and finally new context updates.",
             spike_detection: "This incident is not currently marked as spiking. Spike detection is evaluated after grouping and only marks an existing incident when short-term frequency has sufficient baseline and exceeds the spike threshold.",
             notification_cooldown: "Webhook and GitHub lifecycle notifications use per-rule cooldown windows to suppress repeated bundle.reopened or incident.spike_detected deliveries for the same incident/event fingerprint."
@@ -284,7 +286,7 @@ describe("cli retrieval commands core", () => {
       "Title: Checkout 5xx",
       "Severity: high",
       "Status: open",
-      "Reason: request_failure_5xx",
+      "Reason: request_failure",
       "Why: request_event matched the 5xx request incident rule",
       "Primary signal: request_event",
       "Bundle: ready",
@@ -297,7 +299,7 @@ describe("cli retrieval commands core", () => {
       "Error type: TypeError",
       "Error message: boom",
       "Deploy: 2026.03.11.1 (abc123)",
-      "Grouping visibility: Repeated 5xx request failures with the same normalized route template, request method, response status, service, and environment reuse this incident fingerprint. This incident currently groups POST /checkout with matched fields route_template.",
+      "Grouping visibility: Repeated request-failure incidents with the same normalized route template, request method, response status, service, and environment reuse this incident fingerprint. This incident currently groups POST /checkout with matched fields route_template.",
       "Bundle regeneration: Bundle status is ready. New incidents create a bundle immediately, while regeneration currently prioritizes regression reopen, then deploy metadata, reproduction-confidence changes, and finally new context updates.",
       "Spike detection: This incident is not currently marked as spiking. Spike detection is evaluated after grouping and only marks an existing incident when short-term frequency has sufficient baseline and exceeds the spike threshold.",
       "Notification cooldown: Webhook and GitHub lifecycle notifications use per-rule cooldown windows to suppress repeated bundle.reopened or incident.spike_detected deliveries for the same incident/event fingerprint.",
@@ -829,6 +831,49 @@ describe("cli retrieval commands core", () => {
         })
       })
     );
+  });
+
+  it("derives local incident_reason from request anomaly matched fields when no primary incident signal exists", async () => {
+    const { rootDirectory, openIncident } = await createLocalRetrievalFixture();
+    const statePath = join(rootDirectory, ".debugbundle", "local", "state.json");
+    const rawState = JSON.parse(readFileSync(statePath, "utf8")) as {
+      version: number;
+      last_processed_event_file: string;
+      incidents: Record<string, Record<string, unknown>>;
+    };
+
+    rawState.incidents[openIncident.incidentId] = {
+      ...rawState.incidents[openIncident.incidentId],
+      title: "Request anomaly: GET /checkout/:orderId returned 404 repeatedly",
+      source_event_types: ["request_event"],
+      matched_fields: ["request_anomaly", "route_template", "http_method", "http_status"]
+    };
+
+    await writeFile(statePath, `${JSON.stringify(rawState, null, 2)}\n`, "utf8");
+
+    const result = await getIncidentWithAuthCommand(
+      {
+        incidentId: openIncident.incidentId,
+        json: true
+      },
+      {
+        cwd: () => rootDirectory
+      }
+    );
+
+    expect(result.exitCode).toBe(0);
+    expect(JSON.parse(result.output)).toEqual({
+      incident: expect.objectContaining({
+        incident_id: openIncident.incidentId,
+        incident_reason: {
+          kind: "request_failure",
+          description: "request_event crossed the repeated request anomaly threshold",
+          event_type: "request_event",
+          event_class: "incident_signal",
+          matched_policy: "Repeated contextual request failures crossed the request anomaly threshold"
+        }
+      })
+    });
   });
 
   it("resolves and reopens local incidents without auth when the project is local-only", async () => {

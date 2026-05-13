@@ -439,15 +439,15 @@ All eight canonical event types (FR-SDK-05) are assigned to one of three event c
 
 | Event Class | Event Types | Purpose |
 |---|---|---|
-| **A — Incident Signals** | `backend_exception`, `frontend_exception`, qualifying `log_event` (`error`/`fatal`/`critical`), first-party `request_event` with `response_status >= 500` | Events that create or materially update incidents. The primary product value. |
-| **B — Context Signals** | Non-5xx `request_event` (as request snapshot), `frontend_breadcrumb`, non-incident-eligible `log_event`, `deploy_metadata`, probe data flushed alongside errors | Events that enrich an incident but do not independently create one. Context travels with the incident. |
+| **A — Incident Signals** | `backend_exception`, `frontend_exception`, qualifying `log_event` (`error`/`fatal`/`critical`), first-party `request_event` matching the preset-specific immediate request-failure set (`minimal`: 5xx only; `balanced`: 5xx plus 408/423/424/425/429; `investigative`: balanced plus 409) | Events that create or materially update incidents. The primary product value. |
+| **B — Context Signals** | `request_event` values outside the preset-specific immediate request-failure set (as request snapshot), `frontend_breadcrumb`, non-incident-eligible `log_event`, `deploy_metadata`, probe data flushed alongside errors | Events that enrich an incident but do not independently create one. Context travels with the incident. |
 | **C — Operational Signals** | `error_suppressed`, standalone `probe_event` | Events that exist to operate the platform, not to represent user-facing failures. |
 
 **FR-EVT-01:** Every event persisted through ingestion must carry an `event_class` classification (`incident_signal`, `context_signal`, or `operational_signal`). Classification is determined at the worker normalization stage based on event type and project capture policy.
 
 **FR-EVT-02:** Free tier billing must primarily meter Class A (incident signal) events. Class B and Class C events must not count against the primary `monthly_raw_ingested_events` allowance on Free. On paid tiers (Solo, Team), all remotely ingested events count against the allowance regardless of class.
 
-**FR-EVT-03:** The worker must only create or materially update incidents from Class A events. Class B events attach as context to existing incidents (via `trace_id` or time-window correlation). Class C events are stored for operational visibility but never create incidents.
+**FR-EVT-03:** The worker must only create or materially update incidents directly from Class A events, except for the explicit request-anomaly path. Class B events attach as context to existing incidents (via `trace_id` or time-window correlation), but contextual `request_event` records may also open or update a `request_failure` incident when a preset-enabled repeated-request anomaly threshold fires without mutating the stored event's `event_class`. Class C events are stored for operational visibility but never create incidents.
 
 #### Capture Presets
 
@@ -455,9 +455,9 @@ All eight canonical event types (FR-SDK-05) are assigned to one of three event c
 
 | Preset | Goal | Exceptions | Logs | Request Events | Breadcrumbs | Probe Events |
 |---|---|---|---|---|---|---|
-| `minimal` | Protect quota, capture only real failures | On | Error+ only | 5xx failure requests only | Local ring buffer + exception flush only | Buffer-only |
-| `balanced` | Default hosted behavior | On | Warning+ | 5xx and selected failures only | Local ring buffer + exception flush only | Paid-tier only |
-| `investigative` | Short-term deep debugging | On | Info+ | On with filters | Optional standalone | Paid-tier only |
+| `minimal` | Protect quota, capture only real failures | On | Error+ only | Immediate failures: 5xx only | Local ring buffer + exception flush only | Buffer-only |
+| `balanced` | Default hosted behavior | On | Warning+ | Immediate failures: 5xx plus 408/423/424/425/429 | Local ring buffer + exception flush only | Paid-tier only |
+| `investigative` | Short-term deep debugging | On | Info+ | Immediate failures: balanced set plus 409, with optional broader request capture via overrides | Optional standalone | Paid-tier only |
 
 **FR-EVT-05:** Free tier projects must default to `minimal` preset. Solo projects default to `balanced`. Team projects default to `balanced`. Presets are changeable by the project owner via API, CLI, MCP, and web app (interface parity per INV-5).
 
@@ -471,9 +471,13 @@ Advanced controls are optional. When unset, the preset's defaults apply. The `ca
 
 **FR-EVT-07:** SDKs must respect the project capture policy. The `GET /v1/sdk/config` response must include the resolved capture policy so SDKs can gate event emission client-side. When the SDK's local config conflicts with the server-side policy, the more restrictive setting wins.
 
-**FR-EVT-08:** The ingestion API must enforce plan-level capture rules server-side. If a project sends event types disallowed by its capture policy (e.g., non-5xx standalone `request_event` on a `minimal` Free project), the API must reject those events with a structured reason (`capture_policy_rejected`) rather than silently accepting and billing them. First-party 5xx `request_event` payloads are incident-critical and must be accepted under every preset/override.
+**FR-EVT-08:** The ingestion API must enforce plan-level capture rules server-side. If a project sends event types disallowed by its capture policy (e.g., standalone `request_event` with `response_status: 200` on a `minimal` Free project), the API must reject those events with a structured reason (`capture_policy_rejected`) rather than silently accepting and billing them. First-party request events in the preset-specific immediate request-failure set are incident-critical and must be accepted even when `capture_request_events` is narrowed; 5xx request failures are immediate under every preset.
 
-**FR-EVT-08a:** Browser SDK network capture must promote first-party `fetch`/`XMLHttpRequest` responses with `response_status >= 500` to standalone `request_event` payloads while still retaining the corresponding `network_request` breadcrumb for timeline context. First-party means same-origin/relative URL or a URL matched by trace-propagation allowlist. 4xx browser network responses remain breadcrumb/context captures unless separately reported through an explicit request-event API.
+**FR-EVT-08a:** Browser SDK network capture must promote first-party `fetch`/`XMLHttpRequest` responses that match the preset-specific immediate request-failure set to standalone `request_event` payloads while still retaining the corresponding `network_request` breadcrumb for timeline context. First-party means same-origin/relative URL or a URL matched by trace-propagation allowlist. Under `minimal`, this means 5xx only; under `balanced`, this adds 408/423/424/425/429; under `investigative`, this further adds 409. When the effective `capture_request_events` mode keeps request failure context (`failures_only` or `all`), first-party browser responses in the active preset's request-anomaly set must also emit standalone `request_event` context signals so repeated failures can cross the worker anomaly threshold. Other first-party browser responses outside the current preset's immediate or anomaly set remain breadcrumb/context captures unless separately reported through an explicit request-event API.
+
+**FR-EVT-08b:** The worker must support a thin request-anomaly evaluator for repeated contextual first-party request failures without reclassifying the underlying normalized events. Request anomaly detection is disabled for `minimal`, enabled for selected statuses under `balanced`, and enabled with lower thresholds under `investigative`. The initial thresholds are: `balanced` uses `count >= 20 in 5m` plus `5m/1h ratio >= 3.0` for `401/403/404/409/422`, `count >= 50 in 5m` plus `ratio >= 5.0` for `400/410`; `investigative` uses `count >= 8 in 5m` plus `ratio >= 2.0` for `400/401/403/404/409/410/422`.
+
+**FR-EVT-08c:** When a request anomaly threshold fires, the worker must enqueue a deterministic incident-grouping path keyed by project, service, environment, normalized route template, HTTP method, and response status. The resulting incident must surface as `request_failure` through existing retrieval, bundle, CLI, MCP, and web incident flows while preserving the source `request_event` rows as `context_signal` records.
 
 #### Surfacing Rules
 

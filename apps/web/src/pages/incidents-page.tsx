@@ -13,6 +13,7 @@ import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTi
 import { Skeleton } from "../components/ui/skeleton.js";
 import { Table, TableBody, TableCell, TableHeader, TableRow } from "../components/ui/table.js";
 import { listIncidents, type IncidentRecord } from "../lib/api.js";
+import { formatIncidentMatchedFields } from "../lib/incident-copy.js";
 import { useCursorPagination } from "../lib/use-cursor-pagination.js";
 
 export function IncidentsPage(): JSX.Element {
@@ -114,7 +115,9 @@ export function IncidentsPage(): JSX.Element {
                           <Link to={`/incidents/${incident.incident_id}`} className="font-medium text-foreground hover:underline">
                             {incident.title}
                           </Link>
-                          <p className="mt-1 text-xs text-muted-foreground whitespace-normal break-words">{incident.matched_fields.join(", ")}</p>
+                          <p className="mt-1 text-xs text-muted-foreground whitespace-normal break-words">
+                            {formatIncidentMatchedFields(incident.matched_fields)}
+                          </p>
                         </TableCell>
                         <TableCell className="text-sm text-muted-foreground whitespace-normal break-words align-middle">
                           <Link to={`/projects/${incident.project_id}`} className="hover:underline">

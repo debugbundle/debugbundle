@@ -119,7 +119,7 @@ export function buildCliReference(): string {
     "- `debugbundle ingest <file> --format <format> [--json]`",
     "- `debugbundle watch --log <file> --format <format> [--json]`",
     "- `debugbundle watch --cloud --log <file> --format <format> [--json]`",
-    "- `debugbundle process [--json]`",
+    "- `debugbundle process [--preset <minimal|balanced|investigative>] [--json]`",
     "",
     "## Investigation",
     "",

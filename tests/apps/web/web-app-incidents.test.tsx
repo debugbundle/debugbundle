@@ -16,6 +16,7 @@ import {
 
 afterEach(() => {
   resetBrowserSessionClientState();
+  vi.restoreAllMocks();
   vi.unstubAllGlobals();
   vi.useRealTimers();
 });
@@ -82,6 +83,44 @@ describe("web app — incident and project detail routes", () => {
 
     expect(container.querySelector('[data-token="property"]')).not.toBeNull();
     expect(container.querySelector('[data-token="string"]')).not.toBeNull();
+  });
+
+  it("formats request-anomaly grouping copy on the incident detail page", async () => {
+    const incident = createIncident({
+      title: "Request anomaly: GET /checkout/:orderId returned 404 repeatedly",
+      matched_fields: ["request_anomaly", "route_template", "http_method", "http_status"]
+    });
+    const fetchMock = vi.fn((input: RequestInfo | URL) => {
+      const url = requestUrl(input);
+
+      if (url.endsWith("/v1/auth/session")) {
+        return jsonResponse(200, { session: createSession() });
+      }
+
+      if (url.endsWith(`/v1/incidents/${incident.incident_id}`)) {
+        return jsonResponse(200, { incident });
+      }
+
+      if (url.endsWith(`/v1/incidents/${incident.incident_id}/bundle`)) {
+        return jsonResponse(200, { status: "pending" });
+      }
+
+      if (url.endsWith(`/v1/incidents/${incident.incident_id}/reproduction`)) {
+        return jsonResponse(200, { status: "pending" });
+      }
+
+      return jsonResponse(404, { error: "not_found" });
+    });
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<App initialEntries={[`/incidents/${incident.incident_id}`]} />);
+
+    expect(await screen.findByText(/request anomaly: get \/checkout\/:orderid returned 404 repeatedly/i)).toBeInTheDocument();
+    expect(
+      screen.getByText("Request anomaly threshold crossed. Grouped by route template, HTTP method, and HTTP status.")
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/request_anomaly, route_template, http_method, http_status/i)).toBeNull();
   });
 
   it("allows resolving an incident from the detail page", async () => {
@@ -175,6 +214,40 @@ describe("web app — incident and project detail routes", () => {
 
     expect(await screen.findByText(/typeerror in checkout handler/i)).toBeInTheDocument();
     expect(await screen.findByText(/bundle is being generated/i)).toBeInTheDocument();
+  });
+
+  it("shows unavailable bundle and reproduction callouts when artifact generation fails", async () => {
+    const incident = createIncident();
+    const user = userEvent.setup();
+    const fetchMock = vi.fn((input: RequestInfo | URL) => {
+      const url = requestUrl(input);
+
+      if (url.endsWith("/v1/auth/session")) {
+        return jsonResponse(200, { session: createSession() });
+      }
+
+      if (url.endsWith(`/v1/incidents/${incident.incident_id}`)) {
+        return jsonResponse(200, { incident });
+      }
+
+      if (url.endsWith(`/v1/incidents/${incident.incident_id}/bundle`)) {
+        return jsonResponse(200, { status: "failed" });
+      }
+
+      if (url.endsWith(`/v1/incidents/${incident.incident_id}/reproduction`)) {
+        return jsonResponse(200, { status: "failed" });
+      }
+
+      return jsonResponse(404, { error: "not_found" });
+    });
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<App initialEntries={[`/incidents/${incident.incident_id}`]} />);
+
+    expect(await screen.findByText(/bundle generation failed/i)).toBeInTheDocument();
+    await user.click(screen.getByRole("tab", { name: /reproduction/i }));
+    expect(await screen.findByText(/reproduction not available/i)).toBeInTheDocument();
   });
 
   it("downloads a project bundle when the artifact response is returned directly", async () => {
@@ -730,6 +803,47 @@ describe("web app — incident and project detail routes", () => {
     );
   });
 
+  it("uses the scoped incidents back link for project incident detail routes", async () => {
+    const project = createProject();
+    const incident = createIncident({ project_id: project.project_id });
+
+    const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = requestUrl(input);
+
+      if (url.endsWith("/v1/auth/session")) {
+        return jsonResponse(200, { session: createSession() });
+      }
+
+      if (url.endsWith("/v1/projects") && init?.method === undefined) {
+        return jsonResponse(200, { projects: [project] });
+      }
+
+      if (url.endsWith(`/v1/incidents/${incident.incident_id}`)) {
+        return jsonResponse(200, { incident });
+      }
+
+      if (url.endsWith(`/v1/incidents/${incident.incident_id}/bundle`)) {
+        return jsonResponse(200, { status: "pending" });
+      }
+
+      if (url.endsWith(`/v1/incidents/${incident.incident_id}/reproduction`)) {
+        return jsonResponse(200, { status: "pending" });
+      }
+
+      return jsonResponse(404, { error: "not_found" });
+    });
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<App initialEntries={[`/projects/${project.project_id}/incidents/${incident.incident_id}`]} />);
+
+    expect(await screen.findByText(/typeerror in checkout handler/i)).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /back to incidents/i })).toHaveAttribute(
+      "href",
+      `/projects/${project.project_id}/incidents`
+    );
+  });
+
   it("shows project overview with incidents tab listing project-scoped incidents", async () => {
     const project = createProject();
     const incident = createIncident({ project_id: project.project_id, project_name: project.name, service_name: "Checkout API" });
@@ -800,6 +914,120 @@ describe("web app — incident and project detail routes", () => {
     expect(screen.queryByText(/export incidents as csv/i)).toBeNull();
   });
 
+  it("shows downward-trend project metrics when monthly counters are zero", async () => {
+    const project = createProject({
+      metrics: {
+        monthly_bundle_requests: 0,
+        monthly_raw_ingested_events: 0,
+        retained_bundles: 0,
+        monthly_alert_deliveries: 0
+      }
+    });
+
+    const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = requestUrl(input);
+
+      if (url.endsWith("/v1/auth/session")) {
+        return jsonResponse(200, { session: createSession() });
+      }
+
+      if (url.endsWith("/v1/projects") && init?.method === undefined) {
+        return jsonResponse(200, { projects: [project] });
+      }
+
+      if (url.includes("/v1/incidents") && url.includes(`project_id=${project.project_id}`)) {
+        return jsonResponse(200, { incidents: [], next_cursor: null });
+      }
+
+      return jsonResponse(404, { error: "not_found" });
+    });
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<App initialEntries={[`/projects/${project.project_id}`]} />);
+
+    expect((await screen.findAllByText(/^0$/)).length).toBe(4);
+    expect(screen.getByText(/raw events ingested this month/i)).toBeInTheDocument();
+    expect(screen.getByText(/alert deliveries this month/i)).toBeInTheDocument();
+  });
+
+  it("sorts and pages project bundles", async () => {
+    const user = userEvent.setup();
+    const project = createProject();
+    const alphaIncident = createIncident({
+      incident_id: "inc_alpha_bundle",
+      project_id: project.project_id,
+      title: "Alpha bundle incident",
+      severity: "low",
+      status: "resolved",
+      last_seen_at: "2026-03-17T00:01:00.000Z"
+    });
+    const zuluIncident = createIncident({
+      incident_id: "inc_zulu_bundle",
+      project_id: project.project_id,
+      title: "Zulu bundle incident",
+      severity: "critical",
+      status: "open",
+      last_seen_at: "2026-03-17T00:09:00.000Z"
+    });
+    const secondPageIncident = createIncident({
+      incident_id: "inc_second_page_bundle",
+      project_id: project.project_id,
+      title: "Second page bundle incident",
+      severity: "medium",
+      status: "regressed",
+      last_seen_at: "2026-03-17T00:05:00.000Z"
+    });
+
+    const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = requestUrl(input);
+
+      if (url.endsWith("/v1/auth/session")) {
+        return jsonResponse(200, { session: createSession() });
+      }
+
+      if (url.endsWith("/v1/projects") && init?.method === undefined) {
+        return jsonResponse(200, { projects: [project] });
+      }
+
+      if (url.endsWith(`/v1/incidents?project_id=${project.project_id}&limit=20&status=open`) && init?.method === undefined) {
+        return jsonResponse(200, { incidents: [alphaIncident, zuluIncident], next_cursor: "cursor_2" });
+      }
+
+      if (url.endsWith(`/v1/incidents?project_id=${project.project_id}&limit=20&cursor=cursor_2&status=open`) && init?.method === undefined) {
+        return jsonResponse(200, { incidents: [secondPageIncident], next_cursor: null });
+      }
+
+      return jsonResponse(404, { error: "not_found" });
+    });
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<App initialEntries={[`/projects/${project.project_id}/bundles`]} />);
+
+    expect(await screen.findByText(/alpha bundle incident/i)).toBeInTheDocument();
+
+    const expectFirstBundleRow = (name: RegExp) => {
+      const rows = screen.getAllByRole("row");
+      expect(within(rows[1] as HTMLTableRowElement).getByText(name)).toBeInTheDocument();
+    };
+
+    await user.click(screen.getByRole("button", { name: /^incident$/i }));
+    expectFirstBundleRow(/alpha bundle incident/i);
+
+    await user.click(screen.getByRole("button", { name: /severity/i }));
+    expectFirstBundleRow(/^low$/i);
+
+    await user.click(screen.getByRole("button", { name: /status/i }));
+    expectFirstBundleRow(/^open$/i);
+
+    await user.click(screen.getByRole("button", { name: /last seen/i }));
+    expectFirstBundleRow(/alpha bundle incident/i);
+
+    await user.click(screen.getByRole("button", { name: /next/i }));
+    expect(await screen.findByText(/second page bundle incident/i)).toBeInTheDocument();
+  });
+
   it("shows empty state for project incidents tab with no incidents", async () => {
     const project = createProject();
 
@@ -827,6 +1055,297 @@ describe("web app — incident and project detail routes", () => {
 
     expect(await screen.findByText(/main app/i)).toBeInTheDocument();
     expect(await screen.findByText(/no open incidents for this project/i)).toBeInTheDocument();
+  });
+
+  it("shows every workspace incident empty state as the status filter changes", async () => {
+    const user = userEvent.setup();
+    const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = requestUrl(input);
+
+      if (url.endsWith("/v1/auth/session")) {
+        return jsonResponse(200, { session: createSession() });
+      }
+
+      if (url.includes("/v1/incidents?") && url.includes("limit=20") && init?.method === undefined) {
+        return jsonResponse(200, { incidents: [], next_cursor: null });
+      }
+
+      return jsonResponse(404, { error: "not_found" });
+    });
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<App initialEntries={["/incidents"]} />);
+
+    const statusFilter = await screen.findByRole("combobox", { name: /status/i });
+    expect(await screen.findByText(/no open incidents/i)).toBeInTheDocument();
+
+    await user.selectOptions(statusFilter, "resolved");
+    expect(await screen.findByText(/no resolved incidents/i)).toBeInTheDocument();
+
+    await user.selectOptions(statusFilter, "regressed");
+    expect(await screen.findByText(/no regressed incidents/i)).toBeInTheDocument();
+
+    await user.selectOptions(statusFilter, "all");
+    expect(await screen.findByText(/no incidents captured yet/i)).toBeInTheDocument();
+  });
+
+  it("sorts workspace incidents across every visible column and renders unknown services", async () => {
+    const user = userEvent.setup();
+    const incidents = [
+      createIncident({
+        incident_id: "inc_alpha",
+        project_id: "proj_alpha",
+        project_name: "Alpha App",
+        title: "Alpha failure",
+        severity: "low",
+        status: "resolved",
+        service_name: null,
+        occurrence_count: 1,
+        last_seen_at: "2026-03-17T00:01:00.000Z"
+      }),
+      createIncident({
+        incident_id: "inc_zulu",
+        project_id: "proj_zulu",
+        project_name: "Zulu App",
+        title: "Zulu failure",
+        severity: "critical",
+        status: "open",
+        service_name: "worker-api",
+        occurrence_count: 9,
+        last_seen_at: "2026-03-17T00:09:00.000Z"
+      })
+    ];
+
+    const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = requestUrl(input);
+
+      if (url.endsWith("/v1/auth/session")) {
+        return jsonResponse(200, { session: createSession() });
+      }
+
+      if (url.includes("/v1/incidents?") && url.includes("limit=20") && init?.method === undefined) {
+        return jsonResponse(200, { incidents, next_cursor: null });
+      }
+
+      return jsonResponse(404, { error: "not_found" });
+    });
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<App initialEntries={["/incidents?status=all"]} />);
+
+    expect(await screen.findByText(/alpha failure/i)).toBeInTheDocument();
+    expect(screen.getByText(/unknown service/i)).toBeInTheDocument();
+    expect(screen.getByText(/1 occurrence/i)).toBeInTheDocument();
+
+    const expectFirstDataRow = (name: RegExp) => {
+      const rows = screen.getAllByRole("row");
+      expect(within(rows[1] as HTMLTableRowElement).getByText(name)).toBeInTheDocument();
+    };
+
+    await user.click(screen.getByRole("button", { name: /^incident$/i }));
+    expectFirstDataRow(/alpha failure/i);
+
+    await user.click(screen.getByRole("button", { name: /project/i }));
+    expectFirstDataRow(/alpha app/i);
+
+    await user.click(screen.getByRole("button", { name: /service/i }));
+    expectFirstDataRow(/unknown service/i);
+
+    await user.click(screen.getByRole("button", { name: /severity/i }));
+    expectFirstDataRow(/^low$/i);
+
+    await user.click(screen.getByRole("button", { name: /status/i }));
+    expectFirstDataRow(/^open$/i);
+
+    await user.click(screen.getByRole("button", { name: /occurrences/i }));
+    expectFirstDataRow(/1 occurrence/i);
+
+    await user.click(screen.getByRole("button", { name: /last seen/i }));
+    expectFirstDataRow(/alpha failure/i);
+  });
+
+  it("copies and downloads bundle and reproduction artifacts from the incident detail page", async () => {
+    const incident = createIncident();
+    const user = userEvent.setup();
+    const writeTextMock = vi.fn().mockResolvedValue(undefined);
+    const createObjectUrlMock = vi.fn(() => "blob:incident-artifact");
+    const revokeObjectUrlMock = vi.fn();
+    const clickMock = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => undefined);
+
+    Object.defineProperty(window.navigator, "clipboard", {
+      configurable: true,
+      value: {
+        writeText: writeTextMock
+      }
+    });
+    vi.stubGlobal("URL", {
+      createObjectURL: createObjectUrlMock,
+      revokeObjectURL: revokeObjectUrlMock
+    });
+
+    const fetchMock = vi.fn((input: RequestInfo | URL) => {
+      const url = requestUrl(input);
+
+      if (url.endsWith("/v1/auth/session")) {
+        return jsonResponse(200, { session: createSession() });
+      }
+
+      if (url.endsWith(`/v1/incidents/${incident.incident_id}`)) {
+        return jsonResponse(200, { incident });
+      }
+
+      if (url.endsWith(`/v1/incidents/${incident.incident_id}/bundle`)) {
+        return jsonResponse(200, { bundle_id: "bundle_123", summary: { title: incident.title } });
+      }
+
+      if (url.endsWith(`/v1/incidents/${incident.incident_id}/reproduction`)) {
+        return jsonResponse(200, { steps: ["step 1"], command: "pnpm test" });
+      }
+
+      return jsonResponse(404, { error: "not_found" });
+    });
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<App initialEntries={[`/incidents/${incident.incident_id}`]} />);
+
+    await screen.findByText(/typeerror in checkout handler/i);
+
+    const copyButtons = await screen.findAllByRole("button", { name: /^copy$/i });
+    const downloadButtons = await screen.findAllByRole("button", { name: /^download$/i });
+    await user.click(copyButtons[0] as HTMLButtonElement);
+    await user.click(downloadButtons[0] as HTMLButtonElement);
+
+    await user.click(screen.getByRole("tab", { name: /reproduction/i }));
+    const reproCopyButtons = await screen.findAllByRole("button", { name: /^copy$/i });
+    const reproDownloadButtons = await screen.findAllByRole("button", { name: /^download$/i });
+    await user.click(reproCopyButtons[0] as HTMLButtonElement);
+    await user.click(reproDownloadButtons[0] as HTMLButtonElement);
+
+    expect(writeTextMock).toHaveBeenCalledTimes(2);
+    expect(createObjectUrlMock).toHaveBeenCalledTimes(2);
+    expect(clickMock).toHaveBeenCalledTimes(2);
+    expect(revokeObjectUrlMock).toHaveBeenCalledWith("blob:incident-artifact");
+  });
+
+  it("sorts project incidents across service, severity, status, title, and last seen columns", async () => {
+    const user = userEvent.setup();
+    const project = createProject();
+    const incidents = [
+      createIncident({
+        incident_id: "inc_alpha_project",
+        project_id: project.project_id,
+        title: "Alpha project incident",
+        service_name: null,
+        severity: "low",
+        status: "resolved",
+        occurrence_count: 1,
+        last_seen_at: "2026-03-17T00:01:00.000Z"
+      }),
+      createIncident({
+        incident_id: "inc_zulu_project",
+        project_id: project.project_id,
+        title: "Zulu project incident",
+        service_name: "worker-api",
+        severity: "critical",
+        status: "open",
+        occurrence_count: 9,
+        last_seen_at: "2026-03-17T00:09:00.000Z"
+      })
+    ];
+
+    const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = requestUrl(input);
+
+      if (url.endsWith("/v1/auth/session")) {
+        return jsonResponse(200, { session: createSession() });
+      }
+
+      if (url.endsWith("/v1/projects") && init?.method === undefined) {
+        return jsonResponse(200, { projects: [project] });
+      }
+
+      if (url.includes("/v1/incidents") && url.includes(`project_id=${project.project_id}`)) {
+        return jsonResponse(200, { incidents, next_cursor: null });
+      }
+
+      return jsonResponse(404, { error: "not_found" });
+    });
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<App initialEntries={[`/projects/${project.project_id}/incidents`]} />);
+
+    expect(await screen.findByText(/alpha project incident/i)).toBeInTheDocument();
+    expect(screen.getByText(/unknown service/i)).toBeInTheDocument();
+
+    const expectFirstProjectRow = (name: RegExp) => {
+      const rows = screen.getAllByRole("row");
+      expect(within(rows[1] as HTMLTableRowElement).getByText(name)).toBeInTheDocument();
+    };
+
+    await user.click(screen.getByRole("button", { name: /^incident$/i }));
+    expectFirstProjectRow(/alpha project incident/i);
+
+    await user.click(screen.getByRole("button", { name: /service/i }));
+    expectFirstProjectRow(/unknown service/i);
+
+    await user.click(screen.getByRole("button", { name: /severity/i }));
+    expectFirstProjectRow(/^low$/i);
+
+    await user.click(screen.getByRole("button", { name: /status/i }));
+    expectFirstProjectRow(/^open$/i);
+
+    await user.click(screen.getByRole("button", { name: /occurrences/i }));
+    expectFirstProjectRow(/1$/i);
+
+    await user.click(screen.getByRole("button", { name: /last seen/i }));
+    expectFirstProjectRow(/alpha project incident/i);
+  });
+
+  it("exports project incidents as csv", async () => {
+    const user = userEvent.setup();
+    const project = createProject();
+    const incident = createIncident({ project_id: project.project_id });
+    const createObjectUrlMock = vi.fn(() => "blob:incident-export");
+    const revokeObjectUrlMock = vi.fn();
+    const clickMock = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => undefined);
+
+    vi.stubGlobal("URL", {
+      createObjectURL: createObjectUrlMock,
+      revokeObjectURL: revokeObjectUrlMock
+    });
+
+    const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = requestUrl(input);
+
+      if (url.endsWith("/v1/auth/session")) {
+        return jsonResponse(200, { session: createSession() });
+      }
+
+      if (url.endsWith("/v1/projects") && init?.method === undefined) {
+        return jsonResponse(200, { projects: [project] });
+      }
+
+      if (url.includes("/v1/incidents") && url.includes(`project_id=${project.project_id}`)) {
+        return jsonResponse(200, { incidents: [incident], next_cursor: null });
+      }
+
+      return jsonResponse(404, { error: "not_found" });
+    });
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<App initialEntries={[`/projects/${project.project_id}/incidents`]} />);
+
+    await screen.findByText(/typeerror in checkout handler/i);
+    await user.click(screen.getByRole("button", { name: /export incidents as csv/i }));
+
+    expect(createObjectUrlMock).toHaveBeenCalledTimes(1);
+    expect(clickMock).toHaveBeenCalledTimes(1);
+    expect(revokeObjectUrlMock).toHaveBeenCalledWith("blob:incident-export");
   });
 
   it("shows not-found callout when project does not exist", async () => {

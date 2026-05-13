@@ -360,7 +360,7 @@ The browser SDK collects device/browser metadata once on `init()` and attaches i
 
 ### Breadcrumb Ring Buffer Behavior
 
-Non-exception browser captures (clicks, route changes, network summaries, console entries) are **breadcrumbs** by default. They accumulate in a fixed-size ring buffer (`maxBreadcrumbs`, default 10). First-party network responses with `response_status >= 500` are the exception: the browser SDK must keep the `network_request` breadcrumb for timeline context and also emit a standalone `request_event` so the failure can create a request-failure incident. When a `frontend_exception` occurs:
+Non-exception browser captures (clicks, route changes, network summaries, console entries) are **breadcrumbs** by default. They accumulate in a fixed-size ring buffer (`maxBreadcrumbs`, default 10). First-party network responses that match the active preset's immediate request-failure statuses are the exception: the browser SDK must keep the `network_request` breadcrumb for timeline context and also emit a standalone `request_event` so the failure can create a request-failure incident. Immediate request-failure presets are `minimal`: `5xx`; `balanced`: `5xx`, `408`, `423`, `424`, `425`, `429`; `investigative`: balanced plus `409`. When `capture_request_events` is `failures_only`, first-party browser responses in the preset's request-anomaly set also emit standalone `request_event` context signals so repeated failures can cross the worker anomaly threshold without reclassifying the source events. When a `frontend_exception` occurs:
 
 1. The ring buffer contents are attached to the exception event as `breadcrumbs[]`.
 2. The combined payload (exception + breadcrumbs) is shipped as a single batch.
@@ -371,7 +371,7 @@ When `breadcrumbsOnErrorOnly` is `true` (default), breadcrumbs are **never** shi
 ### Session Sampling and Event Caps
 
 - `sessionSampleRate` decision is made once at session start (random check against threshold). If the session is sampled out, the SDK becomes a no-op for all non-exception events for that session.
-- `maxEventsPerSession` is a hard ceiling. After the cap, only `frontend_exception` events and first-party 5xx `request_event` incident signals are captured. Breadcrumbs stop accumulating. The cap resets on new session (page reload or new tab).
+- `maxEventsPerSession` is a hard ceiling. After the cap, only `frontend_exception` events and first-party immediate request-failure `request_event` incident signals are captured. Breadcrumbs stop accumulating. The cap resets on new session (page reload or new tab).
 
 ### Browser Storm Controls
 
@@ -845,9 +845,9 @@ SDKs fetch this on `init()` alongside probe config. The policy is cached and ref
 | `capture_logs` | `error` | Only buffer/ship `log_event` with level `error` or `critical` |
 | `capture_logs` | `warning` | Buffer/ship `log_event` with level `warning`, `error`, or `critical` |
 | `capture_logs` | `info` | Buffer/ship `log_event` with level `info` and above |
-| `capture_request_events` | `off` | Discard non-5xx standalone `request_event` before buffering; 5xx request failures are still captured as incident signals |
-| `capture_request_events` | `failures_only` | Only buffer/ship `request_event` with `response_status >= 500` |
-| `capture_request_events` | `filtered` | Buffer/ship `request_event` matching configured filters; until custom filters are available, SDKs treat this as 5xx-only |
+| `capture_request_events` | `off` | Discard standalone `request_event` unless the response matches the active preset's immediate request-failure statuses; those immediate request failures are still captured as incident signals |
+| `capture_request_events` | `failures_only` | Buffer/ship immediate request-failure `request_event` for the active preset (`minimal`: `5xx`; `balanced`: `5xx`, `408`, `423`, `424`, `425`, `429`; `investigative`: balanced plus `409`) and preset-enabled request-anomaly candidate `request_event` context signals (`balanced`: `400`, `401`, `403`, `404`, `409`, `410`, `422`; `investigative`: same set with lower thresholds). Minimal has no request-anomaly candidates. |
+| `capture_request_events` | `filtered` | Buffer/ship `request_event` matching configured filters; until custom filters are available, SDKs keep only immediate request failures and do not ship additional filtered request context |
 | `capture_request_events` | `all` | Buffer/ship all `request_event` |
 | `capture_breadcrumbs` | `local_only` | Keep breadcrumbs in local ring buffer; flush only with exceptions |
 | `capture_breadcrumbs` | `exception_only` | Ship breadcrumbs only when attached to an exception event |

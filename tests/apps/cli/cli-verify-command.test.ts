@@ -582,11 +582,11 @@ describe("cli verify cloud command", () => {
           incident_id: "inc_verify_5xx",
           last_seen_at: "2026-03-14T00:10:03.000Z",
           incident_reason: {
-            kind: "request_failure_5xx",
+            kind: "request_failure",
             description: "request_event matched the 5xx request incident rule",
             event_type: "request_event",
             event_class: "incident_signal",
-            matched_policy: "5xx request failures bypass capture_request_events suppression"
+            matched_policy: "Immediate request failure statuses bypass capture_request_events suppression"
           }
         }
       ],
@@ -705,11 +705,11 @@ describe("cli verify cloud command", () => {
         incident_id: "inc_verify_5xx",
         bundle_status: "ready",
         classification_reason: {
-          kind: "request_failure_5xx",
+          kind: "request_failure",
           description: "request_event matched the 5xx request incident rule",
           event_type: "request_event",
           event_class: "incident_signal",
-          matched_policy: "5xx request failures bypass capture_request_events suppression"
+          matched_policy: "Immediate request failure statuses bypass capture_request_events suppression"
         },
         suggested_next_command: "debugbundle inspect inc_verify_5xx --source cloud"
       }

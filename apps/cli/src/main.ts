@@ -27,6 +27,7 @@ import { whoamiCommand as defaultWhoamiCommand } from "./whoami-command.js";
 import { appendCommonAuthOptions, CliInputError, ensureNoExtraPositionals, expectNoUnknownOptions, parseArgv, readBooleanOption, readIntegerOption, readLimitOption, readStringOption, requirePositional } from "./argv-helpers.js";
 import { handleAlertCommand, handleBillingCommand, handleCapturePolicyCommand, handleGithubCommand, handleMemberCommand, handleProbeCommand, handleProjectCommand, handleTokenCommand, handleWebhookCommand, handleWeeklyReportCommand, type ManagementCommandDependencies } from "./management-command-handlers.js";
 import type { CliCommandResult } from "./token-commands.js";
+import { CapturePresetSchema } from "../../../packages/shared-types/src/index.js";
 
 export type CliDependencies = ManagementCommandDependencies & {
   analyzeCommand?: typeof defaultAnalyzeCommand;
@@ -187,11 +188,19 @@ export async function runCli(argv: string[], dependencies: CliDependencies = {})
     }
 
     if (command === "process") {
-      expectNoUnknownOptions(parsedArgv, ["json"]);
+      expectNoUnknownOptions(parsedArgv, ["json", "preset"]);
       ensureNoExtraPositionals(parsedArgv, 1);
 
       const json = readBooleanOption(parsedArgv, "json");
-      return await (dependencies.processCommand ?? defaultProcessCommand)(json === true ? { json: true } : {});
+      const preset = readStringOption(parsedArgv, "preset");
+      if (preset !== undefined && !CapturePresetSchema.safeParse(preset).success) {
+        throw new CliInputError("Invalid value for --preset.");
+      }
+
+      return await (dependencies.processCommand ?? defaultProcessCommand)({
+        ...(json === true ? { json: true } : {}),
+        ...(preset !== undefined ? { preset: preset as "minimal" | "balanced" | "investigative" } : {})
+      });
     }
 
     if (command === "clean") {

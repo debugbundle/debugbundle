@@ -642,7 +642,13 @@ export {
   type CapturePolicyUpdate,
   PRESET_DEFAULTS,
   DEFAULT_PRESET_BY_TIER,
+  RequestSignalClassificationValues,
+  RequestSignalClassificationSchema,
+  type RequestSignalClassification,
   resolvePolicy,
   getDefaultPreset,
+  classifyRequestStatus,
+  isImmediateRequestIncident,
+  getRequestAnomalyThreshold,
   shouldCaptureEvent,
 } from "./capture-policy.js";

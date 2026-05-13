@@ -18,6 +18,7 @@ import {
   type IncidentRecord,
   type ProjectRecord
 } from "../lib/api.js";
+import { formatIncidentMatchedFields } from "../lib/incident-copy.js";
 import { showErrorToast, showInfoToast, showSuccessToast } from "../lib/notify.js";
 import { useCursorPagination } from "../lib/use-cursor-pagination.js";
 
@@ -360,7 +361,9 @@ export function IncidentTable({
               <Link to={`/projects/${incident.project_id}/incidents/${incident.incident_id}`} className="font-medium text-foreground hover:underline">
                 {incident.title}
               </Link>
-              <p className="mt-1 text-xs text-muted-foreground whitespace-normal break-words">{incident.matched_fields.join(", ")}</p>
+              <p className="mt-1 text-xs text-muted-foreground whitespace-normal break-words">
+                {formatIncidentMatchedFields(incident.matched_fields)}
+              </p>
             </TableCell>
             <TableCell className="text-sm text-muted-foreground whitespace-normal break-words align-middle">
               {formatServiceName(incident.service_name)}

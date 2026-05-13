@@ -6,7 +6,7 @@ export const CLI_USAGE_LINES = [
   '  debugbundle connect [--auth-file <path>] [--json]',
   '  debugbundle ingest <file> --format <debugbundle-ndjson|php-error|apache-error> [--json]',
   '  debugbundle watch [--cloud] --log <file> --format <debugbundle-ndjson|php-error|apache-error> [--json]',
-  '  debugbundle process [--json]',
+  '  debugbundle process [--preset <minimal|balanced|investigative>] [--json]',
   '  debugbundle clean [--events] [--bundles] [--all] [--older-than <Nd>] [--json]',
   '  debugbundle validate [--fix] [--json]',
   '  debugbundle verify local [--json]',

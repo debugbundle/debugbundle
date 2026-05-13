@@ -88,6 +88,10 @@ describe("web app — management routes", () => {
 
   it("shows incident inventory from the signed-in incidents route and exposes the sidebar entry", async () => {
     const user = userEvent.setup();
+    const anomalyIncident = createIncident({
+      title: "Request anomaly: GET /checkout/:orderId returned 404 repeatedly",
+      matched_fields: ["request_anomaly", "route_template", "http_method", "http_status"]
+    });
     const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
       const url = requestUrl(input);
 
@@ -99,7 +103,7 @@ describe("web app — management routes", () => {
 
       if (url.endsWith("/v1/incidents?limit=20&status=open") && init?.method === undefined) {
         return jsonResponse(200, {
-          incidents: [createIncident()],
+          incidents: [anomalyIncident],
           next_cursor: null
         });
       }
@@ -132,13 +136,17 @@ describe("web app — management routes", () => {
     expect(await screen.findByRole("heading", { name: /incidents/i, level: 1 })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /incidents/i })).toHaveAttribute("href", "/incidents");
     expect(screen.getByRole("combobox", { name: /status/i })).toHaveValue("open");
-    expect(await screen.findByText(/typeerror in checkout handler/i)).toBeInTheDocument();
+    expect(await screen.findByText(/request anomaly: get \/checkout\/:orderid returned 404 repeatedly/i)).toBeInTheDocument();
     expect(screen.queryByText(/database timeout during signin/i)).toBeNull();
     expect((await screen.findAllByRole("link", { name: /main app/i })).length).toBeGreaterThan(0);
     expect((await screen.findAllByText(/^checkout-api$/i)).length).toBeGreaterThan(0);
     expect(screen.queryByText(/^proj_123$/i)).toBeNull();
     expect(screen.queryByText(/^svc_123$/i)).toBeNull();
     expect(screen.getByText(/^high$/i)).toBeInTheDocument();
+    expect(
+      screen.getByText("Request anomaly threshold crossed. Grouped by route template, HTTP method, and HTTP status.")
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/request_anomaly, route_template, http_method, http_status/i)).toBeNull();
     const incidentTable = screen.getByRole("table");
     expect(within(incidentTable).getByText(/^open$/i)).toBeInTheDocument();
     expect(screen.getByText(/7 occurrences/i)).toBeInTheDocument();
@@ -2851,7 +2859,10 @@ describe("web app — management routes", () => {
       }).length
     ).toBe(1);
 
-    resolveRefreshSession?.(new Response(JSON.stringify({ session: createSession({ organization_plan: "team" }) }), { status: 200 }));
+    expect(resolveRefreshSession).not.toBeNull();
+    resolveRefreshSession!(
+      new Response(JSON.stringify({ session: createSession({ organization_plan: "team" }) }), { status: 200 })
+    );
 
     await waitFor(() => {
       expect(screen.getByText(/^team$/i)).toBeInTheDocument();
@@ -3405,6 +3416,146 @@ describe("web app — management routes", () => {
     expect(await screen.findByText(/^1 active project$/i)).toBeInTheDocument();
     expect(await screen.findByText(/1 member and 1 pending invite/i)).toBeInTheDocument();
     expect(await screen.findByText(/solo plan with 1 active project and 1 allowance unit/i)).toBeInTheDocument();
+  });
+
+  it("shows every project incident empty state when the scoped status filter changes", async () => {
+    const user = userEvent.setup();
+    const project = createProject();
+
+    const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = requestUrl(input);
+
+      if (url.endsWith("/v1/auth/session")) {
+        return jsonResponse(200, { session: createSession() });
+      }
+
+      if (url.endsWith("/v1/projects") && init?.method === undefined) {
+        return jsonResponse(200, { projects: [project] });
+      }
+
+      if (url.includes(`/v1/incidents?project_id=${project.project_id}&limit=20`)) {
+        return jsonResponse(200, { incidents: [], next_cursor: null });
+      }
+
+      return jsonResponse(404, { error: "not_found" });
+    });
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<App initialEntries={[`/projects/${project.project_id}/incidents`]} />);
+
+    const statusFilter = await screen.findByRole("combobox", { name: /status/i });
+    expect(await screen.findByText(/no open incidents for this project/i)).toBeInTheDocument();
+
+    await user.selectOptions(statusFilter, "resolved");
+    expect(await screen.findByText(/no resolved incidents for this project/i)).toBeInTheDocument();
+
+    await user.selectOptions(statusFilter, "regressed");
+    expect(await screen.findByText(/no regressed incidents for this project/i)).toBeInTheDocument();
+
+    await user.selectOptions(statusFilter, "all");
+    expect(await screen.findByText(/no incidents for this project/i)).toBeInTheDocument();
+  });
+
+  it("shows every project bundle empty state when the scoped status filter changes", async () => {
+    const user = userEvent.setup();
+    const project = createProject();
+
+    const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = requestUrl(input);
+
+      if (url.endsWith("/v1/auth/session")) {
+        return jsonResponse(200, { session: createSession() });
+      }
+
+      if (url.endsWith("/v1/projects") && init?.method === undefined) {
+        return jsonResponse(200, { projects: [project] });
+      }
+
+      if (url.includes(`/v1/incidents?project_id=${project.project_id}&limit=20`)) {
+        return jsonResponse(200, { incidents: [], next_cursor: null });
+      }
+
+      return jsonResponse(404, { error: "not_found" });
+    });
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<App initialEntries={[`/projects/${project.project_id}/bundles`]} />);
+
+    const statusFilter = await screen.findByRole("combobox", { name: /status/i });
+    expect(await screen.findByText(/no bundles for open incidents/i)).toBeInTheDocument();
+
+    await user.selectOptions(statusFilter, "resolved");
+    expect(await screen.findByText(/no bundles for resolved incidents/i)).toBeInTheDocument();
+
+    await user.selectOptions(statusFilter, "regressed");
+    expect(await screen.findByText(/no bundles for regressed incidents/i)).toBeInTheDocument();
+
+    await user.selectOptions(statusFilter, "all");
+    expect(await screen.findByText(/no bundles available/i)).toBeInTheDocument();
+  });
+
+  it("does not download a bundle artifact when the bundle is pending, failed, or unavailable", async () => {
+    const user = userEvent.setup();
+    const project = createProject();
+    const incident = createIncident({ project_id: project.project_id });
+    const createObjectUrlMock = vi.fn(() => "blob:test-url");
+    const revokeObjectUrlMock = vi.fn();
+    let bundleAttempt = 0;
+
+    vi.stubGlobal("URL", {
+      createObjectURL: createObjectUrlMock,
+      revokeObjectURL: revokeObjectUrlMock
+    });
+
+    const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = requestUrl(input);
+
+      if (url.endsWith("/v1/auth/session")) {
+        return jsonResponse(200, { session: createSession() });
+      }
+
+      if (url.endsWith("/v1/projects") && init?.method === undefined) {
+        return jsonResponse(200, { projects: [project] });
+      }
+
+      if (url.includes(`/v1/incidents?project_id=${project.project_id}&limit=20&status=open`)) {
+        return jsonResponse(200, { incidents: [incident], next_cursor: null });
+      }
+
+      if (url.endsWith(`/v1/incidents/${incident.incident_id}/bundle`)) {
+        bundleAttempt += 1;
+        if (bundleAttempt === 1) {
+          return jsonResponse(200, { status: "pending" });
+        }
+        if (bundleAttempt === 2) {
+          return jsonResponse(200, { status: "failed" });
+        }
+        return Promise.reject(new Error("network_down"));
+      }
+
+      return jsonResponse(404, { error: "not_found" });
+    });
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<App initialEntries={[`/projects/${project.project_id}/bundles`]} />);
+
+    const incidentRow = (await screen.findByRole("link", { name: /typeerror in checkout handler/i })).closest("tr");
+    expect(incidentRow).not.toBeNull();
+    const rowButtons = within(incidentRow as HTMLTableRowElement).getAllByRole("button");
+    expect(rowButtons.length).toBeGreaterThan(0);
+
+    await user.click(rowButtons[0] as HTMLButtonElement);
+    await user.click(rowButtons[0] as HTMLButtonElement);
+    await user.click(rowButtons[0] as HTMLButtonElement);
+
+    await waitFor(() => {
+      expect(bundleAttempt).toBe(3);
+    });
+    expect(createObjectUrlMock).not.toHaveBeenCalled();
+    expect(revokeObjectUrlMock).not.toHaveBeenCalled();
   });
 
 });

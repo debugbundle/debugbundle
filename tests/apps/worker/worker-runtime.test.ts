@@ -32,6 +32,7 @@ const {
   processNextDeliverGitHubDispatchJobMock,
   processNextGenerateWeeklyReportJobMock,
   frequencyCounterCloseMock,
+  requestAnomalyCounterCloseMock,
   createPostgresBillingStoreMock,
   createPostgresMetadataStoreMock,
   createPostgresRetentionStoreMock,
@@ -59,6 +60,7 @@ const {
   processNextDeliverGitHubDispatchJobMock: vi.fn(),
   processNextGenerateWeeklyReportJobMock: vi.fn(),
   frequencyCounterCloseMock: vi.fn().mockResolvedValue(undefined),
+  requestAnomalyCounterCloseMock: vi.fn().mockResolvedValue(undefined),
   createPostgresBillingStoreMock: vi.fn().mockReturnValue({
     getBillingSummaryForProject: vi.fn().mockResolvedValue(null)
   }),
@@ -166,6 +168,10 @@ vi.mock("../../../packages/storage/src/index.js", () => ({
   createRedisIncidentFrequencyCounter: vi.fn().mockReturnValue({
     recordOccurrence: vi.fn(),
     close: frequencyCounterCloseMock
+  }),
+  createRedisRequestAnomalyCounter: vi.fn().mockReturnValue({
+    recordObservation: vi.fn(),
+    close: requestAnomalyCounterCloseMock
   }),
   createPostgresBillingStore: createPostgresBillingStoreMock,
   createPostgresMetadataStore: createPostgresMetadataStoreMock,
@@ -313,6 +319,7 @@ describe("worker runtime", () => {
     processNextGenerateWeeklyReportJobMock.mockResolvedValue({ processed: false, reason: "no_jobs" });
     processNextCleanupRetentionJobMock.mockResolvedValue({ processed: false, reason: "no_jobs" });
     frequencyCounterCloseMock.mockClear();
+    requestAnomalyCounterCloseMock.mockClear();
     createPostgresBillingStoreMock.mockClear();
     createPostgresMetadataStoreMock.mockClear();
     createPostgresRetentionStoreMock.mockClear();
@@ -451,6 +458,7 @@ describe("worker runtime", () => {
     expect(processNextBuildReproductionJobMock).not.toHaveBeenCalled();
     expect(processNextDeliverWebhookJobMock).not.toHaveBeenCalled();
     expect(frequencyCounterCloseMock).toHaveBeenCalledOnce();
+    expect(requestAnomalyCounterCloseMock).toHaveBeenCalledOnce();
     expect(queueCloseMock).toHaveBeenCalledOnce();
     expect(poolEndMock).toHaveBeenCalledTimes(2);
   });
@@ -956,6 +964,7 @@ describe("worker runtime", () => {
     // With WORKER_RUN_ONCE it completes normally after the failed iteration.
     await runWorkerFromEnv({ WORKER_RUN_ONCE: "1" });
     expect(frequencyCounterCloseMock).toHaveBeenCalledOnce();
+    expect(requestAnomalyCounterCloseMock).toHaveBeenCalledOnce();
     expect(queueCloseMock).toHaveBeenCalledOnce();
     expect(poolEndMock).toHaveBeenCalledTimes(2);
   });

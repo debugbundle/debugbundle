@@ -1,7 +1,7 @@
 export type IncidentReasonKind =
   | "backend_exception"
   | "frontend_exception"
-  | "request_failure_5xx"
+  | "request_failure"
   | "error_log";
 
 export interface IncidentReason extends Record<string, unknown> {
@@ -26,6 +26,7 @@ export function deriveIncidentReasonFromSignal(input: {
   event_class?: string | null;
   level?: string | null;
   response_status?: number | null;
+  request_anomaly?: boolean;
 }): IncidentReason | null {
   if (input.event_class !== undefined && input.event_class !== null && input.event_class !== "incident_signal") {
     return null;
@@ -53,16 +54,23 @@ export function deriveIncidentReasonFromSignal(input: {
     case "request_event": {
       const responseStatus =
         typeof input.response_status === "number" && Number.isFinite(input.response_status) ? input.response_status : null;
+      const isRequestAnomaly = input.request_anomaly === true;
 
       return {
-        kind: "request_failure_5xx",
+        kind: "request_failure",
         description:
-          responseStatus !== null && responseStatus >= 500
-            ? `request_event response_status=${responseStatus} matched the 5xx request incident rule`
-            : "request_event matched the 5xx request incident rule",
+          isRequestAnomaly
+            ? responseStatus !== null
+              ? `request_event response_status=${responseStatus} crossed the repeated request anomaly threshold`
+              : "request_event crossed the repeated request anomaly threshold"
+            : responseStatus !== null
+              ? `request_event response_status=${responseStatus} matched the immediate request failure incident rule`
+              : "request_event matched the immediate request failure incident rule",
         event_type: "request_event",
         event_class: "incident_signal",
-        matched_policy: "5xx request failures bypass capture_request_events suppression"
+        matched_policy: isRequestAnomaly
+          ? "Repeated contextual request failures crossed the request anomaly threshold"
+          : "Immediate request failure statuses bypass capture_request_events suppression"
       };
     }
 

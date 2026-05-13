@@ -187,7 +187,9 @@ export function registerIngestionRoutes(app: FastifyInstance, dependencies: ApiD
 
     let accepted = 0;
     for (const { event } of capturedEvents) {
-      await dependencies.ingestionPersistence.persistAndEnqueue(event, project.project_id);
+      await dependencies.ingestionPersistence.persistAndEnqueue(event, project.project_id, {
+        capturePreset: capturePolicy.preset
+      });
       accepted += 1;
     }
 

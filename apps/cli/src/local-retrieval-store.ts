@@ -2,7 +2,11 @@ import { readFile as readFileFromFs, writeFile as writeFileToFs } from "node:fs/
 import { join } from "node:path";
 
 import { RetrievalApiError } from "../../../packages/retrieval-client/src/index.js";
-import { deriveIncidentReasonFromSourceEventTypes, type IncidentReason } from "../../../packages/storage/src/index.js";
+import {
+  deriveIncidentReasonFromSignal,
+  deriveIncidentReasonFromSourceEventTypes,
+  type IncidentReason
+} from "../../../packages/storage/src/index.js";
 import { isRecord, resolveWorkspacePath } from "./cli-fs-helpers.js";
 
 type FileReader = (path: string, encoding: BufferEncoding) => Promise<string>;
@@ -134,7 +138,13 @@ function parseLocalIncident(candidate: unknown): LocalIncidentRecord {
 
   const serviceRuntime = candidate["service_runtime"];
   const serviceFramework = candidate["service_framework"];
-  const incidentReason = deriveIncidentReasonFromSourceEventTypes(candidate["source_event_types"]);
+  const incidentReason = candidate["matched_fields"].includes("request_anomaly")
+    ? deriveIncidentReasonFromSignal({
+        event_type: "request_event",
+        event_class: "incident_signal",
+        request_anomaly: true
+      })
+    : deriveIncidentReasonFromSourceEventTypes(candidate["source_event_types"]);
   if (serviceRuntime !== null && typeof serviceRuntime !== "string") {
     throw createReadError(400, "invalid_local_state");
   }

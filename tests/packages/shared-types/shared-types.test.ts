@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
   BundleV1Schema,
@@ -7,6 +7,10 @@ import {
   createEventEnvelope,
   type EventEnvelope
 } from "../../../packages/shared-types/src/index.js";
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+});
 
 // ---------------------------------------------------------------------------
 // Minimal valid bundle fixture
@@ -297,6 +301,57 @@ describe("shared-types event envelope", () => {
     if (parsed.event_type === "frontend_exception") {
       expect(parsed.payload.breadcrumbs).toHaveLength(1);
     }
+  });
+
+  it("should use crypto.randomUUID when createEventEnvelope generates an event id", (): void => {
+    vi.stubGlobal("crypto", {
+      randomUUID: () => "11111111-2222-4333-8444-555555555555"
+    });
+
+    const envelope = createEventEnvelope({
+      event_type: "log_event",
+      service: {
+        name: "checkout-api",
+        environment: "production"
+      },
+      payload: {
+        level: "error",
+        message: "boom",
+        attributes: {}
+      }
+    });
+
+    expect(envelope.event_id).toBe("11111111-2222-4333-8444-555555555555");
+    expect(envelope.correlation).toEqual({
+      request_id: null,
+      trace_id: null,
+      session_id: null,
+      user_id_hash: null
+    });
+  });
+
+  it("should fall back to crypto.getRandomValues when randomUUID is unavailable", (): void => {
+    vi.stubGlobal("crypto", {
+      getRandomValues: (array: Uint8Array) => {
+        array.set([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]);
+        return array;
+      }
+    });
+
+    const envelope = createEventEnvelope({
+      event_type: "log_event",
+      service: {
+        name: "checkout-api",
+        environment: "production"
+      },
+      payload: {
+        level: "warning",
+        message: "fallback",
+        attributes: {}
+      }
+    });
+
+    expect(envelope.event_id).toBe("00010203-0405-4607-8809-0a0b0c0d0e0f");
   });
 });
 

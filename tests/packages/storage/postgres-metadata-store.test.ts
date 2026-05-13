@@ -639,6 +639,50 @@ describe("postgres metadata store", () => {
     expect(listProjectsCall!.sql).toContain("COALESCE(o.plan, 'free') AS organization_plan");
   });
 
+  it("normalizes empty project metrics when the alert deliveries table exists", async (): Promise<void> => {
+    const query = vi.fn().mockImplementation((sql: string) => {
+      if (sql.includes("information_schema.tables")) {
+        return { rows: [{ exists: "t" }] };
+      }
+
+      return {
+        rows: [
+          {
+            project_id: "proj_123",
+            organization_id: "org_123",
+            name: "Main App",
+            slug: "main-app",
+            environment_default: "production",
+            organization_plan: "solo",
+            metrics: null,
+            created_at: "2026-03-16T00:00:00.000Z",
+            updated_at: "2026-03-16T00:00:00.000Z"
+          }
+        ]
+      };
+    });
+    const store = createPostgresMetadataStore({ query });
+
+    const projects = await store.listProjectsForOrganization({
+      organization_id: "org_123",
+      now: "2026-03-19T00:00:00.000Z",
+      limit: 10
+    });
+
+    expect(projects).toEqual([
+      expect.objectContaining({
+        project_id: "proj_123",
+        organization_plan: "solo",
+        metrics: {
+          monthly_bundle_requests: 0,
+          monthly_raw_ingested_events: 0,
+          retained_bundles: 0,
+          monthly_alert_deliveries: 0
+        }
+      })
+    ]);
+  });
+
   it("should source project plans from the organization plan across project record mutations", async (): Promise<void> => {
     const calls: string[] = [];
     const query = vi.fn().mockImplementation((sql: string) => {
@@ -1135,6 +1179,60 @@ describe("postgres metadata store", () => {
     expect(created).toBeNull();
   });
 
+  it("omits optional alert update fields when they are not provided", async (): Promise<void> => {
+    const query = vi.fn().mockResolvedValueOnce({
+      rows: [
+        {
+          alert_id: "alt_456",
+          project_id: "proj_123",
+          service_id: null,
+          channel: "email",
+          condition_type: "new_incident",
+          severity_min: null,
+          config: {},
+          is_enabled: true,
+          created_at: "2026-03-15T00:00:00.000Z",
+          updated_at: "2026-03-15T00:10:00.000Z"
+        }
+      ]
+    });
+    const store = createPostgresMetadataStore({ query });
+
+    const updated = await store.updateAlertForOrganization({
+      organization_id: "org_123",
+      alert_id: "alt_456",
+      channel: "email",
+      condition_type: "new_incident",
+      is_enabled: true
+    });
+
+    expect(updated).toEqual({
+      alert_id: "alt_456",
+      project_id: "proj_123",
+      service_id: null,
+      channel: "email",
+      condition_type: "new_incident",
+      severity_min: null,
+      config: {},
+      is_enabled: true,
+      created_at: "2026-03-15T00:00:00.000Z",
+      updated_at: "2026-03-15T00:10:00.000Z"
+    });
+    expect(query).toHaveBeenCalledWith(expect.any(String), [
+      "alt_456",
+      "org_123",
+      false,
+      null,
+      "email",
+      "new_incident",
+      false,
+      null,
+      false,
+      null,
+      true
+    ]);
+  });
+
   it("should list and create scoped project tokens", async (): Promise<void> => {
     const query = vi
       .fn()
@@ -1458,6 +1556,25 @@ describe("postgres metadata store", () => {
       }
     ]);
     expect(query).toHaveBeenCalledWith(expect.any(String), ["proj_123", "2026-03-11T00:00:00.000Z"]);
+  });
+
+  it("falls back to the free plan when a scoped probe query returns an unknown organization plan", async (): Promise<void> => {
+    const query = vi
+      .fn()
+      .mockResolvedValueOnce({ rows: [{ id: "proj_123", organization_plan: "enterprise" }] })
+      .mockResolvedValueOnce({ rows: [] });
+    const store = createPostgresMetadataStore({ query });
+
+    const listed = await store.listActiveProbesForProjectInOrganization({
+      organization_id: "org_123",
+      project_id: "proj_123",
+      now: "2026-03-11T00:00:00.000Z"
+    });
+
+    expect(listed).toEqual({
+      organization_plan: "free",
+      activations: []
+    });
   });
 
   it("should handle out-of-scope and insert-failure probe activation branches", async (): Promise<void> => {
@@ -1888,6 +2005,82 @@ describe("postgres metadata store", () => {
     expect(marked).toBe(false);
   });
 
+  it("records retained incident events and reports demoted references", async (): Promise<void> => {
+    const query = vi
+      .fn()
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [{ max_rank: 1 }] })
+      .mockResolvedValueOnce({ rows: [{ event_id: "evt_latest_old", occurred_at: "2026-03-09T00:00:00.000Z", is_sampled: false }] })
+      .mockResolvedValueOnce({ rows: [{ event_id: "evt_high_old", occurred_at: "2026-03-08T00:00:00.000Z", is_sampled: false }] })
+      .mockResolvedValueOnce({ rows: [{ is_sampled: true }] })
+      .mockResolvedValueOnce({ rows: [] });
+
+    const store = createPostgresMetadataStore({ query });
+
+    const result = await store.recordIncidentEventRetention({
+      incident_id: "inc_123",
+      event_id: "evt_new",
+      event_type: "deploy_metadata",
+      occurred_at: "2026-03-10T00:00:00.000Z",
+      occurrence_count: 1,
+      severity: "critical",
+      level: null
+    });
+
+    expect(result).toEqual({
+      is_sampled: true,
+      demoted_event_references: [
+        { event_id: "evt_high_old", occurred_at: "2026-03-08T00:00:00.000Z" },
+        { event_id: "evt_latest_old", occurred_at: "2026-03-09T00:00:00.000Z" }
+      ]
+    });
+    expect(query.mock.calls.map(([sql]) => String(sql))).toContain("COMMIT");
+  });
+
+  it("rolls back incident retention when persistence fails", async (): Promise<void> => {
+    const query = vi.fn().mockImplementation(async (sql: string) => {
+      if (sql === "BEGIN") {
+        return { rows: [] };
+      }
+      if (sql.includes("FROM incidents i") && sql.includes("JOIN deployments d")) {
+        return { rows: [] };
+      }
+      if (sql.includes("SELECT MAX(severity_rank)")) {
+        return { rows: [{ max_rank: null }] };
+      }
+      if (sql.includes("retain_latest = false")) {
+        return { rows: [] };
+      }
+      if (sql.includes("retain_highest_severity = false")) {
+        return { rows: [] };
+      }
+      if (sql.includes("INSERT INTO incident_events")) {
+        throw new Error("insert_failed");
+      }
+      if (sql === "ROLLBACK") {
+        return { rows: [] };
+      }
+
+      throw new Error(`unexpected_sql:${sql.slice(0, 40)}`);
+    });
+
+    const store = createPostgresMetadataStore({ query });
+
+    await expect(
+      store.recordIncidentEventRetention({
+        incident_id: "inc_123",
+        event_id: "evt_new",
+        event_type: "backend_exception",
+        occurred_at: "2026-03-10T00:00:00.000Z",
+        occurrence_count: 2,
+        severity: "medium",
+        level: "error"
+      })
+    ).rejects.toThrow("insert_failed");
+
+    expect(query.mock.calls.map(([sql]) => String(sql))).toContain("ROLLBACK");
+  });
+
   it("should list and fetch organization-scoped incidents", async (): Promise<void> => {
     const query = vi
       .fn()
@@ -1996,15 +2189,114 @@ describe("postgres metadata store", () => {
       expect.objectContaining({
         incident_id: "inc_5xx",
         incident_reason: {
-          kind: "request_failure_5xx",
-          description: "request_event matched the 5xx request incident rule",
+          kind: "request_failure",
+          description: "request_event matched the immediate request failure incident rule",
           event_type: "request_event",
           event_class: "incident_signal",
-          matched_policy: "5xx request failures bypass capture_request_events suppression"
+          matched_policy: "Immediate request failure statuses bypass capture_request_events suppression"
         }
       })
     ]);
     expect(query).toHaveBeenCalledWith(expect.stringContaining("FROM incident_events ie"), ["org_123", 20]);
+  });
+
+  it("should derive incident_reason for request anomaly incidents from matched_fields when no primary incident-signal row exists", async (): Promise<void> => {
+    const query = vi.fn().mockResolvedValue({
+      rows: [
+        {
+          incident_id: "inc_request_anomaly",
+          project_id: "proj_123",
+          project_name: "Main App",
+          service_id: "svc_123",
+          service_name: "checkout-api",
+          latest_deployment_id: null,
+          environment: "production",
+          fingerprint: "fp_request_anomaly",
+          fingerprint_version: "v1",
+          title: "Request anomaly: GET /checkout/:orderId returned 404 repeatedly",
+          severity: "medium",
+          status: "open",
+          first_seen_at: "2026-03-10T00:00:00.000Z",
+          last_seen_at: "2026-03-10T00:10:00.000Z",
+          occurrence_count: 24,
+          spike_detected_at: null,
+          resolved_at: null,
+          regressed_at: null,
+          matched_fields: ["request_anomaly", "route_template", "http_method", "http_status"],
+          incident_reason_event_type: null,
+          incident_reason_event_class: null,
+          incident_reason_level: null
+        }
+      ]
+    });
+
+    const store = createPostgresMetadataStore({ query });
+
+    const listed = await store.listIncidentsForOrganization({
+      organization_id: "org_123",
+      limit: 20
+    });
+
+    expect(listed).toEqual([
+      expect.objectContaining({
+        incident_id: "inc_request_anomaly",
+        incident_reason: {
+          kind: "request_failure",
+          description: "request_event crossed the repeated request anomaly threshold",
+          event_type: "request_event",
+          event_class: "incident_signal",
+          matched_policy: "Repeated contextual request failures crossed the request anomaly threshold"
+        }
+      })
+    ]);
+  });
+
+  it("preserves the primary incident reason when request_anomaly metadata exists alongside a backend exception", async (): Promise<void> => {
+    const query = vi.fn().mockResolvedValue({
+      rows: [
+        {
+          incident_id: "inc_backend_primary",
+          project_id: "proj_123",
+          project_name: "Main App",
+          service_id: "svc_123",
+          service_name: "checkout-api",
+          latest_deployment_id: null,
+          environment: "production",
+          fingerprint: "fp_backend_primary",
+          fingerprint_version: "v1",
+          title: "TypeError in checkout handler",
+          severity: "high",
+          status: "open",
+          first_seen_at: "2026-03-10T00:00:00.000Z",
+          last_seen_at: "2026-03-10T00:10:00.000Z",
+          occurrence_count: 3,
+          spike_detected_at: null,
+          resolved_at: undefined,
+          regressed_at: null,
+          matched_fields: ["request_anomaly", "message"],
+          incident_reason_event_type: "backend_exception",
+          incident_reason_event_class: "incident_signal",
+          incident_reason_level: null
+        }
+      ]
+    });
+
+    const store = createPostgresMetadataStore({ query });
+
+    const listed = await store.listIncidentsForOrganization({
+      organization_id: "org_123",
+      limit: 20
+    });
+
+    expect(listed).toEqual([
+      expect.objectContaining({
+        incident_id: "inc_backend_primary",
+        incident_reason: expect.objectContaining({
+          event_type: "backend_exception"
+        })
+      })
+    ]);
+    expect(listed[0]).not.toHaveProperty("resolved_at");
   });
 
   it("should list organization-scoped services for a project", async (): Promise<void> => {

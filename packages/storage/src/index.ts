@@ -36,6 +36,7 @@ export { createPostgresWeeklyReportDeliveryStore } from "./weekly-report-deliver
 export { createPostgresWebhookDeliveryStore } from "./webhook-delivery-store.js";
 export { createRedisAuthRateLimiter } from "./auth-rate-limiter.js";
 export { createRedisIncidentFrequencyCounter } from "./frequency-counter.js";
+export { createRedisRequestAnomalyCounter } from "./frequency-counter.js";
 export { createRedisIngestionRateLimiter } from "./ingestion-rate-limiter.js";
 export { createIngestionMetadataService, createMemberAuthService, createIngestionPersistenceService } from "./ingestion-services.js";
 export { createS3ObjectStoreClient } from "./s3-client.js";

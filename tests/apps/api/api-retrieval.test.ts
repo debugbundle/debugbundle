@@ -128,11 +128,11 @@ describe("api retrieval routes", () => {
       regressed_at: null,
       matched_fields: ["route_template"],
       incident_reason: {
-        kind: "request_failure_5xx" as const,
-        description: "request_event matched the 5xx request incident rule",
+        kind: "request_failure" as const,
+        description: "request_event matched the immediate request failure incident rule",
         event_type: "request_event" as const,
         event_class: "incident_signal" as const,
-        matched_policy: "5xx request failures bypass capture_request_events suppression"
+        matched_policy: "Immediate request failure statuses bypass capture_request_events suppression"
       }
     };
 
@@ -241,10 +241,10 @@ describe("api retrieval routes", () => {
       incident: incidentRecord,
       incident_reason: incidentRecord.incident_reason,
       primary_signal: {
-        kind: "request_failure_5xx",
+        kind: "request_failure",
         event_type: "request_event",
         event_class: "incident_signal",
-        description: "request_event matched the 5xx request incident rule",
+        description: "request_event matched the immediate request failure incident rule",
         severity: "high",
         service_name: "checkout-api",
         environment: "production",
@@ -301,7 +301,7 @@ describe("api retrieval routes", () => {
         matched_fields: ["route_template"]
       },
       visibility: {
-        grouping: "Repeated 5xx request failures with the same normalized route template, request method, response status, service, and environment reuse this incident fingerprint. This incident currently groups POST /checkout with matched fields route_template.",
+        grouping: "Repeated request-failure incidents with the same normalized route template, request method, response status, service, and environment reuse this incident fingerprint. This incident currently groups POST /checkout with matched fields route_template.",
         bundle_regeneration: "Bundle status is ready. New incidents create a bundle immediately, while regeneration currently prioritizes regression reopen, then deploy metadata, reproduction-confidence changes, and finally new context updates.",
         spike_detection: "This incident is not currently marked as spiking. Spike detection is evaluated after grouping and only marks an existing incident when short-term frequency has sufficient baseline and exceeds the spike threshold.",
         notification_cooldown: "Webhook and GitHub lifecycle notifications use per-rule cooldown windows to suppress repeated bundle.reopened or incident.spike_detected deliveries for the same incident/event fingerprint."
@@ -312,7 +312,7 @@ describe("api retrieval routes", () => {
         notes: "sensitive headers removed"
       },
       suggested_next_checks: [
-        "Inspect the POST /checkout handler behind this 5xx path.",
+        "Inspect the POST /checkout handler behind this request-failure path.",
         "Start with src/routes/checkout.ts:41 from the first application frame.",
         "Compare this incident against the most recent deploy and recent regressions."
       ]
@@ -759,11 +759,11 @@ describe("api retrieval routes", () => {
           regressed_at: null,
           matched_fields: ["route_template", "http_method", "http_status"],
           incident_reason: {
-            kind: "request_failure_5xx",
-            description: "request_event matched the 5xx request incident rule",
+            kind: "request_failure",
+            description: "request_event matched the immediate request failure incident rule",
             event_type: "request_event",
             event_class: "incident_signal",
-            matched_policy: "5xx request failures bypass capture_request_events suppression"
+            matched_policy: "Immediate request failure statuses bypass capture_request_events suppression"
           }
         }),
         listIncidentLogsForOrganization: vi.fn().mockResolvedValue([]),
@@ -791,11 +791,11 @@ describe("api retrieval routes", () => {
       incident: expect.objectContaining({
         incident_id: "inc_5xx",
         incident_reason: {
-          kind: "request_failure_5xx",
-          description: "request_event matched the 5xx request incident rule",
+          kind: "request_failure",
+          description: "request_event matched the immediate request failure incident rule",
           event_type: "request_event",
           event_class: "incident_signal",
-          matched_policy: "5xx request failures bypass capture_request_events suppression"
+          matched_policy: "Immediate request failure statuses bypass capture_request_events suppression"
         }
       })
     });

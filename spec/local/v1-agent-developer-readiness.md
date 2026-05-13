@@ -24,16 +24,17 @@ The product is V1-ready only if this path is easy for both a human developer and
 
 ## Current Foundation
 
-The foundation is solid after the 5xx incident-signal work:
+The foundation is solid after the preset-aware request-signal work:
 
-- `request_event` with `response_status >= 500` is an `incident_signal`.
-- non-5xx `request_event` remains `context_signal`.
-- ingestion accepts 5xx request failures under every capture preset or override.
+- `request_event` with `response_status >= 500` is an `incident_signal` under every preset.
+- balanced also promotes `408`, `423`, `424`, `425`, and `429`; investigative also promotes `409`.
+- request events outside the preset's immediate set remain `context_signal`, except repeated preset-enabled contextual failures can open request-anomaly incidents without changing their stored event class.
+- ingestion accepts immediate request failures under every capture preset or override, and accepts request-anomaly candidates when the active policy keeps failure context.
 - minimal and balanced capture defaults use `capture_request_events: "failures_only"`.
-- browser SDK first-party 5xx network responses stay as breadcrumbs for timeline context and also emit standalone `request_event` signals.
-- backend SDKs and relays accept and preserve 5xx `request_event` signals even under restrictive capture policy modes.
+- browser SDK first-party immediate request failures stay as breadcrumbs for timeline context and also emit standalone `request_event` signals; balanced/investigative anomaly candidates can also be emitted as contextual `request_event` signals under `failures_only`.
+- backend SDKs and relays accept and preserve immediate request failures even under restrictive capture policy modes, and preserve anomaly candidates when `failures_only` is active.
 - worker grouping skips non-incident signals defensively.
-- specs, data schemas, SDK contracts, and domain invariants now describe the 5xx rule.
+- specs, data schemas, SDK contracts, and domain invariants now describe the preset-aware request-failure and anomaly rules.
 
 This closes the earlier product gap where a handled production 5xx could be user-visible but fail to create an incident.
 
@@ -71,16 +72,16 @@ Current shape:
 ```json
 {
   "incident_reason": {
-    "kind": "request_failure_5xx",
-    "description": "request_event matched the 5xx request incident rule",
+    "kind": "request_failure",
+    "description": "request_event matched the immediate request failure incident rule",
     "event_type": "request_event",
     "event_class": "incident_signal",
-    "matched_policy": "5xx request failures bypass capture_request_events suppression"
+    "matched_policy": "immediate request failures bypass capture_request_events suppression for the active preset"
   }
 }
 ```
 
-Current deterministic kinds are `backend_exception`, `frontend_exception`, `request_failure_5xx`, and `error_log`.
+Current deterministic kinds are `backend_exception`, `frontend_exception`, `request_failure`, and `error_log`.
 
 ### 3. Agent-Friendly One-Call Incident Context (Resolved 2026-05-11)
 
@@ -124,7 +125,7 @@ The public docs now publish a verified V1 SDK parity matrix for Node.js, Browser
 - framework integrations,
 - local file transport support.
 
-The public docs also now make the 5xx incident rule explicit on the SDK landing page and installation path: 5xx request failures remain incident signals across shipped SDKs, and browser first-party 5xx responses also emit standalone `request_event` signals while remaining visible as breadcrumbs.
+The public docs also now make the preset-aware request-signal rule explicit on the SDK landing page and installation path: immediate request failures remain incident signals across shipped SDKs, browser first-party immediate failures emit standalone `request_event` signals while remaining visible as breadcrumbs, and balanced/investigative anomaly candidates can feed contextual request-anomaly detection under `failures_only`.
 
 ### 5. First-Run Privacy Proof (Resolved 2026-05-11)
 
@@ -190,13 +191,13 @@ Before community V1, the developer path should pass this checklist:
 1. A clean project can run `debugbundle setup` successfully.
 2. `debugbundle doctor` reports actionable setup health.
 3. `debugbundle verify local` creates a local incident and bundle.
-4. `debugbundle verify cloud --trigger-5xx` or equivalent creates a hosted 5xx request incident.
+4. `debugbundle verify cloud --trigger-5xx` or equivalent creates a hosted request-failure incident.
 5. `debugbundle incidents` shows the created incident.
 6. `debugbundle inspect <incident-id>` explains status, severity, grouping, and incident reason.
 7. `debugbundle bundle <incident-id>` returns the primary debugging artifact.
 8. `debugbundle reproduce <incident-id>` returns explicit reproduction confidence.
 9. MCP can perform the same retrieval path without relying on undocumented command behavior.
-10. Public docs show the SDK parity matrix and the 5xx incident rule.
+10. Public docs show the SDK parity matrix and preset-aware request-signal rules.
 11. Public docs show what is captured and redacted by default.
 12. Dogfooding proves DebugBundle catches DebugBundle production failures.
 

@@ -2,7 +2,7 @@ import { z } from "zod";
 
 export const IncidentReasonSchema = z
   .object({
-    kind: z.enum(["backend_exception", "frontend_exception", "request_failure_5xx", "error_log"]),
+    kind: z.enum(["backend_exception", "frontend_exception", "request_failure", "error_log"]),
     description: z.string(),
     event_type: z.enum(["backend_exception", "frontend_exception", "request_event", "log_event"]),
     event_class: z.literal("incident_signal"),

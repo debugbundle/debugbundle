@@ -1,7 +1,7 @@
 import { gzipSync } from "node:zlib";
 
 import { FINGERPRINT_VERSION, inferMatchedFields } from "../../event-normalizer/src/index.js";
-import type { EventEnvelope } from "../../shared-types/src/index.js";
+import type { CapturePreset, EventEnvelope } from "../../shared-types/src/index.js";
 import { buildRawEventObjectKey, hashToken, inferEventLogLevel, inferSeverity } from "./helpers.js";
 import type {
   IncidentFrequencyCounter,
@@ -111,7 +111,11 @@ export function createIngestionPersistenceService(
   input: CreateIngestionPersistenceServiceInput
 ): IngestionPersistenceService {
   return {
-    async persistAndEnqueue(event: EventEnvelope, projectId: string): Promise<{ object_key: string }> {
+    async persistAndEnqueue(
+      event: EventEnvelope,
+      projectId: string,
+      options?: { capturePreset?: CapturePreset }
+    ): Promise<{ object_key: string }> {
       const objectKey = buildRawEventObjectKey({
         projectId,
         eventId: event.event_id,
@@ -130,7 +134,8 @@ export function createIngestionPersistenceService(
       await input.queue.enqueue("normalize-events", {
         project_id: projectId,
         event_id: event.event_id,
-        object_key: objectKey
+        object_key: objectKey,
+        ...(options?.capturePreset === undefined ? {} : { capture_preset: options.capturePreset })
       });
 
       return {

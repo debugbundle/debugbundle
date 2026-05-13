@@ -1,7 +1,13 @@
 import { createHash } from "node:crypto";
 
 import { redact, type JsonValue } from "../../redaction/src/index.js";
-import { EventEnvelopeSchema, type EventEnvelope, type EventClass } from "../../shared-types/src/index.js";
+import {
+  EventEnvelopeSchema,
+  classifyRequestStatus,
+  type CapturePreset,
+  type EventEnvelope,
+  type EventClass
+} from "../../shared-types/src/index.js";
 
 export interface NormalizedEvent {
   event_type: EventEnvelope["event_type"];
@@ -237,6 +243,7 @@ export function classifyEvent(
   logLevel?: string,
   probeActivationId?: string | null,
   payload?: Record<string, unknown>,
+  capturePreset: CapturePreset = "minimal",
 ): EventClass {
   switch (eventType) {
     case "backend_exception":
@@ -251,10 +258,7 @@ export function classifyEvent(
 
     case "request_event": {
       const responseStatus = getRequestResponseStatus(payload);
-      if (responseStatus !== null && responseStatus >= 500) {
-        return "incident_signal";
-      }
-      return "context_signal";
+      return classifyRequestStatus({ responseStatus, capturePreset });
     }
 
     case "frontend_breadcrumb":
