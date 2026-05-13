@@ -5,6 +5,7 @@ import {
   createAuthenticatedBillingApi,
   createAuthenticatedAlertApi,
   createAuthenticatedRetrievalApi,
+  createAuthenticatedSlackApi,
   createAuthenticatedTokenManagementApi,
   createAuthenticatedWebhookApi,
   createAuthenticatedWeeklyReportApi,
@@ -347,7 +348,7 @@ describe("cli auth context", () => {
     });
   });
 
-  it("creates authenticated alert, webhook, and weekly report APIs with injected factories", async () => {
+  it("creates authenticated alert, webhook, slack, and weekly report APIs with injected factories", async () => {
     const readAuthState = vi.fn().mockResolvedValue({
       bearer_token: "dbundle_mem_saved",
       base_url: "https://selfhost.debugbundle.test/"
@@ -355,6 +356,7 @@ describe("cli auth context", () => {
     const createHttpClient = vi.fn().mockReturnValue({ request: vi.fn() });
     const createAlertApi = vi.fn().mockReturnValue({ listAlerts: vi.fn().mockResolvedValue([]) });
     const createWebhookApi = vi.fn().mockReturnValue({ listWebhooks: vi.fn().mockResolvedValue([]) });
+    const createSlackApi = vi.fn().mockReturnValue({ listSlackDestinations: vi.fn().mockResolvedValue([]) });
     const createWeeklyReportApi = vi.fn().mockReturnValue({
       listWeeklyReportChannels: vi.fn().mockResolvedValue([])
     });
@@ -377,6 +379,14 @@ describe("cli auth context", () => {
         createApi: createWebhookApi
       }
     );
+    const slackResult = await createAuthenticatedSlackApi(
+      {},
+      {
+        readAuthState,
+        createHttpClient,
+        createApi: createSlackApi
+      }
+    );
     const weeklyReportResult = await createAuthenticatedWeeklyReportApi(
       {},
       {
@@ -388,10 +398,12 @@ describe("cli auth context", () => {
 
     expect(alertResult.authState.base_url).toBe("https://selfhost.debugbundle.test/");
     expect(webhookResult.authState.bearer_token).toBe("dbundle_mem_saved");
+    expect(slackResult.authState.bearer_token).toBe("dbundle_mem_saved");
     expect(weeklyReportResult.authState.bearer_token).toBe("dbundle_mem_saved");
     expect(createHttpClient).toHaveBeenCalledWith({ baseUrl: "https://selfhost.debugbundle.test/" });
     expect(createAlertApi).toHaveBeenCalled();
     expect(createWebhookApi).toHaveBeenCalled();
+    expect(createSlackApi).toHaveBeenCalled();
     expect(createWeeklyReportApi).toHaveBeenCalled();
   });
 

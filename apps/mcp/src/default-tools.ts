@@ -3,6 +3,7 @@ import { createBillingApi } from "../../../packages/billing-client/src/index.js"
 import { createGitHubManagementApi } from "../../../packages/github-client/src/index.js";
 import { createProjectManagementApi } from "../../../packages/project-management-client/src/index.js";
 import { createRetrievalApi } from "../../../packages/retrieval-client/src/index.js";
+import { createSlackApi } from "../../../packages/slack-client/src/index.js";
 import { createTokenManagementApi } from "../../../packages/token-management/src/index.js";
 import { createWebhookApi } from "../../../packages/webhook-client/src/index.js";
 import { createWeeklyReportApi } from "../../../packages/weekly-report-client/src/index.js";
@@ -27,6 +28,7 @@ import { createProjectMcpTools } from "./project-tools.js";
 import { createRetrievalMcpTools } from "./retrieval-tools.js";
 import { createServicesMcpTools } from "./services-tools.js";
 import { createSetupMcpTools } from "./setup-tools.js";
+import { createSlackMcpTools } from "./slack-tools.js";
 import { createTokenMcpTools } from "./token-tools.js";
 import { createWebhookMcpTools } from "./webhook-tools.js";
 import { createWeeklyReportMcpTools } from "./weekly-report-tools.js";
@@ -83,6 +85,7 @@ export async function createDefaultMcpTools(input: { apiBaseUrl?: string } = {})
       ...createServicesMcpTools(retrievalApi),
       ...createTokenMcpTools(createTokenManagementApi(httpClient)),
       ...createWebhookMcpTools(createWebhookApi(httpClient)),
+      ...createSlackMcpTools(createSlackApi(httpClient)),
       ...createWeeklyReportMcpTools(createWeeklyReportApi(httpClient)),
       ...createAlertMcpTools(createAlertApi(httpClient)),
       ...createProjectMcpTools(createProjectManagementApi(httpClient)),

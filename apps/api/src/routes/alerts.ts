@@ -1,9 +1,47 @@
 import type { FastifyInstance } from "fastify";
 
+import { getTierCapabilities } from "../../../../packages/shared-types/src/index.js";
 import type { ApiDependencies } from "../api-types.js";
 import { recordAuditLog, resolveAuditActorType } from "../audit-logging.js";
 import { requireRateLimitedMemberAuth } from "../api-helpers.js";
 import { AlertParamsSchema, AlertsQuerySchema, CreateAlertBodySchema, UpdateAlertBodySchema } from "../schemas.js";
+
+async function ensureScopedSlackDestination(
+  dependencies: ApiDependencies,
+  input: {
+    organization_id: string;
+    channel?: "email" | "slack" | "discord" | "webhook";
+    config?: Record<string, unknown>;
+  }
+): Promise<"ok" | "upgrade_required" | "slack_destination_not_found"> {
+  if (input.channel !== "slack") {
+    return "ok";
+  }
+
+  const slackDestinationId = input.config?.["slack_destination_id"];
+  if (typeof slackDestinationId !== "string") {
+    return "ok";
+  }
+
+  if (dependencies.slackManagement === undefined || dependencies.billingManagement === undefined) {
+    return "slack_destination_not_found";
+  }
+
+  const summary = await dependencies.billingManagement.getBillingSummaryForOrganization({
+    organization_id: input.organization_id,
+    now: new Date().toISOString()
+  });
+  if (summary === null || !getTierCapabilities(summary.plan).slack_integration) {
+    return "upgrade_required";
+  }
+
+  const destination = await dependencies.slackManagement.getSlackDestinationForOrganization({
+    organization_id: input.organization_id,
+    slack_destination_id: slackDestinationId
+  });
+
+  return destination === null ? "slack_destination_not_found" : "ok";
+}
 
 export function registerAlertRoutes(app: FastifyInstance, dependencies: ApiDependencies): void {
   app.get("/v1/alerts", async (request, reply) => {
@@ -45,6 +83,17 @@ export function registerAlertRoutes(app: FastifyInstance, dependencies: ApiDepen
     const parsedBody = CreateAlertBodySchema.safeParse(request.body);
     if (!parsedBody.success) {
       return reply.status(400).send({ error: "invalid_payload" });
+    }
+    const scopedSlackDestination = await ensureScopedSlackDestination(dependencies, {
+      organization_id: member.organization_id,
+      channel: parsedBody.data.channel,
+      config: parsedBody.data.config
+    });
+    if (scopedSlackDestination === "upgrade_required") {
+      return reply.status(403).send({ error: "upgrade_required" });
+    }
+    if (scopedSlackDestination === "slack_destination_not_found") {
+      return reply.status(404).send({ error: "slack_destination_not_found" });
     }
 
     const alertInput: {
@@ -137,6 +186,21 @@ export function registerAlertRoutes(app: FastifyInstance, dependencies: ApiDepen
     const parsedBody = UpdateAlertBodySchema.safeParse(request.body);
     if (!parsedBody.success) {
       return reply.status(400).send({ error: "invalid_payload" });
+    }
+    const updateConfig =
+      "config" in parsedBody.data && parsedBody.data.config !== undefined
+        ? (parsedBody.data.config as Record<string, unknown> | null)
+        : undefined;
+    const scopedSlackDestination = await ensureScopedSlackDestination(dependencies, {
+      organization_id: member.organization_id,
+      ...(parsedBody.data.channel === undefined ? {} : { channel: parsedBody.data.channel }),
+      ...(updateConfig === undefined || updateConfig === null ? {} : { config: updateConfig })
+    });
+    if (scopedSlackDestination === "upgrade_required") {
+      return reply.status(403).send({ error: "upgrade_required" });
+    }
+    if (scopedSlackDestination === "slack_destination_not_found") {
+      return reply.status(404).send({ error: "slack_destination_not_found" });
     }
 
     const updateInput: {

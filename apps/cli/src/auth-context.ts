@@ -38,6 +38,11 @@ import {
   type HttpClient as GitHubManagementHttpClient,
   type HttpResponse as GitHubManagementHttpResponse
 } from "../../../packages/github-client/src/index.js";
+import {
+  createSlackApi,
+  type HttpClient as SlackHttpClient,
+  type HttpResponse as SlackHttpResponse
+} from "../../../packages/slack-client/src/index.js";
 
 import { CliAuthStateError, readCliAuthState } from "./auth-state.js";
 import type { CliAuthState } from "./auth-state.js";
@@ -70,7 +75,8 @@ export function createCliHttpClient(
   WeeklyReportHttpClient &
   ProjectManagementHttpClient &
   BillingHttpClient &
-  GitHubManagementHttpClient {
+  GitHubManagementHttpClient &
+  SlackHttpClient {
   const fetchImpl = dependencies?.fetchImpl ?? fetch;
   const baseUrl = normalizeBaseUrl(input.baseUrl);
 
@@ -85,7 +91,8 @@ export function createCliHttpClient(
         WeeklyReportHttpResponse &
         ProjectManagementHttpResponse &
         BillingHttpResponse &
-        GitHubManagementHttpResponse
+        GitHubManagementHttpResponse &
+        SlackHttpResponse
     > {
       const headers: Record<string, string> = {
         accept: "application/json",
@@ -313,6 +320,41 @@ export async function createAuthenticatedWeeklyReportApi(
     baseUrl: authState.base_url
   });
   const createApi = dependencies?.createApi ?? createWeeklyReportApi;
+
+  return {
+    authState,
+    api: createApi(httpClient)
+  };
+}
+
+export async function createAuthenticatedSlackApi(
+  input: { authFilePath?: string },
+  dependencies?: {
+    readAuthState?: (input: { authFilePath?: string }) => Promise<CliAuthState>;
+    createHttpClient?: (input: { baseUrl: string }) => SlackHttpClient;
+    createApi?: typeof createSlackApi;
+    fetchImpl?: typeof fetch;
+  }
+): Promise<{ authState: CliAuthState; api: ReturnType<typeof createSlackApi> }> {
+  const readAuthState = dependencies?.readAuthState ?? readCliAuthState;
+  const authStateInput: { authFilePath?: string } = {};
+  if (input.authFilePath !== undefined) {
+    authStateInput.authFilePath = input.authFilePath;
+  }
+
+  const authState = await readAuthState(authStateInput);
+  const createHttpClient = dependencies?.createHttpClient ?? ((clientInput: { baseUrl: string }) => {
+    const httpClientDependencies: { fetchImpl?: typeof fetch } = {};
+    if (dependencies?.fetchImpl !== undefined) {
+      httpClientDependencies.fetchImpl = dependencies.fetchImpl;
+    }
+
+    return createCliHttpClient(clientInput, httpClientDependencies);
+  });
+  const httpClient = createHttpClient({
+    baseUrl: authState.base_url
+  });
+  const createApi = dependencies?.createApi ?? createSlackApi;
 
   return {
     authState,

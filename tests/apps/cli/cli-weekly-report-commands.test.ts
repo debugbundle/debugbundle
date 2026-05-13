@@ -220,6 +220,68 @@ describe("cli weekly report commands", () => {
     expect(unknown).toEqual({ exitCode: 1, output: "boom" });
   });
 
+  it("supports connected Slack destination ids for weekly report create and update flows", async (): Promise<void> => {
+    const createApi = {
+      createWeeklyReportChannel: vi.fn().mockResolvedValue({
+        channel_id: "wr_slack",
+        project_id: "proj_1",
+        channel: "slack",
+        config: { slack_destination_id: "sd_123" },
+        schedule: { day_of_week: "thursday", hour_of_day: 8, timezone: "UTC" },
+        is_enabled: true,
+        created_at: "2026-03-15T00:00:00.000Z",
+        updated_at: "2026-03-15T00:00:00.000Z"
+      })
+    };
+    const updateApi = {
+      updateWeeklyReportChannel: vi.fn().mockResolvedValue({
+        channel_id: "wr_slack",
+        project_id: "proj_1",
+        channel: "slack",
+        config: { slack_destination_id: "sd_456" },
+        schedule: { day_of_week: "thursday", hour_of_day: 8, timezone: "UTC" },
+        is_enabled: true,
+        created_at: "2026-03-15T00:00:00.000Z",
+        updated_at: "2026-03-15T01:00:00.000Z"
+      })
+    };
+
+    const created = await createWeeklyReportChannelCommand(
+      {
+        bearerToken: "dbundle_mem_x",
+        projectId: "proj_1",
+        channel: "slack",
+        config: { slackDestinationId: "sd_123" },
+        schedule: { dayOfWeek: "thursday", hourOfDay: 8, timezone: "UTC" },
+        json: true
+      },
+      createApi
+    );
+    const updated = await updateWeeklyReportChannelCommand(
+      {
+        bearerToken: "dbundle_mem_x",
+        channelId: "wr_slack",
+        config: { slackDestinationId: "sd_456" }
+      },
+      updateApi
+    );
+
+    expect(WeeklyReportCreateOutputSchema.parse(JSON.parse(created.output)).channel.channel_id).toBe("wr_slack");
+    expect(updated.output).toContain("Weekly report channel updated: wr_slack");
+    expect(createApi.createWeeklyReportChannel).toHaveBeenCalledWith({
+      bearerToken: "dbundle_mem_x",
+      projectId: "proj_1",
+      channel: "slack",
+      config: { slackDestinationId: "sd_123" },
+      schedule: { dayOfWeek: "thursday", hourOfDay: 8, timezone: "UTC" }
+    });
+    expect(updateApi.updateWeeklyReportChannel).toHaveBeenCalledWith({
+      bearerToken: "dbundle_mem_x",
+      channelId: "wr_slack",
+      config: { slackDestinationId: "sd_456" }
+    });
+  });
+
   it("loads stored auth state for update/delete wrappers", async (): Promise<void> => {
     const readAuthState = vi.fn().mockResolvedValue({
       bearer_token: "dbundle_mem_saved",

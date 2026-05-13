@@ -81,7 +81,7 @@ export async function createWeeklyReportChannelCommand(
     bearerToken: string;
     projectId: string;
     channel: WeeklyReportChannel;
-    config: { to: string[] } | { webhookUrl: string };
+    config: { to: string[] } | { webhookUrl: string } | { slackDestinationId: string };
     schedule: { dayOfWeek: WeeklyReportDayOfWeek; hourOfDay: number; timezone: string };
     isEnabled?: boolean;
     json?: boolean;
@@ -91,7 +91,7 @@ export async function createWeeklyReportChannelCommand(
       bearerToken: string;
       projectId: string;
       channel: WeeklyReportChannel;
-      config: { to: string[] } | { webhookUrl: string };
+      config: { to: string[] } | { webhookUrl: string } | { slackDestinationId: string };
       schedule: { dayOfWeek: WeeklyReportDayOfWeek; hourOfDay: number; timezone: string };
       isEnabled?: boolean;
     }): Promise<WeeklyReportChannelRecord>;
@@ -121,7 +121,7 @@ export async function createWeeklyReportChannelWithAuthCommand(
     authFilePath?: string;
     projectId: string;
     channel: WeeklyReportChannel;
-    config: { to: string[] } | { webhookUrl: string };
+    config: { to: string[] } | { webhookUrl: string } | { slackDestinationId: string };
     schedule: { dayOfWeek: WeeklyReportDayOfWeek; hourOfDay: number; timezone: string };
     isEnabled?: boolean;
     json?: boolean;
@@ -151,7 +151,7 @@ export async function updateWeeklyReportChannelCommand(
   input: {
     bearerToken: string;
     channelId: string;
-    config?: { to: string[] } | { webhookUrl: string };
+    config?: { to: string[] } | { webhookUrl: string } | { slackDestinationId: string };
     schedule?: { dayOfWeek: WeeklyReportDayOfWeek; hourOfDay: number; timezone: string };
     isEnabled?: boolean;
     json?: boolean;
@@ -160,7 +160,7 @@ export async function updateWeeklyReportChannelCommand(
     updateWeeklyReportChannel(input: {
       bearerToken: string;
       channelId: string;
-      config?: { to: string[] } | { webhookUrl: string };
+      config?: { to: string[] } | { webhookUrl: string } | { slackDestinationId: string };
       schedule?: { dayOfWeek: WeeklyReportDayOfWeek; hourOfDay: number; timezone: string };
       isEnabled?: boolean;
     }): Promise<WeeklyReportChannelRecord>;
@@ -188,7 +188,7 @@ export async function updateWeeklyReportChannelWithAuthCommand(
   input: {
     authFilePath?: string;
     channelId: string;
-    config?: { to: string[] } | { webhookUrl: string };
+    config?: { to: string[] } | { webhookUrl: string } | { slackDestinationId: string };
     schedule?: { dayOfWeek: WeeklyReportDayOfWeek; hourOfDay: number; timezone: string };
     isEnabled?: boolean;
     json?: boolean;

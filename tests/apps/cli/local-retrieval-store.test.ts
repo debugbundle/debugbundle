@@ -117,9 +117,9 @@ describe("local retrieval store", () => {
     const secondPage = await listLocalIncidents(
       {
         projectId: "proj_123",
-        cursor: firstPage.next_cursor ?? undefined,
         status: "all",
-        limit: 1
+        limit: 1,
+        ...(firstPage.next_cursor === null ? {} : { cursor: firstPage.next_cursor })
       },
       { cwd: () => rootDirectory }
     );

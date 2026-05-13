@@ -25,7 +25,7 @@ import { validateCommand as defaultValidateCommand } from "./validate-command.js
 import { verifyCloudCommand as defaultVerifyCloudCommand, verifyLocalCommand as defaultVerifyLocalCommand } from "./verify-command.js";
 import { whoamiCommand as defaultWhoamiCommand } from "./whoami-command.js";
 import { appendCommonAuthOptions, CliInputError, ensureNoExtraPositionals, expectNoUnknownOptions, parseArgv, readBooleanOption, readIntegerOption, readLimitOption, readStringOption, requirePositional } from "./argv-helpers.js";
-import { handleAlertCommand, handleBillingCommand, handleCapturePolicyCommand, handleGithubCommand, handleMemberCommand, handleProbeCommand, handleProjectCommand, handleTokenCommand, handleWebhookCommand, handleWeeklyReportCommand, type ManagementCommandDependencies } from "./management-command-handlers.js";
+import { handleAlertCommand, handleBillingCommand, handleCapturePolicyCommand, handleGithubCommand, handleMemberCommand, handleProbeCommand, handleProjectCommand, handleSlackCommand, handleTokenCommand, handleWebhookCommand, handleWeeklyReportCommand, type ManagementCommandDependencies } from "./management-command-handlers.js";
 import type { CliCommandResult } from "./token-commands.js";
 import { CapturePresetSchema } from "../../../packages/shared-types/src/index.js";
 
@@ -567,6 +567,10 @@ export async function runCli(argv: string[], dependencies: CliDependencies = {})
 
     if (command === "alert") {
       return await handleAlertCommand(parsedArgv, dependencies);
+    }
+
+    if (command === "slack") {
+      return await handleSlackCommand(parsedArgv, dependencies);
     }
 
     if (command === "webhook") {

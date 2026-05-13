@@ -258,6 +258,44 @@ describe("cli main management routing", () => {
     });
   });
 
+  it("routes slack management commands", async () => {
+    const listSlackDestinationsCommand = vi.fn().mockResolvedValue({ exitCode: 0, output: "list" });
+    const getSlackConnectUrlCommand = vi.fn().mockResolvedValue({ exitCode: 0, output: "url" });
+    const testSlackDestinationCommand = vi.fn().mockResolvedValue({ exitCode: 0, output: "test" });
+    const deleteSlackDestinationCommand = vi.fn().mockResolvedValue({ exitCode: 0, output: "delete" });
+
+    await runCli(["slack", "list", "--project-id", "proj_123", "--json"], {
+      listSlackDestinationsCommand
+    });
+    await runCli(["slack", "connect-url", "--project-id", "proj_123", "--return-to", "/projects/proj_123/alerts"], {
+      getSlackConnectUrlCommand
+    });
+    await runCli(["slack", "test", "sd_123", "--project-id", "proj_123"], {
+      testSlackDestinationCommand
+    });
+    await runCli(["slack", "delete", "sd_123", "--project-id", "proj_123", "--auth-file", "/tmp/auth.json"], {
+      deleteSlackDestinationCommand
+    });
+
+    expect(listSlackDestinationsCommand).toHaveBeenCalledWith({
+      projectId: "proj_123",
+      json: true
+    });
+    expect(getSlackConnectUrlCommand).toHaveBeenCalledWith({
+      projectId: "proj_123",
+      returnTo: "/projects/proj_123/alerts"
+    });
+    expect(testSlackDestinationCommand).toHaveBeenCalledWith({
+      projectId: "proj_123",
+      destinationId: "sd_123"
+    });
+    expect(deleteSlackDestinationCommand).toHaveBeenCalledWith({
+      projectId: "proj_123",
+      destinationId: "sd_123",
+      authFilePath: "/tmp/auth.json"
+    });
+  });
+
   it("routes billing commands", async () => {
     const getBillingSummaryCommand = vi.fn().mockResolvedValue({ exitCode: 0, output: "billing-get" });
     const increaseBillingCapacityCommand = vi.fn().mockResolvedValue({ exitCode: 0, output: "billing-increase" });

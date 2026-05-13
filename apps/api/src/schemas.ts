@@ -89,6 +89,21 @@ export const GitHubAppInstallUrlQuerySchema = z
   })
   .strict();
 
+export const SlackAppCallbackQuerySchema = z
+  .object({
+    code: z.string().min(1).optional(),
+    state: z.string().min(1).optional(),
+    error: z.string().min(1).optional()
+  })
+  .passthrough();
+
+export const SlackAppInstallUrlQuerySchema = z
+  .object({
+    project_id: z.string().uuid(),
+    return_to: z.string().min(1).optional()
+  })
+  .strict();
+
 export const GitHubProjectRepoBodySchema = z
   .object({
     owner: z.string().min(1),
@@ -230,11 +245,18 @@ const WeeklyReportEmailConfigSchema = z
   })
   .strict();
 
-const WeeklyReportSlackConfigSchema = z
-  .object({
-    webhook_url: z.string().url().max(2000)
-  })
-  .strict();
+const WeeklyReportSlackConfigSchema = z.union([
+  z
+    .object({
+      webhook_url: z.string().url().max(2000)
+    })
+    .strict(),
+  z
+    .object({
+      slack_destination_id: z.string().uuid()
+    })
+    .strict()
+]);
 
 export const AlertConditionTypeSchema = z.enum([
   "new_incident",
@@ -250,11 +272,18 @@ const AlertEmailConfigSchema = z
   })
   .strict();
 
-const AlertSlackConfigSchema = z
-  .object({
-    webhook_url: z.string().url().max(2000)
-  })
-  .strict();
+const AlertSlackConfigSchema = z.union([
+  z
+    .object({
+      webhook_url: z.string().url().max(2000)
+    })
+    .strict(),
+  z
+    .object({
+      slack_destination_id: z.string().uuid()
+    })
+    .strict()
+]);
 
 const AlertDiscordConfigSchema = z
   .object({
@@ -392,6 +421,13 @@ export const UpdateWeeklyReportChannelBodySchema = z
 export const AlertParamsSchema = z
   .object({
     id: z.string().uuid()
+  })
+  .strict();
+
+export const ProjectSlackDestinationDeleteParamsSchema = z
+  .object({
+    id: z.string().uuid(),
+    destinationId: z.string().uuid()
   })
   .strict();
 

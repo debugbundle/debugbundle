@@ -1878,6 +1878,25 @@ describe("web app — management routes", () => {
         });
       }
 
+      if (url.endsWith("/v1/projects/proj_123/slack/destinations") && init?.method === undefined) {
+        return jsonResponse(200, {
+          destinations: [
+            {
+              slack_destination_id: "sd_123",
+              organization_id: "org_123",
+              slack_team_id: "T123",
+              slack_team_name: "Acme",
+              slack_channel_id: "C123",
+              slack_channel_name: "#alerts",
+              installed_by_member_id: "usr_123",
+              is_active: true,
+              created_at: "2026-05-13T10:00:00.000Z",
+              updated_at: "2026-05-13T10:00:00.000Z"
+            }
+          ]
+        });
+      }
+
       if (url.endsWith("/v1/alerts") && init?.method === "POST") {
         expect(init.credentials).toBe("include");
         expect(init.body).toBe(
@@ -1887,7 +1906,7 @@ describe("web app — management routes", () => {
             condition_type: "error_spike",
             severity_min: "critical",
             config: {
-              webhook_url: "https://hooks.slack.com/services/T000/B000/XXX"
+              slack_destination_id: "sd_123"
             },
             is_enabled: true
           })
@@ -1912,7 +1931,7 @@ describe("web app — management routes", () => {
 
     await user.click(await screen.findByRole("button", { name: /create alert rule/i }));
     await user.selectOptions(await screen.findByLabelText(/channel/i), "slack");
-    await user.type(screen.getByLabelText(/slack webhook url/i), "https://hooks.slack.com/services/T000/B000/XXX");
+    await user.selectOptions(await screen.findByLabelText(/slack channel/i), "sd_123");
     await user.selectOptions(screen.getByLabelText(/condition/i), "error_spike");
     await user.selectOptions(screen.getByLabelText(/minimum severity/i), "critical");
     await user.click(screen.getByRole("button", { name: /^create alert rule$/i }));
@@ -1921,6 +1940,88 @@ describe("web app — management routes", () => {
       expect(screen.getByText(/slack/i)).toBeInTheDocument();
     });
     expect(screen.getByText(/critical/i)).toBeInTheDocument();
+  });
+
+  it("lets owners test and disconnect connected Slack channels from the alert dialog", async () => {
+    const user = userEvent.setup();
+    const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = requestUrl(input);
+
+      if (url.endsWith("/v1/auth/session")) {
+        return jsonResponse(200, {
+          session: createSession()
+        });
+      }
+
+      if (url.endsWith("/v1/projects") && init?.method === undefined) {
+        return jsonResponse(200, {
+          projects: [createProject({ organization_plan: "team" })]
+        });
+      }
+
+      if (url.endsWith("/v1/alerts?project_id=proj_123&limit=20") && init?.method === undefined) {
+        return jsonResponse(200, {
+          alerts: []
+        });
+      }
+
+      if (url.endsWith("/v1/projects/proj_123/slack/destinations") && init?.method === undefined) {
+        return jsonResponse(200, {
+          destinations: [
+            {
+              slack_destination_id: "sd_123",
+              organization_id: "org_123",
+              slack_team_id: "T123",
+              slack_team_name: "Acme",
+              slack_channel_id: "C123",
+              slack_channel_name: "#alerts",
+              installed_by_member_id: "usr_123",
+              is_active: true,
+              created_at: "2026-05-13T10:00:00.000Z",
+              updated_at: "2026-05-13T10:00:00.000Z"
+            }
+          ]
+        });
+      }
+
+      if (url.endsWith("/v1/projects/proj_123/slack/destinations/sd_123/test") && init?.method === "POST") {
+        return jsonResponse(200, { delivered: true });
+      }
+
+      if (url.endsWith("/v1/projects/proj_123/slack/destinations/sd_123") && init?.method === "DELETE") {
+        return new Response(null, { status: 204 });
+      }
+
+      return jsonResponse(404, { error: "not_found" });
+    });
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<App initialEntries={["/projects/proj_123/alerts"]} />);
+
+    await user.click(await screen.findByRole("button", { name: /create alert rule/i }));
+    await user.selectOptions(await screen.findByLabelText(/channel/i), "slack");
+    await user.click(screen.getByRole("button", { name: /send test message/i }));
+    await user.click(screen.getByRole("button", { name: /disconnect channel/i }));
+
+    await waitFor(() => {
+      expect(
+        fetchMock.mock.calls.some(
+          ([input, init]) =>
+            requestUrl(input).endsWith("/v1/projects/proj_123/slack/destinations/sd_123/test") &&
+            init?.method === "POST"
+        )
+      ).toBe(true);
+    });
+    await waitFor(() => {
+      expect(
+        fetchMock.mock.calls.some(
+          ([input, init]) =>
+            requestUrl(input).endsWith("/v1/projects/proj_123/slack/destinations/sd_123") &&
+            init?.method === "DELETE"
+        )
+      ).toBe(true);
+    });
   });
 
   it("prefills and requires a single recipient email for email alert rules", async () => {

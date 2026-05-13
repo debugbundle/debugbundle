@@ -49,6 +49,12 @@ describe("tier capabilities", () => {
     expect(getTierCapabilities("team").shared_dashboards).toBe(true);
   });
 
+  it("should gate slack integration for team tier only", (): void => {
+    expect(getTierCapabilities("free").slack_integration).toBe(false);
+    expect(getTierCapabilities("solo").slack_integration).toBe(false);
+    expect(getTierCapabilities("team").slack_integration).toBe(true);
+  });
+
   it("should gate cloud improvement bundles for team tier only", (): void => {
     expect(getTierCapabilities("free").cloud_improvement_bundles).toBe(false);
     expect(getTierCapabilities("solo").cloud_improvement_bundles).toBe(false);
@@ -136,6 +142,7 @@ describe("tier capabilities", () => {
   it("should satisfy type constraint for TierCapabilities", (): void => {
     const caps: TierCapabilities = getTierCapabilities("solo");
     expect(typeof caps.remote_probes).toBe("boolean");
+    expect(typeof caps.slack_integration).toBe("boolean");
     expect(typeof caps.included_capacity_units).toBe("number");
     expect(typeof caps.ingestion_rate_per_min).toBe("number");
   });
@@ -174,6 +181,7 @@ describe("self-host mode", () => {
       const caps = getTierCapabilities(plan);
       expect(caps.remote_probes).toBe(true);
       expect(caps.github_automation).toBe(true);
+      expect(caps.slack_integration).toBe(true);
       expect(caps.cloud_improvement_bundles).toBe(true);
       expect(caps.shared_dashboards).toBe(true);
       expect(caps.member_invites).toBe(true);

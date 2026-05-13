@@ -134,7 +134,9 @@ describe("storage bootstrap schema", () => {
     expect(REQUIRED_API_TABLES).toContain("oauth_identities");
     expect(REQUIRED_API_TABLES).toContain("processed_billing_events");
     expect(REQUIRED_API_TABLES).toContain("github_dispatch_deliveries");
+    expect(REQUIRED_API_TABLES).toContain("slack_destinations");
     expect(REQUIRED_WORKER_TABLES).toContain("alert_deliveries");
+    expect(REQUIRED_WORKER_TABLES).toContain("slack_destinations");
     expect(REQUIRED_WORKER_TABLES).toContain("weekly_report_deliveries");
   });
 
@@ -159,6 +161,7 @@ describe("storage bootstrap schema", () => {
     expect(STORAGE_BOOTSTRAP_SQL.includes("UNIQUE (organization_id, email)")).toBe(true);
     expect(STORAGE_BOOTSTRAP_SQL.includes("project_id uuid NOT NULL UNIQUE REFERENCES projects(id) ON DELETE CASCADE")).toBe(true);
     expect(STORAGE_BOOTSTRAP_SQL.includes("CREATE UNIQUE INDEX github_dispatch_deliveries_rule_dedupe_key_idx")).toBe(true);
+    expect(STORAGE_BOOTSTRAP_SQL.includes("UNIQUE (organization_id, slack_team_id, slack_channel_id)")).toBe(true);
   });
 
   it("should include hot-path indexes for retrieval and claim queries", (): void => {
@@ -168,5 +171,6 @@ describe("storage bootstrap schema", () => {
     expect(STORAGE_BOOTSTRAP_SQL.includes("sessions_token_hash_idx")).toBe(true);
     expect(STORAGE_BOOTSTRAP_SQL.includes("alert_deliveries_project_status_idx")).toBe(true);
     expect(STORAGE_BOOTSTRAP_SQL.includes("organizations_stripe_customer_id_key")).toBe(true);
+    expect(STORAGE_BOOTSTRAP_SQL.includes("slack_destinations_org_active_idx")).toBe(true);
   });
 });

@@ -68,12 +68,15 @@ import {
   OrganizationInviteParamsSchema,
   OrganizationMemberParamsSchema,
   ProjectParamsSchema,
+  ProjectSlackDestinationDeleteParamsSchema,
   ProjectsQuerySchema,
   ProjectTokenParamsSchema,
   ProbeActivateBodySchema,
   ProbeDeactivateBodySchema,
   RequestEmailCodeBodySchema,
   ServicesQuerySchema,
+  SlackAppCallbackQuerySchema,
+  SlackAppInstallUrlQuerySchema,
   TokenListQuerySchema,
   UpdateAlertBodySchema,
   UpdateOrganizationMemberRoleBodySchema,
@@ -213,6 +216,7 @@ const AccountExportResponseSchema = z
     invites: z.array(z.record(z.string(), z.unknown())),
     member_tokens: z.array(z.record(z.string(), z.unknown())),
     projects: z.array(z.record(z.string(), z.unknown())),
+    slack_destinations: z.array(z.record(z.string(), z.unknown())),
     project_tokens: z.array(z.record(z.string(), z.unknown())),
     capture_policies: z.array(z.record(z.string(), z.unknown())),
     services: z.array(z.record(z.string(), z.unknown())),
@@ -254,6 +258,35 @@ const AccountDeletionResponseSchema = z
         deleted_member_token_count: z.number().int().nonnegative(),
       })
       .strict(),
+  })
+  .strict();
+const SlackDestinationSchema = z
+  .object({
+    slack_destination_id: z.string().uuid(),
+    organization_id: z.string().uuid(),
+    slack_team_id: z.string().min(1),
+    slack_team_name: z.string().nullable(),
+    slack_channel_id: z.string().min(1),
+    slack_channel_name: z.string().nullable(),
+    installed_by_member_id: z.string().uuid().nullable(),
+    is_active: z.boolean(),
+    created_at: z.string().datetime(),
+    updated_at: z.string().datetime(),
+  })
+  .strict();
+const SlackInstallUrlResponseSchema = z
+  .object({
+    install_url: z.string().url(),
+  })
+  .strict();
+const SlackDestinationListResponseSchema = z
+  .object({
+    destinations: z.array(SlackDestinationSchema),
+  })
+  .strict();
+const SlackDestinationTestResponseSchema = z
+  .object({
+    delivered: z.literal(true),
   })
   .strict();
 const OrganizationMemberSchema = z
@@ -422,6 +455,9 @@ function buildPublicApiOperations(): OperationSpec[] {
   const projectCreateResponse = component("ProjectCreateResponse", ProjectCreateResponseSchema);
   const projectUpdateResponse = component("ProjectUpdateResponse", ProjectUpdateResponseSchema);
   const projectDeleteResponse = component("ProjectDeleteResponse", ProjectDeleteResponseSchema);
+  const slackInstallUrlResponse = component("SlackInstallUrlResponse", SlackInstallUrlResponseSchema);
+  const slackDestinationListResponse = component("SlackDestinationListResponse", SlackDestinationListResponseSchema);
+  const slackDestinationTestResponse = component("SlackDestinationTestResponse", SlackDestinationTestResponseSchema);
   const billingSummaryResponse = component("BillingSummaryResponse", BillingSummaryResponseSchema);
   const billingLinkResponse = component("BillingLinkResponse", BillingLinkResponseSchema);
   const tokenListResponse = component("TokenListResponse", TokenListResponseSchema);
@@ -982,6 +1018,87 @@ function buildPublicApiOperations(): OperationSpec[] {
     },
     {
       method: "get",
+      path: "/v1/slack/app/install-url",
+      operationId: "getSlackAppInstallUrl",
+      summary: "Create a Slack OAuth install URL",
+      tags: ["Slack"],
+      security: anyMemberAuth,
+      query: SlackAppInstallUrlQuerySchema,
+      responses: {
+        "200": { description: "Slack OAuth install URL.", schema: slackInstallUrlResponse },
+        "400": { description: "Invalid query parameters.", schema: apiError },
+        "401": { description: "Authentication is invalid.", schema: apiError },
+        "403": { description: "Owner access or Team tier is required.", schema: apiError },
+        "404": { description: "Project was not found.", schema: apiError },
+        "503": { description: "Slack integration is not configured.", schema: apiError },
+      },
+    },
+    {
+      method: "get",
+      path: "/v1/slack/app/callback",
+      operationId: "completeSlackAppInstall",
+      summary: "Complete the Slack OAuth install flow",
+      tags: ["Slack"],
+      query: SlackAppCallbackQuerySchema,
+      responses: {
+        "302": { description: "Redirects back to the application after Slack OAuth completes or is cancelled." },
+      },
+    },
+    {
+      method: "get",
+      path: "/v1/projects/{id}/slack/destinations",
+      operationId: "listProjectSlackDestinations",
+      summary: "List reusable Slack destinations for a project organization",
+      tags: ["Slack"],
+      security: anyMemberAuth,
+      params: ProjectParamsSchema,
+      responses: {
+        "200": { description: "Reusable Slack destinations.", schema: slackDestinationListResponse },
+        "400": { description: "Invalid project id.", schema: apiError },
+        "401": { description: "Authentication is invalid.", schema: apiError },
+        "403": { description: "Team tier is required.", schema: apiError },
+        "404": { description: "Project was not found.", schema: apiError },
+        "503": { description: "Slack integration is not configured.", schema: apiError },
+      },
+    },
+    {
+      method: "post",
+      path: "/v1/projects/{id}/slack/destinations/{destinationId}/test",
+      operationId: "testProjectSlackDestination",
+      summary: "Send a test message to a reusable Slack destination",
+      tags: ["Slack"],
+      security: anyMemberAuth,
+      params: ProjectSlackDestinationDeleteParamsSchema,
+      responses: {
+        "200": { description: "Slack destination test delivered.", schema: slackDestinationTestResponse },
+        "400": { description: "Invalid project id or Slack destination id.", schema: apiError },
+        "401": { description: "Authentication is invalid.", schema: apiError },
+        "403": { description: "Owner access or Team tier is required.", schema: apiError },
+        "404": { description: "Project or Slack destination was not found.", schema: apiError },
+        "502": { description: "Slack delivery failed.", schema: apiError },
+        "503": { description: "Slack integration is not configured.", schema: apiError },
+      },
+    },
+    {
+      method: "delete",
+      path: "/v1/projects/{id}/slack/destinations/{destinationId}",
+      operationId: "deleteProjectSlackDestination",
+      summary: "Delete a reusable Slack destination",
+      tags: ["Slack"],
+      security: anyMemberAuth,
+      params: ProjectSlackDestinationDeleteParamsSchema,
+      responses: {
+        "204": { description: "Slack destination deleted." },
+        "400": { description: "Invalid project id or Slack destination id.", schema: apiError },
+        "401": { description: "Authentication is invalid.", schema: apiError },
+        "403": { description: "Owner access or Team tier is required.", schema: apiError },
+        "404": { description: "Slack destination was not found.", schema: apiError },
+        "409": { description: "Slack destination is still referenced by an alert rule or weekly report.", schema: apiError },
+        "503": { description: "Slack integration is not configured.", schema: apiError },
+      },
+    },
+    {
+      method: "get",
       path: "/v1/billing",
       operationId: "getBillingSummary",
       summary: "Get the billing summary",
@@ -1277,7 +1394,9 @@ function buildPublicApiOperations(): OperationSpec[] {
         "201": { description: "Weekly report channel created.", schema: weeklyReportChannelResponse },
         "400": { description: "Invalid request body.", schema: apiError },
         "401": { description: "Authentication is invalid.", schema: apiError },
+        "403": { description: "Team tier is required for connected Slack destinations.", schema: apiError },
         "404": { description: "Project was not found.", schema: apiError },
+        "503": { description: "Slack integration is not configured.", schema: apiError },
       },
     },
     {
@@ -1294,6 +1413,8 @@ function buildPublicApiOperations(): OperationSpec[] {
         "400": { description: "Invalid channel id or request body.", schema: apiError },
         "401": { description: "Authentication is invalid.", schema: apiError },
         "404": { description: "Weekly report channel was not found.", schema: apiError },
+        "403": { description: "Team tier is required for connected Slack destinations.", schema: apiError },
+        "503": { description: "Slack integration is not configured.", schema: apiError },
       },
     },
     {

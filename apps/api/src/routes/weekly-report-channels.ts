@@ -1,5 +1,6 @@
 import type { FastifyInstance } from "fastify";
 
+import { getTierCapabilities } from "../../../../packages/shared-types/src/index.js";
 import type { ApiDependencies } from "../api-types.js";
 import { requireRateLimitedMemberAuth } from "../api-helpers.js";
 import {
@@ -8,6 +9,22 @@ import {
   WeeklyReportChannelParamsSchema,
   WeeklyReportChannelsQuerySchema
 } from "../schemas.js";
+
+async function ensureSlackIntegrationEnabled(
+  dependencies: ApiDependencies,
+  organizationId: string
+): Promise<boolean> {
+  if (dependencies.billingManagement === undefined) {
+    return false;
+  }
+
+  const summary = await dependencies.billingManagement.getBillingSummaryForOrganization({
+    organization_id: organizationId,
+    now: new Date().toISOString()
+  });
+
+  return summary !== null && getTierCapabilities(summary.plan).slack_integration;
+}
 
 export function registerWeeklyReportChannelRoutes(app: FastifyInstance, dependencies: ApiDependencies): void {
   app.get("/v1/weekly-report-channels", async (request, reply) => {
@@ -50,6 +67,35 @@ export function registerWeeklyReportChannelRoutes(app: FastifyInstance, dependen
       return reply.status(400).send({ error: "invalid_payload" });
     }
 
+    if (
+      parsedBody.data.channel === "slack" &&
+      "slack_destination_id" in parsedBody.data.config
+    ) {
+      if (dependencies.slackManagement === undefined) {
+        return reply.status(503).send({ error: "slack_not_configured" });
+      }
+      if (!(await ensureSlackIntegrationEnabled(dependencies, member.organization_id))) {
+        return reply.status(403).send({ error: "upgrade_required" });
+      }
+
+      const scopedProject = await dependencies.slackManagement.listSlackDestinationsForProjectInOrganization({
+        organization_id: member.organization_id,
+        project_id: parsedBody.data.project_id,
+        limit: 1
+      });
+      if (scopedProject === null) {
+        return reply.status(404).send({ error: "project_not_found" });
+      }
+
+      const destination = await dependencies.slackManagement.getSlackDestinationForOrganization({
+        organization_id: member.organization_id,
+        slack_destination_id: parsedBody.data.config.slack_destination_id
+      });
+      if (destination === null) {
+        return reply.status(404).send({ error: "slack_destination_not_found" });
+      }
+    }
+
     const channel = await dependencies.weeklyReportManagement.createWeeklyReportChannelForOrganization({
       organization_id: member.organization_id,
       project_id: parsedBody.data.project_id,
@@ -81,6 +127,27 @@ export function registerWeeklyReportChannelRoutes(app: FastifyInstance, dependen
     const parsedBody = UpdateWeeklyReportChannelBodySchema.safeParse(request.body);
     if (!parsedBody.success) {
       return reply.status(400).send({ error: "invalid_payload" });
+    }
+
+    if (
+      parsedBody.data.config !== undefined &&
+      parsedBody.data.config !== null &&
+      "slack_destination_id" in parsedBody.data.config
+    ) {
+      if (dependencies.slackManagement === undefined) {
+        return reply.status(503).send({ error: "slack_not_configured" });
+      }
+      if (!(await ensureSlackIntegrationEnabled(dependencies, member.organization_id))) {
+        return reply.status(403).send({ error: "upgrade_required" });
+      }
+
+      const destination = await dependencies.slackManagement.getSlackDestinationForOrganization({
+        organization_id: member.organization_id,
+        slack_destination_id: parsedBody.data.config.slack_destination_id
+      });
+      if (destination === null) {
+        return reply.status(404).send({ error: "slack_destination_not_found" });
+      }
     }
 
     const channel = await dependencies.weeklyReportManagement.updateWeeklyReportChannelForOrganization({

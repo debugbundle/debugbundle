@@ -11,6 +11,7 @@ import { PROJECT_MCP_TOOL_NAMES } from './project-tools.js';
 import { RETRIEVAL_MCP_TOOL_NAMES } from './retrieval-tools.js';
 import { SERVICE_MCP_TOOL_NAMES } from './services-tools.js';
 import { SETUP_MCP_TOOL_NAMES } from './setup-tools.js';
+import { SLACK_MCP_TOOL_NAMES } from './slack-tools.js';
 import { TOKEN_MCP_TOOL_NAMES } from './token-tools.js';
 import { WEBHOOK_MCP_TOOL_NAMES } from './webhook-tools.js';
 import { WEEKLY_REPORT_MCP_TOOL_NAMES } from './weekly-report-tools.js';
@@ -27,6 +28,7 @@ type McpToolName =
   | (typeof RETRIEVAL_MCP_TOOL_NAMES)[number]
   | (typeof SERVICE_MCP_TOOL_NAMES)[number]
   | (typeof SETUP_MCP_TOOL_NAMES)[number]
+  | (typeof SLACK_MCP_TOOL_NAMES)[number]
   | (typeof TOKEN_MCP_TOOL_NAMES)[number]
   | (typeof WEBHOOK_MCP_TOOL_NAMES)[number]
   | (typeof WEEKLY_REPORT_MCP_TOOL_NAMES)[number];
@@ -43,6 +45,7 @@ type McpToolGroup =
   | 'retrieval'
   | 'services'
   | 'setup'
+  | 'slack'
   | 'tokens'
   | 'webhooks'
   | 'weekly_reports';
@@ -438,6 +441,45 @@ export const MCP_TOOL_CATALOG = [
       bearerToken: z.string(),
       webhookId: z.string(),
       deliveryId: z.string(),
+    }),
+  },
+  {
+    name: 'list_slack_destinations',
+    group: 'slack',
+    description: 'List reusable connected Slack destinations for a project organization.',
+    inputSchema: z.object({
+      bearerToken: z.string(),
+      projectId: z.string(),
+    }),
+  },
+  {
+    name: 'get_slack_connect_url',
+    group: 'slack',
+    description: 'Return a browser Slack connect URL for a project.',
+    inputSchema: z.object({
+      bearerToken: z.string(),
+      projectId: z.string(),
+      returnTo: z.string().optional(),
+    }),
+  },
+  {
+    name: 'test_slack_destination',
+    group: 'slack',
+    description: 'Send a test message to a connected Slack destination.',
+    inputSchema: z.object({
+      bearerToken: z.string(),
+      projectId: z.string(),
+      destinationId: z.string(),
+    }),
+  },
+  {
+    name: 'delete_slack_destination',
+    group: 'slack',
+    description: 'Delete a connected Slack destination from a project organization.',
+    inputSchema: z.object({
+      bearerToken: z.string(),
+      projectId: z.string(),
+      destinationId: z.string(),
     }),
   },
   {

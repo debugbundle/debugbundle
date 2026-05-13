@@ -2,6 +2,7 @@
 // External consumers continue importing from this file unchanged.
 
 export * from "./types.js";
+export * from "./integration-secret-crypto.js";
 export * from "./incident-context.js";
 export * from "./incident-reason.js";
 export type {
@@ -31,6 +32,13 @@ export { createPostgresGitHubStore } from "./github-store.js";
 export { createIncidentLifecycleService } from "./incident-lifecycle-service.js";
 export { createPostgresMetadataStore } from "./metadata-store.js";
 export { createPostgresRetentionStore, createRetentionCleanupService } from "./retention-store.js";
+export type {
+	SlackDestinationRecord,
+	SlackDestinationSecretRecord,
+	DeleteSlackDestinationResult,
+	SlackDestinationStore
+} from "./slack-destination-store.js";
+export { createPostgresSlackDestinationStore } from "./slack-destination-store.js";
 export { createPostgresWeeklyReportChannelStore } from "./weekly-report-channel-store.js";
 export { createPostgresWeeklyReportDeliveryStore } from "./weekly-report-delivery-store.js";
 export { createPostgresWebhookDeliveryStore } from "./webhook-delivery-store.js";

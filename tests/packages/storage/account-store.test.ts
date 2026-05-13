@@ -65,6 +65,9 @@ describe("postgres account store", () => {
       if (sqlText.includes("FROM alert_rules")) {
         return rowsResult([{ data: { alert_id: "alert_123", project_id: "proj_123" } }]);
       }
+      if (sqlText.includes("FROM slack_destinations")) {
+        return rowsResult([{ data: { slack_destination_id: "sd_123", organization_id: "org_123" } }]);
+      }
       if (sqlText.includes("FROM alert_deliveries")) {
         return rowsResult([{ data: { delivery_id: "alert_delivery_123", project_id: "proj_123" } }]);
       }

@@ -521,6 +521,35 @@ describe("cli management command handlers", () => {
       { updateWeeklyReportChannelCommand }
     );
     await handleWeeklyReportCommand(parseArgv(["weekly-report", "delete", "wr_1"]), { deleteWeeklyReportChannelCommand });
+    await handleWeeklyReportCommand(
+      parseArgv([
+        "weekly-report",
+        "create",
+        "--project-id",
+        "proj_1",
+        "--channel",
+        "slack",
+        "--day-of-week",
+        "wednesday",
+        "--hour-of-day",
+        "7",
+        "--timezone",
+        "UTC",
+        "--config-json",
+        '{"slack_destination_id":"sd_123"}'
+      ]),
+      { createWeeklyReportChannelCommand }
+    );
+    await handleWeeklyReportCommand(
+      parseArgv([
+        "weekly-report",
+        "update",
+        "wr_2",
+        "--config-json",
+        '{"slack_destination_id":"sd_456"}'
+      ]),
+      { updateWeeklyReportChannelCommand }
+    );
 
     expect(getBillingSummaryCommand).toHaveBeenCalledWith({ authFilePath: undefined, json: true });
     expect(increaseBillingCapacityCommand).toHaveBeenCalledWith({ authFilePath: undefined, json: undefined, targetAdditionalCapacityUnits: 2 });
@@ -599,6 +628,20 @@ describe("cli management command handlers", () => {
       isEnabled: true
     });
     expect(deleteWeeklyReportChannelCommand).toHaveBeenCalledWith({ authFilePath: undefined, json: undefined, channelId: "wr_1" });
+    expect(createWeeklyReportChannelCommand).toHaveBeenCalledWith({
+      authFilePath: undefined,
+      json: undefined,
+      projectId: "proj_1",
+      channel: "slack",
+      config: { slackDestinationId: "sd_123" },
+      schedule: { dayOfWeek: "wednesday", hourOfDay: 7, timezone: "UTC" }
+    });
+    expect(updateWeeklyReportChannelCommand).toHaveBeenCalledWith({
+      authFilePath: undefined,
+      json: undefined,
+      channelId: "wr_2",
+      config: { slackDestinationId: "sd_456" }
+    });
   });
 
   it("rejects invalid management subcommands and missing required options across handlers", async () => {

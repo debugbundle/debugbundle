@@ -112,4 +112,44 @@ describe("mcp weekly report tools", () => {
       isEnabled: false
     });
   });
+
+  it("forwards connected Slack destination configs for create and update", async (): Promise<void> => {
+    const api = {
+      listWeeklyReportChannels: vi.fn().mockResolvedValue([]),
+      createWeeklyReportChannel: vi.fn().mockResolvedValue({ channel_id: "wr_sd" }),
+      updateWeeklyReportChannel: vi.fn().mockResolvedValue({ channel_id: "wr_sd" }),
+      deleteWeeklyReportChannel: vi.fn().mockResolvedValue({ channel_id: "wr_sd" })
+    };
+    const tools = createWeeklyReportMcpTools(api);
+
+    await expect(
+      tools.create_weekly_report_channel({
+        bearerToken: "dbundle_mem_x",
+        projectId: "proj_1",
+        channel: "slack",
+        config: { slackDestinationId: "sd_123" },
+        schedule: { dayOfWeek: "monday", hourOfDay: 9, timezone: "UTC" }
+      })
+    ).resolves.toEqual({ channel: { channel_id: "wr_sd" } });
+    await expect(
+      tools.update_weekly_report_channel({
+        bearerToken: "dbundle_mem_x",
+        channelId: "wr_sd",
+        config: { slackDestinationId: "sd_456" }
+      })
+    ).resolves.toEqual({ channel: { channel_id: "wr_sd" } });
+
+    expect(api.createWeeklyReportChannel).toHaveBeenCalledWith({
+      bearerToken: "dbundle_mem_x",
+      projectId: "proj_1",
+      channel: "slack",
+      config: { slackDestinationId: "sd_123" },
+      schedule: { dayOfWeek: "monday", hourOfDay: 9, timezone: "UTC" }
+    });
+    expect(api.updateWeeklyReportChannel).toHaveBeenCalledWith({
+      bearerToken: "dbundle_mem_x",
+      channelId: "wr_sd",
+      config: { slackDestinationId: "sd_456" }
+    });
+  });
 });

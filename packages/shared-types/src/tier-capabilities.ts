@@ -13,6 +13,7 @@ export const TIER_CAPABILITIES = {
   free: {
     remote_probes: false,
     github_automation: false,
+    slack_integration: false,
     cloud_improvement_bundles: false,
     shared_dashboards: false,
     member_invites: false,
@@ -32,6 +33,7 @@ export const TIER_CAPABILITIES = {
   solo: {
     remote_probes: true,
     github_automation: true,
+    slack_integration: false,
     cloud_improvement_bundles: false,
     shared_dashboards: false,
     member_invites: false,
@@ -51,6 +53,7 @@ export const TIER_CAPABILITIES = {
   team: {
     remote_probes: true,
     github_automation: true,
+    slack_integration: true,
     cloud_improvement_bundles: true,
     shared_dashboards: true,
     member_invites: true,
@@ -75,6 +78,7 @@ export type TierName = keyof typeof TIER_CAPABILITIES;
 export interface TierCapabilities {
   readonly remote_probes: boolean;
   readonly github_automation: boolean;
+  readonly slack_integration: boolean;
   readonly cloud_improvement_bundles: boolean;
   readonly shared_dashboards: boolean;
   readonly member_invites: boolean;
@@ -99,6 +103,7 @@ export interface TierCapabilities {
 const SELFHOST_CAPABILITIES: TierCapabilities = {
   remote_probes: true,
   github_automation: true,
+  slack_integration: true,
   cloud_improvement_bundles: true,
   shared_dashboards: true,
   member_invites: true,

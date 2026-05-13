@@ -15,6 +15,7 @@ import type {
   OrganizationMemberRecord,
   OrganizationInviteRecord,
   ProjectTokenRecord,
+  SlackDestinationRecord,
   IncidentRetrievalRecord,
   RemoveOrganizationMemberResult,
   ServiceRetrievalRecord,
@@ -287,6 +288,35 @@ export interface ApiDependencies {
       eventName: string;
       payload: Record<string, unknown>;
     }): Promise<void>;
+  } | undefined;
+  slackManagement?: {
+    listSlackDestinationsForProjectInOrganization(input: {
+      organization_id: string;
+      project_id: string;
+      limit: number;
+    }): Promise<SlackDestinationRecord[] | null>;
+    getSlackDestinationForOrganization(input: {
+      organization_id: string;
+      slack_destination_id: string;
+    }): Promise<SlackDestinationRecord | null>;
+    upsertSlackDestinationForOrganization(input: {
+      organization_id: string;
+      slack_team_id: string;
+      slack_team_name?: string | null;
+      slack_channel_id: string;
+      slack_channel_name?: string | null;
+      webhook_url_ciphertext: string;
+      installed_by_member_id?: string | null;
+    }): Promise<SlackDestinationRecord>;
+    deleteSlackDestinationForProjectInOrganization(input: {
+      organization_id: string;
+      project_id: string;
+      slack_destination_id: string;
+    }): Promise<{ slack_destination_id: string } | "destination_in_use" | null>;
+    getSlackDestinationSecretForOrganization?(input: {
+      organization_id: string;
+      slack_destination_id: string;
+    }): Promise<{ webhook_url_ciphertext: string } | null>;
   } | undefined;
   incidentRetrieval: {
     listIncidentsForOrganization(input: {

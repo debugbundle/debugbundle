@@ -1,6 +1,7 @@
 import { generateKeyPairSync } from "node:crypto";
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { encryptIntegrationSecret } from "../../../packages/storage/src/index.ts";
 
 const TEST_GITHUB_PRIVATE_KEY = "test-only-github-app-private-key-not-used";
 
@@ -1761,6 +1762,33 @@ describe("worker runtime", () => {
         }
       } as never)
     ).rejects.toThrow("weekly_report_slack_http_error_503");
+
+    const encryptedWebhookUrl = encryptIntegrationSecret(
+      "https://hooks.slack.test/weekly",
+      "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+    );
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({ ok: true })
+    );
+
+    await expect(
+      createWeeklyReportTransport({
+        emailTransport: { send: vi.fn() },
+        integrationSecretEncryptionKey: "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+        slackDestinationStore: {
+          getSlackDestinationSecretForDelivery: vi.fn().mockResolvedValue({
+            webhook_url_ciphertext: encryptedWebhookUrl
+          })
+        }
+      }).deliver({
+        ...reportEvent,
+        channel: {
+          channel: "slack",
+          config: { slack_destination_id: "sd_123" }
+        }
+      } as never)
+    ).resolves.toBeUndefined();
   });
 
   it("should enqueue one generate-weekly-report job per active project during scheduler pass", async (): Promise<void> => {

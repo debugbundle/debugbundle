@@ -18,6 +18,7 @@ import { registerOrganizationMemberRoutes } from "./routes/organization-members.
 import { registerProjectRoutes } from "./routes/projects.js";
 import { registerProbeRoutes } from "./routes/probes.js";
 import { registerServicesRoutes } from "./routes/services.js";
+import { registerSlackRoutes } from "./routes/slack.js";
 import { registerStripeWebhookRoute, type StripeWebhookDependencies } from "./routes/stripe-webhook.js";
 import { registerTokenRoutes } from "./routes/tokens.js";
 import { registerWebhookRoutes } from "./routes/webhooks.js";
@@ -240,6 +241,7 @@ export function createApiServer(dependencies: ApiDependencies, options: ApiServe
   registerOrganizationMemberRoutes(app, dependencies);
   registerProjectRoutes(app, dependencies);
   registerProbeRoutes(app, dependencies);
+  registerSlackRoutes(app, dependencies);
   registerTokenRoutes(app, dependencies);
   registerAlertRoutes(app, dependencies);
   registerCapturePolicyRoutes(app, dependencies);

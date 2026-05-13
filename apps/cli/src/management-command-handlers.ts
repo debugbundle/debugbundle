@@ -34,6 +34,12 @@ import {
   updateWeeklyReportChannelWithAuthCommand as defaultUpdateWeeklyReportChannelCommand
 } from "./weekly-report-commands.js";
 import {
+  deleteSlackDestinationWithAuthCommand as defaultDeleteSlackDestinationCommand,
+  getSlackConnectUrlWithAuthCommand as defaultGetSlackConnectUrlCommand,
+  listSlackDestinationsWithAuthCommand as defaultListSlackDestinationsCommand,
+  testSlackDestinationWithAuthCommand as defaultTestSlackDestinationCommand
+} from "./slack-commands.js";
+import {
   cancelBillingCapacityReductionWithAuthCommand as defaultCancelBillingCapacityReductionCommand,
   getBillingSummaryWithAuthCommand as defaultGetBillingSummaryCommand,
   increaseBillingCapacityWithAuthCommand as defaultIncreaseBillingCapacityCommand,
@@ -112,6 +118,10 @@ export type ManagementCommandDependencies = {
   createWeeklyReportChannelCommand?: typeof defaultCreateWeeklyReportChannelCommand;
   updateWeeklyReportChannelCommand?: typeof defaultUpdateWeeklyReportChannelCommand;
   deleteWeeklyReportChannelCommand?: typeof defaultDeleteWeeklyReportChannelCommand;
+  listSlackDestinationsCommand?: typeof defaultListSlackDestinationsCommand;
+  getSlackConnectUrlCommand?: typeof defaultGetSlackConnectUrlCommand;
+  testSlackDestinationCommand?: typeof defaultTestSlackDestinationCommand;
+  deleteSlackDestinationCommand?: typeof defaultDeleteSlackDestinationCommand;
   getCapturePolicyCommand?: typeof defaultGetCapturePolicyCommand;
   setCapturePolicyCommand?: typeof defaultSetCapturePolicyCommand;
   activateProbeCommand?: typeof defaultActivateProbeCommand;
@@ -1270,6 +1280,82 @@ export async function handleAlertCommand(parsedArgv: ParsedArgv, dependencies: M
   throw new CliInputError("Unknown alert command.");
 }
 
+export async function handleSlackCommand(parsedArgv: ParsedArgv, dependencies: ManagementCommandDependencies): Promise<CliCommandResult> {
+  const action = requirePositional(parsedArgv, 1, "action");
+
+  if (action === "list") {
+    expectNoUnknownOptions(parsedArgv, ["auth-file", "json", "project-id"]);
+    ensureNoExtraPositionals(parsedArgv, 2);
+
+    const projectId = readStringOption(parsedArgv, "project-id");
+    if (projectId === undefined) {
+      throw new CliInputError("Missing required option --project-id.");
+    }
+
+    return await (dependencies.listSlackDestinationsCommand ?? defaultListSlackDestinationsCommand)(
+      appendCommonAuthOptions(parsedArgv, {
+        projectId
+      })
+    );
+  }
+
+  if (action === "connect-url") {
+    expectNoUnknownOptions(parsedArgv, ["auth-file", "json", "project-id", "return-to"]);
+    ensureNoExtraPositionals(parsedArgv, 2);
+
+    const projectId = readStringOption(parsedArgv, "project-id");
+    if (projectId === undefined) {
+      throw new CliInputError("Missing required option --project-id.");
+    }
+
+    const input = appendCommonAuthOptions(parsedArgv, {
+      projectId
+    } as { projectId: string; returnTo?: string; authFilePath?: string; json?: boolean });
+    const returnTo = readStringOption(parsedArgv, "return-to");
+    if (returnTo !== undefined) {
+      input.returnTo = returnTo;
+    }
+
+    return await (dependencies.getSlackConnectUrlCommand ?? defaultGetSlackConnectUrlCommand)(input);
+  }
+
+  if (action === "test") {
+    expectNoUnknownOptions(parsedArgv, ["auth-file", "json", "project-id"]);
+    ensureNoExtraPositionals(parsedArgv, 3);
+
+    const projectId = readStringOption(parsedArgv, "project-id");
+    if (projectId === undefined) {
+      throw new CliInputError("Missing required option --project-id.");
+    }
+
+    return await (dependencies.testSlackDestinationCommand ?? defaultTestSlackDestinationCommand)(
+      appendCommonAuthOptions(parsedArgv, {
+        projectId,
+        destinationId: requirePositional(parsedArgv, 2, "destination-id")
+      })
+    );
+  }
+
+  if (action === "delete") {
+    expectNoUnknownOptions(parsedArgv, ["auth-file", "json", "project-id"]);
+    ensureNoExtraPositionals(parsedArgv, 3);
+
+    const projectId = readStringOption(parsedArgv, "project-id");
+    if (projectId === undefined) {
+      throw new CliInputError("Missing required option --project-id.");
+    }
+
+    return await (dependencies.deleteSlackDestinationCommand ?? defaultDeleteSlackDestinationCommand)(
+      appendCommonAuthOptions(parsedArgv, {
+        projectId,
+        destinationId: requirePositional(parsedArgv, 2, "destination-id")
+      })
+    );
+  }
+
+  throw new CliInputError("Unknown slack command.");
+}
+
 export async function handleWeeklyReportCommand(parsedArgv: ParsedArgv, dependencies: ManagementCommandDependencies): Promise<CliCommandResult> {
   const action = requirePositional(parsedArgv, 1, "action");
 
@@ -1332,10 +1418,21 @@ export async function handleWeeklyReportCommand(parsedArgv: ParsedArgv, dependen
       throw new CliInputError("Missing required option --config-json.");
     }
 
+    let weeklyReportConfig: { to: string[] } | { webhookUrl: string } | { slackDestinationId: string };
+    if (channel === "slack") {
+      if (typeof (config as Record<string, unknown>)["slack_destination_id"] === "string") {
+        weeklyReportConfig = { slackDestinationId: String((config as Record<string, unknown>)["slack_destination_id"]) };
+      } else {
+        weeklyReportConfig = { webhookUrl: String((config as Record<string, unknown>)["webhook_url"]) };
+      }
+    } else {
+      weeklyReportConfig = { to: (config as { to: string[] }).to };
+    }
+
     const input = appendCommonAuthOptions(parsedArgv, {
       projectId,
       channel,
-      config: channel === "slack" ? { webhookUrl: String((config as Record<string, unknown>)["webhook_url"]) } : { to: (config as { to: string[] }).to },
+      config: weeklyReportConfig,
       schedule: {
         dayOfWeek,
         hourOfDay,
@@ -1381,9 +1478,11 @@ export async function handleWeeklyReportCommand(parsedArgv: ParsedArgv, dependen
       if (typeof config !== "object" || config === null) {
         throw new CliInputError("Invalid value for --config-json.");
       }
-      input.config = "webhook_url" in (config as Record<string, unknown>)
-        ? { webhookUrl: String((config as Record<string, unknown>)["webhook_url"]) }
-        : { to: (config as { to: string[] }).to };
+      input.config = "slack_destination_id" in (config as Record<string, unknown>)
+        ? { slackDestinationId: String((config as Record<string, unknown>)["slack_destination_id"]) }
+        : "webhook_url" in (config as Record<string, unknown>)
+          ? { webhookUrl: String((config as Record<string, unknown>)["webhook_url"]) }
+          : { to: (config as { to: string[] }).to };
     }
 
     const isEnabled = readBooleanStringOption(parsedArgv, "is-enabled");

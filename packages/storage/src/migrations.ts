@@ -28,6 +28,7 @@ export const REQUIRED_API_TABLES = [
   "incidents",
   "incident_events",
   "alert_rules",
+  "slack_destinations",
   "agent_webhooks",
   "webhook_deliveries",
   "processed_billing_events"
@@ -46,6 +47,7 @@ export const REQUIRED_WORKER_TABLES = [
   "incidents",
   "incident_events",
   "alert_rules",
+  "slack_destinations",
   "alert_deliveries",
   "weekly_report_deliveries",
   "agent_webhooks",
@@ -509,6 +511,26 @@ const STORAGE_BOOTSTRAP_STATEMENTS = [
   `
     CREATE INDEX alert_rules_project_enabled_idx
     ON alert_rules (project_id, is_enabled)
+  `,
+  `
+    CREATE TABLE slack_destinations (
+      id uuid PRIMARY KEY,
+      organization_id uuid NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+      slack_team_id text NOT NULL,
+      slack_team_name text,
+      slack_channel_id text NOT NULL,
+      slack_channel_name text,
+      webhook_url_ciphertext text NOT NULL,
+      installed_by_member_id uuid REFERENCES users(id) ON DELETE SET NULL,
+      is_active boolean NOT NULL DEFAULT true,
+      created_at timestamptz NOT NULL DEFAULT now(),
+      updated_at timestamptz NOT NULL DEFAULT now(),
+      UNIQUE (organization_id, slack_team_id, slack_channel_id)
+    )
+  `,
+  `
+    CREATE INDEX slack_destinations_org_active_idx
+    ON slack_destinations (organization_id, is_active, created_at)
   `,
   `
     CREATE TABLE alert_deliveries (

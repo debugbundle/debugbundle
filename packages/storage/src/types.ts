@@ -261,6 +261,7 @@ export interface AccountDataExportRecord extends Record<string, unknown> {
   incident_events: Record<string, unknown>[];
   bundle_generations: Record<string, unknown>[];
   alert_rules: Record<string, unknown>[];
+  slack_destinations: Record<string, unknown>[];
   alert_deliveries: Record<string, unknown>[];
   weekly_report_channels: Record<string, unknown>[];
   weekly_report_deliveries: Record<string, unknown>[];

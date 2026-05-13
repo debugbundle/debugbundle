@@ -59,12 +59,12 @@ type WeeklyReportCreateInput = {
   projectId: string;
   schedule: { dayOfWeek: WeeklyReportDayOfWeek; hourOfDay: number; timezone: string };
   isEnabled?: boolean;
-} & ({ channel: "email"; config: { to: string[] } } | { channel: "slack"; config: { webhookUrl: string } });
+} & ({ channel: "email"; config: { to: string[] } } | { channel: "slack"; config: { webhookUrl: string } | { slackDestinationId: string } });
 
 type WeeklyReportUpdateInput = {
   bearerToken: string;
   channelId: string;
-  config?: { to: string[] } | { webhookUrl: string };
+  config?: { to: string[] } | { webhookUrl: string } | { slackDestinationId: string };
   schedule?: { dayOfWeek: WeeklyReportDayOfWeek; hourOfDay: number; timezone: string };
   isEnabled?: boolean;
 };
@@ -164,7 +164,12 @@ export function createWeeklyReportApi(client: HttpClient): {
     },
 
     async createWeeklyReportChannel(input) {
-      const config = input.channel === "email" ? { to: input.config.to } : { webhook_url: input.config.webhookUrl };
+      const config =
+        input.channel === "email"
+          ? { to: input.config.to }
+          : "webhookUrl" in input.config
+            ? { webhook_url: input.config.webhookUrl }
+            : { slack_destination_id: input.config.slackDestinationId };
 
       return expectChannel(
         client.request({
@@ -189,7 +194,12 @@ export function createWeeklyReportApi(client: HttpClient): {
     async updateWeeklyReportChannel(input) {
       const body: Record<string, unknown> = {};
       if (input.config !== undefined) {
-        body["config"] = "to" in input.config ? { to: input.config.to } : { webhook_url: input.config.webhookUrl };
+        body["config"] =
+          "to" in input.config
+            ? { to: input.config.to }
+            : "webhookUrl" in input.config
+              ? { webhook_url: input.config.webhookUrl }
+              : { slack_destination_id: input.config.slackDestinationId };
       }
       if (input.schedule !== undefined) {
         body["schedule"] = {

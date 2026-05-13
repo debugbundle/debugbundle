@@ -20,6 +20,7 @@ import {
   createPostgresAlertDeliveryStore,
   createPostgresBillingStore,
   createPostgresGitHubStore,
+  createPostgresSlackDestinationStore,
   createPostgresWebhookDeliveryStore,
   createPostgresMetadataStore,
   createPostgresRetentionStore,
@@ -30,8 +31,11 @@ import {
   createRedisRequestAnomalyCounter,
   createRedisQueueClient,
   createS3ObjectStoreClient,
+  assertIntegrationSecretEncryptionKey,
+  decryptIntegrationSecret,
   type WeeklyReportChannelRecord,
   type GitHubStore,
+  type SlackDestinationStore,
   type WebhookDeliveryStore,
   type WeeklyReportingStore,
   type Queryable
@@ -79,6 +83,7 @@ const WorkerEnvSchema = z.object({
   WEBHOOK_DELIVERY_TIMEOUT_MS: z.coerce.number().int().min(100).max(30000).default(5000),
   GITHUB_APP_ID: z.string().min(1).optional(),
   GITHUB_APP_PRIVATE_KEY: z.string().min(1).optional(),
+  INTEGRATION_SECRET_ENCRYPTION_KEY: z.string().min(1).optional(),
   WEEKLY_REPORT_SCHEDULER_BATCH_SIZE: z.coerce.number().int().min(1).max(500).default(25),
   WEEKLY_REPORT_EMAIL_TIMEOUT_MS: z.coerce.number().int().min(100).max(30000).default(5000),
   SES_REGION: z.string().min(1).optional(),
@@ -131,6 +136,7 @@ export function parseWorkerEnv(env: Record<string, string | undefined>): WorkerE
     WEBHOOK_DELIVERY_TIMEOUT_MS: env["WEBHOOK_DELIVERY_TIMEOUT_MS"],
     GITHUB_APP_ID: readOptionalEnv(env["GITHUB_APP_ID"]),
     GITHUB_APP_PRIVATE_KEY: readOptionalEnv(env["GITHUB_APP_PRIVATE_KEY"]),
+    INTEGRATION_SECRET_ENCRYPTION_KEY: readOptionalEnv(env["INTEGRATION_SECRET_ENCRYPTION_KEY"]),
     WEEKLY_REPORT_SCHEDULER_BATCH_SIZE: env["WEEKLY_REPORT_SCHEDULER_BATCH_SIZE"],
     WEEKLY_REPORT_EMAIL_TIMEOUT_MS: env["WEEKLY_REPORT_EMAIL_TIMEOUT_MS"],
     SES_REGION: readOptionalEnv(env["SES_REGION"]),
@@ -151,6 +157,14 @@ export function parseWorkerEnv(env: Record<string, string | undefined>): WorkerE
     dbSslMode = parsePostgresSslMode(parsed.data.DB_SSL_MODE);
   } catch {
     throw new Error("worker_env_invalid: DB_SSL_MODE: expected disable or require");
+  }
+
+  if (parsed.data.INTEGRATION_SECRET_ENCRYPTION_KEY !== undefined) {
+    try {
+      assertIntegrationSecretEncryptionKey(parsed.data.INTEGRATION_SECRET_ENCRYPTION_KEY);
+    } catch {
+      throw new Error("worker_env_invalid: INTEGRATION_SECRET_ENCRYPTION_KEY: expected 32-byte base64url secret");
+    }
   }
 
   return {
@@ -661,6 +675,8 @@ export function createLifecycleWebhookTransport(input: CreateLifecycleWebhookTra
 interface CreateAlertTransportInput {
   timeoutMs: number;
   emailTransport: EmailTransport | null;
+  slackDestinationStore?: Pick<SlackDestinationStore, "getSlackDestinationSecretForDelivery">;
+  integrationSecretEncryptionKey?: string;
   appBaseUrl?: string | null;
   apiBaseUrl?: string | null;
 }
@@ -757,7 +773,35 @@ export function createAlertTransport(input: CreateAlertTransportInput): AlertDel
       }
 
       if (event.channel === "slack") {
-        const webhookUrl = event.config["webhook_url"] ?? event.config["url"];
+        let webhookUrl = event.config["webhook_url"] ?? event.config["url"];
+        const slackDestinationId = event.config["slack_destination_id"];
+        if (typeof slackDestinationId === "string" && slackDestinationId.length > 0) {
+          if (input.slackDestinationStore === undefined) {
+            throw new AlertDeliveryError("alert_slack_destination_store_missing");
+          }
+          if (
+            input.integrationSecretEncryptionKey === undefined ||
+            input.integrationSecretEncryptionKey.trim().length === 0
+          ) {
+            throw new AlertDeliveryError("alert_slack_encryption_key_missing");
+          }
+
+          const destination = await input.slackDestinationStore.getSlackDestinationSecretForDelivery({
+            slack_destination_id: slackDestinationId
+          });
+          if (destination === null) {
+            throw new AlertDeliveryError("alert_slack_destination_not_found");
+          }
+
+          try {
+            webhookUrl = decryptIntegrationSecret(
+              destination.webhook_url_ciphertext,
+              input.integrationSecretEncryptionKey
+            );
+          } catch {
+            throw new AlertDeliveryError("alert_slack_webhook_secret_invalid");
+          }
+        }
         if (typeof webhookUrl !== "string" || webhookUrl.length === 0) {
           throw new AlertDeliveryError("alert_slack_webhook_url_missing");
         }
@@ -1025,6 +1069,8 @@ function getWeeklyWindowForChannel(
 
 export function createWeeklyReportTransport(input: {
   emailTransport: EmailTransport | null;
+  slackDestinationStore?: Pick<SlackDestinationStore, "getSlackDestinationSecretForDelivery">;
+  integrationSecretEncryptionKey?: string;
 }): WeeklyReportTransport {
   return {
     async deliver(event): Promise<void> {
@@ -1058,7 +1104,36 @@ export function createWeeklyReportTransport(input: {
         return;
       }
 
-      const webhookUrl = event.channel.config["webhook_url"];
+      let webhookUrl = event.channel.config["webhook_url"];
+      const slackDestinationId = event.channel.config["slack_destination_id"];
+      if (typeof slackDestinationId === "string" && slackDestinationId.length > 0) {
+        if (input.slackDestinationStore === undefined) {
+          throw new Error("weekly_report_slack_destination_store_missing");
+        }
+        if (
+          input.integrationSecretEncryptionKey === undefined ||
+          input.integrationSecretEncryptionKey.trim().length === 0
+        ) {
+          throw new Error("weekly_report_slack_encryption_key_missing");
+        }
+
+        const destination = await input.slackDestinationStore.getSlackDestinationSecretForDelivery({
+          slack_destination_id: slackDestinationId
+        });
+        if (destination === null) {
+          throw new Error("weekly_report_slack_destination_not_found");
+        }
+
+        try {
+          webhookUrl = decryptIntegrationSecret(
+            destination.webhook_url_ciphertext,
+            input.integrationSecretEncryptionKey
+          );
+        } catch {
+          throw new Error("weekly_report_slack_webhook_secret_invalid");
+        }
+      }
+
       if (typeof webhookUrl !== "string" || webhookUrl.length === 0) {
         throw new Error("weekly_report_slack_config_invalid");
       }
@@ -1191,6 +1266,7 @@ export async function runWorkerFromEnv(envInput: Record<string, string | undefin
   const incidentStore = createPostgresMetadataStore(queryable);
   const billingStore = createPostgresBillingStore(queryable);
   const alertDeliveryStore = createPostgresAlertDeliveryStore(queryable);
+  const slackDestinationStore = createPostgresSlackDestinationStore(queryable);
   const webhookDeliveryStore = createPostgresWebhookDeliveryStore(queryable);
   const githubStore = createPostgresGitHubStore(queryable);
   const retentionStore = createPostgresRetentionStore(queryable);
@@ -1245,11 +1321,19 @@ export async function runWorkerFromEnv(envInput: Record<string, string | undefin
   const alertTransport = createAlertTransport({
     timeoutMs: env.WEBHOOK_DELIVERY_TIMEOUT_MS,
     emailTransport,
+    slackDestinationStore,
+    ...(env.INTEGRATION_SECRET_ENCRYPTION_KEY === undefined
+      ? {}
+      : { integrationSecretEncryptionKey: env.INTEGRATION_SECRET_ENCRYPTION_KEY }),
     appBaseUrl: normalizeWorkerBaseUrl(envInput["APP_BASE_URL"]),
     apiBaseUrl: normalizeWorkerBaseUrl(envInput["DEBUGBUNDLE_API_URL"] ?? envInput["API_BASE_URL"] ?? envInput["VITE_API_URL"])
   });
   const weeklyReportTransport = createWeeklyReportTransport({
-    emailTransport
+    emailTransport,
+    slackDestinationStore,
+    ...(env.INTEGRATION_SECRET_ENCRYPTION_KEY === undefined
+      ? {}
+      : { integrationSecretEncryptionKey: env.INTEGRATION_SECRET_ENCRYPTION_KEY })
   });
   const retentionCleanupRunner = createRetentionCleanupService({
     retentionStore,

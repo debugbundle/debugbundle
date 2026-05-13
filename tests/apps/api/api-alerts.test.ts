@@ -8,14 +8,19 @@ type AuthRateLimiterDependency = MockedMethods<NonNullable<ApiServerDependencies
 type AuditLoggingDependency = MockedMethods<NonNullable<ApiServerDependencies["auditLogging"]>>;
 type MemberAuthDependency = MockedMethods<ApiServerDependencies["memberAuth"]>;
 type AlertManagementDependency = MockedMethods<NonNullable<ApiServerDependencies["alertManagement"]>>;
+type BillingManagementDependency = MockedMethods<NonNullable<ApiServerDependencies["billingManagement"]>>;
+type SlackManagementDependency = MockedMethods<NonNullable<ApiServerDependencies["slackManagement"]>>;
 
 function createServer(overrides: {
   authRateLimiter?: Partial<AuthRateLimiterDependency>;
   auditLogging?: AuditLoggingDependency | undefined;
   memberAuth?: MemberAuthDependency | undefined;
   alertManagement?: AlertManagementDependency | undefined;
+  billingManagement?: BillingManagementDependency | undefined;
+  slackManagement?: SlackManagementDependency | undefined;
 } = {}): ReturnType<typeof createApiServer> {
   const hasAlertManagementOverride = Object.prototype.hasOwnProperty.call(overrides, "alertManagement");
+  const hasSlackManagementOverride = Object.prototype.hasOwnProperty.call(overrides, "slackManagement");
 
   return createApiServer({
     ingestionPersistence: {
@@ -62,6 +67,7 @@ function createServer(overrides: {
       listDeliveriesForWebhookInOrganization: vi.fn().mockResolvedValue({ deliveries: [] })
     },
     ...(overrides.auditLogging === undefined ? {} : { auditLogging: overrides.auditLogging }),
+    ...(overrides.billingManagement === undefined ? {} : { billingManagement: overrides.billingManagement }),
     alertManagement:
       hasAlertManagementOverride
         ? overrides.alertManagement
@@ -71,7 +77,18 @@ function createServer(overrides: {
         createAlertForOrganization: vi.fn().mockResolvedValue(null),
         updateAlertForOrganization: vi.fn().mockResolvedValue(null),
         deleteAlertForOrganization: vi.fn().mockResolvedValue(null)
-      })
+      }),
+    slackManagement:
+      hasSlackManagementOverride
+        ? overrides.slackManagement
+        : mockedObject<NonNullable<ApiServerDependencies["slackManagement"]>>({
+            listSlackDestinationsForProjectInOrganization: vi.fn().mockResolvedValue([]),
+            getSlackDestinationForOrganization: vi.fn().mockResolvedValue(null),
+            upsertSlackDestinationForOrganization: vi.fn().mockResolvedValue({
+              slack_destination_id: "sd_123"
+            }),
+            deleteSlackDestinationForProjectInOrganization: vi.fn().mockResolvedValue(null)
+          })
   });
 }
 
@@ -317,6 +334,76 @@ describe("api alert routes", () => {
     expect(missingRecipient.json()).toEqual({ error: "invalid_payload" });
     expect(missingProject.statusCode).toBe(404);
     expect(missingProject.json()).toEqual({ error: "project_not_found" });
+  });
+
+  it("accepts connected slack destination ids for team organizations", async (): Promise<void> => {
+    const alertManagement = {
+      listAlertsForOrganization: vi.fn().mockResolvedValue([]),
+      createAlertForOrganization: vi.fn().mockResolvedValue({
+        alert_id: "22222222-2222-4222-8222-222222222222",
+        project_id: "00000000-0000-4000-8000-000000000001",
+        service_id: null,
+        channel: "slack",
+        condition_type: "error_spike",
+        severity_min: "critical",
+        config: { slack_destination_id: "11111111-1111-4111-8111-111111111111" },
+        is_enabled: true,
+        created_at: "2026-03-15T00:00:00.000Z",
+        updated_at: "2026-03-15T00:00:00.000Z"
+      }),
+      updateAlertForOrganization: vi.fn().mockResolvedValue(null),
+      deleteAlertForOrganization: vi.fn().mockResolvedValue(null)
+    };
+    const app = createServer({
+      alertManagement,
+      billingManagement: mockedObject<NonNullable<ApiServerDependencies["billingManagement"]>>({
+        getBillingSummaryForOrganization: vi.fn().mockResolvedValue({ plan: "team" })
+      }),
+      slackManagement: mockedObject<NonNullable<ApiServerDependencies["slackManagement"]>>({
+        listSlackDestinationsForProjectInOrganization: vi.fn().mockResolvedValue([]),
+        getSlackDestinationForOrganization: vi.fn().mockResolvedValue({
+          slack_destination_id: "11111111-1111-4111-8111-111111111111",
+          organization_id: "org_123",
+          slack_team_id: "T123",
+          slack_team_name: "Acme",
+          slack_channel_id: "C123",
+          slack_channel_name: "#alerts",
+          installed_by_member_id: "usr_123",
+          is_active: true,
+          created_at: "2026-05-13T10:00:00.000Z",
+          updated_at: "2026-05-13T10:00:00.000Z"
+        }),
+        upsertSlackDestinationForOrganization: vi.fn().mockResolvedValue({ slack_destination_id: "sd_123" }),
+        deleteSlackDestinationForProjectInOrganization: vi.fn().mockResolvedValue(null)
+      })
+    });
+
+    const response = await app.inject({
+      method: "POST",
+      url: "/v1/alerts",
+      headers: {
+        authorization: "Bearer dbundle_mem_test"
+      },
+      payload: {
+        project_id: "00000000-0000-4000-8000-000000000001",
+        channel: "slack",
+        condition_type: "error_spike",
+        severity_min: "critical",
+        config: {
+          slack_destination_id: "11111111-1111-4111-8111-111111111111"
+        }
+      }
+    });
+
+    expect(response.statusCode).toBe(201);
+    expect(alertManagement.createAlertForOrganization).toHaveBeenCalledWith(
+      expect.objectContaining({
+        channel: "slack",
+        config: {
+          slack_destination_id: "11111111-1111-4111-8111-111111111111"
+        }
+      })
+    );
   });
 
   it("should update alert fields scoped to member organization", async (): Promise<void> => {

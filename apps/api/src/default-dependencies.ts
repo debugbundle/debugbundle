@@ -45,6 +45,7 @@ import {
   type IncidentFrequencyCounter,
   type IngestionRateLimiter,
   createPostgresMetadataStore,
+  createPostgresSlackDestinationStore,
   createPostgresWeeklyReportChannelStore,
   createPostgresWebhookDeliveryStore,
   createRedisIncidentFrequencyCounter,
@@ -698,6 +699,7 @@ export function createApiDependencies(input: CreateApiDependenciesInput): {
     ReturnType<typeof createPostgresMetadataStore>,
     "listAlertsForOrganization" | "createAlertForOrganization" | "updateAlertForOrganization" | "deleteAlertForOrganization"
   >;
+  slackManagement: ReturnType<typeof createPostgresSlackDestinationStore>;
   weeklyReportManagement: ReturnType<typeof createPostgresWeeklyReportChannelStore>;
   webhookDelivery: ReturnType<typeof createPostgresWebhookDeliveryStore>;
   webhookTesting: {
@@ -741,6 +743,7 @@ export function createApiDependencies(input: CreateApiDependenciesInput): {
   const capturePolicyStore = createPostgresCapturePolicyStore(input.db);
   const metadataStore = createPostgresMetadataStore(input.db);
   const githubStore = createPostgresGitHubStore(input.db);
+  const slackDestinationStore = createPostgresSlackDestinationStore(input.db);
   const weeklyReportChannelStore = createPostgresWeeklyReportChannelStore(input.db);
   const billingLinks = createEnvBillingLinkProvider();
   const githubAppClient = input.githubAppClient;
@@ -1641,6 +1644,7 @@ export function createApiDependencies(input: CreateApiDependenciesInput): {
       updateAlertForOrganization: (input) => metadataStore.updateAlertForOrganization(input),
       deleteAlertForOrganization: (input) => metadataStore.deleteAlertForOrganization(input)
     },
+    slackManagement: slackDestinationStore,
     weeklyReportManagement: weeklyReportChannelStore,
     webhookDelivery,
     webhookTesting,
@@ -1761,6 +1765,7 @@ export function createApiDependenciesFromEnv(env: Record<string, string | undefi
     ReturnType<typeof createPostgresMetadataStore>,
     "listAlertsForOrganization" | "createAlertForOrganization" | "updateAlertForOrganization" | "deleteAlertForOrganization"
   >;
+  slackManagement: ReturnType<typeof createPostgresSlackDestinationStore>;
   weeklyReportManagement: ReturnType<typeof createPostgresWeeklyReportChannelStore>;
   webhookDelivery: ReturnType<typeof createPostgresWebhookDeliveryStore>;
   webhookTesting: {

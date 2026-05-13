@@ -238,6 +238,19 @@ export function createPostgresAccountStore(db: Queryable): AccountLifecycleStore
         "created_at ASC, id ASC",
         "alert_rules.*, alert_rules.id AS alert_id",
       );
+      const slackDestinations = await queryJsonRows(
+        db,
+        `
+          SELECT to_jsonb(t) AS data
+          FROM (
+            SELECT slack_destinations.*, slack_destinations.id AS slack_destination_id
+            FROM slack_destinations
+            WHERE organization_id = $1
+            ORDER BY created_at ASC, id ASC
+          ) t
+        `,
+        [input.organization_id],
+      );
       const alertDeliveries = await queryProjectScopedRows(
         db,
         "alert_deliveries",
@@ -388,6 +401,7 @@ export function createPostgresAccountStore(db: Queryable): AccountLifecycleStore
         incident_events: incidentEvents,
         bundle_generations: bundleGenerations,
         alert_rules: alertRules,
+        slack_destinations: slackDestinations,
         alert_deliveries: alertDeliveries,
         weekly_report_channels: weeklyReportChannels,
         weekly_report_deliveries: weeklyReportDeliveries,

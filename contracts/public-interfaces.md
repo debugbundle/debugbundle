@@ -1,7 +1,7 @@
 # Public Interfaces — DebugBundle
 
 Version: v1
-Last updated: 2026-05-11
+Last updated: 2026-05-13
 
 ---
 
@@ -20,6 +20,8 @@ Every capability must be available through all applicable interfaces. Operations
 | Accept invite | `POST /v1/auth/accept-invite` | — | — | Browser session only |
 | GitHub sign-in start | `GET /v1/auth/github/start` | — | — | Browser redirect entry point only |
 | GitHub sign-in callback | `GET /v1/auth/github/callback` | — | — | Browser redirect callback only |
+| Slack app install URL | `GET /v1/slack/app/install-url` | `slack connect-url` | `get_slack_connect_url` | Returns a browser handoff URL for Team-tier project alert setup |
+| Slack app callback | `GET /v1/slack/app/callback` | — | — | Browser OAuth callback only |
 | GitHub device auth start | `POST /v1/auth/github/device/start` | — | — | CLI/browserless bootstrap helper |
 | GitHub device auth poll | `POST /v1/auth/github/device/poll` | — | — | CLI/browserless bootstrap helper |
 | GitHub device auth claim | `POST /v1/auth/github/device/claim` | — | — | Issues the member token after approval |
@@ -57,6 +59,9 @@ Every capability must be available through all applicable interfaces. Operations
 | Revoke member token | `POST /v1/member/tokens/{tokenId}/revoke` | `token member revoke` | `revoke_member_token` | |
 | List services | `GET /v1/services` | `services` | `list_services` | |
 | Alert CRUD | `POST/GET/PATCH/DELETE /v1/alerts` | `alert list/create/update/delete` | `list_alerts/create_alert/update_alert/delete_alert` | Browser Session or Member Token, scoped to organization/project |
+| Project Slack destinations | `GET /v1/projects/{id}/slack/destinations` | `slack list` | `list_slack_destinations` | Browser Session or Member Token, Team tier, reusable Slack channel list for alert setup |
+| Test Slack destination | `POST /v1/projects/{id}/slack/destinations/{destinationId}/test` | `slack test` | `test_slack_destination` | Browser Session or Member Token, owner only, Team tier |
+| Delete Slack destination | `DELETE /v1/projects/{id}/slack/destinations/{destinationId}` | `slack delete` | `delete_slack_destination` | Browser Session or Member Token, owner only, Team tier |
 | Weekly report channel CRUD | `POST/GET/PATCH/DELETE /v1/weekly-report-channels` | `weekly-report list/create/update/delete` | `list_weekly_report_channels/create_weekly_report_channel/update_weekly_report_channel/delete_weekly_report_channel` | Browser Session or Member Token, scoped to organization/project |
 | List webhooks | `GET /v1/webhooks` | `webhook list` | `list_webhooks` | Browser Session or Member Token, scoped to organization/project |
 | Create webhook | `POST /v1/webhooks` | `webhook create` | `create_webhook` | Signing secret returned once |
@@ -166,7 +171,7 @@ GitHub sign-in preserves the same first-party browser-session model as email-cod
 
 The CLI bootstrap flow is additive and issues the same member-token credential used by normal CLI/MCP auth. `POST /v1/auth/github/device/start` plus `poll`/`claim` implement the official GitHub device flow. `POST /v1/auth/github/token/exchange` accepts an already-authenticated GitHub access token such as the output of `gh auth token`.
 
-`GET /v1/account/export` returns a JSON attachment covering the retained organization-account record set, including members, projects, tokens, incidents, audit logs, billing-processing rows, and retained raw-event, bundle, and reproduction artifacts when present in object storage.
+`GET /v1/account/export` returns a JSON attachment covering the retained organization-account record set, including members, projects, tokens, reusable Slack destinations, incidents, audit logs, billing-processing rows, and retained raw-event, bundle, and reproduction artifacts when present in object storage.
 
 `DELETE /v1/account` requires an owner-scoped browser session plus a confirmation body that repeats the signed-in email address:
 
@@ -738,6 +743,7 @@ Checkout confirmation returns the standard billing summary response after the AP
 
 `service_id` and `severity_min` are optional on create, and `is_enabled` defaults to `true`.
 For `channel: "email"`, `config.to` is required and must be a single recipient email address. Create additional alert rules if multiple people should receive email notifications.
+For `channel: "slack"`, prefer `config.slack_destination_id` when the workspace/channel was connected through the Slack OAuth flow. Direct `config.webhook_url` remains valid for callers that intentionally want a raw webhook configuration.
 
 **Update alert request:**
 ```json
@@ -787,7 +793,7 @@ When updating channel-specific `config`, include the `channel` in the same reque
       "condition_type": "error_spike",
       "severity_min": null,
       "config": {
-        "channel": "eng-alerts"
+        "slack_destination_id": "uuid"
       },
       "is_enabled": true,
       "created_at": "ISO8601",
@@ -804,13 +810,65 @@ Current API implementation scope (Phase 10 alert CRUD slice):
 - `DELETE /v1/alerts/{id}` returns `204` on success.
 - Worker-side alert evaluation now enqueues internal `evaluate-alerts` jobs from real incident transitions for `new_incident`, `severity_threshold`, `incident_regressed`, `regression_after_deploy`, and `error_spike` conditions.
 - Matching alert evaluations persist one internal `alert_deliveries` row per `alert_id + incident_id + dedupe_key` before delivery so duplicate worker replays stay idempotent.
-- Delivery transport is implemented for `channel: "email"`, `channel: "slack"`, `channel: "discord"`, and `channel: "webhook"`. Email requires `config.to` as a single recipient address; Slack and Discord require `config.webhook_url`; webhook requires `config.target_url`.
+- Delivery transport is implemented for `channel: "email"`, `channel: "slack"`, `channel: "discord"`, and `channel: "webhook"`. Email requires `config.to` as a single recipient address; Slack accepts either `config.slack_destination_id` (resolved to an encrypted stored webhook URL at delivery time) or `config.webhook_url`; Discord requires `config.webhook_url`; webhook requires `config.target_url`.
 - Authorization failure: `401 { "error": "invalid_member_token" }`
 - Invalid list query: `400 { "error": "invalid_query" }`
 - Invalid alert ID: `400 { "error": "invalid_alert_id" }`
 - Invalid create/update body: `400 { "error": "invalid_payload" }`
+- Slack channel unavailable on current plan: `403 { "error": "upgrade_required" }`
 - Missing scoped project on list/create: `404 { "error": "project_not_found" }`
+- Missing scoped connected Slack destination on create/update: `404 { "error": "slack_destination_not_found" }`
 - Missing scoped alert on update/delete: `404 { "error": "alert_not_found" }`
+
+### 1.4a Slack Connected Destinations
+
+These routes back the Team-tier `Connect Slack` flow inside the project alerts modal and the agent-facing Slack destination management commands. The OAuth callback remains browser-only, while API, CLI, and MCP all support listing, testing, and deleting reusable Slack destinations plus creating browser handoff install URLs.
+
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| GET | `/v1/slack/app/install-url` | Browser Session or Member Token | Return a Slack OAuth authorize URL for a project-scoped connect flow |
+| GET | `/v1/slack/app/callback` | None | Complete Slack OAuth and redirect back to the app |
+| GET | `/v1/projects/{id}/slack/destinations` | Browser Session or Member Token | List reusable connected Slack channels for the project organization |
+| POST | `/v1/projects/{id}/slack/destinations/{destinationId}/test` | Browser Session or Member Token | Send a test message to a reusable connected Slack channel |
+| DELETE | `/v1/projects/{id}/slack/destinations/{destinationId}` | Browser Session or Member Token | Disconnect a reusable Slack destination |
+
+**Install-url query params:** `project_id` (required UUID), `return_to` (optional app-relative path such as `/projects/<projectId>/alerts`)
+
+**Install-url response:**
+```json
+{
+  "install_url": "https://slack.com/oauth/v2/authorize?client_id=...&scope=incoming-webhook&redirect_uri=...&state=..."
+}
+```
+
+**List connected Slack destinations response:**
+```json
+{
+  "destinations": [
+    {
+      "slack_destination_id": "uuid",
+      "organization_id": "uuid",
+      "slack_team_id": "T123",
+      "slack_team_name": "Acme Workspace",
+      "slack_channel_id": "C123",
+      "slack_channel_name": "#alerts",
+      "installed_by_member_id": "uuid",
+      "is_active": true,
+      "created_at": "ISO8601",
+      "updated_at": "ISO8601"
+    }
+  ]
+}
+```
+
+`GET /v1/slack/app/callback` validates the signed install state, exchanges the Slack OAuth code, upserts the reusable destination, clears the transient cookie, and redirects back to the requested app path with `slack_connect=success|cancelled|error`.
+
+Current implementation behavior:
+- `GET /v1/slack/app/install-url` requires owner access, a Team-tier organization, and a scoped project.
+- `GET /v1/projects/{id}/slack/destinations` requires member auth and Team tier.
+- `POST /v1/projects/{id}/slack/destinations/{destinationId}/test` requires owner access, decrypts the stored webhook URL, sends a Slack test message, and returns `502` with a stable Slack-specific error code when delivery fails.
+- `DELETE /v1/projects/{id}/slack/destinations/{destinationId}` requires owner access and returns `409 { "error": "slack_destination_in_use" }` while any alert rule or weekly report still references that destination.
+- Slack webhook URLs are never returned by these routes.
 
 ### 1.5 Webhooks
 
@@ -988,7 +1046,7 @@ Current webhook delivery behavior for the Phase 10 base: worker delivery attempt
 }
 ```
 
-Slack channels use `config.webhook_url` instead of `config.to`.
+Slack channels accept either `config.webhook_url` or `config.slack_destination_id`. Team-tier callers should prefer `slack_destination_id` so weekly reports reuse the same encrypted connected Slack channel as alert rules.
 
 **Update weekly report channel request:**
 ```json
@@ -1010,7 +1068,7 @@ Slack channels use `config.webhook_url` instead of `config.to`.
     "project_id": "uuid",
     "channel": "slack",
     "config": {
-      "webhook_url": "https://hooks.slack.com/services/T/B/x"
+      "slack_destination_id": "uuid"
     },
     "schedule": {
       "day_of_week": "friday",
@@ -1052,7 +1110,10 @@ Slack channels use `config.webhook_url` instead of `config.to`.
 - Invalid list query: `400 { "error": "invalid_query" }`
 - Invalid channel id: `400 { "error": "invalid_weekly_report_channel_id" }`
 - Invalid create/update body: `400 { "error": "invalid_payload" }`
+- Slack connected-destination unavailable on current plan: `403 { "error": "upgrade_required" }`
+- Slack connected-destination management missing in runtime config: `503 { "error": "slack_not_configured" }`
 - Missing scoped project on list/create: `404 { "error": "project_not_found" }`
+- Missing scoped connected Slack destination on create/update: `404 { "error": "slack_destination_not_found" }`
 - Missing scoped channel on update/delete: `404 { "error": "weekly_report_channel_not_found" }`
 
 ### 1.7 Health
@@ -1604,7 +1665,7 @@ debugbundle alert update <id> [--service-id <id|null>] [--channel <channel>] [--
 debugbundle alert delete <id> [--auth-file <path>] [--json]
 ```
 
-Current alert CLI behavior is a thin adapter over the alert HTTP client in `packages/alert-client`, reusing stored member auth after `debugbundle login` and forwarding JSON output without duplicating transport logic. `alert create` requires `--config-json` with a channel-specific object, and `alert update` accepts `null` clears for `service_id`, `severity_min`, or `config`.
+Current alert CLI behavior is a thin adapter over the alert HTTP client in `packages/alert-client`, reusing stored member auth after `debugbundle login` and forwarding JSON output without duplicating transport logic. `alert create` requires `--config-json` with a channel-specific object, and `alert update` accepts `null` clears for `service_id`, `severity_min`, or `config`. Slack alert configs can use either `{"webhook_url":"..."}` or `{"slack_destination_id":"uuid"}`.
 
 ### 2.6 Webhook Commands
 ```
@@ -1618,7 +1679,17 @@ debugbundle webhook deliveries <id> [--limit <n>] [--auth-file <path>] [--json]
 
 Current webhook CLI behavior is a thin adapter over the webhook HTTP client in `packages/webhook-client`, reusing stored member auth after `debugbundle login` and forwarding JSON output without duplicating transport logic. Multi-value flags (`--event`, `--environment`, `--service`, `--bundle-type`) accept comma-separated values.
 
-### 2.7 Weekly Report Commands
+### 2.7 Slack Commands
+```
+debugbundle slack list --project-id <id> [--auth-file <path>] [--json]
+debugbundle slack connect-url --project-id <id> [--return-to </projects/...>] [--auth-file <path>] [--json]
+debugbundle slack test <destination-id> --project-id <id> [--auth-file <path>] [--json]
+debugbundle slack delete <destination-id> --project-id <id> [--auth-file <path>] [--json]
+```
+
+Current Slack CLI behavior is a thin adapter over `packages/slack-client`. `slack connect-url` returns the browser OAuth handoff URL, `slack list` exposes reusable connected destinations for a project organization, `slack test` sends a test message to the selected destination, and `slack delete` removes a destination once no alert rules or weekly reports still reference it.
+
+### 2.8 Weekly Report Commands
 ```
 debugbundle weekly-report list --project-id <id> [--limit <n>] [--auth-file <path>] [--json]
 debugbundle weekly-report create --project-id <id> --channel <email|slack> --day-of-week <day> --hour-of-day <0-23> --timezone <iana> --config-json <json> [--is-enabled <true|false>] [--auth-file <path>] [--json]
@@ -1626,9 +1697,9 @@ debugbundle weekly-report update <channel-id> [--day-of-week <day>] [--hour-of-d
 debugbundle weekly-report delete <channel-id> [--auth-file <path>] [--json]
 ```
 
-Current weekly report CLI behavior is a thin adapter over the weekly report HTTP client in `packages/weekly-report-client`, reusing stored member auth after `debugbundle login` and forwarding JSON output without duplicating transport logic.
+Current weekly report CLI behavior is a thin adapter over the weekly report HTTP client in `packages/weekly-report-client`, reusing stored member auth after `debugbundle login` and forwarding JSON output without duplicating transport logic. Slack weekly-report configs accept either `{"webhook_url":"..."}` or `{"slack_destination_id":"uuid"}` in `--config-json`.
 
-### 2.8 Profile Commands
+### 2.9 Profile Commands
 ```
 debugbundle profile validate [--json]
 debugbundle profile show [--json]
@@ -1637,14 +1708,14 @@ debugbundle profile sync
 
 Current local `debugbundle profile validate` behavior validates `.debugbundle/profile.json` and reports field-path errors for missing or invalid required schema fields.
 
-### 2.9 Analysis Commands
+### 2.10 Analysis Commands
 ```
 debugbundle analyze [--type failure|improvement|performance] [--local] [--json]
 ```
 
 Current local `debugbundle analyze` behavior reads `.debugbundle/bundles/local/`, `.debugbundle/profile.json`, and repository source files discovered from the profile's service paths, then emits a deterministic bundle analysis artifact. The current implementation supports `--type improvement` for local analysis, uses the recipe contract at `.agents/skills/debugbundle/assets/schemas/improvement-analysis.json`, returns exit code `3` when no local bundles are available, and returns exit code `4` for unsupported local analysis types or invalid local profile state.
 
-### 2.10 Probe Commands (Remote Activation — Solo+ Only)
+### 2.11 Probe Commands (Remote Activation — Solo+ Only)
 ```
 debugbundle probe activate <project-id> --label-pattern <pattern> [--service <name>] [--environment <name>] [--ttl-seconds <n>] [--trigger-ttl-seconds <n>] [--auth-file <path>] [--json]
 debugbundle probe list <project-id> [--auth-file <path>] [--json]
@@ -1653,7 +1724,7 @@ debugbundle probe deactivate <project-id> <activation-id> [--auth-file <path>] [
 
 These commands manage **remote probe activations** (Solo+ only). Always-on probes require no CLI commands — they operate automatically in the SDK.
 
-### 2.11 Capture Policy Commands
+### 2.12 Capture Policy Commands
 ```
 debugbundle capture-policy get [--project <id>] [--json]
 debugbundle capture-policy set [--project <id>] --preset <minimal|balanced|investigative> [--json]
@@ -1663,7 +1734,7 @@ debugbundle capture-policy set [--project <id>] --override capture_logs=warning 
 `capture-policy get` displays the project's current capture preset, advanced overrides, and resolved policy. `capture-policy set` updates the preset and/or individual advanced overrides. Owner-only.
 `capture-policy get` displays the project's current resolved policy. `capture-policy set` updates the preset and/or individual override fields via `--override key=value` (use `null` to clear an override). Owner-only.
 
-### 2.12 Billing Commands
+### 2.13 Billing Commands
 ```
 debugbundle billing get [--json]
 debugbundle billing capacity increase --target-additional-capacity-units <n> [--json]
@@ -1683,7 +1754,29 @@ All billing commands require a stored member token with owner role. The `--json`
 
 `analyze` reads local bundles from `.debugbundle/bundles/local/`, the project profile, and relevant source code. It generates an analysis bundle following the bundle schema. The `--local` flag is implied when running without cloud credentials. The skill layer (`.agents/skills/debugbundle/assets/schemas/`) provides structured analysis recipes that the user's AI agent follows to produce the analysis.
 
-### 2.15 GitHub Commands
+### 2.14 Project Commands
+```
+debugbundle project list [--limit <n>] [--auth-file <path>] [--json]
+debugbundle project create --name <name> --slug <slug> [--environment-default <env>] [--auth-file <path>] [--json]
+debugbundle project update <project-id> [--name <name>] [--slug <slug>] [--environment-default <env>] [--auth-file <path>] [--json]
+debugbundle project delete <project-id> [--auth-file <path>] [--json]
+```
+
+`project list` lists all projects scoped to the authenticated member's organization. `project create` creates a new project with the given name and slug. `project update` modifies existing project attributes. `project delete` permanently removes a project (owner-only). All require member token authentication.
+
+### 2.15 Member Commands
+```
+debugbundle member list [--auth-file <path>] [--json]
+debugbundle member invites [--auth-file <path>] [--json]
+debugbundle member invite --email <email> --role <owner|admin|member> [--auth-file <path>] [--json]
+debugbundle member cancel-invite <invite-id> [--auth-file <path>] [--json]
+debugbundle member update-role <user-id> --role <owner|admin|member> [--auth-file <path>] [--json]
+debugbundle member remove <user-id> [--auth-file <path>] [--json]
+```
+
+`member list` lists all organization members. `member invites` lists pending invitations. `member invite` sends an invitation to the specified email (Team tier). `member cancel-invite` cancels a pending invitation. `member update-role` changes a member's role. `member remove` removes a member from the organization. All require owner-scoped member token authentication.
+
+### 2.16 GitHub Commands
 ```
 debugbundle github status [--auth-file <path>] [--json]
 debugbundle github repos [--auth-file <path>] [--json]
@@ -1708,28 +1801,6 @@ debugbundle github deliveries retry <delivery-id> [--project-id <id>] [--auth-fi
 | 3 | Resource not found |
 | 4 | Validation error |
 
-### 2.13 Project Commands
-```
-debugbundle project list [--limit <n>] [--auth-file <path>] [--json]
-debugbundle project create --name <name> --slug <slug> [--environment-default <env>] [--auth-file <path>] [--json]
-debugbundle project update <project-id> [--name <name>] [--slug <slug>] [--environment-default <env>] [--auth-file <path>] [--json]
-debugbundle project delete <project-id> [--auth-file <path>] [--json]
-```
-
-`project list` lists all projects scoped to the authenticated member's organization. `project create` creates a new project with the given name and slug. `project update` modifies existing project attributes. `project delete` permanently removes a project (owner-only). All require member token authentication.
-
-### 2.14 Member Commands
-```
-debugbundle member list [--auth-file <path>] [--json]
-debugbundle member invites [--auth-file <path>] [--json]
-debugbundle member invite --email <email> --role <owner|admin|member> [--auth-file <path>] [--json]
-debugbundle member cancel-invite <invite-id> [--auth-file <path>] [--json]
-debugbundle member update-role <user-id> --role <owner|admin|member> [--auth-file <path>] [--json]
-debugbundle member remove <user-id> [--auth-file <path>] [--json]
-```
-
-`member list` lists all organization members. `member invites` lists pending invitations. `member invite` sends an invitation to the specified email (Team tier). `member cancel-invite` cancels a pending invitation. `member update-role` changes a member's role. `member remove` removes a member from the organization. All require owner-scoped member token authentication.
-
 ---
 
 ## 3. MCP Tool Interface
@@ -1752,6 +1823,10 @@ debugbundle_list_alerts          → same result as `GET /v1/alerts`
 debugbundle_create_alert         → same result as `POST /v1/alerts`
 debugbundle_update_alert         → same result as `PATCH /v1/alerts/{id}`
 debugbundle_delete_alert         → same result as `DELETE /v1/alerts/{id}`
+debugbundle_list_slack_destinations    → same result as `GET /v1/projects/{id}/slack/destinations`
+debugbundle_get_slack_connect_url      → same result as `GET /v1/slack/app/install-url`
+debugbundle_test_slack_destination     → same result as `POST /v1/projects/{id}/slack/destinations/{destinationId}/test`
+debugbundle_delete_slack_destination   → same result as `DELETE /v1/projects/{id}/slack/destinations/{destinationId}`
 debugbundle_list_weekly_report_channels   → same result as `GET /v1/weekly-report-channels`
 debugbundle_create_weekly_report_channel  → same result as `POST /v1/weekly-report-channels`
 debugbundle_update_weekly_report_channel  → same result as `PATCH /v1/weekly-report-channels/{id}`
@@ -1764,7 +1839,7 @@ debugbundle_test_webhook           → same result as `POST /v1/webhooks/{id}/te
 debugbundle_list_webhook_deliveries → same result as `GET /v1/webhooks/{id}/deliveries`
 ```
 
-Current MCP alert and webhook behavior is a thin adapter over the same shared HTTP clients used by CLI, returning the same machine-readable payloads for alert and webhook lifecycle operations without adding business logic.
+Current MCP alert, Slack-destination, weekly-report, and webhook behavior is a thin adapter over the same shared HTTP clients used by CLI, returning the same machine-readable payloads for lifecycle operations without adding business logic.
 
 Current MCP local retrieval behavior: when no `bearerToken` is supplied and the project is configured as local-only, `debugbundle_list_incidents`, `debugbundle_get_incident`, `debugbundle_resolve_incident`, `debugbundle_reopen_incident`, `debugbundle_get_bundle`, and `debugbundle_get_reproduction` read the same local store used by the CLI (`.debugbundle/local/state.json`, `.debugbundle/bundles/local/`, `.debugbundle/bundles/local/reproductions/`) and return the same machine-readable payloads without cloud auth.
 

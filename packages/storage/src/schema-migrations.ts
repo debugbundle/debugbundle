@@ -83,6 +83,32 @@ export const STORAGE_SCHEMA_MIGRATIONS = [
     statements: [
       "ALTER TABLE webhook_deliveries ALTER COLUMN incident_id DROP NOT NULL"
     ]
+  }),
+  defineStorageSchemaMigration({
+    id: "202605130002_add_slack_destinations",
+    description: "Add reusable encrypted Slack alert destinations scoped to organizations.",
+    statements: [
+      `
+        CREATE TABLE IF NOT EXISTS slack_destinations (
+          id uuid PRIMARY KEY,
+          organization_id uuid NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+          slack_team_id text NOT NULL,
+          slack_team_name text,
+          slack_channel_id text NOT NULL,
+          slack_channel_name text,
+          webhook_url_ciphertext text NOT NULL,
+          installed_by_member_id uuid REFERENCES users(id) ON DELETE SET NULL,
+          is_active boolean NOT NULL DEFAULT true,
+          created_at timestamptz NOT NULL DEFAULT now(),
+          updated_at timestamptz NOT NULL DEFAULT now(),
+          UNIQUE (organization_id, slack_team_id, slack_channel_id)
+        )
+      `,
+      `
+        CREATE INDEX IF NOT EXISTS slack_destinations_org_active_idx
+        ON slack_destinations (organization_id, is_active, created_at)
+      `
+    ]
   })
 ] as const;
 

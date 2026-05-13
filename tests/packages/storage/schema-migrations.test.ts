@@ -22,7 +22,7 @@ describe("storage schema migrations", () => {
     expect(query).toHaveBeenCalledWith("BEGIN", []);
     expect(query).toHaveBeenCalledWith("COMMIT", []);
     expect(String(query.mock.calls[3]?.[0] ?? "")).toContain("ALTER TABLE organizations ADD COLUMN IF NOT EXISTS suspended_at timestamptz");
-    expect(String(query.mock.calls[5]?.[0] ?? "")).toContain("INSERT INTO storage_migration_ledger");
+    expect(query.mock.calls.map((call) => String(call[0]))).toContainEqual(expect.stringContaining("CREATE TABLE IF NOT EXISTS slack_destinations"));
   });
 
   it("should skip already-applied migrations with matching checksums", async (): Promise<void> => {

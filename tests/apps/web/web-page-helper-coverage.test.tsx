@@ -30,10 +30,12 @@ import {
   buildAlertConfig,
   describeAlertChannel,
   formatAlertChannel,
+  formatAlertChannelWithDestination,
   formatAlertCondition,
   formatSeverity,
   getDestinationDescription,
   getDestinationLabel,
+  getSlackDestinationErrorMessage,
   validateAlertRecipientEmail
 } from "../../../apps/web/src/pages/project-alerts-page.tsx";
 import * as api from "../../../apps/web/src/lib/api.ts";
@@ -542,29 +544,114 @@ describe("web page helper coverage", () => {
     expect(describeAlertChannel("slack")).toMatch(/Slack channel/i);
     expect(describeAlertChannel("discord" as never)).toMatch(/Discord channel/i);
 
-    expect(getDestinationLabel("slack")).toBe("Slack webhook URL");
+    expect(getDestinationLabel("slack")).toBe("Slack channel");
     expect(getDestinationLabel("discord" as never)).toBe("Discord webhook URL");
     expect(getDestinationLabel("webhook")).toBe("Webhook endpoint URL");
-    expect(getDestinationDescription("slack")).toMatch(/Slack incoming webhook URL/i);
+    expect(getDestinationDescription("slack")).toMatch(/already connected/i);
     expect(getDestinationDescription("discord" as never)).toMatch(/Discord webhook URL/i);
     expect(getDestinationDescription("webhook")).toMatch(/Matched alert events will be POSTed/i);
+    expect(
+      formatAlertChannelWithDestination(
+        {
+          alert_id: "alert_1",
+          project_id: "proj_1",
+          service_id: null,
+          channel: "slack",
+          condition_type: "error_spike",
+          severity_min: null,
+          config: {
+            slack_destination_id: "sd_123"
+          },
+          is_enabled: true,
+          created_at: "2026-05-13T10:00:00.000Z",
+          updated_at: "2026-05-13T10:00:00.000Z"
+        },
+        [
+          {
+            slack_destination_id: "sd_123",
+            organization_id: "org_1",
+            slack_team_id: "T123",
+            slack_team_name: "Acme",
+            slack_channel_id: "C123",
+            slack_channel_name: "#alerts",
+            installed_by_member_id: "usr_1",
+            is_active: true,
+            created_at: "2026-05-13T10:00:00.000Z",
+            updated_at: "2026-05-13T10:00:00.000Z"
+          }
+        ]
+      )
+    ).toBe("Slack - Acme - #alerts");
+    expect(
+      formatAlertChannelWithDestination(
+        {
+          alert_id: "alert_2",
+          project_id: "proj_1",
+          service_id: null,
+          channel: "slack",
+          condition_type: "error_spike",
+          severity_min: null,
+          config: {
+            slack_destination_id: "sd_missing"
+          },
+          is_enabled: true,
+          created_at: "2026-05-13T10:00:00.000Z",
+          updated_at: "2026-05-13T10:00:00.000Z"
+        },
+        []
+      )
+    ).toBe("Slack (channel unavailable)");
+    expect(getSlackDestinationErrorMessage(new Error("slack_destination_in_use"), "delete")).toMatch(/weekly reports/i);
+    expect(getSlackDestinationErrorMessage(new Error("slack_rate_limited"), "test")).toMatch(/slow down/i);
+    expect(getSlackDestinationErrorMessage(new Error("forbidden"), "delete")).toMatch(/owners/i);
+    expect(getSlackDestinationErrorMessage("unknown", "test")).toMatch(/could not send/i);
 
     expect(validateAlertRecipientEmail("")).toBe("Enter the email address that should receive this alert.");
     expect(validateAlertRecipientEmail("broken")).toBe("Enter a valid email address for this alert.");
     expect(validateAlertRecipientEmail("alerts@example.com")).toBeUndefined();
 
-    expect(buildAlertConfig({ channel: "email", emailRecipient: "alerts@example.com", destinationUrl: "" })).toEqual({
+    expect(
+      buildAlertConfig({
+        channel: "email",
+        emailRecipient: "alerts@example.com",
+        destinationUrl: "",
+        slackDestinationId: ""
+      })
+    ).toEqual({
       to: "alerts@example.com"
     });
-    expect(buildAlertConfig({ channel: "email", emailRecipient: "broken", destinationUrl: "" })).toBeNull();
-    expect(buildAlertConfig({ channel: "webhook", emailRecipient: "", destinationUrl: "" })).toBeNull();
-    expect(buildAlertConfig({ channel: "webhook", emailRecipient: "", destinationUrl: "https://alerts.example.test/webhook" })).toEqual({
+    expect(
+      buildAlertConfig({ channel: "email", emailRecipient: "broken", destinationUrl: "", slackDestinationId: "" })
+    ).toBeNull();
+    expect(buildAlertConfig({ channel: "webhook", emailRecipient: "", destinationUrl: "", slackDestinationId: "" })).toBeNull();
+    expect(
+      buildAlertConfig({
+        channel: "webhook",
+        emailRecipient: "",
+        destinationUrl: "https://alerts.example.test/webhook",
+        slackDestinationId: ""
+      })
+    ).toEqual({
       target_url: "https://alerts.example.test/webhook"
     });
-    expect(buildAlertConfig({ channel: "slack", emailRecipient: "", destinationUrl: "https://alerts.example.test/slack" })).toEqual({
-      webhook_url: "https://alerts.example.test/slack"
+    expect(
+      buildAlertConfig({
+        channel: "slack",
+        emailRecipient: "",
+        destinationUrl: "",
+        slackDestinationId: "11111111-1111-4111-8111-111111111111"
+      })
+    ).toEqual({
+      slack_destination_id: "11111111-1111-4111-8111-111111111111"
     });
-    expect(buildAlertConfig({ channel: "discord" as never, emailRecipient: "", destinationUrl: "https://alerts.example.test/discord" })).toEqual({
+    expect(
+      buildAlertConfig({
+        channel: "discord" as never,
+        emailRecipient: "",
+        destinationUrl: "https://alerts.example.test/discord",
+        slackDestinationId: ""
+      })
+    ).toEqual({
       webhook_url: "https://alerts.example.test/discord"
     });
   });

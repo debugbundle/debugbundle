@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { describe, expect, it, vi } from "vitest";
 
+import { encryptIntegrationSecret } from "../../../packages/storage/src/index.js";
 import { processNextEvaluateAlertsJob, processNextGroupIncidentJob } from "../../../apps/worker/src/processor.js";
 import { createAlertTransport } from "../../../apps/worker/src/runtime.js";
 
@@ -488,6 +489,45 @@ describe("alert delivery transport – multi-channel", () => {
     expect(body.blocks[0]?.type).toBe("section");
   });
 
+  it("should resolve connected slack destinations before delivery", async (): Promise<void> => {
+    const fetchSpy = vi.fn<(input: string, init?: RequestInit) => Promise<{ ok: boolean }>>().mockResolvedValue({ ok: true });
+    vi.stubGlobal("fetch", fetchSpy as unknown);
+
+    await createAlertTransport({
+      timeoutMs: 5000,
+      emailTransport: null,
+      integrationSecretEncryptionKey: "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+      slackDestinationStore: {
+        getSlackDestinationSecretForDelivery: vi.fn().mockResolvedValue({
+          slack_destination_id: "sd_123",
+          organization_id: "org_123",
+          slack_team_id: "T123",
+          slack_team_name: "Acme",
+          slack_channel_id: "C123",
+          slack_channel_name: "#alerts",
+          installed_by_member_id: "usr_123",
+          webhook_url_ciphertext: encryptIntegrationSecret(
+            "https://hooks.slack.com/services/T/B/X",
+            "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+          ),
+          is_active: true,
+          created_at: "2026-05-13T10:00:00.000Z",
+          updated_at: "2026-05-13T10:00:00.000Z"
+        })
+      }
+    }).deliver({
+      delivery_id: "adel_connected",
+      alert_id: "alert_connected",
+      project_id: "proj_1",
+      incident_id: "inc_1",
+      channel: "slack",
+      config: { slack_destination_id: "sd_123" },
+      payload: { event_type: "error_spike", summary: "Spike detected" }
+    });
+
+    expect(fetchSpy.mock.calls[0]?.[0]).toBe("https://hooks.slack.com/services/T/B/X");
+  });
+
   it("should deliver discord alerts via webhook URL with embed format", async (): Promise<void> => {
     const fetchSpy = vi.fn<(input: string, init?: RequestInit) => Promise<{ ok: boolean }>>().mockResolvedValue({ ok: true });
     vi.stubGlobal("fetch", fetchSpy as unknown);
@@ -566,6 +606,27 @@ describe("alert delivery transport – multi-channel", () => {
         payload: { event_type: "new_incident", summary: "crash" }
       })
     ).rejects.toThrow("alert_slack_webhook_url_missing");
+  });
+
+  it("should reject connected slack alerts when the destination cannot be resolved", async (): Promise<void> => {
+    await expect(
+      createAlertTransport({
+        timeoutMs: 5000,
+        emailTransport: null,
+        integrationSecretEncryptionKey: "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+        slackDestinationStore: {
+          getSlackDestinationSecretForDelivery: vi.fn().mockResolvedValue(null)
+        }
+      }).deliver({
+        delivery_id: "adel_missing_destination",
+        alert_id: "alert_missing_destination",
+        project_id: "proj_1",
+        incident_id: "inc_1",
+        channel: "slack",
+        config: { slack_destination_id: "sd_missing" },
+        payload: { event_type: "new_incident", summary: "crash" }
+      })
+    ).rejects.toThrow("alert_slack_destination_not_found");
   });
 
   it("should reject discord alerts when webhook_url is missing", async (): Promise<void> => {

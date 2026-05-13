@@ -6,13 +6,19 @@ import { mockedObject, type MockedMethods } from "../../helpers/vitest.ts";
 type ApiServerDependencies = Parameters<typeof createApiServer>[0];
 type MemberAuthDependency = MockedMethods<ApiServerDependencies["memberAuth"]>;
 type WeeklyReportManagementDependency = MockedMethods<NonNullable<ApiServerDependencies["weeklyReportManagement"]>>;
+type SlackManagementDependency = MockedMethods<NonNullable<ApiServerDependencies["slackManagement"]>>;
+type BillingManagementDependency = MockedMethods<NonNullable<ApiServerDependencies["billingManagement"]>>;
 
 function createServer(overrides: {
   memberAuth?: MemberAuthDependency | undefined;
   weeklyReportManagement?: WeeklyReportManagementDependency | undefined;
+  slackManagement?: SlackManagementDependency | undefined;
+  billingManagement?: BillingManagementDependency | undefined;
   authRateLimiter?: ApiServerDependencies["authRateLimiter"];
 } = {}): ReturnType<typeof createApiServer> {
   const hasWeeklyReportManagementOverride = Object.prototype.hasOwnProperty.call(overrides, "weeklyReportManagement");
+  const hasSlackManagementOverride = Object.prototype.hasOwnProperty.call(overrides, "slackManagement");
+  const hasBillingManagementOverride = Object.prototype.hasOwnProperty.call(overrides, "billingManagement");
 
   return createApiServer({
     ingestionPersistence: {
@@ -48,6 +54,24 @@ function createServer(overrides: {
     webhookDelivery: {
       listDeliveriesForWebhookInOrganization: vi.fn().mockResolvedValue({ deliveries: [] })
     },
+    billingManagement:
+      hasBillingManagementOverride
+        ? overrides.billingManagement
+        : mockedObject<NonNullable<ApiServerDependencies["billingManagement"]>>({
+            getBillingSummaryForOrganization: vi.fn().mockResolvedValue({ plan: "team" })
+          }),
+    slackManagement:
+      hasSlackManagementOverride
+        ? overrides.slackManagement
+        : mockedObject<NonNullable<ApiServerDependencies["slackManagement"]>>({
+            listSlackDestinationsForProjectInOrganization: vi.fn().mockResolvedValue([]),
+            getSlackDestinationForOrganization: vi.fn().mockResolvedValue(null),
+            upsertSlackDestinationForOrganization: vi.fn().mockResolvedValue({
+              slack_destination_id: "sd_123"
+            }),
+            deleteSlackDestinationForProjectInOrganization: vi.fn().mockResolvedValue(null),
+            getSlackDestinationSecretForOrganization: vi.fn().mockResolvedValue(null)
+          }),
     weeklyReportManagement:
       hasWeeklyReportManagementOverride
         ? overrides.weeklyReportManagement
@@ -214,6 +238,140 @@ describe("api weekly report channel routes", () => {
     expect(created.statusCode).toBe(201);
     expect(updated.statusCode).toBe(200);
     expect(deleted.statusCode).toBe(204);
+  });
+
+  it("accepts connected Slack destinations for weekly reports and rejects missing ones", async (): Promise<void> => {
+    const weeklyReportManagement = mockedObject<NonNullable<ApiServerDependencies["weeklyReportManagement"]>>({
+      listWeeklyReportChannelsForOrganization: vi.fn().mockResolvedValue([]),
+      createWeeklyReportChannelForOrganization: vi.fn().mockResolvedValue({
+        channel_id: "wr_2",
+        project_id: "00000000-0000-4000-8000-000000000001",
+        channel: "slack",
+        config: { slack_destination_id: "11111111-1111-4111-8111-111111111111" },
+        schedule: { day_of_week: "monday", hour_of_day: 10, timezone: "UTC" },
+        is_enabled: true,
+        created_at: "2026-03-15T00:00:00.000Z",
+        updated_at: "2026-03-15T00:00:00.000Z"
+      }),
+      updateWeeklyReportChannelForOrganization: vi.fn().mockResolvedValue({
+        channel_id: "wr_2",
+        project_id: "00000000-0000-4000-8000-000000000001",
+        channel: "slack",
+        config: { slack_destination_id: "11111111-1111-4111-8111-111111111111" },
+        schedule: { day_of_week: "tuesday", hour_of_day: 12, timezone: "UTC" },
+        is_enabled: true,
+        created_at: "2026-03-15T00:00:00.000Z",
+        updated_at: "2026-03-15T01:00:00.000Z"
+      }),
+      deleteWeeklyReportChannelForOrganization: vi.fn().mockResolvedValue(null)
+    });
+    const slackManagement = mockedObject<NonNullable<ApiServerDependencies["slackManagement"]>>({
+      listSlackDestinationsForProjectInOrganization: vi.fn().mockResolvedValue([]),
+      getSlackDestinationForOrganization: vi
+        .fn()
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce({
+          slack_destination_id: "11111111-1111-4111-8111-111111111111",
+          organization_id: "org_123",
+          slack_team_id: "T123",
+          slack_team_name: "Acme",
+          slack_channel_id: "C123",
+          slack_channel_name: "#alerts",
+          installed_by_member_id: "usr_123",
+          is_active: true,
+          created_at: "2026-05-13T10:00:00.000Z",
+          updated_at: "2026-05-13T10:00:00.000Z"
+        })
+        .mockResolvedValueOnce({
+          slack_destination_id: "11111111-1111-4111-8111-111111111111",
+          organization_id: "org_123",
+          slack_team_id: "T123",
+          slack_team_name: "Acme",
+          slack_channel_id: "C123",
+          slack_channel_name: "#alerts",
+          installed_by_member_id: "usr_123",
+          is_active: true,
+          created_at: "2026-05-13T10:00:00.000Z",
+          updated_at: "2026-05-13T10:00:00.000Z"
+        }),
+      upsertSlackDestinationForOrganization: vi.fn().mockResolvedValue({ slack_destination_id: "sd_123" }),
+      deleteSlackDestinationForProjectInOrganization: vi.fn().mockResolvedValue(null),
+      getSlackDestinationSecretForOrganization: vi.fn().mockResolvedValue(null)
+    });
+    const app = createServer({ weeklyReportManagement, slackManagement });
+
+    const missingDestination = await app.inject({
+      method: "POST",
+      url: "/v1/weekly-report-channels",
+      headers: { authorization: "Bearer dbundle_mem_test" },
+      payload: {
+        project_id: "00000000-0000-4000-8000-000000000001",
+        channel: "slack",
+        config: { slack_destination_id: "11111111-1111-4111-8111-111111111111" },
+        schedule: { day_of_week: "monday", hour_of_day: 10, timezone: "UTC" }
+      }
+    });
+    const created = await app.inject({
+      method: "POST",
+      url: "/v1/weekly-report-channels",
+      headers: { authorization: "Bearer dbundle_mem_test" },
+      payload: {
+        project_id: "00000000-0000-4000-8000-000000000001",
+        channel: "slack",
+        config: { slack_destination_id: "11111111-1111-4111-8111-111111111111" },
+        schedule: { day_of_week: "monday", hour_of_day: 10, timezone: "UTC" }
+      }
+    });
+    const updated = await app.inject({
+      method: "PATCH",
+      url: "/v1/weekly-report-channels/wr_2",
+      headers: { authorization: "Bearer dbundle_mem_test" },
+      payload: {
+        config: { slack_destination_id: "11111111-1111-4111-8111-111111111111" },
+        schedule: { day_of_week: "tuesday", hour_of_day: 12, timezone: "UTC" }
+      }
+    });
+
+    expect(missingDestination.statusCode).toBe(404);
+    expect(missingDestination.json()).toEqual({ error: "slack_destination_not_found" });
+    expect(created.statusCode).toBe(201);
+    expect(updated.statusCode).toBe(200);
+  });
+
+  it("requires Slack integration dependencies and Team tier for connected Slack weekly reports", async (): Promise<void> => {
+    const withoutSlackManagement = createServer({
+      slackManagement: undefined
+    });
+    const soloPlanApp = createServer({
+      billingManagement: mockedObject<NonNullable<ApiServerDependencies["billingManagement"]>>({
+        getBillingSummaryForOrganization: vi.fn().mockResolvedValue({ plan: "solo" })
+      })
+    });
+
+    const missingSlackDependency = await withoutSlackManagement.inject({
+      method: "POST",
+      url: "/v1/weekly-report-channels",
+      headers: { authorization: "Bearer dbundle_mem_test" },
+      payload: {
+        project_id: "00000000-0000-4000-8000-000000000001",
+        channel: "slack",
+        config: { slack_destination_id: "11111111-1111-4111-8111-111111111111" },
+        schedule: { day_of_week: "monday", hour_of_day: 10, timezone: "UTC" }
+      }
+    });
+    const upgradeRequired = await soloPlanApp.inject({
+      method: "PATCH",
+      url: "/v1/weekly-report-channels/11111111-1111-4111-8111-111111111111",
+      headers: { authorization: "Bearer dbundle_mem_test" },
+      payload: {
+        config: { slack_destination_id: "11111111-1111-4111-8111-111111111111" }
+      }
+    });
+
+    expect(missingSlackDependency.statusCode).toBe(503);
+    expect(missingSlackDependency.json()).toEqual({ error: "slack_not_configured" });
+    expect(upgradeRequired.statusCode).toBe(403);
+    expect(upgradeRequired.json()).toEqual({ error: "upgrade_required" });
   });
 
   it("validates params, payloads, and not-found branches for update/delete", async (): Promise<void> => {
