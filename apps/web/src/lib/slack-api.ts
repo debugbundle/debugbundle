@@ -1,4 +1,4 @@
-import { buildApiUrl, InvalidSessionError } from "./api.js";
+import { buildApiUrl, buildBrowserSessionHeaders, InvalidSessionError } from "./api.js";
 
 export interface SlackDestinationRecord {
   slack_destination_id: string;
@@ -55,7 +55,8 @@ export async function testProjectSlackDestination(projectId: string, destination
   await readSlackJson<{ delivered: true }>(
     await fetch(buildApiUrl(`/v1/projects/${projectId}/slack/destinations/${destinationId}/test`), {
       method: "POST",
-      credentials: "include"
+      credentials: "include",
+      headers: buildBrowserSessionHeaders()
     })
   );
 }
@@ -63,7 +64,8 @@ export async function testProjectSlackDestination(projectId: string, destination
 export async function deleteProjectSlackDestination(projectId: string, destinationId: string): Promise<void> {
   const response = await fetch(buildApiUrl(`/v1/projects/${projectId}/slack/destinations/${destinationId}`), {
     method: "DELETE",
-    credentials: "include"
+    credentials: "include",
+    headers: buildBrowserSessionHeaders()
   });
 
   if (!response.ok) {

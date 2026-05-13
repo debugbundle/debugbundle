@@ -434,7 +434,7 @@ function rememberSession<T extends SessionRecord | null>(session: T): T {
   return session;
 }
 
-function buildBrowserSessionHeaders(includeJsonContentType = false): Record<string, string> {
+export function buildBrowserSessionHeaders(includeJsonContentType = false): Record<string, string> {
   const headers: Record<string, string> = {};
 
   if (includeJsonContentType) {

@@ -1985,10 +1985,16 @@ describe("web app — management routes", () => {
       }
 
       if (url.endsWith("/v1/projects/proj_123/slack/destinations/sd_123/test") && init?.method === "POST") {
+        expect(init.headers).toEqual({
+          "X-CSRF-Token": "csrf-token-123"
+        });
         return jsonResponse(200, { delivered: true });
       }
 
       if (url.endsWith("/v1/projects/proj_123/slack/destinations/sd_123") && init?.method === "DELETE") {
+        expect(init.headers).toEqual({
+          "X-CSRF-Token": "csrf-token-123"
+        });
         return new Response(null, { status: 204 });
       }
 
