@@ -131,9 +131,9 @@ export function createPostgresSlackDestinationStore(db: Queryable): SlackDestina
             COALESCE(sd.slack_team_name, sd.slack_team_id) ASC,
             COALESCE(sd.slack_channel_name, sd.slack_channel_id) ASC,
             sd.created_at ASC
-          LIMIT $3
+          LIMIT $2
         `,
-        [input.organization_id, input.project_id, input.limit]
+        [input.organization_id, input.limit]
       );
 
       return result.rows.map(mapSlackDestination);

@@ -57,6 +57,12 @@ describe("postgres slack destination store", () => {
         limit: 20
       })
     ).resolves.toBeNull();
+
+    expect(query).toHaveBeenNthCalledWith(
+      2,
+      expect.stringContaining("LIMIT $2"),
+      ["org_123", 20]
+    );
   });
 
   it("upserts and fetches delivery secrets for destinations", async () => {
@@ -130,7 +136,10 @@ describe("postgres slack destination store", () => {
   });
 
   it("deletes only destinations visible from the scoped project", async () => {
-    const query = vi.fn().mockResolvedValueOnce(rowsResult([{ slack_destination_id: "sd_123" }]));
+    const query = vi
+      .fn()
+      .mockResolvedValueOnce(rowsResult([{ in_use: false }]))
+      .mockResolvedValueOnce(rowsResult([{ slack_destination_id: "sd_123" }]));
     const store = createPostgresSlackDestinationStore({ query } as Queryable);
 
     await expect(
@@ -140,5 +149,11 @@ describe("postgres slack destination store", () => {
         slack_destination_id: "sd_123"
       })
     ).resolves.toEqual({ slack_destination_id: "sd_123" });
+
+    expect(query).toHaveBeenNthCalledWith(
+      2,
+      expect.stringContaining("DELETE FROM slack_destinations"),
+      ["org_123", "proj_123", "sd_123"]
+    );
   });
 });
