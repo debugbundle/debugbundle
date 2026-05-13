@@ -1,7 +1,6 @@
 import {
   CreditCardIcon,
   FolderKanbanIcon,
-  GalleryVerticalEndIcon,
   HomeIcon,
   KeySquareIcon,
   SirenIcon,
@@ -10,6 +9,7 @@ import {
 import { NavLink, useLocation } from "react-router-dom";
 
 import type { SessionRecord } from "../../lib/api.js";
+import { BrandLockup } from "./brand-lockup.js";
 import { NavUser } from "./nav-user.js";
 import {
   Sidebar,
@@ -49,10 +49,7 @@ export function AppSidebar({ session, onSignOut, ...props }: AppSidebarProps): J
         <SidebarMenu>
           <SidebarMenuItem>
             <SidebarMenuButton asChild className="data-[slot=sidebar-menu-button]:!p-1.5">
-              <NavLink to="/dashboard">
-                <GalleryVerticalEndIcon className="!size-5" />
-                <span className="text-base font-semibold">DebugBundle</span>
-              </NavLink>
+              <BrandLockup href="/dashboard" imageClassName="size-5" labelClassName="text-base font-semibold" />
             </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>

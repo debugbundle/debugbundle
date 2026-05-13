@@ -1588,13 +1588,22 @@ describe("worker runtime", () => {
 
     const transport = createAlertTransport({
       timeoutMs: 1000,
-      emailTransport: { send: emailSend }
+      emailTransport: { send: emailSend },
+      appBaseUrl: "https://app.debugbundle.com",
+      apiBaseUrl: "https://api.debugbundle.com"
     });
 
     await transport.deliver({
       channel: "email",
       config: { to: "alerts@example.com" },
-      payload: {}
+      payload: {
+        condition_type: "new_incident",
+        incident_id: "inc_alert_123",
+        occurred_at: "2026-05-13T08:33:56.774Z",
+        service_name: "api",
+        environment: "production",
+        severity: "high"
+      }
     } as never);
     await transport.deliver({
       channel: "slack",
@@ -1615,7 +1624,7 @@ describe("worker runtime", () => {
     expect(emailSend).toHaveBeenCalledWith(
       expect.objectContaining({
         to: ["alerts@example.com"],
-        subject: "[DebugBundle Alert] alert: Alert triggered"
+        subject: "[DebugBundle Alert] A new incident was detected"
       })
     );
     expect(fetchMock).toHaveBeenCalledTimes(3);

@@ -826,7 +826,7 @@ describe("web app — incident and project detail routes", () => {
     render(<App initialEntries={[`/projects/${project.project_id}/incidents`]} />);
 
     expect(await screen.findByText(/main app/i)).toBeInTheDocument();
-    expect(await screen.findByText(/no incidents for this project/i)).toBeInTheDocument();
+    expect(await screen.findByText(/no open incidents for this project/i)).toBeInTheDocument();
   });
 
   it("shows not-found callout when project does not exist", async () => {

@@ -76,6 +76,13 @@ export const STORAGE_SCHEMA_MIGRATIONS = [
         ON github_device_authorizations (expires_at)
       `
     ]
+  }),
+  defineStorageSchemaMigration({
+    id: "202605130001_allow_synthetic_webhook_test_deliveries_without_incident_fk",
+    description: "Allow webhook test deliveries to persist without requiring a backing incidents row.",
+    statements: [
+      "ALTER TABLE webhook_deliveries ALTER COLUMN incident_id DROP NOT NULL"
+    ]
   })
 ] as const;
 

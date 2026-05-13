@@ -2774,6 +2774,18 @@ describe("postgres metadata store", () => {
         event_type: "verification.failed"
       })
     ).resolves.toMatchObject({ event_type: "verification.failed" });
+    expect(query).toHaveBeenNthCalledWith(
+      3,
+      expect.stringContaining("INSERT INTO webhook_deliveries"),
+      expect.arrayContaining([
+        "wh_123",
+        "proj_123",
+        null,
+        "verification.failed",
+        "https://hooks.example.test/debugbundle",
+        "secret_123"
+      ])
+    );
     await expect(
       store.createTestDeliveryForOrganization({
         organization_id: "org_123",

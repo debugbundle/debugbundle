@@ -213,7 +213,7 @@ export interface LifecycleWebhookTransport {
   deliver(input: {
     delivery_id: string;
     project_id: string;
-    incident_id: string;
+    incident_id: string | null;
     event_type: WebhookEventType;
     occurred_at: string;
     target_url: string;

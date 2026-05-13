@@ -237,8 +237,8 @@ describe("web app — management routes", () => {
     render(<App initialEntries={["/incidents"]} />);
 
     expect(await screen.findByRole("heading", { name: /incidents/i, level: 1 })).toBeInTheDocument();
-    expect(await screen.findByText(/no incidents captured yet/i)).toBeInTheDocument();
-    expect(screen.getByText(/incoming incidents will appear here/i)).toBeInTheDocument();
+    expect(await screen.findByText(/no open incidents/i)).toBeInTheDocument();
+    expect(screen.getByText(/incoming open incidents will appear here/i)).toBeInTheDocument();
   });
 
   it("creates a project and opens its overview directly", async () => {

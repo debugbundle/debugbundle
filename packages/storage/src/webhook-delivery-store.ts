@@ -387,7 +387,7 @@ export function createPostgresWebhookDeliveryStore(db: Queryable): WebhookDelive
       }
 
       const deliveryId = randomUUID();
-      const incidentId = randomUUID();
+      const payloadIncidentId = randomUUID();
       const occurredAt = new Date().toISOString();
       const payload = {
         delivery_id: deliveryId,
@@ -396,7 +396,7 @@ export function createPostgresWebhookDeliveryStore(db: Queryable): WebhookDelive
         occurred_at: occurredAt,
         project_id: webhook.project_id,
         webhook_id: webhook.webhook_id,
-        incident_id: incidentId,
+        incident_id: payloadIncidentId,
         test: true,
         data: {
           message: "Synthetic webhook test delivery"
@@ -442,7 +442,7 @@ export function createPostgresWebhookDeliveryStore(db: Queryable): WebhookDelive
           deliveryId,
           webhook.webhook_id,
           webhook.project_id,
-          incidentId,
+          null,
           input.event_type,
           webhook.target_url,
           webhook.signing_secret,
@@ -462,7 +462,7 @@ export function createPostgresWebhookDeliveryStore(db: Queryable): WebhookDelive
         delivery_id: string;
         webhook_id: string;
         project_id: string;
-        incident_id: string;
+        incident_id: string | null;
         event_type: WebhookEventType;
         status: WebhookDeliveryStatus;
         attempt_count: number;

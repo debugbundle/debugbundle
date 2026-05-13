@@ -1327,7 +1327,7 @@ export interface WebhookDeliveryIntent {
   delivery_id: string;
   webhook_id: string;
   project_id: string;
-  incident_id: string;
+  incident_id: string | null;
   event_type: WebhookEventType;
   status: WebhookDeliveryStatus;
   attempt_count: number;

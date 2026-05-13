@@ -554,7 +554,7 @@ const STORAGE_BOOTSTRAP_STATEMENTS = [
       id uuid PRIMARY KEY,
       webhook_id uuid REFERENCES agent_webhooks(id) ON DELETE CASCADE,
       project_id uuid NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
-      incident_id uuid NOT NULL REFERENCES incidents(id) ON DELETE CASCADE,
+      incident_id uuid REFERENCES incidents(id) ON DELETE CASCADE,
       event_type text NOT NULL,
       target_url text NOT NULL,
       signing_secret text NOT NULL,

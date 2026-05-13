@@ -15,6 +15,7 @@ import {
 import type { CapturePolicyUpdate } from "../../../packages/shared-types/src/index.js";
 import {
   createSesEmailTransport,
+  formatProductFromEmail,
   renderEmailAuthCodeEmail,
   renderOrganizationInviteEmail,
   type EmailMessage,
@@ -1809,7 +1810,7 @@ export function createApiDependenciesFromEnv(env: Record<string, string | undefi
     env["SES_FROM_EMAIL"] !== undefined
       ? createSesEmailTransport({
           region: env["SES_REGION"] ?? env["S3_REGION"] ?? "us-east-1",
-          fromEmail: env["SES_FROM_EMAIL"],
+          fromEmail: formatProductFromEmail(env["SES_FROM_EMAIL"]),
           ...(env["AWS_ACCESS_KEY_ID"] === undefined || env["AWS_SECRET_ACCESS_KEY"] === undefined
             ? {}
             : {

@@ -1,4 +1,4 @@
-import { AlertTriangleIcon, ChevronRightIcon } from "lucide-react";
+import { ChevronRightIcon, SirenIcon } from "lucide-react";
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 
@@ -37,6 +37,7 @@ export function IncidentsPage(): JSX.Element {
   );
 
   const sortedIncidents = useMemo(() => sortIncidents(incidents, sort), [incidents, sort]);
+  const emptyState = getWorkspaceIncidentEmptyState(statusFilter);
 
   return (
     <div className="space-y-6">
@@ -76,10 +77,10 @@ export function IncidentsPage(): JSX.Element {
               <Empty>
                 <EmptyHeader>
                   <EmptyMedia variant="icon">
-                    <AlertTriangleIcon />
+                    <SirenIcon />
                   </EmptyMedia>
-                  <EmptyTitle>No incidents captured yet</EmptyTitle>
-                    <EmptyDescription>Incoming incidents will appear here once grouped failures are available for this workspace.</EmptyDescription>
+                  <EmptyTitle>{emptyState.title}</EmptyTitle>
+                  <EmptyDescription>{emptyState.description}</EmptyDescription>
                 </EmptyHeader>
                 <EmptyContent>
                   <Button asChild type="button" variant="outline">
@@ -189,6 +190,31 @@ const INCIDENT_STATUS_FILTER_OPTIONS: Array<{ value: IncidentStatusFilter; label
   { value: "resolved", label: "Resolved" },
   { value: "regressed", label: "Regressed" }
 ];
+
+function getWorkspaceIncidentEmptyState(statusFilter: IncidentStatusFilter): { title: string; description: string } {
+  switch (statusFilter) {
+    case "open":
+      return {
+        title: "No open incidents",
+        description: "Incoming open incidents will appear here once grouped failures are available for this workspace."
+      };
+    case "resolved":
+      return {
+        title: "No resolved incidents",
+        description: "Resolved incidents will appear here after grouped failures have been reviewed and marked resolved."
+      };
+    case "regressed":
+      return {
+        title: "No regressed incidents",
+        description: "Regressed incidents will appear here when a resolved issue starts happening again."
+      };
+    case "all":
+      return {
+        title: "No incidents captured yet",
+        description: "Incoming incidents will appear here once grouped failures are available for this workspace."
+      };
+  }
+}
 
 const filterSelectClassName =
   "flex h-10 min-w-40 rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:cursor-not-allowed disabled:opacity-60";

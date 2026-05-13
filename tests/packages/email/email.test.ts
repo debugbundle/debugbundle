@@ -26,6 +26,8 @@ vi.mock("@aws-sdk/client-sesv2", () => ({
 import {
   EmailDeliveryError,
   createSesEmailTransport,
+  formatProductFromEmail,
+  renderAlertEmail,
   renderEmailAuthCodeEmail,
   renderOrganizationInviteEmail,
   renderWeeklyReportEmail
@@ -78,6 +80,31 @@ describe("email package", () => {
     expect(invite.html).toContain("&lt;secret&gt;");
   });
 
+  it("renders alert emails with human copy and links", () => {
+    const rendered = renderAlertEmail({
+      conditionType: "new_incident",
+      incidentId: "inc_<123>",
+      occurredAt: "2026-05-13T08:33:56.774Z",
+      serviceName: "checkout-<api>",
+      environment: "production",
+      severity: "high",
+      incidentUrl: "https://app.debugbundle.com/incidents/inc_<123>",
+      bundleUrl: "https://api.debugbundle.com/v1/incidents/inc_<123>/bundle"
+    });
+
+    expect(rendered.subject).toBe("[DebugBundle Alert] A new incident was detected");
+    expect(rendered.text).toContain("Service: checkout-<api>");
+    expect(rendered.text).toContain("Open incident: https://app.debugbundle.com/incidents/inc_<123>");
+    expect(rendered.html).toContain("checkout-&lt;api&gt;");
+    expect(rendered.html).toContain("&lt;123&gt;");
+    expect(rendered.html).toContain("Open incident in DebugBundle");
+  });
+
+  it("formats the product from email with a DebugBundle display name", () => {
+    expect(formatProductFromEmail("noreply@debugbundle.com")).toBe("DebugBundle <noreply@debugbundle.com>");
+    expect(formatProductFromEmail("DebugBundle <noreply@debugbundle.com>")).toBe("DebugBundle <noreply@debugbundle.com>");
+  });
+
   it("sends ses requests and maps http, timeout, and transport failures", async () => {
     vi.useFakeTimers();
 
@@ -98,7 +125,7 @@ describe("email package", () => {
 
     const transport = createSesEmailTransport({
       region: "us-east-1",
-      fromEmail: "noreply@example.com",
+      fromEmail: "DebugBundle <noreply@example.com>",
       timeoutMs: 10
     });
 
@@ -149,7 +176,7 @@ describe("email package", () => {
       Content?: { Simple?: unknown };
     };
 
-    expect(commandInput.FromEmailAddress).toBe("noreply@example.com");
+    expect(commandInput.FromEmailAddress).toBe("DebugBundle <noreply@example.com>");
     expect(commandInput.Destination).toEqual({
       ToAddresses: ["team@example.com"]
     });

@@ -394,7 +394,9 @@ describe("alert delivery transport – multi-channel", () => {
     );
     await createAlertTransport({
       timeoutMs: 5000,
-      emailTransport: { send: sendMock }
+      emailTransport: { send: sendMock },
+      appBaseUrl: "https://app.debugbundle.com",
+      apiBaseUrl: "https://api.debugbundle.com"
     }).deliver({
       delivery_id: "adel_1",
       alert_id: "alert_1",
@@ -402,14 +404,22 @@ describe("alert delivery transport – multi-channel", () => {
       incident_id: "inc_1",
       channel: "email",
       config: { to: "team@example.com" },
-      payload: { event_type: "new_incident", summary: "New crash in checkout" }
+      payload: {
+        condition_type: "new_incident",
+        incident_id: "inc_1",
+        occurred_at: "2026-05-13T08:33:56.774Z",
+        service_name: "checkout-api",
+        environment: "production",
+        severity: "high"
+      }
     });
 
     const emailDelivery = sendMock.mock.calls[0]?.[0];
     expect(emailDelivery?.to).toEqual(["team@example.com"]);
-    expect(emailDelivery?.subject).toContain("new_incident");
-    expect(emailDelivery?.text).toContain("New crash in checkout");
-    expect(emailDelivery?.html).toContain("new_incident");
+    expect(emailDelivery?.subject).toBe("[DebugBundle Alert] A new incident was detected");
+    expect(emailDelivery?.text).toContain("Service: checkout-api");
+    expect(emailDelivery?.text).toContain("Open incident: https://app.debugbundle.com/incidents/inc_1");
+    expect(emailDelivery?.html).toContain("View bundle JSON");
   });
 
   it("should reject email alerts when no email transport configured", async (): Promise<void> => {

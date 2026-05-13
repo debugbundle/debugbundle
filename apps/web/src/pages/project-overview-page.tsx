@@ -128,6 +128,7 @@ export function ProjectIncidentsPage(): JSX.Element {
     [projectId, statusFilter]
   );
   const sortedIncidents = useMemo(() => sortProjectIncidents(incidents, sort), [incidents, sort]);
+  const emptyState = getProjectIncidentEmptyState(statusFilter);
 
   return (
     <div className="space-y-4">
@@ -170,8 +171,8 @@ export function ProjectIncidentsPage(): JSX.Element {
                   <EmptyMedia variant="icon">
                     <SirenIcon />
                   </EmptyMedia>
-                  <EmptyTitle>No incidents for this project</EmptyTitle>
-                  <EmptyDescription>Incidents will appear here once the SDK starts sending events for this project.</EmptyDescription>
+                  <EmptyTitle>{emptyState.title}</EmptyTitle>
+                  <EmptyDescription>{emptyState.description}</EmptyDescription>
                 </EmptyHeader>
               </Empty>
             }
@@ -221,6 +222,7 @@ export function ProjectBundlesPage(): JSX.Element {
     [projectId, statusFilter]
   );
   const sortedIncidents = useMemo(() => sortProjectBundles(incidents, sort), [incidents, sort]);
+  const emptyState = getProjectBundleEmptyState(statusFilter);
 
   return (
     <div className="space-y-4">
@@ -265,8 +267,8 @@ export function ProjectBundlesPage(): JSX.Element {
                   <EmptyMedia variant="icon">
                     <PackageIcon />
                   </EmptyMedia>
-                  <EmptyTitle>No bundles available</EmptyTitle>
-                  <EmptyDescription>Bundles are generated when incidents are processed. Start sending events to see bundles here.</EmptyDescription>
+                  <EmptyTitle>{emptyState.title}</EmptyTitle>
+                  <EmptyDescription>{emptyState.description}</EmptyDescription>
                 </EmptyHeader>
               </Empty>
             }
@@ -412,6 +414,56 @@ const INCIDENT_STATUS_FILTER_OPTIONS: Array<{ value: ProjectIncidentStatusFilter
   { value: "resolved", label: "Resolved" },
   { value: "regressed", label: "Regressed" }
 ];
+
+function getProjectIncidentEmptyState(statusFilter: ProjectIncidentStatusFilter): { title: string; description: string } {
+  switch (statusFilter) {
+    case "open":
+      return {
+        title: "No open incidents for this project",
+        description: "Open incidents will appear here once the SDK starts sending grouped failures for this project."
+      };
+    case "resolved":
+      return {
+        title: "No resolved incidents for this project",
+        description: "Resolved incidents will appear here after this project’s grouped failures have been reviewed and marked resolved."
+      };
+    case "regressed":
+      return {
+        title: "No regressed incidents for this project",
+        description: "Regressed incidents will appear here when a resolved issue starts happening again in this project."
+      };
+    case "all":
+      return {
+        title: "No incidents for this project",
+        description: "Incidents will appear here once the SDK starts sending events for this project."
+      };
+  }
+}
+
+function getProjectBundleEmptyState(statusFilter: ProjectIncidentStatusFilter): { title: string; description: string } {
+  switch (statusFilter) {
+    case "open":
+      return {
+        title: "No bundles for open incidents",
+        description: "Bundles for open incidents will appear here once this project has processed grouped failures."
+      };
+    case "resolved":
+      return {
+        title: "No bundles for resolved incidents",
+        description: "Bundles for resolved incidents will appear here after this project’s incidents have been processed and marked resolved."
+      };
+    case "regressed":
+      return {
+        title: "No bundles for regressed incidents",
+        description: "Bundles for regressed incidents will appear here when a resolved issue starts happening again in this project."
+      };
+    case "all":
+      return {
+        title: "No bundles available",
+        description: "Bundles are generated when incidents are processed. Start sending events to see bundles here."
+      };
+  }
+}
 
 const filterSelectClassName =
   "flex h-10 min-w-40 rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:cursor-not-allowed disabled:opacity-60";

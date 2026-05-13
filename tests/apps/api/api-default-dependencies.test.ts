@@ -107,6 +107,7 @@ vi.mock("../../../packages/auth/src/index.js", () => ({
 
 vi.mock("../../../packages/email/src/index.js", () => ({
   createSesEmailTransport: createSesEmailTransportMock,
+  formatProductFromEmail: (fromEmail: string) => `DebugBundle <${fromEmail}>`,
   renderEmailAuthCodeEmail: renderEmailAuthCodeEmailMock,
   renderOrganizationInviteEmail: renderOrganizationInviteEmailMock
 }));
@@ -1173,7 +1174,7 @@ describe("api default dependencies", () => {
 
     expect(createSesEmailTransportMock).toHaveBeenCalledWith({
       region: "eu-west-1",
-      fromEmail: "noreply@debugbundle.test",
+      fromEmail: "DebugBundle <noreply@debugbundle.test>",
       accessKeyId: "aws-key",
       secretAccessKey: "aws-secret",
       timeoutMs: 10000

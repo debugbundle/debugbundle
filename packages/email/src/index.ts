@@ -58,6 +58,17 @@ export interface WeeklyReportEmailInput {
   }>;
 }
 
+export interface AlertEmailInput {
+  conditionType: string;
+  incidentId: string;
+  occurredAt: string;
+  serviceName: string;
+  environment: string;
+  severity: "low" | "medium" | "high" | "critical";
+  incidentUrl?: string | null;
+  bundleUrl?: string | null;
+}
+
 function formatTopSpikesText(input: WeeklyReportEmailInput["topSpikingIncidents"]): string {
   if (input.length === 0) {
     return "None";
@@ -93,6 +104,76 @@ function escapeHtml(value: string): string {
     .replaceAll(">", "&gt;")
     .replaceAll('"', "&quot;")
     .replaceAll("'", "&#39;");
+}
+
+function titleCase(value: string): string {
+  if (value.length === 0) {
+    return value;
+  }
+
+  return value.charAt(0).toUpperCase() + value.slice(1);
+}
+
+function formatAlertConditionLabel(conditionType: string): string {
+  switch (conditionType) {
+    case "new_incident":
+      return "New incident";
+    case "incident_regressed":
+      return "Incident regressed";
+    case "regression_after_deploy":
+      return "Regression after deploy";
+    case "error_spike":
+      return "Error spike";
+    case "severity_threshold":
+      return "Severity threshold reached";
+    default:
+      return "Alert triggered";
+  }
+}
+
+function formatAlertSubject(conditionType: string): string {
+  switch (conditionType) {
+    case "new_incident":
+      return "[DebugBundle Alert] A new incident was detected";
+    case "incident_regressed":
+      return "[DebugBundle Alert] A resolved incident regressed";
+    case "regression_after_deploy":
+      return "[DebugBundle Alert] A regression was detected after deploy";
+    case "error_spike":
+      return "[DebugBundle Alert] An incident spike was detected";
+    case "severity_threshold":
+      return "[DebugBundle Alert] An incident crossed the severity threshold";
+    default:
+      return "[DebugBundle Alert] An alert was triggered";
+  }
+}
+
+function formatAlertIntro(conditionType: string): string {
+  switch (conditionType) {
+    case "new_incident":
+      return "DebugBundle detected a new incident that matched your alert rule.";
+    case "incident_regressed":
+      return "DebugBundle detected a regression for an incident that had previously been resolved.";
+    case "regression_after_deploy":
+      return "DebugBundle detected a regression after a recent deploy.";
+    case "error_spike":
+      return "DebugBundle detected an incident spike that matched your alert rule.";
+    case "severity_threshold":
+      return "DebugBundle detected an incident that crossed your configured severity threshold.";
+    default:
+      return "DebugBundle triggered an alert that matched your configured rule.";
+  }
+}
+
+export function formatProductFromEmail(fromEmail: string, displayName = "DebugBundle"): string {
+  const normalizedEmail = fromEmail.trim();
+  const normalizedDisplayName = displayName.trim();
+
+  if (normalizedDisplayName.length === 0 || normalizedEmail.includes("<")) {
+    return normalizedEmail;
+  }
+
+  return `${normalizedDisplayName} <${normalizedEmail}>`;
 }
 
 export function renderEmailAuthCodeEmail(input: {
@@ -163,6 +244,44 @@ export function renderWeeklyReportEmail(input: WeeklyReportEmailInput): { subjec
     `</ul>`,
     `<h2>Top spiking incidents</h2>`,
     formatTopSpikesHtml(input.topSpikingIncidents)
+  ].join("");
+
+  return { subject, text, html };
+}
+
+export function renderAlertEmail(input: AlertEmailInput): { subject: string; text: string; html: string } {
+  const subject = formatAlertSubject(input.conditionType);
+  const conditionLabel = formatAlertConditionLabel(input.conditionType);
+  const severityLabel = titleCase(input.severity);
+  const text = [
+    formatAlertIntro(input.conditionType),
+    "",
+    `Alert: ${conditionLabel}`,
+    `Service: ${input.serviceName}`,
+    `Environment: ${input.environment}`,
+    `Severity: ${severityLabel}`,
+    `Incident ID: ${input.incidentId}`,
+    `Detected at: ${input.occurredAt}`,
+    ...(input.incidentUrl === undefined || input.incidentUrl === null ? [] : ["", `Open incident: ${input.incidentUrl}`]),
+    ...(input.bundleUrl === undefined || input.bundleUrl === null ? [``, "Use the incident ID above to inspect the bundle in DebugBundle."] : ["", `View bundle: ${input.bundleUrl}`])
+  ].join("\n");
+  const html = [
+    "<h1>DebugBundle alert</h1>",
+    `<p>${escapeHtml(formatAlertIntro(input.conditionType))}</p>`,
+    "<ul>",
+    `<li><strong>Alert:</strong> ${escapeHtml(conditionLabel)}</li>`,
+    `<li><strong>Service:</strong> ${escapeHtml(input.serviceName)}</li>`,
+    `<li><strong>Environment:</strong> ${escapeHtml(input.environment)}</li>`,
+    `<li><strong>Severity:</strong> ${escapeHtml(severityLabel)}</li>`,
+    `<li><strong>Incident ID:</strong> ${escapeHtml(input.incidentId)}</li>`,
+    `<li><strong>Detected at:</strong> ${escapeHtml(input.occurredAt)}</li>`,
+    "</ul>",
+    ...(input.incidentUrl === undefined || input.incidentUrl === null
+      ? []
+      : [`<p><a href="${escapeHtml(input.incidentUrl)}">Open incident in DebugBundle</a></p>`]),
+    ...(input.bundleUrl === undefined || input.bundleUrl === null
+      ? []
+      : [`<p><a href="${escapeHtml(input.bundleUrl)}">View bundle JSON</a></p>`])
   ].join("");
 
   return { subject, text, html };

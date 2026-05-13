@@ -78,6 +78,18 @@ runIntegration("storage bootstrap integration", () => {
     expect(actualIndexes.has("processed_billing_events_pkey")).toBe(true);
     expect(actualIndexes.has("organizations_stripe_customer_id_key")).toBe(true);
 
+    const webhookIncidentColumnResult = await db.query<{ is_nullable: "YES" | "NO" }>(
+      `
+        SELECT is_nullable
+        FROM information_schema.columns
+        WHERE table_schema = 'public'
+          AND table_name = 'webhook_deliveries'
+          AND column_name = 'incident_id'
+      `,
+      []
+    );
+    expect(webhookIncidentColumnResult.rows[0]?.is_nullable).toBe("YES");
+
     const constraintResult = await db.query<{ conname: string; confdeltype: string }>(
       `
         SELECT conname, confdeltype

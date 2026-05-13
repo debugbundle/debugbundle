@@ -1,9 +1,10 @@
-import { CreditCardIcon, GalleryVerticalEndIcon, KeySquareIcon, LoaderCircleIcon, PlusIcon } from "lucide-react";
+import { CreditCardIcon, KeySquareIcon, LoaderCircleIcon, PlusIcon } from "lucide-react";
 import React, { useEffect, useRef, useState } from "react";
 import { BrowserRouter, Link, MemoryRouter, Navigate, Outlet, Route, Routes, useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { Toaster } from "sonner";
 
 import { AppSidebar } from "./components/system/app-sidebar.js";
+import { BrandLockup } from "./components/system/brand-lockup.js";
 import { CalloutCard } from "./components/system/callout-card.js";
 import { DialogFormContent } from "./components/system/dialog-form-content.js";
 import { PageHeader } from "./components/system/page-header.js";
@@ -378,12 +379,7 @@ function AuthLayout({
     <div className="flex min-h-screen flex-col items-center justify-center gap-6 bg-muted p-6 text-foreground md:p-10">
       <div className="flex w-full max-w-md flex-col gap-6">
         <div className="flex justify-center">
-          <Link to="/login" className="flex items-center gap-2 self-center font-medium transition-colors hover:text-foreground/80">
-            <div className="flex size-6 items-center justify-center rounded-md bg-primary text-primary-foreground">
-              <GalleryVerticalEndIcon className="size-4" />
-            </div>
-            DebugBundle
-          </Link>
+          <BrandLockup href="/login" />
         </div>
 
         <Card>

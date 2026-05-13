@@ -10,6 +10,8 @@ import { buildPostgresSslConfig, parsePostgresSslMode, type PostgresSslMode } fr
 import { assertStorageSchemaMigrationsApplied } from "../../../packages/storage/src/schema-migrations.js";
 import {
   createSesEmailTransport,
+  formatProductFromEmail,
+  renderAlertEmail,
   renderWeeklyReportEmail,
   type EmailTransport
 } from "../../../packages/email/src/index.js";
@@ -97,6 +99,15 @@ function readOptionalEnv(value: string | undefined): string | undefined {
 
   const trimmed = value.trim();
   return trimmed.length === 0 ? undefined : trimmed;
+}
+
+function normalizeWorkerBaseUrl(value: string | undefined): string | null {
+  const trimmed = readOptionalEnv(value);
+  if (trimmed === undefined) {
+    return null;
+  }
+
+  return trimmed.replace(/\/+$/, "");
 }
 
 export function parseWorkerEnv(env: Record<string, string | undefined>): WorkerEnv {
@@ -649,6 +660,8 @@ export function createLifecycleWebhookTransport(input: CreateLifecycleWebhookTra
 interface CreateAlertTransportInput {
   timeoutMs: number;
   emailTransport: EmailTransport | null;
+  appBaseUrl?: string | null;
+  apiBaseUrl?: string | null;
 }
 
 export function createAlertTransport(input: CreateAlertTransportInput): AlertDeliveryTransport {
@@ -698,16 +711,42 @@ export function createAlertTransport(input: CreateAlertTransportInput): AlertDel
         if (recipient.length === 0) {
           throw new AlertDeliveryError("alert_email_recipients_missing");
         }
-
-        const summary = typeof event.payload["summary"] === "string" ? event.payload["summary"] : "Alert triggered";
-        const eventType = typeof event.payload["event_type"] === "string" ? event.payload["event_type"] : "alert";
+        const conditionType = typeof event.payload["condition_type"] === "string" ? event.payload["condition_type"] : "alert";
+        const incidentId =
+          typeof event.payload["incident_id"] === "string"
+            ? event.payload["incident_id"]
+            : typeof event.incident_id === "string"
+              ? event.incident_id
+              : "unknown";
+        const occurredAt = typeof event.payload["occurred_at"] === "string" ? event.payload["occurred_at"] : "unknown";
+        const serviceName = typeof event.payload["service_name"] === "string" ? event.payload["service_name"] : "unknown";
+        const environment = typeof event.payload["environment"] === "string" ? event.payload["environment"] : "unknown";
+        const severity =
+          event.payload["severity"] === "low" ||
+          event.payload["severity"] === "medium" ||
+          event.payload["severity"] === "high" ||
+          event.payload["severity"] === "critical"
+            ? event.payload["severity"]
+            : "high";
+        const incidentUrl = input.appBaseUrl === undefined || input.appBaseUrl === null ? null : `${input.appBaseUrl}/incidents/${incidentId}`;
+        const bundleUrl = input.apiBaseUrl === undefined || input.apiBaseUrl === null ? null : `${input.apiBaseUrl}/v1/incidents/${incidentId}/bundle`;
+        const rendered = renderAlertEmail({
+          conditionType,
+          incidentId,
+          occurredAt,
+          serviceName,
+          environment,
+          severity,
+          incidentUrl,
+          bundleUrl
+        });
 
         try {
           await input.emailTransport.send({
             to: [recipient],
-            subject: `[DebugBundle Alert] ${eventType}: ${summary}`,
-            text: JSON.stringify(event.payload, null, 2),
-            html: `<h2>${eventType}</h2><pre>${JSON.stringify(event.payload, null, 2)}</pre>`
+            subject: rendered.subject,
+            text: rendered.text,
+            html: rendered.html
           });
         } catch (error) {
           const message = error instanceof Error ? error.message : String(error);
@@ -1193,7 +1232,7 @@ export async function runWorkerFromEnv(envInput: Record<string, string | undefin
     env.SES_FROM_EMAIL !== undefined
       ? createSesEmailTransport({
           region: env.SES_REGION ?? env.S3_REGION,
-          fromEmail: env.SES_FROM_EMAIL,
+          fromEmail: formatProductFromEmail(env.SES_FROM_EMAIL),
           timeoutMs: env.WEEKLY_REPORT_EMAIL_TIMEOUT_MS,
           accessKeyId: env.AWS_ACCESS_KEY_ID,
           secretAccessKey: env.AWS_SECRET_ACCESS_KEY
@@ -1201,7 +1240,9 @@ export async function runWorkerFromEnv(envInput: Record<string, string | undefin
       : null;
   const alertTransport = createAlertTransport({
     timeoutMs: env.WEBHOOK_DELIVERY_TIMEOUT_MS,
-    emailTransport
+    emailTransport,
+    appBaseUrl: normalizeWorkerBaseUrl(envInput["APP_BASE_URL"]),
+    apiBaseUrl: normalizeWorkerBaseUrl(envInput["DEBUGBUNDLE_API_URL"] ?? envInput["API_BASE_URL"] ?? envInput["VITE_API_URL"])
   });
   const weeklyReportTransport = createWeeklyReportTransport({
     emailTransport
