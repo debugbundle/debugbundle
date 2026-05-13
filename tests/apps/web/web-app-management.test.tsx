@@ -2,6 +2,7 @@
 
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { userEvent } from "@testing-library/user-event";
+import { StrictMode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { App } from "../../../apps/web/src/app.tsx";
@@ -2088,7 +2089,12 @@ describe("web app — management routes", () => {
     const channelSelect = await screen.findByLabelText(/channel/i);
     const channelOptions = within(channelSelect).getAllByRole("option");
 
-    expect(channelOptions.map((option) => option.textContent)).toEqual(["Email", "Alert webhook"]);
+    expect(channelOptions.map((option) => option.textContent)).toEqual([
+      "Email",
+      "Slack (Team tier only)",
+      "Alert webhook"
+    ]);
+    expect(channelOptions[1]).toBeDisabled();
     await user.selectOptions(channelSelect, "webhook");
     expect(screen.getByText(/separate from the Webhooks tab/i)).toBeInTheDocument();
   });
@@ -2728,6 +2734,128 @@ describe("web app — management routes", () => {
 
     expect(screen.getByRole("dialog", { name: /solo is active/i })).toBeInTheDocument();
     expect(screen.getByText(/new tier is available across this account/i)).toBeInTheDocument();
+
+    expect(
+      fetchMock.mock.calls.filter(([input, requestInit]) => {
+        return requestUrl(input).endsWith("/v1/billing/checkout/confirm") && requestInit?.method === "POST";
+      }).length
+    ).toBe(1);
+  });
+
+  it("confirms billing after a successful Stripe checkout return under React StrictMode", async () => {
+    const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = requestUrl(input);
+
+      if (url.endsWith("/v1/auth/session")) {
+        return jsonResponse(200, {
+          session: createSession()
+        });
+      }
+
+      if (url.endsWith("/v1/billing") && init?.method === undefined) {
+        return jsonResponse(200, {
+          billing: createBillingSummary()
+        });
+      }
+
+      if (url.endsWith("/v1/billing/checkout/confirm") && init?.method === "POST") {
+        return jsonResponse(200, {
+          billing: createBillingSummary({
+            plan: "team",
+            stripe_customer_id: "cus_123",
+            capacity_units: {
+              total: 10,
+              included: 10,
+              additional_purchased: 0,
+              pending_reduction: null
+            }
+          })
+        });
+      }
+
+      return jsonResponse(404, { error: "not_found" });
+    });
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(
+      <StrictMode>
+        <App initialEntries={["/billing?checkout=success&session_id=cs_test_123"]} />
+      </StrictMode>
+    );
+
+    expect(await screen.findByRole("dialog", { name: /team is active/i })).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByText(/^team$/i)).toBeInTheDocument();
+    });
+
+    expect(
+      fetchMock.mock.calls.filter(([input, requestInit]) => {
+        return requestUrl(input).endsWith("/v1/billing/checkout/confirm") && requestInit?.method === "POST";
+      }).length
+    ).toBe(1);
+  });
+
+  it("clears the checkout return before refreshing the session after confirmation", async () => {
+    let authSessionRequests = 0;
+    let resolveRefreshSession: ((response: Response) => void) | null = null;
+    const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = requestUrl(input);
+
+      if (url.endsWith("/v1/auth/session")) {
+        authSessionRequests += 1;
+        if (authSessionRequests === 1) {
+          return jsonResponse(200, {
+            session: createSession()
+          });
+        }
+
+        return new Promise<Response>((resolve) => {
+          resolveRefreshSession = resolve;
+        });
+      }
+
+      if (url.endsWith("/v1/billing") && init?.method === undefined) {
+        return jsonResponse(200, {
+          billing: createBillingSummary()
+        });
+      }
+
+      if (url.endsWith("/v1/billing/checkout/confirm") && init?.method === "POST") {
+        return jsonResponse(200, {
+          billing: createBillingSummary({
+            plan: "team",
+            stripe_customer_id: "cus_123",
+            capacity_units: {
+              total: 10,
+              included: 10,
+              additional_purchased: 0,
+              pending_reduction: null
+            }
+          })
+        });
+      }
+
+      return jsonResponse(404, { error: "not_found" });
+    });
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<App initialEntries={["/billing?checkout=success&session_id=cs_test_123"]} />);
+
+    expect(await screen.findByRole("dialog", { name: /team is active/i })).toBeInTheDocument();
+
+    expect(
+      fetchMock.mock.calls.filter(([input, requestInit]) => {
+        return requestUrl(input).endsWith("/v1/billing/checkout/confirm") && requestInit?.method === "POST";
+      }).length
+    ).toBe(1);
+
+    resolveRefreshSession?.(new Response(JSON.stringify({ session: createSession({ organization_plan: "team" }) }), { status: 200 }));
+
+    await waitFor(() => {
+      expect(screen.getByText(/^team$/i)).toBeInTheDocument();
+    });
 
     expect(
       fetchMock.mock.calls.filter(([input, requestInit]) => {

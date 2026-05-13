@@ -35,15 +35,29 @@ import { showErrorToast, showSuccessToast } from "../lib/notify.js";
 import { useSession } from "../lib/session.js";
 import { useDelayedVisibility } from "../lib/use-delayed-visibility.js";
 
-const TEAM_ALERT_CHANNEL_OPTIONS: Array<{ value: AlertChannel; label: string }> = [
-  { value: "email", label: "Email" },
-  { value: "slack", label: "Slack" },
-  { value: "webhook", label: "Alert webhook" }
+type AlertChannelOption = {
+  value: AlertChannel;
+  label: string;
+  disabled?: boolean;
+};
+
+const ALERT_CHANNEL_LABELS: Record<AlertChannel, string> = {
+  email: "Email",
+  slack: "Slack",
+  discord: "Discord",
+  webhook: "Alert webhook"
+};
+
+const TEAM_ALERT_CHANNEL_OPTIONS: AlertChannelOption[] = [
+  { value: "email", label: ALERT_CHANNEL_LABELS["email"] },
+  { value: "slack", label: ALERT_CHANNEL_LABELS["slack"] },
+  { value: "webhook", label: ALERT_CHANNEL_LABELS["webhook"] }
 ];
 
-const STANDARD_ALERT_CHANNEL_OPTIONS: Array<{ value: AlertChannel; label: string }> = [
-  { value: "email", label: "Email" },
-  { value: "webhook", label: "Alert webhook" }
+const STANDARD_ALERT_CHANNEL_OPTIONS: AlertChannelOption[] = [
+  { value: "email", label: ALERT_CHANNEL_LABELS["email"] },
+  { value: "slack", label: `${ALERT_CHANNEL_LABELS["slack"]} (Team tier only)`, disabled: true },
+  { value: "webhook", label: ALERT_CHANNEL_LABELS["webhook"] }
 ];
 
 const ALERT_CONDITION_OPTIONS: Array<{ value: AlertConditionType; label: string }> = [
@@ -85,11 +99,11 @@ export function ProjectAlertsPage(): JSX.Element {
   const resolvedProjectId = projectId;
 
   useEffect(() => {
-    if (channelOptions.some((option) => option.value === channel)) {
+    if (channelOptions.some((option) => option.value === channel && option.disabled !== true)) {
       return;
     }
 
-    setChannel(channelOptions[0]?.value ?? "email");
+    setChannel(channelOptions.find((option) => option.disabled !== true)?.value ?? "email");
   }, [channel, channelOptions]);
 
   function resetCreateForm(nextChannel: AlertChannel = "email"): void {
@@ -190,7 +204,7 @@ export function ProjectAlertsPage(): JSX.Element {
                       onChange={(event) => setChannel(event.currentTarget.value as AlertChannel)}
                     >
                       {channelOptions.map((option) => (
-                        <option key={option.value} value={option.value}>
+                        <option key={option.value} value={option.value} disabled={option.disabled === true}>
                           {option.label}
                         </option>
                       ))}
@@ -358,7 +372,7 @@ export function ProjectAlertsPage(): JSX.Element {
 }
 
 export function formatAlertChannel(channel: AlertChannel): string {
-  return TEAM_ALERT_CHANNEL_OPTIONS.find((option) => option.value === channel)?.label ?? channel;
+  return ALERT_CHANNEL_LABELS[channel] ?? channel;
 }
 
 export function formatAlertCondition(conditionType: AlertConditionType): string {

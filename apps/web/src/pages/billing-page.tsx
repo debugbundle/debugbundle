@@ -1,5 +1,5 @@
 import { CheckCircle2Icon, CreditCardIcon, InfoIcon, LoaderCircleIcon, XCircleIcon } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { CalloutCard } from "../components/system/callout-card.js";
 import { PageHeader } from "../components/system/page-header.js";
@@ -433,23 +433,11 @@ export function BillingPage(): JSX.Element {
   const [isOpeningPortal, setIsOpeningPortal] = useState(false);
   const [isCapacityDialogOpen, setIsCapacityDialogOpen] = useState(false);
   const [checkoutReturnDialog, setCheckoutReturnDialog] = useState<CheckoutReturnDialogState | null>(null);
-  const handledCheckoutReturnKey = useRef<string | null>(null);
   const showBillingLoading = useDelayedVisibility(billing === null && !isForbidden);
   const checkoutStatus = searchParams.get("checkout");
   const checkoutSessionId = searchParams.get("session_id");
 
   useEffect(() => {
-    if (checkoutStatus === null) {
-      handledCheckoutReturnKey.current = null;
-    } else {
-      const checkoutReturnKey = `${checkoutStatus}:${checkoutSessionId ?? ""}`;
-      if (handledCheckoutReturnKey.current === checkoutReturnKey) {
-        return;
-      }
-
-      handledCheckoutReturnKey.current = checkoutReturnKey;
-    }
-
     let cancelled = false;
     let pollTimer: ReturnType<typeof setTimeout> | undefined;
 
@@ -493,15 +481,15 @@ export function BillingPage(): JSX.Element {
 
     const pendingCheckout = checkoutStatus === "success" ? readPendingBillingCheckout() : null;
 
-    const completeCheckoutReturn = async (nextBilling: BillingSummaryRecord): Promise<void> => {
+    const completeCheckoutReturn = (nextBilling: BillingSummaryRecord): void => {
       setBilling(nextBilling);
-      await refreshSession();
       if (cancelled) {
         return;
       }
 
       setCheckoutReturnDialog({ status: "success", plan: nextBilling.plan });
       clearCheckoutReturn();
+      void refreshSession().catch(() => undefined);
     };
 
     const pollForCheckoutUpdate = async (baseline: BillingSummaryRecord, attemptsRemaining: number): Promise<void> => {
@@ -512,7 +500,7 @@ export function BillingPage(): JSX.Element {
       }
 
       if (billingReflectsCheckout(nextBilling, pendingCheckout, baseline)) {
-        await completeCheckoutReturn(nextBilling);
+        completeCheckoutReturn(nextBilling);
         return;
       }
 
@@ -553,7 +541,7 @@ export function BillingPage(): JSX.Element {
             return;
           }
 
-          await completeCheckoutReturn(confirmedBilling);
+          completeCheckoutReturn(confirmedBilling);
           return;
         } catch {
           if (cancelled) {
@@ -563,7 +551,7 @@ export function BillingPage(): JSX.Element {
       }
 
       if (billingReflectsCheckout(initialBilling, pendingCheckout, null)) {
-        await completeCheckoutReturn(initialBilling);
+        completeCheckoutReturn(initialBilling);
         return;
       }
 

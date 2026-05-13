@@ -1960,6 +1960,17 @@ describe("api default dependencies", () => {
       })
     ).resolves.toEqual(summary);
 
+    expect(subscriptionRetrieve).toHaveBeenCalledWith(
+      "sub_123",
+      {
+        expand: ["schedule", "items.data.price"]
+      },
+      {
+        timeout: 2500,
+        maxNetworkRetries: 0
+      }
+    );
+
     expect(checkoutCreate).toHaveBeenCalledWith(
       expect.objectContaining({
         customer: "cus_123",

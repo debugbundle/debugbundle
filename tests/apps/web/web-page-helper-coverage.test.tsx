@@ -531,7 +531,7 @@ describe("web page helper coverage", () => {
 
   it("formats alert channel metadata and builds alert config variants", () => {
     expect(formatAlertChannel("slack")).toBe("Slack");
-    expect(formatAlertChannel("discord" as never)).toBe("discord");
+    expect(formatAlertChannel("discord" as never)).toBe("Discord");
     expect(formatAlertCondition("error_spike")).toBe("Error spike");
     expect(formatAlertCondition("unknown_condition" as never)).toBe("unknown_condition");
     expect(formatSeverity("critical")).toBe("Critical");

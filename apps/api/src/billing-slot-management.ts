@@ -186,17 +186,29 @@ export async function loadStripeBillingSubscriptionState(input: {
   subscriptionId: string;
   fallbackPlan: TierName;
   fallbackEffectiveAt: string;
+  timeoutMs?: number;
 }): Promise<StripeBillingSubscriptionState> {
-  const subscription = await input.stripeConfig.client.subscriptions.retrieve(input.subscriptionId, {
-    expand: ["schedule", "items.data.price"]
-  });
+  const requestOptions =
+    input.timeoutMs === undefined
+      ? undefined
+      : {
+          timeout: input.timeoutMs,
+          maxNetworkRetries: 0
+        } satisfies Stripe.RequestOptions;
+  const subscription = await input.stripeConfig.client.subscriptions.retrieve(
+    input.subscriptionId,
+    {
+      expand: ["schedule", "items.data.price"]
+    },
+    requestOptions
+  );
   const liveState = derivePlanFromSubscriptionItems(subscription.items.data, input.stripeConfig.priceMap);
   const plan = liveState.plan === "free" ? input.fallbackPlan : liveState.plan;
   const schedule =
     subscription.schedule === null
       ? null
       : typeof subscription.schedule === "string"
-        ? await input.stripeConfig.client.subscriptionSchedules.retrieve(subscription.schedule)
+        ? await input.stripeConfig.client.subscriptionSchedules.retrieve(subscription.schedule, {}, requestOptions)
         : subscription.schedule;
 
   return {

@@ -107,6 +107,8 @@ export function stripTrailingSlash(value: string): string {
   return value.replace(/\/+$/, "");
 }
 
+const BILLING_SUMMARY_STRIPE_PROJECTION_TIMEOUT_MS = 2_500;
+
 export function readNonEmptyEnv(env: Record<string, string | undefined>, key: string): string | undefined {
   const value = env[key];
   if (value === undefined) {
@@ -857,7 +859,8 @@ export function createApiDependencies(input: CreateApiDependenciesInput): {
         stripeConfig: input.stripeConfig,
         subscriptionId: organizationBillingState.stripe_subscription_id,
         fallbackPlan: organizationBillingState.plan,
-        fallbackEffectiveAt: summary.usage_window.ends_at
+        fallbackEffectiveAt: summary.usage_window.ends_at,
+        timeoutMs: BILLING_SUMMARY_STRIPE_PROJECTION_TIMEOUT_MS
       });
 
       return projectBillingSummary({

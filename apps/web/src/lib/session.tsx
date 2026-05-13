@@ -1,5 +1,6 @@
 import {
   createContext,
+  useCallback,
   useContext,
   useEffect,
   useMemo,
@@ -31,17 +32,11 @@ export function SessionProvider({ children }: { children: ReactNode }): JSX.Elem
   const [sessionInvalidationCount, setSessionInvalidationCount] = useState(0);
   const hasBootstrappedSession = useRef(false);
 
-  async function refreshSession(): Promise<SessionRecord | null> {
-    setIsLoading(true);
-
-    try {
-      const nextSession = await getSession();
-      setSession(nextSession);
-      return nextSession;
-    } finally {
-      setIsLoading(false);
-    }
-  }
+  const refreshSession = useCallback(async (): Promise<SessionRecord | null> => {
+    const nextSession = await getSession();
+    setSession(nextSession);
+    return nextSession;
+  }, []);
 
   useEffect(() => {
     if (hasBootstrappedSession.current) {
@@ -49,8 +44,10 @@ export function SessionProvider({ children }: { children: ReactNode }): JSX.Elem
     }
 
     hasBootstrappedSession.current = true;
-    void refreshSession();
-  }, []);
+    void refreshSession().finally(() => {
+      setIsLoading(false);
+    });
+  }, [refreshSession]);
 
   useEffect(() => {
     return subscribeToBrowserSessionInvalidation(() => {
@@ -82,7 +79,7 @@ export function SessionProvider({ children }: { children: ReactNode }): JSX.Elem
       refreshSession,
       setSession
     }),
-    [session, isLoading, sessionInvalidationCount]
+    [session, isLoading, sessionInvalidationCount, refreshSession]
   );
 
   return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>;
