@@ -177,7 +177,6 @@ export interface BillingUsageMetric {
 export interface BillingSummaryRecord {
   plan: "free" | "solo" | "team";
   stripe_customer_id: string | null;
-  email_verification_required: boolean;
   active_projects: number;
   capacity_units: {
     total: number;

@@ -196,8 +196,8 @@ describe("api billing routes", () => {
         stripe_customer_id: "cus_123",
         active_projects: 1,
         capacity_units: {
-          total: 2,
-          included: 2,
+          total: 3,
+          included: 3,
           additional_purchased: 0,
           pending_reduction: null
         },
@@ -208,23 +208,23 @@ describe("api billing routes", () => {
         allowances: {
           monthly_bundle_requests: {
             used: 180,
-            limit: 500
+            limit: 750
           },
           monthly_raw_ingested_events: {
             used: 800,
-            limit: 4000
+            limit: 6000
           },
           retained_bundle_cap: {
             used: 40,
-            limit: 300
+            limit: 450
           },
           monthly_remote_activations: {
             used: 3,
-            limit: 50
+            limit: 75
           },
           monthly_alert_deliveries: {
             used: 10,
-            limit: 150
+            limit: 225
           }
         }
       }),
@@ -260,11 +260,10 @@ describe("api billing routes", () => {
       billing: {
         plan: "solo",
         stripe_customer_id: "cus_123",
-        email_verification_required: false,
         active_projects: 1,
         capacity_units: {
-          total: 2,
-          included: 2,
+          total: 3,
+          included: 3,
           additional_purchased: 0,
           pending_reduction: null
         },
@@ -275,23 +274,23 @@ describe("api billing routes", () => {
         allowances: {
           monthly_bundle_requests: {
             used: 180,
-            limit: 500
+            limit: 750
           },
           monthly_raw_ingested_events: {
             used: 800,
-            limit: 4000
+            limit: 6000
           },
           retained_bundle_cap: {
             used: 40,
-            limit: 300
+            limit: 450
           },
           monthly_remote_activations: {
             used: 3,
-            limit: 50
+            limit: 75
           },
           monthly_alert_deliveries: {
             used: 10,
-            limit: 150
+            limit: 225
           }
         }
       }
@@ -363,8 +362,8 @@ describe("api billing routes", () => {
         stripe_customer_id: "cus_123",
         active_projects: 3,
         capacity_units: {
-          total: 8,
-          included: 5,
+          total: 18,
+          included: 15,
           additional_purchased: 3,
           pending_reduction: null
         },
@@ -373,11 +372,11 @@ describe("api billing routes", () => {
           ends_at: "2026-04-01T00:00:00.000Z"
         },
         allowances: {
-          monthly_bundle_requests: { used: 10, limit: 1000 },
-          monthly_raw_ingested_events: { used: 250, limit: 12000 },
-          retained_bundle_cap: { used: 12, limit: 800 },
-          monthly_remote_activations: { used: 4, limit: 400 },
-          monthly_alert_deliveries: { used: 15, limit: 1200 }
+          monthly_bundle_requests: { used: 10, limit: 9000 },
+          monthly_raw_ingested_events: { used: 250, limit: 90000 },
+          retained_bundle_cap: { used: 12, limit: 5400 },
+          monthly_remote_activations: { used: 4, limit: 900 },
+          monthly_alert_deliveries: { used: 15, limit: 2700 }
         }
       }),
       createCheckoutLink: vi.fn().mockResolvedValue(null),
@@ -409,16 +408,15 @@ describe("api billing routes", () => {
     expect(response.json()).toEqual({
       billing: expect.objectContaining({
         plan: "team",
-        email_verification_required: false,
         capacity_units: expect.objectContaining({
           additional_purchased: 3,
-          total: 8
+          total: 18
         })
       })
     });
   });
 
-  it("should create a checkout link for verified owners and reject member or unverified sessions", async (): Promise<void> => {
+  it("should create a checkout link for owners and reject member sessions", async (): Promise<void> => {
     const createAuditLog = vi.fn().mockResolvedValue(undefined);
     const billingManagement = {
       getBillingSummaryForOrganization: vi.fn().mockResolvedValue({
@@ -573,11 +571,13 @@ describe("api billing routes", () => {
     );
     expect(member.statusCode).toBe(403);
     expect(member.json()).toEqual({ error: "forbidden" });
-    expect(unverified.statusCode).toBe(403);
-    expect(unverified.json()).toEqual({ error: "verification_required" });
+    expect(unverified.statusCode).toBe(200);
+    expect(unverified.json()).toEqual({
+      url: "https://billing.stripe.com/checkout/solo"
+    });
   });
 
-  it("should create a customer-portal link for verified paid owners", async (): Promise<void> => {
+  it("should create a customer-portal link for paid owners", async (): Promise<void> => {
     const createAuditLog = vi.fn().mockResolvedValue(undefined);
     const billingManagement = {
       getBillingSummaryForOrganization: vi.fn().mockResolvedValue({
@@ -585,8 +585,8 @@ describe("api billing routes", () => {
         stripe_customer_id: "cus_123",
         active_projects: 4,
         capacity_units: {
-          total: 10,
-          included: 10,
+          total: 15,
+          included: 15,
           additional_purchased: 0,
           pending_reduction: null
         },
@@ -597,23 +597,23 @@ describe("api billing routes", () => {
         allowances: {
           monthly_bundle_requests: {
             used: 600,
-            limit: 5000
+            limit: 7500
           },
           monthly_raw_ingested_events: {
             used: 3200,
-            limit: 50000
+            limit: 75000
           },
           retained_bundle_cap: {
             used: 75,
-            limit: 3000
+            limit: 4500
           },
           monthly_remote_activations: {
             used: 30,
-            limit: 500
+            limit: 750
           },
           monthly_alert_deliveries: {
             used: 90,
-            limit: 1500
+            limit: 2250
           }
         }
       }),
@@ -676,7 +676,7 @@ describe("api billing routes", () => {
     );
   });
 
-  it("should increase allowance capacity for verified owners", async (): Promise<void> => {
+  it("should increase allowance capacity for owners", async (): Promise<void> => {
     const billingManagement = {
       getBillingSummaryForOrganization: vi.fn().mockResolvedValue(null),
       createCheckoutLink: vi.fn().mockResolvedValue(null),
@@ -686,8 +686,8 @@ describe("api billing routes", () => {
         stripe_customer_id: "cus_123",
         active_projects: 2,
         capacity_units: {
-          total: 5,
-          included: 2,
+          total: 6,
+          included: 3,
           additional_purchased: 3,
           pending_reduction: null
         },
@@ -696,11 +696,11 @@ describe("api billing routes", () => {
           ends_at: "2026-04-23T11:56:12.000Z"
         },
         allowances: {
-          monthly_bundle_requests: { used: 20, limit: 2500 },
-          monthly_raw_ingested_events: { used: 200, limit: 20000 },
-          retained_bundle_cap: { used: 5, limit: 1500 },
-          monthly_remote_activations: { used: 1, limit: 250 },
-          monthly_alert_deliveries: { used: 3, limit: 750 }
+          monthly_bundle_requests: { used: 20, limit: 1500 },
+          monthly_raw_ingested_events: { used: 200, limit: 12000 },
+          retained_bundle_cap: { used: 5, limit: 900 },
+          monthly_remote_activations: { used: 1, limit: 150 },
+          monthly_alert_deliveries: { used: 3, limit: 450 }
         }
       }),
       scheduleCapacityReduction: vi.fn().mockResolvedValue(null),
@@ -739,7 +739,7 @@ describe("api billing routes", () => {
       billing: expect.objectContaining({
         capacity_units: expect.objectContaining({
           additional_purchased: 3,
-          total: 5
+          total: 6
         })
       })
     });
@@ -761,12 +761,12 @@ describe("api billing routes", () => {
         stripe_customer_id: "cus_123",
         active_projects: 3,
         capacity_units: {
-          total: 4,
-          included: 2,
+          total: 5,
+          included: 3,
           additional_purchased: 2,
           pending_reduction: {
             additional_purchased: 0,
-            total: 2,
+            total: 3,
             effective_at: "2026-04-23T11:56:12.000Z"
           }
         },
@@ -775,11 +775,11 @@ describe("api billing routes", () => {
           ends_at: "2026-04-23T11:56:12.000Z"
         },
         allowances: {
-          monthly_bundle_requests: { used: 20, limit: 2000 },
-          monthly_raw_ingested_events: { used: 200, limit: 16000 },
-          retained_bundle_cap: { used: 5, limit: 1200 },
-          monthly_remote_activations: { used: 1, limit: 200 },
-          monthly_alert_deliveries: { used: 3, limit: 600 }
+          monthly_bundle_requests: { used: 20, limit: 1250 },
+          monthly_raw_ingested_events: { used: 200, limit: 10000 },
+          retained_bundle_cap: { used: 5, limit: 750 },
+          monthly_remote_activations: { used: 1, limit: 125 },
+          monthly_alert_deliveries: { used: 3, limit: 375 }
         }
       }),
       cancelCapacityReduction: vi.fn().mockResolvedValue(null)
@@ -821,12 +821,12 @@ describe("api billing routes", () => {
         stripe_customer_id: "cus_123",
         active_projects: 3,
         capacity_units: {
-          total: 4,
-          included: 2,
+          total: 5,
+          included: 3,
           additional_purchased: 2,
           pending_reduction: {
             additional_purchased: 1,
-            total: 3,
+            total: 4,
             effective_at: "2026-04-23T11:56:12.000Z"
           }
         },
@@ -835,11 +835,11 @@ describe("api billing routes", () => {
           ends_at: "2026-04-23T11:56:12.000Z"
         },
         allowances: {
-          monthly_bundle_requests: { used: 20, limit: 2000 },
-          monthly_raw_ingested_events: { used: 200, limit: 16000 },
-          retained_bundle_cap: { used: 5, limit: 1200 },
-          monthly_remote_activations: { used: 1, limit: 200 },
-          monthly_alert_deliveries: { used: 3, limit: 600 }
+          monthly_bundle_requests: { used: 20, limit: 1250 },
+          monthly_raw_ingested_events: { used: 200, limit: 10000 },
+          retained_bundle_cap: { used: 5, limit: 750 },
+          monthly_remote_activations: { used: 1, limit: 125 },
+          monthly_alert_deliveries: { used: 3, limit: 375 }
         }
       }),
       createCheckoutLink: vi.fn().mockResolvedValue(null),
@@ -875,7 +875,7 @@ describe("api billing routes", () => {
         capacity_units: expect.objectContaining({
           pending_reduction: {
             additional_purchased: 1,
-            total: 3,
+            total: 4,
             effective_at: "2026-04-23T11:56:12.000Z"
           }
         })
@@ -883,7 +883,7 @@ describe("api billing routes", () => {
     });
   });
 
-  it("should map checkout and portal failure statuses for verified owners", async (): Promise<void> => {
+  it("should map checkout and portal failure statuses for owners", async (): Promise<void> => {
     const createAuditLog = vi.fn().mockResolvedValue(undefined);
     const billingManagement = {
       getBillingSummaryForOrganization: vi
@@ -894,8 +894,8 @@ describe("api billing routes", () => {
           stripe_customer_id: "cus_123",
           active_projects: 2,
           capacity_units: {
-            total: 10,
-            included: 10,
+            total: 15,
+            included: 15,
             additional_purchased: 0,
             pending_reduction: null
           },
@@ -904,11 +904,11 @@ describe("api billing routes", () => {
             ends_at: "2026-04-01T00:00:00.000Z"
           },
           allowances: {
-            monthly_bundle_requests: { used: 10, limit: 5000 },
-            monthly_raw_ingested_events: { used: 100, limit: 50000 },
-            retained_bundle_cap: { used: 5, limit: 3000 },
-            monthly_remote_activations: { used: 1, limit: 500 },
-            monthly_alert_deliveries: { used: 2, limit: 1500 }
+            monthly_bundle_requests: { used: 10, limit: 7500 },
+            monthly_raw_ingested_events: { used: 100, limit: 75000 },
+            retained_bundle_cap: { used: 5, limit: 4500 },
+            monthly_remote_activations: { used: 1, limit: 750 },
+            monthly_alert_deliveries: { used: 2, limit: 2250 }
           }
         })
         .mockResolvedValueOnce({
@@ -927,8 +927,8 @@ describe("api billing routes", () => {
           },
           allowances: {
             monthly_bundle_requests: { used: 10, limit: 100 },
-            monthly_raw_ingested_events: { used: 100, limit: 1000 },
-            retained_bundle_cap: { used: 5, limit: 100 },
+            monthly_raw_ingested_events: { used: 100, limit: 750 },
+            retained_bundle_cap: { used: 5, limit: 50 },
             monthly_remote_activations: { used: 0, limit: 0 },
             monthly_alert_deliveries: { used: 1, limit: 25 }
           }
@@ -950,8 +950,8 @@ describe("api billing routes", () => {
           },
           allowances: {
             monthly_bundle_requests: { used: 10, limit: 100 },
-            monthly_raw_ingested_events: { used: 100, limit: 1000 },
-            retained_bundle_cap: { used: 5, limit: 100 },
+            monthly_raw_ingested_events: { used: 100, limit: 750 },
+            retained_bundle_cap: { used: 5, limit: 50 },
             monthly_remote_activations: { used: 0, limit: 0 },
             monthly_alert_deliveries: { used: 1, limit: 25 }
           }
@@ -961,8 +961,8 @@ describe("api billing routes", () => {
           stripe_customer_id: "cus_123",
           active_projects: 2,
           capacity_units: {
-            total: 10,
-            included: 10,
+            total: 15,
+            included: 15,
             additional_purchased: 0,
             pending_reduction: null
           },
@@ -971,11 +971,11 @@ describe("api billing routes", () => {
             ends_at: "2026-04-01T00:00:00.000Z"
           },
           allowances: {
-            monthly_bundle_requests: { used: 10, limit: 5000 },
-            monthly_raw_ingested_events: { used: 100, limit: 50000 },
-            retained_bundle_cap: { used: 5, limit: 3000 },
-            monthly_remote_activations: { used: 1, limit: 500 },
-            monthly_alert_deliveries: { used: 2, limit: 1500 }
+            monthly_bundle_requests: { used: 10, limit: 7500 },
+            monthly_raw_ingested_events: { used: 100, limit: 75000 },
+            retained_bundle_cap: { used: 5, limit: 4500 },
+            monthly_remote_activations: { used: 1, limit: 750 },
+            monthly_alert_deliveries: { used: 2, limit: 2250 }
           }
         }),
       createCheckoutLink: vi.fn().mockResolvedValue(null),
@@ -1106,8 +1106,8 @@ describe("api billing routes", () => {
       stripe_customer_id: "cus_123",
       active_projects: 1,
       capacity_units: {
-        total: 2,
-        included: 2,
+        total: 3,
+        included: 3,
         additional_purchased: 0,
         pending_reduction: null
       },
@@ -1116,11 +1116,11 @@ describe("api billing routes", () => {
         ends_at: "2026-06-10T22:14:57.000Z"
       },
       allowances: {
-        monthly_bundle_requests: { used: 0, limit: 500 },
-        monthly_raw_ingested_events: { used: 0, limit: 4000 },
-        retained_bundle_cap: { used: 0, limit: 500 },
-        monthly_remote_activations: { used: 0, limit: 50 },
-        monthly_alert_deliveries: { used: 0, limit: 100 }
+        monthly_bundle_requests: { used: 0, limit: 750 },
+        monthly_raw_ingested_events: { used: 0, limit: 6000 },
+        retained_bundle_cap: { used: 0, limit: 450 },
+        monthly_remote_activations: { used: 0, limit: 75 },
+        monthly_alert_deliveries: { used: 0, limit: 225 }
       }
     });
     const billingManagement = mockedObject<BillingManagementDependency>({
@@ -1167,7 +1167,6 @@ describe("api billing routes", () => {
     });
     expect(response.json()).toEqual({
       billing: expect.objectContaining({
-        email_verification_required: false,
         plan: "solo",
         stripe_customer_id: "cus_123"
       })
@@ -1222,7 +1221,7 @@ describe("api billing routes", () => {
         "x-csrf-token": csrfToken
       },
       payload: {
-        target_additional_capacity_units: -1
+        target_additional_capacity_units: 100
       }
     });
     const increaseNotConfigured = await app.inject({
@@ -1274,7 +1273,7 @@ describe("api billing routes", () => {
         "x-csrf-token": csrfToken
       },
       payload: {
-        target_additional_capacity_units: -1
+        target_additional_capacity_units: 100
       }
     });
     const scheduleConflict = await app.inject({

@@ -1,3 +1,5 @@
+import { getTierCapabilities } from "../../../packages/shared-types/src/index.js";
+
 export interface SessionRecord {
   session_id: string;
   user_id: string;
@@ -103,7 +105,6 @@ export interface BillingUsageMetric {
 export interface BillingSummaryRecord {
   plan: "free" | "solo" | "team";
   stripe_customer_id: string | null;
-  email_verification_required: boolean;
   active_projects: number;
   capacity_units: {
     total: number;
@@ -367,41 +368,44 @@ export function createOrganizationInvite(overrides: Partial<OrganizationInviteRe
 }
 
 export function createBillingSummary(overrides: Partial<BillingSummaryRecord> = {}): BillingSummaryRecord {
+  const plan = overrides.plan ?? "free";
+  const capabilities = getTierCapabilities(plan);
+  const capacityUnits = overrides.capacity_units ?? {
+    total: capabilities.included_capacity_units,
+    included: capabilities.included_capacity_units,
+    additional_purchased: 0,
+    pending_reduction: null
+  };
+
   return {
-    plan: "free",
+    plan,
     stripe_customer_id: null,
-    email_verification_required: false,
     active_projects: 1,
-    capacity_units: {
-      total: 1,
-      included: 1,
-      additional_purchased: 0,
-      pending_reduction: null
-    },
+    capacity_units: capacityUnits,
     usage_window: {
       starts_at: "2026-03-01T00:00:00.000Z",
       ends_at: "2026-04-01T00:00:00.000Z"
     },
-    allowances: {
+    allowances: overrides.allowances ?? {
       monthly_bundle_requests: {
         used: 12,
-        limit: 100
+        limit: capabilities.monthly_bundle_requests * capacityUnits.total
       },
       monthly_raw_ingested_events: {
         used: 120,
-        limit: 750
+        limit: capabilities.monthly_raw_ingested_events * capacityUnits.total
       },
       retained_bundle_cap: {
         used: 6,
-        limit: 50
+        limit: capabilities.retained_bundle_cap * capacityUnits.total
       },
       monthly_remote_activations: {
         used: 0,
-        limit: 0
+        limit: capabilities.monthly_remote_activations * capacityUnits.total
       },
       monthly_alert_deliveries: {
         used: 4,
-        limit: 25
+        limit: capabilities.monthly_alert_deliveries * capacityUnits.total
       }
     },
     ...overrides

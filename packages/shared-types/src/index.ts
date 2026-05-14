@@ -618,7 +618,14 @@ export const BundleV1Schema = z.object({
 
 export type BundleV1 = z.infer<typeof BundleV1Schema>;
 
-export { TIER_CAPABILITIES, getTierCapabilities, isSelfHostMode, type TierName, type TierCapabilities } from "./tier-capabilities.js";
+export {
+  MAX_BILLING_ADDITIONAL_CAPACITY_UNITS,
+  TIER_CAPABILITIES,
+  getTierCapabilities,
+  isSelfHostMode,
+  type TierName,
+  type TierCapabilities
+} from "./tier-capabilities.js";
 
 export {
   EventClassValues,

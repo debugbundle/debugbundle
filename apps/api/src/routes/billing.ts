@@ -13,8 +13,6 @@ async function requireOwnerBillingPrincipal(
 ): Promise<
   | {
       organization_id: string;
-      email_verified_at: string | null;
-      verification_required: boolean;
       subject: string;
     }
   | null
@@ -42,8 +40,6 @@ async function requireOwnerBillingPrincipal(
 
     return {
       organization_id: session.organization_id,
-      email_verified_at: session.email_verified_at,
-      verification_required: session.email_verified_at === null,
       subject: `member:${session.user_id}`
     };
   }
@@ -69,8 +65,6 @@ async function requireOwnerBillingPrincipal(
 
   return {
     organization_id: member.organization_id,
-    email_verified_at: null,
-    verification_required: false,
     subject: `member:${member.member_id}`
   };
 }
@@ -105,12 +99,7 @@ export function registerBillingRoutes(app: FastifyInstance, dependencies: ApiDep
       return reply.status(404).send({ error: "billing_not_found" });
     }
 
-    return reply.status(200).send({
-      billing: {
-        ...billing,
-        email_verification_required: principal.verification_required
-      }
-    });
+    return reply.status(200).send({ billing });
   });
 
   app.post("/v1/billing/checkout", async (request, reply) => {
@@ -128,9 +117,6 @@ export function registerBillingRoutes(app: FastifyInstance, dependencies: ApiDep
       }))
     ) {
       return;
-    }
-    if (session.email_verified_at === null) {
-      return reply.status(403).send({ error: "verification_required" });
     }
     if (dependencies.billingManagement === undefined) {
       return reply.status(404).send({ error: "billing_not_available" });
@@ -296,12 +282,7 @@ export function registerBillingRoutes(app: FastifyInstance, dependencies: ApiDep
       }
     });
 
-    return reply.status(200).send({
-      billing: {
-        ...result,
-        email_verification_required: session.email_verified_at === null
-      }
-    });
+    return reply.status(200).send({ billing: result });
   });
 
   app.post("/v1/billing/portal", async (request, reply) => {
@@ -319,9 +300,6 @@ export function registerBillingRoutes(app: FastifyInstance, dependencies: ApiDep
       }))
     ) {
       return;
-    }
-    if (session.email_verified_at === null) {
-      return reply.status(403).send({ error: "verification_required" });
     }
     if (dependencies.billingManagement === undefined) {
       return reply.status(404).send({ error: "billing_not_available" });
@@ -412,9 +390,6 @@ export function registerBillingRoutes(app: FastifyInstance, dependencies: ApiDep
     if (principal === null) {
       return;
     }
-    if (principal.verification_required) {
-      return reply.status(403).send({ error: "verification_required" });
-    }
     if (dependencies.billingManagement?.increaseCapacity === undefined) {
       return reply.status(404).send({ error: "billing_not_available" });
     }
@@ -449,9 +424,6 @@ export function registerBillingRoutes(app: FastifyInstance, dependencies: ApiDep
     if (principal === null) {
       return;
     }
-    if (principal.verification_required) {
-      return reply.status(403).send({ error: "verification_required" });
-    }
     if (dependencies.billingManagement?.scheduleCapacityReduction === undefined) {
       return reply.status(404).send({ error: "billing_not_available" });
     }
@@ -485,9 +457,6 @@ export function registerBillingRoutes(app: FastifyInstance, dependencies: ApiDep
     const principal = await requireOwnerBillingPrincipal(request, reply, dependencies, "management-write");
     if (principal === null) {
       return;
-    }
-    if (principal.verification_required) {
-      return reply.status(403).send({ error: "verification_required" });
     }
     if (dependencies.billingManagement?.cancelCapacityReduction === undefined) {
       return reply.status(404).send({ error: "billing_not_available" });

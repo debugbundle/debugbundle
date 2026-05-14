@@ -223,16 +223,18 @@ See `/spec/tiers.md` for the finalized source-of-truth pricing model. Summary:
 ### Solo Plan ($2.99/month)
 - For independent developers and agent-driven projects.
 - Unlimited projects, 1 member (solo only)
-- Extra capacity units: +$1.99/unit/month
+- 3 included capacity units
+- Extra capacity units: +$0.99/unit/month
 - 30-day bundle retention, 14-day raw event retention
 - Remote probe activation included
 - Configurable operational alerts
 - Local/manual improvement bundles only (no cloud automation)
 - Included and purchased capacity units expand the shared allowance bucket
 
-### Team Plan ($49/month)
+### Team Plan ($19/month)
 - Unlimited projects, 5 members
-- Extra capacity units: +$4.99/unit/month
+- 15 included capacity units
+- Extra capacity units: +$1.99/unit/month
 - 90-day bundle retention, 30-day raw event retention
 - Cloud-automated improvement bundles
 - Shared dashboards, member invites, Slack integration, priority support

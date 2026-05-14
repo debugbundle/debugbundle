@@ -7,8 +7,8 @@ const billingFixture = {
   plan: "solo",
   active_projects: 2,
   capacity_units: {
-    total: 4,
-    included: 2,
+    total: 5,
+    included: 3,
     additional_purchased: 2,
     pending_reduction: null
   },
@@ -17,11 +17,11 @@ const billingFixture = {
     ends_at: "2026-04-23T00:00:00.000Z"
   },
   allowances: {
-    monthly_bundle_requests: { used: 20, limit: 2000 },
-    monthly_raw_ingested_events: { used: 200, limit: 16000 },
-    retained_bundle_cap: { used: 5, limit: 1200 },
-    monthly_remote_activations: { used: 1, limit: 200 },
-    monthly_alert_deliveries: { used: 3, limit: 600 }
+    monthly_bundle_requests: { used: 20, limit: 1250 },
+    monthly_raw_ingested_events: { used: 200, limit: 10000 },
+    retained_bundle_cap: { used: 5, limit: 750 },
+    monthly_remote_activations: { used: 1, limit: 125 },
+    monthly_alert_deliveries: { used: 3, limit: 375 }
   }
 };
 
@@ -38,7 +38,7 @@ describe("mcp billing tools", () => {
   it("returns billing payloads for all operations", async () => {
     const tools = createBillingMcpTools({
       getBillingSummary: vi.fn().mockResolvedValue(billingFixture),
-      increaseCapacity: vi.fn().mockResolvedValue({ ...billingFixture, capacity_units: { ...billingFixture.capacity_units, additional_purchased: 4, total: 6 } }),
+      increaseCapacity: vi.fn().mockResolvedValue({ ...billingFixture, capacity_units: { ...billingFixture.capacity_units, additional_purchased: 4, total: 7 } }),
       scheduleCapacityReduction: vi.fn().mockResolvedValue(billingFixture),
       cancelCapacityReduction: vi.fn().mockResolvedValue(billingFixture)
     });
@@ -50,7 +50,7 @@ describe("mcp billing tools", () => {
     await expect(
       tools.increase_capacity({ bearerToken: "dbundle_mem_x", targetAdditionalCapacityUnits: 4 })
     ).resolves.toEqual({
-      billing: { ...billingFixture, capacity_units: { ...billingFixture.capacity_units, additional_purchased: 4, total: 6 } }
+      billing: { ...billingFixture, capacity_units: { ...billingFixture.capacity_units, additional_purchased: 4, total: 7 } }
     });
 
     await expect(

@@ -46,11 +46,11 @@ Every capability must be available through all applicable interfaces. Operations
 | Update project | `PATCH /v1/projects/{id}` | `project update` | `update_project` | Browser Session or Member Token, owner only |
 | Delete project | `DELETE /v1/projects/{id}` | `project delete` | `delete_project` | Browser Session or Member Token, owner only |
 | Get billing summary | `GET /v1/billing` | `billing get` | `get_billing_summary` | Browser Session or Member Token, owner only |
-| Start billing checkout | `POST /v1/billing/checkout` | — | — | Browser Session only, verified owner only |
-| Open billing portal | `POST /v1/billing/portal` | — | — | Browser Session only, verified owner only |
-| Increase capacity now | `POST /v1/billing/capacity/increase` | `billing capacity increase` | `increase_capacity` | Browser Session or Member Token, owner only. Browser sessions still require verified email. |
-| Schedule capacity reduction | `POST /v1/billing/capacity/scheduled-reduction` | `billing capacity schedule-reduction` | `schedule_capacity_reduction` | Browser Session or Member Token, owner only. Browser sessions still require verified email. |
-| Cancel scheduled capacity reduction | `DELETE /v1/billing/capacity/scheduled-reduction` | `billing capacity cancel-reduction` | `cancel_capacity_reduction` | Browser Session or Member Token, owner only. Browser sessions still require verified email. |
+| Start billing checkout | `POST /v1/billing/checkout` | — | — | Browser Session only, owner only |
+| Open billing portal | `POST /v1/billing/portal` | — | — | Browser Session only, owner only |
+| Increase capacity now | `POST /v1/billing/capacity/increase` | `billing capacity increase` | `increase_capacity` | Browser Session or Member Token, owner only |
+| Schedule capacity reduction | `POST /v1/billing/capacity/scheduled-reduction` | `billing capacity schedule-reduction` | `schedule_capacity_reduction` | Browser Session or Member Token, owner only |
+| Cancel scheduled capacity reduction | `DELETE /v1/billing/capacity/scheduled-reduction` | `billing capacity cancel-reduction` | `cancel_capacity_reduction` | Browser Session or Member Token, owner only |
 | List project tokens | `GET /v1/projects/{id}/tokens` | `token project list` | `list_project_tokens` | Member token scoped to organization |
 | Create project token | `POST /v1/projects/{id}/tokens` | `token project create` | `create_project_token` | Plaintext returned once |
 | Revoke project token | `POST /v1/projects/{id}/tokens/{tokenId}/revoke` | `token project revoke` | `revoke_project_token` | |
@@ -543,12 +543,12 @@ All update fields are optional, but at least one field must be present.
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
 | GET | `/v1/billing` | Browser Session or Member Token (owner only) | Return billing summary, plan state, and allowance usage for the current organization |
-| POST | `/v1/billing/checkout` | Browser Session (verified owner only) | Create a Stripe-hosted checkout session URL for an allowed upgrade target |
+| POST | `/v1/billing/checkout` | Browser Session (owner only) | Create a Stripe-hosted checkout session URL for an allowed upgrade target |
 | POST | `/v1/billing/checkout/confirm` | Browser Session (owner only) | Verify a returned Stripe Checkout Session and sync the organization billing snapshot from Stripe |
-| POST | `/v1/billing/portal` | Browser Session (verified owner only) | Create a Stripe-hosted customer-portal session URL for an active paid plan |
-| POST | `/v1/billing/capacity/increase` | Browser Session or Member Token (verified owner only) | Immediately increase additional allowance-capacity units via Stripe subscription update with proration |
-| POST | `/v1/billing/capacity/scheduled-reduction` | Browser Session or Member Token (verified owner only) | Schedule an allowance-capacity reduction to take effect at the next billing-period boundary via Stripe subscription schedule |
-| DELETE | `/v1/billing/capacity/scheduled-reduction` | Browser Session or Member Token (verified owner only) | Cancel a pending scheduled allowance-capacity reduction, releasing the Stripe subscription schedule |
+| POST | `/v1/billing/portal` | Browser Session (owner only) | Create a Stripe-hosted customer-portal session URL for an active paid plan |
+| POST | `/v1/billing/capacity/increase` | Browser Session or Member Token (owner only) | Immediately increase additional allowance-capacity units via Stripe subscription update with proration |
+| POST | `/v1/billing/capacity/scheduled-reduction` | Browser Session or Member Token (owner only) | Schedule an allowance-capacity reduction to take effect at the next billing-period boundary via Stripe subscription schedule |
+| DELETE | `/v1/billing/capacity/scheduled-reduction` | Browser Session or Member Token (owner only) | Cancel a pending scheduled allowance-capacity reduction, releasing the Stripe subscription schedule |
 
 Billing summary and allowance-capacity management routes accept both browser session and owner-scoped member tokens. Checkout, checkout confirmation, and portal routes are browser-session-only interactive surfaces. Stripe checkout sessions are created dynamically with `client_reference_id` = `organization_id`; the success URL includes Stripe's `{CHECKOUT_SESSION_ID}` placeholder so the web app can ask the API to verify the returned Checkout Session and sync the account immediately.
 
@@ -558,11 +558,10 @@ Billing summary and allowance-capacity management routes accept both browser ses
   "billing": {
     "plan": "solo",
     "stripe_customer_id": "cus_123",
-    "email_verification_required": false,
     "active_projects": 1,
     "capacity_units": {
-      "total": 2,
-      "included": 2,
+      "total": 3,
+      "included": 3,
       "additional_purchased": 0,
       "pending_reduction": null
     },
@@ -573,23 +572,23 @@ Billing summary and allowance-capacity management routes accept both browser ses
     "allowances": {
       "monthly_bundle_requests": {
         "used": 180,
-        "limit": 500
+        "limit": 750
       },
       "monthly_raw_ingested_events": {
         "used": 800,
-        "limit": 4000
+        "limit": 6000
       },
       "retained_bundle_cap": {
         "used": 40,
-        "limit": 300
+        "limit": 450
       },
       "monthly_remote_activations": {
         "used": 3,
-        "limit": 50
+        "limit": 75
       },
       "monthly_alert_deliveries": {
         "used": 10,
-        "limit": 150
+        "limit": 225
       }
     }
   }
@@ -605,7 +604,7 @@ Billing summary and allowance-capacity management routes accept both browser ses
 {
   "pending_reduction": {
     "additional_purchased": 1,
-    "total": 3,
+    "total": 4,
     "effective_at": "2026-04-01T00:00:00.000Z",
   }
 }
@@ -641,7 +640,7 @@ Checkout confirmation returns the standard billing summary response after the AP
 }
 ```
 
-`target_additional_capacity_units` must be greater than the current `additional_purchased` count. The Stripe subscription item quantity is updated immediately with proration. A pending scheduled reduction must be cancelled before increasing capacity. Response is the updated billing summary.
+`target_additional_capacity_units` must be greater than the current `additional_purchased` count and no greater than 99. The Stripe subscription item quantity is updated immediately with proration. A pending scheduled reduction must be cancelled before increasing capacity. Response is the updated billing summary.
 
 **Capacity reduction schedule request:**
 ```json
@@ -650,13 +649,12 @@ Checkout confirmation returns the standard billing summary response after the AP
 }
 ```
 
-`target_additional_capacity_units` must be less than the current `additional_purchased` count (0 to remove all extra capacity units). A Stripe subscription schedule is created (or updated) with two phases: current phase maintains current capacity until billing period end, next phase applies the reduced quantity. Response is the updated billing summary with `pending_reduction` populated.
+`target_additional_capacity_units` must be less than the current `additional_purchased` count and no greater than 99 (0 to remove all extra capacity units). A Stripe subscription schedule is created (or updated) with two phases: current phase maintains current capacity until billing period end, next phase applies the reduced quantity. Response is the updated billing summary with `pending_reduction` populated.
 
 **Cancel capacity reduction:** No request body. Releases the Stripe subscription schedule and keeps the current capacity quantity. Response is the updated billing summary with `pending_reduction: null`.
 
 - Missing or invalid session/token: `401 { "error": "invalid_session" }` or `401 { "error": "invalid_member_token" }`
 - Forbidden for non-owner callers: `403 { "error": "forbidden" }`
-- Verified owner required for checkout, portal, and capacity management: `403 { "error": "verification_required" }`
 - Missing billing dependency/surface: `404 { "error": "billing_not_available" }`
 - Missing billing record for organization: `404 { "error": "billing_not_found" }`
 - Invalid checkout payload: `400 { "error": "invalid_payload" }`

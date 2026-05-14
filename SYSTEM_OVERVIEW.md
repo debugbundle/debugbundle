@@ -336,9 +336,9 @@ See `/spec/tiers.md` for the finalized source-of-truth. Three tiers: **Free → 
 
 Event billing uses the event class model: Free meters only `incident_signal` events (Class A — exceptions, qualifying logs, and immediate request failures), paid tiers meter `incident_signal` + `context_signal` (Class A + B), and `operational_signal` (Class C) is excluded from billing across all tiers. Each project has a capture policy (preset: `minimal`/`balanced`/`investigative`) that controls what the SDK captures and the ingestion API accepts, plus an `immediate_client_error_statuses` override that can promote selected `4xx` responses into normal incident-opening request failures. Free defaults to `minimal` (failure-first, including 5xx request failures); paid defaults to `balanced`, which also treats 408/423/424/425/429 request failures as immediate incident signals; `investigative` additionally defaults the client-error incident override to `401/403/409/422`.
 
-| | Free | Solo ($2.99/mo) | Team ($49/mo) |
+| | Free | Solo ($2.99/mo) | Team ($19/mo) |
 |---|---|---|---|
-| Projects | 1 | Unlimited (+$1.99/capacity unit) | Unlimited (+$4.99/capacity unit) |
+| Projects | Unlimited | Unlimited (+$0.99/capacity unit) | Unlimited (+$1.99/capacity unit) |
 | Members | 1 (owner only) | 1 (solo only) | 5 |
 | Bundle retention | 7 days | 30 days | 90 days |
 | Raw event retention | 7 days | 14 days | 30 days |

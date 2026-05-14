@@ -33,15 +33,15 @@ DebugBundle requires the following Stripe products:
 
 | Product | Description | Billing |
 |---------|-------------|---------|
-| Solo Plan | DebugBundle Solo — 2 included capacity units, solo developer tier | $2.99/month recurring |
-| Team Plan | DebugBundle Team — 10 included capacity units, collaboration tier | $49/month recurring |
+| Solo Plan | DebugBundle Solo — 3 included capacity units, solo developer tier | $2.99/month recurring |
+| Team Plan | DebugBundle Team — 15 included capacity units, collaboration tier | $19/month recurring |
 
 **Extra capacity add-ons (one per paid tier):**
 
 | Product | Description | Billing |
 |---------|-------------|---------|
-| Solo Extra Capacity | Additional capacity unit for Solo plan | $1.99/month recurring, quantity-based |
-| Team Extra Capacity | Additional capacity unit for Team plan | $4.99/month recurring, quantity-based |
+| Solo Extra Capacity | Additional capacity unit for Solo plan | $0.99/month recurring, quantity-based |
+| Team Extra Capacity | Additional capacity unit for Team plan | $1.99/month recurring, quantity-based |
 
 ### 2.2 Price Configuration
 
@@ -149,7 +149,7 @@ For production, the checkout route must create a Stripe Checkout Session dynamic
 | `subscription_data.metadata.organization_id` | `organization_id` (persists on subscription for all future webhooks) |
 | `allow_promotion_codes` | `true` (enable promo codes from day one) |
 
-**Extra capacity add-on:** Extra capacity units are managed directly inside the DebugBundle billing page after subscription creation. Increasing capacity updates the Stripe subscription immediately. Reducing capacity creates or updates a Stripe subscription schedule so the lower quantity only takes effect at the next renewal boundary. These units expand shared allowance capacity only; they do not gate project creation.
+**Extra capacity add-on:** Extra capacity units are managed directly inside the DebugBundle billing page after subscription creation. Increasing capacity updates the Stripe subscription immediately. Reducing capacity creates or updates a Stripe subscription schedule so the lower quantity only takes effect at the next renewal boundary. Paid organizations can hold up to 99 purchased extra capacity units. These units expand shared allowance capacity only; they do not gate project creation.
 
 ### 4.3 Checkout Route Changes
 
@@ -309,6 +309,8 @@ The handler must support both paths and fail gracefully if resolution fails (log
 `additional_capacity_units` must represent the currently valid quantity of paid extra capacity units.
 
 It must be derived from the active Stripe subscription item quantity for the extra-capacity price associated with the organization's plan.
+
+The API must reject user-supplied extra-capacity targets outside the range `0..99` before mutating Stripe subscriptions or schedules.
 
 ### 6.2 Product Capacity Rule
 

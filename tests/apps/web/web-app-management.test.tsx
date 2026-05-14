@@ -2502,8 +2502,8 @@ describe("web app — management routes", () => {
             plan: "team",
             active_projects: 2,
             capacity_units: {
-              total: 5,
-              included: 3,
+              total: 17,
+              included: 15,
               additional_purchased: 2,
               pending_reduction: null
             }
@@ -2521,7 +2521,7 @@ describe("web app — management routes", () => {
     expect(await screen.findByRole("heading", { name: /organization/i, level: 1 })).toBeInTheDocument();
     expect(screen.getAllByText(/org_123/i).length).toBeGreaterThan(0);
     expect(await screen.findByText(/2 members and 1 pending invite/i)).toBeInTheDocument();
-    expect(await screen.findByText(/team plan with 2 active projects and 5 allowance units/i)).toBeInTheDocument();
+    expect(await screen.findByText(/team plan with 2 active projects and 17 allowance units/i)).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /open member management/i })).toHaveAttribute("href", "/organization/members");
     expect(screen.getByRole("link", { name: /open billing management/i })).toHaveAttribute("href", "/billing");
   });
@@ -2825,8 +2825,8 @@ describe("web app — management routes", () => {
             plan: "solo",
             stripe_customer_id: "cus_123",
             capacity_units: {
-              total: 2,
-              included: 2,
+              total: 3,
+              included: 3,
               additional_purchased: 0,
               pending_reduction: null
             }
@@ -2879,8 +2879,8 @@ describe("web app — management routes", () => {
             plan: "team",
             stripe_customer_id: "cus_123",
             capacity_units: {
-              total: 10,
-              included: 10,
+              total: 15,
+              included: 15,
               additional_purchased: 0,
               pending_reduction: null
             }
@@ -2942,8 +2942,8 @@ describe("web app — management routes", () => {
             plan: "team",
             stripe_customer_id: "cus_123",
             capacity_units: {
-              total: 10,
-              included: 10,
+              total: 15,
+              included: 15,
               additional_purchased: 0,
               pending_reduction: null
             }
@@ -2982,7 +2982,7 @@ describe("web app — management routes", () => {
     ).toBe(1);
   });
 
-  it("shows verification and owner gates on the billing surface", async () => {
+  it("shows the owner gate on the billing surface without blocking unverified owners", async () => {
     const ownerFetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
       const url = requestUrl(input);
 
@@ -2995,36 +2995,35 @@ describe("web app — management routes", () => {
       if (url.endsWith("/v1/billing") && init?.method === undefined) {
         return jsonResponse(200, {
           billing: createBillingSummary({
-            email_verification_required: true,
             plan: "solo",
             stripe_customer_id: "cus_123",
             active_projects: 1,
             capacity_units: {
-              total: 2,
-              included: 2,
+              total: 3,
+              included: 3,
               additional_purchased: 0,
               pending_reduction: null
             },
             allowances: {
               monthly_bundle_requests: {
                 used: 180,
-                limit: 500
+                limit: 750
               },
               monthly_raw_ingested_events: {
                 used: 800,
-                limit: 4000
+                limit: 6000
               },
               retained_bundle_cap: {
                 used: 40,
-                limit: 300
+                limit: 450
               },
               monthly_remote_activations: {
                 used: 3,
-                limit: 50
+                limit: 75
               },
               monthly_alert_deliveries: {
                 used: 10,
-                limit: 150
+                limit: 225
               }
             }
           })
@@ -3038,8 +3037,8 @@ describe("web app — management routes", () => {
 
     const ownerView = render(<App initialEntries={["/billing"]} />);
 
-    expect(await screen.findByText(/verify your email before enabling billing changes/i)).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /manage subscription/i })).toBeDisabled();
+    expect(await screen.findByRole("button", { name: /manage subscription/i })).toBeEnabled();
+    expect(screen.queryByText(/verify your email before enabling billing changes/i)).not.toBeInTheDocument();
     expect(screen.getByText(/^solo$/i).className.includes("border-border")).toBe(true);
     expect(screen.getByText(/^solo$/i).className.includes("text-primary")).toBe(false);
     ownerView.unmount();
@@ -3085,8 +3084,8 @@ describe("web app — management routes", () => {
             stripe_customer_id: "cus_123",
             active_projects: 3,
             capacity_units: {
-              total: 4,
-              included: 2,
+              total: 5,
+              included: 3,
               additional_purchased: 2,
               pending_reduction: null
             },
@@ -3108,12 +3107,12 @@ describe("web app — management routes", () => {
             stripe_customer_id: "cus_123",
             active_projects: 3,
             capacity_units: {
-              total: 4,
-              included: 2,
+              total: 5,
+              included: 3,
               additional_purchased: 2,
               pending_reduction: {
                 additional_purchased: 0,
-                total: 2,
+                total: 3,
                 effective_at: "2026-04-23T11:56:12.000Z"
               }
             },
@@ -3141,7 +3140,7 @@ describe("web app — management routes", () => {
     await user.type(reductionInput, "0");
     await user.click(screen.getByRole("button", { name: /schedule reduction/i }));
 
-    expect((await screen.findAllByText(/dropping to 2 total units/i)).length).toBeGreaterThan(0);
+    expect((await screen.findAllByText(/dropping to 3 total units/i)).length).toBeGreaterThan(0);
     expect(screen.getByRole("button", { name: /keep current units/i })).toBeInTheDocument();
   });
 
@@ -3163,12 +3162,12 @@ describe("web app — management routes", () => {
             stripe_customer_id: "cus_123",
             active_projects: 3,
             capacity_units: {
-              total: 4,
-              included: 2,
+              total: 5,
+              included: 3,
               additional_purchased: 2,
               pending_reduction: {
                 additional_purchased: 0,
-                total: 2,
+                total: 3,
                 effective_at: "2026-04-23T11:56:12.000Z"
               }
             },
@@ -3188,8 +3187,8 @@ describe("web app — management routes", () => {
             stripe_customer_id: "cus_123",
             active_projects: 3,
             capacity_units: {
-              total: 4,
-              included: 2,
+              total: 5,
+              included: 3,
               additional_purchased: 2,
               pending_reduction: null
             },
@@ -3208,7 +3207,7 @@ describe("web app — management routes", () => {
 
     render(<App initialEntries={["/billing"]} />);
 
-    expect(await screen.findByText(/dropping to 2 total units/i)).toBeInTheDocument();
+    expect(await screen.findByText(/dropping to 3 total units/i)).toBeInTheDocument();
 
     await user.click(await screen.findByRole("button", { name: /manage capacity/i }));
     await user.click(screen.getByRole("button", { name: /keep current units/i }));
@@ -3222,7 +3221,7 @@ describe("web app — management routes", () => {
     });
 
     expect(await screen.findByText(/scheduled capacity reduction cancelled successfully/i)).toBeInTheDocument();
-    expect(screen.queryByText(/dropping to 2 total units/i)).toBeNull();
+    expect(screen.queryByText(/dropping to 3 total units/i)).toBeNull();
   });
 
   it("keeps the project create dialog open and shows an error when project creation fails", async () => {
@@ -3352,8 +3351,8 @@ describe("web app — management routes", () => {
             plan: "solo",
             stripe_customer_id: "cus_123",
             capacity_units: {
-              total: 2,
-              included: 2,
+              total: 3,
+              included: 3,
               additional_purchased: 0,
               pending_reduction: null
             }
@@ -3438,8 +3437,8 @@ describe("web app — management routes", () => {
             stripe_customer_id: "cus_123",
             active_projects: 2,
             capacity_units: {
-              total: 3,
-              included: 2,
+              total: 4,
+              included: 3,
               additional_purchased: 1,
               pending_reduction: null
             }
@@ -3469,7 +3468,7 @@ describe("web app — management routes", () => {
     expect(await screen.findByText(/choose a unit count above your current purchased quantity/i)).toBeInTheDocument();
   });
 
-  it("renders singular organization overview summaries for one project, one member, and one allowance unit", async () => {
+  it("renders singular organization overview summaries for one project, one member, and three allowance units", async () => {
     const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
       const url = requestUrl(input);
 
@@ -3503,8 +3502,8 @@ describe("web app — management routes", () => {
             plan: "solo",
             active_projects: 1,
             capacity_units: {
-              total: 1,
-              included: 1,
+              total: 3,
+              included: 3,
               additional_purchased: 0,
               pending_reduction: null
             }
@@ -3522,7 +3521,7 @@ describe("web app — management routes", () => {
     expect(await screen.findByRole("heading", { name: /organization/i, level: 1 })).toBeInTheDocument();
     expect(await screen.findByText(/^1 active project$/i)).toBeInTheDocument();
     expect(await screen.findByText(/1 member and 1 pending invite/i)).toBeInTheDocument();
-    expect(await screen.findByText(/solo plan with 1 active project and 1 allowance unit/i)).toBeInTheDocument();
+    expect(await screen.findByText(/solo plan with 1 active project and 3 allowance units/i)).toBeInTheDocument();
   });
 
   it("shows every project incident empty state when the scoped status filter changes", async () => {

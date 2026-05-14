@@ -92,9 +92,9 @@ describe("tier capabilities", () => {
   it("should match finalized tiers.md project and member limits", (): void => {
     expect(TIER_CAPABILITIES.free.included_capacity_units).toBe(1);
     expect(TIER_CAPABILITIES.free.max_members).toBe(1);
-    expect(TIER_CAPABILITIES.solo.included_capacity_units).toBe(2);
+    expect(TIER_CAPABILITIES.solo.included_capacity_units).toBe(3);
     expect(TIER_CAPABILITIES.solo.max_members).toBe(1);
-    expect(TIER_CAPABILITIES.team.included_capacity_units).toBe(10);
+    expect(TIER_CAPABILITIES.team.included_capacity_units).toBe(15);
     expect(TIER_CAPABILITIES.team.max_members).toBe(5);
   });
 

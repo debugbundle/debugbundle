@@ -88,16 +88,16 @@ describe("billing store – event_class filter", () => {
     expect(summary).toMatchObject({
       active_projects: 1,
       capacity_units: {
-        included: 2,
+        included: 3,
         additional_purchased: 3,
-        total: 5
+        total: 6
       },
       allowances: {
-        monthly_bundle_requests: { used: 0, limit: 1250 },
-        monthly_raw_ingested_events: { used: 0, limit: 10000 },
-        retained_bundle_cap: { used: 0, limit: 750 },
-        monthly_remote_activations: { used: 0, limit: 125 },
-        monthly_alert_deliveries: { used: 0, limit: 375 }
+        monthly_bundle_requests: { used: 0, limit: 1500 },
+        monthly_raw_ingested_events: { used: 0, limit: 12000 },
+        retained_bundle_cap: { used: 0, limit: 900 },
+        monthly_remote_activations: { used: 0, limit: 150 },
+        monthly_alert_deliveries: { used: 0, limit: 450 }
       }
     });
   });

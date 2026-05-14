@@ -9,6 +9,8 @@
  * Source-of-truth for values: /spec/tiers.md (finalized).
  */
 
+export const MAX_BILLING_ADDITIONAL_CAPACITY_UNITS = 99;
+
 export const TIER_CAPABILITIES = {
   free: {
     remote_probes: false,
@@ -37,7 +39,7 @@ export const TIER_CAPABILITIES = {
     cloud_improvement_bundles: false,
     shared_dashboards: false,
     member_invites: false,
-    included_capacity_units: 2,
+    included_capacity_units: 3,
     max_members: 1,
     ingestion_rate_per_min: 5_000,
     retrieval_rate_per_min: 300,
@@ -57,7 +59,7 @@ export const TIER_CAPABILITIES = {
     cloud_improvement_bundles: true,
     shared_dashboards: true,
     member_invites: true,
-    included_capacity_units: 10,
+    included_capacity_units: 15,
     max_members: 5,
     ingestion_rate_per_min: 10_000,
     retrieval_rate_per_min: 500,

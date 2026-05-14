@@ -17,12 +17,12 @@ const billingFixture = {
   plan: "solo" as const,
   active_projects: 2,
   capacity_units: {
-    total: 4,
-    included: 2,
+    total: 5,
+    included: 3,
     additional_purchased: 2,
     pending_reduction: {
       additional_purchased: 1,
-      total: 3,
+      total: 4,
       effective_at: "2026-04-23T11:56:12.000Z"
     }
   },
@@ -31,13 +31,12 @@ const billingFixture = {
     ends_at: "2026-04-23T11:56:12.000Z"
   },
   allowances: {
-    monthly_bundle_requests: { used: 20, limit: 2000 },
-    monthly_raw_ingested_events: { used: 200, limit: 16000 },
-    retained_bundle_cap: { used: 5, limit: 1200 },
-    monthly_remote_activations: { used: 1, limit: 200 },
-    monthly_alert_deliveries: { used: 3, limit: 600 }
-  },
-  email_verification_required: false
+    monthly_bundle_requests: { used: 20, limit: 1250 },
+    monthly_raw_ingested_events: { used: 200, limit: 10000 },
+    retained_bundle_cap: { used: 5, limit: 750 },
+    monthly_remote_activations: { used: 1, limit: 125 },
+    monthly_alert_deliveries: { used: 3, limit: 375 }
+  }
 };
 
 describe("cli billing commands", () => {
@@ -63,8 +62,8 @@ describe("cli billing commands", () => {
     expect(humanResult.exitCode).toBe(0);
     expect(humanResult.output).toContain("Plan: solo");
     expect(humanResult.output).toContain("Projects: 2 active");
-    expect(humanResult.output).toContain("Allowance capacity: 4 total units");
-    expect(humanResult.output).toContain("Pending reduction: 3 total units");
+    expect(humanResult.output).toContain("Allowance capacity: 5 total units");
+    expect(humanResult.output).toContain("Pending reduction: 4 total units");
     expect(JSON.parse(jsonResult.output)).toEqual({ billing: billingFixture });
   });
 

@@ -1,6 +1,7 @@
 import { CheckCircle2Icon, CreditCardIcon, InfoIcon, LoaderCircleIcon, XCircleIcon } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
+import { MAX_BILLING_ADDITIONAL_CAPACITY_UNITS } from "../../../../packages/shared-types/src/index.js";
 import { CalloutCard } from "../components/system/callout-card.js";
 import { PageHeader } from "../components/system/page-header.js";
 import { PlanBadge } from "../components/system/plan-badge.js";
@@ -122,7 +123,9 @@ interface CapacityDialogProps {
 }
 
 export function CapacityDialog(props: CapacityDialogProps): JSX.Element {
-  const [increaseTarget, setIncreaseTarget] = useState(String(props.billing.capacity_units.additional_purchased + 1));
+  const [increaseTarget, setIncreaseTarget] = useState(
+    String(Math.min(props.billing.capacity_units.additional_purchased + 1, MAX_BILLING_ADDITIONAL_CAPACITY_UNITS))
+  );
   const [reductionTarget, setReductionTarget] = useState(String(Math.max(props.billing.capacity_units.additional_purchased - 1, 0)));
   const [activeAction, setActiveAction] = useState<"increase" | "reduce" | "cancel" | null>(null);
 
@@ -131,7 +134,7 @@ export function CapacityDialog(props: CapacityDialogProps): JSX.Element {
       return;
     }
 
-    setIncreaseTarget(String(props.billing.capacity_units.additional_purchased + 1));
+    setIncreaseTarget(String(Math.min(props.billing.capacity_units.additional_purchased + 1, MAX_BILLING_ADDITIONAL_CAPACITY_UNITS)));
     setReductionTarget(
       String(props.billing.capacity_units.pending_reduction?.additional_purchased ?? Math.max(props.billing.capacity_units.additional_purchased - 1, 0))
     );
@@ -262,12 +265,13 @@ export function CapacityDialog(props: CapacityDialogProps): JSX.Element {
                     id="billing-slot-increase"
                     type="number"
                     min={currentAdditionalCapacityUnits + 1}
+                    max={MAX_BILLING_ADDITIONAL_CAPACITY_UNITS}
                     step={1}
                     value={increaseTarget}
                     onChange={(event) => setIncreaseTarget(event.currentTarget.value)}
                   />
                   <FieldDescription>
-                    Enter the total purchased extra units you want active right away.
+                    Enter the total purchased extra units you want active right away, up to {MAX_BILLING_ADDITIONAL_CAPACITY_UNITS}.
                   </FieldDescription>
                 </Field>
               </FieldGroup>
@@ -279,6 +283,7 @@ export function CapacityDialog(props: CapacityDialogProps): JSX.Element {
                   pendingReduction !== null ||
                   activeAction !== null ||
                   Number.isNaN(parsedIncreaseTarget) ||
+                  parsedIncreaseTarget > MAX_BILLING_ADDITIONAL_CAPACITY_UNITS ||
                   parsedIncreaseTarget <= currentAdditionalCapacityUnits
                 }
                 onClick={() => void handleIncrease()}
@@ -600,7 +605,7 @@ export function BillingPage(): JSX.Element {
     }
   }
 
-  const canChangeBilling = session?.email_verified_at !== null && billing?.email_verification_required === false;
+  const canChangeBilling = billing !== null;
   const pendingReduction = billing?.capacity_units.pending_reduction ?? null;
 
   return (
@@ -629,15 +634,6 @@ export function BillingPage(): JSX.Element {
         ) : null
       ) : (
         <>
-          {!canChangeBilling ? (
-            <CalloutCard
-              eyebrow="Verification required"
-              title="Verify your email before enabling billing changes"
-              description="You can review billing now, but upgrades and subscription changes stay disabled until your email is verified."
-              tone="warning"
-            />
-          ) : null}
-
           <div className="grid gap-4 xl:grid-cols-[1.2fr_0.8fr]">
             <Card>
               <CardHeader>

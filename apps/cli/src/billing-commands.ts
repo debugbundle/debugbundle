@@ -27,7 +27,6 @@ interface BillingSummaryLike {
     monthly_remote_activations: { used: number; limit: number };
     monthly_alert_deliveries: { used: number; limit: number };
   };
-  email_verification_required?: boolean | undefined;
 }
 
 function mapErrorToExitCode(error: unknown): number {

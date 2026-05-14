@@ -949,8 +949,8 @@ describe("api default dependencies", () => {
         stripe_customer_id: "cus_123",
         active_projects: 2,
         capacity_units: {
-          total: 2,
-          included: 2,
+          total: 3,
+          included: 3,
           additional_purchased: 0,
           pending_reduction: null
         },
@@ -959,11 +959,11 @@ describe("api default dependencies", () => {
           ends_at: "2026-04-23T11:56:12.000Z"
         },
         allowances: {
-          monthly_bundle_requests: { used: 20, limit: 1000 },
-          monthly_raw_ingested_events: { used: 200, limit: 8000 },
-          retained_bundle_cap: { used: 5, limit: 600 },
-          monthly_remote_activations: { used: 1, limit: 100 },
-          monthly_alert_deliveries: { used: 3, limit: 300 }
+          monthly_bundle_requests: { used: 20, limit: 750 },
+          monthly_raw_ingested_events: { used: 200, limit: 6000 },
+          retained_bundle_cap: { used: 5, limit: 450 },
+          monthly_remote_activations: { used: 1, limit: 75 },
+          monthly_alert_deliveries: { used: 3, limit: 225 }
         }
       }),
       getBillingSummaryForProject: vi.fn()
@@ -1849,8 +1849,8 @@ describe("api default dependencies", () => {
       stripe_customer_id: "cus_123",
       active_projects: 2,
       capacity_units: {
-        total: 2,
-        included: 2,
+        total: 3,
+        included: 3,
         additional_purchased: 0,
         pending_reduction: null
       },
@@ -1859,11 +1859,11 @@ describe("api default dependencies", () => {
         ends_at: "2026-04-23T11:56:12.000Z"
       },
       allowances: {
-        monthly_bundle_requests: { used: 20, limit: 1000 },
-        monthly_raw_ingested_events: { used: 200, limit: 8000 },
-        retained_bundle_cap: { used: 5, limit: 600 },
-        monthly_remote_activations: { used: 1, limit: 100 },
-        monthly_alert_deliveries: { used: 3, limit: 300 }
+        monthly_bundle_requests: { used: 20, limit: 750 },
+        monthly_raw_ingested_events: { used: 200, limit: 6000 },
+        retained_bundle_cap: { used: 5, limit: 450 },
+        monthly_remote_activations: { used: 1, limit: 75 },
+        monthly_alert_deliveries: { used: 3, limit: 225 }
       }
     };
     const checkoutCreate = vi.fn().mockResolvedValue({ url: null });
@@ -1989,8 +1989,8 @@ describe("api default dependencies", () => {
       stripe_customer_id: "cus_123",
       active_projects: 2,
       capacity_units: {
-        total: 2,
-        included: 2,
+        total: 3,
+        included: 3,
         additional_purchased: 0,
         pending_reduction: null
       },
@@ -1999,11 +1999,11 @@ describe("api default dependencies", () => {
         ends_at: "2026-04-23T11:56:12.000Z"
       },
       allowances: {
-        monthly_bundle_requests: { used: 20, limit: 1000 },
-        monthly_raw_ingested_events: { used: 200, limit: 8000 },
-        retained_bundle_cap: { used: 5, limit: 600 },
-        monthly_remote_activations: { used: 1, limit: 100 },
-        monthly_alert_deliveries: { used: 3, limit: 300 }
+        monthly_bundle_requests: { used: 20, limit: 750 },
+        monthly_raw_ingested_events: { used: 200, limit: 6000 },
+        retained_bundle_cap: { used: 5, limit: 450 },
+        monthly_remote_activations: { used: 1, limit: 75 },
+        monthly_alert_deliveries: { used: 3, limit: 225 }
       }
     };
     const subscriptionRetrieve = vi.fn();
@@ -2097,8 +2097,8 @@ describe("api default dependencies", () => {
         stripe_customer_id: "cus_123",
         active_projects: 2,
         capacity_units: {
-          total: 2,
-          included: 2,
+          total: 3,
+          included: 3,
           additional_purchased: 0,
           pending_reduction: null
         },
@@ -2107,11 +2107,11 @@ describe("api default dependencies", () => {
           ends_at: "2026-02-01T00:00:00.000Z"
         },
         allowances: {
-          monthly_bundle_requests: { used: 20, limit: 1000 },
-          monthly_raw_ingested_events: { used: 200, limit: 8000 },
-          retained_bundle_cap: { used: 5, limit: 600 },
-          monthly_remote_activations: { used: 1, limit: 100 },
-          monthly_alert_deliveries: { used: 3, limit: 300 }
+          monthly_bundle_requests: { used: 20, limit: 750 },
+          monthly_raw_ingested_events: { used: 200, limit: 6000 },
+          retained_bundle_cap: { used: 5, limit: 450 },
+          monthly_remote_activations: { used: 1, limit: 75 },
+          monthly_alert_deliveries: { used: 3, limit: 225 }
         }
       }),
       getBillingSummaryForProject: vi.fn(),
@@ -2312,8 +2312,8 @@ describe("api default dependencies", () => {
         stripe_customer_id: "cus_123",
         active_projects: 2,
         capacity_units: {
-          total: 2,
-          included: 2,
+          total: 3,
+          included: 3,
           additional_purchased: 0,
           pending_reduction: null
         },
@@ -2322,11 +2322,11 @@ describe("api default dependencies", () => {
           ends_at: "2026-02-01T00:00:00.000Z"
         },
         allowances: {
-          monthly_bundle_requests: { used: 20, limit: 1000 },
-          monthly_raw_ingested_events: { used: 200, limit: 8000 },
-          retained_bundle_cap: { used: 5, limit: 600 },
-          monthly_remote_activations: { used: 1, limit: 100 },
-          monthly_alert_deliveries: { used: 3, limit: 300 }
+          monthly_bundle_requests: { used: 20, limit: 750 },
+          monthly_raw_ingested_events: { used: 200, limit: 6000 },
+          retained_bundle_cap: { used: 5, limit: 450 },
+          monthly_remote_activations: { used: 1, limit: 75 },
+          monthly_alert_deliveries: { used: 3, limit: 225 }
         }
       }),
       getBillingSummaryForProject: vi.fn(),
@@ -2465,8 +2465,8 @@ describe("api default dependencies", () => {
         stripe_customer_id: "cus_123",
         active_projects: 2,
         capacity_units: {
-          total: 2,
-          included: 2,
+          total: 3,
+          included: 3,
           additional_purchased: 0,
           pending_reduction: null
         },
@@ -2475,11 +2475,11 @@ describe("api default dependencies", () => {
           ends_at: "2026-02-01T00:00:00.000Z"
         },
         allowances: {
-          monthly_bundle_requests: { used: 20, limit: 1000 },
-          monthly_raw_ingested_events: { used: 200, limit: 8000 },
-          retained_bundle_cap: { used: 5, limit: 600 },
-          monthly_remote_activations: { used: 1, limit: 100 },
-          monthly_alert_deliveries: { used: 3, limit: 300 }
+          monthly_bundle_requests: { used: 20, limit: 750 },
+          monthly_raw_ingested_events: { used: 200, limit: 6000 },
+          retained_bundle_cap: { used: 5, limit: 450 },
+          monthly_remote_activations: { used: 1, limit: 75 },
+          monthly_alert_deliveries: { used: 3, limit: 225 }
         }
       }),
       getBillingSummaryForProject: vi.fn(),
@@ -2575,8 +2575,8 @@ describe("api default dependencies", () => {
       stripe_customer_id: "cus_123",
       active_projects: 2,
       capacity_units: {
-        total: 4,
-        included: 2,
+        total: 5,
+        included: 3,
         additional_purchased: 2,
         pending_reduction: null
       },
@@ -2585,11 +2585,11 @@ describe("api default dependencies", () => {
         ends_at: "2026-04-23T11:56:12.000Z"
       },
       allowances: {
-        monthly_bundle_requests: { used: 20, limit: 1000 },
-        monthly_raw_ingested_events: { used: 200, limit: 8000 },
-        retained_bundle_cap: { used: 5, limit: 600 },
-        monthly_remote_activations: { used: 1, limit: 100 },
-        monthly_alert_deliveries: { used: 3, limit: 300 }
+        monthly_bundle_requests: { used: 20, limit: 1250 },
+        monthly_raw_ingested_events: { used: 200, limit: 10000 },
+        retained_bundle_cap: { used: 5, limit: 750 },
+        monthly_remote_activations: { used: 1, limit: 125 },
+        monthly_alert_deliveries: { used: 3, limit: 375 }
       }
     };
     const buildStripeConfig = (input: {

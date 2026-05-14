@@ -40,7 +40,7 @@ describe('Phase 15 — Homepage, Marketing & Blog', () => {
 
       // Must reference actual prices
       expect(pricing).toContain('$2.99');
-      expect(pricing).toContain('$49');
+      expect(pricing).toContain('$19');
       // Must reference all three tiers
       expect(pricing).toContain('Free');
       expect(pricing).toContain('Solo');
@@ -51,8 +51,8 @@ describe('Phase 15 — Homepage, Marketing & Blog', () => {
 
     it('includes extra capacity pricing and free-tier capacity wording', () => {
       const pricing = readFileSync(join(siteDir, 'pricing/page.tsx'), 'utf8');
+      expect(pricing).toContain('$0.99');
       expect(pricing).toContain('$1.99');
-      expect(pricing).toContain('$4.99');
       expect(pricing).toContain('Get-started capacity');
       expect(pricing).not.toContain('1 project');
     });

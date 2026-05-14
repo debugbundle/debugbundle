@@ -519,8 +519,8 @@ describe("worker processor \u2013 bundle, delivery & sampling", () => {
           stripe_customer_id: null,
           active_projects: 2,
           capacity_units: {
-            total: 2,
-            included: 2,
+            total: 3,
+            included: 3,
             additional_purchased: 0
           },
           usage_window: {
@@ -528,11 +528,11 @@ describe("worker processor \u2013 bundle, delivery & sampling", () => {
             ends_at: "2026-04-01T00:00:00.000Z"
           },
           allowances: {
-            monthly_bundle_requests: { used: 500, limit: 500 },
-            monthly_raw_ingested_events: { used: 0, limit: 4000 },
-            retained_bundle_cap: { used: 0, limit: 300 },
-            monthly_remote_activations: { used: 0, limit: 50 },
-            monthly_alert_deliveries: { used: 0, limit: 150 }
+            monthly_bundle_requests: { used: 750, limit: 750 },
+            monthly_raw_ingested_events: { used: 0, limit: 6000 },
+            retained_bundle_cap: { used: 0, limit: 450 },
+            monthly_remote_activations: { used: 0, limit: 75 },
+            monthly_alert_deliveries: { used: 0, limit: 225 }
           }
         })
       }
@@ -595,8 +595,8 @@ describe("worker processor \u2013 bundle, delivery & sampling", () => {
           stripe_customer_id: null,
           active_projects: 2,
           capacity_units: {
-            total: 2,
-            included: 2,
+            total: 3,
+            included: 3,
             additional_purchased: 0
           },
           usage_window: {
@@ -604,11 +604,11 @@ describe("worker processor \u2013 bundle, delivery & sampling", () => {
             ends_at: "2026-04-01T00:00:00.000Z"
           },
           allowances: {
-            monthly_bundle_requests: { used: 500, limit: 500 },
-            monthly_raw_ingested_events: { used: 0, limit: 4000 },
-            retained_bundle_cap: { used: 0, limit: 300 },
-            monthly_remote_activations: { used: 0, limit: 50 },
-            monthly_alert_deliveries: { used: 0, limit: 150 }
+            monthly_bundle_requests: { used: 750, limit: 750 },
+            monthly_raw_ingested_events: { used: 0, limit: 6000 },
+            retained_bundle_cap: { used: 0, limit: 450 },
+            monthly_remote_activations: { used: 0, limit: 75 },
+            monthly_alert_deliveries: { used: 0, limit: 225 }
           }
         })
       }
@@ -726,8 +726,8 @@ describe("worker processor \u2013 bundle, delivery & sampling", () => {
           stripe_customer_id: null,
           active_projects: 2,
           capacity_units: {
-            total: 2,
-            included: 2,
+            total: 3,
+            included: 3,
             additional_purchased: 0
           },
           usage_window: {
@@ -735,11 +735,11 @@ describe("worker processor \u2013 bundle, delivery & sampling", () => {
             ends_at: "2026-04-01T00:00:00.000Z"
           },
           allowances: {
-            monthly_bundle_requests: { used: 1, limit: 500 },
-            monthly_raw_ingested_events: { used: 0, limit: 4000 },
-            retained_bundle_cap: { used: 301, limit: 300 },
-            monthly_remote_activations: { used: 0, limit: 50 },
-            monthly_alert_deliveries: { used: 0, limit: 150 }
+            monthly_bundle_requests: { used: 1, limit: 750 },
+            monthly_raw_ingested_events: { used: 0, limit: 6000 },
+            retained_bundle_cap: { used: 451, limit: 450 },
+            monthly_remote_activations: { used: 0, limit: 75 },
+            monthly_alert_deliveries: { used: 0, limit: 225 }
           }
         })
       }
@@ -748,7 +748,7 @@ describe("worker processor \u2013 bundle, delivery & sampling", () => {
     expect(result).toEqual({ processed: true });
     expect(pruneRetainedIncidentsForProject).toHaveBeenCalledWith({
       project_id: "proj_123",
-      retained_bundle_limit: 300
+      retained_bundle_limit: 450
     });
     expect(deleteObject).toHaveBeenCalledWith({
       key: buildBundleObjectKey("proj_old", "inc_old")

@@ -340,8 +340,8 @@ describe("web page helper coverage", () => {
         plan: "team",
         active_projects: 2,
         capacity_units: {
-          total: 5,
-          included: 3,
+          total: 17,
+          included: 15,
           additional_purchased: 2,
           pending_reduction: null
         }
@@ -356,7 +356,7 @@ describe("web page helper coverage", () => {
 
     expect(await screen.findByText(/^2 active projects$/i)).toBeInTheDocument();
     expect(screen.getByText(/2 members and 1 pending invite/i)).toBeInTheDocument();
-    expect(screen.getByText(/team plan with 2 active projects and 5 allowance units/i)).toBeInTheDocument();
+    expect(screen.getByText(/team plan with 2 active projects and 17 allowance units/i)).toBeInTheDocument();
   });
 
   it("handles null, forbidden, and invalid-session organization overview states", async () => {
@@ -407,8 +407,8 @@ describe("web page helper coverage", () => {
       stripe_customer_id: "cus_123",
       active_projects: 3,
       capacity_units: {
-        total: 4,
-        included: 2,
+        total: 5,
+        included: 3,
         additional_purchased: 2,
         pending_reduction: null
       }
@@ -427,8 +427,8 @@ describe("web page helper coverage", () => {
         stripe_customer_id: "cus_123",
         active_projects: 3,
         capacity_units: {
-          total: 4,
-          included: 2,
+          total: 5,
+          included: 3,
           additional_purchased: 2,
           pending_reduction: null
         }
@@ -461,12 +461,12 @@ describe("web page helper coverage", () => {
           stripe_customer_id: "cus_123",
           active_projects: 3,
           capacity_units: {
-            total: 4,
-            included: 2,
+            total: 5,
+            included: 3,
             additional_purchased: 2,
             pending_reduction: {
               additional_purchased: 0,
-              total: 2,
+              total: 3,
               effective_at: "2026-04-23T11:56:12.000Z"
             }
           }
@@ -492,8 +492,8 @@ describe("web page helper coverage", () => {
       stripe_customer_id: "cus_123",
       active_projects: 3,
       capacity_units: {
-        total: 5,
-        included: 2,
+        total: 6,
+        included: 3,
         additional_purchased: 3,
         pending_reduction: null
       }
@@ -510,8 +510,8 @@ describe("web page helper coverage", () => {
           stripe_customer_id: "cus_123",
           active_projects: 3,
           capacity_units: {
-            total: 4,
-            included: 2,
+            total: 5,
+            included: 3,
             additional_purchased: 2,
             pending_reduction: null
           }

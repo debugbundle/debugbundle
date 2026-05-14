@@ -40,8 +40,7 @@ export const BillingSummarySchema = z
         monthly_remote_activations: BillingUsageMetricSchema,
         monthly_alert_deliveries: BillingUsageMetricSchema
       })
-      .strict(),
-    email_verification_required: z.boolean().optional()
+      .strict()
   })
   .strict();
 

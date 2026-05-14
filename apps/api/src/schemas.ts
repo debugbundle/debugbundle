@@ -1,3 +1,4 @@
+import { MAX_BILLING_ADDITIONAL_CAPACITY_UNITS } from "../../../packages/shared-types/src/index.js";
 import { z } from "zod";
 
 export const IngestionRequestSchema = z
@@ -609,7 +610,7 @@ export const BillingCheckoutConfirmBodySchema = z
 
 export const BillingCapacityChangeBodySchema = z
   .object({
-    target_additional_capacity_units: z.coerce.number().int().min(0).max(1000)
+    target_additional_capacity_units: z.coerce.number().int().min(0).max(MAX_BILLING_ADDITIONAL_CAPACITY_UNITS)
   })
   .strict();
 
