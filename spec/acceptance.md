@@ -1037,6 +1037,7 @@ If CLI says something is healthy and MCP says something different, that is a pro
 - **And** `request_event` with `response_status >= 500` → `incident_signal` under every preset
 - **And** `request_event` with `response_status: 429` → `incident_signal` for `balanced` and `investigative`, but `context_signal` for `minimal`
 - **And** `request_event` with `response_status: 409` → `incident_signal` for `investigative`, but `context_signal` for `minimal` and `balanced`
+- **And** `request_event` with a `4xx` status listed in `immediate_client_error_statuses` → `incident_signal` for that project regardless of whether the preset would otherwise keep it contextual
 - **And** `request_event` outside the preset's immediate request-failure set → `context_signal`
 - **And** `frontend_breadcrumb` → `context_signal`
 - **And** `deploy_metadata` → `context_signal`
@@ -1061,19 +1062,31 @@ If CLI says something is healthy and MCP says something different, that is a pro
 - **When** the capture policy is queried via `GET /v1/projects/{id}/capture-policy`
 - **Then** Free-tier projects default to preset `minimal`
 - **And** paid-tier projects default to preset `balanced`
+- **And** `policy.immediate_client_error_statuses` resolves to `[]` for `minimal` and `balanced`
+- **And** `policy.immediate_client_error_statuses` resolves to `[401,403,409,422]` for `investigative`
 - **And** all override fields are `null` (preset controls apply)
 
 ### AC-EVT-05: Capture Policy CRUD
 - **Given** a project with member-token auth
 - **When** `PATCH /v1/projects/{id}/capture-policy` is called with `{ "preset": "investigative" }`
 - **Then** the policy updates to the `investigative` preset
-- **And** `GET /v1/projects/{id}/capture-policy` returns the new preset with resolved control values
+- **And** `GET /v1/projects/{id}/capture-policy` returns the new preset with resolved control values and raw override state
 
 ### AC-EVT-06: Capture Policy Advanced Overrides
 - **Given** a project with preset `balanced`
 - **When** `PATCH /v1/projects/{id}/capture-policy` is called with `{ "capture_logs": "info" }`
 - **Then** the `capture_logs` override is stored as `info`
 - **And** the resolved policy shows `capture_logs: "info"` (override) with all other controls resolved from the `balanced` preset
+
+### AC-EVT-06a: Capture Policy Client Error Incident Overrides
+- **Given** a project with preset `balanced`
+- **When** `PATCH /v1/projects/{id}/capture-policy` is called with `{ "immediate_client_error_statuses": [422,403,422] }`
+- **Then** the override is stored as `[403,422]`
+- **And** the resolved policy shows `immediate_client_error_statuses: [403,422]`
+- **And** `GET /v1/projects/{id}/capture-policy` returns `overrides.immediate_client_error_statuses: [403,422]`
+- **When** the same route is called with `{ "immediate_client_error_statuses": [] }`
+- **Then** the project uses explicit `none`
+- **And** `GET /v1/projects/{id}/capture-policy` returns `overrides.immediate_client_error_statuses: []` rather than `null`
 
 ### AC-EVT-07: SDK Config Includes Capture Policy
 - **Given** a project with a capture policy set
@@ -1105,6 +1118,13 @@ If CLI says something is healthy and MCP says something different, that is a pro
 - **Then** the event is accepted even if `capture_request_events` is otherwise narrowed
 - **And** worker normalization classifies it as `incident_signal`
 
+### AC-EVT-08d: Ingestion Accepts Configured Client Error Incidents
+- **Given** a project with preset `minimal`, `capture_request_events: "off"`, and `immediate_client_error_statuses: [403]`
+- **When** an SDK sends a `request_event` with `response_status: 403` to `POST /v1/events`
+- **Then** the event is accepted
+- **And** worker normalization classifies it as `incident_signal`
+- **And** the same request would be rejected with `capture_policy_rejected` if the override were `[]` or `null`
+
 ### AC-EVT-08c: Repeated Contextual Request Failures Can Open Request Anomaly Incidents
 - **Given** a project with preset `balanced`
 - **And** repeated first-party `request_event` payloads for the same normalized route, method, service, environment, and `response_status: 404`
@@ -1128,6 +1148,7 @@ If CLI says something is healthy and MCP says something different, that is a pro
 - **Then** the SDK emits a standalone `request_event`
 - **And** if the effective preset is `balanced`, `capture_request_events` is `failures_only`, and the response status is anomaly-eligible such as `404` or `409`, the SDK emits a standalone `request_event` that the worker stores as `context_signal`
 - **And** if the effective preset is `investigative` and the response status is `409`, the SDK emits a standalone `request_event`
+- **And** if `immediate_client_error_statuses` includes `403`, the SDK emits a standalone `request_event` for a first-party `403` even when `capture_request_events` is `off`
 - **And** no network request is made for the suppressed event
 
 ### AC-EVT-10: Capture Policy Interface Parity

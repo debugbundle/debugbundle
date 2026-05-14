@@ -51,7 +51,7 @@
 > **Note:** `shared-types`, `redaction`, `sdk-node`, and `sdk-browser` have moved to the separate JS SDK monorepo (`github.com/debugbundle/debugbundle-js`). Their package boundaries are documented below for reference since core monorepo packages (`event-normalizer`, `bundle-engine`, etc.) still depend on the published npm packages. See the "JavaScript SDK Monorepo" section for the full repo layout.
 
 ### `packages/shared-types` _(lives in `debugbundle-js` repo)_
-- **Owns:** All Zod schemas, TypeScript type exports, enums, constants, **tier capabilities config**, **event class enum**, **capture policy types**, and the canonical preset-aware request-failure classifier used by ingestion, workers, and SDKs
+- **Owns:** All Zod schemas, TypeScript type exports, enums, constants, **tier capabilities config**, **event class enum**, **capture policy types**, and the canonical preset-aware plus project-override-aware request-failure classifier used by ingestion, workers, and SDKs
 - **Exports:** `BundleV1Schema`, `BundleV1`, `EventEnvelopeSchema`, `EventEnvelope`, `createEventEnvelope`, `TIER_CAPABILITIES`, `getTierCapabilities`, `TierName`, `TierCapabilities`, `EventClass`, `CapturePreset`, `CapturePolicy`, event payload schemas, `DeviceInfoSchema`, `ContextDeviceSchema`, DB row types, API request/response types, webhook payload types, profile schema, severity enum, signal type enum, all context-block sub-schemas
 - **Depends on:** nothing (leaf package)
 - **Test fixtures:** `__fixtures__/` for canonical schema samples
@@ -212,7 +212,7 @@ The public documentation/marketing/blog site lives in the standalone public repo
 - **Imports:** `auth`, `shared-types`, `event-normalizer`, `redaction`, `storage`
 - **Does NOT own:** Bundle generation, reproduction, webhook delivery (those are worker)
 - **Key constraint:** Ingestion (`POST /v1/events`) must be lightweight — validate, rate-limit, enforce capture policy, persist raw, and enqueue only
-- **Key constraint:** Ingestion (`POST /v1/events`) must be lightweight — validate, rate-limit, enforce capture policy, persist raw, enqueue only, and include the resolved capture preset on normalize jobs so request-event classification stays stable in the worker
+- **Key constraint:** Ingestion (`POST /v1/events`) must be lightweight — validate, rate-limit, enforce capture policy, persist raw, enqueue only, and include the resolved capture preset plus resolved `immediate_client_error_statuses` on normalize jobs so request-event classification stays stable in the worker
 - **Dogfooding note:** Dogfooding is now re-enabled against the published `@debugbundle/sdk-node` prerelease. `server.ts` optionally initializes the npm-published SDK during bootstrap when `DEBUGBUNDLE_DOGFOOD_PROJECT_TOKEN` is present, the manual dev-only backend trigger route `GET /__dogfood/backend-error` remains gated by `DEBUGBUNDLE_DOGFOOD_EXPOSE_TRIGGERS=true`, and the hosted owner-authenticated verification route `POST /v1/internal/dogfooding/backend-error` is separately gated by `DEBUGBUNDLE_DOGFOOD_EXPOSE_OWNER_TRIGGER=true`.
 - **Local dev note:** the top-level `docker-compose.yml` `dev` profile now publishes the API on host port `3003`, so the backend dogfood trigger is reachable directly at `http://localhost:3003/__dogfood/backend-error`
 - **Internal structure:**

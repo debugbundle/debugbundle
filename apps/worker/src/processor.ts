@@ -373,11 +373,16 @@ async function enqueueAlertEvaluation(
 
 function inferSeverity(
   event: EventEnvelope,
-  capturePreset: "minimal" | "balanced" | "investigative" = "minimal"
+  capturePreset: "minimal" | "balanced" | "investigative" = "minimal",
+  immediateClientErrorStatuses: readonly number[] = []
 ): "low" | "medium" | "high" | "critical" {
   if (
     event.event_type === "request_event"
-    && classifyRequestStatus({ responseStatus: event.payload.response_status, capturePreset }) === "incident_signal"
+    && classifyRequestStatus({
+      responseStatus: event.payload.response_status,
+      capturePreset,
+      immediateClientErrorStatuses
+    }) === "incident_signal"
   ) {
     return "high";
   }
@@ -411,15 +416,17 @@ export async function processNextNormalizeEventsJob(
   const normalized = normalizeEvent(validated.data);
   const computedFingerprint = fingerprint(normalized);
   const capturePreset = job.capture_preset ?? "minimal";
+  const immediateClientErrorStatuses = job.immediate_client_error_statuses ?? [];
   const eventClass = classifyEvent(
     validated.data.event_type,
     validated.data.event_type === "log_event" ? validated.data.payload?.level : undefined,
     validated.data.event_type === "probe_event" ? validated.data.payload?.activation_id : undefined,
     validated.data.payload as Record<string, unknown>,
-    capturePreset
+    capturePreset,
+    immediateClientErrorStatuses
   );
   const matchedFields = inferMatchedFields(normalized);
-  const severity = inferSeverity(validated.data, capturePreset);
+  const severity = inferSeverity(validated.data, capturePreset, immediateClientErrorStatuses);
 
   const processedEvent = await dependencies.processedEventStore.upsertProcessedEvent({
     event_id: validated.data.event_id,

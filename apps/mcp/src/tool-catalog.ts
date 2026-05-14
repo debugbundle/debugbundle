@@ -638,6 +638,7 @@ export const MCP_TOOL_CATALOG = [
         capture_request_events: z.string().nullable().optional(),
         capture_breadcrumbs: z.string().nullable().optional(),
         capture_probe_events: z.string().nullable().optional(),
+        immediate_client_error_statuses: z.array(z.number().int().min(400).max(499)).nullable().optional(),
       }),
     }),
   },

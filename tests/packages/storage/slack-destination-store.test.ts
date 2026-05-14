@@ -2,8 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import {
   createPostgresSlackDestinationStore,
-  type Queryable,
-  type SlackDestinationStore
+  type Queryable
 } from "../../../packages/storage/src/index.js";
 
 function rowsResult<Row extends Record<string, unknown>>(rows: Row[]): { rows: Row[] } {

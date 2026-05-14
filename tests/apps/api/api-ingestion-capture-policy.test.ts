@@ -110,6 +110,7 @@ describe("ingestion capture policy enforcement", () => {
         capture_request_events: null,
         capture_breadcrumbs: null,
         capture_probe_events: null,
+        immediate_client_error_statuses: null,
         updated_at: "2026-03-01T00:00:00.000Z"
       }),
       upsertCapturePolicyForProject: vi.fn()
@@ -143,6 +144,7 @@ describe("ingestion capture policy enforcement", () => {
         capture_request_events: null,
         capture_breadcrumbs: null,
         capture_probe_events: null,
+        immediate_client_error_statuses: null,
         updated_at: "2026-03-01T00:00:00.000Z"
       }),
       upsertCapturePolicyForProject: vi.fn()
@@ -176,6 +178,7 @@ describe("ingestion capture policy enforcement", () => {
         capture_request_events: null,
         capture_breadcrumbs: null,
         capture_probe_events: null,
+        immediate_client_error_statuses: null,
         updated_at: "2026-03-01T00:00:00.000Z"
       }),
       upsertCapturePolicyForProject: vi.fn()
@@ -209,6 +212,7 @@ describe("ingestion capture policy enforcement", () => {
         capture_request_events: null,
         capture_breadcrumbs: null,
         capture_probe_events: null,
+        immediate_client_error_statuses: null,
         updated_at: "2026-03-01T00:00:00.000Z"
       }),
       upsertCapturePolicyForProject: vi.fn()
@@ -242,6 +246,7 @@ describe("ingestion capture policy enforcement", () => {
         capture_request_events: null,
         capture_breadcrumbs: null,
         capture_probe_events: null,
+        immediate_client_error_statuses: null,
         updated_at: "2026-03-01T00:00:00.000Z"
       }),
       upsertCapturePolicyForProject: vi.fn()
@@ -275,6 +280,7 @@ describe("ingestion capture policy enforcement", () => {
         capture_request_events: null,
         capture_breadcrumbs: null,
         capture_probe_events: null,
+        immediate_client_error_statuses: null,
         updated_at: "2026-03-01T00:00:00.000Z"
       }),
       upsertCapturePolicyForProject: vi.fn()
@@ -302,6 +308,48 @@ describe("ingestion capture policy enforcement", () => {
     expect(persistAndEnqueue).toHaveBeenCalledTimes(1);
   });
 
+  it("should accept configured client error incidents even when generic request capture is off", async (): Promise<void> => {
+    const persistAndEnqueue = vi.fn().mockResolvedValue({ object_key: "raw-events/p/k.json.gz" });
+    const capturePolicyManagement = {
+      getCapturePolicyForProject: vi.fn().mockResolvedValue({
+        project_id: "proj_123",
+        preset: "minimal",
+        capture_logs: null,
+        capture_request_events: "off",
+        capture_breadcrumbs: null,
+        capture_probe_events: null,
+        immediate_client_error_statuses: [403],
+        updated_at: "2026-03-01T00:00:00.000Z"
+      }),
+      upsertCapturePolicyForProject: vi.fn()
+    };
+
+    const app = createApiServer(createBaseDependencies({ persistAndEnqueue, capturePolicyManagement }));
+
+    const response = await app.inject({
+      method: "POST",
+      url: "/v1/events",
+      headers: { authorization: "Bearer dbundle_proj_test" },
+      payload: { events: [makeRequestEvent(403)] }
+    });
+
+    expect(response.statusCode).toBe(202);
+    expect(response.json()).toMatchObject({
+      accepted: 1,
+      rejected: 0,
+      errors: []
+    });
+    expect(persistAndEnqueue).toHaveBeenCalledTimes(1);
+    expect(persistAndEnqueue).toHaveBeenCalledWith(
+      expect.any(Object),
+      "proj_123",
+      expect.objectContaining({
+        capturePreset: "minimal",
+        immediateClientErrorStatuses: [403]
+      })
+    );
+  });
+
   it("should accept immediate and anomaly-eligible request_event payloads on balanced policy", async (): Promise<void> => {
     const persistAndEnqueue = vi.fn().mockResolvedValue({ object_key: "raw-events/p/k.json.gz" });
     const capturePolicyManagement = {
@@ -312,6 +360,7 @@ describe("ingestion capture policy enforcement", () => {
         capture_request_events: null,
         capture_breadcrumbs: null,
         capture_probe_events: null,
+        immediate_client_error_statuses: null,
         updated_at: "2026-03-01T00:00:00.000Z"
       }),
       upsertCapturePolicyForProject: vi.fn()
@@ -349,6 +398,7 @@ describe("ingestion capture policy enforcement", () => {
         capture_request_events: null,
         capture_breadcrumbs: null,
         capture_probe_events: null,
+        immediate_client_error_statuses: null,
         updated_at: "2026-03-01T00:00:00.000Z"
       }),
       upsertCapturePolicyForProject: vi.fn()
@@ -432,6 +482,7 @@ describe("ingestion capture policy enforcement", () => {
         capture_request_events: null,
         capture_breadcrumbs: null,
         capture_probe_events: null,
+        immediate_client_error_statuses: null,
         updated_at: "2026-03-01T00:00:00.000Z"
       }),
       upsertCapturePolicyForProject: vi.fn()
@@ -476,6 +527,7 @@ describe("ingestion capture policy enforcement", () => {
         capture_request_events: null,
         capture_breadcrumbs: null,
         capture_probe_events: null,
+        immediate_client_error_statuses: null,
         updated_at: "2026-03-01T00:00:00.000Z"
       }),
       upsertCapturePolicyForProject: vi.fn()

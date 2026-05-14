@@ -19,11 +19,21 @@ describe("cli capture-policy commands", () => {
       },
       {
         getCapturePolicy: vi.fn().mockResolvedValue({
-          preset: "balanced",
-          capture_logs: "warning",
-          capture_request_events: "failures_only",
-          capture_breadcrumbs: "exception_only",
-          capture_probe_events: "buffer_only"
+          policy: {
+            preset: "balanced",
+            capture_logs: "warning",
+            capture_request_events: "failures_only",
+            capture_breadcrumbs: "exception_only",
+            capture_probe_events: "buffer_only",
+            immediate_client_error_statuses: []
+          },
+          overrides: {
+            capture_logs: null,
+            capture_request_events: null,
+            capture_breadcrumbs: null,
+            capture_probe_events: null,
+            immediate_client_error_statuses: null
+          }
         })
       }
     );
@@ -31,6 +41,7 @@ describe("cli capture-policy commands", () => {
     expect(result.exitCode).toBe(0);
     expect(result.output).toContain("preset: balanced");
     expect(result.output).toContain("capture_logs: warning");
+    expect(result.output).toContain("client_error_incidents: preset default (none)");
   });
 
   it("renders update results in json mode", async () => {
@@ -46,11 +57,21 @@ describe("cli capture-policy commands", () => {
       },
       {
         updateCapturePolicy: vi.fn().mockResolvedValue({
-          preset: "investigative",
-          capture_logs: "info",
-          capture_request_events: "all",
-          capture_breadcrumbs: "standalone",
-          capture_probe_events: "standalone_when_activated"
+          policy: {
+            preset: "investigative",
+            capture_logs: "info",
+            capture_request_events: "all",
+            capture_breadcrumbs: "standalone",
+            capture_probe_events: "standalone_when_activated",
+            immediate_client_error_statuses: [401, 403, 409, 422]
+          },
+          overrides: {
+            capture_logs: "info",
+            capture_request_events: null,
+            capture_breadcrumbs: null,
+            capture_probe_events: null,
+            immediate_client_error_statuses: [401, 403, 409, 422]
+          }
         })
       }
     );
@@ -62,7 +83,15 @@ describe("cli capture-policy commands", () => {
         capture_logs: "info",
         capture_request_events: "all",
         capture_breadcrumbs: "standalone",
-        capture_probe_events: "standalone_when_activated"
+        capture_probe_events: "standalone_when_activated",
+        immediate_client_error_statuses: [401, 403, 409, 422]
+      },
+      overrides: {
+        capture_logs: "info",
+        capture_request_events: null,
+        capture_breadcrumbs: null,
+        capture_probe_events: null,
+        immediate_client_error_statuses: [401, 403, 409, 422]
       }
     });
   });
@@ -75,18 +104,38 @@ describe("cli capture-policy commands", () => {
     const httpClient = { request: vi.fn() };
     const createHttpClient = vi.fn().mockReturnValue(httpClient);
     const getCapturePolicy = vi.fn().mockResolvedValue({
-      preset: "minimal",
-      capture_logs: "error",
-      capture_request_events: "off",
-      capture_breadcrumbs: "local_only",
-      capture_probe_events: "buffer_only"
+      policy: {
+        preset: "minimal",
+        capture_logs: "error",
+        capture_request_events: "failures_only",
+        capture_breadcrumbs: "local_only",
+        capture_probe_events: "buffer_only",
+        immediate_client_error_statuses: []
+      },
+      overrides: {
+        capture_logs: null,
+        capture_request_events: null,
+        capture_breadcrumbs: null,
+        capture_probe_events: null,
+        immediate_client_error_statuses: null
+      }
     });
     const updateCapturePolicy = vi.fn().mockResolvedValue({
-      preset: "balanced",
-      capture_logs: "warning",
-      capture_request_events: "failures_only",
-      capture_breadcrumbs: "exception_only",
-      capture_probe_events: "buffer_only"
+      policy: {
+        preset: "balanced",
+        capture_logs: "warning",
+        capture_request_events: "failures_only",
+        capture_breadcrumbs: "exception_only",
+        capture_probe_events: "buffer_only",
+        immediate_client_error_statuses: []
+      },
+      overrides: {
+        capture_logs: "warning",
+        capture_request_events: null,
+        capture_breadcrumbs: null,
+        capture_probe_events: null,
+        immediate_client_error_statuses: []
+      }
     });
     const createApi = vi.fn().mockReturnValue({ getCapturePolicy, updateCapturePolicy });
 
@@ -132,9 +181,17 @@ describe("cli capture-policy commands", () => {
       policy: {
         preset: "minimal",
         capture_logs: "error",
-        capture_request_events: "off",
+        capture_request_events: "failures_only",
         capture_breadcrumbs: "local_only",
-        capture_probe_events: "buffer_only"
+        capture_probe_events: "buffer_only",
+        immediate_client_error_statuses: []
+      },
+      overrides: {
+        capture_logs: null,
+        capture_request_events: null,
+        capture_breadcrumbs: null,
+        capture_probe_events: null,
+        immediate_client_error_statuses: null
       }
     });
     expect(setResult.output).toContain("Capture policy updated.");
@@ -198,9 +255,17 @@ describe("cli capture-policy commands", () => {
           policy: {
             preset: "minimal",
             capture_logs: "error",
-            capture_request_events: "off",
+            capture_request_events: "failures_only",
             capture_breadcrumbs: "local_only",
-            capture_probe_events: "buffer_only"
+            capture_probe_events: "buffer_only",
+            immediate_client_error_statuses: []
+          },
+          overrides: {
+            capture_logs: null,
+            capture_request_events: null,
+            capture_breadcrumbs: null,
+            capture_probe_events: null,
+            immediate_client_error_statuses: null
           }
         }
       })
@@ -212,7 +277,15 @@ describe("cli capture-policy commands", () => {
             capture_logs: "warning",
             capture_request_events: "failures_only",
             capture_breadcrumbs: "exception_only",
-            capture_probe_events: "buffer_only"
+            capture_probe_events: "buffer_only",
+            immediate_client_error_statuses: []
+          },
+          overrides: {
+            capture_logs: null,
+            capture_request_events: null,
+            capture_breadcrumbs: null,
+            capture_probe_events: null,
+            immediate_client_error_statuses: null
           }
         }
       });
@@ -236,7 +309,7 @@ describe("cli capture-policy commands", () => {
       bearerToken: "dbundle_mem_owner",
       body: { preset: "balanced" }
     });
-    expect(policy.preset).toBe("minimal");
-    expect(updated.preset).toBe("balanced");
+    expect(policy.policy.preset).toBe("minimal");
+    expect(updated.policy.preset).toBe("balanced");
   });
 });

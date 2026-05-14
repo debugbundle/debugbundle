@@ -60,6 +60,7 @@ describe("capture-policy routes", () => {
             capture_request_events: null,
             capture_breadcrumbs: null,
             capture_probe_events: null,
+            immediate_client_error_statuses: null,
             updated_at: "2026-03-15T00:00:00.000Z"
           }),
           upsertCapturePolicyForProject: vi.fn()
@@ -73,14 +74,61 @@ describe("capture-policy routes", () => {
       });
 
       expect(response.statusCode).toBe(200);
-      const body = response.json<{ policy: Record<string, unknown> }>();
-      expect(body.policy).toEqual(
-        expect.objectContaining({
+      const body = response.json<{ policy: Record<string, unknown>; overrides: Record<string, unknown> }>();
+      expect(body).toEqual({
+        policy: expect.objectContaining({
           preset: "balanced",
           capture_logs: "warning",
-          capture_request_events: "failures_only"
-        })
-      );
+          capture_request_events: "failures_only",
+          immediate_client_error_statuses: []
+        }),
+        overrides: {
+          capture_logs: null,
+          capture_request_events: null,
+          capture_breadcrumbs: null,
+          capture_probe_events: null,
+          immediate_client_error_statuses: null
+        }
+      });
+    });
+
+    it("preserves explicit none for client error incidents in raw overrides", async () => {
+      const app = createDependencies({
+        capturePolicyManagement: {
+          getCapturePolicyForProject: vi.fn().mockResolvedValue({
+            project_id: "00000000-0000-0000-0000-000000000001",
+            preset: "balanced",
+            capture_logs: null,
+            capture_request_events: null,
+            capture_breadcrumbs: null,
+            capture_probe_events: null,
+            immediate_client_error_statuses: [],
+            updated_at: "2026-03-15T00:00:00.000Z"
+          }),
+          upsertCapturePolicyForProject: vi.fn()
+        }
+      });
+
+      const response = await app.inject({
+        method: "GET",
+        url: "/v1/projects/00000000-0000-0000-0000-000000000001/capture-policy",
+        headers: { authorization: "Bearer dbundle_mem_test_token" }
+      });
+
+      expect(response.statusCode).toBe(200);
+      expect(response.json()).toEqual({
+        policy: expect.objectContaining({
+          preset: "balanced",
+          immediate_client_error_statuses: []
+        }),
+        overrides: {
+          capture_logs: null,
+          capture_request_events: null,
+          capture_breadcrumbs: null,
+          capture_probe_events: null,
+          immediate_client_error_statuses: []
+        }
+      });
     });
 
     it("returns 401 for invalid member token", async () => {
@@ -141,10 +189,20 @@ describe("capture-policy routes", () => {
       });
 
       expect(response.statusCode).toBe(200);
-      const body = response.json<{ policy: Record<string, unknown> }>();
-      expect(body.policy).toEqual(
-        expect.objectContaining({ preset: "minimal" })
-      );
+      const body = response.json<{ policy: Record<string, unknown>; overrides: Record<string, unknown> }>();
+      expect(body).toEqual({
+        policy: expect.objectContaining({
+          preset: "minimal",
+          immediate_client_error_statuses: []
+        }),
+        overrides: {
+          capture_logs: null,
+          capture_request_events: null,
+          capture_breadcrumbs: null,
+          capture_probe_events: null,
+          immediate_client_error_statuses: null
+        }
+      });
     });
 
     it("returns project_not_found when capture policy defaults cannot resolve the project", async () => {
@@ -154,6 +212,30 @@ describe("capture-policy routes", () => {
           createProjectForOrganization: vi.fn(),
           updateProjectForOrganization: vi.fn(),
           deleteProjectForOrganization: vi.fn()
+        }
+      });
+
+      const response = await app.inject({
+        method: "GET",
+        url: "/v1/projects/00000000-0000-0000-0000-000000000001/capture-policy",
+        headers: { authorization: "Bearer dbundle_mem_test_token" }
+      });
+
+      expect(response.statusCode).toBe(404);
+      expect(response.json()).toEqual({ error: "project_not_found" });
+    });
+
+    it("returns project_not_found when no policy row exists for an unknown project", async () => {
+      const app = createDependencies({
+        projectManagement: {
+          listProjectsForOrganization: vi.fn().mockResolvedValue([]),
+          createProjectForOrganization: vi.fn(),
+          updateProjectForOrganization: vi.fn(),
+          deleteProjectForOrganization: vi.fn()
+        },
+        capturePolicyManagement: {
+          getCapturePolicyForProject: vi.fn().mockResolvedValue(null),
+          upsertCapturePolicyForProject: vi.fn()
         }
       });
 
@@ -218,14 +300,22 @@ describe("capture-policy routes", () => {
       });
 
       expect(response.statusCode).toBe(200);
-      const body = response.json<{ policy: Record<string, unknown> }>();
-      expect(body.policy).toEqual(
-        expect.objectContaining({
+      const body = response.json<{ policy: Record<string, unknown>; overrides: Record<string, unknown> }>();
+      expect(body).toEqual({
+        policy: expect.objectContaining({
           preset: "balanced",
           capture_logs: "warning",
-          capture_request_events: "failures_only"
-        })
-      );
+          capture_request_events: "failures_only",
+          immediate_client_error_statuses: []
+        }),
+        overrides: {
+          capture_logs: null,
+          capture_request_events: null,
+          capture_breadcrumbs: null,
+          capture_probe_events: null,
+          immediate_client_error_statuses: null
+        }
+      });
     });
   });
 
@@ -243,6 +333,7 @@ describe("capture-policy routes", () => {
             capture_request_events: null,
             capture_breadcrumbs: null,
             capture_probe_events: null,
+            immediate_client_error_statuses: [422, 403],
             updated_at: "2026-03-15T01:00:00.000Z"
           })
         }
@@ -256,13 +347,21 @@ describe("capture-policy routes", () => {
       });
 
       expect(response.statusCode).toBe(200);
-      const body = response.json<{ policy: Record<string, unknown> }>();
-      expect(body.policy).toEqual(
-        expect.objectContaining({
+      const body = response.json<{ policy: Record<string, unknown>; overrides: Record<string, unknown> }>();
+      expect(body).toEqual({
+        policy: expect.objectContaining({
           preset: "investigative",
-          capture_logs: "info"
-        })
-      );
+          capture_logs: "info",
+          immediate_client_error_statuses: [403, 422]
+        }),
+        overrides: {
+          capture_logs: "info",
+          capture_request_events: null,
+          capture_breadcrumbs: null,
+          capture_probe_events: null,
+          immediate_client_error_statuses: [403, 422]
+        }
+      });
       expect(createAuditLog).toHaveBeenCalledWith(
         expect.objectContaining({
           organization_id: "org_123",

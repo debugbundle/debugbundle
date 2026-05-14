@@ -1,31 +1,14 @@
-import { z } from "zod";
-
 import {
-  CaptureBreadcrumbsSchema,
-  CaptureLogsSchema,
+  CapturePolicyResponseSchema,
   CapturePolicyUpdateSchema,
-  CapturePresetSchema,
-  CaptureProbeEventsSchema,
-  CaptureRequestEventsSchema,
+  RECOMMENDED_IMMEDIATE_CLIENT_ERROR_STATUSES,
+  type CapturePolicyResponse,
   type CapturePolicyUpdate,
-  type ResolvedCapturePolicy
 } from "../../../packages/shared-types/src/index.js";
 import { createCliHttpClient, runAuthenticatedCliCommand } from "./auth-context.js";
 import { readCliAuthState } from "./auth-state.js";
 import type { CliAuthState } from "./auth-state.js";
 import type { CliCommandResult } from "./token-commands.js";
-
-const ResolvedCapturePolicySchema = z.object({
-  preset: CapturePresetSchema,
-  capture_logs: CaptureLogsSchema,
-  capture_request_events: CaptureRequestEventsSchema,
-  capture_breadcrumbs: CaptureBreadcrumbsSchema,
-  capture_probe_events: CaptureProbeEventsSchema
-});
-
-const CapturePolicyResponseSchema = z.object({
-  policy: ResolvedCapturePolicySchema
-});
 
 type CapturePolicyHttpRequest = {
   method: "GET" | "PATCH";
@@ -60,11 +43,11 @@ function toApiError(status: number, body: unknown, fallback: string): CapturePol
 export function createCapturePolicyApi(httpClient: {
   request(request: CapturePolicyHttpRequest): Promise<CapturePolicyHttpResponse>;
 }): {
-  getCapturePolicy(input: { bearerToken: string; projectId: string }): Promise<ResolvedCapturePolicy>;
-  updateCapturePolicy(input: { bearerToken: string; projectId: string; update: CapturePolicyUpdate }): Promise<ResolvedCapturePolicy>;
+  getCapturePolicy(input: { bearerToken: string; projectId: string }): Promise<CapturePolicyResponse>;
+  updateCapturePolicy(input: { bearerToken: string; projectId: string; update: CapturePolicyUpdate }): Promise<CapturePolicyResponse>;
 } {
   return {
-    async getCapturePolicy(input): Promise<ResolvedCapturePolicy> {
+    async getCapturePolicy(input): Promise<CapturePolicyResponse> {
       const response = await httpClient.request({
         method: "GET",
         path: `/v1/projects/${encodeURIComponent(input.projectId)}/capture-policy`,
@@ -80,10 +63,10 @@ export function createCapturePolicyApi(httpClient: {
         throw new CapturePolicyApiError(500, "Invalid capture policy response.");
       }
 
-      return parsed.data.policy;
+      return parsed.data;
     },
 
-    async updateCapturePolicy(input): Promise<ResolvedCapturePolicy> {
+    async updateCapturePolicy(input): Promise<CapturePolicyResponse> {
       const response = await httpClient.request({
         method: "PATCH",
         path: `/v1/projects/${encodeURIComponent(input.projectId)}/capture-policy`,
@@ -100,7 +83,7 @@ export function createCapturePolicyApi(httpClient: {
         throw new CapturePolicyApiError(500, "Invalid capture policy response.");
       }
 
-      return parsed.data.policy;
+      return parsed.data;
     }
   };
 }
@@ -123,13 +106,46 @@ function mapErrorToExitCode(error: unknown): number {
   return 1;
 }
 
-function formatPolicy(policy: ResolvedCapturePolicy): string {
+function statusesEqual(left: readonly number[], right: readonly number[]): boolean {
+  if (left.length !== right.length) {
+    return false;
+  }
+
+  return left.every((value, index) => value === right[index]);
+}
+
+function formatStatusList(statuses: readonly number[]): string {
+  return statuses.length === 0 ? "none" : statuses.join(", ");
+}
+
+function formatClientErrorIncidents(response: CapturePolicyResponse): string {
+  const rawOverride = response.overrides.immediate_client_error_statuses;
+
+  if (rawOverride === null) {
+    return `preset default (${formatStatusList(response.policy.immediate_client_error_statuses)})`;
+  }
+
+  if (rawOverride.length === 0) {
+    return "none (explicit)";
+  }
+
+  if (statusesEqual(rawOverride, RECOMMENDED_IMMEDIATE_CLIENT_ERROR_STATUSES)) {
+    return `recommended (${formatStatusList(rawOverride)})`;
+  }
+
+  return `custom (${formatStatusList(rawOverride)})`;
+}
+
+function formatPolicy(response: CapturePolicyResponse): string {
+  const policy = response.policy;
+
   return [
     `preset: ${policy.preset}`,
     `capture_logs: ${policy.capture_logs}`,
     `capture_request_events: ${policy.capture_request_events}`,
     `capture_breadcrumbs: ${policy.capture_breadcrumbs}`,
-    `capture_probe_events: ${policy.capture_probe_events}`
+    `capture_probe_events: ${policy.capture_probe_events}`,
+    `client_error_incidents: ${formatClientErrorIncidents(response)}`
   ].join("\n");
 }
 
@@ -140,18 +156,18 @@ export async function getCapturePolicyCommand(
     json?: boolean;
   },
   api: {
-    getCapturePolicy(input: { bearerToken: string; projectId: string }): Promise<ResolvedCapturePolicy>;
+    getCapturePolicy(input: { bearerToken: string; projectId: string }): Promise<CapturePolicyResponse>;
   }
 ): Promise<CliCommandResult> {
   try {
-    const policy = await api.getCapturePolicy({
+    const response = await api.getCapturePolicy({
       bearerToken: input.bearerToken,
       projectId: input.projectId
     });
 
     return {
       exitCode: 0,
-      output: input.json ? JSON.stringify({ policy }) : formatPolicy(policy)
+      output: input.json ? JSON.stringify(response) : formatPolicy(response)
     };
   } catch (error) {
     return {
@@ -169,7 +185,7 @@ export async function setCapturePolicyCommand(
     json?: boolean;
   },
   api: {
-    updateCapturePolicy(input: { bearerToken: string; projectId: string; update: CapturePolicyUpdate }): Promise<ResolvedCapturePolicy>;
+    updateCapturePolicy(input: { bearerToken: string; projectId: string; update: CapturePolicyUpdate }): Promise<CapturePolicyResponse>;
   }
 ): Promise<CliCommandResult> {
   try {
@@ -181,7 +197,7 @@ export async function setCapturePolicyCommand(
       };
     }
 
-    const policy = await api.updateCapturePolicy({
+    const response = await api.updateCapturePolicy({
       bearerToken: input.bearerToken,
       projectId: input.projectId,
       update: parsedUpdate.data
@@ -189,7 +205,7 @@ export async function setCapturePolicyCommand(
 
     return {
       exitCode: 0,
-      output: input.json ? JSON.stringify({ policy }) : `Capture policy updated.\n${formatPolicy(policy)}`
+      output: input.json ? JSON.stringify(response) : `Capture policy updated.\n${formatPolicy(response)}`
     };
   } catch (error) {
     return {

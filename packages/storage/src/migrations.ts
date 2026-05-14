@@ -321,6 +321,7 @@ const STORAGE_BOOTSTRAP_STATEMENTS = [
       capture_request_events text,
       capture_breadcrumbs text,
       capture_probe_events text,
+      immediate_client_error_statuses jsonb,
       updated_at timestamptz NOT NULL DEFAULT now()
     )
   `,

@@ -95,6 +95,20 @@ export interface ProjectCapturePolicy {
   capture_request_events: CaptureRequestEvents;
   capture_breadcrumbs: CaptureBreadcrumbs;
   capture_probe_events: CaptureProbeEvents;
+  immediate_client_error_statuses: number[];
+}
+
+export interface ProjectCapturePolicyOverrides {
+  capture_logs: CaptureLogs | null;
+  capture_request_events: CaptureRequestEvents | null;
+  capture_breadcrumbs: CaptureBreadcrumbs | null;
+  capture_probe_events: CaptureProbeEvents | null;
+  immediate_client_error_statuses: number[] | null;
+}
+
+export interface ProjectCapturePolicyResponse {
+  policy: ProjectCapturePolicy;
+  overrides: ProjectCapturePolicyOverrides;
 }
 
 export interface ProjectCapturePolicyUpdate {
@@ -103,6 +117,7 @@ export interface ProjectCapturePolicyUpdate {
   capture_request_events?: CaptureRequestEvents | null;
   capture_breadcrumbs?: CaptureBreadcrumbs | null;
   capture_probe_events?: CaptureProbeEvents | null;
+  immediate_client_error_statuses?: number[] | null;
 }
 
 export interface IncidentRecord {
@@ -763,21 +778,19 @@ export async function deleteProject(projectId: string): Promise<DeletedProjectRe
   return body.project;
 }
 
-export async function getProjectCapturePolicy(projectId: string): Promise<ProjectCapturePolicy> {
-  const body = await readJson<{ policy: ProjectCapturePolicy }>(
+export async function getProjectCapturePolicy(projectId: string): Promise<ProjectCapturePolicyResponse> {
+  return readJson<ProjectCapturePolicyResponse>(
     await fetch(`${API_BASE}/v1/projects/${projectId}/capture-policy`, {
       credentials: "include"
     })
   );
-
-  return body.policy;
 }
 
 export async function updateProjectCapturePolicy(
   projectId: string,
   payload: ProjectCapturePolicyUpdate
-): Promise<ProjectCapturePolicy> {
-  const body = await readJson<{ policy: ProjectCapturePolicy }>(
+): Promise<ProjectCapturePolicyResponse> {
+  return readJson<ProjectCapturePolicyResponse>(
     await fetch(`${API_BASE}/v1/projects/${projectId}/capture-policy`, {
       method: "PATCH",
       credentials: "include",
@@ -785,8 +798,6 @@ export async function updateProjectCapturePolicy(
       body: JSON.stringify(payload)
     })
   );
-
-  return body.policy;
 }
 
 export async function listProjectTokens(projectId: string): Promise<ProjectTokenRecord[]> {

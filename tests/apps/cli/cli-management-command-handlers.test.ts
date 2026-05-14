@@ -428,7 +428,9 @@ describe("cli management command handlers", () => {
         "--override",
         "capture_logs=false",
         "--override",
-        "capture_probe_events=null"
+        "capture_probe_events=null",
+        "--client-error-incidents",
+        "recommended"
       ]),
       { setCapturePolicyCommand }
     );
@@ -576,7 +578,8 @@ describe("cli management command handlers", () => {
       update: {
         preset: "balanced",
         capture_logs: "false",
-        capture_probe_events: null
+        capture_probe_events: null,
+        immediate_client_error_statuses: [401, 403, 409, 422]
       }
     });
 

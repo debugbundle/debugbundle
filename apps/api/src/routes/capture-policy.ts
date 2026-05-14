@@ -1,8 +1,11 @@
 import type { FastifyInstance } from "fastify";
 
 import {
+  getCapturePolicyOverrides,
   CapturePolicyUpdateSchema,
   PRESET_DEFAULTS,
+  type CapturePolicyOverrides,
+  type CapturePolicyResponse,
   getDefaultPreset,
   resolvePolicy,
   type ResolvedCapturePolicy
@@ -17,6 +20,26 @@ function buildDefaultRecord(plan: string | undefined): ResolvedCapturePolicy {
   return {
     preset,
     ...PRESET_DEFAULTS[preset]
+  };
+}
+
+function buildDefaultOverrides(): CapturePolicyOverrides {
+  return {
+    capture_logs: null,
+    capture_request_events: null,
+    capture_breadcrumbs: null,
+    capture_probe_events: null,
+    immediate_client_error_statuses: null
+  };
+}
+
+function buildCapturePolicyResponse(input: {
+  resolvedPolicy: ResolvedCapturePolicy;
+  recordOverrides?: CapturePolicyOverrides;
+}): CapturePolicyResponse {
+  return {
+    policy: input.resolvedPolicy,
+    overrides: input.recordOverrides ?? buildDefaultOverrides()
   };
 }
 
@@ -55,7 +78,9 @@ export function registerCapturePolicyRoutes(app: FastifyInstance, dependencies: 
         return reply.status(404).send({ error: "project_not_found" });
       }
 
-      return reply.status(200).send({ policy: buildDefaultRecord(plan ?? undefined) });
+      return reply.status(200).send(
+        buildCapturePolicyResponse({ resolvedPolicy: buildDefaultRecord(plan ?? undefined) })
+      );
     }
 
     const record = await dependencies.capturePolicyManagement.getCapturePolicyForProject({
@@ -63,11 +88,23 @@ export function registerCapturePolicyRoutes(app: FastifyInstance, dependencies: 
       project_id: parsedParams.data.id
     });
 
-    const policy: ResolvedCapturePolicy = record !== null
-      ? resolvePolicy(record)
-      : buildDefaultRecord(await resolveProjectPlanForOrganization(dependencies, member.organization_id, parsedParams.data.id) ?? undefined);
+    let policy: ResolvedCapturePolicy;
+    if (record !== null) {
+      policy = resolvePolicy(record);
+    } else {
+      const plan = await resolveProjectPlanForOrganization(dependencies, member.organization_id, parsedParams.data.id);
+      if (plan === null && dependencies.projectManagement !== undefined) {
+        return reply.status(404).send({ error: "project_not_found" });
+      }
+      policy = buildDefaultRecord(plan ?? undefined);
+    }
 
-    return reply.status(200).send({ policy });
+    return reply.status(200).send(
+      buildCapturePolicyResponse({
+        resolvedPolicy: policy,
+        ...(record === null ? {} : { recordOverrides: getCapturePolicyOverrides(record) })
+      })
+    );
   });
 
   app.patch("/v1/projects/:id/capture-policy", async (request, reply) => {
@@ -135,6 +172,11 @@ export function registerCapturePolicyRoutes(app: FastifyInstance, dependencies: 
       }
     });
 
-    return reply.status(200).send({ policy });
+    return reply.status(200).send(
+      buildCapturePolicyResponse({
+        resolvedPolicy: policy,
+        recordOverrides: getCapturePolicyOverrides(record)
+      })
+    );
   });
 }

@@ -48,7 +48,15 @@ describe("web app — project capture policy settings", () => {
             capture_logs: "warning",
             capture_request_events: "failures_only",
             capture_breadcrumbs: "exception_only",
-            capture_probe_events: "buffer_only"
+            capture_probe_events: "buffer_only",
+            immediate_client_error_statuses: []
+          },
+          overrides: {
+            capture_logs: null,
+            capture_request_events: null,
+            capture_breadcrumbs: null,
+            capture_probe_events: null,
+            immediate_client_error_statuses: null
           }
         });
       }
@@ -60,7 +68,8 @@ describe("web app — project capture policy settings", () => {
           capture_logs: null,
           capture_request_events: "filtered",
           capture_breadcrumbs: null,
-          capture_probe_events: null
+          capture_probe_events: null,
+          immediate_client_error_statuses: [401, 403, 409, 422]
         }));
 
         return jsonResponse(200, {
@@ -69,7 +78,15 @@ describe("web app — project capture policy settings", () => {
             capture_logs: "info",
             capture_request_events: "filtered",
             capture_breadcrumbs: "standalone",
-            capture_probe_events: "standalone_when_activated"
+            capture_probe_events: "standalone_when_activated",
+            immediate_client_error_statuses: [401, 403, 409, 422]
+          },
+          overrides: {
+            capture_logs: null,
+            capture_request_events: "filtered",
+            capture_breadcrumbs: null,
+            capture_probe_events: null,
+            immediate_client_error_statuses: [401, 403, 409, 422]
           }
         });
       }
@@ -85,6 +102,7 @@ describe("web app — project capture policy settings", () => {
 
     const presetSelect = expectSelect(screen.getByLabelText(/^preset$/i));
     const requestSelect = expectSelect(screen.getByLabelText(/^request events$/i));
+    const clientErrorSelect = expectSelect(screen.getByLabelText(/^client error incidents$/i));
     const saveButton = expectButton(screen.getByRole("button", { name: /save capture policy/i }));
 
     await waitFor(() => {
@@ -94,6 +112,12 @@ describe("web app — project capture policy settings", () => {
 
     await user.selectOptions(presetSelect, "investigative");
     await user.selectOptions(requestSelect, "filtered");
+    await user.selectOptions(clientErrorSelect, "recommended");
+
+    await waitFor(() => {
+      expect(saveButton.disabled).toBe(false);
+    });
+
     await user.click(saveButton);
 
     await waitFor(() => {
@@ -109,6 +133,7 @@ describe("web app — project capture policy settings", () => {
     });
 
     expect(screen.getAllByText(/filtered request events/i).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/recommended \(401, 403, 409, 422\)/i).length).toBeGreaterThan(0);
   });
 
   it("shows capture policy in read-only mode for members", async () => {
@@ -132,9 +157,17 @@ describe("web app — project capture policy settings", () => {
           policy: {
             preset: "minimal",
             capture_logs: "error",
-            capture_request_events: "off",
+            capture_request_events: "failures_only",
             capture_breadcrumbs: "local_only",
-            capture_probe_events: "buffer_only"
+            capture_probe_events: "buffer_only",
+            immediate_client_error_statuses: []
+          },
+          overrides: {
+            capture_logs: null,
+            capture_request_events: null,
+            capture_breadcrumbs: null,
+            capture_probe_events: null,
+            immediate_client_error_statuses: null
           }
         });
       }
@@ -151,9 +184,110 @@ describe("web app — project capture policy settings", () => {
 
     const presetSelect = expectSelect(screen.getByLabelText(/^preset$/i));
     const requestSelect = expectSelect(screen.getByLabelText(/^request events$/i));
+    const clientErrorSelect = expectSelect(screen.getByLabelText(/^client error incidents$/i));
 
     expect(presetSelect.disabled).toBe(true);
     expect(requestSelect.disabled).toBe(true);
+    expect(clientErrorSelect.disabled).toBe(true);
     expect(screen.queryByRole("button", { name: /save capture policy/i })).toBeNull();
+  });
+
+  it("preserves explicit none for client error incidents after reload", async () => {
+    const user = userEvent.setup();
+    let requestCount = 0;
+    const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = requestUrl(input);
+
+      if (url.endsWith("/v1/auth/session")) {
+        return jsonResponse(200, {
+          session: createSession()
+        });
+      }
+
+      if (url.endsWith("/v1/projects") && init?.method === undefined) {
+        return jsonResponse(200, {
+          projects: [createProject({ organization_plan: "team" })]
+        });
+      }
+
+      if (url.endsWith("/v1/projects/proj_123/capture-policy") && init?.method === undefined) {
+        requestCount += 1;
+
+        return jsonResponse(200, {
+          policy: {
+            preset: "investigative",
+            capture_logs: "info",
+            capture_request_events: "all",
+            capture_breadcrumbs: "standalone",
+            capture_probe_events: "standalone_when_activated",
+            immediate_client_error_statuses: requestCount === 1 ? [401, 403, 409, 422] : []
+          },
+          overrides: {
+            capture_logs: null,
+            capture_request_events: null,
+            capture_breadcrumbs: null,
+            capture_probe_events: null,
+            immediate_client_error_statuses: requestCount === 1 ? null : []
+          }
+        });
+      }
+
+      if (url.endsWith("/v1/projects/proj_123/capture-policy") && init?.method === "PATCH") {
+        expect(init.body).toBe(JSON.stringify({
+          preset: "investigative",
+          capture_logs: null,
+          capture_request_events: null,
+          capture_breadcrumbs: null,
+          capture_probe_events: null,
+          immediate_client_error_statuses: []
+        }));
+
+        return jsonResponse(200, {
+          policy: {
+            preset: "investigative",
+            capture_logs: "info",
+            capture_request_events: "all",
+            capture_breadcrumbs: "standalone",
+            capture_probe_events: "standalone_when_activated",
+            immediate_client_error_statuses: []
+          },
+          overrides: {
+            capture_logs: null,
+            capture_request_events: null,
+            capture_breadcrumbs: null,
+            capture_probe_events: null,
+            immediate_client_error_statuses: []
+          }
+        });
+      }
+
+      return jsonResponse(404, { error: "not_found" });
+    });
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<App initialEntries={["/projects/proj_123/settings"]} />);
+
+    const clientErrorSelect = expectSelect(await screen.findByLabelText(/^client error incidents$/i));
+    const saveButton = expectButton(screen.getByRole("button", { name: /save capture policy/i }));
+
+    await user.selectOptions(clientErrorSelect, "none");
+
+    await waitFor(() => {
+      expect(saveButton.disabled).toBe(false);
+    });
+
+    await user.click(saveButton);
+
+    await waitFor(() => {
+      expect(saveButton.disabled).toBe(true);
+    });
+
+    render(<App initialEntries={["/projects/proj_123/settings"]} />);
+
+    const reloadedClientErrorSelect = expectSelect(await screen.findAllByLabelText(/^client error incidents$/i).then((elements) => elements.at(-1)!));
+    await waitFor(() => {
+      expect(reloadedClientErrorSelect.value).toBe("none");
+    });
   });
 });

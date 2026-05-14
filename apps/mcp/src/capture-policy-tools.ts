@@ -17,12 +17,10 @@ export function createCapturePolicyMcpTools(api: {
   return {
     async get_capture_policy(input) {
       try {
-        return {
-          policy: await api.getCapturePolicy({
-            bearerToken: String(input["bearerToken"]),
-            projectId: String(input["projectId"])
-          })
-        };
+        return await api.getCapturePolicy({
+          bearerToken: String(input["bearerToken"]),
+          projectId: String(input["projectId"])
+        });
       } catch (error) {
         mapMcpError(error);
       }
@@ -34,13 +32,11 @@ export function createCapturePolicyMcpTools(api: {
           ? (input["update"] as Record<string, unknown>)
           : {};
 
-        return {
-          policy: await api.updateCapturePolicy({
-            bearerToken: String(input["bearerToken"]),
-            projectId: String(input["projectId"]),
-            update
-          })
-        };
+        return await api.updateCapturePolicy({
+          bearerToken: String(input["bearerToken"]),
+          projectId: String(input["projectId"]),
+          update
+        });
       } catch (error) {
         mapMcpError(error);
       }

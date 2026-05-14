@@ -109,6 +109,13 @@ export const STORAGE_SCHEMA_MIGRATIONS = [
         ON slack_destinations (organization_id, is_active, created_at)
       `
     ]
+  }),
+  defineStorageSchemaMigration({
+    id: "202605140001_add_capture_policy_immediate_client_error_statuses",
+    description: "Add nullable immediate client error status overrides to capture policies.",
+    statements: [
+      "ALTER TABLE capture_policies ADD COLUMN IF NOT EXISTS immediate_client_error_statuses jsonb"
+    ]
   })
 ] as const;
 

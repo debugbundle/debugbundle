@@ -888,12 +888,6 @@ describe("cli process command", () => {
 
     const result = await processCommand({ json: true }, { cwd: () => rootDirectory });
     const incidents = Object.values((await readLocalState({ cwd: () => rootDirectory })).incidents);
-    const rawState = JSON.parse(
-      await readFile(join(rootDirectory, ".debugbundle", "local", "state.json"), "utf8")
-    ) as {
-      incidents: Record<string, { source_events: EventEnvelope[] }>;
-    };
-    const rawIncident = Object.values(rawState.incidents)[0];
 
     expect(result.exitCode).toBe(0);
     expect(JSON.parse(result.output)).toEqual(expect.objectContaining({

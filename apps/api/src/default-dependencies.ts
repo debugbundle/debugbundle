@@ -12,7 +12,7 @@ import {
   type GitHubOAuthConfig,
   type WebSessionAuthService
 } from "../../../packages/auth/src/index.js";
-import type { CapturePolicyUpdate } from "../../../packages/shared-types/src/index.js";
+import { getDefaultPreset, type CapturePolicyUpdate } from "../../../packages/shared-types/src/index.js";
 import {
   createSesEmailTransport,
   formatProductFromEmail,
@@ -674,7 +674,12 @@ export function createApiDependencies(input: CreateApiDependenciesInput): {
       organization_id: string;
       project_id: string;
       update: CapturePolicyUpdate;
-    }): Promise<ReturnType<typeof createPostgresCapturePolicyStore>["upsertCapturePolicy"] extends (...args: never[]) => Promise<infer TResult> ? TResult : never>;
+    }): Promise<
+      | (ReturnType<typeof createPostgresCapturePolicyStore>["upsertCapturePolicy"] extends (...args: never[]) => Promise<infer TResult>
+        ? TResult
+        : never)
+      | null
+    >;
   };
   incidentRetrieval: Pick<
     ReturnType<typeof createPostgresMetadataStore>,
@@ -1566,18 +1571,47 @@ export function createApiDependencies(input: CreateApiDependenciesInput): {
         project_id: string;
         update: CapturePolicyUpdate;
       }) => {
-        void input.organization_id;
-        const update = {
+        const existingRecord = await capturePolicyStore.getCapturePolicyByProjectId(input.project_id);
+        let preset = existingRecord?.preset;
+
+        if (preset === undefined) {
+          const projects = await metadataStore.listProjectsForOrganization({
+            organization_id: input.organization_id,
+            now: new Date().toISOString(),
+            limit: 1_000
+          });
+          const project = projects.find((candidate) => candidate.project_id === input.project_id);
+          if (project === undefined) {
+            return null;
+          }
+
+          preset = getDefaultPreset(project.organization_plan);
+        }
+
+        const record = await capturePolicyStore.upsertCapturePolicy({
           project_id: input.project_id,
-          preset: input.update.preset ?? "minimal",
-          ...(input.update.capture_logs !== undefined ? { capture_logs: input.update.capture_logs } : {}),
-          ...(input.update.capture_request_events !== undefined
-            ? { capture_request_events: input.update.capture_request_events }
-            : {}),
-          ...(input.update.capture_breadcrumbs !== undefined ? { capture_breadcrumbs: input.update.capture_breadcrumbs } : {}),
-          ...(input.update.capture_probe_events !== undefined ? { capture_probe_events: input.update.capture_probe_events } : {})
-        };
-        const record = await capturePolicyStore.upsertCapturePolicy(update);
+          preset: input.update.preset ?? preset,
+          capture_logs:
+            input.update.capture_logs !== undefined
+              ? input.update.capture_logs
+              : (existingRecord?.capture_logs ?? null),
+          capture_request_events:
+            input.update.capture_request_events !== undefined
+              ? input.update.capture_request_events
+              : (existingRecord?.capture_request_events ?? null),
+          capture_breadcrumbs:
+            input.update.capture_breadcrumbs !== undefined
+              ? input.update.capture_breadcrumbs
+              : (existingRecord?.capture_breadcrumbs ?? null),
+          capture_probe_events:
+            input.update.capture_probe_events !== undefined
+              ? input.update.capture_probe_events
+              : (existingRecord?.capture_probe_events ?? null),
+          immediate_client_error_statuses:
+            input.update.immediate_client_error_statuses !== undefined
+              ? input.update.immediate_client_error_statuses
+              : (existingRecord?.immediate_client_error_statuses ?? null)
+        });
         return record;
       }
     },

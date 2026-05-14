@@ -18,18 +18,44 @@ describe("mcp capture-policy tools", () => {
 
   it("returns capture policy payloads", async () => {
     const policyFixture = {
-      preset: "balanced",
-      capture_logs: "warning",
-      capture_request_events: "failures_only",
-      capture_breadcrumbs: "exception_only",
-      capture_probe_events: "buffer_only",
+      policy: {
+        preset: "balanced",
+        capture_logs: "warning",
+        capture_request_events: "failures_only",
+        capture_breadcrumbs: "exception_only",
+        capture_probe_events: "buffer_only",
+        immediate_client_error_statuses: []
+      },
+      overrides: {
+        capture_logs: null,
+        capture_request_events: null,
+        capture_breadcrumbs: null,
+        capture_probe_events: null,
+        immediate_client_error_statuses: null
+      }
     };
 
     const tools = createCapturePolicyMcpTools({
       getCapturePolicy: vi.fn().mockResolvedValue(policyFixture),
       updateCapturePolicy: vi
         .fn()
-        .mockResolvedValue({ ...policyFixture, preset: "investigative", capture_logs: "info" }),
+        .mockResolvedValue({
+          policy: {
+            preset: "investigative",
+            capture_logs: "info",
+            capture_request_events: "all",
+            capture_breadcrumbs: "standalone",
+            capture_probe_events: "standalone_when_activated",
+            immediate_client_error_statuses: [401, 403, 409, 422]
+          },
+          overrides: {
+            capture_logs: "info",
+            capture_request_events: null,
+            capture_breadcrumbs: null,
+            capture_probe_events: null,
+            immediate_client_error_statuses: [401, 403, 409, 422]
+          }
+        }),
     });
 
     await expect(
@@ -37,7 +63,7 @@ describe("mcp capture-policy tools", () => {
         bearerToken: "dbundle_mem_x",
         projectId: "proj_1",
       })
-    ).resolves.toEqual({ policy: policyFixture });
+    ).resolves.toEqual(policyFixture);
 
     await expect(
       tools.update_capture_policy({
@@ -46,7 +72,21 @@ describe("mcp capture-policy tools", () => {
         update: { preset: "investigative", capture_logs: "info" },
       })
     ).resolves.toEqual({
-      policy: { ...policyFixture, preset: "investigative", capture_logs: "info" },
+      policy: {
+        preset: "investigative",
+        capture_logs: "info",
+        capture_request_events: "all",
+        capture_breadcrumbs: "standalone",
+        capture_probe_events: "standalone_when_activated",
+        immediate_client_error_statuses: [401, 403, 409, 422]
+      },
+      overrides: {
+        capture_logs: "info",
+        capture_request_events: null,
+        capture_breadcrumbs: null,
+        capture_probe_events: null,
+        immediate_client_error_statuses: [401, 403, 409, 422]
+      }
     });
   });
 

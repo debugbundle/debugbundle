@@ -830,7 +830,8 @@ The `GET /v1/sdk/config` response includes a `capture_policy` field:
     "capture_logs": "error",
     "capture_request_events": "failures_only",
     "capture_breadcrumbs": "local_only",
-    "capture_probe_events": "buffer_only"
+    "capture_probe_events": "buffer_only",
+    "immediate_client_error_statuses": []
   }
 }
 ```
@@ -845,14 +846,15 @@ SDKs fetch this on `init()` alongside probe config. The policy is cached and ref
 | `capture_logs` | `error` | Only buffer/ship `log_event` with level `error` or `critical` |
 | `capture_logs` | `warning` | Buffer/ship `log_event` with level `warning`, `error`, or `critical` |
 | `capture_logs` | `info` | Buffer/ship `log_event` with level `info` and above |
-| `capture_request_events` | `off` | Discard standalone `request_event` unless the response matches the active preset's immediate request-failure statuses; those immediate request failures are still captured as incident signals |
-| `capture_request_events` | `failures_only` | Buffer/ship immediate request-failure `request_event` for the active preset (`minimal`: `5xx`; `balanced`: `5xx`, `408`, `423`, `424`, `425`, `429`; `investigative`: balanced plus `409`) and preset-enabled request-anomaly candidate `request_event` context signals (`balanced`: `400`, `401`, `403`, `404`, `409`, `410`, `422`; `investigative`: same set with lower thresholds). Minimal has no request-anomaly candidates. |
+| `capture_request_events` | `off` | Discard standalone `request_event` unless the response matches the active preset's immediate request-failure statuses or the resolved `immediate_client_error_statuses`; those immediate request failures are still captured as incident signals |
+| `capture_request_events` | `failures_only` | Buffer/ship immediate request-failure `request_event` for the active preset (`minimal`: `5xx`; `balanced`: `5xx`, `408`, `423`, `424`, `425`, `429`; `investigative`: balanced plus `409`) plus any resolved `immediate_client_error_statuses`, and also ship preset-enabled request-anomaly candidate `request_event` context signals (`balanced`: `400`, `401`, `403`, `404`, `409`, `410`, `422`; `investigative`: same set with lower thresholds). Minimal has no request-anomaly candidates. |
 | `capture_request_events` | `filtered` | Buffer/ship `request_event` matching configured filters; until custom filters are available, SDKs keep only immediate request failures and do not ship additional filtered request context |
 | `capture_request_events` | `all` | Buffer/ship all `request_event` |
 | `capture_breadcrumbs` | `local_only` | Keep breadcrumbs in local ring buffer; flush only with exceptions |
 | `capture_breadcrumbs` | `exception_only` | Ship breadcrumbs only when attached to an exception event |
 | `capture_breadcrumbs` | `standalone` | Ship standalone `frontend_breadcrumb` events independently |
 | `capture_probe_events` | `buffer_only` | Probes stay in ring buffer; flush only with errors (always-on mode) |
+| `immediate_client_error_statuses` | `[401,403,409,422]` etc. | Promote those project-selected `4xx` request failures to immediate standalone `request_event` incident signals across browser and backend SDKs |
 | `capture_probe_events` | `standalone_when_activated` | Remote-activated probes ship independently (paid tiers only) |
 
 ### Fallback Behavior

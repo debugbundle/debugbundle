@@ -64,6 +64,7 @@ export interface NormalizeEventsJob {
   event_id: string;
   object_key: string;
   capture_preset?: CapturePreset;
+  immediate_client_error_statuses?: number[];
 }
 
 export interface GroupIncidentJob {
@@ -160,7 +161,7 @@ export interface IngestionPersistenceService {
   persistAndEnqueue(
     event: EventEnvelope,
     projectId: string,
-    options?: { capturePreset?: CapturePreset }
+    options?: { capturePreset?: CapturePreset; immediateClientErrorStatuses?: number[] }
   ): Promise<{ object_key: string }>;
 }
 

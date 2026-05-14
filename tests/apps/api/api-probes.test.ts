@@ -165,7 +165,8 @@ describe("api probe routes", () => {
         capture_logs: "error",
         capture_request_events: "failures_only",
         capture_breadcrumbs: "local_only",
-        capture_probe_events: "buffer_only"
+        capture_probe_events: "buffer_only",
+        immediate_client_error_statuses: []
       }
     });
   });
@@ -178,7 +179,8 @@ describe("api probe routes", () => {
         capture_logs: null,
         capture_request_events: "failures_only",
         capture_breadcrumbs: null,
-        capture_probe_events: null
+        capture_probe_events: null,
+        immediate_client_error_statuses: null
       }),
       upsertCapturePolicyForProject: vi.fn()
     };
@@ -223,7 +225,8 @@ describe("api probe routes", () => {
         capture_logs: "info",
         capture_request_events: "failures_only",
         capture_breadcrumbs: "standalone",
-        capture_probe_events: "standalone_when_activated"
+        capture_probe_events: "standalone_when_activated",
+        immediate_client_error_statuses: [401, 403, 409, 422]
       }
     });
     expect(capturePolicyManagement.getCapturePolicyForProject).toHaveBeenCalledWith({
@@ -306,7 +309,8 @@ describe("api probe routes", () => {
         capture_logs: "warning",
         capture_request_events: "failures_only",
         capture_breadcrumbs: "exception_only",
-        capture_probe_events: "buffer_only"
+        capture_probe_events: "buffer_only",
+        immediate_client_error_statuses: []
       }
     });
   });

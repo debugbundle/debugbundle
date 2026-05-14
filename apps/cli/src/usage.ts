@@ -72,7 +72,7 @@ export const CLI_USAGE_LINES = [
   '  debugbundle weekly-report update <channel-id> [--day-of-week <day>] [--hour-of-day <0-23>] [--timezone <iana>] [--config-json <json>] [--is-enabled <true|false>] [--auth-file <path>] [--json]',
   '  debugbundle weekly-report delete <channel-id> [--auth-file <path>] [--json]',
   '  debugbundle capture-policy get --project <id> [--auth-file <path>] [--json]',
-  '  debugbundle capture-policy set --project <id> [--preset <minimal|balanced|investigative>] [--override <key=value>] [--auth-file <path>] [--json]',
+  '  debugbundle capture-policy set --project <id> [--preset <minimal|balanced|investigative>] [--override <key=value>] [--client-error-incidents <preset-default|none|recommended|custom>] [--client-error-statuses <400,401,...>] [--auth-file <path>] [--json]',
   '  debugbundle probe activate <project-id> --label-pattern <pattern> [--service <name>] [--environment <name>] [--ttl-seconds <n>] [--trigger-ttl-seconds <n>] [--auth-file <path>] [--json]',
   '  debugbundle probe list <project-id> [--auth-file <path>] [--json]',
   '  debugbundle probe deactivate <project-id> <activation-id> [--auth-file <path>] [--json]',

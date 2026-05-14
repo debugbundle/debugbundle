@@ -11,8 +11,10 @@ import {
 } from "../../../packages/billing-client/src/index.js";
 import {
   BundleV1Schema,
+  CapturePolicyResponseSchema as SharedCapturePolicyResponseSchema,
   CapturePolicyUpdateSchema,
   EventEnvelopeSchema,
+  ResolvedCapturePolicySchema as SharedResolvedCapturePolicySchema,
 } from "../../../packages/shared-types/src/index.js";
 import {
   DeletedProjectRecordSchema,
@@ -341,16 +343,8 @@ const ProbeDeactivationResponseSchema = z
     deactivated: z.object({ activation_id: z.string().uuid(), deactivated_at: z.string().datetime() }).strict(),
   })
   .strict();
-const ResolvedCapturePolicySchema = z
-  .object({
-    preset: z.enum(["minimal", "balanced", "investigative"]),
-    capture_logs: z.enum(["off", "error", "warning", "info"]),
-    capture_request_events: z.enum(["off", "failures_only", "filtered", "all"]),
-    capture_breadcrumbs: z.enum(["local_only", "exception_only", "standalone"]),
-    capture_probe_events: z.enum(["buffer_only", "standalone_when_activated"]),
-  })
-  .strict();
-const CapturePolicyResponseSchema = z.object({ policy: ResolvedCapturePolicySchema }).strict();
+const ResolvedCapturePolicySchema = SharedResolvedCapturePolicySchema;
+const CapturePolicyResponseSchema = SharedCapturePolicyResponseSchema;
 const SdkConfigResponseSchema = z
   .object({
     probes_enabled: z.boolean(),

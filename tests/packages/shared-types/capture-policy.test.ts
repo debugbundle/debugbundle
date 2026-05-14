@@ -6,9 +6,14 @@ import {
   CapturePresetSchema,
   CapturePresetValues,
   CapturePolicySchema,
+  CapturePolicyResponseSchema,
   CapturePolicyUpdateSchema,
   PRESET_DEFAULTS,
+  RECOMMENDED_IMMEDIATE_CLIENT_ERROR_STATUSES,
   getRequestAnomalyThreshold,
+  getCapturePolicyOverrides,
+  classifyRequestStatus,
+  normalizeImmediateClientErrorStatuses,
   resolvePolicy,
   getDefaultPreset,
   shouldCaptureEvent,
@@ -60,6 +65,7 @@ describe("preset defaults", () => {
       capture_request_events: "failures_only",
       capture_breadcrumbs: "local_only",
       capture_probe_events: "buffer_only",
+      immediate_client_error_statuses: [],
     });
   });
 
@@ -69,6 +75,7 @@ describe("preset defaults", () => {
       capture_request_events: "failures_only",
       capture_breadcrumbs: "exception_only",
       capture_probe_events: "buffer_only",
+      immediate_client_error_statuses: [],
     });
   });
 
@@ -78,6 +85,7 @@ describe("preset defaults", () => {
       capture_request_events: "all",
       capture_breadcrumbs: "standalone",
       capture_probe_events: "standalone_when_activated",
+      immediate_client_error_statuses: [...RECOMMENDED_IMMEDIATE_CLIENT_ERROR_STATUSES],
     });
   });
 });
@@ -90,6 +98,7 @@ describe("capture policy schema", () => {
     capture_request_events: null,
     capture_breadcrumbs: null,
     capture_probe_events: null,
+    immediate_client_error_statuses: null,
     updated_at: "2026-03-19T00:00:00Z",
   };
 
@@ -98,7 +107,12 @@ describe("capture policy schema", () => {
   });
 
   it("accepts a record with explicit overrides", () => {
-    const withOverrides = { ...validRecord, capture_logs: "info", capture_request_events: "all" };
+    const withOverrides = {
+      ...validRecord,
+      capture_logs: "info",
+      capture_request_events: "all",
+      immediate_client_error_statuses: [422, 401, 422]
+    };
     expect(CapturePolicySchema.safeParse(withOverrides).success).toBe(true);
   });
 
@@ -126,8 +140,17 @@ describe("capture policy update schema", () => {
     expect(CapturePolicyUpdateSchema.safeParse({ capture_logs: null }).success).toBe(true);
   });
 
+  it("normalizes client error status overrides", () => {
+    const parsed = CapturePolicyUpdateSchema.parse({
+      immediate_client_error_statuses: [422, 401, 422, 409]
+    });
+
+    expect(parsed.immediate_client_error_statuses).toEqual([401, 409, 422]);
+  });
+
   it("rejects invalid values", () => {
     expect(CapturePolicyUpdateSchema.safeParse({ preset: "custom" }).success).toBe(false);
+    expect(CapturePolicyUpdateSchema.safeParse({ immediate_client_error_statuses: [399] }).success).toBe(false);
   });
 });
 
@@ -140,6 +163,7 @@ describe("resolvePolicy", () => {
       capture_request_events: null,
       capture_breadcrumbs: null,
       capture_probe_events: null,
+      immediate_client_error_statuses: null,
       updated_at: "2026-03-19T00:00:00Z",
     };
     expect(resolvePolicy(record)).toEqual({
@@ -156,14 +180,65 @@ describe("resolvePolicy", () => {
       capture_request_events: "all",
       capture_breadcrumbs: null,
       capture_probe_events: null,
+      immediate_client_error_statuses: [422, 403],
       updated_at: "2026-03-19T00:00:00Z",
     };
     const resolved = resolvePolicy(record);
     expect(resolved.capture_logs).toBe("info");
     expect(resolved.capture_request_events).toBe("all");
+    expect(resolved.immediate_client_error_statuses).toEqual([403, 422]);
     // These should still come from preset defaults
     expect(resolved.capture_breadcrumbs).toBe("local_only");
     expect(resolved.capture_probe_events).toBe("buffer_only");
+  });
+});
+
+describe("capture policy response schema", () => {
+  it("accepts resolved policy plus raw overrides", () => {
+    expect(CapturePolicyResponseSchema.safeParse({
+      policy: {
+        preset: "investigative",
+        capture_logs: "info",
+        capture_request_events: "all",
+        capture_breadcrumbs: "standalone",
+        capture_probe_events: "standalone_when_activated",
+        immediate_client_error_statuses: [...RECOMMENDED_IMMEDIATE_CLIENT_ERROR_STATUSES]
+      },
+      overrides: {
+        capture_logs: null,
+        capture_request_events: null,
+        capture_breadcrumbs: null,
+        capture_probe_events: null,
+        immediate_client_error_statuses: null
+      }
+    }).success).toBe(true);
+  });
+});
+
+describe("client error status helpers", () => {
+  it("normalizes immediate client error statuses", () => {
+    expect(normalizeImmediateClientErrorStatuses([422, 401, 422, 409])).toEqual([401, 409, 422]);
+  });
+
+  it("returns raw capture policy overrides without coercing null", () => {
+    const record: CapturePolicyRecord = {
+      project_id: "00000000-0000-4000-8000-000000000001",
+      preset: "balanced",
+      capture_logs: null,
+      capture_request_events: null,
+      capture_breadcrumbs: null,
+      capture_probe_events: null,
+      immediate_client_error_statuses: [],
+      updated_at: "2026-03-19T00:00:00Z",
+    };
+
+    expect(getCapturePolicyOverrides(record)).toEqual({
+      capture_logs: null,
+      capture_request_events: null,
+      capture_breadcrumbs: null,
+      capture_probe_events: null,
+      immediate_client_error_statuses: []
+    });
   });
 });
 
@@ -216,6 +291,18 @@ describe("getRequestAnomalyThreshold", () => {
   });
 });
 
+describe("classifyRequestStatus", () => {
+  it("treats configured client error statuses as immediate incidents", () => {
+    expect(
+      classifyRequestStatus({
+        responseStatus: 403,
+        capturePreset: "minimal",
+        immediateClientErrorStatuses: [401, 403, 422]
+      })
+    ).toBe("incident_signal");
+  });
+});
+
 describe("shouldCaptureEvent", () => {
   const minimal: ResolvedCapturePolicy = { preset: "minimal", ...PRESET_DEFAULTS.minimal };
   const balanced: ResolvedCapturePolicy = { preset: "balanced", ...PRESET_DEFAULTS.balanced };
@@ -257,6 +344,16 @@ describe("shouldCaptureEvent", () => {
     // investigative preset has capture_logs: "info"
     expect(shouldCaptureEvent(investigative, "log_event", { level: "info" })).toBe(true);
     expect(shouldCaptureEvent(investigative, "log_event", { level: "debug" })).toBe(true);
+  });
+
+  it("accepts selected client error incidents even when request events are otherwise off", () => {
+    const policy: ResolvedCapturePolicy = {
+      ...minimal,
+      capture_request_events: "off",
+      immediate_client_error_statuses: [403]
+    };
+
+    expect(shouldCaptureEvent(policy, "request_event", { response_status: 403 })).toBe(true);
   });
 
   it("always accepts immediate request incident statuses on minimal", () => {

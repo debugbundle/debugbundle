@@ -11,6 +11,7 @@ export interface CapturePolicyStore {
     capture_request_events?: string | null;
     capture_breadcrumbs?: string | null;
     capture_probe_events?: string | null;
+    immediate_client_error_statuses?: number[] | null;
   }): Promise<CapturePolicyRecord>;
   createDefaultCapturePolicy(projectId: string, plan: string): Promise<CapturePolicyRecord>;
 }
@@ -21,7 +22,7 @@ export function createPostgresCapturePolicyStore(db: Queryable): CapturePolicySt
       const result = await db.query<CapturePolicyRecord>(
         `
           SELECT project_id, preset, capture_logs, capture_request_events,
-                 capture_breadcrumbs, capture_probe_events, updated_at
+                 capture_breadcrumbs, capture_probe_events, immediate_client_error_statuses, updated_at
           FROM capture_policies
           WHERE project_id = $1
           LIMIT 1
@@ -37,9 +38,9 @@ export function createPostgresCapturePolicyStore(db: Queryable): CapturePolicySt
         `
           INSERT INTO capture_policies (
             project_id, preset, capture_logs, capture_request_events,
-            capture_breadcrumbs, capture_probe_events, updated_at
+            capture_breadcrumbs, capture_probe_events, immediate_client_error_statuses, updated_at
           )
-          VALUES ($1, $2, $3, $4, $5, $6, NOW())
+          VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, NOW())
           ON CONFLICT (project_id)
           DO UPDATE SET
             preset = EXCLUDED.preset,
@@ -47,9 +48,10 @@ export function createPostgresCapturePolicyStore(db: Queryable): CapturePolicySt
             capture_request_events = EXCLUDED.capture_request_events,
             capture_breadcrumbs = EXCLUDED.capture_breadcrumbs,
             capture_probe_events = EXCLUDED.capture_probe_events,
+            immediate_client_error_statuses = EXCLUDED.immediate_client_error_statuses,
             updated_at = NOW()
           RETURNING project_id, preset, capture_logs, capture_request_events,
-                    capture_breadcrumbs, capture_probe_events, updated_at
+                    capture_breadcrumbs, capture_probe_events, immediate_client_error_statuses, updated_at
         `,
         [
           input.project_id,
@@ -58,6 +60,9 @@ export function createPostgresCapturePolicyStore(db: Queryable): CapturePolicySt
           input.capture_request_events ?? null,
           input.capture_breadcrumbs ?? null,
           input.capture_probe_events ?? null,
+          input.immediate_client_error_statuses === undefined || input.immediate_client_error_statuses === null
+            ? null
+            : JSON.stringify(input.immediate_client_error_statuses),
         ]
       );
 
@@ -70,12 +75,12 @@ export function createPostgresCapturePolicyStore(db: Queryable): CapturePolicySt
         `
           INSERT INTO capture_policies (
             project_id, preset, capture_logs, capture_request_events,
-            capture_breadcrumbs, capture_probe_events, updated_at
+            capture_breadcrumbs, capture_probe_events, immediate_client_error_statuses, updated_at
           )
-          VALUES ($1, $2, NULL, NULL, NULL, NULL, NOW())
+          VALUES ($1, $2, NULL, NULL, NULL, NULL, NULL, NOW())
           ON CONFLICT (project_id) DO NOTHING
           RETURNING project_id, preset, capture_logs, capture_request_events,
-                    capture_breadcrumbs, capture_probe_events, updated_at
+                    capture_breadcrumbs, capture_probe_events, immediate_client_error_statuses, updated_at
         `,
         [projectId, preset]
       );

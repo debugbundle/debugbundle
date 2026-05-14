@@ -8,6 +8,7 @@ import {
   getCapturePolicyWithAuthCommand as defaultGetCapturePolicyCommand,
   setCapturePolicyWithAuthCommand as defaultSetCapturePolicyCommand
 } from "./capture-policy-commands.js";
+import { RECOMMENDED_IMMEDIATE_CLIENT_ERROR_STATUSES } from "../../../packages/shared-types/src/index.js";
 import { deleteProjectWithAuthCommand as defaultDeleteProjectCommand, listProjectsWithAuthCommand as defaultListProjectsCommand, createProjectWithAuthCommand as defaultCreateProjectCommand, updateProjectWithAuthCommand as defaultUpdateProjectCommand } from "./project-commands.js";
 import {
   createProjectTokenWithAuthCommand as defaultCreateProjectTokenCommand,
@@ -646,6 +647,34 @@ export async function handleCapturePolicyCommand(
   parsedArgv: ParsedArgv,
   dependencies: ManagementCommandDependencies
 ): Promise<CliCommandResult> {
+  function parseClientErrorStatusesOption(value: string): number[] {
+    const parts = value.split(",").map((part) => part.trim()).filter((part) => part.length > 0);
+    if (parts.length === 0) {
+      throw new CliInputError("Invalid value for --client-error-statuses.");
+    }
+
+    const statuses: number[] = [];
+    for (const part of parts) {
+      if (!/^\d+$/.test(part)) {
+        throw new CliInputError("Invalid value for --client-error-statuses.");
+      }
+
+      const status = Number(part);
+      if (!Number.isInteger(status) || status < 400 || status > 499) {
+        throw new CliInputError("Invalid value for --client-error-statuses.");
+      }
+
+      statuses.push(status);
+    }
+
+    const normalized = Array.from(new Set(statuses)).sort((left, right) => left - right);
+    if (normalized.length > 12) {
+      throw new CliInputError("Invalid value for --client-error-statuses.");
+    }
+
+    return normalized;
+  }
+
   const action = requirePositional(parsedArgv, 1, "action");
 
   if (action === "get") {
@@ -663,7 +692,15 @@ export async function handleCapturePolicyCommand(
   }
 
   if (action === "set") {
-    expectNoUnknownOptions(parsedArgv, ["auth-file", "json", "project", "preset", "override"]);
+    expectNoUnknownOptions(parsedArgv, [
+      "auth-file",
+      "json",
+      "project",
+      "preset",
+      "override",
+      "client-error-incidents",
+      "client-error-statuses"
+    ]);
     ensureNoExtraPositionals(parsedArgv, 2);
 
     const projectId = readStringOption(parsedArgv, "project");
@@ -696,6 +733,35 @@ export async function handleCapturePolicyCommand(
       }
 
       (update as Record<string, string | null | undefined>)[key] = rawValue === "null" ? null : rawValue;
+    }
+
+    const clientErrorIncidents = readStringOption(parsedArgv, "client-error-incidents");
+    const clientErrorStatuses = readStringOption(parsedArgv, "client-error-statuses");
+
+    if (clientErrorStatuses !== undefined && clientErrorIncidents !== "custom") {
+      throw new CliInputError("Use --client-error-statuses only with --client-error-incidents custom.");
+    }
+
+    if (clientErrorIncidents !== undefined) {
+      switch (clientErrorIncidents) {
+        case "preset-default":
+          update.immediate_client_error_statuses = null;
+          break;
+        case "none":
+          update.immediate_client_error_statuses = [];
+          break;
+        case "recommended":
+          update.immediate_client_error_statuses = [...RECOMMENDED_IMMEDIATE_CLIENT_ERROR_STATUSES];
+          break;
+        case "custom":
+          if (clientErrorStatuses === undefined) {
+            throw new CliInputError("Missing required option --client-error-statuses.");
+          }
+          update.immediate_client_error_statuses = parseClientErrorStatusesOption(clientErrorStatuses);
+          break;
+        default:
+          throw new CliInputError("Invalid value for --client-error-incidents.");
+      }
     }
 
     if (Object.keys(update).length === 0) {

@@ -29,7 +29,7 @@ describe("cli main capture-policy routing", () => {
     expect(result).toEqual({ exitCode: 0, output: "capture-policy-get" });
   });
 
-  it("routes capture-policy set arguments including repeated overrides into the set command", async () => {
+  it("routes capture-policy set arguments including repeated overrides and client error modes into the set command", async () => {
     const setCapturePolicyCommand = vi.fn().mockResolvedValue({
       exitCode: 0,
       output: "capture-policy-set"
@@ -48,6 +48,10 @@ describe("cli main capture-policy routing", () => {
       "capture_request_events=all",
       "--override",
       "capture_breadcrumbs=null",
+      "--client-error-incidents",
+      "custom",
+      "--client-error-statuses",
+      "422,401,422",
       "--auth-file",
       "/tmp/auth.json",
       "--json"
@@ -61,7 +65,8 @@ describe("cli main capture-policy routing", () => {
         preset: "investigative",
         capture_logs: "info",
         capture_request_events: "all",
-        capture_breadcrumbs: null
+        capture_breadcrumbs: null,
+        immediate_client_error_statuses: [401, 422]
       },
       authFilePath: "/tmp/auth.json",
       json: true
@@ -80,6 +85,16 @@ describe("cli main capture-policy routing", () => {
       "--override",
       "not-valid"
     ]);
+    const invalidClientErrorStatuses = await runCli([
+      "capture-policy",
+      "set",
+      "--project",
+      "proj_123",
+      "--client-error-incidents",
+      "custom",
+      "--client-error-statuses",
+      "399"
+    ]);
 
     expect(missingProject.exitCode).toBe(4);
     expect(missingProject.output).toContain("Missing required option --project.");
@@ -87,6 +102,8 @@ describe("cli main capture-policy routing", () => {
     expect(missingUpdate.output).toContain("At least one capture policy field must be provided.");
     expect(invalidOverride.exitCode).toBe(4);
     expect(invalidOverride.output).toContain("Invalid value for --override.");
+    expect(invalidClientErrorStatuses.exitCode).toBe(4);
+    expect(invalidClientErrorStatuses.output).toContain("Invalid value for --client-error-statuses.");
   });
 
   it("rejects unknown options on capture-policy routes", async () => {

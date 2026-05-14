@@ -1251,12 +1251,20 @@ Response `200`:
     "capture_logs": "off | warning | error | info",
     "capture_request_events": "off | failures_only | filtered | all",
     "capture_breadcrumbs": "local_only | exception_only | standalone",
-    "capture_probe_events": "buffer_only | standalone_when_activated"
+    "capture_probe_events": "buffer_only | standalone_when_activated",
+    "immediate_client_error_statuses": [401, 403, 409, 422]
+  },
+  "overrides": {
+    "capture_logs": "off | warning | error | info | null",
+    "capture_request_events": "off | failures_only | filtered | all | null",
+    "capture_breadcrumbs": "local_only | exception_only | standalone | null",
+    "capture_probe_events": "buffer_only | standalone_when_activated | null",
+    "immediate_client_error_statuses": null
   }
 }
 ```
 
-`policy` is the effective resolved policy after merging preset defaults with any non-null overrides. SDKs consume the same resolved values via `GET /v1/sdk/config`.
+`policy` is the effective resolved policy after merging preset defaults with any non-null overrides. `overrides` preserves the raw saved state so clients can distinguish `use preset default` from explicit `none`. SDKs consume the same resolved values via `GET /v1/sdk/config`.
 
 **Update capture policy:**
 
@@ -1273,7 +1281,8 @@ Request body (all fields optional):
   "capture_logs": "warning",
   "capture_request_events": "failures_only",
   "capture_breadcrumbs": "exception_only",
-  "capture_probe_events": "buffer_only"
+  "capture_probe_events": "buffer_only",
+  "immediate_client_error_statuses": [401, 403, 409, 422]
 }
 ```
 
@@ -1283,8 +1292,10 @@ Response `200`: same shape as GET response with updated values.
 - `preset` must be one of `minimal`, `balanced`, `investigative`
 - override keys must be valid control names
 - override values must be valid for that control
+- `immediate_client_error_statuses` must contain only integer HTTP statuses in `400..499`, is normalized to deduped ascending order, and is limited to 12 entries
+- `null` for `immediate_client_error_statuses` means `use preset default`; `[]` means explicit `none`
 - Free-tier projects cannot set `capture_probe_events` to `standalone_when_activated` (returns 403)
-- Omitted override fields inherit from preset defaults
+- Omitted override fields keep their existing override state; on a project with no saved capture-policy row yet, omitted overrides behave as `null` and resolve from preset defaults
 
 **Error responses:**
 - `401` — missing or invalid auth
@@ -1305,7 +1316,8 @@ Response `200`: same shape as GET response with updated values.
     "capture_logs": "error",
     "capture_request_events": "failures_only",
     "capture_breadcrumbs": "local_only",
-    "capture_probe_events": "buffer_only"
+    "capture_probe_events": "buffer_only",
+    "immediate_client_error_statuses": []
   }
 }
 ```
@@ -1729,10 +1741,10 @@ These commands manage **remote probe activations** (Solo+ only). Always-on probe
 debugbundle capture-policy get [--project <id>] [--json]
 debugbundle capture-policy set [--project <id>] --preset <minimal|balanced|investigative> [--json]
 debugbundle capture-policy set [--project <id>] --override capture_logs=warning --override capture_request_events=failures_only [--json]
+debugbundle capture-policy set [--project <id>] --client-error-incidents <preset-default|none|recommended|custom> [--client-error-statuses <401,403,...>] [--json]
 ```
 
-`capture-policy get` displays the project's current capture preset, advanced overrides, and resolved policy. `capture-policy set` updates the preset and/or individual advanced overrides. Owner-only.
-`capture-policy get` displays the project's current resolved policy. `capture-policy set` updates the preset and/or individual override fields via `--override key=value` (use `null` to clear an override). Owner-only.
+`capture-policy get` displays the project's current resolved policy plus raw override semantics for client error incidents. `capture-policy set` updates the preset and/or individual override fields via `--override key=value` (use `null` to clear an override), and also supports the dedicated client-error incident mode flags shown above. Owner-only.
 
 ### 2.13 Billing Commands
 ```

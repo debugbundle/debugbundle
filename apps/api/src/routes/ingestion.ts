@@ -15,12 +15,16 @@ function toRetryAfterSeconds(retryAfterMs: number): string {
 
 function countsTowardMonthlyIngestAllowance(
   organizationPlan: string | undefined,
-  event: ReturnType<typeof redactEvent>
+  event: ReturnType<typeof redactEvent>,
+  capturePolicy: ResolvedCapturePolicy
 ): boolean {
   const eventClass = classifyEvent(
     event.event_type,
     event.event_type === "log_event" ? event.payload.level : undefined,
-    event.event_type === "probe_event" && "activation_id" in event.payload ? event.payload.activation_id : undefined
+    event.event_type === "probe_event" && "activation_id" in event.payload ? event.payload.activation_id : undefined,
+    event.payload as Record<string, unknown>,
+    capturePolicy.preset,
+    capturePolicy.immediate_client_error_statuses
   );
 
   if (eventClass === "operational_signal") {
@@ -152,7 +156,9 @@ export function registerIngestionRoutes(app: FastifyInstance, dependencies: ApiD
       dependencies.billingManagement !== undefined &&
       !isSelfHostMode()
     ) {
-      const countedEvents = capturedEvents.filter(({ event }) => countsTowardMonthlyIngestAllowance(project.organization_plan, event));
+      const countedEvents = capturedEvents.filter(({ event }) =>
+        countsTowardMonthlyIngestAllowance(project.organization_plan, event, capturePolicy)
+      );
 
       if (countedEvents.length > 0) {
         const billingSummary = await dependencies.billingManagement.getBillingSummaryForOrganization({
@@ -188,7 +194,8 @@ export function registerIngestionRoutes(app: FastifyInstance, dependencies: ApiD
     let accepted = 0;
     for (const { event } of capturedEvents) {
       await dependencies.ingestionPersistence.persistAndEnqueue(event, project.project_id, {
-        capturePreset: capturePolicy.preset
+        capturePreset: capturePolicy.preset,
+        immediateClientErrorStatuses: capturePolicy.immediate_client_error_statuses
       });
       accepted += 1;
     }

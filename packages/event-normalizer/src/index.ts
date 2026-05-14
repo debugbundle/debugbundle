@@ -244,6 +244,7 @@ export function classifyEvent(
   probeActivationId?: string | null,
   payload?: Record<string, unknown>,
   capturePreset: CapturePreset = "minimal",
+  immediateClientErrorStatuses: readonly number[] = [],
 ): EventClass {
   switch (eventType) {
     case "backend_exception":
@@ -258,7 +259,7 @@ export function classifyEvent(
 
     case "request_event": {
       const responseStatus = getRequestResponseStatus(payload);
-      return classifyRequestStatus({ responseStatus, capturePreset });
+      return classifyRequestStatus({ responseStatus, capturePreset, immediateClientErrorStatuses });
     }
 
     case "frontend_breadcrumb":
