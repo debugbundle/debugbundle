@@ -341,6 +341,35 @@ describe("cli main core routing", () => {
     });
   });
 
+  it("routes verify cloud 4xx trigger arguments into the verify-cloud command", async () => {
+    const verifyCloudCommand = vi.fn().mockResolvedValue({
+      exitCode: 0,
+      output: "verify-cloud"
+    });
+
+    const result = await runCli([
+      "verify",
+      "cloud",
+      "--project-id",
+      "proj_123",
+      "--trigger-4xx",
+      "403",
+      "--json"
+    ], {
+      verifyCloudCommand
+    });
+
+    expect(verifyCloudCommand).toHaveBeenCalledWith({
+      projectId: "proj_123",
+      trigger4xxStatus: 403,
+      json: true
+    });
+    expect(result).toEqual({
+      exitCode: 0,
+      output: "verify-cloud"
+    });
+  });
+
   it("routes verify local arguments into the verify-local command", async () => {
     const verifyLocalCommand = vi.fn().mockResolvedValue({
       exitCode: 0,

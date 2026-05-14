@@ -47,7 +47,7 @@ This closes the earlier product gap where a handled production 5xx could be user
 | Capture policy | `contracts/public-interfaces.md`, `contracts/sdk-interface.md`, CLI capture-policy commands | Strong |
 | Local setup | `spec/local/local-first-onboarding.md`, `contracts/public-interfaces.md` setup section, CLI `setup`, `doctor`, `validate` | Strong |
 | Local verification | CLI and MCP expose `verify local`; CLI synthesizes a local incident-signal batch, processes it, reads incident state, and reads the bundle | Strong |
-| Cloud verification | CLI and MCP expose `verify cloud`; active `--trigger-5xx` proof path creates a synthetic hosted 5xx request incident and reports bundle status plus classification reason | Strong |
+| Cloud verification | CLI and MCP expose `verify cloud`; active `--trigger-5xx` proof path creates a synthetic hosted 5xx request incident and `--trigger-4xx <status>` proves configured promoted client-error incidents, both reporting bundle status plus classification reason | Strong |
 | Smoke flow | CLI and MCP expose `smoke`; current behavior orchestrates local and cloud verification through the shared proof surfaces | Strong for V1 scope |
 | Retrieval | API, CLI, and MCP expose list/get incident, bundle, reproduction, logs, resolve, reopen, plus deterministic `incident_reason` on incident retrieval | Strong |
 | Agent entry points | MCP exposes setup, retrieval, analyze, probes, services, alerts, webhooks, projects, tokens, capture policy, GitHub, members, billing | Strong |
@@ -59,7 +59,7 @@ This closes the earlier product gap where a handled production 5xx could be user
 
 ### 1. Active Cloud 5xx Verification (Resolved 2026-05-11)
 
-`verify cloud` is no longer passive-only. CLI and MCP now support an active `--trigger-5xx` / `trigger5xx` path that creates a temporary verification project token, sends a synthetic hosted `request_event` with `response_status: 503` through the real ingestion route, revokes the temporary token, polls incident retrieval, and reports incident id, bundle status, classification reason, and suggested next command.
+`verify cloud` is no longer passive-only. CLI and MCP now support an active `--trigger-5xx` / `trigger5xx` path that creates a temporary verification project token, sends a synthetic hosted `request_event` with `response_status: 503` through the real ingestion route, revokes the temporary token, polls incident retrieval, and reports incident id, bundle status, classification reason, and suggested next command. They also support `--trigger-4xx <status>` / `trigger4xxStatus` for the same proof path against a configured promoted client-error status such as `403`.
 
 The synthetic cloud event is clearly marked as verification/test data while still flowing through the same ingestion, normalization, classification, grouping, bundle, and retrieval path as a real 5xx `request_event`.
 
@@ -191,7 +191,7 @@ Before community V1, the developer path should pass this checklist:
 1. A clean project can run `debugbundle setup` successfully.
 2. `debugbundle doctor` reports actionable setup health.
 3. `debugbundle verify local` creates a local incident and bundle.
-4. `debugbundle verify cloud --trigger-5xx` or equivalent creates a hosted request-failure incident.
+4. `debugbundle verify cloud --trigger-5xx`, `debugbundle verify cloud --trigger-4xx <status>`, or equivalent creates a hosted request-failure incident.
 5. `debugbundle incidents` shows the created incident.
 6. `debugbundle inspect <incident-id>` explains status, severity, grouping, and incident reason.
 7. `debugbundle bundle <incident-id>` returns the primary debugging artifact.

@@ -112,13 +112,14 @@ export const MCP_TOOL_CATALOG = [
   {
     name: 'verify_cloud',
     group: 'setup',
-    description: 'Verify that a hosted project is sending data to DebugBundle.',
+    description: 'Verify hosted ingestion or actively prove hosted incident creation.',
     inputSchema: z.object({
       projectId: z.string(),
       service: z.string().optional(),
       environment: z.string().optional(),
       maxAgeMinutes: z.number().optional(),
       trigger5xx: z.boolean().optional(),
+      trigger4xxStatus: z.number().int().min(400).max(499).optional(),
       authFilePath: z.string().optional(),
     }),
   },

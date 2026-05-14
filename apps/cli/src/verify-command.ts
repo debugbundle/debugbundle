@@ -31,7 +31,7 @@ type ProductionIncidentLike = {
 };
 
 type CloudVerificationDetails = {
-  mode: "active_5xx" | "passive_recent_incident";
+  mode: "active_4xx" | "active_5xx" | "passive_recent_incident";
   accepted_event_count?: number;
   incident_id?: string;
   bundle_status?: "ready" | "pending" | "unknown";
@@ -148,7 +148,7 @@ function formatResult(
 }
 
 function buildCloudSuggestedActions(status: "healthy" | "warning" | "error", incidentId?: string, mode: CloudVerificationDetails["mode"] = "passive_recent_incident"): string[] {
-  if (status === "healthy" && incidentId !== undefined && mode === "active_5xx") {
+  if (status === "healthy" && incidentId !== undefined && (mode === "active_5xx" || mode === "active_4xx")) {
     return [
       `Run debugbundle inspect ${incidentId} --source cloud to inspect why the incident fired.`,
       `Run debugbundle bundle ${incidentId} --source cloud to fetch the generated debug bundle.`
@@ -246,11 +246,11 @@ function cloudVerificationRunId(now: Date): string {
   return now.toISOString().replace(/[-:.TZ]/g, "").slice(0, 14);
 }
 
-function requestFailureReason(): IncidentReason {
+function requestFailureReason(responseStatus: number): IncidentReason {
   const incidentReason = deriveIncidentReasonFromSignal({
     event_type: "request_event",
     event_class: "incident_signal",
-    response_status: 503
+    response_status: responseStatus
   });
 
   if (incidentReason === null) {
@@ -264,8 +264,14 @@ function buildCloudVerificationEvent(input: {
   now: Date;
   serviceName: string;
   environment: string;
+  responseStatus: number;
 }): ReturnType<typeof createEventEnvelope> {
   const runId = cloudVerificationRunId(input.now);
+  const is5xxVerification = input.responseStatus >= 500;
+  const routeTemplate = is5xxVerification
+    ? "/debugbundle/verify/cloud"
+    : `/debugbundle/verify/cloud/client-error/${input.responseStatus}`;
+  const verificationLabel = is5xxVerification ? "true" : `client-error-${input.responseStatus}`;
   return createEventEnvelope({
     event_type: "request_event",
     sdk_name: "debugbundle-cli",
@@ -279,27 +285,44 @@ function buildCloudVerificationEvent(input: {
     occurred_at: input.now.toISOString(),
     payload: {
       method: "GET",
-      path: "/debugbundle/verify/cloud",
-      route_template: "/debugbundle/verify/cloud",
+      path: routeTemplate,
+      route_template: routeTemplate,
       query: {
         debugbundle_verification: true,
-        run_id: runId
+        run_id: runId,
+        synthetic_status: input.responseStatus
       },
       headers: {
-        "x-debugbundle-verification": "true"
+        "x-debugbundle-verification": verificationLabel
       },
-      response_status: 503,
+      response_status: input.responseStatus,
       duration_ms: 37,
       response_headers: {
-        "x-debugbundle-verification": "true"
+        "x-debugbundle-verification": verificationLabel
       },
       response_body: {
-        error: "debugbundle_cloud_verification",
+        error: is5xxVerification ? "debugbundle_cloud_verification" : "debugbundle_cloud_client_error_verification",
         synthetic: true,
-        run_id: runId
+        run_id: runId,
+        response_status: input.responseStatus
       }
     }
   });
+}
+
+function validateActiveCloudVerificationInput(input: {
+  trigger5xx?: boolean;
+  trigger4xxStatus?: number;
+}): string | null {
+  if (input.trigger5xx === true && input.trigger4xxStatus !== undefined) {
+    return "Choose either --trigger-5xx or --trigger-4xx, not both.";
+  }
+
+  if (input.trigger4xxStatus !== undefined && (input.trigger4xxStatus < 400 || input.trigger4xxStatus > 499)) {
+    return "--trigger-4xx must be an integer status between 400 and 499.";
+  }
+
+  return null;
 }
 
 async function sendEventsToApi(
@@ -535,6 +558,7 @@ export async function verifyCloudCommand(
     environment?: string;
     maxAgeMinutes?: number;
     trigger5xx?: boolean;
+    trigger4xxStatus?: number;
     authFilePath?: string;
     json?: boolean;
   },
@@ -544,6 +568,17 @@ export async function verifyCloudCommand(
   const checks: VerifyCheck[] = [];
   const environment = input.environment ?? "production";
   const maxAgeMinutes = input.maxAgeMinutes ?? 15;
+  const activeInputError = validateActiveCloudVerificationInput(input);
+
+  if (activeInputError !== null) {
+    checks.push({
+      name: "trigger-input",
+      status: "error",
+      message: activeInputError
+    });
+
+    return formatCloudResult(input, 4, checks, [activeInputError]);
+  }
 
   const readAuthState = dependencies.readAuthState ?? readCliAuthState;
   let authState: CliAuthState;
@@ -587,7 +622,7 @@ export async function verifyCloudCommand(
       dependencies.fetchImpl === undefined ? {} : { fetchImpl: dependencies.fetchImpl }
     ));
 
-  if (input.trigger5xx === true) {
+  if (input.trigger5xx === true || input.trigger4xxStatus !== undefined) {
     const verificationStartedAt = now();
     const runId = cloudVerificationRunId(verificationStartedAt);
     const serviceName = input.service ?? `debugbundle-verify-cloud-${runId}`;
@@ -595,16 +630,20 @@ export async function verifyCloudCommand(
     const pollAttempts = dependencies.pollAttempts ?? 6;
     const pollIntervalMs = dependencies.pollIntervalMs ?? 2_000;
     const sleep = dependencies.sleep ?? ((milliseconds: number) => new Promise<void>((resolve) => setTimeout(resolve, milliseconds)));
+    const responseStatus = input.trigger4xxStatus ?? 503;
+    const activeMode: CloudVerificationDetails["mode"] = input.trigger4xxStatus !== undefined ? "active_4xx" : "active_5xx";
+    const activeCheckName: VerifyCheck["name"] = input.trigger4xxStatus !== undefined ? "active-4xx-event" : "active-5xx-event";
+    const statusLabel = input.trigger4xxStatus !== undefined ? `${responseStatus}` : "5xx";
     const verification: CloudVerificationDetails = {
-      mode: "active_5xx",
+      mode: activeMode,
       bundle_status: "unknown",
-      classification_reason: requestFailureReason()
+      classification_reason: requestFailureReason(responseStatus)
     };
     const errors: string[] = [];
     let exitCode = 0;
     let tokenId: string | null = null;
     let incidentId: string | undefined;
-    let activeStep: VerifyCheck["name"] = "active-5xx-event";
+    let activeStep: VerifyCheck["name"] = activeCheckName;
 
     try {
       const token = await createProjectToken({
@@ -620,7 +659,8 @@ export async function verifyCloudCommand(
       const event = buildCloudVerificationEvent({
         now: verificationStartedAt,
         serviceName,
-        environment
+        environment,
+        responseStatus
       });
       const ingestion = await sendEvents({
         baseUrl: authState.base_url,
@@ -630,13 +670,13 @@ export async function verifyCloudCommand(
       verification.accepted_event_count = ingestion.accepted;
 
       if (ingestion.accepted < 1 || ingestion.rejected > 0 || ingestion.errors.length > 0) {
-        throw new Error(`Synthetic 5xx ingestion was not fully accepted: accepted=${ingestion.accepted}, rejected=${ingestion.rejected}.`);
+        throw new Error(`Synthetic ${statusLabel} ingestion was not fully accepted: accepted=${ingestion.accepted}, rejected=${ingestion.rejected}.`);
       }
 
       checks.push({
-        name: "active-5xx-event",
+        name: activeCheckName,
         status: "ok",
-        message: "Sent synthetic 5xx request_event through cloud ingestion."
+        message: `Sent synthetic ${statusLabel} request_event through cloud ingestion.`
       });
       activeStep = "incident-retrieval";
 
@@ -655,7 +695,7 @@ export async function verifyCloudCommand(
         if (candidate !== undefined) {
           incidentId = candidate.incident_id;
           verification.incident_id = candidate.incident_id;
-          verification.classification_reason = candidate.incident_reason ?? requestFailureReason();
+          verification.classification_reason = candidate.incident_reason ?? requestFailureReason(responseStatus);
           break;
         }
 
@@ -665,13 +705,13 @@ export async function verifyCloudCommand(
       }
 
       if (incidentId === undefined) {
-        throw new Error("Synthetic 5xx request was accepted but no matching cloud incident was visible yet.");
+        throw new Error(`Synthetic ${statusLabel} request was accepted but no matching cloud incident was visible yet.`);
       }
 
       checks.push({
         name: "incident-retrieval",
         status: "ok",
-        message: `Retrieved cloud incident ${incidentId} for the synthetic 5xx request.`
+        message: `Retrieved cloud incident ${incidentId} for the synthetic ${statusLabel} request.`
       });
       activeStep = "bundle-status";
 

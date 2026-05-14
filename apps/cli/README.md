@@ -21,6 +21,7 @@ debugbundle setup --non-interactive
 debugbundle doctor --privacy
 debugbundle verify local
 debugbundle verify cloud --project-id <id> --trigger-5xx
+debugbundle verify cloud --project-id <id> --trigger-4xx 403
 debugbundle process
 debugbundle incidents
 debugbundle explain <incident-id> --source cloud

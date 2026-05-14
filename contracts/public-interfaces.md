@@ -73,7 +73,7 @@ Every capability must be available through all applicable interfaces. Operations
 | Doctor | — | `doctor` | `doctor` | CLI/MCP-only (local env) |
 | Validate | — | `validate [--fix]` | `validate` | CLI/MCP-only (local env) |
 | Verify local | — | `verify local` | `verify_local` | CLI/MCP-only (local env) |
-| Verify cloud | — | `verify cloud` | `verify_cloud` | Uses API internally; `--trigger-5xx`/`trigger5xx` actively proves hosted 5xx incident creation |
+| Verify cloud | — | `verify cloud` | `verify_cloud` | Uses API internally; `--trigger-5xx`/`trigger5xx` proves hosted 5xx incident creation and `--trigger-4xx <status>`/`trigger4xxStatus` proves configured hosted 4xx incident creation |
 | Smoke test | — | `smoke` | `smoke` | CLI/MCP-only |
 | Login | — | `login` | — | CLI-only (stores member-token auth state locally; supports member-token, GitHub device, and `gh` bootstrap modes) |
 | Setup project | — | `setup` | — | CLI-only (local scaffold generation and relay scaffolding) |
@@ -1607,19 +1607,19 @@ Current local CLI process behavior is `debugbundle process [--json]`. It reads b
 ### 2.3 Verification Commands
 ```
 debugbundle verify local [--json]
-debugbundle verify cloud --project-id <id> [--trigger-5xx] [--service <name>] [--environment <name>] [--max-age-minutes <n>] [--auth-file <path>] [--json]
+debugbundle verify cloud --project-id <id> [--trigger-5xx | --trigger-4xx <400-499>] [--service <name>] [--environment <name>] [--max-age-minutes <n>] [--auth-file <path>] [--json]
 debugbundle smoke [--json]
 ```
 
 Current local CLI verify behavior is `debugbundle verify local [--json]`. It validates `.debugbundle/profile.json`, synthesizes a local incident-signal batch in `.debugbundle/local/events/`, runs the existing local `debugbundle process` pipeline, confirms that local incident state now contains the synthetic incident, and reads the generated local bundle artifact from `.debugbundle/bundles/local/`. No cloud auth, member token, or project token is required.
 
-Cloud CLI verify behavior is `debugbundle verify cloud --project-id <id> [--trigger-5xx] [--service <name>] [--environment <name>] [--max-age-minutes <n>] [--auth-file <path>] [--json]`. Without `--trigger-5xx`, it reuses stored member auth, performs passive verification through the retrieval API, and confirms that the latest incident matching the requested project/service/environment filters has a `last_seen_at` inside the verification window (default `15` minutes). With `--trigger-5xx`, it creates a temporary verification project token, sends a synthetic `request_event` with `response_status: 503` through the real `POST /v1/events` ingestion endpoint, revokes the temporary token, polls incident retrieval, and fetches bundle status. The synthetic event is marked with verification headers/path/body while still using the same ingestion, processing, grouping, bundle, and retrieval path as a real request failure. The current scaffold defaults `environment` to `production`, returns setup-style JSON output, and reports auth/config failures separately from passive or active verification failures.
+Cloud CLI verify behavior is `debugbundle verify cloud --project-id <id> [--trigger-5xx | --trigger-4xx <400-499>] [--service <name>] [--environment <name>] [--max-age-minutes <n>] [--auth-file <path>] [--json]`. Without an active trigger flag, it reuses stored member auth, performs passive verification through the retrieval API, and confirms that the latest incident matching the requested project/service/environment filters has a `last_seen_at` inside the verification window (default `15` minutes). With `--trigger-5xx`, it creates a temporary verification project token, sends a synthetic `request_event` with `response_status: 503` through the real `POST /v1/events` ingestion endpoint, revokes the temporary token, polls incident retrieval, and fetches bundle status. With `--trigger-4xx <status>`, it runs the same real-ingestion proof path using the provided `4xx` status and succeeds only when the target project configuration promotes that status into immediate incident creation. `--trigger-5xx` and `--trigger-4xx` are mutually exclusive. The synthetic event is marked with verification headers/path/body while still using the same ingestion, processing, grouping, bundle, and retrieval path as a real request failure. The current scaffold defaults `environment` to `production`, returns setup-style JSON output, and reports auth/config failures separately from passive or active verification failures.
 
-Active `verify cloud --trigger-5xx --json` includes a `verification` object:
+Active `verify cloud --trigger-5xx --json` and `verify cloud --trigger-4xx <status> --json` include a `verification` object:
 
 ```json
 {
-  "mode": "active_5xx",
+  "mode": "active_5xx | active_4xx",
   "accepted_event_count": 1,
   "incident_id": "inc_123",
   "bundle_status": "ready | pending | unknown",
@@ -1874,7 +1874,7 @@ Current MCP setup/verification input shape:
 - `doctor`: optional `authFilePath`, `privacy`
 - `validate`: optional `fix`
 - `verify_local`: no required inputs
-- `verify_cloud`: required `projectId`, optional `service`, `environment`, `maxAgeMinutes`, `trigger5xx`, `authFilePath`
+- `verify_cloud`: required `projectId`, optional `service`, `environment`, `maxAgeMinutes`, `trigger5xx`, `trigger4xxStatus`, `authFilePath`
 - `smoke`: required `projectId`, optional `service`, `environment`, `maxAgeMinutes`, `authFilePath`
 
 ### 3.3 Analysis Tools

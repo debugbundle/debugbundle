@@ -169,6 +169,25 @@ describe("mcp setup tools", () => {
     });
 
     await expect(
+      tools.verify_cloud({
+        projectId: "proj_123",
+        trigger4xxStatus: 403
+      })
+    ).resolves.toEqual({
+      status: "error",
+      checks: [{ name: "passive-traffic-check", status: "error", message: "Latest production incident inc_prod_123 is older than the 15 minute verification window." }],
+      warnings: [],
+      errors: ["Latest production incident inc_prod_123 is older than the 15 minute verification window."],
+      suggested_actions: ["Generate a live cloud request, then re-run debugbundle verify cloud with the correct project and service filters."],
+      auto_fix_available: false
+    });
+    expect(verifyCloudCommand).toHaveBeenCalledWith({
+      projectId: "proj_123",
+      trigger4xxStatus: 403,
+      json: true
+    });
+
+    await expect(
       tools.smoke({
         projectId: "proj_123",
         service: "checkout-api",

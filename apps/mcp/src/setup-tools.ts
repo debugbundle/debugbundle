@@ -76,6 +76,7 @@ export function createSetupMcpTools(commands: {
           ...(typeof input["environment"] === "string" ? { environment: input["environment"] } : {}),
           ...(typeof input["maxAgeMinutes"] === "number" ? { maxAgeMinutes: input["maxAgeMinutes"] } : {}),
           ...(input["trigger5xx"] === true ? { trigger5xx: true } : {}),
+          ...(typeof input["trigger4xxStatus"] === "number" ? { trigger4xxStatus: input["trigger4xxStatus"] } : {}),
           ...(typeof input["authFilePath"] === "string" ? { authFilePath: input["authFilePath"] } : {}),
           json: true
         })
