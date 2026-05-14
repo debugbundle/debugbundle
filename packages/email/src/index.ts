@@ -69,6 +69,10 @@ export interface AlertEmailInput {
   bundleUrl?: string | null;
 }
 
+function escapeSlackMrkdwn(value: string): string {
+  return value.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;");
+}
+
 function formatTopSpikesText(input: WeeklyReportEmailInput["topSpikingIncidents"]): string {
   if (input.length === 0) {
     return "None";
@@ -165,6 +169,10 @@ function formatAlertIntro(conditionType: string): string {
   }
 }
 
+function formatAlertHeadline(conditionType: string): string {
+  return formatAlertSubject(conditionType).replace("[DebugBundle Alert] ", "");
+}
+
 export function formatProductFromEmail(fromEmail: string, displayName = "DebugBundle"): string {
   const normalizedEmail = fromEmail.trim();
   const normalizedDisplayName = displayName.trim();
@@ -247,6 +255,88 @@ export function renderWeeklyReportEmail(input: WeeklyReportEmailInput): { subjec
   ].join("");
 
   return { subject, text, html };
+}
+
+export function renderAlertSlackMessage(input: AlertEmailInput): { text: string; blocks: Array<Record<string, unknown>> } {
+  const headline = formatAlertHeadline(input.conditionType);
+  const intro = formatAlertIntro(input.conditionType);
+  const conditionLabel = formatAlertConditionLabel(input.conditionType);
+  const severityLabel = titleCase(input.severity);
+  const linkParts = [
+    ...(input.incidentUrl === undefined || input.incidentUrl === null
+      ? []
+      : [`<${input.incidentUrl}|Open incident>`]),
+    ...(input.bundleUrl === undefined || input.bundleUrl === null
+      ? []
+      : [`<${input.bundleUrl}|View bundle JSON>`])
+  ];
+
+  const text = [
+    `[DebugBundle Alert] ${headline}`,
+    `Alert: ${conditionLabel}`,
+    `Service: ${input.serviceName}`,
+    `Environment: ${input.environment}`,
+    `Severity: ${severityLabel}`,
+    `Incident ID: ${input.incidentId}`,
+    `Detected at: ${input.occurredAt}`,
+    ...(input.incidentUrl === undefined || input.incidentUrl === null ? [] : [`Open incident: ${input.incidentUrl}`]),
+    ...(input.bundleUrl === undefined || input.bundleUrl === null ? [] : [`View bundle: ${input.bundleUrl}`])
+  ].join("\n");
+
+  const blocks: Array<Record<string, unknown>> = [
+    {
+      type: "section",
+      text: {
+        type: "mrkdwn",
+        text: `*:rotating_light: ${escapeSlackMrkdwn(headline)}*\n${escapeSlackMrkdwn(intro)}`
+      }
+    },
+    {
+      type: "section",
+      fields: [
+        {
+          type: "mrkdwn",
+          text: `*Alert*\n${escapeSlackMrkdwn(conditionLabel)}`
+        },
+        {
+          type: "mrkdwn",
+          text: `*Severity*\n${escapeSlackMrkdwn(severityLabel)}`
+        },
+        {
+          type: "mrkdwn",
+          text: `*Service*\n${escapeSlackMrkdwn(input.serviceName)}`
+        },
+        {
+          type: "mrkdwn",
+          text: `*Environment*\n${escapeSlackMrkdwn(input.environment)}`
+        },
+        {
+          type: "mrkdwn",
+          text: `*Incident ID*\n${escapeSlackMrkdwn(input.incidentId)}`
+        },
+        {
+          type: "mrkdwn",
+          text: `*Detected at*\n${escapeSlackMrkdwn(input.occurredAt)}`
+        }
+      ]
+    },
+    ...(linkParts.length === 0
+      ? []
+      : [
+          {
+            type: "section",
+            text: {
+              type: "mrkdwn",
+              text: linkParts.join(" • ")
+            }
+          }
+        ])
+  ];
+
+  return {
+    text,
+    blocks
+  };
 }
 
 export function renderAlertEmail(input: AlertEmailInput): { subject: string; text: string; html: string } {

@@ -1069,9 +1069,9 @@ If CLI says something is healthy and MCP says something different, that is a pro
 ### AC-EVT-04: Capture Policy Defaults
 - **Given** a new project is created
 - **When** the capture policy is queried via `GET /v1/projects/{id}/capture-policy`
-- **Then** Free-tier projects default to preset `minimal`
+- **Then** Free-tier projects default to preset `balanced`
 - **And** paid-tier projects default to preset `balanced`
-- **And** `policy.immediate_client_error_statuses` resolves to `[]` for `minimal` and `balanced`
+- **And** `policy.immediate_client_error_statuses` resolves to `[]` for `balanced`
 - **And** `policy.immediate_client_error_statuses` resolves to `[401,403,409,422]` for `investigative`
 - **And** all override fields are `null` (preset controls apply)
 

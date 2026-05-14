@@ -20,6 +20,7 @@ export function useCursorPagination<TItem>(
   hasNextPage: boolean;
   goToNextPage: () => Promise<void>;
   goToPreviousPage: () => void;
+  refreshPage: () => Promise<void>;
 } {
   const [pages, setPages] = useState<CachedCursorPage<TItem>[]>([]);
   const [pageIndex, setPageIndex] = useState(0);
@@ -75,12 +76,30 @@ export function useCursorPagination<TItem>(
     setPageIndex((current) => Math.max(0, current - 1));
   }
 
+  async function refreshPage(): Promise<void> {
+    if (isLoading) {
+      return;
+    }
+
+    const cursor = pageIndex === 0 ? null : pages[pageIndex - 1]?.nextCursor ?? null;
+
+    setIsLoading(true);
+
+    try {
+      const refreshedPage = await loadPage(cursor);
+      setPages((current) => [...current.slice(0, pageIndex), refreshedPage]);
+    } finally {
+      setIsLoading(false);
+    }
+  }
+
   return {
     items: currentPage?.items ?? null,
     isLoading,
     page: pageIndex + 1,
     hasNextPage: currentPage !== undefined && currentPage.nextCursor !== null,
     goToNextPage,
-    goToPreviousPage
+    goToPreviousPage,
+    refreshPage
   };
 }

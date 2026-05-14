@@ -12,7 +12,9 @@ import {
   createSesEmailTransport,
   formatProductFromEmail,
   renderAlertEmail,
+  renderAlertSlackMessage,
   renderWeeklyReportEmail,
+  type AlertEmailInput,
   type EmailTransport
 } from "../../../packages/email/src/index.js";
 import { REQUIRED_WORKER_TABLES } from "../../../packages/storage/src/migrations.js";
@@ -681,6 +683,42 @@ interface CreateAlertTransportInput {
   apiBaseUrl?: string | null;
 }
 
+function buildAlertNotificationInput(
+  input: Pick<CreateAlertTransportInput, "appBaseUrl" | "apiBaseUrl">,
+  event: {
+    incident_id?: string | null;
+    payload: Record<string, unknown>;
+  }
+): AlertEmailInput {
+  const incidentId =
+    typeof event.payload["incident_id"] === "string"
+      ? event.payload["incident_id"]
+      : typeof event.incident_id === "string"
+        ? event.incident_id
+        : "unknown";
+
+  return {
+    conditionType: typeof event.payload["condition_type"] === "string" ? event.payload["condition_type"] : "alert",
+    incidentId,
+    occurredAt: typeof event.payload["occurred_at"] === "string" ? event.payload["occurred_at"] : "unknown",
+    serviceName: typeof event.payload["service_name"] === "string" ? event.payload["service_name"] : "unknown",
+    environment: typeof event.payload["environment"] === "string" ? event.payload["environment"] : "unknown",
+    severity:
+      event.payload["severity"] === "low" ||
+      event.payload["severity"] === "medium" ||
+      event.payload["severity"] === "high" ||
+      event.payload["severity"] === "critical"
+        ? event.payload["severity"]
+        : "high",
+    ...(input.appBaseUrl === undefined || input.appBaseUrl === null
+      ? {}
+      : { incidentUrl: `${input.appBaseUrl}/incidents/${incidentId}` }),
+    ...(input.apiBaseUrl === undefined || input.apiBaseUrl === null
+      ? {}
+      : { bundleUrl: `${input.apiBaseUrl}/v1/incidents/${incidentId}/bundle` })
+  };
+}
+
 export function createAlertTransport(input: CreateAlertTransportInput): AlertDeliveryTransport {
   async function deliverViaWebhook(targetUrl: string, payload: Record<string, unknown>): Promise<void> {
     const controller = new AbortController();
@@ -728,35 +766,7 @@ export function createAlertTransport(input: CreateAlertTransportInput): AlertDel
         if (recipient.length === 0) {
           throw new AlertDeliveryError("alert_email_recipients_missing");
         }
-        const conditionType = typeof event.payload["condition_type"] === "string" ? event.payload["condition_type"] : "alert";
-        const incidentId =
-          typeof event.payload["incident_id"] === "string"
-            ? event.payload["incident_id"]
-            : typeof event.incident_id === "string"
-              ? event.incident_id
-              : "unknown";
-        const occurredAt = typeof event.payload["occurred_at"] === "string" ? event.payload["occurred_at"] : "unknown";
-        const serviceName = typeof event.payload["service_name"] === "string" ? event.payload["service_name"] : "unknown";
-        const environment = typeof event.payload["environment"] === "string" ? event.payload["environment"] : "unknown";
-        const severity =
-          event.payload["severity"] === "low" ||
-          event.payload["severity"] === "medium" ||
-          event.payload["severity"] === "high" ||
-          event.payload["severity"] === "critical"
-            ? event.payload["severity"]
-            : "high";
-        const incidentUrl = input.appBaseUrl === undefined || input.appBaseUrl === null ? null : `${input.appBaseUrl}/incidents/${incidentId}`;
-        const bundleUrl = input.apiBaseUrl === undefined || input.apiBaseUrl === null ? null : `${input.apiBaseUrl}/v1/incidents/${incidentId}/bundle`;
-        const rendered = renderAlertEmail({
-          conditionType,
-          incidentId,
-          occurredAt,
-          serviceName,
-          environment,
-          severity,
-          incidentUrl,
-          bundleUrl
-        });
+        const rendered = renderAlertEmail(buildAlertNotificationInput(input, event));
 
         try {
           await input.emailTransport.send({
@@ -806,20 +816,7 @@ export function createAlertTransport(input: CreateAlertTransportInput): AlertDel
           throw new AlertDeliveryError("alert_slack_webhook_url_missing");
         }
 
-        const summary = typeof event.payload["summary"] === "string" ? event.payload["summary"] : "Alert triggered";
-        const eventType = typeof event.payload["event_type"] === "string" ? event.payload["event_type"] : "alert";
-        const slackPayload = {
-          text: `[DebugBundle] ${eventType}: ${summary}`,
-          blocks: [
-            {
-              type: "section",
-              text: {
-                type: "mrkdwn",
-                text: `*${eventType}*: ${summary}`
-              }
-            }
-          ]
-        };
+        const slackPayload = renderAlertSlackMessage(buildAlertNotificationInput(input, event));
 
         await deliverViaWebhook(webhookUrl, slackPayload);
         return;

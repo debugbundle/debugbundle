@@ -37,7 +37,7 @@ interface ProjectCapturePolicyCardProps {
 }
 
 const DEFAULT_PRESET_BY_PLAN: Record<ProjectCapturePolicyCardProps["organizationPlan"], CapturePreset> = {
-  free: "minimal",
+  free: "balanced",
   solo: "balanced",
   team: "balanced"
 };
@@ -391,6 +391,8 @@ function ClientErrorIncidentsField({
   onModeChange: (value: ClientErrorIncidentMode) => void;
   onCustomInputChange: (value: string) => void;
 }): JSX.Element {
+  const presetDefaultLabel = formatClientErrorPresetDefaultLabel(draft.preset);
+
   return (
     <Field>
       <FieldLabel htmlFor="project-capture-policy-client-errors">Client error incidents</FieldLabel>
@@ -402,7 +404,8 @@ function ClientErrorIncidentsField({
         onChange={(event) => onModeChange(event.currentTarget.value as ClientErrorIncidentMode)}
         disabled={disabled}
       >
-        {clientErrorIncidentModeOptions.map((option) => (
+        <option value="preset_default">Use preset default ({presetDefaultLabel})</option>
+        {clientErrorIncidentModeOptions.filter((option) => option.value !== "preset_default").map((option) => (
           <option key={option.value} value={option.value}>
             {option.label}
           </option>
@@ -655,6 +658,20 @@ function formatClientErrorIncidentsPreview(draft: CapturePolicyDraft, validation
 
       return `Custom (${formatStatusList(parseClientErrorStatusesInput(draft.client_error_custom_input).statuses ?? [])})`;
   }
+}
+
+function formatClientErrorPresetDefaultLabel(preset: CapturePreset): string {
+  const presetDefault = PRESET_DEFAULTS[preset].immediate_client_error_statuses;
+
+  if (presetDefault.length === 0) {
+    return "None";
+  }
+
+  if (statusesEqual(presetDefault, RECOMMENDED_IMMEDIATE_CLIENT_ERROR_STATUSES)) {
+    return "Recommended for interactive apps";
+  }
+
+  return `Custom (${formatStatusList(presetDefault)})`;
 }
 
 function formatStatusList(statuses: readonly number[]): string {

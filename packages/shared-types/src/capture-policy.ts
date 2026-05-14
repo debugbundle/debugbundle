@@ -181,7 +181,7 @@ export const PRESET_DEFAULTS: Record<CapturePreset, Omit<ResolvedCapturePolicy, 
 // ---------------------------------------------------------------------------
 
 export const DEFAULT_PRESET_BY_TIER: Record<string, CapturePreset> = {
-  free: "minimal",
+  free: "balanced",
   solo: "balanced",
   team: "balanced",
 };

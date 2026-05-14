@@ -526,6 +526,50 @@ describe("web app — incident and project detail routes", () => {
     expect(await screen.findByText(/alpha failure/i)).toBeInTheDocument();
   });
 
+  it("refreshes the main incidents table without reloading the page", async () => {
+    const user = userEvent.setup();
+    const project = createProject();
+    const initialIncident = createIncident({ project_id: project.project_id, project_name: project.name, title: "Initial workspace incident" });
+    const refreshedIncident = createIncident({
+      incident_id: "inc_workspace_refreshed",
+      project_id: project.project_id,
+      project_name: project.name,
+      title: "Refreshed workspace incident"
+    });
+    let workspaceIncidentRequests = 0;
+
+    const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = requestUrl(input);
+
+      if (url.endsWith("/v1/auth/session")) {
+        return jsonResponse(200, { session: createSession() });
+      }
+
+      if (url.includes("/v1/incidents?") && url.includes("limit=20") && url.includes("status=open") && init?.method === undefined) {
+        workspaceIncidentRequests += 1;
+        return jsonResponse(200, {
+          incidents: workspaceIncidentRequests === 1 ? [initialIncident] : [refreshedIncident],
+          next_cursor: null
+        });
+      }
+
+      return jsonResponse(404, { error: "not_found" });
+    });
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<App initialEntries={["/incidents"]} />);
+
+    expect(await screen.findByText(/initial workspace incident/i)).toBeInTheDocument();
+    expect(workspaceIncidentRequests).toBe(1);
+
+    await user.click(screen.getByRole("button", { name: /^refresh$/i }));
+
+    expect(await screen.findByText(/refreshed workspace incident/i)).toBeInTheDocument();
+    expect(screen.queryByText(/initial workspace incident/i)).toBeNull();
+    expect(workspaceIncidentRequests).toBe(2);
+  });
+
   it("sorts the project incidents table by occurrence count", async () => {
     const user = userEvent.setup();
     const project = createProject();
@@ -608,6 +652,53 @@ describe("web app — incident and project detail routes", () => {
     expect(screen.queryByText(/open project incident/i)).toBeNull();
   });
 
+  it("refreshes the project incidents table without reloading the page", async () => {
+    const user = userEvent.setup();
+    const project = createProject();
+    const initialIncident = createIncident({ project_id: project.project_id, title: "Initial project incident" });
+    const refreshedIncident = createIncident({
+      incident_id: "inc_refreshed_project",
+      project_id: project.project_id,
+      title: "Refreshed project incident"
+    });
+    let projectIncidentRequests = 0;
+
+    const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = requestUrl(input);
+
+      if (url.endsWith("/v1/auth/session")) {
+        return jsonResponse(200, { session: createSession() });
+      }
+
+      if (url.endsWith("/v1/projects") && init?.method === undefined) {
+        return jsonResponse(200, { projects: [project] });
+      }
+
+      if (url.endsWith(`/v1/incidents?project_id=${project.project_id}&limit=20&status=open`) && init?.method === undefined) {
+        projectIncidentRequests += 1;
+        return jsonResponse(200, {
+          incidents: projectIncidentRequests === 1 ? [initialIncident] : [refreshedIncident],
+          next_cursor: null
+        });
+      }
+
+      return jsonResponse(404, { error: "not_found" });
+    });
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<App initialEntries={[`/projects/${project.project_id}/incidents`]} />);
+
+    expect(await screen.findByText(/initial project incident/i)).toBeInTheDocument();
+    expect(projectIncidentRequests).toBe(1);
+
+    await user.click(screen.getByRole("button", { name: /^refresh$/i }));
+
+    expect(await screen.findByText(/refreshed project incident/i)).toBeInTheDocument();
+    expect(screen.queryByText(/initial project incident/i)).toBeNull();
+    expect(projectIncidentRequests).toBe(2);
+  });
+
   it("defaults the project bundles tab to open and lets users switch the status filter", async () => {
     const user = userEvent.setup();
     const project = createProject();
@@ -653,6 +744,53 @@ describe("web app — incident and project detail routes", () => {
     await user.selectOptions(statusFilter, "resolved");
     expect(await screen.findByText(/resolved bundle incident/i)).toBeInTheDocument();
     expect(screen.queryByText(/open bundle incident/i)).toBeNull();
+  });
+
+  it("refreshes the project bundles table without reloading the page", async () => {
+    const user = userEvent.setup();
+    const project = createProject();
+    const initialIncident = createIncident({ project_id: project.project_id, title: "Initial bundle incident" });
+    const refreshedIncident = createIncident({
+      incident_id: "inc_refreshed_bundle",
+      project_id: project.project_id,
+      title: "Refreshed bundle incident"
+    });
+    let projectBundleRequests = 0;
+
+    const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = requestUrl(input);
+
+      if (url.endsWith("/v1/auth/session")) {
+        return jsonResponse(200, { session: createSession() });
+      }
+
+      if (url.endsWith("/v1/projects") && init?.method === undefined) {
+        return jsonResponse(200, { projects: [project] });
+      }
+
+      if (url.endsWith(`/v1/incidents?project_id=${project.project_id}&limit=20&status=open`) && init?.method === undefined) {
+        projectBundleRequests += 1;
+        return jsonResponse(200, {
+          incidents: projectBundleRequests === 1 ? [initialIncident] : [refreshedIncident],
+          next_cursor: null
+        });
+      }
+
+      return jsonResponse(404, { error: "not_found" });
+    });
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<App initialEntries={[`/projects/${project.project_id}/bundles`]} />);
+
+    expect(await screen.findByText(/initial bundle incident/i)).toBeInTheDocument();
+    expect(projectBundleRequests).toBe(1);
+
+    await user.click(screen.getByRole("button", { name: /^refresh$/i }));
+
+    expect(await screen.findByText(/refreshed bundle incident/i)).toBeInTheDocument();
+    expect(screen.queryByText(/initial bundle incident/i)).toBeNull();
+    expect(projectBundleRequests).toBe(2);
   });
 
   it("renders project and service names from the initial incidents response without extra name lookups", async () => {

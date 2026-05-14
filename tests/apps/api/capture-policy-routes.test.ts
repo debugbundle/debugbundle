@@ -192,7 +192,7 @@ describe("capture-policy routes", () => {
       const body = response.json<{ policy: Record<string, unknown>; overrides: Record<string, unknown> }>();
       expect(body).toEqual({
         policy: expect.objectContaining({
-          preset: "minimal",
+          preset: "balanced",
           immediate_client_error_statuses: []
         }),
         overrides: {

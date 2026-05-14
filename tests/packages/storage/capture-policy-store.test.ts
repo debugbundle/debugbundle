@@ -121,7 +121,7 @@ describe("capture policy store", () => {
     it("creates a default policy based on the tier plan", async () => {
       const row = {
         project_id: "proj_123",
-        preset: "minimal",
+        preset: "balanced",
         capture_logs: null,
         capture_request_events: null,
         capture_breadcrumbs: null,
@@ -135,10 +135,10 @@ describe("capture policy store", () => {
       const result = await store.createDefaultCapturePolicy("proj_123", "free");
 
       expect(result).toEqual(row);
-      // Should use preset "minimal" for free tier
+      // Should use preset "balanced" for free tier
       const params = query.mock.calls[0]![1] as unknown[];
       expect(params[0]).toBe("proj_123");
-      expect(params[1]).toBe("minimal");
+      expect(params[1]).toBe("balanced");
     });
 
     it("creates a balanced default for solo tier", async () => {

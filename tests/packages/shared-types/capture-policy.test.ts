@@ -243,8 +243,8 @@ describe("client error status helpers", () => {
 });
 
 describe("getDefaultPreset", () => {
-  it("returns minimal for free tier", () => {
-    expect(getDefaultPreset("free")).toBe("minimal");
+  it("returns balanced for free tier", () => {
+    expect(getDefaultPreset("free")).toBe("balanced");
   });
 
   it("returns balanced for solo tier", () => {

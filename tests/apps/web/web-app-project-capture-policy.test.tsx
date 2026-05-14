@@ -105,6 +105,8 @@ describe("web app — project capture policy settings", () => {
     const clientErrorSelect = expectSelect(screen.getByLabelText(/^client error incidents$/i));
     const saveButton = expectButton(screen.getByRole("button", { name: /save capture policy/i }));
 
+    expect(screen.getByRole("option", { name: /^use preset default \(none\)$/i })).toBeInTheDocument();
+
     await waitFor(() => {
       expect(presetSelect.value).toBe("balanced");
       expect(saveButton.disabled).toBe(true);
@@ -194,7 +196,7 @@ describe("web app — project capture policy settings", () => {
 
   it("preserves explicit none for client error incidents after reload", async () => {
     const user = userEvent.setup();
-    let requestCount = 0;
+    let savedImmediateClientErrorStatuses: number[] | null = null;
     const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
       const url = requestUrl(input);
 
@@ -211,7 +213,10 @@ describe("web app — project capture policy settings", () => {
       }
 
       if (url.endsWith("/v1/projects/proj_123/capture-policy") && init?.method === undefined) {
-        requestCount += 1;
+        const effectiveImmediateClientErrorStatuses =
+          savedImmediateClientErrorStatuses === null
+            ? [401, 403, 409, 422]
+            : savedImmediateClientErrorStatuses;
 
         return jsonResponse(200, {
           policy: {
@@ -220,14 +225,14 @@ describe("web app — project capture policy settings", () => {
             capture_request_events: "all",
             capture_breadcrumbs: "standalone",
             capture_probe_events: "standalone_when_activated",
-            immediate_client_error_statuses: requestCount === 1 ? [401, 403, 409, 422] : []
+            immediate_client_error_statuses: effectiveImmediateClientErrorStatuses
           },
           overrides: {
             capture_logs: null,
             capture_request_events: null,
             capture_breadcrumbs: null,
             capture_probe_events: null,
-            immediate_client_error_statuses: requestCount === 1 ? null : []
+            immediate_client_error_statuses: savedImmediateClientErrorStatuses
           }
         });
       }
@@ -241,6 +246,8 @@ describe("web app — project capture policy settings", () => {
           capture_probe_events: null,
           immediate_client_error_statuses: []
         }));
+
+        savedImmediateClientErrorStatuses = [];
 
         return jsonResponse(200, {
           policy: {

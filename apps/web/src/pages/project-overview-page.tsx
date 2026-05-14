@@ -1,4 +1,4 @@
-import { ActivityIcon, BugIcon, DownloadIcon, InboxIcon, PackageIcon, SirenIcon, TrendingDownIcon, TrendingUpIcon } from "lucide-react";
+import { ActivityIcon, BugIcon, DownloadIcon, InboxIcon, PackageIcon, RefreshCwIcon, SirenIcon, TrendingDownIcon, TrendingUpIcon } from "lucide-react";
 import { useMemo, useState } from "react";
 import { Link, useOutletContext } from "react-router-dom";
 
@@ -118,7 +118,7 @@ export function ProjectIncidentsPage(): JSX.Element {
     field: "last_seen_at",
     direction: "desc"
   });
-  const { items: incidents, isLoading, page, hasNextPage, goToNextPage, goToPreviousPage } = useCursorPagination(
+  const { items: incidents, isLoading, page, hasNextPage, goToNextPage, goToPreviousPage, refreshPage } = useCursorPagination(
     async (cursor) => {
       const response = await listProjectIncidents(projectId, 20, cursor ?? undefined, statusFilter === "all" ? undefined : statusFilter);
       return {
@@ -140,6 +140,7 @@ export function ProjectIncidentsPage(): JSX.Element {
             <CardDescription>Grouped failures for this project.</CardDescription>
           </div>
           <div className="flex items-center gap-2 sm:justify-end">
+            <TableRefreshButton isLoading={isLoading} onRefresh={() => void refreshPage()} />
             <label htmlFor="project-incidents-status-filter" className="text-sm font-medium text-foreground">
               Status
             </label>
@@ -212,7 +213,7 @@ export function ProjectBundlesPage(): JSX.Element {
     field: "last_seen_at",
     direction: "desc"
   });
-  const { items: incidents, isLoading, page, hasNextPage, goToNextPage, goToPreviousPage } = useCursorPagination(
+  const { items: incidents, isLoading, page, hasNextPage, goToNextPage, goToPreviousPage, refreshPage } = useCursorPagination(
     async (cursor) => {
       const response = await listProjectIncidents(projectId, 20, cursor ?? undefined, statusFilter === "all" ? undefined : statusFilter);
       return {
@@ -236,6 +237,7 @@ export function ProjectBundlesPage(): JSX.Element {
             </CardDescription>
           </div>
           <div className="flex items-center gap-2 sm:justify-end">
+            <TableRefreshButton isLoading={isLoading} onRefresh={() => void refreshPage()} />
             <label htmlFor="project-bundles-status-filter" className="text-sm font-medium text-foreground">
               Status
             </label>
@@ -380,6 +382,15 @@ export function IncidentTable({
         ))}
       </TableBody>
     </Table>
+  );
+}
+
+function TableRefreshButton({ isLoading, onRefresh }: { isLoading: boolean; onRefresh: () => void }): JSX.Element {
+  return (
+    <Button type="button" variant="outline" size="sm" disabled={isLoading} onClick={onRefresh}>
+      <RefreshCwIcon className="size-4" />
+      Refresh
+    </Button>
   );
 }
 

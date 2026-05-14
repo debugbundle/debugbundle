@@ -463,7 +463,9 @@ describe("alert delivery transport – multi-channel", () => {
 
     await createAlertTransport({
       timeoutMs: 5000,
-      emailTransport: null
+      emailTransport: null,
+      appBaseUrl: "https://app.debugbundle.com",
+      apiBaseUrl: "https://api.debugbundle.com"
     }).deliver({
       delivery_id: "adel_4",
       alert_id: "alert_4",
@@ -471,7 +473,14 @@ describe("alert delivery transport – multi-channel", () => {
       incident_id: "inc_1",
       channel: "slack",
       config: { webhook_url: "https://hooks.slack.com/services/T/B/X" },
-      payload: { event_type: "error_spike", summary: "Spike detected" }
+      payload: {
+        condition_type: "new_incident",
+        incident_id: "inc_1",
+        occurred_at: "2026-05-14T20:47:00.000Z",
+        service_name: "checkout-api",
+        environment: "production",
+        severity: "critical"
+      }
     });
 
     const slackCall = fetchSpy.mock.calls[0];
@@ -482,10 +491,16 @@ describe("alert delivery transport – multi-channel", () => {
     if (typeof slackBody !== "string") {
       throw new Error("Expected Slack request body to be a string");
     }
-    expect(slackBody).toContain("Spike detected");
+    expect(slackBody).toContain("A new incident was detected");
+    expect(slackBody).toContain("checkout-api");
+    expect(slackBody).toContain("https://app.debugbundle.com/incidents/inc_1");
+    expect(slackBody).toContain("https://api.debugbundle.com/v1/incidents/inc_1/bundle");
 
     const body = SlackAlertBodySchema.parse(getJsonRequestBody(fetchSpy));
-    expect(body.text).toContain("error_spike");
+    expect(body.text).toContain("A new incident was detected");
+    expect(body.text).toContain("Open incident: https://app.debugbundle.com/incidents/inc_1");
+    expect(body.text).not.toContain("Alert triggered");
+    expect(body.text).not.toContain("new_incident");
     expect(body.blocks[0]?.type).toBe("section");
   });
 

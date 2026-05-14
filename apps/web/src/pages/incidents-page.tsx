@@ -1,4 +1,4 @@
-import { ChevronRightIcon, SirenIcon } from "lucide-react";
+import { ChevronRightIcon, RefreshCwIcon, SirenIcon } from "lucide-react";
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 
@@ -22,7 +22,7 @@ export function IncidentsPage(): JSX.Element {
     field: "last_seen_at",
     direction: "desc"
   });
-  const { items: incidents, isLoading, page, hasNextPage, goToNextPage, goToPreviousPage } = useCursorPagination(
+  const { items: incidents, isLoading, page, hasNextPage, goToNextPage, goToPreviousPage, refreshPage } = useCursorPagination(
     async (cursor) => {
       const response = await listIncidents({
         limit: 20,
@@ -48,6 +48,10 @@ export function IncidentsPage(): JSX.Element {
         <CardHeader className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <CardTitle>Incident inventory</CardTitle>
           <div className="flex items-center gap-2 sm:justify-end">
+            <Button type="button" variant="outline" size="sm" disabled={isLoading} onClick={() => void refreshPage()}>
+              <RefreshCwIcon className="size-4" />
+              Refresh
+            </Button>
             <label htmlFor="workspace-incidents-status-filter" className="text-sm font-medium text-foreground">
               Status
             </label>
