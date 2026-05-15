@@ -1405,7 +1405,7 @@ export function createPostgresMetadataStore(db: Queryable): PostgresMetadataStor
               (
                 SELECT COUNT(*)::int
                 FROM alert_deliveries ad
-                WHERE ad.project_id = projects.id
+                WHERE ad.project_id = up.project_id
                   AND ad.created_at >= $6::timestamptz
                   AND ad.created_at < $7::timestamptz
               )
@@ -1665,7 +1665,7 @@ export function createPostgresMetadataStore(db: Queryable): PostgresMetadataStor
               (
                 SELECT COUNT(*)::int
                 FROM alert_deliveries ad
-                WHERE ad.project_id = projects.id
+                WHERE ad.project_id = up.project_id
                   AND ad.created_at >= $6::timestamptz
                   AND ad.created_at < $7::timestamptz
               )

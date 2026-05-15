@@ -426,6 +426,77 @@ describe("postgres metadata store", () => {
     expect(duplicate).toBe("slug_taken");
   });
 
+  it("should scope alert delivery metrics to the updated project in user-scoped project updates", async (): Promise<void> => {
+    const calls: Array<{ sql: string; params: unknown[] }> = [];
+    const query = vi.fn().mockImplementation((sql: string, params: unknown[]) => {
+      calls.push({ sql, params });
+
+      if (sql.includes("information_schema.tables")) {
+        return { rows: [{ exists: true }] };
+      }
+
+      return {
+        rows: [
+          {
+            project_id: "proj_123",
+            organization_id: "org_123",
+            owner_user_id: "usr_123",
+            owner_email: "owen@example.com",
+            relationship: "owned",
+            effective_role: "owner",
+            name: "Main App API",
+            slug: "main-app-api",
+            environment_default: "development",
+            organization_plan: "free",
+            metrics: {
+              monthly_bundle_requests: 12,
+              monthly_raw_ingested_events: 120,
+              retained_bundles: 6,
+              monthly_alert_deliveries: 4
+            },
+            created_at: "2026-03-16T00:00:00.000Z",
+            updated_at: "2026-03-18T00:00:00.000Z"
+          }
+        ]
+      };
+    });
+
+    const store = createPostgresMetadataStore({ query });
+
+    const updated = await store.updateProjectForUser({
+      user_id: "usr_123",
+      project_id: "proj_123",
+      environment_default: "development"
+    });
+
+    expect(updated).toEqual({
+      project_id: "proj_123",
+      organization_id: "org_123",
+      owner_user_id: "usr_123",
+      owner_email: "owen@example.com",
+      relationship: "owned",
+      effective_role: "owner",
+      name: "Main App API",
+      slug: "main-app-api",
+      environment_default: "development",
+      organization_plan: "free",
+      metrics: {
+        monthly_bundle_requests: 12,
+        monthly_raw_ingested_events: 120,
+        retained_bundles: 6,
+        monthly_alert_deliveries: 4
+      },
+      created_at: "2026-03-16T00:00:00.000Z",
+      updated_at: "2026-03-18T00:00:00.000Z"
+    });
+
+    const updateCall = calls.find((call) => call.sql.includes("WITH updated_project AS"));
+
+    expect(updateCall).toBeDefined();
+    expect(updateCall?.sql).toContain("WHERE ad.project_id = up.project_id");
+    expect(updateCall?.sql).not.toContain("WHERE ad.project_id = projects.id");
+  });
+
   it("should delete projects for an organization and map missing projects", async (): Promise<void> => {
     const deletedQuery = vi.fn().mockResolvedValue({
       rows: [
