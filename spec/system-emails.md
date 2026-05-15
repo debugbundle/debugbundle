@@ -35,7 +35,7 @@ This file defines:
 
 Mandatory v1 emails:
 - email sign-in code
-- organization invite
+- project invite
 
 ### 3.2 Billing Emails
 
@@ -88,10 +88,10 @@ Recommended v1 or shortly after:
 - Required in v1: yes
 - Current implementation status: exists
 
-### 4.2 Organization Invite
+### 4.2 Project Invite
 
 - Category: auth / collaboration
-- Trigger: invite created successfully
+- Trigger: project invite created successfully
 - Recipient: invited email address
 - Required in v1: yes
 - Current implementation status: exists
@@ -240,7 +240,7 @@ Billing emails should additionally include when relevant:
 
 At minimum, test coverage must verify that the system triggers the correct email workflow for:
 - email sign-in code delivery
-- organization invite
+- project invite
 - first paid purchase confirmation
 - renewal success
 - payment failure

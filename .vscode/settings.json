@@ -2,21 +2,38 @@
   "typescript.tsdk": "node_modules/typescript/lib",
   "typescript.enablePromptUseWorkspaceTsdk": true,
   "eslint.useFlatConfig": true,
+  "search.useIgnoreFiles": false,
   "search.exclude": {
-    "**/sdks/**": true,
-    "**/.local-repos/**": true
+    "**/node_modules/**": true,
+    "**/vendor/**": true,
+    "**/.next/**": true,
+    "**/out/**": true,
+    "**/public/**": true,
+    "**/.pnpm-store/**": true,
+    "**/.venv/**": true,
+    "**/venv/**": true,
   },
   "files.watcherExclude": {
     "**/sdks/**": true,
     "**/.local-repos/**": true
   },
   "intelephense.files.exclude": [
+    "**/node_modules/**",
+    "**/vendor/**",
+    "**/.venv/**",
+    "**/venv/**",
     "**/sdks/**",
     "**/.local-repos/**"
   ],
   "python.analysis.exclude": [
+    "**/node_modules/**",
+    "**/vendor/**",
+    "**/.venv/**",
+    "**/venv/**",
     "**/sdks/**",
-    "**/.local-repos/**"
+    "**/.local-repos/**", 
+    "**/__pycache__", 
+    "**/.*"
   ],
   "eslint.workingDirectories": [
     {

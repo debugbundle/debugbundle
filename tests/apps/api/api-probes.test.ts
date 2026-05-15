@@ -161,10 +161,10 @@ describe("api probe routes", () => {
       active_probes: [],
       poll_interval_ms: 60000,
       capture_policy: {
-        preset: "minimal",
-        capture_logs: "error",
+        preset: "balanced",
+        capture_logs: "warning",
         capture_request_events: "failures_only",
-        capture_breadcrumbs: "local_only",
+        capture_breadcrumbs: "exception_only",
         capture_probe_events: "buffer_only",
         immediate_client_error_statuses: []
       }
@@ -370,7 +370,7 @@ describe("api probe routes", () => {
           },
           allowances: {
             monthly_bundle_requests: { used: 0, limit: 750 },
-            monthly_raw_ingested_events: { used: 0, limit: 6000 },
+            monthly_raw_ingested_events: { used: 0, limit: 10500 },
             retained_bundle_cap: { used: 0, limit: 450 },
             monthly_remote_activations: { used: 75, limit: 75 },
             monthly_alert_deliveries: { used: 0, limit: 225 }

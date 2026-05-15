@@ -53,7 +53,7 @@ import {
   BillingCheckoutConfirmBodySchema,
   BillingCapacityChangeBodySchema,
   CreateAlertBodySchema,
-  CreateOrganizationInviteBodySchema,
+  CreateProjectInviteBodySchema,
   CreateProjectBodySchema,
   CreateTokenBodySchema,
   CreateWebhookBodySchema,
@@ -67,8 +67,8 @@ import {
   IncidentsQuerySchema,
   LogsQuerySchema,
   MemberTokenParamsSchema,
-  OrganizationInviteParamsSchema,
-  OrganizationMemberParamsSchema,
+  ProjectInviteParamsSchema,
+  ProjectMemberParamsSchema,
   ProjectParamsSchema,
   ProjectSlackDestinationDeleteParamsSchema,
   ProjectsQuerySchema,
@@ -81,7 +81,7 @@ import {
   SlackAppInstallUrlQuerySchema,
   TokenListQuerySchema,
   UpdateAlertBodySchema,
-  UpdateOrganizationMemberRoleBodySchema,
+  UpdateProjectMemberRoleBodySchema,
   UpdateProjectBodySchema,
   UpdateWebhookBodySchema,
   UpdateWeeklyReportChannelBodySchema,
@@ -144,9 +144,10 @@ const BillingLinkResponseSchema = z.object({ url: z.string().url() }).strict();
 const BundleFailureStatusSchema = z.object({ status: z.literal("failed"), reason: z.string() }).strict();
 const OrganizationInviteMembershipSchema = z
   .object({
+    project_id: z.string(),
     user_id: z.string(),
-    organization_id: z.string(),
-    role: z.enum(["owner", "member"]),
+    role: z.enum(["owner", "admin", "member"]),
+    membership_type: z.enum(["owner", "collaborator"]).optional(),
   })
   .strict();
 const AcceptInviteResponseSchema = z.object({ membership: OrganizationInviteMembershipSchema }).strict();
@@ -291,30 +292,32 @@ const SlackDestinationTestResponseSchema = z
     delivered: z.literal(true),
   })
   .strict();
-const OrganizationMemberSchema = z
+const ProjectMemberSchema = z
   .object({
     user_id: z.string(),
     email: z.string().email(),
-    role: z.enum(["owner", "member"]),
+    role: z.enum(["owner", "admin", "member"]),
+    membership_type: z.enum(["owner", "collaborator"]),
     created_at: z.string().datetime(),
   })
   .strict();
-const OrganizationInviteSchema = z
+const ProjectInviteSchema = z
   .object({
     invite_id: z.string().uuid(),
-    organization_id: z.string(),
+    project_id: z.string(),
     email: z.string().email(),
-    role: z.literal("member"),
-    invited_by: z.string(),
+    role: z.enum(["admin", "member"]),
+    invited_by_user_id: z.string(),
     accepted_at: z.string().datetime().nullable(),
+    canceled_at: z.string().datetime().nullable(),
     expires_at: z.string().datetime(),
     created_at: z.string().datetime(),
   })
   .strict();
-const OrganizationMemberListResponseSchema = z.object({ members: z.array(OrganizationMemberSchema) }).strict();
-const OrganizationMemberResponseSchema = z.object({ member: OrganizationMemberSchema }).strict();
-const OrganizationInviteListResponseSchema = z.object({ invites: z.array(OrganizationInviteSchema) }).strict();
-const OrganizationInviteResponseSchema = z.object({ invite: OrganizationInviteSchema }).strict();
+const ProjectMemberListResponseSchema = z.object({ members: z.array(ProjectMemberSchema) }).strict();
+const ProjectMemberResponseSchema = z.object({ member: ProjectMemberSchema }).strict();
+const ProjectInviteListResponseSchema = z.object({ invites: z.array(ProjectInviteSchema) }).strict();
+const ProjectInviteResponseSchema = z.object({ invite: ProjectInviteSchema }).strict();
 const ProjectUpdateResponseSchema = z.object({ project: DeletedProjectRecordSchema.extend({ metrics: z.object({
   monthly_bundle_requests: z.number().int().nonnegative(),
   monthly_raw_ingested_events: z.number().int().nonnegative(),
@@ -441,10 +444,10 @@ function buildPublicApiOperations(): OperationSpec[] {
   const reproductionResponse = component("ReproductionResponse", ReproductionResponseSchema);
   const logsResponse = component("LogsResponse", LogsResponseSchema);
   const servicesResponse = component("ServicesResponse", ServicesResponseSchema);
-  const memberListResponse = component("OrganizationMemberListResponse", OrganizationMemberListResponseSchema);
-  const inviteListResponse = component("OrganizationInviteListResponse", OrganizationInviteListResponseSchema);
-  const inviteResponse = component("OrganizationInviteResponse", OrganizationInviteResponseSchema);
-  const memberResponse = component("OrganizationMemberResponse", OrganizationMemberResponseSchema);
+  const memberListResponse = component("ProjectMemberListResponse", ProjectMemberListResponseSchema);
+  const inviteListResponse = component("ProjectInviteListResponse", ProjectInviteListResponseSchema);
+  const inviteResponse = component("ProjectInviteResponse", ProjectInviteResponseSchema);
+  const memberResponse = component("ProjectMemberResponse", ProjectMemberResponseSchema);
   const projectListResponse = component("ProjectListResponse", ProjectListResponseSchema);
   const projectCreateResponse = component("ProjectCreateResponse", ProjectCreateResponseSchema);
   const projectUpdateResponse = component("ProjectUpdateResponse", ProjectUpdateResponseSchema);
@@ -655,9 +658,9 @@ function buildPublicApiOperations(): OperationSpec[] {
     },
     {
       method: "post",
-      path: "/v1/auth/accept-invite",
+      path: "/v1/auth/project-invite/accept",
       operationId: "acceptInvite",
-      summary: "Accept an organization invite",
+      summary: "Accept a project invite",
       tags: ["Auth"],
       security: browserSessionAuth,
       requestBody: component("AcceptInviteBody", AcceptInviteBodySchema),
@@ -849,97 +852,100 @@ function buildPublicApiOperations(): OperationSpec[] {
     },
     {
       method: "get",
-      path: "/v1/organization/members",
-      operationId: "listOrganizationMembers",
-      summary: "List organization members",
-      tags: ["Organization"],
+      path: "/v1/projects/{id}/members",
+      operationId: "listProjectMembers",
+      summary: "List project members",
+      tags: ["Projects"],
       security: anyMemberAuth,
+      params: ProjectParamsSchema,
       responses: {
-        "200": { description: "Organization members.", schema: memberListResponse },
+        "200": { description: "Project members.", schema: memberListResponse },
+        "400": { description: "Invalid project id.", schema: apiError },
         "401": { description: "Authentication is invalid.", schema: apiError },
-        "403": { description: "Owner access is required.", schema: apiError },
-        "404": { description: "Organization member management is unavailable.", schema: apiError },
+        "404": { description: "Project was not found or collaboration is unavailable.", schema: apiError },
       },
     },
     {
       method: "get",
-      path: "/v1/organization/members/invites",
-      operationId: "listOrganizationInvites",
-      summary: "List pending organization invites",
-      tags: ["Organization"],
+      path: "/v1/projects/{id}/invites",
+      operationId: "listProjectInvites",
+      summary: "List pending project invites",
+      tags: ["Projects"],
       security: anyMemberAuth,
+      params: ProjectParamsSchema,
       responses: {
-        "200": { description: "Pending organization invites.", schema: inviteListResponse },
+        "200": { description: "Pending project invites.", schema: inviteListResponse },
+        "400": { description: "Invalid project id.", schema: apiError },
         "401": { description: "Authentication is invalid.", schema: apiError },
-        "403": { description: "Owner access is required.", schema: apiError },
-        "404": { description: "Organization member management is unavailable.", schema: apiError },
+        "404": { description: "Project was not found or collaboration is unavailable.", schema: apiError },
       },
     },
     {
       method: "post",
-      path: "/v1/organization/members/invite",
-      operationId: "inviteOrganizationMember",
-      summary: "Invite an organization member",
-      tags: ["Organization"],
+      path: "/v1/projects/{id}/invite",
+      operationId: "inviteProjectMember",
+      summary: "Invite a project member",
+      tags: ["Projects"],
       security: anyMemberAuth,
-      requestBody: component("CreateOrganizationInviteBody", CreateOrganizationInviteBodySchema),
+      params: ProjectParamsSchema,
+      requestBody: component("CreateProjectInviteBody", CreateProjectInviteBodySchema),
       responses: {
         "201": { description: "Invite created.", schema: inviteResponse },
-        "400": { description: "Invalid request body.", schema: apiError },
+        "400": { description: "Invalid project id or request body.", schema: apiError },
         "401": { description: "Authentication is invalid.", schema: apiError },
-        "403": { description: "Owner access or verified email is required.", schema: apiError },
-        "404": { description: "Organization member management is unavailable.", schema: apiError },
-        "409": { description: "Member or invite already exists.", schema: apiError },
+        "403": { description: "Admin or owner access and verified email are required.", schema: apiError },
+        "404": { description: "Project was not found or collaboration is unavailable.", schema: apiError },
+        "409": { description: "Member or invite already exists, or collaborator limits were reached.", schema: apiError },
         "500": { description: "Unexpected invite creation failure.", schema: apiError },
       },
     },
     {
       method: "delete",
-      path: "/v1/organization/members/invites/{inviteId}",
-      operationId: "cancelOrganizationInvite",
-      summary: "Cancel an organization invite",
-      tags: ["Organization"],
+      path: "/v1/projects/{id}/invites/{inviteId}",
+      operationId: "cancelProjectInvite",
+      summary: "Cancel a project invite",
+      tags: ["Projects"],
       security: anyMemberAuth,
-      params: OrganizationInviteParamsSchema,
+      params: ProjectInviteParamsSchema,
       responses: {
         "200": { description: "Invite cancelled.", schema: inviteResponse },
-        "400": { description: "Invalid invite id.", schema: apiError },
+        "400": { description: "Invalid request body.", schema: apiError },
         "401": { description: "Authentication is invalid.", schema: apiError },
-        "403": { description: "Owner access or verified email is required.", schema: apiError },
+        "403": { description: "Admin or owner access and verified email are required.", schema: apiError },
         "404": { description: "Invite was not found.", schema: apiError },
       },
     },
     {
       method: "patch",
-      path: "/v1/organization/members/{userId}",
-      operationId: "updateOrganizationMemberRole",
-      summary: "Update an organization member role",
-      tags: ["Organization"],
+      path: "/v1/projects/{id}/members/{userId}",
+      operationId: "updateProjectMemberRole",
+      summary: "Update a project member role",
+      tags: ["Projects"],
       security: anyMemberAuth,
-      params: OrganizationMemberParamsSchema,
-      requestBody: component("UpdateOrganizationMemberRoleBody", UpdateOrganizationMemberRoleBodySchema),
+      params: ProjectMemberParamsSchema,
+      requestBody: component("UpdateProjectMemberRoleBody", UpdateProjectMemberRoleBodySchema),
       responses: {
-        "200": { description: "Updated organization member.", schema: memberResponse },
+        "200": { description: "Updated project member.", schema: memberResponse },
         "400": { description: "Invalid member id or payload.", schema: apiError },
         "401": { description: "Authentication is invalid.", schema: apiError },
-        "403": { description: "Owner access is required.", schema: apiError },
+        "403": { description: "Admin or owner access is required.", schema: apiError },
         "404": { description: "Member was not found.", schema: apiError },
         "409": { description: "Owner role cannot be changed.", schema: apiError },
       },
     },
     {
       method: "delete",
-      path: "/v1/organization/members/{userId}",
-      operationId: "removeOrganizationMember",
-      summary: "Remove an organization member",
-      tags: ["Organization"],
+      path: "/v1/projects/{id}/members/{userId}",
+      operationId: "removeProjectMember",
+      summary: "Remove a project member",
+      tags: ["Projects"],
       security: anyMemberAuth,
-      params: OrganizationMemberParamsSchema,
+      params: ProjectMemberParamsSchema,
       responses: {
-        "200": { description: "Removed organization member.", schema: memberResponse },
+        "200": { description: "Removed project member.", schema: memberResponse },
         "400": { description: "Invalid member id.", schema: apiError },
         "401": { description: "Authentication is invalid.", schema: apiError },
-        "403": { description: "Owner access is required.", schema: apiError },
+        "403": { description: "Admin or owner access is required.", schema: apiError },
         "404": { description: "Member was not found.", schema: apiError },
         "409": { description: "Owner cannot be removed.", schema: apiError },
       },

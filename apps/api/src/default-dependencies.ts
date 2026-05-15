@@ -440,7 +440,7 @@ function createAuthEmailSender(input: { emailTransport: EmailTransport; appBaseU
 
     async sendOrganizationInviteEmail({ email, token }): Promise<void> {
       const rendered = renderOrganizationInviteEmail({
-        acceptUrl: `${baseUrl}/auth/accept-invite?token=${encodeURIComponent(token)}`
+        acceptUrl: `${baseUrl}/invite?token=${encodeURIComponent(token)}`
       });
       await input.emailTransport.send({
         to: [email],
@@ -533,7 +533,15 @@ export function createApiDependencies(input: CreateApiDependenciesInput): {
   >;
   projectManagement: Pick<
     ReturnType<typeof createPostgresMetadataStore>,
-    "listProjectsForOrganization" | "createProjectForOrganization" | "updateProjectForOrganization" | "deleteProjectForOrganization"
+    | "resolveProjectAccessForUser"
+    | "listProjectsForUser"
+    | "createProjectForUser"
+    | "updateProjectForUser"
+    | "deleteProjectForUser"
+    | "listProjectsForOrganization"
+    | "createProjectForOrganization"
+    | "updateProjectForOrganization"
+    | "deleteProjectForOrganization"
   >;
   billingManagement: {
     getBillingSummaryForOrganization: ReturnType<typeof createPostgresBillingStore>["getBillingSummaryForOrganization"];
@@ -577,6 +585,15 @@ export function createApiDependencies(input: CreateApiDependenciesInput): {
     | "cancelInviteForOrganization"
     | "removeMemberFromOrganization"
     | "updateMemberRoleForOrganization"
+  >;
+  projectCollaboration: Pick<
+    ReturnType<typeof createPostgresMetadataStore>,
+    | "listMembersForProject"
+    | "listPendingInvitesForProject"
+    | "createInviteForProject"
+    | "cancelInviteForProject"
+    | "updateProjectMemberRole"
+    | "removeProjectMember"
   >;
   githubManagement?: {
     getInstallUrl(): Promise<string>;
@@ -760,7 +777,7 @@ export function createApiDependencies(input: CreateApiDependenciesInput): {
       user_id: string;
       email: string;
       accepted_at: string;
-    }) => metadataStore.acceptInviteForUser(request)
+    }) => metadataStore.acceptProjectInviteForUser!(request)
   };
   const signupEmailAllowlist = input.signupEmailAllowlist;
   const webAuth = createWebSessionAuthService(
@@ -956,6 +973,17 @@ export function createApiDependencies(input: CreateApiDependenciesInput): {
       revokeMemberTokenForOrganization: (input) => metadataStore.revokeMemberTokenForOrganization(input)
     },
     projectManagement: {
+      resolveProjectAccessForUser: (input) => metadataStore.resolveProjectAccessForUser!(input),
+      listProjectsForUser: (input) => metadataStore.listProjectsForUser!(input),
+      createProjectForUser: (input) => metadataStore.createProjectForUser!(input),
+      updateProjectForUser: (input) => metadataStore.updateProjectForUser!(input),
+      deleteProjectForUser: async (deleteInput) => {
+        const result = await metadataStore.deleteProjectForUser!(deleteInput);
+        if (result !== null) {
+          await deleteProjectObjects(input.objectStore, deleteInput.project_id).catch(() => undefined);
+        }
+        return result;
+      },
       listProjectsForOrganization: (input) => metadataStore.listProjectsForOrganization(input),
       createProjectForOrganization: (input) => metadataStore.createProjectForOrganization(input),
       updateProjectForOrganization: (input) => metadataStore.updateProjectForOrganization(input),
@@ -1303,6 +1331,14 @@ export function createApiDependencies(input: CreateApiDependenciesInput): {
       cancelInviteForOrganization: (input) => metadataStore.cancelInviteForOrganization(input),
       removeMemberFromOrganization: (input) => metadataStore.removeMemberFromOrganization(input),
       updateMemberRoleForOrganization: (input) => metadataStore.updateMemberRoleForOrganization(input)
+    },
+    projectCollaboration: {
+      listMembersForProject: (input) => metadataStore.listMembersForProject!(input),
+      listPendingInvitesForProject: (input) => metadataStore.listPendingInvitesForProject!(input),
+      createInviteForProject: (input) => metadataStore.createInviteForProject!(input),
+      cancelInviteForProject: (input) => metadataStore.cancelInviteForProject!(input),
+      updateProjectMemberRole: (input) => metadataStore.updateProjectMemberRole!(input),
+      removeProjectMember: (input) => metadataStore.removeProjectMember!(input)
     },
     ...(githubAppClient === undefined
       ? {}

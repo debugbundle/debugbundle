@@ -22,6 +22,7 @@ const {
   createWebSessionAuthServiceMock,
   createIngestionPersistenceServiceMock,
   createPostgresMetadataStoreMock,
+  createPostgresSlackDestinationStoreMock,
   createPostgresWeeklyReportChannelStoreMock,
   createPostgresWebhookDeliveryStoreMock,
   createPostgresGitHubStoreMock,
@@ -51,6 +52,7 @@ const {
   createWebSessionAuthServiceMock: vi.fn(),
   createIngestionPersistenceServiceMock: vi.fn(),
   createPostgresMetadataStoreMock: vi.fn(),
+  createPostgresSlackDestinationStoreMock: vi.fn(),
   createPostgresWeeklyReportChannelStoreMock: vi.fn(),
   createPostgresWebhookDeliveryStoreMock: vi.fn(),
   createPostgresGitHubStoreMock: vi.fn(),
@@ -91,6 +93,7 @@ vi.mock("../../../packages/storage/src/index.js", () => ({
   createMemberAuthService: createMemberAuthServiceMock,
   createIngestionPersistenceService: createIngestionPersistenceServiceMock,
   createPostgresMetadataStore: createPostgresMetadataStoreMock,
+  createPostgresSlackDestinationStore: createPostgresSlackDestinationStoreMock,
   createPostgresWeeklyReportChannelStore: createPostgresWeeklyReportChannelStoreMock,
   createPostgresWebhookDeliveryStore: createPostgresWebhookDeliveryStoreMock,
   createPostgresGitHubStore: createPostgresGitHubStoreMock,
@@ -144,6 +147,7 @@ describe("api default dependencies", () => {
     createWebSessionAuthServiceMock.mockReset();
     createIngestionPersistenceServiceMock.mockReset();
     createPostgresMetadataStoreMock.mockReset();
+    createPostgresSlackDestinationStoreMock.mockReset();
     createPostgresWeeklyReportChannelStoreMock.mockReset();
     createPostgresWebhookDeliveryStoreMock.mockReset();
     createIngestionMetadataServiceMock.mockReset();
@@ -248,6 +252,7 @@ describe("api default dependencies", () => {
       createProbeActivationForProjectInOrganization: vi.fn(),
       deactivateProbeActivationForProjectInOrganization: vi.fn()
     });
+    createPostgresSlackDestinationStoreMock.mockReturnValue({});
     createPostgresWeeklyReportChannelStoreMock.mockReturnValue({
       listWeeklyReportChannelsForOrganization: vi.fn(),
       createWeeklyReportChannelForOrganization: vi.fn(),
@@ -960,7 +965,7 @@ describe("api default dependencies", () => {
         },
         allowances: {
           monthly_bundle_requests: { used: 20, limit: 750 },
-          monthly_raw_ingested_events: { used: 200, limit: 6000 },
+          monthly_raw_ingested_events: { used: 200, limit: 10500 },
           retained_bundle_cap: { used: 5, limit: 450 },
           monthly_remote_activations: { used: 1, limit: 75 },
           monthly_alert_deliveries: { used: 3, limit: 225 }
@@ -1046,7 +1051,7 @@ describe("api default dependencies", () => {
       expect.objectContaining({
         capacity_units: expect.objectContaining({
           additional_purchased: 2,
-          total: 4
+          total: 5
         })
       })
     );
@@ -1207,7 +1212,7 @@ describe("api default dependencies", () => {
       expiresInMinutes: 10
     });
     expect(renderOrganizationInviteEmailMock).toHaveBeenCalledWith({
-      acceptUrl: "https://app.debugbundle.test/auth/accept-invite?token=invite-token"
+      acceptUrl: "https://app.debugbundle.test/invite?token=invite-token"
     });
     expect(emailTransportSendMock).toHaveBeenCalledTimes(2);
   });
@@ -1860,7 +1865,7 @@ describe("api default dependencies", () => {
       },
       allowances: {
         monthly_bundle_requests: { used: 20, limit: 750 },
-        monthly_raw_ingested_events: { used: 200, limit: 6000 },
+        monthly_raw_ingested_events: { used: 200, limit: 10500 },
         retained_bundle_cap: { used: 5, limit: 450 },
         monthly_remote_activations: { used: 1, limit: 75 },
         monthly_alert_deliveries: { used: 3, limit: 225 }
@@ -2000,7 +2005,7 @@ describe("api default dependencies", () => {
       },
       allowances: {
         monthly_bundle_requests: { used: 20, limit: 750 },
-        monthly_raw_ingested_events: { used: 200, limit: 6000 },
+        monthly_raw_ingested_events: { used: 200, limit: 10500 },
         retained_bundle_cap: { used: 5, limit: 450 },
         monthly_remote_activations: { used: 1, limit: 75 },
         monthly_alert_deliveries: { used: 3, limit: 225 }
@@ -2108,7 +2113,7 @@ describe("api default dependencies", () => {
         },
         allowances: {
           monthly_bundle_requests: { used: 20, limit: 750 },
-          monthly_raw_ingested_events: { used: 200, limit: 6000 },
+          monthly_raw_ingested_events: { used: 200, limit: 10500 },
           retained_bundle_cap: { used: 5, limit: 450 },
           monthly_remote_activations: { used: 1, limit: 75 },
           monthly_alert_deliveries: { used: 3, limit: 225 }
@@ -2323,7 +2328,7 @@ describe("api default dependencies", () => {
         },
         allowances: {
           monthly_bundle_requests: { used: 20, limit: 750 },
-          monthly_raw_ingested_events: { used: 200, limit: 6000 },
+          monthly_raw_ingested_events: { used: 200, limit: 10500 },
           retained_bundle_cap: { used: 5, limit: 450 },
           monthly_remote_activations: { used: 1, limit: 75 },
           monthly_alert_deliveries: { used: 3, limit: 225 }
@@ -2476,7 +2481,7 @@ describe("api default dependencies", () => {
         },
         allowances: {
           monthly_bundle_requests: { used: 20, limit: 750 },
-          monthly_raw_ingested_events: { used: 200, limit: 6000 },
+          monthly_raw_ingested_events: { used: 200, limit: 10500 },
           retained_bundle_cap: { used: 5, limit: 450 },
           monthly_remote_activations: { used: 1, limit: 75 },
           monthly_alert_deliveries: { used: 3, limit: 225 }

@@ -3,6 +3,7 @@ import { createContext, useContext } from "react";
 export interface ActiveProjectRoute {
   projectId: string;
   projectName: string;
+  relationship: "owned" | "shared";
 }
 
 export interface ProjectRouteContextValue {

@@ -559,6 +559,20 @@ export const ProjectParamsSchema = z
   })
   .strict();
 
+export const ProjectMemberParamsSchema = z
+  .object({
+    id: z.string().uuid(),
+    userId: z.string().uuid()
+  })
+  .strict();
+
+export const ProjectInviteParamsSchema = z
+  .object({
+    id: z.string().uuid(),
+    inviteId: z.string().uuid()
+  })
+  .strict();
+
 export const ProbeActivateBodySchema = z
   .object({
     label_pattern: z.string().min(1).max(200),
@@ -637,6 +651,19 @@ export const CreateOrganizationInviteBodySchema = z
   .object({
     email: z.string().email(),
     role: z.literal("member").default("member")
+  })
+  .strict();
+
+export const CreateProjectInviteBodySchema = z
+  .object({
+    email: z.string().email(),
+    role: z.enum(["admin", "member"]).default("member")
+  })
+  .strict();
+
+export const UpdateProjectMemberRoleBodySchema = z
+  .object({
+    role: z.enum(["admin", "member"])
   })
   .strict();
 

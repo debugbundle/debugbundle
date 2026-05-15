@@ -18,14 +18,15 @@ import {
   readPendingBillingCheckout,
   writePendingBillingCheckout
 } from "../../../apps/web/src/pages/billing-page.tsx";
-import { OrganizationMembersPage, ProjectTokensPage, ProjectsPage, sortProjects } from "../../../apps/web/src/pages/management-pages.tsx";
+import { ProjectTokensPage, ProjectsPage, sortProjects } from "../../../apps/web/src/pages/management-pages.tsx";
 import {
   OrganizationOverviewPage,
   formatActiveProjects,
   formatAllowanceUnits,
   formatBillingSummary,
-  formatMembershipSummary
+  formatProjectSharingSummary
 } from "../../../apps/web/src/pages/organization-overview-page.tsx";
+import { ProjectMembersPage } from "../../../apps/web/src/pages/project-members-page.tsx";
 import {
   buildAlertConfig,
   describeAlertChannel,
@@ -40,9 +41,10 @@ import {
 } from "../../../apps/web/src/pages/project-alerts-page.tsx";
 import * as api from "../../../apps/web/src/lib/api.ts";
 import * as notify from "../../../apps/web/src/lib/notify.tsx";
+import * as projectSharingApi from "../../../apps/web/src/lib/project-sharing-api.ts";
 import * as sessionModule from "../../../apps/web/src/lib/session.tsx";
 import { createBillingSummary, createProject, jsonResponse } from "./web-test-helpers.js";
-import { createOrganizationInvite, createOrganizationMember, createProjectToken, createSession } from "./web-test-helpers.js";
+import { createProjectInvite, createProjectMember, createProjectToken, createSession } from "./web-test-helpers.js";
 
 function renderProjectTokensPage(): ReturnType<typeof render> {
   return render(
@@ -50,6 +52,21 @@ function renderProjectTokensPage(): ReturnType<typeof render> {
       <routerDom.Routes>
         <routerDom.Route path="/" element={<routerDom.Outlet context={{ projectId: "proj_123" }} />}>
           <routerDom.Route index element={<ProjectTokensPage />} />
+        </routerDom.Route>
+      </routerDom.Routes>
+    </MemoryRouter>
+  );
+}
+
+function renderProjectMembersPage(project = createProject()): ReturnType<typeof render> {
+  return render(
+    <MemoryRouter initialEntries={["/"]}>
+      <routerDom.Routes>
+        <routerDom.Route
+          path="/"
+          element={<routerDom.Outlet context={{ projectId: project.project_id, project, onProjectUpdated: vi.fn() }} />}
+        >
+          <routerDom.Route index element={<ProjectMembersPage />} />
         </routerDom.Route>
       </routerDom.Routes>
     </MemoryRouter>
@@ -249,7 +266,7 @@ describe("web page helper coverage", () => {
     expect(screen.queryByText(/^never$/i)).toBeNull();
   });
 
-  it("creates the first organization invite when the initial member load returns an invalid session", async () => {
+  it("creates the first project invite when the initial member load returns an invalid session", async () => {
     const user = userEvent.setup();
 
     vi.spyOn(sessionModule, "useSession").mockReturnValue({
@@ -259,22 +276,22 @@ describe("web page helper coverage", () => {
       refreshSession: vi.fn(async () => createSession()),
       setSession: vi.fn()
     });
-    vi.spyOn(api, "listOrganizationMembers").mockRejectedValue(new Error("invalid_session"));
-    vi.spyOn(api, "listOrganizationInvites").mockRejectedValue(new Error("invalid_session"));
-    vi.spyOn(api, "inviteOrganizationMember").mockResolvedValue(
-      createOrganizationInvite({ invite_id: "inv_bootstrap", email: "bootstrap@example.com" })
+    vi.spyOn(projectSharingApi, "listProjectMembers").mockRejectedValue(new Error("invalid_session"));
+    vi.spyOn(projectSharingApi, "listProjectInvites").mockRejectedValue(new Error("invalid_session"));
+    vi.spyOn(projectSharingApi, "inviteProjectMember").mockResolvedValue(
+      createProjectInvite({ invite_id: "pinv_bootstrap", email: "bootstrap@example.com" })
     );
 
-    render(<OrganizationMembersPage />);
+    renderProjectMembersPage(createProject({ organization_plan: "team" }));
 
-    await user.click(screen.getByRole("button", { name: /invite member/i }));
+    await user.click(screen.getByRole("button", { name: /invite collaborator/i }));
     await user.type(screen.getByLabelText(/email address/i), "bootstrap@example.com");
     await user.click(screen.getByRole("button", { name: /send invite/i }));
 
     expect(await screen.findByText(/bootstrap@example.com/i)).toBeInTheDocument();
   });
 
-  it("renders the organization member empty state", async () => {
+  it("renders the project member empty state", async () => {
     vi.spyOn(sessionModule, "useSession").mockReturnValue({
       session: createSession(),
       isLoading: false,
@@ -282,10 +299,10 @@ describe("web page helper coverage", () => {
       refreshSession: vi.fn(async () => createSession()),
       setSession: vi.fn()
     });
-    vi.spyOn(api, "listOrganizationMembers").mockResolvedValue([]);
-    vi.spyOn(api, "listOrganizationInvites").mockResolvedValue([]);
+    vi.spyOn(projectSharingApi, "listProjectMembers").mockResolvedValue([]);
+    vi.spyOn(projectSharingApi, "listProjectInvites").mockResolvedValue([]);
 
-    render(<OrganizationMembersPage />);
+    renderProjectMembersPage(createProject({ organization_plan: "team" }));
 
     expect(await screen.findByText(/no members found/i)).toBeInTheDocument();
   });
@@ -295,9 +312,15 @@ describe("web page helper coverage", () => {
     expect(formatActiveProjects(1)).toBe("1 active project");
     expect(formatActiveProjects(2)).toBe("2 active projects");
 
-    expect(formatMembershipSummary(null)).toBe("Loading member summary...");
-    expect(formatMembershipSummary({ members: 1, invites: 1 })).toBe("1 member and 1 pending invite.");
-    expect(formatMembershipSummary({ members: 2, invites: 0 })).toBe("2 members and 0 pending invites.");
+    expect(formatProjectSharingSummary(null)).toBe("Loading sharing summary...");
+    expect(formatProjectSharingSummary([])).toBe("Create a project to start sending events and sharing access.");
+    expect(formatProjectSharingSummary([createProject()])).toBe("1 active project. Sharing is managed from each project's Members tab.");
+    expect(
+      formatProjectSharingSummary([
+        createProject(),
+        createProject({ project_id: "proj_456", relationship: "shared" })
+      ])
+    ).toBe("2 active projects. 1 project is shared.");
 
     expect(formatAllowanceUnits(1)).toBe("1 allowance unit");
     expect(formatAllowanceUnits(3)).toBe("3 allowance units");
@@ -328,13 +351,8 @@ describe("web page helper coverage", () => {
     });
     vi.spyOn(api, "listProjects").mockResolvedValue([
       createProject(),
-      createProject({ project_id: "proj_456", name: "Worker", slug: "worker" })
+      createProject({ project_id: "proj_456", name: "Worker", slug: "worker", relationship: "shared" })
     ]);
-    vi.spyOn(api, "listOrganizationMembers").mockResolvedValue([
-      createOrganizationMember(),
-      createOrganizationMember({ user_id: "usr_456", email: "casey@example.com", role: "member" })
-    ]);
-    vi.spyOn(api, "listOrganizationInvites").mockResolvedValue([createOrganizationInvite()]);
     vi.spyOn(api, "getBillingSummary").mockResolvedValue(
       createBillingSummary({
         plan: "team",
@@ -355,7 +373,7 @@ describe("web page helper coverage", () => {
     );
 
     expect(await screen.findByText(/^2 active projects$/i)).toBeInTheDocument();
-    expect(screen.getByText(/2 members and 1 pending invite/i)).toBeInTheDocument();
+    expect(screen.getByText(/2 active projects\. 1 project is shared\./i)).toBeInTheDocument();
     expect(screen.getByText(/team plan with 2 active projects and 17 allowance units/i)).toBeInTheDocument();
   });
 
@@ -386,8 +404,7 @@ describe("web page helper coverage", () => {
       refreshSession: vi.fn(async () => createSession()),
       setSession: vi.fn()
     });
-    vi.spyOn(api, "listOrganizationMembers").mockRejectedValue(new Error("forbidden"));
-    vi.spyOn(api, "listOrganizationInvites").mockResolvedValue([]);
+    vi.spyOn(api, "listProjects").mockResolvedValue([]);
     vi.spyOn(api, "getBillingSummary").mockRejectedValue(new Error("invalid_session"));
 
     render(
@@ -396,7 +413,7 @@ describe("web page helper coverage", () => {
       </MemoryRouter>
     );
 
-    expect(await screen.findByText(/owner permissions are required to manage members/i)).toBeInTheDocument();
+    expect(await screen.findByText(/manage sharing from each project/i)).toBeInTheDocument();
     expect(screen.getByText(/loading billing summary/i)).toBeInTheDocument();
   });
 

@@ -212,15 +212,15 @@ export function renderEmailAuthCodeEmail(input: {
 
 export function renderOrganizationInviteEmail(input: { acceptUrl: string }): { subject: string; text: string; html: string } {
   return {
-    subject: "You've been invited to DebugBundle",
+    subject: "A DebugBundle project was shared with you",
     text: [
-      "You've been invited to join a DebugBundle organization.",
+      "A DebugBundle project was shared with you.",
       "",
       input.acceptUrl
     ].join("\n"),
     html: [
-      "<h1>You're invited to DebugBundle</h1>",
-      "<p>You've been invited to join a DebugBundle organization.</p>",
+      "<h1>A DebugBundle project was shared with you</h1>",
+      "<p>Open the invite link to accept access to the shared project.</p>",
       `<p><a href=\"${escapeHtml(input.acceptUrl)}\">${escapeHtml(input.acceptUrl)}</a></p>`
     ].join("")
   };

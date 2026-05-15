@@ -142,7 +142,7 @@ describe("retrieval parity mapping contract", () => {
     const contract = await readFile(CONTRACT_PATH, "utf8");
 
     expect(contract).toContain(
-      "| List projects | `GET /v1/projects` | `project list` | `list_projects` | Browser Session or Member Token, scoped to member organization |"
+      "| List projects | `GET /v1/projects` | `project list` | `list_projects` | Browser Session or Member Token, scoped to owned and shared projects |"
     );
     expect(contract).toContain(
       "| Create project | `POST /v1/projects` | `project create` | `create_project` | Browser Session or Member Token, owner only |"
@@ -232,22 +232,22 @@ describe("retrieval parity mapping contract", () => {
     const contract = await readFile(CONTRACT_PATH, "utf8");
 
     expect(contract).toContain(
-      "| List organization members | `GET /v1/organization/members` | `member list` | `list_members` | Browser Session or Member Token, owner only |"
+      "| List project members | `GET /v1/projects/{id}/members` | `project members list` | `list_project_members` | Browser Session or Member Token, owner/admin/member |"
     );
     expect(contract).toContain(
-      "| List pending organization invites | `GET /v1/organization/members/invites` | `member invites` | `list_member_invites` | Browser Session or Member Token, owner only |"
+      "| List pending project invites | `GET /v1/projects/{id}/invites` | `project members invites` | `list_project_member_invites` | Browser Session or Member Token, owner/admin/member |"
     );
     expect(contract).toContain(
-      "| Invite organization member | `POST /v1/organization/members/invite` | `member invite` | `invite_member` | Browser Session or Member Token, owner only, Team tier |"
+      "| Invite project member | `POST /v1/projects/{id}/invite` | `project members invite` | `invite_project_member` | Browser Session or Member Token, owner/admin only, Team tier |"
     );
     expect(contract).toContain(
-      "| Cancel organization invite | `DELETE /v1/organization/members/invites/{inviteId}` | `member cancel-invite` | `cancel_member_invite` | Browser Session or Member Token, owner only |"
+      "| Cancel project invite | `DELETE /v1/projects/{id}/invites/{inviteId}` | `project members cancel-invite` | `cancel_project_member_invite` | Browser Session or Member Token, owner/admin only |"
     );
     expect(contract).toContain(
-      "| Update organization member role | `PATCH /v1/organization/members/{userId}` | `member update-role` | `update_member_role` | Browser Session or Member Token, owner only |"
+      "| Update project member role | `PATCH /v1/projects/{id}/members/{userId}` | `project members update-role` | `update_project_member_role` | Browser Session or Member Token, owner/admin only |"
     );
     expect(contract).toContain(
-      "| Remove organization member | `DELETE /v1/organization/members/{userId}` | `member remove` | `remove_member` | Browser Session or Member Token, owner only |"
+      "| Remove project member | `DELETE /v1/projects/{id}/members/{userId}` | `project members remove` | `remove_project_member` | Browser Session or Member Token, owner/admin only |"
     );
   });
 });

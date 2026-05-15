@@ -249,7 +249,7 @@ Last updated: 2026-03-13
 - **And** the response includes `project_name`, `service_name`, `fingerprint_version`, `spike_detected_at`, `resolved_at`, `regressed_at`, `matched_fields`, and `occurrence_count`
 
 ### AC-RET-02: Incident Resolve Mutation
-- **Given** an authenticated organization member viewing an `open` incident
+- **Given** an authenticated caller with access to an `open` incident's project
 - **When** `POST /v1/incidents/{id}/resolve` is called for that incident
 - **Then** the incident transitions to `resolved`
 - **And** `resolved_at` is persisted and returned in the response
@@ -429,7 +429,7 @@ Each MCP tool must produce results that match its API/CLI equivalent:
 - Probe parity (`activate_probe` / `list_active_probes` / `deactivate_probe` = `debugbundle probe activate/list/deactivate --json`)
 - Project parity (`list_projects` / `create_project` / `update_project` / `delete_project` = `debugbundle project list/create/update/delete --json`)
 - Billing parity (`get_billing_summary` / `increase_capacity` / `schedule_capacity_reduction` / `cancel_capacity_reduction` = `debugbundle billing get/capacity increase/capacity schedule-reduction/capacity cancel-reduction --json`)
-- Member parity (`list_members` / `list_member_invites` / `invite_member` / `cancel_member_invite` / `update_member_role` / `remove_member` = `debugbundle member list/invites/invite/cancel-invite/update-role/remove --json`)
+- Project-member parity (`list_project_members` / `list_project_member_invites` / `invite_project_member` / `cancel_project_member_invite` / `update_project_member_role` / `remove_project_member` = `debugbundle project members list/invites/invite/cancel-invite/update-role/remove --project-id <id> --json`)
 
 If CLI says something is healthy and MCP says something different, that is a product bug.
 
@@ -459,11 +459,16 @@ If CLI says something is healthy and MCP says something different, that is a pro
 - **When** the token bearer creates a project token via API
 - **Then** the project token is created successfully (no additional email verification required)
 
-### AC-AUTH-05: Role Permissions
-- **Given** a Member-role user token
-- **When** the user attempts to invite another member or manage billing
+### AC-AUTH-05: Project Collaboration Role Permissions
+- **Given** a project collaborator with role `member`
+- **When** the user attempts to invite another collaborator, cancel an invite, update a collaborator role, or remove a collaborator for that project
 - **Then** the request is rejected with a permissions error
-- **And** the user can still read incidents, bundles, manage webhooks/alerts
+- **And** the user can still read project incidents and bundles and perform normal project-scoped operational actions
+
+- **Given** a project collaborator with role `admin`
+- **When** the user manages collaborators for that same project
+- **Then** the request succeeds
+- **And** deleting the project itself still remains forbidden
 
 ### AC-AUTH-06: Session And Member-Token Parity
 - **Given** the same verified user identity

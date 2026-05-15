@@ -17,7 +17,7 @@ Every capability must be available through all applicable interfaces. Operations
 | Current session | `GET /v1/auth/session` | — | — | Web-auth bootstrap only |
 | Export account data | `GET /v1/account/export` | — | — | Browser session only, owner only |
 | Delete account | `DELETE /v1/account` | — | — | Browser session only, owner only |
-| Accept invite | `POST /v1/auth/accept-invite` | — | — | Browser session only |
+| Accept project invite | `POST /v1/auth/project-invite/accept` | — | — | Browser session only |
 | GitHub sign-in start | `GET /v1/auth/github/start` | — | — | Browser redirect entry point only |
 | GitHub sign-in callback | `GET /v1/auth/github/callback` | — | — | Browser redirect callback only |
 | Slack app install URL | `GET /v1/slack/app/install-url` | `slack connect-url` | `get_slack_connect_url` | Returns a browser handoff URL for Team-tier project alert setup |
@@ -35,13 +35,13 @@ Every capability must be available through all applicable interfaces. Operations
 | Get bundle | `GET /v1/incidents/{id}/bundle` | `bundle` | `get_bundle` | |
 | Get reproduction | `GET /v1/incidents/{id}/reproduction` | `reproduce` | `get_reproduction` | |
 | Get logs | `GET /v1/logs` | `logs` | `get_logs` | Query by incident_id |
-| List organization members | `GET /v1/organization/members` | `member list` | `list_members` | Browser Session or Member Token, owner only |
-| List pending organization invites | `GET /v1/organization/members/invites` | `member invites` | `list_member_invites` | Browser Session or Member Token, owner only |
-| Invite organization member | `POST /v1/organization/members/invite` | `member invite` | `invite_member` | Browser Session or Member Token, owner only, Team tier |
-| Cancel organization invite | `DELETE /v1/organization/members/invites/{inviteId}` | `member cancel-invite` | `cancel_member_invite` | Browser Session or Member Token, owner only |
-| Update organization member role | `PATCH /v1/organization/members/{userId}` | `member update-role` | `update_member_role` | Browser Session or Member Token, owner only |
-| Remove organization member | `DELETE /v1/organization/members/{userId}` | `member remove` | `remove_member` | Browser Session or Member Token, owner only |
-| List projects | `GET /v1/projects` | `project list` | `list_projects` | Browser Session or Member Token, scoped to member organization |
+| List project members | `GET /v1/projects/{id}/members` | `project members list` | `list_project_members` | Browser Session or Member Token, owner/admin/member |
+| List pending project invites | `GET /v1/projects/{id}/invites` | `project members invites` | `list_project_member_invites` | Browser Session or Member Token, owner/admin/member |
+| Invite project member | `POST /v1/projects/{id}/invite` | `project members invite` | `invite_project_member` | Browser Session or Member Token, owner/admin only, Team tier |
+| Cancel project invite | `DELETE /v1/projects/{id}/invites/{inviteId}` | `project members cancel-invite` | `cancel_project_member_invite` | Browser Session or Member Token, owner/admin only |
+| Update project member role | `PATCH /v1/projects/{id}/members/{userId}` | `project members update-role` | `update_project_member_role` | Browser Session or Member Token, owner/admin only |
+| Remove project member | `DELETE /v1/projects/{id}/members/{userId}` | `project members remove` | `remove_project_member` | Browser Session or Member Token, owner/admin only |
+| List projects | `GET /v1/projects` | `project list` | `list_projects` | Browser Session or Member Token, scoped to owned and shared projects |
 | Create project | `POST /v1/projects` | `project create` | `create_project` | Browser Session or Member Token, owner only |
 | Update project | `PATCH /v1/projects/{id}` | `project update` | `update_project` | Browser Session or Member Token, owner only |
 | Delete project | `DELETE /v1/projects/{id}` | `project delete` | `delete_project` | Browser Session or Member Token, owner only |
@@ -135,7 +135,7 @@ Stripe checkout and customer-portal billing routes remain browser-session-only i
 | GET | `/v1/auth/session` | Browser Session | Return current session state or `session: null` when signed out |
 | GET | `/v1/account/export` | Browser Session | Export retained organization-account data as a JSON attachment (owner only) |
 | DELETE | `/v1/account` | Browser Session | Permanently delete the current organization account after email confirmation (owner only) |
-| POST | `/v1/auth/accept-invite` | Browser Session | Accept a pending organization invite for the current signed-in user |
+| POST | `/v1/auth/project-invite/accept` | Browser Session | Accept a pending project invite for the current signed-in user |
 | GET | `/v1/auth/github/start` | None | Start GitHub OAuth and set transient state cookie |
 | GET | `/v1/auth/github/callback` | None | Complete GitHub OAuth, issue browser session, and redirect back to the app |
 | POST | `/v1/auth/github/device/start` | None | Start GitHub device flow and return the verification URL/code |
@@ -185,19 +185,19 @@ The CLI bootstrap flow is additive and issues the same member-token credential u
 - Confirmation email mismatch: `400 { "error": "invalid_confirmation" }`
 - User is still the sole owner of another organization: `409 { "error": "other_owned_organizations_exist" }`
 
-**Accept invite request:**
+**Accept project invite request:**
 ```json
 {
   "token": "dbundle_invite_..."
 }
 ```
 
-**Accept invite response:**
+**Accept project invite response:**
 ```json
 {
   "membership": {
+    "project_id": "uuid",
     "user_id": "uuid",
-    "organization_id": "uuid",
     "role": "member"
   }
 }
@@ -365,16 +365,16 @@ Current API implementation scope (Phase 7 kickoff slice):
 - Out-of-scope or missing project: `404 { "error": "project_not_found" }`
 - Invalid query: `400 { "error": "invalid_query" }`
 
-### 1.3a Organization Members
+### 1.3a Project Members
 
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
-| GET | `/v1/organization/members` | Browser Session or Member Token (owner only) | List organization members |
-| GET | `/v1/organization/members/invites` | Browser Session or Member Token (owner only) | List pending, non-expired organization invites |
-| POST | `/v1/organization/members/invite` | Browser Session or Member Token (owner only) | Create a pending organization member invite |
-| DELETE | `/v1/organization/members/invites/{inviteId}` | Browser Session or Member Token (owner only) | Cancel a pending organization invite |
-| PATCH | `/v1/organization/members/{userId}` | Browser Session or Member Token (owner only) | Update an organization member role between `owner` and `member` |
-| DELETE | `/v1/organization/members/{userId}` | Browser Session or Member Token (owner only) | Remove a non-owner organization member |
+| GET | `/v1/projects/{id}/members` | Browser Session or Member Token | List project members including the owner and collaborators |
+| GET | `/v1/projects/{id}/invites` | Browser Session or Member Token | List pending, non-expired project invites |
+| POST | `/v1/projects/{id}/invite` | Browser Session or Member Token (owner/admin only) | Create a pending project collaborator invite |
+| DELETE | `/v1/projects/{id}/invites/{inviteId}` | Browser Session or Member Token (owner/admin only) | Cancel a pending project invite |
+| PATCH | `/v1/projects/{id}/members/{userId}` | Browser Session or Member Token (owner/admin only) | Update a collaborator role between `admin` and `member` |
+| DELETE | `/v1/projects/{id}/members/{userId}` | Browser Session or Member Token (owner/admin only) | Remove a collaborator from the project |
 
 **Member list response shape:**
 ```json
@@ -473,10 +473,10 @@ Invite creation also sends a transactional invite email containing a one-time ac
 - Invalid invite payload: `400 { "error": "invalid_payload" }`
 - Invalid invite params: `400 { "error": "invalid_invite_id" }`
 - Invalid member params: `400 { "error": "invalid_member_id" }`
-- Existing organization member email: `409 { "error": "member_already_exists" }`
+- Existing project member email: `409 { "error": "member_already_exists" }`
 - Existing pending invite email: `409 { "error": "invite_already_exists" }`
 - Missing pending invite: `404 { "error": "invite_not_found" }`
-- Missing organization member: `404 { "error": "member_not_found" }`
+- Missing project member: `404 { "error": "member_not_found" }`
 - Demoting the last remaining owner is not allowed on this surface: `409 { "error": "owner_role_change_not_allowed" }`
 - Removing an owner is not allowed on this surface: `409 { "error": "owner_removal_not_allowed" }`
 
@@ -484,7 +484,7 @@ Invite creation also sends a transactional invite email containing a one-time ac
 
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
-| GET | `/v1/projects` | Browser Session or Member Token | List projects in caller organization |
+| GET | `/v1/projects` | Browser Session or Member Token | List projects visible to the caller, including owned and shared projects |
 | POST | `/v1/projects` | Browser Session or Member Token (owner only) | Create new project in caller organization |
 | PATCH | `/v1/projects/{id}` | Browser Session or Member Token (owner only) | Update project name, slug, or default environment |
 | DELETE | `/v1/projects/{id}` | Browser Session or Member Token (owner only) | Delete project and its project-scoped resources |
@@ -576,7 +576,7 @@ Billing summary and allowance-capacity management routes accept both browser ses
       },
       "monthly_raw_ingested_events": {
         "used": 800,
-        "limit": 6000
+        "limit": 10500
       },
       "retained_bundle_cap": {
         "used": 40,
@@ -1772,19 +1772,19 @@ debugbundle project update <project-id> [--name <name>] [--slug <slug>] [--envir
 debugbundle project delete <project-id> [--auth-file <path>] [--json]
 ```
 
-`project list` lists all projects scoped to the authenticated member's organization. `project create` creates a new project with the given name and slug. `project update` modifies existing project attributes. `project delete` permanently removes a project (owner-only). All require member token authentication.
+`project list` lists both owned and shared projects visible to the authenticated member. `project create` creates a new owned project with the given name and slug. `project update` modifies existing project attributes for an accessible project. `project delete` permanently removes a project (owner-only). All require member token authentication.
 
-### 2.15 Member Commands
+### 2.15 Project Member Commands
 ```
-debugbundle member list [--auth-file <path>] [--json]
-debugbundle member invites [--auth-file <path>] [--json]
-debugbundle member invite --email <email> --role <owner|admin|member> [--auth-file <path>] [--json]
-debugbundle member cancel-invite <invite-id> [--auth-file <path>] [--json]
-debugbundle member update-role <user-id> --role <owner|admin|member> [--auth-file <path>] [--json]
-debugbundle member remove <user-id> [--auth-file <path>] [--json]
+debugbundle project members list --project-id <id> [--auth-file <path>] [--json]
+debugbundle project members invites --project-id <id> [--auth-file <path>] [--json]
+debugbundle project members invite --project-id <id> --email <email> --role <admin|member> [--auth-file <path>] [--json]
+debugbundle project members cancel-invite <invite-id> --project-id <id> [--auth-file <path>] [--json]
+debugbundle project members update-role <user-id> --project-id <id> --role <admin|member> [--auth-file <path>] [--json]
+debugbundle project members remove <user-id> --project-id <id> [--auth-file <path>] [--json]
 ```
 
-`member list` lists all organization members. `member invites` lists pending invitations. `member invite` sends an invitation to the specified email (Team tier). `member cancel-invite` cancels a pending invitation. `member update-role` changes a member's role. `member remove` removes a member from the organization. All require owner-scoped member token authentication.
+`project members list` lists the owner and collaborators for one project. `project members invites` lists pending invitations for that project. `project members invite` sends a collaborator invitation to the specified email (Team tier). `project members cancel-invite` cancels a pending invitation. `project members update-role` changes a collaborator's role. `project members remove` removes a collaborator from the project. All require project-scoped authorization.
 
 ### 2.16 GitHub Commands
 ```
@@ -1921,15 +1921,15 @@ These tools manage project lifecycle. `create_project`, `update_project`, and `d
 
 ### 3.8 Member Tools
 ```
-debugbundle_list_members          → same result as GET /v1/organization/members
-debugbundle_list_member_invites   → same result as GET /v1/organization/members/invites
-debugbundle_invite_member         → same result as POST /v1/organization/members/invite
-debugbundle_cancel_member_invite  → same result as DELETE /v1/organization/members/invites/{inviteId}
-debugbundle_update_member_role    → same result as PATCH /v1/organization/members/{userId}
-debugbundle_remove_member         → same result as DELETE /v1/organization/members/{userId}
+list_project_members         → same result as GET /v1/projects/{id}/members
+list_project_member_invites  → same result as GET /v1/projects/{id}/invites
+invite_project_member        → same result as POST /v1/projects/{id}/invite
+cancel_project_member_invite → same result as DELETE /v1/projects/{id}/invites/{inviteId}
+update_project_member_role   → same result as PATCH /v1/projects/{id}/members/{userId}
+remove_project_member        → same result as DELETE /v1/projects/{id}/members/{userId}
 ```
 
-These tools manage organization member lifecycle. All require owner-scoped member token authentication. `invite_member` requires Team tier.
+These tools manage project collaboration lifecycle. Listing requires project access. Invite, cancel, role update, and removal require owner/admin authorization. `invite_project_member` requires Team tier.
 
 ### 3.9 GitHub Tools
 ```

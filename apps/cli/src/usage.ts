@@ -76,12 +76,12 @@ export const CLI_USAGE_LINES = [
   '  debugbundle probe activate <project-id> --label-pattern <pattern> [--service <name>] [--environment <name>] [--ttl-seconds <n>] [--trigger-ttl-seconds <n>] [--auth-file <path>] [--json]',
   '  debugbundle probe list <project-id> [--auth-file <path>] [--json]',
   '  debugbundle probe deactivate <project-id> <activation-id> [--auth-file <path>] [--json]',
-  '  debugbundle member list [--auth-file <path>] [--json]',
-  '  debugbundle member invites [--auth-file <path>] [--json]',
-  '  debugbundle member invite --email <email> --role <owner|admin|member> [--auth-file <path>] [--json]',
-  '  debugbundle member cancel-invite <invite-id> [--auth-file <path>] [--json]',
-  '  debugbundle member update-role <user-id> --role <owner|admin|member> [--auth-file <path>] [--json]',
-  '  debugbundle member remove <user-id> [--auth-file <path>] [--json]',
+  '  debugbundle project members list --project-id <id> [--auth-file <path>] [--json]',
+  '  debugbundle project members invites --project-id <id> [--auth-file <path>] [--json]',
+  '  debugbundle project members invite --project-id <id> --email <email> --role <admin|member> [--auth-file <path>] [--json]',
+  '  debugbundle project members cancel-invite <invite-id> --project-id <id> [--auth-file <path>] [--json]',
+  '  debugbundle project members update-role <user-id> --project-id <id> --role <admin|member> [--auth-file <path>] [--json]',
+  '  debugbundle project members remove <user-id> --project-id <id> [--auth-file <path>] [--json]',
 ];
 
 export function formatUsage(): string {

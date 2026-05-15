@@ -39,7 +39,8 @@ interface MemberLike {
   user_id: string;
   email: string;
   role: string;
-  joined_at: string;
+  membership_type?: string;
+  created_at: string;
 }
 
 interface InviteLike {
@@ -52,18 +53,18 @@ interface InviteLike {
 export function createMemberApi(httpClient: {
   request(request: MemberHttpRequest): Promise<MemberHttpResponse>;
 }): {
-  listMembers(input: { bearerToken: string }): Promise<{ members: MemberLike[] }>;
-  listInvites(input: { bearerToken: string }): Promise<{ invites: InviteLike[] }>;
-  inviteMember(input: { bearerToken: string; email: string; role: string }): Promise<{ invite: InviteLike }>;
-  cancelInvite(input: { bearerToken: string; inviteId: string }): Promise<{ invite: InviteLike }>;
-  updateMemberRole(input: { bearerToken: string; userId: string; role: string }): Promise<{ member: MemberLike }>;
-  removeMember(input: { bearerToken: string; userId: string }): Promise<{ member: MemberLike }>;
+  listMembers(input: { bearerToken: string; projectId: string }): Promise<{ members: MemberLike[] }>;
+  listInvites(input: { bearerToken: string; projectId: string }): Promise<{ invites: InviteLike[] }>;
+  inviteMember(input: { bearerToken: string; projectId: string; email: string; role: string }): Promise<{ invite: InviteLike }>;
+  cancelInvite(input: { bearerToken: string; projectId: string; inviteId: string }): Promise<{ invite: InviteLike }>;
+  updateMemberRole(input: { bearerToken: string; projectId: string; userId: string; role: string }): Promise<{ member: MemberLike }>;
+  removeMember(input: { bearerToken: string; projectId: string; userId: string }): Promise<{ member: MemberLike }>;
 } {
   return {
     async listMembers(input) {
       const response = await httpClient.request({
         method: "GET",
-        path: "/v1/organization/members",
+        path: `/v1/projects/${input.projectId}/members`,
         bearerToken: input.bearerToken
       });
 
@@ -77,7 +78,7 @@ export function createMemberApi(httpClient: {
     async listInvites(input) {
       const response = await httpClient.request({
         method: "GET",
-        path: "/v1/organization/members/invites",
+        path: `/v1/projects/${input.projectId}/invites`,
         bearerToken: input.bearerToken
       });
 
@@ -91,7 +92,7 @@ export function createMemberApi(httpClient: {
     async inviteMember(input) {
       const response = await httpClient.request({
         method: "POST",
-        path: "/v1/organization/members/invite",
+        path: `/v1/projects/${input.projectId}/invite`,
         bearerToken: input.bearerToken,
         body: { email: input.email, role: input.role }
       });
@@ -106,7 +107,7 @@ export function createMemberApi(httpClient: {
     async cancelInvite(input) {
       const response = await httpClient.request({
         method: "DELETE",
-        path: `/v1/organization/members/invites/${input.inviteId}`,
+        path: `/v1/projects/${input.projectId}/invites/${input.inviteId}`,
         bearerToken: input.bearerToken
       });
 
@@ -120,7 +121,7 @@ export function createMemberApi(httpClient: {
     async updateMemberRole(input) {
       const response = await httpClient.request({
         method: "PATCH",
-        path: `/v1/organization/members/${input.userId}`,
+        path: `/v1/projects/${input.projectId}/members/${input.userId}`,
         bearerToken: input.bearerToken,
         body: { role: input.role }
       });
@@ -135,7 +136,7 @@ export function createMemberApi(httpClient: {
     async removeMember(input) {
       const response = await httpClient.request({
         method: "DELETE",
-        path: `/v1/organization/members/${input.userId}`,
+        path: `/v1/projects/${input.projectId}/members/${input.userId}`,
         bearerToken: input.bearerToken
       });
 
@@ -153,7 +154,7 @@ function formatMembersTable(members: MemberLike[]): string {
     return "No members found.";
   }
 
-  return members.map((m) => `${m.user_id} | ${m.email} | ${m.role} | joined=${m.joined_at}`).join("\n");
+  return members.map((m) => `${m.user_id} | ${m.email} | ${m.role} | type=${m.membership_type ?? "collaborator"} | joined=${m.created_at}`).join("\n");
 }
 
 function formatInvitesTable(invites: InviteLike[]): string {
@@ -186,11 +187,11 @@ function mapErrorToExitCode(error: unknown): number {
 }
 
 export async function listMembersCommand(
-  input: { bearerToken: string; json?: boolean },
+  input: { bearerToken: string; projectId: string; json?: boolean },
   api: ReturnType<typeof createMemberApi>
 ): Promise<CliCommandResult> {
   try {
-    const result = await api.listMembers({ bearerToken: input.bearerToken });
+    const result = await api.listMembers({ bearerToken: input.bearerToken, projectId: input.projectId });
     return {
       exitCode: 0,
       output: input.json ? JSON.stringify(result) : formatMembersTable(result.members)
@@ -204,11 +205,11 @@ export async function listMembersCommand(
 }
 
 export async function listInvitesCommand(
-  input: { bearerToken: string; json?: boolean },
+  input: { bearerToken: string; projectId: string; json?: boolean },
   api: ReturnType<typeof createMemberApi>
 ): Promise<CliCommandResult> {
   try {
-    const result = await api.listInvites({ bearerToken: input.bearerToken });
+    const result = await api.listInvites({ bearerToken: input.bearerToken, projectId: input.projectId });
     return {
       exitCode: 0,
       output: input.json ? JSON.stringify(result) : formatInvitesTable(result.invites)
@@ -222,11 +223,16 @@ export async function listInvitesCommand(
 }
 
 export async function inviteMemberCommand(
-  input: { bearerToken: string; email: string; role: string; json?: boolean },
+  input: { bearerToken: string; projectId: string; email: string; role: string; json?: boolean },
   api: ReturnType<typeof createMemberApi>
 ): Promise<CliCommandResult> {
   try {
-    const result = await api.inviteMember({ bearerToken: input.bearerToken, email: input.email, role: input.role });
+    const result = await api.inviteMember({
+      bearerToken: input.bearerToken,
+      projectId: input.projectId,
+      email: input.email,
+      role: input.role
+    });
     return {
       exitCode: 0,
       output: input.json ? JSON.stringify(result) : `Invite sent: ${result.invite.invite_id} → ${result.invite.email} (${result.invite.role})`
@@ -240,11 +246,11 @@ export async function inviteMemberCommand(
 }
 
 export async function cancelInviteCommand(
-  input: { bearerToken: string; inviteId: string; json?: boolean },
+  input: { bearerToken: string; projectId: string; inviteId: string; json?: boolean },
   api: ReturnType<typeof createMemberApi>
 ): Promise<CliCommandResult> {
   try {
-    const result = await api.cancelInvite({ bearerToken: input.bearerToken, inviteId: input.inviteId });
+    const result = await api.cancelInvite({ bearerToken: input.bearerToken, projectId: input.projectId, inviteId: input.inviteId });
     return {
       exitCode: 0,
       output: input.json ? JSON.stringify(result) : `Invite cancelled: ${result.invite.invite_id}`
@@ -258,11 +264,16 @@ export async function cancelInviteCommand(
 }
 
 export async function updateMemberRoleCommand(
-  input: { bearerToken: string; userId: string; role: string; json?: boolean },
+  input: { bearerToken: string; projectId: string; userId: string; role: string; json?: boolean },
   api: ReturnType<typeof createMemberApi>
 ): Promise<CliCommandResult> {
   try {
-    const result = await api.updateMemberRole({ bearerToken: input.bearerToken, userId: input.userId, role: input.role });
+    const result = await api.updateMemberRole({
+      bearerToken: input.bearerToken,
+      projectId: input.projectId,
+      userId: input.userId,
+      role: input.role
+    });
     return {
       exitCode: 0,
       output: input.json ? JSON.stringify(result) : `Role updated: ${result.member.user_id} → ${result.member.role}`
@@ -276,11 +287,11 @@ export async function updateMemberRoleCommand(
 }
 
 export async function removeMemberCommand(
-  input: { bearerToken: string; userId: string; json?: boolean },
+  input: { bearerToken: string; projectId: string; userId: string; json?: boolean },
   api: ReturnType<typeof createMemberApi>
 ): Promise<CliCommandResult> {
   try {
-    const result = await api.removeMember({ bearerToken: input.bearerToken, userId: input.userId });
+    const result = await api.removeMember({ bearerToken: input.bearerToken, projectId: input.projectId, userId: input.userId });
     return {
       exitCode: 0,
       output: input.json ? JSON.stringify(result) : `Member removed: ${result.member.user_id}`
@@ -316,7 +327,7 @@ async function createAuthenticatedMemberApi(
 }
 
 export async function listMembersWithAuthCommand(
-  input: { json?: boolean; authFilePath?: string },
+  input: { projectId: string; json?: boolean; authFilePath?: string },
   dependencies?: Parameters<typeof createAuthenticatedMemberApi>[1]
 ): Promise<CliCommandResult> {
   return runAuthenticatedCliCommand(input, {
@@ -324,14 +335,14 @@ export async function listMembersWithAuthCommand(
     dependencies,
     runCommand: (authState, api) =>
       listMembersCommand(
-        { bearerToken: authState.bearer_token, ...(input.json === undefined ? {} : { json: input.json }) },
+        { bearerToken: authState.bearer_token, projectId: input.projectId, ...(input.json === undefined ? {} : { json: input.json }) },
         api
       )
   });
 }
 
 export async function listInvitesWithAuthCommand(
-  input: { json?: boolean; authFilePath?: string },
+  input: { projectId: string; json?: boolean; authFilePath?: string },
   dependencies?: Parameters<typeof createAuthenticatedMemberApi>[1]
 ): Promise<CliCommandResult> {
   return runAuthenticatedCliCommand(input, {
@@ -339,14 +350,14 @@ export async function listInvitesWithAuthCommand(
     dependencies,
     runCommand: (authState, api) =>
       listInvitesCommand(
-        { bearerToken: authState.bearer_token, ...(input.json === undefined ? {} : { json: input.json }) },
+        { bearerToken: authState.bearer_token, projectId: input.projectId, ...(input.json === undefined ? {} : { json: input.json }) },
         api
       )
   });
 }
 
 export async function inviteMemberWithAuthCommand(
-  input: { email: string; role: string; json?: boolean; authFilePath?: string },
+  input: { projectId: string; email: string; role: string; json?: boolean; authFilePath?: string },
   dependencies?: Parameters<typeof createAuthenticatedMemberApi>[1]
 ): Promise<CliCommandResult> {
   return runAuthenticatedCliCommand(input, {
@@ -354,14 +365,20 @@ export async function inviteMemberWithAuthCommand(
     dependencies,
     runCommand: (authState, api) =>
       inviteMemberCommand(
-        { bearerToken: authState.bearer_token, email: input.email, role: input.role, ...(input.json === undefined ? {} : { json: input.json }) },
+        {
+          bearerToken: authState.bearer_token,
+          projectId: input.projectId,
+          email: input.email,
+          role: input.role,
+          ...(input.json === undefined ? {} : { json: input.json })
+        },
         api
       )
   });
 }
 
 export async function cancelInviteWithAuthCommand(
-  input: { inviteId: string; json?: boolean; authFilePath?: string },
+  input: { projectId: string; inviteId: string; json?: boolean; authFilePath?: string },
   dependencies?: Parameters<typeof createAuthenticatedMemberApi>[1]
 ): Promise<CliCommandResult> {
   return runAuthenticatedCliCommand(input, {
@@ -369,14 +386,19 @@ export async function cancelInviteWithAuthCommand(
     dependencies,
     runCommand: (authState, api) =>
       cancelInviteCommand(
-        { bearerToken: authState.bearer_token, inviteId: input.inviteId, ...(input.json === undefined ? {} : { json: input.json }) },
+        {
+          bearerToken: authState.bearer_token,
+          projectId: input.projectId,
+          inviteId: input.inviteId,
+          ...(input.json === undefined ? {} : { json: input.json })
+        },
         api
       )
   });
 }
 
 export async function updateMemberRoleWithAuthCommand(
-  input: { userId: string; role: string; json?: boolean; authFilePath?: string },
+  input: { projectId: string; userId: string; role: string; json?: boolean; authFilePath?: string },
   dependencies?: Parameters<typeof createAuthenticatedMemberApi>[1]
 ): Promise<CliCommandResult> {
   return runAuthenticatedCliCommand(input, {
@@ -384,14 +406,20 @@ export async function updateMemberRoleWithAuthCommand(
     dependencies,
     runCommand: (authState, api) =>
       updateMemberRoleCommand(
-        { bearerToken: authState.bearer_token, userId: input.userId, role: input.role, ...(input.json === undefined ? {} : { json: input.json }) },
+        {
+          bearerToken: authState.bearer_token,
+          projectId: input.projectId,
+          userId: input.userId,
+          role: input.role,
+          ...(input.json === undefined ? {} : { json: input.json })
+        },
         api
       )
   });
 }
 
 export async function removeMemberWithAuthCommand(
-  input: { userId: string; json?: boolean; authFilePath?: string },
+  input: { projectId: string; userId: string; json?: boolean; authFilePath?: string },
   dependencies?: Parameters<typeof createAuthenticatedMemberApi>[1]
 ): Promise<CliCommandResult> {
   return runAuthenticatedCliCommand(input, {
@@ -399,7 +427,12 @@ export async function removeMemberWithAuthCommand(
     dependencies,
     runCommand: (authState, api) =>
       removeMemberCommand(
-        { bearerToken: authState.bearer_token, userId: input.userId, ...(input.json === undefined ? {} : { json: input.json }) },
+        {
+          bearerToken: authState.bearer_token,
+          projectId: input.projectId,
+          userId: input.userId,
+          ...(input.json === undefined ? {} : { json: input.json })
+        },
         api
       )
   });

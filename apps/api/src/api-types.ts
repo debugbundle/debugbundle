@@ -7,6 +7,7 @@ import type {
   AlertChannel,
   AlertConditionType,
   CreateOrganizationInviteResult,
+  CreateProjectInviteResult,
   DeletedAccountRecord,
   AuthRateLimiter,
   DeletedProjectRecord,
@@ -14,12 +15,17 @@ import type {
   MemberTokenRecord,
   OrganizationMemberRecord,
   OrganizationInviteRecord,
+  ProjectAccessRecord,
+  ProjectInviteRecord,
+  ProjectMemberRecord,
   ProjectTokenRecord,
   SlackDestinationRecord,
   IncidentRetrievalRecord,
   RemoveOrganizationMemberResult,
+  RemoveProjectMemberResult,
   ServiceRetrievalRecord,
   UpdateOrganizationMemberRoleResult,
+  UpdateProjectMemberRoleResult,
   IngestionMetadataService,
   IngestionPersistenceService,
   ObjectStoreReader,
@@ -96,6 +102,33 @@ export interface ApiDependencies {
     }): Promise<MemberTokenRecord | null>;
   };
   projectManagement?: {
+    resolveProjectAccessForUser?(input: {
+      user_id: string;
+      project_id: string;
+    }): Promise<ProjectAccessRecord | null>;
+    listProjectsForUser?(input: {
+      user_id: string;
+      now: string;
+      limit: number;
+    }): Promise<ProjectRecord[]>;
+    createProjectForUser?(input: {
+      user_id: string;
+      organization_id: string;
+      name: string;
+      slug: string;
+      environment_default: string;
+    }): Promise<ProjectRecord | null>;
+    updateProjectForUser?(input: {
+      user_id: string;
+      project_id: string;
+      name?: string;
+      slug?: string;
+      environment_default?: string;
+    }): Promise<ProjectRecord | "slug_taken" | null>;
+    deleteProjectForUser?(input: {
+      user_id: string;
+      project_id: string;
+    }): Promise<DeletedProjectRecord | null>;
     listProjectsForOrganization(input: {
       organization_id: string;
       now: string;
@@ -205,6 +238,42 @@ export interface ApiDependencies {
       user_id: string;
       role: "owner" | "member";
     }): Promise<UpdateOrganizationMemberRoleResult | null>;
+  } | undefined;
+  projectCollaboration?: {
+    listMembersForProject?(input: {
+      project_id: string;
+      user_id: string;
+    }): Promise<{ owner_plan: string; members: ProjectMemberRecord[] } | null>;
+    listPendingInvitesForProject?(input: {
+      project_id: string;
+      user_id: string;
+      now: string;
+    }): Promise<ProjectInviteRecord[] | null>;
+    createInviteForProject?(input: {
+      project_id: string;
+      user_id: string;
+      email: string;
+      role: "admin" | "member";
+      invited_by_user_id: string;
+      invite_token_hash: string;
+      expires_at: string;
+    }): Promise<CreateProjectInviteResult | null>;
+    cancelInviteForProject?(input: {
+      project_id: string;
+      user_id: string;
+      invite_id: string;
+    }): Promise<ProjectInviteRecord | null>;
+    updateProjectMemberRole?(input: {
+      project_id: string;
+      actor_user_id: string;
+      user_id: string;
+      role: "admin" | "member";
+    }): Promise<UpdateProjectMemberRoleResult | null>;
+    removeProjectMember?(input: {
+      project_id: string;
+      actor_user_id: string;
+      user_id: string;
+    }): Promise<RemoveProjectMemberResult | null>;
   } | undefined;
   githubManagement?: {
     getInstallUrl(): Promise<string>;

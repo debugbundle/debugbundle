@@ -1137,9 +1137,10 @@ describe("api auth routes", () => {
       .mockResolvedValueOnce({
         ok: true,
         membership: {
+          project_id: "proj_123",
           user_id: "usr_123",
-          organization_id: "org_123",
-          role: "owner"
+          role: "member",
+          membership_type: "collaborator"
         }
       });
     const app = createServer({
@@ -1150,12 +1151,12 @@ describe("api auth routes", () => {
 
     const missingSession = await app.inject({
       method: "POST",
-      url: "/v1/auth/accept-invite",
+      url: "/v1/auth/project-invite/accept",
       payload: { token: "invite-secret" }
     });
     const mismatch = await app.inject({
       method: "POST",
-      url: "/v1/auth/accept-invite",
+      url: "/v1/auth/project-invite/accept",
       headers: {
         cookie: `${SESSION_COOKIE_NAME}=session-secret`,
         "x-csrf-token": csrfToken
@@ -1164,7 +1165,7 @@ describe("api auth routes", () => {
     });
     const success = await app.inject({
       method: "POST",
-      url: "/v1/auth/accept-invite",
+      url: "/v1/auth/project-invite/accept",
       headers: {
         cookie: `${SESSION_COOKIE_NAME}=session-secret`,
         "x-csrf-token": csrfToken
@@ -1177,9 +1178,10 @@ describe("api auth routes", () => {
     expect(success.statusCode).toBe(200);
     expect(success.json()).toEqual({
       membership: {
+        project_id: "proj_123",
         user_id: "usr_123",
-        organization_id: "org_123",
-        role: "owner"
+        role: "member",
+        membership_type: "collaborator"
       }
     });
   });

@@ -8,44 +8,29 @@ import { PlanBadge } from "../components/system/plan-badge.js";
 import { Button } from "../components/ui/button.js";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card.js";
 import { Skeleton } from "../components/ui/skeleton.js";
-import {
-  getBillingSummary,
-  isInvalidSessionError,
-  listOrganizationInvites,
-  listOrganizationMembers,
-  listProjects,
-  type BillingSummaryRecord
-} from "../lib/api.js";
+import { getBillingSummary, isInvalidSessionError, listProjects, type BillingSummaryRecord, type ProjectRecord } from "../lib/api.js";
+import { isSharedProject } from "../lib/project-access.js";
 import { useSession } from "../lib/session.js";
-
-interface OrganizationMembershipSummary {
-  members: number;
-  invites: number;
-}
 
 export function OrganizationOverviewPage(): JSX.Element {
   const { session } = useSession();
-  const [projectCount, setProjectCount] = useState<number | null>(null);
-  const [membershipSummary, setMembershipSummary] = useState<OrganizationMembershipSummary | null>(null);
+  const [projects, setProjects] = useState<ProjectRecord[] | null>(null);
   const [billingSummary, setBillingSummary] = useState<BillingSummaryRecord | null>(null);
-  const [isMembersForbidden, setIsMembersForbidden] = useState(session?.role !== "owner");
   const [isBillingForbidden, setIsBillingForbidden] = useState(session?.role !== "owner");
 
   useEffect(() => {
     let isCancelled = false;
 
-    setProjectCount(null);
-    setMembershipSummary(null);
+    setProjects(null);
     setBillingSummary(null);
-    setIsMembersForbidden(session?.role !== "owner");
     setIsBillingForbidden(session?.role !== "owner");
 
     void (async () => {
       try {
-        const projects = await listProjects();
+        const nextProjects = await listProjects();
 
         if (!isCancelled) {
-          setProjectCount(projects.length);
+          setProjects(nextProjects);
         }
       } catch (error) {
         if (isInvalidSessionError(error)) {
@@ -57,33 +42,6 @@ export function OrganizationOverviewPage(): JSX.Element {
     })();
 
     if (session?.role === "owner") {
-      void (async () => {
-        try {
-          const [members, invites] = await Promise.all([listOrganizationMembers(), listOrganizationInvites()]);
-
-          if (!isCancelled) {
-            setMembershipSummary({
-              members: members.length,
-              invites: invites.length
-            });
-          }
-        } catch (error) {
-          if (error instanceof Error && error.message === "forbidden") {
-            if (!isCancelled) {
-              setIsMembersForbidden(true);
-            }
-
-            return;
-          }
-
-          if (isInvalidSessionError(error)) {
-            return;
-          }
-
-          throw error;
-        }
-      })();
-
       void (async () => {
         try {
           const billing = await getBillingSummary();
@@ -118,14 +76,12 @@ export function OrganizationOverviewPage(): JSX.Element {
     return <></>;
   }
 
-  const projectSummaryText = formatActiveProjects(projectCount);
+  const projectSummaryText = formatActiveProjects(projects?.length ?? null);
   const roleLabel = session.role === "owner" ? "Owner" : "Member";
 
   return (
     <div className="space-y-8">
-      <PageHeader
-        description="Review organization details, access, and links to member and billing management."
-      />
+      <PageHeader description="Review organization details, project access, and billing." />
 
       <div className="grid gap-4 xl:grid-cols-3">
         <Card>
@@ -168,7 +124,7 @@ export function OrganizationOverviewPage(): JSX.Element {
         <Card>
           <CardHeader>
             <CardTitle>Access scope</CardTitle>
-            <CardDescription>What this signed-in role can manage.</CardDescription>
+            <CardDescription>What this signed-in role can manage across the workspace.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4 text-sm">
             <div className="flex items-center gap-3">
@@ -177,7 +133,7 @@ export function OrganizationOverviewPage(): JSX.Element {
             </div>
             <div className="flex items-center gap-3">
               <UsersRoundIcon className="size-4 text-muted-foreground" />
-              <p>{session.role === "owner" ? "Member management is available." : "Member management is owner-only."}</p>
+              <p>{session.role === "owner" ? "Project sharing is managed from each project." : "Shared projects appear in the project inventory."}</p>
             </div>
             <div className="flex items-center gap-3">
               <CreditCardIcon className="size-4 text-muted-foreground" />
@@ -188,28 +144,19 @@ export function OrganizationOverviewPage(): JSX.Element {
       </div>
 
       <div className="grid gap-4 xl:grid-cols-2">
-        {isMembersForbidden ? (
-          <CalloutCard
-            eyebrow="Owner scope"
-            title="Owner permissions are required to manage members"
-            description="Members can still review this page and use project and token routes, but member management is owner-only."
-            tone="warning"
-          />
-        ) : (
-          <CalloutCard
-            eyebrow="Members"
-            title="Member management"
-            description={formatMembershipSummary(membershipSummary)}
-            tone="neutral"
-          >
-            <Button asChild variant="outline">
-              <Link to="/organization/members">
-                <UsersRoundIcon data-icon="inline-start" />
-                Open member management
-              </Link>
-            </Button>
-          </CalloutCard>
-        )}
+        <CalloutCard
+          eyebrow="Project sharing"
+          title="Manage sharing from each project"
+          description={formatProjectSharingSummary(projects)}
+          tone="neutral"
+        >
+          <Button asChild variant="outline">
+            <Link to="/projects">
+              <UsersRoundIcon data-icon="inline-start" />
+              Open projects
+            </Link>
+          </Button>
+        </CalloutCard>
 
         {isBillingForbidden ? (
           <CalloutCard
@@ -247,12 +194,23 @@ export function formatActiveProjects(projectCount: number | null): string | null
   return `${projectCount} active ${projectCount === 1 ? "project" : "projects"}`;
 }
 
-export function formatMembershipSummary(summary: OrganizationMembershipSummary | null): string {
-  if (summary === null) {
-    return "Loading member summary...";
+export function formatProjectSharingSummary(projects: ProjectRecord[] | null): string {
+  if (projects === null) {
+    return "Loading sharing summary...";
   }
 
-  return `${summary.members} ${summary.members === 1 ? "member" : "members"} and ${summary.invites} pending ${summary.invites === 1 ? "invite" : "invites"}.`;
+  if (projects.length === 0) {
+    return "Create a project to start sending events and sharing access.";
+  }
+
+  const sharedCount = projects.filter((project) => isSharedProject(project)).length;
+  const projectSummary = formatActiveProjects(projects.length);
+
+  if (sharedCount === 0) {
+    return `${projectSummary}. Sharing is managed from each project's Members tab.`;
+  }
+
+  return `${projectSummary}. ${sharedCount} ${sharedCount === 1 ? "project is" : "projects are"} shared.`;
 }
 
 export function formatBillingSummary(summary: BillingSummaryRecord | null): string {

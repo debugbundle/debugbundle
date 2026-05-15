@@ -47,7 +47,7 @@ export const TIER_CAPABILITIES = {
     raw_event_retention_days: 14,
     // Per-unit allowance (multiply by included and purchased capacity units)
     monthly_bundle_requests: 250,
-    monthly_raw_ingested_events: 2_000,
+    monthly_raw_ingested_events: 3_500,
     retained_bundle_cap: 150,
     monthly_remote_activations: 25,
     monthly_alert_deliveries: 75,
@@ -66,11 +66,11 @@ export const TIER_CAPABILITIES = {
     bundle_retention_days: 90,
     raw_event_retention_days: 30,
     // Per-unit allowance (multiply by included and purchased capacity units)
-    monthly_bundle_requests: 500,
-    monthly_raw_ingested_events: 5_000,
-    retained_bundle_cap: 300,
+    monthly_bundle_requests: 1_000,
+    monthly_raw_ingested_events: 10_000,
+    retained_bundle_cap: 400,
     monthly_remote_activations: 50,
-    monthly_alert_deliveries: 150,
+    monthly_alert_deliveries: 300,
   },
 } as const;
 

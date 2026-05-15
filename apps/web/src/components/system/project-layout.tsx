@@ -7,6 +7,7 @@ import { Button } from "../ui/button.js";
 import { Skeleton } from "../ui/skeleton.js";
 import { Tabs, TabsList, TabsTrigger } from "../ui/tabs.js";
 import { listProjects, type ProjectRecord } from "../../lib/api.js";
+import { getProjectRelationship } from "../../lib/project-access.js";
 
 const PROJECT_TABS = [
   { value: "overview", label: "Overview", suffix: "" },
@@ -16,6 +17,7 @@ const PROJECT_TABS = [
   { value: "webhooks", label: "Webhooks", suffix: "/webhooks" },
   { value: "github", label: "GitHub", suffix: "/github" },
   { value: "tokens", label: "Tokens", suffix: "/tokens" },
+  { value: "members", label: "Members", suffix: "/members" },
   { value: "settings", label: "Settings", suffix: "/settings" },
 ] as const;
 
@@ -66,7 +68,11 @@ export function ProjectLayout(): JSX.Element {
       return;
     }
 
-    setActiveProject({ projectId, projectName: project.name });
+    setActiveProject({
+      projectId,
+      projectName: project.name,
+      relationship: getProjectRelationship(project)
+    });
 
     return () => {
       setActiveProject((current) => {
@@ -81,7 +87,11 @@ export function ProjectLayout(): JSX.Element {
 
   function handleProjectUpdated(nextProject: ProjectRecord): void {
     setProject(nextProject);
-    setActiveProject({ projectId: nextProject.project_id, projectName: nextProject.name });
+    setActiveProject({
+      projectId: nextProject.project_id,
+      projectName: nextProject.name,
+      relationship: getProjectRelationship(nextProject)
+    });
   }
 
   if (projectId === undefined) {

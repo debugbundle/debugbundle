@@ -8,6 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "../ui/card.js";
 import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "../ui/empty.js";
 import { Skeleton } from "../ui/skeleton.js";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../ui/table.js";
+import { ProjectNameWithAccessIndicator } from "./project-name-with-access-indicator.js";
 import { listProjects, type ProjectRecord } from "../../lib/api.js";
 import { useDelayedVisibility } from "../../lib/use-delayed-visibility.js";
 
@@ -82,7 +83,9 @@ export function RecentProjectsTable(): JSX.Element {
                         void navigate(`/projects/${project.project_id}`);
                       }}
                     >
-                      <TableCell className="font-medium">{project.name}</TableCell>
+                      <TableCell className="font-medium">
+                        <ProjectNameWithAccessIndicator project={project} />
+                      </TableCell>
                       <TableCell className="text-muted-foreground">{project.slug}</TableCell>
                       <TableCell>
                         <Badge variant="outline">{project.environment_default}</Badge>

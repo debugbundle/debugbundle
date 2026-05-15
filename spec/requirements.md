@@ -195,7 +195,7 @@ Last updated: 2026-03-27
 
 **FR-RET-02:** `GET /v1/incidents/{id}` — incident metadata.
 
-**FR-RET-03:** `POST /v1/incidents/{id}/resolve` — explicitly resolve an incident for the authenticated organization member, persist `resolved_at` and resolver attribution, and return the updated incident record.
+**FR-RET-03:** `POST /v1/incidents/{id}/resolve` — explicitly resolve an incident for an authenticated caller with access to that project, persist `resolved_at` and resolver attribution, and return the updated incident record.
 
 **FR-RET-04:** `GET /v1/incidents/{id}/bundle` — full debug bundle. Return `{"status": "pending"}` if still processing, `{"status": "failed", "reason": "..."}` if generation failed.
 
@@ -235,7 +235,7 @@ Last updated: 2026-03-27
 
 ### 1.9 CLI
 
-**FR-CLI-01:** Core commands: `login`, `whoami`, `setup`, `connect`, `ingest`, `watch`, `process`, `clean`, `incidents`, `inspect`, `resolve`, `reopen`, `bundle`, `reproduce`, `logs`, `services`, `analyze`, `token project list/create/revoke`, `token member list/create/revoke`, `webhook list/create/update/delete/test/deliveries/retry`, `alert list/create/update/delete`, `weekly-report list/create/update/delete`, `capture-policy get/set`, `project list/create/update/delete`, `probe activate/list/deactivate`, `member list/invites/invite/cancel-invite/update-role/remove`, `billing get/capacity increase/capacity schedule-reduction/capacity cancel-reduction`.
+**FR-CLI-01:** Core commands: `login`, `whoami`, `setup`, `connect`, `ingest`, `watch`, `process`, `clean`, `incidents`, `inspect`, `resolve`, `reopen`, `bundle`, `reproduce`, `logs`, `services`, `analyze`, `token project list/create/revoke`, `token member list/create/revoke`, `webhook list/create/update/delete/test/deliveries/retry`, `alert list/create/update/delete`, `weekly-report list/create/update/delete`, `capture-policy get/set`, `project list/create/update/delete`, `project members list/invites/invite/cancel-invite/update-role/remove`, `probe activate/list/deactivate`, `billing get/capacity increase/capacity schedule-reduction/capacity cancel-reduction`.
 
 **FR-CLI-02:** Setup commands: `doctor`, `validate`, `validate --fix`, `verify local`, `verify cloud`, `smoke`. `verify cloud --trigger-5xx` must actively prove hosted ingestion by sending a synthetic 5xx `request_event` through the real ingestion endpoint, confirming incident visibility, and reporting bundle status. `verify cloud --trigger-4xx <status>` must run the same hosted proof path for a specific `4xx` status, validate that the status is in `400..499`, and only succeed when the target project configuration promotes that status into immediate incident creation.
 
@@ -269,7 +269,7 @@ Last updated: 2026-03-27
 
 ### 1.10 MCP Server
 
-**FR-MCP-01:** Expose tools: `list_incidents`, `get_incident`, `resolve_incident`, `reopen_incident`, `get_bundle`, `get_reproduction`, `get_logs`, `doctor`, `validate`, `verify_local`, `verify_cloud`, `smoke`, `list_webhooks`, `create_webhook`, `update_webhook`, `delete_webhook`, `test_webhook`, `list_webhook_deliveries`, `retry_webhook_delivery`, `list_project_tokens`, `create_project_token`, `revoke_project_token`, `list_member_tokens`, `create_member_token`, `revoke_member_token`, `list_alerts`, `create_alert`, `update_alert`, `delete_alert`, `list_weekly_report_channels`, `create_weekly_report_channel`, `update_weekly_report_channel`, `delete_weekly_report_channel`, `list_services`, `analyze`, `get_capture_policy`, `update_capture_policy`, `activate_probe`, `list_active_probes`, `deactivate_probe`, `list_projects`, `create_project`, `update_project`, `delete_project`, `get_billing_summary`, `increase_capacity`, `schedule_capacity_reduction`, `cancel_capacity_reduction`, `list_members`, `list_member_invites`, `invite_member`, `cancel_member_invite`, `update_member_role`, `remove_member`.
+**FR-MCP-01:** Expose tools: `list_incidents`, `get_incident`, `resolve_incident`, `reopen_incident`, `get_bundle`, `get_reproduction`, `get_logs`, `doctor`, `validate`, `verify_local`, `verify_cloud`, `smoke`, `list_webhooks`, `create_webhook`, `update_webhook`, `delete_webhook`, `test_webhook`, `list_webhook_deliveries`, `retry_webhook_delivery`, `list_project_tokens`, `create_project_token`, `revoke_project_token`, `list_member_tokens`, `create_member_token`, `revoke_member_token`, `list_alerts`, `create_alert`, `update_alert`, `delete_alert`, `list_weekly_report_channels`, `create_weekly_report_channel`, `update_weekly_report_channel`, `delete_weekly_report_channel`, `list_services`, `analyze`, `get_capture_policy`, `update_capture_policy`, `activate_probe`, `list_active_probes`, `deactivate_probe`, `list_projects`, `create_project`, `update_project`, `delete_project`, `get_billing_summary`, `increase_capacity`, `schedule_capacity_reduction`, `cancel_capacity_reduction`, `list_project_members`, `list_project_member_invites`, `invite_project_member`, `cancel_project_member_invite`, `update_project_member_role`, `remove_project_member`.
 
 **FR-MCP-02:** MCP must be a thin adapter over the same domain services used by CLI/API.
 
@@ -323,9 +323,9 @@ See `/spec/billing.md` and `/spec/system-emails.md` for the detailed source-of-t
 
 **FR-AUTH-08:** Anti-abuse: email-code verification (see FR-AUTH-04), rate limiting (see NFR-RATE-*), signup throttling, and CAPTCHA on browser email-code requests.
 
-**FR-AUTH-09:** Invite model: owners can invite members by email. Invited identity accepts via link. Agent members may be added via direct token generation without email invite.
+**FR-AUTH-09:** Project-sharing invite model: project owners and project admins can invite collaborators to a specific project by email. Invited identity accepts via link into their own DebugBundle account. Collaborator roles are `admin` and `member`. Agent members may still be added through direct member-token generation without email invite.
 
-**FR-AUTH-10:** V1 project access: all organization members have access to all organization projects. Per-project scoping deferred to Enterprise.
+**FR-AUTH-10:** V1 project access is explicit and project-scoped. A user may access a project only when they own it or have an active `project_members` row for it. Shared access must never imply visibility into other projects owned by the same billing account.
 
 **FR-AUTH-11:** Member-authorized API operations must accept either a valid browser session or a valid member token. After principal resolution, both auth paths must run through the same authorization and domain logic.
 

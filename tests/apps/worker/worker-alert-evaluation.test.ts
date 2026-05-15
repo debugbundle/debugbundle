@@ -373,7 +373,7 @@ describe("worker alert evaluation", () => {
           },
           allowances: {
             monthly_bundle_requests: { used: 0, limit: 750 },
-            monthly_raw_ingested_events: { used: 0, limit: 6000 },
+            monthly_raw_ingested_events: { used: 0, limit: 10500 },
             retained_bundle_cap: { used: 0, limit: 450 },
             monthly_remote_activations: { used: 0, limit: 75 },
             monthly_alert_deliveries: { used: 225, limit: 225 }

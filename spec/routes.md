@@ -146,6 +146,8 @@ app.debugbundle.com
 │   └── First-time account creation through the shared email-code flow
 ├── /auth/github/callback
 │   └── GitHub sign-in completion
+├── /invite
+│   └── Project invite acceptance handoff
 ├── /dashboard
 │   └── Minimal signed-in home
 ├── /billing
@@ -158,6 +160,12 @@ app.debugbundle.com
 │   └── Create project
 ├── /projects/:projectId
 │   └── Project overview
+├── /projects/:projectId/members
+│   ├── Project member list
+│   ├── Pending invites
+│   ├── Invite collaborator
+│   ├── Role management
+│   └── Remove collaborator
 ├── /projects/:projectId/settings
 │   ├── Project details
 │   ├── Environment / install guidance entry point
@@ -195,11 +203,6 @@ app.debugbundle.com
 │   └── Revoke token
 ├── /organization
 │   └── Organization overview
-├── /organization/members
-│   ├── Member list
-│   ├── Invite member
-│   ├── Role management
-│   └── Remove member
 ├── /settings
 │   ├── Account profile
 │   ├── Password change

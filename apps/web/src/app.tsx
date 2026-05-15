@@ -50,12 +50,14 @@ import {
 import { showErrorToast, showInfoToast, showSuccessToast } from "./lib/notify.js";
 import { SessionProvider, useSession } from "./lib/session.js";
 import { BillingPage } from "./pages/billing-page.js";
-import { OrganizationMembersPage, ProjectsPage, ProjectTokensPage } from "./pages/management-pages.js";
+import { ProjectsPage, ProjectTokensPage } from "./pages/management-pages.js";
 import { IncidentsPage } from "./pages/incidents-page.js";
 import { IncidentDetailPage } from "./pages/incident-detail-page.js";
 import { OrganizationOverviewPage } from "./pages/organization-overview-page.js";
 import { ProjectLayout } from "./components/system/project-layout.js";
 import { ProjectAlertsPage } from "./pages/project-alerts-page.js";
+import { ProjectInvitePage } from "./pages/project-invite-page.js";
+import { ProjectMembersPage } from "./pages/project-members-page.js";
 import { ProjectGitHubPage } from "./pages/project-github-page.js";
 import { ProjectBundlesPage, ProjectIncidentsPage, ProjectOverviewPage } from "./pages/project-overview-page.js";
 import { ProjectSettingsPage } from "./pages/project-settings-page.js";
@@ -133,6 +135,7 @@ export function App({ initialEntries }: AppProps): JSX.Element {
           <Route element={<RootGate />}>
             <Route path="/login" element={<LoginPage />} />
             <Route path="/signup" element={<SignupPage />} />
+            <Route path="/invite" element={<ProjectInvitePage />} />
             <Route path="/auth/github/callback" element={<GithubAuthCallbackPage />} />
             <Route element={<ProtectedLayout />}>
               <Route path="/dashboard" element={<DashboardPage />} />
@@ -145,7 +148,7 @@ export function App({ initialEntries }: AppProps): JSX.Element {
                 element={
                   <TeamPlanGate
                     title="Shared workspace requires Team"
-                    description="Shared workspace views and member management are only available on Team. Free and Solo stay focused on project setup."
+                    description="Shared workspace views and project sharing are only available on Team. Free and Solo stay focused on project setup."
                   >
                     <OrganizationOverviewPage />
                   </TeamPlanGate>
@@ -158,22 +161,12 @@ export function App({ initialEntries }: AppProps): JSX.Element {
                 <Route path="bundles" element={<ProjectBundlesPage />} />
                 <Route path="bundles/:incidentId" element={<IncidentDetailPage />} />
                 <Route path="github" element={<ProjectGitHubPage />} />
+                <Route path="members" element={<ProjectMembersPage />} />
                 <Route path="settings" element={<ProjectSettingsPage />} />
                 <Route path="tokens" element={<ProjectTokensPage />} />
                 <Route path="alerts" element={<ProjectAlertsPage />} />
                 <Route path="webhooks" element={<ProjectWebhooksPage />} />
               </Route>
-              <Route
-                path="/organization/members"
-                element={
-                  <TeamPlanGate
-                    title="Member management requires Team"
-                    description="Member management is a Team feature. Upgrade to open this page."
-                  >
-                    <OrganizationMembersPage />
-                  </TeamPlanGate>
-                }
-              />
               <Route path="/settings" element={<SettingsPage />} />
               <Route path="/member-tokens" element={<MemberTokensPage />} />
             </Route>
@@ -187,6 +180,7 @@ export function App({ initialEntries }: AppProps): JSX.Element {
           <Route element={<RootGate />}>
             <Route path="/login" element={<LoginPage />} />
             <Route path="/signup" element={<SignupPage />} />
+            <Route path="/invite" element={<ProjectInvitePage />} />
             <Route path="/auth/github/callback" element={<GithubAuthCallbackPage />} />
             <Route element={<ProtectedLayout />}>
               <Route path="/dashboard" element={<DashboardPage />} />
@@ -199,7 +193,7 @@ export function App({ initialEntries }: AppProps): JSX.Element {
                 element={
                   <TeamPlanGate
                     title="Shared workspace requires Team"
-                    description="Shared workspace views and member management are only available on Team. Free and Solo stay focused on project setup."
+                    description="Shared workspace views and project sharing are only available on Team. Free and Solo stay focused on project setup."
                   >
                     <OrganizationOverviewPage />
                   </TeamPlanGate>
@@ -212,22 +206,12 @@ export function App({ initialEntries }: AppProps): JSX.Element {
                 <Route path="bundles" element={<ProjectBundlesPage />} />
                 <Route path="bundles/:incidentId" element={<IncidentDetailPage />} />
                 <Route path="github" element={<ProjectGitHubPage />} />
+                <Route path="members" element={<ProjectMembersPage />} />
                 <Route path="settings" element={<ProjectSettingsPage />} />
                 <Route path="tokens" element={<ProjectTokensPage />} />
                 <Route path="alerts" element={<ProjectAlertsPage />} />
                 <Route path="webhooks" element={<ProjectWebhooksPage />} />
               </Route>
-              <Route
-                path="/organization/members"
-                element={
-                  <TeamPlanGate
-                    title="Member management requires Team"
-                    description="Member management is a Team feature. Upgrade to open this page."
-                  >
-                    <OrganizationMembersPage />
-                  </TeamPlanGate>
-                }
-              />
               <Route path="/settings" element={<SettingsPage />} />
               <Route path="/member-tokens" element={<MemberTokensPage />} />
             </Route>
@@ -283,7 +267,7 @@ function RootGate(): JSX.Element {
 }
 
 function isPublicAuthPath(pathname: string): boolean {
-  return pathname === "/login" || pathname === "/signup" || pathname.startsWith("/auth/github/callback");
+  return pathname === "/login" || pathname === "/signup" || pathname === "/invite" || pathname.startsWith("/auth/github/callback");
 }
 
 function RootRedirect(): JSX.Element {
@@ -325,7 +309,11 @@ function TeamPlanGate({
 function ProtectedLayout(): JSX.Element {
   const { session, setSession } = useSession();
   const navigate = useNavigate();
-  const [activeProject, setActiveProject] = useState<{ projectId: string; projectName: string } | null>(null);
+  const [activeProject, setActiveProject] = useState<{
+    projectId: string;
+    projectName: string;
+    relationship: "owned" | "shared";
+  } | null>(null);
 
   if (session === null) {
     return <Navigate replace to="/login" />;
@@ -426,6 +414,26 @@ function AuthMethodDivider(): JSX.Element {
   );
 }
 
+function resolvePostAuthPath(nextPath: string | null): string {
+  if (nextPath === null || nextPath.length === 0) {
+    return "/dashboard";
+  }
+
+  if (!nextPath.startsWith("/") || nextPath.startsWith("//")) {
+    return "/dashboard";
+  }
+
+  return nextPath;
+}
+
+function appendNextPath(pathname: string, nextPath: string): string {
+  if (nextPath === "/dashboard") {
+    return pathname;
+  }
+
+  return `${pathname}?next=${encodeURIComponent(nextPath)}`;
+}
+
 function EmailAuthPage({
   title,
   heading,
@@ -443,6 +451,7 @@ function EmailAuthPage({
 }): JSX.Element {
   const { session, setSession } = useSession();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const emailInputRef = useRef<HTMLInputElement>(null);
   const codeInputRef = useRef<HTMLInputElement>(null);
   const [email, setEmail] = useState("");
@@ -451,9 +460,11 @@ function EmailAuthPage({
   const [fieldErrors, setFieldErrors] = useState<AuthFieldErrors>({});
   const [requestError, setRequestError] = useState<AuthRequestError | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const postAuthPath = resolvePostAuthPath(searchParams.get("next"));
+  const alternateHref = appendNextPath(alternateLinkHref, postAuthPath);
 
   if (session !== null) {
-    return <Navigate replace to="/dashboard" />;
+    return <Navigate replace to={postAuthPath} />;
   }
 
   function focusFirstInvalidField(errors: AuthFieldErrors): void {
@@ -499,7 +510,7 @@ function EmailAuthPage({
         const nextSession = await verifyEmailCode({ email: normalizedEmail, code: normalizedCode });
         setSession(nextSession);
         showSuccessToast("Signed in successfully.");
-        void navigate("/dashboard", { replace: true });
+        void navigate(postAuthPath, { replace: true });
       }
     } catch {
       setRequestError(
@@ -649,7 +660,7 @@ function EmailAuthPage({
               </div>
             ) : null}
             <FieldDescription className="text-center">
-              {alternatePrompt} <Link className="underline underline-offset-4 hover:text-foreground" to={alternateLinkHref}>{alternateLinkLabel}</Link>
+              {alternatePrompt} <Link className="underline underline-offset-4 hover:text-foreground" to={alternateHref}>{alternateLinkLabel}</Link>
             </FieldDescription>
           </Field>
         </FieldGroup>

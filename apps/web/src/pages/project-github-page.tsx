@@ -60,7 +60,7 @@ async function loadOptionalGitHubInstallUrl(projectId: string): Promise<{ instal
 
 function mapGitHubLoadErrorMessage(error: unknown): string {
   if (error instanceof Error && error.message === "github_not_configured") {
-    return "GitHub automation is not configured on the API yet. Set GITHUB_APP_ID, GITHUB_APP_PRIVATE_KEY, and GITHUB_APP_WEBHOOK_SECRET before using this tab.";
+    return "GitHub automation is not configured on the API yet.";
   }
 
   return "Could not load GitHub automation settings.";

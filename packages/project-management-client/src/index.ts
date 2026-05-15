@@ -13,6 +13,10 @@ export const ProjectRecordSchema = z
   .object({
     project_id: z.string(),
     organization_id: z.string(),
+    owner_user_id: z.string(),
+    owner_email: z.string().email(),
+    relationship: z.enum(["owned", "shared"]),
+    effective_role: z.enum(["owner", "admin", "member"]),
     name: z.string(),
     slug: z.string(),
     environment_default: z.string(),
@@ -39,6 +43,10 @@ export const DeletedProjectRecordSchema = z
   .object({
     project_id: z.string(),
     organization_id: z.string(),
+    owner_user_id: z.string(),
+    owner_email: z.string().email(),
+    relationship: z.enum(["owned", "shared"]),
+    effective_role: z.enum(["owner", "admin", "member"]),
     name: z.string(),
     slug: z.string(),
     environment_default: z.string(),

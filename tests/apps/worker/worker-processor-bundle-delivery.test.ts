@@ -529,7 +529,7 @@ describe("worker processor \u2013 bundle, delivery & sampling", () => {
           },
           allowances: {
             monthly_bundle_requests: { used: 750, limit: 750 },
-            monthly_raw_ingested_events: { used: 0, limit: 6000 },
+            monthly_raw_ingested_events: { used: 0, limit: 10500 },
             retained_bundle_cap: { used: 0, limit: 450 },
             monthly_remote_activations: { used: 0, limit: 75 },
             monthly_alert_deliveries: { used: 0, limit: 225 }
@@ -605,7 +605,7 @@ describe("worker processor \u2013 bundle, delivery & sampling", () => {
           },
           allowances: {
             monthly_bundle_requests: { used: 750, limit: 750 },
-            monthly_raw_ingested_events: { used: 0, limit: 6000 },
+            monthly_raw_ingested_events: { used: 0, limit: 10500 },
             retained_bundle_cap: { used: 0, limit: 450 },
             monthly_remote_activations: { used: 0, limit: 75 },
             monthly_alert_deliveries: { used: 0, limit: 225 }
@@ -736,7 +736,7 @@ describe("worker processor \u2013 bundle, delivery & sampling", () => {
           },
           allowances: {
             monthly_bundle_requests: { used: 1, limit: 750 },
-            monthly_raw_ingested_events: { used: 0, limit: 6000 },
+            monthly_raw_ingested_events: { used: 0, limit: 10500 },
             retained_bundle_cap: { used: 451, limit: 450 },
             monthly_remote_activations: { used: 0, limit: 75 },
             monthly_alert_deliveries: { used: 0, limit: 225 }

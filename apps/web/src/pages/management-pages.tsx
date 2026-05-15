@@ -1,10 +1,10 @@
-import { FolderIcon, KeyRoundIcon, MailCheckIcon, PlusIcon } from "lucide-react";
+import { FolderIcon, KeyRoundIcon, PlusIcon } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useOutletContext } from "react-router-dom";
-import { CalloutCard } from "../components/system/callout-card.js";
 import { DialogFormContent } from "../components/system/dialog-form-content.js";
 import { PageHeader } from "../components/system/page-header.js";
 import { PlaintextTokenReveal } from "../components/system/plaintext-token-reveal.js";
+import { ProjectNameWithAccessIndicator } from "../components/system/project-name-with-access-indicator.js";
 import { ProjectResourceEmptyState } from "../components/system/project-resource-empty-state.js";
 import type { ProjectContext } from "../components/system/project-layout.js";
 import { ResourceListState } from "../components/system/resource-list-state.js";
@@ -30,27 +30,18 @@ import { Input } from "../components/ui/input.js";
 import { Skeleton } from "../components/ui/skeleton.js";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../components/ui/table.js";
 import {
-  cancelOrganizationInvite,
   createProject,
   createProjectToken,
   isInvalidSessionError,
-  inviteOrganizationMember,
-  listOrganizationInvites,
-  listOrganizationMembers,
   listProjects,
   listProjectTokens,
-  removeOrganizationMember,
   revokeProjectToken,
-  updateOrganizationMemberRole,
   type CreatedProjectToken,
-  type OrganizationInviteRecord,
-  type OrganizationMemberRecord,
   type ProjectRecord,
   type ProjectTokenRecord
 } from "../lib/api.js";
 import { showErrorToast, showSuccessToast } from "../lib/notify.js";
 import { CUSTOM_PROJECT_ENVIRONMENT_VALUE, PROJECT_ENVIRONMENT_OPTIONS, slugifyProjectName } from "../lib/project-form.js";
-import { useSession } from "../lib/session.js";
 
 export { BillingPage } from "./billing-page.js";
 
@@ -259,7 +250,9 @@ export function ProjectsPage(): JSX.Element {
                         void navigate(`/projects/${project.project_id}`);
                       }}
                     >
-                      <TableCell className="font-medium">{project.name}</TableCell>
+                      <TableCell className="font-medium">
+                        <ProjectNameWithAccessIndicator project={project} />
+                      </TableCell>
                       <TableCell>{project.slug}</TableCell>
                       <TableCell>
                         <Badge variant="outline">{project.environment_default}</Badge>
@@ -415,272 +408,6 @@ export function ProjectTokensPage(): JSX.Element {
           )}
         </CardContent>
       </Card>
-    </div>
-  );
-}
-
-export function OrganizationMembersPage(): JSX.Element {
-  const { session } = useSession();
-  const [members, setMembers] = useState<OrganizationMemberRecord[] | null>(null);
-  const [invites, setInvites] = useState<OrganizationInviteRecord[] | null>(null);
-  const [isForbidden, setIsForbidden] = useState(false);
-  const [isInviteOpen, setIsInviteOpen] = useState(false);
-  const [inviteEmail, setInviteEmail] = useState("");
-  const [inviteRole, setInviteRole] = useState<"owner" | "member">("member");
-
-  useEffect(() => {
-    void (async () => {
-      try {
-        const [nextMembers, nextInvites] = await Promise.all([listOrganizationMembers(), listOrganizationInvites()]);
-        setMembers(nextMembers);
-        setInvites(nextInvites);
-      } catch (error) {
-        if (error instanceof Error && error.message === "forbidden") {
-          setIsForbidden(true);
-          return;
-        }
-
-        if (isInvalidSessionError(error)) {
-          return;
-        }
-
-        throw error;
-      }
-    })();
-  }, []);
-
-  async function handleInvite(event: React.FormEvent<HTMLFormElement>): Promise<void> {
-    event.preventDefault();
-
-    try {
-      const created = await inviteOrganizationMember({ email: inviteEmail, role: inviteRole });
-      setInvites((current) => [...(current ?? []), created]);
-      setInviteEmail("");
-      setInviteRole("member");
-      setIsInviteOpen(false);
-      showSuccessToast("Invitation sent successfully.");
-    } catch {
-      showErrorToast("Could not send invite.");
-    }
-  }
-
-  async function handleRoleChange(userId: string, newRole: "owner" | "member"): Promise<void> {
-    try {
-      const updated = await updateOrganizationMemberRole(userId, newRole);
-      setMembers((current) => (current ?? []).map((m) => (m.user_id === userId ? updated : m)));
-      showSuccessToast("Member role updated successfully.");
-    } catch {
-      showErrorToast("Could not update member role.");
-    }
-  }
-
-  async function handleRemoveMember(userId: string): Promise<void> {
-    try {
-      await removeOrganizationMember(userId);
-      setMembers((current) => (current ?? []).filter((m) => m.user_id !== userId));
-      showSuccessToast("Member removed successfully.");
-    } catch {
-      showErrorToast("Could not remove member.");
-    }
-  }
-
-  async function handleCancelInvite(inviteId: string): Promise<void> {
-    try {
-      await cancelOrganizationInvite(inviteId);
-      setInvites((current) => (current ?? []).filter((i) => i.invite_id !== inviteId));
-      showSuccessToast("Invite cancelled successfully.");
-    } catch {
-      showErrorToast("Could not cancel invite.");
-    }
-  }
-
-  return (
-    <div className="space-y-8">
-      <PageHeader
-        description="Manage members and pending invites for this organization."
-        actions={
-          !isForbidden ? (
-            <Dialog open={isInviteOpen} onOpenChange={setIsInviteOpen}>
-              <DialogTrigger asChild>
-                <Button type="button">
-                  <PlusIcon data-icon="inline-start" />
-                  Invite member
-                </Button>
-              </DialogTrigger>
-              <DialogFormContent
-                title="Invite member"
-                description="Invite someone to this organization."
-                footer={<Button type="submit">Send invite</Button>}
-                onSubmit={(event) => void handleInvite(event)}
-              >
-                  <FieldGroup>
-                    <Field>
-                      <FieldLabel htmlFor="invite-email">Email address</FieldLabel>
-                      <Input id="invite-email" type="email" value={inviteEmail} onChange={(event) => setInviteEmail(event.currentTarget.value)} />
-                    </Field>
-                    <Field>
-                      <FieldLabel htmlFor="invite-role">Role</FieldLabel>
-                      <select
-                        id="invite-role"
-                        className="flex h-10 w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
-                        value={inviteRole}
-                        onChange={(event) => setInviteRole(event.currentTarget.value as "owner" | "member")}
-                      >
-                        <option value="member">Member</option>
-                        <option value="owner">Owner</option>
-                      </select>
-                    </Field>
-                  </FieldGroup>
-              </DialogFormContent>
-            </Dialog>
-          ) : undefined
-        }
-      />
-
-      {isForbidden ? (
-        <CalloutCard
-          eyebrow="Owner scope"
-          title="Owner permissions are required to manage members"
-          description="Only owners can manage members. Signed-in members can still use project and token routes."
-          tone="warning"
-        />
-      ) : (
-        <div className="grid gap-4 xl:grid-cols-2">
-          <Card>
-            <CardHeader>
-              <CardTitle>Members</CardTitle>
-              <CardDescription>Current members and roles.</CardDescription>
-            </CardHeader>
-            <CardContent>
-              {members === null ? (
-                <div className="space-y-3">
-                  <Skeleton className="h-12 w-full" />
-                  <Skeleton className="h-12 w-full" />
-                </div>
-              ) : members.length === 0 ? (
-                <p className="text-sm text-muted-foreground">No members found.</p>
-              ) : (
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Email</TableHead>
-                      <TableHead>Role</TableHead>
-                      <TableHead>Added</TableHead>
-                      <TableHead className="text-right">Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {members.map((member) => {
-                      const isSelf = member.user_id === session?.user_id;
-                      return (
-                        <TableRow key={member.user_id}>
-                          <TableCell className="font-medium">{member.email}</TableCell>
-                          <TableCell>
-                            <select
-                              aria-label={`role for ${member.email}`}
-                              className="rounded border border-border bg-background px-2 py-1 text-sm"
-                              value={member.role}
-                              disabled={isSelf}
-                              onChange={(event) => void handleRoleChange(member.user_id, event.currentTarget.value as "owner" | "member")}
-                            >
-                              <option value="owner">owner</option>
-                              <option value="member">member</option>
-                            </select>
-                          </TableCell>
-                          <TableCell>{formatDate(member.created_at)}</TableCell>
-                          <TableCell className="text-right">
-                            <AlertDialog>
-                              <AlertDialogTrigger asChild>
-                                <Button type="button" variant="ghost" size="sm" disabled={isSelf}>Remove</Button>
-                              </AlertDialogTrigger>
-                              <AlertDialogContent>
-                                <AlertDialogHeader>
-                                  <AlertDialogTitle>Remove member</AlertDialogTitle>
-                                  <AlertDialogDescription>
-                                    This removes {member.email} from the organization immediately.
-                                  </AlertDialogDescription>
-                                </AlertDialogHeader>
-                                <AlertDialogFooter>
-                                  <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                  <AlertDialogAction onClick={() => void handleRemoveMember(member.user_id)}>Remove member</AlertDialogAction>
-                                </AlertDialogFooter>
-                              </AlertDialogContent>
-                            </AlertDialog>
-                          </TableCell>
-                        </TableRow>
-                      );
-                    })}
-                  </TableBody>
-                </Table>
-              )}
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>Pending invites</CardTitle>
-              <CardDescription>Invitations waiting to be accepted.</CardDescription>
-            </CardHeader>
-            <CardContent>
-              {invites === null ? (
-                <div className="space-y-3">
-                  <Skeleton className="h-12 w-full" />
-                  <Skeleton className="h-12 w-full" />
-                </div>
-              ) : invites.length === 0 ? (
-                <Empty className="min-h-[9rem] justify-center border border-dashed border-border/80 bg-background/50">
-                  <EmptyHeader>
-                    <EmptyMedia variant="icon">
-                      <MailCheckIcon />
-                    </EmptyMedia>
-                    <EmptyTitle>No pending invites right now</EmptyTitle>
-                    <EmptyDescription>Outstanding invitations will appear here until they are accepted or cancelled.</EmptyDescription>
-                  </EmptyHeader>
-                </Empty>
-              ) : (
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Email</TableHead>
-                      <TableHead>Role</TableHead>
-                      <TableHead>Expires</TableHead>
-                      <TableHead className="text-right">Action</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {invites.map((invite) => (
-                      <TableRow key={invite.invite_id}>
-                        <TableCell className="font-medium">{invite.email}</TableCell>
-                        <TableCell>{invite.role}</TableCell>
-                        <TableCell>{formatDate(invite.expires_at)}</TableCell>
-                        <TableCell className="text-right">
-                          <AlertDialog>
-                            <AlertDialogTrigger asChild>
-                              <Button type="button" variant="ghost" size="sm">Cancel</Button>
-                            </AlertDialogTrigger>
-                            <AlertDialogContent>
-                              <AlertDialogHeader>
-                                <AlertDialogTitle>Cancel invite</AlertDialogTitle>
-                                <AlertDialogDescription>
-                                  This will revoke the pending invitation for {invite.email}.
-                                </AlertDialogDescription>
-                              </AlertDialogHeader>
-                              <AlertDialogFooter>
-                                <AlertDialogCancel>Keep invite</AlertDialogCancel>
-                                <AlertDialogAction onClick={() => void handleCancelInvite(invite.invite_id)}>Cancel invite</AlertDialogAction>
-                              </AlertDialogFooter>
-                            </AlertDialogContent>
-                          </AlertDialog>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              )}
-            </CardContent>
-          </Card>
-        </div>
-      )}
     </div>
   );
 }

@@ -224,6 +224,10 @@ export interface ResolveMemberResult {
 export interface ProjectRecord {
   project_id: string;
   organization_id: string;
+  owner_user_id: string;
+  owner_email: string;
+  relationship: "owned" | "shared";
+  effective_role: "owner" | "admin" | "member";
   name: string;
   slug: string;
   environment_default: string;
@@ -239,6 +243,16 @@ export interface ProjectRecord {
 }
 
 export type DeletedProjectRecord = Omit<ProjectRecord, "metrics">;
+
+export interface ProjectAccessRecord {
+  project_id: string;
+  organization_id: string;
+  owner_user_id: string;
+  owner_email: string;
+  relationship: "owned" | "shared";
+  effective_role: "owner" | "admin" | "member";
+  organization_plan: TierName;
+}
 
 export interface AccountStoredArtifactRecord extends Record<string, unknown> {
   key: string;
@@ -296,6 +310,57 @@ export interface OrganizationMemberRecord {
   role: "owner" | "member";
   created_at: string;
 }
+
+export interface ProjectMemberRecord {
+  user_id: string;
+  email: string;
+  role: "owner" | "admin" | "member";
+  membership_type: "owner" | "collaborator";
+  created_at: string;
+}
+
+export interface ProjectInviteRecord {
+  invite_id: string;
+  project_id: string;
+  email: string;
+  role: "admin" | "member";
+  invited_by_user_id: string;
+  accepted_at: string | null;
+  canceled_at: string | null;
+  expires_at: string;
+  created_at: string;
+}
+
+export type CreateProjectInviteResult =
+  | {
+      kind: "created";
+      owner_plan: TierName;
+      invite: ProjectInviteRecord;
+    }
+  | {
+      kind: "member_exists" | "invite_exists" | "upgrade_required" | "collaborator_limit_reached";
+      owner_plan: TierName;
+    };
+
+export type RemoveProjectMemberResult =
+  | {
+      kind: "removed";
+      member: ProjectMemberRecord;
+    }
+  | {
+      kind: "owner_removal_forbidden";
+      member: ProjectMemberRecord;
+    };
+
+export type UpdateProjectMemberRoleResult =
+  | {
+      kind: "updated";
+      member: ProjectMemberRecord;
+    }
+  | {
+      kind: "owner_role_change_forbidden";
+      member: ProjectMemberRecord;
+    };
 
 export interface OrganizationInviteRecord {
   invite_id: string;
@@ -507,6 +572,7 @@ export interface PostgresMetadataStore
     TokenManagementStore,
     ProjectManagementStore,
     OrganizationManagementStore,
+    ProjectCollaborationStore,
     ProbeManagementStore,
     AlertManagementStore,
     BundleBuildContextStore,
@@ -721,6 +787,10 @@ export interface InsertIncidentEventInput {
 export interface MetadataStore {
   resolveProjectByTokenHash(tokenHash: string): Promise<ResolveProjectResult | null>;
   resolveMemberByTokenHash(tokenHash: string): Promise<ResolveMemberResult | null>;
+  resolveProjectAccessForUser?(input: {
+    user_id: string;
+    project_id: string;
+  }): Promise<ProjectAccessRecord | null>;
   listIncidentsForOrganization(input: {
     organization_id: string;
     project_id?: string;
@@ -990,6 +1060,29 @@ export interface TokenManagementStore {
 }
 
 export interface ProjectManagementStore {
+  listProjectsForUser?(input: {
+    user_id: string;
+    now: string;
+    limit: number;
+  }): Promise<ProjectRecord[]>;
+  createProjectForUser?(input: {
+    user_id: string;
+    organization_id: string;
+    name: string;
+    slug: string;
+    environment_default: string;
+  }): Promise<ProjectRecord | null>;
+  updateProjectForUser?(input: {
+    user_id: string;
+    project_id: string;
+    name?: string;
+    slug?: string;
+    environment_default?: string;
+  }): Promise<ProjectRecord | "slug_taken" | null>;
+  deleteProjectForUser?(input: {
+    user_id: string;
+    project_id: string;
+  }): Promise<DeletedProjectRecord | null>;
   listProjectsForOrganization(input: {
     organization_id: string;
     now: string;
@@ -1289,6 +1382,57 @@ export interface OrganizationManagementStore {
     user_id: string;
     role: "owner" | "member";
   }): Promise<UpdateOrganizationMemberRoleResult | null>;
+}
+
+export interface ProjectCollaborationStore {
+  listMembersForProject?(input: {
+    project_id: string;
+    user_id: string;
+  }): Promise<{ owner_plan: TierName; members: ProjectMemberRecord[] } | null>;
+  listPendingInvitesForProject?(input: {
+    project_id: string;
+    user_id: string;
+    now: string;
+  }): Promise<ProjectInviteRecord[] | null>;
+  createInviteForProject?(input: {
+    project_id: string;
+    user_id: string;
+    email: string;
+    role: "admin" | "member";
+    invited_by_user_id: string;
+    invite_token_hash: string;
+    expires_at: string;
+  }): Promise<CreateProjectInviteResult | null>;
+  cancelInviteForProject?(input: {
+    project_id: string;
+    user_id: string;
+    invite_id: string;
+  }): Promise<ProjectInviteRecord | null>;
+  acceptProjectInviteForUser?(input: {
+    invite_token_hash: string;
+    user_id: string;
+    email: string;
+    accepted_at: string;
+  }): Promise<
+    | {
+        kind: "accepted";
+        membership: ProjectMemberRecord & { project_id: string };
+      }
+    | {
+        kind: "invalid_token" | "email_mismatch";
+      }
+  >;
+  updateProjectMemberRole?(input: {
+    project_id: string;
+    actor_user_id: string;
+    user_id: string;
+    role: "admin" | "member";
+  }): Promise<UpdateProjectMemberRoleResult | null>;
+  removeProjectMember?(input: {
+    project_id: string;
+    actor_user_id: string;
+    user_id: string;
+  }): Promise<RemoveProjectMemberResult | null>;
 }
 
 export interface CreateWebhookDeliveryIntentInput {

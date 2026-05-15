@@ -19,6 +19,7 @@ import {
   type ProjectRecord
 } from "../lib/api.js";
 import { formatIncidentMatchedFields } from "../lib/incident-copy.js";
+import { formatProjectRelationship, getProjectEffectiveRole, getProjectOwnerEmail, isSharedProject } from "../lib/project-access.js";
 import { showErrorToast, showInfoToast, showSuccessToast } from "../lib/notify.js";
 import { useCursorPagination } from "../lib/use-cursor-pagination.js";
 
@@ -32,9 +33,14 @@ export function ProjectOverviewPage(): JSX.Element {
       <Card>
         <CardHeader>
           <CardTitle>Project details</CardTitle>
-          <CardDescription>Project identity and the default environment.</CardDescription>
+          <CardDescription>Project identity, access, and the default environment.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
+          <DetailRow label="Access" value={formatProjectRelationship(project)} />
+          <DetailRow label="Your role" value={getProjectEffectiveRole(project)} />
+          {isSharedProject(project) && getProjectOwnerEmail(project) !== null ? (
+            <DetailRow label="Owner" value={getProjectOwnerEmail(project)!} />
+          ) : null}
           <DetailRow label="Slug" value={project.slug} />
           <DetailRow label="Project default environment" value={project.environment_default} />
           <DetailRow label="Created" value={formatDate(project.created_at)} />

@@ -151,24 +151,6 @@ export interface ServiceRecord {
   environment: string;
 }
 
-export interface OrganizationMemberRecord {
-  user_id: string;
-  email: string;
-  role: "owner" | "member";
-  created_at: string;
-}
-
-export interface OrganizationInviteRecord {
-  invite_id: string;
-  organization_id: string;
-  email: string;
-  role: "owner" | "member";
-  invited_by: string;
-  accepted_at: string | null;
-  expires_at: string;
-  created_at: string;
-}
-
 export interface BillingUsageMetric {
   used: number;
   limit: number;
@@ -1130,26 +1112,6 @@ export async function revokeProjectToken(projectId: string, tokenId: string): Pr
   );
 }
 
-export async function listOrganizationMembers(): Promise<OrganizationMemberRecord[]> {
-  const body = await readJson<{ members: OrganizationMemberRecord[] }>(
-    await fetch(`${API_BASE}/v1/organization/members`, {
-      credentials: "include"
-    })
-  );
-
-  return body.members;
-}
-
-export async function listOrganizationInvites(): Promise<OrganizationInviteRecord[]> {
-  const body = await readJson<{ invites: OrganizationInviteRecord[] }>(
-    await fetch(`${API_BASE}/v1/organization/members/invites`, {
-      credentials: "include"
-    })
-  );
-
-  return body.invites;
-}
-
 export async function createMemberToken(payload: { label: string }): Promise<CreatedMemberToken> {
   const body = await readJson<{ token: CreatedMemberToken }>(
     await fetch(`${API_BASE}/v1/member/tokens`, {
@@ -1184,58 +1146,6 @@ export async function deleteAlert(alertId: string): Promise<void> {
     const body = (await response.json().catch(() => null)) as { error?: string } | null;
     throw new Error(body?.error ?? `request_failed_${response.status}`);
   }
-}
-
-export async function inviteOrganizationMember(payload: {
-  email: string;
-  role: "owner" | "member";
-}): Promise<OrganizationInviteRecord> {
-  const body = await readJson<{ invite: OrganizationInviteRecord }>(
-    await fetch(`${API_BASE}/v1/organization/members/invite`, {
-      method: "POST",
-      credentials: "include",
-      headers: buildBrowserSessionHeaders(true),
-      body: JSON.stringify(payload)
-    })
-  );
-
-  return body.invite;
-}
-
-export async function updateOrganizationMemberRole(
-  userId: string,
-  role: "owner" | "member"
-): Promise<OrganizationMemberRecord> {
-  const body = await readJson<{ member: OrganizationMemberRecord }>(
-    await fetch(`${API_BASE}/v1/organization/members/${userId}`, {
-      method: "PATCH",
-      credentials: "include",
-      headers: buildBrowserSessionHeaders(true),
-      body: JSON.stringify({ role })
-    })
-  );
-
-  return body.member;
-}
-
-export async function removeOrganizationMember(userId: string): Promise<void> {
-  await readJson(
-    await fetch(`${API_BASE}/v1/organization/members/${userId}`, {
-      method: "DELETE",
-      credentials: "include",
-      headers: buildBrowserSessionHeaders()
-    })
-  );
-}
-
-export async function cancelOrganizationInvite(inviteId: string): Promise<void> {
-  await readJson(
-    await fetch(`${API_BASE}/v1/organization/members/invites/${inviteId}`, {
-      method: "DELETE",
-      credentials: "include",
-      headers: buildBrowserSessionHeaders()
-    })
-  );
 }
 
 export async function getIncident(incidentId: string): Promise<IncidentRecord> {

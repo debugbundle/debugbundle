@@ -236,7 +236,6 @@ See `/spec/tiers.md` for the finalized source-of-truth pricing model. Summary:
 - 15 included capacity units
 - Extra capacity units: +$1.99/unit/month
 - 90-day bundle retention, 30-day raw event retention
-- Cloud-automated improvement bundles
 - Shared dashboards, member invites, Slack integration, priority support
 - Higher operational limits and higher allowance per included or purchased capacity unit
 

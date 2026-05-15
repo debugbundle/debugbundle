@@ -14,7 +14,7 @@ import { registerBillingRoutes } from "./routes/billing.js";
 import { registerCapturePolicyRoutes } from "./routes/capture-policy.js";
 import { registerGitHubRoutes } from "./routes/github.js";
 import { registerHealthRoutes } from "./routes/health.js";
-import { registerOrganizationMemberRoutes } from "./routes/organization-members.js";
+import { registerProjectMemberRoutes } from "./routes/project-members.js";
 import { registerProjectRoutes } from "./routes/projects.js";
 import { registerProbeRoutes } from "./routes/probes.js";
 import { registerServicesRoutes } from "./routes/services.js";
@@ -238,7 +238,7 @@ export function createApiServer(dependencies: ApiDependencies, options: ApiServe
   registerBillingRoutes(app, dependencies);
   registerGitHubRoutes(app, dependencies);
   registerHealthRoutes(app, dependencies, context);
-  registerOrganizationMemberRoutes(app, dependencies);
+  registerProjectMemberRoutes(app, dependencies);
   registerProjectRoutes(app, dependencies);
   registerProbeRoutes(app, dependencies);
   registerSlackRoutes(app, dependencies);

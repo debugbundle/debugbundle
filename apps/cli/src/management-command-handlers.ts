@@ -448,6 +448,86 @@ export async function handleBillingCommand(parsedArgv: ParsedArgv, dependencies:
 export async function handleProjectCommand(parsedArgv: ParsedArgv, dependencies: ManagementCommandDependencies): Promise<CliCommandResult> {
   const action = requirePositional(parsedArgv, 1, "action");
 
+  if (action === "members") {
+    const membersAction = requirePositional(parsedArgv, 2, "members-action");
+    const projectId = readStringOption(parsedArgv, "project-id");
+    if (projectId === undefined) {
+      throw new CliInputError("Missing required option --project-id.");
+    }
+
+    if (membersAction === "list") {
+      expectNoUnknownOptions(parsedArgv, ["auth-file", "json", "project-id"]);
+      ensureNoExtraPositionals(parsedArgv, 3);
+      return await (dependencies.listMembersCommand ?? defaultListMembersCommand)(
+        appendCommonAuthOptions(parsedArgv, { projectId })
+      );
+    }
+
+    if (membersAction === "invites") {
+      expectNoUnknownOptions(parsedArgv, ["auth-file", "json", "project-id"]);
+      ensureNoExtraPositionals(parsedArgv, 3);
+      return await (dependencies.listInvitesCommand ?? defaultListInvitesCommand)(
+        appendCommonAuthOptions(parsedArgv, { projectId })
+      );
+    }
+
+    if (membersAction === "invite") {
+      expectNoUnknownOptions(parsedArgv, ["auth-file", "json", "project-id", "email", "role"]);
+      ensureNoExtraPositionals(parsedArgv, 3);
+      const email = readStringOption(parsedArgv, "email");
+      if (email === undefined) {
+        throw new CliInputError("Missing required option --email.");
+      }
+      const role = readStringOption(parsedArgv, "role");
+      if (role === undefined) {
+        throw new CliInputError("Missing required option --role.");
+      }
+      return await (dependencies.inviteMemberCommand ?? defaultInviteMemberCommand)(
+        appendCommonAuthOptions(parsedArgv, { projectId, email, role })
+      );
+    }
+
+    if (membersAction === "cancel-invite") {
+      expectNoUnknownOptions(parsedArgv, ["auth-file", "json", "project-id"]);
+      ensureNoExtraPositionals(parsedArgv, 4);
+      return await (dependencies.cancelInviteCommand ?? defaultCancelInviteCommand)(
+        appendCommonAuthOptions(parsedArgv, {
+          projectId,
+          inviteId: requirePositional(parsedArgv, 3, "invite-id")
+        })
+      );
+    }
+
+    if (membersAction === "update-role") {
+      expectNoUnknownOptions(parsedArgv, ["auth-file", "json", "project-id", "role"]);
+      ensureNoExtraPositionals(parsedArgv, 4);
+      const role = readStringOption(parsedArgv, "role");
+      if (role === undefined) {
+        throw new CliInputError("Missing required option --role.");
+      }
+      return await (dependencies.updateMemberRoleCommand ?? defaultUpdateMemberRoleCommand)(
+        appendCommonAuthOptions(parsedArgv, {
+          projectId,
+          userId: requirePositional(parsedArgv, 3, "user-id"),
+          role
+        })
+      );
+    }
+
+    if (membersAction === "remove") {
+      expectNoUnknownOptions(parsedArgv, ["auth-file", "json", "project-id"]);
+      ensureNoExtraPositionals(parsedArgv, 4);
+      return await (dependencies.removeMemberCommand ?? defaultRemoveMemberCommand)(
+        appendCommonAuthOptions(parsedArgv, {
+          projectId,
+          userId: requirePositional(parsedArgv, 3, "user-id")
+        })
+      );
+    }
+
+    throw new CliInputError("Unknown project members command.");
+  }
+
   if (action === "list") {
     expectNoUnknownOptions(parsedArgv, ["auth-file", "json", "limit"]);
     ensureNoExtraPositionals(parsedArgv, 2);
@@ -849,80 +929,9 @@ export async function handleProbeCommand(parsedArgv: ParsedArgv, dependencies: M
 }
 
 export async function handleMemberCommand(parsedArgv: ParsedArgv, dependencies: ManagementCommandDependencies): Promise<CliCommandResult> {
-  const action = requirePositional(parsedArgv, 1, "action");
-
-  if (action === "list") {
-    expectNoUnknownOptions(parsedArgv, ["auth-file", "json"]);
-    ensureNoExtraPositionals(parsedArgv, 2);
-
-    return await (dependencies.listMembersCommand ?? defaultListMembersCommand)(appendCommonAuthOptions(parsedArgv, {}));
-  }
-
-  if (action === "invites") {
-    expectNoUnknownOptions(parsedArgv, ["auth-file", "json"]);
-    ensureNoExtraPositionals(parsedArgv, 2);
-
-    return await (dependencies.listInvitesCommand ?? defaultListInvitesCommand)(appendCommonAuthOptions(parsedArgv, {}));
-  }
-
-  if (action === "invite") {
-    expectNoUnknownOptions(parsedArgv, ["auth-file", "json", "email", "role"]);
-    ensureNoExtraPositionals(parsedArgv, 2);
-
-    const email = readStringOption(parsedArgv, "email");
-    if (email === undefined) {
-      throw new CliInputError("Missing required option --email.");
-    }
-    const role = readStringOption(parsedArgv, "role");
-    if (role === undefined) {
-      throw new CliInputError("Missing required option --role.");
-    }
-
-    return await (dependencies.inviteMemberCommand ?? defaultInviteMemberCommand)(
-      appendCommonAuthOptions(parsedArgv, { email, role })
-    );
-  }
-
-  if (action === "cancel-invite") {
-    expectNoUnknownOptions(parsedArgv, ["auth-file", "json"]);
-    ensureNoExtraPositionals(parsedArgv, 3);
-
-    return await (dependencies.cancelInviteCommand ?? defaultCancelInviteCommand)(
-      appendCommonAuthOptions(parsedArgv, {
-        inviteId: requirePositional(parsedArgv, 2, "invite-id")
-      })
-    );
-  }
-
-  if (action === "update-role") {
-    expectNoUnknownOptions(parsedArgv, ["auth-file", "json", "role"]);
-    ensureNoExtraPositionals(parsedArgv, 3);
-
-    const role = readStringOption(parsedArgv, "role");
-    if (role === undefined) {
-      throw new CliInputError("Missing required option --role.");
-    }
-
-    return await (dependencies.updateMemberRoleCommand ?? defaultUpdateMemberRoleCommand)(
-      appendCommonAuthOptions(parsedArgv, {
-        userId: requirePositional(parsedArgv, 2, "user-id"),
-        role
-      })
-    );
-  }
-
-  if (action === "remove") {
-    expectNoUnknownOptions(parsedArgv, ["auth-file", "json"]);
-    ensureNoExtraPositionals(parsedArgv, 3);
-
-    return await (dependencies.removeMemberCommand ?? defaultRemoveMemberCommand)(
-      appendCommonAuthOptions(parsedArgv, {
-        userId: requirePositional(parsedArgv, 2, "user-id")
-      })
-    );
-  }
-
-  throw new CliInputError("Unknown member command.");
+  void parsedArgv;
+  void dependencies;
+  throw new CliInputError("Use `debugbundle project members ... --project-id <id>` for project collaboration commands.");
 }
 
 export async function handleWebhookCommand(parsedArgv: ParsedArgv, dependencies: ManagementCommandDependencies): Promise<CliCommandResult> {

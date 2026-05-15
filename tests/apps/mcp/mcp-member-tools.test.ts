@@ -7,25 +7,28 @@ const memberFixture = {
   user_id: "usr_abc",
   email: "alice@example.com",
   role: "owner",
-  joined_at: "2026-01-01T00:00:00.000Z"
+  membership_type: "owner",
+  created_at: "2026-01-01T00:00:00.000Z"
 };
 
 const inviteFixture = {
   invite_id: "inv_xyz",
+  project_id: "550e8400-e29b-41d4-a716-446655440000",
   email: "bob@example.com",
   role: "member",
+  canceled_at: null,
   expires_at: "2026-01-08T00:00:00.000Z"
 };
 
 describe("mcp member tools", () => {
   it("declares member tool parity", () => {
     expect(MEMBER_MCP_TOOL_NAMES).toEqual([
-      "list_members",
-      "list_member_invites",
-      "invite_member",
-      "cancel_member_invite",
-      "update_member_role",
-      "remove_member"
+      "list_project_members",
+      "list_project_member_invites",
+      "invite_project_member",
+      "cancel_project_member_invite",
+      "update_project_member_role",
+      "remove_project_member"
     ]);
   });
 
@@ -40,27 +43,48 @@ describe("mcp member tools", () => {
     });
 
     await expect(
-      tools.list_members({ bearerToken: "dbundle_mem_x" })
+      tools.list_project_members({ bearerToken: "dbundle_mem_x", projectId: "550e8400-e29b-41d4-a716-446655440000" })
     ).resolves.toEqual({ members: [memberFixture] });
 
     await expect(
-      tools.list_member_invites({ bearerToken: "dbundle_mem_x" })
+      tools.list_project_member_invites({
+        bearerToken: "dbundle_mem_x",
+        projectId: "550e8400-e29b-41d4-a716-446655440000"
+      })
     ).resolves.toEqual({ invites: [inviteFixture] });
 
     await expect(
-      tools.invite_member({ bearerToken: "dbundle_mem_x", email: "bob@example.com", role: "member" })
+      tools.invite_project_member({
+        bearerToken: "dbundle_mem_x",
+        projectId: "550e8400-e29b-41d4-a716-446655440000",
+        email: "bob@example.com",
+        role: "member"
+      })
     ).resolves.toEqual({ invite: inviteFixture });
 
     await expect(
-      tools.cancel_member_invite({ bearerToken: "dbundle_mem_x", inviteId: "inv_xyz" })
+      tools.cancel_project_member_invite({
+        bearerToken: "dbundle_mem_x",
+        projectId: "550e8400-e29b-41d4-a716-446655440000",
+        inviteId: "inv_xyz"
+      })
     ).resolves.toEqual({ invite: inviteFixture });
 
     await expect(
-      tools.update_member_role({ bearerToken: "dbundle_mem_x", userId: "usr_abc", role: "member" })
+      tools.update_project_member_role({
+        bearerToken: "dbundle_mem_x",
+        projectId: "550e8400-e29b-41d4-a716-446655440000",
+        userId: "usr_abc",
+        role: "member"
+      })
     ).resolves.toEqual({ member: { ...memberFixture, role: "member" } });
 
     await expect(
-      tools.remove_member({ bearerToken: "dbundle_mem_x", userId: "usr_abc" })
+      tools.remove_project_member({
+        bearerToken: "dbundle_mem_x",
+        projectId: "550e8400-e29b-41d4-a716-446655440000",
+        userId: "usr_abc"
+      })
     ).resolves.toEqual({ member: memberFixture });
   });
 
@@ -75,19 +99,31 @@ describe("mcp member tools", () => {
     });
 
     await expect(
-      tools.list_members({ bearerToken: "bad" })
+      tools.list_project_members({ bearerToken: "bad", projectId: "550e8400-e29b-41d4-a716-446655440000" })
     ).rejects.toThrow("mcp_tool_error:invalid_member_token");
 
     await expect(
-      tools.list_member_invites({ bearerToken: "dbundle_mem_x" })
+      tools.list_project_member_invites({
+        bearerToken: "dbundle_mem_x",
+        projectId: "550e8400-e29b-41d4-a716-446655440000"
+      })
     ).rejects.toThrow("mcp_tool_error:forbidden");
 
     await expect(
-      tools.invite_member({ bearerToken: "dbundle_mem_x", email: "dup@example.com", role: "member" })
+      tools.invite_project_member({
+        bearerToken: "dbundle_mem_x",
+        projectId: "550e8400-e29b-41d4-a716-446655440000",
+        email: "dup@example.com",
+        role: "member"
+      })
     ).rejects.toThrow("mcp_tool_error:member_already_exists");
 
     await expect(
-      tools.cancel_member_invite({ bearerToken: "dbundle_mem_x", inviteId: "inv_123" })
+      tools.cancel_project_member_invite({
+        bearerToken: "dbundle_mem_x",
+        projectId: "550e8400-e29b-41d4-a716-446655440000",
+        inviteId: "inv_123"
+      })
     ).rejects.toThrow("mcp_tool_error:unknown_error");
   });
 });

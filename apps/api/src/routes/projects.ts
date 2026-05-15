@@ -1,7 +1,7 @@
 import type { FastifyInstance } from "fastify";
 
 import type { ApiDependencies } from "../api-types.js";
-import { requireRateLimitedMemberAuth, requireRateLimitedOwnerMemberAuth } from "../api-helpers.js";
+import { requireRateLimitedMemberAuth } from "../api-helpers.js";
 import { CreateProjectBodySchema, ProjectParamsSchema, ProjectsQuerySchema, UpdateProjectBodySchema } from "../schemas.js";
 
 export function registerProjectRoutes(app: FastifyInstance, dependencies: ApiDependencies): void {
@@ -10,7 +10,8 @@ export function registerProjectRoutes(app: FastifyInstance, dependencies: ApiDep
     if (member === null) {
       return;
     }
-    if (dependencies.projectManagement === undefined) {
+    const projectManagement = dependencies.projectManagement;
+    if (projectManagement === undefined || projectManagement.listProjectsForUser === undefined) {
       return reply.status(404).send({ error: "projects_not_available" });
     }
 
@@ -19,8 +20,8 @@ export function registerProjectRoutes(app: FastifyInstance, dependencies: ApiDep
       return reply.status(400).send({ error: "invalid_query" });
     }
 
-    const projects = await dependencies.projectManagement.listProjectsForOrganization({
-      organization_id: member.organization_id,
+    const projects = await projectManagement.listProjectsForUser({
+      user_id: member.member_id,
       now: new Date().toISOString(),
       limit: parsedQuery.data.limit
     });
@@ -29,14 +30,12 @@ export function registerProjectRoutes(app: FastifyInstance, dependencies: ApiDep
   });
 
   app.post("/v1/projects", async (request, reply) => {
-    const member = await requireRateLimitedOwnerMemberAuth(request, reply, dependencies, "management-write");
+    const member = await requireRateLimitedMemberAuth(request, reply, dependencies, "management-write");
     if (member === null) {
       return;
     }
-    if (member === "forbidden") {
-      return reply.status(403).send({ error: "forbidden" });
-    }
-    if (dependencies.projectManagement === undefined) {
+    const projectManagement = dependencies.projectManagement;
+    if (projectManagement === undefined || projectManagement.createProjectForUser === undefined) {
       return reply.status(404).send({ error: "projects_not_available" });
     }
 
@@ -45,7 +44,8 @@ export function registerProjectRoutes(app: FastifyInstance, dependencies: ApiDep
       return reply.status(400).send({ error: "invalid_payload" });
     }
 
-    const project = await dependencies.projectManagement.createProjectForOrganization({
+    const project = await projectManagement.createProjectForUser({
+      user_id: member.member_id,
       organization_id: member.organization_id,
       name: parsedBody.data.name,
       slug: parsedBody.data.slug,
@@ -60,14 +60,16 @@ export function registerProjectRoutes(app: FastifyInstance, dependencies: ApiDep
   });
 
   app.patch("/v1/projects/:id", async (request, reply) => {
-    const member = await requireRateLimitedOwnerMemberAuth(request, reply, dependencies, "management-write");
+    const member = await requireRateLimitedMemberAuth(request, reply, dependencies, "management-write");
     if (member === null) {
       return;
     }
-    if (member === "forbidden") {
-      return reply.status(403).send({ error: "forbidden" });
-    }
-    if (dependencies.projectManagement === undefined) {
+    const projectManagement = dependencies.projectManagement;
+    if (
+      projectManagement === undefined ||
+      projectManagement.resolveProjectAccessForUser === undefined ||
+      projectManagement.updateProjectForUser === undefined
+    ) {
       return reply.status(404).send({ error: "projects_not_available" });
     }
 
@@ -81,8 +83,16 @@ export function registerProjectRoutes(app: FastifyInstance, dependencies: ApiDep
       return reply.status(400).send({ error: "invalid_payload" });
     }
 
-    const project = await dependencies.projectManagement.updateProjectForOrganization({
-      organization_id: member.organization_id,
+    const access = await projectManagement.resolveProjectAccessForUser({
+      user_id: member.member_id,
+      project_id: parsedParams.data.id
+    });
+    if (access === null) {
+      return reply.status(404).send({ error: "project_not_found" });
+    }
+
+    const project = await projectManagement.updateProjectForUser({
+      user_id: member.member_id,
       project_id: parsedParams.data.id,
       ...(parsedBody.data.name === undefined ? {} : { name: parsedBody.data.name }),
       ...(parsedBody.data.slug === undefined ? {} : { slug: parsedBody.data.slug }),
@@ -103,14 +113,16 @@ export function registerProjectRoutes(app: FastifyInstance, dependencies: ApiDep
   });
 
   app.delete("/v1/projects/:id", async (request, reply) => {
-    const member = await requireRateLimitedOwnerMemberAuth(request, reply, dependencies, "management-write");
+    const member = await requireRateLimitedMemberAuth(request, reply, dependencies, "management-write");
     if (member === null) {
       return;
     }
-    if (member === "forbidden") {
-      return reply.status(403).send({ error: "forbidden" });
-    }
-    if (dependencies.projectManagement === undefined) {
+    const projectManagement = dependencies.projectManagement;
+    if (
+      projectManagement === undefined ||
+      projectManagement.resolveProjectAccessForUser === undefined ||
+      projectManagement.deleteProjectForUser === undefined
+    ) {
       return reply.status(404).send({ error: "projects_not_available" });
     }
 
@@ -119,8 +131,19 @@ export function registerProjectRoutes(app: FastifyInstance, dependencies: ApiDep
       return reply.status(400).send({ error: "invalid_project_id" });
     }
 
-    const project = await dependencies.projectManagement.deleteProjectForOrganization({
-      organization_id: member.organization_id,
+    const access = await projectManagement.resolveProjectAccessForUser({
+      user_id: member.member_id,
+      project_id: parsedParams.data.id
+    });
+    if (access === null) {
+      return reply.status(404).send({ error: "project_not_found" });
+    }
+    if (access.effective_role !== "owner") {
+      return reply.status(403).send({ error: "forbidden" });
+    }
+
+    const project = await projectManagement.deleteProjectForUser({
+      user_id: member.member_id,
       project_id: parsedParams.data.id
     });
 

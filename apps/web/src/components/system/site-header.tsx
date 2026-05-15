@@ -1,5 +1,6 @@
 import { Link, useLocation } from "react-router-dom";
 
+import { ProjectNameWithAccessIndicator } from "./project-name-with-access-indicator.js";
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -17,7 +18,6 @@ const routeTitles: Record<string, string> = {
   "/incidents": "Incidents",
   "/projects": "Projects",
   "/organization": "Organization",
-  "/organization/members": "Organization Members",
   "/billing": "Billing",
   "/member-tokens": "Member Tokens",
   "/settings": "Settings"
@@ -35,6 +35,7 @@ function resolveTitle(pathname: string): string {
 }
 
 const projectTabLabels: Record<string, string> = {
+  members: "Members",
   settings: "Settings",
   tokens: "Tokens",
   alerts: "Alerts",
@@ -74,7 +75,31 @@ export function SiteHeader(): JSX.Element {
               </BreadcrumbItem>
               <BreadcrumbSeparator />
               <BreadcrumbItem>
-                <BreadcrumbPage>{activeProject?.projectName ?? "Project"}</BreadcrumbPage>
+                <BreadcrumbPage>
+                  {activeProject === null ? (
+                    "Project"
+                  ) : (
+                    <ProjectNameWithAccessIndicator
+                      project={{
+                        project_id: activeProject.projectId,
+                        organization_id: "",
+                        name: activeProject.projectName,
+                        slug: "",
+                        environment_default: "",
+                        organization_plan: "team",
+                        metrics: {
+                          monthly_bundle_requests: 0,
+                          monthly_raw_ingested_events: 0,
+                          retained_bundles: 0,
+                          monthly_alert_deliveries: 0
+                        },
+                        created_at: "",
+                        updated_at: "",
+                        relationship: activeProject.relationship
+                      }}
+                    />
+                  )}
+                </BreadcrumbPage>
               </BreadcrumbItem>
               <BreadcrumbSeparator />
               <BreadcrumbItem>

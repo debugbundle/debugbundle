@@ -12,6 +12,8 @@ export const REQUIRED_API_TABLES = [
   "organization_members",
   "invites",
   "projects",
+  "project_members",
+  "project_invites",
   "project_tokens",
   "member_tokens",
   "audit_logs",
@@ -94,7 +96,8 @@ const STORAGE_BOOTSTRAP_STATEMENTS = [
   `
     CREATE TABLE projects (
       id uuid PRIMARY KEY,
-      organization_id uuid REFERENCES organizations(id) ON DELETE SET NULL,
+      organization_id uuid NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+      owner_user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
       name text NOT NULL,
       slug text NOT NULL,
       environment_default text NOT NULL DEFAULT 'production',
@@ -106,7 +109,6 @@ const STORAGE_BOOTSTRAP_STATEMENTS = [
   `
     CREATE UNIQUE INDEX projects_organization_id_slug_key
     ON projects (organization_id, slug)
-    WHERE organization_id IS NOT NULL
   `,
   `
     CREATE TABLE services (
@@ -278,6 +280,53 @@ const STORAGE_BOOTSTRAP_STATEMENTS = [
     CREATE UNIQUE INDEX invites_invite_token_hash_key
     ON invites (invite_token_hash)
     WHERE invite_token_hash IS NOT NULL
+  `,
+  `
+    CREATE TABLE project_members (
+      id uuid PRIMARY KEY,
+      project_id uuid NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+      user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      role text NOT NULL,
+      invited_by_user_id uuid REFERENCES users(id) ON DELETE SET NULL,
+      created_at timestamptz NOT NULL DEFAULT now(),
+      updated_at timestamptz NOT NULL DEFAULT now(),
+      UNIQUE (project_id, user_id)
+    )
+  `,
+  `
+    CREATE INDEX project_members_project_id_idx
+    ON project_members (project_id, created_at DESC)
+  `,
+  `
+    CREATE INDEX project_members_user_id_idx
+    ON project_members (user_id, created_at DESC)
+  `,
+  `
+    CREATE TABLE project_invites (
+      id uuid PRIMARY KEY,
+      project_id uuid NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+      email text NOT NULL,
+      role text NOT NULL,
+      invited_by_user_id uuid REFERENCES users(id) ON DELETE SET NULL,
+      invite_token_hash text NOT NULL,
+      accepted_at timestamptz,
+      canceled_at timestamptz,
+      expires_at timestamptz NOT NULL,
+      created_at timestamptz NOT NULL DEFAULT now()
+    )
+  `,
+  `
+    CREATE INDEX project_invites_project_id_idx
+    ON project_invites (project_id, created_at DESC)
+  `,
+  `
+    CREATE UNIQUE INDEX project_invites_pending_project_email_key
+    ON project_invites (project_id, lower(email))
+    WHERE accepted_at IS NULL AND canceled_at IS NULL
+  `,
+  `
+    CREATE UNIQUE INDEX project_invites_invite_token_hash_key
+    ON project_invites (invite_token_hash)
   `,
   `
     CREATE TABLE oauth_identities (

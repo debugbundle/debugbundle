@@ -10,6 +10,7 @@ import type {
   BuildBundleJob,
   BundleBuildContext,
   CreateOrganizationInviteResult,
+  CreateProjectInviteResult,
   DemotedIncidentEventReference,
   DeleteAlertResult,
   IncidentEventReference,
@@ -25,6 +26,9 @@ import type {
   ProbeActivationRecord,
   ProbeEventCandidateReference,
   ProjectRecord,
+  ProjectAccessRecord,
+  ProjectInviteRecord,
+  ProjectMemberRecord,
   ProjectTokenRecord,
   Queryable,
   RecordIncidentEventRetentionInput,
@@ -32,10 +36,12 @@ import type {
   RegressionDeployCorrelation,
   DeletedProjectRecord,
   RemoveOrganizationMemberResult,
+  RemoveProjectMemberResult,
   ResolveMemberResult,
   ResolveProjectResult,
   ServiceRetrievalRecord,
   UpdateOrganizationMemberRoleResult,
+  UpdateProjectMemberRoleResult,
   UpsertIncidentInput,
   UpsertIncidentResult,
   WeeklyProjectReportSummary,
@@ -156,6 +162,10 @@ function mapProjectRow(row: ProjectRecord & Record<string, unknown>): ProjectRec
   return {
     project_id: row.project_id,
     organization_id: row.organization_id,
+    owner_user_id: row.owner_user_id,
+    owner_email: row.owner_email,
+    relationship: row.relationship,
+    effective_role: row.effective_role,
     name: row.name,
     slug: row.slug,
     environment_default: row.environment_default,
@@ -170,12 +180,40 @@ function mapDeletedProjectRow(row: DeletedProjectRecord & Record<string, unknown
   return {
     project_id: row.project_id,
     organization_id: row.organization_id,
+    owner_user_id: row.owner_user_id,
+    owner_email: row.owner_email,
+    relationship: row.relationship,
+    effective_role: row.effective_role,
     name: row.name,
     slug: row.slug,
     environment_default: row.environment_default,
     organization_plan: row.organization_plan,
     created_at: row.created_at,
     updated_at: row.updated_at
+  };
+}
+
+function mapProjectMemberRow(row: ProjectMemberRecord & Record<string, unknown>): ProjectMemberRecord {
+  return {
+    user_id: row.user_id,
+    email: row.email,
+    role: row.role,
+    membership_type: row.membership_type,
+    created_at: row.created_at
+  };
+}
+
+function mapProjectInviteRow(row: ProjectInviteRecord & Record<string, unknown>): ProjectInviteRecord {
+  return {
+    invite_id: row.invite_id,
+    project_id: row.project_id,
+    email: row.email,
+    role: row.role,
+    invited_by_user_id: row.invited_by_user_id,
+    accepted_at: row.accepted_at,
+    canceled_at: row.canceled_at,
+    expires_at: row.expires_at,
+    created_at: row.created_at
   };
 }
 
@@ -479,6 +517,39 @@ export function createPostgresMetadataStore(db: Queryable): PostgresMetadataStor
           LIMIT 1
         `,
         [tokenHash]
+      );
+
+      return result.rows[0] ?? null;
+    },
+
+    async resolveProjectAccessForUser(input): Promise<ProjectAccessRecord | null> {
+      const result = await db.query<ProjectAccessRecord & Record<string, unknown>>(
+        `
+          SELECT
+            p.id AS project_id,
+            p.organization_id,
+            p.owner_user_id,
+            owner_user.email AS owner_email,
+            CASE
+              WHEN p.owner_user_id = $1::uuid THEN 'owned'
+              ELSE 'shared'
+            END AS relationship,
+            CASE
+              WHEN p.owner_user_id = $1::uuid THEN 'owner'
+              ELSE pm.role
+            END AS effective_role,
+            COALESCE(org.plan, 'free') AS organization_plan
+          FROM projects p
+          JOIN organizations org ON org.id = p.organization_id
+          JOIN users owner_user ON owner_user.id = p.owner_user_id
+          LEFT JOIN project_members pm
+            ON pm.project_id = p.id
+           AND pm.user_id = $1::uuid
+          WHERE p.id = $2::uuid
+            AND (p.owner_user_id = $1::uuid OR pm.user_id IS NOT NULL)
+          LIMIT 1
+        `,
+        [input.user_id, input.project_id]
       );
 
       return result.rows[0] ?? null;
@@ -940,7 +1011,607 @@ export function createPostgresMetadataStore(db: Queryable): PostgresMetadataStor
       };
     },
 
-    async listProjectsForOrganization(input): Promise<ProjectRecord[]> {
+    async listMembersForProject(input: { project_id: string; user_id: string }): Promise<{ owner_plan: TierName; members: ProjectMemberRecord[] } | null> {
+      const access = await db.query<{ owner_plan: TierName } & Record<string, unknown>>(
+        `
+          SELECT COALESCE(org.plan, 'free') AS owner_plan
+          FROM projects p
+          JOIN organizations org ON org.id = p.organization_id
+          LEFT JOIN project_members actor_membership
+            ON actor_membership.project_id = p.id
+           AND actor_membership.user_id = $2::uuid
+          WHERE p.id = $1::uuid
+            AND (p.owner_user_id = $2::uuid OR actor_membership.user_id IS NOT NULL)
+          LIMIT 1
+        `,
+        [input.project_id, input.user_id]
+      );
+
+      const scope = access.rows[0];
+      if (scope === undefined) {
+        return null;
+      }
+
+      const membersResult = await db.query<ProjectMemberRecord & Record<string, unknown>>(
+        `
+          SELECT
+            p.owner_user_id AS user_id,
+            owner_user.email,
+            'owner' AS role,
+            'owner' AS membership_type,
+            p.created_at::text AS created_at
+          FROM projects p
+          JOIN users owner_user ON owner_user.id = p.owner_user_id
+          WHERE p.id = $1::uuid
+
+          UNION ALL
+
+          SELECT
+            pm.user_id,
+            member_user.email,
+            pm.role,
+            'collaborator' AS membership_type,
+            pm.created_at::text AS created_at
+          FROM project_members pm
+          JOIN users member_user ON member_user.id = pm.user_id
+          WHERE pm.project_id = $1::uuid
+
+          ORDER BY membership_type ASC, created_at ASC, user_id ASC
+        `,
+        [input.project_id]
+      );
+
+      return {
+        owner_plan: scope.owner_plan,
+        members: membersResult.rows.map(mapProjectMemberRow)
+      };
+    },
+
+    async listPendingInvitesForProject(input: { project_id: string; user_id: string; now: string }): Promise<ProjectInviteRecord[] | null> {
+      const access = await db.query<{ project_id: string }>(
+        `
+          SELECT p.id AS project_id
+          FROM projects p
+          LEFT JOIN project_members actor_membership
+            ON actor_membership.project_id = p.id
+           AND actor_membership.user_id = $2::uuid
+          WHERE p.id = $1::uuid
+            AND (p.owner_user_id = $2::uuid OR actor_membership.user_id IS NOT NULL)
+          LIMIT 1
+        `,
+        [input.project_id, input.user_id]
+      );
+
+      if (access.rows[0] === undefined) {
+        return null;
+      }
+
+      const invitesResult = await db.query<ProjectInviteRecord & Record<string, unknown>>(
+        `
+          SELECT
+            id AS invite_id,
+            project_id,
+            email,
+            role,
+            invited_by_user_id,
+            accepted_at::text AS accepted_at,
+            canceled_at::text AS canceled_at,
+            expires_at::text AS expires_at,
+            created_at::text AS created_at
+          FROM project_invites
+          WHERE project_id = $1::uuid
+            AND accepted_at IS NULL
+            AND canceled_at IS NULL
+            AND expires_at > $2::timestamptz
+          ORDER BY created_at DESC, id DESC
+        `,
+        [input.project_id, input.now]
+      );
+
+      return invitesResult.rows.map(mapProjectInviteRow);
+    },
+
+    async createInviteForProject(input: {
+      project_id: string;
+      user_id: string;
+      email: string;
+      role: "admin" | "member";
+      invited_by_user_id: string;
+      invite_token_hash: string;
+      expires_at: string;
+    }): Promise<CreateProjectInviteResult | null> {
+      const scopeResult = await db.query<
+        {
+          owner_plan: TierName;
+          actor_role: "owner" | "admin" | "member" | null;
+          actor_membership_type: "owner" | "collaborator";
+        } & Record<string, unknown>
+      >(
+        `
+          SELECT
+            COALESCE(org.plan, 'free') AS owner_plan,
+            CASE
+              WHEN p.owner_user_id = $2::uuid THEN 'owner'
+              ELSE actor_membership.role
+            END AS actor_role,
+            CASE
+              WHEN p.owner_user_id = $2::uuid THEN 'owner'
+              ELSE 'collaborator'
+            END AS actor_membership_type
+          FROM projects p
+          JOIN organizations org ON org.id = p.organization_id
+          LEFT JOIN project_members actor_membership
+            ON actor_membership.project_id = p.id
+           AND actor_membership.user_id = $2::uuid
+          WHERE p.id = $1::uuid
+            AND (p.owner_user_id = $2::uuid OR actor_membership.user_id IS NOT NULL)
+          LIMIT 1
+        `,
+        [input.project_id, input.user_id]
+      );
+
+      const scope = scopeResult.rows[0];
+      if (scope === undefined || (scope.actor_role !== "owner" && scope.actor_role !== "admin")) {
+        return null;
+      }
+
+      if (!getTierCapabilities(scope.owner_plan).member_invites) {
+        return {
+          kind: "upgrade_required",
+          owner_plan: scope.owner_plan
+        };
+      }
+
+      const collaboratorCountResult = await db.query<{ collaborator_count: string }>(
+        `
+          SELECT COUNT(*)::text AS collaborator_count
+          FROM project_members
+          WHERE project_id = $1::uuid
+        `,
+        [input.project_id]
+      );
+
+      if (Number(collaboratorCountResult.rows[0]?.collaborator_count ?? "0") >= 1000) {
+        return {
+          kind: "collaborator_limit_reached",
+          owner_plan: scope.owner_plan
+        };
+      }
+
+      const normalizedEmail = input.email.trim().toLowerCase();
+      const existingMemberResult = await db.query<{ user_id: string }>(
+        `
+          SELECT p.owner_user_id AS user_id
+          FROM projects p
+          JOIN users owner_user ON owner_user.id = p.owner_user_id
+          WHERE p.id = $1::uuid
+            AND lower(owner_user.email) = $2
+
+          UNION
+
+          SELECT pm.user_id
+          FROM project_members pm
+          JOIN users member_user ON member_user.id = pm.user_id
+          WHERE pm.project_id = $1::uuid
+            AND lower(member_user.email) = $2
+          LIMIT 1
+        `,
+        [input.project_id, normalizedEmail]
+      );
+
+      if (existingMemberResult.rows[0] !== undefined) {
+        return {
+          kind: "member_exists",
+          owner_plan: scope.owner_plan
+        };
+      }
+
+      try {
+        const result = await db.query<ProjectInviteRecord & Record<string, unknown>>(
+          `
+            INSERT INTO project_invites (
+              id,
+              project_id,
+              email,
+              role,
+              invited_by_user_id,
+              invite_token_hash,
+              expires_at,
+              created_at
+            )
+            VALUES ($1::uuid, $2::uuid, $3, $4, $5::uuid, $6, $7::timestamptz, now())
+            RETURNING
+              id AS invite_id,
+              project_id,
+              email,
+              role,
+              invited_by_user_id,
+              accepted_at::text AS accepted_at,
+              canceled_at::text AS canceled_at,
+              expires_at::text AS expires_at,
+              created_at::text AS created_at
+          `,
+          [
+            randomUUID(),
+            input.project_id,
+            normalizedEmail,
+            input.role,
+            input.invited_by_user_id,
+            input.invite_token_hash,
+            input.expires_at
+          ]
+        );
+
+        const invite = result.rows[0];
+        if (invite === undefined) {
+          throw new Error("project_invite_insert_failed");
+        }
+
+        return {
+          kind: "created",
+          owner_plan: scope.owner_plan,
+          invite: mapProjectInviteRow(invite)
+        };
+      } catch (error) {
+        if (
+          typeof error === "object" &&
+          error !== null &&
+          "code" in error &&
+          error.code === "23505" &&
+          "constraint" in error &&
+          error.constraint === "project_invites_pending_project_email_key"
+        ) {
+          return {
+            kind: "invite_exists",
+            owner_plan: scope.owner_plan
+          };
+        }
+
+        throw error;
+      }
+    },
+
+    async cancelInviteForProject(input: { project_id: string; user_id: string; invite_id: string }): Promise<ProjectInviteRecord | null> {
+      const scopeResult = await db.query<{ actor_role: "owner" | "admin" | "member" | null } & Record<string, unknown>>(
+        `
+          SELECT
+            CASE
+              WHEN p.owner_user_id = $2::uuid THEN 'owner'
+              ELSE actor_membership.role
+            END AS actor_role
+          FROM projects p
+          LEFT JOIN project_members actor_membership
+            ON actor_membership.project_id = p.id
+           AND actor_membership.user_id = $2::uuid
+          WHERE p.id = $1::uuid
+            AND (p.owner_user_id = $2::uuid OR actor_membership.user_id IS NOT NULL)
+          LIMIT 1
+        `,
+        [input.project_id, input.user_id]
+      );
+
+      const scope = scopeResult.rows[0];
+      if (scope === undefined || (scope.actor_role !== "owner" && scope.actor_role !== "admin")) {
+        return null;
+      }
+
+      const result = await db.query<ProjectInviteRecord & Record<string, unknown>>(
+        `
+          UPDATE project_invites
+          SET canceled_at = now()
+          WHERE project_id = $1::uuid
+            AND id = $2::uuid
+            AND accepted_at IS NULL
+            AND canceled_at IS NULL
+          RETURNING
+            id AS invite_id,
+            project_id,
+            email,
+            role,
+            invited_by_user_id,
+            accepted_at::text AS accepted_at,
+            canceled_at::text AS canceled_at,
+            expires_at::text AS expires_at,
+            created_at::text AS created_at
+        `,
+        [input.project_id, input.invite_id]
+      );
+
+      const invite = result.rows[0];
+      return invite === undefined ? null : mapProjectInviteRow(invite);
+    },
+
+    async acceptProjectInviteForUser(input: {
+      invite_token_hash: string;
+      user_id: string;
+      email: string;
+      accepted_at: string;
+    }) {
+      const inviteResult = await db.query<
+        {
+          invite_id: string;
+          project_id: string;
+          email: string;
+          role: "admin" | "member";
+        } & Record<string, unknown>
+      >(
+        `
+          SELECT
+            id AS invite_id,
+            project_id,
+            email,
+            role
+          FROM project_invites
+          WHERE invite_token_hash = $1
+            AND accepted_at IS NULL
+            AND canceled_at IS NULL
+            AND expires_at > $2::timestamptz
+          LIMIT 1
+        `,
+        [input.invite_token_hash, input.accepted_at]
+      );
+
+      const invite = inviteResult.rows[0];
+      if (invite === undefined) {
+        return { kind: "invalid_token" } as const;
+      }
+
+      if (invite.email.trim().toLowerCase() !== input.email.trim().toLowerCase()) {
+        return { kind: "email_mismatch" } as const;
+      }
+
+      const existingMembershipResult = await db.query<ProjectMemberRecord & Record<string, unknown>>(
+        `
+          SELECT
+            pm.user_id,
+            member_user.email,
+            pm.role,
+            'collaborator' AS membership_type,
+            pm.created_at::text AS created_at
+          FROM project_members pm
+          JOIN users member_user ON member_user.id = pm.user_id
+          WHERE pm.project_id = $1::uuid
+            AND pm.user_id = $2::uuid
+          LIMIT 1
+        `,
+        [invite.project_id, input.user_id]
+      );
+
+      const existingMembership = existingMembershipResult.rows[0];
+      if (existingMembership !== undefined) {
+        await db.query(
+          `
+            UPDATE project_invites
+            SET accepted_at = $2::timestamptz
+            WHERE id = $1::uuid
+              AND accepted_at IS NULL
+          `,
+          [invite.invite_id, input.accepted_at]
+        );
+
+        return {
+          kind: "accepted",
+          membership: {
+            ...mapProjectMemberRow(existingMembership),
+            project_id: invite.project_id
+          }
+        } as const;
+      }
+
+      const createdMembershipResult = await db.query<ProjectMemberRecord & Record<string, unknown>>(
+        `
+          INSERT INTO project_members (id, project_id, user_id, role, invited_by_user_id, created_at, updated_at)
+          VALUES ($1::uuid, $2::uuid, $3::uuid, $4, NULL, $5::timestamptz, $5::timestamptz)
+          ON CONFLICT (project_id, user_id) DO NOTHING
+          RETURNING
+            user_id,
+            (
+              SELECT u.email
+              FROM users u
+              WHERE u.id = project_members.user_id
+            ) AS email,
+            role,
+            'collaborator' AS membership_type,
+            created_at::text AS created_at
+        `,
+        [randomUUID(), invite.project_id, input.user_id, invite.role, input.accepted_at]
+      );
+
+      const membership = createdMembershipResult.rows[0];
+      if (membership === undefined) {
+        return { kind: "invalid_token" } as const;
+      }
+
+      await db.query(
+        `
+          UPDATE project_invites
+          SET accepted_at = $2::timestamptz
+          WHERE id = $1::uuid
+            AND accepted_at IS NULL
+        `,
+        [invite.invite_id, input.accepted_at]
+      );
+
+      return {
+        kind: "accepted",
+        membership: {
+          ...mapProjectMemberRow(membership),
+          project_id: invite.project_id
+        }
+      } as const;
+    },
+
+    async updateProjectMemberRole(input: {
+      project_id: string;
+      actor_user_id: string;
+      user_id: string;
+      role: "admin" | "member";
+    }): Promise<UpdateProjectMemberRoleResult | null> {
+      const scopeResult = await db.query<{ actor_role: "owner" | "admin" | "member" | null } & Record<string, unknown>>(
+        `
+          SELECT
+            CASE
+              WHEN p.owner_user_id = $2::uuid THEN 'owner'
+              ELSE actor_membership.role
+            END AS actor_role
+          FROM projects p
+          LEFT JOIN project_members actor_membership
+            ON actor_membership.project_id = p.id
+           AND actor_membership.user_id = $2::uuid
+          WHERE p.id = $1::uuid
+            AND (p.owner_user_id = $2::uuid OR actor_membership.user_id IS NOT NULL)
+          LIMIT 1
+        `,
+        [input.project_id, input.actor_user_id]
+      );
+
+      const scope = scopeResult.rows[0];
+      if (scope === undefined || (scope.actor_role !== "owner" && scope.actor_role !== "admin")) {
+        return null;
+      }
+
+      const ownerResult = await db.query<{ owner_user_id: string; owner_email: string; created_at: string }>(
+        `
+          SELECT
+            p.owner_user_id,
+            owner_user.email AS owner_email,
+            p.created_at::text AS created_at
+          FROM projects p
+          JOIN users owner_user ON owner_user.id = p.owner_user_id
+          WHERE p.id = $1::uuid
+          LIMIT 1
+        `,
+        [input.project_id]
+      );
+
+      const owner = ownerResult.rows[0];
+      if (owner !== undefined && owner.owner_user_id === input.user_id) {
+        return {
+          kind: "owner_role_change_forbidden",
+          member: {
+            user_id: owner.owner_user_id,
+            email: owner.owner_email,
+            role: "owner",
+            membership_type: "owner",
+            created_at: owner.created_at
+          }
+        };
+      }
+
+      const updatedMemberResult = await db.query<ProjectMemberRecord & Record<string, unknown>>(
+        `
+          UPDATE project_members pm
+          SET role = $3, updated_at = now()
+          FROM users member_user
+          WHERE pm.project_id = $1::uuid
+            AND pm.user_id = $2::uuid
+            AND member_user.id = pm.user_id
+          RETURNING
+            pm.user_id,
+            member_user.email,
+            pm.role,
+            'collaborator' AS membership_type,
+            pm.created_at::text AS created_at
+        `,
+        [input.project_id, input.user_id, input.role]
+      );
+
+      const member = updatedMemberResult.rows[0];
+      if (member === undefined) {
+        return null;
+      }
+
+      return {
+        kind: "updated",
+        member: mapProjectMemberRow(member)
+      };
+    },
+
+    async removeProjectMember(input: {
+      project_id: string;
+      actor_user_id: string;
+      user_id: string;
+    }): Promise<RemoveProjectMemberResult | null> {
+      const scopeResult = await db.query<{ actor_role: "owner" | "admin" | "member" | null } & Record<string, unknown>>(
+        `
+          SELECT
+            CASE
+              WHEN p.owner_user_id = $2::uuid THEN 'owner'
+              ELSE actor_membership.role
+            END AS actor_role
+          FROM projects p
+          LEFT JOIN project_members actor_membership
+            ON actor_membership.project_id = p.id
+           AND actor_membership.user_id = $2::uuid
+          WHERE p.id = $1::uuid
+            AND (p.owner_user_id = $2::uuid OR actor_membership.user_id IS NOT NULL)
+          LIMIT 1
+        `,
+        [input.project_id, input.actor_user_id]
+      );
+
+      const scope = scopeResult.rows[0];
+      if (scope === undefined || (scope.actor_role !== "owner" && scope.actor_role !== "admin")) {
+        return null;
+      }
+
+      const ownerResult = await db.query<{ owner_user_id: string; owner_email: string; created_at: string }>(
+        `
+          SELECT
+            p.owner_user_id,
+            owner_user.email AS owner_email,
+            p.created_at::text AS created_at
+          FROM projects p
+          JOIN users owner_user ON owner_user.id = p.owner_user_id
+          WHERE p.id = $1::uuid
+          LIMIT 1
+        `,
+        [input.project_id]
+      );
+
+      const owner = ownerResult.rows[0];
+      if (owner !== undefined && owner.owner_user_id === input.user_id) {
+        return {
+          kind: "owner_removal_forbidden",
+          member: {
+            user_id: owner.owner_user_id,
+            email: owner.owner_email,
+            role: "owner",
+            membership_type: "owner",
+            created_at: owner.created_at
+          }
+        };
+      }
+
+      const deletedMemberResult = await db.query<ProjectMemberRecord & Record<string, unknown>>(
+        `
+          DELETE FROM project_members pm
+          USING users member_user
+          WHERE pm.project_id = $1::uuid
+            AND pm.user_id = $2::uuid
+            AND member_user.id = pm.user_id
+          RETURNING
+            pm.user_id,
+            member_user.email,
+            pm.role,
+            'collaborator' AS membership_type,
+            pm.created_at::text AS created_at
+        `,
+        [input.project_id, input.user_id]
+      );
+
+      const member = deletedMemberResult.rows[0];
+      if (member === undefined) {
+        return null;
+      }
+
+      return {
+        kind: "removed",
+        member: mapProjectMemberRow(member)
+      };
+    },
+
+    async listProjectsForUser(input): Promise<ProjectRecord[]> {
       const usageWindow = buildProjectMetricsWindow(input.now);
       const hasAlertDeliveries = await alertDeliveriesTableExists(db);
       const organizationPlanSql = "COALESCE(o.plan, 'free')";
@@ -964,6 +1635,16 @@ export function createPostgresMetadataStore(db: Queryable): PostgresMetadataStor
           SELECT
             p.id AS project_id,
             p.organization_id,
+            p.owner_user_id,
+            owner_user.email AS owner_email,
+            CASE
+              WHEN p.owner_user_id = $1::uuid THEN 'owned'
+              ELSE 'shared'
+            END AS relationship,
+            CASE
+              WHEN p.owner_user_id = $1::uuid THEN 'owner'
+              ELSE pm.role
+            END AS effective_role,
             p.name,
             p.slug,
             p.environment_default,
@@ -996,6 +1677,85 @@ export function createPostgresMetadataStore(db: Queryable): PostgresMetadataStor
             p.updated_at::text AS updated_at
           FROM projects p
           JOIN organizations o ON o.id = p.organization_id
+          JOIN users owner_user ON owner_user.id = p.owner_user_id
+          LEFT JOIN project_members pm
+            ON pm.project_id = p.id
+           AND pm.user_id = $1::uuid
+          WHERE p.owner_user_id = $1::uuid
+             OR pm.user_id IS NOT NULL
+          ORDER BY
+            CASE WHEN p.owner_user_id = $1::uuid THEN 0 ELSE 1 END,
+            p.created_at DESC,
+            p.id DESC
+          LIMIT $4
+        `,
+        [input.user_id, usageWindow.starts_at, usageWindow.ends_at, input.limit]
+      );
+
+      return result.rows.map(mapProjectRow);
+    },
+
+    async listProjectsForOrganization(input): Promise<ProjectRecord[]> {
+      const usageWindow = buildProjectMetricsWindow(input.now);
+      const hasAlertDeliveries = await alertDeliveriesTableExists(db);
+      const organizationPlanSql = "COALESCE(o.plan, 'free')";
+      const billableIncidentEventsPredicate = buildBillableIncidentEventsPredicateSql({
+        planSql: organizationPlanSql,
+        eventClassSql: "ie.event_class"
+      });
+      const alertDeliveriesSelect = hasAlertDeliveries
+        ? `
+            (
+              SELECT COUNT(*)::int
+              FROM alert_deliveries ad
+              WHERE ad.project_id = p.id
+                AND ad.created_at >= $2::timestamptz
+                AND ad.created_at < $3::timestamptz
+            )
+          `
+        : "0";
+      const result = await db.query<ProjectRecord & Record<string, unknown>>(
+        `
+          SELECT
+            p.id AS project_id,
+            p.organization_id,
+            p.owner_user_id,
+            owner_user.email AS owner_email,
+            'owned' AS relationship,
+            'owner' AS effective_role,
+            p.name,
+            p.slug,
+            p.environment_default,
+            ${organizationPlanSql} AS organization_plan,
+            json_build_object(
+              'monthly_bundle_requests', (
+                SELECT COUNT(*)::int
+                FROM bundle_generations bg
+                WHERE bg.project_id = p.id
+                  AND bg.created_at >= $2::timestamptz
+                  AND bg.created_at < $3::timestamptz
+              ),
+              'monthly_raw_ingested_events', (
+                SELECT COUNT(*)::int
+                FROM incident_events ie
+                JOIN incidents i ON i.id = ie.incident_id
+                WHERE i.project_id = p.id
+                  AND (${billableIncidentEventsPredicate})
+                  AND ie.occurred_at >= $2::timestamptz
+                  AND ie.occurred_at < $3::timestamptz
+              ),
+              'retained_bundles', (
+                SELECT COUNT(DISTINCT bg.incident_id)::int
+                FROM bundle_generations bg
+                WHERE bg.project_id = p.id
+              ),
+              'monthly_alert_deliveries', ${alertDeliveriesSelect}
+            ) AS metrics,
+            p.created_at::text AS created_at,
+            p.updated_at::text AS updated_at
+          FROM projects p
+          JOIN organizations o ON o.id = p.organization_id
+          JOIN users owner_user ON owner_user.id = p.owner_user_id
           WHERE p.organization_id = $1
           ORDER BY p.created_at DESC, p.id DESC
           LIMIT $4
@@ -1004,6 +1764,260 @@ export function createPostgresMetadataStore(db: Queryable): PostgresMetadataStor
       );
 
       return result.rows.map(mapProjectRow);
+    },
+
+    async createProjectForUser(input): Promise<ProjectRecord | null> {
+      try {
+        const result = await db.query<ProjectRecord & Record<string, unknown>>(
+          `
+            WITH created_project AS (
+              INSERT INTO projects (
+                id,
+                organization_id,
+                owner_user_id,
+                name,
+                slug,
+                environment_default,
+                created_at,
+                updated_at
+              )
+              VALUES (
+                $1::uuid,
+                $2::uuid,
+                $3::uuid,
+                $4,
+                $5,
+                $6,
+                now(),
+                now()
+              )
+              RETURNING
+                id AS project_id,
+                organization_id,
+                owner_user_id,
+                name,
+                slug,
+                environment_default,
+                created_at,
+                updated_at
+            )
+            SELECT
+              cp.project_id,
+              cp.organization_id,
+              cp.owner_user_id,
+              owner_user.email AS owner_email,
+              'owned' AS relationship,
+              'owner' AS effective_role,
+              cp.name,
+              cp.slug,
+              cp.environment_default,
+              COALESCE(o.plan, 'free') AS organization_plan,
+              json_build_object(
+                'monthly_bundle_requests', 0,
+                'monthly_raw_ingested_events', 0,
+                'retained_bundles', 0,
+                'monthly_alert_deliveries', 0
+              ) AS metrics,
+              cp.created_at::text AS created_at,
+              cp.updated_at::text AS updated_at
+            FROM created_project cp
+            JOIN organizations o ON o.id = cp.organization_id
+            JOIN users owner_user ON owner_user.id = cp.owner_user_id
+          `,
+          [
+            randomUUID(),
+            input.organization_id,
+            input.user_id,
+            input.name,
+            input.slug,
+            input.environment_default
+          ]
+        );
+
+        return result.rows[0] === undefined ? null : mapProjectRow(result.rows[0]);
+      } catch (error) {
+        if (
+          typeof error === "object" &&
+          error !== null &&
+          "code" in error &&
+          error.code === "23505" &&
+          "constraint" in error &&
+          error.constraint === "projects_organization_id_slug_key"
+        ) {
+          return null;
+        }
+
+        throw error;
+      }
+    },
+
+    async updateProjectForUser(input): Promise<ProjectRecord | "slug_taken" | null> {
+      try {
+        const usageWindow = buildProjectMetricsWindow(new Date().toISOString());
+        const hasAlertDeliveries = await alertDeliveriesTableExists(db);
+        const billableIncidentEventsPredicate = buildBillableIncidentEventsPredicateSql({
+          planSql: "(SELECT COALESCE(o.plan, 'free') FROM organizations o WHERE o.id = projects.organization_id)",
+          eventClassSql: "ie.event_class"
+        });
+        const alertDeliveriesSelect = hasAlertDeliveries
+          ? `
+              (
+                SELECT COUNT(*)::int
+                FROM alert_deliveries ad
+                WHERE ad.project_id = projects.id
+                  AND ad.created_at >= $6::timestamptz
+                  AND ad.created_at < $7::timestamptz
+              )
+            `
+          : "0";
+        const result = await db.query<ProjectRecord & Record<string, unknown>>(
+          `
+            WITH updated_project AS (
+              UPDATE projects
+              SET
+                name = COALESCE($3, name),
+                slug = COALESCE($4, slug),
+                environment_default = COALESCE($5, environment_default),
+                updated_at = now()
+              WHERE id = $2::uuid
+                AND (
+                  owner_user_id = $1::uuid
+                  OR EXISTS (
+                    SELECT 1
+                    FROM project_members pm
+                    WHERE pm.project_id = projects.id
+                      AND pm.user_id = $1::uuid
+                  )
+                )
+              RETURNING
+                id AS project_id,
+                organization_id,
+                owner_user_id,
+                name,
+                slug,
+                environment_default,
+                created_at,
+                updated_at
+            )
+            SELECT
+              up.project_id,
+              up.organization_id,
+              up.owner_user_id,
+              owner_user.email AS owner_email,
+              CASE
+                WHEN up.owner_user_id = $1::uuid THEN 'owned'
+                ELSE 'shared'
+              END AS relationship,
+              CASE
+                WHEN up.owner_user_id = $1::uuid THEN 'owner'
+                ELSE (
+                  SELECT pm.role
+                  FROM project_members pm
+                  WHERE pm.project_id = up.project_id
+                    AND pm.user_id = $1::uuid
+                  LIMIT 1
+                )
+              END AS effective_role,
+              up.name,
+              up.slug,
+              up.environment_default,
+              COALESCE(o.plan, 'free') AS organization_plan,
+              json_build_object(
+                'monthly_bundle_requests', (
+                  SELECT COUNT(*)::int
+                  FROM bundle_generations bg
+                  WHERE bg.project_id = up.project_id
+                    AND bg.created_at >= $6::timestamptz
+                    AND bg.created_at < $7::timestamptz
+                ),
+                'monthly_raw_ingested_events', (
+                  SELECT COUNT(*)::int
+                  FROM incident_events ie
+                  JOIN incidents i ON i.id = ie.incident_id
+                  WHERE i.project_id = up.project_id
+                    AND (${billableIncidentEventsPredicate})
+                    AND ie.occurred_at >= $6::timestamptz
+                    AND ie.occurred_at < $7::timestamptz
+                ),
+                'retained_bundles', (
+                  SELECT COUNT(DISTINCT bg.incident_id)::int
+                  FROM bundle_generations bg
+                  WHERE bg.project_id = up.project_id
+                ),
+                'monthly_alert_deliveries', ${alertDeliveriesSelect}
+              ) AS metrics,
+              up.created_at::text AS created_at,
+              up.updated_at::text AS updated_at
+            FROM updated_project up
+            JOIN organizations o ON o.id = up.organization_id
+            JOIN users owner_user ON owner_user.id = up.owner_user_id
+          `,
+          [
+            input.user_id,
+            input.project_id,
+            input.name ?? null,
+            input.slug ?? null,
+            input.environment_default ?? null,
+            usageWindow.starts_at,
+            usageWindow.ends_at
+          ]
+        );
+
+        return result.rows[0] === undefined ? null : mapProjectRow(result.rows[0]);
+      } catch (error) {
+        if (
+          typeof error === "object" &&
+          error !== null &&
+          "code" in error &&
+          error.code === "23505" &&
+          "constraint" in error &&
+          error.constraint === "projects_organization_id_slug_key"
+        ) {
+          return "slug_taken";
+        }
+
+        throw error;
+      }
+    },
+
+    async deleteProjectForUser(input): Promise<DeletedProjectRecord | null> {
+      const result = await db.query<DeletedProjectRecord & Record<string, unknown>>(
+        `
+          WITH deleted_project AS (
+            DELETE FROM projects
+            WHERE id = $2::uuid
+              AND owner_user_id = $1::uuid
+            RETURNING
+              id AS project_id,
+              organization_id,
+              owner_user_id,
+              name,
+              slug,
+              environment_default,
+              created_at,
+              updated_at
+          )
+          SELECT
+            dp.project_id,
+            dp.organization_id,
+            dp.owner_user_id,
+            owner_user.email AS owner_email,
+            'owned' AS relationship,
+            'owner' AS effective_role,
+            dp.name,
+            dp.slug,
+            dp.environment_default,
+            COALESCE(o.plan, 'free') AS organization_plan,
+            dp.created_at::text AS created_at,
+            dp.updated_at::text AS updated_at
+          FROM deleted_project dp
+          JOIN organizations o ON o.id = dp.organization_id
+          JOIN users owner_user ON owner_user.id = dp.owner_user_id
+        `,
+        [input.user_id, input.project_id]
+      );
+
+      return result.rows[0] === undefined ? null : mapDeletedProjectRow(result.rows[0]);
     },
 
     async createProjectForOrganization(input): Promise<ProjectRecord | null> {
@@ -1023,6 +2037,14 @@ export function createPostgresMetadataStore(db: Queryable): PostgresMetadataStor
               SELECT
                 $1,
                 o.id,
+                (
+                  SELECT om.user_id
+                  FROM organization_members om
+                  WHERE om.organization_id = o.id
+                    AND om.role = 'owner'
+                  ORDER BY om.created_at ASC
+                  LIMIT 1
+                ),
                 $3,
                 $4,
                 $5,
@@ -1033,6 +2055,7 @@ export function createPostgresMetadataStore(db: Queryable): PostgresMetadataStor
               RETURNING
                 id AS project_id,
                 organization_id,
+                owner_user_id,
                 name,
                 slug,
                 environment_default,
@@ -1042,6 +2065,10 @@ export function createPostgresMetadataStore(db: Queryable): PostgresMetadataStor
             SELECT
               cp.project_id,
               cp.organization_id,
+              cp.owner_user_id,
+              owner_user.email AS owner_email,
+              'owned' AS relationship,
+              'owner' AS effective_role,
               cp.name,
               cp.slug,
               cp.environment_default,
@@ -1056,6 +2083,7 @@ export function createPostgresMetadataStore(db: Queryable): PostgresMetadataStor
               cp.updated_at::text AS updated_at
             FROM created_project cp
             JOIN organizations o ON o.id = cp.organization_id
+            JOIN users owner_user ON owner_user.id = cp.owner_user_id
           `,
           [
             randomUUID(),
@@ -1115,6 +2143,7 @@ export function createPostgresMetadataStore(db: Queryable): PostgresMetadataStor
               RETURNING
                 id AS project_id,
                 organization_id,
+                owner_user_id,
                 name,
                 slug,
                 environment_default,
@@ -1124,6 +2153,10 @@ export function createPostgresMetadataStore(db: Queryable): PostgresMetadataStor
             SELECT
               up.project_id,
               up.organization_id,
+              up.owner_user_id,
+              owner_user.email AS owner_email,
+              'owned' AS relationship,
+              'owner' AS effective_role,
               up.name,
               up.slug,
               up.environment_default,
@@ -1156,6 +2189,7 @@ export function createPostgresMetadataStore(db: Queryable): PostgresMetadataStor
               up.updated_at::text AS updated_at
             FROM updated_project up
             JOIN organizations o ON o.id = up.organization_id
+            JOIN users owner_user ON owner_user.id = up.owner_user_id
           `,
           [
             input.organization_id,
@@ -1194,6 +2228,7 @@ export function createPostgresMetadataStore(db: Queryable): PostgresMetadataStor
             RETURNING
               id AS project_id,
               organization_id,
+              owner_user_id,
               name,
               slug,
               environment_default,
@@ -1203,6 +2238,10 @@ export function createPostgresMetadataStore(db: Queryable): PostgresMetadataStor
           SELECT
             dp.project_id,
             dp.organization_id,
+            dp.owner_user_id,
+            owner_user.email AS owner_email,
+            'owned' AS relationship,
+            'owner' AS effective_role,
             dp.name,
             dp.slug,
             dp.environment_default,
@@ -1211,6 +2250,7 @@ export function createPostgresMetadataStore(db: Queryable): PostgresMetadataStor
             dp.updated_at::text AS updated_at
           FROM deleted_project dp
           JOIN organizations o ON o.id = dp.organization_id
+          JOIN users owner_user ON owner_user.id = dp.owner_user_id
         `,
         [input.organization_id, input.project_id]
       );

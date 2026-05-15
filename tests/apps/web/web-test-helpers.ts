@@ -36,6 +36,10 @@ export interface ProjectRecord {
   slug: string;
   environment_default: string;
   organization_plan: "free" | "solo" | "team";
+  owner_user_id?: string;
+  owner_email?: string;
+  relationship?: "owned" | "shared";
+  effective_role?: "owner" | "admin" | "member";
   metrics: {
     monthly_bundle_requests: number;
     monthly_raw_ingested_events: number;
@@ -79,20 +83,22 @@ export interface IncidentRecord {
   matched_fields: string[];
 }
 
-export interface OrganizationMemberRecord {
+export interface ProjectMemberRecord {
   user_id: string;
   email: string;
-  role: "owner" | "member";
+  role: "owner" | "admin" | "member";
+  membership_type: "owner" | "collaborator";
   created_at: string;
 }
 
-export interface OrganizationInviteRecord {
+export interface ProjectInviteRecord {
   invite_id: string;
-  organization_id: string;
+  project_id: string;
   email: string;
-  role: "owner" | "member";
-  invited_by: string;
+  role: "admin" | "member";
+  invited_by_user_id: string;
   accepted_at: string | null;
+  canceled_at: string | null;
   expires_at: string;
   created_at: string;
 }
@@ -343,24 +349,26 @@ export function createIncident(overrides: Partial<IncidentRecord> = {}): Inciden
   };
 }
 
-export function createOrganizationMember(overrides: Partial<OrganizationMemberRecord> = {}): OrganizationMemberRecord {
+export function createProjectMember(overrides: Partial<ProjectMemberRecord> = {}): ProjectMemberRecord {
   return {
     user_id: "usr_123",
     email: "owen@example.com",
     role: "owner",
+    membership_type: "owner",
     created_at: "2026-03-17T00:00:00.000Z",
     ...overrides
   };
 }
 
-export function createOrganizationInvite(overrides: Partial<OrganizationInviteRecord> = {}): OrganizationInviteRecord {
+export function createProjectInvite(overrides: Partial<ProjectInviteRecord> = {}): ProjectInviteRecord {
   return {
-    invite_id: "inv_123",
-    organization_id: "org_123",
+    invite_id: "pinv_123",
+    project_id: "proj_123",
     email: "pending@example.com",
     role: "member",
-    invited_by: "usr_123",
+    invited_by_user_id: "usr_123",
     accepted_at: null,
+    canceled_at: null,
     expires_at: "2026-03-24T00:00:00.000Z",
     created_at: "2026-03-17T00:00:00.000Z",
     ...overrides

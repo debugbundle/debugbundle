@@ -158,7 +158,7 @@ describe("web app - auth routes", () => {
     render(<App initialEntries={["/organization"]} />);
 
     expect(await screen.findByText(/shared workspace requires team/i)).toBeInTheDocument();
-    expect(screen.getByText(/shared workspace views and member management are only available on team/i)).toBeInTheDocument();
+    expect(screen.getByText(/shared workspace views and project sharing are only available on team/i)).toBeInTheDocument();
   });
 
   it("requests and verifies an email code from the login screen before landing on the dashboard", async () => {

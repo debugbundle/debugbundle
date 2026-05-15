@@ -122,9 +122,10 @@ export interface ConsumeEmailAuthChallengeInput {
 }
 
 export interface OrganizationInviteMembership {
+  project_id: string;
   user_id: string;
-  organization_id: string;
-  role: "owner" | "member";
+  role: "owner" | "admin" | "member";
+  membership_type?: "owner" | "collaborator";
 }
 
 export interface IssuedMemberTokenRecord {

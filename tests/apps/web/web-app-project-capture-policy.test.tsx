@@ -98,7 +98,11 @@ describe("web app — project capture policy settings", () => {
 
     render(<App initialEntries={["/projects/proj_123/settings"]} />);
 
-    expect(await screen.findByRole("heading", { name: /capture policy/i, level: 3 })).toBeInTheDocument();
+    const capturePolicyHeading = await screen.findByRole("heading", { name: /capture policy/i, level: 3 });
+    const projectDetailsHeading = await screen.findByRole("heading", { name: /project details/i, level: 3 });
+
+    expect(capturePolicyHeading).toBeInTheDocument();
+    expect(capturePolicyHeading.compareDocumentPosition(projectDetailsHeading) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
 
     const presetSelect = expectSelect(screen.getByLabelText(/^preset$/i));
     const requestSelect = expectSelect(screen.getByLabelText(/^request events$/i));

@@ -1,6 +1,6 @@
-import { BookMarkedIcon, PencilIcon, Settings2Icon, Trash2Icon } from "lucide-react";
+import { PencilIcon, Settings2Icon, Trash2Icon } from "lucide-react";
 import { useEffect, useState } from "react";
-import { Link, useNavigate, useOutletContext } from "react-router-dom";
+import { useNavigate, useOutletContext } from "react-router-dom";
 import { DialogFormContent } from "../components/system/dialog-form-content.js";
 import { ProjectCapturePolicyCard } from "../components/system/project-capture-policy-card.js";
 import type { ProjectContext } from "../components/system/project-layout.js";
@@ -127,66 +127,35 @@ export function ProjectSettingsPage(): JSX.Element {
   }
 
   return (
-    <div className="grid gap-4 xl:grid-cols-[1.15fr_0.85fr]">
-      <div className="space-y-4">
-        <Card>
-          <CardHeader>
-            <CardAction>
-              <Button type="button" variant="outline" size="sm" onClick={() => setIsEditOpen(true)} disabled={!canEditProject}>
-                <PencilIcon data-icon="inline-start" />
-                Edit project
-              </Button>
-            </CardAction>
-            <CardTitle>Project details</CardTitle>
-            <CardDescription>Current project identity and editable environment defaults used across setup guidance and project metadata.</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            <div className="grid gap-4 sm:grid-cols-2">
-              <DetailBlock label="Project name" value={project.name} />
-              <DetailBlock label="Project slug" value={project.slug} />
-              <DetailBlock label="Project default environment" value={project.environment_default} />
-              <DetailBlock label="Created" value={formatDate(project.created_at)} />
-              <DetailBlock label="Updated" value={formatDate(project.updated_at)} />
-            </div>
-          </CardContent>
-        </Card>
+    <div className="space-y-4">
+      <ProjectCapturePolicyCard projectId={project.project_id} organizationPlan={project.organization_plan} canEdit={canEditProject} />
 
-        <ProjectCapturePolicyCard projectId={project.project_id} organizationPlan={project.organization_plan} canEdit={canEditProject} />
-      </div>
-
-      <div className="space-y-4">
-        <Card>
-          <CardHeader>
-            <CardTitle>Install guidance entry point</CardTitle>
-            <CardDescription>Start here before setting up tokens, alerts, webhooks, or GitHub automation.</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="rounded-lg border border-border/80 bg-background/60 p-4 text-sm text-muted-foreground">
-              <div className="flex items-center gap-2 font-medium text-foreground">
-                <BookMarkedIcon className="size-4" />
-                Install guidance entry point
+      <div className="grid gap-4 xl:grid-cols-[1.15fr_0.85fr]">
+        <div className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardAction>
+                <Button type="button" variant="outline" size="sm" onClick={() => setIsEditOpen(true)} disabled={!canEditProject}>
+                  <PencilIcon data-icon="inline-start" />
+                  Edit project
+                </Button>
+              </CardAction>
+              <CardTitle>Project details</CardTitle>
+              <CardDescription>Current project identity and editable environment defaults used across setup guidance and project metadata.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="grid gap-4 sm:grid-cols-2">
+                <DetailBlock label="Project name" value={project.name} />
+                <DetailBlock label="Project slug" value={project.slug} />
+                <DetailBlock label="Project default environment" value={project.environment_default} />
+                <DetailBlock label="Created" value={formatDate(project.created_at)} />
+                <DetailBlock label="Updated" value={formatDate(project.updated_at)} />
               </div>
-              <p className="mt-2 leading-6">
-                Start with project tokens for SDK setup, then move into alerts, webhooks, and GitHub automation once ingestion is running.
-              </p>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              <Button asChild type="button" variant="outline" size="sm">
-                <Link to={`/projects/${project.project_id}/tokens`}>Open project tokens</Link>
-              </Button>
-              <Button asChild type="button" variant="outline" size="sm">
-                <Link to={`/projects/${project.project_id}/alerts`}>Open alerts</Link>
-              </Button>
-              <Button asChild type="button" variant="outline" size="sm">
-                <Link to={`/projects/${project.project_id}/webhooks`}>Open webhooks</Link>
-              </Button>
-              <Button asChild type="button" variant="outline" size="sm">
-                <Link to={`/projects/${project.project_id}/github`}>Open GitHub automation</Link>
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+        </div>
 
+        <div className="space-y-4">
         <Card className="border-destructive/25 bg-destructive/5">
           <CardHeader>
             <CardTitle>Destructive actions</CardTitle>
@@ -246,6 +215,7 @@ export function ProjectSettingsPage(): JSX.Element {
             </AlertDialog>
           </CardContent>
         </Card>
+        </div>
       </div>
 
       <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>

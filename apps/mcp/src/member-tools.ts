@@ -1,12 +1,12 @@
 import { MemberApiError, createMemberApi } from "../../cli/src/member-commands.js";
 
 export const MEMBER_MCP_TOOL_NAMES = [
-  "list_members",
-  "list_member_invites",
-  "invite_member",
-  "cancel_member_invite",
-  "update_member_role",
-  "remove_member"
+  "list_project_members",
+  "list_project_member_invites",
+  "invite_project_member",
+  "cancel_project_member_invite",
+  "update_project_member_role",
+  "remove_project_member"
 ] as const;
 
 function mapMcpError(error: unknown): never {
@@ -21,30 +21,33 @@ type MemberApi = ReturnType<typeof createMemberApi>;
 
 export function createMemberMcpTools(api: MemberApi): Record<(typeof MEMBER_MCP_TOOL_NAMES)[number], (input: Record<string, unknown>) => Promise<unknown>> {
   return {
-    async list_members(input) {
+    async list_project_members(input) {
       try {
         return await api.listMembers({
-          bearerToken: String(input["bearerToken"])
+          bearerToken: String(input["bearerToken"]),
+          projectId: String(input["projectId"])
         });
       } catch (error) {
         mapMcpError(error);
       }
     },
 
-    async list_member_invites(input) {
+    async list_project_member_invites(input) {
       try {
         return await api.listInvites({
-          bearerToken: String(input["bearerToken"])
+          bearerToken: String(input["bearerToken"]),
+          projectId: String(input["projectId"])
         });
       } catch (error) {
         mapMcpError(error);
       }
     },
 
-    async invite_member(input) {
+    async invite_project_member(input) {
       try {
         return await api.inviteMember({
           bearerToken: String(input["bearerToken"]),
+          projectId: String(input["projectId"]),
           email: String(input["email"]),
           role: String(input["role"])
         });
@@ -53,10 +56,11 @@ export function createMemberMcpTools(api: MemberApi): Record<(typeof MEMBER_MCP_
       }
     },
 
-    async cancel_member_invite(input) {
+    async cancel_project_member_invite(input) {
       try {
         return await api.cancelInvite({
           bearerToken: String(input["bearerToken"]),
+          projectId: String(input["projectId"]),
           inviteId: String(input["inviteId"])
         });
       } catch (error) {
@@ -64,10 +68,11 @@ export function createMemberMcpTools(api: MemberApi): Record<(typeof MEMBER_MCP_
       }
     },
 
-    async update_member_role(input) {
+    async update_project_member_role(input) {
       try {
         return await api.updateMemberRole({
           bearerToken: String(input["bearerToken"]),
+          projectId: String(input["projectId"]),
           userId: String(input["userId"]),
           role: String(input["role"])
         });
@@ -76,10 +81,11 @@ export function createMemberMcpTools(api: MemberApi): Record<(typeof MEMBER_MCP_
       }
     },
 
-    async remove_member(input) {
+    async remove_project_member(input) {
       try {
         return await api.removeMember({
           bearerToken: String(input["bearerToken"]),
+          projectId: String(input["projectId"]),
           userId: String(input["userId"])
         });
       } catch (error) {

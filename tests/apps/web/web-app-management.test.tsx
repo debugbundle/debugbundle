@@ -15,8 +15,6 @@ import {
   createGitHubInstallation,
   createGitHubRepository,
   createIncident,
-  createOrganizationInvite,
-  createOrganizationMember,
   createProject,
   createProjectGitHubRepo,
   createProjectToken,
@@ -83,6 +81,7 @@ describe("web app — management routes", () => {
     expect(screen.getByRole("tab", { name: /webhooks/i })).toBeInTheDocument();
     expect(screen.getByRole("tab", { name: /github/i })).toBeInTheDocument();
     expect(screen.getByRole("tab", { name: /tokens/i })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: /members/i })).toBeInTheDocument();
     expect(screen.getByRole("tab", { name: /settings/i })).toBeInTheDocument();
   });
 
@@ -621,8 +620,6 @@ describe("web app — management routes", () => {
     });
     expect(screen.getByText(/production/i)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /edit project/i })).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: /install guidance entry point/i, level: 3 })).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: /open github automation/i })).toHaveAttribute("href", "/projects/proj_123/github");
     expect(screen.getByRole("button", { name: /delete project/i })).toBeDisabled();
   });
 
@@ -956,7 +953,6 @@ describe("web app — management routes", () => {
     render(<App initialEntries={["/projects/proj_123/github"]} />);
 
     expect(await screen.findByText(/github automation is not configured on the api yet/i)).toBeInTheDocument();
-    expect(screen.getByText(/set github_app_id, github_app_private_key, and github_app_webhook_secret/i)).toBeInTheDocument();
   });
 
   it("routes free-plan github automation upsells to billing", async () => {
@@ -1495,7 +1491,7 @@ describe("web app — management routes", () => {
 
     await user.click(await screen.findByRole("tab", { name: /settings/i }));
 
-    expect(await screen.findByRole("heading", { name: /install guidance entry point/i, level: 3 })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: /capture policy/i, level: 3 })).toBeInTheDocument();
   });
 
   it("shows project webhooks with recent delivery status and triggers a synthetic test delivery", async () => {
@@ -2248,227 +2244,7 @@ describe("web app — management routes", () => {
     expect(screen.getAllByRole("button", { name: /create alert rule/i }).length).toBe(2);
   });
 
-  it("shows organization members for owners and blocks member-role callers from the management surface", async () => {
-    const ownerFetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
-      const url = requestUrl(input);
-
-      if (url.endsWith("/v1/auth/session")) {
-        return jsonResponse(200, {
-          session: createSession()
-        });
-      }
-
-      if (url.endsWith("/v1/organization/members") && init?.method === undefined) {
-        return jsonResponse(200, {
-          members: [createOrganizationMember(), createOrganizationMember({ user_id: "usr_456", email: "casey@example.com", role: "member" })]
-        });
-      }
-
-      if (url.endsWith("/v1/organization/members/invites") && init?.method === undefined) {
-        return jsonResponse(200, {
-          invites: [createOrganizationInvite()]
-        });
-      }
-
-      return jsonResponse(404, { error: "not_found" });
-    });
-
-    vi.stubGlobal("fetch", ownerFetchMock);
-
-    const ownerView = render(<App initialEntries={["/organization/members"]} />);
-
-    expect(await screen.findByRole("heading", { name: /organization members/i, level: 1 })).toBeInTheDocument();
-    expect(await screen.findByText(/casey@example.com/i)).toBeInTheDocument();
-    expect(await screen.findByText(/pending@example.com/i)).toBeInTheDocument();
-    ownerView.unmount();
-
-    const memberFetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
-      const url = requestUrl(input);
-
-      if (url.endsWith("/v1/auth/session")) {
-        return jsonResponse(200, {
-          session: createSession({ role: "member" })
-        });
-      }
-
-      if (url.endsWith("/v1/organization/members") && init?.method === undefined) {
-        return jsonResponse(403, { error: "forbidden" });
-      }
-
-      if (url.endsWith("/v1/organization/members/invites") && init?.method === undefined) {
-        return jsonResponse(403, { error: "forbidden" });
-      }
-
-      return jsonResponse(404, { error: "not_found" });
-    });
-
-    vi.stubGlobal("fetch", memberFetchMock);
-
-    render(<App initialEntries={["/organization/members"]} />);
-
-    expect(await screen.findByText(/owner permissions are required to manage members/i)).toBeInTheDocument();
-  });
-
-  it("invites a member, changes a member role, removes a member, and cancels an invite from the org members page", async () => {
-    const user = userEvent.setup();
-    const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
-      const url = requestUrl(input);
-
-      if (url.endsWith("/v1/auth/session")) {
-        return jsonResponse(200, {
-          session: createSession()
-        });
-      }
-
-      if (url.endsWith("/v1/organization/members") && init?.method === undefined) {
-        return jsonResponse(200, {
-          members: [
-            createOrganizationMember(),
-            createOrganizationMember({ user_id: "usr_456", email: "casey@example.com", role: "member" })
-          ]
-        });
-      }
-
-      if (url.endsWith("/v1/organization/members/invites") && init?.method === undefined) {
-        return jsonResponse(200, {
-          invites: [createOrganizationInvite()]
-        });
-      }
-
-      if (url.endsWith("/v1/organization/members/invite") && init?.method === "POST") {
-        expect(init.credentials).toBe("include");
-        const body = JSON.parse(init.body as string) as { email: string; role: string };
-        return jsonResponse(201, {
-          invite: createOrganizationInvite({ invite_id: "inv_456", email: body.email, role: body.role as "owner" | "member" })
-        });
-      }
-
-      if (url.endsWith("/v1/organization/members/usr_456") && init?.method === "PATCH") {
-        expect(init.credentials).toBe("include");
-        const body = JSON.parse(init.body as string) as { role: string };
-        return jsonResponse(200, {
-          member: createOrganizationMember({ user_id: "usr_456", email: "casey@example.com", role: body.role as "owner" | "member" })
-        });
-      }
-
-      if (url.endsWith("/v1/organization/members/usr_456") && init?.method === "DELETE") {
-        return jsonResponse(200, {
-          member: createOrganizationMember({ user_id: "usr_456", email: "casey@example.com", role: "member" })
-        });
-      }
-
-      if (url.includes("/v1/organization/members/invites/inv_123") && init?.method === "DELETE") {
-        return jsonResponse(200, {
-          invite: createOrganizationInvite()
-        });
-      }
-
-      return jsonResponse(404, { error: "not_found" });
-    });
-
-    vi.stubGlobal("fetch", fetchMock);
-
-    render(<App initialEntries={["/organization/members"]} />);
-
-    expect(await screen.findByRole("heading", { name: /organization members/i, level: 1 })).toBeInTheDocument();
-    expect(await screen.findByText(/casey@example.com/i)).toBeInTheDocument();
-
-    // Invite a new member
-    await user.click(screen.getByRole("button", { name: /invite member/i }));
-    expect((await screen.findByRole("dialog")).className.includes("sm:max-w-lg")).toBe(true);
-    expect(screen.getByText(/invite someone to this organization/i)).toBeInTheDocument();
-    await user.type(await screen.findByLabelText(/email address/i), "newbie@example.com");
-    await user.click(screen.getByRole("button", { name: /send invite/i }));
-
-    await waitFor(() => {
-      expect(screen.getByText(/newbie@example.com/i)).toBeInTheDocument();
-    });
-
-    // Change casey's role
-    const caseyRoleSelect = screen.getByLabelText(/role for casey@example.com/i);
-    await user.selectOptions(caseyRoleSelect, "owner");
-
-    await waitFor(() => {
-      expect(
-        fetchMock.mock.calls.some(
-          ([input, init]) => requestUrl(input).endsWith("/v1/organization/members/usr_456") && init?.method === "PATCH"
-        )
-      ).toBe(true);
-    });
-
-    // Cancel the original pending invite
-    const cancelButtons = screen.getAllByRole("button", { name: /^cancel$/i });
-    expect(cancelButtons[0]).toBeDefined();
-    await user.click(cancelButtons[0] as HTMLButtonElement);
-    await user.click(await screen.findByRole("button", { name: /cancel invite/i }));
-
-    await waitFor(() => {
-      expect(
-        fetchMock.mock.calls.some(
-          ([input, init]) => requestUrl(input).includes("/v1/organization/members/invites/inv_123") && init?.method === "DELETE"
-        )
-      ).toBe(true);
-    });
-  });
-
-  it("removes a member from the organization members page", async () => {
-    const user = userEvent.setup();
-    const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
-      const url = requestUrl(input);
-
-      if (url.endsWith("/v1/auth/session")) {
-        return jsonResponse(200, {
-          session: createSession()
-        });
-      }
-
-      if (url.endsWith("/v1/organization/members") && init?.method === undefined) {
-        return jsonResponse(200, {
-          members: [
-            createOrganizationMember(),
-            createOrganizationMember({ user_id: "usr_456", email: "casey@example.com", role: "member" })
-          ]
-        });
-      }
-
-      if (url.endsWith("/v1/organization/members/invites") && init?.method === undefined) {
-        return jsonResponse(200, {
-          invites: []
-        });
-      }
-
-      if (url.endsWith("/v1/organization/members/usr_456") && init?.method === "DELETE") {
-        expect(init.credentials).toBe("include");
-        return jsonResponse(200, { success: true });
-      }
-
-      return jsonResponse(404, { error: "not_found" });
-    });
-
-    vi.stubGlobal("fetch", fetchMock);
-
-    render(<App initialEntries={["/organization/members"]} />);
-
-    expect(await screen.findByText(/casey@example.com/i)).toBeInTheDocument();
-
-    const memberRow = screen.getByText(/casey@example.com/i).closest("tr");
-    expect(memberRow).not.toBeNull();
-    await user.click(within(memberRow as HTMLTableRowElement).getByRole("button", { name: /^remove$/i }));
-    await user.click(await screen.findByRole("button", { name: /remove member/i }));
-
-    await waitFor(() => {
-      expect(
-        fetchMock.mock.calls.some(
-          ([input, init]) => requestUrl(input).endsWith("/v1/organization/members/usr_456") && init?.method === "DELETE"
-        )
-      ).toBe(true);
-    });
-
-    expect(await screen.findByText(/member removed successfully/i)).toBeInTheDocument();
-    expect(screen.queryByText(/casey@example.com/i)).toBeNull();
-  });
-
-  it("shows organization overview summary with entry points into member and billing management", async () => {
+  it("shows organization overview summary with entry points into project sharing and billing", async () => {
     const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
       const url = requestUrl(input);
 
@@ -2480,19 +2256,10 @@ describe("web app — management routes", () => {
 
       if (url.endsWith("/v1/projects") && init?.method === undefined) {
         return jsonResponse(200, {
-          projects: [createProject(), createProject({ project_id: "proj_456", name: "Worker", slug: "worker" })]
-        });
-      }
-
-      if (url.endsWith("/v1/organization/members") && init?.method === undefined) {
-        return jsonResponse(200, {
-          members: [createOrganizationMember(), createOrganizationMember({ user_id: "usr_456", email: "casey@example.com", role: "member" })]
-        });
-      }
-
-      if (url.endsWith("/v1/organization/members/invites") && init?.method === undefined) {
-        return jsonResponse(200, {
-          invites: [createOrganizationInvite()]
+          projects: [
+            createProject(),
+            createProject({ project_id: "proj_456", name: "Worker", slug: "worker", relationship: "shared" })
+          ]
         });
       }
 
@@ -2520,9 +2287,9 @@ describe("web app — management routes", () => {
 
     expect(await screen.findByRole("heading", { name: /organization/i, level: 1 })).toBeInTheDocument();
     expect(screen.getAllByText(/org_123/i).length).toBeGreaterThan(0);
-    expect(await screen.findByText(/2 members and 1 pending invite/i)).toBeInTheDocument();
+    expect(await screen.findByText(/2 active projects\. 1 project is shared\./i)).toBeInTheDocument();
     expect(await screen.findByText(/team plan with 2 active projects and 17 allowance units/i)).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: /open member management/i })).toHaveAttribute("href", "/organization/members");
+    expect(screen.getByRole("link", { name: /open projects/i })).toHaveAttribute("href", "/projects");
     expect(screen.getByRole("link", { name: /open billing management/i })).toHaveAttribute("href", "/billing");
   });
 
@@ -2543,14 +2310,6 @@ describe("web app — management routes", () => {
         });
       }
 
-      if (url.endsWith("/v1/organization/members") && init?.method === undefined) {
-        return jsonResponse(403, { error: "forbidden" });
-      }
-
-      if (url.endsWith("/v1/organization/members/invites") && init?.method === undefined) {
-        return jsonResponse(403, { error: "forbidden" });
-      }
-
       if (url.endsWith("/v1/billing") && init?.method === undefined) {
         return jsonResponse(403, { error: "forbidden" });
       }
@@ -2565,8 +2324,8 @@ describe("web app — management routes", () => {
     await user.click(await screen.findByRole("link", { name: /organization/i }));
 
     expect(await screen.findByRole("heading", { name: /organization/i, level: 1 })).toBeInTheDocument();
-    expect(await screen.findByText(/1 active project/i)).toBeInTheDocument();
-    expect(await screen.findByText(/owner permissions are required to manage members/i)).toBeInTheDocument();
+    expect(await screen.findAllByText(/1 active project/i)).toHaveLength(2);
+    expect(await screen.findByText(/manage sharing from each project/i)).toBeInTheDocument();
     expect(await screen.findByText(/owner permissions are required to manage billing/i)).toBeInTheDocument();
   });
 
@@ -2584,14 +2343,6 @@ describe("web app — management routes", () => {
         return jsonResponse(200, {
           projects: [createProject({ organization_plan: "free" })]
         });
-      }
-
-      if (url.endsWith("/v1/organization/members") && init?.method === undefined) {
-        return jsonResponse(403, { error: "forbidden" });
-      }
-
-      if (url.endsWith("/v1/organization/members/invites") && init?.method === undefined) {
-        return jsonResponse(403, { error: "forbidden" });
       }
 
       if (url.endsWith("/v1/billing") && init?.method === undefined) {
@@ -3011,7 +2762,7 @@ describe("web app — management routes", () => {
               },
               monthly_raw_ingested_events: {
                 used: 800,
-                limit: 6000
+                limit: 10500
               },
               retained_bundle_cap: {
                 used: 40,
@@ -3262,7 +3013,7 @@ describe("web app — management routes", () => {
     expect(screen.getByRole("dialog")).toBeInTheDocument();
   });
 
-  it("shows owner-scope warnings on the organization overview when member and billing APIs forbid access", async () => {
+  it("shows owner-scope warnings on the organization overview when billing is forbidden", async () => {
     const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
       const url = requestUrl(input);
 
@@ -3278,14 +3029,6 @@ describe("web app — management routes", () => {
         });
       }
 
-      if (url.endsWith("/v1/organization/members") && init?.method === undefined) {
-        return jsonResponse(403, { error: "forbidden" });
-      }
-
-      if (url.endsWith("/v1/organization/members/invites") && init?.method === undefined) {
-        return jsonResponse(200, { invites: [] });
-      }
-
       if (url.endsWith("/v1/billing") && init?.method === undefined) {
         return jsonResponse(403, { error: "forbidden" });
       }
@@ -3298,7 +3041,7 @@ describe("web app — management routes", () => {
     render(<App initialEntries={["/organization"]} />);
 
     expect(await screen.findByRole("heading", { name: /organization/i, level: 1 })).toBeInTheDocument();
-    expect(await screen.findByText(/owner permissions are required to manage members/i)).toBeInTheDocument();
+    expect(await screen.findByText(/manage sharing from each project/i)).toBeInTheDocument();
     expect(screen.getByText(/owner permissions are required to manage billing/i)).toBeInTheDocument();
   });
 
@@ -3468,7 +3211,7 @@ describe("web app — management routes", () => {
     expect(await screen.findByText(/choose a unit count above your current purchased quantity/i)).toBeInTheDocument();
   });
 
-  it("renders singular organization overview summaries for one project, one member, and three allowance units", async () => {
+  it("renders singular organization overview summaries for one project and three allowance units", async () => {
     const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
       const url = requestUrl(input);
 
@@ -3481,18 +3224,6 @@ describe("web app — management routes", () => {
       if (url.endsWith("/v1/projects") && init?.method === undefined) {
         return jsonResponse(200, {
           projects: [createProject({ organization_plan: "team" })]
-        });
-      }
-
-      if (url.endsWith("/v1/organization/members") && init?.method === undefined) {
-        return jsonResponse(200, {
-          members: [createOrganizationMember()]
-        });
-      }
-
-      if (url.endsWith("/v1/organization/members/invites") && init?.method === undefined) {
-        return jsonResponse(200, {
-          invites: [createOrganizationInvite()]
         });
       }
 
@@ -3520,7 +3251,7 @@ describe("web app — management routes", () => {
 
     expect(await screen.findByRole("heading", { name: /organization/i, level: 1 })).toBeInTheDocument();
     expect(await screen.findByText(/^1 active project$/i)).toBeInTheDocument();
-    expect(await screen.findByText(/1 member and 1 pending invite/i)).toBeInTheDocument();
+    expect(await screen.findByText(/1 active project\. Sharing is managed from each project's Members tab\./i)).toBeInTheDocument();
     expect(await screen.findByText(/solo plan with 1 active project and 3 allowance units/i)).toBeInTheDocument();
   });
 

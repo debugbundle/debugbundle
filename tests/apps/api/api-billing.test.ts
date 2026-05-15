@@ -212,7 +212,7 @@ describe("api billing routes", () => {
           },
           monthly_raw_ingested_events: {
             used: 800,
-            limit: 6000
+            limit: 10500
           },
           retained_bundle_cap: {
             used: 40,
@@ -278,7 +278,7 @@ describe("api billing routes", () => {
           },
           monthly_raw_ingested_events: {
             used: 800,
-            limit: 6000
+            limit: 10500
           },
           retained_bundle_cap: {
             used: 40,
@@ -597,15 +597,15 @@ describe("api billing routes", () => {
         allowances: {
           monthly_bundle_requests: {
             used: 600,
-            limit: 7500
+            limit: 15000
           },
           monthly_raw_ingested_events: {
             used: 3200,
-            limit: 75000
+            limit: 150000
           },
           retained_bundle_cap: {
             used: 75,
-            limit: 4500
+            limit: 6000
           },
           monthly_remote_activations: {
             used: 30,
@@ -613,7 +613,7 @@ describe("api billing routes", () => {
           },
           monthly_alert_deliveries: {
             used: 90,
-            limit: 2250
+            limit: 4500
           }
         }
       }),
@@ -905,10 +905,10 @@ describe("api billing routes", () => {
           },
           allowances: {
             monthly_bundle_requests: { used: 10, limit: 7500 },
-            monthly_raw_ingested_events: { used: 100, limit: 75000 },
-            retained_bundle_cap: { used: 5, limit: 4500 },
+            monthly_raw_ingested_events: { used: 100, limit: 150000 },
+            retained_bundle_cap: { used: 5, limit: 6000 },
             monthly_remote_activations: { used: 1, limit: 750 },
-            monthly_alert_deliveries: { used: 2, limit: 2250 }
+            monthly_alert_deliveries: { used: 2, limit: 4500 }
           }
         })
         .mockResolvedValueOnce({
@@ -972,10 +972,10 @@ describe("api billing routes", () => {
           },
           allowances: {
             monthly_bundle_requests: { used: 10, limit: 7500 },
-            monthly_raw_ingested_events: { used: 100, limit: 75000 },
-            retained_bundle_cap: { used: 5, limit: 4500 },
+            monthly_raw_ingested_events: { used: 100, limit: 150000 },
+            retained_bundle_cap: { used: 5, limit: 6000 },
             monthly_remote_activations: { used: 1, limit: 750 },
-            monthly_alert_deliveries: { used: 2, limit: 2250 }
+            monthly_alert_deliveries: { used: 2, limit: 4500 }
           }
         }),
       createCheckoutLink: vi.fn().mockResolvedValue(null),
@@ -1117,7 +1117,7 @@ describe("api billing routes", () => {
       },
       allowances: {
         monthly_bundle_requests: { used: 0, limit: 750 },
-        monthly_raw_ingested_events: { used: 0, limit: 6000 },
+        monthly_raw_ingested_events: { used: 0, limit: 10500 },
         retained_bundle_cap: { used: 0, limit: 450 },
         monthly_remote_activations: { used: 0, limit: 75 },
         monthly_alert_deliveries: { used: 0, limit: 225 }

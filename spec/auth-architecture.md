@@ -52,7 +52,7 @@ No interface may implement its own:
 - permission rules
 - token validation rules
 - verification gating rules
-- organization membership checks
+- project-access checks
 - role checks
 - token issuance or revocation logic
 
@@ -112,7 +112,7 @@ The session is used for interactive browser actions such as:
 - creating the first member token
 - creating project tokens
 - managing billing
-- managing organization members
+- managing project sharing
 
 ### 4.2 CLI
 
@@ -280,7 +280,7 @@ The system recognizes these principal types:
 
 Authorization decisions combine:
 - principal type
-- organization membership
+- account ownership context
 - project access
 - member role
 - credential scope
@@ -296,7 +296,7 @@ Unverified users may:
 Unverified users may not:
 - create member tokens
 - enable billing
-- invite members
+- invite collaborators
 
 The first member token is the trust transition point from human bootstrap to agent-capable operations.
 

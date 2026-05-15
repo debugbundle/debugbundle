@@ -461,7 +461,7 @@ Used for:
 - projects
 - tokens
 - settings
-- organization members
+- project members
 - webhooks
 - alerts
 
@@ -698,7 +698,7 @@ Rationale:
 Second slice after that:
 - `/projects`
 - `/projects/:projectId/tokens`
-- `/organization/members`
+- `/projects/:projectId/members`
 
 ---
 
