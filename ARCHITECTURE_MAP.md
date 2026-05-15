@@ -219,12 +219,12 @@ The public documentation/marketing/blog site lives in the standalone public repo
   - `server.ts` — route composition (delegates to route modules)
   - `dogfooding.ts` — env-gated API SDK bootstrap and manual backend trigger registration
   - `audit-logging.ts` — fail-open audit log recording with actor-type resolution (browser session vs member token) and request IP hashing
-  - `routes/account.ts` — owner-scoped browser-session account export and destructive account deletion with confirmation + audit logging
+  - `routes/account.ts` — owner-scoped browser-session account export, cached-avatar retrieval/import, and destructive account deletion with confirmation + audit logging
   - `routes/health.ts` — health/ready/live probes
-  - `routes/auth.ts` — signup/login/logout/session plus invite-acceptance, GitHub start/callback browser-auth flows, GitHub device bootstrap, GitHub access-token exchange, and session auth-method disclosure
+  - `routes/auth.ts` — signup/login/logout/session plus invite-acceptance, GitHub start/callback browser-auth flows, GitHub device bootstrap, GitHub access-token exchange, session auth-method disclosure, and best-effort GitHub avatar caching after browser OAuth completion
   - `routes/ingestion.ts` — event ingestion
   - `routes/incidents.ts` — incident retrieval, bundle, reproduction, logs
-  - `routes/project-members.ts` — project-scoped collaborator listing, pending-invite lifecycle, invite creation with transactional invite email delivery, role updates, and member removal
+  - `routes/project-members.ts` — project-scoped collaborator listing, cached member-avatar reads, pending-invite lifecycle, invite creation with transactional invite email delivery, role updates, and member removal
   - `routes/billing.ts` — owner-scoped billing summary and allowance-capacity management for browser sessions or member tokens, plus browser-only Stripe checkout and customer-portal handoff
   - `routes/stripe-webhook.ts` — Stripe webhook ingestion with raw-body signature verification, idempotent event processing, and entitlement recomputation for checkout.session.completed, subscription.created/updated/deleted, invoice.paid, and invoice.payment_failed events, including synced Stripe billing-period boundaries used by billing summaries
   - `routes/projects.ts` — organization-scoped project list/create/update/delete with owner-only destructive enforcement

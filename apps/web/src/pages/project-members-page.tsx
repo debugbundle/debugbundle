@@ -1,4 +1,4 @@
-import { MailCheckIcon, PlusIcon, UsersRoundIcon } from "lucide-react";
+import { MailCheckIcon, PlusIcon } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useOutletContext } from "react-router-dom";
 
@@ -6,6 +6,7 @@ import { CalloutCard } from "../components/system/callout-card.js";
 import { DialogFormContent } from "../components/system/dialog-form-content.js";
 import { PageHeader } from "../components/system/page-header.js";
 import type { ProjectContext } from "../components/system/project-layout.js";
+import { UserAvatar } from "../components/system/user-avatar.js";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -23,6 +24,7 @@ import { Dialog, DialogTrigger } from "../components/ui/dialog.js";
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "../components/ui/empty.js";
 import { Field, FieldGroup, FieldLabel } from "../components/ui/field.js";
 import { Input } from "../components/ui/input.js";
+import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select.js";
 import { Skeleton } from "../components/ui/skeleton.js";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../components/ui/table.js";
 import { showErrorToast, showSuccessToast } from "../lib/notify.js";
@@ -167,16 +169,21 @@ export function ProjectMembersPage(): JSX.Element {
                     />
                   </Field>
                   <Field>
-                    <FieldLabel htmlFor="project-invite-role">Role</FieldLabel>
-                    <select
-                      id="project-invite-role"
-                      className="flex h-10 w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+                    <FieldLabel id="project-invite-role-label" htmlFor="project-invite-role">Role</FieldLabel>
+                    <Select
                       value={inviteRole}
-                      onChange={(event) => setInviteRole(event.currentTarget.value as "admin" | "member")}
+                      onValueChange={(value) => setInviteRole(value as "admin" | "member")}
                     >
-                      <option value="member">Member</option>
-                      <option value="admin">Admin</option>
-                    </select>
+                      <SelectTrigger id="project-invite-role" aria-labelledby="project-invite-role-label project-invite-role" className="w-full">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent position="popper">
+                        <SelectGroup>
+                          <SelectItem value="member">Member</SelectItem>
+                          <SelectItem value="admin">Admin</SelectItem>
+                        </SelectGroup>
+                      </SelectContent>
+                    </Select>
                   </Field>
                 </FieldGroup>
               </DialogFormContent>
@@ -236,18 +243,28 @@ export function ProjectMembersPage(): JSX.Element {
 
                     return (
                       <TableRow key={member.user_id}>
-                        <TableCell className="font-medium">{member.email}</TableCell>
+                        <TableCell className="font-medium">
+                          <div className="flex items-center gap-3">
+                            <UserAvatar email={member.email} avatarUrl={member.avatar_url} size="sm" />
+                            <span>{member.email}</span>
+                          </div>
+                        </TableCell>
                         <TableCell>
                           {canEditRole ? (
-                            <select
-                              aria-label={`role for ${member.email}`}
-                              className="rounded border border-border bg-background px-2 py-1 text-sm"
+                            <Select
                               value={member.role}
-                              onChange={(event) => void handleRoleChange(member.user_id, event.currentTarget.value as "admin" | "member")}
+                              onValueChange={(value) => void handleRoleChange(member.user_id, value as "admin" | "member")}
                             >
-                              <option value="member">member</option>
-                              <option value="admin">admin</option>
-                            </select>
+                              <SelectTrigger aria-label={`role for ${member.email}`} className="min-w-28" size="sm">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent position="popper">
+                                <SelectGroup>
+                                  <SelectItem value="member">member</SelectItem>
+                                  <SelectItem value="admin">admin</SelectItem>
+                                </SelectGroup>
+                              </SelectContent>
+                            </Select>
                           ) : (
                             member.role
                           )}

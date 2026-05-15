@@ -78,6 +78,16 @@ describe("web dogfooding", () => {
     });
   });
 
+  it("rejects production direct-mode dogfooding when no api base url is configured", () => {
+    expect(() =>
+      resolveWebDogfoodingConfig({
+        DEV: false,
+        MODE: "production",
+        VITE_DEBUGBUNDLE_DOGFOOD_PROJECT_TOKEN: "dbundle_proj_browser"
+      })
+    ).toThrowError("web_dogfooding_missing_api_url");
+  });
+
   it("initializes the browser sdk and exposes a manual trigger bridge when enabled", () => {
     const sdk = {
       init: vi.fn(),
@@ -174,5 +184,30 @@ describe("web dogfooding", () => {
       captureConsole: false,
       breadcrumbsOnErrorOnly: false
     });
+  });
+
+  it("warns and disables dogfooding when production direct mode is missing the api base url", () => {
+    const sdk = {
+      init: vi.fn()
+    };
+    const warn = vi.fn();
+    const target: DogfoodingWindowTarget = {
+      setTimeout: vi.fn()
+    };
+
+    const config = initializeWebDogfooding(
+      {
+        DEV: false,
+        MODE: "production",
+        VITE_DEBUGBUNDLE_DOGFOOD_PROJECT_TOKEN: "dbundle_proj_browser"
+      },
+      target,
+      sdk,
+      warn
+    );
+
+    expect(config).toBeNull();
+    expect(sdk.init).not.toHaveBeenCalled();
+    expect(warn).toHaveBeenCalledWith("web_dogfooding_disabled: web_dogfooding_missing_api_url");
   });
 });

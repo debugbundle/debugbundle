@@ -22,6 +22,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../co
 import { Dialog, DialogTrigger } from "../components/ui/dialog.js";
 import { Field, FieldDescription, FieldGroup, FieldLabel } from "../components/ui/field.js";
 import { Input } from "../components/ui/input.js";
+import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select.js";
 import { Skeleton } from "../components/ui/skeleton.js";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../components/ui/table.js";
 import {
@@ -83,6 +84,8 @@ const SEVERITY_OPTIONS: Array<{ value: "" | "low" | "medium" | "high" | "critica
   { value: "high", label: "High" },
   { value: "critical", label: "Critical" }
 ];
+
+const ALERT_SEVERITY_ANY_VALUE = "__any_severity__";
 
 export function ProjectAlertsPage(): JSX.Element {
   const { project, projectId } = useOutletContext<ProjectContext>();
@@ -340,19 +343,24 @@ export function ProjectAlertsPage(): JSX.Element {
             >
                 <FieldGroup>
                   <Field>
-                    <FieldLabel htmlFor="project-alert-channel">Channel</FieldLabel>
-                    <select
-                      id="project-alert-channel"
-                      className="flex h-10 w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+                    <FieldLabel id="project-alert-channel-label" htmlFor="project-alert-channel">Channel</FieldLabel>
+                    <Select
                       value={channel}
-                      onChange={(event) => setChannel(event.currentTarget.value as AlertChannel)}
+                      onValueChange={(value) => setChannel(value as AlertChannel)}
                     >
-                      {channelOptions.map((option) => (
-                        <option key={option.value} value={option.value} disabled={option.disabled === true}>
-                          {option.label}
-                        </option>
-                      ))}
-                    </select>
+                      <SelectTrigger id="project-alert-channel" aria-labelledby="project-alert-channel-label project-alert-channel" className="w-full">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent position="popper">
+                        <SelectGroup>
+                          {channelOptions.map((option) => (
+                            <SelectItem key={option.value} value={option.value} disabled={option.disabled === true}>
+                              {option.label}
+                            </SelectItem>
+                          ))}
+                        </SelectGroup>
+                      </SelectContent>
+                    </Select>
                     <FieldDescription>{describeAlertChannel(channel)}</FieldDescription>
                   </Field>
                   {channel === "email" ? (
@@ -372,28 +380,33 @@ export function ProjectAlertsPage(): JSX.Element {
                     </Field>
                   ) : channel === "slack" ? (
                     <Field>
-                      <FieldLabel htmlFor="project-alert-slack-channel">{getDestinationLabel(channel)}</FieldLabel>
+                      <FieldLabel id="project-alert-slack-channel-label" htmlFor="project-alert-slack-channel">{getDestinationLabel(channel)}</FieldLabel>
                       <FieldDescription>{getDestinationDescription(channel)}</FieldDescription>
                       {!slackDestinationsLoaded ? (
                         <Skeleton className="h-10 w-full" />
                       ) : slackDestinations.length > 0 ? (
                         <div className="space-y-3">
-                          <select
-                            id="project-alert-slack-channel"
-                            className="flex h-10 w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+                          <Select
                             value={selectedSlackDestinationId}
-                            onChange={(event) => setSelectedSlackDestinationId(event.currentTarget.value)}
-                            required
+                            onValueChange={setSelectedSlackDestinationId}
                           >
-                            <option value="" disabled>
-                              Choose a Slack channel
-                            </option>
-                            {slackDestinations.map((destination) => (
-                              <option key={destination.slack_destination_id} value={destination.slack_destination_id}>
-                                {formatSlackDestinationLabel(destination)}
-                              </option>
-                            ))}
-                          </select>
+                            <SelectTrigger
+                              id="project-alert-slack-channel"
+                              aria-labelledby="project-alert-slack-channel-label project-alert-slack-channel"
+                              className="w-full"
+                            >
+                              <SelectValue placeholder="Choose a Slack channel" />
+                            </SelectTrigger>
+                            <SelectContent position="popper">
+                              <SelectGroup>
+                                {slackDestinations.map((destination) => (
+                                  <SelectItem key={destination.slack_destination_id} value={destination.slack_destination_id}>
+                                    {formatSlackDestinationLabel(destination)}
+                                  </SelectItem>
+                                ))}
+                              </SelectGroup>
+                            </SelectContent>
+                          </Select>
                           {selectedSlackDestination !== null ? (
                             <div className="rounded-md border border-border bg-muted/30 px-3 py-2 text-sm text-muted-foreground">
                               Selected: {formatSlackDestinationLabel(selectedSlackDestination)}
@@ -478,35 +491,53 @@ export function ProjectAlertsPage(): JSX.Element {
                     </Field>
                   )}
                   <Field>
-                    <FieldLabel htmlFor="project-alert-condition">Condition</FieldLabel>
-                    <select
-                      id="project-alert-condition"
-                      className="flex h-10 w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+                    <FieldLabel id="project-alert-condition-label" htmlFor="project-alert-condition">Condition</FieldLabel>
+                    <Select
                       value={conditionType}
-                      onChange={(event) => setConditionType(event.currentTarget.value as AlertConditionType)}
+                      onValueChange={(value) => setConditionType(value as AlertConditionType)}
                     >
-                      {ALERT_CONDITION_OPTIONS.map((option) => (
-                        <option key={option.value} value={option.value}>
-                          {option.label}
-                        </option>
-                      ))}
-                    </select>
+                      <SelectTrigger
+                        id="project-alert-condition"
+                        aria-labelledby="project-alert-condition-label project-alert-condition"
+                        className="w-full"
+                      >
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent position="popper">
+                        <SelectGroup>
+                          {ALERT_CONDITION_OPTIONS.map((option) => (
+                            <SelectItem key={option.value} value={option.value}>
+                              {option.label}
+                            </SelectItem>
+                          ))}
+                        </SelectGroup>
+                      </SelectContent>
+                    </Select>
                   </Field>
                   <Field>
-                    <FieldLabel htmlFor="project-alert-severity">Minimum severity</FieldLabel>
+                    <FieldLabel id="project-alert-severity-label" htmlFor="project-alert-severity">Minimum severity</FieldLabel>
                     <FieldDescription>Leave unset to deliver for all severities matching the selected condition.</FieldDescription>
-                    <select
-                      id="project-alert-severity"
-                      className="flex h-10 w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
-                      value={severityMin}
-                      onChange={(event) => setSeverityMin(event.currentTarget.value as typeof severityMin)}
+                    <Select
+                      value={severityMin === "" ? ALERT_SEVERITY_ANY_VALUE : severityMin}
+                      onValueChange={(value) => setSeverityMin((value === ALERT_SEVERITY_ANY_VALUE ? "" : value) as typeof severityMin)}
                     >
-                      {SEVERITY_OPTIONS.map((option) => (
-                        <option key={option.value || "any"} value={option.value}>
-                          {option.label}
-                        </option>
-                      ))}
-                    </select>
+                      <SelectTrigger
+                        id="project-alert-severity"
+                        aria-labelledby="project-alert-severity-label project-alert-severity"
+                        className="w-full"
+                      >
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent position="popper">
+                        <SelectGroup>
+                          {SEVERITY_OPTIONS.map((option) => (
+                            <SelectItem key={option.value || "any"} value={option.value === "" ? ALERT_SEVERITY_ANY_VALUE : option.value}>
+                              {option.label}
+                            </SelectItem>
+                          ))}
+                        </SelectGroup>
+                      </SelectContent>
+                    </Select>
                   </Field>
                 </FieldGroup>
             </DialogFormContent>

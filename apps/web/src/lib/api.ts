@@ -9,11 +9,18 @@ export interface SessionRecord {
   created_at: string;
   expires_at: string;
   revoked_at: string | null;
+  avatar_url: string | null;
   auth_methods: {
     email: boolean;
     github: boolean;
   };
   csrf_token: string;
+}
+
+export interface ImportedAccountAvatarRecord {
+  source: "github" | "gravatar";
+  avatar_url: string;
+  updated_at: string;
 }
 
 export interface DeletedAccountRecord {
@@ -332,6 +339,18 @@ export function buildApiUrl(path: string, env: WebApiEnv = import.meta.env): str
   return `${resolveApiBaseUrl(env)}${path}`;
 }
 
+export function resolveApiResourceUrl(value: string | null, env: WebApiEnv = import.meta.env): string | null {
+  if (value === null) {
+    return null;
+  }
+
+  if (/^https?:\/\//i.test(value)) {
+    return value;
+  }
+
+  return buildApiUrl(value.startsWith("/") ? value : `/${value}`, env);
+}
+
 const API_BASE = resolveApiBaseUrl();
 let browserSessionCsrfToken: string | null = null;
 let browserSessionInvalidated = false;
@@ -515,6 +534,18 @@ export async function exportAccountData(): Promise<{ blob: Blob; filename: strin
     blob: await response.blob(),
     filename: parseAttachmentFilename(response.headers.get("Content-Disposition")) ?? "debugbundle-account-export.json"
   };
+}
+
+export async function importAccountAvatarFromGravatar(): Promise<ImportedAccountAvatarRecord> {
+  const body = await readJson<{ avatar: ImportedAccountAvatarRecord }>(
+    await fetch(`${API_BASE}/v1/account/avatar/import-gravatar`, {
+      method: "POST",
+      credentials: "include",
+      headers: buildBrowserSessionHeaders()
+    })
+  );
+
+  return body.avatar;
 }
 
 export async function deleteAccount(payload: { email: string }): Promise<DeletedAccountRecord> {

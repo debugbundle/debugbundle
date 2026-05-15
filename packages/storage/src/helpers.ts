@@ -23,6 +23,10 @@ export function buildReproductionObjectKey(projectId: string, incidentId: string
   return `reproductions/${projectId}/${incidentId}/reproduction.json.gz`;
 }
 
+export function buildUserAvatarObjectKey(userId: string): string {
+  return `avatars/users/${userId}/profile`;
+}
+
 export function buildBundleRegenerationLeaseKey(incidentId: string): string {
   return `leases:bundle-regeneration:${incidentId}`;
 }

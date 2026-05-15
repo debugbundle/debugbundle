@@ -10,8 +10,10 @@ import {
   buildSessionCookie,
   readCookieValue
 } from "../../../../packages/auth/src/index.js";
+import { importUserAvatarFromUrl } from "../../../../packages/storage/src/index.js";
 import { isSelfHostMode } from "../../../../packages/shared-types/src/index.js";
 import type { ApiDependencies } from "../api-types.js";
+import { buildAccountAvatarUrl } from "../avatar-urls.js";
 import { hashAuditIdentifier, recordAuditLog } from "../audit-logging.js";
 import { SMALL_REQUEST_BODY_LIMIT_BYTES } from "../http-limits.js";
 import {
@@ -153,21 +155,33 @@ function buildSessionResponse(
     revoked_at: string | null;
     has_email_auth?: boolean;
     has_github_oauth?: boolean;
-  }
+    avatar_object_key?: string | null;
+  },
+  options: {
+    avatar_url?: string | null;
+  } = {}
 ): {
   session: Omit<typeof session, "has_email_auth" | "has_github_oauth"> & {
     csrf_token: string;
+    avatar_url: string | null;
     auth_methods: {
       email: boolean;
       github: boolean;
     };
   };
 } {
-  const { has_email_auth, has_github_oauth, ...publicSession } = session;
+  const { has_email_auth, has_github_oauth, avatar_object_key, ...publicSession } = session;
+  const avatarUrl =
+    options.avatar_url !== undefined
+      ? options.avatar_url
+      : avatar_object_key === null || avatar_object_key === undefined
+        ? null
+        : buildAccountAvatarUrl();
 
   return {
     session: {
       ...publicSession,
+      avatar_url: avatarUrl,
       auth_methods: {
         email: has_email_auth ?? true,
         github: has_github_oauth ?? false
@@ -485,6 +499,17 @@ export function registerAuthRoutes(app: FastifyInstance, dependencies: ApiDepend
       buildSessionCookie(completed.session_token, completed.session.expires_at, { secure: shouldUseSecureCookies() }),
       buildClearedGithubOauthStateCookie({ secure: shouldUseSecureCookies() })
     ]);
+
+    if (typeof completed.avatar_url === "string" && dependencies.accountManagement !== undefined && dependencies.objectStoreWriter !== undefined) {
+      await importUserAvatarFromUrl({
+        user_id: completed.session.user_id,
+        source: "github",
+        url: completed.avatar_url,
+        store: dependencies.accountManagement,
+        objectStoreWriter: dependencies.objectStoreWriter
+      }).catch(() => ({ ok: false as const, error: "fetch_failed" as const }));
+    }
+
     return reply.redirect(completed.redirect_url);
   });
 

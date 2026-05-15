@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { Navigate, useNavigate } from "react-router-dom";
 import { CalloutCard } from "../components/system/callout-card.js";
 import { PageHeader } from "../components/system/page-header.js";
+import { UserAvatar } from "../components/system/user-avatar.js";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -18,7 +19,7 @@ import { Button } from "../components/ui/button.js";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card.js";
 import { Field, FieldLabel } from "../components/ui/field.js";
 import { Input } from "../components/ui/input.js";
-import { deleteAccount, exportAccountData } from "../lib/api.js";
+import { deleteAccount, exportAccountData, importAccountAvatarFromGravatar } from "../lib/api.js";
 import { showErrorToast, showSuccessToast } from "../lib/notify.js";
 import { useSession } from "../lib/session.js";
 
@@ -29,6 +30,7 @@ export function SettingsPage(): JSX.Element {
   const [deleteConfirmationEmail, setDeleteConfirmationEmail] = useState("");
   const [deleteErrorMessage, setDeleteErrorMessage] = useState<string | null>(null);
   const [isExporting, setIsExporting] = useState(false);
+  const [isImportingAvatar, setIsImportingAvatar] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
 
   useEffect(() => {
@@ -102,6 +104,31 @@ export function SettingsPage(): JSX.Element {
     }
   }
 
+  async function handleImportGravatarAvatar(): Promise<void> {
+    if (session === null) {
+      return;
+    }
+
+    setIsImportingAvatar(true);
+
+    try {
+      const avatar = await importAccountAvatarFromGravatar();
+      setSession({
+        ...session,
+        avatar_url: avatar.avatar_url
+      });
+      showSuccessToast("Avatar imported successfully.");
+    } catch (error) {
+      if (error instanceof Error && error.message === "gravatar_not_found") {
+        showErrorToast("No Gravatar image was found for this email.");
+      } else {
+        showErrorToast("Could not import avatar.");
+      }
+    } finally {
+      setIsImportingAvatar(false);
+    }
+  }
+
   return (
     <div className="space-y-8">
       <PageHeader description="Review your active sign-in methods, account verification state, and account lifecycle controls." />
@@ -117,6 +144,25 @@ export function SettingsPage(): JSX.Element {
               <DetailBlock label="Workspace" value={session.organization_id} />
               <DetailBlock label="Role" value={session.role} />
               <DetailBlock label="Session" value={session.session_id} />
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Avatar</CardTitle>
+              <CardDescription>GitHub avatars sync automatically when available. Gravatar import is always explicit.</CardDescription>
+            </CardHeader>
+            <CardContent className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex items-center gap-4">
+                <UserAvatar email={session.email} avatarUrl={session.avatar_url} size="lg" />
+                <div className="space-y-1 text-sm">
+                  <p className="font-medium text-foreground">{session.avatar_url === null ? "Initials fallback active" : "Cached profile avatar active"}</p>
+                  <p className="text-muted-foreground">Imports are fetched server-side and cached in DebugBundle storage.</p>
+                </div>
+              </div>
+              <Button type="button" variant="outline" onClick={() => void handleImportGravatarAvatar()} disabled={isImportingAvatar}>
+                {isImportingAvatar ? "Importing..." : "Import from Gravatar"}
+              </Button>
             </CardContent>
           </Card>
 

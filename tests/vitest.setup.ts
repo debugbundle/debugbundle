@@ -29,6 +29,10 @@ if (typeof globalThis.ResizeObserver === "undefined") {
 	};
 }
 
+if (typeof HTMLElement !== "undefined" && typeof HTMLElement.prototype.scrollIntoView !== "function") {
+	HTMLElement.prototype.scrollIntoView = () => {};
+}
+
 afterEach(() => {
 	cleanup();
 });

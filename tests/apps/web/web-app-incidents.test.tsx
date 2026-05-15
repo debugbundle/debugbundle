@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { userEvent } from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -13,6 +13,25 @@ import {
   jsonResponse,
   requestUrl
 } from "./web-test-helpers.js";
+
+async function findStatusFilterTrigger(id: string): Promise<HTMLElement> {
+  await waitFor(() => {
+    expect(document.getElementById(id)).not.toBeNull();
+  });
+
+  return document.getElementById(id) as HTMLElement;
+}
+
+async function chooseStatusFilterOption(
+  user: ReturnType<typeof userEvent.setup>,
+  triggerId: string,
+  optionName: RegExp | string
+): Promise<void> {
+  const trigger = await findStatusFilterTrigger(triggerId);
+  trigger.focus();
+  fireEvent.keyDown(trigger, { key: "ArrowDown", code: "ArrowDown" });
+  await user.click(await screen.findByRole("option", { name: optionName }));
+}
 
 afterEach(() => {
   resetBrowserSessionClientState();
@@ -471,10 +490,10 @@ describe("web app — incident and project detail routes", () => {
     render(<App initialEntries={["/incidents"]} />);
 
     expect(await screen.findByText(/typeerror in checkout handler/i)).toBeInTheDocument();
-    expect(screen.getByRole("combobox", { name: /status/i })).toHaveValue("open");
+    expect(await findStatusFilterTrigger("workspace-incidents-status-filter")).toHaveTextContent(/^open$/i);
     expect(screen.queryByText(/database timeout during signin/i)).toBeNull();
 
-    await user.selectOptions(screen.getByRole("combobox", { name: /status/i }), "all");
+    await chooseStatusFilterOption(user, "workspace-incidents-status-filter", /all statuses/i);
     expect(await screen.findByText(/database timeout during signin/i)).toBeInTheDocument();
 
     // Project and service columns exist
@@ -570,6 +589,68 @@ describe("web app — incident and project detail routes", () => {
     expect(workspaceIncidentRequests).toBe(2);
   });
 
+  it("keeps the refresh button spinning for at least one second after a workspace refresh", async () => {
+    const user = userEvent.setup();
+    const project = createProject();
+    const initialIncident = createIncident({ project_id: project.project_id, project_name: project.name, title: "Initial workspace incident" });
+    const refreshedIncident = createIncident({
+      incident_id: "inc_workspace_refreshed_spin",
+      project_id: project.project_id,
+      project_name: project.name,
+      title: "Refreshed workspace incident"
+    });
+    let workspaceIncidentRequests = 0;
+
+    const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = requestUrl(input);
+
+      if (url.endsWith("/v1/auth/session")) {
+        return jsonResponse(200, { session: createSession() });
+      }
+
+      if (url.includes("/v1/incidents?") && url.includes("limit=20") && url.includes("status=open") && init?.method === undefined) {
+        workspaceIncidentRequests += 1;
+        return jsonResponse(200, {
+          incidents: workspaceIncidentRequests === 1 ? [initialIncident] : [refreshedIncident],
+          next_cursor: null
+        });
+      }
+
+      return jsonResponse(404, { error: "not_found" });
+    });
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<App initialEntries={["/incidents"]} />);
+
+    expect(await screen.findByText(/initial workspace incident/i)).toBeInTheDocument();
+
+    const refreshButton = screen.getByRole("button", { name: /^refresh$/i });
+    const refreshIcon = refreshButton.querySelector("svg");
+
+    expect(refreshIcon).not.toBeNull();
+    expect(refreshButton).not.toBeDisabled();
+    expect(refreshIcon).not.toHaveClass("animate-spin");
+
+    const refreshStartedAt = Date.now();
+    await user.click(refreshButton);
+
+    expect(await screen.findByText(/refreshed workspace incident/i)).toBeInTheDocument();
+    expect(refreshButton).toBeDisabled();
+    expect(refreshButton).toHaveAttribute("aria-busy", "true");
+    expect(refreshIcon).toHaveClass("animate-spin");
+
+    await waitFor(() => {
+      expect(refreshButton).not.toBeDisabled();
+    }, { timeout: 2_000 });
+
+    expect(Date.now() - refreshStartedAt).toBeGreaterThanOrEqual(1_000);
+    await waitFor(() => {
+      expect(refreshButton).toHaveAttribute("aria-busy", "false");
+    });
+    expect(refreshIcon).not.toHaveClass("animate-spin");
+  });
+
   it("sorts the project incidents table by occurrence count", async () => {
     const user = userEvent.setup();
     const project = createProject();
@@ -642,12 +723,12 @@ describe("web app — incident and project detail routes", () => {
 
     render(<App initialEntries={[`/projects/${project.project_id}/incidents`]} />);
 
-    const statusFilter = await screen.findByRole("combobox", { name: /status/i });
-    expect(statusFilter).toHaveValue("open");
+    const statusFilter = await findStatusFilterTrigger("project-incidents-status-filter");
+    expect(statusFilter).toHaveTextContent(/^open$/i);
     expect(await screen.findByText(/open project incident/i)).toBeInTheDocument();
     expect(screen.queryByText(/resolved project incident/i)).toBeNull();
 
-    await user.selectOptions(statusFilter, "resolved");
+    await chooseStatusFilterOption(user, "project-incidents-status-filter", /^resolved$/i);
     expect(await screen.findByText(/resolved project incident/i)).toBeInTheDocument();
     expect(screen.queryByText(/open project incident/i)).toBeNull();
   });
@@ -736,12 +817,12 @@ describe("web app — incident and project detail routes", () => {
 
     render(<App initialEntries={[`/projects/${project.project_id}/bundles`]} />);
 
-    const statusFilter = await screen.findByRole("combobox", { name: /status/i });
-    expect(statusFilter).toHaveValue("open");
+    const statusFilter = await findStatusFilterTrigger("project-bundles-status-filter");
+    expect(statusFilter).toHaveTextContent(/^open$/i);
     expect(await screen.findByText(/open bundle incident/i)).toBeInTheDocument();
     expect(screen.queryByText(/resolved bundle incident/i)).toBeNull();
 
-    await user.selectOptions(statusFilter, "resolved");
+    await chooseStatusFilterOption(user, "project-bundles-status-filter", /^resolved$/i);
     expect(await screen.findByText(/resolved bundle incident/i)).toBeInTheDocument();
     expect(screen.queryByText(/open bundle incident/i)).toBeNull();
   });
@@ -1215,16 +1296,17 @@ describe("web app — incident and project detail routes", () => {
 
     render(<App initialEntries={["/incidents"]} />);
 
-    const statusFilter = await screen.findByRole("combobox", { name: /status/i });
+    const statusFilter = await findStatusFilterTrigger("workspace-incidents-status-filter");
     expect(await screen.findByText(/no open incidents/i)).toBeInTheDocument();
+    expect(statusFilter).toHaveTextContent(/^open$/i);
 
-    await user.selectOptions(statusFilter, "resolved");
+    await chooseStatusFilterOption(user, "workspace-incidents-status-filter", /^resolved$/i);
     expect(await screen.findByText(/no resolved incidents/i)).toBeInTheDocument();
 
-    await user.selectOptions(statusFilter, "regressed");
+    await chooseStatusFilterOption(user, "workspace-incidents-status-filter", /^regressed$/i);
     expect(await screen.findByText(/no regressed incidents/i)).toBeInTheDocument();
 
-    await user.selectOptions(statusFilter, "all");
+    await chooseStatusFilterOption(user, "workspace-incidents-status-filter", /all statuses/i);
     expect(await screen.findByText(/no incidents captured yet/i)).toBeInTheDocument();
   });
 

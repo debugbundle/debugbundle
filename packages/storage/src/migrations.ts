@@ -65,7 +65,11 @@ const STORAGE_BOOTSTRAP_STATEMENTS = [
       accepted_terms_at timestamptz,
       created_at timestamptz NOT NULL DEFAULT now(),
       updated_at timestamptz NOT NULL DEFAULT now(),
-      email_verified_at timestamptz
+      email_verified_at timestamptz,
+      avatar_source text,
+      avatar_object_key text,
+      avatar_content_type text,
+      avatar_updated_at timestamptz
     )
   `,
   `

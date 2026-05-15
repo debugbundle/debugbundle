@@ -123,6 +123,7 @@ export type CompleteGitHubAuthResult =
       redirect_url: string;
       created_user: boolean;
       accepted_terms_at: string | null;
+      avatar_url?: string;
     }
   | {
       ok: false;
@@ -475,7 +476,10 @@ export function createWebSessionAuthService(
         session,
         redirect_url: githubOAuth.appRedirectUrl,
         created_user: resolvedAccount.account.created_user,
-        accepted_terms_at: statePayload.accepted_terms_at ?? null
+        accepted_terms_at: statePayload.accepted_terms_at ?? null,
+        ...(typeof identity.avatar_url === "string" && identity.avatar_url.length > 0
+          ? { avatar_url: identity.avatar_url }
+          : {})
       };
     },
 

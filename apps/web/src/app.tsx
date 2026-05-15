@@ -462,6 +462,16 @@ function EmailAuthPage({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const postAuthPath = resolvePostAuthPath(searchParams.get("next"));
   const alternateHref = appendNextPath(alternateLinkHref, postAuthPath);
+  const isVerifyStep = step === "verify";
+
+  useEffect(() => {
+    if (isVerifyStep) {
+      codeInputRef.current?.focus();
+      return;
+    }
+
+    emailInputRef.current?.focus();
+  }, [isVerifyStep]);
 
   if (session !== null) {
     return <Navigate replace to={postAuthPath} />;
@@ -569,52 +579,17 @@ function EmailAuthPage({
   const codeErrorId = fieldErrors.code === undefined ? undefined : "email-auth-code-error";
   const requestErrorId = requestError === null ? undefined : "email-auth-request-error";
 
+  const layoutTitle = isVerifyStep ? "Check your inbox" : title;
+  const layoutHeading = isVerifyStep ? "Check your inbox" : heading;
+  const layoutDescription = isVerifyStep
+    ? `Enter the six-digit code we sent to ${email}.`
+    : description;
+
   return (
-    <AuthLayout title={title} heading={heading} description={description}>
+    <AuthLayout title={layoutTitle} heading={layoutHeading} description={layoutDescription}>
       <form className="flex flex-col gap-6" onSubmit={(event) => void handleSubmit(event)}>
         <FieldGroup>
-          <Field>
-            <GithubLink />
-          </Field>
-          <AuthMethodDivider />
-          <div className="space-y-1">
-            <p className="text-sm font-medium">Continue with email</p>
-            <FieldDescription>We&apos;ll send a six-digit code so you can sign in without a password.</FieldDescription>
-          </div>
-          <Field data-invalid={fieldErrors.email !== undefined || undefined}>
-            <FieldLabel htmlFor="email-auth-email">
-              Email<span className="sr-only"> address</span>
-            </FieldLabel>
-            <Input
-              ref={emailInputRef}
-              id="email-auth-email"
-              type="email"
-              autoComplete="email"
-              value={email}
-              aria-invalid={fieldErrors.email !== undefined || undefined}
-              aria-describedby={emailErrorId}
-              disabled={step === "verify"}
-              onChange={(event) => {
-                setEmail(event.currentTarget.value);
-                clearFieldError("email");
-                setRequestError(null);
-              }}
-            />
-            {fieldErrors.email === undefined ? null : (
-              <Notice id={emailErrorId} tone="destructive">
-                {fieldErrors.email}
-              </Notice>
-            )}
-          </Field>
-          {step === "verify" ? (
-            <CalloutCard
-              eyebrow="Code sent"
-              title="Check your inbox"
-              description={`Enter the six-digit code we sent to ${email}.`}
-              tone="neutral"
-            />
-          ) : null}
-          {step === "verify" ? (
+          {isVerifyStep ? (
             <Field data-invalid={fieldErrors.code !== undefined || undefined}>
               <FieldLabel htmlFor="email-auth-code">Six-digit code</FieldLabel>
               <Input
@@ -638,7 +613,42 @@ function EmailAuthPage({
                 </Notice>
               )}
             </Field>
-          ) : null}
+          ) : (
+            <>
+              <Field>
+                <GithubLink />
+              </Field>
+              <AuthMethodDivider />
+              <div className="space-y-1">
+                <p className="text-sm font-medium">Continue with email</p>
+                <FieldDescription>We&apos;ll send a six-digit code so you can sign in without a password.</FieldDescription>
+              </div>
+              <Field data-invalid={fieldErrors.email !== undefined || undefined}>
+                <FieldLabel htmlFor="email-auth-email">
+                  Email<span className="sr-only"> address</span>
+                </FieldLabel>
+                <Input
+                  ref={emailInputRef}
+                  id="email-auth-email"
+                  type="email"
+                  autoComplete="email"
+                  value={email}
+                  aria-invalid={fieldErrors.email !== undefined || undefined}
+                  aria-describedby={emailErrorId}
+                  onChange={(event) => {
+                    setEmail(event.currentTarget.value);
+                    clearFieldError("email");
+                    setRequestError(null);
+                  }}
+                />
+                {fieldErrors.email === undefined ? null : (
+                  <Notice id={emailErrorId} tone="destructive">
+                    {fieldErrors.email}
+                  </Notice>
+                )}
+              </Field>
+            </>
+          )}
           {requestError === null ? null : (
             <Notice id={requestErrorId} tone="destructive" title={requestError.title}>
               {requestError.description}
@@ -647,9 +657,9 @@ function EmailAuthPage({
           <Field>
             <Button type="submit" className="w-full" disabled={isSubmitting} aria-describedby={requestErrorId}>
               {isSubmitting ? <LoaderCircleIcon className="animate-spin" /> : null}
-              {step === "request" ? "Send code" : "Send code"}
+              {isVerifyStep ? "Verify code" : "Send code"}
             </Button>
-            {step === "verify" ? (
+            {isVerifyStep ? (
               <div className="mt-3 flex flex-col gap-3 sm:flex-row">
                 <Button type="button" variant="outline" className="sm:flex-1" disabled={isSubmitting} onClick={() => void handleResendCode()}>
                   Resend code
@@ -658,10 +668,11 @@ function EmailAuthPage({
                   Use a different email
                 </Button>
               </div>
-            ) : null}
-            <FieldDescription className="text-center">
-              {alternatePrompt} <Link className="underline underline-offset-4 hover:text-foreground" to={alternateHref}>{alternateLinkLabel}</Link>
-            </FieldDescription>
+            ) : (
+              <FieldDescription className="text-center">
+                {alternatePrompt} <Link className="underline underline-offset-4 hover:text-foreground" to={alternateHref}>{alternateLinkLabel}</Link>
+              </FieldDescription>
+            )}
           </Field>
         </FieldGroup>
       </form>

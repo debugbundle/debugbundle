@@ -82,6 +82,7 @@ export function AppSidebar({ session, onSignOut, ...props }: AppSidebarProps): J
         <NavUser
           email={session.email}
           role={session.role}
+          avatarUrl={session.avatar_url}
           onSignOut={onSignOut}
         />
       </SidebarFooter>

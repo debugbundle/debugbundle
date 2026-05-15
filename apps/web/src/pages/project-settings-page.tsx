@@ -4,7 +4,7 @@ import { useNavigate, useOutletContext } from "react-router-dom";
 import { DialogFormContent } from "../components/system/dialog-form-content.js";
 import { ProjectCapturePolicyCard } from "../components/system/project-capture-policy-card.js";
 import type { ProjectContext } from "../components/system/project-layout.js";
-import { useSession } from "../lib/session.js";
+import { getProjectEffectiveRole } from "../lib/project-access.js";
 import { Button } from "../components/ui/button.js";
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card.js";
 import {
@@ -21,6 +21,7 @@ import {
 import { Dialog } from "../components/ui/dialog.js";
 import { Field, FieldDescription, FieldGroup, FieldLabel } from "../components/ui/field.js";
 import { Input } from "../components/ui/input.js";
+import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select.js";
 import {
   deleteProject,
   updateProject
@@ -30,7 +31,6 @@ import { CUSTOM_PROJECT_ENVIRONMENT_VALUE, PROJECT_ENVIRONMENT_OPTIONS } from ".
 
 export function ProjectSettingsPage(): JSX.Element {
   const { project, onProjectUpdated } = useOutletContext<ProjectContext>();
-  const { session } = useSession();
   const navigate = useNavigate();
   const deleteConfirmationPhrase = `delete ${project.name}`;
   const [isEditOpen, setIsEditOpen] = useState(false);
@@ -48,7 +48,9 @@ export function ProjectSettingsPage(): JSX.Element {
     ? environmentDefault
     : CUSTOM_PROJECT_ENVIRONMENT_VALUE;
 
-  const canEditProject = session?.role === "owner";
+  const effectiveRole = getProjectEffectiveRole(project);
+  const canManageProject = effectiveRole === "owner" || effectiveRole === "admin";
+  const canDeleteProject = effectiveRole === "owner";
 
   useEffect(() => {
     setName(project.name);
@@ -128,14 +130,14 @@ export function ProjectSettingsPage(): JSX.Element {
 
   return (
     <div className="space-y-4">
-      <ProjectCapturePolicyCard projectId={project.project_id} organizationPlan={project.organization_plan} canEdit={canEditProject} />
+      <ProjectCapturePolicyCard projectId={project.project_id} organizationPlan={project.organization_plan} canEdit={canManageProject} />
 
       <div className="grid gap-4 xl:grid-cols-[1.15fr_0.85fr]">
         <div className="space-y-4">
           <Card>
             <CardHeader>
               <CardAction>
-                <Button type="button" variant="outline" size="sm" onClick={() => setIsEditOpen(true)} disabled={!canEditProject}>
+                <Button type="button" variant="outline" size="sm" onClick={() => setIsEditOpen(true)} disabled={!canManageProject}>
                   <PencilIcon data-icon="inline-start" />
                   Edit project
                 </Button>
@@ -173,7 +175,7 @@ export function ProjectSettingsPage(): JSX.Element {
             </div>
             <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
               <AlertDialogTrigger asChild>
-                <Button type="button" variant="destructive" disabled={!canEditProject || isDeleting}>
+                <Button type="button" variant="destructive" disabled={!canDeleteProject || isDeleting}>
                   <Trash2Icon data-icon="inline-start" />
                   Delete project
                 </Button>
@@ -224,7 +226,7 @@ export function ProjectSettingsPage(): JSX.Element {
           description="Update the name, slug, and editable environment default used in setup snippets and project metadata."
           size="lg"
           footer={
-            <Button type="submit" disabled={isSaving || !canEditProject}>
+            <Button type="submit" disabled={isSaving || !canManageProject}>
               {isSaving ? "Saving..." : "Save changes"}
             </Button>
           }
@@ -241,20 +243,29 @@ export function ProjectSettingsPage(): JSX.Element {
                 <FieldDescription>Lowercase letters, numbers, and single dashes only.</FieldDescription>
               </Field>
               <Field>
-                <FieldLabel htmlFor="edit-project-environment-default">Default environment</FieldLabel>
+                <FieldLabel id="edit-project-environment-default-label" htmlFor="edit-project-environment-default">Default environment</FieldLabel>
                 <FieldDescription>Used as the initial environment in setup snippets and project defaults. You can change it later.</FieldDescription>
-                <select
-                  id="edit-project-environment-default"
-                  className="flex h-10 w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+                <Select
                   value={selectedProjectEnvironment}
-                  onChange={(event) => handleProjectEnvironmentChange(event.currentTarget.value)}
+                  onValueChange={handleProjectEnvironmentChange}
                 >
-                  {PROJECT_ENVIRONMENT_OPTIONS.map((option) => (
-                    <option key={option.value} value={option.value}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
+                  <SelectTrigger
+                    id="edit-project-environment-default"
+                    aria-labelledby="edit-project-environment-default-label edit-project-environment-default"
+                    className="w-full"
+                  >
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent position="popper">
+                    <SelectGroup>
+                      {PROJECT_ENVIRONMENT_OPTIONS.map((option) => (
+                        <SelectItem key={option.value} value={option.value}>
+                          {option.label}
+                        </SelectItem>
+                      ))}
+                    </SelectGroup>
+                  </SelectContent>
+                </Select>
                 {selectedProjectEnvironment !== CUSTOM_PROJECT_ENVIRONMENT_VALUE ? null : (
                   <Input
                     id="edit-project-environment-default-custom"

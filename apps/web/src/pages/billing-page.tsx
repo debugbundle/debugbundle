@@ -430,7 +430,7 @@ export function CheckoutReturnDialog(props: {
 }
 
 export function BillingPage(): JSX.Element {
-  const { session, refreshSession } = useSession();
+  const { refreshSession } = useSession();
   const [searchParams, setSearchParams] = useSearchParams();
   const [billing, setBilling] = useState<BillingSummaryRecord | null>(null);
   const [isForbidden, setIsForbidden] = useState(false);

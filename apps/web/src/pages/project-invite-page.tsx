@@ -81,7 +81,7 @@ export function ProjectInvitePage(): JSX.Element {
             tone="neutral"
           />
           <Button asChild className="w-full">
-            <Link to={loginHref}>Sign in with email</Link>
+            <Link to={loginHref}>Sign in</Link>
           </Button>
         </div>
       </InviteShell>

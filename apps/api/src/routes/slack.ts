@@ -5,7 +5,11 @@ import { getTierCapabilities } from "../../../../packages/shared-types/src/index
 import { decryptIntegrationSecret, encryptIntegrationSecret } from "../../../../packages/storage/src/index.js";
 import type { ApiDependencies } from "../api-types.js";
 import { recordAuditLog, resolveAuditActorType } from "../audit-logging.js";
-import { requireMemberAuth, requireRateLimitedMemberAuth, requireRateLimitedOwnerMemberAuth } from "../api-helpers.js";
+import {
+  requireMemberAuth,
+  requireRateLimitedOwnerMemberAuth,
+  requireRateLimitedProjectAccess,
+} from "../api-helpers.js";
 import {
   ProjectParamsSchema,
   ProjectSlackDestinationDeleteParamsSchema,
@@ -271,24 +275,27 @@ export function registerSlackRoutes(app: FastifyInstance, dependencies: ApiDepen
   });
 
   app.get("/v1/projects/:id/slack/destinations", async (request, reply) => {
-    const member = await requireRateLimitedMemberAuth(request, reply, dependencies, "management-read");
-    if (member === null) {
-      return;
-    }
-    if (dependencies.slackManagement === undefined) {
-      return reply.status(503).send({ error: "slack_not_configured" });
-    }
-    if (!(await ensureSlackIntegrationEnabled(dependencies, member.organization_id))) {
-      return reply.status(403).send({ error: "upgrade_required" });
-    }
-
     const parsedParams = ProjectParamsSchema.safeParse(request.params);
     if (!parsedParams.success) {
       return reply.status(400).send({ error: "invalid_project_id" });
     }
 
+    const auth = await requireRateLimitedProjectAccess(request, reply, dependencies, {
+      bucket: "management-read",
+      projectId: parsedParams.data.id
+    });
+    if (auth === null) {
+      return;
+    }
+    if (dependencies.slackManagement === undefined) {
+      return reply.status(503).send({ error: "slack_not_configured" });
+    }
+    if (!(await ensureSlackIntegrationEnabled(dependencies, auth.access.organization_id))) {
+      return reply.status(403).send({ error: "upgrade_required" });
+    }
+
     const destinations = await dependencies.slackManagement.listSlackDestinationsForProjectInOrganization({
-      organization_id: member.organization_id,
+      organization_id: auth.access.organization_id,
       project_id: parsedParams.data.id,
       limit: 100
     });

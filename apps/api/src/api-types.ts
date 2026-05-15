@@ -23,9 +23,11 @@ import type {
   UpdateProjectMemberRoleResult,
   IngestionMetadataService,
   IngestionPersistenceService,
+  ObjectStoreClient,
   ObjectStoreReader,
   MemberAuthService,
   ProjectRecord,
+  UserAvatarRecord,
   WeeklyReportChannel,
   WeeklyReportChannelRecord,
   WeeklyReportScheduleDayOfWeek,
@@ -158,6 +160,16 @@ export interface ApiDependencies {
       user_id: string;
       deleted_at: string;
     }): Promise<DeletedAccountRecord | "other_owned_organizations_exist" | null>;
+    getUserAvatar(input: {
+      user_id: string;
+    }): Promise<UserAvatarRecord | null>;
+    saveUserAvatar(input: {
+      user_id: string;
+      source: "github" | "gravatar";
+      object_key: string;
+      content_type: string;
+      updated_at: string;
+    }): Promise<UserAvatarRecord | null>;
   } | undefined;
   billingManagement?: {
     getBillingSummaryForOrganization(input: {
@@ -396,6 +408,7 @@ export interface ApiDependencies {
     >;
   };
   objectStoreReader: Pick<ObjectStoreReader, "getObject">;
+  objectStoreWriter?: Pick<ObjectStoreClient, "putObject">;
   bundleRegeneration?: {
     requestRegeneration(input: {
       organization_id: string;

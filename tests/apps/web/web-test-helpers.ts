@@ -11,6 +11,7 @@ export interface SessionRecord {
   created_at: string;
   expires_at: string;
   revoked_at: string | null;
+  avatar_url: string | null;
   auth_methods: {
     email: boolean;
     github: boolean;
@@ -89,6 +90,7 @@ export interface ProjectMemberRecord {
   role: "owner" | "admin" | "member";
   membership_type: "owner" | "collaborator";
   created_at: string;
+  avatar_url: string | null;
 }
 
 export interface ProjectInviteRecord {
@@ -268,6 +270,7 @@ export function createSession(overrides: Partial<SessionRecord> = {}): SessionRe
     created_at: "2026-03-17T00:00:00.000Z",
     expires_at: "2026-03-17T12:00:00.000Z",
     revoked_at: null,
+    avatar_url: null,
     auth_methods: {
       email: true,
       github: false
@@ -356,6 +359,7 @@ export function createProjectMember(overrides: Partial<ProjectMemberRecord> = {}
     role: "owner",
     membership_type: "owner",
     created_at: "2026-03-17T00:00:00.000Z",
+    avatar_url: null,
     ...overrides
   };
 }

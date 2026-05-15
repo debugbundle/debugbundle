@@ -193,7 +193,8 @@ function mapProjectMemberRow(row: ProjectMemberRecord & Record<string, unknown>)
     email: row.email,
     role: row.role,
     membership_type: row.membership_type,
-    created_at: row.created_at
+    created_at: row.created_at,
+    avatar_object_key: row.avatar_object_key ?? null
   };
 }
 
@@ -577,6 +578,7 @@ export function createPostgresMetadataStore(db: Queryable): PostgresMetadataStor
             owner_user.email,
             'owner' AS role,
             'owner' AS membership_type,
+            owner_user.avatar_object_key,
             p.created_at::text AS created_at
           FROM projects p
           JOIN users owner_user ON owner_user.id = p.owner_user_id
@@ -589,6 +591,7 @@ export function createPostgresMetadataStore(db: Queryable): PostgresMetadataStor
             member_user.email,
             pm.role,
             'collaborator' AS membership_type,
+            member_user.avatar_object_key,
             pm.created_at::text AS created_at
           FROM project_members pm
           JOIN users member_user ON member_user.id = pm.user_id

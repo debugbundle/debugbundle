@@ -27,6 +27,7 @@ import {
   buildBundleRegenerationLeaseKey,
   buildRawEventObjectKey,
   buildReproductionObjectKey,
+  buildUserAvatarObjectKey,
   createPostgresAccountStore,
   type BillingSummaryRecord,
   createPostgresAuditLogStore,
@@ -701,6 +702,7 @@ export function createApiDependencies(input: CreateApiDependenciesInput): {
     | "listIncidentLogsForOrganization"
   >;
   objectStoreReader: Pick<ObjectStoreReader, "getObject">;
+  objectStoreWriter: Pick<ObjectStoreClient, "putObject">;
   bundleRegeneration: {
     requestRegeneration(input: {
       organization_id: string;
@@ -741,6 +743,16 @@ export function createApiDependencies(input: CreateApiDependenciesInput): {
       user_id: string;
       deleted_at: string;
     }): Promise<import("../../../packages/storage/src/index.js").DeletedAccountRecord | "other_owned_organizations_exist" | null>;
+    getUserAvatar(input: {
+      user_id: string;
+    }): Promise<import("../../../packages/storage/src/index.js").UserAvatarRecord | null>;
+    saveUserAvatar(input: {
+      user_id: string;
+      source: "github" | "gravatar";
+      object_key: string;
+      content_type: string;
+      updated_at: string;
+    }): Promise<import("../../../packages/storage/src/index.js").UserAvatarRecord | null>;
   };
 } {
   const ingestionPersistence = createIngestionPersistenceService({
@@ -1012,10 +1024,17 @@ export function createApiDependencies(input: CreateApiDependenciesInput): {
           await Promise.all(
             result.deleted_project_ids.map((projectId) => deleteProjectObjects(input.objectStore, projectId).catch(() => undefined)),
           );
+          if (result.user_deleted && input.objectStore.deleteObject !== undefined) {
+            await input.objectStore.deleteObject({
+              key: buildUserAvatarObjectKey(deleteInput.user_id)
+            }).catch(() => undefined);
+          }
         }
 
         return result;
       },
+      getUserAvatar: (request) => accountStore.getUserAvatar(request),
+      saveUserAvatar: (request) => accountStore.saveUserAvatar(request),
     },
     billingManagement: {
       getBillingSummaryForOrganization: (input) => getProjectedBillingSummary(input),
@@ -1646,6 +1665,9 @@ export function createApiDependencies(input: CreateApiDependenciesInput): {
     },
     objectStoreReader: {
       getObject: (request) => input.objectStore.getObject(request)
+    },
+    objectStoreWriter: {
+      putObject: (request: Parameters<ObjectStoreClient["putObject"]>[0]) => input.objectStore.putObject(request)
     },
     bundleRegeneration: {
       async requestRegeneration(regenerationInput) {

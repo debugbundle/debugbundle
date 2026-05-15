@@ -1,15 +1,17 @@
-import { ActivityIcon, BugIcon, DownloadIcon, InboxIcon, PackageIcon, RefreshCwIcon, SirenIcon, TrendingDownIcon, TrendingUpIcon } from "lucide-react";
+import { ActivityIcon, BugIcon, DownloadIcon, InboxIcon, PackageIcon, SirenIcon, TrendingDownIcon, TrendingUpIcon } from "lucide-react";
 import { useMemo, useState } from "react";
 import { Link, useOutletContext } from "react-router-dom";
 
 import { CursorPaginationControls } from "../components/system/cursor-pagination-controls.js";
 import { ResourceListState } from "../components/system/resource-list-state.js";
 import { SortableTableHead, toggleSort, type SortState } from "../components/system/sortable-table-head.js";
+import { TableRefreshButton } from "../components/system/table-refresh-button.js";
 import type { ProjectContext } from "../components/system/project-layout.js";
 import { Badge } from "../components/ui/badge.js";
 import { Button } from "../components/ui/button.js";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card.js";
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "../components/ui/empty.js";
+import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select.js";
 import { Skeleton } from "../components/ui/skeleton.js";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../components/ui/table.js";
 import {
@@ -147,21 +149,27 @@ export function ProjectIncidentsPage(): JSX.Element {
           </div>
           <div className="flex items-center gap-2 sm:justify-end">
             <TableRefreshButton isLoading={isLoading} onRefresh={() => void refreshPage()} />
-            <label htmlFor="project-incidents-status-filter" className="text-sm font-medium text-foreground">
+            <label id="project-incidents-status-filter-label" htmlFor="project-incidents-status-filter" className="text-sm font-medium text-foreground">
               Status
             </label>
-            <select
-              id="project-incidents-status-filter"
-              className={filterSelectClassName}
-              value={statusFilter}
-              onChange={(event) => setStatusFilter(event.currentTarget.value as ProjectIncidentStatusFilter)}
-            >
-              {INCIDENT_STATUS_FILTER_OPTIONS.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
+            <Select value={statusFilter} onValueChange={(value) => setStatusFilter(value as ProjectIncidentStatusFilter)}>
+              <SelectTrigger
+                id="project-incidents-status-filter"
+                aria-labelledby="project-incidents-status-filter-label project-incidents-status-filter"
+                className="min-w-40"
+              >
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectGroup>
+                  {INCIDENT_STATUS_FILTER_OPTIONS.map((option) => (
+                    <SelectItem key={option.value} value={option.value}>
+                      {option.label}
+                    </SelectItem>
+                  ))}
+                </SelectGroup>
+              </SelectContent>
+            </Select>
           </div>
         </CardHeader>
         <CardContent>
@@ -244,21 +252,27 @@ export function ProjectBundlesPage(): JSX.Element {
           </div>
           <div className="flex items-center gap-2 sm:justify-end">
             <TableRefreshButton isLoading={isLoading} onRefresh={() => void refreshPage()} />
-            <label htmlFor="project-bundles-status-filter" className="text-sm font-medium text-foreground">
+            <label id="project-bundles-status-filter-label" htmlFor="project-bundles-status-filter" className="text-sm font-medium text-foreground">
               Status
             </label>
-            <select
-              id="project-bundles-status-filter"
-              className={filterSelectClassName}
-              value={statusFilter}
-              onChange={(event) => setStatusFilter(event.currentTarget.value as ProjectIncidentStatusFilter)}
-            >
-              {INCIDENT_STATUS_FILTER_OPTIONS.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
+            <Select value={statusFilter} onValueChange={(value) => setStatusFilter(value as ProjectIncidentStatusFilter)}>
+              <SelectTrigger
+                id="project-bundles-status-filter"
+                aria-labelledby="project-bundles-status-filter-label project-bundles-status-filter"
+                className="min-w-40"
+              >
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectGroup>
+                  {INCIDENT_STATUS_FILTER_OPTIONS.map((option) => (
+                    <SelectItem key={option.value} value={option.value}>
+                      {option.label}
+                    </SelectItem>
+                  ))}
+                </SelectGroup>
+              </SelectContent>
+            </Select>
           </div>
         </CardHeader>
         <CardContent>
@@ -391,15 +405,6 @@ export function IncidentTable({
   );
 }
 
-function TableRefreshButton({ isLoading, onRefresh }: { isLoading: boolean; onRefresh: () => void }): JSX.Element {
-  return (
-    <Button type="button" variant="outline" size="sm" disabled={isLoading} onClick={onRefresh}>
-      <RefreshCwIcon className="size-4" />
-      Refresh
-    </Button>
-  );
-}
-
 const severityVariantMap: Record<IncidentRecord["severity"], "secondary" | "warning" | "destructive"> = {
   low: "secondary",
   medium: "secondary",
@@ -484,9 +489,6 @@ function getProjectBundleEmptyState(statusFilter: ProjectIncidentStatusFilter): 
       };
   }
 }
-
-const filterSelectClassName =
-  "flex h-10 min-w-40 rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:cursor-not-allowed disabled:opacity-60";
 
 function sortProjectIncidents(incidents: IncidentRecord[] | null, sort: SortState<ProjectIncidentSortField>): IncidentRecord[] {
   if (incidents === null) {

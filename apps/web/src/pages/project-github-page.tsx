@@ -13,6 +13,7 @@ import { Dialog } from "../components/ui/dialog.js";
 import { Field, FieldDescription, FieldGroup, FieldLabel } from "../components/ui/field.js";
 import { Input } from "../components/ui/input.js";
 import { Notice } from "../components/ui/notice.js";
+import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select.js";
 import { Skeleton } from "../components/ui/skeleton.js";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../components/ui/table.js";
 import { useDelayedVisibility } from "../lib/use-delayed-visibility.js";
@@ -443,22 +444,31 @@ export function ProjectGitHubPage(): JSX.Element {
                       which repos appear here, update the installation in GitHub and then refresh this page.
                     </p>
                     <Field>
-                      <FieldLabel htmlFor="github-repository-select">
+                      <FieldLabel id="github-repository-select-label" htmlFor="github-repository-select">
                         Repositories accessible to this GitHub App installation
                       </FieldLabel>
-                      <select
-                        id="github-repository-select"
-                        className="flex h-10 w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+                      <Select
                         value={selectedRepositoryFullName}
-                        onChange={(event) => setSelectedRepositoryFullName(event.currentTarget.value)}
+                        onValueChange={setSelectedRepositoryFullName}
                         disabled={githubSettings.repositories.length === 0 || isConnectingRepository || isRemovingRepository}
                       >
-                        {githubSettings.repositories.map((repository) => (
-                          <option key={repository.full_name} value={repository.full_name}>
-                            {repository.full_name}
-                          </option>
-                        ))}
-                      </select>
+                        <SelectTrigger
+                          id="github-repository-select"
+                          aria-labelledby="github-repository-select-label github-repository-select"
+                          className="w-full"
+                        >
+                          <SelectValue placeholder="Choose a repository" />
+                        </SelectTrigger>
+                        <SelectContent position="popper">
+                          <SelectGroup>
+                            {githubSettings.repositories.map((repository) => (
+                              <SelectItem key={repository.full_name} value={repository.full_name}>
+                                {repository.full_name}
+                              </SelectItem>
+                            ))}
+                          </SelectGroup>
+                        </SelectContent>
+                      </Select>
                     </Field>
                     {githubSettings.repositories.length === 0 ? (
                       <p className="text-sm text-muted-foreground">
@@ -635,16 +645,21 @@ export function ProjectGitHubPage(): JSX.Element {
               <Input id="github-rule-name" value={ruleName} onChange={(event) => setRuleName(event.currentTarget.value)} />
             </Field>
             <Field>
-              <FieldLabel htmlFor="github-rule-event-type">Event type</FieldLabel>
-              <select
-                id="github-rule-event-type"
-                className="flex h-10 w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+              <FieldLabel id="github-rule-event-type-label" htmlFor="github-rule-event-type">Event type</FieldLabel>
+              <Select
                 value={ruleEventType}
-                onChange={(event) => setRuleEventType(event.currentTarget.value)}
+                onValueChange={setRuleEventType}
               >
-                <option value="bundle.created">bundle.created</option>
-                <option value="bundle.reopened">bundle.reopened</option>
-              </select>
+                <SelectTrigger id="github-rule-event-type" aria-labelledby="github-rule-event-type-label github-rule-event-type" className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent position="popper">
+                  <SelectGroup>
+                    <SelectItem value="bundle.created">bundle.created</SelectItem>
+                    <SelectItem value="bundle.reopened">bundle.reopened</SelectItem>
+                  </SelectGroup>
+                </SelectContent>
+              </Select>
             </Field>
             <Field>
               <FieldLabel htmlFor="github-rule-environments">Environment list</FieldLabel>
@@ -657,31 +672,45 @@ export function ProjectGitHubPage(): JSX.Element {
               <FieldDescription>Comma-separated services. Leave blank for all services.</FieldDescription>
             </Field>
             <Field>
-              <FieldLabel htmlFor="github-rule-severity">Minimum severity</FieldLabel>
-              <select
-                id="github-rule-severity"
-                className="flex h-10 w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+              <FieldLabel id="github-rule-severity-label" htmlFor="github-rule-severity">Minimum severity</FieldLabel>
+              <Select
                 value={ruleSeverityMin}
-                onChange={(event) => setRuleSeverityMin(event.currentTarget.value)}
+                onValueChange={setRuleSeverityMin}
               >
-                <option value="low">low</option>
-                <option value="medium">medium</option>
-                <option value="high">high</option>
-                <option value="critical">critical</option>
-              </select>
+                <SelectTrigger id="github-rule-severity" aria-labelledby="github-rule-severity-label github-rule-severity" className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent position="popper">
+                  <SelectGroup>
+                    <SelectItem value="low">low</SelectItem>
+                    <SelectItem value="medium">medium</SelectItem>
+                    <SelectItem value="high">high</SelectItem>
+                    <SelectItem value="critical">critical</SelectItem>
+                  </SelectGroup>
+                </SelectContent>
+              </Select>
             </Field>
             <Field>
-              <FieldLabel htmlFor="github-rule-incident-status">Incident state</FieldLabel>
-              <select
-                id="github-rule-incident-status"
-                className="flex h-10 w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+              <FieldLabel id="github-rule-incident-status-label" htmlFor="github-rule-incident-status">Incident state</FieldLabel>
+              <Select
                 value={ruleIncidentStatus}
-                onChange={(event) => setRuleIncidentStatus(event.currentTarget.value)}
+                onValueChange={setRuleIncidentStatus}
               >
-                <option value="new_only">new_only</option>
-                <option value="reopened_only">reopened_only</option>
-                <option value="new_or_reopened">new_or_reopened</option>
-              </select>
+                <SelectTrigger
+                  id="github-rule-incident-status"
+                  aria-labelledby="github-rule-incident-status-label github-rule-incident-status"
+                  className="w-full"
+                >
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent position="popper">
+                  <SelectGroup>
+                    <SelectItem value="new_only">new_only</SelectItem>
+                    <SelectItem value="reopened_only">reopened_only</SelectItem>
+                    <SelectItem value="new_or_reopened">new_or_reopened</SelectItem>
+                  </SelectGroup>
+                </SelectContent>
+              </Select>
             </Field>
             <Field>
               <FieldLabel htmlFor="github-rule-cooldown-seconds">Cooldown seconds</FieldLabel>

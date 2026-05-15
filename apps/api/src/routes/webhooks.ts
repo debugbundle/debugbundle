@@ -4,7 +4,7 @@ import type { FastifyInstance } from "fastify";
 import type { WebhookEventType, WebhookFilters } from "../../../../packages/storage/src/index.js";
 import type { ApiDependencies } from "../api-types.js";
 import { recordAuditLog, resolveAuditActorType } from "../audit-logging.js";
-import { requireRateLimitedMemberAuth } from "../api-helpers.js";
+import { requireRateLimitedMemberAuth, requireRateLimitedProjectAccess } from "../api-helpers.js";
 import {
   CreateWebhookBodySchema,
   UpdateWebhookBodySchema,
@@ -50,21 +50,24 @@ function normalizeWebhookFilters(filters: {
 
 export function registerWebhookRoutes(app: FastifyInstance, dependencies: ApiDependencies): void {
   app.get("/v1/webhooks", async (request, reply) => {
-    const member = await requireRateLimitedMemberAuth(request, reply, dependencies, "management-read");
-    if (member === null) {
+    const parsedQuery = WebhooksQuerySchema.safeParse(request.query);
+    if (!parsedQuery.success) {
+      return reply.status(400).send({ error: "invalid_query" });
+    }
+
+    const auth = await requireRateLimitedProjectAccess(request, reply, dependencies, {
+      bucket: "management-read",
+      projectId: parsedQuery.data.project_id
+    });
+    if (auth === null) {
       return;
     }
     if (dependencies.webhookManagement === undefined) {
       return reply.status(404).send({ error: "project_not_found" });
     }
 
-    const parsedQuery = WebhooksQuerySchema.safeParse(request.query);
-    if (!parsedQuery.success) {
-      return reply.status(400).send({ error: "invalid_query" });
-    }
-
     const webhooks = await dependencies.webhookManagement.listWebhooksForOrganization({
-      organization_id: member.organization_id,
+      organization_id: auth.access.organization_id,
       project_id: parsedQuery.data.project_id,
       limit: parsedQuery.data.limit
     });

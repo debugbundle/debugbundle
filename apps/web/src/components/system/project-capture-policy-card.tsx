@@ -16,6 +16,7 @@ import { showErrorToast, showSuccessToast } from "../../lib/notify.js";
 import { Button } from "../ui/button.js";
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "../ui/card.js";
 import { Field, FieldDescription, FieldGroup, FieldLabel } from "../ui/field.js";
+import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "../ui/select.js";
 
 type OverrideValue<T extends string> = "" | T;
 type ClientErrorIncidentMode = "preset_default" | "none" | "recommended" | "custom";
@@ -106,8 +107,8 @@ const clientErrorIncidentModeOptions: Array<{ value: ClientErrorIncidentMode; la
   { value: "custom", label: "Custom" }
 ];
 
-const selectClassName = "flex h-10 w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:cursor-not-allowed disabled:opacity-60";
-const inputClassName = selectClassName;
+const OVERRIDE_SELECT_DEFAULT_VALUE = "__use_preset_default__";
+const inputClassName = "flex h-10 w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:cursor-not-allowed disabled:opacity-60";
 
 export function ProjectCapturePolicyCard({ projectId, organizationPlan, canEdit }: ProjectCapturePolicyCardProps): JSX.Element {
   const [draft, setDraft] = useState<CapturePolicyDraft | null>(null);
@@ -208,7 +209,7 @@ export function ProjectCapturePolicyCard({ projectId, organizationPlan, canEdit 
           <p className="mt-2 leading-6">
             {canEdit
               ? "Preset defaults keep common setups fast. Leave an advanced control on its preset default unless this project needs a narrower or richer signal mix."
-              : "Members can review the effective policy here, but only owners can change project capture settings."}
+              : "Members can review the effective policy here, but only project owners and admins can change capture settings."}
           </p>
         </div>
 
@@ -219,24 +220,32 @@ export function ProjectCapturePolicyCard({ projectId, organizationPlan, canEdit 
         <form className="space-y-6" onSubmit={(event) => void handleSave(event)}>
           <FieldGroup>
             <Field>
-              <FieldLabel htmlFor="project-capture-policy-preset">Preset</FieldLabel>
-              <FieldDescription>Projects in organizations on the {organizationPlan} plan default to {formatPreset(DEFAULT_PRESET_BY_PLAN[organizationPlan]).toLowerCase()} unless an owner saves a different policy.</FieldDescription>
-              <select
-                id="project-capture-policy-preset"
-                className={selectClassName}
+              <FieldLabel id="project-capture-policy-preset-label" htmlFor="project-capture-policy-preset">Preset</FieldLabel>
+              <FieldDescription>Projects in organizations on the {organizationPlan} plan default to {formatPreset(DEFAULT_PRESET_BY_PLAN[organizationPlan]).toLowerCase()} unless a project owner or admin saves a different policy.</FieldDescription>
+              <Select
                 value={policyDraft.preset}
-                onChange={(event) => {
-                  const value = event.currentTarget.value as CapturePreset;
-                  setDraft((current) => ({ ...(current ?? policyDraft), preset: value }));
+                onValueChange={(value) => {
+                  setDraft((current) => ({ ...(current ?? policyDraft), preset: value as CapturePreset }));
                 }}
                 disabled={isDisabled}
               >
-                {presetOptions.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
+                <SelectTrigger
+                  id="project-capture-policy-preset"
+                  aria-labelledby="project-capture-policy-preset-label project-capture-policy-preset"
+                  className="w-full"
+                >
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent position="popper">
+                  <SelectGroup>
+                    {presetOptions.map((option) => (
+                      <SelectItem key={option.value} value={option.value}>
+                        {option.label}
+                      </SelectItem>
+                    ))}
+                  </SelectGroup>
+                </SelectContent>
+              </Select>
               <FieldDescription>{presetOptions.find((option) => option.value === policyDraft.preset)?.description}</FieldDescription>
             </Field>
           </FieldGroup>
@@ -358,22 +367,27 @@ function OverrideField<T extends string>({
 
   return (
     <Field>
-      <FieldLabel htmlFor={id}>{label}</FieldLabel>
+      <FieldLabel id={`${id}-label`} htmlFor={id}>{label}</FieldLabel>
       <FieldDescription>{description}</FieldDescription>
-      <select
-        id={id}
-        className={selectClassName}
-        value={value}
-        onChange={(event) => onChange(event.currentTarget.value as OverrideValue<T>)}
+      <Select
+        value={value === "" ? OVERRIDE_SELECT_DEFAULT_VALUE : value}
+        onValueChange={(nextValue) => onChange((nextValue === OVERRIDE_SELECT_DEFAULT_VALUE ? "" : nextValue) as OverrideValue<T>)}
         disabled={disabled}
       >
-        <option value="">Use preset default ({defaultLabel})</option>
-        {options.map((option) => (
-          <option key={option.value} value={option.value}>
-            {option.label}
-          </option>
-        ))}
-      </select>
+        <SelectTrigger id={id} aria-labelledby={`${id}-label ${id}`} className="w-full">
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent position="popper">
+          <SelectGroup>
+            <SelectItem value={OVERRIDE_SELECT_DEFAULT_VALUE}>Use preset default ({defaultLabel})</SelectItem>
+            {options.map((option) => (
+              <SelectItem key={option.value} value={option.value}>
+                {option.label}
+              </SelectItem>
+            ))}
+          </SelectGroup>
+        </SelectContent>
+      </Select>
     </Field>
   );
 }
@@ -395,22 +409,31 @@ function ClientErrorIncidentsField({
 
   return (
     <Field>
-      <FieldLabel htmlFor="project-capture-policy-client-errors">Client error incidents</FieldLabel>
+      <FieldLabel id="project-capture-policy-client-errors-label" htmlFor="project-capture-policy-client-errors">Client error incidents</FieldLabel>
       <FieldDescription>Choose which 4xx responses should open incidents immediately instead of waiting for repeated-anomaly thresholds.</FieldDescription>
-      <select
-        id="project-capture-policy-client-errors"
-        className={selectClassName}
+      <Select
         value={draft.client_error_incident_mode}
-        onChange={(event) => onModeChange(event.currentTarget.value as ClientErrorIncidentMode)}
+        onValueChange={(value) => onModeChange(value as ClientErrorIncidentMode)}
         disabled={disabled}
       >
-        <option value="preset_default">Use preset default ({presetDefaultLabel})</option>
-        {clientErrorIncidentModeOptions.filter((option) => option.value !== "preset_default").map((option) => (
-          <option key={option.value} value={option.value}>
-            {option.label}
-          </option>
-        ))}
-      </select>
+        <SelectTrigger
+          id="project-capture-policy-client-errors"
+          aria-labelledby="project-capture-policy-client-errors-label project-capture-policy-client-errors"
+          className="w-full"
+        >
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent position="popper">
+          <SelectGroup>
+            <SelectItem value="preset_default">Use preset default ({presetDefaultLabel})</SelectItem>
+            {clientErrorIncidentModeOptions.filter((option) => option.value !== "preset_default").map((option) => (
+              <SelectItem key={option.value} value={option.value}>
+                {option.label}
+              </SelectItem>
+            ))}
+          </SelectGroup>
+        </SelectContent>
+      </Select>
       {draft.client_error_incident_mode === "custom" ? (
         <div className="mt-3 space-y-2">
           <FieldLabel htmlFor="project-capture-policy-client-errors-custom">Status codes</FieldLabel>

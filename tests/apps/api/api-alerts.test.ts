@@ -10,11 +10,23 @@ type MemberAuthDependency = MockedMethods<ApiServerDependencies["memberAuth"]>;
 type AlertManagementDependency = MockedMethods<NonNullable<ApiServerDependencies["alertManagement"]>>;
 type BillingManagementDependency = MockedMethods<NonNullable<ApiServerDependencies["billingManagement"]>>;
 type SlackManagementDependency = MockedMethods<NonNullable<ApiServerDependencies["slackManagement"]>>;
+type ProjectManagementDependency = MockedMethods<NonNullable<ApiServerDependencies["projectManagement"]>>;
+
+const defaultProjectAccess = {
+  project_id: "00000000-0000-4000-8000-000000000001",
+  organization_id: "org_123",
+  owner_user_id: "usr_owner",
+  owner_email: "owner@example.com",
+  relationship: "owned",
+  effective_role: "owner",
+  organization_plan: "team"
+} as const;
 
 function createServer(overrides: {
   authRateLimiter?: Partial<AuthRateLimiterDependency>;
   auditLogging?: AuditLoggingDependency | undefined;
   memberAuth?: MemberAuthDependency | undefined;
+  projectManagement?: ProjectManagementDependency | undefined;
   alertManagement?: AlertManagementDependency | undefined;
   billingManagement?: BillingManagementDependency | undefined;
   slackManagement?: SlackManagementDependency | undefined;
@@ -45,6 +57,15 @@ function createServer(overrides: {
       overrides.memberAuth ??
       mockedObject<ApiServerDependencies["memberAuth"]>({
         resolveMemberByTokenHash: vi.fn().mockResolvedValue({ member_id: "usr_123", organization_id: "org_123" })
+      }),
+    projectManagement:
+      overrides.projectManagement ??
+      mockedObject<NonNullable<ApiServerDependencies["projectManagement"]>>({
+        resolveProjectAccessForUser: vi.fn().mockResolvedValue(defaultProjectAccess),
+        listProjectsForUser: vi.fn().mockResolvedValue([]),
+        createProjectForUser: vi.fn().mockResolvedValue(null),
+        updateProjectForUser: vi.fn().mockResolvedValue(null),
+        deleteProjectForUser: vi.fn().mockResolvedValue(null)
       }),
     tokenManagement: mockedObject<ApiServerDependencies["tokenManagement"]>({
       listProjectTokensForOrganization: vi.fn().mockResolvedValue([]),
@@ -194,6 +215,43 @@ describe("api alert routes", () => {
     });
     expect(alertManagement.listAlertsForOrganization).toHaveBeenCalledWith({
       organization_id: "org_123",
+      project_id: "00000000-0000-4000-8000-000000000001",
+      limit: 10
+    });
+  });
+
+  it("should list alerts for collaborators using the shared project's organization", async (): Promise<void> => {
+    const projectManagement = mockedObject<NonNullable<ApiServerDependencies["projectManagement"]>>({
+      resolveProjectAccessForUser: vi.fn().mockResolvedValue({
+        ...defaultProjectAccess,
+        organization_id: "org_shared",
+        relationship: "shared",
+        effective_role: "member"
+      }),
+      listProjectsForUser: vi.fn().mockResolvedValue([]),
+      createProjectForUser: vi.fn().mockResolvedValue(null),
+      updateProjectForUser: vi.fn().mockResolvedValue(null),
+      deleteProjectForUser: vi.fn().mockResolvedValue(null)
+    });
+    const alertManagement = {
+      listAlertsForOrganization: vi.fn().mockResolvedValue([]),
+      createAlertForOrganization: vi.fn().mockResolvedValue(null),
+      updateAlertForOrganization: vi.fn().mockResolvedValue(null),
+      deleteAlertForOrganization: vi.fn().mockResolvedValue(null)
+    };
+    const app = createServer({ projectManagement, alertManagement });
+
+    const response = await app.inject({
+      method: "GET",
+      url: "/v1/alerts?project_id=00000000-0000-4000-8000-000000000001&limit=10",
+      headers: {
+        authorization: "Bearer dbundle_mem_test"
+      }
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(alertManagement.listAlertsForOrganization).toHaveBeenCalledWith({
+      organization_id: "org_shared",
       project_id: "00000000-0000-4000-8000-000000000001",
       limit: 10
     });

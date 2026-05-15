@@ -17,6 +17,8 @@ function createServer(overrides: {
   webAuth?: Partial<WebAuthDependency> | undefined;
   githubCliAuth?: Partial<GitHubCliAuthDependency> | undefined;
   accountManagement?: Partial<AccountManagementDependency>;
+  objectStoreWriter?: ApiServerDependencies["objectStoreWriter"];
+  objectStoreReader?: ApiServerDependencies["objectStoreReader"];
 } = {}): ReturnType<typeof createApiServer> {
   const hasWebAuthOverride = Object.prototype.hasOwnProperty.call(overrides, "webAuth");
   const hasGitHubCliAuthOverride = Object.prototype.hasOwnProperty.call(overrides, "githubCliAuth");
@@ -181,15 +183,22 @@ function createServer(overrides: {
       exportAccountForOrganization:
         overrides.accountManagement?.exportAccountForOrganization ?? vi.fn().mockResolvedValue(null),
       deleteAccountForOrganization:
-        overrides.accountManagement?.deleteAccountForOrganization ?? vi.fn().mockResolvedValue(null)
+        overrides.accountManagement?.deleteAccountForOrganization ?? vi.fn().mockResolvedValue(null),
+      getUserAvatar:
+        overrides.accountManagement?.getUserAvatar ?? vi.fn().mockResolvedValue(null),
+      saveUserAvatar:
+        overrides.accountManagement?.saveUserAvatar ?? vi.fn().mockResolvedValue(null)
     }),
     incidentRetrieval: {
       listIncidentsForOrganization: vi.fn().mockResolvedValue([]),
       getIncidentForOrganization: vi.fn().mockResolvedValue(null),
       listIncidentLogsForOrganization: vi.fn().mockResolvedValue([])
     },
-    objectStoreReader: {
+    objectStoreReader: overrides.objectStoreReader ?? {
       getObject: vi.fn()
+    },
+    objectStoreWriter: overrides.objectStoreWriter ?? {
+      putObject: vi.fn()
     },
     webhookDelivery: {
       listDeliveriesForWebhookInOrganization: vi.fn().mockResolvedValue({ deliveries: [] }),
@@ -366,6 +375,7 @@ describe("api auth routes", () => {
         created_at: "2026-03-16T00:00:00.000Z",
         expires_at: "2026-03-16T04:00:00.000Z",
         revoked_at: null,
+        avatar_url: null,
         auth_methods: {
           email: true,
           github: false
@@ -1235,6 +1245,7 @@ describe("api auth routes", () => {
         created_at: "2026-03-16T00:00:00.000Z",
         expires_at: "2026-03-16T04:00:00.000Z",
         revoked_at: null,
+        avatar_url: null,
         auth_methods: {
           email: true,
           github: true
@@ -1401,6 +1412,120 @@ describe("account routes backed by browser auth", () => {
       organization_id: "org_123",
       user_id: "usr_123",
       exported_at: expect.any(String)
+    });
+  });
+
+  it("serves the current cached account avatar for valid browser sessions", async (): Promise<void> => {
+    const accountManagement = {
+      getUserAvatar: vi.fn().mockResolvedValue({
+        user_id: "usr_123",
+        source: "github",
+        object_key: "avatars/users/usr_123/profile",
+        content_type: "image/png",
+        updated_at: "2026-04-06T00:00:00.000Z"
+      })
+    };
+    const objectStoreReader = {
+      getObject: vi.fn().mockResolvedValue(Buffer.from("png-body"))
+    };
+    const app = createServer({
+      accountManagement,
+      objectStoreReader,
+      webAuth: {
+        resolveSessionByToken: vi.fn().mockResolvedValue({
+          session_id: "ses_123",
+          user_id: "usr_123",
+          email: "owen@example.com",
+          email_verified_at: "2026-03-16T00:00:00.000Z",
+          organization_id: "org_123",
+          role: "owner",
+          created_at: "2026-03-16T00:00:00.000Z",
+          expires_at: "2026-03-16T12:00:00.000Z",
+          revoked_at: null,
+          has_email_auth: true,
+          has_github_oauth: false
+        })
+      }
+    });
+
+    const response = await app.inject({
+      method: "GET",
+      url: "/v1/account/avatar",
+      headers: {
+        cookie: `${SESSION_COOKIE_NAME}=session-secret`
+      }
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.headers["content-type"]).toContain("image/png");
+    expect(response.body).toBe("png-body");
+    expect(accountManagement.getUserAvatar).toHaveBeenCalledWith({ user_id: "usr_123" });
+    expect(objectStoreReader.getObject).toHaveBeenCalledWith({ key: "avatars/users/usr_123/profile" });
+  });
+
+  it("imports and caches a gravatar avatar for valid browser sessions", async (): Promise<void> => {
+    const csrfToken = buildCsrfToken("session-secret");
+    const accountManagement = {
+      saveUserAvatar: vi.fn().mockResolvedValue({
+        user_id: "usr_123",
+        source: "gravatar",
+        object_key: "avatars/users/usr_123/profile",
+        content_type: "image/png",
+        updated_at: "2026-04-06T00:00:00.000Z"
+      })
+    };
+    const objectStoreWriter = {
+      putObject: vi.fn().mockResolvedValue(undefined)
+    };
+
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(Buffer.from("avatar-image"), {
+      status: 200,
+      headers: {
+        "Content-Type": "image/png"
+      }
+    })));
+
+    const app = createServer({
+      accountManagement,
+      objectStoreWriter,
+      webAuth: {
+        resolveSessionByToken: vi.fn().mockResolvedValue({
+          session_id: "ses_123",
+          user_id: "usr_123",
+          email: "owen@example.com",
+          email_verified_at: "2026-03-16T00:00:00.000Z",
+          organization_id: "org_123",
+          role: "owner",
+          created_at: "2026-03-16T00:00:00.000Z",
+          expires_at: "2026-03-16T12:00:00.000Z",
+          revoked_at: null,
+          has_email_auth: true,
+          has_github_oauth: false
+        })
+      }
+    });
+
+    const response = await app.inject({
+      method: "POST",
+      url: "/v1/account/avatar/import-gravatar",
+      headers: {
+        cookie: `${SESSION_COOKIE_NAME}=session-secret`,
+        "x-csrf-token": csrfToken
+      }
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toEqual({
+      avatar: {
+        source: "gravatar",
+        avatar_url: "/v1/account/avatar",
+        updated_at: "2026-04-06T00:00:00.000Z"
+      }
+    });
+    expect(objectStoreWriter.putObject).toHaveBeenCalledWith({
+      key: "avatars/users/usr_123/profile",
+      body: Buffer.from("avatar-image"),
+      contentType: "image/png"
     });
   });
 

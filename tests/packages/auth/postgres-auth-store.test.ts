@@ -803,6 +803,7 @@ describe("postgres auth store", () => {
       created_at: "2026-03-17T00:00:00.000Z",
       expires_at: "2026-03-17T12:00:00.000Z",
       revoked_at: null,
+      avatar_object_key: null,
       has_email_auth: true,
       has_github_oauth: true
     });

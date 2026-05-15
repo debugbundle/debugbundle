@@ -1,4 +1,4 @@
-import { ChevronRightIcon, RefreshCwIcon, SirenIcon } from "lucide-react";
+import { ChevronRightIcon, SirenIcon } from "lucide-react";
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 
@@ -6,10 +6,12 @@ import { CursorPaginationControls } from "../components/system/cursor-pagination
 import { PageHeader } from "../components/system/page-header.js";
 import { ResourceListState } from "../components/system/resource-list-state.js";
 import { SortableTableHead, toggleSort, type SortState } from "../components/system/sortable-table-head.js";
+import { TableRefreshButton } from "../components/system/table-refresh-button.js";
 import { Badge } from "../components/ui/badge.js";
 import { Button } from "../components/ui/button.js";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card.js";
 import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "../components/ui/empty.js";
+import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select.js";
 import { Skeleton } from "../components/ui/skeleton.js";
 import { Table, TableBody, TableCell, TableHeader, TableRow } from "../components/ui/table.js";
 import { listIncidents, type IncidentRecord } from "../lib/api.js";
@@ -48,25 +50,28 @@ export function IncidentsPage(): JSX.Element {
         <CardHeader className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <CardTitle>Incident inventory</CardTitle>
           <div className="flex items-center gap-2 sm:justify-end">
-            <Button type="button" variant="outline" size="sm" disabled={isLoading} onClick={() => void refreshPage()}>
-              <RefreshCwIcon className="size-4" />
-              Refresh
-            </Button>
-            <label htmlFor="workspace-incidents-status-filter" className="text-sm font-medium text-foreground">
+            <TableRefreshButton isLoading={isLoading} onRefresh={refreshPage} />
+            <label id="workspace-incidents-status-filter-label" htmlFor="workspace-incidents-status-filter" className="text-sm font-medium text-foreground">
               Status
             </label>
-            <select
-              id="workspace-incidents-status-filter"
-              className={filterSelectClassName}
-              value={statusFilter}
-              onChange={(event) => setStatusFilter(event.currentTarget.value as IncidentStatusFilter)}
-            >
-              {INCIDENT_STATUS_FILTER_OPTIONS.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
+            <Select value={statusFilter} onValueChange={(value) => setStatusFilter(value as IncidentStatusFilter)}>
+              <SelectTrigger
+                id="workspace-incidents-status-filter"
+                aria-labelledby="workspace-incidents-status-filter-label workspace-incidents-status-filter"
+                className="min-w-40"
+              >
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectGroup>
+                  {INCIDENT_STATUS_FILTER_OPTIONS.map((option) => (
+                    <SelectItem key={option.value} value={option.value}>
+                      {option.label}
+                    </SelectItem>
+                  ))}
+                </SelectGroup>
+              </SelectContent>
+            </Select>
           </div>
         </CardHeader>
         <CardContent>
@@ -222,9 +227,6 @@ function getWorkspaceIncidentEmptyState(statusFilter: IncidentStatusFilter): { t
       };
   }
 }
-
-const filterSelectClassName =
-  "flex h-10 min-w-40 rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:cursor-not-allowed disabled:opacity-60";
 
 function sortIncidents(incidents: IncidentRecord[] | null, sort: SortState<IncidentSortField>): IncidentRecord[] {
   if (incidents === null) {

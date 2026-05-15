@@ -37,7 +37,8 @@ function mapSessionRow(row: Record<string, unknown>): WebSessionRecord {
     expires_at: String(row["expires_at"]),
     revoked_at: (row["revoked_at"] as string | null) ?? null,
     has_email_auth: row["has_email_auth"] === true,
-    has_github_oauth: row["has_github_oauth"] === true
+    has_github_oauth: row["has_github_oauth"] === true,
+    avatar_object_key: (row["avatar_object_key"] as string | null) ?? null
   };
 }
 
@@ -201,6 +202,7 @@ export function createPostgresAuthStore(db: Queryable): PostgresAuthStore {
             inserted.expires_at::text AS expires_at,
             inserted.revoked_at::text AS revoked_at,
             true AS has_email_auth,
+            u.avatar_object_key,
             EXISTS (
               SELECT 1
               FROM oauth_identities oi
@@ -238,6 +240,7 @@ export function createPostgresAuthStore(db: Queryable): PostgresAuthStore {
             s.expires_at::text AS expires_at,
             s.revoked_at::text AS revoked_at,
             true AS has_email_auth,
+            u.avatar_object_key,
             EXISTS (
               SELECT 1
               FROM oauth_identities oi

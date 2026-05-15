@@ -25,6 +25,26 @@ import {
   requestUrl
 } from "./web-test-helpers.js";
 
+async function findSelectTrigger(label: RegExp | string): Promise<HTMLElement> {
+  return await screen.findByLabelText(label);
+}
+
+async function openSelect(label: RegExp | string): Promise<HTMLElement> {
+  const trigger = await findSelectTrigger(label);
+  trigger.focus();
+  fireEvent.keyDown(trigger, { key: "ArrowDown", code: "ArrowDown" });
+  return trigger;
+}
+
+async function chooseSelectOption(
+  user: ReturnType<typeof userEvent.setup>,
+  label: RegExp | string,
+  optionName: RegExp | string
+): Promise<void> {
+  await openSelect(label);
+  await user.click(await screen.findByRole("option", { name: optionName }));
+}
+
 afterEach(() => {
   resetBrowserSessionClientState();
   vi.unstubAllGlobals();
@@ -134,7 +154,7 @@ describe("web app — management routes", () => {
 
     expect(await screen.findByRole("heading", { name: /incidents/i, level: 1 })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /incidents/i })).toHaveAttribute("href", "/incidents");
-    expect(screen.getByRole("combobox", { name: /status/i })).toHaveValue("open");
+    expect(screen.getByRole("combobox", { name: /status/i })).toHaveTextContent(/^open$/i);
     expect(await screen.findByText(/request anomaly: get \/checkout\/:orderid returned 404 repeatedly/i)).toBeInTheDocument();
     expect(screen.queryByText(/database timeout during signin/i)).toBeNull();
     expect((await screen.findAllByRole("link", { name: /main app/i })).length).toBeGreaterThan(0);
@@ -152,7 +172,7 @@ describe("web app — management routes", () => {
     expect(screen.queryByRole("button", { name: /next/i })).toBeNull();
     expect(screen.queryByRole("button", { name: /previous/i })).toBeNull();
 
-    await user.selectOptions(screen.getByRole("combobox", { name: /status/i }), "all");
+    await chooseSelectOption(user, /status/i, /all statuses/i);
     expect(await screen.findByText(/database timeout during signin/i)).toBeInTheDocument();
     expect(screen.getByText(/^critical$/i)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /next/i })).toBeEnabled();
@@ -329,7 +349,7 @@ describe("web app — management routes", () => {
     expect((await screen.findByRole("dialog")).className.includes("sm:max-w-2xl")).toBe(true);
     await user.type(await screen.findByLabelText(/project name/i), "Ops API");
     expect(screen.getByLabelText(/project slug/i)).toHaveValue("ops-api");
-    await user.selectOptions(screen.getByLabelText(/default environment/i), "staging");
+    await chooseSelectOption(user, /default environment/i, /^staging$/i);
     await user.click(screen.getByRole("button", { name: /^create project$/i }));
 
     expect(await screen.findByText(/project details/i)).toBeInTheDocument();
@@ -406,7 +426,7 @@ describe("web app — management routes", () => {
 
     expect(screen.getByLabelText(/project slug/i)).toHaveValue("ops-control-plane");
 
-    await user.selectOptions(screen.getByLabelText(/default environment/i), "__custom__");
+    await chooseSelectOption(user, /default environment/i, /^custom$/i);
     await user.type(screen.getByLabelText(/custom environment/i), "preview");
     await user.click(screen.getByRole("button", { name: /^create project$/i }));
 
@@ -604,7 +624,7 @@ describe("web app — management routes", () => {
 
       if (url.endsWith("/v1/projects") && init?.method === undefined) {
         return jsonResponse(200, {
-          projects: [createProject()]
+          projects: [createProject({ relationship: "shared", effective_role: "admin" })]
         });
       }
 
@@ -619,7 +639,7 @@ describe("web app — management routes", () => {
       expect(screen.getAllByText(/main-app/i).length).toBeGreaterThan(0);
     });
     expect(screen.getByText(/production/i)).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /edit project/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /edit project/i })).toBeEnabled();
     expect(screen.getByRole("button", { name: /delete project/i })).toBeDisabled();
   });
 
@@ -1052,7 +1072,7 @@ describe("web app — management routes", () => {
       "https://github.com/apps/debugbundle-automation/installations/new"
     );
 
-    await user.selectOptions(screen.getByLabelText(/repositories accessible to this github app installation/i), "debugbundle/worker");
+    await chooseSelectOption(user, /repositories accessible to this github app installation/i, /^debugbundle\/worker$/i);
     await user.click(screen.getByRole("button", { name: /connect to this project/i }));
 
     expect((await screen.findAllByText(/debugbundle\/worker/i)).length).toBeGreaterThan(0);
@@ -1134,6 +1154,7 @@ describe("web app — management routes", () => {
 
     await user.click(screen.getByRole("button", { name: /refresh list/i }));
 
+    await openSelect(/repositories accessible to this github app installation/i);
     expect(await screen.findByRole("option", { name: "debugbundle/worker" })).toBeInTheDocument();
   });
 
@@ -1208,11 +1229,11 @@ describe("web app — management routes", () => {
 
     await user.click(screen.getByRole("button", { name: /create rule/i }));
     await user.type(screen.getByLabelText(/^rule name$/i), "Critical incidents");
-    await user.selectOptions(screen.getByLabelText(/event type/i), "bundle.created");
+    await chooseSelectOption(user, /event type/i, /^bundle\.created$/i);
     await user.type(screen.getByLabelText(/environment list/i), "production");
     await user.type(screen.getByLabelText(/service list/i), "checkout-api");
-    await user.selectOptions(screen.getByLabelText(/minimum severity/i), "critical");
-    await user.selectOptions(screen.getByLabelText(/incident state/i), "new_only");
+    await chooseSelectOption(user, /minimum severity/i, /^critical$/i);
+    await chooseSelectOption(user, /incident state/i, /^new_only$/i);
     await user.clear(screen.getByLabelText(/cooldown seconds/i));
     await user.type(screen.getByLabelText(/cooldown seconds/i), "900");
     await user.click(screen.getByRole("button", { name: /^create rule$/i }));
@@ -1308,8 +1329,8 @@ describe("web app — management routes", () => {
     await user.click(screen.getByRole("button", { name: /edit rule high severity incidents/i }));
     await user.clear(screen.getByLabelText(/^rule name$/i));
     await user.type(screen.getByLabelText(/^rule name$/i), "Critical only");
-    await user.selectOptions(screen.getByLabelText(/minimum severity/i), "critical");
-    await user.selectOptions(screen.getByLabelText(/incident state/i), "new_only");
+    await chooseSelectOption(user, /minimum severity/i, /^critical$/i);
+    await chooseSelectOption(user, /incident state/i, /^new_only$/i);
     await user.clear(screen.getByLabelText(/cooldown seconds/i));
     await user.type(screen.getByLabelText(/cooldown seconds/i), "900");
     await user.click(screen.getByRole("button", { name: /^save rule$/i }));
@@ -1400,13 +1421,13 @@ describe("web app — management routes", () => {
 
       if (url.endsWith("/v1/auth/session")) {
         return jsonResponse(200, {
-          session: createSession()
+          session: createSession({ role: "member" })
         });
       }
 
       if (url.endsWith("/v1/projects") && init?.method === undefined) {
         return jsonResponse(200, {
-          projects: [createProject()]
+          projects: [createProject({ relationship: "shared", effective_role: "admin" })]
         });
       }
 
@@ -1441,7 +1462,7 @@ describe("web app — management routes", () => {
     await user.type(screen.getByLabelText(/project name/i), "Main API");
     await user.clear(screen.getByLabelText(/project slug/i));
     await user.type(screen.getByLabelText(/project slug/i), "main-api");
-    await user.selectOptions(screen.getByLabelText(/default environment/i), "__custom__");
+    await chooseSelectOption(user, /default environment/i, /^custom$/i);
     await user.type(screen.getByLabelText(/custom environment/i), "preview");
     await user.click(screen.getByRole("button", { name: /save changes/i }));
 
@@ -1715,8 +1736,8 @@ describe("web app — management routes", () => {
     await user.click(screen.getByLabelText(/bundle\.reopened/i));
     await user.type(screen.getByLabelText(/environments/i), "production, staging");
     await user.type(screen.getByLabelText(/services/i), "checkout-api, worker");
-    await user.selectOptions(screen.getByLabelText(/minimum severity/i), "high");
-    await user.selectOptions(screen.getByLabelText(/verification scope/i), "non_verification_only");
+    await chooseSelectOption(user, /minimum severity/i, /^high$/i);
+    await chooseSelectOption(user, /verification scope/i, /non-verification events only/i);
     await user.click(screen.getByLabelText(/failure bundles/i));
     await user.click(screen.getByRole("button", { name: /^create webhook$/i }));
 
@@ -1926,10 +1947,10 @@ describe("web app — management routes", () => {
     render(<App initialEntries={["/projects/proj_123/alerts"]} />);
 
     await user.click(await screen.findByRole("button", { name: /create alert rule/i }));
-    await user.selectOptions(await screen.findByLabelText(/channel/i), "slack");
-    await user.selectOptions(await screen.findByLabelText(/slack channel/i), "sd_123");
-    await user.selectOptions(screen.getByLabelText(/condition/i), "error_spike");
-    await user.selectOptions(screen.getByLabelText(/minimum severity/i), "critical");
+    await chooseSelectOption(user, /channel/i, /^slack$/i);
+    await chooseSelectOption(user, /slack channel/i, /^acme - #alerts$/i);
+    await chooseSelectOption(user, /condition/i, /^error spike$/i);
+    await chooseSelectOption(user, /minimum severity/i, /^critical$/i);
     await user.click(screen.getByRole("button", { name: /^create alert rule$/i }));
 
     await waitFor(() => {
@@ -2002,7 +2023,7 @@ describe("web app — management routes", () => {
     render(<App initialEntries={["/projects/proj_123/alerts"]} />);
 
     await user.click(await screen.findByRole("button", { name: /create alert rule/i }));
-    await user.selectOptions(await screen.findByLabelText(/channel/i), "slack");
+    await chooseSelectOption(user, /channel/i, /^slack$/i);
     await user.click(screen.getByRole("button", { name: /send test message/i }));
     await user.click(screen.getByRole("button", { name: /disconnect channel/i }));
 
@@ -2145,8 +2166,7 @@ describe("web app — management routes", () => {
 
     await user.click(await screen.findByRole("button", { name: /create alert rule/i }));
 
-    const channelSelect = await screen.findByLabelText(/channel/i);
-    await user.selectOptions(channelSelect, "webhook");
+    await chooseSelectOption(user, /channel/i, /^alert webhook$/i);
     const destinationInput = screen.getByLabelText(/webhook endpoint url/i);
     expect(destinationInput).toBeInTheDocument();
 
@@ -2197,16 +2217,16 @@ describe("web app — management routes", () => {
 
     await user.click(await screen.findByRole("button", { name: /create alert rule/i }));
 
-    const channelSelect = await screen.findByLabelText(/channel/i);
-    const channelOptions = within(channelSelect).getAllByRole("option");
+    await openSelect(/channel/i);
+    const channelOptions = screen.getAllByRole("option");
 
     expect(channelOptions.map((option) => option.textContent)).toEqual([
       "Email",
       "Slack (Team tier only)",
       "Alert webhook"
     ]);
-    expect(channelOptions[1]).toBeDisabled();
-    await user.selectOptions(channelSelect, "webhook");
+    expect(channelOptions[1]).toHaveAttribute("data-disabled");
+    await chooseSelectOption(user, /channel/i, /^alert webhook$/i);
     expect(screen.getByText(/separate from the Webhooks tab/i)).toBeInTheDocument();
   });
 
@@ -3283,14 +3303,15 @@ describe("web app — management routes", () => {
 
     const statusFilter = await screen.findByRole("combobox", { name: /status/i });
     expect(await screen.findByText(/no open incidents for this project/i)).toBeInTheDocument();
+    expect(statusFilter).toHaveTextContent(/^open$/i);
 
-    await user.selectOptions(statusFilter, "resolved");
+    await chooseSelectOption(user, /status/i, /^resolved$/i);
     expect(await screen.findByText(/no resolved incidents for this project/i)).toBeInTheDocument();
 
-    await user.selectOptions(statusFilter, "regressed");
+    await chooseSelectOption(user, /status/i, /^regressed$/i);
     expect(await screen.findByText(/no regressed incidents for this project/i)).toBeInTheDocument();
 
-    await user.selectOptions(statusFilter, "all");
+    await chooseSelectOption(user, /status/i, /all statuses/i);
     expect(await screen.findByText(/no incidents for this project/i)).toBeInTheDocument();
   });
 
@@ -3322,14 +3343,15 @@ describe("web app — management routes", () => {
 
     const statusFilter = await screen.findByRole("combobox", { name: /status/i });
     expect(await screen.findByText(/no bundles for open incidents/i)).toBeInTheDocument();
+    expect(statusFilter).toHaveTextContent(/^open$/i);
 
-    await user.selectOptions(statusFilter, "resolved");
+    await chooseSelectOption(user, /status/i, /^resolved$/i);
     expect(await screen.findByText(/no bundles for resolved incidents/i)).toBeInTheDocument();
 
-    await user.selectOptions(statusFilter, "regressed");
+    await chooseSelectOption(user, /status/i, /^regressed$/i);
     expect(await screen.findByText(/no bundles for regressed incidents/i)).toBeInTheDocument();
 
-    await user.selectOptions(statusFilter, "all");
+    await chooseSelectOption(user, /status/i, /all statuses/i);
     expect(await screen.findByText(/no bundles available/i)).toBeInTheDocument();
   });
 

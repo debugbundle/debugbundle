@@ -163,6 +163,7 @@ const WebSessionSchema = z
     created_at: z.string().datetime(),
     expires_at: z.string().datetime(),
     revoked_at: z.string().datetime().nullable(),
+    avatar_url: z.string().min(1).nullable(),
     csrf_token: z.string(),
     auth_methods: z
       .object({
@@ -298,7 +299,19 @@ const ProjectMemberSchema = z
     email: z.string().email(),
     role: z.enum(["owner", "admin", "member"]),
     membership_type: z.enum(["owner", "collaborator"]),
+    avatar_url: z.string().min(1).nullable(),
     created_at: z.string().datetime(),
+  })
+  .strict();
+const AccountAvatarImportResponseSchema = z
+  .object({
+    avatar: z
+      .object({
+        source: z.enum(["github", "gravatar"]),
+        avatar_url: z.string().min(1),
+        updated_at: z.string().datetime(),
+      })
+      .strict(),
   })
   .strict();
 const ProjectInviteSchema = z
@@ -434,6 +447,7 @@ function buildPublicApiOperations(): OperationSpec[] {
   const acceptInviteResponse = component("AcceptInviteResponse", AcceptInviteResponseSchema);
   const accountExportResponse = component("AccountExportResponse", AccountExportResponseSchema);
   const accountDeletionResponse = component("AccountDeletionResponse", AccountDeletionResponseSchema);
+  const avatarImageResponse = component("AvatarImageResponse", z.string());
   const ingestionRequest = component("IngestionRequest", OpenApiIngestionRequestSchema);
   const ingestionResponse = component("IngestionAcceptedResponse", IngestionAcceptedResponseSchema);
   const incidentListResponse = component("IncidentListResponse", IncidentsResponseSchema);
@@ -688,6 +702,35 @@ function buildPublicApiOperations(): OperationSpec[] {
       },
     },
     {
+      method: "get",
+      path: "/v1/account/avatar",
+      operationId: "getAccountAvatar",
+      summary: "Get the current account avatar image",
+      tags: ["Account"],
+      security: browserSessionAuth,
+      responses: {
+        "200": { description: "Avatar image bytes.", schema: avatarImageResponse },
+        "401": { description: "Browser session is missing or invalid.", schema: apiError },
+        "404": { description: "Avatar was not found.", schema: apiError },
+        "503": { description: "Account management is not configured.", schema: apiError },
+      },
+    },
+    {
+      method: "post",
+      path: "/v1/account/avatar/import-gravatar",
+      operationId: "importAccountAvatarFromGravatar",
+      summary: "Import and cache a Gravatar avatar for the signed-in account",
+      tags: ["Account"],
+      security: browserSessionAuth,
+      responses: {
+        "200": { description: "Avatar imported and cached.", schema: component("AccountAvatarImportResponse", AccountAvatarImportResponseSchema) },
+        "401": { description: "Browser session is missing or invalid.", schema: apiError },
+        "404": { description: "No Gravatar image was found.", schema: apiError },
+        "502": { description: "Avatar import failed.", schema: apiError },
+        "503": { description: "Account management is not configured.", schema: apiError },
+      },
+    },
+    {
       method: "delete",
       path: "/v1/account",
       operationId: "deleteAccount",
@@ -878,6 +921,22 @@ function buildPublicApiOperations(): OperationSpec[] {
         "400": { description: "Invalid project id.", schema: apiError },
         "401": { description: "Authentication is invalid.", schema: apiError },
         "404": { description: "Project was not found or collaboration is unavailable.", schema: apiError },
+      },
+    },
+    {
+      method: "get",
+      path: "/v1/projects/{id}/members/{userId}/avatar",
+      operationId: "getProjectMemberAvatar",
+      summary: "Get a cached project member avatar image",
+      tags: ["Projects"],
+      security: anyMemberAuth,
+      params: ProjectMemberParamsSchema,
+      responses: {
+        "200": { description: "Avatar image bytes.", schema: avatarImageResponse },
+        "400": { description: "Invalid member id.", schema: apiError },
+        "401": { description: "Authentication is invalid.", schema: apiError },
+        "404": { description: "Project, member, or avatar was not found.", schema: apiError },
+        "503": { description: "Account management is not configured.", schema: apiError },
       },
     },
     {

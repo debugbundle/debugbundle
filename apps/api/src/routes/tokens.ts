@@ -3,7 +3,13 @@ import type { FastifyInstance } from "fastify";
 import { generateMemberToken, generateProjectToken } from "../../../../packages/auth/src/index.js";
 import type { ApiDependencies } from "../api-types.js";
 import { recordAuditLog, resolveAuditActorType } from "../audit-logging.js";
-import { enforceRequestRateLimit, requireMemberAuth, requireRateLimitedMemberAuth, resolveBrowserSession } from "../api-helpers.js";
+import {
+  enforceRequestRateLimit,
+  requireMemberAuth,
+  requireRateLimitedMemberAuth,
+  requireRateLimitedProjectAccess,
+  resolveBrowserSession,
+} from "../api-helpers.js";
 import {
   ProjectParamsSchema,
   ProjectTokenParamsSchema,
@@ -14,11 +20,6 @@ import {
 
 export function registerTokenRoutes(app: FastifyInstance, dependencies: ApiDependencies): void {
   app.get("/v1/projects/:id/tokens", async (request, reply) => {
-    const member = await requireRateLimitedMemberAuth(request, reply, dependencies, "management-read");
-    if (member === null) {
-      return;
-    }
-
     const parsedParams = ProjectParamsSchema.safeParse(request.params);
     if (!parsedParams.success) {
       return reply.status(400).send({
@@ -33,8 +34,16 @@ export function registerTokenRoutes(app: FastifyInstance, dependencies: ApiDepen
       });
     }
 
+    const auth = await requireRateLimitedProjectAccess(request, reply, dependencies, {
+      bucket: "management-read",
+      projectId: parsedParams.data.id
+    });
+    if (auth === null) {
+      return;
+    }
+
     const tokens = await dependencies.tokenManagement.listProjectTokensForOrganization({
-      organization_id: member.organization_id,
+      organization_id: auth.access.organization_id,
       project_id: parsedParams.data.id,
       limit: parsedQuery.data.limit
     });

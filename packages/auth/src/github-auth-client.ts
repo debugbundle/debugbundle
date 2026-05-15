@@ -9,6 +9,7 @@ const DEFAULT_GITHUB_EMAILS_URL = "https://api.github.com/user/emails";
 export interface GitHubOAuthIdentity {
   github_user_id: string;
   email: string;
+  avatar_url?: string;
 }
 
 export type GitHubAccessTokenIdentityResult =
@@ -101,7 +102,11 @@ async function resolveIdentityFromAccessToken(
     };
   }
 
-  const userPayload = (await userResponse.json()) as { id?: string | number; email?: string | null };
+  const userPayload = (await userResponse.json()) as {
+    id?: string | number;
+    email?: string | null;
+    avatar_url?: string | null;
+  };
   const githubUserId = userPayload.id === undefined ? null : String(userPayload.id);
   if (githubUserId === null || githubUserId.length === 0) {
     return {
@@ -149,7 +154,10 @@ async function resolveIdentityFromAccessToken(
     ok: true,
     identity: {
       github_user_id: githubUserId,
-      email
+      email,
+      ...(typeof userPayload.avatar_url === "string" && userPayload.avatar_url.length > 0
+        ? { avatar_url: userPayload.avatar_url }
+        : {})
     }
   };
 }

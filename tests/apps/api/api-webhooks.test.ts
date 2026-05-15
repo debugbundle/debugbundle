@@ -9,11 +9,23 @@ type AuditLoggingDependency = MockedMethods<NonNullable<ApiServerDependencies["a
 type MemberAuthDependency = MockedMethods<ApiServerDependencies["memberAuth"]>;
 type WebhookManagementDependency = MockedMethods<NonNullable<ApiServerDependencies["webhookManagement"]>>;
 type WebhookTestingDependency = MockedMethods<NonNullable<ApiServerDependencies["webhookTesting"]>>;
+type ProjectManagementDependency = MockedMethods<NonNullable<ApiServerDependencies["projectManagement"]>>;
+
+const defaultProjectAccess = {
+  project_id: "00000000-0000-4000-8000-000000000001",
+  organization_id: "org_123",
+  owner_user_id: "usr_owner",
+  owner_email: "owner@example.com",
+  relationship: "owned",
+  effective_role: "owner",
+  organization_plan: "team"
+} as const;
 
 function createServer(overrides: {
   authRateLimiter?: Partial<AuthRateLimiterDependency>;
   auditLogging?: AuditLoggingDependency | undefined;
   memberAuth?: MemberAuthDependency | undefined;
+  projectManagement?: ProjectManagementDependency | undefined;
   webhookManagement?: WebhookManagementDependency | undefined;
   webhookTesting?: WebhookTestingDependency | undefined;
 } = {}): ReturnType<typeof createApiServer> {
@@ -42,6 +54,15 @@ function createServer(overrides: {
       overrides.memberAuth ??
       mockedObject<ApiServerDependencies["memberAuth"]>({
         resolveMemberByTokenHash: vi.fn().mockResolvedValue({ member_id: "usr_123", organization_id: "org_123" })
+      }),
+    projectManagement:
+      overrides.projectManagement ??
+      mockedObject<NonNullable<ApiServerDependencies["projectManagement"]>>({
+        resolveProjectAccessForUser: vi.fn().mockResolvedValue(defaultProjectAccess),
+        listProjectsForUser: vi.fn().mockResolvedValue([]),
+        createProjectForUser: vi.fn().mockResolvedValue(null),
+        updateProjectForUser: vi.fn().mockResolvedValue(null),
+        deleteProjectForUser: vi.fn().mockResolvedValue(null)
       }),
     tokenManagement: mockedObject<ApiServerDependencies["tokenManagement"]>({
       listProjectTokensForOrganization: vi.fn().mockResolvedValue([]),
@@ -188,6 +209,44 @@ describe("api webhook routes", () => {
     });
     expect(webhookManagement.listWebhooksForOrganization).toHaveBeenCalledWith({
       organization_id: "org_123",
+      project_id: "00000000-0000-4000-8000-000000000001",
+      limit: 10
+    });
+  });
+
+  it("should list webhooks for collaborators using the shared project's organization", async (): Promise<void> => {
+    const projectManagement = mockedObject<NonNullable<ApiServerDependencies["projectManagement"]>>({
+      resolveProjectAccessForUser: vi.fn().mockResolvedValue({
+        ...defaultProjectAccess,
+        organization_id: "org_shared",
+        relationship: "shared",
+        effective_role: "member"
+      }),
+      listProjectsForUser: vi.fn().mockResolvedValue([]),
+      createProjectForUser: vi.fn().mockResolvedValue(null),
+      updateProjectForUser: vi.fn().mockResolvedValue(null),
+      deleteProjectForUser: vi.fn().mockResolvedValue(null)
+    });
+    const webhookManagement = {
+      listWebhooksForOrganization: vi.fn().mockResolvedValue([]),
+      createWebhookForOrganization: vi.fn().mockResolvedValue(null),
+      getWebhookForOrganization: vi.fn().mockResolvedValue(null),
+      updateWebhookForOrganization: vi.fn().mockResolvedValue(null),
+      deleteWebhookForOrganization: vi.fn().mockResolvedValue(null)
+    };
+    const app = createServer({ projectManagement, webhookManagement });
+
+    const response = await app.inject({
+      method: "GET",
+      url: "/v1/webhooks?project_id=00000000-0000-4000-8000-000000000001&limit=10",
+      headers: {
+        authorization: "Bearer dbundle_mem_test"
+      }
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(webhookManagement.listWebhooksForOrganization).toHaveBeenCalledWith({
+      organization_id: "org_shared",
       project_id: "00000000-0000-4000-8000-000000000001",
       limit: 10
     });

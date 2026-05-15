@@ -13,6 +13,13 @@ function createServer(overrides: {
   webAuth?: { resolveSessionByToken: ReturnType<typeof vi.fn> } | undefined;
   inviteEmails?: { sendProjectInviteEmail: ReturnType<typeof vi.fn> } | undefined;
   authRateLimiter?: Parameters<typeof createApiServer>[0]["authRateLimiter"];
+  accountManagement?: {
+    getUserAvatar: ReturnType<typeof vi.fn>;
+    saveUserAvatar: ReturnType<typeof vi.fn>;
+    exportAccountForOrganization?: ReturnType<typeof vi.fn>;
+    deleteAccountForOrganization?: ReturnType<typeof vi.fn>;
+  } | undefined;
+  objectStoreReader?: Parameters<typeof createApiServer>[0]["objectStoreReader"];
   projectManagement?: {
     resolveProjectAccessForUser: ReturnType<typeof vi.fn>;
   } | undefined;
@@ -140,9 +147,19 @@ function createServer(overrides: {
       listIncidentLogsForOrganization: vi.fn().mockResolvedValue([]),
       listServicesForOrganization: vi.fn().mockResolvedValue([])
     },
-    objectStoreReader: {
+    objectStoreReader: overrides.objectStoreReader ?? {
       getObject: vi.fn()
     },
+    ...(overrides.accountManagement === undefined
+      ? {}
+      : {
+          accountManagement: {
+            exportAccountForOrganization: overrides.accountManagement.exportAccountForOrganization ?? vi.fn().mockResolvedValue(null),
+            deleteAccountForOrganization: overrides.accountManagement.deleteAccountForOrganization ?? vi.fn().mockResolvedValue(null),
+            getUserAvatar: overrides.accountManagement.getUserAvatar,
+            saveUserAvatar: overrides.accountManagement.saveUserAvatar
+          }
+        }),
     webhookDelivery: {
       listDeliveriesForWebhookInOrganization: vi.fn().mockResolvedValue({ deliveries: [] })
     },
@@ -199,6 +216,7 @@ describe("api project member routes", () => {
             email: "owner@example.com",
             role: "owner",
             membership_type: "owner",
+            avatar_object_key: null,
             created_at: "2026-03-16T00:00:00.000Z"
           },
           {
@@ -206,6 +224,7 @@ describe("api project member routes", () => {
             email: "alice@example.com",
             role: "member",
             membership_type: "collaborator",
+            avatar_object_key: "avatars/users/usr_456/profile",
             created_at: "2026-03-16T01:00:00.000Z"
           }
         ]
@@ -234,6 +253,7 @@ describe("api project member routes", () => {
           email: "owner@example.com",
           role: "owner",
           membership_type: "owner",
+          avatar_url: null,
           created_at: "2026-03-16T00:00:00.000Z"
         },
         {
@@ -241,6 +261,7 @@ describe("api project member routes", () => {
           email: "alice@example.com",
           role: "member",
           membership_type: "collaborator",
+          avatar_url: `/v1/projects/${PROJECT_ID}/members/usr_456/avatar`,
           created_at: "2026-03-16T01:00:00.000Z"
         }
       ]
@@ -322,6 +343,56 @@ describe("api project member routes", () => {
       email: "new@example.com",
       token: expect.stringMatching(/^dbundle_invite_/)
     });
+  });
+
+  it("serves cached project member avatars for authorized callers", async (): Promise<void> => {
+    const projectCollaboration = {
+      listMembersForProject: vi.fn().mockResolvedValue({
+        owner_plan: "team",
+        members: [
+          {
+            user_id: USER_ID,
+            email: "alice@example.com",
+            role: "member",
+            membership_type: "collaborator",
+            avatar_object_key: `avatars/users/${USER_ID}/profile`,
+            created_at: "2026-03-16T01:00:00.000Z"
+          }
+        ]
+      }),
+      listPendingInvitesForProject: vi.fn().mockResolvedValue([]),
+      createInviteForProject: vi.fn(),
+      cancelInviteForProject: vi.fn(),
+      updateProjectMemberRole: vi.fn(),
+      removeProjectMember: vi.fn()
+    };
+    const accountManagement = {
+      getUserAvatar: vi.fn().mockResolvedValue({
+        user_id: USER_ID,
+        source: "gravatar",
+        object_key: `avatars/users/${USER_ID}/profile`,
+        content_type: "image/webp",
+        updated_at: "2026-04-06T00:00:00.000Z"
+      }),
+      saveUserAvatar: vi.fn()
+    };
+    const objectStoreReader = {
+      getObject: vi.fn().mockResolvedValue(Buffer.from("avatar-body"))
+    };
+    const app = createServer({ projectCollaboration, accountManagement, objectStoreReader });
+
+    const response = await app.inject({
+      method: "GET",
+      url: `/v1/projects/${PROJECT_ID}/members/${USER_ID}/avatar`,
+      headers: {
+        authorization: "Bearer dbundle_mem_test"
+      }
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.headers["content-type"]).toContain("image/webp");
+    expect(response.body).toBe("avatar-body");
+    expect(accountManagement.getUserAvatar).toHaveBeenCalledWith({ user_id: USER_ID });
   });
 
   it("requires verified browser sessions for invite create and cancel actions", async (): Promise<void> => {
@@ -539,6 +610,7 @@ describe("api project member routes", () => {
         email: "alice@example.com",
         role: "admin",
         membership_type: "collaborator",
+        avatar_url: null,
         created_at: "2026-03-16T01:00:00.000Z"
       }
     });
@@ -593,6 +665,7 @@ describe("api project member routes", () => {
         email: "alice@example.com",
         role: "member",
         membership_type: "collaborator",
+        avatar_url: null,
         created_at: "2026-03-16T01:00:00.000Z"
       }
     });

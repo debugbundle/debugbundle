@@ -43,7 +43,21 @@ function createDependencies(overrides: {
       listDeliveriesForWebhookInOrganization: vi.fn().mockResolvedValue(null)
     },
     ...(overrides.auditLogging === undefined ? {} : { auditLogging: overrides.auditLogging }),
-    projectManagement: overrides.projectManagement,
+    projectManagement: overrides.projectManagement ?? {
+      resolveProjectAccessForUser: vi.fn().mockResolvedValue({
+        project_id: "00000000-0000-0000-0000-000000000001",
+        organization_id: "org_123",
+        owner_user_id: "usr_owner",
+        owner_email: "owner@example.com",
+        relationship: "owned",
+        effective_role: "owner",
+        organization_plan: "free"
+      }),
+      listProjectsForOrganization: vi.fn().mockResolvedValue([]),
+      createProjectForOrganization: vi.fn(),
+      updateProjectForOrganization: vi.fn(),
+      deleteProjectForOrganization: vi.fn()
+    },
     capturePolicyManagement: overrides.capturePolicyManagement
   });
 }
@@ -320,9 +334,33 @@ describe("capture-policy routes", () => {
   });
 
   describe("PATCH /v1/projects/:id/capture-policy", () => {
-    it("updates the capture policy and returns the resolved result", async () => {
+    it("updates the capture policy and returns the resolved result for project admins", async () => {
       const createAuditLog = vi.fn().mockResolvedValue(undefined);
       const app = createDependencies({
+        memberAuth: {
+          resolveMemberByTokenHash: vi.fn().mockResolvedValue({
+            member_id: "usr_admin",
+            organization_id: "org_123",
+            role: "member",
+            revoked_at: null,
+            expires_at: null
+          })
+        },
+        projectManagement: {
+          resolveProjectAccessForUser: vi.fn().mockResolvedValue({
+            project_id: "00000000-0000-0000-0000-000000000001",
+            organization_id: "org_123",
+            owner_user_id: "usr_owner",
+            owner_email: "owner@example.com",
+            relationship: "shared",
+            effective_role: "admin",
+            organization_plan: "team"
+          }),
+          listProjectsForOrganization: vi.fn().mockResolvedValue([]),
+          createProjectForOrganization: vi.fn(),
+          updateProjectForOrganization: vi.fn(),
+          deleteProjectForOrganization: vi.fn()
+        },
         auditLogging: { createAuditLog },
         capturePolicyManagement: {
           getCapturePolicyForProject: vi.fn(),
@@ -365,7 +403,7 @@ describe("capture-policy routes", () => {
       expect(createAuditLog).toHaveBeenCalledWith(
         expect.objectContaining({
           organization_id: "org_123",
-          actor_user_id: "usr_owner",
+          actor_user_id: "usr_admin",
           actor_type: "member_token",
           action: "capture_policy.update",
           target_type: "capture_policy",
@@ -380,7 +418,7 @@ describe("capture-policy routes", () => {
       );
     });
 
-    it("returns 403 for non-owner members", async () => {
+    it("returns 403 for non-admin project members", async () => {
       const app = createDependencies({
         memberAuth: {
           resolveMemberByTokenHash: vi.fn().mockResolvedValue({
@@ -390,6 +428,21 @@ describe("capture-policy routes", () => {
             revoked_at: null,
             expires_at: null
           })
+        },
+        projectManagement: {
+          resolveProjectAccessForUser: vi.fn().mockResolvedValue({
+            project_id: "00000000-0000-0000-0000-000000000001",
+            organization_id: "org_123",
+            owner_user_id: "usr_owner",
+            owner_email: "owner@example.com",
+            relationship: "shared",
+            effective_role: "member",
+            organization_plan: "team"
+          }),
+          listProjectsForOrganization: vi.fn().mockResolvedValue([]),
+          createProjectForOrganization: vi.fn(),
+          updateProjectForOrganization: vi.fn(),
+          deleteProjectForOrganization: vi.fn()
         },
         capturePolicyManagement: {
           getCapturePolicyForProject: vi.fn(),

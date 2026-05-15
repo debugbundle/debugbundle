@@ -6,6 +6,7 @@ export interface ProjectMemberRecord {
   role: "owner" | "admin" | "member";
   membership_type: "owner" | "collaborator";
   created_at: string;
+  avatar_url: string | null;
 }
 
 export interface ProjectInviteRecord {

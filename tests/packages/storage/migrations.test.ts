@@ -158,7 +158,7 @@ describe("storage bootstrap schema", () => {
   it("should include critical uniqueness constraints for ownership and delivery paths", (): void => {
     expect(STORAGE_BOOTSTRAP_SQL.includes("UNIQUE (project_id, environment, service_id, fingerprint)")).toBe(true);
     expect(STORAGE_BOOTSTRAP_SQL.includes("UNIQUE (organization_id, user_id)")).toBe(true);
-    expect(STORAGE_BOOTSTRAP_SQL.includes("UNIQUE (organization_id, email)")).toBe(true);
+    expect(STORAGE_BOOTSTRAP_SQL.includes("email text NOT NULL UNIQUE")).toBe(true);
     expect(STORAGE_BOOTSTRAP_SQL.includes("project_id uuid NOT NULL UNIQUE REFERENCES projects(id) ON DELETE CASCADE")).toBe(true);
     expect(STORAGE_BOOTSTRAP_SQL.includes("CREATE UNIQUE INDEX github_dispatch_deliveries_rule_dedupe_key_idx")).toBe(true);
     expect(STORAGE_BOOTSTRAP_SQL.includes("UNIQUE (organization_id, slack_team_id, slack_channel_id)")).toBe(true);

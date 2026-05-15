@@ -5,7 +5,7 @@ import { validateEvent } from "../../../packages/event-normalizer/src/index.js";
 import { redact } from "../../../packages/redaction/src/index.js";
 import { isSelfHostMode } from "../../../packages/shared-types/src/index.js";
 import type { EventEnvelope } from "../../../packages/shared-types/src/index.js";
-import type { ResolveMemberResult } from "../../../packages/storage/src/index.js";
+import type { ProjectAccessRecord, ResolveMemberResult } from "../../../packages/storage/src/index.js";
 import type { ApiDependencies } from "./api-types.js";
 import { IncidentsCursorSchema, LogsCursorSchema } from "./schemas.js";
 
@@ -182,6 +182,37 @@ export async function requireRateLimitedOwnerMemberAuth(
   }
 
   return member;
+}
+
+export async function requireRateLimitedProjectAccess(
+  request: FastifyRequest,
+  reply: FastifyReply,
+  dependencies: Pick<ApiDependencies, "memberAuth" | "webAuth" | "authRateLimiter" | "projectManagement">,
+  input: {
+    bucket: RequestRateLimitBucket;
+    projectId: string;
+  }
+): Promise<{ member: ResolveMemberResult; access: ProjectAccessRecord } | null> {
+  const member = await requireRateLimitedMemberAuth(request, reply, dependencies, input.bucket);
+  if (member === null) {
+    return null;
+  }
+
+  if (dependencies.projectManagement?.resolveProjectAccessForUser === undefined) {
+    await reply.status(404).send({ error: "project_not_found" });
+    return null;
+  }
+
+  const access = await dependencies.projectManagement.resolveProjectAccessForUser({
+    user_id: member.member_id,
+    project_id: input.projectId
+  });
+  if (access === null) {
+    await reply.status(404).send({ error: "project_not_found" });
+    return null;
+  }
+
+  return { member, access };
 }
 
 export async function resolveBrowserSession(

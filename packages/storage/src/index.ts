@@ -15,6 +15,7 @@ export {
 	buildRawEventObjectKey,
 	buildBundleObjectKey,
 	buildReproductionObjectKey,
+	buildUserAvatarObjectKey,
 	buildBundleRegenerationLeaseKey,
 	deleteProjectObjects,
 	hashToken
@@ -48,6 +49,7 @@ export { createRedisRequestAnomalyCounter } from "./frequency-counter.js";
 export { createRedisIngestionRateLimiter } from "./ingestion-rate-limiter.js";
 export { createIngestionMetadataService, createMemberAuthService, createIngestionPersistenceService } from "./ingestion-services.js";
 export { createS3ObjectStoreClient } from "./s3-client.js";
+export { buildGravatarAvatarUrl, importUserAvatarFromUrl } from "./user-avatar-service.js";
 export { createRedisQueueClient } from "./redis-queue.js";
 export {
 	migrateStorageSchema,

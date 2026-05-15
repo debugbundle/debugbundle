@@ -310,6 +310,7 @@ export interface ProjectMemberRecord {
   role: "owner" | "admin" | "member";
   membership_type: "owner" | "collaborator";
   created_at: string;
+  avatar_object_key?: string | null;
 }
 
 export interface ProjectInviteRecord {
@@ -1053,6 +1054,24 @@ export interface AccountLifecycleStore {
     user_id: string;
     deleted_at: string;
   }): Promise<DeletedAccountRecord | "other_owned_organizations_exist" | null>;
+  getUserAvatar(input: {
+    user_id: string;
+  }): Promise<UserAvatarRecord | null>;
+  saveUserAvatar(input: {
+    user_id: string;
+    source: "github" | "gravatar";
+    object_key: string;
+    content_type: string;
+    updated_at: string;
+  }): Promise<UserAvatarRecord | null>;
+}
+
+export interface UserAvatarRecord {
+  user_id: string;
+  source: "github" | "gravatar";
+  object_key: string;
+  content_type: string;
+  updated_at: string;
 }
 
 export interface GitHubInstallationRecord extends Record<string, unknown> {

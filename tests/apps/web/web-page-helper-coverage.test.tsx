@@ -44,7 +44,7 @@ import * as notify from "../../../apps/web/src/lib/notify.tsx";
 import * as projectSharingApi from "../../../apps/web/src/lib/project-sharing-api.ts";
 import * as sessionModule from "../../../apps/web/src/lib/session.tsx";
 import { createBillingSummary, createProject, jsonResponse } from "./web-test-helpers.js";
-import { createProjectInvite, createProjectMember, createProjectToken, createSession } from "./web-test-helpers.js";
+import { createProjectInvite, createProjectToken, createSession } from "./web-test-helpers.js";
 
 function renderProjectTokensPage(): ReturnType<typeof render> {
   return render(

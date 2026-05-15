@@ -928,7 +928,7 @@ export async function handleProbeCommand(parsedArgv: ParsedArgv, dependencies: M
   throw new CliInputError("Unknown probe command.");
 }
 
-export async function handleMemberCommand(parsedArgv: ParsedArgv, dependencies: ManagementCommandDependencies): Promise<CliCommandResult> {
+export function handleMemberCommand(parsedArgv: ParsedArgv, dependencies: ManagementCommandDependencies): Promise<CliCommandResult> {
   void parsedArgv;
   void dependencies;
   throw new CliInputError("Use `debugbundle project members ... --project-id <id>` for project collaboration commands.");

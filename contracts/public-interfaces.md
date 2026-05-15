@@ -1,7 +1,7 @@
 # Public Interfaces — DebugBundle
 
 Version: v1
-Last updated: 2026-05-13
+Last updated: 2026-05-15
 
 ---
 
@@ -15,6 +15,8 @@ Every capability must be available through all applicable interfaces. Operations
 | Verify email code | `POST /v1/auth/verify-code` | — | — | Web-auth bootstrap only |
 | Logout (web session) | `POST /v1/auth/logout` | — | — | Web-auth bootstrap only |
 | Current session | `GET /v1/auth/session` | — | — | Web-auth bootstrap only |
+| Get current account avatar | `GET /v1/account/avatar` | — | — | Browser session only, cached first-party avatar bytes |
+| Import Gravatar avatar | `POST /v1/account/avatar/import-gravatar` | — | — | Browser session only, explicit user action from account settings |
 | Export account data | `GET /v1/account/export` | — | — | Browser session only, owner only |
 | Delete account | `DELETE /v1/account` | — | — | Browser session only, owner only |
 | Accept project invite | `POST /v1/auth/project-invite/accept` | — | — | Browser session only |
@@ -36,6 +38,7 @@ Every capability must be available through all applicable interfaces. Operations
 | Get reproduction | `GET /v1/incidents/{id}/reproduction` | `reproduce` | `get_reproduction` | |
 | Get logs | `GET /v1/logs` | `logs` | `get_logs` | Query by incident_id |
 | List project members | `GET /v1/projects/{id}/members` | `project members list` | `list_project_members` | Browser Session or Member Token, owner/admin/member |
+| Get project member avatar | `GET /v1/projects/{id}/members/{userId}/avatar` | — | — | Browser session or member token, authorized project viewers only |
 | List pending project invites | `GET /v1/projects/{id}/invites` | `project members invites` | `list_project_member_invites` | Browser Session or Member Token, owner/admin/member |
 | Invite project member | `POST /v1/projects/{id}/invite` | `project members invite` | `invite_project_member` | Browser Session or Member Token, owner/admin only, Team tier |
 | Cancel project invite | `DELETE /v1/projects/{id}/invites/{inviteId}` | `project members cancel-invite` | `cancel_project_member_invite` | Browser Session or Member Token, owner/admin only |
@@ -133,6 +136,8 @@ Stripe checkout and customer-portal billing routes remain browser-session-only i
 | POST | `/v1/auth/verify-code` | None | Verify a one-time email code and create a browser session |
 | POST | `/v1/auth/logout` | Browser Session | Revoke current browser session |
 | GET | `/v1/auth/session` | Browser Session | Return current session state or `session: null` when signed out |
+| GET | `/v1/account/avatar` | Browser Session | Return the signed-in user's cached avatar bytes when one has been imported |
+| POST | `/v1/account/avatar/import-gravatar` | Browser Session | Import and cache a Gravatar avatar server-side after explicit user action |
 | GET | `/v1/account/export` | Browser Session | Export retained organization-account data as a JSON attachment (owner only) |
 | DELETE | `/v1/account` | Browser Session | Permanently delete the current organization account after email confirmation (owner only) |
 | POST | `/v1/auth/project-invite/accept` | Browser Session | Accept a pending project invite for the current signed-in user |
@@ -145,7 +150,7 @@ Stripe checkout and customer-portal billing routes remain browser-session-only i
 
 Browser-session bootstrap endpoints exist for the SPA flow only. The separate GitHub CLI bootstrap endpoints are API-backed helpers used by `debugbundle login --github*`, while MCP still reuses the member-token auth state established by the CLI.
 
-`GET /v1/auth/session` returns either `session: null` or a session object with `auth_methods.email`, `auth_methods.github`, and `csrf_token`. Browser-session mutations continue to use `csrf_token` from the same session payload.
+`GET /v1/auth/session` returns either `session: null` or a session object with `auth_methods.email`, `auth_methods.github`, `avatar_url`, and `csrf_token`. Browser-session mutations continue to use `csrf_token` from the same session payload.
 
 `POST /v1/auth/request-code` always returns a generic success payload when the request is valid. Existing accounts can use the code immediately. New accounts are created only after a valid code is verified, and the request endpoint preserves the same response shape so the browser flow does not reveal account existence.
 
@@ -169,9 +174,17 @@ Browser-session bootstrap endpoints exist for the SPA flow only. The separate Gi
 
 GitHub sign-in preserves the same first-party browser-session model as email-code auth. The start endpoint redirects to GitHub and sets a transient `SameSite=Lax` OAuth state cookie; the callback validates that state, links or creates the user account through `oauth_identities`, issues the normal session cookie, clears the transient OAuth cookie, and redirects back to the app callback URL.
 
+When GitHub sign-in returns a profile image URL, the API may fetch and cache that avatar server-side in first-party object storage as a best-effort post-login step. Avatar import failures must not block authentication.
+
 The CLI bootstrap flow is additive and issues the same member-token credential used by normal CLI/MCP auth. `POST /v1/auth/github/device/start` plus `poll`/`claim` implement the official GitHub device flow. `POST /v1/auth/github/token/exchange` accepts an already-authenticated GitHub access token such as the output of `gh auth token`.
 
 `GET /v1/account/export` returns a JSON attachment covering the retained organization-account record set, including members, projects, tokens, reusable Slack destinations, incidents, audit logs, billing-processing rows, and retained raw-event, bundle, and reproduction artifacts when present in object storage.
+
+`GET /v1/account/avatar` returns the signed-in user's cached avatar bytes with a first-party URL shape of `/v1/account/avatar`. `POST /v1/account/avatar/import-gravatar` performs a server-side fetch against Gravatar only after explicit user action, stores the resulting avatar in object storage, and returns:
+
+- `200 { "avatar": { "source": "gravatar", "avatar_url": "/v1/account/avatar", "updated_at": "ISO8601" } }`
+- `404 { "error": "gravatar_not_found" }` when no Gravatar image exists
+- `502 { "error": "avatar_import_failed" }` when the remote fetch fails or returns an unsupported image
 
 `DELETE /v1/account` requires an owner-scoped browser session plus a confirmation body that repeats the signed-in email address:
 
@@ -370,6 +383,7 @@ Current API implementation scope (Phase 7 kickoff slice):
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
 | GET | `/v1/projects/{id}/members` | Browser Session or Member Token | List project members including the owner and collaborators |
+| GET | `/v1/projects/{id}/members/{userId}/avatar` | Browser Session or Member Token | Return a cached project member avatar for authorized project viewers |
 | GET | `/v1/projects/{id}/invites` | Browser Session or Member Token | List pending, non-expired project invites |
 | POST | `/v1/projects/{id}/invite` | Browser Session or Member Token (owner/admin only) | Create a pending project collaborator invite |
 | DELETE | `/v1/projects/{id}/invites/{inviteId}` | Browser Session or Member Token (owner/admin only) | Cancel a pending project invite |
@@ -384,6 +398,8 @@ Current API implementation scope (Phase 7 kickoff slice):
       "user_id": "uuid",
       "email": "owner@example.com",
       "role": "owner",
+      "membership_type": "owner",
+      "avatar_url": null,
       "created_at": "ISO8601"
     }
   ]
@@ -441,6 +457,8 @@ Invite creation also sends a transactional invite email containing a one-time ac
     "user_id": "uuid",
     "email": "member@example.com",
     "role": "member",
+    "membership_type": "collaborator",
+    "avatar_url": null,
     "created_at": "ISO8601"
   }
 }
@@ -460,6 +478,8 @@ Invite creation also sends a transactional invite email containing a one-time ac
     "user_id": "uuid",
     "email": "member@example.com",
     "role": "owner",
+    "membership_type": "collaborator",
+    "avatar_url": null,
     "created_at": "ISO8601"
   }
 }
@@ -477,6 +497,7 @@ Invite creation also sends a transactional invite email containing a one-time ac
 - Existing pending invite email: `409 { "error": "invite_already_exists" }`
 - Missing pending invite: `404 { "error": "invite_not_found" }`
 - Missing project member: `404 { "error": "member_not_found" }`
+- Missing project member avatar: `404 { "error": "avatar_not_found" }`
 - Demoting the last remaining owner is not allowed on this surface: `409 { "error": "owner_role_change_not_allowed" }`
 - Removing an owner is not allowed on this surface: `409 { "error": "owner_removal_not_allowed" }`
 

@@ -11,6 +11,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../co
 import { Dialog, DialogTrigger } from "../components/ui/dialog.js";
 import { Field, FieldDescription, FieldGroup, FieldLabel } from "../components/ui/field.js";
 import { Input } from "../components/ui/input.js";
+import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select.js";
 import { Skeleton } from "../components/ui/skeleton.js";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../components/ui/table.js";
 import {
@@ -72,8 +73,7 @@ const BUNDLE_TYPE_FILTER_OPTIONS: Array<{ value: "failure" | "improvement"; labe
   { value: "improvement", label: "Improvement bundles" }
 ];
 
-const selectClassName =
-  "flex h-10 w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background";
+const ANY_SEVERITY_SELECT_VALUE = "__any_severity__";
 
 type DeliveryState = Record<string, WebhookDeliveryRecord[]>;
 
@@ -270,32 +270,50 @@ export function ProjectWebhooksPage(): JSX.Element {
                         />
                       </Field>
                       <Field>
-                        <FieldLabel htmlFor="webhook-filter-severity">Minimum severity</FieldLabel>
-                        <select
-                          id="webhook-filter-severity"
-                          className={selectClassName}
-                          value={severityMin}
-                          onChange={(event) => setSeverityMin(event.currentTarget.value as typeof severityMin)}
+                        <FieldLabel id="webhook-filter-severity-label" htmlFor="webhook-filter-severity">Minimum severity</FieldLabel>
+                        <Select
+                          value={severityMin === "" ? ANY_SEVERITY_SELECT_VALUE : severityMin}
+                          onValueChange={(value) => setSeverityMin((value === ANY_SEVERITY_SELECT_VALUE ? "" : value) as typeof severityMin)}
                         >
-                          {SEVERITY_FILTER_OPTIONS.map((option) => (
-                            <option key={option.value || "any"} value={option.value}>
-                              {option.label}
-                            </option>
-                          ))}
-                        </select>
+                          <SelectTrigger
+                            id="webhook-filter-severity"
+                            aria-labelledby="webhook-filter-severity-label webhook-filter-severity"
+                            className="w-full"
+                          >
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent position="popper">
+                            <SelectGroup>
+                              {SEVERITY_FILTER_OPTIONS.map((option) => (
+                                <SelectItem key={option.value || "any"} value={option.value === "" ? ANY_SEVERITY_SELECT_VALUE : option.value}>
+                                  {option.label}
+                                </SelectItem>
+                              ))}
+                            </SelectGroup>
+                          </SelectContent>
+                        </Select>
                       </Field>
                       <Field>
-                        <FieldLabel htmlFor="webhook-filter-verification">Verification scope</FieldLabel>
-                        <select
-                          id="webhook-filter-verification"
-                          className={selectClassName}
+                        <FieldLabel id="webhook-filter-verification-label" htmlFor="webhook-filter-verification">Verification scope</FieldLabel>
+                        <Select
                           value={verificationScope}
-                          onChange={(event) => setVerificationScope(event.currentTarget.value as typeof verificationScope)}
+                          onValueChange={(value) => setVerificationScope(value as typeof verificationScope)}
                         >
-                          <option value="all">All matching events</option>
-                          <option value="verification_only">Verification events only</option>
-                          <option value="non_verification_only">Non-verification events only</option>
-                        </select>
+                          <SelectTrigger
+                            id="webhook-filter-verification"
+                            aria-labelledby="webhook-filter-verification-label webhook-filter-verification"
+                            className="w-full"
+                          >
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent position="popper">
+                            <SelectGroup>
+                              <SelectItem value="all">All matching events</SelectItem>
+                              <SelectItem value="verification_only">Verification events only</SelectItem>
+                              <SelectItem value="non_verification_only">Non-verification events only</SelectItem>
+                            </SelectGroup>
+                          </SelectContent>
+                        </Select>
                       </Field>
                       <Field className="md:col-span-2">
                         <FieldLabel>Bundle type</FieldLabel>

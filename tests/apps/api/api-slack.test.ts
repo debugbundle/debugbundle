@@ -8,12 +8,24 @@ type ApiServerDependencies = Parameters<typeof createApiServer>[0];
 type MemberAuthDependency = MockedMethods<ApiServerDependencies["memberAuth"]>;
 type SlackManagementDependency = MockedMethods<NonNullable<ApiServerDependencies["slackManagement"]>>;
 type BillingManagementDependency = MockedMethods<NonNullable<ApiServerDependencies["billingManagement"]>>;
+type ProjectManagementDependency = MockedMethods<NonNullable<ApiServerDependencies["projectManagement"]>>;
 const slackDestinationId = "11111111-1111-4111-8111-111111111111";
+
+const defaultProjectAccess = {
+  project_id: "00000000-0000-4000-8000-000000000001",
+  organization_id: "org_123",
+  owner_user_id: "usr_owner",
+  owner_email: "owner@example.com",
+  relationship: "owned",
+  effective_role: "owner",
+  organization_plan: "team"
+} as const;
 
 function createServer(overrides: {
   memberAuth?: MemberAuthDependency | undefined;
   slackManagement?: SlackManagementDependency | undefined;
   billingManagement?: BillingManagementDependency | undefined;
+  projectManagement?: ProjectManagementDependency | undefined;
 } = {}): ReturnType<typeof createApiServer> {
   return createApiServer({
     ingestionPersistence: {
@@ -28,6 +40,15 @@ function createServer(overrides: {
         resolveMemberByTokenHash: vi
           .fn()
           .mockResolvedValue({ member_id: "usr_123", organization_id: "org_123", role: "owner" })
+      }),
+    projectManagement:
+      overrides.projectManagement ??
+      mockedObject<NonNullable<ApiServerDependencies["projectManagement"]>>({
+        resolveProjectAccessForUser: vi.fn().mockResolvedValue(defaultProjectAccess),
+        listProjectsForUser: vi.fn().mockResolvedValue([]),
+        createProjectForUser: vi.fn().mockResolvedValue(null),
+        updateProjectForUser: vi.fn().mockResolvedValue(null),
+        deleteProjectForUser: vi.fn().mockResolvedValue(null)
       }),
     tokenManagement: mockedObject<ApiServerDependencies["tokenManagement"]>({
       listProjectTokensForOrganization: vi.fn().mockResolvedValue([]),
@@ -224,6 +245,51 @@ describe("api slack routes", () => {
           slack_channel_name: "#alerts"
         })
       ]
+    });
+  });
+
+  it("lists Slack destinations for collaborators using the shared project's organization", async () => {
+    const projectManagement = mockedObject<NonNullable<ApiServerDependencies["projectManagement"]>>({
+      resolveProjectAccessForUser: vi.fn().mockResolvedValue({
+        ...defaultProjectAccess,
+        organization_id: "org_shared",
+        relationship: "shared",
+        effective_role: "member"
+      }),
+      listProjectsForUser: vi.fn().mockResolvedValue([]),
+      createProjectForUser: vi.fn().mockResolvedValue(null),
+      updateProjectForUser: vi.fn().mockResolvedValue(null),
+      deleteProjectForUser: vi.fn().mockResolvedValue(null)
+    });
+    const billingManagement = mockedObject<NonNullable<ApiServerDependencies["billingManagement"]>>({
+      getBillingSummaryForOrganization: vi.fn().mockResolvedValue({ plan: "team" })
+    });
+    const slackManagement = mockedObject<NonNullable<ApiServerDependencies["slackManagement"]>>({
+      listSlackDestinationsForProjectInOrganization: vi.fn().mockResolvedValue([]),
+      getSlackDestinationForOrganization: vi.fn().mockResolvedValue(null),
+      getSlackDestinationSecretForOrganization: vi.fn().mockResolvedValue(null),
+      upsertSlackDestinationForOrganization: vi.fn().mockResolvedValue({ slack_destination_id: slackDestinationId }),
+      deleteSlackDestinationForProjectInOrganization: vi.fn().mockResolvedValue(null)
+    });
+    const app = createServer({ projectManagement, billingManagement, slackManagement });
+
+    const response = await app.inject({
+      method: "GET",
+      url: "/v1/projects/00000000-0000-4000-8000-000000000001/slack/destinations",
+      headers: {
+        authorization: "Bearer dbundle_mem_test"
+      }
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(billingManagement.getBillingSummaryForOrganization).toHaveBeenCalledWith({
+      organization_id: "org_shared",
+      now: expect.any(String)
+    });
+    expect(slackManagement.listSlackDestinationsForProjectInOrganization).toHaveBeenCalledWith({
+      organization_id: "org_shared",
+      project_id: "00000000-0000-4000-8000-000000000001",
+      limit: 100
     });
   });
 

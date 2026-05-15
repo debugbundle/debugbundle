@@ -116,6 +116,16 @@ export const STORAGE_SCHEMA_MIGRATIONS = [
     statements: [
       "ALTER TABLE capture_policies ADD COLUMN IF NOT EXISTS immediate_client_error_statuses jsonb"
     ]
+  }),
+  defineStorageSchemaMigration({
+    id: "202605150001_add_user_avatar_columns",
+    description: "Add cached user avatar metadata for GitHub and Gravatar profile images.",
+    statements: [
+      "ALTER TABLE users ADD COLUMN IF NOT EXISTS avatar_source text",
+      "ALTER TABLE users ADD COLUMN IF NOT EXISTS avatar_object_key text",
+      "ALTER TABLE users ADD COLUMN IF NOT EXISTS avatar_content_type text",
+      "ALTER TABLE users ADD COLUMN IF NOT EXISTS avatar_updated_at timestamptz"
+    ]
   })
 ] as const;
 

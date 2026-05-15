@@ -5,7 +5,7 @@ import { userEvent } from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { App } from "../../../apps/web/src/app.tsx";
-import { buildApiUrl, resetBrowserSessionClientState, resolveApiBaseUrl } from "../../../apps/web/src/lib/api.ts";
+import { buildApiUrl, resetBrowserSessionClientState, resolveApiBaseUrl, resolveApiResourceUrl } from "../../../apps/web/src/lib/api.ts";
 import { resolveDocumentationUrl } from "../../../apps/web/src/lib/external-links.ts";
 import {
   createBillingSummary,
@@ -34,6 +34,12 @@ describe("web app - auth routes", () => {
     );
     expect(buildApiUrl("/v1/auth/github/start", { VITE_API_URL: "https://api.debugbundle.com" })).toBe(
       "https://api.debugbundle.com/v1/auth/github/start"
+    );
+    expect(resolveApiResourceUrl("/v1/account/avatar", { VITE_API_URL: "https://api.debugbundle.com/" })).toBe(
+      "https://api.debugbundle.com/v1/account/avatar"
+    );
+    expect(resolveApiResourceUrl("https://cdn.example.test/avatar.png", { VITE_API_URL: "https://api.debugbundle.com/" })).toBe(
+      "https://cdn.example.test/avatar.png"
     );
   });
 
@@ -206,10 +212,15 @@ describe("web app - auth routes", () => {
     await user.type(await screen.findByLabelText(/email address/i), "owen@example.com");
     await user.click(screen.getByRole("button", { name: /^send code$/i }));
 
+    expect(await screen.findByRole("heading", { name: /check your inbox/i })).toBeInTheDocument();
     expect(await screen.findByLabelText(/six-digit code/i)).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: /continue with github/i })).toBeNull();
+    expect(screen.queryByLabelText(/email address/i)).toBeNull();
+    expect(screen.queryByRole("link", { name: /sign up here/i })).toBeNull();
+    expect(screen.getByRole("button", { name: /^verify code$/i })).toBeInTheDocument();
 
     await user.type(screen.getByLabelText(/six-digit code/i), "123456");
-    await user.click(screen.getByRole("button", { name: /^send code$/i }));
+    await user.click(screen.getByRole("button", { name: /^verify code$/i }));
 
     expect(await screen.findByText(/bundle requests/i)).toBeInTheDocument();
   });
@@ -261,7 +272,7 @@ describe("web app - auth routes", () => {
     await user.click(screen.getByRole("button", { name: /^send code$/i }));
 
     const codeInput = await screen.findByLabelText(/six-digit code/i);
-    await user.click(screen.getByRole("button", { name: /^send code$/i }));
+    await user.click(screen.getByRole("button", { name: /^verify code$/i }));
 
     expect(codeInput).toHaveAttribute("aria-invalid", "true");
     expect(screen.getByText(/enter the six-digit code from your email/i)).toBeInTheDocument();
@@ -346,7 +357,7 @@ describe("web app - auth routes", () => {
     await user.type(screen.getByLabelText(/email address/i), "owen@example.com");
     await user.click(screen.getByRole("button", { name: /^send code$/i }));
     await user.type(await screen.findByLabelText(/six-digit code/i), "654321");
-    await user.click(screen.getByRole("button", { name: /^send code$/i }));
+    await user.click(screen.getByRole("button", { name: /^verify code$/i }));
 
     expect(await screen.findByText(/bundle requests/i)).toBeInTheDocument();
   });
@@ -527,6 +538,7 @@ describe("web app - auth routes", () => {
     await user.type(await screen.findByLabelText(/email address/i), "owen@example.com");
     await user.click(screen.getByRole("button", { name: /^send code$/i }));
     expect(await screen.findByLabelText(/six-digit code/i)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /^verify code$/i })).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: /resend code/i }));
     await user.click(screen.getByRole("button", { name: /use a different email/i }));
@@ -679,6 +691,49 @@ describe("web app - auth routes", () => {
     await user.click(within(dialog).getAllByRole("button", { name: /delete account/i })[0] as HTMLButtonElement);
 
     expect(await screen.findByRole("heading", { name: /continue to debugbundle/i })).toBeInTheDocument();
+  });
+
+  it("imports a gravatar avatar from settings with an explicit user action", async () => {
+    const user = userEvent.setup();
+    const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = requestUrl(input);
+
+      if (url.endsWith("/v1/auth/session")) {
+        return jsonResponse(200, { session: createSession() });
+      }
+
+      if (url.endsWith("/v1/billing")) {
+        return jsonResponse(200, { billing: createBillingSummary() });
+      }
+
+      if (url.endsWith("/v1/projects")) {
+        return jsonResponse(200, { projects: [] });
+      }
+
+      if (url.endsWith("/v1/account/avatar/import-gravatar") && init?.method === "POST") {
+        expect(init.headers).toEqual({
+          "X-CSRF-Token": "csrf-token-123"
+        });
+
+        return jsonResponse(200, {
+          avatar: {
+            source: "gravatar",
+            avatar_url: "/v1/account/avatar",
+            updated_at: "2026-03-17T12:00:00.000Z"
+          }
+        });
+      }
+
+      return jsonResponse(200, { tokens: [] });
+    });
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<App initialEntries={["/settings"]} />);
+
+    expect(await screen.findByText(/initials fallback active/i)).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: /import from gravatar/i }));
+    expect(await screen.findByText(/cached profile avatar active/i)).toBeInTheDocument();
   });
 
   it("signs out from the authenticated shell and revokes member tokens", async () => {

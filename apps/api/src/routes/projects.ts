@@ -90,6 +90,9 @@ export function registerProjectRoutes(app: FastifyInstance, dependencies: ApiDep
     if (access === null) {
       return reply.status(404).send({ error: "project_not_found" });
     }
+    if (access.effective_role !== "owner" && access.effective_role !== "admin") {
+      return reply.status(403).send({ error: "forbidden" });
+    }
 
     const project = await projectManagement.updateProjectForUser({
       user_id: member.member_id,

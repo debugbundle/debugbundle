@@ -3,7 +3,7 @@ import type { FastifyInstance } from "fastify";
 import { getTierCapabilities } from "../../../../packages/shared-types/src/index.js";
 import type { ApiDependencies } from "../api-types.js";
 import { recordAuditLog, resolveAuditActorType } from "../audit-logging.js";
-import { requireRateLimitedMemberAuth } from "../api-helpers.js";
+import { requireRateLimitedMemberAuth, requireRateLimitedProjectAccess } from "../api-helpers.js";
 import { AlertParamsSchema, AlertsQuerySchema, CreateAlertBodySchema, UpdateAlertBodySchema } from "../schemas.js";
 
 async function ensureScopedSlackDestination(
@@ -45,21 +45,24 @@ async function ensureScopedSlackDestination(
 
 export function registerAlertRoutes(app: FastifyInstance, dependencies: ApiDependencies): void {
   app.get("/v1/alerts", async (request, reply) => {
-    const member = await requireRateLimitedMemberAuth(request, reply, dependencies, "management-read");
-    if (member === null) {
+    const parsedQuery = AlertsQuerySchema.safeParse(request.query);
+    if (!parsedQuery.success) {
+      return reply.status(400).send({ error: "invalid_query" });
+    }
+
+    const auth = await requireRateLimitedProjectAccess(request, reply, dependencies, {
+      bucket: "management-read",
+      projectId: parsedQuery.data.project_id
+    });
+    if (auth === null) {
       return;
     }
     if (dependencies.alertManagement === undefined) {
       return reply.status(404).send({ error: "project_not_found" });
     }
 
-    const parsedQuery = AlertsQuerySchema.safeParse(request.query);
-    if (!parsedQuery.success) {
-      return reply.status(400).send({ error: "invalid_query" });
-    }
-
     const alerts = await dependencies.alertManagement.listAlertsForOrganization({
-      organization_id: member.organization_id,
+      organization_id: auth.access.organization_id,
       project_id: parsedQuery.data.project_id,
       limit: parsedQuery.data.limit
     });

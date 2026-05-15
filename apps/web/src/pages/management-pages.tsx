@@ -27,6 +27,7 @@ import { Dialog, DialogTrigger } from "../components/ui/dialog.js";
 import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "../components/ui/empty.js";
 import { Field, FieldDescription, FieldGroup, FieldLabel } from "../components/ui/field.js";
 import { Input } from "../components/ui/input.js";
+import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select.js";
 import { Skeleton } from "../components/ui/skeleton.js";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../components/ui/table.js";
 import {
@@ -166,20 +167,29 @@ export function ProjectsPage(): JSX.Element {
                     />
                   </Field>
                   <Field>
-                    <FieldLabel htmlFor="project-environment-default">Default environment</FieldLabel>
+                    <FieldLabel id="project-environment-default-label" htmlFor="project-environment-default">Default environment</FieldLabel>
                     <FieldDescription>Used as the initial environment in setup snippets and project defaults. You can change it later.</FieldDescription>
-                    <select
-                      id="project-environment-default"
-                      className="flex h-10 w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+                    <Select
                       value={selectedProjectEnvironment}
-                      onChange={(event) => handleProjectEnvironmentChange(event.currentTarget.value)}
+                      onValueChange={handleProjectEnvironmentChange}
                     >
-                      {PROJECT_ENVIRONMENT_OPTIONS.map((option) => (
-                        <option key={option.value} value={option.value}>
-                          {option.label}
-                        </option>
-                      ))}
-                    </select>
+                      <SelectTrigger
+                        id="project-environment-default"
+                        aria-labelledby="project-environment-default-label project-environment-default"
+                        className="w-full"
+                      >
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent position="popper">
+                        <SelectGroup>
+                          {PROJECT_ENVIRONMENT_OPTIONS.map((option) => (
+                            <SelectItem key={option.value} value={option.value}>
+                              {option.label}
+                            </SelectItem>
+                          ))}
+                        </SelectGroup>
+                      </SelectContent>
+                    </Select>
                     {selectedProjectEnvironment !== CUSTOM_PROJECT_ENVIRONMENT_VALUE ? null : (
                       <Input
                         id="project-environment-default-custom"

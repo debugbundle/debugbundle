@@ -1,7 +1,9 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 
 import { generateProjectInviteToken } from "../../../../packages/auth/src/index.js";
+import type { ProjectAccessRecord, ResolveMemberResult } from "../../../../packages/storage/src/index.js";
 import type { ApiDependencies } from "../api-types.js";
+import { buildProjectMemberAvatarUrl } from "../avatar-urls.js";
 import { requireRateLimitedMemberAuth, resolveBrowserSession } from "../api-helpers.js";
 import {
   CreateProjectInviteBodySchema,
@@ -13,13 +15,42 @@ import {
 
 const INVITE_LIFETIME_MS = 1000 * 60 * 60 * 24 * 7;
 
+function toPublicProjectMember(
+  projectId: string,
+  member: {
+    user_id: string;
+    email: string;
+    role: "owner" | "admin" | "member";
+    membership_type: "owner" | "collaborator";
+    created_at: string;
+    avatar_object_key?: string | null;
+  }
+): {
+  user_id: string;
+  email: string;
+  role: "owner" | "admin" | "member";
+  membership_type: "owner" | "collaborator";
+  created_at: string;
+  avatar_url: string | null;
+} {
+  const { avatar_object_key, ...publicMember } = member;
+
+  return {
+    ...publicMember,
+    avatar_url:
+      avatar_object_key === null || avatar_object_key === undefined
+        ? null
+        : buildProjectMemberAvatarUrl(projectId, member.user_id)
+  };
+}
+
 export function registerProjectMemberRoutes(app: FastifyInstance, dependencies: ApiDependencies): void {
   async function requireProjectAccess(input: {
     request: FastifyRequest;
     reply: FastifyReply;
     projectId: string;
     bucket: "management-read" | "management-write";
-  }) {
+  }): Promise<{ member: ResolveMemberResult; access: ProjectAccessRecord } | null> {
     const member = await requireRateLimitedMemberAuth(input.request, input.reply, dependencies, input.bucket);
     if (member === null) {
       return null;
@@ -72,7 +103,66 @@ export function registerProjectMemberRoutes(app: FastifyInstance, dependencies: 
       return reply.status(404).send({ error: "project_not_found" });
     }
 
-    return reply.status(200).send({ members: listed.members });
+    return reply.status(200).send({
+      members: listed.members.map((member) => toPublicProjectMember(parsedParams.data.id, member))
+    });
+  });
+
+  app.get("/v1/projects/:id/members/:userId/avatar", async (request, reply) => {
+    const parsedParams = ProjectMemberParamsSchema.safeParse(request.params);
+    if (!parsedParams.success) {
+      return reply.status(400).send({ error: "invalid_member_id" });
+    }
+
+    const auth = await requireProjectAccess({
+      request,
+      reply,
+      projectId: parsedParams.data.id,
+      bucket: "management-read"
+    });
+    if (auth === null) {
+      return;
+    }
+
+    const projectCollaboration = dependencies.projectCollaboration;
+    if (
+      projectCollaboration === undefined ||
+      projectCollaboration.listMembersForProject === undefined ||
+      dependencies.accountManagement === undefined
+    ) {
+      return reply.status(503).send({ error: "account_management_not_configured" });
+    }
+
+    const listed = await projectCollaboration.listMembersForProject({
+      project_id: parsedParams.data.id,
+      user_id: auth.member.member_id
+    });
+    if (listed === null) {
+      return reply.status(404).send({ error: "project_not_found" });
+    }
+
+    const member = listed.members.find((candidate) => candidate.user_id === parsedParams.data.userId);
+    if (member === undefined) {
+      return reply.status(404).send({ error: "member_not_found" });
+    }
+
+    const avatar = await dependencies.accountManagement.getUserAvatar({
+      user_id: parsedParams.data.userId
+    });
+    if (avatar === null) {
+      return reply.status(404).send({ error: "avatar_not_found" });
+    }
+
+    const body = await dependencies.objectStoreReader.getObject({
+      key: avatar.object_key
+    }).catch(() => null);
+    if (body === null) {
+      return reply.status(404).send({ error: "avatar_not_found" });
+    }
+
+    reply.header("Cache-Control", "private, max-age=300");
+    reply.header("Content-Type", avatar.content_type);
+    return reply.status(200).send(body);
   });
 
   app.get("/v1/projects/:id/invites", async (request, reply) => {
@@ -263,7 +353,7 @@ export function registerProjectMemberRoutes(app: FastifyInstance, dependencies: 
       return reply.status(409).send({ error: "owner_role_change_not_allowed" });
     }
 
-    return reply.status(200).send({ member: updated.member });
+    return reply.status(200).send({ member: toPublicProjectMember(parsedParams.data.id, updated.member) });
   });
 
   app.delete("/v1/projects/:id/members/:userId", async (request, reply) => {
@@ -301,6 +391,6 @@ export function registerProjectMemberRoutes(app: FastifyInstance, dependencies: 
       return reply.status(409).send({ error: "owner_removal_not_allowed" });
     }
 
-    return reply.status(200).send({ member: removed.member });
+    return reply.status(200).send({ member: toPublicProjectMember(parsedParams.data.id, removed.member) });
   });
 }

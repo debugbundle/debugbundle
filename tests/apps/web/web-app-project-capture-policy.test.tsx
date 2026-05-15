@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { userEvent } from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -13,14 +13,34 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-function expectSelect(element: HTMLElement): HTMLSelectElement {
-  expect(element).toBeInstanceOf(HTMLSelectElement);
-  return element as HTMLSelectElement;
+function expectSelectTrigger(element: HTMLElement): HTMLButtonElement {
+  expect(element).toBeInstanceOf(HTMLButtonElement);
+  return element as HTMLButtonElement;
 }
 
 function expectButton(element: HTMLElement): HTMLButtonElement {
   expect(element).toBeInstanceOf(HTMLButtonElement);
   return element as HTMLButtonElement;
+}
+
+async function findSelectTrigger(label: RegExp | string): Promise<HTMLButtonElement> {
+  return expectSelectTrigger(await screen.findByLabelText(label));
+}
+
+async function openSelect(label: RegExp | string): Promise<HTMLButtonElement> {
+  const trigger = await findSelectTrigger(label);
+  trigger.focus();
+  fireEvent.keyDown(trigger, { key: "ArrowDown", code: "ArrowDown" });
+  return trigger;
+}
+
+async function chooseSelectOption(
+  user: ReturnType<typeof userEvent.setup>,
+  label: RegExp | string,
+  optionName: RegExp | string
+): Promise<void> {
+  await openSelect(label);
+  await user.click(await screen.findByRole("option", { name: optionName }));
 }
 
 describe("web app — project capture policy settings", () => {
@@ -104,24 +124,26 @@ describe("web app — project capture policy settings", () => {
     expect(capturePolicyHeading).toBeInTheDocument();
     expect(capturePolicyHeading.compareDocumentPosition(projectDetailsHeading) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
 
-    const presetSelect = expectSelect(screen.getByLabelText(/^preset$/i));
-    const requestSelect = expectSelect(screen.getByLabelText(/^request events$/i));
-    const clientErrorSelect = expectSelect(screen.getByLabelText(/^client error incidents$/i));
+    const presetSelect = await findSelectTrigger(/^preset$/i);
+    await findSelectTrigger(/^request events$/i);
+    await findSelectTrigger(/^client error incidents$/i);
     const saveButton = expectButton(screen.getByRole("button", { name: /save capture policy/i }));
 
-    expect(screen.getByRole("option", { name: /^use preset default \(none\)$/i })).toBeInTheDocument();
-
     await waitFor(() => {
-      expect(presetSelect.value).toBe("balanced");
-      expect(saveButton.disabled).toBe(true);
+      expect(presetSelect).toHaveTextContent(/^balanced$/i);
+      expect(saveButton).toBeDisabled();
     });
 
-    await user.selectOptions(presetSelect, "investigative");
-    await user.selectOptions(requestSelect, "filtered");
-    await user.selectOptions(clientErrorSelect, "recommended");
+    await openSelect(/^client error incidents$/i);
+    expect(await screen.findByRole("option", { name: /^use preset default \(none\)$/i })).toBeInTheDocument();
+    fireEvent.keyDown(document.body, { key: "Escape", code: "Escape" });
+
+    await chooseSelectOption(user, /^preset$/i, /^investigative$/i);
+    await chooseSelectOption(user, /^request events$/i, /^filtered request events$/i);
+    await chooseSelectOption(user, /^client error incidents$/i, /^recommended for interactive apps$/i);
 
     await waitFor(() => {
-      expect(saveButton.disabled).toBe(false);
+      expect(saveButton).not.toBeDisabled();
     });
 
     await user.click(saveButton);
@@ -135,7 +157,7 @@ describe("web app — project capture policy settings", () => {
     });
 
     await waitFor(() => {
-      expect(saveButton.disabled).toBe(true);
+      expect(saveButton).toBeDisabled();
     });
 
     expect(screen.getAllByText(/filtered request events/i).length).toBeGreaterThan(0);
@@ -154,7 +176,7 @@ describe("web app — project capture policy settings", () => {
 
       if (url.endsWith("/v1/projects") && init?.method === undefined) {
         return jsonResponse(200, {
-          projects: [createProject({ organization_plan: "free" })]
+          projects: [createProject({ relationship: "shared", effective_role: "member", organization_plan: "free" })]
         });
       }
 
@@ -186,16 +208,114 @@ describe("web app — project capture policy settings", () => {
     render(<App initialEntries={["/projects/proj_123/settings"]} />);
 
     expect(await screen.findByRole("heading", { name: /capture policy/i, level: 3 })).toBeInTheDocument();
-    expect(screen.getByText(/only owners can change project capture settings/i)).toBeInTheDocument();
+    expect(screen.getByText(/only project owners and admins can change capture settings/i)).toBeInTheDocument();
 
-    const presetSelect = expectSelect(screen.getByLabelText(/^preset$/i));
-    const requestSelect = expectSelect(screen.getByLabelText(/^request events$/i));
-    const clientErrorSelect = expectSelect(screen.getByLabelText(/^client error incidents$/i));
+    const presetSelect = await findSelectTrigger(/^preset$/i);
+    const requestSelect = await findSelectTrigger(/^request events$/i);
+    const clientErrorSelect = await findSelectTrigger(/^client error incidents$/i);
 
-    expect(presetSelect.disabled).toBe(true);
-    expect(requestSelect.disabled).toBe(true);
-    expect(clientErrorSelect.disabled).toBe(true);
+    expect(presetSelect).toBeDisabled();
+    expect(requestSelect).toBeDisabled();
+    expect(clientErrorSelect).toBeDisabled();
     expect(screen.queryByRole("button", { name: /save capture policy/i })).toBeNull();
+  });
+
+  it("lets shared project admins update capture policy without owner session role", async () => {
+    const user = userEvent.setup();
+    const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = requestUrl(input);
+
+      if (url.endsWith("/v1/auth/session")) {
+        return jsonResponse(200, {
+          session: createSession({ role: "member" })
+        });
+      }
+
+      if (url.endsWith("/v1/projects") && init?.method === undefined) {
+        return jsonResponse(200, {
+          projects: [createProject({ relationship: "shared", effective_role: "admin", organization_plan: "team" })]
+        });
+      }
+
+      if (url.endsWith("/v1/projects/proj_123/capture-policy") && init?.method === undefined) {
+        return jsonResponse(200, {
+          policy: {
+            preset: "balanced",
+            capture_logs: "warning",
+            capture_request_events: "failures_only",
+            capture_breadcrumbs: "exception_only",
+            capture_probe_events: "buffer_only",
+            immediate_client_error_statuses: []
+          },
+          overrides: {
+            capture_logs: null,
+            capture_request_events: null,
+            capture_breadcrumbs: null,
+            capture_probe_events: null,
+            immediate_client_error_statuses: null
+          }
+        });
+      }
+
+      if (url.endsWith("/v1/projects/proj_123/capture-policy") && init?.method === "PATCH") {
+        expect(init.credentials).toBe("include");
+        expect(init.body).toBe(JSON.stringify({
+          preset: "balanced",
+          capture_logs: null,
+          capture_request_events: "all",
+          capture_breadcrumbs: null,
+          capture_probe_events: null,
+          immediate_client_error_statuses: null
+        }));
+
+        return jsonResponse(200, {
+          policy: {
+            preset: "balanced",
+            capture_logs: "warning",
+            capture_request_events: "all",
+            capture_breadcrumbs: "exception_only",
+            capture_probe_events: "buffer_only",
+            immediate_client_error_statuses: []
+          },
+          overrides: {
+            capture_logs: null,
+            capture_request_events: "all",
+            capture_breadcrumbs: null,
+            capture_probe_events: null,
+            immediate_client_error_statuses: null
+          }
+        });
+      }
+
+      return jsonResponse(404, { error: "not_found" });
+    });
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<App initialEntries={["/projects/proj_123/settings"]} />);
+
+    const requestSelect = await findSelectTrigger(/^request events$/i);
+    const saveButton = expectButton(await screen.findByRole("button", { name: /save capture policy/i }));
+
+    expect(requestSelect).toBeEnabled();
+    expect(saveButton).toBeDisabled();
+
+    await chooseSelectOption(user, /^request events$/i, /^all request events$/i);
+
+    await waitFor(() => {
+      expect(saveButton).toBeEnabled();
+    });
+
+    await user.click(saveButton);
+
+    await waitFor(() => {
+      expect(
+        fetchMock.mock.calls.some(
+          ([input, requestInit]) =>
+            requestUrl(input).endsWith("/v1/projects/proj_123/capture-policy") && requestInit?.method === "PATCH"
+        )
+      ).toBe(true);
+    });
   });
 
   it("preserves explicit none for client error incidents after reload", async () => {
@@ -279,26 +399,28 @@ describe("web app — project capture policy settings", () => {
 
     render(<App initialEntries={["/projects/proj_123/settings"]} />);
 
-    const clientErrorSelect = expectSelect(await screen.findByLabelText(/^client error incidents$/i));
+    await findSelectTrigger(/^client error incidents$/i);
     const saveButton = expectButton(screen.getByRole("button", { name: /save capture policy/i }));
 
-    await user.selectOptions(clientErrorSelect, "none");
+    await chooseSelectOption(user, /^client error incidents$/i, /^none$/i);
 
     await waitFor(() => {
-      expect(saveButton.disabled).toBe(false);
+      expect(saveButton).not.toBeDisabled();
     });
 
     await user.click(saveButton);
 
     await waitFor(() => {
-      expect(saveButton.disabled).toBe(true);
+      expect(saveButton).toBeDisabled();
     });
 
     render(<App initialEntries={["/projects/proj_123/settings"]} />);
 
-    const reloadedClientErrorSelect = expectSelect(await screen.findAllByLabelText(/^client error incidents$/i).then((elements) => elements.at(-1)!));
+    const reloadedClientErrorSelect = expectSelectTrigger(
+      await screen.findAllByLabelText(/^client error incidents$/i).then((elements) => elements.at(-1)!)
+    );
     await waitFor(() => {
-      expect(reloadedClientErrorSelect.value).toBe("none");
+      expect(reloadedClientErrorSelect).toHaveTextContent(/^none$/i);
     });
   });
 });

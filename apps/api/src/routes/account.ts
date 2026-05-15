@@ -1,12 +1,15 @@
 import type { FastifyInstance } from "fastify";
+import type { WebSessionRecord } from "../../../../packages/auth/src/index.js";
 
 import {
   SESSION_COOKIE_NAME,
   buildClearedSessionCookie,
   readCookieValue,
 } from "../../../../packages/auth/src/index.js";
+import { buildGravatarAvatarUrl, importUserAvatarFromUrl } from "../../../../packages/storage/src/index.js";
 
 import type { ApiDependencies } from "../api-types.js";
+import { buildAccountAvatarUrl } from "../avatar-urls.js";
 import { hashAuditIdentifier, recordAuditLog } from "../audit-logging.js";
 import { AccountDeleteBodySchema } from "../schemas.js";
 
@@ -19,6 +22,34 @@ function normalizeEmail(value: string): string {
 }
 
 export function registerAccountRoutes(app: FastifyInstance, dependencies: ApiDependencies): void {
+  async function resolveBrowserSessionOrReply(cookieHeader: string | undefined): Promise<
+    | {
+        sessionToken: string;
+        session: WebSessionRecord;
+      }
+    | {
+        error: "account_management_not_configured" | "invalid_session";
+      }
+  > {
+    if (dependencies.webAuth === undefined) {
+      return { error: "account_management_not_configured" as const };
+    }
+
+    const sessionToken = readCookieValue(cookieHeader, SESSION_COOKIE_NAME);
+    if (sessionToken === null) {
+      return { error: "invalid_session" as const };
+    }
+
+    const session = await dependencies.webAuth.resolveSessionByToken(sessionToken, {
+      now: new Date(),
+    });
+    if (session === null) {
+      return { error: "invalid_session" as const };
+    }
+
+    return { sessionToken, session };
+  }
+
   app.get("/v1/account/export", async (request, reply) => {
     if (dependencies.webAuth === undefined || dependencies.accountManagement === undefined) {
       return reply.status(503).send({ error: "account_management_not_configured" });
@@ -59,6 +90,70 @@ export function registerAccountRoutes(app: FastifyInstance, dependencies: ApiDep
     );
 
     return reply.status(200).send(accountExport);
+  });
+
+  app.get("/v1/account/avatar", async (request, reply) => {
+    if (dependencies.accountManagement === undefined) {
+      return reply.status(503).send({ error: "account_management_not_configured" });
+    }
+
+    const resolved = await resolveBrowserSessionOrReply(request.headers.cookie);
+    if ("error" in resolved) {
+      return reply.status(resolved.error === "account_management_not_configured" ? 503 : 401).send({ error: resolved.error });
+    }
+
+    const avatar = await dependencies.accountManagement.getUserAvatar({
+      user_id: resolved.session.user_id,
+    });
+    if (avatar === null) {
+      return reply.status(404).send({ error: "avatar_not_found" });
+    }
+
+    const body = await dependencies.objectStoreReader.getObject({
+      key: avatar.object_key,
+    }).catch(() => null);
+    if (body === null) {
+      return reply.status(404).send({ error: "avatar_not_found" });
+    }
+
+    reply.header("Cache-Control", "private, max-age=300");
+    reply.header("Content-Type", avatar.content_type);
+    return reply.status(200).send(body);
+  });
+
+  app.post("/v1/account/avatar/import-gravatar", async (request, reply) => {
+    if (dependencies.accountManagement === undefined || dependencies.objectStoreWriter === undefined) {
+      return reply.status(503).send({ error: "account_management_not_configured" });
+    }
+
+    const resolved = await resolveBrowserSessionOrReply(request.headers.cookie);
+    if ("error" in resolved) {
+      return reply.status(resolved.error === "account_management_not_configured" ? 503 : 401).send({ error: resolved.error });
+    }
+
+    const imported = await importUserAvatarFromUrl({
+      user_id: resolved.session.user_id,
+      source: "gravatar",
+      url: buildGravatarAvatarUrl(resolved.session.email),
+      store: dependencies.accountManagement,
+      objectStoreWriter: dependencies.objectStoreWriter,
+    });
+
+    if (!imported.ok) {
+      if (imported.error === "not_found") {
+        return reply.status(404).send({ error: "gravatar_not_found" });
+      }
+
+      return reply.status(502).send({ error: "avatar_import_failed" });
+    }
+
+    return reply.status(200).send({
+      avatar: {
+        source: imported.avatar.source,
+        avatar_url: buildAccountAvatarUrl(),
+        updated_at: imported.avatar.updated_at,
+      }
+    });
   });
 
   app.delete("/v1/account", async (request, reply) => {

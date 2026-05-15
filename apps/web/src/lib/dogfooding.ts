@@ -79,7 +79,12 @@ function resolveDogfoodingEndpoint(env: WebDogfoodingEnv): string {
     return "/debugbundle/browser";
   }
 
-  return new URL("/v1/events", normalizeText(env.VITE_API_URL) ?? window.location.origin).toString();
+  const apiBaseUrl = normalizeText(env.VITE_API_URL);
+  if (apiBaseUrl === null) {
+    throw new Error("web_dogfooding_missing_api_url");
+  }
+
+  return new URL("/v1/events", apiBaseUrl).toString();
 }
 
 export function resolveWebDogfoodingConfig(env: WebDogfoodingEnv): WebDogfoodingConfig | null {

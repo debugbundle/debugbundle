@@ -3,6 +3,7 @@ import type {
   AccountLifecycleStore,
   DeletedAccountRecord,
   Queryable,
+  UserAvatarRecord,
 } from "./types.js";
 
 type JsonRow = {
@@ -60,6 +61,16 @@ async function queryProjectScopedRows(
 
 async function rollbackQuietly(db: Queryable): Promise<void> {
   await db.query("ROLLBACK", []).catch(() => undefined);
+}
+
+function mapUserAvatarRow(row: Record<string, unknown>): UserAvatarRecord {
+  return {
+    user_id: String(row["user_id"]),
+    source: row["avatar_source"] === "github" ? "github" : "gravatar",
+    object_key: String(row["avatar_object_key"]),
+    content_type: String(row["avatar_content_type"]),
+    updated_at: String(row["avatar_updated_at"]),
+  };
 }
 
 export function createPostgresAccountStore(db: Queryable): AccountLifecycleStore {
@@ -582,6 +593,52 @@ export function createPostgresAccountStore(db: Queryable): AccountLifecycleStore
         await rollbackQuietly(db);
         throw error;
       }
+    },
+    async getUserAvatar(input): Promise<UserAvatarRecord | null> {
+      const result = await db.query<Record<string, unknown>>(
+        `
+          SELECT
+            id AS user_id,
+            avatar_source,
+            avatar_object_key,
+            avatar_content_type,
+            avatar_updated_at::text AS avatar_updated_at
+          FROM users
+          WHERE id = $1
+            AND avatar_source IS NOT NULL
+            AND avatar_object_key IS NOT NULL
+            AND avatar_content_type IS NOT NULL
+            AND avatar_updated_at IS NOT NULL
+          LIMIT 1
+        `,
+        [input.user_id],
+      );
+
+      const row = result.rows[0];
+      return row === undefined ? null : mapUserAvatarRow(row);
+    },
+    async saveUserAvatar(input): Promise<UserAvatarRecord | null> {
+      const result = await db.query<Record<string, unknown>>(
+        `
+          UPDATE users
+          SET avatar_source = $2,
+              avatar_object_key = $3,
+              avatar_content_type = $4,
+              avatar_updated_at = $5::timestamptz,
+              updated_at = $5::timestamptz
+          WHERE id = $1
+          RETURNING
+            id AS user_id,
+            avatar_source,
+            avatar_object_key,
+            avatar_content_type,
+            avatar_updated_at::text AS avatar_updated_at
+        `,
+        [input.user_id, input.source, input.object_key, input.content_type, input.updated_at],
+      );
+
+      const row = result.rows[0];
+      return row === undefined ? null : mapUserAvatarRow(row);
     },
   };
 }

@@ -11,7 +11,7 @@ import { useNavigate } from "react-router-dom";
 
 import { resolveDocumentationUrl } from "../../lib/external-links.js";
 import { useTheme } from "../../lib/theme.js";
-import { Avatar, AvatarFallback } from "../ui/avatar.js";
+import { UserAvatar } from "./user-avatar.js";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -31,19 +31,15 @@ import {
 interface NavUserProps {
   email: string;
   role: string;
+  avatarUrl?: string | null;
   onSignOut: () => Promise<void>;
 }
 
-export function NavUser({ email, role, onSignOut }: NavUserProps): JSX.Element {
+export function NavUser({ email, role, avatarUrl = null, onSignOut }: NavUserProps): JSX.Element {
   const { isMobile } = useSidebar();
   const navigate = useNavigate();
   const { resolvedTheme, setTheme } = useTheme();
   const documentationUrl = resolveDocumentationUrl();
-
-  const initials = email
-    .split("@")[0]
-    ?.slice(0, 2)
-    .toUpperCase() ?? "DB";
 
   function handleToggleTheme(): void {
     setTheme(resolvedTheme === "dark" ? "light" : "dark");
@@ -58,9 +54,7 @@ export function NavUser({ email, role, onSignOut }: NavUserProps): JSX.Element {
               size="lg"
               className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
             >
-              <Avatar className="size-8 rounded-lg">
-                <AvatarFallback className="rounded-lg">{initials}</AvatarFallback>
-              </Avatar>
+              <UserAvatar email={email} avatarUrl={avatarUrl} className="size-8 rounded-lg" fallbackClassName="rounded-lg" />
               <div className="grid flex-1 text-left text-sm leading-tight">
                 <span className="truncate font-medium">{email}</span>
                 <span className="truncate text-xs text-muted-foreground">{role}</span>
@@ -76,9 +70,7 @@ export function NavUser({ email, role, onSignOut }: NavUserProps): JSX.Element {
           >
             <DropdownMenuLabel className="p-0 font-normal">
               <div className="flex items-center gap-2 px-1 py-1.5 text-left text-sm">
-                <Avatar className="size-8 rounded-lg">
-                  <AvatarFallback className="rounded-lg">{initials}</AvatarFallback>
-                </Avatar>
+                <UserAvatar email={email} avatarUrl={avatarUrl} className="size-8 rounded-lg" fallbackClassName="rounded-lg" />
                 <div className="grid flex-1 text-left text-sm leading-tight">
                   <span className="truncate font-medium">{email}</span>
                   <span className="truncate text-xs text-muted-foreground">{role}</span>

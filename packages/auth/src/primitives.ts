@@ -55,6 +55,7 @@ export interface WebSessionRecord {
   revoked_at: string | null;
   has_email_auth?: boolean;
   has_github_oauth?: boolean;
+  avatar_object_key?: string | null;
 }
 
 export interface CreateSessionInput {
