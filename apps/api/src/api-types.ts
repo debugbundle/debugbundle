@@ -6,25 +6,20 @@ import type {
   BillingSummaryRecord,
   AlertChannel,
   AlertConditionType,
-  CreateOrganizationInviteResult,
   CreateProjectInviteResult,
   DeletedAccountRecord,
   AuthRateLimiter,
   DeletedProjectRecord,
   IngestionRateLimiter,
   MemberTokenRecord,
-  OrganizationMemberRecord,
-  OrganizationInviteRecord,
   ProjectAccessRecord,
   ProjectInviteRecord,
   ProjectMemberRecord,
   ProjectTokenRecord,
   SlackDestinationRecord,
   IncidentRetrievalRecord,
-  RemoveOrganizationMemberResult,
   RemoveProjectMemberResult,
   ServiceRetrievalRecord,
-  UpdateOrganizationMemberRoleResult,
   UpdateProjectMemberRoleResult,
   IngestionMetadataService,
   IngestionPersistenceService,
@@ -64,7 +59,7 @@ export interface ApiDependencies {
     GitHubCliAuthService,
     "beginDeviceAuth" | "pollDeviceAuth" | "claimDeviceAuth" | "exchangeGitHubAccessToken"
   > | undefined;
-  inviteEmails?: Pick<AuthEmailSender, "sendOrganizationInviteEmail">;
+  inviteEmails?: Pick<AuthEmailSender, "sendProjectInviteEmail">;
   tokenManagement: {
     listProjectTokensForOrganization(input: {
       organization_id: string;
@@ -207,37 +202,6 @@ export interface ApiDependencies {
       organization_id: string;
       now: string;
     }): Promise<BillingSummaryRecord | "billing_not_configured" | "billing_not_found" | "no_active_subscription" | "capacity_reduction_not_found">;
-  } | undefined;
-  organizationManagement?: {
-    listMembersForOrganization(input: {
-      organization_id: string;
-    }): Promise<{ plan: string; members: OrganizationMemberRecord[] } | null>;
-    listPendingInvitesForOrganization(input: {
-      organization_id: string;
-      now: string;
-    }): Promise<OrganizationInviteRecord[] | null>;
-    createInviteForOrganization(input: {
-      organization_id: string;
-      email: string;
-      role: "member";
-      invited_by_user_id: string;
-      invite_token_hash: string;
-      expires_at: string;
-    }): Promise<CreateOrganizationInviteResult | null>;
-    cancelInviteForOrganization(input: {
-      organization_id: string;
-      invite_id: string;
-    }): Promise<OrganizationInviteRecord | null>;
-    removeMemberFromOrganization(input: {
-      organization_id: string;
-      user_id: string;
-      revoked_at: string;
-    }): Promise<RemoveOrganizationMemberResult | null>;
-    updateMemberRoleForOrganization(input: {
-      organization_id: string;
-      user_id: string;
-      role: "owner" | "member";
-    }): Promise<UpdateOrganizationMemberRoleResult | null>;
   } | undefined;
   projectCollaboration?: {
     listMembersForProject?(input: {

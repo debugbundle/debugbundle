@@ -321,24 +321,6 @@ export const WebhookParamsSchema = z
   })
   .strict();
 
-export const OrganizationInviteParamsSchema = z
-  .object({
-    inviteId: z.string().uuid()
-  })
-  .strict();
-
-export const OrganizationMemberParamsSchema = z
-  .object({
-    userId: z.string().uuid()
-  })
-  .strict();
-
-export const UpdateOrganizationMemberRoleBodySchema = z
-  .object({
-    role: z.enum(["owner", "member"])
-  })
-  .strict();
-
 export const CreateWebhookBodySchema = z
   .object({
     project_id: z.string().uuid(),
@@ -646,13 +628,6 @@ export const UpdateProjectBodySchema = z
   .refine((value) => Object.keys(value).length > 0, {
     message: "update_requires_changes"
   });
-
-export const CreateOrganizationInviteBodySchema = z
-  .object({
-    email: z.string().email(),
-    role: z.literal("member").default("member")
-  })
-  .strict();
 
 export const CreateProjectInviteBodySchema = z
   .object({

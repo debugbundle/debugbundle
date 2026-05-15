@@ -210,7 +210,7 @@ export function renderEmailAuthCodeEmail(input: {
   };
 }
 
-export function renderOrganizationInviteEmail(input: { acceptUrl: string }): { subject: string; text: string; html: string } {
+export function renderProjectInviteEmail(input: { acceptUrl: string }): { subject: string; text: string; html: string } {
   return {
     subject: "A DebugBundle project was shared with you",
     text: [

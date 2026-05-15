@@ -10,7 +10,6 @@ export const REQUIRED_API_TABLES = [
   "oauth_identities",
   "organizations",
   "organization_members",
-  "invites",
   "projects",
   "project_members",
   "project_invites",
@@ -257,29 +256,6 @@ const STORAGE_BOOTSTRAP_STATEMENTS = [
   `
     CREATE INDEX github_device_authorizations_expires_at_idx
     ON github_device_authorizations (expires_at)
-  `,
-  `
-    CREATE TABLE invites (
-      id uuid PRIMARY KEY,
-      organization_id uuid NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
-      email text NOT NULL,
-      role text NOT NULL DEFAULT 'member',
-      invited_by uuid REFERENCES users(id) ON DELETE SET NULL,
-      accepted_at timestamptz,
-      expires_at timestamptz NOT NULL,
-      created_at timestamptz NOT NULL DEFAULT now(),
-      invite_token_hash text,
-      UNIQUE (organization_id, email)
-    )
-  `,
-  `
-    CREATE INDEX invites_organization_id_idx
-    ON invites (organization_id, created_at DESC)
-  `,
-  `
-    CREATE UNIQUE INDEX invites_invite_token_hash_key
-    ON invites (invite_token_hash)
-    WHERE invite_token_hash IS NOT NULL
   `,
   `
     CREATE TABLE project_members (

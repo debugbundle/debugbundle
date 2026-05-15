@@ -17,7 +17,7 @@ import {
   createSesEmailTransport,
   formatProductFromEmail,
   renderEmailAuthCodeEmail,
-  renderOrganizationInviteEmail,
+  renderProjectInviteEmail,
   type EmailMessage,
   type EmailTransport
 } from "../../../packages/email/src/index.js";
@@ -438,8 +438,8 @@ function createAuthEmailSender(input: { emailTransport: EmailTransport; appBaseU
       });
     },
 
-    async sendOrganizationInviteEmail({ email, token }): Promise<void> {
-      const rendered = renderOrganizationInviteEmail({
+    async sendProjectInviteEmail({ email, token }): Promise<void> {
+      const rendered = renderProjectInviteEmail({
         acceptUrl: `${baseUrl}/invite?token=${encodeURIComponent(token)}`
       });
       await input.emailTransport.send({
@@ -520,7 +520,7 @@ export function createApiDependencies(input: CreateApiDependenciesInput): {
     GitHubCliAuthService,
     "beginDeviceAuth" | "pollDeviceAuth" | "claimDeviceAuth" | "exchangeGitHubAccessToken"
   >;
-  inviteEmails?: Pick<AuthEmailSender, "sendOrganizationInviteEmail">;
+  inviteEmails?: Pick<AuthEmailSender, "sendProjectInviteEmail">;
   billingEmails?: BillingEmailService;
   tokenManagement: Pick<
     ReturnType<typeof createPostgresMetadataStore>,
@@ -577,15 +577,6 @@ export function createApiDependencies(input: CreateApiDependenciesInput): {
       now: string;
     }): Promise<BillingSummaryRecord | "billing_not_configured" | "billing_not_found" | "no_active_subscription" | "capacity_reduction_not_found">;
   };
-  organizationManagement: Pick<
-    ReturnType<typeof createPostgresMetadataStore>,
-    | "listMembersForOrganization"
-    | "listPendingInvitesForOrganization"
-    | "createInviteForOrganization"
-    | "cancelInviteForOrganization"
-    | "removeMemberFromOrganization"
-    | "updateMemberRoleForOrganization"
-  >;
   projectCollaboration: Pick<
     ReturnType<typeof createPostgresMetadataStore>,
     | "listMembersForProject"
@@ -772,7 +763,7 @@ export function createApiDependencies(input: CreateApiDependenciesInput): {
   const memberAuth = createMemberAuthService(metadataStore);
   const webAuthStore = {
     ...authStore,
-    acceptOrganizationInvite: (request: {
+    acceptProjectInvite: (request: {
       invite_token_hash: string;
       user_id: string;
       email: string;
@@ -827,8 +818,8 @@ export function createApiDependencies(input: CreateApiDependenciesInput): {
     authEmails === undefined
       ? undefined
       : {
-          sendOrganizationInviteEmail: (request: Parameters<AuthEmailSender["sendOrganizationInviteEmail"]>[0]) =>
-            authEmails.sendOrganizationInviteEmail(request)
+          sendProjectInviteEmail: (request: Parameters<AuthEmailSender["sendProjectInviteEmail"]>[0]) =>
+            authEmails.sendProjectInviteEmail(request)
         };
 
   async function getOrganizationBillingState(organizationId: string): Promise<{
@@ -1324,14 +1315,6 @@ export function createApiDependencies(input: CreateApiDependenciesInput): {
         });
       }
     },
-    organizationManagement: {
-      listMembersForOrganization: (input) => metadataStore.listMembersForOrganization(input),
-      listPendingInvitesForOrganization: (input) => metadataStore.listPendingInvitesForOrganization(input),
-      createInviteForOrganization: (input) => metadataStore.createInviteForOrganization(input),
-      cancelInviteForOrganization: (input) => metadataStore.cancelInviteForOrganization(input),
-      removeMemberFromOrganization: (input) => metadataStore.removeMemberFromOrganization(input),
-      updateMemberRoleForOrganization: (input) => metadataStore.updateMemberRoleForOrganization(input)
-    },
     projectCollaboration: {
       listMembersForProject: (input) => metadataStore.listMembersForProject!(input),
       listPendingInvitesForProject: (input) => metadataStore.listPendingInvitesForProject!(input),
@@ -1752,7 +1735,7 @@ export function createApiDependenciesFromEnv(env: Record<string, string | undefi
     GitHubCliAuthService,
     "beginDeviceAuth" | "pollDeviceAuth" | "claimDeviceAuth" | "exchangeGitHubAccessToken"
   >;
-  inviteEmails?: Pick<AuthEmailSender, "sendOrganizationInviteEmail">;
+  inviteEmails?: Pick<AuthEmailSender, "sendProjectInviteEmail">;
   billingEmails?: BillingEmailService;
   tokenManagement: Pick<
     ReturnType<typeof createPostgresMetadataStore>,
@@ -1796,15 +1779,6 @@ export function createApiDependenciesFromEnv(env: Record<string, string | undefi
       now: string;
     }): Promise<BillingSummaryRecord | "billing_not_configured" | "billing_not_found" | "no_active_subscription" | "capacity_reduction_not_found">;
   };
-  organizationManagement: Pick<
-    ReturnType<typeof createPostgresMetadataStore>,
-    | "listMembersForOrganization"
-    | "listPendingInvitesForOrganization"
-    | "createInviteForOrganization"
-    | "cancelInviteForOrganization"
-    | "removeMemberFromOrganization"
-    | "updateMemberRoleForOrganization"
-  >;
   probeManagement: Pick<
     ReturnType<typeof createPostgresMetadataStore>,
     | "listActiveProbesForProject"

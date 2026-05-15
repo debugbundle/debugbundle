@@ -32,7 +32,7 @@ describe("postgres account store", () => {
       if (sqlText.includes("FROM organization_members om") && sqlText.includes("JOIN users u ON u.id = om.user_id")) {
         return rowsResult([{ data: { user_id: "usr_123", email: "owen@example.com", role: "owner" } }]);
       }
-      if (sqlText.includes("FROM invites")) {
+      if (sqlText.includes("FROM project_invites")) {
         return rowsResult([{ data: { invite_id: "inv_123" } }]);
       }
       if (sqlText.includes("FROM member_tokens")) {

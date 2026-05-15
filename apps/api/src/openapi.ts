@@ -142,7 +142,7 @@ const ApiErrorSchema = z.object({ error: z.string() }).strict();
 const SuccessResponseSchema = z.object({ success: z.boolean() }).strict();
 const BillingLinkResponseSchema = z.object({ url: z.string().url() }).strict();
 const BundleFailureStatusSchema = z.object({ status: z.literal("failed"), reason: z.string() }).strict();
-const OrganizationInviteMembershipSchema = z
+const ProjectInviteMembershipSchema = z
   .object({
     project_id: z.string(),
     user_id: z.string(),
@@ -150,7 +150,7 @@ const OrganizationInviteMembershipSchema = z
     membership_type: z.enum(["owner", "collaborator"]).optional(),
   })
   .strict();
-const AcceptInviteResponseSchema = z.object({ membership: OrganizationInviteMembershipSchema }).strict();
+const AcceptInviteResponseSchema = z.object({ membership: ProjectInviteMembershipSchema }).strict();
 const WebSessionSchema = z
   .object({
     session_id: z.string(),
@@ -216,7 +216,7 @@ const AccountExportResponseSchema = z
     user: z.record(z.string(), z.unknown()),
     organization: z.record(z.string(), z.unknown()),
     members: z.array(z.record(z.string(), z.unknown())),
-    invites: z.array(z.record(z.string(), z.unknown())),
+    project_invites: z.array(z.record(z.string(), z.unknown())),
     member_tokens: z.array(z.record(z.string(), z.unknown())),
     projects: z.array(z.record(z.string(), z.unknown())),
     slack_destinations: z.array(z.record(z.string(), z.unknown())),

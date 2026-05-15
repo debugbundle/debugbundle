@@ -11,7 +11,7 @@ function createServer(overrides: {
   auditLogging?: { createAuditLog: ReturnType<typeof vi.fn> } | undefined;
   memberAuth?: { resolveMemberByTokenHash: ReturnType<typeof vi.fn> } | undefined;
   webAuth?: { resolveSessionByToken: ReturnType<typeof vi.fn> } | undefined;
-  inviteEmails?: { sendOrganizationInviteEmail: ReturnType<typeof vi.fn> } | undefined;
+  inviteEmails?: { sendProjectInviteEmail: ReturnType<typeof vi.fn> } | undefined;
   authRateLimiter?: Parameters<typeof createApiServer>[0]["authRateLimiter"];
   projectManagement?: {
     resolveProjectAccessForUser: ReturnType<typeof vi.fn>;
@@ -257,7 +257,7 @@ describe("api project member routes", () => {
 
   it("creates a project invite for owner or admin callers and sends the invite email", async (): Promise<void> => {
     const inviteEmails = {
-      sendOrganizationInviteEmail: vi.fn().mockResolvedValue(undefined)
+      sendProjectInviteEmail: vi.fn().mockResolvedValue(undefined)
     };
     const projectCollaboration = {
       listMembersForProject: vi.fn().mockResolvedValue({ owner_plan: "team", members: [] }),
@@ -318,7 +318,7 @@ describe("api project member routes", () => {
       invite_token_hash: expect.any(String),
       expires_at: expect.any(String)
     });
-    expect(inviteEmails.sendOrganizationInviteEmail).toHaveBeenCalledWith({
+    expect(inviteEmails.sendProjectInviteEmail).toHaveBeenCalledWith({
       email: "new@example.com",
       token: expect.stringMatching(/^dbundle_invite_/)
     });

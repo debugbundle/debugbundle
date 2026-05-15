@@ -219,13 +219,13 @@ describe("auth email-code and session primitives", () => {
         replaceEmailAuthChallenge,
         consumeEmailAuthChallenge: vi.fn(),
         upsertGitHubUserAccount: vi.fn(),
-        acceptOrganizationInvite: vi.fn()
+        acceptProjectInvite: vi.fn()
       },
       {
         signupEmailAllowlist: ["owen@example.com"],
         authEmails: {
           sendEmailAuthCode,
-          sendOrganizationInviteEmail: vi.fn().mockResolvedValue(undefined)
+          sendProjectInviteEmail: vi.fn().mockResolvedValue(undefined)
         }
       }
     );
@@ -267,13 +267,13 @@ describe("auth email-code and session primitives", () => {
         replaceEmailAuthChallenge,
         consumeEmailAuthChallenge: vi.fn(),
         upsertGitHubUserAccount: vi.fn(),
-        acceptOrganizationInvite: vi.fn()
+        acceptProjectInvite: vi.fn()
       },
       {
         signupEmailAllowlist: ["allowlisted@example.com"],
         authEmails: {
           sendEmailAuthCode,
-          sendOrganizationInviteEmail: vi.fn().mockResolvedValue(undefined)
+          sendProjectInviteEmail: vi.fn().mockResolvedValue(undefined)
         }
       }
     );
@@ -328,7 +328,7 @@ describe("auth email-code and session primitives", () => {
         replaceEmailAuthChallenge: vi.fn(),
         consumeEmailAuthChallenge,
         upsertGitHubUserAccount: vi.fn(),
-        acceptOrganizationInvite: vi.fn()
+        acceptProjectInvite: vi.fn()
       },
       {
         signupEmailAllowlist: ["owen@example.com"]
@@ -378,7 +378,7 @@ describe("auth email-code and session primitives", () => {
       replaceEmailAuthChallenge: vi.fn(),
       consumeEmailAuthChallenge: vi.fn().mockResolvedValue(null),
       upsertGitHubUserAccount: vi.fn(),
-      acceptOrganizationInvite: vi.fn()
+      acceptProjectInvite: vi.fn()
     });
 
     await expect(invalidService.verifyEmailCode({ email: "owen@example.com", code: "123456" })).resolves.toEqual({
@@ -401,7 +401,7 @@ describe("auth email-code and session primitives", () => {
           accepted_terms_at: null
         }),
         upsertGitHubUserAccount: vi.fn(),
-        acceptOrganizationInvite: vi.fn()
+        acceptProjectInvite: vi.fn()
       },
       {
         signupEmailAllowlist: ["owen@example.com"]
@@ -451,7 +451,7 @@ describe("auth email-code and session primitives", () => {
         accepted_terms_at: now.toISOString()
       }),
       upsertGitHubUserAccount: vi.fn(),
-      acceptOrganizationInvite: vi.fn()
+      acceptProjectInvite: vi.fn()
     });
 
     const verified = await service.verifyEmailCode({ email: "owen@example.com", code: "123456", now });
@@ -491,7 +491,7 @@ describe("auth email-code and session primitives", () => {
         accepted_terms_at: now.toISOString()
       }),
       upsertGitHubUserAccount: vi.fn(),
-      acceptOrganizationInvite: vi.fn()
+      acceptProjectInvite: vi.fn()
     });
 
     await expect(service.verifyEmailCode({ email: "owen@example.com", code: "123456", now })).resolves.toEqual({
@@ -514,7 +514,7 @@ describe("auth email-code and session primitives", () => {
         replaceEmailAuthChallenge: vi.fn(),
         consumeEmailAuthChallenge: vi.fn(),
         upsertGitHubUserAccount: vi.fn(),
-        acceptOrganizationInvite: vi.fn()
+        acceptProjectInvite: vi.fn()
       },
       {
         githubOAuth: {
@@ -588,7 +588,7 @@ describe("auth email-code and session primitives", () => {
         replaceEmailAuthChallenge: vi.fn(),
         consumeEmailAuthChallenge: vi.fn(),
         upsertGitHubUserAccount,
-        acceptOrganizationInvite: vi.fn()
+        acceptProjectInvite: vi.fn()
       },
       {
         githubOAuth: {
@@ -650,7 +650,7 @@ describe("auth email-code and session primitives", () => {
         replaceEmailAuthChallenge: vi.fn(),
         consumeEmailAuthChallenge: vi.fn(),
         upsertGitHubUserAccount: vi.fn(),
-        acceptOrganizationInvite: vi.fn()
+        acceptProjectInvite: vi.fn()
       },
       {
         signupEmailAllowlist: ["owen@example.com"],
@@ -715,7 +715,7 @@ describe("auth email-code and session primitives", () => {
           role: "owner",
           created_user: false
         }),
-        acceptOrganizationInvite: vi.fn()
+        acceptProjectInvite: vi.fn()
       },
       {
         githubOAuth: {
@@ -760,7 +760,7 @@ describe("auth email-code and session primitives", () => {
       replaceEmailAuthChallenge: vi.fn(),
       consumeEmailAuthChallenge: vi.fn(),
       upsertGitHubUserAccount: vi.fn(),
-      acceptOrganizationInvite: vi.fn(),
+      acceptProjectInvite: vi.fn(),
     });
 
     await expect(noGithubService.beginGithubAuth()).resolves.toEqual({ ok: false, error: "provider_not_configured" });
@@ -790,7 +790,7 @@ describe("auth email-code and session primitives", () => {
         replaceEmailAuthChallenge: vi.fn(),
         consumeEmailAuthChallenge: vi.fn(),
         upsertGitHubUserAccount: vi.fn(),
-        acceptOrganizationInvite: vi.fn(),
+        acceptProjectInvite: vi.fn(),
       },
       {
         githubOAuth: {
@@ -828,7 +828,7 @@ describe("auth email-code and session primitives", () => {
         replaceEmailAuthChallenge: vi.fn(),
         consumeEmailAuthChallenge: vi.fn(),
         upsertGitHubUserAccount: vi.fn(),
-        acceptOrganizationInvite: vi
+        acceptProjectInvite: vi
           .fn()
           .mockResolvedValueOnce({ kind: "email_mismatch" })
           .mockResolvedValueOnce({ kind: "accepted", membership: { user_id: "usr_123", organization_id: "org_123", role: "member" } }),

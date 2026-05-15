@@ -3,14 +3,14 @@ import { createHmac, randomBytes } from "node:crypto";
 import { DEFAULT_GITHUB_AUTHORIZE_URL, type GitHubOAuthConfig } from "./github-auth-client.js";
 import { resolveGitHubAccountForIdentity } from "./github-account-linking.js";
 import {
-  ORGANIZATION_INVITE_TOKEN_PREFIX,
-  type AcceptOrganizationInviteStoreResult,
+  PROJECT_INVITE_TOKEN_PREFIX,
+  type AcceptProjectInviteStoreResult,
   type AuthEmailSender,
   type ConsumeEmailAuthChallengeInput,
   type CreateSessionInput,
   type CreateUserAccountInput,
   type EmailAuthChallengeRecord,
-  type OrganizationInviteMembership,
+  type ProjectInviteMembership,
   type RevokeOtherSessionsInput,
   type RevokeSessionInput,
   type WebSessionRecord,
@@ -66,13 +66,13 @@ export interface EmailAuthChallengeStore {
   consumeEmailAuthChallenge(input: ConsumeEmailAuthChallengeInput): Promise<{ email: string; accepted_terms_at: string | null } | null>;
 }
 
-export interface OrganizationInviteAcceptanceStore {
-  acceptOrganizationInvite(input: {
+export interface ProjectInviteAcceptanceStore {
+  acceptProjectInvite(input: {
     invite_token_hash: string;
     user_id: string;
     email: string;
     accepted_at: string;
-  }): Promise<AcceptOrganizationInviteStoreResult>;
+  }): Promise<AcceptProjectInviteStoreResult>;
 }
 
 export type RequestEmailCodeResult =
@@ -96,7 +96,7 @@ export type VerifyEmailCodeResult =
 export type AcceptInviteResult =
   | {
       ok: true;
-      membership: OrganizationInviteMembership;
+      membership: ProjectInviteMembership;
     }
   | {
       ok: false;
@@ -250,7 +250,7 @@ function buildGithubAppRedirectUrl(appRedirectUrl: string, error?: string): stri
 }
 
 export function createWebSessionAuthService(
-  store: WebSessionAuthStore & EmailAuthChallengeStore & OrganizationInviteAcceptanceStore,
+  store: WebSessionAuthStore & EmailAuthChallengeStore & ProjectInviteAcceptanceStore,
   options: WebSessionAuthServiceOptions = {}
 ): WebSessionAuthService {
   const sessionLifetimeMs = options.sessionLifetimeMs ?? DEFAULT_SESSION_LIFETIME_MS;
@@ -489,14 +489,14 @@ export function createWebSessionAuthService(
         };
       }
 
-      if (!input.token.startsWith(ORGANIZATION_INVITE_TOKEN_PREFIX)) {
+      if (!input.token.startsWith(PROJECT_INVITE_TOKEN_PREFIX)) {
         return {
           ok: false,
           error: "invalid_token"
         };
       }
 
-      const accepted = await store.acceptOrganizationInvite({
+      const accepted = await store.acceptProjectInvite({
         invite_token_hash: hashToken(input.token),
         user_id: session.user_id,
         email: session.email,

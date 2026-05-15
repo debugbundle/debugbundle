@@ -135,15 +135,16 @@ export function createPostgresAccountStore(db: Queryable): AccountLifecycleStore
         [input.organization_id],
       );
 
-      const invites = await queryJsonRows(
+      const projectInvites = await queryJsonRows(
         db,
         `
           SELECT to_jsonb(t) AS data
           FROM (
-            SELECT invites.*,
-                   invites.id AS invite_id
-            FROM invites
-            WHERE organization_id = $1
+            SELECT project_invites.*,
+                   project_invites.id AS invite_id
+            FROM project_invites
+            JOIN projects p ON p.id = project_invites.project_id
+            WHERE p.organization_id = $1
             ORDER BY created_at ASC, id ASC
           ) t
         `,
@@ -389,7 +390,7 @@ export function createPostgresAccountStore(db: Queryable): AccountLifecycleStore
         user,
         organization,
         members,
-        invites,
+        project_invites: projectInvites,
         member_tokens: memberTokens,
         projects,
         project_tokens: projectTokens,

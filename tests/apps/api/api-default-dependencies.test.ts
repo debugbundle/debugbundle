@@ -30,7 +30,7 @@ const {
   createIncidentLifecycleServiceMock,
   createSesEmailTransportMock,
   renderEmailAuthCodeEmailMock,
-  renderOrganizationInviteEmailMock,
+  renderProjectInviteEmailMock,
   emailTransportSendMock
 } = vi.hoisted(() => ({
   poolQueryMock: vi.fn(),
@@ -60,7 +60,7 @@ const {
   createIncidentLifecycleServiceMock: vi.fn(),
   createSesEmailTransportMock: vi.fn(),
   renderEmailAuthCodeEmailMock: vi.fn(),
-  renderOrganizationInviteEmailMock: vi.fn(),
+  renderProjectInviteEmailMock: vi.fn(),
   emailTransportSendMock: vi.fn()
 }));
 
@@ -112,7 +112,7 @@ vi.mock("../../../packages/email/src/index.js", () => ({
   createSesEmailTransport: createSesEmailTransportMock,
   formatProductFromEmail: (fromEmail: string) => `DebugBundle <${fromEmail}>`,
   renderEmailAuthCodeEmail: renderEmailAuthCodeEmailMock,
-  renderOrganizationInviteEmail: renderOrganizationInviteEmailMock
+  renderProjectInviteEmail: renderProjectInviteEmailMock
 }));
 
 import {
@@ -154,7 +154,7 @@ describe("api default dependencies", () => {
     createIncidentLifecycleServiceMock.mockReset();
     createSesEmailTransportMock.mockReset();
     renderEmailAuthCodeEmailMock.mockReset();
-    renderOrganizationInviteEmailMock.mockReset();
+    renderProjectInviteEmailMock.mockReset();
     emailTransportSendMock.mockReset();
 
     createRedisQueueClientMock.mockReturnValue({ enqueue: vi.fn() });
@@ -171,7 +171,7 @@ describe("api default dependencies", () => {
       replaceEmailAuthChallenge: vi.fn(),
       consumeEmailAuthChallenge: vi.fn(),
       markUserEmailVerified: vi.fn(),
-      acceptOrganizationInvite: vi.fn(),
+      acceptProjectInvite: vi.fn(),
       upsertGitHubUserAccount: vi.fn()
     });
     createPostgresBillingStoreMock.mockReturnValue({
@@ -216,16 +216,9 @@ describe("api default dependencies", () => {
     });
     createSesEmailTransportMock.mockReturnValue({ send: emailTransportSendMock });
     renderEmailAuthCodeEmailMock.mockReturnValue({ subject: "Your DebugBundle code", text: "123456", html: "<b>123456</b>" });
-    renderOrganizationInviteEmailMock.mockReturnValue({ subject: "Invite", text: "invite-text", html: "invite-html" });
+    renderProjectInviteEmailMock.mockReturnValue({ subject: "Invite", text: "invite-text", html: "invite-html" });
     createIngestionPersistenceServiceMock.mockReturnValue({ persistAndEnqueue: vi.fn() });
     createPostgresMetadataStoreMock.mockReturnValue({
-      listMembersForOrganization: vi.fn(),
-      createInviteForOrganization: vi.fn(),
-      listPendingInvitesForOrganization: vi.fn(),
-      cancelInviteForOrganization: vi.fn(),
-      acceptInviteForUser: vi.fn(),
-      removeMemberFromOrganization: vi.fn(),
-      updateMemberRoleForOrganization: vi.fn(),
       listProjectsForOrganization: vi.fn(),
       createProjectForOrganization: vi.fn(),
       updateProjectForOrganization: vi.fn(),
@@ -430,12 +423,6 @@ describe("api default dependencies", () => {
     expect(typeof deps.billingManagement.increaseCapacity).toBe("function");
     expect(typeof deps.billingManagement.scheduleCapacityReduction).toBe("function");
     expect(typeof deps.billingManagement.cancelCapacityReduction).toBe("function");
-    expect(typeof deps.organizationManagement.listMembersForOrganization).toBe("function");
-    expect(typeof deps.organizationManagement.createInviteForOrganization).toBe("function");
-    expect(typeof deps.organizationManagement.listPendingInvitesForOrganization).toBe("function");
-    expect(typeof deps.organizationManagement.cancelInviteForOrganization).toBe("function");
-    expect(typeof deps.organizationManagement.removeMemberFromOrganization).toBe("function");
-    expect(typeof deps.organizationManagement.updateMemberRoleForOrganization).toBe("function");
     expect(typeof deps.incidentRetrieval.listIncidentsForOrganization).toBe("function");
     expect(typeof deps.incidentRetrieval.getIncidentForOrganization).toBe("function");
     expect(typeof deps.incidentRetrieval.listIncidentLogsForOrganization).toBe("function");
@@ -544,35 +531,6 @@ describe("api default dependencies", () => {
       organization_id: "org_123",
       project_id: "proj_123",
       name: "Main App API"
-    });
-    void deps.organizationManagement.listMembersForOrganization({
-      organization_id: "org_123"
-    });
-    void deps.organizationManagement.createInviteForOrganization({
-      organization_id: "org_123",
-      email: "new@example.com",
-      role: "member",
-      invited_by_user_id: "usr_123",
-      invite_token_hash: "invite_hash_123",
-      expires_at: "2026-03-23T00:00:00.000Z"
-    });
-    void deps.organizationManagement.listPendingInvitesForOrganization({
-      organization_id: "org_123",
-      now: "2026-03-16T00:00:00.000Z"
-    });
-    void deps.organizationManagement.cancelInviteForOrganization({
-      organization_id: "org_123",
-      invite_id: "550e8400-e29b-41d4-a716-446655440000"
-    });
-    void deps.organizationManagement.removeMemberFromOrganization({
-      organization_id: "org_123",
-      user_id: "660e8400-e29b-41d4-a716-446655440000",
-      revoked_at: "2026-03-16T01:00:00.000Z"
-    });
-    void deps.organizationManagement.updateMemberRoleForOrganization({
-      organization_id: "org_123",
-      user_id: "660e8400-e29b-41d4-a716-446655440000",
-      role: "member"
     });
     void deps.webAuth.requestEmailCode({
       email: "owen@example.com",
@@ -690,13 +648,6 @@ describe("api default dependencies", () => {
       listProjectsForOrganization: ReturnType<typeof vi.fn>;
       createProjectForOrganization: ReturnType<typeof vi.fn>;
       updateProjectForOrganization: ReturnType<typeof vi.fn>;
-      listMembersForOrganization: ReturnType<typeof vi.fn>;
-      createInviteForOrganization: ReturnType<typeof vi.fn>;
-      listPendingInvitesForOrganization: ReturnType<typeof vi.fn>;
-      cancelInviteForOrganization: ReturnType<typeof vi.fn>;
-      acceptInviteForUser: ReturnType<typeof vi.fn>;
-      removeMemberFromOrganization: ReturnType<typeof vi.fn>;
-      updateMemberRoleForOrganization: ReturnType<typeof vi.fn>;
     };
     const webhookStore = createPostgresWebhookDeliveryStoreMock.mock.results[0]?.value as {
       createTestDeliveryForOrganization: ReturnType<typeof vi.fn>;
@@ -796,36 +747,6 @@ describe("api default dependencies", () => {
       organization_id: "org_123",
       project_id: "proj_123",
       name: "Main App API"
-    });
-    expect(metadataStore.listMembersForOrganization).toHaveBeenCalledWith({
-      organization_id: "org_123"
-    });
-    expect(metadataStore.createInviteForOrganization).toHaveBeenCalledWith({
-      organization_id: "org_123",
-      email: "new@example.com",
-      role: "member",
-      invited_by_user_id: "usr_123",
-      invite_token_hash: "invite_hash_123",
-      expires_at: "2026-03-23T00:00:00.000Z"
-    });
-    expect(metadataStore.listPendingInvitesForOrganization).toHaveBeenCalledWith({
-      organization_id: "org_123",
-      now: "2026-03-16T00:00:00.000Z"
-    });
-    expect(metadataStore.cancelInviteForOrganization).toHaveBeenCalledWith({
-      organization_id: "org_123",
-      invite_id: "550e8400-e29b-41d4-a716-446655440000"
-    });
-    expect(typeof metadataStore.acceptInviteForUser).toBe("function");
-    expect(metadataStore.removeMemberFromOrganization).toHaveBeenCalledWith({
-      organization_id: "org_123",
-      user_id: "660e8400-e29b-41d4-a716-446655440000",
-      revoked_at: "2026-03-16T01:00:00.000Z"
-    });
-    expect(metadataStore.updateMemberRoleForOrganization).toHaveBeenCalledWith({
-      organization_id: "org_123",
-      user_id: "660e8400-e29b-41d4-a716-446655440000",
-      role: "member"
     });
     expect(objectStore.getObject).toHaveBeenCalledWith({ key: "bundles/proj_123/inc_123/bundle.json.gz" });
     expect(metadataStore.listAlertsForOrganization).toHaveBeenCalledWith({
@@ -1189,7 +1110,7 @@ describe("api default dependencies", () => {
       | {
           authEmails?: {
             sendEmailAuthCode(input: { email: string; code: string; expires_in_minutes: number }): Promise<void>;
-            sendOrganizationInviteEmail(input: { email: string; token: string }): Promise<void>;
+            sendProjectInviteEmail(input: { email: string; token: string }): Promise<void>;
           };
         }
       | undefined;
@@ -1201,7 +1122,7 @@ describe("api default dependencies", () => {
       code: "123456",
       expires_in_minutes: 10
     });
-    await serviceOptions?.authEmails?.sendOrganizationInviteEmail({
+    await serviceOptions?.authEmails?.sendProjectInviteEmail({
       email: "invitee@example.com",
       token: "invite-token"
     });
@@ -1211,7 +1132,7 @@ describe("api default dependencies", () => {
       appUrl: "https://app.debugbundle.test/login",
       expiresInMinutes: 10
     });
-    expect(renderOrganizationInviteEmailMock).toHaveBeenCalledWith({
+    expect(renderProjectInviteEmailMock).toHaveBeenCalledWith({
       acceptUrl: "https://app.debugbundle.test/invite?token=invite-token"
     });
     expect(emailTransportSendMock).toHaveBeenCalledTimes(2);
@@ -1402,7 +1323,7 @@ describe("api default dependencies", () => {
         user: { user_id: "usr_123" },
         organization: { organization_id: "org_123" },
         members: [],
-        invites: [],
+        project_invites: [],
         member_tokens: [],
         projects: [],
         project_tokens: [],

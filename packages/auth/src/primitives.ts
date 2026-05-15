@@ -8,7 +8,7 @@ export const PROBE_TRIGGER_TOKEN_PREFIX = "dbundle_probe_";
 export const SESSION_COOKIE_NAME = "dbundle_session";
 export const GITHUB_OAUTH_STATE_COOKIE_NAME = "dbundle_github_oauth_state";
 export const GITHUB_APP_INSTALL_STATE_COOKIE_NAME = "dbundle_github_app_install_state";
-export const ORGANIZATION_INVITE_TOKEN_PREFIX = "dbundle_invite_";
+export const PROJECT_INVITE_TOKEN_PREFIX = "dbundle_invite_";
 
 type Argon2Algorithm = NonNullable<Argon2Options["algorithm"]>;
 
@@ -121,7 +121,7 @@ export interface ConsumeEmailAuthChallengeInput {
   used_at: string;
 }
 
-export interface OrganizationInviteMembership {
+export interface ProjectInviteMembership {
   project_id: string;
   user_id: string;
   role: "owner" | "admin" | "member";
@@ -139,10 +139,10 @@ export interface IssuedMemberTokenRecord {
   expires_at: string | null;
 }
 
-export type AcceptOrganizationInviteStoreResult =
+export type AcceptProjectInviteStoreResult =
   | {
       kind: "accepted";
-      membership: OrganizationInviteMembership;
+      membership: ProjectInviteMembership;
     }
   | {
       kind: "invalid_token" | "email_mismatch";
@@ -150,7 +150,7 @@ export type AcceptOrganizationInviteStoreResult =
 
 export interface AuthEmailSender {
   sendEmailAuthCode(input: { email: string; code: string; expires_in_minutes: number }): Promise<void>;
-  sendOrganizationInviteEmail(input: { email: string; token: string }): Promise<void>;
+  sendProjectInviteEmail(input: { email: string; token: string }): Promise<void>;
 }
 
 export interface CookieOptions {
@@ -277,9 +277,9 @@ export function generateEmailAuthCode(): { plaintext: string; hash: string } {
   };
 }
 
-export function generateOrganizationInviteToken(_inviteId: string): { plaintext: string; hash: string } {
+export function generateProjectInviteToken(_inviteId: string): { plaintext: string; hash: string } {
   void _inviteId;
-  return generateOpaqueToken(ORGANIZATION_INVITE_TOKEN_PREFIX);
+  return generateOpaqueToken(PROJECT_INVITE_TOKEN_PREFIX);
 }
 
 export async function hashPassword(password: string): Promise<string> {

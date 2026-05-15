@@ -29,7 +29,7 @@ import {
   formatProductFromEmail,
   renderAlertEmail,
   renderEmailAuthCodeEmail,
-  renderOrganizationInviteEmail,
+  renderProjectInviteEmail,
   renderWeeklyReportEmail
 } from "../../../packages/email/src/index.js";
 
@@ -68,14 +68,14 @@ describe("email package", () => {
       appUrl: "https://debugbundle.test/login?next=<dashboard>",
       expiresInMinutes: 10
     });
-    const invite = renderOrganizationInviteEmail({ acceptUrl: "https://debugbundle.test/accept?token=<secret>" });
+    const invite = renderProjectInviteEmail({ acceptUrl: "https://debugbundle.test/accept?token=<secret>" });
 
     expect(emailCode.subject).toContain("sign-in code");
     expect(emailCode.text).toContain("12<3456>");
     expect(emailCode.text).toContain("https://debugbundle.test/login?next=<dashboard>");
     expect(emailCode.html).toContain("12&lt;3456&gt;");
     expect(emailCode.html).toContain("&lt;dashboard&gt;");
-    expect(invite.subject).toContain("invited");
+    expect(invite.subject).toContain("project was shared");
     expect(invite.text).toContain("https://debugbundle.test/accept?token=<secret>");
     expect(invite.html).toContain("&lt;secret&gt;");
   });

@@ -1342,7 +1342,7 @@ describe("account routes backed by browser auth", () => {
         user: { user_id: "usr_123" },
         organization: { organization_id: "org_123" },
         members: [],
-        invites: [],
+        project_invites: [],
         member_tokens: [],
         projects: [],
         project_tokens: [],

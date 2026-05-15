@@ -713,19 +713,20 @@ Emitted by SDKs when duplicate suppression is active:
 | created_at | timestamptz | NOT NULL DEFAULT now() |
 | revoked_at | timestamptz | |
 
-### 5.5b invites
+### 5.5b project_invites
 | Column | Type | Constraints |
 |--------|------|-------------|
 | id | uuid | PK |
-| organization_id | uuid | FK → organizations, CASCADE |
+| project_id | uuid | FK → projects, CASCADE |
 | email | text | NOT NULL |
-| role | text | NOT NULL DEFAULT 'member' |
-| invited_by | uuid | FK → users |
-| invite_token_hash | text | UNIQUE when present |
+| role | text | NOT NULL |
+| invited_by_user_id | uuid | FK → users |
+| invite_token_hash | text | UNIQUE NOT NULL |
 | accepted_at | timestamptz | |
+| canceled_at | timestamptz | |
 | expires_at | timestamptz | NOT NULL |
 | created_at | timestamptz | NOT NULL DEFAULT now() |
-| UNIQUE | (organization_id, email) | |
+| UNIQUE | (project_id, lower(email)) | WHERE accepted_at IS NULL AND canceled_at IS NULL |
 
 ### 5.5c oauth_identities
 | Column | Type | Constraints |

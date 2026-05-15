@@ -264,7 +264,7 @@ export interface AccountDataExportRecord extends Record<string, unknown> {
   user: Record<string, unknown>;
   organization: Record<string, unknown>;
   members: Record<string, unknown>[];
-  invites: Record<string, unknown>[];
+  project_invites: Record<string, unknown>[];
   member_tokens: Record<string, unknown>[];
   projects: Record<string, unknown>[];
   project_tokens: Record<string, unknown>[];
@@ -302,13 +302,6 @@ export interface DeletedAccountRecord extends Record<string, unknown> {
   deleted_project_ids: string[];
   user_deleted: boolean;
   deleted_member_token_count: number;
-}
-
-export interface OrganizationMemberRecord {
-  user_id: string;
-  email: string;
-  role: "owner" | "member";
-  created_at: string;
 }
 
 export interface ProjectMemberRecord {
@@ -360,63 +353,6 @@ export type UpdateProjectMemberRoleResult =
   | {
       kind: "owner_role_change_forbidden";
       member: ProjectMemberRecord;
-    };
-
-export interface OrganizationInviteRecord {
-  invite_id: string;
-  organization_id: string;
-  email: string;
-  role: "member";
-  invited_by: string;
-  accepted_at: string | null;
-  expires_at: string;
-  created_at: string;
-}
-
-export type CreateOrganizationInviteResult =
-  | {
-      kind: "created";
-      plan: string;
-      invite: OrganizationInviteRecord;
-    }
-  | {
-      kind: "member_exists" | "invite_exists" | "upgrade_required";
-      plan: string;
-    };
-
-export type RemoveOrganizationMemberResult =
-  | {
-      kind: "removed";
-      member: OrganizationMemberRecord;
-    }
-  | {
-      kind: "owner_removal_forbidden";
-      member: OrganizationMemberRecord;
-    };
-
-export type UpdateOrganizationMemberRoleResult =
-  | {
-      kind: "updated";
-      member: OrganizationMemberRecord;
-    }
-  | {
-      kind: "owner_role_change_forbidden";
-      member: OrganizationMemberRecord;
-    };
-
-export interface AcceptedOrganizationInviteMembershipRecord {
-  user_id: string;
-  organization_id: string;
-  role: "owner" | "member";
-}
-
-export type AcceptOrganizationInviteResult =
-  | {
-      kind: "accepted";
-      membership: AcceptedOrganizationInviteMembershipRecord;
-    }
-  | {
-      kind: "invalid_token" | "email_mismatch";
     };
 
 export interface ProbeManagementStore {
@@ -571,7 +507,6 @@ export interface PostgresMetadataStore
   extends MetadataStore,
     TokenManagementStore,
     ProjectManagementStore,
-    OrganizationManagementStore,
     ProjectCollaborationStore,
     ProbeManagementStore,
     AlertManagementStore,
@@ -1344,44 +1279,6 @@ export interface GitHubStore {
   claimDueGitHubDispatchDeliveries(limit: number): Promise<DeliverGitHubDispatchJob[]>;
   getGitHubDispatchDeliveryIntent(deliveryId: string): Promise<GitHubDispatchDeliveryIntent | null>;
   markGitHubDispatchDeliveryAttempt(input: MarkGitHubDispatchDeliveryAttemptInput): Promise<MarkGitHubDispatchDeliveryAttemptResult>;
-}
-
-export interface OrganizationManagementStore {
-  listMembersForOrganization(input: {
-    organization_id: string;
-  }): Promise<{ plan: string; members: OrganizationMemberRecord[] } | null>;
-  listPendingInvitesForOrganization(input: {
-    organization_id: string;
-    now: string;
-  }): Promise<OrganizationInviteRecord[] | null>;
-  createInviteForOrganization(input: {
-    organization_id: string;
-    email: string;
-    role: "member";
-    invited_by_user_id: string;
-    invite_token_hash: string;
-    expires_at: string;
-  }): Promise<CreateOrganizationInviteResult | null>;
-  cancelInviteForOrganization(input: {
-    organization_id: string;
-    invite_id: string;
-  }): Promise<OrganizationInviteRecord | null>;
-  acceptInviteForUser(input: {
-    invite_token_hash: string;
-    user_id: string;
-    email: string;
-    accepted_at: string;
-  }): Promise<AcceptOrganizationInviteResult>;
-  removeMemberFromOrganization(input: {
-    organization_id: string;
-    user_id: string;
-    revoked_at: string;
-  }): Promise<RemoveOrganizationMemberResult | null>;
-  updateMemberRoleForOrganization(input: {
-    organization_id: string;
-    user_id: string;
-    role: "owner" | "member";
-  }): Promise<UpdateOrganizationMemberRoleResult | null>;
 }
 
 export interface ProjectCollaborationStore {

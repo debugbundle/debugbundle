@@ -1,6 +1,6 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 
-import { generateOrganizationInviteToken } from "../../../../packages/auth/src/index.js";
+import { generateProjectInviteToken } from "../../../../packages/auth/src/index.js";
 import type { ApiDependencies } from "../api-types.js";
 import { requireRateLimitedMemberAuth, resolveBrowserSession } from "../api-helpers.js";
 import {
@@ -142,7 +142,7 @@ export function registerProjectMemberRoutes(app: FastifyInstance, dependencies: 
       return reply.status(400).send({ error: "invalid_payload" });
     }
 
-    const inviteToken = generateOrganizationInviteToken(auth.member.member_id);
+    const inviteToken = generateProjectInviteToken(auth.member.member_id);
     const result = await projectCollaboration.createInviteForProject({
       project_id: parsedParams.data.id,
       user_id: auth.member.member_id,
@@ -172,7 +172,7 @@ export function registerProjectMemberRoutes(app: FastifyInstance, dependencies: 
       return reply.status(500).send({ error: "member_management_not_available" });
     }
 
-    await dependencies.inviteEmails?.sendOrganizationInviteEmail({
+    await dependencies.inviteEmails?.sendProjectInviteEmail({
       email: result.invite.email,
       token: inviteToken.plaintext
     });
