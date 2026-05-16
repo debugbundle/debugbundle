@@ -7,8 +7,8 @@
     "start": "next start -p 3007"
   },
   "dependencies": {
-    "@debugbundle/sdk-browser": "0.1.7",
-    "@debugbundle/sdk-node": "0.1.7",
+    "@debugbundle/sdk-browser": "0.1.6",
+    "@debugbundle/sdk-node": "0.1.6",
     "next": "^15.5.4",
     "react": "^19.1.1",
     "react-dom": "^19.1.1"

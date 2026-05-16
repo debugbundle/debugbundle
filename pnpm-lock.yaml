@@ -587,16 +587,16 @@ packages:
     resolution: {integrity: sha512-Vd/9EVDiu6PPJt9yAh6roZP6El1xHrdvIVGjyBsHR0RYwNHgL7FJPyIIW4fANJNG6FtyZfvlRPpFI4ZM/lubvw==}
     engines: {node: '>=18'}
 
-  '@debugbundle/redaction@0.1.7':
+  '@debugbundle/redaction@0.1.6':
     resolution: {integrity: sha512-oSFQK9xWvqmr6GGu4GrVoXsmmBHycGZrk/eTLoWx+WwBHQ4zA6K4mYCQOP/N0UqHhPQDRhZRd+Z8jpf4c6PLbQ==}
 
-  '@debugbundle/sdk-browser@0.1.7':
+  '@debugbundle/sdk-browser@0.1.6':
     resolution: {integrity: sha512-AJSR4QvesEDM06aRoW/HfGSR22JwjqCv17KVbFj2bzkgYQ2Mev+zNTfptyNfxzUFeDglGA6GAzW0hQ/P/gmVtg==}
 
-  '@debugbundle/sdk-node@0.1.7':
+  '@debugbundle/sdk-node@0.1.6':
     resolution: {integrity: sha512-SxmCve21eZXME1QI9GmnDu0zrfKQzY/zm3TuOrLTLkBRu6yQmIL2Eex/AL/PIwFOfwKsD62/NEmXZyoXRbllyA==}
 
-  '@debugbundle/shared-types@0.1.7':
+  '@debugbundle/shared-types@0.1.6':
     resolution: {integrity: sha512-UI2/QtFKwqLyWIEvTR9Kw1MqD4FVvcRLPAzCH2Th3Xfk2Z+6vUmsbPer/Poaxh2aSH7RQAmyPMCy7NIwyCt21w==}
 
   '@dotenvx/dotenvx@1.60.0':
@@ -5310,20 +5310,20 @@ snapshots:
 
   '@csstools/css-tokenizer@3.0.4': {}
 
-  '@debugbundle/redaction@0.1.7': {}
+  '@debugbundle/redaction@0.1.6': {}
 
-  '@debugbundle/sdk-browser@0.1.7':
+  '@debugbundle/sdk-browser@0.1.6':
     dependencies:
-      '@debugbundle/redaction': 0.1.7
-      '@debugbundle/shared-types': 0.1.7
+      '@debugbundle/redaction': 0.1.6
+      '@debugbundle/shared-types': 0.1.6
 
-  '@debugbundle/sdk-node@0.1.7':
+  '@debugbundle/sdk-node@0.1.6':
     dependencies:
-      '@debugbundle/redaction': 0.1.7
-      '@debugbundle/shared-types': 0.1.7
+      '@debugbundle/redaction': 0.1.6
+      '@debugbundle/shared-types': 0.1.6
       zod: 3.25.76
 
-  '@debugbundle/shared-types@0.1.7':
+  '@debugbundle/shared-types@0.1.6':
     dependencies:
       zod: 3.25.76
 

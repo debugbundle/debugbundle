@@ -10,7 +10,7 @@
     "typecheck": "tsc --noEmit -p tsconfig.json"
   },
   "dependencies": {
-    "@debugbundle/sdk-browser": "0.1.7",
+    "@debugbundle/sdk-browser": "0.1.6",
     "@fontsource-variable/geist": "^5.2.8",
     "@fontsource/instrument-sans": "^5.2.8",
     "@fontsource/jetbrains-mono": "^5.2.8",
