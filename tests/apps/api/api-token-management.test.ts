@@ -333,6 +333,107 @@ describe("api token management routes", () => {
     );
   });
 
+  it("should create project tokens for shared-project admins using the shared project's scope", async (): Promise<void> => {
+    const projectManagement = mockedObject<NonNullable<ApiServerDependencies["projectManagement"]>>({
+      resolveProjectAccessForUser: vi.fn().mockResolvedValue({
+        ...defaultProjectAccess,
+        organization_id: "org_shared",
+        relationship: "shared",
+        effective_role: "admin"
+      }),
+      listProjectsForUser: vi.fn().mockResolvedValue([]),
+      createProjectForUser: vi.fn().mockResolvedValue(null),
+      updateProjectForUser: vi.fn().mockResolvedValue(null),
+      deleteProjectForUser: vi.fn().mockResolvedValue(null)
+    });
+    const tokenManagement = {
+      listProjectTokensForOrganization: vi.fn().mockResolvedValue([]),
+      createProjectTokenForOrganization: vi.fn().mockResolvedValue({
+        token_id: "11111111-1111-4111-8111-111111111111",
+        project_id: "00000000-0000-4000-8000-000000000001",
+        label: "ci",
+        created_at: "2026-03-11T00:00:00.000Z",
+        last_used_at: null,
+        revoked_at: null,
+        expires_at: null
+      }),
+      revokeProjectTokenForOrganization: vi.fn().mockResolvedValue(null),
+      listMemberTokensForOrganization: vi.fn().mockResolvedValue([]),
+      createMemberTokenForOrganization: vi.fn().mockResolvedValue(null),
+      revokeMemberTokenForOrganization: vi.fn().mockResolvedValue(null)
+    };
+    const app = createServer({ projectManagement, tokenManagement });
+
+    const response = await app.inject({
+      method: "POST",
+      url: "/v1/projects/00000000-0000-4000-8000-000000000001/tokens",
+      headers: {
+        authorization: "Bearer dbundle_mem_test"
+      },
+      payload: {
+        label: "ci"
+      }
+    });
+
+    expect(response.statusCode).toBe(201);
+    expect(tokenManagement.createProjectTokenForOrganization).toHaveBeenCalledWith(
+      expect.objectContaining({
+        organization_id: "org_shared",
+        project_id: "00000000-0000-4000-8000-000000000001",
+        label: "ci"
+      })
+    );
+  });
+
+  it("should block plain shared-project members from project token credential management", async (): Promise<void> => {
+    const projectManagement = mockedObject<NonNullable<ApiServerDependencies["projectManagement"]>>({
+      resolveProjectAccessForUser: vi.fn().mockResolvedValue({
+        ...defaultProjectAccess,
+        organization_id: "org_shared",
+        relationship: "shared",
+        effective_role: "member"
+      }),
+      listProjectsForUser: vi.fn().mockResolvedValue([]),
+      createProjectForUser: vi.fn().mockResolvedValue(null),
+      updateProjectForUser: vi.fn().mockResolvedValue(null),
+      deleteProjectForUser: vi.fn().mockResolvedValue(null)
+    });
+    const tokenManagement = {
+      listProjectTokensForOrganization: vi.fn().mockResolvedValue([]),
+      createProjectTokenForOrganization: vi.fn().mockResolvedValue(null),
+      revokeProjectTokenForOrganization: vi.fn().mockResolvedValue(null),
+      listMemberTokensForOrganization: vi.fn().mockResolvedValue([]),
+      createMemberTokenForOrganization: vi.fn().mockResolvedValue(null),
+      revokeMemberTokenForOrganization: vi.fn().mockResolvedValue(null)
+    };
+    const app = createServer({ projectManagement, tokenManagement });
+
+    const createResponse = await app.inject({
+      method: "POST",
+      url: "/v1/projects/00000000-0000-4000-8000-000000000001/tokens",
+      headers: {
+        authorization: "Bearer dbundle_mem_test"
+      },
+      payload: {
+        label: "ci"
+      }
+    });
+    const revokeResponse = await app.inject({
+      method: "POST",
+      url: "/v1/projects/00000000-0000-4000-8000-000000000001/tokens/11111111-1111-4111-8111-111111111111/revoke",
+      headers: {
+        authorization: "Bearer dbundle_mem_test"
+      }
+    });
+
+    expect(createResponse.statusCode).toBe(403);
+    expect(createResponse.json()).toEqual({ error: "forbidden" });
+    expect(revokeResponse.statusCode).toBe(403);
+    expect(revokeResponse.json()).toEqual({ error: "forbidden" });
+    expect(tokenManagement.createProjectTokenForOrganization).not.toHaveBeenCalled();
+    expect(tokenManagement.revokeProjectTokenForOrganization).not.toHaveBeenCalled();
+  });
+
   it("should return project_not_found and invalid_payload for project token creation", async (): Promise<void> => {
     const tokenManagement = {
       listProjectTokensForOrganization: vi.fn().mockResolvedValue([]),

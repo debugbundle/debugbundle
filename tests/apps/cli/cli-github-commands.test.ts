@@ -38,11 +38,13 @@ describe("cli github commands", () => {
       updated_at: "2026-03-26T00:00:00.000Z"
     };
 
+    const getInstallation = vi.fn().mockResolvedValue(installation);
+    const getProjectRepo = vi.fn().mockResolvedValue(repo);
     const humanResult = await getGitHubStatusCommand(
       { bearerToken: "dbundle_mem_x", projectId: "proj_1" },
       {
-        getInstallation: vi.fn().mockResolvedValue(installation),
-        getProjectRepo: vi.fn().mockResolvedValue(repo)
+        getInstallation,
+        getProjectRepo
       }
     );
     const jsonResult = await getGitHubStatusCommand(
@@ -56,22 +58,25 @@ describe("cli github commands", () => {
     expect(humanResult.output).toContain("GitHub installation: debugbundle");
     expect(humanResult.output).toContain("Assigned repo: debugbundle/app");
     expect(JSON.parse(jsonResult.output)).toEqual({ installation });
+    expect(getInstallation).toHaveBeenCalledWith({ bearerToken: "dbundle_mem_x", projectId: "proj_1" });
+    expect(getProjectRepo).toHaveBeenCalledWith({ bearerToken: "dbundle_mem_x", projectId: "proj_1" });
   });
 
   it("renders repository list, repo set, and repo remove output", async () => {
-    const listResult = await listGitHubRepositoriesCommand(
-      { bearerToken: "dbundle_mem_x" },
+    const listRepositories = vi.fn().mockResolvedValue([
       {
-        listRepositories: vi.fn().mockResolvedValue([
-          {
-            id: 1,
-            owner: "debugbundle",
-            name: "app",
-            full_name: "debugbundle/app",
-            default_branch: "main",
-            private: true
-          }
-        ])
+        id: 1,
+        owner: "debugbundle",
+        name: "app",
+        full_name: "debugbundle/app",
+        default_branch: "main",
+        private: true
+      }
+    ]);
+    const listResult = await listGitHubRepositoriesCommand(
+      { bearerToken: "dbundle_mem_x", projectId: "proj_1" },
+      {
+        listRepositories
       }
     );
     const setResult = await setProjectGitHubRepoCommand(
@@ -98,6 +103,7 @@ describe("cli github commands", () => {
 
     expect(listResult.exitCode).toBe(0);
     expect(listResult.output).toContain("debugbundle/app (main)");
+    expect(listRepositories).toHaveBeenCalledWith({ bearerToken: "dbundle_mem_x", projectId: "proj_1" });
     expect(setResult.output).toContain("Project repo set: Assigned repo: debugbundle/app");
     expect(JSON.parse(removeResult.output)).toEqual({ removed: true, project_id: "proj_1" });
   });

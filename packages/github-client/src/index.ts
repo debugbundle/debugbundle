@@ -40,6 +40,7 @@ export const GitHubDispatchRuleSchema = z
   .object({
     rule_id: z.string(),
     project_id: z.string(),
+    created_by_user_id: z.string(),
     name: z.string(),
     enabled: z.boolean(),
     event_types: z.array(z.string().min(1)),
@@ -271,8 +272,8 @@ async function expectNoContent(responsePromise: Promise<HttpResponse>): Promise<
 }
 
 export function createGitHubManagementApi(client: HttpClient): {
-  getInstallation(input: { bearerToken: string }): Promise<GitHubInstallation>;
-  listRepositories(input: { bearerToken: string }): Promise<GitHubRepository[]>;
+  getInstallation(input: { bearerToken: string; projectId?: string }): Promise<GitHubInstallation>;
+  listRepositories(input: { bearerToken: string; projectId?: string }): Promise<GitHubRepository[]>;
   getProjectRepo(input: { bearerToken: string; projectId: string }): Promise<ProjectGitHubRepo>;
   listProjectDeliveries(input: {
     bearerToken: string;
@@ -315,20 +316,22 @@ export function createGitHubManagementApi(client: HttpClient): {
 } {
   return {
     async getInstallation(input) {
+      const query = input.projectId === undefined ? "" : `?project_id=${encodeURIComponent(input.projectId)}`;
       return expectInstallation(
         client.request({
           method: "GET",
-          path: "/v1/github/installation",
+          path: `/v1/github/installation${query}`,
           bearerToken: input.bearerToken
         })
       );
     },
 
     async listRepositories(input) {
+      const query = input.projectId === undefined ? "" : `?project_id=${encodeURIComponent(input.projectId)}`;
       return expectRepositories(
         client.request({
           method: "GET",
-          path: "/v1/github/repositories",
+          path: `/v1/github/repositories${query}`,
           bearerToken: input.bearerToken
         })
       );

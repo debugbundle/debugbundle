@@ -58,16 +58,22 @@ export function registerTokenRoutes(app: FastifyInstance, dependencies: ApiDepen
   });
 
   app.post("/v1/projects/:id/tokens", async (request, reply) => {
-    const member = await requireRateLimitedMemberAuth(request, reply, dependencies, "management-write");
-    if (member === null) {
-      return;
-    }
-
     const parsedParams = ProjectParamsSchema.safeParse(request.params);
     if (!parsedParams.success) {
       return reply.status(400).send({
         error: "invalid_project_id"
       });
+    }
+
+    const auth = await requireRateLimitedProjectAccess(request, reply, dependencies, {
+      bucket: "management-write",
+      projectId: parsedParams.data.id
+    });
+    if (auth === null) {
+      return;
+    }
+    if (auth.access.effective_role !== "owner" && auth.access.effective_role !== "admin") {
+      return reply.status(403).send({ error: "forbidden" });
     }
 
     const parsedBody = CreateTokenBodySchema.safeParse(request.body);
@@ -79,7 +85,7 @@ export function registerTokenRoutes(app: FastifyInstance, dependencies: ApiDepen
 
     const generated = generateProjectToken(parsedParams.data.id);
     const created = await dependencies.tokenManagement.createProjectTokenForOrganization({
-      organization_id: member.organization_id,
+      organization_id: auth.access.organization_id,
       project_id: parsedParams.data.id,
       label: parsedBody.data.label,
       token_hash: generated.hash
@@ -87,8 +93,8 @@ export function registerTokenRoutes(app: FastifyInstance, dependencies: ApiDepen
 
     if (created === null) {
       await recordAuditLog(dependencies.auditLogging, {
-        organization_id: member.organization_id,
-        actor_user_id: member.member_id,
+        organization_id: auth.access.organization_id,
+        actor_user_id: auth.member.member_id,
         actor_type: resolveAuditActorType(request.headers),
         action: "token.project.create",
         target_type: "project_token",
@@ -108,8 +114,8 @@ export function registerTokenRoutes(app: FastifyInstance, dependencies: ApiDepen
     }
 
     await recordAuditLog(dependencies.auditLogging, {
-      organization_id: member.organization_id,
-      actor_user_id: member.member_id,
+      organization_id: auth.access.organization_id,
+      actor_user_id: auth.member.member_id,
       actor_type: resolveAuditActorType(request.headers),
       action: "token.project.create",
       target_type: "project_token",
@@ -131,11 +137,6 @@ export function registerTokenRoutes(app: FastifyInstance, dependencies: ApiDepen
   });
 
   app.post("/v1/projects/:id/tokens/:tokenId/revoke", async (request, reply) => {
-    const member = await requireRateLimitedMemberAuth(request, reply, dependencies, "management-write");
-    if (member === null) {
-      return;
-    }
-
     const parsedParams = ProjectTokenParamsSchema.safeParse(request.params);
     if (!parsedParams.success) {
       return reply.status(400).send({
@@ -143,8 +144,19 @@ export function registerTokenRoutes(app: FastifyInstance, dependencies: ApiDepen
       });
     }
 
+    const auth = await requireRateLimitedProjectAccess(request, reply, dependencies, {
+      bucket: "management-write",
+      projectId: parsedParams.data.id
+    });
+    if (auth === null) {
+      return;
+    }
+    if (auth.access.effective_role !== "owner" && auth.access.effective_role !== "admin") {
+      return reply.status(403).send({ error: "forbidden" });
+    }
+
     const revoked = await dependencies.tokenManagement.revokeProjectTokenForOrganization({
-      organization_id: member.organization_id,
+      organization_id: auth.access.organization_id,
       project_id: parsedParams.data.id,
       token_id: parsedParams.data.tokenId,
       revoked_at: new Date().toISOString()
@@ -152,8 +164,8 @@ export function registerTokenRoutes(app: FastifyInstance, dependencies: ApiDepen
 
     if (revoked === null) {
       await recordAuditLog(dependencies.auditLogging, {
-        organization_id: member.organization_id,
-        actor_user_id: member.member_id,
+        organization_id: auth.access.organization_id,
+        actor_user_id: auth.member.member_id,
         actor_type: resolveAuditActorType(request.headers),
         action: "token.project.revoke",
         target_type: "project_token",
@@ -172,8 +184,8 @@ export function registerTokenRoutes(app: FastifyInstance, dependencies: ApiDepen
     }
 
     await recordAuditLog(dependencies.auditLogging, {
-      organization_id: member.organization_id,
-      actor_user_id: member.member_id,
+      organization_id: auth.access.organization_id,
+      actor_user_id: auth.member.member_id,
       actor_type: resolveAuditActorType(request.headers),
       action: "token.project.revoke",
       target_type: "project_token",

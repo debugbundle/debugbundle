@@ -408,6 +408,12 @@ Last updated: 2026-03-13
 - **Then** the webhook status is set to `disabled`
 - **And** the owner is notified via email
 
+### AC-WHK-05: Member Webhook Ownership
+- **Given** a shared project where one member created a webhook
+- **When** a different non-admin member attempts to update, test, or delete that webhook
+- **Then** the request is rejected with a permissions error
+- **And** owner and admin can still manage the same webhook
+
 ---
 
 ## 9. MCP Acceptance
@@ -463,12 +469,29 @@ If CLI says something is healthy and MCP says something different, that is a pro
 - **Given** a project collaborator with role `member`
 - **When** the user attempts to invite another collaborator, cancel an invite, update a collaborator role, or remove a collaborator for that project
 - **Then** the request is rejected with a permissions error
+- **And** the user cannot access the project members-management surface
 - **And** the user can still read project incidents and bundles and perform normal project-scoped operational actions
 
 - **Given** a project collaborator with role `admin`
 - **When** the user manages collaborators for that same project
 - **Then** the request succeeds
 - **And** deleting the project itself still remains forbidden
+
+- **Given** a project collaborator with role `member`
+- **When** the user attempts to update or delete an alert rule, webhook, or GitHub dispatch rule created by another collaborator
+- **Then** the request is rejected with a permissions error
+
+- **Given** a project collaborator with role `member`
+- **When** the user updates or deletes one of their own alert rules, webhooks, or GitHub dispatch rules
+- **Then** the request succeeds
+
+### AC-AUTH-05a: Project Sharing State Metadata
+- **Given** an owner who has shared one of their projects with collaborators
+- **And** a collaborator who can access that shared project
+- **When** each user lists visible projects
+- **Then** the owner's response marks that project with `sharing_state: "shared_by_you"`
+- **And** the collaborator's response marks the same project with `sharing_state: "shared_with_you"`
+- **And** a private owned project returns `sharing_state: "private"`
 
 ### AC-AUTH-06: Session And Member-Token Parity
 - **Given** the same verified user identity
@@ -558,6 +581,12 @@ If CLI says something is healthy and MCP says something different, that is a pro
 - **Given** an authenticated user
 - **When** creating, listing, or deleting alert rules via API or CLI
 - **Then** the operations succeed and the rules take effect immediately
+
+### AC-ALT-05: Member Alert Ownership
+- **Given** a shared project where one member created an alert rule
+- **When** a different non-admin member attempts to update or delete that alert rule
+- **Then** the request is rejected with a permissions error
+- **And** owner and admin can still manage the same alert rule
 
 ---
 
@@ -1079,12 +1108,21 @@ If CLI says something is healthy and MCP says something different, that is a pro
 - **And** `policy.immediate_client_error_statuses` resolves to `[]` for `balanced`
 - **And** `policy.immediate_client_error_statuses` resolves to `[401,403,409,422]` for `investigative`
 - **And** all override fields are `null` (preset controls apply)
+- **And** a plain member viewer receives only the resolved preview payload, not raw override provenance
 
 ### AC-EVT-05: Capture Policy CRUD
-- **Given** a project with member-token auth
+- **Given** a project owner or admin with member-token auth
 - **When** `PATCH /v1/projects/{id}/capture-policy` is called with `{ "preset": "investigative" }`
 - **Then** the policy updates to the `investigative` preset
 - **And** `GET /v1/projects/{id}/capture-policy` returns the new preset with resolved control values and raw override state
+
+### AC-EVT-05a: Capture Policy Member Preview
+- **Given** a project collaborator with role `member`
+- **When** `GET /v1/projects/{id}/capture-policy` is called
+- **Then** the response includes only the resolved policy preview needed for read-only display
+- **And** the response omits raw override state and preset-origin adornment data
+- **When** the same collaborator calls `PATCH /v1/projects/{id}/capture-policy`
+- **Then** the request is rejected with a permissions error
 
 ### AC-EVT-06: Capture Policy Advanced Overrides
 - **Given** a project with preset `balanced`
@@ -1336,30 +1374,38 @@ If CLI says something is healthy and MCP says something different, that is a pro
 
 ### AC-GHA-13: Delivery History
 - **Given** a project with dispatch deliveries
-- **When** the owner views the project GitHub tab → Delivery History
+- **When** an authorized project member views the project GitHub tab → Delivery History
 - **Then** each delivery shows rule name, incident title, timestamp, status, attempt count, and last error
 - **And** failed deliveries show the HTTP status code from GitHub
 - **And** a "Retry" button is available on failed deliveries
 
 ### AC-GHA-14: Free Tier Gating
 - **Given** a Free-tier project
-- **When** the owner navigates to the project's GitHub tab
+- **When** any collaborator navigates to the project's GitHub tab
 - **Then** the integration panel shows an upgrade prompt
 - **And** no GitHub App connection, repo assignment, or dispatch rules can be created
 
-### AC-GHA-15: Interface Parity
+### AC-GHA-15: Shared Project Plan Gating
+- **Given** a shared project owned by a Solo or Team account
+- **And** the acting collaborator's own personal account plan is Free
+- **When** the collaborator opens that shared project's GitHub automation surface
+- **Then** GitHub automation remains available for the shared project
+- **And** the collaborator can create a new dispatch rule when the project already has a connection and assigned repository
+- **And** the collaborator cannot change the GitHub connection, change the assigned repository, or edit/delete rules created by someone else
+
+### AC-GHA-16: Interface Parity
 - **Given** any GitHub automation management operation (installation status, repo assignment, rule CRUD, delivery history, retry)
 - **When** the operation is performed
 - **Then** it is available through API, CLI, and MCP
 - **And** all three interfaces call the same domain services
 
-### AC-GHA-16: Dispatch Payload Stability
+### AC-GHA-17: Dispatch Payload Stability
 - **Given** a `repository_dispatch` sent by DebugBundle
 - **When** the receiving workflow inspects `client_payload`
 - **Then** the payload matches the documented stable contract
 - **And** `client_payload.debugbundle.dispatch_id` is globally unique per delivery attempt for deduplication
 
-### AC-GHA-17: Self-Host GitHub App
+### AC-GHA-18: Self-Host GitHub App
 - **Given** a self-hosted DebugBundle deployment with custom `GITHUB_APP_ID` and `GITHUB_APP_PRIVATE_KEY` environment variables
 - **When** the operator completes GitHub App setup
 - **Then** dispatch rule evaluation, delivery, and retry logic is identical to cloud

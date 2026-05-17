@@ -44,6 +44,7 @@ import type {
 function mapAlertRuleRow(row: {
   alert_id: string;
   project_id: string;
+  created_by_user_id: string;
   service_id: string | null;
   channel: AlertRuleRecord["channel"];
   condition_type: AlertRuleRecord["condition_type"];
@@ -56,6 +57,7 @@ function mapAlertRuleRow(row: {
   return {
     alert_id: row.alert_id,
     project_id: row.project_id,
+    created_by_user_id: row.created_by_user_id,
     service_id: row.service_id,
     channel: row.channel,
     condition_type: row.condition_type,
@@ -159,6 +161,7 @@ function mapProjectRow(row: ProjectRecord & Record<string, unknown>): ProjectRec
     owner_user_id: row.owner_user_id,
     owner_email: row.owner_email,
     relationship: row.relationship,
+    sharing_state: row.sharing_state,
     effective_role: row.effective_role,
     name: row.name,
     slug: row.slug,
@@ -177,6 +180,7 @@ function mapDeletedProjectRow(row: DeletedProjectRecord & Record<string, unknown
     owner_user_id: row.owner_user_id,
     owner_email: row.owner_email,
     relationship: row.relationship,
+    sharing_state: row.sharing_state,
     effective_role: row.effective_role,
     name: row.name,
     slug: row.slug,
@@ -530,6 +534,24 @@ export function createPostgresMetadataStore(db: Queryable): PostgresMetadataStor
               ELSE 'shared'
             END AS relationship,
             CASE
+              WHEN p.owner_user_id <> $1::uuid THEN 'shared_with_you'
+              WHEN EXISTS (
+                SELECT 1
+                FROM project_members shared_members
+                WHERE shared_members.project_id = p.id
+              )
+                OR EXISTS (
+                  SELECT 1
+                  FROM project_invites pending_invites
+                  WHERE pending_invites.project_id = p.id
+                    AND pending_invites.accepted_at IS NULL
+                    AND pending_invites.canceled_at IS NULL
+                    AND pending_invites.expires_at > now()
+                )
+                THEN 'shared_by_you'
+              ELSE 'private'
+            END AS sharing_state,
+            CASE
               WHEN p.owner_user_id = $1::uuid THEN 'owner'
               ELSE pm.role
             END AS effective_role,
@@ -560,7 +582,10 @@ export function createPostgresMetadataStore(db: Queryable): PostgresMetadataStor
             ON actor_membership.project_id = p.id
            AND actor_membership.user_id = $2::uuid
           WHERE p.id = $1::uuid
-            AND (p.owner_user_id = $2::uuid OR actor_membership.user_id IS NOT NULL)
+            AND (
+              p.owner_user_id = $2::uuid
+              OR actor_membership.role = 'admin'
+            )
           LIMIT 1
         `,
         [input.project_id, input.user_id]
@@ -617,7 +642,10 @@ export function createPostgresMetadataStore(db: Queryable): PostgresMetadataStor
             ON actor_membership.project_id = p.id
            AND actor_membership.user_id = $2::uuid
           WHERE p.id = $1::uuid
-            AND (p.owner_user_id = $2::uuid OR actor_membership.user_id IS NOT NULL)
+            AND (
+              p.owner_user_id = $2::uuid
+              OR actor_membership.role = 'admin'
+            )
           LIMIT 1
         `,
         [input.project_id, input.user_id]
@@ -1183,6 +1211,24 @@ export function createPostgresMetadataStore(db: Queryable): PostgresMetadataStor
               ELSE 'shared'
             END AS relationship,
             CASE
+              WHEN p.owner_user_id <> $1::uuid THEN 'shared_with_you'
+              WHEN EXISTS (
+                SELECT 1
+                FROM project_members shared_members
+                WHERE shared_members.project_id = p.id
+              )
+                OR EXISTS (
+                  SELECT 1
+                  FROM project_invites pending_invites
+                  WHERE pending_invites.project_id = p.id
+                    AND pending_invites.accepted_at IS NULL
+                    AND pending_invites.canceled_at IS NULL
+                    AND pending_invites.expires_at > now()
+                )
+                THEN 'shared_by_you'
+              ELSE 'private'
+            END AS sharing_state,
+            CASE
               WHEN p.owner_user_id = $1::uuid THEN 'owner'
               ELSE pm.role
             END AS effective_role,
@@ -1263,6 +1309,23 @@ export function createPostgresMetadataStore(db: Queryable): PostgresMetadataStor
             p.owner_user_id,
             owner_user.email AS owner_email,
             'owned' AS relationship,
+            CASE
+              WHEN EXISTS (
+                SELECT 1
+                FROM project_members shared_members
+                WHERE shared_members.project_id = p.id
+              )
+                OR EXISTS (
+                  SELECT 1
+                  FROM project_invites pending_invites
+                  WHERE pending_invites.project_id = p.id
+                    AND pending_invites.accepted_at IS NULL
+                    AND pending_invites.canceled_at IS NULL
+                    AND pending_invites.expires_at > now()
+                )
+                THEN 'shared_by_you'
+              ELSE 'private'
+            END AS sharing_state,
             'owner' AS effective_role,
             p.name,
             p.slug,
@@ -1348,6 +1411,7 @@ export function createPostgresMetadataStore(db: Queryable): PostgresMetadataStor
               cp.owner_user_id,
               owner_user.email AS owner_email,
               'owned' AS relationship,
+              'private' AS sharing_state,
               'owner' AS effective_role,
               cp.name,
               cp.slug,
@@ -1450,6 +1514,24 @@ export function createPostgresMetadataStore(db: Queryable): PostgresMetadataStor
                 ELSE 'shared'
               END AS relationship,
               CASE
+                WHEN up.owner_user_id <> $1::uuid THEN 'shared_with_you'
+                WHEN EXISTS (
+                  SELECT 1
+                  FROM project_members shared_members
+                  WHERE shared_members.project_id = up.project_id
+                )
+                  OR EXISTS (
+                    SELECT 1
+                    FROM project_invites pending_invites
+                    WHERE pending_invites.project_id = up.project_id
+                      AND pending_invites.accepted_at IS NULL
+                      AND pending_invites.canceled_at IS NULL
+                      AND pending_invites.expires_at > now()
+                  )
+                  THEN 'shared_by_you'
+                ELSE 'private'
+              END AS sharing_state,
+              CASE
                 WHEN up.owner_user_id = $1::uuid THEN 'owner'
                 ELSE (
                   SELECT pm.role
@@ -1544,6 +1626,7 @@ export function createPostgresMetadataStore(db: Queryable): PostgresMetadataStor
             dp.owner_user_id,
             owner_user.email AS owner_email,
             'owned' AS relationship,
+            'private' AS sharing_state,
             'owner' AS effective_role,
             dp.name,
             dp.slug,
@@ -1609,6 +1692,7 @@ export function createPostgresMetadataStore(db: Queryable): PostgresMetadataStor
               cp.owner_user_id,
               owner_user.email AS owner_email,
               'owned' AS relationship,
+              'private' AS sharing_state,
               'owner' AS effective_role,
               cp.name,
               cp.slug,
@@ -1697,6 +1781,23 @@ export function createPostgresMetadataStore(db: Queryable): PostgresMetadataStor
               up.owner_user_id,
               owner_user.email AS owner_email,
               'owned' AS relationship,
+              CASE
+                WHEN EXISTS (
+                  SELECT 1
+                  FROM project_members shared_members
+                  WHERE shared_members.project_id = up.project_id
+                )
+                  OR EXISTS (
+                    SELECT 1
+                    FROM project_invites pending_invites
+                    WHERE pending_invites.project_id = up.project_id
+                      AND pending_invites.accepted_at IS NULL
+                      AND pending_invites.canceled_at IS NULL
+                      AND pending_invites.expires_at > now()
+                  )
+                  THEN 'shared_by_you'
+                ELSE 'private'
+              END AS sharing_state,
               'owner' AS effective_role,
               up.name,
               up.slug,
@@ -1782,6 +1883,7 @@ export function createPostgresMetadataStore(db: Queryable): PostgresMetadataStor
             dp.owner_user_id,
             owner_user.email AS owner_email,
             'owned' AS relationship,
+            'private' AS sharing_state,
             'owner' AS effective_role,
             dp.name,
             dp.slug,
@@ -1993,6 +2095,7 @@ export function createPostgresMetadataStore(db: Queryable): PostgresMetadataStor
       const result = await db.query<{
         alert_id: string;
         project_id: string;
+        created_by_user_id: string;
         service_id: string | null;
         channel: AlertRuleRecord["channel"];
         condition_type: AlertRuleRecord["condition_type"];
@@ -2006,6 +2109,7 @@ export function createPostgresMetadataStore(db: Queryable): PostgresMetadataStor
           SELECT
             id AS alert_id,
             project_id,
+            created_by_user_id,
             service_id,
             channel,
             condition_type,
@@ -2046,6 +2150,7 @@ export function createPostgresMetadataStore(db: Queryable): PostgresMetadataStor
       const result = await db.query<{
         alert_id: string;
         project_id: string;
+        created_by_user_id: string;
         service_id: string | null;
         channel: AlertRuleRecord["channel"];
         condition_type: AlertRuleRecord["condition_type"];
@@ -2059,6 +2164,7 @@ export function createPostgresMetadataStore(db: Queryable): PostgresMetadataStor
           INSERT INTO alert_rules (
             id,
             project_id,
+            created_by_user_id,
             service_id,
             channel,
             condition_type,
@@ -2068,10 +2174,11 @@ export function createPostgresMetadataStore(db: Queryable): PostgresMetadataStor
             created_at,
             updated_at
           )
-          VALUES ($1, $2, $3::uuid, $4, $5, $6, $7::jsonb, $8, now(), now())
+          VALUES ($1, $2, $3::uuid, $4::uuid, $5, $6, $7, $8::jsonb, $9, now(), now())
           RETURNING
             id AS alert_id,
             project_id,
+            created_by_user_id,
             service_id,
             channel,
             condition_type,
@@ -2084,6 +2191,7 @@ export function createPostgresMetadataStore(db: Queryable): PostgresMetadataStor
         [
           randomUUID(),
           input.project_id,
+          input.created_by_user_id,
           input.service_id ?? null,
           input.channel,
           input.condition_type,
@@ -2104,6 +2212,7 @@ export function createPostgresMetadataStore(db: Queryable): PostgresMetadataStor
       const result = await db.query<{
         alert_id: string;
         project_id: string;
+        created_by_user_id: string;
         service_id: string | null;
         channel: AlertRuleRecord["channel"];
         condition_type: AlertRuleRecord["condition_type"];
@@ -2128,10 +2237,17 @@ export function createPostgresMetadataStore(db: Queryable): PostgresMetadataStor
           WHERE ar.id = $1
             AND p.id = ar.project_id
             AND p.organization_id = $2
+            AND ($12::uuid IS NULL OR ar.project_id = $12::uuid)
+            AND (
+              $13::uuid IS NULL
+              OR $14::text IN ('owner', 'admin')
+              OR ar.created_by_user_id = $13::uuid
+            )
             AND ($4::uuid IS NULL OR $3::boolean = false OR s.project_id = ar.project_id)
           RETURNING
             ar.id AS alert_id,
             ar.project_id,
+            ar.created_by_user_id,
             ar.service_id,
             ar.channel,
             ar.condition_type,
@@ -2152,7 +2268,10 @@ export function createPostgresMetadataStore(db: Queryable): PostgresMetadataStor
           optionalFieldValue(hasSeverityMin, input.severity_min),
           hasConfig,
           optionalJsonFieldValue(hasConfig, input.config),
-          input.is_enabled ?? null
+          input.is_enabled ?? null,
+          input.project_id ?? null,
+          input.actor_user_id ?? null,
+          input.actor_role ?? null
         ]
       );
 
@@ -2167,9 +2286,21 @@ export function createPostgresMetadataStore(db: Queryable): PostgresMetadataStor
           WHERE ar.id = $1
             AND p.id = ar.project_id
             AND p.organization_id = $2
+            AND ($3::uuid IS NULL OR ar.project_id = $3::uuid)
+            AND (
+              $4::uuid IS NULL
+              OR $5::text IN ('owner', 'admin')
+              OR ar.created_by_user_id = $4::uuid
+            )
           RETURNING ar.id AS alert_id
         `,
-        [input.alert_id, input.organization_id]
+        [
+          input.alert_id,
+          input.organization_id,
+          input.project_id ?? null,
+          input.actor_user_id ?? null,
+          input.actor_role ?? null
+        ]
       );
 
       return result.rows[0] ?? null;

@@ -12,7 +12,7 @@ import {
 } from "../../../../packages/shared-types/src/index.js";
 import type { ApiDependencies } from "../api-types.js";
 import { recordAuditLog, resolveAuditActorType } from "../audit-logging.js";
-import { requireRateLimitedMemberAuth, requireRateLimitedProjectAccess } from "../api-helpers.js";
+import { requireRateLimitedProjectAccess } from "../api-helpers.js";
 import { ProjectParamsSchema } from "../schemas.js";
 
 function buildDefaultRecord(plan: string | undefined): ResolvedCapturePolicy {
@@ -34,57 +34,46 @@ function buildDefaultOverrides(): CapturePolicyOverrides {
 }
 
 function buildCapturePolicyResponse(input: {
+  accessMode: CapturePolicyResponse["access_mode"];
   resolvedPolicy: ResolvedCapturePolicy;
   recordOverrides?: CapturePolicyOverrides;
 }): CapturePolicyResponse {
   return {
+    access_mode: input.accessMode,
     policy: input.resolvedPolicy,
     overrides: input.recordOverrides ?? buildDefaultOverrides()
   };
 }
 
-async function resolveProjectPlanForOrganization(
-  dependencies: ApiDependencies,
-  organizationId: string,
-  projectId: string
-): Promise<string | null> {
-  if (dependencies.projectManagement === undefined) {
-    return null;
-  }
-
-  const projects = await dependencies.projectManagement.listProjectsForOrganization({
-    organization_id: organizationId,
-    now: new Date().toISOString(),
-    limit: 1_000
-  });
-  return projects.find((project) => project.project_id === projectId)?.organization_plan ?? null;
-}
-
 export function registerCapturePolicyRoutes(app: FastifyInstance, dependencies: ApiDependencies): void {
   app.get("/v1/projects/:id/capture-policy", async (request, reply) => {
-    const member = await requireRateLimitedMemberAuth(request, reply, dependencies, "management-read");
-    if (member === null) {
-      return;
-    }
-
     const parsedParams = ProjectParamsSchema.safeParse(request.params);
     if (!parsedParams.success) {
       return reply.status(400).send({ error: "invalid_project_id" });
     }
 
-    if (dependencies.capturePolicyManagement === undefined) {
-      const plan = await resolveProjectPlanForOrganization(dependencies, member.organization_id, parsedParams.data.id);
-      if (plan === null && dependencies.projectManagement !== undefined) {
-        return reply.status(404).send({ error: "project_not_found" });
-      }
+    const auth = await requireRateLimitedProjectAccess(request, reply, dependencies, {
+      bucket: "management-read",
+      projectId: parsedParams.data.id
+    });
+    if (auth === null) {
+      return;
+    }
 
+    const accessMode: CapturePolicyResponse["access_mode"] =
+      auth.access.effective_role === "owner" || auth.access.effective_role === "admin" ? "manage" : "preview";
+
+    if (dependencies.capturePolicyManagement === undefined) {
       return reply.status(200).send(
-        buildCapturePolicyResponse({ resolvedPolicy: buildDefaultRecord(plan ?? undefined) })
+        buildCapturePolicyResponse({
+          accessMode,
+          resolvedPolicy: buildDefaultRecord(auth.access.organization_plan)
+        })
       );
     }
 
     const record = await dependencies.capturePolicyManagement.getCapturePolicyForProject({
-      organization_id: member.organization_id,
+      organization_id: auth.access.organization_id,
       project_id: parsedParams.data.id
     });
 
@@ -92,15 +81,12 @@ export function registerCapturePolicyRoutes(app: FastifyInstance, dependencies: 
     if (record !== null) {
       policy = resolvePolicy(record);
     } else {
-      const plan = await resolveProjectPlanForOrganization(dependencies, member.organization_id, parsedParams.data.id);
-      if (plan === null && dependencies.projectManagement !== undefined) {
-        return reply.status(404).send({ error: "project_not_found" });
-      }
-      policy = buildDefaultRecord(plan ?? undefined);
+      policy = buildDefaultRecord(auth.access.organization_plan);
     }
 
     return reply.status(200).send(
       buildCapturePolicyResponse({
+        accessMode,
         resolvedPolicy: policy,
         ...(record === null ? {} : { recordOverrides: getCapturePolicyOverrides(record) })
       })
@@ -177,6 +163,7 @@ export function registerCapturePolicyRoutes(app: FastifyInstance, dependencies: 
 
     return reply.status(200).send(
       buildCapturePolicyResponse({
+        accessMode: "manage",
         resolvedPolicy: policy,
         recordOverrides: getCapturePolicyOverrides(record)
       })

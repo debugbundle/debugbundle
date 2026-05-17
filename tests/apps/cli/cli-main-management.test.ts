@@ -483,6 +483,8 @@ describe("cli main management routing", () => {
       "webhook",
       "update",
       "wh_123",
+      "--project-id",
+      "proj_123",
       "--event",
       "bundle.updated",
       "--is-enabled",
@@ -495,6 +497,8 @@ describe("cli main management routing", () => {
       "webhook",
       "delete",
       "wh_123",
+      "--project-id",
+      "proj_123",
       "--auth-file",
       "/tmp/auth.json"
     ], {
@@ -505,6 +509,8 @@ describe("cli main management routing", () => {
       "webhook",
       "deliveries",
       "wh_123",
+      "--project-id",
+      "proj_123",
       "--limit",
       "10",
       "--json"
@@ -534,15 +540,18 @@ describe("cli main management routing", () => {
     });
     expect(updateWebhookCommand).toHaveBeenCalledWith({
       webhookId: "wh_123",
+      projectId: "proj_123",
       events: ["bundle.updated"],
       isEnabled: false
     });
     expect(deleteWebhookCommand).toHaveBeenCalledWith({
       webhookId: "wh_123",
+      projectId: "proj_123",
       authFilePath: "/tmp/auth.json"
     });
     expect(listWebhookDeliveriesCommand).toHaveBeenCalledWith({
       webhookId: "wh_123",
+      projectId: "proj_123",
       limit: 10,
       json: true
     });
@@ -594,6 +603,8 @@ describe("cli main management routing", () => {
       "alert",
       "update",
       "al_123",
+      "--project-id",
+      "proj_123",
       "--service-id",
       "null",
       "--severity-min",
@@ -610,6 +621,8 @@ describe("cli main management routing", () => {
       "alert",
       "delete",
       "al_123",
+      "--project-id",
+      "proj_123",
       "--auth-file",
       "/tmp/auth.json"
     ], {
@@ -636,6 +649,7 @@ describe("cli main management routing", () => {
     });
     expect(updateAlertCommand).toHaveBeenCalledWith({
       alertId: "al_123",
+      projectId: "proj_123",
       serviceId: null,
       severityMin: null,
       config: {
@@ -645,6 +659,7 @@ describe("cli main management routing", () => {
     });
     expect(deleteAlertCommand).toHaveBeenCalledWith({
       alertId: "al_123",
+      projectId: "proj_123",
       authFilePath: "/tmp/auth.json"
     });
   });
@@ -705,8 +720,8 @@ describe("cli main management routing", () => {
       "--config-json",
       '{"to":"owner@example.com"}'
     ], { createAlertCommand });
-    await runCli(["alert", "update", "al_123", "--is-enabled", "false"], { updateAlertCommand });
-    await runCli(["alert", "delete", "al_123"], { deleteAlertCommand });
+    await runCli(["alert", "update", "al_123", "--project-id", "proj_123", "--is-enabled", "false"], { updateAlertCommand });
+    await runCli(["alert", "delete", "al_123", "--project-id", "proj_123"], { deleteAlertCommand });
     await runCli(["webhook", "list", "--project-id", "proj_123"], { listWebhooksCommand });
     await runCli([
       "webhook",
@@ -718,10 +733,10 @@ describe("cli main management routing", () => {
       "--event",
       "bundle.created"
     ], { createWebhookCommand });
-    await runCli(["webhook", "update", "wh_123", "--is-enabled", "false"], { updateWebhookCommand });
-    await runCli(["webhook", "delete", "wh_123"], { deleteWebhookCommand });
-    await runCli(["webhook", "test", "wh_123"], { testWebhookCommand });
-    await runCli(["webhook", "deliveries", "wh_123"], { listWebhookDeliveriesCommand });
+    await runCli(["webhook", "update", "wh_123", "--project-id", "proj_123", "--is-enabled", "false"], { updateWebhookCommand });
+    await runCli(["webhook", "delete", "wh_123", "--project-id", "proj_123"], { deleteWebhookCommand });
+    await runCli(["webhook", "test", "wh_123", "--project-id", "proj_123"], { testWebhookCommand });
+    await runCli(["webhook", "deliveries", "wh_123", "--project-id", "proj_123"], { listWebhookDeliveriesCommand });
 
     expect(analyzeCommand).toHaveBeenCalledWith({});
     expect(doctorCommand).toHaveBeenCalledWith({});
@@ -747,18 +762,18 @@ describe("cli main management routing", () => {
         to: "owner@example.com"
       }
     });
-    expect(updateAlertCommand).toHaveBeenCalledWith({ alertId: "al_123", isEnabled: false });
-    expect(deleteAlertCommand).toHaveBeenCalledWith({ alertId: "al_123" });
+    expect(updateAlertCommand).toHaveBeenCalledWith({ alertId: "al_123", projectId: "proj_123", isEnabled: false });
+    expect(deleteAlertCommand).toHaveBeenCalledWith({ alertId: "al_123", projectId: "proj_123" });
     expect(listWebhooksCommand).toHaveBeenCalledWith({ projectId: "proj_123" });
     expect(createWebhookCommand).toHaveBeenCalledWith({
       projectId: "proj_123",
       url: "https://hooks.example.test/debugbundle",
       events: ["bundle.created"]
     });
-    expect(updateWebhookCommand).toHaveBeenCalledWith({ webhookId: "wh_123", isEnabled: false });
-    expect(deleteWebhookCommand).toHaveBeenCalledWith({ webhookId: "wh_123" });
-    expect(testWebhookCommand).toHaveBeenCalledWith({ webhookId: "wh_123" });
-    expect(listWebhookDeliveriesCommand).toHaveBeenCalledWith({ webhookId: "wh_123" });
+    expect(updateWebhookCommand).toHaveBeenCalledWith({ webhookId: "wh_123", projectId: "proj_123", isEnabled: false });
+    expect(deleteWebhookCommand).toHaveBeenCalledWith({ webhookId: "wh_123", projectId: "proj_123" });
+    expect(testWebhookCommand).toHaveBeenCalledWith({ webhookId: "wh_123", projectId: "proj_123" });
+    expect(listWebhookDeliveriesCommand).toHaveBeenCalledWith({ webhookId: "wh_123", projectId: "proj_123" });
   });
 
   it("returns validation errors for unknown commands and invalid option values", async () => {
@@ -828,7 +843,7 @@ describe("cli main management routing", () => {
     const webhookListMissingProject = await runCli(["webhook", "list"]);
     const webhookCreateMissingUrl = await runCli(["webhook", "create", "--project-id", "proj_123", "--event", "bundle.created"]);
     const webhookCreateMissingEvent = await runCli(["webhook", "create", "--project-id", "proj_123", "--url", "https://hooks.example.test/debugbundle"]);
-    const webhookUpdateWithoutChanges = await runCli(["webhook", "update", "wh_123"]);
+    const webhookUpdateWithoutChanges = await runCli(["webhook", "update", "wh_123", "--project-id", "proj_123"]);
     const inspectExtraPositional = await runCli(["inspect", "inc_123", "extra"]);
     const logsExtraPositional = await runCli(["logs", "inc_123", "extra"]);
 
@@ -1078,7 +1093,7 @@ describe("cli main management routing", () => {
       ],
       { createWebhookCommand }
     );
-    await runCli(["webhook", "retry", "wh_123", "del_123", "--json"], {
+    await runCli(["webhook", "retry", "wh_123", "del_123", "--project-id", "proj_123", "--json"], {
       retryWebhookDeliveryCommand
     });
 
@@ -1095,7 +1110,7 @@ describe("cli main management routing", () => {
       },
       isEnabled: false
     });
-    expect(retryWebhookDeliveryCommand).toHaveBeenCalledWith({ webhookId: "wh_123", deliveryId: "del_123", json: true });
+    expect(retryWebhookDeliveryCommand).toHaveBeenCalledWith({ webhookId: "wh_123", projectId: "proj_123", deliveryId: "del_123", json: true });
   });
 
   it("validates webhook boolean options and weekly-report config json", async () => {
@@ -1136,10 +1151,10 @@ describe("cli main management routing", () => {
     const testWebhookCommand = vi.fn().mockResolvedValue({ exitCode: 0, output: "webhook-test" });
     const listWebhookDeliveriesCommand = vi.fn().mockResolvedValue({ exitCode: 0, output: "webhook-deliveries" });
 
-    await runCli(["webhook", "test", "wh_123", "--event", "verification.failed", "--json"], {
+    await runCli(["webhook", "test", "wh_123", "--project-id", "proj_123", "--event", "verification.failed", "--json"], {
       testWebhookCommand
     });
-    await runCli(["webhook", "deliveries", "wh_123", "--limit", "3"], {
+    await runCli(["webhook", "deliveries", "wh_123", "--project-id", "proj_123", "--limit", "3"], {
       listWebhookDeliveriesCommand
     });
     const invalidWeeklyEnabled = await runCli([
@@ -1161,8 +1176,8 @@ describe("cli main management routing", () => {
       "maybe"
     ]);
 
-    expect(testWebhookCommand).toHaveBeenCalledWith({ webhookId: "wh_123", eventType: "verification.failed", json: true });
-    expect(listWebhookDeliveriesCommand).toHaveBeenCalledWith({ webhookId: "wh_123", limit: 3 });
+    expect(testWebhookCommand).toHaveBeenCalledWith({ webhookId: "wh_123", projectId: "proj_123", eventType: "verification.failed", json: true });
+    expect(listWebhookDeliveriesCommand).toHaveBeenCalledWith({ webhookId: "wh_123", projectId: "proj_123", limit: 3 });
     expect(invalidWeeklyEnabled.output).toContain("Invalid value for --is-enabled.");
   });
 

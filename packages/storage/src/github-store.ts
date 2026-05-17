@@ -51,6 +51,7 @@ function mapGitHubDispatchRuleRow(row: GitHubDispatchRuleRecord & Record<string,
   return {
     rule_id: row.rule_id,
     project_id: row.project_id,
+    created_by_user_id: row.created_by_user_id,
     name: row.name,
     enabled: row.enabled,
     event_types: Array.isArray(row.event_types) ? row.event_types.map((value) => String(value)) : [],
@@ -377,6 +378,7 @@ export function createPostgresGitHubStore(db: Queryable): GitHubStore {
           SELECT
             id AS rule_id,
             project_id,
+            created_by_user_id,
             name,
             enabled,
             event_types,
@@ -404,6 +406,7 @@ export function createPostgresGitHubStore(db: Queryable): GitHubStore {
           SELECT
             gdr.id AS rule_id,
             gdr.project_id,
+            gdr.created_by_user_id,
             gdr.name,
             gdr.enabled,
             gdr.event_types,
@@ -449,6 +452,7 @@ export function createPostgresGitHubStore(db: Queryable): GitHubStore {
           INSERT INTO github_dispatch_rules (
             id,
             project_id,
+            created_by_user_id,
             name,
             enabled,
             event_types,
@@ -461,10 +465,11 @@ export function createPostgresGitHubStore(db: Queryable): GitHubStore {
             created_at,
             updated_at
           )
-          VALUES ($1, $2, $3, $4, $5::text[], $6::text[], $7::text[], $8, $9, $10, $11, now(), now())
+          VALUES ($1, $2, $3::uuid, $4, $5, $6::text[], $7::text[], $8::text[], $9, $10, $11, $12, now(), now())
           RETURNING
             id AS rule_id,
             project_id,
+            created_by_user_id,
             name,
             enabled,
             event_types,
@@ -480,6 +485,7 @@ export function createPostgresGitHubStore(db: Queryable): GitHubStore {
         [
           randomUUID(),
           input.project_id,
+          input.created_by_user_id,
           input.name,
           input.enabled,
           input.event_types,
@@ -526,9 +532,15 @@ export function createPostgresGitHubStore(db: Queryable): GitHubStore {
             AND gdr.project_id = $2
             AND p.id = gdr.project_id
             AND p.organization_id = $3
+            AND (
+              $22::uuid IS NULL
+              OR $23::text IN ('owner', 'admin')
+              OR gdr.created_by_user_id = $22::uuid
+            )
           RETURNING
             gdr.id AS rule_id,
             gdr.project_id,
+            gdr.created_by_user_id,
             gdr.name,
             gdr.enabled,
             gdr.event_types,
@@ -562,7 +574,9 @@ export function createPostgresGitHubStore(db: Queryable): GitHubStore {
           hasIncidentStatus,
           hasIncidentStatus ? input.incident_status ?? null : null,
           hasCooldown,
-          hasCooldown ? input.cooldown_seconds ?? null : null
+          hasCooldown ? input.cooldown_seconds ?? null : null,
+          input.actor_user_id ?? null,
+          input.actor_role ?? null
         ]
       );
 
@@ -579,9 +593,20 @@ export function createPostgresGitHubStore(db: Queryable): GitHubStore {
             AND p.organization_id = $1
             AND gdr.project_id = $2
             AND gdr.id = $3
+            AND (
+              $4::uuid IS NULL
+              OR $5::text IN ('owner', 'admin')
+              OR gdr.created_by_user_id = $4::uuid
+            )
           RETURNING gdr.id AS rule_id
         `,
-        [input.organization_id, input.project_id, input.rule_id]
+        [
+          input.organization_id,
+          input.project_id,
+          input.rule_id,
+          input.actor_user_id ?? null,
+          input.actor_role ?? null
+        ]
       );
 
       return result.rows[0] !== undefined;
@@ -637,6 +662,11 @@ export function createPostgresGitHubStore(db: Queryable): GitHubStore {
             AND gdd.project_id = $2
             AND gdd.id = $3
             AND gdd.status = 'failed'
+            AND (
+              $4::uuid IS NULL
+              OR $5::text IN ('owner', 'admin')
+              OR gdr.created_by_user_id = $4::uuid
+            )
           RETURNING
             gdd.id AS delivery_id,
             gdd.rule_id,
@@ -650,7 +680,13 @@ export function createPostgresGitHubStore(db: Queryable): GitHubStore {
             gdd.github_status_code,
             gdd.created_at::text AS created_at
         `,
-        [input.organization_id, input.project_id, input.delivery_id]
+        [
+          input.organization_id,
+          input.project_id,
+          input.delivery_id,
+          input.actor_user_id ?? null,
+          input.actor_role ?? null
+        ]
       );
 
       const row = result.rows[0];

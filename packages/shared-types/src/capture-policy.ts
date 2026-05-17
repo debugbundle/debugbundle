@@ -107,11 +107,13 @@ export const CapturePolicyOverridesSchema = z.object({
 });
 
 export interface CapturePolicyResponse {
+  access_mode: "manage" | "preview";
   policy: ResolvedCapturePolicy;
   overrides: CapturePolicyOverrides;
 }
 
 export const CapturePolicyResponseSchema = z.object({
+  access_mode: z.enum(["manage", "preview"]),
   policy: ResolvedCapturePolicySchema,
   overrides: CapturePolicyOverridesSchema
 });

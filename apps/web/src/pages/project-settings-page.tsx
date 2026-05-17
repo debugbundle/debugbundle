@@ -158,6 +158,7 @@ export function ProjectSettingsPage(): JSX.Element {
         </div>
 
         <div className="space-y-4">
+        {effectiveRole === "member" ? null : (
         <Card className="border-destructive/25 bg-destructive/5">
           <CardHeader>
             <CardTitle>Destructive actions</CardTitle>
@@ -217,6 +218,7 @@ export function ProjectSettingsPage(): JSX.Element {
             </AlertDialog>
           </CardContent>
         </Card>
+        )}
         </div>
       </div>
 

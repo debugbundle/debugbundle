@@ -40,6 +40,7 @@ export interface ProjectRecord {
   owner_user_id?: string;
   owner_email?: string;
   relationship?: "owned" | "shared";
+  sharing_state?: "private" | "shared_by_you" | "shared_with_you";
   effective_role?: "owner" | "admin" | "member";
   metrics: {
     monthly_bundle_requests: number;
@@ -149,6 +150,7 @@ export type AlertConditionType =
 export interface AlertRecord {
   alert_id: string;
   project_id: string;
+  created_by_user_id: string;
   service_id: string | null;
   channel: AlertChannel;
   condition_type: AlertConditionType;
@@ -172,6 +174,7 @@ export type WebhookEventType =
 export interface WebhookRecord {
   webhook_id: string;
   project_id: string;
+  created_by_user_id: string;
   url: string;
   events: WebhookEventType[];
   filters: {
@@ -222,6 +225,7 @@ export interface ProjectGitHubRepoRecord {
 export interface GitHubDispatchRuleRecord {
   rule_id: string;
   project_id: string;
+  created_by_user_id: string;
   name: string;
   enabled: boolean;
   event_types: string[];
@@ -298,6 +302,11 @@ export function createProject(overrides: Partial<ProjectRecord> = {}): ProjectRe
   return {
     project_id: "proj_123",
     organization_id: "org_123",
+    owner_user_id: "usr_123",
+    owner_email: "owner@example.com",
+    relationship: "owned",
+    sharing_state: "private",
+    effective_role: "owner",
     name: "Main App",
     slug: "main-app",
     environment_default: "production",
@@ -428,6 +437,7 @@ export function createAlert(overrides: Partial<AlertRecord> = {}): AlertRecord {
   return {
     alert_id: "alert_123",
     project_id: "proj_123",
+    created_by_user_id: "usr_123",
     service_id: null,
     channel: "email",
     condition_type: "new_incident",
@@ -444,6 +454,7 @@ export function createWebhook(overrides: Partial<WebhookRecord> = {}): WebhookRe
   return {
     webhook_id: "wh_123",
     project_id: "proj_123",
+    created_by_user_id: "usr_123",
     url: "https://hooks.example.test/debugbundle",
     events: ["bundle.created"],
     filters: {},
@@ -489,6 +500,7 @@ export function createGitHubDispatchRule(
   return {
     rule_id: "ghr_123",
     project_id: "proj_123",
+    created_by_user_id: "usr_123",
     name: "High severity incidents",
     enabled: true,
     event_types: ["bundle.created", "bundle.reopened"],

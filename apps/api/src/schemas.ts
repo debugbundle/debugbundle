@@ -541,6 +541,18 @@ export const ProjectParamsSchema = z
   })
   .strict();
 
+export const ProjectScopedQuerySchema = z
+  .object({
+    project_id: z.string().uuid()
+  })
+  .strict();
+
+export const OptionalProjectScopedQuerySchema = z
+  .object({
+    project_id: z.string().uuid().optional()
+  })
+  .strict();
+
 export const ProjectMemberParamsSchema = z
   .object({
     id: z.string().uuid(),

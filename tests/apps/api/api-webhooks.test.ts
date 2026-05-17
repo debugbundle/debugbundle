@@ -515,7 +515,7 @@ describe("api webhook routes", () => {
 
     const invalidTestPayload = await app.inject({
       method: "POST",
-      url: "/v1/webhooks/11111111-1111-4111-8111-111111111111/test",
+      url: "/v1/webhooks/11111111-1111-4111-8111-111111111111/test?project_id=00000000-0000-4000-8000-000000000001",
       headers: {
         authorization: "Bearer dbundle_mem_test"
       },
@@ -525,7 +525,7 @@ describe("api webhook routes", () => {
     });
     const missingTestTarget = await app.inject({
       method: "POST",
-      url: "/v1/webhooks/11111111-1111-4111-8111-111111111111/test",
+      url: "/v1/webhooks/11111111-1111-4111-8111-111111111111/test?project_id=00000000-0000-4000-8000-000000000001",
       headers: {
         authorization: "Bearer dbundle_mem_test"
       },
@@ -535,7 +535,7 @@ describe("api webhook routes", () => {
     });
     const invalidDeliveriesQuery = await app.inject({
       method: "GET",
-      url: "/v1/webhooks/11111111-1111-4111-8111-111111111111/deliveries?limit=0",
+      url: "/v1/webhooks/11111111-1111-4111-8111-111111111111/deliveries?project_id=00000000-0000-4000-8000-000000000001&limit=0",
       headers: {
         authorization: "Bearer dbundle_mem_test"
       }
@@ -563,7 +563,7 @@ describe("api webhook routes", () => {
 
     const response = await app.inject({
       method: "POST",
-      url: "/v1/webhooks/11111111-1111-4111-8111-111111111111/test",
+      url: "/v1/webhooks/11111111-1111-4111-8111-111111111111/test?project_id=00000000-0000-4000-8000-000000000001",
       headers: {
         authorization: "Bearer dbundle_mem_test"
       },
@@ -579,12 +579,12 @@ describe("api webhook routes", () => {
 
     const getResponse = await app.inject({
       method: "GET",
-      url: "/v1/webhooks/11111111-1111-4111-8111-111111111111",
+      url: "/v1/webhooks/11111111-1111-4111-8111-111111111111?project_id=00000000-0000-4000-8000-000000000001",
       headers: { authorization: "Bearer dbundle_mem_test" }
     });
     const patchResponse = await app.inject({
       method: "PATCH",
-      url: "/v1/webhooks/11111111-1111-4111-8111-111111111111",
+      url: "/v1/webhooks/11111111-1111-4111-8111-111111111111?project_id=00000000-0000-4000-8000-000000000001",
       headers: { authorization: "Bearer dbundle_mem_test" },
       payload: { is_enabled: false }
     });
@@ -657,7 +657,7 @@ describe("api webhook routes", () => {
 
     const response = await app.inject({
       method: "GET",
-      url: "/v1/webhooks/11111111-1111-4111-8111-111111111111",
+      url: "/v1/webhooks/11111111-1111-4111-8111-111111111111?project_id=00000000-0000-4000-8000-000000000001",
       headers: {
         authorization: "Bearer dbundle_mem_test"
       }
@@ -701,7 +701,7 @@ describe("api webhook routes", () => {
 
     const response = await app.inject({
       method: "PATCH",
-      url: "/v1/webhooks/11111111-1111-4111-8111-111111111111",
+      url: "/v1/webhooks/11111111-1111-4111-8111-111111111111?project_id=00000000-0000-4000-8000-000000000001",
       headers: {
         authorization: "Bearer dbundle_mem_test"
       },
@@ -745,7 +745,7 @@ describe("api webhook routes", () => {
 
     const invalidPayload = await app.inject({
       method: "PATCH",
-      url: "/v1/webhooks/11111111-1111-4111-8111-111111111111",
+      url: "/v1/webhooks/11111111-1111-4111-8111-111111111111?project_id=00000000-0000-4000-8000-000000000001",
       headers: {
         authorization: "Bearer dbundle_mem_test"
       },
@@ -753,7 +753,7 @@ describe("api webhook routes", () => {
     });
     const notFound = await app.inject({
       method: "PATCH",
-      url: "/v1/webhooks/11111111-1111-4111-8111-111111111111",
+      url: "/v1/webhooks/11111111-1111-4111-8111-111111111111?project_id=00000000-0000-4000-8000-000000000001",
       headers: {
         authorization: "Bearer dbundle_mem_test"
       },
@@ -783,7 +783,7 @@ describe("api webhook routes", () => {
 
     const response = await app.inject({
       method: "DELETE",
-      url: "/v1/webhooks/11111111-1111-4111-8111-111111111111",
+      url: "/v1/webhooks/11111111-1111-4111-8111-111111111111?project_id=00000000-0000-4000-8000-000000000001",
       headers: {
         authorization: "Bearer dbundle_mem_test"
       }
@@ -792,7 +792,10 @@ describe("api webhook routes", () => {
     expect(response.statusCode).toBe(204);
     expect(webhookManagement.deleteWebhookForOrganization).toHaveBeenCalledWith({
       organization_id: "org_123",
-      webhook_id: "11111111-1111-4111-8111-111111111111"
+      project_id: "00000000-0000-4000-8000-000000000001",
+      webhook_id: "11111111-1111-4111-8111-111111111111",
+      actor_user_id: "usr_123",
+      actor_role: "owner"
     });
     expect(createAuditLog).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -821,14 +824,14 @@ describe("api webhook routes", () => {
     });
     const missingGet = await app.inject({
       method: "GET",
-      url: "/v1/webhooks/11111111-1111-4111-8111-111111111111",
+      url: "/v1/webhooks/11111111-1111-4111-8111-111111111111?project_id=00000000-0000-4000-8000-000000000001",
       headers: {
         authorization: "Bearer dbundle_mem_test"
       }
     });
     const missingDelete = await app.inject({
       method: "DELETE",
-      url: "/v1/webhooks/11111111-1111-4111-8111-111111111111",
+      url: "/v1/webhooks/11111111-1111-4111-8111-111111111111?project_id=00000000-0000-4000-8000-000000000001",
       headers: {
         authorization: "Bearer dbundle_mem_test"
       }
@@ -847,7 +850,7 @@ describe("api webhook routes", () => {
 
     const response = await app.inject({
       method: "POST",
-      url: "/v1/webhooks/11111111-1111-4111-8111-111111111111/test",
+      url: "/v1/webhooks/11111111-1111-4111-8111-111111111111/test?project_id=00000000-0000-4000-8000-000000000001",
       headers: {
         authorization: "Bearer dbundle_mem_test"
       },
@@ -868,7 +871,7 @@ describe("api webhook routes", () => {
 
     const response = await app.inject({
       method: "POST",
-      url: "/v1/webhooks/11111111-1111-4111-8111-111111111111/test",
+      url: "/v1/webhooks/11111111-1111-4111-8111-111111111111/test?project_id=00000000-0000-4000-8000-000000000001",
       headers: {
         authorization: "Bearer dbundle_mem_test"
       }
@@ -889,7 +892,7 @@ describe("api webhook routes", () => {
 
     const response = await app.inject({
       method: "POST",
-      url: "/v1/webhooks/11111111-1111-4111-8111-111111111111/test",
+      url: "/v1/webhooks/11111111-1111-4111-8111-111111111111/test?project_id=00000000-0000-4000-8000-000000000001",
       headers: {
         authorization: "Bearer dbundle_mem_test"
       }
@@ -904,8 +907,11 @@ describe("api webhook routes", () => {
     });
     expect(webhookTesting.triggerTestDelivery).toHaveBeenCalledWith({
       organization_id: "org_123",
+      project_id: "00000000-0000-4000-8000-000000000001",
       webhook_id: "11111111-1111-4111-8111-111111111111",
-      event_type: "verification.passed"
+      event_type: "verification.passed",
+      actor_user_id: "usr_123",
+      actor_role: "owner"
     });
   });
 });

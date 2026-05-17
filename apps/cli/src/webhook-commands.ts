@@ -215,6 +215,7 @@ export async function createWebhookWithAuthCommand(
 export async function updateWebhookCommand(
   input: {
     bearerToken: string;
+    projectId: string;
     webhookId: string;
     url?: string;
     events?: string[];
@@ -225,6 +226,7 @@ export async function updateWebhookCommand(
   api: {
     updateWebhook(input: {
       bearerToken: string;
+      projectId: string;
       webhookId: string;
       url?: string;
       events?: string[];
@@ -236,6 +238,7 @@ export async function updateWebhookCommand(
   try {
     const requestInput: {
       bearerToken: string;
+      projectId: string;
       webhookId: string;
       url?: string;
       events?: string[];
@@ -243,6 +246,7 @@ export async function updateWebhookCommand(
       isEnabled?: boolean;
     } = {
       bearerToken: input.bearerToken,
+      projectId: input.projectId,
       webhookId: input.webhookId
     };
 
@@ -272,6 +276,7 @@ export async function updateWebhookCommand(
 export async function updateWebhookWithAuthCommand(
   input: {
     authFilePath?: string;
+    projectId: string;
     webhookId: string;
     url?: string;
     events?: string[];
@@ -287,6 +292,7 @@ export async function updateWebhookWithAuthCommand(
     runCommand: (authState, api) => {
       const commandInput: {
         bearerToken: string;
+        projectId: string;
         webhookId: string;
         url?: string;
         events?: string[];
@@ -295,6 +301,7 @@ export async function updateWebhookWithAuthCommand(
         json?: boolean;
       } = {
         bearerToken: authState.bearer_token,
+        projectId: input.projectId,
         webhookId: input.webhookId
       };
 
@@ -324,16 +331,18 @@ export async function updateWebhookWithAuthCommand(
 export async function deleteWebhookCommand(
   input: {
     bearerToken: string;
+    projectId: string;
     webhookId: string;
     json?: boolean;
   },
   api: {
-    deleteWebhook(input: { bearerToken: string; webhookId: string }): Promise<{ webhook_id: string }>;
+    deleteWebhook(input: { bearerToken: string; projectId: string; webhookId: string }): Promise<{ webhook_id: string }>;
   }
 ): Promise<CliCommandResult> {
   try {
     const webhook = await api.deleteWebhook({
       bearerToken: input.bearerToken,
+      projectId: input.projectId,
       webhookId: input.webhookId
     });
     return {
@@ -346,15 +355,16 @@ export async function deleteWebhookCommand(
 }
 
 export async function deleteWebhookWithAuthCommand(
-  input: { authFilePath?: string; webhookId: string; json?: boolean },
+  input: { authFilePath?: string; projectId: string; webhookId: string; json?: boolean },
   dependencies?: Parameters<typeof createAuthenticatedWebhookApi>[1]
 ): Promise<CliCommandResult> {
   return runAuthenticatedCliCommand(input, {
     createApi: createAuthenticatedWebhookApi,
     dependencies,
     runCommand: (authState, api) => {
-      const commandInput: { bearerToken: string; webhookId: string; json?: boolean } = {
+      const commandInput: { bearerToken: string; projectId: string; webhookId: string; json?: boolean } = {
         bearerToken: authState.bearer_token,
+        projectId: input.projectId,
         webhookId: input.webhookId
       };
 
@@ -372,6 +382,7 @@ export async function deleteWebhookWithAuthCommand(
 export async function testWebhookCommand(
   input: {
     bearerToken: string;
+    projectId: string;
     webhookId: string;
     eventType?: "verification.passed" | "verification.failed";
     json?: boolean;
@@ -379,6 +390,7 @@ export async function testWebhookCommand(
   api: {
     testWebhook(input: {
       bearerToken: string;
+      projectId: string;
       webhookId: string;
       eventType?: "verification.passed" | "verification.failed";
     }): Promise<WebhookDelivery>;
@@ -387,10 +399,12 @@ export async function testWebhookCommand(
   try {
     const requestInput: {
       bearerToken: string;
+      projectId: string;
       webhookId: string;
       eventType?: "verification.passed" | "verification.failed";
     } = {
       bearerToken: input.bearerToken,
+      projectId: input.projectId,
       webhookId: input.webhookId
     };
 
@@ -413,6 +427,7 @@ export async function testWebhookCommand(
 export async function testWebhookWithAuthCommand(
   input: {
     authFilePath?: string;
+    projectId: string;
     webhookId: string;
     eventType?: "verification.passed" | "verification.failed";
     json?: boolean;
@@ -425,11 +440,13 @@ export async function testWebhookWithAuthCommand(
     runCommand: (authState, api) => {
       const commandInput: {
         bearerToken: string;
+        projectId: string;
         webhookId: string;
         eventType?: "verification.passed" | "verification.failed";
         json?: boolean;
       } = {
         bearerToken: authState.bearer_token,
+        projectId: input.projectId,
         webhookId: input.webhookId
       };
 
@@ -450,17 +467,19 @@ export async function testWebhookWithAuthCommand(
 export async function listWebhookDeliveriesCommand(
   input: {
     bearerToken: string;
+    projectId: string;
     webhookId: string;
     limit?: number;
     json?: boolean;
   },
   api: {
-    listWebhookDeliveries(input: { bearerToken: string; webhookId: string; limit?: number }): Promise<WebhookDelivery[]>;
+    listWebhookDeliveries(input: { bearerToken: string; projectId: string; webhookId: string; limit?: number }): Promise<WebhookDelivery[]>;
   }
 ): Promise<CliCommandResult> {
   try {
-    const requestInput: { bearerToken: string; webhookId: string; limit?: number } = {
+    const requestInput: { bearerToken: string; projectId: string; webhookId: string; limit?: number } = {
       bearerToken: input.bearerToken,
+      projectId: input.projectId,
       webhookId: input.webhookId
     };
 
@@ -479,15 +498,16 @@ export async function listWebhookDeliveriesCommand(
 }
 
 export async function listWebhookDeliveriesWithAuthCommand(
-  input: { authFilePath?: string; webhookId: string; limit?: number; json?: boolean },
+  input: { authFilePath?: string; projectId: string; webhookId: string; limit?: number; json?: boolean },
   dependencies?: Parameters<typeof createAuthenticatedWebhookApi>[1]
 ): Promise<CliCommandResult> {
   return runAuthenticatedCliCommand(input, {
     createApi: createAuthenticatedWebhookApi,
     dependencies,
     runCommand: (authState, api) => {
-      const commandInput: { bearerToken: string; webhookId: string; limit?: number; json?: boolean } = {
+      const commandInput: { bearerToken: string; projectId: string; webhookId: string; limit?: number; json?: boolean } = {
         bearerToken: authState.bearer_token,
+        projectId: input.projectId,
         webhookId: input.webhookId
       };
 
@@ -508,17 +528,19 @@ export async function listWebhookDeliveriesWithAuthCommand(
 export async function retryWebhookDeliveryCommand(
   input: {
     bearerToken: string;
+    projectId: string;
     webhookId: string;
     deliveryId: string;
     json?: boolean;
   },
   api: {
-    retryWebhookDelivery(input: { bearerToken: string; webhookId: string; deliveryId: string }): Promise<{ delivery_id: string; event_type: string }>;
+    retryWebhookDelivery(input: { bearerToken: string; projectId: string; webhookId: string; deliveryId: string }): Promise<{ delivery_id: string; event_type: string }>;
   }
 ): Promise<CliCommandResult> {
   try {
     const result = await api.retryWebhookDelivery({
       bearerToken: input.bearerToken,
+      projectId: input.projectId,
       webhookId: input.webhookId,
       deliveryId: input.deliveryId
     });
@@ -532,15 +554,16 @@ export async function retryWebhookDeliveryCommand(
 }
 
 export async function retryWebhookDeliveryWithAuthCommand(
-  input: { authFilePath?: string; webhookId: string; deliveryId: string; json?: boolean },
+  input: { authFilePath?: string; projectId: string; webhookId: string; deliveryId: string; json?: boolean },
   dependencies?: Parameters<typeof createAuthenticatedWebhookApi>[1]
 ): Promise<CliCommandResult> {
   return runAuthenticatedCliCommand(input, {
     createApi: createAuthenticatedWebhookApi,
     dependencies,
     runCommand: (authState, api) => {
-      const commandInput: { bearerToken: string; webhookId: string; deliveryId: string; json?: boolean } = {
+      const commandInput: { bearerToken: string; projectId: string; webhookId: string; deliveryId: string; json?: boolean } = {
         bearerToken: authState.bearer_token,
+        projectId: input.projectId,
         webhookId: input.webhookId,
         deliveryId: input.deliveryId
       };

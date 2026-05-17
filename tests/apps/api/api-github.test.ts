@@ -8,6 +8,7 @@ import { mockedObject, type MockedMethods } from "../../helpers/vitest.ts";
 type ApiServerDependencies = Parameters<typeof createApiServer>[0];
 type MemberAuthDependency = MockedMethods<ApiServerDependencies["memberAuth"]>;
 type WebAuthDependency = MockedMethods<NonNullable<ApiServerDependencies["webAuth"]>>;
+type ProjectManagementDependency = MockedMethods<NonNullable<ApiServerDependencies["projectManagement"]>>;
 type BillingManagementDependency = MockedMethods<NonNullable<ApiServerDependencies["billingManagement"]>>;
 type GitHubManagementDependency = MockedMethods<NonNullable<ApiServerDependencies["githubManagement"]>>;
 
@@ -18,6 +19,7 @@ const InstallUrlResponseSchema = z.object({
 function createServer(overrides: {
   memberAuth?: MemberAuthDependency;
   webAuth?: Partial<WebAuthDependency>;
+  projectManagement?: Partial<ProjectManagementDependency>;
   billingManagement?: Partial<BillingManagementDependency>;
   githubManagement?: Partial<GitHubManagementDependency>;
   authRateLimiter?: ApiServerDependencies["authRateLimiter"];
@@ -66,15 +68,25 @@ function createServer(overrides: {
     },
     objectStoreReader: { getObject: vi.fn() },
     webhookDelivery: { listDeliveriesForWebhookInOrganization: vi.fn().mockResolvedValue({ deliveries: [] }) },
-    projectManagement: {
+    projectManagement: mockedObject<NonNullable<ApiServerDependencies["projectManagement"]>>({
+      resolveProjectAccessForUser: vi.fn().mockResolvedValue({
+        project_id: "00000000-0000-4000-8000-000000000001",
+        organization_id: "org_123",
+        owner_user_id: "usr_123",
+        owner_email: "owner@example.com",
+        relationship: "owned",
+        effective_role: "owner",
+        organization_plan: "solo"
+      }),
       listProjectsForOrganization: vi.fn().mockResolvedValue([]),
       createProjectForOrganization: vi.fn(),
       updateProjectForOrganization: vi.fn(),
-      deleteProjectForOrganization: vi.fn()
-    },
+      deleteProjectForOrganization: vi.fn(),
+      ...overrides.projectManagement
+    }),
     billingManagement: mockedObject<NonNullable<ApiServerDependencies["billingManagement"]>>({
       getBillingSummaryForOrganization: vi.fn().mockResolvedValue({ plan: "solo" }),
-      getBillingSummaryForProject: vi.fn(),
+      getBillingSummaryForProject: vi.fn().mockResolvedValue({ plan: "solo" }),
       createCheckoutLink: vi.fn(),
       createPortalLink: vi.fn(),
       increaseCapacity: vi.fn(),
@@ -296,7 +308,7 @@ describe("api github routes", () => {
     });
     const installUrlResponse = await app.inject({
       method: "GET",
-      url: `/v1/github/app/install-url?return_to=${encodeURIComponent(`/projects/${projectId}/github`)}`,
+      url: `/v1/github/app/install-url?return_to=${encodeURIComponent(`/projects/${projectId}/github`)}&project_id=${projectId}`,
       headers: {
         authorization: "Bearer dbundle_mem_test"
       },
@@ -327,6 +339,7 @@ describe("api github routes", () => {
     expect(githubManagement.setProjectRepoForOrganization).toHaveBeenCalledWith({
       organization_id: "org_123",
       project_id: projectId,
+      created_by_user_id: "usr_123",
       owner: "debugbundle",
       repo: "app"
     });
@@ -393,7 +406,6 @@ describe("api github routes", () => {
 
   it("blocks non-owner members from github mutation routes", async () => {
     const projectId = "00000000-0000-4000-8000-000000000001";
-    const ruleId = "11111111-1111-4111-8111-111111111111";
     const githubManagement = {
       getInstallationForOrganization: vi.fn(),
       disconnectInstallationForOrganization: vi.fn().mockResolvedValue(true),
@@ -420,83 +432,86 @@ describe("api github routes", () => {
           role: "member"
         })
       },
+      projectManagement: {
+        resolveProjectAccessForUser: vi.fn().mockResolvedValue({
+          project_id: projectId,
+          organization_id: "org_123",
+          owner_user_id: "usr_owner",
+          owner_email: "owner@example.com",
+          relationship: "shared",
+          effective_role: "member",
+          organization_plan: "solo"
+        }),
+        listProjectsForOrganization: vi.fn().mockResolvedValue([]),
+        createProjectForOrganization: vi.fn(),
+        updateProjectForOrganization: vi.fn(),
+        deleteProjectForOrganization: vi.fn()
+      },
       githubManagement
     });
 
-    const responses = await Promise.all([
-      app.inject({
-        method: "DELETE",
-        url: "/v1/github/installation",
-        headers: {
-          authorization: "Bearer dbundle_mem_test"
-        }
-      }),
-      app.inject({
-        method: "PUT",
-        url: `/v1/projects/${projectId}/github/repo`,
-        headers: {
-          authorization: "Bearer dbundle_mem_test"
-        },
-        payload: {
-          owner: "debugbundle",
-          repo: "app"
-        }
-      }),
-      app.inject({
-        method: "DELETE",
-        url: `/v1/projects/${projectId}/github/repo`,
-        headers: {
-          authorization: "Bearer dbundle_mem_test"
-        }
-      }),
-      app.inject({
-        method: "POST",
-        url: `/v1/projects/${projectId}/github/rules`,
-        headers: {
-          authorization: "Bearer dbundle_mem_test"
-        },
-        payload: {
-          name: "High severity incidents",
-          event_types: ["bundle.created"],
-          environments: ["production"],
-          services: ["checkout-api"],
-          severity_min: "high",
-          bundle_type: "failure",
-          incident_status: "new_only",
-          cooldown_seconds: 300,
-          enabled: true
-        }
-      }),
-      app.inject({
-        method: "PATCH",
-        url: `/v1/projects/${projectId}/github/rules/${ruleId}`,
-        headers: {
-          authorization: "Bearer dbundle_mem_test"
-        },
-        payload: {
-          enabled: false
-        }
-      }),
-      app.inject({
-        method: "DELETE",
-        url: `/v1/projects/${projectId}/github/rules/${ruleId}`,
-        headers: {
-          authorization: "Bearer dbundle_mem_test"
-        }
-      })
-    ]);
+    const installationDelete = await app.inject({
+      method: "DELETE",
+      url: "/v1/github/installation",
+      headers: {
+        authorization: "Bearer dbundle_mem_test"
+      }
+    });
+    const repoPut = await app.inject({
+      method: "PUT",
+      url: `/v1/projects/${projectId}/github/repo`,
+      headers: {
+        authorization: "Bearer dbundle_mem_test"
+      },
+      payload: {
+        owner: "debugbundle",
+        repo: "app"
+      }
+    });
+    const repoDelete = await app.inject({
+      method: "DELETE",
+      url: `/v1/projects/${projectId}/github/repo`,
+      headers: {
+        authorization: "Bearer dbundle_mem_test"
+      }
+    });
+    const createRule = await app.inject({
+      method: "POST",
+      url: `/v1/projects/${projectId}/github/rules`,
+      headers: {
+        authorization: "Bearer dbundle_mem_test"
+      },
+      payload: {
+        name: "High severity incidents",
+        event_types: ["bundle.created"],
+        environments: ["production"],
+        services: ["checkout-api"],
+        severity_min: "high",
+        bundle_type: "failure",
+        incident_status: "new_only",
+        cooldown_seconds: 300,
+        enabled: true
+      }
+    });
 
-    for (const response of responses) {
-      expect(response.statusCode).toBe(403);
-      expect(response.json()).toEqual({ error: "forbidden" });
-    }
+    expect(installationDelete.statusCode).toBe(403);
+    expect(installationDelete.json()).toEqual({ error: "forbidden" });
+    expect(repoPut.statusCode).toBe(403);
+    expect(repoPut.json()).toEqual({ error: "forbidden" });
+    expect(repoDelete.statusCode).toBe(403);
+    expect(repoDelete.json()).toEqual({ error: "forbidden" });
+    expect(createRule.statusCode).toBe(201);
 
     expect(githubManagement.disconnectInstallationForOrganization).not.toHaveBeenCalled();
     expect(githubManagement.setProjectRepoForOrganization).not.toHaveBeenCalled();
     expect(githubManagement.removeProjectRepoForOrganization).not.toHaveBeenCalled();
-    expect(githubManagement.createProjectRuleForOrganization).not.toHaveBeenCalled();
-    expect(githubManagement.updateProjectRuleForOrganization).not.toHaveBeenCalled();
-    expect(githubManagement.deleteProjectRuleForOrganization).not.toHaveBeenCalled();
+    expect(githubManagement.createProjectRuleForOrganization).toHaveBeenCalledWith(
+      expect.objectContaining({
+        organization_id: "org_123",
+        project_id: projectId,
+        created_by_user_id: "usr_123"
+      })
+    );
   });
 
   it("lists, creates, updates, and deletes github rules", async () => {
@@ -628,6 +643,7 @@ describe("api github routes", () => {
     expect(githubManagement.createProjectRuleForOrganization).toHaveBeenCalledWith({
       organization_id: "org_123",
       project_id: projectId,
+      created_by_user_id: "usr_123",
       name: "High severity incidents",
       enabled: true,
       event_types: ["bundle.created", "bundle.reopened"],
@@ -642,6 +658,8 @@ describe("api github routes", () => {
       organization_id: "org_123",
       project_id: projectId,
       rule_id: ruleId,
+      actor_user_id: "usr_123",
+      actor_role: "owner",
       name: "Critical incidents only",
       enabled: false,
       severity_min: "critical",
@@ -739,7 +757,9 @@ describe("api github routes", () => {
     expect(githubManagement.retryProjectDeliveryForOrganization).toHaveBeenCalledWith({
       organization_id: "org_123",
       project_id: projectId,
-      delivery_id: deliveryId
+      delivery_id: deliveryId,
+      actor_user_id: "usr_123",
+      actor_role: "owner"
     });
   });
 

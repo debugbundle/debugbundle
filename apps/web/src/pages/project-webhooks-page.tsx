@@ -159,7 +159,7 @@ export function ProjectWebhooksPage(): JSX.Element {
     setActiveTestWebhookId(webhookId);
 
     try {
-      const delivery = await testProjectWebhook(webhookId);
+      const delivery = await testProjectWebhook(webhookId, resolvedProjectId);
       setDeliveriesByWebhook((current) => ({
         ...current,
         [webhookId]: [delivery, ...(current[webhookId] ?? [])].slice(0, 5)
@@ -485,7 +485,7 @@ async function loadWebhooks(
 
   const deliveryEntries = await Promise.all(
     nextWebhooks.map(async (webhook) => {
-      const deliveries = await listProjectWebhookDeliveries(webhook.webhook_id);
+      const deliveries = await listProjectWebhookDeliveries(webhook.webhook_id, projectId);
       return [webhook.webhook_id, deliveries] as const;
     })
   );

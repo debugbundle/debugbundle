@@ -528,6 +528,7 @@ const STORAGE_BOOTSTRAP_STATEMENTS = [
     CREATE TABLE alert_rules (
       id uuid PRIMARY KEY,
       project_id uuid NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+      created_by_user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
       service_id uuid REFERENCES services(id) ON DELETE CASCADE,
       channel text NOT NULL,
       condition_type text NOT NULL,
@@ -588,6 +589,7 @@ const STORAGE_BOOTSTRAP_STATEMENTS = [
     CREATE TABLE agent_webhooks (
       id uuid PRIMARY KEY,
       project_id uuid NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+      created_by_user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
       url text NOT NULL,
       secret_hash text NOT NULL,
       events text[] NOT NULL,
@@ -667,6 +669,7 @@ const STORAGE_BOOTSTRAP_STATEMENTS = [
     CREATE TABLE github_dispatch_rules (
       id uuid PRIMARY KEY,
       project_id uuid NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+      created_by_user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
       name text NOT NULL,
       enabled boolean NOT NULL DEFAULT true,
       event_types text[] NOT NULL,

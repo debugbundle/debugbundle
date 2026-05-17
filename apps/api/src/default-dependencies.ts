@@ -653,6 +653,7 @@ export function createApiDependencies(input: CreateApiDependenciesInput): {
     setProjectRepoForOrganization(input: {
       organization_id: string;
       project_id: string;
+      created_by_user_id: string;
       owner: string;
       repo: string;
     }): Promise<import("../../../packages/storage/src/index.js").ProjectGitHubRepoRecord | "installation_not_found" | "installation_suspended" | "installation_removed" | "project_not_found" | "repo_not_found">;
@@ -720,8 +721,11 @@ export function createApiDependencies(input: CreateApiDependenciesInput): {
   webhookTesting: {
     triggerTestDelivery(input: {
       organization_id: string;
+      project_id?: string;
       webhook_id: string;
       event_type: WebhookEventType;
+      actor_user_id?: string;
+      actor_role?: "owner" | "admin" | "member";
     }): Promise<{ delivery_id: string; event_type: WebhookEventType } | null>;
   };
   webhookManagement: Pick<
@@ -805,8 +809,11 @@ export function createApiDependencies(input: CreateApiDependenciesInput): {
   const webhookTesting = {
     triggerTestDelivery: async (request: {
       organization_id: string;
+      project_id?: string;
       webhook_id: string;
       event_type: WebhookEventType;
+      actor_user_id?: string;
+      actor_role?: "owner" | "admin" | "member";
     }) => {
       const delivery = await webhookDelivery.createTestDeliveryForOrganization(request);
       if (delivery === null) {
@@ -1378,6 +1385,8 @@ export function createApiDependencies(input: CreateApiDependenciesInput): {
               organization_id: string;
               project_id: string;
               delivery_id: string;
+              actor_user_id?: string;
+              actor_role?: "owner" | "admin" | "member";
             }) {
               const installation = await githubStore.getGitHubInstallationForOrganization({
                 organization_id: requestInput.organization_id
@@ -1413,6 +1422,7 @@ export function createApiDependencies(input: CreateApiDependenciesInput): {
             async createProjectRuleForOrganization(requestInput: {
               organization_id: string;
               project_id: string;
+              created_by_user_id: string;
               name: string;
               enabled: boolean;
               event_types: string[];
@@ -1460,6 +1470,8 @@ export function createApiDependencies(input: CreateApiDependenciesInput): {
               organization_id: string;
               project_id: string;
               rule_id: string;
+              actor_user_id?: string;
+              actor_role?: "owner" | "admin" | "member";
               name?: string;
               enabled?: boolean;
               event_types?: string[];
@@ -1477,6 +1489,8 @@ export function createApiDependencies(input: CreateApiDependenciesInput): {
               organization_id: string;
               project_id: string;
               rule_id: string;
+              actor_user_id?: string;
+              actor_role?: "owner" | "admin" | "member";
             }) => githubStore.deleteProjectGitHubRuleForOrganization(requestInput),
             async setProjectRepoForOrganization(requestInput) {
               const installation = await githubStore.getGitHubInstallationForOrganization({
@@ -1521,6 +1535,7 @@ export function createApiDependencies(input: CreateApiDependenciesInput): {
                 await githubStore.createProjectGitHubRuleForOrganization({
                   organization_id: requestInput.organization_id,
                   project_id: requestInput.project_id,
+                  created_by_user_id: requestInput.created_by_user_id,
                   name: "Default triage rule",
                   enabled: true,
                   event_types: ["bundle.created", "bundle.reopened"],
@@ -1837,8 +1852,11 @@ export function createApiDependenciesFromEnv(env: Record<string, string | undefi
   webhookTesting: {
     triggerTestDelivery(input: {
       organization_id: string;
+      project_id?: string;
       webhook_id: string;
       event_type: WebhookEventType;
+      actor_user_id?: string;
+      actor_role?: "owner" | "admin" | "member";
     }): Promise<{ delivery_id: string; event_type: WebhookEventType } | null>;
   };
   webhookManagement: Pick<

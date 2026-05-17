@@ -487,7 +487,7 @@ describe("api alert routes", () => {
 
     const response = await app.inject({
       method: "PATCH",
-      url: "/v1/alerts/22222222-2222-4222-8222-222222222222",
+      url: "/v1/alerts/22222222-2222-4222-8222-222222222222?project_id=00000000-0000-4000-8000-000000000001",
       headers: {
         authorization: "Bearer dbundle_mem_test"
       },
@@ -547,7 +547,7 @@ describe("api alert routes", () => {
 
     const invalidPayload = await app.inject({
       method: "PATCH",
-      url: "/v1/alerts/22222222-2222-4222-8222-222222222222",
+      url: "/v1/alerts/22222222-2222-4222-8222-222222222222?project_id=00000000-0000-4000-8000-000000000001",
       headers: {
         authorization: "Bearer dbundle_mem_test"
       },
@@ -555,7 +555,7 @@ describe("api alert routes", () => {
     });
     const notFound = await app.inject({
       method: "PATCH",
-      url: "/v1/alerts/22222222-2222-4222-8222-222222222222",
+      url: "/v1/alerts/22222222-2222-4222-8222-222222222222?project_id=00000000-0000-4000-8000-000000000001",
       headers: {
         authorization: "Bearer dbundle_mem_test"
       },
@@ -565,7 +565,7 @@ describe("api alert routes", () => {
     });
     const configWithoutChannel = await app.inject({
       method: "PATCH",
-      url: "/v1/alerts/22222222-2222-4222-8222-222222222222",
+      url: "/v1/alerts/22222222-2222-4222-8222-222222222222?project_id=00000000-0000-4000-8000-000000000001",
       headers: {
         authorization: "Bearer dbundle_mem_test"
       },
@@ -614,7 +614,7 @@ describe("api alert routes", () => {
     });
     const clearedUpdate = await app.inject({
       method: "PATCH",
-      url: "/v1/alerts/22222222-2222-4222-8222-222222222222",
+      url: "/v1/alerts/22222222-2222-4222-8222-222222222222?project_id=00000000-0000-4000-8000-000000000001",
       headers: {
         authorization: "Bearer dbundle_mem_test"
       },
@@ -640,6 +640,9 @@ describe("api alert routes", () => {
     expect(alertManagement.updateAlertForOrganization).toHaveBeenCalledWith({
       organization_id: "org_123",
       alert_id: "22222222-2222-4222-8222-222222222222",
+      project_id: "00000000-0000-4000-8000-000000000001",
+      actor_user_id: "usr_123",
+      actor_role: "owner",
       service_id: null,
       channel: "email",
       severity_min: null,
@@ -655,7 +658,7 @@ describe("api alert routes", () => {
 
     const updated = await app.inject({
       method: "PATCH",
-      url: "/v1/alerts/11111111-1111-4111-8111-111111111111",
+      url: "/v1/alerts/11111111-1111-4111-8111-111111111111?project_id=00000000-0000-4000-8000-000000000001",
       headers: {
         authorization: "Bearer dbundle_mem_test"
       },
@@ -665,7 +668,7 @@ describe("api alert routes", () => {
     });
     const deleted = await app.inject({
       method: "DELETE",
-      url: "/v1/alerts/11111111-1111-4111-8111-111111111111",
+      url: "/v1/alerts/11111111-1111-4111-8111-111111111111?project_id=00000000-0000-4000-8000-000000000001",
       headers: {
         authorization: "Bearer dbundle_mem_test"
       }
@@ -690,7 +693,7 @@ describe("api alert routes", () => {
 
     const response = await app.inject({
       method: "DELETE",
-      url: "/v1/alerts/22222222-2222-4222-8222-222222222222",
+      url: "/v1/alerts/22222222-2222-4222-8222-222222222222?project_id=00000000-0000-4000-8000-000000000001",
       headers: {
         authorization: "Bearer dbundle_mem_test"
       }
@@ -699,7 +702,10 @@ describe("api alert routes", () => {
     expect(response.statusCode).toBe(204);
     expect(alertManagement.deleteAlertForOrganization).toHaveBeenCalledWith({
       organization_id: "org_123",
-      alert_id: "22222222-2222-4222-8222-222222222222"
+      project_id: "00000000-0000-4000-8000-000000000001",
+      alert_id: "22222222-2222-4222-8222-222222222222",
+      actor_user_id: "usr_123",
+      actor_role: "owner"
     });
   });
 
@@ -728,7 +734,7 @@ describe("api alert routes", () => {
     });
     const deleted = await app.inject({
       method: "DELETE",
-      url: "/v1/alerts/22222222-2222-4222-8222-222222222222",
+      url: "/v1/alerts/22222222-2222-4222-8222-222222222222?project_id=00000000-0000-4000-8000-000000000001",
       headers: {
         authorization: "Bearer dbundle_mem_test"
       }

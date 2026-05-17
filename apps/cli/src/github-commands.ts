@@ -131,12 +131,15 @@ export async function getGitHubStatusCommand(
     json?: boolean;
   },
   api: {
-    getInstallation(input: { bearerToken: string }): Promise<InstallationLike>;
+    getInstallation(input: { bearerToken: string; projectId?: string }): Promise<InstallationLike>;
     getProjectRepo?(input: { bearerToken: string; projectId: string }): Promise<ProjectRepoLike>;
   }
 ): Promise<CliCommandResult> {
   try {
-    const installation = await api.getInstallation({ bearerToken: input.bearerToken });
+    const installation = await api.getInstallation({
+      bearerToken: input.bearerToken,
+      ...(input.projectId === undefined ? {} : { projectId: input.projectId })
+    });
     const repo =
       input.projectId === undefined || api.getProjectRepo === undefined
         ? null
@@ -161,14 +164,18 @@ export async function getGitHubStatusCommand(
 export async function listGitHubRepositoriesCommand(
   input: {
     bearerToken: string;
+    projectId?: string;
     json?: boolean;
   },
   api: {
-    listRepositories(input: { bearerToken: string }): Promise<RepositoryLike[]>;
+    listRepositories(input: { bearerToken: string; projectId?: string }): Promise<RepositoryLike[]>;
   }
 ): Promise<CliCommandResult> {
   try {
-    const repositories = await api.listRepositories({ bearerToken: input.bearerToken });
+    const repositories = await api.listRepositories({
+      bearerToken: input.bearerToken,
+      ...(input.projectId === undefined ? {} : { projectId: input.projectId })
+    });
     return {
       exitCode: 0,
       output: input.json

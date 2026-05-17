@@ -207,6 +207,7 @@ describe("github store", () => {
     const created = await store.createProjectGitHubRuleForOrganization({
       organization_id: "org_1",
       project_id: "00000000-0000-4000-8000-000000000001",
+      created_by_user_id: "00000000-0000-4000-8000-000000000011",
       name: "High severity incidents",
       enabled: true,
       event_types: ["bundle.created", "bundle.reopened"],

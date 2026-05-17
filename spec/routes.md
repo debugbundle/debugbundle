@@ -161,20 +161,20 @@ app.debugbundle.com
 ├── /projects/:projectId
 │   └── Project overview
 ├── /projects/:projectId/members
-│   ├── Project member list
-│   ├── Pending invites
-│   ├── Invite collaborator
-│   ├── Role management
-│   └── Remove collaborator
+│   ├── Project member list (owner/admin only)
+│   ├── Pending invites (owner/admin only)
+│   ├── Invite collaborator (owner/admin only)
+│   ├── Role management (owner/admin only)
+│   └── Remove collaborator (owner/admin only)
 ├── /projects/:projectId/settings
 │   ├── Project details
 │   ├── Environment / install guidance entry point
-│   └── Destructive actions
+│   └── Destructive actions (owner only)
 │       └── Delete project confirmation
 ├── /projects/:projectId/github
 │   ├── GitHub integration status (connection, assigned repo)
-│   ├── Connect GitHub / Reconnect prompt
-│   ├── Repository selection
+│   ├── Connect GitHub / Reconnect prompt (owner/admin only)
+│   ├── Repository selection (owner/admin only)
 │   ├── Dispatch rules list / create / edit / delete
 │   ├── Delivery history table with status and retry
 │   └── Free-tier upgrade prompt (when applicable)
@@ -194,8 +194,8 @@ app.debugbundle.com
 │   └── Delete alert rule
 ├── /projects/:projectId/capture-policy
 │   ├── Current capture preset and resolved policy
-│   ├── Preset selection (minimal / balanced / investigative)
-│   └── Advanced override controls (owner only)
+│   ├── Preset selection (minimal / balanced / investigative, owner/admin only)
+│   └── Advanced override controls (owner/admin only; members see preview only)
 ├── /member-tokens
 │   ├── Member token list
 │   ├── Create token

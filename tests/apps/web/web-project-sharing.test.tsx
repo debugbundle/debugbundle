@@ -20,6 +20,18 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
+if (typeof HTMLElement !== "undefined" && HTMLElement.prototype.hasPointerCapture === undefined) {
+  HTMLElement.prototype.hasPointerCapture = () => false;
+}
+
+if (typeof HTMLElement !== "undefined" && HTMLElement.prototype.setPointerCapture === undefined) {
+  HTMLElement.prototype.setPointerCapture = () => {};
+}
+
+if (typeof HTMLElement !== "undefined" && HTMLElement.prototype.releasePointerCapture === undefined) {
+  HTMLElement.prototype.releasePointerCapture = () => {};
+}
+
 describe("web app — project sharing", () => {
   it("renders shared project icons in project tables and project breadcrumbs", async () => {
     const sharedProject = createProject({
@@ -28,6 +40,7 @@ describe("web app — project sharing", () => {
       slug: "shared-app",
       organization_plan: "team",
       relationship: "shared",
+      sharing_state: "shared_with_you",
       effective_role: "member",
       owner_email: "owner@example.com"
     });
@@ -46,24 +59,6 @@ describe("web app — project sharing", () => {
         });
       }
 
-      if (url.endsWith("/v1/projects/proj_shared/members") && init?.method === undefined) {
-        return jsonResponse(200, {
-          members: [
-            createProjectMember({
-              email: "owner@example.com",
-              role: "owner",
-              membership_type: "owner"
-            })
-          ]
-        });
-      }
-
-      if (url.endsWith("/v1/projects/proj_shared/invites") && init?.method === undefined) {
-        return jsonResponse(200, {
-          invites: []
-        });
-      }
-
       return jsonResponse(404, { error: "not_found" });
     });
 
@@ -72,17 +67,17 @@ describe("web app — project sharing", () => {
     const inventoryView = render(<App initialEntries={["/projects"]} />);
 
     expect(await screen.findByRole("heading", { name: /projects/i, level: 1 })).toBeInTheDocument();
-    expect(screen.getAllByText(/shared app/i).length).toBeGreaterThan(0);
+    expect((await screen.findAllByText(/shared app/i)).length).toBeGreaterThan(0);
     await waitFor(() => {
       expect(document.querySelectorAll('[aria-label="Shared project"]')).toHaveLength(1);
     });
 
     inventoryView.unmount();
 
-    render(<App initialEntries={["/projects/proj_shared/members"]} />);
+    render(<App initialEntries={["/projects/proj_shared"]} />);
 
-    expect(await screen.findByText(/manage who can access this project/i)).toBeInTheDocument();
-    expect(screen.getByRole("tab", { name: /members/i })).toHaveAttribute("data-state", "active");
+    expect(await screen.findByText(/project details/i)).toBeInTheDocument();
+    expect(screen.queryByRole("tab", { name: /members/i })).not.toBeInTheDocument();
     await waitFor(() => {
       expect(document.querySelectorAll('[aria-label="Shared project"]')).toHaveLength(1);
     });
@@ -174,7 +169,8 @@ describe("web app — project sharing", () => {
 
     expect(await screen.findByText(/newbie@example.com/i)).toBeInTheDocument();
 
-    await user.selectOptions(screen.getByLabelText(/role for casey@example.com/i), "admin");
+    await user.pointer([{ target: screen.getByLabelText(/role for casey@example.com/i), keys: "[MouseLeft]" }]);
+    await user.click(await screen.findByRole("option", { name: /^admin$/i }));
     await waitFor(() => {
       expect(
         fetchMock.mock.calls.some(
@@ -218,6 +214,7 @@ describe("web app — project sharing", () => {
       slug: "shared-app",
       organization_plan: "team",
       relationship: "shared",
+      sharing_state: "shared_with_you",
       effective_role: "member",
       owner_email: "owner@example.com"
     });
@@ -268,10 +265,10 @@ describe("web app — project sharing", () => {
     await user.type(screen.getByLabelText(/email/i), "invited@example.com");
     await user.click(screen.getByRole("button", { name: /^send code$/i }));
 
-    expect(await screen.findByText(/check your inbox/i)).toBeInTheDocument();
+    expect(await screen.findByLabelText(/six-digit code/i)).toBeInTheDocument();
 
     await user.type(screen.getByLabelText(/six-digit code/i), "123456");
-    await user.click(screen.getByRole("button", { name: /^send code$/i }));
+    await user.click(screen.getByRole("button", { name: /verify code/i }));
 
     expect(await screen.findByText(/ready to accept invite/i)).toBeInTheDocument();
 

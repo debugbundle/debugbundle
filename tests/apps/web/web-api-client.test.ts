@@ -89,6 +89,7 @@ describe("web api client", () => {
           alert: {
             alert_id: "al_1",
             project_id: "proj_1",
+            created_by_user_id: "usr_123",
             service_id: null,
             channel: "webhook",
             condition_type: "severity_threshold",
@@ -153,7 +154,7 @@ describe("web api client", () => {
       severity: "high"
     });
     const installUrl = await getGitHubInstallUrl();
-    const installUrlWithReturnTo = await getGitHubInstallUrl("/projects/proj_1/github");
+    const installUrlWithReturnTo = await getGitHubInstallUrl("/projects/proj_1/github", "proj_1");
 
     expect(incidents).toEqual({ incidents: [], nextCursor: "cursor_2" });
     expect(fetchMock).toHaveBeenNthCalledWith(
@@ -166,7 +167,7 @@ describe("web api client", () => {
     expect(installUrlWithReturnTo).toBe("https://github.com/apps/debugbundle/installations/new?state=return");
     expect(fetchMock).toHaveBeenNthCalledWith(
       3,
-      "http://localhost:3003/v1/github/app/install-url?return_to=%2Fprojects%2Fproj_1%2Fgithub",
+      "http://localhost:3003/v1/github/app/install-url?return_to=%2Fprojects%2Fproj_1%2Fgithub&project_id=proj_1",
       { credentials: "include" }
     );
   });
@@ -192,6 +193,7 @@ describe("web api client", () => {
             webhook: {
               webhook_id: "wh_1",
               project_id: "proj_1",
+              created_by_user_id: "usr_123",
               url: "https://hooks.example.test/alerts",
               events: ["bundle.created"],
               filters: {},
@@ -217,8 +219,8 @@ describe("web api client", () => {
       url: "https://hooks.example.test/alerts",
       events: ["bundle.created"]
     });
-    await testProjectWebhook("wh_1");
-    await testProjectWebhook("wh_1", "verification.failed");
+    await testProjectWebhook("wh_1", "proj_1");
+    await testProjectWebhook("wh_1", "proj_1", "verification.failed");
 
     expect(webhook.webhook_id).toBe("wh_1");
     expect(fetchMock).toHaveBeenNthCalledWith(
@@ -237,12 +239,12 @@ describe("web api client", () => {
     );
     expect(fetchMock).toHaveBeenNthCalledWith(
       2,
-      "http://localhost:3003/v1/webhooks/wh_1/test",
+      "http://localhost:3003/v1/webhooks/wh_1/test?project_id=proj_1",
       expect.objectContaining({ body: JSON.stringify({ event_type: "verification.passed" }) })
     );
     expect(fetchMock).toHaveBeenNthCalledWith(
       3,
-      "http://localhost:3003/v1/webhooks/wh_1/test",
+      "http://localhost:3003/v1/webhooks/wh_1/test?project_id=proj_1",
       expect.objectContaining({ body: JSON.stringify({ event_type: "verification.failed" }) })
     );
   });
@@ -272,7 +274,7 @@ describe("web api client", () => {
     await expect(getIncidentBundle("inc_1")).resolves.toEqual({ status: "pending" });
     await expect(getIncidentBundle("inc_1")).resolves.toMatchObject({ status: "ready", bundle: { bundle_id: "bun_1" } });
     await expect(getIncidentReproduction("inc_1")).resolves.toEqual({ status: "failed" });
-    await expect(deleteAlert("al_1")).rejects.toThrow("delete_failed");
-    await expect(deleteAlert("al_2")).rejects.toThrow("request_failed_502");
+    await expect(deleteAlert("al_1", "proj_1")).rejects.toThrow("delete_failed");
+    await expect(deleteAlert("al_2", "proj_1")).rejects.toThrow("request_failed_502");
   });
 });

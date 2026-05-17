@@ -5,6 +5,7 @@ import { CalloutCard } from "../components/system/callout-card.js";
 import { DialogFormContent } from "../components/system/dialog-form-content.js";
 import { GitHubMark } from "../components/system/github-mark.js";
 import type { ProjectContext } from "../components/system/project-layout.js";
+import { getProjectEffectiveRole } from "../lib/project-access.js";
 import { useSession } from "../lib/session.js";
 import { Badge } from "../components/ui/badge.js";
 import { Button } from "../components/ui/button.js";
@@ -51,7 +52,7 @@ interface GitHubSettingsState {
 async function loadOptionalGitHubInstallUrl(projectId: string): Promise<{ installUrl: string | null; installUrlLoadFailed: boolean }> {
   try {
     return {
-      installUrl: await getGitHubInstallUrl(`/projects/${projectId}/github`),
+      installUrl: await getGitHubInstallUrl(`/projects/${projectId}/github`, projectId),
       installUrlLoadFailed: false
     };
   } catch {
@@ -89,7 +90,8 @@ export function ProjectGitHubPage(): JSX.Element {
   const [editingRuleId, setEditingRuleId] = useState<string | null>(null);
   const [activeRuleDeleteId, setActiveRuleDeleteId] = useState<string | null>(null);
 
-  const canEditProject = session?.role === "owner";
+  const effectiveRole = getProjectEffectiveRole(project);
+  const canManageConnections = effectiveRole === "owner" || effectiveRole === "admin";
   const githubAutomationEnabled = project.organization_plan !== "free";
 
   useEffect(() => {
@@ -119,10 +121,12 @@ export function ProjectGitHubPage(): JSX.Element {
       setGitHubSettings(null);
 
       try {
-        const installation = await getGitHubInstallation();
+        const installation = await getGitHubInstallation(project.project_id);
 
         if (installation === null) {
-          const installUrlState = await loadOptionalGitHubInstallUrl(project.project_id);
+          const installUrlState = canManageConnections
+            ? await loadOptionalGitHubInstallUrl(project.project_id)
+            : { installUrl: null, installUrlLoadFailed: false };
 
           if (cancelled) {
             return;
@@ -139,14 +143,16 @@ export function ProjectGitHubPage(): JSX.Element {
           return;
         }
 
-        const installUrlPromise = loadOptionalGitHubInstallUrl(project.project_id);
+        const installUrlPromise = canManageConnections
+          ? loadOptionalGitHubInstallUrl(project.project_id)
+          : Promise.resolve({ installUrl: null, installUrlLoadFailed: false });
         const [repo, rules, deliveries] = await Promise.all([
           getProjectGitHubRepo(project.project_id),
           listProjectGitHubRules(project.project_id),
           listProjectGitHubDeliveries(project.project_id)
         ]);
         const repositories =
-          installation !== null && installation.status === "active" ? await listGitHubRepositories() : [];
+          canManageConnections && installation.status === "active" ? await listGitHubRepositories(project.project_id) : [];
         const installUrlState = await installUrlPromise;
 
         if (cancelled) {
@@ -166,7 +172,7 @@ export function ProjectGitHubPage(): JSX.Element {
     return () => {
       cancelled = true;
     };
-  }, [githubAutomationEnabled, githubSettingsReloadKey, project.project_id]);
+  }, [canManageConnections, githubAutomationEnabled, githubSettingsReloadKey, project.project_id]);
 
   useEffect(() => {
     if (githubSettings === null) {
@@ -380,7 +386,7 @@ export function ProjectGitHubPage(): JSX.Element {
               description="No GitHub App installation is connected to this workspace yet. Complete the install flow, then return here to assign a repository and manage dispatch rules."
               tone="neutral"
             >
-              {githubSettings.installUrl === null ? null : (
+              {!canManageConnections || githubSettings.installUrl === null ? null : (
                 <div className="flex flex-wrap gap-2">
                   <Button asChild type="button" variant="outline" size="sm">
                     <a href={githubSettings.installUrl}>
@@ -404,7 +410,7 @@ export function ProjectGitHubPage(): JSX.Element {
                   description="Dispatches are paused until the installation is active again. Reconnect the GitHub App in the linked account before expecting new automation deliveries."
                   tone="warning"
                 >
-                  {githubSettings.installUrl === null ? null : (
+                  {!canManageConnections || githubSettings.installUrl === null ? null : (
                     <div className="flex flex-wrap gap-2">
                       <Button asChild type="button" variant="outline" size="sm">
                         <a href={githubSettings.installUrl}>
@@ -437,7 +443,7 @@ export function ProjectGitHubPage(): JSX.Element {
                     <Badge variant="secondary">{githubSettings.repo.default_branch}</Badge>
                   </div>
                 )}
-                {!canEditProject ? null : (
+                {!canManageConnections ? null : (
                   <div className="mt-4 space-y-3">
                     <p className="text-sm text-muted-foreground">
                       Choose one repository from the repos currently granted to this GitHub App installation. To change
@@ -523,7 +529,7 @@ export function ProjectGitHubPage(): JSX.Element {
                   </div>
                   <div className="flex items-center gap-2">
                     <Badge variant="outline">{githubSettings.rules.length}</Badge>
-                    {!canEditProject || githubSettings.repo === null ? null : (
+                    {githubSettings.repo === null ? null : (
                       <Button type="button" size="sm" variant="outline" onClick={() => handleStartCreateRule()}>
                         <PlusIcon data-icon="inline-start" />
                         Create rule
@@ -541,7 +547,7 @@ export function ProjectGitHubPage(): JSX.Element {
                           <p className="text-sm font-medium text-foreground">{rule.name}</p>
                           <div className="flex items-center gap-2">
                             <Badge variant={rule.enabled ? "success" : "secondary"}>{rule.enabled ? "enabled" : "disabled"}</Badge>
-                            {!canEditProject ? null : (
+                            {canManageGitHubRule(rule, session?.user_id, effectiveRole) ? (
                               <Button
                                 type="button"
                                 variant="ghost"
@@ -552,8 +558,8 @@ export function ProjectGitHubPage(): JSX.Element {
                                 <PencilIcon data-icon="inline-start" />
                                 Edit rule
                               </Button>
-                            )}
-                            {!canEditProject ? null : (
+                            ) : null}
+                            {canManageGitHubRule(rule, session?.user_id, effectiveRole) ? (
                               <Button
                                 type="button"
                                 variant="ghost"
@@ -564,7 +570,7 @@ export function ProjectGitHubPage(): JSX.Element {
                               >
                                 {activeRuleDeleteId === rule.rule_id ? "Deleting..." : "Delete rule"}
                               </Button>
-                            )}
+                            ) : null}
                           </div>
                         </div>
                         <p className="mt-2 text-sm text-muted-foreground">{rule.event_types.join(", ")}</p>
@@ -605,7 +611,7 @@ export function ProjectGitHubPage(): JSX.Element {
                             </TableCell>
                             <TableCell>{delivery.last_error ?? "-"}</TableCell>
                             <TableCell className="text-right">
-                              {delivery.status === "failed" ? (
+                              {delivery.status === "failed" && canRetryGitHubDelivery(delivery, githubSettings.rules, session?.user_id, effectiveRole) ? (
                                 <Button
                                   type="button"
                                   variant="ghost"
@@ -735,6 +741,24 @@ function splitCsvInput(value: string): string[] {
     .split(",")
     .map((entry) => entry.trim())
     .filter((entry) => entry.length > 0);
+}
+
+function canManageGitHubRule(
+  rule: GitHubDispatchRuleRecord,
+  userId: string | undefined,
+  effectiveRole: "owner" | "admin" | "member"
+): boolean {
+  return effectiveRole === "owner" || effectiveRole === "admin" || (userId !== undefined && rule.created_by_user_id === userId);
+}
+
+function canRetryGitHubDelivery(
+  delivery: GitHubDispatchDeliveryRecord,
+  rules: GitHubDispatchRuleRecord[],
+  userId: string | undefined,
+  effectiveRole: "owner" | "admin" | "member"
+): boolean {
+  const rule = rules.find((entry) => entry.rule_id === delivery.rule_id);
+  return rule !== undefined && canManageGitHubRule(rule, userId, effectiveRole);
 }
 
 function getGitHubDeliveryBadgeVariant(

@@ -90,6 +90,9 @@ export function registerProjectMemberRoutes(app: FastifyInstance, dependencies: 
     if (auth === null) {
       return;
     }
+    if (auth.access.effective_role !== "owner" && auth.access.effective_role !== "admin") {
+      return reply.status(403).send({ error: "forbidden" });
+    }
     const projectCollaboration = dependencies.projectCollaboration;
     if (projectCollaboration === undefined || projectCollaboration.listMembersForProject === undefined) {
       return reply.status(404).send({ error: "member_management_not_available" });
@@ -122,6 +125,9 @@ export function registerProjectMemberRoutes(app: FastifyInstance, dependencies: 
     });
     if (auth === null) {
       return;
+    }
+    if (auth.access.effective_role !== "owner" && auth.access.effective_role !== "admin") {
+      return reply.status(403).send({ error: "forbidden" });
     }
 
     const projectCollaboration = dependencies.projectCollaboration;
@@ -179,6 +185,9 @@ export function registerProjectMemberRoutes(app: FastifyInstance, dependencies: 
     });
     if (auth === null) {
       return;
+    }
+    if (auth.access.effective_role !== "owner" && auth.access.effective_role !== "admin") {
+      return reply.status(403).send({ error: "forbidden" });
     }
     const projectCollaboration = dependencies.projectCollaboration;
     if (projectCollaboration === undefined || projectCollaboration.listPendingInvitesForProject === undefined) {

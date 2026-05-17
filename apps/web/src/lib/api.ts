@@ -47,6 +47,11 @@ export interface CreatedMemberToken extends MemberTokenRecord {
 export interface ProjectRecord {
   project_id: string;
   organization_id: string;
+  owner_user_id?: string;
+  owner_email?: string;
+  relationship?: "owned" | "shared";
+  sharing_state?: "private" | "shared_by_you" | "shared_with_you";
+  effective_role?: "owner" | "admin" | "member";
   name: string;
   slug: string;
   environment_default: string;
@@ -64,6 +69,11 @@ export interface ProjectRecord {
 export interface DeletedProjectRecord {
   project_id: string;
   organization_id: string;
+  owner_user_id?: string;
+  owner_email?: string;
+  relationship?: "owned" | "shared";
+  sharing_state?: "private" | "shared_by_you" | "shared_with_you";
+  effective_role?: "owner" | "admin" | "member";
   name: string;
   slug: string;
   environment_default: string;
@@ -114,6 +124,7 @@ export interface ProjectCapturePolicyOverrides {
 }
 
 export interface ProjectCapturePolicyResponse {
+  access_mode: "manage" | "preview";
   policy: ProjectCapturePolicy;
   overrides: ProjectCapturePolicyOverrides;
 }
@@ -202,6 +213,7 @@ export type AlertConditionType =
 export interface AlertRecord {
   alert_id: string;
   project_id: string;
+  created_by_user_id: string;
   service_id: string | null;
   channel: AlertChannel;
   condition_type: AlertConditionType;
@@ -225,6 +237,7 @@ export type WebhookEventType =
 export interface WebhookRecord {
   webhook_id: string;
   project_id: string;
+  created_by_user_id: string;
   url: string;
   events: WebhookEventType[];
   filters: {
@@ -291,6 +304,7 @@ export interface ProjectGitHubRepoRecord {
 export interface GitHubDispatchRuleRecord {
   rule_id: string;
   project_id: string;
+  created_by_user_id: string;
   name: string;
   enabled: boolean;
   event_types: string[];
@@ -881,9 +895,14 @@ export async function listProjectWebhooks(projectId: string, limit = 20): Promis
   return body.webhooks;
 }
 
-export async function getGitHubInstallation(): Promise<GitHubInstallationRecord | null> {
+export async function getGitHubInstallation(projectId?: string): Promise<GitHubInstallationRecord | null> {
+  const searchParams = new URLSearchParams();
+  if (projectId !== undefined) {
+    searchParams.set("project_id", projectId);
+  }
+
   const body = await readJson<{ installation: GitHubInstallationRecord | null }>(
-    await fetch(`${API_BASE}/v1/github/installation`, {
+    await fetch(`${API_BASE}/v1/github/installation${searchParams.size === 0 ? "" : `?${searchParams.toString()}`}`, {
       credentials: "include"
     })
   );
@@ -891,10 +910,13 @@ export async function getGitHubInstallation(): Promise<GitHubInstallationRecord 
   return body.installation;
 }
 
-export async function getGitHubInstallUrl(returnTo?: string): Promise<string> {
+export async function getGitHubInstallUrl(returnTo?: string, projectId?: string): Promise<string> {
   const searchParams = new URLSearchParams();
   if (returnTo !== undefined) {
     searchParams.set("return_to", returnTo);
+  }
+  if (projectId !== undefined) {
+    searchParams.set("project_id", projectId);
   }
 
   const body = await readJson<GitHubInstallUrlResponse>(
@@ -909,9 +931,14 @@ export async function getGitHubInstallUrl(returnTo?: string): Promise<string> {
   return body.install_url;
 }
 
-export async function listGitHubRepositories(): Promise<GitHubRepositoryRecord[]> {
+export async function listGitHubRepositories(projectId?: string): Promise<GitHubRepositoryRecord[]> {
+  const searchParams = new URLSearchParams();
+  if (projectId !== undefined) {
+    searchParams.set("project_id", projectId);
+  }
+
   const body = await readJson<{ repositories: GitHubRepositoryRecord[] }>(
-    await fetch(`${API_BASE}/v1/github/repositories`, {
+    await fetch(`${API_BASE}/v1/github/repositories${searchParams.size === 0 ? "" : `?${searchParams.toString()}`}`, {
       credentials: "include"
     })
   );
@@ -1090,8 +1117,13 @@ export async function createProjectWebhook(payload: {
   return body.webhook;
 }
 
-export async function listProjectWebhookDeliveries(webhookId: string, limit = 5): Promise<WebhookDeliveryRecord[]> {
+export async function listProjectWebhookDeliveries(
+  webhookId: string,
+  projectId: string,
+  limit = 5
+): Promise<WebhookDeliveryRecord[]> {
   const searchParams = new URLSearchParams({
+    project_id: projectId,
     limit: String(limit)
   });
 
@@ -1106,10 +1138,11 @@ export async function listProjectWebhookDeliveries(webhookId: string, limit = 5)
 
 export async function testProjectWebhook(
   webhookId: string,
+  projectId: string,
   eventType: Extract<WebhookEventType, "verification.passed" | "verification.failed"> = "verification.passed"
 ): Promise<WebhookDeliveryRecord> {
   const body = await readJson<{ delivery: WebhookDeliveryRecord }>(
-    await fetch(`${API_BASE}/v1/webhooks/${webhookId}/test`, {
+    await fetch(`${API_BASE}/v1/webhooks/${webhookId}/test?project_id=${encodeURIComponent(projectId)}`, {
       method: "POST",
       credentials: "include",
       headers: buildBrowserSessionHeaders(true),
@@ -1166,8 +1199,8 @@ export async function revokeMemberToken(tokenId: string): Promise<void> {
   );
 }
 
-export async function deleteAlert(alertId: string): Promise<void> {
-  const response = await fetch(`${API_BASE}/v1/alerts/${alertId}`, {
+export async function deleteAlert(alertId: string, projectId: string): Promise<void> {
+  const response = await fetch(`${API_BASE}/v1/alerts/${alertId}?project_id=${encodeURIComponent(projectId)}`, {
     method: "DELETE",
     credentials: "include",
     headers: buildBrowserSessionHeaders()

@@ -22,8 +22,8 @@ function mapMcpError(error: unknown): never {
 }
 
 export function createGitHubMcpTools(api: {
-  getInstallation(input: { bearerToken: string }): Promise<unknown>;
-  listRepositories(input: { bearerToken: string }): Promise<unknown[]>;
+  getInstallation(input: { bearerToken: string; projectId?: string }): Promise<unknown>;
+  listRepositories(input: { bearerToken: string; projectId?: string }): Promise<unknown[]>;
   getProjectRepo?(input: { bearerToken: string; projectId: string }): Promise<unknown>;
   listProjectDeliveries?(input: {
     bearerToken: string;
@@ -68,8 +68,11 @@ export function createGitHubMcpTools(api: {
     async get_github_status(input) {
       try {
         const bearerToken = String(input["bearerToken"]);
-        const installation = await api.getInstallation({ bearerToken });
         const projectId = typeof input["projectId"] === "string" ? input["projectId"] : undefined;
+        const installation = await api.getInstallation({
+          bearerToken,
+          ...(projectId === undefined ? {} : { projectId })
+        });
         const repo =
           projectId === undefined || api.getProjectRepo === undefined
             ? undefined
@@ -85,7 +88,8 @@ export function createGitHubMcpTools(api: {
       try {
         return {
           repositories: await api.listRepositories({
-            bearerToken: String(input["bearerToken"])
+            bearerToken: String(input["bearerToken"]),
+            ...(typeof input["projectId"] === "string" ? { projectId: input["projectId"] } : {})
           })
         };
       } catch (error) {

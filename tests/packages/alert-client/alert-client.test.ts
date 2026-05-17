@@ -19,6 +19,7 @@ describe("alert api client", () => {
               to: "oncall@example.com"
             },
             is_enabled: true,
+            created_by_user_id: "usr_1",
             created_at: "2026-03-15T00:00:00.000Z",
             updated_at: "2026-03-15T00:00:00.000Z"
           }
@@ -56,6 +57,7 @@ describe("alert api client", () => {
             to: "oncall@example.com"
           },
           is_enabled: true,
+          created_by_user_id: "usr_1",
           created_at: "2026-03-15T00:00:00.000Z",
           updated_at: "2026-03-15T00:00:00.000Z"
         }
@@ -112,6 +114,7 @@ describe("alert api client", () => {
               channel: "eng-alerts"
             },
             is_enabled: false,
+            created_by_user_id: "usr_1",
             created_at: "2026-03-15T00:00:00.000Z",
             updated_at: "2026-03-15T00:05:00.000Z"
           }
@@ -125,6 +128,7 @@ describe("alert api client", () => {
     const api = createAlertApi({ request });
     const updated = await api.updateAlert({
       bearerToken: "dbundle_mem_x",
+      projectId: "proj_1",
       alertId: "al_1",
       serviceId: null,
       channel: "slack",
@@ -137,6 +141,7 @@ describe("alert api client", () => {
     });
     const deleted = await api.deleteAlert({
       bearerToken: "dbundle_mem_x",
+      projectId: "proj_1",
       alertId: "al_1"
     });
 
@@ -144,7 +149,7 @@ describe("alert api client", () => {
     expect(deleted).toEqual({ alert_id: "al_1" });
     expect(request).toHaveBeenNthCalledWith(1, {
       method: "PATCH",
-      path: "/v1/alerts/al_1",
+      path: "/v1/alerts/al_1?project_id=proj_1",
       bearerToken: "dbundle_mem_x",
       body: {
         service_id: null,
@@ -159,7 +164,7 @@ describe("alert api client", () => {
     });
     expect(request).toHaveBeenNthCalledWith(2, {
       method: "DELETE",
-      path: "/v1/alerts/al_1",
+      path: "/v1/alerts/al_1?project_id=proj_1",
       bearerToken: "dbundle_mem_x"
     });
   });
@@ -188,7 +193,7 @@ describe("alert api client", () => {
     const apiShape = createAlertApi({ request: requestShape });
     const apiMalformedError = createAlertApi({ request: requestMalformedError });
 
-    await expect(apiError.deleteAlert({ bearerToken: "dbundle_mem_x", alertId: "al_missing" })).rejects.toEqual(
+    await expect(apiError.deleteAlert({ bearerToken: "dbundle_mem_x", projectId: "proj_1", alertId: "al_missing" })).rejects.toEqual(
       new AlertApiError(404, "alert_not_found")
     );
     await expect(apiShape.listAlerts({ bearerToken: "dbundle_mem_x", projectId: "proj_1" })).rejects.toEqual(
@@ -228,6 +233,7 @@ describe("alert api client", () => {
               to: "owner@example.com"
             },
             is_enabled: true,
+            created_by_user_id: "usr_1",
             created_at: "2026-03-15T00:00:00.000Z",
             updated_at: "2026-03-15T00:00:00.000Z"
           }
@@ -247,6 +253,7 @@ describe("alert api client", () => {
               to: "owner@example.com"
             },
             is_enabled: true,
+            created_by_user_id: "usr_1",
             created_at: "2026-03-15T00:00:00.000Z",
             updated_at: "2026-03-15T00:00:00.000Z"
           }
@@ -267,6 +274,7 @@ describe("alert api client", () => {
     await expect(
       api.updateAlert({
         bearerToken: "dbundle_mem_x",
+        projectId: "proj_1",
         alertId: "al_minimal",
         isEnabled: true
       })
@@ -292,7 +300,7 @@ describe("alert api client", () => {
     });
     expect(request).toHaveBeenNthCalledWith(3, {
       method: "PATCH",
-      path: "/v1/alerts/al_minimal",
+      path: "/v1/alerts/al_minimal?project_id=proj_1",
       bearerToken: "dbundle_mem_x",
       body: {
         is_enabled: true

@@ -171,6 +171,7 @@ describe("cli alert commands", () => {
     const updateResult = await updateAlertCommand(
       {
         bearerToken: "dbundle_mem_x",
+        projectId: "proj_1",
         alertId: "al_1",
         isEnabled: false,
         json: true
@@ -194,6 +195,7 @@ describe("cli alert commands", () => {
     const deleteResult = await deleteAlertCommand(
       {
         bearerToken: "dbundle_mem_x",
+        projectId: "proj_1",
         alertId: "al_1"
       },
       {
@@ -270,6 +272,7 @@ describe("cli alert commands", () => {
     const updated = await updateAlertCommand(
       {
         bearerToken: "dbundle_mem_x",
+        projectId: "proj_1",
         alertId: "al_2",
         serviceId: null,
         severityMin: null,
@@ -323,6 +326,7 @@ describe("cli alert commands", () => {
     const authResult = await deleteAlertCommand(
       {
         bearerToken: "dbundle_mem_x",
+        projectId: "proj_1",
         alertId: "al_1"
       },
       {
@@ -333,6 +337,7 @@ describe("cli alert commands", () => {
     const notFoundResult = await updateAlertCommand(
       {
         bearerToken: "dbundle_mem_x",
+        projectId: "proj_1",
         alertId: "al_missing",
         isEnabled: false
       },
@@ -357,6 +362,7 @@ describe("cli alert commands", () => {
     const unknownResult = await deleteAlertCommand(
       {
         bearerToken: "dbundle_mem_x",
+        projectId: "proj_1",
         alertId: "al_1"
       },
       {
@@ -398,6 +404,7 @@ describe("cli alert commands", () => {
 
     const updateResult = await updateAlertWithAuthCommand(
       {
+        projectId: "proj_1",
         alertId: "al_1",
         channel: "slack",
         conditionType: "error_spike",
@@ -411,6 +418,7 @@ describe("cli alert commands", () => {
 
     const deleteResult = await deleteAlertWithAuthCommand(
       {
+        projectId: "proj_1",
         alertId: "al_1",
         json: true
       },
@@ -453,6 +461,7 @@ describe("cli alert commands", () => {
     await updateAlertWithAuthCommand(
       {
         authFilePath: "/tmp/auth.json",
+        projectId: "proj_1",
         alertId: "al_2",
         serviceId: null,
         severityMin: null,
@@ -467,6 +476,7 @@ describe("cli alert commands", () => {
     await deleteAlertWithAuthCommand(
       {
         authFilePath: "/tmp/auth.json",
+        projectId: "proj_1",
         alertId: "al_2"
       },
       {
@@ -477,6 +487,7 @@ describe("cli alert commands", () => {
 
     expect(updateAlert).toHaveBeenCalledWith({
       bearerToken: "dbundle_mem_saved",
+      projectId: "proj_1",
       alertId: "al_2",
       serviceId: null,
       severityMin: null,
@@ -484,6 +495,7 @@ describe("cli alert commands", () => {
     });
     expect(deleteAlert).toHaveBeenCalledWith({
       bearerToken: "dbundle_mem_saved",
+      projectId: "proj_1",
       alertId: "al_2"
     });
   });

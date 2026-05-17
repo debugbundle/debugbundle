@@ -7,7 +7,7 @@ import { Button } from "../ui/button.js";
 import { Skeleton } from "../ui/skeleton.js";
 import { Tabs, TabsList, TabsTrigger } from "../ui/tabs.js";
 import { listProjects, type ProjectRecord } from "../../lib/api.js";
-import { getProjectRelationship } from "../../lib/project-access.js";
+import { getProjectEffectiveRole, getProjectRelationship } from "../../lib/project-access.js";
 
 const PROJECT_TABS = [
   { value: "overview", label: "Overview", suffix: "" },
@@ -20,6 +20,11 @@ const PROJECT_TABS = [
   { value: "members", label: "Members", suffix: "/members" },
   { value: "settings", label: "Settings", suffix: "/settings" },
 ] as const;
+
+function canViewProjectMembers(project: ProjectRecord): boolean {
+  const effectiveRole = getProjectEffectiveRole(project);
+  return effectiveRole === "owner" || effectiveRole === "admin";
+}
 
 export type ProjectTab = (typeof PROJECT_TABS)[number]["value"];
 
@@ -94,12 +99,16 @@ export function ProjectLayout(): JSX.Element {
     });
   }
 
+  const visibleTabs = project === null || project === undefined
+    ? PROJECT_TABS
+    : PROJECT_TABS.filter((tab) => tab.value !== "members" || canViewProjectMembers(project));
+
   if (projectId === undefined) {
     return <Navigate replace to="/projects" />;
   }
 
   function handleTabChange(value: string): void {
-    const tab = PROJECT_TABS.find((t) => t.value === value);
+    const tab = visibleTabs.find((t) => t.value === value);
     if (tab === undefined) return;
     void navigate(`/projects/${projectId}${tab.suffix}`);
   }
@@ -129,11 +138,15 @@ export function ProjectLayout(): JSX.Element {
     );
   }
 
+  if (activeTab === "members" && !canViewProjectMembers(project)) {
+    return <Navigate replace to={`/projects/${projectId}`} />;
+  }
+
   return (
     <div className="min-w-0 space-y-6">
       <Tabs value={activeTab} onValueChange={handleTabChange}>
         <TabsList>
-          {PROJECT_TABS.map((tab) => (
+          {visibleTabs.map((tab) => (
             <TabsTrigger key={tab.value} value={tab.value}>
               {tab.label}
             </TabsTrigger>

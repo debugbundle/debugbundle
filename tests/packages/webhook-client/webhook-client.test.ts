@@ -17,6 +17,7 @@ describe("webhook api client", () => {
               environment: ["production"]
             },
             is_enabled: true,
+            created_by_user_id: "usr_1",
             created_at: "2026-03-15T00:00:00.000Z",
             updated_at: "2026-03-15T00:00:00.000Z"
           }
@@ -53,6 +54,7 @@ describe("webhook api client", () => {
             severity_min: "high"
           },
           is_enabled: true,
+          created_by_user_id: "usr_1",
           created_at: "2026-03-15T00:00:00.000Z",
           updated_at: "2026-03-15T00:00:00.000Z",
           signing_secret: "dbundle_whsec_secret"
@@ -104,6 +106,7 @@ describe("webhook api client", () => {
             events: ["bundle.created"],
             filters: {},
             is_enabled: true,
+            created_by_user_id: "usr_1",
             created_at: "2026-03-15T00:00:00.000Z",
             updated_at: "2026-03-15T00:00:00.000Z"
           }
@@ -122,6 +125,7 @@ describe("webhook api client", () => {
               verification: false
             },
             is_enabled: false,
+            created_by_user_id: "usr_1",
             created_at: "2026-03-15T00:00:00.000Z",
             updated_at: "2026-03-15T00:05:00.000Z"
           }
@@ -131,10 +135,12 @@ describe("webhook api client", () => {
     const api = createWebhookApi({ request });
     const fetched = await api.getWebhook({
       bearerToken: "dbundle_mem_x",
+      projectId: "proj_1",
       webhookId: "wh_1"
     });
     const updated = await api.updateWebhook({
       bearerToken: "dbundle_mem_x",
+      projectId: "proj_1",
       webhookId: "wh_1",
       url: "https://hooks.example.test/updated",
       events: ["bundle.updated"],
@@ -149,12 +155,12 @@ describe("webhook api client", () => {
     expect(updated.is_enabled).toBe(false);
     expect(request).toHaveBeenNthCalledWith(1, {
       method: "GET",
-      path: "/v1/webhooks/wh_1",
+      path: "/v1/webhooks/wh_1?project_id=proj_1",
       bearerToken: "dbundle_mem_x"
     });
     expect(request).toHaveBeenNthCalledWith(2, {
       method: "PATCH",
-      path: "/v1/webhooks/wh_1",
+      path: "/v1/webhooks/wh_1?project_id=proj_1",
       bearerToken: "dbundle_mem_x",
       body: {
         url: "https://hooks.example.test/updated",
@@ -177,13 +183,14 @@ describe("webhook api client", () => {
     const api = createWebhookApi({ request });
     const deleted = await api.deleteWebhook({
       bearerToken: "dbundle_mem_x",
+      projectId: "proj_1",
       webhookId: "wh_1"
     });
 
     expect(deleted).toEqual({ webhook_id: "wh_1" });
     expect(request).toHaveBeenCalledWith({
       method: "DELETE",
-      path: "/v1/webhooks/wh_1",
+      path: "/v1/webhooks/wh_1?project_id=proj_1",
       bearerToken: "dbundle_mem_x"
     });
   });
@@ -210,6 +217,7 @@ describe("webhook api client", () => {
     const api = createWebhookApi({ request });
     const deliveries = await api.listWebhookDeliveries({
       bearerToken: "dbundle_mem_x",
+      projectId: "proj_1",
       webhookId: "wh_1",
       limit: 10
     });
@@ -217,7 +225,7 @@ describe("webhook api client", () => {
     expect(deliveries).toHaveLength(1);
     expect(request).toHaveBeenCalledWith({
       method: "GET",
-      path: "/v1/webhooks/wh_1/deliveries?limit=10",
+      path: "/v1/webhooks/wh_1/deliveries?project_id=proj_1&limit=10",
       bearerToken: "dbundle_mem_x"
     });
   });
@@ -259,10 +267,12 @@ describe("webhook api client", () => {
     const api = createWebhookApi({ request });
     const defaultDelivery = await api.testWebhook({
       bearerToken: "dbundle_mem_x",
+      projectId: "proj_1",
       webhookId: "wh_1"
     });
     const explicitDelivery = await api.testWebhook({
       bearerToken: "dbundle_mem_x",
+      projectId: "proj_1",
       webhookId: "wh_1",
       eventType: "verification.failed"
     });
@@ -271,13 +281,13 @@ describe("webhook api client", () => {
     expect(explicitDelivery.event_type).toBe("verification.failed");
     expect(request).toHaveBeenNthCalledWith(1, {
       method: "POST",
-      path: "/v1/webhooks/wh_1/test",
+      path: "/v1/webhooks/wh_1/test?project_id=proj_1",
       bearerToken: "dbundle_mem_x",
       body: {}
     });
     expect(request).toHaveBeenNthCalledWith(2, {
       method: "POST",
-      path: "/v1/webhooks/wh_1/test",
+      path: "/v1/webhooks/wh_1/test?project_id=proj_1",
       bearerToken: "dbundle_mem_x",
       body: {
         event_type: "verification.failed"
@@ -309,7 +319,7 @@ describe("webhook api client", () => {
     const apiShape = createWebhookApi({ request: requestShape });
     const apiMalformedError = createWebhookApi({ request: requestMalformedError });
 
-    await expect(apiError.getWebhook({ bearerToken: "dbundle_mem_x", webhookId: "wh_missing" })).rejects.toEqual(
+    await expect(apiError.getWebhook({ bearerToken: "dbundle_mem_x", projectId: "proj_1", webhookId: "wh_missing" })).rejects.toEqual(
       new WebhookApiError(404, "webhook_not_found")
     );
     await expect(apiShape.listWebhooks({ bearerToken: "dbundle_mem_x", projectId: "proj_1" })).rejects.toEqual(
@@ -334,6 +344,7 @@ describe("webhook api client", () => {
     const api = createWebhookApi({ request });
     const result = await api.retryWebhookDelivery({
       bearerToken: "dbundle_mem_test",
+      projectId: "proj_1",
       webhookId: "wh_1",
       deliveryId: "del_failed"
     });
@@ -344,7 +355,7 @@ describe("webhook api client", () => {
     });
     expect(request).toHaveBeenCalledWith({
       method: "POST",
-      path: "/v1/webhooks/wh_1/deliveries/del_failed/retry",
+      path: "/v1/webhooks/wh_1/deliveries/del_failed/retry?project_id=proj_1",
       bearerToken: "dbundle_mem_test",
       body: {}
     });
@@ -360,6 +371,7 @@ describe("webhook api client", () => {
     await expect(
       api.retryWebhookDelivery({
         bearerToken: "dbundle_mem_test",
+        projectId: "proj_1",
         webhookId: "wh_1",
         deliveryId: "del_missing"
       })
@@ -388,6 +400,7 @@ describe("webhook api client", () => {
     const api = createWebhookApi({ request });
     const deliveries = await api.listWebhookDeliveries({
       bearerToken: "dbundle_mem_test",
+      projectId: "proj_1",
       webhookId: "wh_1"
     });
 

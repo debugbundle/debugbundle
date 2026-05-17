@@ -90,6 +90,7 @@ describe("capture-policy routes", () => {
       expect(response.statusCode).toBe(200);
       const body = response.json<{ policy: Record<string, unknown>; overrides: Record<string, unknown> }>();
       expect(body).toEqual({
+        access_mode: "manage",
         policy: expect.objectContaining({
           preset: "balanced",
           capture_logs: "warning",
@@ -131,6 +132,7 @@ describe("capture-policy routes", () => {
 
       expect(response.statusCode).toBe(200);
       expect(response.json()).toEqual({
+        access_mode: "manage",
         policy: expect.objectContaining({
           preset: "balanced",
           immediate_client_error_statuses: []
@@ -168,6 +170,15 @@ describe("capture-policy routes", () => {
     it("returns default policy when no policy row exists", async () => {
       const app = createDependencies({
         projectManagement: {
+          resolveProjectAccessForUser: vi.fn().mockResolvedValue({
+            project_id: "00000000-0000-0000-0000-000000000001",
+            organization_id: "org_123",
+            owner_user_id: "usr_owner",
+            owner_email: "owner@example.com",
+            relationship: "owned",
+            effective_role: "owner",
+            organization_plan: "free"
+          }),
           listProjectsForOrganization: vi.fn().mockResolvedValue([
             {
               project_id: "00000000-0000-0000-0000-000000000001",
@@ -205,6 +216,7 @@ describe("capture-policy routes", () => {
       expect(response.statusCode).toBe(200);
       const body = response.json<{ policy: Record<string, unknown>; overrides: Record<string, unknown> }>();
       expect(body).toEqual({
+        access_mode: "manage",
         policy: expect.objectContaining({
           preset: "balanced",
           immediate_client_error_statuses: []
@@ -222,6 +234,7 @@ describe("capture-policy routes", () => {
     it("returns project_not_found when capture policy defaults cannot resolve the project", async () => {
       const app = createDependencies({
         projectManagement: {
+          resolveProjectAccessForUser: vi.fn().mockResolvedValue(null),
           listProjectsForOrganization: vi.fn().mockResolvedValue([]),
           createProjectForOrganization: vi.fn(),
           updateProjectForOrganization: vi.fn(),
@@ -242,6 +255,7 @@ describe("capture-policy routes", () => {
     it("returns project_not_found when no policy row exists for an unknown project", async () => {
       const app = createDependencies({
         projectManagement: {
+          resolveProjectAccessForUser: vi.fn().mockResolvedValue(null),
           listProjectsForOrganization: vi.fn().mockResolvedValue([]),
           createProjectForOrganization: vi.fn(),
           updateProjectForOrganization: vi.fn(),
@@ -279,6 +293,15 @@ describe("capture-policy routes", () => {
     it("returns the tier default preset for paid projects when no policy row exists", async () => {
       const app = createDependencies({
         projectManagement: {
+          resolveProjectAccessForUser: vi.fn().mockResolvedValue({
+            project_id: "00000000-0000-0000-0000-000000000001",
+            organization_id: "org_123",
+            owner_user_id: "usr_owner",
+            owner_email: "owner@example.com",
+            relationship: "owned",
+            effective_role: "owner",
+            organization_plan: "solo"
+          }),
           listProjectsForOrganization: vi.fn().mockResolvedValue([
             {
               project_id: "00000000-0000-0000-0000-000000000001",
@@ -316,6 +339,7 @@ describe("capture-policy routes", () => {
       expect(response.statusCode).toBe(200);
       const body = response.json<{ policy: Record<string, unknown>; overrides: Record<string, unknown> }>();
       expect(body).toEqual({
+        access_mode: "manage",
         policy: expect.objectContaining({
           preset: "balanced",
           capture_logs: "warning",
@@ -387,6 +411,7 @@ describe("capture-policy routes", () => {
       expect(response.statusCode).toBe(200);
       const body = response.json<{ policy: Record<string, unknown>; overrides: Record<string, unknown> }>();
       expect(body).toEqual({
+        access_mode: "manage",
         policy: expect.objectContaining({
           preset: "investigative",
           capture_logs: "info",

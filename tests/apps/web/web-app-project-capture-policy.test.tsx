@@ -63,6 +63,7 @@ describe("web app — project capture policy settings", () => {
 
       if (url.endsWith("/v1/projects/proj_123/capture-policy") && init?.method === undefined) {
         return jsonResponse(200, {
+          access_mode: "manage",
           policy: {
             preset: "balanced",
             capture_logs: "warning",
@@ -93,6 +94,7 @@ describe("web app — project capture policy settings", () => {
         }));
 
         return jsonResponse(200, {
+          access_mode: "manage",
           policy: {
             preset: "investigative",
             capture_logs: "info",
@@ -135,7 +137,7 @@ describe("web app — project capture policy settings", () => {
     });
 
     await openSelect(/^client error incidents$/i);
-    expect(await screen.findByRole("option", { name: /^use preset default \(none\)$/i })).toBeInTheDocument();
+    expect(await screen.findByRole("option", { name: /^use preset default$/i })).toBeInTheDocument();
     fireEvent.keyDown(document.body, { key: "Escape", code: "Escape" });
 
     await chooseSelectOption(user, /^preset$/i, /^investigative$/i);
@@ -161,7 +163,7 @@ describe("web app — project capture policy settings", () => {
     });
 
     expect(screen.getAllByText(/filtered request events/i).length).toBeGreaterThan(0);
-    expect(screen.getAllByText(/recommended \(401, 403, 409, 422\)/i).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/^401, 403, 409, 422$/i).length).toBeGreaterThan(0);
   });
 
   it("shows capture policy in read-only mode for members", async () => {
@@ -182,6 +184,7 @@ describe("web app — project capture policy settings", () => {
 
       if (url.endsWith("/v1/projects/proj_123/capture-policy") && init?.method === undefined) {
         return jsonResponse(200, {
+          access_mode: "preview",
           policy: {
             preset: "minimal",
             capture_logs: "error",
@@ -210,13 +213,10 @@ describe("web app — project capture policy settings", () => {
     expect(await screen.findByRole("heading", { name: /capture policy/i, level: 3 })).toBeInTheDocument();
     expect(screen.getByText(/only project owners and admins can change capture settings/i)).toBeInTheDocument();
 
-    const presetSelect = await findSelectTrigger(/^preset$/i);
-    const requestSelect = await findSelectTrigger(/^request events$/i);
-    const clientErrorSelect = await findSelectTrigger(/^client error incidents$/i);
-
-    expect(presetSelect).toBeDisabled();
-    expect(requestSelect).toBeDisabled();
-    expect(clientErrorSelect).toBeDisabled();
+    expect(screen.queryByLabelText(/^preset$/i)).toBeNull();
+    expect(screen.queryByLabelText(/^request events$/i)).toBeNull();
+    expect(screen.queryByLabelText(/^client error incidents$/i)).toBeNull();
+    expect(screen.getByText(/resolved policy preview/i)).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /save capture policy/i })).toBeNull();
   });
 
@@ -239,6 +239,7 @@ describe("web app — project capture policy settings", () => {
 
       if (url.endsWith("/v1/projects/proj_123/capture-policy") && init?.method === undefined) {
         return jsonResponse(200, {
+          access_mode: "manage",
           policy: {
             preset: "balanced",
             capture_logs: "warning",
@@ -269,6 +270,7 @@ describe("web app — project capture policy settings", () => {
         }));
 
         return jsonResponse(200, {
+          access_mode: "manage",
           policy: {
             preset: "balanced",
             capture_logs: "warning",
@@ -343,6 +345,7 @@ describe("web app — project capture policy settings", () => {
             : savedImmediateClientErrorStatuses;
 
         return jsonResponse(200, {
+          access_mode: "manage",
           policy: {
             preset: "investigative",
             capture_logs: "info",
@@ -374,6 +377,7 @@ describe("web app — project capture policy settings", () => {
         savedImmediateClientErrorStatuses = [];
 
         return jsonResponse(200, {
+          access_mode: "manage",
           policy: {
             preset: "investigative",
             capture_logs: "info",

@@ -31,6 +31,7 @@ const SEVERITY_RANK: Record<"low" | "medium" | "high" | "critical", number> = {
 function mapWebhookRow(row: {
   webhook_id: string;
   project_id: string;
+  created_by_user_id: string;
   url: string;
   events: string[];
   filters: Record<string, unknown>;
@@ -41,6 +42,7 @@ function mapWebhookRow(row: {
   return {
     webhook_id: row.webhook_id,
     project_id: row.project_id,
+    created_by_user_id: row.created_by_user_id,
     url: row.url,
     events: row.events as WebhookRecord["events"],
     filters: row.filters as WebhookFilters,
@@ -71,6 +73,7 @@ export function createPostgresWebhookDeliveryStore(db: Queryable): WebhookDelive
       const result = await db.query<{
         webhook_id: string;
         project_id: string;
+        created_by_user_id: string;
         url: string;
         events: string[];
         filters: Record<string, unknown>;
@@ -82,6 +85,7 @@ export function createPostgresWebhookDeliveryStore(db: Queryable): WebhookDelive
           SELECT
             id AS webhook_id,
             project_id,
+            created_by_user_id,
             url,
             events,
             filters,
@@ -118,6 +122,7 @@ export function createPostgresWebhookDeliveryStore(db: Queryable): WebhookDelive
       const result = await db.query<{
         webhook_id: string;
         project_id: string;
+        created_by_user_id: string;
         url: string;
         events: string[];
         filters: Record<string, unknown>;
@@ -129,6 +134,7 @@ export function createPostgresWebhookDeliveryStore(db: Queryable): WebhookDelive
           INSERT INTO agent_webhooks (
             id,
             project_id,
+            created_by_user_id,
             url,
             secret_hash,
             events,
@@ -137,10 +143,11 @@ export function createPostgresWebhookDeliveryStore(db: Queryable): WebhookDelive
             created_at,
             updated_at
           )
-          VALUES ($1, $2, $3, $4, $5::text[], $6::jsonb, $7, now(), now())
+          VALUES ($1, $2, $3::uuid, $4, $5, $6::text[], $7::jsonb, $8, now(), now())
           RETURNING
             id AS webhook_id,
             project_id,
+            created_by_user_id,
             url,
             events,
             filters,
@@ -148,7 +155,16 @@ export function createPostgresWebhookDeliveryStore(db: Queryable): WebhookDelive
             created_at::text AS created_at,
             updated_at::text AS updated_at
         `,
-        [randomUUID(), input.project_id, input.url, input.signing_secret, input.events, JSON.stringify(input.filters), input.is_enabled]
+        [
+          randomUUID(),
+          input.project_id,
+          input.created_by_user_id,
+          input.url,
+          input.signing_secret,
+          input.events,
+          JSON.stringify(input.filters),
+          input.is_enabled
+        ]
       );
 
       const created = result.rows[0];
@@ -159,6 +175,7 @@ export function createPostgresWebhookDeliveryStore(db: Queryable): WebhookDelive
       const result = await db.query<{
         webhook_id: string;
         project_id: string;
+        created_by_user_id: string;
         url: string;
         events: string[];
         filters: Record<string, unknown>;
@@ -170,6 +187,7 @@ export function createPostgresWebhookDeliveryStore(db: Queryable): WebhookDelive
           SELECT
             aw.id AS webhook_id,
             aw.project_id,
+            aw.created_by_user_id,
             aw.url,
             aw.events,
             aw.filters,
@@ -180,9 +198,10 @@ export function createPostgresWebhookDeliveryStore(db: Queryable): WebhookDelive
           JOIN projects p ON p.id = aw.project_id
           WHERE aw.id = $1
             AND p.organization_id = $2
+            AND ($3::uuid IS NULL OR aw.project_id = $3::uuid)
           LIMIT 1
         `,
-        [input.webhook_id, input.organization_id]
+        [input.webhook_id, input.organization_id, input.project_id ?? null]
       );
 
       const record = result.rows[0];
@@ -193,6 +212,7 @@ export function createPostgresWebhookDeliveryStore(db: Queryable): WebhookDelive
       const result = await db.query<{
         webhook_id: string;
         project_id: string;
+        created_by_user_id: string;
         url: string;
         events: string[];
         filters: Record<string, unknown>;
@@ -212,9 +232,16 @@ export function createPostgresWebhookDeliveryStore(db: Queryable): WebhookDelive
           WHERE aw.id = $1
             AND p.id = aw.project_id
             AND p.organization_id = $2
+            AND ($7::uuid IS NULL OR aw.project_id = $7::uuid)
+            AND (
+              $8::uuid IS NULL
+              OR $9::text IN ('owner', 'admin')
+              OR aw.created_by_user_id = $8::uuid
+            )
           RETURNING
             aw.id AS webhook_id,
             aw.project_id,
+            aw.created_by_user_id,
             aw.url,
             aw.events,
             aw.filters,
@@ -228,7 +255,10 @@ export function createPostgresWebhookDeliveryStore(db: Queryable): WebhookDelive
           input.url ?? null,
           input.events ?? null,
           input.filters === undefined ? null : JSON.stringify(input.filters),
-          input.is_enabled ?? null
+          input.is_enabled ?? null,
+          input.project_id ?? null,
+          input.actor_user_id ?? null,
+          input.actor_role ?? null
         ]
       );
 
@@ -244,9 +274,21 @@ export function createPostgresWebhookDeliveryStore(db: Queryable): WebhookDelive
           WHERE aw.id = $1
             AND p.id = aw.project_id
             AND p.organization_id = $2
+            AND ($3::uuid IS NULL OR aw.project_id = $3::uuid)
+            AND (
+              $4::uuid IS NULL
+              OR $5::text IN ('owner', 'admin')
+              OR aw.created_by_user_id = $4::uuid
+            )
           RETURNING aw.id AS webhook_id
         `,
-        [input.webhook_id, input.organization_id]
+        [
+          input.webhook_id,
+          input.organization_id,
+          input.project_id ?? null,
+          input.actor_user_id ?? null,
+          input.actor_role ?? null
+        ]
       );
 
       return result.rows[0] ?? null;
@@ -376,9 +418,10 @@ export function createPostgresWebhookDeliveryStore(db: Queryable): WebhookDelive
           JOIN projects p ON p.id = aw.project_id
           WHERE aw.id = $1
             AND p.organization_id = $2
+            AND ($3::uuid IS NULL OR aw.project_id = $3::uuid)
           LIMIT 1
         `,
-        [input.webhook_id, input.organization_id]
+        [input.webhook_id, input.organization_id, input.project_id ?? null]
       );
 
       const webhook = scopedWebhook.rows[0];
@@ -767,8 +810,11 @@ export function createPostgresWebhookDeliveryStore(db: Queryable): WebhookDelive
 
     async retryDeliveryForOrganization(input: {
       organization_id: string;
+      project_id?: string;
       webhook_id: string;
       delivery_id: string;
+      actor_user_id?: string;
+      actor_role?: "owner" | "admin" | "member";
     }): Promise<{ delivery_id: string; event_type: WebhookEventType } | null> {
       const scopedWebhook = await db.query<{ webhook_id: string }>(
         `
@@ -777,10 +823,22 @@ export function createPostgresWebhookDeliveryStore(db: Queryable): WebhookDelive
           JOIN projects p ON p.id = aw.project_id
           WHERE aw.id = $1
             AND p.organization_id = $2
+            AND ($3::uuid IS NULL OR aw.project_id = $3::uuid)
             AND aw.is_enabled = true
+            AND (
+              $4::uuid IS NULL
+              OR $5::text IN ('owner', 'admin')
+              OR aw.created_by_user_id = $4::uuid
+            )
           LIMIT 1
         `,
-        [input.webhook_id, input.organization_id]
+        [
+          input.webhook_id,
+          input.organization_id,
+          input.project_id ?? null,
+          input.actor_user_id ?? null,
+          input.actor_role ?? null
+        ]
       );
 
       if (scopedWebhook.rows[0] === undefined) {

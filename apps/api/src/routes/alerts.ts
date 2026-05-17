@@ -3,8 +3,14 @@ import type { FastifyInstance } from "fastify";
 import { getTierCapabilities } from "../../../../packages/shared-types/src/index.js";
 import type { ApiDependencies } from "../api-types.js";
 import { recordAuditLog, resolveAuditActorType } from "../audit-logging.js";
-import { requireRateLimitedMemberAuth, requireRateLimitedProjectAccess } from "../api-helpers.js";
-import { AlertParamsSchema, AlertsQuerySchema, CreateAlertBodySchema, UpdateAlertBodySchema } from "../schemas.js";
+import { requireRateLimitedProjectAccess } from "../api-helpers.js";
+import {
+  AlertParamsSchema,
+  AlertsQuerySchema,
+  CreateAlertBodySchema,
+  ProjectScopedQuerySchema,
+  UpdateAlertBodySchema
+} from "../schemas.js";
 
 async function ensureScopedSlackDestination(
   dependencies: ApiDependencies,
@@ -75,20 +81,22 @@ export function registerAlertRoutes(app: FastifyInstance, dependencies: ApiDepen
   });
 
   app.post("/v1/alerts", async (request, reply) => {
-    const member = await requireRateLimitedMemberAuth(request, reply, dependencies, "management-write");
-    if (member === null) {
+    const parsedBody = CreateAlertBodySchema.safeParse(request.body);
+    if (!parsedBody.success) {
+      return reply.status(400).send({ error: "invalid_payload" });
+    }
+    const auth = await requireRateLimitedProjectAccess(request, reply, dependencies, {
+      bucket: "management-write",
+      projectId: parsedBody.data.project_id
+    });
+    if (auth === null) {
       return;
     }
     if (dependencies.alertManagement === undefined) {
       return reply.status(404).send({ error: "project_not_found" });
     }
-
-    const parsedBody = CreateAlertBodySchema.safeParse(request.body);
-    if (!parsedBody.success) {
-      return reply.status(400).send({ error: "invalid_payload" });
-    }
     const scopedSlackDestination = await ensureScopedSlackDestination(dependencies, {
-      organization_id: member.organization_id,
+      organization_id: auth.access.organization_id,
       channel: parsedBody.data.channel,
       config: parsedBody.data.config
     });
@@ -102,6 +110,7 @@ export function registerAlertRoutes(app: FastifyInstance, dependencies: ApiDepen
     const alertInput: {
       organization_id: string;
       project_id: string;
+      created_by_user_id: string;
       service_id?: string;
       channel: "email" | "slack" | "discord" | "webhook";
       condition_type:
@@ -114,8 +123,9 @@ export function registerAlertRoutes(app: FastifyInstance, dependencies: ApiDepen
       config: Record<string, unknown>;
       is_enabled: boolean;
     } = {
-      organization_id: member.organization_id,
+      organization_id: auth.access.organization_id,
       project_id: parsedBody.data.project_id,
+      created_by_user_id: auth.member.member_id,
       channel: parsedBody.data.channel,
       condition_type: parsedBody.data.condition_type,
       config: parsedBody.data.config,
@@ -132,8 +142,8 @@ export function registerAlertRoutes(app: FastifyInstance, dependencies: ApiDepen
     const alert = await dependencies.alertManagement.createAlertForOrganization(alertInput);
     if (alert === null) {
       await recordAuditLog(dependencies.auditLogging, {
-        organization_id: member.organization_id,
-        actor_user_id: member.member_id,
+        organization_id: auth.access.organization_id,
+        actor_user_id: auth.member.member_id,
         actor_type: resolveAuditActorType(request.headers),
         action: "alert.create",
         target_type: "alert",
@@ -153,8 +163,8 @@ export function registerAlertRoutes(app: FastifyInstance, dependencies: ApiDepen
     }
 
     await recordAuditLog(dependencies.auditLogging, {
-      organization_id: member.organization_id,
-      actor_user_id: member.member_id,
+      organization_id: auth.access.organization_id,
+      actor_user_id: auth.member.member_id,
       actor_type: resolveAuditActorType(request.headers),
       action: "alert.create",
       target_type: "alert",
@@ -173,29 +183,36 @@ export function registerAlertRoutes(app: FastifyInstance, dependencies: ApiDepen
   });
 
   app.patch("/v1/alerts/:id", async (request, reply) => {
-    const member = await requireRateLimitedMemberAuth(request, reply, dependencies, "management-write");
-    if (member === null) {
-      return;
-    }
-    if (dependencies.alertManagement === undefined) {
-      return reply.status(404).send({ error: "alert_not_found" });
-    }
-
     const parsedParams = AlertParamsSchema.safeParse(request.params);
     if (!parsedParams.success) {
       return reply.status(400).send({ error: "invalid_alert_id" });
+    }
+    const parsedQuery = ProjectScopedQuerySchema.safeParse(request.query);
+    if (!parsedQuery.success) {
+      return reply.status(400).send({ error: "invalid_query" });
     }
 
     const parsedBody = UpdateAlertBodySchema.safeParse(request.body);
     if (!parsedBody.success) {
       return reply.status(400).send({ error: "invalid_payload" });
     }
+    const auth = await requireRateLimitedProjectAccess(request, reply, dependencies, {
+      bucket: "management-write",
+      projectId: parsedQuery.data.project_id
+    });
+    if (auth === null) {
+      return;
+    }
+    if (dependencies.alertManagement === undefined) {
+      return reply.status(404).send({ error: "alert_not_found" });
+    }
+
     const updateConfig =
       "config" in parsedBody.data && parsedBody.data.config !== undefined
         ? (parsedBody.data.config as Record<string, unknown> | null)
         : undefined;
     const scopedSlackDestination = await ensureScopedSlackDestination(dependencies, {
-      organization_id: member.organization_id,
+      organization_id: auth.access.organization_id,
       ...(parsedBody.data.channel === undefined ? {} : { channel: parsedBody.data.channel }),
       ...(updateConfig === undefined || updateConfig === null ? {} : { config: updateConfig })
     });
@@ -209,6 +226,9 @@ export function registerAlertRoutes(app: FastifyInstance, dependencies: ApiDepen
     const updateInput: {
       organization_id: string;
       alert_id: string;
+      project_id: string;
+      actor_user_id: string;
+      actor_role: "owner" | "admin" | "member";
       service_id?: string | null;
       channel?: "email" | "slack" | "discord" | "webhook";
       condition_type?:
@@ -221,8 +241,11 @@ export function registerAlertRoutes(app: FastifyInstance, dependencies: ApiDepen
       config?: Record<string, unknown> | null;
       is_enabled?: boolean;
     } = {
-      organization_id: member.organization_id,
-      alert_id: parsedParams.data.id
+      organization_id: auth.access.organization_id,
+      alert_id: parsedParams.data.id,
+      project_id: parsedQuery.data.project_id,
+      actor_user_id: auth.member.member_id,
+      actor_role: auth.access.effective_role
     };
 
     if (Object.prototype.hasOwnProperty.call(parsedBody.data, "service_id")) {
@@ -256,8 +279,8 @@ export function registerAlertRoutes(app: FastifyInstance, dependencies: ApiDepen
     const alert = await dependencies.alertManagement.updateAlertForOrganization(updateInput);
     if (alert === null) {
       await recordAuditLog(dependencies.auditLogging, {
-        organization_id: member.organization_id,
-        actor_user_id: member.member_id,
+        organization_id: auth.access.organization_id,
+        actor_user_id: auth.member.member_id,
         actor_type: resolveAuditActorType(request.headers),
         action: "alert.update",
         target_type: "alert",
@@ -274,8 +297,8 @@ export function registerAlertRoutes(app: FastifyInstance, dependencies: ApiDepen
     }
 
     await recordAuditLog(dependencies.auditLogging, {
-      organization_id: member.organization_id,
-      actor_user_id: member.member_id,
+      organization_id: auth.access.organization_id,
+      actor_user_id: auth.member.member_id,
       actor_type: resolveAuditActorType(request.headers),
       action: "alert.update",
       target_type: "alert",
@@ -294,27 +317,36 @@ export function registerAlertRoutes(app: FastifyInstance, dependencies: ApiDepen
   });
 
   app.delete("/v1/alerts/:id", async (request, reply) => {
-    const member = await requireRateLimitedMemberAuth(request, reply, dependencies, "management-write");
-    if (member === null) {
+    const parsedParams = AlertParamsSchema.safeParse(request.params);
+    if (!parsedParams.success) {
+      return reply.status(400).send({ error: "invalid_alert_id" });
+    }
+    const parsedQuery = ProjectScopedQuerySchema.safeParse(request.query);
+    if (!parsedQuery.success) {
+      return reply.status(400).send({ error: "invalid_query" });
+    }
+    const auth = await requireRateLimitedProjectAccess(request, reply, dependencies, {
+      bucket: "management-write",
+      projectId: parsedQuery.data.project_id
+    });
+    if (auth === null) {
       return;
     }
     if (dependencies.alertManagement === undefined) {
       return reply.status(404).send({ error: "alert_not_found" });
     }
 
-    const parsedParams = AlertParamsSchema.safeParse(request.params);
-    if (!parsedParams.success) {
-      return reply.status(400).send({ error: "invalid_alert_id" });
-    }
-
     const deleted = await dependencies.alertManagement.deleteAlertForOrganization({
-      organization_id: member.organization_id,
-      alert_id: parsedParams.data.id
+      organization_id: auth.access.organization_id,
+      project_id: parsedQuery.data.project_id,
+      alert_id: parsedParams.data.id,
+      actor_user_id: auth.member.member_id,
+      actor_role: auth.access.effective_role
     });
     if (deleted === null) {
       await recordAuditLog(dependencies.auditLogging, {
-        organization_id: member.organization_id,
-        actor_user_id: member.member_id,
+        organization_id: auth.access.organization_id,
+        actor_user_id: auth.member.member_id,
         actor_type: resolveAuditActorType(request.headers),
         action: "alert.delete",
         target_type: "alert",
@@ -330,8 +362,8 @@ export function registerAlertRoutes(app: FastifyInstance, dependencies: ApiDepen
     }
 
     await recordAuditLog(dependencies.auditLogging, {
-      organization_id: member.organization_id,
-      actor_user_id: member.member_id,
+      organization_id: auth.access.organization_id,
+      actor_user_id: auth.member.member_id,
       actor_type: resolveAuditActorType(request.headers),
       action: "alert.delete",
       target_type: "alert",

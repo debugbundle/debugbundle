@@ -34,6 +34,7 @@ import {
   type AlertRecord
 } from "../lib/api.js";
 import { showErrorToast, showSuccessToast } from "../lib/notify.js";
+import { getProjectEffectiveRole } from "../lib/project-access.js";
 import { useSession } from "../lib/session.js";
 import {
   deleteProjectSlackDestination,
@@ -107,7 +108,8 @@ export function ProjectAlertsPage(): JSX.Element {
   const [selectedSlackDestinationId, setSelectedSlackDestinationId] = useState("");
   const [preferredSlackDestinationId, setPreferredSlackDestinationId] = useState<string | null>(null);
   const slackEnabled = getTierCapabilities(project.organization_plan).slack_integration;
-  const isOwner = session?.role === "owner";
+  const effectiveRole = getProjectEffectiveRole(project);
+  const canManageIntegrations = effectiveRole === "owner" || effectiveRole === "admin";
   const channelOptions = slackEnabled ? TEAM_ALERT_CHANNEL_OPTIONS : STANDARD_ALERT_CHANNEL_OPTIONS;
   const selectedSlackDestination = slackDestinations.find(
     (destination) => destination.slack_destination_id === selectedSlackDestinationId
@@ -309,7 +311,7 @@ export function ProjectAlertsPage(): JSX.Element {
 
   async function handleDeleteAlert(alertId: string): Promise<void> {
     try {
-      await deleteAlert(alertId);
+      await deleteAlert(alertId, resolvedProjectId);
       setAlerts((current) => (current ?? []).filter((a) => a.alert_id !== alertId));
       showSuccessToast("Alert rule deleted successfully.");
     } catch {
@@ -412,7 +414,7 @@ export function ProjectAlertsPage(): JSX.Element {
                               Selected: {formatSlackDestinationLabel(selectedSlackDestination)}
                             </div>
                           ) : null}
-                          {isOwner ? (
+                          {canManageIntegrations ? (
                             <div className="flex flex-wrap gap-2">
                               <Button
                                 type="button"
@@ -456,11 +458,11 @@ export function ProjectAlertsPage(): JSX.Element {
                       ) : (
                         <div className="space-y-3 rounded-lg border border-dashed border-border bg-muted/30 p-3 text-sm text-muted-foreground">
                           <p>
-                            {isOwner
+                            {canManageIntegrations
                               ? "Connect Slack once, choose a channel in Slack, and it will become available for alert rules here."
-                              : "An owner needs to connect Slack before this project can send Slack alerts."}
+                              : "A project admin needs to connect Slack before this project can send Slack alerts."}
                           </p>
-                          {isOwner ? (
+                          {canManageIntegrations ? (
                             <Button
                               type="button"
                               variant="secondary"
@@ -589,26 +591,30 @@ export function ProjectAlertsPage(): JSX.Element {
                         <Badge variant={alert.is_enabled ? "success" : "secondary"}>{alert.is_enabled ? "enabled" : "disabled"}</Badge>
                       </TableCell>
                       <TableCell className="text-right">
-                        <AlertDialog>
-                          <AlertDialogTrigger asChild>
-                            <Button type="button" variant="ghost" size="sm">
-                              <Trash2Icon className="size-4" />
-                              Delete
-                            </Button>
-                          </AlertDialogTrigger>
-                          <AlertDialogContent>
-                            <AlertDialogHeader>
-                              <AlertDialogTitle>Delete alert rule</AlertDialogTitle>
-                              <AlertDialogDescription>
-                                This will permanently remove this alert rule. Incident lifecycle events will no longer be delivered through this channel.
-                              </AlertDialogDescription>
-                            </AlertDialogHeader>
-                            <AlertDialogFooter>
-                              <AlertDialogCancel>Cancel</AlertDialogCancel>
-                              <AlertDialogAction onClick={() => void handleDeleteAlert(alert.alert_id)}>Delete alert</AlertDialogAction>
-                            </AlertDialogFooter>
-                          </AlertDialogContent>
-                        </AlertDialog>
+                        {canManageAlertRule(alert, session?.user_id, effectiveRole) ? (
+                          <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                              <Button type="button" variant="ghost" size="sm">
+                                <Trash2Icon className="size-4" />
+                                Delete
+                              </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                              <AlertDialogHeader>
+                                <AlertDialogTitle>Delete alert rule</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                  This will permanently remove this alert rule. Incident lifecycle events will no longer be delivered through this channel.
+                                </AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                <AlertDialogAction onClick={() => void handleDeleteAlert(alert.alert_id)}>Delete alert</AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
+                        ) : (
+                          <span className="text-sm text-muted-foreground">Only the creator or a project admin can delete this rule.</span>
+                        )}
                       </TableCell>
                     </TableRow>
                   ))}
@@ -648,6 +654,21 @@ export function formatAlertChannelWithDestination(
   alert: AlertRecord,
   slackDestinations: SlackDestinationRecord[]
 ): string {
+  if (alert.channel === "email") {
+    const recipient = alert.config["to"];
+    return typeof recipient === "string" && recipient.length > 0 ? `Email - ${recipient}` : "Email";
+  }
+
+  if (alert.channel === "webhook") {
+    const targetUrl = alert.config["target_url"];
+    return typeof targetUrl === "string" && targetUrl.length > 0 ? `Alert webhook - ${targetUrl}` : "Alert webhook";
+  }
+
+  if (alert.channel === "discord") {
+    const webhookUrl = alert.config["webhook_url"];
+    return typeof webhookUrl === "string" && webhookUrl.length > 0 ? `Discord - ${webhookUrl}` : "Discord";
+  }
+
   if (alert.channel !== "slack") {
     return formatAlertChannel(alert.channel);
   }
@@ -663,6 +684,14 @@ export function formatAlertChannelWithDestination(
   }
 
   return `Slack - ${formatSlackDestinationLabel(destination)}`;
+}
+
+function canManageAlertRule(
+  alert: AlertRecord,
+  userId: string | undefined,
+  effectiveRole: "owner" | "admin" | "member"
+): boolean {
+  return effectiveRole === "owner" || effectiveRole === "admin" || (userId !== undefined && alert.created_by_user_id === userId);
 }
 
 export function formatAlertCondition(conditionType: AlertConditionType): string {

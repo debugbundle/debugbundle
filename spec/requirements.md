@@ -305,6 +305,10 @@ See `/spec/billing.md` and `/spec/system-emails.md` for the detailed source-of-t
 
 **FR-WEB-06:** UI primitives must be shadcn-based, reusable, support dark and light themes from the start, and consume icons through a shared wrapper layer.
 
+**FR-WEB-07:** Project navigation and detail surfaces must expose sharing state clearly for both sides of collaboration. Shared-with-you projects and owner-owned projects that have active collaborators must both render a shared indicator, backed by project payload metadata that distinguishes `private`, `shared_by_you`, and `shared_with_you`.
+
+**FR-WEB-08:** In project settings and collaboration surfaces, role-based visibility must match server authorization: plain members do not see the members-management tab, receive only the resolved capture-policy preview, and do not see destructive settings sections; owner/admin callers receive the corresponding management affordances allowed by their role.
+
 ### 1.12 Auth & Identity
 
 **FR-AUTH-01:** Account → Projects → Members hierarchy. Account is billing/ownership unit.
@@ -317,7 +321,7 @@ See `/spec/billing.md` and `/spec/system-emails.md` for the detailed source-of-t
 
 **FR-AUTH-05:** Agent-assisted signup flow supported (agent orchestrates, human completes trust step).
 
-**FR-AUTH-06:** Two roles in V1: **Owner** (billing, invite/remove members, create/delete projects, manage all tokens, all data access) and **Member** (all data access including incidents/bundles/services, manage webhooks/alerts for projects, cannot manage billing or invite members). Fine-grained RBAC deferred to Enterprise.
+**FR-AUTH-06:** Three effective project roles exist in V1: **Owner** (billing owner, delete project, manage all project resources), **Admin** (manage collaborators, capture policy, shared integrations, and all project-scoped automation resources except project deletion/billing takeover), and **Member** (all project data access plus normal project-scoped writes, but no collaborator management, no capture-policy edits, no shared integration management, and no mutation of another collaborator's project-scoped automation resources). Fine-grained RBAC beyond these role semantics is deferred to Enterprise.
 
 **FR-AUTH-07:** Agents modeled as project members (no separate permissions model).
 
@@ -326,6 +330,10 @@ See `/spec/billing.md` and `/spec/system-emails.md` for the detailed source-of-t
 **FR-AUTH-09:** Project-sharing invite model: project owners and project admins can invite collaborators to a specific project by email. Invited identity accepts via link into their own DebugBundle account. Collaborator roles are `admin` and `member`. Agent members may still be added through direct member-token generation without email invite.
 
 **FR-AUTH-10:** V1 project access is explicit and project-scoped. A user may access a project only when they own it or have an active `project_members` row for it. Shared access must never imply visibility into other projects owned by the same billing account.
+
+**FR-AUTH-10a:** Collaborator-management surfaces are admin-only. Plain members must not be able to list pending invites, invite collaborators, cancel invites, change collaborator roles, remove collaborators, or see the members-management surface in the web app.
+
+**FR-AUTH-10b:** For project-scoped automation resources that members may create in shared projects, including alert rules, webhooks, and GitHub dispatch rules, owner and admin may manage every resource while member-role collaborators may mutate only the resources they created themselves.
 
 **FR-AUTH-11:** Member-authorized API operations must accept either a valid browser session or a valid member token. After principal resolution, both auth paths must run through the same authorization and domain logic.
 
@@ -470,7 +478,7 @@ All eight canonical event types (FR-SDK-05) are assigned to one of three event c
 
 Advanced controls are optional. When unset, the preset's defaults apply. The initial preset defaults for `immediate_client_error_statuses` are `[]` for `minimal` and `balanced`, and `[401,403,409,422]` for `investigative`. The `capture_preset` field and advanced controls together form the **project capture policy**.
 
-**FR-EVT-07:** SDKs must respect the project capture policy. The `GET /v1/sdk/config` response must include the resolved capture policy so SDKs can gate event emission client-side, while `GET /v1/projects/{id}/capture-policy` must return both the resolved policy and the raw override state so UI/API clients can distinguish preset defaults from explicit overrides after reload. When the SDK's local config conflicts with the server-side policy, the more restrictive setting wins.
+**FR-EVT-07:** SDKs must respect the project capture policy. The `GET /v1/sdk/config` response must include the resolved capture policy so SDKs can gate event emission client-side. For interactive management, `GET /v1/projects/{id}/capture-policy` must return the resolved policy to any authorized project viewer, but raw override state is returned only to owner/admin edit flows so plain members receive a preview-only view without edit provenance. When the SDK's local config conflicts with the server-side policy, the more restrictive setting wins.
 
 **FR-EVT-08:** The ingestion API must enforce plan-level capture rules server-side. If a project sends event types disallowed by its capture policy (e.g., standalone `request_event` with `response_status: 200` on a `minimal` Free project), the API must reject those events with a structured reason (`capture_policy_rejected`) rather than silently accepting and billing them. First-party request events in the preset-specific immediate request-failure set or the project's resolved `immediate_client_error_statuses` set are incident-critical and must be accepted even when `capture_request_events` is narrowed; 5xx request failures are immediate under every preset.
 
@@ -568,9 +576,11 @@ This ensures Free behaves as **failure-first, not telemetry-first**.
 
 **FR-GHA-16:** If the GitHub installation becomes suspended or removed, show a "GitHub connection lost" banner in the project GitHub tab with a "Reconnect" action.
 
-**FR-GHA-17:** Enforce tier gating: GitHub automation (App connection, repo assignment, dispatch rules, delivery history, manual retry) is available on Solo and Team tiers only. Free-tier projects see an upgrade prompt.
+**FR-GHA-17:** Enforce tier gating from the target project's owner plan: GitHub automation (App connection, repo assignment, dispatch rules, delivery history, manual retry) is available on Solo and Team tiers only. Free-tier projects see an upgrade prompt even when the acting collaborator personally pays for a higher plan, while shared projects owned by Solo/Team accounts remain eligible even when the acting collaborator's own account is Free.
 
 **FR-GHA-18:** All GitHub automation management operations must be available through API, CLI, and MCP (INV-5 interface parity). Member token or browser session required; project tokens rejected.
+
+**FR-GHA-18a:** On an eligible shared project, owner/admin manage the GitHub connection and repository assignment. Plain members may view GitHub automation status and create project dispatch rules, but they may not mutate the shared connection/repository configuration or mutate dispatch rules created by other collaborators.
 
 **FR-GHA-19:** Self-hosted deployments must support custom GitHub App configuration via environment variables (`GITHUB_APP_ID`, `GITHUB_APP_PRIVATE_KEY`, `GITHUB_APP_WEBHOOK_SECRET`, `GITHUB_APP_CLIENT_ID`, `GITHUB_APP_CLIENT_SECRET`).
 

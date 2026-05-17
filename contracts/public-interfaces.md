@@ -37,9 +37,9 @@ Every capability must be available through all applicable interfaces. Operations
 | Get bundle | `GET /v1/incidents/{id}/bundle` | `bundle` | `get_bundle` | |
 | Get reproduction | `GET /v1/incidents/{id}/reproduction` | `reproduce` | `get_reproduction` | |
 | Get logs | `GET /v1/logs` | `logs` | `get_logs` | Query by incident_id |
-| List project members | `GET /v1/projects/{id}/members` | `project members list` | `list_project_members` | Browser Session or Member Token, owner/admin/member |
+| List project members | `GET /v1/projects/{id}/members` | `project members list` | `list_project_members` | Browser Session or Member Token, owner/admin only |
 | Get project member avatar | `GET /v1/projects/{id}/members/{userId}/avatar` | — | — | Browser session or member token, authorized project viewers only |
-| List pending project invites | `GET /v1/projects/{id}/invites` | `project members invites` | `list_project_member_invites` | Browser Session or Member Token, owner/admin/member |
+| List pending project invites | `GET /v1/projects/{id}/invites` | `project members invites` | `list_project_member_invites` | Browser Session or Member Token, owner/admin only |
 | Invite project member | `POST /v1/projects/{id}/invite` | `project members invite` | `invite_project_member` | Browser Session or Member Token, owner/admin only, Team tier |
 | Cancel project invite | `DELETE /v1/projects/{id}/invites/{inviteId}` | `project members cancel-invite` | `cancel_project_member_invite` | Browser Session or Member Token, owner/admin only |
 | Update project member role | `PATCH /v1/projects/{id}/members/{userId}` | `project members update-role` | `update_project_member_role` | Browser Session or Member Token, owner/admin only |
@@ -54,25 +54,25 @@ Every capability must be available through all applicable interfaces. Operations
 | Increase capacity now | `POST /v1/billing/capacity/increase` | `billing capacity increase` | `increase_capacity` | Browser Session or Member Token, owner only |
 | Schedule capacity reduction | `POST /v1/billing/capacity/scheduled-reduction` | `billing capacity schedule-reduction` | `schedule_capacity_reduction` | Browser Session or Member Token, owner only |
 | Cancel scheduled capacity reduction | `DELETE /v1/billing/capacity/scheduled-reduction` | `billing capacity cancel-reduction` | `cancel_capacity_reduction` | Browser Session or Member Token, owner only |
-| List project tokens | `GET /v1/projects/{id}/tokens` | `token project list` | `list_project_tokens` | Member token scoped to organization |
-| Create project token | `POST /v1/projects/{id}/tokens` | `token project create` | `create_project_token` | Plaintext returned once |
-| Revoke project token | `POST /v1/projects/{id}/tokens/{tokenId}/revoke` | `token project revoke` | `revoke_project_token` | |
+| List project tokens | `GET /v1/projects/{id}/tokens` | `token project list` | `list_project_tokens` | Browser session or member token with project access |
+| Create project token | `POST /v1/projects/{id}/tokens` | `token project create` | `create_project_token` | Owner/admin project access; plaintext returned once |
+| Revoke project token | `POST /v1/projects/{id}/tokens/{tokenId}/revoke` | `token project revoke` | `revoke_project_token` | Owner/admin project access |
 | List member tokens | `GET /v1/member/tokens` | `token member list` | `list_member_tokens` | Member token scoped to caller |
 | Create member token | `POST /v1/member/tokens` | `token member create` | `create_member_token` | Plaintext returned once |
 | Revoke member token | `POST /v1/member/tokens/{tokenId}/revoke` | `token member revoke` | `revoke_member_token` | |
 | List services | `GET /v1/services` | `services` | `list_services` | |
-| Alert CRUD | `POST/GET/PATCH/DELETE /v1/alerts` | `alert list/create/update/delete` | `list_alerts/create_alert/update_alert/delete_alert` | Browser Session or Member Token, scoped to organization/project |
+| Alert CRUD | `POST/GET/PATCH/DELETE /v1/alerts` | `alert list/create/update/delete` | `list_alerts/create_alert/update_alert/delete_alert` | Browser Session or Member Token, scoped to project; member may mutate only self-created rules |
 | Project Slack destinations | `GET /v1/projects/{id}/slack/destinations` | `slack list` | `list_slack_destinations` | Browser Session or Member Token, Team tier, reusable Slack channel list for alert setup |
-| Test Slack destination | `POST /v1/projects/{id}/slack/destinations/{destinationId}/test` | `slack test` | `test_slack_destination` | Browser Session or Member Token, owner only, Team tier |
-| Delete Slack destination | `DELETE /v1/projects/{id}/slack/destinations/{destinationId}` | `slack delete` | `delete_slack_destination` | Browser Session or Member Token, owner only, Team tier |
+| Test Slack destination | `POST /v1/projects/{id}/slack/destinations/{destinationId}/test` | `slack test` | `test_slack_destination` | Browser Session or Member Token, owner/admin only, Team tier |
+| Delete Slack destination | `DELETE /v1/projects/{id}/slack/destinations/{destinationId}` | `slack delete` | `delete_slack_destination` | Browser Session or Member Token, owner/admin only, Team tier |
 | Weekly report channel CRUD | `POST/GET/PATCH/DELETE /v1/weekly-report-channels` | `weekly-report list/create/update/delete` | `list_weekly_report_channels/create_weekly_report_channel/update_weekly_report_channel/delete_weekly_report_channel` | Browser Session or Member Token, scoped to organization/project |
-| List webhooks | `GET /v1/webhooks` | `webhook list` | `list_webhooks` | Browser Session or Member Token, scoped to organization/project |
+| List webhooks | `GET /v1/webhooks` | `webhook list` | `list_webhooks` | Browser Session or Member Token, scoped to project |
 | Create webhook | `POST /v1/webhooks` | `webhook create` | `create_webhook` | Signing secret returned once |
-| Update webhook | `PATCH /v1/webhooks/{id}` | `webhook update` | `update_webhook` | |
-| Delete webhook | `DELETE /v1/webhooks/{id}` | `webhook delete` | `delete_webhook` | |
-| Test webhook | `POST /v1/webhooks/{id}/test` | `webhook test` | `test_webhook` | Queues a signed synthetic delivery |
+| Update webhook | `PATCH /v1/webhooks/{id}` | `webhook update` | `update_webhook` | Owner/admin may update any webhook; member may update only self-created webhooks |
+| Delete webhook | `DELETE /v1/webhooks/{id}` | `webhook delete` | `delete_webhook` | Owner/admin may delete any webhook; member may delete only self-created webhooks |
+| Test webhook | `POST /v1/webhooks/{id}/test` | `webhook test` | `test_webhook` | Queues a signed synthetic delivery; member may test only self-created webhooks |
 | Webhook deliveries | `GET /v1/webhooks/{id}/deliveries` | `webhook deliveries` | `list_webhook_deliveries` | Statuses: pending, retrying, delivered, failed, disabled |
-| Retry webhook delivery | `POST /v1/webhooks/{id}/deliveries/{deliveryId}/retry` | `webhook retry` | `retry_webhook_delivery` | Resets failed/disabled delivery to retrying |
+| Retry webhook delivery | `POST /v1/webhooks/{id}/deliveries/{deliveryId}/retry` | `webhook retry` | `retry_webhook_delivery` | Resets failed/disabled delivery to retrying; member may retry only self-created webhooks |
 | Doctor | — | `doctor` | `doctor` | CLI/MCP-only (local env) |
 | Validate | — | `validate [--fix]` | `validate` | CLI/MCP-only (local env) |
 | Verify local | — | `verify local` | `verify_local` | CLI/MCP-only (local env) |
@@ -91,23 +91,23 @@ Every capability must be available through all applicable interfaces. Operations
 | Activate probes (remote) | `POST /v1/projects/{id}/probes/activate` | `probe activate` | `activate_probe` | Browser Session or Member Token, Solo+ only |
 | List active probes (remote) | `GET /v1/projects/{id}/probes` | `probe list` | `list_active_probes` | Solo+ only |
 | Deactivate probes (remote) | `POST /v1/projects/{id}/probes/deactivate` | `probe deactivate` | `deactivate_probe` | Solo+ only |
-| Get capture policy | `GET /v1/projects/{id}/capture-policy` | `capture-policy get` | `get_capture_policy` | Browser Session or Member Token |
-| Update capture policy | `PATCH /v1/projects/{id}/capture-policy` | `capture-policy set` | `update_capture_policy` | Browser Session or Member Token, owner only |
+| Get capture policy | `GET /v1/projects/{id}/capture-policy` | `capture-policy get` | `get_capture_policy` | Browser Session or Member Token; member receives preview-only payload |
+| Update capture policy | `PATCH /v1/projects/{id}/capture-policy` | `capture-policy set` | `update_capture_policy` | Browser Session or Member Token, owner/admin only |
 | SDK config | `GET /v1/sdk/config` | — | — | SDK-only (project token, includes resolved capture policy) |
-| Get GitHub App install URL | `GET /v1/github/app/install-url` | — | — | Browser Session or Member Token, Solo+ only; web convenience route for the install/reconnect CTA, optionally signed with a return path |
-| Get GitHub installation | `GET /v1/github/installation` | `github status` | `get_github_status` | Browser Session or Member Token, Solo+ only |
-| Disconnect GitHub installation | `DELETE /v1/github/installation` | — | — | Web/API only; mirrors web-initiated installation flow |
-| List GitHub repositories | `GET /v1/github/repositories` | `github repos` | `list_github_repositories` | Browser Session or Member Token, Solo+ only |
+| Get GitHub App install URL | `GET /v1/github/app/install-url` | — | — | Browser Session or Member Token, owner/admin only on eligible Solo+ project; web convenience route for the install/reconnect CTA, optionally signed with a return path |
+| Get GitHub installation | `GET /v1/github/installation` | `github status` | `get_github_status` | Browser Session or Member Token, available to authorized members on eligible Solo+ project |
+| Disconnect GitHub installation | `DELETE /v1/github/installation` | — | — | Web/API only; owner/admin only |
+| List GitHub repositories | `GET /v1/github/repositories` | `github repos` | `list_github_repositories` | Browser Session or Member Token, owner/admin only on eligible Solo+ project |
 | Get project GitHub repo | `GET /v1/projects/{id}/github/repo` | `github status` | `get_github_status` | Included in status response; Solo+ only |
-| Set project GitHub repo | `PUT /v1/projects/{id}/github/repo` | `github repo set` | `set_project_github_repo` | Browser Session or Member Token, owner only, Solo+ only |
-| Remove project GitHub repo | `DELETE /v1/projects/{id}/github/repo` | `github repo remove` | `remove_project_github_repo` | Browser Session or Member Token, owner only, Solo+ only |
-| Create dispatch rule | `POST /v1/projects/{id}/github/rules` | `github rules create` | `create_github_dispatch_rule` | Browser Session or Member Token, owner only, Solo+ only |
-| List dispatch rules | `GET /v1/projects/{id}/github/rules` | `github rules` | `list_github_dispatch_rules` | Browser Session or Member Token, Solo+ only |
+| Set project GitHub repo | `PUT /v1/projects/{id}/github/repo` | `github repo set` | `set_project_github_repo` | Browser Session or Member Token, owner/admin only, Solo+ only |
+| Remove project GitHub repo | `DELETE /v1/projects/{id}/github/repo` | `github repo remove` | `remove_project_github_repo` | Browser Session or Member Token, owner/admin only, Solo+ only |
+| Create dispatch rule | `POST /v1/projects/{id}/github/rules` | `github rules create` | `create_github_dispatch_rule` | Browser Session or Member Token, any authorized project member on eligible Solo+ project |
+| List dispatch rules | `GET /v1/projects/{id}/github/rules` | `github rules` | `list_github_dispatch_rules` | Browser Session or Member Token, available to authorized members on eligible Solo+ project |
 | Get dispatch rule | `GET /v1/projects/{id}/github/rules/{ruleId}` | — | — | API convenience; CLI/MCP use list |
-| Update dispatch rule | `PATCH /v1/projects/{id}/github/rules/{ruleId}` | `github rules update` | `update_github_dispatch_rule` | Browser Session or Member Token, owner only, Solo+ only |
-| Delete dispatch rule | `DELETE /v1/projects/{id}/github/rules/{ruleId}` | `github rules delete` | `delete_github_dispatch_rule` | Browser Session or Member Token, owner only, Solo+ only |
-| List dispatch deliveries | `GET /v1/projects/{id}/github/deliveries` | `github deliveries` | `list_github_deliveries` | Browser Session or Member Token, Solo+ only |
-| Retry dispatch delivery | `POST /v1/projects/{id}/github/deliveries/{id}/retry` | `github deliveries retry` | `retry_github_delivery` | Browser Session or Member Token, Solo+ only |
+| Update dispatch rule | `PATCH /v1/projects/{id}/github/rules/{ruleId}` | `github rules update` | `update_github_dispatch_rule` | Browser Session or Member Token, owner/admin may update any rule; member may update only self-created rules |
+| Delete dispatch rule | `DELETE /v1/projects/{id}/github/rules/{ruleId}` | `github rules delete` | `delete_github_dispatch_rule` | Browser Session or Member Token, owner/admin may delete any rule; member may delete only self-created rules |
+| List dispatch deliveries | `GET /v1/projects/{id}/github/deliveries` | `github deliveries` | `list_github_deliveries` | Browser Session or Member Token, available to authorized members on eligible Solo+ project |
+| Retry dispatch delivery | `POST /v1/projects/{id}/github/deliveries/{id}/retry` | `github deliveries retry` | `retry_github_delivery` | Browser Session or Member Token, owner/admin or creator-owned-rule member on eligible Solo+ project |
 | GitHub App callback | `GET /v1/github/app/callback` | — | — | GitHub App setup URL / post-install redirect handler |
 | GitHub App webhook | `POST /v1/github/app/webhook` | — | — | Installation lifecycle events (HMAC-verified) |
 
@@ -382,9 +382,9 @@ Current API implementation scope (Phase 7 kickoff slice):
 
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
-| GET | `/v1/projects/{id}/members` | Browser Session or Member Token | List project members including the owner and collaborators |
+| GET | `/v1/projects/{id}/members` | Browser Session or Member Token (owner/admin only) | List project members including the owner and collaborators |
 | GET | `/v1/projects/{id}/members/{userId}/avatar` | Browser Session or Member Token | Return a cached project member avatar for authorized project viewers |
-| GET | `/v1/projects/{id}/invites` | Browser Session or Member Token | List pending, non-expired project invites |
+| GET | `/v1/projects/{id}/invites` | Browser Session or Member Token (owner/admin only) | List pending, non-expired project invites |
 | POST | `/v1/projects/{id}/invite` | Browser Session or Member Token (owner/admin only) | Create a pending project collaborator invite |
 | DELETE | `/v1/projects/{id}/invites/{inviteId}` | Browser Session or Member Token (owner/admin only) | Cancel a pending project invite |
 | PATCH | `/v1/projects/{id}/members/{userId}` | Browser Session or Member Token (owner/admin only) | Update a collaborator role between `admin` and `member` |
@@ -419,7 +419,7 @@ Current API implementation scope (Phase 7 kickoff slice):
 {
   "invite": {
     "invite_id": "uuid",
-    "organization_id": "uuid",
+    "project_id": "uuid",
     "email": "new@example.com",
     "role": "member",
     "invited_by": "uuid",
@@ -438,7 +438,7 @@ Invite creation also sends a transactional invite email containing a one-time ac
   "invites": [
     {
       "invite_id": "uuid",
-      "organization_id": "uuid",
+      "project_id": "uuid",
       "email": "pending@example.com",
       "role": "member",
       "invited_by": "uuid",
@@ -467,7 +467,7 @@ Invite creation also sends a transactional invite email containing a one-time ac
 **Update member role request:**
 ```json
 {
-  "role": "owner"
+  "role": "admin"
 }
 ```
 
@@ -477,7 +477,7 @@ Invite creation also sends a transactional invite email containing a one-time ac
   "member": {
     "user_id": "uuid",
     "email": "member@example.com",
-    "role": "owner",
+    "role": "admin",
     "membership_type": "collaborator",
     "avatar_url": null,
     "created_at": "ISO8601"
@@ -486,9 +486,9 @@ Invite creation also sends a transactional invite email containing a one-time ac
 ```
 
 - Authorization failure: `401 { "error": "invalid_member_token" }`
-- Forbidden for non-owner callers: `403 { "error": "forbidden" }`
-- Unverified browser-session owners cannot create or cancel invites: `403 { "error": "email_verification_required" }`
-- Team-tier capability required for invites: `403 { "error": "upgrade_required" }`
+- Forbidden for non-admin callers: `403 { "error": "forbidden" }`
+- Unverified browser-session owner/admin callers cannot create or cancel invites: `403 { "error": "email_verification_required" }`
+- Team-tier capability on the project owner's plan is required for invites: `403 { "error": "upgrade_required" }`
 - Missing member-management dependency/surface: `404 { "error": "member_management_not_available" }`
 - Invalid invite payload: `400 { "error": "invalid_payload" }`
 - Invalid invite params: `400 { "error": "invalid_invite_id" }`
@@ -532,6 +532,10 @@ Invite creation also sends a transactional invite email containing a one-time ac
     "slug": "main-app",
     "environment_default": "production",
     "organization_plan": "free",
+    "relationship": "owned",
+    "effective_role": "owner",
+    "sharing_state": "private",
+    "owner_email": "owner@example.com",
     "created_at": "ISO8601",
     "updated_at": "ISO8601"
   }
@@ -549,7 +553,7 @@ Invite creation also sends a transactional invite email containing a one-time ac
 
 All update fields are optional, but at least one field must be present.
 
-`organization_plan` is the owning organization's active billing tier projected onto project-shaped responses for capability decisions. It is not a project-specific subscription.
+`organization_plan` is the owning organization's active billing tier projected onto project-shaped responses for capability decisions. It is not a project-specific subscription. `sharing_state` exists in addition to `relationship` so owners can tell when one of their own projects has already been shared with collaborators.
 
 - Authorization failure: `401 { "error": "invalid_member_token" }`
 - Forbidden for non-owner callers: `403 { "error": "forbidden" }`
@@ -689,9 +693,9 @@ Checkout confirmation returns the standard billing summary response after the AP
 
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
-| GET | `/v1/projects/{id}/tokens` | Browser Session or Member Token | List project tokens in member organization |
-| POST | `/v1/projects/{id}/tokens` | Browser Session or Member Token | Create new project token (plaintext shown once) |
-| POST | `/v1/projects/{id}/tokens/{tokenId}/revoke` | Browser Session or Member Token | Revoke project token |
+| GET | `/v1/projects/{id}/tokens` | Browser Session or Member Token | List project tokens visible through project access |
+| POST | `/v1/projects/{id}/tokens` | Browser Session or Member Token, owner/admin project access | Create new project token (plaintext shown once) |
+| POST | `/v1/projects/{id}/tokens/{tokenId}/revoke` | Browser Session or Member Token, owner/admin project access | Revoke project token |
 | GET | `/v1/member/tokens` | Browser Session or Member Token | List member tokens for caller identity |
 | POST | `/v1/member/tokens` | Browser Session or Member Token | Create new member token (plaintext shown once) |
 | POST | `/v1/member/tokens/{tokenId}/revoke` | Browser Session or Member Token | Revoke member token |
@@ -786,6 +790,7 @@ When updating channel-specific `config`, include the `channel` in the same reque
   "alert": {
     "alert_id": "uuid",
     "project_id": "uuid",
+    "created_by_user_id": "uuid",
     "service_id": null,
     "channel": "email",
     "condition_type": "severity_threshold",
@@ -807,6 +812,7 @@ When updating channel-specific `config`, include the `channel` in the same reque
     {
       "alert_id": "uuid",
       "project_id": "uuid",
+      "created_by_user_id": "uuid",
       "service_id": null,
       "channel": "slack",
       "condition_type": "error_spike",
@@ -823,10 +829,10 @@ When updating channel-specific `config`, include the `channel` in the same reque
 ```
 
 Current API implementation scope (Phase 10 alert CRUD slice):
-- `GET /v1/alerts` returns `200 { alerts: AlertRule[] }` for member-token callers scoped to the project's organization.
+- `GET /v1/alerts` returns `200 { alerts: AlertRule[] }` for callers authorized on the target project.
 - `POST /v1/alerts` returns `201 { alert: AlertRule }`.
-- `PATCH /v1/alerts/{id}` returns `200 { alert: AlertRule }`.
-- `DELETE /v1/alerts/{id}` returns `204` on success.
+- `PATCH /v1/alerts/{id}` returns `200 { alert: AlertRule }` for owner/admin or the rule creator.
+- `DELETE /v1/alerts/{id}` returns `204` on success for owner/admin or the rule creator.
 - Worker-side alert evaluation now enqueues internal `evaluate-alerts` jobs from real incident transitions for `new_incident`, `severity_threshold`, `incident_regressed`, `regression_after_deploy`, and `error_spike` conditions.
 - Matching alert evaluations persist one internal `alert_deliveries` row per `alert_id + incident_id + dedupe_key` before delivery so duplicate worker replays stay idempotent.
 - Delivery transport is implemented for `channel: "email"`, `channel: "slack"`, `channel: "discord"`, and `channel: "webhook"`. Email requires `config.to` as a single recipient address; Slack accepts either `config.slack_destination_id` (resolved to an encrypted stored webhook URL at delivery time) or `config.webhook_url`; Discord requires `config.webhook_url`; webhook requires `config.target_url`.
@@ -838,6 +844,7 @@ Current API implementation scope (Phase 10 alert CRUD slice):
 - Missing scoped project on list/create: `404 { "error": "project_not_found" }`
 - Missing scoped connected Slack destination on create/update: `404 { "error": "slack_destination_not_found" }`
 - Missing scoped alert on update/delete: `404 { "error": "alert_not_found" }`
+- Existing alert owned by another collaborator when member tries to mutate it: `403 { "error": "forbidden" }`
 
 ### 1.4a Slack Connected Destinations
 
@@ -845,11 +852,11 @@ These routes back the Team-tier `Connect Slack` flow inside the project alerts m
 
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
-| GET | `/v1/slack/app/install-url` | Browser Session or Member Token | Return a Slack OAuth authorize URL for a project-scoped connect flow |
+| GET | `/v1/slack/app/install-url` | Browser Session or Member Token (owner/admin only) | Return a Slack OAuth authorize URL for a project-scoped connect flow |
 | GET | `/v1/slack/app/callback` | None | Complete Slack OAuth and redirect back to the app |
 | GET | `/v1/projects/{id}/slack/destinations` | Browser Session or Member Token | List reusable connected Slack channels for the project organization |
-| POST | `/v1/projects/{id}/slack/destinations/{destinationId}/test` | Browser Session or Member Token | Send a test message to a reusable connected Slack channel |
-| DELETE | `/v1/projects/{id}/slack/destinations/{destinationId}` | Browser Session or Member Token | Disconnect a reusable Slack destination |
+| POST | `/v1/projects/{id}/slack/destinations/{destinationId}/test` | Browser Session or Member Token (owner/admin only) | Send a test message to a reusable connected Slack channel |
+| DELETE | `/v1/projects/{id}/slack/destinations/{destinationId}` | Browser Session or Member Token (owner/admin only) | Disconnect a reusable Slack destination |
 
 **Install-url query params:** `project_id` (required UUID), `return_to` (optional app-relative path such as `/projects/<projectId>/alerts`)
 
@@ -883,10 +890,10 @@ These routes back the Team-tier `Connect Slack` flow inside the project alerts m
 `GET /v1/slack/app/callback` validates the signed install state, exchanges the Slack OAuth code, upserts the reusable destination, clears the transient cookie, and redirects back to the requested app path with `slack_connect=success|cancelled|error`.
 
 Current implementation behavior:
-- `GET /v1/slack/app/install-url` requires owner access, a Team-tier organization, and a scoped project.
+- `GET /v1/slack/app/install-url` requires owner/admin access, a Team-tier organization, and a scoped project.
 - `GET /v1/projects/{id}/slack/destinations` requires member auth and Team tier.
-- `POST /v1/projects/{id}/slack/destinations/{destinationId}/test` requires owner access, decrypts the stored webhook URL, sends a Slack test message, and returns `502` with a stable Slack-specific error code when delivery fails.
-- `DELETE /v1/projects/{id}/slack/destinations/{destinationId}` requires owner access and returns `409 { "error": "slack_destination_in_use" }` while any alert rule or weekly report still references that destination.
+- `POST /v1/projects/{id}/slack/destinations/{destinationId}/test` requires owner/admin access, decrypts the stored webhook URL, sends a Slack test message, and returns `502` with a stable Slack-specific error code when delivery fails.
+- `DELETE /v1/projects/{id}/slack/destinations/{destinationId}` requires owner/admin access and returns `409 { "error": "slack_destination_in_use" }` while any alert rule or weekly report still references that destination.
 - Slack webhook URLs are never returned by these routes.
 
 ### 1.5 Webhooks
@@ -961,6 +968,7 @@ Current implementation behavior:
   "webhook": {
     "webhook_id": "uuid",
     "project_id": "uuid",
+    "created_by_user_id": "uuid",
     "url": "https://example.com/hook",
     "events": ["bundle.created", "improvement_bundle.created"],
     "filters": {
@@ -987,6 +995,7 @@ Current implementation behavior:
   "webhook": {
     "webhook_id": "uuid",
     "project_id": "uuid",
+    "created_by_user_id": "uuid",
     "url": "https://example.com/hook",
     "events": ["bundle.created"],
     "filters": {},
@@ -1036,6 +1045,8 @@ Deploy correlation fields are populated when `regression_after_deploy` is `true`
 ```
 
 Current webhook delivery behavior for the Phase 10 base: worker delivery attempts retry with exponential backoff through the persisted delivery queue, delivery history exposes per-attempt state (`pending`, `retrying`, `delivered`, `failed`), and a webhook is automatically disabled by setting `is_enabled = false` after 50 consecutive final delivery failures.
+
+Owner and admin may manage any webhook in the project. Plain members may create webhooks, but may update, test, retry, or delete only the webhooks they created themselves.
 
 ### 1.6 Weekly Report Channels
 
@@ -1279,17 +1290,18 @@ Response `200`:
     "capture_breadcrumbs": "local_only | exception_only | standalone | null",
     "capture_probe_events": "buffer_only | standalone_when_activated | null",
     "immediate_client_error_statuses": null
-  }
+  },
+  "access_mode": "editable | preview"
 }
 ```
 
-`policy` is the effective resolved policy after merging preset defaults with any non-null overrides. `overrides` preserves the raw saved state so clients can distinguish `use preset default` from explicit `none`. SDKs consume the same resolved values via `GET /v1/sdk/config`.
+`policy` is the effective resolved policy after merging preset defaults with any non-null overrides. `access_mode: "editable"` responses include `overrides` so owner/admin clients can distinguish `use preset default` from explicit `none`. `access_mode: "preview"` responses are returned to plain members and omit raw override provenance from the interactive experience. SDKs consume the same resolved values via `GET /v1/sdk/config`.
 
 **Update capture policy:**
 
 ```
 PATCH /v1/projects/{id}/capture-policy
-Authorization: Bearer dbundle_member_...  (or browser session, owner only)
+Authorization: Bearer dbundle_member_...  (or browser session, owner/admin only)
 Content-Type: application/json
 ```
 
@@ -1315,6 +1327,7 @@ Response `200`: same shape as GET response with updated values.
 - `null` for `immediate_client_error_statuses` means `use preset default`; `[]` means explicit `none`
 - Free-tier projects cannot set `capture_probe_events` to `standalone_when_activated` (returns 403)
 - Omitted override fields keep their existing override state; on a project with no saved capture-policy row yet, omitted overrides behave as `null` and resolve from preset defaults
+- Plain members receive `403 { "error": "forbidden" }` on update attempts
 
 **Error responses:**
 - `401` — missing or invalid auth
@@ -1360,13 +1373,13 @@ The webhook endpoint handles `installation.created`, `installation.deleted`, `in
 
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
-| GET | `/v1/github/app/install-url` | Browser Session or Member Token | Get the GitHub App installation URL used by the web install/reconnect CTA |
-| GET | `/v1/github/installation` | Browser Session or Member Token | Get current org's GitHub App installation status |
-| DELETE | `/v1/github/installation` | Browser Session or Member Token (owner only) | Disconnect GitHub installation |
-| GET | `/v1/github/repositories` | Browser Session or Member Token | List repositories available to the installation |
+| GET | `/v1/github/app/install-url` | Browser Session or Member Token (owner/admin only) | Get the GitHub App installation URL used by the web install/reconnect CTA |
+| GET | `/v1/github/installation` | Browser Session or Member Token | Get current org's GitHub App installation status for an eligible project |
+| DELETE | `/v1/github/installation` | Browser Session or Member Token (owner/admin only) | Disconnect GitHub installation |
+| GET | `/v1/github/repositories` | Browser Session or Member Token (owner/admin only) | List repositories available to the installation |
 | GET | `/v1/projects/{id}/github/repo` | Browser Session or Member Token | Get project's assigned primary repo |
-| PUT | `/v1/projects/{id}/github/repo` | Browser Session or Member Token (owner only) | Set or change project's primary repo |
-| DELETE | `/v1/projects/{id}/github/repo` | Browser Session or Member Token (owner only) | Remove project's repo assignment |
+| PUT | `/v1/projects/{id}/github/repo` | Browser Session or Member Token (owner/admin only) | Set or change project's primary repo |
+| DELETE | `/v1/projects/{id}/github/repo` | Browser Session or Member Token (owner/admin only) | Remove project's repo assignment |
 
 **Get installation response:**
 ```json
@@ -1437,15 +1450,17 @@ When no repository is assigned to the project yet, the route returns:
 }
 ```
 
+GitHub automation eligibility is determined from the target project's owner plan, not from the acting collaborator's personal account plan.
+
 **Dispatch rule management:**
 
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
-| POST | `/v1/projects/{id}/github/rules` | Browser Session or Member Token (owner only) | Create dispatch rule |
+| POST | `/v1/projects/{id}/github/rules` | Browser Session or Member Token | Create dispatch rule |
 | GET | `/v1/projects/{id}/github/rules` | Browser Session or Member Token | List dispatch rules |
 | GET | `/v1/projects/{id}/github/rules/{ruleId}` | Browser Session or Member Token | Get single rule |
-| PATCH | `/v1/projects/{id}/github/rules/{ruleId}` | Browser Session or Member Token (owner only) | Update rule |
-| DELETE | `/v1/projects/{id}/github/rules/{ruleId}` | Browser Session or Member Token (owner only) | Delete rule |
+| PATCH | `/v1/projects/{id}/github/rules/{ruleId}` | Browser Session or Member Token | Update rule |
+| DELETE | `/v1/projects/{id}/github/rules/{ruleId}` | Browser Session or Member Token | Delete rule |
 
 **Create rule request:**
 ```json
@@ -1467,6 +1482,7 @@ When no repository is assigned to the project yet, the route returns:
   "rule": {
     "rule_id": "uuid",
     "project_id": "uuid",
+    "created_by_user_id": "uuid",
     "name": "High severity incidents",
     "enabled": true,
     "event_types": ["bundle.created", "bundle.reopened"],
@@ -1523,9 +1539,11 @@ When no repository is assigned to the project yet, the route returns:
 
 **Retry response:** Same shape as single delivery.
 
+Owner and admin may manage any dispatch rule. Plain members may create dispatch rules on an eligible shared project, but may update, delete, or retry only the rules and deliveries tied to rules they created themselves. Plain members may not mutate the shared GitHub installation or repository assignment.
+
 **Error responses:**
 - `401 { "error": "invalid_member_token" }` — missing or invalid auth
-- `403 { "error": "forbidden" }` — non-owner caller for write operations
+- `403 { "error": "forbidden" }` — caller lacks the required project role or resource ownership for the attempted mutation
 - `403 { "error": "upgrade_required" }` — Free-tier project
 - `404 { "error": "installation_not_found" }` — no active GitHub installation for the organization
 - `404 { "error": "rule_not_found" }` — dispatch rule not found
@@ -1692,8 +1710,8 @@ Current local CLI retrieval limitation: `debugbundle logs` still requires the au
 ```
 debugbundle alert list --project-id <id> [--limit <n>] [--auth-file <path>] [--json]
 debugbundle alert create --project-id <id> --channel <channel> --condition <condition> [--service-id <id>] [--severity-min <level>] --config-json <json> [--is-enabled <true|false>] [--auth-file <path>] [--json]
-debugbundle alert update <id> [--service-id <id|null>] [--channel <channel>] [--condition <condition>] [--severity-min <level|null>] [--config-json <json|null>] [--is-enabled <true|false>] [--auth-file <path>] [--json]
-debugbundle alert delete <id> [--auth-file <path>] [--json]
+debugbundle alert update <id> --project-id <id> [--service-id <id|null>] [--channel <channel>] [--condition <condition>] [--severity-min <level|null>] [--config-json <json|null>] [--is-enabled <true|false>] [--auth-file <path>] [--json]
+debugbundle alert delete <id> --project-id <id> [--auth-file <path>] [--json]
 ```
 
 Current alert CLI behavior is a thin adapter over the alert HTTP client in `packages/alert-client`, reusing stored member auth after `debugbundle login` and forwarding JSON output without duplicating transport logic. `alert create` requires `--config-json` with a channel-specific object, and `alert update` accepts `null` clears for `service_id`, `severity_min`, or `config`. Slack alert configs can use either `{"webhook_url":"..."}` or `{"slack_destination_id":"uuid"}`.
@@ -1702,10 +1720,11 @@ Current alert CLI behavior is a thin adapter over the alert HTTP client in `pack
 ```
 debugbundle webhook list --project-id <id> [--limit <n>] [--auth-file <path>] [--json]
 debugbundle webhook create --project-id <id> --url <url> --event <event[,event]> [--environment <env[,env]>] [--service <svc[,svc]>] [--severity-min <level>] [--bundle-type <type[,type]>] [--verification <true|false>] [--is-enabled <true|false>] [--auth-file <path>] [--json]
-debugbundle webhook update <id> [--url <url>] [--event <event[,event]>] [--environment <env[,env]>] [--service <svc[,svc]>] [--severity-min <level>] [--bundle-type <type[,type]>] [--verification <true|false>] [--is-enabled <true|false>] [--auth-file <path>] [--json]
-debugbundle webhook delete <id> [--auth-file <path>] [--json]
-debugbundle webhook test <id> [--event <verification.passed|verification.failed>] [--auth-file <path>] [--json]
-debugbundle webhook deliveries <id> [--limit <n>] [--auth-file <path>] [--json]
+debugbundle webhook update <id> --project-id <id> [--url <url>] [--event <event[,event]>] [--environment <env[,env]>] [--service <svc[,svc]>] [--severity-min <level>] [--bundle-type <type[,type]>] [--verification <true|false>] [--is-enabled <true|false>] [--auth-file <path>] [--json]
+debugbundle webhook delete <id> --project-id <id> [--auth-file <path>] [--json]
+debugbundle webhook test <id> --project-id <id> [--event <verification.passed|verification.failed>] [--auth-file <path>] [--json]
+debugbundle webhook deliveries <id> --project-id <id> [--limit <n>] [--auth-file <path>] [--json]
+debugbundle webhook retry <id> <delivery-id> --project-id <id> [--auth-file <path>] [--json]
 ```
 
 Current webhook CLI behavior is a thin adapter over the webhook HTTP client in `packages/webhook-client`, reusing stored member auth after `debugbundle login` and forwarding JSON output without duplicating transport logic. Multi-value flags (`--event`, `--environment`, `--service`, `--bundle-type`) accept comma-separated values.
@@ -1793,7 +1812,7 @@ debugbundle project update <project-id> [--name <name>] [--slug <slug>] [--envir
 debugbundle project delete <project-id> [--auth-file <path>] [--json]
 ```
 
-`project list` lists both owned and shared projects visible to the authenticated member. `project create` creates a new owned project with the given name and slug. `project update` modifies existing project attributes for an accessible project. `project delete` permanently removes a project (owner-only). All require member token authentication.
+`project list` lists both owned and shared projects visible to the authenticated member and includes relationship metadata such as `effective_role`, `owner_email`, and owner-visible `sharing_state`. `project create` creates a new owned project with the given name and slug. `project update` modifies existing project attributes for an accessible project. `project delete` permanently removes a project (owner-only). All require member token authentication.
 
 ### 2.15 Project Member Commands
 ```
@@ -1805,23 +1824,23 @@ debugbundle project members update-role <user-id> --project-id <id> --role <admi
 debugbundle project members remove <user-id> --project-id <id> [--auth-file <path>] [--json]
 ```
 
-`project members list` lists the owner and collaborators for one project. `project members invites` lists pending invitations for that project. `project members invite` sends a collaborator invitation to the specified email (Team tier). `project members cancel-invite` cancels a pending invitation. `project members update-role` changes a collaborator's role. `project members remove` removes a collaborator from the project. All require project-scoped authorization.
+`project members list` lists the owner and collaborators for one project. `project members invites` lists pending invitations for that project. `project members invite` sends a collaborator invitation to the specified email (Team tier). `project members cancel-invite` cancels a pending invitation. `project members update-role` changes a collaborator's role. `project members remove` removes a collaborator from the project. Listing and invite visibility require owner/admin access; plain members do not receive these surfaces.
 
 ### 2.16 GitHub Commands
 ```
-debugbundle github status [--auth-file <path>] [--json]
-debugbundle github repos [--auth-file <path>] [--json]
-debugbundle github repo set <owner/repo> [--project-id <id>] [--auth-file <path>] [--json]
-debugbundle github repo remove [--project-id <id>] [--auth-file <path>] [--json]
-debugbundle github rules [--project-id <id>] [--auth-file <path>] [--json]
-debugbundle github rules create [--project-id <id>] [--name <name>] [--event <event[,event]>] [--environment <env[,env]>] [--service <svc[,svc]>] [--severity-min <level>] [--bundle-type <type>] [--incident-status <status>] [--cooldown <seconds>] [--auth-file <path>] [--json]
-debugbundle github rules update <rule-id> [--name <name>] [--event <event[,event]>] [--environment <env[,env]>] [--service <svc[,svc]>] [--severity-min <level>] [--bundle-type <type>] [--incident-status <status>] [--cooldown <seconds>] [--enabled <true|false>] [--auth-file <path>] [--json]
-debugbundle github rules delete <rule-id> [--auth-file <path>] [--json]
+debugbundle github status [--project-id <id>] [--auth-file <path>] [--json]
+debugbundle github repos [--project-id <id>] [--auth-file <path>] [--json]
+debugbundle github repo set <owner/repo> --project-id <id> [--auth-file <path>] [--json]
+debugbundle github repo remove --project-id <id> [--auth-file <path>] [--json]
+debugbundle github rules --project-id <id> [--auth-file <path>] [--json]
+debugbundle github rules create --project-id <id> --name <name> --event <event[,event]> [--environment <env[,env]>] [--service <svc[,svc]>] --severity-min <level> --bundle-type <type> [--incident-status <status>] [--cooldown <seconds>] [--enabled <true|false>] [--auth-file <path>] [--json]
+debugbundle github rules update <rule-id> --project-id <id> [--name <name>] [--event <event[,event]>] [--environment <env[,env]>] [--service <svc[,svc]>] [--severity-min <level>] [--bundle-type <type>] [--incident-status <status>] [--cooldown <seconds>] [--enabled <true|false>] [--auth-file <path>] [--json]
+debugbundle github rules delete <rule-id> --project-id <id> [--auth-file <path>] [--json]
 debugbundle github deliveries [--project-id <id>] [--status <status>] [--limit <n>] [--auth-file <path>] [--json]
 debugbundle github deliveries retry <delivery-id> [--project-id <id>] [--auth-file <path>] [--json]
 ```
 
-`github status` shows the organization's GitHub App installation status and any assigned repo for the current project. `github repos` lists repositories available to the installation. `github repo set` assigns a primary repo to the project. `github deliveries` lists recent delivery history for a project, and `github deliveries retry` retries a failed delivery within that project scope. Multi-value flags (`--event`, `--environment`, `--service`) accept comma-separated values. All commands require member token authentication (Solo+ tier).
+`github status` shows the organization's GitHub App installation status and any assigned repo for the current project. `github repos` lists repositories available to the installation for owner/admin callers. `github repo set` assigns a primary repo to the project for owner/admin callers. `github rules create` is available to any authorized collaborator on an eligible shared project, while rule update/delete and delivery retry obey creator ownership for plain members. `github deliveries` lists recent delivery history for a project, and `github deliveries retry` retries a failed delivery within that project scope when the caller owns the underlying rule or has admin rights. Multi-value flags (`--event`, `--environment`, `--service`) accept comma-separated values. Eligibility is determined from the target project's owner plan, not the acting collaborator's personal plan.
 
 ### Exit Codes
 | Code | Meaning |
@@ -1918,7 +1937,7 @@ get_capture_policy            → same result as GET /v1/projects/{id}/capture-p
 update_capture_policy         → same result as PATCH /v1/projects/{id}/capture-policy
 ```
 
-These tools manage per-project capture policy (preset selection and advanced overrides). `update_capture_policy` is owner-only.
+These tools manage per-project capture policy (preset selection and advanced overrides). `get_capture_policy` returns a preview-only payload to plain members and an editable payload to owner/admin callers. `update_capture_policy` requires owner/admin authorization.
 
 ### 3.6 Billing Tools
 ```
@@ -1950,7 +1969,7 @@ update_project_member_role   → same result as PATCH /v1/projects/{id}/members/
 remove_project_member        → same result as DELETE /v1/projects/{id}/members/{userId}
 ```
 
-These tools manage project collaboration lifecycle. Listing requires project access. Invite, cancel, role update, and removal require owner/admin authorization. `invite_project_member` requires Team tier.
+These tools manage project collaboration lifecycle. Listing requires owner/admin authorization, not mere project access. Invite, cancel, role update, and removal require owner/admin authorization. `invite_project_member` requires Team tier.
 
 ### 3.9 GitHub Tools
 ```
@@ -1966,7 +1985,7 @@ debugbundle_list_github_deliveries      → same result as GET /v1/projects/{id}
 debugbundle_retry_github_delivery       → same result as POST /v1/projects/{id}/github/deliveries/{id}/retry
 ```
 
-These tools manage GitHub repository automation. Read operations require member-token authentication and Solo+ tier; mutating tools additionally require owner scope where the paired HTTP route does.
+These tools manage GitHub repository automation. Project-scoped read operations use the target project's owner plan for eligibility; repository connection management requires owner/admin access; dispatch-rule create is available to authorized project collaborators, while update/delete and delivery retry obey creator ownership for plain members.
 
 ### MCP Response Rules
 - Deterministic

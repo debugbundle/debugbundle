@@ -42,6 +42,7 @@ import {
   type ProjectTokenRecord
 } from "../lib/api.js";
 import { showErrorToast, showSuccessToast } from "../lib/notify.js";
+import { getProjectEffectiveRole } from "../lib/project-access.js";
 import { CUSTOM_PROJECT_ENVIRONMENT_VALUE, PROJECT_ENVIRONMENT_OPTIONS, slugifyProjectName } from "../lib/project-form.js";
 
 export { BillingPage } from "./billing-page.js";
@@ -282,11 +283,13 @@ export function ProjectsPage(): JSX.Element {
 }
 
 export function ProjectTokensPage(): JSX.Element {
-  const { projectId } = useOutletContext<ProjectContext>();
+  const { projectId, project } = useOutletContext<ProjectContext>();
   const [tokens, setTokens] = useState<ProjectTokenRecord[] | null>(null);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [label, setLabel] = useState("");
   const [createdToken, setCreatedToken] = useState<CreatedProjectToken | null>(null);
+  const effectiveRole = getProjectEffectiveRole(project);
+  const canManageProjectTokens = effectiveRole === "owner" || effectiveRole === "admin";
 
   useEffect(() => {
     void (async () => {
@@ -334,25 +337,27 @@ export function ProjectTokensPage(): JSX.Element {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <div />
-        <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
-          <DialogTrigger asChild>
-            <Button type="button">
-              <PlusIcon data-icon="inline-start" />
-              Create project token
-            </Button>
-          </DialogTrigger>
-            <DialogFormContent
-              title="Create token"
-              description="Create a project token for SDK ingestion."
-              footer={<Button type="submit">Create token</Button>}
-              onSubmit={(event) => void handleCreateToken(event)}
-            >
-                <Field>
-                  <FieldLabel htmlFor="project-token-label">Token label</FieldLabel>
-                  <Input id="project-token-label" value={label} onChange={(event) => setLabel(event.currentTarget.value)} />
-                </Field>
-            </DialogFormContent>
-          </Dialog>
+        {canManageProjectTokens ? (
+          <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
+            <DialogTrigger asChild>
+              <Button type="button">
+                <PlusIcon data-icon="inline-start" />
+                Create project token
+              </Button>
+            </DialogTrigger>
+              <DialogFormContent
+                title="Create token"
+                description="Create a project token for SDK ingestion."
+                footer={<Button type="submit">Create token</Button>}
+                onSubmit={(event) => void handleCreateToken(event)}
+              >
+                  <Field>
+                    <FieldLabel htmlFor="project-token-label">Token label</FieldLabel>
+                    <Input id="project-token-label" value={label} onChange={(event) => setLabel(event.currentTarget.value)} />
+                  </Field>
+              </DialogFormContent>
+            </Dialog>
+        ) : null}
       </div>
 
       {createdToken?.plaintext === undefined ? null : <PlaintextTokenReveal value={createdToken.plaintext} />}
@@ -372,9 +377,17 @@ export function ProjectTokensPage(): JSX.Element {
             <ProjectResourceEmptyState
               icon={KeyRoundIcon}
               title="No project tokens yet"
-              description="Create an ingestion token when you are ready to connect an SDK or environment-specific deploy flow to this project."
-              actionLabel="Create project token"
-              onAction={() => setIsCreateOpen(true)}
+              description={
+                canManageProjectTokens
+                  ? "Create an ingestion token when you are ready to connect an SDK or environment-specific deploy flow to this project."
+                  : "Project tokens are managed by project owners and admins."
+              }
+              {...(canManageProjectTokens
+                ? {
+                    actionLabel: "Create project token",
+                    onAction: () => setIsCreateOpen(true)
+                  }
+                : {})}
             />
           ) : (
             <Table>
@@ -383,7 +396,7 @@ export function ProjectTokensPage(): JSX.Element {
                   <TableHead>Label</TableHead>
                   <TableHead>Created</TableHead>
                   <TableHead>Last used</TableHead>
-                  <TableHead className="text-right">Action</TableHead>
+                    {canManageProjectTokens ? <TableHead className="text-right">Action</TableHead> : null}
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -392,25 +405,27 @@ export function ProjectTokensPage(): JSX.Element {
                     <TableCell className="font-medium">{token.label}</TableCell>
                     <TableCell>{formatDate(token.created_at)}</TableCell>
                     <TableCell>{token.last_used_at === null ? "Never" : formatDate(token.last_used_at)}</TableCell>
-                    <TableCell className="text-right">
-                      <AlertDialog>
-                        <AlertDialogTrigger asChild>
-                          <Button type="button" variant="ghost" size="sm">Revoke</Button>
-                        </AlertDialogTrigger>
-                        <AlertDialogContent>
-                          <AlertDialogHeader>
-                            <AlertDialogTitle>Revoke project token</AlertDialogTitle>
-                            <AlertDialogDescription>
-                              This will stop SDK ingestion for any deployment still using the token.
-                            </AlertDialogDescription>
-                          </AlertDialogHeader>
-                          <AlertDialogFooter>
-                            <AlertDialogCancel>Cancel</AlertDialogCancel>
-                            <AlertDialogAction onClick={() => void handleRevokeToken(token.token_id)}>Revoke token</AlertDialogAction>
-                          </AlertDialogFooter>
-                        </AlertDialogContent>
-                      </AlertDialog>
-                    </TableCell>
+                    {canManageProjectTokens ? (
+                      <TableCell className="text-right">
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button type="button" variant="ghost" size="sm">Revoke</Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>Revoke project token</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                This will stop SDK ingestion for any deployment still using the token.
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel>Cancel</AlertDialogCancel>
+                              <AlertDialogAction onClick={() => void handleRevokeToken(token.token_id)}>Revoke token</AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
+                      </TableCell>
+                    ) : null}
                   </TableRow>
                 ))}
               </TableBody>

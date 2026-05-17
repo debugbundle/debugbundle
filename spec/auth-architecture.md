@@ -110,7 +110,7 @@ The web app authenticates with a first-party session cookie.
 The session is used for interactive browser actions such as:
 - viewing account state
 - creating the first member token
-- creating project tokens
+- creating project tokens for projects where the signed-in user has owner/admin project access
 - managing billing
 - managing project sharing
 
@@ -283,6 +283,7 @@ Authorization decisions combine:
 - account ownership context
 - project access
 - member role
+- project-scoped resource ownership where member-created automation is allowed
 - credential scope
 - verification state where applicable
 
@@ -303,8 +304,14 @@ The first member token is the trust transition point from human bootstrap to age
 ### 7.4 Role Model
 
 The auth domain must support member roles at minimum for:
-- full management access
+- owner access
+- admin access
 - standard member access
+
+Role semantics:
+- **Owner**: billing owner, delete-project authority, full access to all project resources
+- **Admin**: can manage collaborators, capture policy, and shared integrations/configuration, but cannot delete the project or take over billing
+- **Member**: can access project data and create allowed project-scoped automation resources, but cannot manage collaborators, edit capture policy, manage shared integrations, or mutate automation resources created by other collaborators
 
 Role checks must be enforced identically for session-authenticated and member-token-authenticated requests.
 

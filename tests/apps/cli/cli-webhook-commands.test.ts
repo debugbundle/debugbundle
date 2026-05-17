@@ -181,6 +181,7 @@ describe("cli webhook commands", () => {
     const updateResult = await updateWebhookCommand(
       {
         bearerToken: "dbundle_mem_x",
+        projectId: "proj_1",
         webhookId: "wh_1",
         isEnabled: false,
         json: true
@@ -202,6 +203,7 @@ describe("cli webhook commands", () => {
     const deleteResult = await deleteWebhookCommand(
       {
         bearerToken: "dbundle_mem_x",
+        projectId: "proj_1",
         webhookId: "wh_1"
       },
       {
@@ -212,6 +214,7 @@ describe("cli webhook commands", () => {
     const deliveriesResult = await listWebhookDeliveriesCommand(
       {
         bearerToken: "dbundle_mem_x",
+        projectId: "proj_1",
         webhookId: "wh_1",
         json: true
       },
@@ -234,6 +237,7 @@ describe("cli webhook commands", () => {
     const testResult = await testWebhookCommand(
       {
         bearerToken: "dbundle_mem_x",
+        projectId: "proj_1",
         webhookId: "wh_1",
         eventType: "verification.failed",
         json: true
@@ -299,6 +303,7 @@ describe("cli webhook commands", () => {
     const authResult = await deleteWebhookCommand(
       {
         bearerToken: "dbundle_mem_x",
+        projectId: "proj_1",
         webhookId: "wh_1"
       },
       {
@@ -309,6 +314,7 @@ describe("cli webhook commands", () => {
     const notFoundResult = await listWebhookDeliveriesCommand(
       {
         bearerToken: "dbundle_mem_x",
+        projectId: "proj_1",
         webhookId: "wh_missing"
       },
       {
@@ -319,6 +325,7 @@ describe("cli webhook commands", () => {
     const validationResult = await updateWebhookCommand(
       {
         bearerToken: "dbundle_mem_x",
+        projectId: "proj_1",
         webhookId: "wh_1",
         isEnabled: false
       },
@@ -330,6 +337,7 @@ describe("cli webhook commands", () => {
     const unknownResult = await deleteWebhookCommand(
       {
         bearerToken: "dbundle_mem_x",
+        projectId: "proj_1",
         webhookId: "wh_1"
       },
       {
@@ -381,6 +389,7 @@ describe("cli webhook commands", () => {
 
     const updateResult = await updateWebhookWithAuthCommand(
       {
+        projectId: "proj_1",
         webhookId: "wh_1",
         url: "https://hooks.example.test/updated"
       },
@@ -391,6 +400,7 @@ describe("cli webhook commands", () => {
     );
     const deleteResult = await deleteWebhookWithAuthCommand(
       {
+        projectId: "proj_1",
         webhookId: "wh_1"
       },
       {
@@ -400,6 +410,7 @@ describe("cli webhook commands", () => {
     );
     const deliveriesResult = await listWebhookDeliveriesWithAuthCommand(
       {
+        projectId: "proj_1",
         webhookId: "wh_1",
         limit: 5
       },
@@ -410,6 +421,7 @@ describe("cli webhook commands", () => {
     );
     const testResult = await testWebhookWithAuthCommand(
       {
+        projectId: "proj_1",
         webhookId: "wh_1"
       },
       {
@@ -461,6 +473,7 @@ describe("cli webhook commands", () => {
     const updateHuman = await updateWebhookCommand(
       {
         bearerToken: "dbundle_mem_x",
+        projectId: "proj_1",
         webhookId: "wh_2",
         url: "https://hooks.example.test/updated",
         events: ["bundle.updated"],
@@ -482,6 +495,7 @@ describe("cli webhook commands", () => {
     const emptyDeliveries = await listWebhookDeliveriesCommand(
       {
         bearerToken: "dbundle_mem_x",
+        projectId: "proj_1",
         webhookId: "wh_2"
       },
       {
@@ -491,6 +505,7 @@ describe("cli webhook commands", () => {
     const retryResult = await retryWebhookDeliveryCommand(
       {
         bearerToken: "dbundle_mem_x",
+        projectId: "proj_1",
         webhookId: "wh_2",
         deliveryId: "del_2",
         json: true
@@ -525,6 +540,7 @@ describe("cli webhook commands", () => {
     );
     const retryWrapper = await retryWebhookDeliveryWithAuthCommand(
       {
+        projectId: "proj_1",
         webhookId: "wh_2",
         deliveryId: "del_3"
       },
@@ -547,6 +563,7 @@ describe("cli webhook commands", () => {
     const validation = await retryWebhookDeliveryCommand(
       {
         bearerToken: "dbundle_mem_x",
+        projectId: "proj_1",
         webhookId: "wh_9",
         deliveryId: "del_9"
       },
@@ -580,6 +597,7 @@ describe("cli webhook commands", () => {
 
     const testResult = await testWebhookWithAuthCommand(
       {
+        projectId: "proj_1",
         webhookId: "wh_9",
         json: true
       },
@@ -590,6 +608,7 @@ describe("cli webhook commands", () => {
     );
     const deliveriesResult = await listWebhookDeliveriesWithAuthCommand(
       {
+        projectId: "proj_1",
         webhookId: "wh_9",
         json: true
       },
@@ -608,6 +627,7 @@ describe("cli webhook commands", () => {
     const retryNotFound = await retryWebhookDeliveryCommand(
       {
         bearerToken: "dbundle_mem_x",
+        projectId: "proj_1",
         webhookId: "wh_10",
         deliveryId: "del_missing"
       },
@@ -618,6 +638,7 @@ describe("cli webhook commands", () => {
     const testHuman = await testWebhookCommand(
       {
         bearerToken: "dbundle_mem_x",
+        projectId: "proj_1",
         webhookId: "wh_10"
       },
       {
@@ -690,6 +711,7 @@ describe("cli webhook commands", () => {
     );
     const updateResult = await updateWebhookWithAuthCommand(
       {
+        projectId: "proj_1",
         webhookId: "wh_wrap",
         events: ["bundle.updated"],
         filters: { verification: true },

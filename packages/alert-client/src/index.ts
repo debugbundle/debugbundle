@@ -13,6 +13,7 @@ export const AlertSchema = z
   .object({
     alert_id: z.string(),
     project_id: z.string(),
+    created_by_user_id: z.string(),
     service_id: z.string().nullable(),
     channel: AlertChannelSchema,
     condition_type: AlertConditionTypeSchema,
@@ -137,6 +138,7 @@ export function createAlertApi(client: HttpClient): {
   }): Promise<AlertRecord>;
   updateAlert(input: {
     bearerToken: string;
+    projectId: string;
     alertId: string;
     serviceId?: string | null;
     channel?: AlertChannel;
@@ -145,7 +147,7 @@ export function createAlertApi(client: HttpClient): {
     config?: Record<string, unknown> | null;
     isEnabled?: boolean;
   }): Promise<AlertRecord>;
-  deleteAlert(input: { bearerToken: string; alertId: string }): Promise<{ alert_id: string }>;
+  deleteAlert(input: { bearerToken: string; projectId: string; alertId: string }): Promise<{ alert_id: string }>;
 } {
   return {
     async listAlerts(input) {
@@ -226,7 +228,7 @@ export function createAlertApi(client: HttpClient): {
       return expectAlert(
         client.request({
           method: "PATCH",
-          path: `/v1/alerts/${input.alertId}`,
+          path: `/v1/alerts/${input.alertId}${buildQuery({ project_id: input.projectId })}`,
           bearerToken: input.bearerToken,
           body
         })
@@ -236,7 +238,7 @@ export function createAlertApi(client: HttpClient): {
     async deleteAlert(input) {
       const response = await client.request({
         method: "DELETE",
-        path: `/v1/alerts/${input.alertId}`,
+        path: `/v1/alerts/${input.alertId}${buildQuery({ project_id: input.projectId })}`,
         bearerToken: input.bearerToken
       });
 

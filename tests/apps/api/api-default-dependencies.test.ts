@@ -557,6 +557,7 @@ describe("api default dependencies", () => {
     void deps.alertManagement.createAlertForOrganization({
       organization_id: "org_123",
       project_id: "proj_123",
+      created_by_user_id: "usr_123",
       channel: "email",
       condition_type: "new_incident",
       config: { to: "owner@example.com" },
@@ -601,6 +602,7 @@ describe("api default dependencies", () => {
     void deps.webhookManagement.createWebhookForOrganization({
       organization_id: "org_123",
       project_id: "proj_123",
+      created_by_user_id: "usr_123",
       url: "https://hooks.example.test/debugbundle",
       signing_secret: "secret_123",
       events: ["bundle.created"],
@@ -1560,6 +1562,7 @@ describe("api default dependencies", () => {
     const result = await deps.githubManagement!.setProjectRepoForOrganization({
       organization_id: "org_1",
       project_id: "proj_1",
+      created_by_user_id: "usr_1",
       owner: "testorg",
       repo: "myrepo"
     });
@@ -1572,6 +1575,7 @@ describe("api default dependencies", () => {
     expect(githubStore.createProjectGitHubRuleForOrganization).toHaveBeenCalledWith({
       organization_id: "org_1",
       project_id: "proj_1",
+      created_by_user_id: "usr_1",
       name: "Default triage rule",
       enabled: true,
       event_types: ["bundle.created", "bundle.reopened"],
@@ -1642,6 +1646,7 @@ describe("api default dependencies", () => {
     const result = await deps.githubManagement!.setProjectRepoForOrganization({
       organization_id: "org_1",
       project_id: "proj_1",
+      created_by_user_id: "usr_1",
       owner: "testorg",
       repo: "myrepo"
     });

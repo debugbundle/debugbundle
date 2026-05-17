@@ -10,7 +10,11 @@ import {
 } from "../../../../packages/auth/src/index.js";
 import { getTierCapabilities } from "../../../../packages/shared-types/src/index.js";
 import type { ApiDependencies } from "../api-types.js";
-import { requireRateLimitedMemberAuth, requireRateLimitedOwnerMemberAuth } from "../api-helpers.js";
+import {
+  requireRateLimitedMemberAuth,
+  requireRateLimitedOwnerMemberAuth,
+  requireRateLimitedProjectAccess
+} from "../api-helpers.js";
 import {
   GitHubAppCallbackQuerySchema,
   GitHubAppInstallUrlQuerySchema,
@@ -19,6 +23,7 @@ import {
   GitHubDispatchRuleBodySchema,
   GitHubDispatchRuleParamsSchema,
   GitHubProjectRepoBodySchema,
+  OptionalProjectScopedQuerySchema,
   ProjectParamsSchema,
   UpdateGitHubDispatchRuleBodySchema
 } from "../schemas.js";
@@ -154,6 +159,24 @@ async function ensureGitHubAutomationEnabled(
   return summary !== null && getTierCapabilities(summary.plan).github_automation;
 }
 
+async function ensureGitHubAutomationEnabledForProject(
+  dependencies: ApiDependencies,
+  input: { project_id: string; organization_id: string }
+): Promise<boolean> {
+  if (dependencies.billingManagement?.getBillingSummaryForProject !== undefined) {
+    const summary = await dependencies.billingManagement.getBillingSummaryForProject({
+      project_id: input.project_id,
+      now: new Date().toISOString()
+    });
+
+    if (summary !== null) {
+      return getTierCapabilities(summary.plan).github_automation;
+    }
+  }
+
+  return ensureGitHubAutomationEnabled(dependencies, input.organization_id);
+}
+
 function mapGithubManagementError(error: string): { status: number; body: { error: string } } {
   switch (error) {
     case "installation_not_found":
@@ -179,6 +202,10 @@ function mapGithubManagementError(error: string): { status: number; body: { erro
 
 export function registerGitHubRoutes(app: FastifyInstance, dependencies: ApiDependencies): void {
   app.get("/v1/github/app/install-url", async (request, reply) => {
+    const parsedQuery = GitHubAppInstallUrlQuerySchema.merge(OptionalProjectScopedQuerySchema).safeParse(request.query);
+    if (!parsedQuery.success) {
+      return reply.status(400).send({ error: "invalid_query" });
+    }
     const member = await requireRateLimitedMemberAuth(request, reply, dependencies, "management-read");
     if (member === null) {
       return;
@@ -186,13 +213,30 @@ export function registerGitHubRoutes(app: FastifyInstance, dependencies: ApiDepe
     if (dependencies.githubManagement === undefined) {
       return reply.status(503).send({ error: "github_not_configured" });
     }
-    if (!(await ensureGitHubAutomationEnabled(dependencies, member.organization_id))) {
-      return reply.status(403).send({ error: "upgrade_required" });
-    }
 
-    const parsedQuery = GitHubAppInstallUrlQuerySchema.safeParse(request.query);
-    if (!parsedQuery.success) {
-      return reply.status(400).send({ error: "invalid_query" });
+    let organizationId = member.organization_id;
+    if (parsedQuery.data.project_id !== undefined) {
+      const auth = await requireRateLimitedProjectAccess(request, reply, dependencies, {
+        bucket: "management-read",
+        projectId: parsedQuery.data.project_id
+      });
+      if (auth === null) {
+        return;
+      }
+      if (auth.access.effective_role !== "owner" && auth.access.effective_role !== "admin") {
+        return reply.status(403).send({ error: "forbidden" });
+      }
+      if (
+        !(await ensureGitHubAutomationEnabledForProject(dependencies, {
+          project_id: parsedQuery.data.project_id,
+          organization_id: auth.access.organization_id
+        }))
+      ) {
+        return reply.status(403).send({ error: "upgrade_required" });
+      }
+      organizationId = auth.access.organization_id;
+    } else if (!(await ensureGitHubAutomationEnabled(dependencies, member.organization_id))) {
+      return reply.status(403).send({ error: "upgrade_required" });
     }
 
     const stateSecret = resolveGitHubAppInstallStateSecret();
@@ -202,7 +246,7 @@ export function registerGitHubRoutes(app: FastifyInstance, dependencies: ApiDepe
 
     const returnTo = normalizeGitHubInstallReturnPath(parsedQuery.data.return_to) ?? "/projects";
     const installState = buildGitHubInstallState({
-      organizationId: member.organization_id,
+      organizationId,
       returnTo,
       secret: stateSecret
     });
@@ -217,6 +261,10 @@ export function registerGitHubRoutes(app: FastifyInstance, dependencies: ApiDepe
   });
 
   app.get("/v1/github/installation", async (request, reply) => {
+    const parsedQuery = OptionalProjectScopedQuerySchema.safeParse(request.query);
+    if (!parsedQuery.success) {
+      return reply.status(400).send({ error: "invalid_query" });
+    }
     const member = await requireRateLimitedMemberAuth(request, reply, dependencies, "management-read");
     if (member === null) {
       return;
@@ -224,12 +272,31 @@ export function registerGitHubRoutes(app: FastifyInstance, dependencies: ApiDepe
     if (dependencies.githubManagement === undefined) {
       return reply.status(503).send({ error: "github_not_configured" });
     }
-    if (!(await ensureGitHubAutomationEnabled(dependencies, member.organization_id))) {
+
+    let organizationId = member.organization_id;
+    if (parsedQuery.data.project_id !== undefined) {
+      const auth = await requireRateLimitedProjectAccess(request, reply, dependencies, {
+        bucket: "management-read",
+        projectId: parsedQuery.data.project_id
+      });
+      if (auth === null) {
+        return;
+      }
+      if (
+        !(await ensureGitHubAutomationEnabledForProject(dependencies, {
+          project_id: parsedQuery.data.project_id,
+          organization_id: auth.access.organization_id
+        }))
+      ) {
+        return reply.status(403).send({ error: "upgrade_required" });
+      }
+      organizationId = auth.access.organization_id;
+    } else if (!(await ensureGitHubAutomationEnabled(dependencies, member.organization_id))) {
       return reply.status(403).send({ error: "upgrade_required" });
     }
 
     const installation = await dependencies.githubManagement.getInstallationForOrganization({
-      organization_id: member.organization_id
+      organization_id: organizationId
     });
     return reply.status(200).send({ installation });
   });
@@ -260,6 +327,10 @@ export function registerGitHubRoutes(app: FastifyInstance, dependencies: ApiDepe
   });
 
   app.get("/v1/github/repositories", async (request, reply) => {
+    const parsedQuery = OptionalProjectScopedQuerySchema.safeParse(request.query);
+    if (!parsedQuery.success) {
+      return reply.status(400).send({ error: "invalid_query" });
+    }
     const member = await requireRateLimitedMemberAuth(request, reply, dependencies, "management-read");
     if (member === null) {
       return;
@@ -267,12 +338,34 @@ export function registerGitHubRoutes(app: FastifyInstance, dependencies: ApiDepe
     if (dependencies.githubManagement === undefined) {
       return reply.status(503).send({ error: "github_not_configured" });
     }
-    if (!(await ensureGitHubAutomationEnabled(dependencies, member.organization_id))) {
+
+    let organizationId = member.organization_id;
+    if (parsedQuery.data.project_id !== undefined) {
+      const auth = await requireRateLimitedProjectAccess(request, reply, dependencies, {
+        bucket: "management-read",
+        projectId: parsedQuery.data.project_id
+      });
+      if (auth === null) {
+        return;
+      }
+      if (auth.access.effective_role !== "owner" && auth.access.effective_role !== "admin") {
+        return reply.status(403).send({ error: "forbidden" });
+      }
+      if (
+        !(await ensureGitHubAutomationEnabledForProject(dependencies, {
+          project_id: parsedQuery.data.project_id,
+          organization_id: auth.access.organization_id
+        }))
+      ) {
+        return reply.status(403).send({ error: "upgrade_required" });
+      }
+      organizationId = auth.access.organization_id;
+    } else if (!(await ensureGitHubAutomationEnabled(dependencies, member.organization_id))) {
       return reply.status(403).send({ error: "upgrade_required" });
     }
 
     const repositories = await dependencies.githubManagement.listRepositoriesForOrganization({
-      organization_id: member.organization_id
+      organization_id: organizationId
     });
     if (!Array.isArray(repositories)) {
       const mapped = mapGithubManagementError(repositories);
@@ -283,24 +376,31 @@ export function registerGitHubRoutes(app: FastifyInstance, dependencies: ApiDepe
   });
 
   app.get("/v1/projects/:id/github/repo", async (request, reply) => {
-    const member = await requireRateLimitedMemberAuth(request, reply, dependencies, "management-read");
-    if (member === null) {
+    const parsedParams = ProjectParamsSchema.safeParse(request.params);
+    if (!parsedParams.success) {
+      return reply.status(400).send({ error: "invalid_project_id" });
+    }
+    const auth = await requireRateLimitedProjectAccess(request, reply, dependencies, {
+      bucket: "management-read",
+      projectId: parsedParams.data.id
+    });
+    if (auth === null) {
       return;
     }
     if (dependencies.githubManagement === undefined) {
       return reply.status(503).send({ error: "github_not_configured" });
     }
-    if (!(await ensureGitHubAutomationEnabled(dependencies, member.organization_id))) {
+    if (
+      !(await ensureGitHubAutomationEnabledForProject(dependencies, {
+        project_id: parsedParams.data.id,
+        organization_id: auth.access.organization_id
+      }))
+    ) {
       return reply.status(403).send({ error: "upgrade_required" });
     }
 
-    const parsedParams = ProjectParamsSchema.safeParse(request.params);
-    if (!parsedParams.success) {
-      return reply.status(400).send({ error: "invalid_project_id" });
-    }
-
     const repo = await dependencies.githubManagement.getProjectRepoForOrganization({
-      organization_id: member.organization_id,
+      organization_id: auth.access.organization_id,
       project_id: parsedParams.data.id
     });
 
@@ -308,23 +408,30 @@ export function registerGitHubRoutes(app: FastifyInstance, dependencies: ApiDepe
   });
 
   app.put("/v1/projects/:id/github/repo", async (request, reply) => {
-    const member = await requireRateLimitedOwnerMemberAuth(request, reply, dependencies, "management-write");
-    if (member === null) {
+    const parsedParams = ProjectParamsSchema.safeParse(request.params);
+    if (!parsedParams.success) {
+      return reply.status(400).send({ error: "invalid_project_id" });
+    }
+    const auth = await requireRateLimitedProjectAccess(request, reply, dependencies, {
+      bucket: "management-write",
+      projectId: parsedParams.data.id
+    });
+    if (auth === null) {
       return;
     }
-    if (member === "forbidden") {
+    if (auth.access.effective_role !== "owner" && auth.access.effective_role !== "admin") {
       return reply.status(403).send({ error: "forbidden" });
     }
     if (dependencies.githubManagement === undefined) {
       return reply.status(503).send({ error: "github_not_configured" });
     }
-    if (!(await ensureGitHubAutomationEnabled(dependencies, member.organization_id))) {
+    if (
+      !(await ensureGitHubAutomationEnabledForProject(dependencies, {
+        project_id: parsedParams.data.id,
+        organization_id: auth.access.organization_id
+      }))
+    ) {
       return reply.status(403).send({ error: "upgrade_required" });
-    }
-
-    const parsedParams = ProjectParamsSchema.safeParse(request.params);
-    if (!parsedParams.success) {
-      return reply.status(400).send({ error: "invalid_project_id" });
     }
     const parsedBody = GitHubProjectRepoBodySchema.safeParse(request.body);
     if (!parsedBody.success) {
@@ -332,8 +439,9 @@ export function registerGitHubRoutes(app: FastifyInstance, dependencies: ApiDepe
     }
 
     const repo = await dependencies.githubManagement.setProjectRepoForOrganization({
-      organization_id: member.organization_id,
+      organization_id: auth.access.organization_id,
       project_id: parsedParams.data.id,
+      created_by_user_id: auth.member.member_id,
       owner: parsedBody.data.owner,
       repo: parsedBody.data.repo
     });
@@ -346,27 +454,34 @@ export function registerGitHubRoutes(app: FastifyInstance, dependencies: ApiDepe
   });
 
   app.delete("/v1/projects/:id/github/repo", async (request, reply) => {
-    const member = await requireRateLimitedOwnerMemberAuth(request, reply, dependencies, "management-write");
-    if (member === null) {
+    const parsedParams = ProjectParamsSchema.safeParse(request.params);
+    if (!parsedParams.success) {
+      return reply.status(400).send({ error: "invalid_project_id" });
+    }
+    const auth = await requireRateLimitedProjectAccess(request, reply, dependencies, {
+      bucket: "management-write",
+      projectId: parsedParams.data.id
+    });
+    if (auth === null) {
       return;
     }
-    if (member === "forbidden") {
+    if (auth.access.effective_role !== "owner" && auth.access.effective_role !== "admin") {
       return reply.status(403).send({ error: "forbidden" });
     }
     if (dependencies.githubManagement === undefined) {
       return reply.status(503).send({ error: "github_not_configured" });
     }
-    if (!(await ensureGitHubAutomationEnabled(dependencies, member.organization_id))) {
+    if (
+      !(await ensureGitHubAutomationEnabledForProject(dependencies, {
+        project_id: parsedParams.data.id,
+        organization_id: auth.access.organization_id
+      }))
+    ) {
       return reply.status(403).send({ error: "upgrade_required" });
     }
 
-    const parsedParams = ProjectParamsSchema.safeParse(request.params);
-    if (!parsedParams.success) {
-      return reply.status(400).send({ error: "invalid_project_id" });
-    }
-
     const removed = await dependencies.githubManagement.removeProjectRepoForOrganization({
-      organization_id: member.organization_id,
+      organization_id: auth.access.organization_id,
       project_id: parsedParams.data.id
     });
     if (!removed) {
@@ -377,24 +492,31 @@ export function registerGitHubRoutes(app: FastifyInstance, dependencies: ApiDepe
   });
 
   app.get("/v1/projects/:id/github/rules", async (request, reply) => {
-    const member = await requireRateLimitedMemberAuth(request, reply, dependencies, "management-read");
-    if (member === null) {
+    const parsedParams = ProjectParamsSchema.safeParse(request.params);
+    if (!parsedParams.success) {
+      return reply.status(400).send({ error: "invalid_project_id" });
+    }
+    const auth = await requireRateLimitedProjectAccess(request, reply, dependencies, {
+      bucket: "management-read",
+      projectId: parsedParams.data.id
+    });
+    if (auth === null) {
       return;
     }
     if (dependencies.githubManagement === undefined) {
       return reply.status(503).send({ error: "github_not_configured" });
     }
-    if (!(await ensureGitHubAutomationEnabled(dependencies, member.organization_id))) {
+    if (
+      !(await ensureGitHubAutomationEnabledForProject(dependencies, {
+        project_id: parsedParams.data.id,
+        organization_id: auth.access.organization_id
+      }))
+    ) {
       return reply.status(403).send({ error: "upgrade_required" });
     }
 
-    const parsedParams = ProjectParamsSchema.safeParse(request.params);
-    if (!parsedParams.success) {
-      return reply.status(400).send({ error: "invalid_project_id" });
-    }
-
     const rules = await dependencies.githubManagement.listProjectRulesForOrganization({
-      organization_id: member.organization_id,
+      organization_id: auth.access.organization_id,
       project_id: parsedParams.data.id
     });
     if (rules === null) {
@@ -405,20 +527,27 @@ export function registerGitHubRoutes(app: FastifyInstance, dependencies: ApiDepe
   });
 
   app.get("/v1/projects/:id/github/deliveries", async (request, reply) => {
-    const member = await requireRateLimitedMemberAuth(request, reply, dependencies, "management-read");
-    if (member === null) {
+    const parsedParams = ProjectParamsSchema.safeParse(request.params);
+    if (!parsedParams.success) {
+      return reply.status(400).send({ error: "invalid_project_id" });
+    }
+    const auth = await requireRateLimitedProjectAccess(request, reply, dependencies, {
+      bucket: "management-read",
+      projectId: parsedParams.data.id
+    });
+    if (auth === null) {
       return;
     }
     if (dependencies.githubManagement === undefined) {
       return reply.status(503).send({ error: "github_not_configured" });
     }
-    if (!(await ensureGitHubAutomationEnabled(dependencies, member.organization_id))) {
+    if (
+      !(await ensureGitHubAutomationEnabledForProject(dependencies, {
+        project_id: parsedParams.data.id,
+        organization_id: auth.access.organization_id
+      }))
+    ) {
       return reply.status(403).send({ error: "upgrade_required" });
-    }
-
-    const parsedParams = ProjectParamsSchema.safeParse(request.params);
-    if (!parsedParams.success) {
-      return reply.status(400).send({ error: "invalid_project_id" });
     }
     const parsedQuery = GitHubDispatchDeliveriesQuerySchema.safeParse(request.query);
     if (!parsedQuery.success) {
@@ -426,7 +555,7 @@ export function registerGitHubRoutes(app: FastifyInstance, dependencies: ApiDepe
     }
 
     const deliveries = await dependencies.githubManagement.listProjectDeliveriesForOrganization({
-      organization_id: member.organization_id,
+      organization_id: auth.access.organization_id,
       project_id: parsedParams.data.id,
       ...(parsedQuery.data.status === undefined ? {} : { status: parsedQuery.data.status }),
       limit: parsedQuery.data.limit
@@ -436,26 +565,35 @@ export function registerGitHubRoutes(app: FastifyInstance, dependencies: ApiDepe
   });
 
   app.post("/v1/projects/:id/github/deliveries/:deliveryId/retry", async (request, reply) => {
-    const member = await requireRateLimitedMemberAuth(request, reply, dependencies, "management-write");
-    if (member === null) {
+    const parsedParams = GitHubDispatchDeliveryRetryParamsSchema.safeParse(request.params);
+    if (!parsedParams.success) {
+      return reply.status(400).send({ error: "invalid_delivery_id" });
+    }
+    const auth = await requireRateLimitedProjectAccess(request, reply, dependencies, {
+      bucket: "management-write",
+      projectId: parsedParams.data.id
+    });
+    if (auth === null) {
       return;
     }
     if (dependencies.githubManagement === undefined) {
       return reply.status(503).send({ error: "github_not_configured" });
     }
-    if (!(await ensureGitHubAutomationEnabled(dependencies, member.organization_id))) {
+    if (
+      !(await ensureGitHubAutomationEnabledForProject(dependencies, {
+        project_id: parsedParams.data.id,
+        organization_id: auth.access.organization_id
+      }))
+    ) {
       return reply.status(403).send({ error: "upgrade_required" });
     }
 
-    const parsedParams = GitHubDispatchDeliveryRetryParamsSchema.safeParse(request.params);
-    if (!parsedParams.success) {
-      return reply.status(400).send({ error: "invalid_delivery_id" });
-    }
-
     const delivery = await dependencies.githubManagement.retryProjectDeliveryForOrganization({
-      organization_id: member.organization_id,
+      organization_id: auth.access.organization_id,
       project_id: parsedParams.data.id,
-      delivery_id: parsedParams.data.deliveryId
+      delivery_id: parsedParams.data.deliveryId,
+      actor_user_id: auth.member.member_id,
+      actor_role: auth.access.effective_role
     });
     if (typeof delivery === "string") {
       const mapped = mapGithubManagementError(delivery);
@@ -466,24 +604,31 @@ export function registerGitHubRoutes(app: FastifyInstance, dependencies: ApiDepe
   });
 
   app.get("/v1/projects/:id/github/rules/:ruleId", async (request, reply) => {
-    const member = await requireRateLimitedMemberAuth(request, reply, dependencies, "management-read");
-    if (member === null) {
+    const parsedParams = GitHubDispatchRuleParamsSchema.safeParse(request.params);
+    if (!parsedParams.success) {
+      return reply.status(400).send({ error: "invalid_rule_id" });
+    }
+    const auth = await requireRateLimitedProjectAccess(request, reply, dependencies, {
+      bucket: "management-read",
+      projectId: parsedParams.data.id
+    });
+    if (auth === null) {
       return;
     }
     if (dependencies.githubManagement === undefined) {
       return reply.status(503).send({ error: "github_not_configured" });
     }
-    if (!(await ensureGitHubAutomationEnabled(dependencies, member.organization_id))) {
+    if (
+      !(await ensureGitHubAutomationEnabledForProject(dependencies, {
+        project_id: parsedParams.data.id,
+        organization_id: auth.access.organization_id
+      }))
+    ) {
       return reply.status(403).send({ error: "upgrade_required" });
     }
 
-    const parsedParams = GitHubDispatchRuleParamsSchema.safeParse(request.params);
-    if (!parsedParams.success) {
-      return reply.status(400).send({ error: "invalid_rule_id" });
-    }
-
     const rule = await dependencies.githubManagement.getProjectRuleForOrganization({
-      organization_id: member.organization_id,
+      organization_id: auth.access.organization_id,
       project_id: parsedParams.data.id,
       rule_id: parsedParams.data.ruleId
     });
@@ -495,23 +640,27 @@ export function registerGitHubRoutes(app: FastifyInstance, dependencies: ApiDepe
   });
 
   app.post("/v1/projects/:id/github/rules", async (request, reply) => {
-    const member = await requireRateLimitedOwnerMemberAuth(request, reply, dependencies, "management-write");
-    if (member === null) {
-      return;
+    const parsedParams = ProjectParamsSchema.safeParse(request.params);
+    if (!parsedParams.success) {
+      return reply.status(400).send({ error: "invalid_project_id" });
     }
-    if (member === "forbidden") {
-      return reply.status(403).send({ error: "forbidden" });
+    const auth = await requireRateLimitedProjectAccess(request, reply, dependencies, {
+      bucket: "management-write",
+      projectId: parsedParams.data.id
+    });
+    if (auth === null) {
+      return;
     }
     if (dependencies.githubManagement === undefined) {
       return reply.status(503).send({ error: "github_not_configured" });
     }
-    if (!(await ensureGitHubAutomationEnabled(dependencies, member.organization_id))) {
+    if (
+      !(await ensureGitHubAutomationEnabledForProject(dependencies, {
+        project_id: parsedParams.data.id,
+        organization_id: auth.access.organization_id
+      }))
+    ) {
       return reply.status(403).send({ error: "upgrade_required" });
-    }
-
-    const parsedParams = ProjectParamsSchema.safeParse(request.params);
-    if (!parsedParams.success) {
-      return reply.status(400).send({ error: "invalid_project_id" });
     }
     const parsedBody = GitHubDispatchRuleBodySchema.safeParse(request.body);
     if (!parsedBody.success) {
@@ -519,8 +668,9 @@ export function registerGitHubRoutes(app: FastifyInstance, dependencies: ApiDepe
     }
 
     const rule = await dependencies.githubManagement.createProjectRuleForOrganization({
-      organization_id: member.organization_id,
+      organization_id: auth.access.organization_id,
       project_id: parsedParams.data.id,
+      created_by_user_id: auth.member.member_id,
       name: parsedBody.data.name,
       enabled: parsedBody.data.enabled,
       event_types: parsedBody.data.event_types,
@@ -540,23 +690,27 @@ export function registerGitHubRoutes(app: FastifyInstance, dependencies: ApiDepe
   });
 
   app.patch("/v1/projects/:id/github/rules/:ruleId", async (request, reply) => {
-    const member = await requireRateLimitedOwnerMemberAuth(request, reply, dependencies, "management-write");
-    if (member === null) {
-      return;
+    const parsedParams = GitHubDispatchRuleParamsSchema.safeParse(request.params);
+    if (!parsedParams.success) {
+      return reply.status(400).send({ error: "invalid_rule_id" });
     }
-    if (member === "forbidden") {
-      return reply.status(403).send({ error: "forbidden" });
+    const auth = await requireRateLimitedProjectAccess(request, reply, dependencies, {
+      bucket: "management-write",
+      projectId: parsedParams.data.id
+    });
+    if (auth === null) {
+      return;
     }
     if (dependencies.githubManagement === undefined) {
       return reply.status(503).send({ error: "github_not_configured" });
     }
-    if (!(await ensureGitHubAutomationEnabled(dependencies, member.organization_id))) {
+    if (
+      !(await ensureGitHubAutomationEnabledForProject(dependencies, {
+        project_id: parsedParams.data.id,
+        organization_id: auth.access.organization_id
+      }))
+    ) {
       return reply.status(403).send({ error: "upgrade_required" });
-    }
-
-    const parsedParams = GitHubDispatchRuleParamsSchema.safeParse(request.params);
-    if (!parsedParams.success) {
-      return reply.status(400).send({ error: "invalid_rule_id" });
     }
     const parsedBody = UpdateGitHubDispatchRuleBodySchema.safeParse(request.body);
     if (!parsedBody.success) {
@@ -567,6 +721,8 @@ export function registerGitHubRoutes(app: FastifyInstance, dependencies: ApiDepe
       organization_id: string;
       project_id: string;
       rule_id: string;
+      actor_user_id: string;
+      actor_role: "owner" | "admin" | "member";
       name?: string;
       enabled?: boolean;
       event_types?: string[];
@@ -577,9 +733,11 @@ export function registerGitHubRoutes(app: FastifyInstance, dependencies: ApiDepe
       incident_status?: "new_only" | "reopened_only" | "new_or_reopened";
       cooldown_seconds?: number;
     } = {
-      organization_id: member.organization_id,
+      organization_id: auth.access.organization_id,
       project_id: parsedParams.data.id,
-      rule_id: parsedParams.data.ruleId
+      rule_id: parsedParams.data.ruleId,
+      actor_user_id: auth.member.member_id,
+      actor_role: auth.access.effective_role
     };
 
     if (parsedBody.data.name !== undefined) {
@@ -620,29 +778,35 @@ export function registerGitHubRoutes(app: FastifyInstance, dependencies: ApiDepe
   });
 
   app.delete("/v1/projects/:id/github/rules/:ruleId", async (request, reply) => {
-    const member = await requireRateLimitedOwnerMemberAuth(request, reply, dependencies, "management-write");
-    if (member === null) {
-      return;
-    }
-    if (member === "forbidden") {
-      return reply.status(403).send({ error: "forbidden" });
-    }
-    if (dependencies.githubManagement === undefined) {
-      return reply.status(503).send({ error: "github_not_configured" });
-    }
-    if (!(await ensureGitHubAutomationEnabled(dependencies, member.organization_id))) {
-      return reply.status(403).send({ error: "upgrade_required" });
-    }
-
     const parsedParams = GitHubDispatchRuleParamsSchema.safeParse(request.params);
     if (!parsedParams.success) {
       return reply.status(400).send({ error: "invalid_rule_id" });
     }
+    const auth = await requireRateLimitedProjectAccess(request, reply, dependencies, {
+      bucket: "management-write",
+      projectId: parsedParams.data.id
+    });
+    if (auth === null) {
+      return;
+    }
+    if (dependencies.githubManagement === undefined) {
+      return reply.status(503).send({ error: "github_not_configured" });
+    }
+    if (
+      !(await ensureGitHubAutomationEnabledForProject(dependencies, {
+        project_id: parsedParams.data.id,
+        organization_id: auth.access.organization_id
+      }))
+    ) {
+      return reply.status(403).send({ error: "upgrade_required" });
+    }
 
     const deleted = await dependencies.githubManagement.deleteProjectRuleForOrganization({
-      organization_id: member.organization_id,
+      organization_id: auth.access.organization_id,
       project_id: parsedParams.data.id,
-      rule_id: parsedParams.data.ruleId
+      rule_id: parsedParams.data.ruleId,
+      actor_user_id: auth.member.member_id,
+      actor_role: auth.access.effective_role
     });
     if (!deleted) {
       return reply.status(404).send({ error: "rule_not_found" });

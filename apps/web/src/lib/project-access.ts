@@ -1,12 +1,14 @@
 import type { ProjectRecord } from "./api.js";
 
 export type ProjectRelationship = "owned" | "shared";
+export type ProjectSharingState = "private" | "shared_by_you" | "shared_with_you";
 export type ProjectEffectiveRole = "owner" | "admin" | "member";
 
 export type AccessibleProjectRecord = ProjectRecord & {
   owner_user_id?: string;
   owner_email?: string;
   relationship?: ProjectRelationship;
+  sharing_state?: ProjectSharingState;
   effective_role?: ProjectEffectiveRole;
 };
 
@@ -19,7 +21,17 @@ export function getProjectRelationship(project: ProjectRecord): ProjectRelations
 }
 
 export function isSharedProject(project: ProjectRecord): boolean {
-  return getProjectRelationship(project) === "shared";
+  return getProjectSharingState(project) !== "private";
+}
+
+export function getProjectSharingState(project: ProjectRecord): ProjectSharingState {
+  const accessibleProject = asAccessibleProject(project);
+
+  if (accessibleProject.sharing_state !== undefined) {
+    return accessibleProject.sharing_state;
+  }
+
+  return getProjectRelationship(project) === "shared" ? "shared_with_you" : "private";
 }
 
 export function getProjectEffectiveRole(project: ProjectRecord): ProjectEffectiveRole {
@@ -31,5 +43,15 @@ export function getProjectOwnerEmail(project: ProjectRecord): string | null {
 }
 
 export function formatProjectRelationship(project: ProjectRecord): string {
-  return isSharedProject(project) ? "Shared with you" : "Owned by you";
+  const sharingState = getProjectSharingState(project);
+
+  if (sharingState === "shared_with_you") {
+    return "Shared with you";
+  }
+
+  if (sharingState === "shared_by_you") {
+    return "Shared by you";
+  }
+
+  return "Owned by you";
 }

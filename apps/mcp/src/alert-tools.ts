@@ -24,6 +24,7 @@ export function createAlertMcpTools(api: {
   }): Promise<unknown>;
   updateAlert(input: {
     bearerToken: string;
+    projectId: string;
     alertId: string;
     serviceId?: string | null;
     channel?: string;
@@ -32,7 +33,7 @@ export function createAlertMcpTools(api: {
     config?: Record<string, unknown> | null;
     isEnabled?: boolean;
   }): Promise<unknown>;
-  deleteAlert(input: { bearerToken: string; alertId: string }): Promise<unknown>;
+  deleteAlert(input: { bearerToken: string; projectId: string; alertId: string }): Promise<unknown>;
 }): Record<(typeof ALERT_MCP_TOOL_NAMES)[number], (input: Record<string, unknown>) => Promise<unknown>> {
   return {
     async list_alerts(input) {
@@ -89,6 +90,7 @@ export function createAlertMcpTools(api: {
       try {
         const requestInput: {
           bearerToken: string;
+          projectId: string;
           alertId: string;
           serviceId?: string | null;
           channel?: string;
@@ -98,6 +100,7 @@ export function createAlertMcpTools(api: {
           isEnabled?: boolean;
         } = {
           bearerToken: String(input["bearerToken"]),
+          projectId: String(input["projectId"]),
           alertId: String(input["alertId"])
         };
         if (typeof input["serviceId"] === "string") {
@@ -134,6 +137,7 @@ export function createAlertMcpTools(api: {
         return {
           alert: await api.deleteAlert({
             bearerToken: String(input["bearerToken"]),
+            projectId: String(input["projectId"]),
             alertId: String(input["alertId"])
           })
         };

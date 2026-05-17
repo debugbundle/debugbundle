@@ -54,8 +54,8 @@ describe("github management api client", () => {
 
     const api = createGitHubManagementApi({ request });
 
-    const installation = await api.getInstallation({ bearerToken: "dbundle_mem_x" });
-    const repositories = await api.listRepositories({ bearerToken: "dbundle_mem_x" });
+    const installation = await api.getInstallation({ bearerToken: "dbundle_mem_x", projectId: "proj_1" });
+    const repositories = await api.listRepositories({ bearerToken: "dbundle_mem_x", projectId: "proj_1" });
     const repo = await api.setProjectRepo({
       bearerToken: "dbundle_mem_x",
       projectId: "proj_1",
@@ -69,12 +69,12 @@ describe("github management api client", () => {
     expect(repo.repo_name).toBe("app");
     expect(request).toHaveBeenNthCalledWith(1, {
       method: "GET",
-      path: "/v1/github/installation",
+      path: "/v1/github/installation?project_id=proj_1",
       bearerToken: "dbundle_mem_x"
     });
     expect(request).toHaveBeenNthCalledWith(2, {
       method: "GET",
-      path: "/v1/github/repositories",
+      path: "/v1/github/repositories?project_id=proj_1",
       bearerToken: "dbundle_mem_x"
     });
     expect(request).toHaveBeenNthCalledWith(3, {
@@ -130,6 +130,7 @@ describe("github management api client", () => {
               bundle_type: "failure",
               incident_status: "new_or_reopened",
               cooldown_seconds: 300,
+              created_by_user_id: "usr_1",
               created_at: "2026-03-26T00:00:00.000Z",
               updated_at: "2026-03-26T00:00:00.000Z"
             }
@@ -151,6 +152,7 @@ describe("github management api client", () => {
             bundle_type: "failure",
             incident_status: "new_or_reopened",
             cooldown_seconds: 300,
+            created_by_user_id: "usr_1",
             created_at: "2026-03-26T00:00:00.000Z",
             updated_at: "2026-03-26T00:00:00.000Z"
           }
@@ -171,6 +173,7 @@ describe("github management api client", () => {
             bundle_type: "failure",
             incident_status: "new_only",
             cooldown_seconds: 900,
+            created_by_user_id: "usr_1",
             created_at: "2026-03-26T00:00:00.000Z",
             updated_at: "2026-03-26T00:05:00.000Z"
           }

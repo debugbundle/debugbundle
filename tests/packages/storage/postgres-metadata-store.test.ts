@@ -463,7 +463,7 @@ describe("postgres metadata store", () => {
 
     const store = createPostgresMetadataStore({ query });
 
-    const updated = await store.updateProjectForUser({
+    const updated = await store.updateProjectForUser!({
       user_id: "usr_123",
       project_id: "proj_123",
       environment_default: "development"
@@ -620,6 +620,7 @@ describe("postgres metadata store", () => {
           {
             alert_id: "alt_123",
             project_id: "proj_123",
+            created_by_user_id: "usr_123",
             service_id: null,
             channel: "email",
             condition_type: "new_incident",
@@ -643,6 +644,7 @@ describe("postgres metadata store", () => {
       {
         alert_id: "alt_123",
         project_id: "proj_123",
+        created_by_user_id: "usr_123",
         service_id: null,
         channel: "email",
         condition_type: "new_incident",
@@ -664,6 +666,7 @@ describe("postgres metadata store", () => {
           {
             alert_id: "alt_123",
             project_id: "proj_123",
+            created_by_user_id: "usr_123",
             service_id: null,
             channel: "email",
             condition_type: "new_incident",
@@ -680,6 +683,7 @@ describe("postgres metadata store", () => {
           {
             alert_id: "alt_123",
             project_id: "proj_123",
+            created_by_user_id: "usr_123",
             service_id: "svc_123",
             channel: "webhook",
             condition_type: "severity_threshold",
@@ -697,6 +701,7 @@ describe("postgres metadata store", () => {
     const created = await store.createAlertForOrganization({
       organization_id: "org_123",
       project_id: "proj_123",
+      created_by_user_id: "usr_123",
       channel: "email",
       condition_type: "new_incident",
       config: { to: "owner@example.com" },
@@ -720,6 +725,7 @@ describe("postgres metadata store", () => {
     expect(created).toEqual({
       alert_id: "alt_123",
       project_id: "proj_123",
+      created_by_user_id: "usr_123",
       service_id: null,
       channel: "email",
       condition_type: "new_incident",
@@ -732,6 +738,7 @@ describe("postgres metadata store", () => {
     expect(updated).toEqual({
       alert_id: "alt_123",
       project_id: "proj_123",
+      created_by_user_id: "usr_123",
       service_id: "svc_123",
       channel: "webhook",
       condition_type: "severity_threshold",
@@ -759,6 +766,7 @@ describe("postgres metadata store", () => {
     const created = await store.createAlertForOrganization({
       organization_id: "org_123",
       project_id: "proj_missing",
+      created_by_user_id: "usr_123",
       service_id: "svc_123",
       channel: "email",
       condition_type: "new_incident",
@@ -776,6 +784,7 @@ describe("postgres metadata store", () => {
         {
           alert_id: "alt_456",
           project_id: "proj_123",
+          created_by_user_id: "usr_123",
           service_id: null,
           channel: "email",
           condition_type: "new_incident",
@@ -800,6 +809,7 @@ describe("postgres metadata store", () => {
     expect(updated).toEqual({
       alert_id: "alt_456",
       project_id: "proj_123",
+      created_by_user_id: "usr_123",
       service_id: null,
       channel: "email",
       condition_type: "new_incident",
@@ -820,7 +830,10 @@ describe("postgres metadata store", () => {
       null,
       false,
       null,
-      true
+      true,
+      null,
+      null,
+      null
     ]);
   });
 
@@ -2365,6 +2378,7 @@ describe("postgres metadata store", () => {
           {
             webhook_id: "wh_123",
             project_id: "proj_123",
+            created_by_user_id: "usr_123",
             url: "https://hooks.example.test/debugbundle",
             events: ["bundle.created", "bundle.updated"],
             filters: { environment: ["production"] },
@@ -2386,6 +2400,7 @@ describe("postgres metadata store", () => {
       {
         webhook_id: "wh_123",
         project_id: "proj_123",
+        created_by_user_id: "usr_123",
         url: "https://hooks.example.test/debugbundle",
         events: ["bundle.created", "bundle.updated"],
         filters: { environment: ["production"] },
@@ -2420,6 +2435,7 @@ describe("postgres metadata store", () => {
           {
             webhook_id: "wh_123",
             project_id: "proj_123",
+            created_by_user_id: "usr_123",
             url: "https://hooks.example.test/debugbundle",
             events: ["bundle.created"],
             filters: { environment: ["production"] },
@@ -2434,6 +2450,7 @@ describe("postgres metadata store", () => {
           {
             webhook_id: "wh_123",
             project_id: "proj_123",
+            created_by_user_id: "usr_123",
             url: "https://hooks.example.test/debugbundle",
             events: ["bundle.created"],
             filters: { environment: ["production"] },
@@ -2448,6 +2465,7 @@ describe("postgres metadata store", () => {
           {
             webhook_id: "wh_123",
             project_id: "proj_123",
+            created_by_user_id: "usr_123",
             url: "https://hooks.example.test/updated",
             events: ["bundle.updated"],
             filters: { environment: ["staging"] },
@@ -2463,6 +2481,7 @@ describe("postgres metadata store", () => {
     const created = await store.createWebhookForOrganization({
       organization_id: "org_123",
       project_id: "proj_123",
+      created_by_user_id: "usr_123",
       url: "https://hooks.example.test/debugbundle",
       signing_secret: "dbundle_whsec_test",
       events: ["bundle.created"],
@@ -2471,6 +2490,7 @@ describe("postgres metadata store", () => {
     });
     const fetched = await store.getWebhookForOrganization({
       organization_id: "org_123",
+      project_id: "proj_123",
       webhook_id: "wh_123"
     });
     const updated = await store.updateWebhookForOrganization({
@@ -2489,6 +2509,7 @@ describe("postgres metadata store", () => {
     expect(created).toEqual({
       webhook_id: "wh_123",
       project_id: "proj_123",
+      created_by_user_id: "usr_123",
       url: "https://hooks.example.test/debugbundle",
       events: ["bundle.created"],
       filters: { environment: ["production"] },
@@ -2500,6 +2521,7 @@ describe("postgres metadata store", () => {
     expect(updated).toEqual({
       webhook_id: "wh_123",
       project_id: "proj_123",
+      created_by_user_id: "usr_123",
       url: "https://hooks.example.test/updated",
       events: ["bundle.updated"],
       filters: { environment: ["staging"] },

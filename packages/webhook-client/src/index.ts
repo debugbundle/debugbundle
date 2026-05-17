@@ -92,6 +92,7 @@ export const WebhookSchema = z
   .object({
     webhook_id: z.string(),
     project_id: z.string(),
+    created_by_user_id: z.string(),
     url: z.string(),
     events: z.array(WebhookEventTypeSchema),
     filters: WebhookFiltersSchema,
@@ -309,23 +310,25 @@ export function createWebhookApi(client: HttpClient): {
     filters?: Record<string, unknown>;
     isEnabled?: boolean;
   }): Promise<WebhookCreatedRecord>;
-  getWebhook(input: { bearerToken: string; webhookId: string }): Promise<WebhookRecord>;
+  getWebhook(input: { bearerToken: string; projectId: string; webhookId: string }): Promise<WebhookRecord>;
   updateWebhook(input: {
     bearerToken: string;
+    projectId: string;
     webhookId: string;
     url?: string;
     events?: string[];
     filters?: Record<string, unknown>;
     isEnabled?: boolean;
   }): Promise<WebhookRecord>;
-  deleteWebhook(input: { bearerToken: string; webhookId: string }): Promise<{ webhook_id: string }>;
+  deleteWebhook(input: { bearerToken: string; projectId: string; webhookId: string }): Promise<{ webhook_id: string }>;
   testWebhook(input: {
     bearerToken: string;
+    projectId: string;
     webhookId: string;
     eventType?: "verification.passed" | "verification.failed";
   }): Promise<WebhookDelivery>;
-  listWebhookDeliveries(input: { bearerToken: string; webhookId: string; limit?: number }): Promise<WebhookDelivery[]>;
-  retryWebhookDelivery(input: { bearerToken: string; webhookId: string; deliveryId: string }): Promise<{ delivery_id: string; event_type: string }>;
+  listWebhookDeliveries(input: { bearerToken: string; projectId: string; webhookId: string; limit?: number }): Promise<WebhookDelivery[]>;
+  retryWebhookDelivery(input: { bearerToken: string; projectId: string; webhookId: string; deliveryId: string }): Promise<{ delivery_id: string; event_type: string }>;
 } {
   return {
     async listWebhooks(input) {
@@ -372,7 +375,7 @@ export function createWebhookApi(client: HttpClient): {
       return expectWebhook(
         client.request({
           method: "GET",
-          path: `/v1/webhooks/${input.webhookId}`,
+          path: `/v1/webhooks/${input.webhookId}${buildQuery({ project_id: input.projectId })}`,
           bearerToken: input.bearerToken
         })
       );
@@ -402,7 +405,7 @@ export function createWebhookApi(client: HttpClient): {
       return expectWebhook(
         client.request({
           method: "PATCH",
-          path: `/v1/webhooks/${input.webhookId}`,
+          path: `/v1/webhooks/${input.webhookId}${buildQuery({ project_id: input.projectId })}`,
           bearerToken: input.bearerToken,
           body
         })
@@ -412,7 +415,7 @@ export function createWebhookApi(client: HttpClient): {
     async deleteWebhook(input) {
       const response = await client.request({
         method: "DELETE",
-        path: `/v1/webhooks/${input.webhookId}`,
+        path: `/v1/webhooks/${input.webhookId}${buildQuery({ project_id: input.projectId })}`,
         bearerToken: input.bearerToken
       });
 
@@ -437,7 +440,7 @@ export function createWebhookApi(client: HttpClient): {
       return expectWebhookTestDelivery(
         client.request({
           method: "POST",
-          path: `/v1/webhooks/${input.webhookId}/test`,
+          path: `/v1/webhooks/${input.webhookId}/test${buildQuery({ project_id: input.projectId })}`,
           bearerToken: input.bearerToken,
           body
         })
@@ -448,7 +451,7 @@ export function createWebhookApi(client: HttpClient): {
       return expectWebhookDeliveries(
         client.request({
           method: "GET",
-          path: `/v1/webhooks/${input.webhookId}/deliveries${buildQuery({ limit: input.limit })}`,
+          path: `/v1/webhooks/${input.webhookId}/deliveries${buildQuery({ project_id: input.projectId, limit: input.limit })}`,
           bearerToken: input.bearerToken
         })
       );
@@ -458,7 +461,7 @@ export function createWebhookApi(client: HttpClient): {
       return expectRetryDelivery(
         client.request({
           method: "POST",
-          path: `/v1/webhooks/${input.webhookId}/deliveries/${input.deliveryId}/retry`,
+          path: `/v1/webhooks/${input.webhookId}/deliveries/${input.deliveryId}/retry${buildQuery({ project_id: input.projectId })}`,
           bearerToken: input.bearerToken,
           body: {}
         })

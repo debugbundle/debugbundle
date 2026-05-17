@@ -195,7 +195,7 @@ describe("api project member routes", () => {
     expect(missingDeps.json()).toEqual({ error: "member_management_not_available" });
   });
 
-  it("lists project members for callers with project access", async (): Promise<void> => {
+  it("lists project members for callers with admin project access", async (): Promise<void> => {
     const projectManagement = {
       resolveProjectAccessForUser: vi.fn().mockResolvedValue({
         project_id: PROJECT_ID,
@@ -203,7 +203,7 @@ describe("api project member routes", () => {
         owner_user_id: "usr_123",
         owner_email: "owner@example.com",
         relationship: "shared",
-        effective_role: "member",
+        effective_role: "admin",
         organization_plan: "team"
       })
     };

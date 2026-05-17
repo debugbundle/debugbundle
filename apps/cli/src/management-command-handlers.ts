@@ -167,12 +167,20 @@ export async function handleGithubCommand(parsedArgv: ParsedArgv, dependencies: 
   }
 
   if (action === "repos") {
-    expectNoUnknownOptions(parsedArgv, ["auth-file", "json"]);
+    expectNoUnknownOptions(parsedArgv, ["auth-file", "json", "project-id"]);
     ensureNoExtraPositionals(parsedArgv, 2);
 
-    return await (dependencies.listGitHubRepositoriesCommand ?? defaultListGitHubRepositoriesCommand)(
-      appendCommonAuthOptions(parsedArgv, {})
-    );
+    const input = appendCommonAuthOptions(parsedArgv, {} as {
+      authFilePath?: string;
+      json?: boolean;
+      projectId?: string;
+    });
+    const projectId = readStringOption(parsedArgv, "project-id");
+    if (projectId !== undefined) {
+      input.projectId = projectId;
+    }
+
+    return await (dependencies.listGitHubRepositoriesCommand ?? defaultListGitHubRepositoriesCommand)(input);
   }
 
   if (action !== "repo") {
@@ -1042,6 +1050,7 @@ export async function handleWebhookCommand(parsedArgv: ParsedArgv, dependencies:
     expectNoUnknownOptions(parsedArgv, [
       "auth-file",
       "json",
+      "project-id",
       "url",
       "event",
       "environment",
@@ -1052,10 +1061,16 @@ export async function handleWebhookCommand(parsedArgv: ParsedArgv, dependencies:
       "is-enabled"
     ]);
     ensureNoExtraPositionals(parsedArgv, 3);
+    const projectId = readStringOption(parsedArgv, "project-id");
+    if (projectId === undefined) {
+      throw new CliInputError("Missing required option --project-id.");
+    }
 
     const input = appendCommonAuthOptions(parsedArgv, {
+      projectId,
       webhookId: requirePositional(parsedArgv, 2, "webhook-id")
     } as {
+      projectId: string;
       webhookId: string;
       url?: string;
       events?: string[];
@@ -1114,23 +1129,34 @@ export async function handleWebhookCommand(parsedArgv: ParsedArgv, dependencies:
   }
 
   if (action === "delete") {
-    expectNoUnknownOptions(parsedArgv, ["auth-file", "json"]);
+    expectNoUnknownOptions(parsedArgv, ["auth-file", "json", "project-id"]);
     ensureNoExtraPositionals(parsedArgv, 3);
+    const projectId = readStringOption(parsedArgv, "project-id");
+    if (projectId === undefined) {
+      throw new CliInputError("Missing required option --project-id.");
+    }
 
     return await (dependencies.deleteWebhookCommand ?? defaultDeleteWebhookCommand)(
       appendCommonAuthOptions(parsedArgv, {
+        projectId,
         webhookId: requirePositional(parsedArgv, 2, "webhook-id")
       })
     );
   }
 
   if (action === "test") {
-    expectNoUnknownOptions(parsedArgv, ["auth-file", "json", "event"]);
+    expectNoUnknownOptions(parsedArgv, ["auth-file", "json", "project-id", "event"]);
     ensureNoExtraPositionals(parsedArgv, 3);
+    const projectId = readStringOption(parsedArgv, "project-id");
+    if (projectId === undefined) {
+      throw new CliInputError("Missing required option --project-id.");
+    }
 
     const input = appendCommonAuthOptions(parsedArgv, {
+      projectId,
       webhookId: requirePositional(parsedArgv, 2, "webhook-id")
     } as {
+      projectId: string;
       webhookId: string;
       eventType?: "verification.passed" | "verification.failed";
       authFilePath?: string;
@@ -1149,12 +1175,18 @@ export async function handleWebhookCommand(parsedArgv: ParsedArgv, dependencies:
   }
 
   if (action === "deliveries") {
-    expectNoUnknownOptions(parsedArgv, ["auth-file", "json", "limit"]);
+    expectNoUnknownOptions(parsedArgv, ["auth-file", "json", "project-id", "limit"]);
     ensureNoExtraPositionals(parsedArgv, 3);
+    const projectId = readStringOption(parsedArgv, "project-id");
+    if (projectId === undefined) {
+      throw new CliInputError("Missing required option --project-id.");
+    }
 
     const input = appendCommonAuthOptions(parsedArgv, {
+      projectId,
       webhookId: requirePositional(parsedArgv, 2, "webhook-id")
     } as {
+      projectId: string;
       webhookId: string;
       limit?: number;
       authFilePath?: string;
@@ -1169,13 +1201,19 @@ export async function handleWebhookCommand(parsedArgv: ParsedArgv, dependencies:
   }
 
   if (action === "retry") {
-    expectNoUnknownOptions(parsedArgv, ["auth-file", "json"]);
+    expectNoUnknownOptions(parsedArgv, ["auth-file", "json", "project-id"]);
     ensureNoExtraPositionals(parsedArgv, 4);
+    const projectId = readStringOption(parsedArgv, "project-id");
+    if (projectId === undefined) {
+      throw new CliInputError("Missing required option --project-id.");
+    }
 
     const input = appendCommonAuthOptions(parsedArgv, {
+      projectId,
       webhookId: requirePositional(parsedArgv, 2, "webhook-id"),
       deliveryId: requirePositional(parsedArgv, 3, "delivery-id")
     } as {
+      projectId: string;
       webhookId: string;
       deliveryId: string;
       authFilePath?: string;
@@ -1279,6 +1317,7 @@ export async function handleAlertCommand(parsedArgv: ParsedArgv, dependencies: M
     expectNoUnknownOptions(parsedArgv, [
       "auth-file",
       "json",
+      "project-id",
       "service-id",
       "channel",
       "condition",
@@ -1287,10 +1326,16 @@ export async function handleAlertCommand(parsedArgv: ParsedArgv, dependencies: M
       "is-enabled"
     ]);
     ensureNoExtraPositionals(parsedArgv, 3);
+    const projectId = readStringOption(parsedArgv, "project-id");
+    if (projectId === undefined) {
+      throw new CliInputError("Missing required option --project-id.");
+    }
 
     const input = appendCommonAuthOptions(parsedArgv, {
+      projectId,
       alertId: requirePositional(parsedArgv, 2, "alert-id")
     } as {
+      projectId: string;
       alertId: string;
       serviceId?: string | null;
       channel?: string;
@@ -1342,11 +1387,16 @@ export async function handleAlertCommand(parsedArgv: ParsedArgv, dependencies: M
   }
 
   if (action === "delete") {
-    expectNoUnknownOptions(parsedArgv, ["auth-file", "json"]);
+    expectNoUnknownOptions(parsedArgv, ["auth-file", "json", "project-id"]);
     ensureNoExtraPositionals(parsedArgv, 3);
+    const projectId = readStringOption(parsedArgv, "project-id");
+    if (projectId === undefined) {
+      throw new CliInputError("Missing required option --project-id.");
+    }
 
     return await (dependencies.deleteAlertCommand ?? defaultDeleteAlertCommand)(
       appendCommonAuthOptions(parsedArgv, {
+        projectId,
         alertId: requirePositional(parsedArgv, 2, "alert-id")
       })
     );

@@ -18,6 +18,7 @@ const SEVERITY_RANK: Record<"low" | "medium" | "high" | "critical", number> = {
 function mapAlertRuleRow(row: {
   alert_id: string;
   project_id: string;
+  created_by_user_id: string;
   service_id: string | null;
   channel: AlertChannel;
   condition_type: AlertConditionType;
@@ -30,6 +31,7 @@ function mapAlertRuleRow(row: {
   return {
     alert_id: row.alert_id,
     project_id: row.project_id,
+    created_by_user_id: row.created_by_user_id,
     service_id: row.service_id,
     channel: row.channel,
     condition_type: row.condition_type,
@@ -53,6 +55,7 @@ export function createPostgresAlertDeliveryStore(db: Queryable): AlertDeliverySt
       const result = await db.query<{
         alert_id: string;
         project_id: string;
+        created_by_user_id: string;
         service_id: string | null;
         channel: AlertChannel;
         condition_type: AlertConditionType;
@@ -66,6 +69,7 @@ export function createPostgresAlertDeliveryStore(db: Queryable): AlertDeliverySt
           SELECT
             ar.id AS alert_id,
             ar.project_id,
+            ar.created_by_user_id,
             ar.service_id,
             ar.channel,
             ar.condition_type,

@@ -227,6 +227,7 @@ export interface ProjectRecord {
   owner_user_id: string;
   owner_email: string;
   relationship: "owned" | "shared";
+  sharing_state: "private" | "shared_by_you" | "shared_with_you";
   effective_role: "owner" | "admin" | "member";
   name: string;
   slug: string;
@@ -250,6 +251,7 @@ export interface ProjectAccessRecord {
   owner_user_id: string;
   owner_email: string;
   relationship: "owned" | "shared";
+  sharing_state: "private" | "shared_by_you" | "shared_with_you";
   effective_role: "owner" | "admin" | "member";
   organization_plan: TierName;
 }
@@ -393,6 +395,7 @@ export type AlertConditionType =
 export interface AlertRuleRecord extends Record<string, unknown> {
   alert_id: string;
   project_id: string;
+  created_by_user_id: string;
   service_id: string | null;
   channel: AlertChannel;
   condition_type: AlertConditionType;
@@ -416,6 +419,7 @@ export interface AlertManagementStore {
   createAlertForOrganization(input: {
     organization_id: string;
     project_id: string;
+    created_by_user_id: string;
     service_id?: string | null;
     channel: AlertChannel;
     condition_type: AlertConditionType;
@@ -426,6 +430,9 @@ export interface AlertManagementStore {
   updateAlertForOrganization(input: {
     organization_id: string;
     alert_id: string;
+    project_id?: string;
+    actor_user_id?: string;
+    actor_role?: "owner" | "admin" | "member";
     service_id?: string | null;
     channel?: AlertChannel;
     condition_type?: AlertConditionType;
@@ -435,7 +442,10 @@ export interface AlertManagementStore {
   }): Promise<AlertRuleRecord | null>;
   deleteAlertForOrganization(input: {
     organization_id: string;
+    project_id?: string;
     alert_id: string;
+    actor_user_id?: string;
+    actor_role?: "owner" | "admin" | "member";
   }): Promise<DeleteAlertResult | null>;
 }
 
@@ -590,6 +600,7 @@ export interface WebhookFilters extends Record<string, unknown> {
 export interface WebhookRecord extends Record<string, unknown> {
   webhook_id: string;
   project_id: string;
+  created_by_user_id: string;
   url: string;
   events: WebhookEventType[];
   filters: WebhookFilters;
@@ -1107,6 +1118,7 @@ export interface ProjectGitHubRepoRecord extends Record<string, unknown> {
 export interface GitHubDispatchRuleRecord extends Record<string, unknown> {
   rule_id: string;
   project_id: string;
+  created_by_user_id: string;
   name: string;
   enabled: boolean;
   event_types: string[];
@@ -1222,6 +1234,7 @@ export interface GitHubStore {
   createProjectGitHubRuleForOrganization(input: {
     organization_id: string;
     project_id: string;
+    created_by_user_id: string;
     name: string;
     enabled: boolean;
     event_types: string[];
@@ -1236,6 +1249,8 @@ export interface GitHubStore {
     organization_id: string;
     project_id: string;
     rule_id: string;
+    actor_user_id?: string;
+    actor_role?: "owner" | "admin" | "member";
     name?: string;
     enabled?: boolean;
     event_types?: string[];
@@ -1250,6 +1265,8 @@ export interface GitHubStore {
     organization_id: string;
     project_id: string;
     rule_id: string;
+    actor_user_id?: string;
+    actor_role?: "owner" | "admin" | "member";
   }): Promise<boolean>;
   listProjectGitHubDeliveriesForOrganization(input: {
     organization_id: string;
@@ -1261,6 +1278,8 @@ export interface GitHubStore {
     organization_id: string;
     project_id: string;
     delivery_id: string;
+    actor_user_id?: string;
+    actor_role?: "owner" | "admin" | "member";
   }): Promise<GitHubDispatchDeliveryRecord | null>;
   listMatchingGitHubDispatchRules(input: {
     project_id: string;
@@ -1364,8 +1383,11 @@ export interface CreateWebhookDeliveryIntentInput {
 
 export interface CreateWebhookTestDeliveryInput {
   organization_id: string;
+  project_id?: string;
   webhook_id: string;
   event_type: WebhookEventType;
+  actor_user_id?: string;
+  actor_role?: "owner" | "admin" | "member";
 }
 
 export interface CreateWebhookTestDeliveryResult {
@@ -1433,22 +1455,36 @@ export interface WebhookDeliveryStore {
   createWebhookForOrganization(input: {
     organization_id: string;
     project_id: string;
+    created_by_user_id: string;
     url: string;
     signing_secret: string;
     events: WebhookEventType[];
     filters: WebhookFilters;
     is_enabled: boolean;
   }): Promise<WebhookRecord | null>;
-  getWebhookForOrganization(input: { organization_id: string; webhook_id: string }): Promise<WebhookRecord | null>;
+  getWebhookForOrganization(input: {
+    organization_id: string;
+    project_id?: string;
+    webhook_id: string;
+  }): Promise<WebhookRecord | null>;
   updateWebhookForOrganization(input: {
     organization_id: string;
     webhook_id: string;
+    project_id?: string;
+    actor_user_id?: string;
+    actor_role?: "owner" | "admin" | "member";
     url?: string;
     events?: WebhookEventType[];
     filters?: WebhookFilters;
     is_enabled?: boolean;
   }): Promise<WebhookRecord | null>;
-  deleteWebhookForOrganization(input: { organization_id: string; webhook_id: string }): Promise<DeleteWebhookResult | null>;
+  deleteWebhookForOrganization(input: {
+    organization_id: string;
+    webhook_id: string;
+    project_id?: string;
+    actor_user_id?: string;
+    actor_role?: "owner" | "admin" | "member";
+  }): Promise<DeleteWebhookResult | null>;
   listMatchingWebhooks(input: MatchingWebhookInput): Promise<MatchingWebhook[]>;
   createDeliveryIntent(input: CreateWebhookDeliveryIntentInput): Promise<{ delivery_id: string }>;
   createTestDeliveryForOrganization(input: CreateWebhookTestDeliveryInput): Promise<CreateWebhookTestDeliveryResult | null>;
@@ -1486,8 +1522,11 @@ export interface WebhookDeliveryStore {
   >;
   retryDeliveryForOrganization(input: {
     organization_id: string;
+    project_id?: string;
     webhook_id: string;
     delivery_id: string;
+    actor_user_id?: string;
+    actor_role?: "owner" | "admin" | "member";
   }): Promise<{ delivery_id: string; event_type: WebhookEventType } | null>;
 }
 

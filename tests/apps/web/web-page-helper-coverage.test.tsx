@@ -318,7 +318,7 @@ describe("web page helper coverage", () => {
     expect(
       formatProjectSharingSummary([
         createProject(),
-        createProject({ project_id: "proj_456", relationship: "shared" })
+        createProject({ project_id: "proj_456", relationship: "shared", sharing_state: "shared_by_you" })
       ])
     ).toBe("2 active projects. 1 project is shared.");
 
@@ -351,7 +351,7 @@ describe("web page helper coverage", () => {
     });
     vi.spyOn(api, "listProjects").mockResolvedValue([
       createProject(),
-      createProject({ project_id: "proj_456", name: "Worker", slug: "worker", relationship: "shared" })
+      createProject({ project_id: "proj_456", name: "Worker", slug: "worker", relationship: "shared", sharing_state: "shared_by_you" })
     ]);
     vi.spyOn(api, "getBillingSummary").mockResolvedValue(
       createBillingSummary({
@@ -572,6 +572,7 @@ describe("web page helper coverage", () => {
         {
           alert_id: "alert_1",
           project_id: "proj_1",
+          created_by_user_id: "usr_1",
           service_id: null,
           channel: "slack",
           condition_type: "error_spike",
@@ -604,6 +605,7 @@ describe("web page helper coverage", () => {
         {
           alert_id: "alert_2",
           project_id: "proj_1",
+          created_by_user_id: "usr_1",
           service_id: null,
           channel: "slack",
           condition_type: "error_spike",

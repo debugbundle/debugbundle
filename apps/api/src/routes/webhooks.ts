@@ -4,9 +4,10 @@ import type { FastifyInstance } from "fastify";
 import type { WebhookEventType, WebhookFilters } from "../../../../packages/storage/src/index.js";
 import type { ApiDependencies } from "../api-types.js";
 import { recordAuditLog, resolveAuditActorType } from "../audit-logging.js";
-import { requireRateLimitedMemberAuth, requireRateLimitedProjectAccess } from "../api-helpers.js";
+import { requireRateLimitedProjectAccess } from "../api-helpers.js";
 import {
   CreateWebhookBodySchema,
+  ProjectScopedQuerySchema,
   UpdateWebhookBodySchema,
   WebhookDeliveriesParamsSchema,
   WebhookDeliveriesQuerySchema,
@@ -80,23 +81,26 @@ export function registerWebhookRoutes(app: FastifyInstance, dependencies: ApiDep
   });
 
   app.post("/v1/webhooks", async (request, reply) => {
-    const member = await requireRateLimitedMemberAuth(request, reply, dependencies, "management-write");
-    if (member === null) {
+    const parsedBody = CreateWebhookBodySchema.safeParse(request.body);
+    if (!parsedBody.success) {
+      return reply.status(400).send({ error: "invalid_payload" });
+    }
+    const auth = await requireRateLimitedProjectAccess(request, reply, dependencies, {
+      bucket: "management-write",
+      projectId: parsedBody.data.project_id
+    });
+    if (auth === null) {
       return;
     }
     if (dependencies.webhookManagement === undefined) {
       return reply.status(404).send({ error: "project_not_found" });
     }
 
-    const parsedBody = CreateWebhookBodySchema.safeParse(request.body);
-    if (!parsedBody.success) {
-      return reply.status(400).send({ error: "invalid_payload" });
-    }
-
     const signingSecret = generateWebhookSigningSecret();
     const webhook = await dependencies.webhookManagement.createWebhookForOrganization({
-      organization_id: member.organization_id,
+      organization_id: auth.access.organization_id,
       project_id: parsedBody.data.project_id,
+      created_by_user_id: auth.member.member_id,
       url: parsedBody.data.url,
       signing_secret: signingSecret,
       events: parsedBody.data.events,
@@ -106,8 +110,8 @@ export function registerWebhookRoutes(app: FastifyInstance, dependencies: ApiDep
 
     if (webhook === null) {
       await recordAuditLog(dependencies.auditLogging, {
-        organization_id: member.organization_id,
-        actor_user_id: member.member_id,
+        organization_id: auth.access.organization_id,
+        actor_user_id: auth.member.member_id,
         actor_type: resolveAuditActorType(request.headers),
         action: "webhook.create",
         target_type: "webhook",
@@ -127,8 +131,8 @@ export function registerWebhookRoutes(app: FastifyInstance, dependencies: ApiDep
     }
 
     await recordAuditLog(dependencies.auditLogging, {
-      organization_id: member.organization_id,
-      actor_user_id: member.member_id,
+      organization_id: auth.access.organization_id,
+      actor_user_id: auth.member.member_id,
       actor_type: resolveAuditActorType(request.headers),
       action: "webhook.create",
       target_type: "webhook",
@@ -152,21 +156,28 @@ export function registerWebhookRoutes(app: FastifyInstance, dependencies: ApiDep
   });
 
   app.get("/v1/webhooks/:id", async (request, reply) => {
-    const member = await requireRateLimitedMemberAuth(request, reply, dependencies, "management-read");
-    if (member === null) {
+    const parsedParams = WebhookParamsSchema.safeParse(request.params);
+    if (!parsedParams.success) {
+      return reply.status(400).send({ error: "invalid_webhook_id" });
+    }
+    const parsedQuery = ProjectScopedQuerySchema.safeParse(request.query);
+    if (!parsedQuery.success) {
+      return reply.status(400).send({ error: "invalid_query" });
+    }
+    const auth = await requireRateLimitedProjectAccess(request, reply, dependencies, {
+      bucket: "management-read",
+      projectId: parsedQuery.data.project_id
+    });
+    if (auth === null) {
       return;
     }
     if (dependencies.webhookManagement === undefined) {
       return reply.status(404).send({ error: "webhook_not_found" });
     }
 
-    const parsedParams = WebhookParamsSchema.safeParse(request.params);
-    if (!parsedParams.success) {
-      return reply.status(400).send({ error: "invalid_webhook_id" });
-    }
-
     const webhook = await dependencies.webhookManagement.getWebhookForOrganization({
-      organization_id: member.organization_id,
+      organization_id: auth.access.organization_id,
+      project_id: parsedQuery.data.project_id,
       webhook_id: parsedParams.data.id
     });
 
@@ -178,34 +189,46 @@ export function registerWebhookRoutes(app: FastifyInstance, dependencies: ApiDep
   });
 
   app.patch("/v1/webhooks/:id", async (request, reply) => {
-    const member = await requireRateLimitedMemberAuth(request, reply, dependencies, "management-write");
-    if (member === null) {
-      return;
-    }
-    if (dependencies.webhookManagement === undefined) {
-      return reply.status(404).send({ error: "webhook_not_found" });
-    }
-
     const parsedParams = WebhookParamsSchema.safeParse(request.params);
     if (!parsedParams.success) {
       return reply.status(400).send({ error: "invalid_webhook_id" });
+    }
+    const parsedQuery = ProjectScopedQuerySchema.safeParse(request.query);
+    if (!parsedQuery.success) {
+      return reply.status(400).send({ error: "invalid_query" });
     }
 
     const parsedBody = UpdateWebhookBodySchema.safeParse(request.body);
     if (!parsedBody.success) {
       return reply.status(400).send({ error: "invalid_payload" });
     }
+    const auth = await requireRateLimitedProjectAccess(request, reply, dependencies, {
+      bucket: "management-write",
+      projectId: parsedQuery.data.project_id
+    });
+    if (auth === null) {
+      return;
+    }
+    if (dependencies.webhookManagement === undefined) {
+      return reply.status(404).send({ error: "webhook_not_found" });
+    }
 
     const updateInput: {
       organization_id: string;
       webhook_id: string;
+      project_id: string;
+      actor_user_id: string;
+      actor_role: "owner" | "admin" | "member";
       url?: string;
       events?: WebhookEventType[];
       filters?: WebhookFilters;
       is_enabled?: boolean;
     } = {
-      organization_id: member.organization_id,
-      webhook_id: parsedParams.data.id
+      organization_id: auth.access.organization_id,
+      webhook_id: parsedParams.data.id,
+      project_id: parsedQuery.data.project_id,
+      actor_user_id: auth.member.member_id,
+      actor_role: auth.access.effective_role
     };
 
     if (parsedBody.data.url !== undefined) {
@@ -225,8 +248,8 @@ export function registerWebhookRoutes(app: FastifyInstance, dependencies: ApiDep
 
     if (webhook === null) {
       await recordAuditLog(dependencies.auditLogging, {
-        organization_id: member.organization_id,
-        actor_user_id: member.member_id,
+        organization_id: auth.access.organization_id,
+        actor_user_id: auth.member.member_id,
         actor_type: resolveAuditActorType(request.headers),
         action: "webhook.update",
         target_type: "webhook",
@@ -243,8 +266,8 @@ export function registerWebhookRoutes(app: FastifyInstance, dependencies: ApiDep
     }
 
     await recordAuditLog(dependencies.auditLogging, {
-      organization_id: member.organization_id,
-      actor_user_id: member.member_id,
+      organization_id: auth.access.organization_id,
+      actor_user_id: auth.member.member_id,
       actor_type: resolveAuditActorType(request.headers),
       action: "webhook.update",
       target_type: "webhook",
@@ -263,28 +286,37 @@ export function registerWebhookRoutes(app: FastifyInstance, dependencies: ApiDep
   });
 
   app.delete("/v1/webhooks/:id", async (request, reply) => {
-    const member = await requireRateLimitedMemberAuth(request, reply, dependencies, "management-write");
-    if (member === null) {
+    const parsedParams = WebhookParamsSchema.safeParse(request.params);
+    if (!parsedParams.success) {
+      return reply.status(400).send({ error: "invalid_webhook_id" });
+    }
+    const parsedQuery = ProjectScopedQuerySchema.safeParse(request.query);
+    if (!parsedQuery.success) {
+      return reply.status(400).send({ error: "invalid_query" });
+    }
+    const auth = await requireRateLimitedProjectAccess(request, reply, dependencies, {
+      bucket: "management-write",
+      projectId: parsedQuery.data.project_id
+    });
+    if (auth === null) {
       return;
     }
     if (dependencies.webhookManagement === undefined) {
       return reply.status(404).send({ error: "webhook_not_found" });
     }
 
-    const parsedParams = WebhookParamsSchema.safeParse(request.params);
-    if (!parsedParams.success) {
-      return reply.status(400).send({ error: "invalid_webhook_id" });
-    }
-
     const deleted = await dependencies.webhookManagement.deleteWebhookForOrganization({
-      organization_id: member.organization_id,
-      webhook_id: parsedParams.data.id
+      organization_id: auth.access.organization_id,
+      project_id: parsedQuery.data.project_id,
+      webhook_id: parsedParams.data.id,
+      actor_user_id: auth.member.member_id,
+      actor_role: auth.access.effective_role
     });
 
     if (deleted === null) {
       await recordAuditLog(dependencies.auditLogging, {
-        organization_id: member.organization_id,
-        actor_user_id: member.member_id,
+        organization_id: auth.access.organization_id,
+        actor_user_id: auth.member.member_id,
         actor_type: resolveAuditActorType(request.headers),
         action: "webhook.delete",
         target_type: "webhook",
@@ -300,8 +332,8 @@ export function registerWebhookRoutes(app: FastifyInstance, dependencies: ApiDep
     }
 
     await recordAuditLog(dependencies.auditLogging, {
-      organization_id: member.organization_id,
-      actor_user_id: member.member_id,
+      organization_id: auth.access.organization_id,
+      actor_user_id: auth.member.member_id,
       actor_type: resolveAuditActorType(request.headers),
       action: "webhook.delete",
       target_type: "webhook",
@@ -315,28 +347,36 @@ export function registerWebhookRoutes(app: FastifyInstance, dependencies: ApiDep
   });
 
   app.post("/v1/webhooks/:id/test", async (request, reply) => {
-    const member = await requireRateLimitedMemberAuth(request, reply, dependencies, "management-write");
-    if (member === null) {
+    const parsedParams = WebhookParamsSchema.safeParse(request.params);
+    if (!parsedParams.success) {
+      return reply.status(400).send({ error: "invalid_webhook_id" });
+    }
+    const parsedQuery = ProjectScopedQuerySchema.safeParse(request.query);
+    if (!parsedQuery.success) {
+      return reply.status(400).send({ error: "invalid_query" });
+    }
+    const auth = await requireRateLimitedProjectAccess(request, reply, dependencies, {
+      bucket: "management-write",
+      projectId: parsedQuery.data.project_id
+    });
+    if (auth === null) {
       return;
     }
     if (dependencies.webhookTesting === undefined) {
       return reply.status(404).send({ error: "webhook_not_found" });
     }
-
-    const parsedParams = WebhookParamsSchema.safeParse(request.params);
-    if (!parsedParams.success) {
-      return reply.status(400).send({ error: "invalid_webhook_id" });
-    }
-
     const parsedBody = WebhookTestBodySchema.safeParse(request.body ?? {});
     if (!parsedBody.success) {
       return reply.status(400).send({ error: "invalid_payload" });
     }
 
     const delivery = await dependencies.webhookTesting.triggerTestDelivery({
-      organization_id: member.organization_id,
+      organization_id: auth.access.organization_id,
+      project_id: parsedQuery.data.project_id,
       webhook_id: parsedParams.data.id,
-      event_type: parsedBody.data.event_type
+      event_type: parsedBody.data.event_type,
+      actor_user_id: auth.member.member_id,
+      actor_role: auth.access.effective_role
     });
 
     if (delivery === null) {
@@ -347,24 +387,25 @@ export function registerWebhookRoutes(app: FastifyInstance, dependencies: ApiDep
   });
 
   app.get("/v1/webhooks/:id/deliveries", async (request, reply) => {
-    const member = await requireRateLimitedMemberAuth(request, reply, dependencies, "management-read");
-    if (member === null) {
-      return;
-    }
-
     const parsedParams = WebhookDeliveriesParamsSchema.safeParse(request.params);
     if (!parsedParams.success) {
       return reply.status(400).send({ error: "invalid_webhook_id" });
     }
-
-    const parsedQuery = WebhookDeliveriesQuerySchema.safeParse(request.query);
+    const parsedQuery = WebhookDeliveriesQuerySchema.and(ProjectScopedQuerySchema).safeParse(request.query);
     if (!parsedQuery.success) {
       return reply.status(400).send({ error: "invalid_query" });
+    }
+    const auth = await requireRateLimitedProjectAccess(request, reply, dependencies, {
+      bucket: "management-read",
+      projectId: parsedQuery.data.project_id
+    });
+    if (auth === null) {
+      return;
     }
 
     const scopedDeliveries = await dependencies.webhookDelivery.listDeliveriesForWebhookInOrganization({
       webhookId: parsedParams.data.id,
-      organizationId: member.organization_id,
+      organizationId: auth.access.organization_id,
       limit: parsedQuery.data.limit
     });
 
@@ -376,24 +417,32 @@ export function registerWebhookRoutes(app: FastifyInstance, dependencies: ApiDep
   });
 
   app.post("/v1/webhooks/:id/deliveries/:deliveryId/retry", async (request, reply) => {
-    const member = await requireRateLimitedMemberAuth(request, reply, dependencies, "management-write");
-    if (member === null) {
-      return;
-    }
-
-    if (dependencies.webhookDelivery.retryDeliveryForOrganization === undefined) {
-      return reply.status(404).send({ error: "delivery_not_found" });
-    }
-
     const parsedParams = WebhookDeliveryRetryParamsSchema.safeParse(request.params);
     if (!parsedParams.success) {
       return reply.status(400).send({ error: "invalid_params" });
     }
+    const parsedQuery = ProjectScopedQuerySchema.safeParse(request.query);
+    if (!parsedQuery.success) {
+      return reply.status(400).send({ error: "invalid_query" });
+    }
+    const auth = await requireRateLimitedProjectAccess(request, reply, dependencies, {
+      bucket: "management-write",
+      projectId: parsedQuery.data.project_id
+    });
+    if (auth === null) {
+      return;
+    }
+    if (dependencies.webhookDelivery.retryDeliveryForOrganization === undefined) {
+      return reply.status(404).send({ error: "delivery_not_found" });
+    }
 
     const result = await dependencies.webhookDelivery.retryDeliveryForOrganization({
-      organization_id: member.organization_id,
+      organization_id: auth.access.organization_id,
+      project_id: parsedQuery.data.project_id,
       webhook_id: parsedParams.data.id,
-      delivery_id: parsedParams.data.deliveryId
+      delivery_id: parsedParams.data.deliveryId,
+      actor_user_id: auth.member.member_id,
+      actor_role: auth.access.effective_role
     });
 
     if (result === null) {

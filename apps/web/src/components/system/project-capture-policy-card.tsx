@@ -14,7 +14,7 @@ import {
 } from "../../lib/api.js";
 import { showErrorToast, showSuccessToast } from "../../lib/notify.js";
 import { Button } from "../ui/button.js";
-import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "../ui/card.js";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../ui/card.js";
 import { Field, FieldDescription, FieldGroup, FieldLabel } from "../ui/field.js";
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "../ui/select.js";
 
@@ -22,6 +22,7 @@ type OverrideValue<T extends string> = "" | T;
 type ClientErrorIncidentMode = "preset_default" | "none" | "recommended" | "custom";
 
 interface CapturePolicyDraft {
+  access_mode: ProjectCapturePolicyResponse["access_mode"];
   preset: CapturePreset;
   capture_logs: OverrideValue<CaptureLogs>;
   capture_request_events: OverrideValue<CaptureRequestEvents>;
@@ -156,6 +157,7 @@ export function ProjectCapturePolicyCard({ projectId, organizationPlan, canEdit 
   const policyDraft = draft ?? buildDraft(buildDefaultPolicyResponse(organizationPlan));
   const customStatusValidationError = getClientErrorCustomValidationError(policyDraft);
   const resolvedPolicy = resolveDraft(policyDraft);
+  const showPreviewOnly = policyDraft.access_mode === "preview" || !canEdit;
   const isDirty = baselineDraft !== null && !draftsEqual(policyDraft, baselineDraft);
   const isDisabled = isLoading || isSaving || !canEdit;
   const isSaveDisabled = isDisabled || !isDirty || customStatusValidationError !== null;
@@ -192,11 +194,6 @@ export function ProjectCapturePolicyCard({ projectId, organizationPlan, canEdit 
   return (
     <Card>
       <CardHeader>
-        <CardAction>
-          <div className="inline-flex items-center rounded-full border border-border/70 bg-background/80 px-3 py-1 text-xs font-medium uppercase tracking-[0.18em] text-muted-foreground">
-            {formatPreset(DEFAULT_PRESET_BY_PLAN[organizationPlan])} default on {organizationPlan}
-          </div>
-        </CardAction>
         <CardTitle>Capture policy</CardTitle>
         <CardDescription>Control how much request, log, breadcrumb, and probe context the SDK forwards before worker processing begins.</CardDescription>
       </CardHeader>
@@ -218,46 +215,47 @@ export function ProjectCapturePolicyCard({ projectId, organizationPlan, canEdit 
         )}
 
         <form className="space-y-6" onSubmit={(event) => void handleSave(event)}>
-          <FieldGroup>
-            <Field>
-              <FieldLabel id="project-capture-policy-preset-label" htmlFor="project-capture-policy-preset">Preset</FieldLabel>
-              <FieldDescription>Projects in organizations on the {organizationPlan} plan default to {formatPreset(DEFAULT_PRESET_BY_PLAN[organizationPlan]).toLowerCase()} unless a project owner or admin saves a different policy.</FieldDescription>
-              <Select
-                value={policyDraft.preset}
-                onValueChange={(value) => {
-                  setDraft((current) => ({ ...(current ?? policyDraft), preset: value as CapturePreset }));
-                }}
-                disabled={isDisabled}
-              >
-                <SelectTrigger
-                  id="project-capture-policy-preset"
-                  aria-labelledby="project-capture-policy-preset-label project-capture-policy-preset"
-                  className="w-full"
-                >
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent position="popper">
-                  <SelectGroup>
-                    {presetOptions.map((option) => (
-                      <SelectItem key={option.value} value={option.value}>
-                        {option.label}
-                      </SelectItem>
-                    ))}
-                  </SelectGroup>
-                </SelectContent>
-              </Select>
-              <FieldDescription>{presetOptions.find((option) => option.value === policyDraft.preset)?.description}</FieldDescription>
-            </Field>
-          </FieldGroup>
+          {showPreviewOnly ? null : (
+            <>
+              <FieldGroup>
+                <Field>
+                  <FieldLabel id="project-capture-policy-preset-label" htmlFor="project-capture-policy-preset">Preset</FieldLabel>
+                  <FieldDescription>Choose the baseline capture behavior for this project. Advanced controls below can override individual values.</FieldDescription>
+                  <Select
+                    value={policyDraft.preset}
+                    onValueChange={(value) => {
+                      setDraft((current) => ({ ...(current ?? policyDraft), preset: value as CapturePreset }));
+                    }}
+                    disabled={isDisabled}
+                  >
+                    <SelectTrigger
+                      id="project-capture-policy-preset"
+                      aria-labelledby="project-capture-policy-preset-label project-capture-policy-preset"
+                      className="w-full"
+                    >
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent position="popper">
+                      <SelectGroup>
+                        {presetOptions.map((option) => (
+                          <SelectItem key={option.value} value={option.value}>
+                            {option.label}
+                          </SelectItem>
+                        ))}
+                      </SelectGroup>
+                    </SelectContent>
+                  </Select>
+                  <FieldDescription>{presetOptions.find((option) => option.value === policyDraft.preset)?.description}</FieldDescription>
+                </Field>
+              </FieldGroup>
 
-          <div className="grid gap-4 lg:grid-cols-2">
+              <div className="grid gap-4 lg:grid-cols-2">
             <OverrideField
               id="project-capture-policy-logs"
               label="Log events"
               description="Raise or lower standalone log capture independently from the preset."
               disabled={isDisabled}
               value={policyDraft.capture_logs}
-              defaultValue={PRESET_DEFAULTS[policyDraft.preset].capture_logs}
               options={captureLogsOptions}
               onChange={(value) => {
                 setDraft((current) => ({ ...(current ?? policyDraft), capture_logs: value }));
@@ -269,7 +267,6 @@ export function ProjectCapturePolicyCard({ projectId, organizationPlan, canEdit 
               description="Control how broadly SDKs send standalone request events before worker classification and anomaly thresholds run."
               disabled={isDisabled}
               value={policyDraft.capture_request_events}
-              defaultValue={PRESET_DEFAULTS[policyDraft.preset].capture_request_events}
               options={captureRequestOptions}
               onChange={(value) => {
                 setDraft((current) => ({ ...(current ?? policyDraft), capture_request_events: value }));
@@ -292,7 +289,6 @@ export function ProjectCapturePolicyCard({ projectId, organizationPlan, canEdit 
               description="Decide whether breadcrumbs only enrich exceptions or persist as standalone events."
               disabled={isDisabled}
               value={policyDraft.capture_breadcrumbs}
-              defaultValue={PRESET_DEFAULTS[policyDraft.preset].capture_breadcrumbs}
               options={captureBreadcrumbOptions}
               onChange={(value) => {
                 setDraft((current) => ({ ...(current ?? policyDraft), capture_breadcrumbs: value }));
@@ -304,13 +300,14 @@ export function ProjectCapturePolicyCard({ projectId, organizationPlan, canEdit 
               description="Control whether activated probes stay bundle-only or also persist as standalone events."
               disabled={isDisabled}
               value={policyDraft.capture_probe_events}
-              defaultValue={PRESET_DEFAULTS[policyDraft.preset].capture_probe_events}
               options={captureProbeOptions}
               onChange={(value) => {
                 setDraft((current) => ({ ...(current ?? policyDraft), capture_probe_events: value }));
               }}
             />
-          </div>
+              </div>
+            </>
+          )}
 
           <div className="rounded-xl border border-border/80 bg-muted/30 p-4">
             <p className="text-xs font-medium uppercase tracking-[0.18em] text-muted-foreground">Resolved policy preview</p>
@@ -349,7 +346,6 @@ function OverrideField<T extends string>({
   label,
   description,
   value,
-  defaultValue,
   options,
   disabled,
   onChange,
@@ -358,13 +354,10 @@ function OverrideField<T extends string>({
   label: string;
   description: string;
   value: OverrideValue<T>;
-  defaultValue: T;
   options: Array<{ value: T; label: string }>;
   disabled: boolean;
   onChange: (value: OverrideValue<T>) => void;
 }): JSX.Element {
-  const defaultLabel = options.find((option) => option.value === defaultValue)?.label ?? defaultValue;
-
   return (
     <Field>
       <FieldLabel id={`${id}-label`} htmlFor={id}>{label}</FieldLabel>
@@ -379,7 +372,7 @@ function OverrideField<T extends string>({
         </SelectTrigger>
         <SelectContent position="popper">
           <SelectGroup>
-            <SelectItem value={OVERRIDE_SELECT_DEFAULT_VALUE}>Use preset default ({defaultLabel})</SelectItem>
+            <SelectItem value={OVERRIDE_SELECT_DEFAULT_VALUE}>Use preset default</SelectItem>
             {options.map((option) => (
               <SelectItem key={option.value} value={option.value}>
                 {option.label}
@@ -405,8 +398,6 @@ function ClientErrorIncidentsField({
   onModeChange: (value: ClientErrorIncidentMode) => void;
   onCustomInputChange: (value: string) => void;
 }): JSX.Element {
-  const presetDefaultLabel = formatClientErrorPresetDefaultLabel(draft.preset);
-
   return (
     <Field>
       <FieldLabel id="project-capture-policy-client-errors-label" htmlFor="project-capture-policy-client-errors">Client error incidents</FieldLabel>
@@ -425,7 +416,7 @@ function ClientErrorIncidentsField({
         </SelectTrigger>
         <SelectContent position="popper">
           <SelectGroup>
-            <SelectItem value="preset_default">Use preset default ({presetDefaultLabel})</SelectItem>
+            <SelectItem value="preset_default">Use preset default</SelectItem>
             {clientErrorIncidentModeOptions.filter((option) => option.value !== "preset_default").map((option) => (
               <SelectItem key={option.value} value={option.value}>
                 {option.label}
@@ -475,6 +466,7 @@ function buildDefaultPolicy(plan: ProjectCapturePolicyCardProps["organizationPla
 
 function buildDefaultPolicyResponse(plan: ProjectCapturePolicyCardProps["organizationPlan"]): ProjectCapturePolicyResponse {
   return {
+    access_mode: "manage",
     policy: buildDefaultPolicy(plan),
     overrides: {
       capture_logs: null,
@@ -492,6 +484,7 @@ function buildDraft(policyResponse: ProjectCapturePolicyResponse): CapturePolicy
   const clientErrorOverride = overrides.immediate_client_error_statuses;
 
   return {
+    access_mode: policyResponse.access_mode,
     preset: policy.preset,
     capture_logs: overrides.capture_logs === null ? "" : overrides.capture_logs,
     capture_request_events: overrides.capture_request_events === null ? "" : overrides.capture_request_events,
@@ -669,34 +662,20 @@ function formatClientErrorIncidentsPreview(draft: CapturePolicyDraft, validation
 
   switch (draft.client_error_incident_mode) {
     case "preset_default":
-      return `Preset default (${formatStatusList(presetDefault)})`;
+      return formatClientErrorStatusList(presetDefault);
     case "none":
       return "None";
     case "recommended":
-      return `Recommended (${formatStatusList(RECOMMENDED_IMMEDIATE_CLIENT_ERROR_STATUSES)})`;
+      return formatClientErrorStatusList(RECOMMENDED_IMMEDIATE_CLIENT_ERROR_STATUSES);
     case "custom":
       if (validationError !== null) {
         return "Custom (invalid)";
       }
 
-      return `Custom (${formatStatusList(parseClientErrorStatusesInput(draft.client_error_custom_input).statuses ?? [])})`;
+      return formatClientErrorStatusList(parseClientErrorStatusesInput(draft.client_error_custom_input).statuses ?? []);
   }
 }
 
-function formatClientErrorPresetDefaultLabel(preset: CapturePreset): string {
-  const presetDefault = PRESET_DEFAULTS[preset].immediate_client_error_statuses;
-
-  if (presetDefault.length === 0) {
-    return "None";
-  }
-
-  if (statusesEqual(presetDefault, RECOMMENDED_IMMEDIATE_CLIENT_ERROR_STATUSES)) {
-    return "Recommended for interactive apps";
-  }
-
-  return `Custom (${formatStatusList(presetDefault)})`;
-}
-
-function formatStatusList(statuses: readonly number[]): string {
-  return statuses.length === 0 ? "none" : statuses.join(", ");
+function formatClientErrorStatusList(statuses: readonly number[]): string {
+  return statuses.length === 0 ? "None" : statuses.join(", ");
 }

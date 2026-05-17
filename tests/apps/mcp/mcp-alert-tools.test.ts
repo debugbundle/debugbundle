@@ -47,6 +47,7 @@ describe("mcp alert tools", () => {
     await expect(
       tools.update_alert({
         bearerToken: "dbundle_mem_x",
+        projectId: "proj_1",
         alertId: "al_2",
         isEnabled: false
       })
@@ -57,6 +58,7 @@ describe("mcp alert tools", () => {
     await expect(
       tools.delete_alert({
         bearerToken: "dbundle_mem_x",
+        projectId: "proj_1",
         alertId: "al_2"
       })
     ).resolves.toEqual({
@@ -111,6 +113,7 @@ describe("mcp alert tools", () => {
     });
     await tools.update_alert({
       bearerToken: "dbundle_mem_x",
+      projectId: "proj_1",
       alertId: "al_3",
       serviceId: null,
       channel: "slack",
@@ -132,6 +135,7 @@ describe("mcp alert tools", () => {
     });
     expect(api.updateAlert).toHaveBeenCalledWith({
       bearerToken: "dbundle_mem_x",
+      projectId: "proj_1",
       alertId: "al_3",
       serviceId: null,
       channel: "slack",

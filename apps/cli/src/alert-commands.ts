@@ -210,6 +210,7 @@ export async function createAlertWithAuthCommand(
 export async function updateAlertCommand(
   input: {
     bearerToken: string;
+    projectId: string;
     alertId: string;
     serviceId?: string | null;
     channel?: AlertChannel;
@@ -222,6 +223,7 @@ export async function updateAlertCommand(
   api: {
     updateAlert(input: {
       bearerToken: string;
+      projectId: string;
       alertId: string;
       serviceId?: string | null;
       channel?: AlertChannel;
@@ -235,6 +237,7 @@ export async function updateAlertCommand(
   try {
     const requestInput: {
       bearerToken: string;
+      projectId: string;
       alertId: string;
       serviceId?: string | null;
       channel?: AlertChannel;
@@ -244,6 +247,7 @@ export async function updateAlertCommand(
       isEnabled?: boolean;
     } = {
       bearerToken: input.bearerToken,
+      projectId: input.projectId,
       alertId: input.alertId
     };
     if (input.serviceId !== undefined) {
@@ -278,6 +282,7 @@ export async function updateAlertCommand(
 export async function updateAlertWithAuthCommand(
   input: {
     authFilePath?: string;
+    projectId: string;
     alertId: string;
     serviceId?: string | null;
     channel?: AlertChannel;
@@ -295,6 +300,7 @@ export async function updateAlertWithAuthCommand(
     runCommand: (authState, api) => {
       const commandInput: {
         bearerToken: string;
+        projectId: string;
         alertId: string;
         serviceId?: string | null;
         channel?: AlertChannel;
@@ -305,6 +311,7 @@ export async function updateAlertWithAuthCommand(
         json?: boolean;
       } = {
         bearerToken: authState.bearer_token,
+        projectId: input.projectId,
         alertId: input.alertId
       };
       if (input.serviceId !== undefined) {
@@ -339,16 +346,18 @@ export async function updateAlertWithAuthCommand(
 export async function deleteAlertCommand(
   input: {
     bearerToken: string;
+    projectId: string;
     alertId: string;
     json?: boolean;
   },
   api: {
-    deleteAlert(input: { bearerToken: string; alertId: string }): Promise<{ alert_id: string }>;
+    deleteAlert(input: { bearerToken: string; projectId: string; alertId: string }): Promise<{ alert_id: string }>;
   }
 ): Promise<CliCommandResult> {
   try {
     const alert = await api.deleteAlert({
       bearerToken: input.bearerToken,
+      projectId: input.projectId,
       alertId: input.alertId
     });
     return {
@@ -361,15 +370,16 @@ export async function deleteAlertCommand(
 }
 
 export async function deleteAlertWithAuthCommand(
-  input: { authFilePath?: string; alertId: string; json?: boolean },
+  input: { authFilePath?: string; projectId: string; alertId: string; json?: boolean },
   dependencies?: Parameters<typeof createAuthenticatedAlertApi>[1]
 ): Promise<CliCommandResult> {
   return runAuthenticatedCliCommand(input, {
     createApi: createAuthenticatedAlertApi,
     dependencies,
     runCommand: (authState, api) => {
-      const commandInput: { bearerToken: string; alertId: string; json?: boolean } = {
+      const commandInput: { bearerToken: string; projectId: string; alertId: string; json?: boolean } = {
         bearerToken: authState.bearer_token,
+        projectId: input.projectId,
         alertId: input.alertId
       };
       if (input.json !== undefined) {

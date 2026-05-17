@@ -20,9 +20,11 @@ describe("mcp github tools", () => {
   });
 
   it("returns github payloads for slice-one operations", async () => {
+    const getInstallation = vi.fn().mockResolvedValue({ account_login: "debugbundle", status: "active" });
+    const listRepositories = vi.fn().mockResolvedValue([{ full_name: "debugbundle/app", default_branch: "main" }]);
     const tools = createGitHubMcpTools({
-      getInstallation: vi.fn().mockResolvedValue({ account_login: "debugbundle", status: "active" }),
-      listRepositories: vi.fn().mockResolvedValue([{ full_name: "debugbundle/app", default_branch: "main" }]),
+      getInstallation,
+      listRepositories,
       getProjectRepo: vi.fn().mockResolvedValue({ repo_owner: "debugbundle", repo_name: "app" }),
       setProjectRepo: vi.fn().mockResolvedValue({ repo_owner: "debugbundle", repo_name: "app" }),
       removeProjectRepo: vi.fn().mockResolvedValue(undefined)
@@ -34,12 +36,14 @@ describe("mcp github tools", () => {
       installation: { account_login: "debugbundle", status: "active" },
       repo: { repo_owner: "debugbundle", repo_name: "app" }
     });
+    expect(getInstallation).toHaveBeenCalledWith({ bearerToken: "dbundle_mem_x", projectId: "proj_1" });
 
     await expect(
-      tools.list_github_repositories({ bearerToken: "dbundle_mem_x" })
+      tools.list_github_repositories({ bearerToken: "dbundle_mem_x", projectId: "proj_1" })
     ).resolves.toEqual({
       repositories: [{ full_name: "debugbundle/app", default_branch: "main" }]
     });
+    expect(listRepositories).toHaveBeenCalledWith({ bearerToken: "dbundle_mem_x", projectId: "proj_1" });
 
     await expect(
       tools.set_project_github_repo({

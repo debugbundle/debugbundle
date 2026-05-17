@@ -201,7 +201,7 @@ export const MCP_TOOL_CATALOG = [
   {
     name: 'get_github_status',
     group: 'github',
-    description: 'Get the organization GitHub App installation status and optional project repo assignment.',
+    description: 'Get the project GitHub App installation status and optional project repo assignment.',
     inputSchema: z.object({
       bearerToken: z.string(),
       projectId: z.string().optional(),
@@ -210,9 +210,10 @@ export const MCP_TOOL_CATALOG = [
   {
     name: 'list_github_repositories',
     group: 'github',
-    description: 'List repositories available to the organization GitHub App installation.',
+    description: 'List repositories available to the project GitHub App installation for owner/admin callers.',
     inputSchema: z.object({
       bearerToken: z.string(),
+      projectId: z.string().optional(),
     }),
   },
   {
@@ -398,6 +399,7 @@ export const MCP_TOOL_CATALOG = [
     description: 'Update a webhook endpoint.',
     inputSchema: z.object({
       bearerToken: z.string(),
+      projectId: z.string(),
       webhookId: z.string(),
       url: z.string().optional(),
       events: z.array(z.string()).optional(),
@@ -411,6 +413,7 @@ export const MCP_TOOL_CATALOG = [
     description: 'Delete a webhook endpoint.',
     inputSchema: z.object({
       bearerToken: z.string(),
+      projectId: z.string(),
       webhookId: z.string(),
     }),
   },
@@ -420,6 +423,7 @@ export const MCP_TOOL_CATALOG = [
     description: 'Queue a synthetic webhook delivery.',
     inputSchema: z.object({
       bearerToken: z.string(),
+      projectId: z.string(),
       webhookId: z.string(),
       eventType: verificationEventTypeSchema.optional(),
     }),
@@ -430,6 +434,7 @@ export const MCP_TOOL_CATALOG = [
     description: 'List deliveries for a webhook endpoint.',
     inputSchema: z.object({
       bearerToken: z.string(),
+      projectId: z.string(),
       webhookId: z.string(),
       limit: z.number().optional(),
     }),
@@ -440,6 +445,7 @@ export const MCP_TOOL_CATALOG = [
     description: 'Retry a webhook delivery.',
     inputSchema: z.object({
       bearerToken: z.string(),
+      projectId: z.string(),
       webhookId: z.string(),
       deliveryId: z.string(),
     }),
@@ -558,6 +564,7 @@ export const MCP_TOOL_CATALOG = [
     description: 'Update an alert rule.',
     inputSchema: z.object({
       bearerToken: z.string(),
+      projectId: z.string(),
       alertId: z.string(),
       serviceId: z.string().nullable().optional(),
       channel: z.string().optional(),
@@ -573,6 +580,7 @@ export const MCP_TOOL_CATALOG = [
     description: 'Delete an alert rule.',
     inputSchema: z.object({
       bearerToken: z.string(),
+      projectId: z.string(),
       alertId: z.string(),
     }),
   },

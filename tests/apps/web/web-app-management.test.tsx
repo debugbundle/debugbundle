@@ -660,7 +660,7 @@ describe("web app — management routes", () => {
         });
       }
 
-      if (url.endsWith("/v1/github/installation") && init?.method === undefined) {
+      if (url.endsWith("/v1/github/installation?project_id=proj_123") && init?.method === undefined) {
         return jsonResponse(200, {
           installation: createGitHubInstallation()
         });
@@ -672,7 +672,7 @@ describe("web app — management routes", () => {
         });
       }
 
-      if (url.endsWith("/v1/github/repositories") && init?.method === undefined) {
+      if (url.endsWith("/v1/github/repositories?project_id=proj_123") && init?.method === undefined) {
         return jsonResponse(200, {
           repositories: [createGitHubRepository()]
         });
@@ -776,7 +776,7 @@ describe("web app — management routes", () => {
         });
       }
 
-      if (url.endsWith("/v1/github/installation") && init?.method === undefined) {
+      if (url.endsWith("/v1/github/installation?project_id=proj_123") && init?.method === undefined) {
         return jsonResponse(200, {
           installation: createGitHubInstallation({ status: "suspended" })
         });
@@ -788,7 +788,7 @@ describe("web app — management routes", () => {
         });
       }
 
-      if (url.endsWith("/v1/github/repositories") && init?.method === undefined) {
+      if (url.endsWith("/v1/github/repositories?project_id=proj_123") && init?.method === undefined) {
         return jsonResponse(200, {
           repositories: [createGitHubRepository()]
         });
@@ -845,7 +845,7 @@ describe("web app — management routes", () => {
         });
       }
 
-      if (url.endsWith("/v1/github/installation") && init?.method === undefined) {
+      if (url.endsWith("/v1/github/installation?project_id=proj_123") && init?.method === undefined) {
         return jsonResponse(200, { installation: null });
       }
 
@@ -884,10 +884,10 @@ describe("web app — management routes", () => {
     expect(installLink).not.toHaveAttribute("target");
     expect(
       fetchMock.mock.calls.some(([input]) =>
-        requestUrl(input).includes("/v1/github/app/install-url?return_to=%2Fprojects%2Fproj_123%2Fgithub")
+        requestUrl(input).includes("/v1/github/app/install-url?return_to=%2Fprojects%2Fproj_123%2Fgithub&project_id=proj_123")
       )
     ).toBe(true);
-    expect(fetchMock.mock.calls.some(([input]) => requestUrl(input).endsWith("/v1/github/repositories"))).toBe(false);
+    expect(fetchMock.mock.calls.some(([input]) => requestUrl(input).endsWith("/v1/github/repositories?project_id=proj_123"))).toBe(false);
     expect(fetchMock.mock.calls.some(([input]) => requestUrl(input).endsWith("/v1/projects/proj_123/github/repo"))).toBe(false);
     expect(fetchMock.mock.calls.some(([input]) => requestUrl(input).endsWith("/v1/projects/proj_123/github/rules"))).toBe(false);
     expect(fetchMock.mock.calls.some(([input]) => requestUrl(input).endsWith("/v1/projects/proj_123/github/deliveries?limit=20"))).toBe(false);
@@ -909,7 +909,7 @@ describe("web app — management routes", () => {
         });
       }
 
-      if (url.endsWith("/v1/github/installation") && init?.method === undefined) {
+      if (url.endsWith("/v1/github/installation?project_id=proj_123") && init?.method === undefined) {
         return jsonResponse(200, { installation: null });
       }
 
@@ -961,7 +961,7 @@ describe("web app — management routes", () => {
         });
       }
 
-      if (url.endsWith("/v1/github/installation") && init?.method === undefined) {
+      if (url.endsWith("/v1/github/installation?project_id=proj_123") && init?.method === undefined) {
         return jsonResponse(503, { error: "github_not_configured" });
       }
 
@@ -1017,7 +1017,7 @@ describe("web app — management routes", () => {
         });
       }
 
-      if (url.endsWith("/v1/github/installation") && init?.method === undefined) {
+      if (url.endsWith("/v1/github/installation?project_id=proj_123") && init?.method === undefined) {
         return jsonResponse(200, {
           installation: createGitHubInstallation()
         });
@@ -1029,7 +1029,7 @@ describe("web app — management routes", () => {
         });
       }
 
-      if (url.endsWith("/v1/github/repositories") && init?.method === undefined) {
+      if (url.endsWith("/v1/github/repositories?project_id=proj_123") && init?.method === undefined) {
         return jsonResponse(200, {
           repositories: [createGitHubRepository(), createGitHubRepository({ id: 2, name: "worker", full_name: "debugbundle/worker" })]
         });
@@ -1107,7 +1107,7 @@ describe("web app — management routes", () => {
         });
       }
 
-      if (url.endsWith("/v1/github/installation") && init?.method === undefined) {
+      if (url.endsWith("/v1/github/installation?project_id=proj_123") && init?.method === undefined) {
         return jsonResponse(200, {
           installation: createGitHubInstallation()
         });
@@ -1119,7 +1119,7 @@ describe("web app — management routes", () => {
         });
       }
 
-      if (url.endsWith("/v1/github/repositories") && init?.method === undefined) {
+      if (url.endsWith("/v1/github/repositories?project_id=proj_123") && init?.method === undefined) {
         repositoryListRequestCount += 1;
 
         return jsonResponse(200, {
@@ -1173,13 +1173,13 @@ describe("web app — management routes", () => {
         });
       }
 
-      if (url.endsWith("/v1/github/installation") && init?.method === undefined) {
+      if (url.endsWith("/v1/github/installation?project_id=proj_123") && init?.method === undefined) {
         return jsonResponse(200, {
           installation: createGitHubInstallation()
         });
       }
 
-      if (url.endsWith("/v1/github/repositories") && init?.method === undefined) {
+      if (url.endsWith("/v1/github/repositories?project_id=proj_123") && init?.method === undefined) {
         return jsonResponse(200, {
           repositories: [createGitHubRepository()]
         });
@@ -1278,13 +1278,13 @@ describe("web app — management routes", () => {
         });
       }
 
-      if (url.endsWith("/v1/github/installation") && init?.method === undefined) {
+      if (url.endsWith("/v1/github/installation?project_id=proj_123") && init?.method === undefined) {
         return jsonResponse(200, {
           installation: createGitHubInstallation()
         });
       }
 
-      if (url.endsWith("/v1/github/repositories") && init?.method === undefined) {
+      if (url.endsWith("/v1/github/repositories?project_id=proj_123") && init?.method === undefined) {
         return jsonResponse(200, {
           repositories: [createGitHubRepository()]
         });
@@ -1538,13 +1538,13 @@ describe("web app — management routes", () => {
         });
       }
 
-      if (url.endsWith("/v1/webhooks/wh_123/deliveries?limit=5") && init?.method === undefined) {
+      if (url.endsWith("/v1/webhooks/wh_123/deliveries?project_id=proj_123&limit=5") && init?.method === undefined) {
         return jsonResponse(200, {
           deliveries: [createWebhookDelivery()]
         });
       }
 
-      if (url.endsWith("/v1/webhooks/wh_123/test") && init?.method === "POST") {
+      if (url.endsWith("/v1/webhooks/wh_123/test?project_id=proj_123") && init?.method === "POST") {
         expect(init.credentials).toBe("include");
         expect(init.body).toBe(JSON.stringify({ event_type: "verification.passed" }));
 
@@ -1569,7 +1569,7 @@ describe("web app — management routes", () => {
     await screen.findByRole("button", { name: /send test webhook/i });
     await waitFor(() => {
       expect(
-        fetchMock.mock.calls.some(([input]) => requestUrl(input).includes("/v1/webhooks/wh_123/deliveries?limit=5"))
+        fetchMock.mock.calls.some(([input]) => requestUrl(input).includes("/v1/webhooks/wh_123/deliveries?project_id=proj_123&limit=5"))
       ).toBe(true);
     });
 
@@ -1578,7 +1578,7 @@ describe("web app — management routes", () => {
     await waitFor(() => {
       expect(
         fetchMock.mock.calls.some(
-          ([input, init]) => requestUrl(input).endsWith("/v1/webhooks/wh_123/test") && init?.method === "POST"
+          ([input, init]) => requestUrl(input).endsWith("/v1/webhooks/wh_123/test?project_id=proj_123") && init?.method === "POST"
         )
       ).toBe(true);
     });
@@ -1846,7 +1846,7 @@ describe("web app — management routes", () => {
         });
       }
 
-      if (url.endsWith("/v1/alerts/alert_123") && init?.method === "DELETE") {
+      if (url.endsWith("/v1/alerts/alert_123?project_id=proj_123") && init?.method === "DELETE") {
         expect(init.credentials).toBe("include");
         return new Response(null, { status: 204 });
       }
@@ -1866,7 +1866,7 @@ describe("web app — management routes", () => {
     await waitFor(() => {
       expect(
         fetchMock.mock.calls.some(
-          ([input, init]) => requestUrl(input).endsWith("/v1/alerts/alert_123") && init?.method === "DELETE"
+          ([input, init]) => requestUrl(input).endsWith("/v1/alerts/alert_123?project_id=proj_123") && init?.method === "DELETE"
         )
       ).toBe(true);
     });
@@ -2278,7 +2278,7 @@ describe("web app — management routes", () => {
         return jsonResponse(200, {
           projects: [
             createProject(),
-            createProject({ project_id: "proj_456", name: "Worker", slug: "worker", relationship: "shared" })
+            createProject({ project_id: "proj_456", name: "Worker", slug: "worker", relationship: "shared", sharing_state: "shared_by_you" })
           ]
         });
       }

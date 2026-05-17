@@ -54,6 +54,7 @@ describe("mcp webhook tools", () => {
     await expect(
       tools.update_webhook({
         bearerToken: "dbundle_mem_x",
+        projectId: "proj_1",
         webhookId: "wh_2",
         isEnabled: false
       })
@@ -64,6 +65,7 @@ describe("mcp webhook tools", () => {
     await expect(
       tools.delete_webhook({
         bearerToken: "dbundle_mem_x",
+        projectId: "proj_1",
         webhookId: "wh_2"
       })
     ).resolves.toEqual({
@@ -73,6 +75,7 @@ describe("mcp webhook tools", () => {
     await expect(
       tools.test_webhook({
         bearerToken: "dbundle_mem_x",
+        projectId: "proj_1",
         webhookId: "wh_2",
         eventType: "verification.failed"
       })
@@ -83,6 +86,7 @@ describe("mcp webhook tools", () => {
     await expect(
       tools.list_webhook_deliveries({
         bearerToken: "dbundle_mem_x",
+        projectId: "proj_1",
         webhookId: "wh_2"
       })
     ).resolves.toEqual({
@@ -142,6 +146,7 @@ describe("mcp webhook tools", () => {
     });
     await tools.update_webhook({
       bearerToken: "dbundle_mem_x",
+      projectId: "proj_1",
       webhookId: "wh_3",
       url: "https://hooks.example.test/updated",
       events: ["bundle.updated"],
@@ -151,6 +156,7 @@ describe("mcp webhook tools", () => {
     await expect(
       tools.retry_webhook_delivery({
         bearerToken: "dbundle_mem_x",
+        projectId: "proj_1",
         webhookId: "wh_3",
         deliveryId: "del_3"
       })
@@ -166,6 +172,7 @@ describe("mcp webhook tools", () => {
     });
     expect(api.updateWebhook).toHaveBeenCalledWith({
       bearerToken: "dbundle_mem_x",
+      projectId: "proj_1",
       webhookId: "wh_3",
       url: "https://hooks.example.test/updated",
       events: ["bundle.updated"],
@@ -188,19 +195,21 @@ describe("mcp webhook tools", () => {
     const tools = createWebhookMcpTools(api);
 
     await expect(
-      tools.list_webhook_deliveries({ bearerToken: "dbundle_mem_x", webhookId: "wh_4", limit: 7 })
+      tools.list_webhook_deliveries({ bearerToken: "dbundle_mem_x", projectId: "proj_1", webhookId: "wh_4", limit: 7 })
     ).resolves.toEqual({ deliveries: [{ delivery_id: "del_4" }] });
     await expect(
-      tools.test_webhook({ bearerToken: "dbundle_mem_x", webhookId: "wh_4", eventType: "not-valid" })
+      tools.test_webhook({ bearerToken: "dbundle_mem_x", projectId: "proj_1", webhookId: "wh_4", eventType: "not-valid" })
     ).resolves.toEqual({ delivery: { delivery_id: "del_4" } });
 
     expect(api.listWebhookDeliveries).toHaveBeenCalledWith({
       bearerToken: "dbundle_mem_x",
+      projectId: "proj_1",
       webhookId: "wh_4",
       limit: 7
     });
     expect(api.testWebhook).toHaveBeenCalledWith({
       bearerToken: "dbundle_mem_x",
+      projectId: "proj_1",
       webhookId: "wh_4"
     });
   });

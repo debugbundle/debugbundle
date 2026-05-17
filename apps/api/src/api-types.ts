@@ -272,6 +272,8 @@ export interface ApiDependencies {
       organization_id: string;
       project_id: string;
       delivery_id: string;
+      actor_user_id?: string;
+      actor_role?: "owner" | "admin" | "member";
     }): Promise<GitHubDispatchDeliveryRecord | "delivery_not_found" | "repo_not_found" | "installation_not_found" | "installation_suspended" | "installation_removed">;
     listProjectRulesForOrganization(input: {
       organization_id: string;
@@ -285,6 +287,7 @@ export interface ApiDependencies {
     createProjectRuleForOrganization(input: {
       organization_id: string;
       project_id: string;
+      created_by_user_id: string;
       name: string;
       enabled: boolean;
       event_types: string[];
@@ -299,6 +302,8 @@ export interface ApiDependencies {
       organization_id: string;
       project_id: string;
       rule_id: string;
+      actor_user_id?: string;
+      actor_role?: "owner" | "admin" | "member";
       name?: string;
       enabled?: boolean;
       event_types?: string[];
@@ -313,10 +318,13 @@ export interface ApiDependencies {
       organization_id: string;
       project_id: string;
       rule_id: string;
+      actor_user_id?: string;
+      actor_role?: "owner" | "admin" | "member";
     }): Promise<boolean>;
     setProjectRepoForOrganization(input: {
       organization_id: string;
       project_id: string;
+      created_by_user_id: string;
       owner: string;
       repo: string;
     }): Promise<ProjectGitHubRepoRecord | "installation_not_found" | "installation_suspended" | "installation_removed" | "project_not_found" | "repo_not_found">;
@@ -438,6 +446,7 @@ export interface ApiDependencies {
     createAlertForOrganization(input: {
       organization_id: string;
       project_id: string;
+      created_by_user_id: string;
       service_id?: string;
       channel: AlertChannel;
       condition_type: AlertConditionType;
@@ -447,6 +456,7 @@ export interface ApiDependencies {
     }): Promise<{
       alert_id: string;
       project_id: string;
+      created_by_user_id: string;
       service_id: string | null;
       channel: AlertChannel;
       condition_type: AlertConditionType;
@@ -459,6 +469,9 @@ export interface ApiDependencies {
     updateAlertForOrganization(input: {
       organization_id: string;
       alert_id: string;
+      project_id?: string;
+      actor_user_id?: string;
+      actor_role?: "owner" | "admin" | "member";
       service_id?: string | null;
       channel?: AlertChannel;
       condition_type?: AlertConditionType;
@@ -468,6 +481,7 @@ export interface ApiDependencies {
     }): Promise<{
       alert_id: string;
       project_id: string;
+      created_by_user_id: string;
       service_id: string | null;
       channel: AlertChannel;
       condition_type: AlertConditionType;
@@ -477,7 +491,13 @@ export interface ApiDependencies {
       created_at: string;
       updated_at: string;
     } | null>;
-    deleteAlertForOrganization(input: { organization_id: string; alert_id: string }): Promise<{ alert_id: string } | null>;
+    deleteAlertForOrganization(input: {
+      organization_id: string;
+      alert_id: string;
+      project_id?: string;
+      actor_user_id?: string;
+      actor_role?: "owner" | "admin" | "member";
+    }): Promise<{ alert_id: string } | null>;
   } | undefined;
   weeklyReportManagement?: {
     listWeeklyReportChannelsForOrganization(input: {
@@ -519,8 +539,11 @@ export interface ApiDependencies {
   webhookTesting?: {
     triggerTestDelivery(input: {
       organization_id: string;
+      project_id?: string;
       webhook_id: string;
       event_type: WebhookEventType;
+      actor_user_id?: string;
+      actor_role?: "owner" | "admin" | "member";
     }): Promise<{ delivery_id: string; event_type: WebhookEventType } | null>;
   } | undefined;
   webhookManagement?: Pick<

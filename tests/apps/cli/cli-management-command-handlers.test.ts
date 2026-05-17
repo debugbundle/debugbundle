@@ -116,45 +116,10 @@ describe("cli management command handlers", () => {
     });
   });
 
-  it("forwards member management inputs and validates required role input", async () => {
-    const listMembersCommand = vi.fn().mockResolvedValue({ exitCode: 0, output: "members" });
-    const listInvitesCommand = vi.fn().mockResolvedValue({ exitCode: 0, output: "invites" });
-    const inviteMemberCommand = vi.fn().mockResolvedValue({ exitCode: 0, output: "invite" });
-    const cancelInviteCommand = vi.fn().mockResolvedValue({ exitCode: 0, output: "cancel" });
-    const updateMemberRoleCommand = vi.fn().mockResolvedValue({ exitCode: 0, output: "role" });
-    const removeMemberCommand = vi.fn().mockResolvedValue({ exitCode: 0, output: "remove" });
-
-    await handleMemberCommand(parseArgv(["members", "list"]), { listMembersCommand });
-    await handleMemberCommand(parseArgv(["members", "invites", "--json"]), { listInvitesCommand });
-    await handleMemberCommand(parseArgv(["members", "invite", "--email", "owner@example.com", "--role", "owner"]), {
-      inviteMemberCommand
-    });
-    await handleMemberCommand(parseArgv(["members", "cancel-invite", "inv_1"]), { cancelInviteCommand });
-    await handleMemberCommand(parseArgv(["members", "update-role", "usr_1", "--role", "member"]), {
-      updateMemberRoleCommand
-    });
-    await handleMemberCommand(parseArgv(["members", "remove", "usr_1"]), { removeMemberCommand });
-
-    await expect(handleMemberCommand(parseArgv(["members", "invite", "--email", "owner@example.com"]), {})).rejects.toThrow(
-      "Missing required option --role."
+  it("rejects removed top-level member management commands", () => {
+    expect(() => handleMemberCommand(parseArgv(["members", "list"]), {})).toThrow(
+      "Use `debugbundle project members ... --project-id <id>` for project collaboration commands."
     );
-
-    expect(listMembersCommand).toHaveBeenCalledWith({ authFilePath: undefined, json: undefined });
-    expect(listInvitesCommand).toHaveBeenCalledWith({ authFilePath: undefined, json: true });
-    expect(inviteMemberCommand).toHaveBeenCalledWith({
-      authFilePath: undefined,
-      json: undefined,
-      email: "owner@example.com",
-      role: "owner"
-    });
-    expect(cancelInviteCommand).toHaveBeenCalledWith({ authFilePath: undefined, json: undefined, inviteId: "inv_1" });
-    expect(updateMemberRoleCommand).toHaveBeenCalledWith({
-      authFilePath: undefined,
-      json: undefined,
-      userId: "usr_1",
-      role: "member"
-    });
-    expect(removeMemberCommand).toHaveBeenCalledWith({ authFilePath: undefined, json: undefined, userId: "usr_1" });
   });
 
   it("forwards GitHub management inputs across status, deliveries, rules, and repo actions", async () => {
@@ -466,6 +431,8 @@ describe("cli management command handlers", () => {
         "webhooks",
         "update",
         "wh_1",
+        "--project-id",
+        "proj_1",
         "--url",
         "https://hooks.example.test/updated",
         "--event",
@@ -475,10 +442,10 @@ describe("cli management command handlers", () => {
       ]),
       { updateWebhookCommand }
     );
-    await handleWebhookCommand(parseArgv(["webhooks", "delete", "wh_1", "--json"]), { deleteWebhookCommand });
-    await handleWebhookCommand(parseArgv(["webhooks", "test", "wh_1"]), { testWebhookCommand });
-    await handleWebhookCommand(parseArgv(["webhooks", "deliveries", "wh_1", "--limit", "6"]), { listWebhookDeliveriesCommand });
-    await handleWebhookCommand(parseArgv(["webhooks", "retry", "wh_1", "del_1", "--json"]), { retryWebhookDeliveryCommand });
+    await handleWebhookCommand(parseArgv(["webhooks", "delete", "wh_1", "--project-id", "proj_1", "--json"]), { deleteWebhookCommand });
+    await handleWebhookCommand(parseArgv(["webhooks", "test", "wh_1", "--project-id", "proj_1"]), { testWebhookCommand });
+    await handleWebhookCommand(parseArgv(["webhooks", "deliveries", "wh_1", "--project-id", "proj_1", "--limit", "6"]), { listWebhookDeliveriesCommand });
+    await handleWebhookCommand(parseArgv(["webhooks", "retry", "wh_1", "del_1", "--project-id", "proj_1", "--json"]), { retryWebhookDeliveryCommand });
 
     await handleWeeklyReportCommand(parseArgv(["weekly-report", "list", "--project-id", "proj_1", "--limit", "4", "--json"]), {
       listWeeklyReportChannelsCommand
@@ -603,14 +570,15 @@ describe("cli management command handlers", () => {
       authFilePath: undefined,
       json: undefined,
       webhookId: "wh_1",
+      projectId: "proj_1",
       url: "https://hooks.example.test/updated",
       events: ["bundle.updated"],
       isEnabled: true
     });
-    expect(deleteWebhookCommand).toHaveBeenCalledWith({ authFilePath: undefined, json: true, webhookId: "wh_1" });
-    expect(testWebhookCommand).toHaveBeenCalledWith({ authFilePath: undefined, json: undefined, webhookId: "wh_1" });
-    expect(listWebhookDeliveriesCommand).toHaveBeenCalledWith({ authFilePath: undefined, json: undefined, webhookId: "wh_1", limit: 6 });
-    expect(retryWebhookDeliveryCommand).toHaveBeenCalledWith({ authFilePath: undefined, json: true, webhookId: "wh_1", deliveryId: "del_1" });
+    expect(deleteWebhookCommand).toHaveBeenCalledWith({ authFilePath: undefined, json: true, webhookId: "wh_1", projectId: "proj_1" });
+    expect(testWebhookCommand).toHaveBeenCalledWith({ authFilePath: undefined, json: undefined, webhookId: "wh_1", projectId: "proj_1" });
+    expect(listWebhookDeliveriesCommand).toHaveBeenCalledWith({ authFilePath: undefined, json: undefined, webhookId: "wh_1", projectId: "proj_1", limit: 6 });
+    expect(retryWebhookDeliveryCommand).toHaveBeenCalledWith({ authFilePath: undefined, json: true, webhookId: "wh_1", projectId: "proj_1", deliveryId: "del_1" });
 
     expect(listWeeklyReportChannelsCommand).toHaveBeenCalledWith({ authFilePath: undefined, json: true, projectId: "proj_1", limit: 4 });
     expect(createWeeklyReportChannelCommand).toHaveBeenCalledWith({
@@ -688,7 +656,7 @@ describe("cli management command handlers", () => {
     await expect(handleWebhookCommand(parseArgv(["webhooks", "create", "--project-id", "proj_1", "--url", "https://example.com"]), {})).rejects.toThrow(
       "Missing required option --event."
     );
-    await expect(handleWebhookCommand(parseArgv(["webhooks", "test", "wh_1", "--event", "invalid-event"]), {})).rejects.toThrow(
+    await expect(handleWebhookCommand(parseArgv(["webhooks", "test", "wh_1", "--project-id", "proj_1", "--event", "invalid-event"]), {})).rejects.toThrow(
       "Invalid value for --event."
     );
 
@@ -704,12 +672,12 @@ describe("cli management command handlers", () => {
   });
 
   it("rejects additional invalid update flows across alerts, webhooks, github rules, members, and weekly reports", async () => {
-    await expect(handleAlertCommand(parseArgv(["alerts", "update", "al_1"]), {})).rejects.toThrow(
+    await expect(handleAlertCommand(parseArgv(["alerts", "update", "al_1", "--project-id", "proj_1"]), {})).rejects.toThrow(
       "At least one alert field must be provided."
     );
     await expect(handleAlertCommand(parseArgv(["alerts", "unknown"]), {})).rejects.toThrow("Unknown alert command.");
 
-    await expect(handleWebhookCommand(parseArgv(["webhooks", "update", "wh_1"]), {})).rejects.toThrow(
+    await expect(handleWebhookCommand(parseArgv(["webhooks", "update", "wh_1", "--project-id", "proj_1"]), {})).rejects.toThrow(
       "At least one webhook field must be provided."
     );
     await expect(handleWebhookCommand(parseArgv(["webhooks", "unknown"]), {})).rejects.toThrow("Unknown webhook command.");
@@ -721,10 +689,12 @@ describe("cli management command handlers", () => {
       "Unknown github rules command."
     );
 
-    await expect(handleMemberCommand(parseArgv(["members", "invite", "--role", "owner"]), {})).rejects.toThrow(
-      "Missing required option --email."
+    expect(() => handleMemberCommand(parseArgv(["members", "invite", "--role", "owner"]), {})).toThrow(
+      "Use `debugbundle project members ... --project-id <id>` for project collaboration commands."
     );
-    await expect(handleMemberCommand(parseArgv(["members", "unknown"]), {})).rejects.toThrow("Unknown member command.");
+    expect(() => handleMemberCommand(parseArgv(["members", "unknown"]), {})).toThrow(
+      "Use `debugbundle project members ... --project-id <id>` for project collaboration commands."
+    );
 
     await expect(
       handleWeeklyReportCommand(
