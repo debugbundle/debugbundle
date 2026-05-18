@@ -64,7 +64,7 @@ User-configured alert notifications (not system-triggered):
 - incident alert delivery via email channel
 
 These are driven by user-created alert rules, not system lifecycle events.
-The alert delivery system already supports email as a channel type.
+The alert delivery system already supports email as a channel type and now batches alert emails into 10-second per-project/per-recipient digests to reduce burst noise.
 Email alert rules require one explicit recipient address per rule in v1.
 They are listed here for completeness but follow a different trigger model.
 

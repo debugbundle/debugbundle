@@ -26,6 +26,7 @@ interface BillingSummaryLike {
     retained_bundle_cap: { used: number; limit: number };
     monthly_remote_activations: { used: number; limit: number };
     monthly_alert_deliveries: { used: number; limit: number };
+    monthly_webhook_deliveries: { used: number; limit: number };
   };
 }
 
@@ -64,7 +65,8 @@ function formatBillingSummary(billing: BillingSummaryLike): string {
     formatMetric("Raw ingested events", billing.allowances.monthly_raw_ingested_events),
     formatMetric("Retained bundles", billing.allowances.retained_bundle_cap),
     formatMetric("Remote activations", billing.allowances.monthly_remote_activations),
-    formatMetric("Alert deliveries", billing.allowances.monthly_alert_deliveries)
+    formatMetric("Alert deliveries", billing.allowances.monthly_alert_deliveries),
+    formatMetric("Webhook deliveries", billing.allowances.monthly_webhook_deliveries)
   ];
 
   if (billing.capacity_units.pending_reduction !== null) {

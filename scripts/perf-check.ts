@@ -334,6 +334,10 @@ function createIngestionBenchmarkApp() {
           monthly_alert_deliveries: {
             used: 0,
             limit: 100
+          },
+          monthly_webhook_deliveries: {
+            used: 0,
+            limit: 250
           }
         }
       }),

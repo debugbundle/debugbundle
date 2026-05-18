@@ -69,6 +69,10 @@ export interface AlertEmailInput {
   bundleUrl?: string | null;
 }
 
+export interface AlertDigestEmailEntryInput extends AlertEmailInput {
+  summary: string | null;
+}
+
 function escapeSlackMrkdwn(value: string): string {
   return value.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;");
 }
@@ -372,6 +376,94 @@ export function renderAlertEmail(input: AlertEmailInput): { subject: string; tex
     ...(input.bundleUrl === undefined || input.bundleUrl === null
       ? []
       : [`<p><a href="${escapeHtml(input.bundleUrl)}">View bundle JSON</a></p>`])
+  ].join("");
+
+  return { subject, text, html };
+}
+
+export function renderAlertDigestEmail(input: {
+  alerts: AlertDigestEmailEntryInput[];
+}): { subject: string; text: string; html: string } {
+  const groupedAlerts = new Map<
+    string,
+    AlertDigestEmailEntryInput & {
+      conditionLabels: string[];
+    }
+  >();
+
+  for (const alert of input.alerts) {
+    const existing = groupedAlerts.get(alert.incidentId);
+    const conditionLabel = formatAlertConditionLabel(alert.conditionType);
+
+    if (existing === undefined) {
+      groupedAlerts.set(alert.incidentId, {
+        ...alert,
+        conditionLabels: [conditionLabel]
+      });
+      continue;
+    }
+
+    if (!existing.conditionLabels.includes(conditionLabel)) {
+      existing.conditionLabels.push(conditionLabel);
+    }
+  }
+
+  const alerts = Array.from(groupedAlerts.values());
+  const incidentCount = alerts.length;
+  const subject =
+    incidentCount === 1
+      ? "[DebugBundle Alerts] 1 incident matched your alerts"
+      : `[DebugBundle Alerts] ${incidentCount} incidents matched your alerts`;
+
+  const text = [
+    incidentCount === 1
+      ? "DebugBundle batched 1 incident into this alert digest."
+      : `DebugBundle batched ${incidentCount} incidents into this alert digest.`,
+    "",
+    ...alerts.flatMap((alert, index) => [
+      `${index + 1}. ${alert.summary ?? "Alert triggered"}`,
+      `   Incident ID: ${alert.incidentId}`,
+      `   Alerts: ${alert.conditionLabels.join(", ")}`,
+      `   Service: ${alert.serviceName}`,
+      `   Environment: ${alert.environment}`,
+      `   Severity: ${titleCase(alert.severity)}`,
+      `   Detected at: ${alert.occurredAt}`,
+      ...(alert.incidentUrl === undefined || alert.incidentUrl === null ? [] : [`   Open incident: ${alert.incidentUrl}`]),
+      ...(alert.bundleUrl === undefined || alert.bundleUrl === null ? [] : [`   View bundle: ${alert.bundleUrl}`]),
+      ""
+    ])
+  ].join("\n").trimEnd();
+
+  const html = [
+    "<h1>DebugBundle alert digest</h1>",
+    `<p>${escapeHtml(
+      incidentCount === 1
+        ? "DebugBundle batched 1 incident into this alert digest."
+        : `DebugBundle batched ${incidentCount} incidents into this alert digest.`
+    )}</p>`,
+    "<ol>",
+    ...alerts.map((alert) =>
+      [
+        "<li>",
+        `<p><strong>${escapeHtml(alert.summary ?? "Alert triggered")}</strong></p>`,
+        "<ul>",
+        `<li><strong>Incident ID:</strong> ${escapeHtml(alert.incidentId)}</li>`,
+        `<li><strong>Alerts:</strong> ${escapeHtml(alert.conditionLabels.join(", "))}</li>`,
+        `<li><strong>Service:</strong> ${escapeHtml(alert.serviceName)}</li>`,
+        `<li><strong>Environment:</strong> ${escapeHtml(alert.environment)}</li>`,
+        `<li><strong>Severity:</strong> ${escapeHtml(titleCase(alert.severity))}</li>`,
+        `<li><strong>Detected at:</strong> ${escapeHtml(alert.occurredAt)}</li>`,
+        "</ul>",
+        ...(alert.incidentUrl === undefined || alert.incidentUrl === null
+          ? []
+          : [`<p><a href="${escapeHtml(alert.incidentUrl)}">Open incident in DebugBundle</a></p>`]),
+        ...(alert.bundleUrl === undefined || alert.bundleUrl === null
+          ? []
+          : [`<p><a href="${escapeHtml(alert.bundleUrl)}">View bundle JSON</a></p>`]),
+        "</li>"
+      ].join("")
+    ),
+    "</ol>"
   ].join("");
 
   return { subject, text, html };

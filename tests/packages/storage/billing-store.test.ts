@@ -94,12 +94,39 @@ describe("billing store – event_class filter", () => {
       },
       allowances: {
         monthly_bundle_requests: { used: 0, limit: 1500 },
-        monthly_raw_ingested_events: { used: 0, limit: 12000 },
+        monthly_raw_ingested_events: { used: 0, limit: 21000 },
         retained_bundle_cap: { used: 0, limit: 900 },
         monthly_remote_activations: { used: 0, limit: 150 },
-        monthly_alert_deliveries: { used: 0, limit: 450 }
+        monthly_alert_deliveries: { used: 0, limit: 450 },
+        monthly_webhook_deliveries: { used: 0, limit: 1500 }
       }
     });
+  });
+
+  it("counts lifecycle webhook delivery rows against the webhook delivery allowance", async () => {
+    const query = vi.fn().mockImplementation((sql: string, params: unknown[]) => {
+      if (sql.includes("FROM organizations")) {
+        return { rows: [{ plan: "free", stripe_customer_id: null, additional_capacity_units: 0 }] };
+      }
+
+      if (sql.includes("to_regclass")) {
+        return { rows: [{ exists: params[0] === "public.webhook_deliveries" }] };
+      }
+
+      if (sql.includes("FROM webhook_deliveries")) {
+        return { rows: [{ count: 12 }] };
+      }
+
+      return { rows: [{ count: 0 }] };
+    });
+
+    const store = createPostgresBillingStore({ query });
+    const summary = await store.getBillingSummaryForOrganization({
+      organization_id: "org_123",
+      now: "2026-03-15T12:00:00.000Z"
+    });
+
+    expect(summary?.allowances.monthly_webhook_deliveries).toEqual({ used: 12, limit: 100 });
   });
 
   it("reads optional billing fields via row JSON so older local schemas do not break summary reads", async () => {

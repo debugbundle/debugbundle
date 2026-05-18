@@ -28,6 +28,7 @@ const {
   processNextBuildBundleJobMock,
   processNextBuildReproductionJobMock,
   processNextEvaluateAlertsJobMock,
+  processNextDeliverAlertEmailDigestJobMock,
   processNextCleanupRetentionJobMock,
   processNextDeliverWebhookJobMock,
   processNextDeliverGitHubDispatchJobMock,
@@ -41,6 +42,7 @@ const {
   createPostgresWebhookDeliveryStoreMock,
   createPostgresGitHubStoreMock,
   createPostgresAlertDeliveryStoreMock,
+  createPostgresSlackDestinationStoreMock,
   createPostgresWeeklyReportDeliveryStoreMock,
   createPostgresWeeklyReportChannelStoreMock
 } = vi.hoisted(() => ({
@@ -56,6 +58,7 @@ const {
   processNextBuildBundleJobMock: vi.fn(),
   processNextBuildReproductionJobMock: vi.fn(),
   processNextEvaluateAlertsJobMock: vi.fn(),
+  processNextDeliverAlertEmailDigestJobMock: vi.fn(),
   processNextCleanupRetentionJobMock: vi.fn(),
   processNextDeliverWebhookJobMock: vi.fn(),
   processNextDeliverGitHubDispatchJobMock: vi.fn(),
@@ -92,6 +95,7 @@ const {
     countProjectGitHubDispatchesSince: vi.fn().mockResolvedValue(0),
     countInstallationGitHubDispatchesSince: vi.fn().mockResolvedValue(0),
     createGitHubDispatchDeliveryIntent: vi.fn(),
+    createSkippedGitHubDispatchDelivery: vi.fn(),
     claimDueGitHubDispatchDeliveries: vi.fn().mockResolvedValue([]),
     getGitHubDispatchDeliveryIntent: vi.fn().mockResolvedValue(null),
     markGitHubDispatchDeliveryAttempt: vi.fn()
@@ -99,7 +103,14 @@ const {
   createPostgresAlertDeliveryStoreMock: vi.fn().mockReturnValue({
     listMatchingAlerts: vi.fn().mockResolvedValue([]),
     createAlertDeliveryIntent: vi.fn(),
-    markAlertDeliveryResult: vi.fn()
+    markAlertDeliveryResult: vi.fn(),
+    queueAlertEmailDigestItem: vi.fn(),
+    claimDueAlertEmailDigests: vi.fn().mockResolvedValue([]),
+    getAlertEmailDigest: vi.fn().mockResolvedValue(null),
+    markAlertEmailDigestResult: vi.fn()
+  }),
+  createPostgresSlackDestinationStoreMock: vi.fn().mockReturnValue({
+    getSlackDestinationSecretForDelivery: vi.fn().mockResolvedValue(null)
   }),
   createPostgresWeeklyReportDeliveryStoreMock: vi.fn().mockReturnValue({
     claimWeeklyReportDelivery: vi.fn(),
@@ -150,7 +161,11 @@ vi.mock("@aws-sdk/client-s3", () => ({
   }
 }));
 
-vi.mock("../../../packages/storage/src/index.js", () => ({
+vi.mock("../../../packages/storage/src/index.js", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../../../packages/storage/src/index.js")>();
+
+  return {
+  ...actual,
   createRedisQueueClient: vi.fn().mockImplementation((input: unknown) => {
     redisFactoryMock(input);
     return {
@@ -181,9 +196,10 @@ vi.mock("../../../packages/storage/src/index.js", () => ({
   createPostgresWebhookDeliveryStore: createPostgresWebhookDeliveryStoreMock,
   createPostgresGitHubStore: createPostgresGitHubStoreMock,
   createPostgresAlertDeliveryStore: createPostgresAlertDeliveryStoreMock,
+  createPostgresSlackDestinationStore: createPostgresSlackDestinationStoreMock,
   createPostgresWeeklyReportDeliveryStore: createPostgresWeeklyReportDeliveryStoreMock,
   createPostgresWeeklyReportChannelStore: createPostgresWeeklyReportChannelStoreMock
-}));
+}});
 
 vi.mock("../../../packages/storage/src/migrations.js", () => ({
   REQUIRED_WORKER_TABLES: [
@@ -195,6 +211,8 @@ vi.mock("../../../packages/storage/src/migrations.js", () => ({
     "incident_events",
     "alert_rules",
     "alert_deliveries",
+    "alert_email_digests",
+    "alert_email_digest_items",
     "agent_webhooks",
     "webhook_deliveries",
     "weekly_report_deliveries"
@@ -207,6 +225,7 @@ vi.mock("../../../apps/worker/src/processor.js", () => ({
   processNextBuildBundleJob: processNextBuildBundleJobMock,
   processNextBuildReproductionJob: processNextBuildReproductionJobMock,
   processNextEvaluateAlertsJob: processNextEvaluateAlertsJobMock,
+  processNextDeliverAlertEmailDigestJob: processNextDeliverAlertEmailDigestJobMock,
   processNextCleanupRetentionJob: processNextCleanupRetentionJobMock,
   processNextDeliverWebhookJob: processNextDeliverWebhookJobMock,
   processNextDeliverGitHubDispatchJob: processNextDeliverGitHubDispatchJobMock,
@@ -246,6 +265,7 @@ import {
   getIncidentStatusForDispatchEvent,
   normalizeGitHubPrivateKey,
   scheduleDueGitHubDispatches,
+  scheduleDueAlertEmailDigests,
   scheduleDueWebhookDeliveries,
   scheduleRetentionCleanup,
   scheduleWeeklyReports,
@@ -264,6 +284,8 @@ const WORKER_TABLE_ROWS = [
   { table_name: "incident_events" },
   { table_name: "alert_rules" },
   { table_name: "alert_deliveries" },
+  { table_name: "alert_email_digests" },
+  { table_name: "alert_email_digest_items" },
   { table_name: "agent_webhooks" },
   { table_name: "webhook_deliveries" },
   { table_name: "weekly_report_deliveries" }
@@ -306,6 +328,7 @@ describe("worker runtime", () => {
     processNextBuildBundleJobMock.mockReset();
     processNextBuildReproductionJobMock.mockReset();
     processNextEvaluateAlertsJobMock.mockReset();
+    processNextDeliverAlertEmailDigestJobMock.mockReset();
     processNextCleanupRetentionJobMock.mockReset();
     processNextDeliverWebhookJobMock.mockReset();
     processNextDeliverGitHubDispatchJobMock.mockReset();
@@ -315,6 +338,7 @@ describe("worker runtime", () => {
     processNextBuildBundleJobMock.mockResolvedValue({ processed: false, reason: "no_jobs" });
     processNextBuildReproductionJobMock.mockResolvedValue({ processed: false, reason: "no_jobs" });
     processNextEvaluateAlertsJobMock.mockResolvedValue({ processed: false, reason: "no_jobs" });
+    processNextDeliverAlertEmailDigestJobMock.mockResolvedValue({ processed: false, reason: "no_jobs" });
     processNextDeliverWebhookJobMock.mockResolvedValue({ processed: false, reason: "no_jobs" });
     processNextDeliverGitHubDispatchJobMock.mockResolvedValue({ processed: false, reason: "no_jobs" });
     processNextGenerateWeeklyReportJobMock.mockResolvedValue({ processed: false, reason: "no_jobs" });
@@ -328,6 +352,7 @@ describe("worker runtime", () => {
     createPostgresWebhookDeliveryStoreMock.mockClear();
     createPostgresGitHubStoreMock.mockClear();
     createPostgresAlertDeliveryStoreMock.mockClear();
+    createPostgresSlackDestinationStoreMock.mockClear();
     createPostgresWeeklyReportDeliveryStoreMock.mockClear();
     createPostgresWeeklyReportChannelStoreMock.mockClear();
     redisPingMock.mockReset();
@@ -432,6 +457,8 @@ describe("worker runtime", () => {
         { table_name: "incident_events" },
         { table_name: "alert_rules" },
         { table_name: "alert_deliveries" },
+        { table_name: "alert_email_digests" },
+        { table_name: "alert_email_digest_items" },
         { table_name: "agent_webhooks" },
         { table_name: "webhook_deliveries" },
         { table_name: "weekly_report_deliveries" }
@@ -475,6 +502,8 @@ describe("worker runtime", () => {
         { table_name: "incident_events" },
         { table_name: "alert_rules" },
         { table_name: "alert_deliveries" },
+        { table_name: "alert_email_digests" },
+        { table_name: "alert_email_digest_items" },
         { table_name: "agent_webhooks" },
         { table_name: "webhook_deliveries" },
         { table_name: "weekly_report_deliveries" }
@@ -497,6 +526,8 @@ describe("worker runtime", () => {
         { table_name: "incident_events" },
         { table_name: "alert_rules" },
         { table_name: "alert_deliveries" },
+        { table_name: "alert_email_digests" },
+        { table_name: "alert_email_digest_items" },
         { table_name: "agent_webhooks" },
         { table_name: "webhook_deliveries" },
         { table_name: "weekly_report_deliveries" }
@@ -519,6 +550,8 @@ describe("worker runtime", () => {
         { table_name: "incident_events" },
         { table_name: "alert_rules" },
         { table_name: "alert_deliveries" },
+        { table_name: "alert_email_digests" },
+        { table_name: "alert_email_digest_items" },
         { table_name: "agent_webhooks" },
         { table_name: "webhook_deliveries" },
         { table_name: "weekly_report_deliveries" }
@@ -541,6 +574,8 @@ describe("worker runtime", () => {
         { table_name: "incident_events" },
         { table_name: "alert_rules" },
         { table_name: "alert_deliveries" },
+        { table_name: "alert_email_digests" },
+        { table_name: "alert_email_digest_items" },
         { table_name: "agent_webhooks" },
         { table_name: "webhook_deliveries" },
         { table_name: "weekly_report_deliveries" }
@@ -690,6 +725,8 @@ describe("worker runtime", () => {
         { table_name: "incident_events" },
         { table_name: "alert_rules" },
         { table_name: "alert_deliveries" },
+        { table_name: "alert_email_digests" },
+        { table_name: "alert_email_digest_items" },
         { table_name: "agent_webhooks" },
         { table_name: "webhook_deliveries" },
         { table_name: "weekly_report_deliveries" }
@@ -718,6 +755,8 @@ describe("worker runtime", () => {
         { table_name: "incident_events" },
         { table_name: "alert_rules" },
         { table_name: "alert_deliveries" },
+        { table_name: "alert_email_digests" },
+        { table_name: "alert_email_digest_items" },
         { table_name: "agent_webhooks" },
         { table_name: "webhook_deliveries" },
         { table_name: "weekly_report_deliveries" }
@@ -759,6 +798,8 @@ describe("worker runtime", () => {
         { table_name: "incident_events" },
         { table_name: "alert_rules" },
         { table_name: "alert_deliveries" },
+        { table_name: "alert_email_digests" },
+        { table_name: "alert_email_digest_items" },
         { table_name: "agent_webhooks" },
         { table_name: "webhook_deliveries" },
         { table_name: "weekly_report_deliveries" }
@@ -787,6 +828,8 @@ describe("worker runtime", () => {
         { table_name: "incident_events" },
         { table_name: "alert_rules" },
         { table_name: "alert_deliveries" },
+        { table_name: "alert_email_digests" },
+        { table_name: "alert_email_digest_items" },
         { table_name: "agent_webhooks" },
         { table_name: "webhook_deliveries" },
         { table_name: "weekly_report_deliveries" }
@@ -817,6 +860,8 @@ describe("worker runtime", () => {
         { table_name: "incident_events" },
         { table_name: "alert_rules" },
         { table_name: "alert_deliveries" },
+        { table_name: "alert_email_digests" },
+        { table_name: "alert_email_digest_items" },
         { table_name: "agent_webhooks" },
         { table_name: "webhook_deliveries" },
         { table_name: "weekly_report_deliveries" }
@@ -851,6 +896,8 @@ describe("worker runtime", () => {
         { table_name: "incident_events" },
         { table_name: "alert_rules" },
         { table_name: "alert_deliveries" },
+        { table_name: "alert_email_digests" },
+        { table_name: "alert_email_digest_items" },
         { table_name: "agent_webhooks" },
         { table_name: "webhook_deliveries" },
         { table_name: "weekly_report_deliveries" }
@@ -920,6 +967,8 @@ describe("worker runtime", () => {
         { table_name: "incident_events" },
         { table_name: "alert_rules" },
         { table_name: "alert_deliveries" },
+        { table_name: "alert_email_digests" },
+        { table_name: "alert_email_digest_items" },
         { table_name: "agent_webhooks" },
         { table_name: "webhook_deliveries" },
         { table_name: "weekly_report_deliveries" }
@@ -954,6 +1003,8 @@ describe("worker runtime", () => {
         { table_name: "incident_events" },
         { table_name: "alert_rules" },
         { table_name: "alert_deliveries" },
+        { table_name: "alert_email_digests" },
+        { table_name: "alert_email_digest_items" },
         { table_name: "agent_webhooks" },
         { table_name: "webhook_deliveries" },
         { table_name: "weekly_report_deliveries" }
@@ -1032,6 +1083,42 @@ describe("worker runtime", () => {
     );
   });
 
+  it("should skip lifecycle webhook intents when the monthly webhook quota is exhausted", async (): Promise<void> => {
+    const listMatchingWebhooks = vi.fn().mockResolvedValue([
+      {
+        webhook_id: "wh_123",
+        target_url: "https://hooks.example.test/debugbundle",
+        signing_secret: "secret_123"
+      }
+    ]);
+    const createDeliveryIntent = vi.fn();
+
+    const publisher = createLifecycleWebhookPublisher({
+      fallbackTargetUrl: null,
+      fallbackSigningSecret: null,
+      webhookDeliveryStore: { listMatchingWebhooks, createDeliveryIntent },
+      billingStore: {
+        getBillingSummaryForProject: vi.fn().mockResolvedValue({
+          allowances: {
+            monthly_webhook_deliveries: { used: 100, limit: 100 }
+          }
+        })
+      }
+    });
+
+    await publisher.publish({
+      event_type: "bundle.created",
+      incident_id: "inc_123",
+      project_id: "proj_123",
+      occurred_at: "2026-03-11T00:00:00.000Z",
+      service_name: "checkout-api",
+      environment: "production",
+      severity: "high"
+    });
+
+    expect(createDeliveryIntent).not.toHaveBeenCalled();
+  });
+
   it("should persist github dispatch intent when a rule matches", async (): Promise<void> => {
     const listMatchingGitHubDispatchRules = vi.fn().mockResolvedValue([
       {
@@ -1047,6 +1134,7 @@ describe("worker runtime", () => {
     const countProjectGitHubDispatchesSince = vi.fn().mockResolvedValue(1);
     const countInstallationGitHubDispatchesSince = vi.fn().mockResolvedValue(25);
     const createGitHubDispatchDeliveryIntent = vi.fn().mockResolvedValue({ delivery_id: "gdd_123", created: true });
+    const createSkippedGitHubDispatchDelivery = vi.fn();
 
     const publisher = createGitHubDispatchPublisher({
       githubStore: {
@@ -1054,7 +1142,8 @@ describe("worker runtime", () => {
         hasRecentGitHubDispatch,
         countProjectGitHubDispatchesSince,
         countInstallationGitHubDispatchesSince,
-        createGitHubDispatchDeliveryIntent
+        createGitHubDispatchDeliveryIntent,
+        createSkippedGitHubDispatchDelivery
       }
     });
 
@@ -1130,6 +1219,7 @@ describe("worker runtime", () => {
       cooldown_seconds: 300
     };
     const createGitHubDispatchDeliveryIntent = vi.fn();
+    const createSkippedGitHubDispatchDelivery = vi.fn().mockResolvedValue({ delivery_id: "gdd_skipped", created: true });
     const listMatchingGitHubDispatchRules = vi.fn().mockResolvedValue([baseRule]);
 
     const cooldownPublisher = createGitHubDispatchPublisher({
@@ -1138,7 +1228,8 @@ describe("worker runtime", () => {
         hasRecentGitHubDispatch: vi.fn().mockResolvedValue(true),
         countProjectGitHubDispatchesSince: vi.fn().mockResolvedValue(0),
         countInstallationGitHubDispatchesSince: vi.fn().mockResolvedValue(0),
-        createGitHubDispatchDeliveryIntent
+        createGitHubDispatchDeliveryIntent,
+        createSkippedGitHubDispatchDelivery
       }
     });
 
@@ -1158,7 +1249,8 @@ describe("worker runtime", () => {
         hasRecentGitHubDispatch: vi.fn().mockResolvedValue(false),
         countProjectGitHubDispatchesSince: vi.fn().mockResolvedValue(100),
         countInstallationGitHubDispatchesSince: vi.fn().mockResolvedValue(0),
-        createGitHubDispatchDeliveryIntent
+        createGitHubDispatchDeliveryIntent,
+        createSkippedGitHubDispatchDelivery
       }
     });
 
@@ -1178,7 +1270,8 @@ describe("worker runtime", () => {
         hasRecentGitHubDispatch: vi.fn().mockResolvedValue(false),
         countProjectGitHubDispatchesSince: vi.fn().mockResolvedValue(0),
         countInstallationGitHubDispatchesSince: vi.fn().mockResolvedValue(4000),
-        createGitHubDispatchDeliveryIntent
+        createGitHubDispatchDeliveryIntent,
+        createSkippedGitHubDispatchDelivery
       }
     });
 
@@ -1193,6 +1286,18 @@ describe("worker runtime", () => {
     });
 
     expect(createGitHubDispatchDeliveryIntent).not.toHaveBeenCalled();
+    expect(createSkippedGitHubDispatchDelivery).toHaveBeenCalledWith(
+      expect.objectContaining({
+        incident_id: "inc_124",
+        reason: "project_hourly_rate_limited"
+      })
+    );
+    expect(createSkippedGitHubDispatchDelivery).toHaveBeenCalledWith(
+      expect.objectContaining({
+        incident_id: "inc_125",
+        reason: "installation_hourly_rate_limited"
+      })
+    );
   });
 
   it("should derive github dispatch dedupe keys from occurred_at when bundle version is absent", async (): Promise<void> => {
@@ -1210,6 +1315,7 @@ describe("worker runtime", () => {
     const countProjectGitHubDispatchesSince = vi.fn().mockResolvedValue(1);
     const countInstallationGitHubDispatchesSince = vi.fn().mockResolvedValue(25);
     const createGitHubDispatchDeliveryIntent = vi.fn().mockResolvedValue({ delivery_id: "gdd_123", created: true });
+    const createSkippedGitHubDispatchDelivery = vi.fn();
 
     const publisher = createGitHubDispatchPublisher({
       githubStore: {
@@ -1217,7 +1323,8 @@ describe("worker runtime", () => {
         hasRecentGitHubDispatch,
         countProjectGitHubDispatchesSince,
         countInstallationGitHubDispatchesSince,
-        createGitHubDispatchDeliveryIntent
+        createGitHubDispatchDeliveryIntent,
+        createSkippedGitHubDispatchDelivery
       }
     });
 
@@ -1366,6 +1473,23 @@ describe("worker runtime", () => {
 
     expect(count).toBe(2);
     expect(enqueue).toHaveBeenCalledTimes(2);
+  });
+
+  it("should enqueue only due alert email digest deliveries during scheduler pass", async (): Promise<void> => {
+    const claimDueAlertEmailDigests = vi
+      .fn()
+      .mockResolvedValue([{ digest_id: "dig_1" }, { digest_id: "dig_2" }]);
+    const enqueue = vi.fn().mockResolvedValue(undefined);
+
+    const count = await scheduleDueAlertEmailDigests({
+      queue: { enqueue },
+      alertStore: { claimDueAlertEmailDigests },
+      batchSize: 50
+    });
+
+    expect(count).toBe(2);
+    expect(enqueue).toHaveBeenCalledWith("deliver-alert-email-digest", { digest_id: "dig_1" });
+    expect(enqueue).toHaveBeenCalledWith("deliver-alert-email-digest", { digest_id: "dig_2" });
   });
 
   it("should enqueue only due github dispatch deliveries during scheduler pass", async (): Promise<void> => {

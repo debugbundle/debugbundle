@@ -163,7 +163,7 @@ export const GitHubDispatchRuleParamsSchema = z
   })
   .strict();
 
-export const GitHubDispatchDeliveryStatusSchema = z.enum(["pending", "retrying", "delivered", "failed"]);
+export const GitHubDispatchDeliveryStatusSchema = z.enum(["pending", "retrying", "delivered", "failed", "skipped"]);
 
 export const GitHubDispatchDeliveriesQuerySchema = z
   .object({

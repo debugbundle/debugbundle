@@ -31,6 +31,7 @@ export const TIER_CAPABILITIES = {
     retained_bundle_cap: 50,
     monthly_remote_activations: 0,
     monthly_alert_deliveries: 25,
+    monthly_webhook_deliveries: 100,
   },
   solo: {
     remote_probes: true,
@@ -51,6 +52,7 @@ export const TIER_CAPABILITIES = {
     retained_bundle_cap: 150,
     monthly_remote_activations: 25,
     monthly_alert_deliveries: 75,
+    monthly_webhook_deliveries: 250,
   },
   team: {
     remote_probes: true,
@@ -71,6 +73,7 @@ export const TIER_CAPABILITIES = {
     retained_bundle_cap: 400,
     monthly_remote_activations: 50,
     monthly_alert_deliveries: 300,
+    monthly_webhook_deliveries: 1_000,
   },
 } as const;
 
@@ -95,6 +98,7 @@ export interface TierCapabilities {
   readonly retained_bundle_cap: number;
   readonly monthly_remote_activations: number;
   readonly monthly_alert_deliveries: number;
+  readonly monthly_webhook_deliveries: number;
 }
 
 /**
@@ -120,6 +124,7 @@ const SELFHOST_CAPABILITIES: TierCapabilities = {
   retained_bundle_cap: 1_000_000,
   monthly_remote_activations: 1_000_000,
   monthly_alert_deliveries: 1_000_000,
+  monthly_webhook_deliveries: 1_000_000,
 };
 
 /** Whether the instance is running in self-host mode (all tier limits bypassed). */

@@ -786,6 +786,12 @@ export function BillingPage(): JSX.Element {
                 limit={billing.allowances.monthly_alert_deliveries.limit}
                 description="Alert deliveries sent this month."
               />
+              <UsageMeter
+                label="Webhook deliveries"
+                used={billing.allowances.monthly_webhook_deliveries.used}
+                limit={billing.allowances.monthly_webhook_deliveries.limit}
+                description="Lifecycle webhook deliveries created this month."
+              />
             </CardContent>
           </Card>
         </>

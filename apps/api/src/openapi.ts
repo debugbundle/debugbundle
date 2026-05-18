@@ -70,6 +70,7 @@ import {
   ProjectInviteParamsSchema,
   ProjectMemberParamsSchema,
   ProjectParamsSchema,
+  ProjectScopedQuerySchema,
   ProjectSlackDestinationDeleteParamsSchema,
   ProjectsQuerySchema,
   ProjectTokenParamsSchema,
@@ -1591,7 +1592,7 @@ function buildPublicApiOperations(): OperationSpec[] {
       tags: ["Webhooks"],
       security: anyMemberAuth,
       params: WebhookDeliveriesParamsSchema,
-      query: WebhookDeliveriesQuerySchema,
+      query: WebhookDeliveriesQuerySchema.merge(ProjectScopedQuerySchema),
       responses: {
         "200": { description: "Webhook deliveries.", schema: webhookDeliveriesResponse },
         "400": { description: "Invalid webhook id or query parameters.", schema: apiError },

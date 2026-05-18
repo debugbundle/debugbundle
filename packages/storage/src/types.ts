@@ -36,6 +36,7 @@ export interface QueueClient {
   enqueue(jobName: "build-bundle", payload: BuildBundleJob): Promise<void>;
   enqueue(jobName: "build-reproduction", payload: BuildReproductionJob): Promise<void>;
   enqueue(jobName: "evaluate-alerts", payload: EvaluateAlertsJob): Promise<void>;
+  enqueue(jobName: "deliver-alert-email-digest", payload: DeliverAlertEmailDigestJob): Promise<void>;
   enqueue(jobName: "deliver-webhook", payload: DeliverWebhookJob): Promise<void>;
   enqueue(jobName: "deliver-github-dispatch", payload: DeliverGitHubDispatchJob): Promise<void>;
   enqueue(jobName: "generate-weekly-report", payload: GenerateWeeklyReportJob): Promise<void>;
@@ -43,8 +44,8 @@ export interface QueueClient {
 }
 
 export interface RedisQueueClient extends QueueClient {
-  readJobQueue(jobName: "normalize-events" | "group-incident" | "build-bundle" | "build-reproduction" | "evaluate-alerts" | "deliver-webhook" | "deliver-github-dispatch" | "generate-weekly-report" | "cleanup-retention"): Promise<string[]>;
-  clearJobQueue(jobName: "normalize-events" | "group-incident" | "build-bundle" | "build-reproduction" | "evaluate-alerts" | "deliver-webhook" | "deliver-github-dispatch" | "generate-weekly-report" | "cleanup-retention"): Promise<void>;
+  readJobQueue(jobName: "normalize-events" | "group-incident" | "build-bundle" | "build-reproduction" | "evaluate-alerts" | "deliver-alert-email-digest" | "deliver-webhook" | "deliver-github-dispatch" | "generate-weekly-report" | "cleanup-retention"): Promise<string[]>;
+  clearJobQueue(jobName: "normalize-events" | "group-incident" | "build-bundle" | "build-reproduction" | "evaluate-alerts" | "deliver-alert-email-digest" | "deliver-webhook" | "deliver-github-dispatch" | "generate-weekly-report" | "cleanup-retention"): Promise<void>;
   acquireLease(key: string, ttlSeconds: number): Promise<boolean>;
   releaseLease(key: string): Promise<void>;
   dequeue(jobName: "normalize-events"): Promise<NormalizeEventsJob | null>;
@@ -52,6 +53,7 @@ export interface RedisQueueClient extends QueueClient {
   dequeue(jobName: "build-bundle"): Promise<BuildBundleJob | null>;
   dequeue(jobName: "build-reproduction"): Promise<BuildReproductionJob | null>;
   dequeue(jobName: "evaluate-alerts"): Promise<EvaluateAlertsJob | null>;
+  dequeue(jobName: "deliver-alert-email-digest"): Promise<DeliverAlertEmailDigestJob | null>;
   dequeue(jobName: "deliver-webhook"): Promise<DeliverWebhookJob | null>;
   dequeue(jobName: "deliver-github-dispatch"): Promise<DeliverGitHubDispatchJob | null>;
   dequeue(jobName: "generate-weekly-report"): Promise<GenerateWeeklyReportJob | null>;
@@ -118,10 +120,15 @@ export interface EvaluateAlertsJob {
   condition_type: AlertConditionType;
   dedupe_key: string;
   occurred_at: string;
+  summary?: string;
   service_name: string;
   environment: string;
   severity: "low" | "medium" | "high" | "critical";
   regression_deploy?: RegressionDeployCorrelation | null;
+}
+
+export interface DeliverAlertEmailDigestJob {
+  digest_id: string;
 }
 
 export interface DeliverWebhookJob {
@@ -486,6 +493,31 @@ export interface AlertDeliveryRecord extends Record<string, unknown> {
   updated_at: string;
 }
 
+export interface AlertEmailDigestRecord extends Record<string, unknown> {
+  digest_id: string;
+  project_id: string;
+  recipient: string;
+  status: "pending" | "delivered" | "failed";
+  next_attempt_at: string | null;
+  claimed_at: string | null;
+  last_error: string | null;
+  delivered_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface AlertEmailDigestItemRecord extends Record<string, unknown> {
+  item_id: string;
+  digest_id: string;
+  alert_id: string;
+  project_id: string;
+  incident_id: string;
+  condition_type: AlertConditionType;
+  dedupe_key: string;
+  payload: Record<string, unknown>;
+  created_at: string;
+}
+
 export interface CreateAlertDeliveryIntentInput {
   alert_id: string;
   project_id: string;
@@ -502,6 +534,18 @@ export interface MarkAlertDeliveryResultInput {
   error_message: string | null;
 }
 
+export interface QueueAlertEmailDigestItemInput {
+  alert_id: string;
+  project_id: string;
+  incident_id: string;
+  condition_type: AlertConditionType;
+  dedupe_key: string;
+  recipient: string;
+  payload: Record<string, unknown>;
+  aggregation_window_seconds: number;
+  allow_new_digest: boolean;
+}
+
 export interface AlertDeliveryStore {
   listMatchingAlerts(input: {
     project_id: string;
@@ -512,6 +556,21 @@ export interface AlertDeliveryStore {
   }): Promise<AlertRuleRecord[]>;
   createAlertDeliveryIntent(input: CreateAlertDeliveryIntentInput): Promise<{ delivery_id: string | null; created: boolean }>;
   markAlertDeliveryResult(input: MarkAlertDeliveryResultInput): Promise<{ status: "delivered" | "failed" }>;
+  queueAlertEmailDigestItem(input: QueueAlertEmailDigestItemInput): Promise<{
+    digest_id: string | null;
+    created: boolean;
+    created_digest: boolean;
+  }>;
+  claimDueAlertEmailDigests(limit: number): Promise<DeliverAlertEmailDigestJob[]>;
+  getAlertEmailDigest(digestId: string): Promise<{
+    digest: AlertEmailDigestRecord;
+    items: AlertEmailDigestItemRecord[];
+  } | null>;
+  markAlertEmailDigestResult(input: {
+    digest_id: string;
+    delivered: boolean;
+    error_message: string | null;
+  }): Promise<{ status: "delivered" | "failed" }>;
 }
 
 export interface PostgresMetadataStore
@@ -1138,7 +1197,7 @@ export interface GitHubDispatchDeliveryRecord extends Record<string, unknown> {
   rule_name: string;
   incident_id: string;
   incident_title: string;
-  status: "pending" | "retrying" | "delivered" | "failed";
+  status: "pending" | "retrying" | "delivered" | "failed" | "skipped";
   attempt_count: number;
   last_attempt_at: string | null;
   last_error: string | null;
@@ -1163,7 +1222,7 @@ export interface GitHubDispatchDeliveryIntent {
   installation_id: number;
   repo_owner: string;
   repo_name: string;
-  status: "pending" | "retrying" | "delivered" | "failed";
+  status: "pending" | "retrying" | "delivered" | "failed" | "skipped";
   attempt_count: number;
   next_attempt_at: string | null;
   last_attempt_at: string | null;
@@ -1271,7 +1330,7 @@ export interface GitHubStore {
   listProjectGitHubDeliveriesForOrganization(input: {
     organization_id: string;
     project_id: string;
-    status?: "pending" | "retrying" | "delivered" | "failed";
+    status?: "pending" | "retrying" | "delivered" | "failed" | "skipped";
     limit: number;
   }): Promise<GitHubDispatchDeliveryRecord[]>;
   retryProjectGitHubDeliveryForOrganization(input: {
@@ -1312,6 +1371,18 @@ export interface GitHubStore {
     installation_id: number;
     repo_owner: string;
     repo_name: string;
+    dispatch_payload: Record<string, unknown>;
+  }): Promise<{ delivery_id: string; created: boolean }>;
+  createSkippedGitHubDispatchDelivery(input: {
+    rule_id: string;
+    project_id: string;
+    incident_id: string;
+    incident_fingerprint: string;
+    dedupe_key: string;
+    installation_id: number;
+    repo_owner: string;
+    repo_name: string;
+    reason: "project_hourly_rate_limited" | "installation_hourly_rate_limited";
     dispatch_payload: Record<string, unknown>;
   }): Promise<{ delivery_id: string; created: boolean }>;
   claimDueGitHubDispatchDeliveries(limit: number): Promise<DeliverGitHubDispatchJob[]>;

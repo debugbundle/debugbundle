@@ -199,7 +199,7 @@ export async function handleGithubCommand(parsedArgv: ParsedArgv, dependencies: 
         const limit = readLimitOption(parsedArgv);
         const input = appendCommonAuthOptions(parsedArgv, {
           projectId,
-          ...(status === undefined ? {} : { status: status as "pending" | "retrying" | "delivered" | "failed" }),
+          ...(status === undefined ? {} : { status: status as "pending" | "retrying" | "delivered" | "failed" | "skipped" }),
           ...(limit === undefined ? {} : { limit })
         });
 

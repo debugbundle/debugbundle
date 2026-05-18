@@ -126,6 +126,61 @@ export const STORAGE_SCHEMA_MIGRATIONS = [
       "ALTER TABLE users ADD COLUMN IF NOT EXISTS avatar_content_type text",
       "ALTER TABLE users ADD COLUMN IF NOT EXISTS avatar_updated_at timestamptz"
     ]
+  }),
+  defineStorageSchemaMigration({
+    id: "202605170001_add_alert_email_digest_queue",
+    description: "Add queued email alert digests and digest items for fixed-window alert batching.",
+    statements: [
+      `
+        CREATE TABLE IF NOT EXISTS alert_email_digests (
+          id uuid PRIMARY KEY,
+          project_id uuid NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+          recipient text NOT NULL,
+          status text NOT NULL,
+          next_attempt_at timestamptz,
+          claimed_at timestamptz,
+          last_error text,
+          delivered_at timestamptz,
+          created_at timestamptz NOT NULL DEFAULT now(),
+          updated_at timestamptz NOT NULL DEFAULT now()
+        )
+      `,
+      `
+        CREATE UNIQUE INDEX IF NOT EXISTS alert_email_digests_project_recipient_pending_idx
+        ON alert_email_digests (project_id, recipient)
+        WHERE status = 'pending' AND claimed_at IS NULL
+      `,
+      `
+        CREATE INDEX IF NOT EXISTS alert_email_digests_status_next_attempt_idx
+        ON alert_email_digests (status, next_attempt_at)
+      `,
+      `
+        CREATE TABLE IF NOT EXISTS alert_email_digest_items (
+          id uuid PRIMARY KEY,
+          digest_id uuid NOT NULL REFERENCES alert_email_digests(id) ON DELETE CASCADE,
+          alert_id uuid NOT NULL REFERENCES alert_rules(id) ON DELETE CASCADE,
+          project_id uuid NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+          incident_id uuid NOT NULL REFERENCES incidents(id) ON DELETE CASCADE,
+          condition_type text NOT NULL,
+          dedupe_key text NOT NULL,
+          payload jsonb NOT NULL,
+          created_at timestamptz NOT NULL DEFAULT now(),
+          UNIQUE (alert_id, incident_id, dedupe_key)
+        )
+      `,
+      `
+        CREATE INDEX IF NOT EXISTS alert_email_digest_items_digest_created_idx
+        ON alert_email_digest_items (digest_id, created_at ASC)
+      `
+    ]
+  }),
+  defineStorageSchemaMigration({
+    id: "202605180001_add_skipped_github_dispatch_status",
+    description: "Allow GitHub dispatch delivery history to record rate-limited skips without retrying them.",
+    statements: [
+      "ALTER TABLE github_dispatch_deliveries DROP CONSTRAINT IF EXISTS github_dispatch_deliveries_status_check",
+      "ALTER TABLE github_dispatch_deliveries ADD CONSTRAINT github_dispatch_deliveries_status_check CHECK (status IN ('pending', 'retrying', 'delivered', 'failed', 'skipped'))"
+    ]
   })
 ] as const;
 

@@ -50,6 +50,8 @@ export const REQUIRED_WORKER_TABLES = [
   "alert_rules",
   "slack_destinations",
   "alert_deliveries",
+  "alert_email_digests",
+  "alert_email_digest_items",
   "weekly_report_deliveries",
   "agent_webhooks",
   "webhook_deliveries"
@@ -586,6 +588,47 @@ const STORAGE_BOOTSTRAP_STATEMENTS = [
     ON alert_deliveries (project_id, status, created_at DESC)
   `,
   `
+    CREATE TABLE alert_email_digests (
+      id uuid PRIMARY KEY,
+      project_id uuid NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+      recipient text NOT NULL,
+      status text NOT NULL,
+      next_attempt_at timestamptz,
+      claimed_at timestamptz,
+      last_error text,
+      delivered_at timestamptz,
+      created_at timestamptz NOT NULL DEFAULT now(),
+      updated_at timestamptz NOT NULL DEFAULT now()
+    )
+  `,
+  `
+    CREATE UNIQUE INDEX alert_email_digests_project_recipient_pending_idx
+    ON alert_email_digests (project_id, recipient)
+    WHERE status = 'pending' AND claimed_at IS NULL
+  `,
+  `
+    CREATE INDEX alert_email_digests_status_next_attempt_idx
+    ON alert_email_digests (status, next_attempt_at)
+  `,
+  `
+    CREATE TABLE alert_email_digest_items (
+      id uuid PRIMARY KEY,
+      digest_id uuid NOT NULL REFERENCES alert_email_digests(id) ON DELETE CASCADE,
+      alert_id uuid NOT NULL REFERENCES alert_rules(id) ON DELETE CASCADE,
+      project_id uuid NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+      incident_id uuid NOT NULL REFERENCES incidents(id) ON DELETE CASCADE,
+      condition_type text NOT NULL,
+      dedupe_key text NOT NULL,
+      payload jsonb NOT NULL,
+      created_at timestamptz NOT NULL DEFAULT now(),
+      UNIQUE (alert_id, incident_id, dedupe_key)
+    )
+  `,
+  `
+    CREATE INDEX alert_email_digest_items_digest_created_idx
+    ON alert_email_digest_items (digest_id, created_at ASC)
+  `,
+  `
     CREATE TABLE agent_webhooks (
       id uuid PRIMARY KEY,
       project_id uuid NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
@@ -699,7 +742,7 @@ const STORAGE_BOOTSTRAP_STATEMENTS = [
       repo_owner text NOT NULL,
       repo_name text NOT NULL,
       status text NOT NULL DEFAULT 'pending'
-        CHECK (status IN ('pending', 'retrying', 'delivered', 'failed')),
+        CHECK (status IN ('pending', 'retrying', 'delivered', 'failed', 'skipped')),
       attempt_count integer NOT NULL DEFAULT 0,
       next_attempt_at timestamptz,
       last_attempt_at timestamptz,

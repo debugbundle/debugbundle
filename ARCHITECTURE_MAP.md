@@ -251,9 +251,9 @@ The public documentation/marketing/blog site lives in the standalone public repo
 
 ### `apps/worker`
 - **Owns:** Background job processing via BullMQ
-- **Jobs:** `normalize-events`, `group-incident`, `build-bundle`, `build-reproduction`, `deliver-webhook`, `evaluate-alerts`, `generate-weekly-report`, `cleanup-retention`, `dispatch-github`
+- **Jobs:** `normalize-events`, `group-incident`, `build-bundle`, `build-reproduction`, `evaluate-alerts`, `deliver-alert-email-digest`, `deliver-webhook`, `generate-weekly-report`, `cleanup-retention`, `dispatch-github`
 - **Imports:** `bundle-engine`, `repro-engine`, `event-normalizer`, `shared-types`, `redaction`, `email`
-- **Key constraint:** All jobs must be idempotent; alert evaluation achieves this by persisting one internal `alert_deliveries` row per alert/incident/dedupe key before transport delivery (with multi-channel support: email, slack, discord, webhook), resolving reusable Slack destinations only after the claim row is written, weekly reporting now relies on persisted `bundle_generations` history plus `weekly_report_deliveries` claim rows before email or Slack transport is attempted, and GitHub dispatch achieves idempotency via `github_dispatch_deliveries` claim rows with cooldown enforcement before `repository_dispatch` API calls
+- **Key constraint:** All jobs must be idempotent; lifecycle webhooks gate new intents against `monthly_webhook_deliveries` before queue insertion, alert evaluation achieves this by persisting one internal `alert_deliveries` row per alert/incident/dedupe key before immediate non-email delivery plus an `alert_email_digests` / `alert_email_digest_items` queue for fixed 10-second email batching, resolving reusable Slack destinations only after the claim row is written, weekly reporting now relies on persisted `bundle_generations` history plus `weekly_report_deliveries` claim rows before email or Slack transport is attempted, and GitHub dispatch achieves idempotency via `github_dispatch_deliveries` claim rows with cooldown enforcement before `repository_dispatch` API calls and non-retryable `skipped` rows for DebugBundle-side hourly suppressions
 - **Local dev note:** the top-level `docker-compose.yml` `dev` profile now starts the worker alongside API and web so local dogfooding can exercise the full ingestion-to-bundle path without a separate manual worker launch
 
 ### `apps/cli`
@@ -305,7 +305,7 @@ The public documentation/marketing/blog site lives in the standalone public repo
   - `metadata-store.ts` — Postgres metadata store (account membership, explicit project ownership + `project_members`, invite-token-backed `project_invites`, invite cancellation/acceptance, project list/create + tokens, incidents, probes, deployments, alerts, weekly-report aggregation, incident-event retention reasons)
   - `slack-destination-store.ts` — Postgres reusable Slack destination CRUD plus worker-side encrypted-secret lookup
   - `billing-store.ts` — Postgres billing summary queries derived from organization plan, active-project counts, shared allowance-capacity units, and monthly usage counters
-  - `alert-delivery-store.ts` — Postgres alert evaluation queries and alert delivery-intent persistence
+  - `alert-delivery-store.ts` — Postgres alert evaluation queries, immediate alert delivery-intent persistence, and queued email-digest persistence/claiming
   - `webhook-delivery-store.ts` — Postgres webhook delivery persistence
   - `weekly-report-channel-store.ts` — Postgres weekly-report channel CRUD and scheduler lookup
   - `frequency-counter.ts` — Redis rolling frequency counter (1m/5m/1h/24h buckets)
@@ -363,7 +363,7 @@ The public documentation/marketing/blog site lives in the standalone public repo
 
 | Store | Owned By | Contents |
 |-------|----------|----------|
-| PostgreSQL | `apps/api`, `apps/worker` | 33 relational tables (users, organizations, organization_members, projects, project_tokens, member_tokens, services, incidents, incident_events, processed_events, bundle_generations, alert_rules, alert_deliveries, agent_webhooks, webhook_deliveries, weekly_report_channels, weekly_report_deliveries, probe_activations, deployments, org_usage_counters, capture_policies, github_installations, project_github_repos, github_dispatch_rules, github_dispatch_deliveries, audit_logs, password_credentials, sessions, email_verification_tokens, password_reset_tokens, invites, oauth_identities, processed_billing_events) |
+| PostgreSQL | `apps/api`, `apps/worker` | 35 relational tables (users, organizations, organization_members, projects, project_tokens, member_tokens, services, incidents, incident_events, processed_events, bundle_generations, alert_rules, alert_deliveries, alert_email_digests, alert_email_digest_items, agent_webhooks, webhook_deliveries, weekly_report_channels, weekly_report_deliveries, probe_activations, deployments, org_usage_counters, capture_policies, github_installations, project_github_repos, github_dispatch_rules, github_dispatch_deliveries, audit_logs, password_credentials, sessions, email_verification_tokens, password_reset_tokens, invites, oauth_identities, processed_billing_events) |
 | Amazon S3 | `apps/api` (write), `apps/worker` (read/write/delete) | Raw events (`raw/{project_id}/{date}/{event_id}.json`) for retained sampled occurrences, bundles (`bundles/{project_id}/{incident_id}/bundle.json.gz`), reproductions (`reproductions/{project_id}/{incident_id}/reproduction.json.gz`) |
 | Redis | `apps/api`, `apps/worker` | BullMQ job queues, incident frequency counters, ingestion rate-limit counters, GitHub App installation token cache (50m TTL), optional caches |
 
@@ -407,7 +407,7 @@ build-bundle reservation → append deterministic `bundle_generations` history r
 
 ### GitHub Dispatch Flow
 ```
-Worker lifecycle event (bundle.created / bundle.reopened / incident.spike_detected) → match enabled `github_dispatch_rules` by event + filters (environment/service/severity/incident_status) + cooldown check → persist delivery intent (Postgres `github_dispatch_deliveries`) → claim due deliveries by `next_attempt_at` → acquire GitHub App installation token (Redis cache, 50m TTL) → POST `repository_dispatch` with event_type "debugbundle.incident" and client_payload (summary fields + API links) → update delivery status/retry state → rate-limit enforcement (100/project/hour, 4000/installation/hour) → retry on failure (1s → 5s → 30s → 2m → 10m, 5 attempts max)
+Worker lifecycle event (bundle.created / bundle.reopened / incident.spike_detected) → match enabled `github_dispatch_rules` by event + filters (environment/service/severity/incident_status) + cooldown check → enforce DebugBundle hourly dispatch caps (100/project/hour, 4000/installation/hour) and persist non-retryable `skipped` history rows for suppressed matches → persist delivery intent (Postgres `github_dispatch_deliveries`) → claim due deliveries by `next_attempt_at` → acquire GitHub App installation token (Redis cache, 50m TTL) → POST `repository_dispatch` with event_type "debugbundle.incident" and client_payload (summary fields + API links) → update delivery status/retry state → retry on failure (1s → 5s → 30s → 2m → 10m, 5 attempts max)
 ```
 
 ### Agent Automation Flow

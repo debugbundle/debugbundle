@@ -38,7 +38,8 @@ export const BillingSummarySchema = z
         monthly_raw_ingested_events: BillingUsageMetricSchema,
         retained_bundle_cap: BillingUsageMetricSchema,
         monthly_remote_activations: BillingUsageMetricSchema,
-        monthly_alert_deliveries: BillingUsageMetricSchema
+        monthly_alert_deliveries: BillingUsageMetricSchema,
+        monthly_webhook_deliveries: BillingUsageMetricSchema
       })
       .strict()
   })

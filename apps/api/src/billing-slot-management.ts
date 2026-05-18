@@ -15,6 +15,7 @@ interface ProjectBillingLimits {
   retained_bundle_cap: BillingUsageMetric;
   monthly_remote_activations: BillingUsageMetric;
   monthly_alert_deliveries: BillingUsageMetric;
+  monthly_webhook_deliveries: BillingUsageMetric;
 }
 
 export interface StripeBillingSubscriptionState {
@@ -131,6 +132,10 @@ function buildAllowanceLimits(plan: TierName, totalCapacityUnits: number): Proje
     monthly_alert_deliveries: {
       used: 0,
       limit: capabilities.monthly_alert_deliveries * totalCapacityUnits
+    },
+    monthly_webhook_deliveries: {
+      used: 0,
+      limit: capabilities.monthly_webhook_deliveries * totalCapacityUnits
     }
   };
 }
@@ -176,6 +181,10 @@ export function projectBillingSummary(input: {
       monthly_alert_deliveries: {
         used: input.summary.allowances.monthly_alert_deliveries.used,
         limit: allowanceLimits.monthly_alert_deliveries.limit
+      },
+      monthly_webhook_deliveries: {
+        used: input.summary.allowances.monthly_webhook_deliveries.used,
+        limit: allowanceLimits.monthly_webhook_deliveries.limit
       }
     }
   };

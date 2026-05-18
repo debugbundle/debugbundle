@@ -601,7 +601,7 @@ export function createApiDependencies(input: CreateApiDependenciesInput): {
     listProjectDeliveriesForOrganization(input: {
       organization_id: string;
       project_id: string;
-      status?: "pending" | "retrying" | "delivered" | "failed";
+      status?: "pending" | "retrying" | "delivered" | "failed" | "skipped";
       limit: number;
     }): Promise<import("../../../packages/storage/src/index.js").GitHubDispatchDeliveryRecord[]>;
     retryProjectDeliveryForOrganization(input: {
@@ -804,7 +804,8 @@ export function createApiDependencies(input: CreateApiDependenciesInput): {
     incidentStore: metadataStore,
     webhookDeliveryStore: webhookDelivery,
     fallbackTargetUrl: input.lifecycleWebhookFallbackTargetUrl ?? null,
-    fallbackSigningSecret: input.lifecycleWebhookFallbackSigningSecret ?? null
+    fallbackSigningSecret: input.lifecycleWebhookFallbackSigningSecret ?? null,
+    billingStore
   });
   const webhookTesting = {
     triggerTestDelivery: async (request: {
@@ -1376,7 +1377,7 @@ export function createApiDependencies(input: CreateApiDependenciesInput): {
             async listProjectDeliveriesForOrganization(requestInput: {
               organization_id: string;
               project_id: string;
-              status?: "pending" | "retrying" | "delivered" | "failed";
+              status?: "pending" | "retrying" | "delivered" | "failed" | "skipped";
               limit: number;
             }) {
               return githubStore.listProjectGitHubDeliveriesForOrganization(requestInput);

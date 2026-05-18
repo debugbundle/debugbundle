@@ -135,6 +135,7 @@ export interface BillingSummaryRecord {
     retained_bundle_cap: BillingUsageMetric;
     monthly_remote_activations: BillingUsageMetric;
     monthly_alert_deliveries: BillingUsageMetric;
+    monthly_webhook_deliveries: BillingUsageMetric;
   };
 }
 
@@ -245,7 +246,7 @@ export interface GitHubDispatchDeliveryRecord {
   rule_name: string;
   incident_id: string;
   incident_title: string;
-  status: "pending" | "retrying" | "delivered" | "failed";
+  status: "pending" | "retrying" | "delivered" | "failed" | "skipped";
   attempt_count: number;
   last_attempt_at: string | null;
   last_error: string | null;
@@ -427,6 +428,10 @@ export function createBillingSummary(overrides: Partial<BillingSummaryRecord> = 
       monthly_alert_deliveries: {
         used: 4,
         limit: capabilities.monthly_alert_deliveries * capacityUnits.total
+      },
+      monthly_webhook_deliveries: {
+        used: 8,
+        limit: capabilities.monthly_webhook_deliveries * capacityUnits.total
       }
     },
     ...overrides

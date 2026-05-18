@@ -14,6 +14,7 @@ type TokenManagementDependency = MockedMethods<ApiServerDependencies["tokenManag
 type ProbeManagementDependency = MockedMethods<NonNullable<ApiServerDependencies["probeManagement"]>>;
 type IngestionRateLimiterDependency = MockedMethods<NonNullable<ApiServerDependencies["ingestionRateLimiter"]>>;
 type BillingManagementDependency = MockedMethods<NonNullable<ApiServerDependencies["billingManagement"]>>;
+type ProjectManagementDependency = MockedMethods<NonNullable<ApiServerDependencies["projectManagement"]>>;
 
 function createWebhookDeliveryDependency(): WebhookDeliveryDependency {
   return mockedObject<ApiServerDependencies["webhookDelivery"]>({
@@ -50,6 +51,24 @@ function createTokenManagementDependency(): TokenManagementDependency {
     listMemberTokensForOrganization: vi.fn().mockResolvedValue([]),
     createMemberTokenForOrganization: vi.fn().mockResolvedValue(null),
     revokeMemberTokenForOrganization: vi.fn().mockResolvedValue(null)
+  });
+}
+
+function createProjectManagementDependency(): ProjectManagementDependency {
+  return mockedObject<NonNullable<ApiServerDependencies["projectManagement"]>>({
+    resolveProjectAccessForUser: vi.fn().mockResolvedValue({
+      project_id: "00000000-0000-4000-8000-000000000001",
+      organization_id: "org_123",
+      owner_user_id: "usr_owner",
+      owner_email: "owner@example.com",
+      relationship: "owned",
+      effective_role: "owner",
+      organization_plan: "team"
+    }),
+    listProjectsForUser: vi.fn().mockResolvedValue([]),
+    createProjectForUser: vi.fn().mockResolvedValue(null),
+    updateProjectForUser: vi.fn().mockResolvedValue(null),
+    deleteProjectForUser: vi.fn().mockResolvedValue(null)
   });
 }
 
@@ -91,10 +110,15 @@ function createBillingManagementDependency(overrides: {
           ends_at: "2026-04-01T00:00:00.000Z"
         },
         allowances: {
+          monthly_bundle_requests: { used: 0, limit: 25 },
           monthly_raw_ingested_events: {
             used: 0,
             limit: 750
-          }
+          },
+          retained_bundle_cap: { used: 0, limit: 5 },
+          monthly_remote_activations: { used: 0, limit: 0 },
+          monthly_alert_deliveries: { used: 0, limit: 25 },
+          monthly_webhook_deliveries: { used: 0, limit: 100 }
         }
       }),
     createCheckoutLink: vi.fn().mockResolvedValue(null),
@@ -176,10 +200,15 @@ describe("api ingestion route", () => {
         ends_at: "2026-04-01T00:00:00.000Z"
       },
       allowances: {
+        monthly_bundle_requests: { used: 0, limit: 25 },
         monthly_raw_ingested_events: {
           used: 750,
           limit: 750
-        }
+        },
+        retained_bundle_cap: { used: 0, limit: 5 },
+        monthly_remote_activations: { used: 0, limit: 0 },
+        monthly_alert_deliveries: { used: 0, limit: 25 },
+        monthly_webhook_deliveries: { used: 0, limit: 100 }
       }
     });
 
@@ -944,6 +973,7 @@ describe("api ingestion route", () => {
       memberAuth: {
         resolveMemberByTokenHash
       },
+      projectManagement: createProjectManagementDependency(),
       tokenManagement: createTokenManagementDependency(),
       incidentRetrieval: createIncidentRetrievalDependency(),
       objectStoreReader: createObjectStoreReaderDependency(),
@@ -954,7 +984,7 @@ describe("api ingestion route", () => {
 
     const response = await app.inject({
       method: "GET",
-      url: "/v1/webhooks/wh_123/deliveries?limit=10",
+      url: "/v1/webhooks/11111111-1111-4111-8111-111111111111/deliveries?project_id=00000000-0000-4000-8000-000000000001&limit=10",
       headers: {
         authorization: "Bearer dbundle_mem_test"
       }
@@ -963,7 +993,7 @@ describe("api ingestion route", () => {
     expect(response.statusCode).toBe(200);
     expect(resolveMemberByTokenHash).toHaveBeenCalledWith(hashToken("dbundle_mem_test"));
     expect(listDeliveriesForWebhookInOrganization).toHaveBeenCalledWith({
-      webhookId: "wh_123",
+      webhookId: "11111111-1111-4111-8111-111111111111",
       organizationId: "org_123",
       limit: 10
     });
@@ -1003,7 +1033,7 @@ describe("api ingestion route", () => {
 
     const response = await app.inject({
       method: "GET",
-      url: "/v1/webhooks/wh_123/deliveries",
+      url: "/v1/webhooks/11111111-1111-4111-8111-111111111111/deliveries?project_id=00000000-0000-4000-8000-000000000001",
       headers: {
         authorization: "Bearer dbundle_mem_test"
       }
@@ -1033,7 +1063,7 @@ describe("api ingestion route", () => {
 
     const response = await app.inject({
       method: "GET",
-      url: "/v1/webhooks/wh_123/deliveries?limit=999",
+      url: "/v1/webhooks/11111111-1111-4111-8111-111111111111/deliveries?project_id=00000000-0000-4000-8000-000000000001&limit=999",
       headers: {
         authorization: "Bearer dbundle_mem_test"
       }
@@ -1062,7 +1092,7 @@ describe("api ingestion route", () => {
 
     const response = await app.inject({
       method: "GET",
-      url: "/v1/webhooks/wh_123/deliveries",
+      url: "/v1/webhooks/11111111-1111-4111-8111-111111111111/deliveries?project_id=00000000-0000-4000-8000-000000000001",
       headers: {
         authorization: "Bearer dbundle_mem_test"
       }

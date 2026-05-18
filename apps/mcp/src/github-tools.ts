@@ -28,7 +28,7 @@ export function createGitHubMcpTools(api: {
   listProjectDeliveries?(input: {
     bearerToken: string;
     projectId: string;
-    status?: "pending" | "retrying" | "delivered" | "failed";
+    status?: "pending" | "retrying" | "delivered" | "failed" | "skipped";
     limit?: number;
   }): Promise<unknown[]>;
   retryProjectDelivery?(input: { bearerToken: string; projectId: string; deliveryId: string }): Promise<unknown>;
@@ -186,7 +186,7 @@ export function createGitHubMcpTools(api: {
             bearerToken: String(input["bearerToken"]),
             projectId: String(input["projectId"]),
             ...(typeof input["status"] === "string"
-              ? { status: input["status"] as "pending" | "retrying" | "delivered" | "failed" }
+              ? { status: input["status"] as "pending" | "retrying" | "delivered" | "failed" | "skipped" }
               : {}),
             ...(typeof input["limit"] === "number" ? { limit: input["limit"] } : {})
           })

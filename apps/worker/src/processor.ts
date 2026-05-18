@@ -21,6 +21,7 @@ import type {
   BundleBuildContextStore,
   BuildBundleJob,
   CleanupRetentionJob,
+  DeliverAlertEmailDigestJob,
   DeliverGitHubDispatchJob,
   EvaluateAlertsJob,
   GenerateWeeklyReportJob,
@@ -65,12 +66,14 @@ export interface WorkerQueue {
   dequeue(jobName: "build-bundle"): Promise<BuildBundleJob | null>;
   dequeue(jobName: "build-reproduction"): Promise<BuildReproductionJob | null>;
   dequeue(jobName: "evaluate-alerts"): Promise<EvaluateAlertsJob | null>;
+  dequeue(jobName: "deliver-alert-email-digest"): Promise<DeliverAlertEmailDigestJob | null>;
   dequeue(jobName: "generate-weekly-report"): Promise<GenerateWeeklyReportJob | null>;
   dequeue(jobName: "cleanup-retention"): Promise<CleanupRetentionJob | null>;
   enqueue(jobName: "group-incident", payload: GroupIncidentJob): Promise<void>;
   enqueue(jobName: "build-bundle", payload: BuildBundleJob): Promise<void>;
   enqueue(jobName: "build-reproduction", payload: BuildReproductionJob): Promise<void>;
   enqueue(jobName: "evaluate-alerts", payload: EvaluateAlertsJob): Promise<void>;
+  enqueue(jobName: "deliver-alert-email-digest", payload: DeliverAlertEmailDigestJob): Promise<void>;
   dequeue(jobName: "deliver-webhook"): Promise<{ delivery_id: string; attempt: number } | null>;
   enqueue(jobName: "deliver-webhook", payload: { delivery_id: string; attempt: number }): Promise<void>;
   dequeue(jobName: "deliver-github-dispatch"): Promise<DeliverGitHubDispatchJob | null>;
@@ -310,6 +313,19 @@ export interface AlertDeliveryTransport {
   }): Promise<void>;
 }
 
+export interface AlertEmailDigestTransport {
+  deliver(input: {
+    digest_id: string;
+    project_id: string;
+    recipient: string;
+    items: Array<{
+      incident_id: string;
+      condition_type: AlertConditionType;
+      payload: Record<string, unknown>;
+    }>;
+  }): Promise<void>;
+}
+
 export class AlertDeliveryError extends Error {
   constructor(message: string) {
     super(message);
@@ -322,6 +338,12 @@ export interface EvaluateAlertsWorkerDependencies {
   alertStore: AlertDeliveryStore;
   alertTransport: AlertDeliveryTransport;
   billingStore?: Pick<BillingStore, "getBillingSummaryForProject">;
+}
+
+export interface DeliverAlertEmailDigestWorkerDependencies {
+  queue: WorkerQueue;
+  alertStore: Pick<AlertDeliveryStore, "getAlertEmailDigest" | "markAlertEmailDigestResult">;
+  alertEmailDigestTransport: AlertEmailDigestTransport;
 }
 
 export interface GenerateWeeklyReportWorkerDependencies {
@@ -348,6 +370,8 @@ export interface WorkerProcessResult {
   reason?: string;
 }
 
+const ALERT_EMAIL_DIGEST_WINDOW_SECONDS = 10;
+
 function getWorkerErrorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
@@ -360,6 +384,7 @@ async function enqueueAlertEvaluation(
     condition_type: AlertConditionType;
     dedupe_key: string;
     occurred_at: string;
+    summary?: string;
     service_name: string;
     environment: string;
     severity: "low" | "medium" | "high" | "critical";
@@ -678,6 +703,7 @@ export async function processNextGroupIncidentJob(
         condition_type: "new_incident",
         dedupe_key: "new_incident",
         occurred_at: job.occurred_at,
+        summary: job.normalized_message,
         service_name: job.service_name,
         environment: job.environment,
         severity: job.severity
@@ -690,6 +716,7 @@ export async function processNextGroupIncidentJob(
       condition_type: "severity_threshold",
       dedupe_key: `severity_threshold:${job.severity}`,
       occurred_at: job.occurred_at,
+      summary: job.normalized_message,
       service_name: job.service_name,
       environment: job.environment,
       severity: job.severity
@@ -702,6 +729,7 @@ export async function processNextGroupIncidentJob(
         condition_type: "incident_regressed",
         dedupe_key: "incident_regressed",
         occurred_at: job.occurred_at,
+        summary: job.normalized_message,
         service_name: job.service_name,
         environment: job.environment,
         severity: job.severity,
@@ -715,6 +743,7 @@ export async function processNextGroupIncidentJob(
           condition_type: "regression_after_deploy",
           dedupe_key: "regression_after_deploy",
           occurred_at: job.occurred_at,
+          summary: job.normalized_message,
           service_name: job.service_name,
           environment: job.environment,
           severity: job.severity,
@@ -774,6 +803,7 @@ export async function processNextGroupIncidentJob(
           condition_type: "error_spike",
           dedupe_key: "error_spike",
           occurred_at: job.occurred_at,
+          summary: job.normalized_message,
           service_name: job.service_name,
           environment: job.environment,
           severity: job.severity
@@ -841,16 +871,13 @@ export async function processNextEvaluateAlertsJob(
   }
 
   for (const alert of alerts) {
-    if (remainingAlertDeliveries !== null && remainingAlertDeliveries <= 0) {
-      continue;
-    }
-
     const payload: Record<string, unknown> = {
       alert_id: alert.alert_id,
       condition_type: job.condition_type,
       incident_id: job.incident_id,
       project_id: job.project_id,
       occurred_at: job.occurred_at,
+      summary: job.summary ?? null,
       service_name: job.service_name,
       environment: job.environment,
       severity: job.severity,
@@ -861,6 +888,35 @@ export async function processNextEvaluateAlertsJob(
       deploy_deployed_at: job.regression_deploy?.deployed_at ?? null,
       minutes_since_deploy: job.regression_deploy?.minutes_since_deploy ?? null
     };
+
+    if (alert.channel === "email") {
+      const toField = alert.config["to"];
+      const recipient = typeof toField === "string" ? toField.trim().toLowerCase() : "";
+      if (recipient.length === 0) {
+        continue;
+      }
+
+      const queued = await dependencies.alertStore.queueAlertEmailDigestItem({
+        alert_id: alert.alert_id,
+        project_id: job.project_id,
+        incident_id: job.incident_id,
+        condition_type: job.condition_type,
+        dedupe_key: job.dedupe_key,
+        recipient,
+        payload,
+        aggregation_window_seconds: ALERT_EMAIL_DIGEST_WINDOW_SECONDS,
+        allow_new_digest: remainingAlertDeliveries === null || remainingAlertDeliveries > 0
+      });
+
+      if (queued.created && queued.created_digest && remainingAlertDeliveries !== null) {
+        remainingAlertDeliveries -= 1;
+      }
+      continue;
+    }
+
+    if (remainingAlertDeliveries !== null && remainingAlertDeliveries <= 0) {
+      continue;
+    }
 
     const intent = await dependencies.alertStore.createAlertDeliveryIntent({
       alert_id: alert.alert_id,
@@ -904,6 +960,57 @@ export async function processNextEvaluateAlertsJob(
         error_message: message
       });
     }
+  }
+
+  return { processed: true };
+}
+
+export async function processNextDeliverAlertEmailDigestJob(
+  dependencies: DeliverAlertEmailDigestWorkerDependencies
+): Promise<WorkerProcessResult> {
+  const job = await dependencies.queue.dequeue("deliver-alert-email-digest");
+  if (job === null) {
+    return { processed: false, reason: "no_jobs" };
+  }
+
+  const digest = await dependencies.alertStore.getAlertEmailDigest(job.digest_id);
+  if (digest === null || digest.digest.status !== "pending") {
+    return { processed: true };
+  }
+
+  if (digest.items.length === 0) {
+    await dependencies.alertStore.markAlertEmailDigestResult({
+      digest_id: digest.digest.digest_id,
+      delivered: false,
+      error_message: "alert_email_digest_empty"
+    });
+    return { processed: true };
+  }
+
+  try {
+    await dependencies.alertEmailDigestTransport.deliver({
+      digest_id: digest.digest.digest_id,
+      project_id: digest.digest.project_id,
+      recipient: digest.digest.recipient,
+      items: digest.items.map((item) => ({
+        incident_id: item.incident_id,
+        condition_type: item.condition_type,
+        payload: item.payload
+      }))
+    });
+
+    await dependencies.alertStore.markAlertEmailDigestResult({
+      digest_id: digest.digest.digest_id,
+      delivered: true,
+      error_message: null
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    await dependencies.alertStore.markAlertEmailDigestResult({
+      digest_id: digest.digest.digest_id,
+      delivered: false,
+      error_message: message
+    });
   }
 
   return { processed: true };

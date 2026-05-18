@@ -11,6 +11,7 @@ import { assertStorageSchemaMigrationsApplied } from "../../../packages/storage/
 import {
   createSesEmailTransport,
   formatProductFromEmail,
+  renderAlertDigestEmail,
   renderAlertEmail,
   renderAlertSlackMessage,
   renderWeeklyReportEmail,
@@ -35,6 +36,8 @@ import {
   createS3ObjectStoreClient,
   assertIntegrationSecretEncryptionKey,
   decryptIntegrationSecret,
+  type AlertDeliveryStore,
+  type BillingStore,
   type WeeklyReportChannelRecord,
   type GitHubStore,
   type SlackDestinationStore,
@@ -48,10 +51,12 @@ import {
   processNextBuildReproductionJob,
   processNextEvaluateAlertsJob,
   processNextCleanupRetentionJob,
+  processNextDeliverAlertEmailDigestJob,
   processNextDeliverGitHubDispatchJob,
   processNextDeliverWebhookJob,
   processNextGenerateWeeklyReportJob,
   AlertDeliveryError,
+  type AlertEmailDigestTransport,
   GitHubDispatchDeliveryError,
   LifecycleWebhookDeliveryError,
   processNextNormalizeEventsJob,
@@ -279,6 +284,7 @@ interface CreateLifecycleWebhookPublisherInput {
   fallbackTargetUrl: string | null;
   fallbackSigningSecret: string | null;
   webhookDeliveryStore: Pick<WebhookDeliveryStore, "listMatchingWebhooks" | "createDeliveryIntent">;
+  billingStore?: Pick<BillingStore, "getBillingSummaryForProject">;
 }
 
 interface GitHubDispatchTokenCache {
@@ -294,6 +300,7 @@ interface CreateGitHubDispatchPublisherInput {
     | "countProjectGitHubDispatchesSince"
     | "countInstallationGitHubDispatchesSince"
     | "createGitHubDispatchDeliveryIntent"
+    | "createSkippedGitHubDispatchDelivery"
   >;
 }
 
@@ -335,9 +342,32 @@ export function createGitHubDispatchPublisher(input: CreateGitHubDispatchPublish
       const since = new Date(Date.parse(event.occurred_at) - 60 * 60 * 1000).toISOString();
 
       for (const rule of matching) {
+        const incidentFingerprint = `${event.incident_id}:${event.event_type}`;
+        const dedupeKey = getGitHubDispatchDedupeKey(event);
+        const dispatchPayload = {
+          debugbundle_event: event.event_type,
+          incident_id: event.incident_id,
+          bundle_type: event.bundle_type ?? "failure",
+          bundle_version: event.bundle_version ?? 1,
+          severity: event.severity,
+          service: event.service_name,
+          environment: event.environment,
+          title: event.title ?? null,
+          links: {
+            bundle: `/v1/incidents/${event.incident_id}/bundle`,
+            reproduction: `/v1/incidents/${event.incident_id}/reproduction`,
+            dashboard: `/incidents/${event.incident_id}`
+          },
+          debugbundle: {
+            project_id: event.project_id,
+            occurrence_count: event.occurrence_count ?? 1,
+            first_seen_at: event.first_seen_at ?? event.occurred_at
+          }
+        };
+
         const withinCooldown = await input.githubStore.hasRecentGitHubDispatch({
           rule_id: rule.rule_id,
-          incident_fingerprint: `${event.incident_id}:${event.event_type}`,
+          incident_fingerprint: incidentFingerprint,
           cooldown_seconds: rule.cooldown_seconds
         });
         if (withinCooldown) {
@@ -349,6 +379,18 @@ export function createGitHubDispatchPublisher(input: CreateGitHubDispatchPublish
           since
         });
         if (projectCount >= 100) {
+          await input.githubStore.createSkippedGitHubDispatchDelivery({
+            rule_id: rule.rule_id,
+            project_id: event.project_id,
+            incident_id: event.incident_id,
+            incident_fingerprint: incidentFingerprint,
+            dedupe_key: dedupeKey,
+            installation_id: rule.installation_id,
+            repo_owner: rule.repo_owner,
+            repo_name: rule.repo_name,
+            reason: "project_hourly_rate_limited",
+            dispatch_payload: dispatchPayload
+          });
           continue;
         }
 
@@ -357,6 +399,18 @@ export function createGitHubDispatchPublisher(input: CreateGitHubDispatchPublish
           since
         });
         if (installationCount >= 4000) {
+          await input.githubStore.createSkippedGitHubDispatchDelivery({
+            rule_id: rule.rule_id,
+            project_id: event.project_id,
+            incident_id: event.incident_id,
+            incident_fingerprint: incidentFingerprint,
+            dedupe_key: dedupeKey,
+            installation_id: rule.installation_id,
+            repo_owner: rule.repo_owner,
+            repo_name: rule.repo_name,
+            reason: "installation_hourly_rate_limited",
+            dispatch_payload: dispatchPayload
+          });
           continue;
         }
 
@@ -364,31 +418,12 @@ export function createGitHubDispatchPublisher(input: CreateGitHubDispatchPublish
           rule_id: rule.rule_id,
           project_id: event.project_id,
           incident_id: event.incident_id,
-          incident_fingerprint: `${event.incident_id}:${event.event_type}`,
-          dedupe_key: getGitHubDispatchDedupeKey(event),
+          incident_fingerprint: incidentFingerprint,
+          dedupe_key: dedupeKey,
           installation_id: rule.installation_id,
           repo_owner: rule.repo_owner,
           repo_name: rule.repo_name,
-          dispatch_payload: {
-            debugbundle_event: event.event_type,
-            incident_id: event.incident_id,
-            bundle_type: event.bundle_type ?? "failure",
-            bundle_version: event.bundle_version ?? 1,
-            severity: event.severity,
-            service: event.service_name,
-            environment: event.environment,
-            title: event.title ?? null,
-            links: {
-              bundle: `/v1/incidents/${event.incident_id}/bundle`,
-              reproduction: `/v1/incidents/${event.incident_id}/reproduction`,
-              dashboard: `/incidents/${event.incident_id}`
-            },
-            debugbundle: {
-              project_id: event.project_id,
-              occurrence_count: event.occurrence_count ?? 1,
-              first_seen_at: event.first_seen_at ?? event.occurred_at
-            }
-          }
+          dispatch_payload: dispatchPayload
         });
       }
     }
@@ -427,8 +462,23 @@ export function createLifecycleWebhookPublisher(input: CreateLifecycleWebhookPub
           : [];
 
       const targets = matching.length > 0 ? matching : fallback;
+      let remainingWebhookDeliveries: number | null = null;
+      if (input.billingStore !== undefined) {
+        const billingSummary = await input.billingStore.getBillingSummaryForProject({
+          project_id: event.project_id,
+          now: new Date().toISOString()
+        });
+        const allowance = billingSummary?.allowances.monthly_webhook_deliveries;
+        if (billingSummary !== null && allowance !== undefined) {
+          remainingWebhookDeliveries = Math.max(0, allowance.limit - allowance.used);
+        }
+      }
 
       for (const target of targets) {
+        if (remainingWebhookDeliveries !== null && remainingWebhookDeliveries <= 0) {
+          break;
+        }
+
         await input.webhookDeliveryStore.createDeliveryIntent({
           webhook_id: target.webhook_id,
           project_id: event.project_id,
@@ -461,6 +511,9 @@ export function createLifecycleWebhookPublisher(input: CreateLifecycleWebhookPub
             minutes_since_deploy: event.regression_deploy?.minutes_since_deploy ?? null
           }
         });
+        if (remainingWebhookDeliveries !== null) {
+          remainingWebhookDeliveries -= 1;
+        }
       }
     }
   };
@@ -719,6 +772,22 @@ function buildAlertNotificationInput(
   };
 }
 
+function buildAlertDigestEntryInput(
+  input: Pick<CreateAlertTransportInput, "appBaseUrl" | "apiBaseUrl">,
+  item: {
+    incident_id: string;
+    payload: Record<string, unknown>;
+  }
+): AlertEmailInput & { summary: string | null } {
+  return {
+    ...buildAlertNotificationInput(input, {
+      incident_id: item.incident_id,
+      payload: item.payload
+    }),
+    summary: typeof item.payload["summary"] === "string" ? item.payload["summary"] : null
+  };
+}
+
 export function createAlertTransport(input: CreateAlertTransportInput): AlertDeliveryTransport {
   async function deliverViaWebhook(targetUrl: string, payload: Record<string, unknown>): Promise<void> {
     const controller = new AbortController();
@@ -858,6 +927,48 @@ export function createAlertTransport(input: CreateAlertTransportInput): AlertDel
       throw new AlertDeliveryError(`alert_channel_not_supported:${event.channel as string}`);
     }
   };
+}
+
+export function createAlertEmailDigestTransport(
+  input: Pick<CreateAlertTransportInput, "emailTransport" | "appBaseUrl" | "apiBaseUrl">
+): AlertEmailDigestTransport {
+  return {
+    async deliver(event): Promise<void> {
+      if (input.emailTransport === null) {
+        throw new AlertDeliveryError("alert_email_not_configured");
+      }
+
+      const rendered = renderAlertDigestEmail({
+        alerts: event.items.map((item) => buildAlertDigestEntryInput(input, item))
+      });
+
+      try {
+        await input.emailTransport.send({
+          to: [event.recipient],
+          subject: rendered.subject,
+          text: rendered.text,
+          html: rendered.html
+        });
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        throw new AlertDeliveryError(`alert_email_error:${message}`);
+      }
+    }
+  };
+}
+
+export async function scheduleDueAlertEmailDigests(input: {
+  queue: { enqueue(jobName: "deliver-alert-email-digest", payload: { digest_id: string }): Promise<void> };
+  alertStore: Pick<AlertDeliveryStore, "claimDueAlertEmailDigests">;
+  batchSize: number;
+}): Promise<number> {
+  const dueDigests = await input.alertStore.claimDueAlertEmailDigests(input.batchSize);
+
+  for (const job of dueDigests) {
+    await input.queue.enqueue("deliver-alert-email-digest", job);
+  }
+
+  return dueDigests.length;
 }
 
 export async function scheduleDueWebhookDeliveries(input: {
@@ -1279,7 +1390,8 @@ export async function runWorkerFromEnv(envInput: Record<string, string | undefin
   const lifecycleWebhookPublisher = createLifecycleWebhookPublisher({
     fallbackTargetUrl: env.LIFECYCLE_WEBHOOK_TARGET_URL ?? null,
     fallbackSigningSecret: env.LIFECYCLE_WEBHOOK_SECRET ?? null,
-    webhookDeliveryStore
+    webhookDeliveryStore,
+    billingStore
   });
   const githubDispatchPublisher = createGitHubDispatchPublisher({
     githubStore
@@ -1322,6 +1434,11 @@ export async function runWorkerFromEnv(envInput: Record<string, string | undefin
     ...(env.INTEGRATION_SECRET_ENCRYPTION_KEY === undefined
       ? {}
       : { integrationSecretEncryptionKey: env.INTEGRATION_SECRET_ENCRYPTION_KEY }),
+    appBaseUrl: normalizeWorkerBaseUrl(envInput["APP_BASE_URL"]),
+    apiBaseUrl: normalizeWorkerBaseUrl(envInput["DEBUGBUNDLE_API_URL"] ?? envInput["API_BASE_URL"] ?? envInput["VITE_API_URL"])
+  });
+  const alertEmailDigestTransport = createAlertEmailDigestTransport({
+    emailTransport,
     appBaseUrl: normalizeWorkerBaseUrl(envInput["APP_BASE_URL"]),
     apiBaseUrl: normalizeWorkerBaseUrl(envInput["DEBUGBUNDLE_API_URL"] ?? envInput["API_BASE_URL"] ?? envInput["VITE_API_URL"])
   });
@@ -1401,6 +1518,13 @@ export async function runWorkerFromEnv(envInput: Record<string, string | undefin
               );
 
               if (!evaluateAlertsResult.processed) {
+                const alertDigestSchedulingOk = await runWorkerStep(logger, "schedule-alert-email-digests", async () => {
+                  await scheduleDueAlertEmailDigests({
+                    queue,
+                    alertStore: alertDeliveryStore,
+                    batchSize: env.WEBHOOK_DELIVERY_SCHEDULER_BATCH_SIZE
+                  });
+                });
                 const webhookSchedulingOk = await runWorkerStep(logger, "schedule-webhook-deliveries", async () => {
                   await scheduleDueWebhookDeliveries({
                     queue,
@@ -1431,7 +1555,21 @@ export async function runWorkerFromEnv(envInput: Record<string, string | undefin
                   });
                 });
 
-                if (webhookSchedulingOk && githubSchedulingOk && weeklySchedulingOk && retentionSchedulingOk) {
+                if (
+                  alertDigestSchedulingOk &&
+                  webhookSchedulingOk &&
+                  githubSchedulingOk &&
+                  weeklySchedulingOk &&
+                  retentionSchedulingOk
+                ) {
+                  await runWorkerStep(logger, "deliver-alert-email-digest", async () => {
+                    await processNextDeliverAlertEmailDigestJob({
+                      queue,
+                      alertStore: alertDeliveryStore,
+                      alertEmailDigestTransport
+                    });
+                  });
+
                   await runWorkerStep(logger, "deliver-webhook", async () => {
                     await processNextDeliverWebhookJob({
                       queue,

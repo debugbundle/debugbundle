@@ -768,7 +768,7 @@ function getGitHubDeliveryBadgeVariant(
     return "success";
   }
 
-  if (status === "pending" || status === "retrying") {
+  if (status === "pending" || status === "retrying" || status === "skipped") {
     return "warning";
   }
 

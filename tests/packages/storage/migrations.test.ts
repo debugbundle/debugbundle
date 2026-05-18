@@ -136,6 +136,8 @@ describe("storage bootstrap schema", () => {
     expect(REQUIRED_API_TABLES).toContain("github_dispatch_deliveries");
     expect(REQUIRED_API_TABLES).toContain("slack_destinations");
     expect(REQUIRED_WORKER_TABLES).toContain("alert_deliveries");
+    expect(REQUIRED_WORKER_TABLES).toContain("alert_email_digests");
+    expect(REQUIRED_WORKER_TABLES).toContain("alert_email_digest_items");
     expect(REQUIRED_WORKER_TABLES).toContain("slack_destinations");
     expect(REQUIRED_WORKER_TABLES).toContain("weekly_report_deliveries");
   });
@@ -151,6 +153,7 @@ describe("storage bootstrap schema", () => {
     expect(STORAGE_BOOTSTRAP_SQL.includes("organization_id uuid NOT NULL REFERENCES organizations(id) ON DELETE CASCADE")).toBe(true);
     expect(STORAGE_BOOTSTRAP_SQL.includes("organization_id uuid REFERENCES organizations(id) ON DELETE SET NULL")).toBe(true);
     expect(STORAGE_BOOTSTRAP_SQL.includes("project_id uuid NOT NULL REFERENCES projects(id) ON DELETE CASCADE")).toBe(true);
+    expect(STORAGE_BOOTSTRAP_SQL.includes("digest_id uuid NOT NULL REFERENCES alert_email_digests(id) ON DELETE CASCADE")).toBe(true);
     expect(STORAGE_BOOTSTRAP_SQL.includes("webhook_id uuid REFERENCES agent_webhooks(id) ON DELETE CASCADE")).toBe(true);
     expect(STORAGE_BOOTSTRAP_SQL.includes("installation_id uuid NOT NULL REFERENCES github_installations(id) ON DELETE CASCADE")).toBe(true);
   });
@@ -161,6 +164,7 @@ describe("storage bootstrap schema", () => {
     expect(STORAGE_BOOTSTRAP_SQL.includes("email text NOT NULL UNIQUE")).toBe(true);
     expect(STORAGE_BOOTSTRAP_SQL.includes("project_id uuid NOT NULL UNIQUE REFERENCES projects(id) ON DELETE CASCADE")).toBe(true);
     expect(STORAGE_BOOTSTRAP_SQL.includes("CREATE UNIQUE INDEX github_dispatch_deliveries_rule_dedupe_key_idx")).toBe(true);
+    expect(STORAGE_BOOTSTRAP_SQL.includes("CREATE UNIQUE INDEX alert_email_digests_project_recipient_pending_idx")).toBe(true);
     expect(STORAGE_BOOTSTRAP_SQL.includes("UNIQUE (organization_id, slack_team_id, slack_channel_id)")).toBe(true);
   });
 
@@ -168,6 +172,7 @@ describe("storage bootstrap schema", () => {
     expect(STORAGE_BOOTSTRAP_SQL.includes("incident_events_incident_occurred_event_idx")).toBe(true);
     expect(STORAGE_BOOTSTRAP_SQL.includes("webhook_deliveries_status_next_attempt_idx")).toBe(true);
     expect(STORAGE_BOOTSTRAP_SQL.includes("github_dispatch_deliveries_status_next_attempt_idx")).toBe(true);
+    expect(STORAGE_BOOTSTRAP_SQL.includes("alert_email_digests_status_next_attempt_idx")).toBe(true);
     expect(STORAGE_BOOTSTRAP_SQL.includes("sessions_token_hash_idx")).toBe(true);
     expect(STORAGE_BOOTSTRAP_SQL.includes("alert_deliveries_project_status_idx")).toBe(true);
     expect(STORAGE_BOOTSTRAP_SQL.includes("organizations_stripe_customer_id_key")).toBe(true);

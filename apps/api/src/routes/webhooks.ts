@@ -21,6 +21,14 @@ function generateWebhookSigningSecret(): string {
   return `dbundle_whsec_${randomBytes(24).toString("hex")}`;
 }
 
+function toRetryAfterSeconds(retryAfterMs: number): string {
+  return String(Math.max(1, Math.ceil(retryAfterMs / 1_000)));
+}
+
+function getQuotaRetryAfterMs(resetAt: string, now: Date): number {
+  return Math.max(1_000, new Date(resetAt).getTime() - now.getTime());
+}
+
 function normalizeWebhookFilters(filters: {
   environment?: string[] | undefined;
   service?: string[] | undefined;
@@ -370,6 +378,22 @@ export function registerWebhookRoutes(app: FastifyInstance, dependencies: ApiDep
       return reply.status(400).send({ error: "invalid_payload" });
     }
 
+    const now = new Date();
+    if (dependencies.billingManagement !== undefined) {
+      const billingSummary = await dependencies.billingManagement.getBillingSummaryForOrganization({
+        organization_id: auth.access.organization_id,
+        now: now.toISOString()
+      });
+      const allowance = billingSummary?.allowances.monthly_webhook_deliveries;
+      if (billingSummary !== null && allowance !== undefined && allowance.used + 1 > allowance.limit) {
+        const retryAfterMs = getQuotaRetryAfterMs(billingSummary.usage_window.ends_at, now);
+        return reply.header("Retry-After", toRetryAfterSeconds(retryAfterMs)).status(429).send({
+          error: "monthly_quota_exceeded",
+          retry_after_ms: retryAfterMs
+        });
+      }
+    }
+
     const delivery = await dependencies.webhookTesting.triggerTestDelivery({
       organization_id: auth.access.organization_id,
       project_id: parsedQuery.data.project_id,
@@ -391,7 +415,7 @@ export function registerWebhookRoutes(app: FastifyInstance, dependencies: ApiDep
     if (!parsedParams.success) {
       return reply.status(400).send({ error: "invalid_webhook_id" });
     }
-    const parsedQuery = WebhookDeliveriesQuerySchema.and(ProjectScopedQuerySchema).safeParse(request.query);
+    const parsedQuery = WebhookDeliveriesQuerySchema.merge(ProjectScopedQuerySchema).safeParse(request.query);
     if (!parsedQuery.success) {
       return reply.status(400).send({ error: "invalid_query" });
     }

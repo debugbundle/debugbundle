@@ -780,6 +780,7 @@ export function createPostgresGitHubStore(db: Queryable): GitHubStore {
           FROM github_dispatch_deliveries
           WHERE project_id = $1
             AND created_at >= $2::timestamptz
+            AND status <> 'skipped'
         `,
         [input.project_id, input.since]
       );
@@ -794,6 +795,7 @@ export function createPostgresGitHubStore(db: Queryable): GitHubStore {
           FROM github_dispatch_deliveries
           WHERE installation_id = $1
             AND created_at >= $2::timestamptz
+            AND status <> 'skipped'
         `,
         [input.installation_id, input.since]
       );
@@ -835,6 +837,49 @@ export function createPostgresGitHubStore(db: Queryable): GitHubStore {
           input.installation_id,
           input.repo_owner,
           input.repo_name,
+          JSON.stringify(input.dispatch_payload)
+        ]
+      );
+
+      return result.rows[0] === undefined ? { delivery_id: deliveryId, created: false } : { delivery_id: deliveryId, created: true };
+    },
+
+    async createSkippedGitHubDispatchDelivery(input) {
+      const deliveryId = randomUUID();
+      const result = await db.query<{ id: string }>(
+        `
+          INSERT INTO github_dispatch_deliveries (
+            id,
+            rule_id,
+            project_id,
+            incident_id,
+            incident_fingerprint,
+            dedupe_key,
+            installation_id,
+            repo_owner,
+            repo_name,
+            status,
+            attempt_count,
+            last_error,
+            dispatch_payload,
+            created_at,
+            updated_at
+          )
+          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'skipped', 0, $10, $11::jsonb, now(), now())
+          ON CONFLICT (rule_id, incident_id, dedupe_key) DO NOTHING
+          RETURNING id
+        `,
+        [
+          deliveryId,
+          input.rule_id,
+          input.project_id,
+          input.incident_id,
+          input.incident_fingerprint,
+          input.dedupe_key,
+          input.installation_id,
+          input.repo_owner,
+          input.repo_name,
+          input.reason,
           JSON.stringify(input.dispatch_payload)
         ]
       );

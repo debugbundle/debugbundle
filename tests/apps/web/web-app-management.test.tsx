@@ -2493,6 +2493,10 @@ describe("web app — management routes", () => {
               monthly_alert_deliveries: {
                 used: 999,
                 limit: 1000
+              },
+              monthly_webhook_deliveries: {
+                used: 999,
+                limit: 1000
               }
             }
           })
@@ -2795,6 +2799,10 @@ describe("web app — management routes", () => {
               monthly_alert_deliveries: {
                 used: 10,
                 limit: 225
+              },
+              monthly_webhook_deliveries: {
+                used: 20,
+                limit: 750
               }
             }
           })

@@ -136,7 +136,8 @@ describe("api billing routes", () => {
           monthly_raw_ingested_events: { used: 120, limit: 750 },
           retained_bundle_cap: { used: 6, limit: 50 },
           monthly_remote_activations: { used: 0, limit: 0 },
-          monthly_alert_deliveries: { used: 4, limit: 25 }
+          monthly_alert_deliveries: { used: 4, limit: 25 },
+          monthly_webhook_deliveries: { used: 8, limit: 100 }
         }
       }),
       createCheckoutLink: vi.fn().mockResolvedValue({ url: "https://billing.stripe.com/checkout/solo" }),
@@ -225,6 +226,10 @@ describe("api billing routes", () => {
           monthly_alert_deliveries: {
             used: 10,
             limit: 225
+          },
+          monthly_webhook_deliveries: {
+            used: 20,
+            limit: 750
           }
         }
       }),
@@ -291,6 +296,10 @@ describe("api billing routes", () => {
           monthly_alert_deliveries: {
             used: 10,
             limit: 225
+          },
+          monthly_webhook_deliveries: {
+            used: 20,
+            limit: 750
           }
         }
       }
@@ -376,7 +385,8 @@ describe("api billing routes", () => {
           monthly_raw_ingested_events: { used: 250, limit: 90000 },
           retained_bundle_cap: { used: 12, limit: 5400 },
           monthly_remote_activations: { used: 4, limit: 900 },
-          monthly_alert_deliveries: { used: 15, limit: 2700 }
+          monthly_alert_deliveries: { used: 15, limit: 2700 },
+          monthly_webhook_deliveries: { used: 30, limit: 9000 }
         }
       }),
       createCheckoutLink: vi.fn().mockResolvedValue(null),
@@ -453,6 +463,10 @@ describe("api billing routes", () => {
           monthly_alert_deliveries: {
             used: 4,
             limit: 25
+          },
+          monthly_webhook_deliveries: {
+            used: 8,
+            limit: 100
           }
         }
       }),
@@ -614,6 +628,10 @@ describe("api billing routes", () => {
           monthly_alert_deliveries: {
             used: 90,
             limit: 4500
+          },
+          monthly_webhook_deliveries: {
+            used: 180,
+            limit: 15000
           }
         }
       }),
@@ -700,7 +718,8 @@ describe("api billing routes", () => {
           monthly_raw_ingested_events: { used: 200, limit: 12000 },
           retained_bundle_cap: { used: 5, limit: 900 },
           monthly_remote_activations: { used: 1, limit: 150 },
-          monthly_alert_deliveries: { used: 3, limit: 450 }
+          monthly_alert_deliveries: { used: 3, limit: 450 },
+          monthly_webhook_deliveries: { used: 6, limit: 1500 }
         }
       }),
       scheduleCapacityReduction: vi.fn().mockResolvedValue(null),
@@ -779,7 +798,8 @@ describe("api billing routes", () => {
           monthly_raw_ingested_events: { used: 200, limit: 10000 },
           retained_bundle_cap: { used: 5, limit: 750 },
           monthly_remote_activations: { used: 1, limit: 125 },
-          monthly_alert_deliveries: { used: 3, limit: 375 }
+          monthly_alert_deliveries: { used: 3, limit: 375 },
+          monthly_webhook_deliveries: { used: 6, limit: 1250 }
         }
       }),
       cancelCapacityReduction: vi.fn().mockResolvedValue(null)
@@ -839,7 +859,8 @@ describe("api billing routes", () => {
           monthly_raw_ingested_events: { used: 200, limit: 10000 },
           retained_bundle_cap: { used: 5, limit: 750 },
           monthly_remote_activations: { used: 1, limit: 125 },
-          monthly_alert_deliveries: { used: 3, limit: 375 }
+          monthly_alert_deliveries: { used: 3, limit: 375 },
+          monthly_webhook_deliveries: { used: 6, limit: 1250 }
         }
       }),
       createCheckoutLink: vi.fn().mockResolvedValue(null),
@@ -908,7 +929,8 @@ describe("api billing routes", () => {
             monthly_raw_ingested_events: { used: 100, limit: 150000 },
             retained_bundle_cap: { used: 5, limit: 6000 },
             monthly_remote_activations: { used: 1, limit: 750 },
-            monthly_alert_deliveries: { used: 2, limit: 4500 }
+            monthly_alert_deliveries: { used: 2, limit: 4500 },
+            monthly_webhook_deliveries: { used: 4, limit: 15000 }
           }
         })
         .mockResolvedValueOnce({
@@ -930,7 +952,8 @@ describe("api billing routes", () => {
             monthly_raw_ingested_events: { used: 100, limit: 750 },
             retained_bundle_cap: { used: 5, limit: 50 },
             monthly_remote_activations: { used: 0, limit: 0 },
-            monthly_alert_deliveries: { used: 1, limit: 25 }
+            monthly_alert_deliveries: { used: 1, limit: 25 },
+            monthly_webhook_deliveries: { used: 2, limit: 100 }
           }
         })
         .mockResolvedValueOnce(null)
@@ -953,7 +976,8 @@ describe("api billing routes", () => {
             monthly_raw_ingested_events: { used: 100, limit: 750 },
             retained_bundle_cap: { used: 5, limit: 50 },
             monthly_remote_activations: { used: 0, limit: 0 },
-            monthly_alert_deliveries: { used: 1, limit: 25 }
+            monthly_alert_deliveries: { used: 1, limit: 25 },
+            monthly_webhook_deliveries: { used: 2, limit: 100 }
           }
         })
         .mockResolvedValueOnce({
@@ -975,7 +999,8 @@ describe("api billing routes", () => {
             monthly_raw_ingested_events: { used: 100, limit: 150000 },
             retained_bundle_cap: { used: 5, limit: 6000 },
             monthly_remote_activations: { used: 1, limit: 750 },
-            monthly_alert_deliveries: { used: 2, limit: 4500 }
+            monthly_alert_deliveries: { used: 2, limit: 4500 },
+            monthly_webhook_deliveries: { used: 4, limit: 15000 }
           }
         }),
       createCheckoutLink: vi.fn().mockResolvedValue(null),
@@ -1120,7 +1145,8 @@ describe("api billing routes", () => {
         monthly_raw_ingested_events: { used: 0, limit: 10500 },
         retained_bundle_cap: { used: 0, limit: 450 },
         monthly_remote_activations: { used: 0, limit: 75 },
-        monthly_alert_deliveries: { used: 0, limit: 225 }
+        monthly_alert_deliveries: { used: 0, limit: 225 },
+        monthly_webhook_deliveries: { used: 0, limit: 750 }
       }
     });
     const billingManagement = mockedObject<BillingManagementDependency>({

@@ -27,6 +27,7 @@ import {
   EmailDeliveryError,
   createSesEmailTransport,
   formatProductFromEmail,
+  renderAlertDigestEmail,
   renderAlertEmail,
   renderEmailAuthCodeEmail,
   renderProjectInviteEmail,
@@ -98,6 +99,40 @@ describe("email package", () => {
     expect(rendered.html).toContain("checkout-&lt;api&gt;");
     expect(rendered.html).toContain("&lt;123&gt;");
     expect(rendered.html).toContain("Open incident in DebugBundle");
+  });
+
+  it("renders alert digest emails with grouped incidents", () => {
+    const rendered = renderAlertDigestEmail({
+      alerts: [
+        {
+          conditionType: "new_incident",
+          incidentId: "inc_1",
+          occurredAt: "2026-05-17T10:00:00.000Z",
+          serviceName: "checkout-<api>",
+          environment: "production",
+          severity: "high",
+          incidentUrl: "https://app.debugbundle.com/incidents/inc_1",
+          bundleUrl: "https://api.debugbundle.com/v1/incidents/inc_1/bundle",
+          summary: "Checkout crash"
+        },
+        {
+          conditionType: "severity_threshold",
+          incidentId: "inc_1",
+          occurredAt: "2026-05-17T10:00:01.000Z",
+          serviceName: "checkout-<api>",
+          environment: "production",
+          severity: "high",
+          incidentUrl: "https://app.debugbundle.com/incidents/inc_1",
+          bundleUrl: "https://api.debugbundle.com/v1/incidents/inc_1/bundle",
+          summary: "Checkout crash"
+        }
+      ]
+    });
+
+    expect(rendered.subject).toBe("[DebugBundle Alerts] 1 incident matched your alerts");
+    expect(rendered.text).toContain("Alerts: New incident, Severity threshold reached");
+    expect(rendered.html).toContain("Checkout crash");
+    expect(rendered.html).toContain("checkout-&lt;api&gt;");
   });
 
   it("formats the product from email with a DebugBundle display name", () => {

@@ -265,7 +265,7 @@ export interface ApiDependencies {
     listProjectDeliveriesForOrganization(input: {
       organization_id: string;
       project_id: string;
-      status?: "pending" | "retrying" | "delivered" | "failed";
+      status?: "pending" | "retrying" | "delivered" | "failed" | "skipped";
       limit: number;
     }): Promise<GitHubDispatchDeliveryRecord[]>;
     retryProjectDeliveryForOrganization(input: {

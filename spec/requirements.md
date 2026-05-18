@@ -225,6 +225,8 @@ Last updated: 2026-03-27
 
 **FR-WHK-08:** Test delivery support (synthetic payload, event replay, verification event).
 
+**FR-WHK-09:** Lifecycle webhook deliveries must enforce the shared `monthly_webhook_deliveries` allowance for the owning organization. When exhausted, new lifecycle webhook and synthetic test delivery intents are not created, existing incidents/bundles/history remain accessible, and API-triggered synthetic tests return `429 monthly_quota_exceeded` with `Retry-After`.
+
 ### 1.8 Alert System
 
 **FR-ALT-01:** Alert channels: email, Slack, Discord, webhook.
@@ -568,7 +570,7 @@ This ensures Free behaves as **failure-first, not telemetry-first**.
 
 **FR-GHA-12:** Implement retry strategy for failed dispatches: 1s → 5s → 30s → 2min → 10min (5 attempts). After 5 failed attempts, mark delivery as `failed`. Do not auto-disable rules.
 
-**FR-GHA-13:** Enforce rate limits: maximum 100 dispatches per project per hour, maximum 4,000 dispatches per installation per hour. Respect GitHub `429`/`503` responses with `Retry-After` or exponential backoff.
+**FR-GHA-13:** Enforce rate limits: maximum 100 dispatches per project per hour, maximum 4,000 dispatches per installation per hour. Respect GitHub `429`/`503` responses with `Retry-After` or exponential backoff. DebugBundle-side hourly rate-limit drops must persist non-retryable `skipped` delivery history records so operators can see why dispatches were suppressed.
 
 **FR-GHA-14:** When a user connects a repo for the first time, offer a default automation rule preset: `event_types: [bundle.created, bundle.reopened]`, `severity_min: high`, `incident_status: new_or_reopened`, `cooldown_seconds: 300`.
 

@@ -34,6 +34,7 @@ export interface BillingSummaryRecord {
     retained_bundle_cap: BillingUsageMetric;
     monthly_remote_activations: BillingUsageMetric;
     monthly_alert_deliveries: BillingUsageMetric;
+    monthly_webhook_deliveries: BillingUsageMetric;
   };
 }
 
@@ -167,6 +168,8 @@ export function createPostgresBillingStore(db: Queryable): BillingStore {
         retainedBundles,
         monthlyRemoteActivations,
         alertDeliveriesTablePresent,
+        alertEmailDigestsTablePresent,
+        webhookDeliveriesTablePresent,
         usageCountersTablePresent
       ] = await Promise.all([
         readCount(
@@ -227,19 +230,53 @@ export function createPostgresBillingStore(db: Queryable): BillingStore {
           [input.organization_id, usageWindow.starts_at, usageWindow.ends_at]
         ),
         tableExists(db, "alert_deliveries"),
+        tableExists(db, "alert_email_digests"),
+        tableExists(db, "webhook_deliveries"),
         tableExists(db, "org_usage_counters")
       ]);
 
-      const monthlyAlertDeliveries = alertDeliveriesTablePresent
+      const monthlyAlertDeliveries = alertDeliveriesTablePresent || alertEmailDigestsTablePresent
         ? await readCount(
             db,
             `
               SELECT COUNT(*)::int AS count
-              FROM alert_deliveries ad
-              JOIN projects p ON p.id = ad.project_id
+              FROM (
+                ${[
+                  alertDeliveriesTablePresent
+                    ? `
+                        SELECT ad.project_id, ad.created_at
+                        FROM alert_deliveries ad
+                      `
+                    : null,
+                  alertEmailDigestsTablePresent
+                    ? `
+                        SELECT dig.project_id, dig.created_at
+                        FROM alert_email_digests dig
+                      `
+                    : null
+                ]
+                  .filter((part): part is string => part !== null)
+                  .join("\nUNION ALL\n")}
+              ) deliveries
+              JOIN projects p ON p.id = deliveries.project_id
               WHERE p.organization_id = $1
-                AND ad.created_at >= $2::timestamptz
-                AND ad.created_at < $3::timestamptz
+                AND deliveries.created_at >= $2::timestamptz
+                AND deliveries.created_at < $3::timestamptz
+            `,
+            [input.organization_id, usageWindow.starts_at, usageWindow.ends_at]
+          )
+        : 0;
+
+      const monthlyWebhookDeliveries = webhookDeliveriesTablePresent
+        ? await readCount(
+            db,
+            `
+              SELECT COUNT(*)::int AS count
+              FROM webhook_deliveries wd
+              JOIN projects p ON p.id = wd.project_id
+              WHERE p.organization_id = $1
+                AND wd.created_at >= $2::timestamptz
+                AND wd.created_at < $3::timestamptz
             `,
             [input.organization_id, usageWindow.starts_at, usageWindow.ends_at]
           )
@@ -291,6 +328,10 @@ export function createPostgresBillingStore(db: Queryable): BillingStore {
           monthly_alert_deliveries: {
             used: monthlyAlertDeliveries,
             limit: capabilities.monthly_alert_deliveries * totalCapacityUnits
+          },
+          monthly_webhook_deliveries: {
+            used: monthlyWebhookDeliveries,
+            limit: capabilities.monthly_webhook_deliveries * totalCapacityUnits
           }
         }
       };

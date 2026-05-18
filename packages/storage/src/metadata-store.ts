@@ -134,6 +134,63 @@ async function alertDeliveriesTableExists(db: Queryable): Promise<boolean> {
   return value === true || value === "t";
 }
 
+async function alertEmailDigestsTableExists(db: Queryable): Promise<boolean> {
+  const result = await db.query<{ exists: string | boolean } & Record<string, unknown>>(
+    `
+      SELECT EXISTS (
+        SELECT 1
+        FROM information_schema.tables
+        WHERE table_schema = 'public'
+          AND table_name = 'alert_email_digests'
+      ) AS exists
+    `,
+    []
+  );
+
+  const value = result.rows[0]?.exists;
+  return value === true || value === "t";
+}
+
+function buildAlertDeliveriesCountSelect(input: {
+  hasAlertDeliveries: boolean;
+  hasAlertEmailDigests: boolean;
+}): string {
+  const parts: string[] = [];
+
+  if (input.hasAlertDeliveries) {
+    parts.push(`
+      SELECT ad.created_at
+      FROM alert_deliveries ad
+      WHERE ad.project_id = p.id
+        AND ad.created_at >= $2::timestamptz
+        AND ad.created_at < $3::timestamptz
+    `);
+  }
+
+  if (input.hasAlertEmailDigests) {
+    parts.push(`
+      SELECT dig.created_at
+      FROM alert_email_digests dig
+      WHERE dig.project_id = p.id
+        AND dig.created_at >= $2::timestamptz
+        AND dig.created_at < $3::timestamptz
+    `);
+  }
+
+  if (parts.length === 0) {
+    return "0";
+  }
+
+  return `
+    (
+      SELECT COUNT(*)::int
+      FROM (
+        ${parts.join("\nUNION ALL\n")}
+      ) AS alert_events
+    )
+  `;
+}
+
 function normalizeProjectMetrics(value: unknown): ProjectRecord["metrics"] {
   if (typeof value !== "object" || value === null) {
     return {
@@ -1183,22 +1240,16 @@ export function createPostgresMetadataStore(db: Queryable): PostgresMetadataStor
     async listProjectsForUser(input): Promise<ProjectRecord[]> {
       const usageWindow = buildProjectMetricsWindow(input.now);
       const hasAlertDeliveries = await alertDeliveriesTableExists(db);
+      const hasAlertEmailDigests = await alertEmailDigestsTableExists(db);
       const organizationPlanSql = "COALESCE(o.plan, 'free')";
       const billableIncidentEventsPredicate = buildBillableIncidentEventsPredicateSql({
         planSql: organizationPlanSql,
         eventClassSql: "ie.event_class"
       });
-      const alertDeliveriesSelect = hasAlertDeliveries
-        ? `
-            (
-              SELECT COUNT(*)::int
-              FROM alert_deliveries ad
-              WHERE ad.project_id = p.id
-                AND ad.created_at >= $2::timestamptz
-                AND ad.created_at < $3::timestamptz
-            )
-          `
-        : "0";
+      const alertDeliveriesSelect = buildAlertDeliveriesCountSelect({
+        hasAlertDeliveries,
+        hasAlertEmailDigests
+      });
       const result = await db.query<ProjectRecord & Record<string, unknown>>(
         `
           SELECT
@@ -1285,22 +1336,16 @@ export function createPostgresMetadataStore(db: Queryable): PostgresMetadataStor
     async listProjectsForOrganization(input): Promise<ProjectRecord[]> {
       const usageWindow = buildProjectMetricsWindow(input.now);
       const hasAlertDeliveries = await alertDeliveriesTableExists(db);
+      const hasAlertEmailDigests = await alertEmailDigestsTableExists(db);
       const organizationPlanSql = "COALESCE(o.plan, 'free')";
       const billableIncidentEventsPredicate = buildBillableIncidentEventsPredicateSql({
         planSql: organizationPlanSql,
         eventClassSql: "ie.event_class"
       });
-      const alertDeliveriesSelect = hasAlertDeliveries
-        ? `
-            (
-              SELECT COUNT(*)::int
-              FROM alert_deliveries ad
-              WHERE ad.project_id = p.id
-                AND ad.created_at >= $2::timestamptz
-                AND ad.created_at < $3::timestamptz
-            )
-          `
-        : "0";
+      const alertDeliveriesSelect = buildAlertDeliveriesCountSelect({
+        hasAlertDeliveries,
+        hasAlertEmailDigests
+      });
       const result = await db.query<ProjectRecord & Record<string, unknown>>(
         `
           SELECT
@@ -1460,21 +1505,43 @@ export function createPostgresMetadataStore(db: Queryable): PostgresMetadataStor
       try {
         const usageWindow = buildProjectMetricsWindow(new Date().toISOString());
         const hasAlertDeliveries = await alertDeliveriesTableExists(db);
+        const hasAlertEmailDigests = await alertEmailDigestsTableExists(db);
         const billableIncidentEventsPredicate = buildBillableIncidentEventsPredicateSql({
-          planSql: "(SELECT COALESCE(o.plan, 'free') FROM organizations o WHERE o.id = projects.organization_id)",
+          planSql: "(SELECT COALESCE(o.plan, 'free') FROM organizations o WHERE o.id = up.organization_id)",
           eventClassSql: "ie.event_class"
         });
-        const alertDeliveriesSelect = hasAlertDeliveries
-          ? `
-              (
-                SELECT COUNT(*)::int
-                FROM alert_deliveries ad
-                WHERE ad.project_id = up.project_id
-                  AND ad.created_at >= $6::timestamptz
-                  AND ad.created_at < $7::timestamptz
-              )
-            `
-          : "0";
+        const alertDeliveriesSelect =
+          hasAlertDeliveries || hasAlertEmailDigests
+            ? `
+                (
+                  SELECT COUNT(*)::int
+                  FROM (
+                    ${[
+                      hasAlertDeliveries
+                        ? `
+                            SELECT ad.created_at
+                            FROM alert_deliveries ad
+                            WHERE ad.project_id = up.project_id
+                              AND ad.created_at >= $6::timestamptz
+                              AND ad.created_at < $7::timestamptz
+                          `
+                        : null,
+                      hasAlertEmailDigests
+                        ? `
+                            SELECT dig.created_at
+                            FROM alert_email_digests dig
+                            WHERE dig.project_id = up.project_id
+                              AND dig.created_at >= $6::timestamptz
+                              AND dig.created_at < $7::timestamptz
+                          `
+                        : null
+                    ]
+                      .filter((part): part is string => part !== null)
+                      .join("\nUNION ALL\n")}
+                  ) AS alert_events
+                )
+              `
+            : "0";
         const result = await db.query<ProjectRecord & Record<string, unknown>>(
           `
             WITH updated_project AS (
@@ -1740,21 +1807,43 @@ export function createPostgresMetadataStore(db: Queryable): PostgresMetadataStor
       try {
         const usageWindow = buildProjectMetricsWindow(new Date().toISOString());
         const hasAlertDeliveries = await alertDeliveriesTableExists(db);
+        const hasAlertEmailDigests = await alertEmailDigestsTableExists(db);
         const billableIncidentEventsPredicate = buildBillableIncidentEventsPredicateSql({
-          planSql: "(SELECT COALESCE(o.plan, 'free') FROM organizations o WHERE o.id = projects.organization_id)",
+          planSql: "(SELECT COALESCE(o.plan, 'free') FROM organizations o WHERE o.id = up.organization_id)",
           eventClassSql: "ie.event_class"
         });
-        const alertDeliveriesSelect = hasAlertDeliveries
-          ? `
-              (
-                SELECT COUNT(*)::int
-                FROM alert_deliveries ad
-                WHERE ad.project_id = up.project_id
-                  AND ad.created_at >= $6::timestamptz
-                  AND ad.created_at < $7::timestamptz
-              )
-            `
-          : "0";
+        const alertDeliveriesSelect =
+          hasAlertDeliveries || hasAlertEmailDigests
+            ? `
+                (
+                  SELECT COUNT(*)::int
+                  FROM (
+                    ${[
+                      hasAlertDeliveries
+                        ? `
+                            SELECT ad.created_at
+                            FROM alert_deliveries ad
+                            WHERE ad.project_id = up.project_id
+                              AND ad.created_at >= $6::timestamptz
+                              AND ad.created_at < $7::timestamptz
+                          `
+                        : null,
+                      hasAlertEmailDigests
+                        ? `
+                            SELECT dig.created_at
+                            FROM alert_email_digests dig
+                            WHERE dig.project_id = up.project_id
+                              AND dig.created_at >= $6::timestamptz
+                              AND dig.created_at < $7::timestamptz
+                          `
+                        : null
+                    ]
+                      .filter((part): part is string => part !== null)
+                      .join("\nUNION ALL\n")}
+                  ) AS alert_events
+                )
+              `
+            : "0";
         const result = await db.query<ProjectRecord & Record<string, unknown>>(
           `
             WITH updated_project AS (

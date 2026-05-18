@@ -200,7 +200,8 @@ async function main(): Promise<void> {
           monthly_raw_ingested_events: { used: 10, limit: 100_000 },
           retained_bundle_cap: { used: 0, limit: 50 },
           monthly_remote_activations: { used: 0, limit: 25 },
-          monthly_alert_deliveries: { used: 0, limit: 100 }
+          monthly_alert_deliveries: { used: 0, limit: 100 },
+          monthly_webhook_deliveries: { used: 0, limit: 250 }
         }
       }),
       createCheckoutLink: async () => null,

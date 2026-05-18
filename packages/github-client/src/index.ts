@@ -62,7 +62,7 @@ export const GitHubDispatchDeliverySchema = z
     rule_name: z.string(),
     incident_id: z.string(),
     incident_title: z.string(),
-    status: z.enum(["pending", "retrying", "delivered", "failed"]),
+    status: z.enum(["pending", "retrying", "delivered", "failed", "skipped"]),
     attempt_count: z.number().int(),
     last_attempt_at: z.string().nullable(),
     last_error: z.string().nullable(),
@@ -278,7 +278,7 @@ export function createGitHubManagementApi(client: HttpClient): {
   listProjectDeliveries(input: {
     bearerToken: string;
     projectId: string;
-    status?: "pending" | "retrying" | "delivered" | "failed";
+    status?: "pending" | "retrying" | "delivered" | "failed" | "skipped";
     limit?: number;
   }): Promise<GitHubDispatchDelivery[]>;
   retryProjectDelivery(input: { bearerToken: string; projectId: string; deliveryId: string }): Promise<GitHubDispatchDelivery>;

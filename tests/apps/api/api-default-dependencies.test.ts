@@ -891,7 +891,8 @@ describe("api default dependencies", () => {
           monthly_raw_ingested_events: { used: 200, limit: 10500 },
           retained_bundle_cap: { used: 5, limit: 450 },
           monthly_remote_activations: { used: 1, limit: 75 },
-          monthly_alert_deliveries: { used: 3, limit: 225 }
+          monthly_alert_deliveries: { used: 3, limit: 225 },
+          monthly_webhook_deliveries: { used: 6, limit: 750 }
         }
       }),
       getBillingSummaryForProject: vi.fn()
@@ -1794,7 +1795,8 @@ describe("api default dependencies", () => {
         monthly_raw_ingested_events: { used: 200, limit: 10500 },
         retained_bundle_cap: { used: 5, limit: 450 },
         monthly_remote_activations: { used: 1, limit: 75 },
-        monthly_alert_deliveries: { used: 3, limit: 225 }
+        monthly_alert_deliveries: { used: 3, limit: 225 },
+        monthly_webhook_deliveries: { used: 6, limit: 750 }
       }
     };
     const checkoutCreate = vi.fn().mockResolvedValue({ url: null });
@@ -1934,7 +1936,8 @@ describe("api default dependencies", () => {
         monthly_raw_ingested_events: { used: 200, limit: 10500 },
         retained_bundle_cap: { used: 5, limit: 450 },
         monthly_remote_activations: { used: 1, limit: 75 },
-        monthly_alert_deliveries: { used: 3, limit: 225 }
+        monthly_alert_deliveries: { used: 3, limit: 225 },
+        monthly_webhook_deliveries: { used: 6, limit: 750 }
       }
     };
     const subscriptionRetrieve = vi.fn();
@@ -2042,7 +2045,8 @@ describe("api default dependencies", () => {
           monthly_raw_ingested_events: { used: 200, limit: 10500 },
           retained_bundle_cap: { used: 5, limit: 450 },
           monthly_remote_activations: { used: 1, limit: 75 },
-          monthly_alert_deliveries: { used: 3, limit: 225 }
+          monthly_alert_deliveries: { used: 3, limit: 225 },
+          monthly_webhook_deliveries: { used: 6, limit: 750 }
         }
       }),
       getBillingSummaryForProject: vi.fn(),
@@ -2257,7 +2261,8 @@ describe("api default dependencies", () => {
           monthly_raw_ingested_events: { used: 200, limit: 10500 },
           retained_bundle_cap: { used: 5, limit: 450 },
           monthly_remote_activations: { used: 1, limit: 75 },
-          monthly_alert_deliveries: { used: 3, limit: 225 }
+          monthly_alert_deliveries: { used: 3, limit: 225 },
+          monthly_webhook_deliveries: { used: 6, limit: 750 }
         }
       }),
       getBillingSummaryForProject: vi.fn(),
@@ -2410,7 +2415,8 @@ describe("api default dependencies", () => {
           monthly_raw_ingested_events: { used: 200, limit: 10500 },
           retained_bundle_cap: { used: 5, limit: 450 },
           monthly_remote_activations: { used: 1, limit: 75 },
-          monthly_alert_deliveries: { used: 3, limit: 225 }
+          monthly_alert_deliveries: { used: 3, limit: 225 },
+          monthly_webhook_deliveries: { used: 6, limit: 750 }
         }
       }),
       getBillingSummaryForProject: vi.fn(),
@@ -2520,7 +2526,8 @@ describe("api default dependencies", () => {
         monthly_raw_ingested_events: { used: 200, limit: 10000 },
         retained_bundle_cap: { used: 5, limit: 750 },
         monthly_remote_activations: { used: 1, limit: 125 },
-        monthly_alert_deliveries: { used: 3, limit: 375 }
+        monthly_alert_deliveries: { used: 3, limit: 375 },
+        monthly_webhook_deliveries: { used: 6, limit: 1250 }
       }
     };
     const buildStripeConfig = (input: {

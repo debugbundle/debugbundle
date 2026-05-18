@@ -1,8 +1,5 @@
-import type {
-  IncidentLifecycleService,
-  IncidentRetrievalRecord,
-  WebhookEventType
-} from "./types.js";
+import type { BillingStore } from "./billing-store.js";
+import type { IncidentLifecycleService, IncidentRetrievalRecord, WebhookEventType } from "./types.js";
 
 type IncidentResolutionInput = {
   organization_id: string;
@@ -48,6 +45,7 @@ interface CreateIncidentLifecycleServiceInput {
   webhookDeliveryStore: IncidentLifecycleWebhookStore;
   fallbackTargetUrl: string | null;
   fallbackSigningSecret: string | null;
+  billingStore?: Pick<BillingStore, "getBillingSummaryForProject">;
 }
 
 function buildLifecyclePayload(eventType: WebhookEventType, incident: IncidentRetrievalRecord): Record<string, unknown> {
@@ -112,7 +110,23 @@ async function publishResolvedWebhook(
   }
 
   const payload = buildLifecyclePayload("bundle.resolved", incident);
+  let remainingWebhookDeliveries: number | null = null;
+  if (input.billingStore !== undefined) {
+    const billingSummary = await input.billingStore.getBillingSummaryForProject({
+      project_id: incident.project_id,
+      now: new Date().toISOString()
+    });
+    const allowance = billingSummary?.allowances.monthly_webhook_deliveries;
+    if (billingSummary !== null && allowance !== undefined) {
+      remainingWebhookDeliveries = Math.max(0, allowance.limit - allowance.used);
+    }
+  }
+
   for (const target of targets) {
+    if (remainingWebhookDeliveries !== null && remainingWebhookDeliveries <= 0) {
+      break;
+    }
+
     await input.webhookDeliveryStore.createDeliveryIntent({
       webhook_id: target.webhook_id,
       project_id: incident.project_id,
@@ -123,6 +137,9 @@ async function publishResolvedWebhook(
       signing_secret: target.signing_secret,
       payload
     });
+    if (remainingWebhookDeliveries !== null) {
+      remainingWebhookDeliveries -= 1;
+    }
   }
 }
 

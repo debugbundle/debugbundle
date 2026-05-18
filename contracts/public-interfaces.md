@@ -614,6 +614,10 @@ Billing summary and allowance-capacity management routes accept both browser ses
       "monthly_alert_deliveries": {
         "used": 10,
         "limit": 225
+      },
+      "monthly_webhook_deliveries": {
+        "used": 20,
+        "limit": 750
       }
     }
   }
@@ -834,7 +838,7 @@ Current API implementation scope (Phase 10 alert CRUD slice):
 - `PATCH /v1/alerts/{id}` returns `200 { alert: AlertRule }` for owner/admin or the rule creator.
 - `DELETE /v1/alerts/{id}` returns `204` on success for owner/admin or the rule creator.
 - Worker-side alert evaluation now enqueues internal `evaluate-alerts` jobs from real incident transitions for `new_incident`, `severity_threshold`, `incident_regressed`, `regression_after_deploy`, and `error_spike` conditions.
-- Matching alert evaluations persist one internal `alert_deliveries` row per `alert_id + incident_id + dedupe_key` before delivery so duplicate worker replays stay idempotent.
+- Matching non-email alerts persist one internal `alert_deliveries` row per `alert_id + incident_id + dedupe_key` before delivery so duplicate worker replays stay idempotent. Email alerts aggregate into a 10-second per-project/per-recipient digest queue backed by `alert_email_digests` plus `alert_email_digest_items`, so bursts send one email while preserving per-incident dedupe.
 - Delivery transport is implemented for `channel: "email"`, `channel: "slack"`, `channel: "discord"`, and `channel: "webhook"`. Email requires `config.to` as a single recipient address; Slack accepts either `config.slack_destination_id` (resolved to an encrypted stored webhook URL at delivery time) or `config.webhook_url`; Discord requires `config.webhook_url`; webhook requires `config.target_url`.
 - Authorization failure: `401 { "error": "invalid_member_token" }`
 - Invalid list query: `400 { "error": "invalid_query" }`
@@ -946,6 +950,8 @@ Current implementation behavior:
   ]
 }
 ```
+
+Lifecycle webhook delivery creation is paused when the shared `monthly_webhook_deliveries` allowance is exhausted. Existing incidents, bundles, webhook configuration, delivery history, and manual retry of already-created failed deliveries remain available. Synthetic test deliveries also consume this meter and return `429 { "error": "monthly_quota_exceeded" }` with `Retry-After` when the allowance is exhausted.
 
 **Create webhook request:**
 ```json
@@ -1514,7 +1520,7 @@ GitHub automation eligibility is determined from the target project's owner plan
 | GET | `/v1/projects/{id}/github/deliveries` | Browser Session or Member Token | List delivery history |
 | POST | `/v1/projects/{id}/github/deliveries/{id}/retry` | Browser Session or Member Token | Retry a failed delivery |
 
-**Deliveries query params:** `status` (optional: `pending`, `delivered`, `failed`, `retrying`), `limit` (optional, 1-100, default 20)
+**Deliveries query params:** `status` (optional: `pending`, `delivered`, `failed`, `retrying`, `skipped`), `limit` (optional, 1-100, default 20)
 
 **List deliveries response:**
 ```json
@@ -1526,7 +1532,7 @@ GitHub automation eligibility is determined from the target project's owner plan
       "rule_name": "High severity incidents",
       "incident_id": "uuid",
       "incident_title": "TypeError in checkout",
-      "status": "delivered",
+      "status": "delivered | skipped",
       "attempt_count": 1,
       "last_attempt_at": "ISO8601",
       "last_error": null,
@@ -1538,6 +1544,8 @@ GitHub automation eligibility is determined from the target project's owner plan
 ```
 
 **Retry response:** Same shape as single delivery.
+
+`skipped` delivery records are non-retryable warnings created when DebugBundle suppresses a matching dispatch because the project or GitHub App installation has reached its hourly dispatch limit.
 
 Owner and admin may manage any dispatch rule. Plain members may create dispatch rules on an eligible shared project, but may update, delete, or retry only the rules and deliveries tied to rules they created themselves. Plain members may not mutate the shared GitHub installation or repository assignment.
 

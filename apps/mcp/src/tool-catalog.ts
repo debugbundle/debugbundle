@@ -279,7 +279,7 @@ export const MCP_TOOL_CATALOG = [
     inputSchema: z.object({
       bearerToken: z.string(),
       projectId: z.string(),
-      status: z.enum(['pending', 'retrying', 'delivered', 'failed']).optional(),
+      status: z.enum(['pending', 'retrying', 'delivered', 'failed', 'skipped']).optional(),
       limit: z.number().optional(),
     }),
   },

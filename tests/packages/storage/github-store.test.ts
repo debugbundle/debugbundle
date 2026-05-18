@@ -59,6 +59,31 @@ describe("github store", () => {
     });
   });
 
+  it("persists skipped dispatch deliveries for rate-limited GitHub automation", async () => {
+    const query = vi.fn().mockResolvedValueOnce({ rows: [{ id: "gdd_skipped" }] });
+    const store = createPostgresGitHubStore({ query });
+
+    const created = await store.createSkippedGitHubDispatchDelivery({
+      rule_id: "11111111-1111-4111-8111-111111111111",
+      project_id: "22222222-2222-4222-8222-222222222222",
+      incident_id: "33333333-3333-4333-8333-333333333333",
+      incident_fingerprint: "fp_123",
+      dedupe_key: "bundle.created:3",
+      installation_id: 99,
+      repo_owner: "debugbundle",
+      repo_name: "app",
+      reason: "project_hourly_rate_limited",
+      dispatch_payload: {
+        debugbundle_event: "bundle.created",
+        incident_id: "33333333-3333-4333-8333-333333333333"
+      }
+    });
+
+    expect(created.created).toBe(true);
+    expect(String(query.mock.calls[0]?.[0])).toContain("'skipped'");
+    expect(query.mock.calls[0]?.[1]).toContain("project_hourly_rate_limited");
+  });
+
   it("upserts installation and repo assignments and handles delete misses", async () => {
     const query = vi
       .fn()

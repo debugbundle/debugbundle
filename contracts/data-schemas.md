@@ -851,6 +851,56 @@ Emitted by SDKs when duplicate suppression is active:
 | created_at | timestamptz | NOT NULL DEFAULT now() |
 | updated_at | timestamptz | NOT NULL DEFAULT now() |
 
+### 5.10a alert_deliveries
+| Column | Type | Constraints |
+|--------|------|-------------|
+| id | uuid | PK |
+| alert_id | uuid | NOT NULL, FK → alert_rules, CASCADE |
+| project_id | uuid | NOT NULL, FK → projects, CASCADE |
+| incident_id | uuid | NOT NULL, FK → incidents, CASCADE |
+| condition_type | text | NOT NULL |
+| dedupe_key | text | NOT NULL |
+| channel | text | NOT NULL |
+| status | text | NOT NULL |
+| payload | jsonb | NOT NULL |
+| last_error | text | |
+| delivered_at | timestamptz | |
+| created_at | timestamptz | NOT NULL DEFAULT now() |
+| updated_at | timestamptz | NOT NULL DEFAULT now() |
+| UNIQUE | (alert_id, incident_id, dedupe_key) | |
+
+These rows represent immediate non-email alert sends. Email alerts use the digest queue below so bursty incidents can be aggregated before transport delivery.
+
+### 5.10b alert_email_digests
+| Column | Type | Constraints |
+|--------|------|-------------|
+| id | uuid | PK |
+| project_id | uuid | NOT NULL, FK → projects, CASCADE |
+| recipient | text | NOT NULL |
+| status | text | NOT NULL |
+| next_attempt_at | timestamptz | |
+| claimed_at | timestamptz | |
+| last_error | text | |
+| delivered_at | timestamptz | |
+| created_at | timestamptz | NOT NULL DEFAULT now() |
+| updated_at | timestamptz | NOT NULL DEFAULT now() |
+
+Pending email digests aggregate for a fixed 10-second window per `(project_id, recipient)` before the worker claims them for send.
+
+### 5.10c alert_email_digest_items
+| Column | Type | Constraints |
+|--------|------|-------------|
+| id | uuid | PK |
+| digest_id | uuid | NOT NULL, FK → alert_email_digests, CASCADE |
+| alert_id | uuid | NOT NULL, FK → alert_rules, CASCADE |
+| project_id | uuid | NOT NULL, FK → projects, CASCADE |
+| incident_id | uuid | NOT NULL, FK → incidents, CASCADE |
+| condition_type | text | NOT NULL |
+| dedupe_key | text | NOT NULL |
+| payload | jsonb | NOT NULL |
+| created_at | timestamptz | NOT NULL DEFAULT now() |
+| UNIQUE | (alert_id, incident_id, dedupe_key) | |
+
 ### 5.11 agent_webhooks
 | Column | Type | Constraints |
 |--------|------|-------------|
@@ -997,7 +1047,7 @@ Dispatch rules reuse the same filter field semantics as webhook filters (`event_
 | project_id | uuid | NOT NULL, FK → projects |
 | incident_id | uuid | NOT NULL |
 | incident_fingerprint | text | NOT NULL |
-| status | text | NOT NULL, DEFAULT 'pending', CHECK IN ('pending', 'delivered', 'failed', 'retrying') |
+| status | text | NOT NULL, DEFAULT 'pending', CHECK IN ('pending', 'delivered', 'failed', 'retrying', 'skipped') |
 | attempt_count | integer | NOT NULL, DEFAULT 0 |
 | last_attempt_at | timestamptz | |
 | last_error | text | |
@@ -1007,7 +1057,7 @@ Dispatch rules reuse the same filter field semantics as webhook filters (`event_
 
 **Index:** `idx_dispatch_deliveries_cooldown` on `(rule_id, incident_fingerprint, created_at DESC)` supports efficient cooldown lookups ("has this fingerprint been dispatched within cooldown_seconds?").
 
-Delivery statuses: `pending` → `delivered` or `retrying` → `delivered` or `failed`. Retry strategy: 1s → 5s → 30s → 2min → 10min (5 attempts). Rules are NOT auto-disabled after failures.
+Delivery statuses: `pending` → `delivered` or `retrying` → `delivered` or `failed`. `skipped` records are non-retryable history rows for dispatches suppressed by DebugBundle-side hourly rate limits. Retry strategy: 1s → 5s → 30s → 2min → 10min (5 attempts). Rules are NOT auto-disabled after failures.
 
 ---
 

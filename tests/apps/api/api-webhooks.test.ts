@@ -10,6 +10,7 @@ type MemberAuthDependency = MockedMethods<ApiServerDependencies["memberAuth"]>;
 type WebhookManagementDependency = MockedMethods<NonNullable<ApiServerDependencies["webhookManagement"]>>;
 type WebhookTestingDependency = MockedMethods<NonNullable<ApiServerDependencies["webhookTesting"]>>;
 type ProjectManagementDependency = MockedMethods<NonNullable<ApiServerDependencies["projectManagement"]>>;
+type BillingManagementDependency = MockedMethods<NonNullable<ApiServerDependencies["billingManagement"]>>;
 
 const defaultProjectAccess = {
   project_id: "00000000-0000-4000-8000-000000000001",
@@ -28,6 +29,7 @@ function createServer(overrides: {
   projectManagement?: ProjectManagementDependency | undefined;
   webhookManagement?: WebhookManagementDependency | undefined;
   webhookTesting?: WebhookTestingDependency | undefined;
+  billingManagement?: BillingManagementDependency | undefined;
 } = {}): ReturnType<typeof createApiServer> {
   const hasWebhookManagementOverride = Object.prototype.hasOwnProperty.call(overrides, "webhookManagement");
 
@@ -80,6 +82,7 @@ function createServer(overrides: {
     objectStoreReader: {
       getObject: vi.fn()
     },
+    ...(overrides.billingManagement === undefined ? {} : { billingManagement: overrides.billingManagement }),
     webhookDelivery: {
       listDeliveriesForWebhookInOrganization: vi.fn().mockResolvedValue({ deliveries: [] }),
       retryDeliveryForOrganization: vi.fn().mockResolvedValue(null)
@@ -879,6 +882,63 @@ describe("api webhook routes", () => {
 
     expect(response.statusCode).toBe(404);
     expect(response.json()).toEqual({ error: "webhook_not_found" });
+  });
+
+  it("should reject webhook test delivery when the monthly webhook quota is exhausted", async (): Promise<void> => {
+    const webhookTesting = {
+      triggerTestDelivery: vi.fn().mockResolvedValue({
+        delivery_id: "del_123",
+        event_type: "verification.passed"
+      })
+    };
+    const billingManagement = mockedObject<NonNullable<ApiServerDependencies["billingManagement"]>>({
+      getBillingSummaryForOrganization: vi.fn().mockResolvedValue({
+        plan: "free",
+        stripe_customer_id: null,
+        active_projects: 1,
+        capacity_units: {
+          total: 1,
+          included: 1,
+          additional_purchased: 0,
+          pending_reduction: null
+        },
+        usage_window: {
+          starts_at: "2026-05-01T00:00:00.000Z",
+          ends_at: "2099-01-01T00:00:00.000Z"
+        },
+        allowances: {
+          monthly_bundle_requests: { used: 0, limit: 25 },
+          monthly_raw_ingested_events: { used: 0, limit: 750 },
+          retained_bundle_cap: { used: 0, limit: 5 },
+          monthly_remote_activations: { used: 0, limit: 0 },
+          monthly_alert_deliveries: { used: 0, limit: 25 },
+          monthly_webhook_deliveries: { used: 100, limit: 100 }
+        }
+      }),
+      createCheckoutLink: vi.fn().mockResolvedValue(null),
+      createPortalLink: vi.fn().mockResolvedValue(null)
+    });
+    const app = createServer({ webhookTesting, billingManagement });
+
+    const response = await app.inject({
+      method: "POST",
+      url: "/v1/webhooks/11111111-1111-4111-8111-111111111111/test?project_id=00000000-0000-4000-8000-000000000001",
+      headers: {
+        authorization: "Bearer dbundle_mem_test"
+      }
+    });
+
+    expect(response.statusCode).toBe(429);
+    expect(response.headers["retry-after"]).toBeDefined();
+    expect(response.json()).toEqual({
+      error: "monthly_quota_exceeded",
+      retry_after_ms: expect.any(Number)
+    });
+    expect(billingManagement.getBillingSummaryForOrganization).toHaveBeenCalledWith({
+      organization_id: "org_123",
+      now: expect.any(String)
+    });
+    expect(webhookTesting.triggerTestDelivery).not.toHaveBeenCalled();
   });
 
   it("should enqueue webhook test delivery with verification.passed default", async (): Promise<void> => {

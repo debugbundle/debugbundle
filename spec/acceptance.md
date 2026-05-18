@@ -408,7 +408,15 @@ Last updated: 2026-03-13
 - **Then** the webhook status is set to `disabled`
 - **And** the owner is notified via email
 
-### AC-WHK-05: Member Webhook Ownership
+### AC-WHK-05: Lifecycle Webhook Delivery Allowance
+- **Given** an organization has exhausted its `monthly_webhook_deliveries` allowance
+- **When** a lifecycle event matches a project webhook
+- **Then** no new webhook delivery intent is created
+- **And** incidents, bundles, webhook configuration, and existing delivery history remain visible
+- **When** the user sends a synthetic test webhook through the API
+- **Then** the API returns `429 monthly_quota_exceeded` with `Retry-After`
+
+### AC-WHK-06: Member Webhook Ownership
 - **Given** a shared project where one member created a webhook
 - **When** a different non-admin member attempts to update, test, or delete that webhook
 - **Then** the request is rejected with a permissions error
@@ -1357,7 +1365,7 @@ If CLI says something is healthy and MCP says something different, that is a pro
 - **Given** a project that has sent 100 dispatches in the current hour
 - **When** the 101st dispatch is triggered
 - **Then** the dispatch is dropped and logged
-- **And** the delivery history shows a rate-limit warning
+- **And** the delivery history shows a non-retryable `skipped` rate-limit warning
 
 ### AC-GHA-11: Installation Lifecycle — Suspended
 - **Given** an active GitHub App installation

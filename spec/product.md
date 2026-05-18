@@ -232,7 +232,7 @@ See `/spec/tiers.md` for the finalized source-of-truth pricing model. Summary:
 - Included and purchased capacity units expand the shared allowance bucket
 
 ### Team Plan ($19/month)
-- Unlimited projects and unlimited project collaborators
+- Unlimited projects and up to 5 members
 - 15 included capacity units
 - Extra capacity units: +$1.99/unit/month
 - 90-day bundle retention, 30-day raw event retention

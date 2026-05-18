@@ -2,7 +2,11 @@ import { z } from "zod";
 import { describe, expect, it, vi } from "vitest";
 
 import { encryptIntegrationSecret } from "../../../packages/storage/src/index.js";
-import { processNextEvaluateAlertsJob, processNextGroupIncidentJob } from "../../../apps/worker/src/processor.js";
+import {
+  processNextDeliverAlertEmailDigestJob,
+  processNextEvaluateAlertsJob,
+  processNextGroupIncidentJob
+} from "../../../apps/worker/src/processor.js";
 import { createAlertTransport } from "../../../apps/worker/src/runtime.js";
 
 const SlackAlertBodySchema = z
@@ -95,6 +99,7 @@ describe("worker alert evaluation", () => {
       condition_type: "new_incident",
       dedupe_key: "new_incident",
       occurred_at: "2026-03-15T12:00:00.000Z",
+      summary: "boom",
       service_name: "checkout-api",
       environment: "production",
       severity: "high"
@@ -105,6 +110,7 @@ describe("worker alert evaluation", () => {
       condition_type: "severity_threshold",
       dedupe_key: "severity_threshold:high",
       occurred_at: "2026-03-15T12:00:00.000Z",
+      summary: "boom",
       service_name: "checkout-api",
       environment: "production",
       severity: "high"
@@ -241,7 +247,11 @@ describe("worker alert evaluation", () => {
       alertStore: {
         listMatchingAlerts,
         createAlertDeliveryIntent,
-        markAlertDeliveryResult
+        markAlertDeliveryResult,
+        queueAlertEmailDigestItem: vi.fn(),
+        claimDueAlertEmailDigests: vi.fn(),
+        getAlertEmailDigest: vi.fn(),
+        markAlertEmailDigestResult: vi.fn()
       },
       alertTransport: {
         deliver
@@ -270,8 +280,12 @@ describe("worker alert evaluation", () => {
     });
   });
 
-  it("marks alert deliveries failed when transport delivery raises an alert error", async (): Promise<void> => {
-    const markAlertDeliveryResult = vi.fn().mockResolvedValue({ status: "failed" });
+  it("queues email alerts into digest rows instead of sending immediately", async (): Promise<void> => {
+    const createAlertDeliveryIntent = vi.fn();
+    const queueAlertEmailDigestItem = vi
+      .fn()
+      .mockResolvedValue({ digest_id: "dig_1", created: true, created_digest: true });
+    const deliver = vi.fn();
 
     const result = await processNextEvaluateAlertsJob({
       queue: {
@@ -302,20 +316,36 @@ describe("worker alert evaluation", () => {
             updated_at: "2026-03-15T00:00:00.000Z"
           }
         ]),
-        createAlertDeliveryIntent: vi.fn().mockResolvedValue({ delivery_id: "ad_1", created: true }),
-        markAlertDeliveryResult
+        createAlertDeliveryIntent,
+        markAlertDeliveryResult: vi.fn(),
+        queueAlertEmailDigestItem,
+        claimDueAlertEmailDigests: vi.fn(),
+        getAlertEmailDigest: vi.fn(),
+        markAlertEmailDigestResult: vi.fn()
       },
       alertTransport: {
-        deliver: vi.fn().mockRejectedValue(new Error("alert_channel_not_supported:email"))
+        deliver
       }
     });
 
     expect(result).toEqual({ processed: true });
-    expect(markAlertDeliveryResult).toHaveBeenCalledWith({
-      delivery_id: "ad_1",
-      delivered: false,
-      error_message: "alert_channel_not_supported:email"
+    expect(queueAlertEmailDigestItem).toHaveBeenCalledWith({
+      alert_id: "alt_1",
+      project_id: "proj_123",
+      incident_id: "inc_123",
+      condition_type: "error_spike",
+      dedupe_key: "error_spike",
+      recipient: "alerts@example.com",
+      payload: expect.objectContaining({
+        incident_id: "inc_123",
+        summary: null,
+        severity: "critical"
+      }),
+      aggregation_window_seconds: 10,
+      allow_new_digest: true
     });
+    expect(createAlertDeliveryIntent).not.toHaveBeenCalled();
+    expect(deliver).not.toHaveBeenCalled();
   });
 
   it("skips new alert deliveries when the monthly delivery quota is exhausted", async (): Promise<void> => {
@@ -352,7 +382,11 @@ describe("worker alert evaluation", () => {
           }
         ]),
         createAlertDeliveryIntent,
-        markAlertDeliveryResult: vi.fn()
+        markAlertDeliveryResult: vi.fn(),
+        queueAlertEmailDigestItem: vi.fn(),
+        claimDueAlertEmailDigests: vi.fn(),
+        getAlertEmailDigest: vi.fn(),
+        markAlertEmailDigestResult: vi.fn()
       },
       alertTransport: {
         deliver
@@ -376,7 +410,8 @@ describe("worker alert evaluation", () => {
             monthly_raw_ingested_events: { used: 0, limit: 10500 },
             retained_bundle_cap: { used: 0, limit: 450 },
             monthly_remote_activations: { used: 0, limit: 75 },
-            monthly_alert_deliveries: { used: 225, limit: 225 }
+            monthly_alert_deliveries: { used: 225, limit: 225 },
+            monthly_webhook_deliveries: { used: 0, limit: 750 }
           }
         })
       }
@@ -385,6 +420,55 @@ describe("worker alert evaluation", () => {
     expect(result).toEqual({ processed: true });
     expect(createAlertDeliveryIntent).not.toHaveBeenCalled();
     expect(deliver).not.toHaveBeenCalled();
+  });
+
+  it("does not resend an alert email digest that is no longer pending", async (): Promise<void> => {
+    const deliver = vi.fn();
+    const markAlertEmailDigestResult = vi.fn();
+
+    const result = await processNextDeliverAlertEmailDigestJob({
+      queue: {
+        enqueue: vi.fn().mockResolvedValue(undefined),
+        dequeue: vi.fn().mockResolvedValue({ digest_id: "dig_1" })
+      },
+      alertStore: {
+        getAlertEmailDigest: vi.fn().mockResolvedValue({
+          digest: {
+            digest_id: "dig_1",
+            project_id: "proj_123",
+            recipient: "alerts@example.com",
+            status: "delivered",
+            next_attempt_at: "2026-05-17T10:00:10.000Z",
+            claimed_at: null,
+            last_error: null,
+            delivered_at: "2026-05-17T10:00:11.000Z",
+            created_at: "2026-05-17T10:00:00.000Z",
+            updated_at: "2026-05-17T10:00:11.000Z"
+          },
+          items: [
+            {
+              item_id: "item_1",
+              digest_id: "dig_1",
+              alert_id: "alt_1",
+              project_id: "proj_123",
+              incident_id: "inc_123",
+              condition_type: "new_incident",
+              dedupe_key: "new_incident",
+              payload: { incident_id: "inc_123" },
+              created_at: "2026-05-17T10:00:00.000Z"
+            }
+          ]
+        }),
+        markAlertEmailDigestResult
+      },
+      alertEmailDigestTransport: {
+        deliver
+      }
+    });
+
+    expect(result).toEqual({ processed: true });
+    expect(deliver).not.toHaveBeenCalled();
+    expect(markAlertEmailDigestResult).not.toHaveBeenCalled();
   });
 });
 

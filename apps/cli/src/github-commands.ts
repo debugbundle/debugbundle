@@ -55,7 +55,7 @@ interface GitHubDispatchDeliveryLike {
   rule_name: string;
   incident_id: string;
   incident_title: string;
-  status: "pending" | "retrying" | "delivered" | "failed";
+  status: "pending" | "retrying" | "delivered" | "failed" | "skipped";
   attempt_count: number;
   last_attempt_at: string | null;
   last_error: string | null;
@@ -275,7 +275,7 @@ export async function listProjectGitHubDeliveriesCommand(
   input: {
     bearerToken: string;
     projectId: string;
-    status?: "pending" | "retrying" | "delivered" | "failed";
+    status?: "pending" | "retrying" | "delivered" | "failed" | "skipped";
     limit?: number;
     json?: boolean;
   },
@@ -283,7 +283,7 @@ export async function listProjectGitHubDeliveriesCommand(
     listProjectDeliveries(input: {
       bearerToken: string;
       projectId: string;
-      status?: "pending" | "retrying" | "delivered" | "failed";
+      status?: "pending" | "retrying" | "delivered" | "failed" | "skipped";
       limit?: number;
     }): Promise<GitHubDispatchDeliveryLike[]>;
   }
@@ -680,7 +680,7 @@ export async function listProjectGitHubDeliveriesWithAuthCommand(
   input: {
     authFilePath?: string;
     projectId: string;
-    status?: "pending" | "retrying" | "delivered" | "failed";
+    status?: "pending" | "retrying" | "delivered" | "failed" | "skipped";
     limit?: number;
     json?: boolean;
   },
