@@ -185,7 +185,7 @@ Last updated: 2026-03-27
 
 **FR-BND-10:** One active bundle per incident. When significant new events arrive for an existing incident, the bundle is regenerated (not appended). A version counter increments on each regeneration (v1, v2, v3). `bundle.updated` webhook fires on regeneration. Retention cleanup deletes the incident + all associated bundles + reproduction artifacts atomically. No historical bundle snapshots in V1 — only the latest bundle is kept.
 
-**FR-BND-08:** Improvement bundle generation is available at all tiers. Free tier: user/agent triggers local analysis via `debugbundle analyze` using local bundles + profile + codebase (agent uses own LLM). Team tier: cloud generates improvement bundles automatically on every ingested event with full incident history and cross-deploy trend analysis.
+**FR-BND-08:** Improvement bundle generation is available at all tiers. Free tier: user/agent triggers local analysis via `debugbundle analyze` using local bundles + profile + codebase (agent uses own LLM). Solo and Team tiers: hosted cloud automation is available for deterministic improvement analysis, controlled by per-project improvement settings and backed by the shared bundle allowance.
 
 **FR-BND-09:** `debugbundle analyze [--type failure|improvement|performance] [--local]` generates analysis bundles locally by reading `.debugbundle/bundles/local/`, `profile.json`, and relevant source code. Output follows the standard bundle schema. The skill layer provides structured analysis recipes (schemas + examples) that any AI agent can follow.
 
@@ -203,9 +203,15 @@ Last updated: 2026-03-27
 
 **FR-RET-06:** `GET /v1/services` — list services for a project.
 
-**FR-RET-07:** Incident retrieval responses must include denormalized `project_name` and `service_name` values so API/CLI/MCP/web clients do not need follow-up lookups to render incident lists or detail views.
+**FR-RET-07:** `GET /v1/improvements` — list/filter hosted improvement opportunities (project_id, environment, service, status [open/resolved/snoozed], severity, kind, limit, cursor).
 
-**FR-RET-08:** All API responses must be JSON, versioned, with explicit nulls, stable field names, ISO timestamps, redaction markers.
+**FR-RET-08:** `GET /v1/improvements/{id}` plus `POST /v1/improvements/{id}/resolve|reopen` — hosted improvement metadata and lifecycle mutations.
+
+**FR-RET-09:** `GET /v1/projects/{projectId}/improvements/{improvementId}/bundle` — hosted improvement bundle artifact. Return `{"status": "pending"}` if still processing and `{"status": "failed", "reason": "..."}` if generation failed or no artifact is available.
+
+**FR-RET-10:** Incident and improvement retrieval responses must include denormalized `project_name` and `service_name` values so API/CLI/MCP/web clients do not need follow-up lookups to render list or detail views.
+
+**FR-RET-11:** All API responses must be JSON, versioned, with explicit nulls, stable field names, ISO timestamps, redaction markers.
 
 ### 1.7 Webhook System
 
@@ -237,7 +243,7 @@ Last updated: 2026-03-27
 
 ### 1.9 CLI
 
-**FR-CLI-01:** Core commands: `login`, `whoami`, `setup`, `connect`, `ingest`, `watch`, `process`, `clean`, `incidents`, `inspect`, `resolve`, `reopen`, `bundle`, `reproduce`, `logs`, `services`, `analyze`, `token project list/create/revoke`, `token member list/create/revoke`, `webhook list/create/update/delete/test/deliveries/retry`, `alert list/create/update/delete`, `weekly-report list/create/update/delete`, `capture-policy get/set`, `project list/create/update/delete`, `project members list/invites/invite/cancel-invite/update-role/remove`, `probe activate/list/deactivate`, `billing get/capacity increase/capacity schedule-reduction/capacity cancel-reduction`.
+**FR-CLI-01:** Core commands: `login`, `whoami`, `setup`, `connect`, `ingest`, `watch`, `process`, `clean`, `incidents`, `inspect`, `resolve`, `reopen`, `bundle`, `reproduce`, `logs`, `services`, `analyze`, `token project list/create/revoke`, `token member list/create/revoke`, `webhook list/create/update/delete/test/deliveries/retry`, `alert list/create/update/delete`, `weekly-report list/create/update/delete`, `capture-policy get/set`, `improvements list/get/bundle/resolve/reopen/snooze`, `improvements settings get/set`, `project list/create/update/delete`, `project members list/invites/invite/cancel-invite/update-role/remove`, `probe activate/list/deactivate`, `billing get/capacity increase/capacity schedule-reduction/capacity cancel-reduction`.
 
 **FR-CLI-02:** Setup commands: `doctor`, `validate`, `validate --fix`, `verify local`, `verify cloud`, `smoke`. `verify cloud --trigger-5xx` must actively prove hosted ingestion by sending a synthetic 5xx `request_event` through the real ingestion endpoint, confirming incident visibility, and reporting bundle status. `verify cloud --trigger-4xx <status>` must run the same hosted proof path for a specific `4xx` status, validate that the status is in `400..499`, and only succeed when the target project configuration promotes that status into immediate incident creation.
 
@@ -271,7 +277,7 @@ Last updated: 2026-03-27
 
 ### 1.10 MCP Server
 
-**FR-MCP-01:** Expose tools: `list_incidents`, `get_incident`, `resolve_incident`, `reopen_incident`, `get_bundle`, `get_reproduction`, `get_logs`, `doctor`, `validate`, `verify_local`, `verify_cloud`, `smoke`, `list_webhooks`, `create_webhook`, `update_webhook`, `delete_webhook`, `test_webhook`, `list_webhook_deliveries`, `retry_webhook_delivery`, `list_project_tokens`, `create_project_token`, `revoke_project_token`, `list_member_tokens`, `create_member_token`, `revoke_member_token`, `list_alerts`, `create_alert`, `update_alert`, `delete_alert`, `list_weekly_report_channels`, `create_weekly_report_channel`, `update_weekly_report_channel`, `delete_weekly_report_channel`, `list_services`, `analyze`, `get_capture_policy`, `update_capture_policy`, `activate_probe`, `list_active_probes`, `deactivate_probe`, `list_projects`, `create_project`, `update_project`, `delete_project`, `get_billing_summary`, `increase_capacity`, `schedule_capacity_reduction`, `cancel_capacity_reduction`, `list_project_members`, `list_project_member_invites`, `invite_project_member`, `cancel_project_member_invite`, `update_project_member_role`, `remove_project_member`.
+**FR-MCP-01:** Expose tools: `list_incidents`, `get_incident`, `resolve_incident`, `reopen_incident`, `get_bundle`, `get_reproduction`, `get_logs`, `doctor`, `validate`, `verify_local`, `verify_cloud`, `smoke`, `list_webhooks`, `create_webhook`, `update_webhook`, `delete_webhook`, `test_webhook`, `list_webhook_deliveries`, `retry_webhook_delivery`, `list_project_tokens`, `create_project_token`, `revoke_project_token`, `list_member_tokens`, `create_member_token`, `revoke_member_token`, `list_alerts`, `create_alert`, `update_alert`, `delete_alert`, `list_weekly_report_channels`, `create_weekly_report_channel`, `update_weekly_report_channel`, `delete_weekly_report_channel`, `list_services`, `analyze`, `get_capture_policy`, `update_capture_policy`, `get_improvement_settings`, `update_improvement_settings`, `activate_probe`, `list_active_probes`, `deactivate_probe`, `list_projects`, `create_project`, `update_project`, `delete_project`, `get_billing_summary`, `increase_capacity`, `schedule_capacity_reduction`, `cancel_capacity_reduction`, `list_project_members`, `list_project_member_invites`, `invite_project_member`, `cancel_project_member_invite`, `update_project_member_role`, `remove_project_member`.
 
 **FR-MCP-02:** MCP must be a thin adapter over the same domain services used by CLI/API.
 

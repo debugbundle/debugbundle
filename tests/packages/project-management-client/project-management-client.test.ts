@@ -2,29 +2,43 @@ import { describe, expect, it, vi } from "vitest";
 
 import { createProjectManagementApi, ProjectManagementApiError, type HttpClient } from "../../../packages/project-management-client/src/index.js";
 
+function projectFixture(overrides: Record<string, unknown> = {}): Record<string, unknown> {
+  return {
+    project_id: "proj_1",
+    organization_id: "org_1",
+    owner_user_id: "user_1",
+    owner_email: "owner@example.com",
+    relationship: "owned",
+    sharing_state: "private",
+    effective_role: "owner",
+    name: "Checkout",
+    slug: "checkout",
+    environment_default: "production",
+    organization_plan: "free",
+    metrics: {
+      monthly_bundle_requests: 1,
+      monthly_raw_ingested_events: 2,
+      retained_bundles: 3,
+      monthly_alert_deliveries: 4
+    },
+    created_at: "2026-03-21T00:00:00.000Z",
+    updated_at: "2026-03-21T00:00:00.000Z",
+    ...overrides
+  };
+}
+
+function deletedProjectFixture(overrides: Record<string, unknown> = {}): Record<string, unknown> {
+  const project = projectFixture({ project_id: "proj_2", ...overrides });
+  delete project["metrics"];
+  return project;
+}
+
 describe("project-management api client", () => {
   it("calls the project list route with an optional query", async () => {
     const request = vi.fn<HttpClient["request"]>().mockResolvedValue({
       status: 200,
       body: {
-        projects: [
-          {
-            project_id: "proj_1",
-            organization_id: "org_1",
-            name: "Checkout",
-            slug: "checkout",
-            environment_default: "production",
-            organization_plan: "free",
-            metrics: {
-              monthly_bundle_requests: 1,
-              monthly_raw_ingested_events: 2,
-              retained_bundles: 3,
-              monthly_alert_deliveries: 4
-            },
-            created_at: "2026-03-21T00:00:00.000Z",
-            updated_at: "2026-03-21T00:00:00.000Z"
-          }
-        ]
+        projects: [projectFixture()]
       }
     });
 
@@ -43,22 +57,15 @@ describe("project-management api client", () => {
     const request = vi.fn<HttpClient["request"]>().mockResolvedValue({
       status: 201,
       body: {
-        project: {
+        project: projectFixture({
           project_id: "proj_2",
-          organization_id: "org_1",
-          name: "Checkout",
-          slug: "checkout",
-          environment_default: "production",
-          organization_plan: "free",
           metrics: {
             monthly_bundle_requests: 0,
             monthly_raw_ingested_events: 0,
             retained_bundles: 0,
             monthly_alert_deliveries: 0
-          },
-          created_at: "2026-03-21T00:00:00.000Z",
-          updated_at: "2026-03-21T00:00:00.000Z"
-        }
+          }
+        })
       }
     });
 
@@ -117,16 +124,7 @@ describe("project-management api client", () => {
     const request = vi.fn<HttpClient["request"]>().mockResolvedValue({
       status: 200,
       body: {
-        project: {
-          project_id: "proj_2",
-          organization_id: "org_1",
-          name: "Checkout",
-          slug: "checkout",
-          environment_default: "production",
-          organization_plan: "free",
-          created_at: "2026-03-21T00:00:00.000Z",
-          updated_at: "2026-03-21T00:00:00.000Z"
-        }
+        project: deletedProjectFixture()
       }
     });
 

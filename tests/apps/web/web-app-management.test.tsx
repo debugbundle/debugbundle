@@ -2575,6 +2575,70 @@ describe("web app — management routes", () => {
     expect(locationAssign).toHaveBeenCalledWith("https://billing.stripe.com/checkout/solo");
   });
 
+  it("renders the billing page when the billing payload omits webhook delivery usage", async () => {
+    const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = requestUrl(input);
+
+      if (url.endsWith("/v1/auth/session")) {
+        return jsonResponse(200, {
+          session: createSession()
+        });
+      }
+
+      if (url.endsWith("/v1/billing") && init?.method === undefined) {
+        return jsonResponse(200, {
+          billing: {
+            plan: "free",
+            stripe_customer_id: null,
+            active_projects: 1,
+            capacity_units: {
+              total: 1,
+              included: 1,
+              additional_purchased: 0,
+              pending_reduction: null
+            },
+            usage_window: {
+              starts_at: "2026-03-01T00:00:00.000Z",
+              ends_at: "2026-04-01T00:00:00.000Z"
+            },
+            allowances: {
+              monthly_bundle_requests: {
+                used: 12,
+                limit: 100
+              },
+              monthly_raw_ingested_events: {
+                used: 120,
+                limit: 750
+              },
+              retained_bundle_cap: {
+                used: 6,
+                limit: 50
+              },
+              monthly_remote_activations: {
+                used: 0,
+                limit: 0
+              },
+              monthly_alert_deliveries: {
+                used: 4,
+                limit: 25
+              }
+            }
+          }
+        });
+      }
+
+      return jsonResponse(404, { error: "not_found" });
+    });
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<App initialEntries={["/billing"]} />);
+
+    expect(await screen.findByRole("heading", { name: /billing/i, level: 1 })).toBeInTheDocument();
+    expect(await screen.findByText(/^Webhook deliveries$/i)).toBeInTheDocument();
+    expect(screen.getByText(/lifecycle webhook deliveries created this month\./i)).toBeInTheDocument();
+  });
+
   it("confirms billing and shows a success dialog after a successful Stripe checkout return", async () => {
     const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
       const url = requestUrl(input);

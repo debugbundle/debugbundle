@@ -35,6 +35,37 @@ export const IncidentSchema = z
   })
   .strict();
 
+export const ImprovementSchema = z
+  .object({
+    improvement_id: z.string(),
+    project_id: z.string(),
+    project_name: z.string(),
+    project_slug: z.string(),
+    service_id: z.string().nullable(),
+    service_name: z.string(),
+    service_runtime: z.string().nullable(),
+    service_framework: z.string().nullable(),
+    environment: z.string(),
+    kind: z.enum(["warning_hotspot", "slow_request", "request_failure_pattern", "recurring_incident", "post_deploy_regression"]),
+    status: z.enum(["open", "resolved", "snoozed"]),
+    severity: z.enum(["low", "medium", "high", "critical"]),
+    confidence: z.number(),
+    fingerprint: z.string(),
+    title: z.string(),
+    summary: z.string(),
+    occurrence_count: z.number().int(),
+    evidence: z.record(z.unknown()),
+    first_detected_at: z.string(),
+    last_detected_at: z.string(),
+    resolved_at: z.string().nullable(),
+    snoozed_until: z.string().nullable(),
+    bundle_generation_number: z.number().int(),
+    bundle_created_at: z.string().nullable(),
+    bundle_updated_at: z.string().nullable(),
+    bundle_failure_reason: z.string().nullable()
+  })
+  .strict();
+
 export const ServiceSchema = z
   .object({
     service_id: z.string(),
@@ -66,6 +97,12 @@ export const IncidentsResponseSchema = z
 export const IncidentResponseSchema = z
   .object({
     incident: IncidentSchema
+  })
+  .strict();
+
+export const ImprovementResponseSchema = z
+  .object({
+    improvement: ImprovementSchema
   })
   .strict();
 
@@ -168,6 +205,13 @@ export const ServicesResponseSchema = z
   })
   .strict();
 
+export const ImprovementsResponseSchema = z
+  .object({
+    improvements: z.array(ImprovementSchema),
+    next_cursor: z.string().nullable().optional()
+  })
+  .strict();
+
 export const LogsResponseSchema = z
   .object({
     logs: z.array(LogSchema),
@@ -219,6 +263,7 @@ export interface HttpRequestInput {
   method: "GET" | "POST";
   path: string;
   bearerToken: string;
+  body?: unknown;
 }
 
 export interface HttpResponse {
@@ -297,6 +342,30 @@ export function createRetrievalApi(client: HttpClient): {
   }): Promise<{ logs: Array<z.infer<typeof LogSchema>>; next_cursor: string | null }>;
   getReproduction(input: { bearerToken: string; incidentId: string }): Promise<z.infer<typeof PendingStatusSchema> | z.infer<typeof ReproductionSchema>>;
   listServices(input: { bearerToken: string; projectId: string; limit?: number }): Promise<Array<z.infer<typeof ServiceSchema>>>;
+  listImprovements(input: {
+    bearerToken: string;
+    projectId?: string;
+    environment?: string;
+    service?: string;
+    status?: string;
+    severity?: string;
+    kind?: string;
+    cursor?: string;
+    limit?: number;
+  }): Promise<{ improvements: Array<z.infer<typeof ImprovementSchema>>; next_cursor: string | null }>;
+  getImprovement(input: { bearerToken: string; improvementId: string }): Promise<z.infer<typeof ImprovementSchema>>;
+  resolveImprovement(input: { bearerToken: string; improvementId: string }): Promise<z.infer<typeof ImprovementSchema>>;
+  reopenImprovement(input: { bearerToken: string; improvementId: string }): Promise<z.infer<typeof ImprovementSchema>>;
+  snoozeImprovement(input: {
+    bearerToken: string;
+    improvementId: string;
+    snoozedUntil: string;
+  }): Promise<z.infer<typeof ImprovementSchema>>;
+  getImprovementBundle(input: {
+    bearerToken: string;
+    projectId: string;
+    improvementId: string;
+  }): Promise<z.infer<typeof PendingStatusSchema> | z.infer<typeof BundleSchema> | { status: "failed"; reason: string }>;
 } {
   return {
     async listIncidents(input) {
@@ -446,6 +515,114 @@ export function createRetrievalApi(client: HttpClient): {
           path: `/v1/services?${query.toString()}`,
           bearerToken: input.bearerToken
         })
+      );
+    },
+    async listImprovements(input) {
+      const query = new URLSearchParams();
+      if (input.projectId !== undefined) {
+        query.set("project_id", input.projectId);
+      }
+      if (input.environment !== undefined) {
+        query.set("environment", input.environment);
+      }
+      if (input.service !== undefined) {
+        query.set("service", input.service);
+      }
+      if (input.status !== undefined) {
+        query.set("status", input.status);
+      }
+      if (input.severity !== undefined) {
+        query.set("severity", input.severity);
+      }
+      if (input.kind !== undefined) {
+        query.set("kind", input.kind);
+      }
+      if (input.cursor !== undefined) {
+        query.set("cursor", input.cursor);
+      }
+      if (input.limit !== undefined) {
+        query.set("limit", String(input.limit));
+      }
+
+      const path = query.size > 0 ? `/v1/improvements?${query.toString()}` : "/v1/improvements";
+      const parsed = await expectParsed(
+        client.request({
+          method: "GET",
+          path,
+          bearerToken: input.bearerToken
+        }),
+        ImprovementsResponseSchema
+      );
+
+      return {
+        improvements: parsed.improvements,
+        next_cursor: parsed.next_cursor ?? null
+      };
+    },
+    async getImprovement(input) {
+      const parsed = await expectParsed(
+        client.request({
+          method: "GET",
+          path: `/v1/improvements/${input.improvementId}`,
+          bearerToken: input.bearerToken
+        }),
+        ImprovementResponseSchema
+      );
+
+      return parsed.improvement;
+    },
+    async resolveImprovement(input) {
+      const parsed = await expectParsed(
+        client.request({
+          method: "POST",
+          path: `/v1/improvements/${input.improvementId}/resolve`,
+          bearerToken: input.bearerToken
+        }),
+        ImprovementResponseSchema
+      );
+
+      return parsed.improvement;
+    },
+    async reopenImprovement(input) {
+      const parsed = await expectParsed(
+        client.request({
+          method: "POST",
+          path: `/v1/improvements/${input.improvementId}/reopen`,
+          bearerToken: input.bearerToken
+        }),
+        ImprovementResponseSchema
+      );
+
+      return parsed.improvement;
+    },
+    async snoozeImprovement(input) {
+      const parsed = await expectParsed(
+        client.request({
+          method: "POST",
+          path: `/v1/improvements/${input.improvementId}/snooze`,
+          bearerToken: input.bearerToken,
+          body: { snoozed_until: input.snoozedUntil }
+        }),
+        ImprovementResponseSchema
+      );
+
+      return parsed.improvement;
+    },
+    async getImprovementBundle(input) {
+      return await expectParsed(
+        client.request({
+          method: "GET",
+          path: `/v1/projects/${input.projectId}/improvements/${input.improvementId}/bundle`,
+          bearerToken: input.bearerToken
+        }),
+        z.union([
+          PendingStatusSchema,
+          BundleSchema,
+          z.object({
+            status: z.literal("failed"),
+            reason: z.string()
+          }).strict()
+        ])
       );
     }
   };

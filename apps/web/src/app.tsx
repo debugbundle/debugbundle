@@ -50,6 +50,8 @@ import {
 import { showErrorToast, showInfoToast, showSuccessToast } from "./lib/notify.js";
 import { SessionProvider, useSession } from "./lib/session.js";
 import { BillingPage } from "./pages/billing-page.js";
+import { ImprovementDetailPage } from "./pages/improvement-detail-page.js";
+import { ImprovementsPage } from "./pages/improvements-page.js";
 import { ProjectsPage, ProjectTokensPage } from "./pages/management-pages.js";
 import { IncidentsPage } from "./pages/incidents-page.js";
 import { IncidentDetailPage } from "./pages/incident-detail-page.js";
@@ -60,6 +62,7 @@ import { ProjectInvitePage } from "./pages/project-invite-page.js";
 import { ProjectMembersPage } from "./pages/project-members-page.js";
 import { ProjectGitHubPage } from "./pages/project-github-page.js";
 import { ProjectBundlesPage, ProjectIncidentsPage, ProjectOverviewPage } from "./pages/project-overview-page.js";
+import { ProjectImprovementsPage } from "./pages/project-improvements-page.js";
 import { ProjectSettingsPage } from "./pages/project-settings-page.js";
 import { SettingsPage } from "./pages/settings-page.js";
 import { ProjectWebhooksPage } from "./pages/project-webhooks-page.js";
@@ -141,6 +144,7 @@ export function App({ initialEntries }: AppProps): JSX.Element {
               <Route path="/dashboard" element={<DashboardPage />} />
               <Route path="/incidents" element={<IncidentsPage />} />
               <Route path="/incidents/:incidentId" element={<IncidentDetailPage />} />
+              <Route path="/improvements" element={<ImprovementsPage />} />
               <Route path="/billing" element={<BillingPage />} />
               <Route path="/projects" element={<ProjectsPage />} />
               <Route
@@ -158,6 +162,8 @@ export function App({ initialEntries }: AppProps): JSX.Element {
                 <Route index element={<ProjectOverviewPage />} />
                 <Route path="incidents" element={<ProjectIncidentsPage />} />
                 <Route path="incidents/:incidentId" element={<IncidentDetailPage />} />
+                <Route path="improvements" element={<ProjectImprovementsPage />} />
+                <Route path="improvements/:improvementId" element={<ImprovementDetailPage />} />
                 <Route path="bundles" element={<ProjectBundlesPage />} />
                 <Route path="bundles/:incidentId" element={<IncidentDetailPage />} />
                 <Route path="github" element={<ProjectGitHubPage />} />
@@ -186,6 +192,7 @@ export function App({ initialEntries }: AppProps): JSX.Element {
               <Route path="/dashboard" element={<DashboardPage />} />
               <Route path="/incidents" element={<IncidentsPage />} />
               <Route path="/incidents/:incidentId" element={<IncidentDetailPage />} />
+              <Route path="/improvements" element={<ImprovementsPage />} />
               <Route path="/billing" element={<BillingPage />} />
               <Route path="/projects" element={<ProjectsPage />} />
               <Route
@@ -203,6 +210,8 @@ export function App({ initialEntries }: AppProps): JSX.Element {
                 <Route index element={<ProjectOverviewPage />} />
                 <Route path="incidents" element={<ProjectIncidentsPage />} />
                 <Route path="incidents/:incidentId" element={<IncidentDetailPage />} />
+                <Route path="improvements" element={<ProjectImprovementsPage />} />
+                <Route path="improvements/:improvementId" element={<ImprovementDetailPage />} />
                 <Route path="bundles" element={<ProjectBundlesPage />} />
                 <Route path="bundles/:incidentId" element={<IncidentDetailPage />} />
                 <Route path="github" element={<ProjectGitHubPage />} />

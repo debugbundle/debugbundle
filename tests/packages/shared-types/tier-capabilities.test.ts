@@ -55,9 +55,9 @@ describe("tier capabilities", () => {
     expect(getTierCapabilities("team").slack_integration).toBe(true);
   });
 
-  it("should gate cloud improvement bundles for team tier only", (): void => {
+  it("should gate cloud improvement bundles for Solo and Team tiers", (): void => {
     expect(getTierCapabilities("free").cloud_improvement_bundles).toBe(false);
-    expect(getTierCapabilities("solo").cloud_improvement_bundles).toBe(false);
+    expect(getTierCapabilities("solo").cloud_improvement_bundles).toBe(true);
     expect(getTierCapabilities("team").cloud_improvement_bundles).toBe(true);
   });
 

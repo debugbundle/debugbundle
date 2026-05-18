@@ -1,9 +1,10 @@
 import { PencilIcon, PlusIcon } from "lucide-react";
 import { useEffect, useState } from "react";
-import { Link, useOutletContext } from "react-router-dom";
+import { useOutletContext } from "react-router-dom";
 import { CalloutCard } from "../components/system/callout-card.js";
 import { DialogFormContent } from "../components/system/dialog-form-content.js";
 import { GitHubMark } from "../components/system/github-mark.js";
+import { PlanUpgradeCallout } from "../components/system/plan-upgrade-callout.js";
 import type { ProjectContext } from "../components/system/project-layout.js";
 import { getProjectEffectiveRole } from "../lib/project-access.js";
 import { useSession } from "../lib/session.js";
@@ -352,18 +353,10 @@ export function ProjectGitHubPage(): JSX.Element {
         </CardHeader>
         <CardContent className="space-y-4">
           {!githubAutomationEnabled ? (
-            <CalloutCard
-              eyebrow="Paid plan"
+            <PlanUpgradeCallout
               title="Upgrade to Solo or Team to connect GitHub automation"
               description="GitHub automation is available on paid plans. Upgrade before connecting a repository, creating dispatch rules, or retrying failed deliveries from this project."
-              tone="neutral"
-            >
-              <div className="flex flex-wrap gap-2">
-                <Button asChild type="button" variant="outline" size="sm">
-                  <Link to="/billing">Open billing</Link>
-                </Button>
-              </div>
-            </CalloutCard>
+            />
           ) : githubErrorMessage !== null ? (
             <CalloutCard
               eyebrow="Unavailable"

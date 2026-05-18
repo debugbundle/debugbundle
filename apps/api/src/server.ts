@@ -14,6 +14,8 @@ import { registerBillingRoutes } from "./routes/billing.js";
 import { registerCapturePolicyRoutes } from "./routes/capture-policy.js";
 import { registerGitHubRoutes } from "./routes/github.js";
 import { registerHealthRoutes } from "./routes/health.js";
+import { registerImprovementRoutes } from "./routes/improvements.js";
+import { registerImprovementSettingsRoutes } from "./routes/improvement-settings.js";
 import { registerProjectMemberRoutes } from "./routes/project-members.js";
 import { registerProjectRoutes } from "./routes/projects.js";
 import { registerProbeRoutes } from "./routes/probes.js";
@@ -245,10 +247,12 @@ export function createApiServer(dependencies: ApiDependencies, options: ApiServe
   registerTokenRoutes(app, dependencies);
   registerAlertRoutes(app, dependencies);
   registerCapturePolicyRoutes(app, dependencies);
+  registerImprovementSettingsRoutes(app, dependencies);
   registerWeeklyReportChannelRoutes(app, dependencies);
   registerWebhookRoutes(app, dependencies);
   registerServicesRoutes(app, dependencies);
   registerIncidentRoutes(app, dependencies);
+  registerImprovementRoutes(app, dependencies);
   registerIngestionRoutes(app, dependencies);
 
   if (options.stripeWebhook !== undefined) {

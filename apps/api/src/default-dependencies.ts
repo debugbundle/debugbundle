@@ -12,7 +12,11 @@ import {
   type GitHubOAuthConfig,
   type WebSessionAuthService
 } from "../../../packages/auth/src/index.js";
-import { getDefaultPreset, type CapturePolicyUpdate } from "../../../packages/shared-types/src/index.js";
+import {
+  getDefaultPreset,
+  type CapturePolicyUpdate,
+  type ImprovementSettingsUpdate
+} from "../../../packages/shared-types/src/index.js";
 import {
   createSesEmailTransport,
   formatProductFromEmail,
@@ -35,6 +39,8 @@ import {
   createPostgresBillingSyncStore,
   createPostgresAuthStore,
   createPostgresCapturePolicyStore,
+  createPostgresImprovementOpportunityStore,
+  createPostgresImprovementSettingsStore,
   createPostgresGitHubStore,
   createIncidentLifecycleService,
   createMemberAuthService,
@@ -691,6 +697,37 @@ export function createApiDependencies(input: CreateApiDependenciesInput): {
       | null
     >;
   };
+  improvementSettingsManagement: {
+    getImprovementSettingsForProject(input: {
+      organization_id: string;
+      project_id: string;
+    }): Promise<
+      ReturnType<typeof createPostgresImprovementSettingsStore>["getImprovementSettingsByProjectId"] extends (
+        ...args: never[]
+      ) => Promise<infer TResult>
+        ? TResult
+        : never
+    >;
+    updateImprovementSettingsForProject(input: {
+      organization_id: string;
+      project_id: string;
+      update: ImprovementSettingsUpdate;
+    }): Promise<
+      | (ReturnType<typeof createPostgresImprovementSettingsStore>["updateImprovementSettings"] extends (
+          ...args: never[]
+        ) => Promise<infer TResult>
+          ? TResult
+          : never)
+      | null
+    >;
+  };
+  improvementManagement: Pick<
+    ReturnType<typeof createPostgresImprovementOpportunityStore>,
+    | "listImprovementsForOrganization"
+    | "getImprovementForOrganization"
+    | "resolveImprovementForOrganization"
+    | "reopenImprovementForOrganization"
+  >;
   incidentRetrieval: Pick<
     ReturnType<typeof createPostgresMetadataStore>,
     | "listIncidentsForOrganization"
@@ -770,6 +807,8 @@ export function createApiDependencies(input: CreateApiDependenciesInput): {
   const billingStore = createPostgresBillingStore(input.db);
   const billingSyncStore = createPostgresBillingSyncStore(input.db);
   const capturePolicyStore = createPostgresCapturePolicyStore(input.db);
+  const improvementOpportunityStore = createPostgresImprovementOpportunityStore(input.db);
+  const improvementSettingsStore = createPostgresImprovementSettingsStore(input.db);
   const metadataStore = createPostgresMetadataStore(input.db);
   const githubStore = createPostgresGitHubStore(input.db);
   const slackDestinationStore = createPostgresSlackDestinationStore(input.db);
@@ -1668,6 +1707,41 @@ export function createApiDependencies(input: CreateApiDependenciesInput): {
         });
         return record;
       }
+    },
+    improvementSettingsManagement: {
+      getImprovementSettingsForProject: (input: { organization_id: string; project_id: string }) => {
+        void input.organization_id;
+        return improvementSettingsStore.getImprovementSettingsByProjectId(input.project_id);
+      },
+      updateImprovementSettingsForProject: (input: {
+        organization_id: string;
+        project_id: string;
+        update: ImprovementSettingsUpdate;
+      }) => {
+        void input.organization_id;
+        const update: {
+          project_id: string;
+          automated_improvement_bundles_enabled?: boolean;
+          improvement_bundle_sensitivity?: "high_confidence" | "balanced" | "verbose";
+        } = {
+          project_id: input.project_id
+        };
+
+        if (input.update.automated_improvement_bundles_enabled !== undefined) {
+          update.automated_improvement_bundles_enabled = input.update.automated_improvement_bundles_enabled;
+        }
+        if (input.update.improvement_bundle_sensitivity !== undefined) {
+          update.improvement_bundle_sensitivity = input.update.improvement_bundle_sensitivity;
+        }
+
+        return improvementSettingsStore.updateImprovementSettings(update);
+      }
+    },
+    improvementManagement: {
+      listImprovementsForOrganization: (input) => improvementOpportunityStore.listImprovementsForOrganization(input),
+      getImprovementForOrganization: (input) => improvementOpportunityStore.getImprovementForOrganization(input),
+      resolveImprovementForOrganization: (input) => improvementOpportunityStore.resolveImprovementForOrganization(input),
+      reopenImprovementForOrganization: (input) => improvementOpportunityStore.reopenImprovementForOrganization(input)
     },
     incidentRetrieval: {
       listIncidentsForOrganization: (input) => metadataStore.listIncidentsForOrganization(input),

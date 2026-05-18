@@ -38,6 +38,9 @@ export function registerProjectRoutes(app: FastifyInstance, dependencies: ApiDep
     if (projectManagement === undefined || projectManagement.createProjectForUser === undefined) {
       return reply.status(404).send({ error: "projects_not_available" });
     }
+    if (member.role !== "owner") {
+      return reply.status(403).send({ error: "forbidden" });
+    }
 
     const parsedBody = CreateProjectBodySchema.safeParse(request.body);
     if (!parsedBody.success) {

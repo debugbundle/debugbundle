@@ -228,15 +228,16 @@ describe("storage adapters", () => {
     expect(sendMock).toHaveBeenCalledTimes(1);
   });
 
-  it("should delete objects under all three project prefixes via deleteProjectObjects", async (): Promise<void> => {
+  it("should delete objects under all project prefixes via deleteProjectObjects", async (): Promise<void> => {
     const deleteObjectsByPrefix = vi.fn().mockResolvedValue(undefined);
 
     await deleteProjectObjects({ deleteObjectsByPrefix }, "proj_abc");
 
-    expect(deleteObjectsByPrefix).toHaveBeenCalledTimes(3);
+    expect(deleteObjectsByPrefix).toHaveBeenCalledTimes(4);
     expect(deleteObjectsByPrefix).toHaveBeenNthCalledWith(1, "raw-events/proj_abc/");
     expect(deleteObjectsByPrefix).toHaveBeenNthCalledWith(2, "bundles/proj_abc/");
-    expect(deleteObjectsByPrefix).toHaveBeenNthCalledWith(3, "reproductions/proj_abc/");
+    expect(deleteObjectsByPrefix).toHaveBeenNthCalledWith(3, "improvement-bundles/proj_abc/");
+    expect(deleteObjectsByPrefix).toHaveBeenNthCalledWith(4, "reproductions/proj_abc/");
   });
 
   it("should throw when S3 get returns no body", async (): Promise<void> => {

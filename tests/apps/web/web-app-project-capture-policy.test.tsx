@@ -127,17 +127,19 @@ describe("web app — project capture policy settings", () => {
     expect(capturePolicyHeading.compareDocumentPosition(projectDetailsHeading) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
 
     const presetSelect = await findSelectTrigger(/^preset$/i);
-    await findSelectTrigger(/^request events$/i);
-    await findSelectTrigger(/^client error incidents$/i);
+    const requestEventsSelect = await findSelectTrigger(/^request events$/i);
+    const clientErrorIncidentsSelect = await findSelectTrigger(/^client error incidents$/i);
     const saveButton = expectButton(screen.getByRole("button", { name: /save capture policy/i }));
 
     await waitFor(() => {
       expect(presetSelect).toHaveTextContent(/^balanced$/i);
+      expect(requestEventsSelect).toHaveTextContent(/^use preset default \(failures only\)$/i);
+      expect(clientErrorIncidentsSelect).toHaveTextContent(/^use preset default \(none\)$/i);
       expect(saveButton).toBeDisabled();
     });
 
     await openSelect(/^client error incidents$/i);
-    expect(await screen.findByRole("option", { name: /^use preset default$/i })).toBeInTheDocument();
+    expect(await screen.findByRole("option", { name: /^use preset default \(none\)$/i })).toBeInTheDocument();
     fireEvent.keyDown(document.body, { key: "Escape", code: "Escape" });
 
     await chooseSelectOption(user, /^preset$/i, /^investigative$/i);

@@ -206,6 +206,58 @@ describe("web app — project sharing", () => {
     });
   });
 
+  it("shows the team upgrade notice on the members tab for free and solo projects", async () => {
+    for (const plan of ["free", "solo"] as const) {
+      const project = createProject({
+        project_id: `proj_${plan}`,
+        name: `${plan} project`,
+        organization_plan: plan,
+        relationship: "owned",
+        effective_role: "owner"
+      });
+      const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+        const url = requestUrl(input);
+
+        if (url.endsWith("/v1/auth/session")) {
+          return jsonResponse(200, {
+            session: createSession({ organization_plan: plan })
+          });
+        }
+
+        if (url.endsWith("/v1/projects") && init?.method === undefined) {
+          return jsonResponse(200, {
+            projects: [project]
+          });
+        }
+
+        if (url.endsWith(`/v1/projects/${project.project_id}/members`) && init?.method === undefined) {
+          return jsonResponse(200, {
+            members: [createProjectMember()]
+          });
+        }
+
+        if (url.endsWith(`/v1/projects/${project.project_id}/invites`) && init?.method === undefined) {
+          return jsonResponse(200, {
+            invites: []
+          });
+        }
+
+        return jsonResponse(404, { error: "not_found" });
+      });
+
+      vi.stubGlobal("fetch", fetchMock);
+
+      const view = render(<App initialEntries={[`/projects/${project.project_id}/members`]} />);
+
+      expect(await screen.findByText(/upgrade to team to share this project/i)).toBeInTheDocument();
+      expect(screen.getByRole("link", { name: /open billing/i })).toHaveAttribute("href", "/billing");
+      expect(screen.queryByRole("button", { name: /invite collaborator/i })).not.toBeInTheDocument();
+
+      view.unmount();
+      vi.unstubAllGlobals();
+    }
+  });
+
   it("returns email sign-in flows to the invite page and accepts the invite", async () => {
     const user = userEvent.setup();
     const project = createProject({

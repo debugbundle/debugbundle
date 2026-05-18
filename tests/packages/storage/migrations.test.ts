@@ -168,6 +168,19 @@ describe("storage bootstrap schema", () => {
     expect(STORAGE_BOOTSTRAP_SQL.includes("UNIQUE (organization_id, slack_team_id, slack_channel_id)")).toBe(true);
   });
 
+  it("should encode improvement constraints directly in the bootstrap schema", (): void => {
+    expect(
+      STORAGE_BOOTSTRAP_SQL.includes(
+        "improvement_bundle_sensitivity text NOT NULL DEFAULT 'balanced'\n        CHECK (improvement_bundle_sensitivity IN ('high_confidence', 'balanced', 'verbose'))"
+      )
+    ).toBe(true);
+    expect(
+      STORAGE_BOOTSTRAP_SQL.includes(
+        "CHECK (\n        (incident_id IS NOT NULL AND improvement_opportunity_id IS NULL AND bundle_type = 'failure')\n        OR (incident_id IS NULL AND improvement_opportunity_id IS NOT NULL AND bundle_type = 'improvement')\n      )"
+      )
+    ).toBe(true);
+  });
+
   it("should include hot-path indexes for retrieval and claim queries", (): void => {
     expect(STORAGE_BOOTSTRAP_SQL.includes("incident_events_incident_occurred_event_idx")).toBe(true);
     expect(STORAGE_BOOTSTRAP_SQL.includes("webhook_deliveries_status_next_attempt_idx")).toBe(true);

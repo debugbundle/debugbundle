@@ -5,6 +5,7 @@ import { useOutletContext } from "react-router-dom";
 import { CalloutCard } from "../components/system/callout-card.js";
 import { DialogFormContent } from "../components/system/dialog-form-content.js";
 import { PageHeader } from "../components/system/page-header.js";
+import { PlanUpgradeCallout } from "../components/system/plan-upgrade-callout.js";
 import type { ProjectContext } from "../components/system/project-layout.js";
 import { UserAvatar } from "../components/system/user-avatar.js";
 import {
@@ -91,7 +92,7 @@ export function ProjectMembersPage(): JSX.Element {
       showSuccessToast("Invite sent successfully.");
     } catch (error) {
       if (error instanceof Error && error.message === "upgrade_required") {
-        showErrorToast("Project sharing requires Team.");
+        showErrorToast("Upgrade to Team to invite collaborators.");
         return;
       }
 
@@ -202,11 +203,9 @@ export function ProjectMembersPage(): JSX.Element {
       ) : null}
 
       {canManage && project.organization_plan !== "team" ? (
-        <CalloutCard
-          eyebrow="Team plan"
-          title="Project sharing requires Team"
-          description="Upgrade to Team to invite collaborators to this project."
-          tone="warning"
+        <PlanUpgradeCallout
+          title="Upgrade to Team to share this project"
+          description="Project sharing is available on Team. Upgrade before inviting collaborators or managing shared access from this project."
         />
       ) : null}
 

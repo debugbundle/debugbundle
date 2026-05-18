@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { useNavigate, useOutletContext } from "react-router-dom";
 import { DialogFormContent } from "../components/system/dialog-form-content.js";
 import { ProjectCapturePolicyCard } from "../components/system/project-capture-policy-card.js";
+import { ProjectImprovementSettingsCard } from "../components/system/project-improvement-settings-card.js";
 import type { ProjectContext } from "../components/system/project-layout.js";
 import { getProjectEffectiveRole } from "../lib/project-access.js";
 import { Button } from "../components/ui/button.js";
@@ -131,6 +132,11 @@ export function ProjectSettingsPage(): JSX.Element {
   return (
     <div className="space-y-4">
       <ProjectCapturePolicyCard projectId={project.project_id} organizationPlan={project.organization_plan} canEdit={canManageProject} />
+      <ProjectImprovementSettingsCard
+        projectId={project.project_id}
+        organizationPlan={project.organization_plan}
+        canEdit={canManageProject}
+      />
 
       <div className="grid gap-4 xl:grid-cols-[1.15fr_0.85fr]">
         <div className="space-y-4">

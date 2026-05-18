@@ -16,6 +16,7 @@ import { SidebarTrigger } from "../ui/sidebar.js";
 const routeTitles: Record<string, string> = {
   "/dashboard": "Dashboard",
   "/incidents": "Incidents",
+  "/improvements": "Improvements",
   "/projects": "Projects",
   "/organization": "Organization",
   "/billing": "Billing",
@@ -30,6 +31,7 @@ function resolveTitle(pathname: string): string {
 
   // /incidents/:id
   if (/^\/incidents\/[^/]+$/.test(pathname)) return "Incident";
+  if (/^\/projects\/[^/]+\/improvements\/[^/]+$/.test(pathname)) return "Improvement";
 
   return "DebugBundle";
 }
@@ -42,6 +44,7 @@ const projectTabLabels: Record<string, string> = {
   webhooks: "Webhooks",
   github: "GitHub",
   incidents: "Incidents",
+  improvements: "Improvements",
   bundles: "Bundles"
 };
 

@@ -515,10 +515,38 @@ export const IncidentsQuerySchema = z
   })
   .strict();
 
+export const ImprovementsQuerySchema = z
+  .object({
+    project_id: z.string().uuid().optional(),
+    environment: z.string().min(1).optional(),
+    service: z.string().min(1).optional(),
+    status: z.enum(["open", "resolved", "snoozed"]).optional(),
+    severity: z.enum(["low", "medium", "high", "critical"]).optional(),
+    kind: z
+      .enum(["warning_hotspot", "slow_request", "request_failure_pattern", "recurring_incident", "post_deploy_regression"])
+      .optional(),
+    cursor: z.string().min(1).optional(),
+    limit: z.coerce.number().int().min(1).max(100).default(20)
+  })
+  .strict();
+
 export const IncidentsCursorSchema = z
   .object({
     last_seen_at: z.string().datetime(),
     incident_id: z.string().min(1)
+  })
+  .strict();
+
+export const ImprovementsCursorSchema = z
+  .object({
+    last_detected_at: z.string().datetime(),
+    improvement_id: z.string().min(1)
+  })
+  .strict();
+
+export const ImprovementSnoozeBodySchema = z
+  .object({
+    snoozed_until: z.string().datetime()
   })
   .strict();
 
@@ -535,9 +563,22 @@ export const IncidentParamsSchema = z
   })
   .strict();
 
+export const ImprovementParamsSchema = z
+  .object({
+    id: z.string().min(1)
+  })
+  .strict();
+
 export const ProjectParamsSchema = z
   .object({
     id: z.string().uuid()
+  })
+  .strict();
+
+export const ProjectImprovementParamsSchema = z
+  .object({
+    id: z.string().uuid(),
+    improvementId: z.string().min(1)
   })
   .strict();
 

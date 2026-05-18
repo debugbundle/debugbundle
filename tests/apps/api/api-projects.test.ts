@@ -14,9 +14,18 @@ function createServer(overrides: {
   authRateLimiter?: Partial<AuthRateLimiterDependency>;
   memberAuth?: MemberAuthDependency | undefined;
   webAuth?: Partial<WebAuthDependency> | undefined;
-  projectManagement?: ProjectManagementDependency | undefined;
+  projectManagement?: Partial<ProjectManagementDependency> | undefined;
 } = {}): ReturnType<typeof createApiServer> {
   const hasProjectManagementOverride = Object.prototype.hasOwnProperty.call(overrides, "projectManagement");
+  const defaultProjectManagement = mockedObject<NonNullable<ApiServerDependencies["projectManagement"]>>({
+    listProjectsForUser: vi.fn().mockResolvedValue([]),
+    createProjectForUser: vi.fn().mockResolvedValue(null),
+    resolveProjectAccessForUser: vi.fn().mockResolvedValue({
+      effective_role: "owner"
+    }),
+    updateProjectForUser: vi.fn().mockResolvedValue(null),
+    deleteProjectForUser: vi.fn().mockResolvedValue(null)
+  });
 
   return createApiServer({
     ingestionPersistence: {
@@ -80,13 +89,13 @@ function createServer(overrides: {
     },
     projectManagement:
       hasProjectManagementOverride
-        ? overrides.projectManagement
-        : mockedObject<NonNullable<ApiServerDependencies["projectManagement"]>>({
-            listProjectsForOrganization: vi.fn().mockResolvedValue([]),
-            createProjectForOrganization: vi.fn().mockResolvedValue(null),
-            updateProjectForOrganization: vi.fn().mockResolvedValue(null),
-            deleteProjectForOrganization: vi.fn().mockResolvedValue(null)
-          })
+        ? overrides.projectManagement === undefined
+          ? undefined
+          : mockedObject<NonNullable<ApiServerDependencies["projectManagement"]>>({
+              ...defaultProjectManagement,
+              ...overrides.projectManagement
+            })
+        : defaultProjectManagement
   });
 }
 
@@ -121,7 +130,7 @@ describe("api project routes", () => {
 
   it("should list projects scoped to the caller organization", async (): Promise<void> => {
     const projectManagement = {
-      listProjectsForOrganization: vi.fn().mockResolvedValue([
+      listProjectsForUser: vi.fn().mockResolvedValue([
         {
           project_id: "00000000-0000-4000-8000-000000000001",
           organization_id: "org_123",
@@ -139,9 +148,9 @@ describe("api project routes", () => {
           updated_at: "2026-03-16T00:00:00.000Z"
         }
       ]),
-      createProjectForOrganization: vi.fn().mockResolvedValue(null),
-      updateProjectForOrganization: vi.fn().mockResolvedValue(null),
-      deleteProjectForOrganization: vi.fn().mockResolvedValue(null)
+      createProjectForUser: vi.fn().mockResolvedValue(null),
+      updateProjectForUser: vi.fn().mockResolvedValue(null),
+      deleteProjectForUser: vi.fn().mockResolvedValue(null)
     };
     const app = createServer({ projectManagement });
 
@@ -174,8 +183,8 @@ describe("api project routes", () => {
         }
       ]
     });
-    expect(projectManagement.listProjectsForOrganization).toHaveBeenCalledWith({
-      organization_id: "org_123",
+    expect(projectManagement.listProjectsForUser).toHaveBeenCalledWith({
+      user_id: "usr_123",
       limit: 10,
       now: expect.any(String)
     });
@@ -198,8 +207,8 @@ describe("api project routes", () => {
 
   it("should create a project for owner-role callers", async (): Promise<void> => {
     const projectManagement = {
-      listProjectsForOrganization: vi.fn().mockResolvedValue([]),
-      createProjectForOrganization: vi.fn().mockResolvedValue({
+      listProjectsForUser: vi.fn().mockResolvedValue([]),
+      createProjectForUser: vi.fn().mockResolvedValue({
         project_id: "00000000-0000-4000-8000-000000000001",
         organization_id: "org_123",
         name: "Main App",
@@ -215,8 +224,8 @@ describe("api project routes", () => {
         created_at: "2026-03-16T00:00:00.000Z",
         updated_at: "2026-03-16T00:00:00.000Z"
       }),
-      updateProjectForOrganization: vi.fn().mockResolvedValue(null),
-      deleteProjectForOrganization: vi.fn().mockResolvedValue(null)
+      updateProjectForUser: vi.fn().mockResolvedValue(null),
+      deleteProjectForUser: vi.fn().mockResolvedValue(null)
     };
     const app = createServer({ projectManagement });
 
@@ -233,7 +242,8 @@ describe("api project routes", () => {
     });
 
     expect(response.statusCode).toBe(201);
-    expect(projectManagement.createProjectForOrganization).toHaveBeenCalledWith({
+    expect(projectManagement.createProjectForUser).toHaveBeenCalledWith({
+      user_id: "usr_123",
       organization_id: "org_123",
       name: "Main App",
       slug: "main-app",
@@ -276,10 +286,11 @@ describe("api project routes", () => {
 
   it("should reject project creation for member-role callers", async (): Promise<void> => {
     const projectManagement = {
-      listProjectsForOrganization: vi.fn().mockResolvedValue([]),
-      createProjectForOrganization: vi.fn().mockResolvedValue(null),
-      updateProjectForOrganization: vi.fn().mockResolvedValue(null),
-      deleteProjectForOrganization: vi.fn().mockResolvedValue(null)
+      listProjectsForUser: vi.fn().mockResolvedValue([]),
+      createProjectForUser: vi.fn().mockResolvedValue(null),
+      resolveProjectAccessForUser: vi.fn().mockResolvedValue({ effective_role: "member" }),
+      updateProjectForUser: vi.fn().mockResolvedValue(null),
+      deleteProjectForUser: vi.fn().mockResolvedValue(null)
     };
     const app = createServer({
       memberAuth: {
@@ -306,14 +317,14 @@ describe("api project routes", () => {
 
     expect(response.statusCode).toBe(403);
     expect(response.json()).toEqual({ error: "forbidden" });
-    expect(projectManagement.createProjectForOrganization).not.toHaveBeenCalled();
+    expect(projectManagement.createProjectForUser).not.toHaveBeenCalled();
   });
 
   it("should accept browser sessions for project creation when the session user is an owner", async (): Promise<void> => {
     const csrfToken = buildCsrfToken("session-secret");
     const projectManagement = {
-      listProjectsForOrganization: vi.fn().mockResolvedValue([]),
-      createProjectForOrganization: vi.fn().mockResolvedValue({
+      listProjectsForUser: vi.fn().mockResolvedValue([]),
+      createProjectForUser: vi.fn().mockResolvedValue({
         project_id: "00000000-0000-4000-8000-000000000001",
         organization_id: "org_123",
         name: "Main App",
@@ -329,8 +340,8 @@ describe("api project routes", () => {
         created_at: "2026-03-16T00:00:00.000Z",
         updated_at: "2026-03-16T00:00:00.000Z"
       }),
-      updateProjectForOrganization: vi.fn().mockResolvedValue(null),
-      deleteProjectForOrganization: vi.fn().mockResolvedValue(null)
+      updateProjectForUser: vi.fn().mockResolvedValue(null),
+      deleteProjectForUser: vi.fn().mockResolvedValue(null)
     };
     const app = createServer({
       memberAuth: {
@@ -367,7 +378,8 @@ describe("api project routes", () => {
     });
 
     expect(response.statusCode).toBe(201);
-    expect(projectManagement.createProjectForOrganization).toHaveBeenCalledWith({
+    expect(projectManagement.createProjectForUser).toHaveBeenCalledWith({
+      user_id: "usr_123",
       organization_id: "org_123",
       name: "Main App",
       slug: "main-app",
@@ -377,10 +389,11 @@ describe("api project routes", () => {
 
   it("should reject browser-session project creation without a valid csrf token", async (): Promise<void> => {
     const projectManagement = {
-      listProjectsForOrganization: vi.fn().mockResolvedValue([]),
-      createProjectForOrganization: vi.fn().mockResolvedValue(null),
-      updateProjectForOrganization: vi.fn().mockResolvedValue(null),
-      deleteProjectForOrganization: vi.fn().mockResolvedValue(null)
+      listProjectsForUser: vi.fn().mockResolvedValue([]),
+      createProjectForUser: vi.fn().mockResolvedValue(null),
+      resolveProjectAccessForUser: vi.fn().mockResolvedValue({ effective_role: "member" }),
+      updateProjectForUser: vi.fn().mockResolvedValue(null),
+      deleteProjectForUser: vi.fn().mockResolvedValue(null)
     };
     const app = createServer({
       memberAuth: {
@@ -417,15 +430,15 @@ describe("api project routes", () => {
 
     expect(response.statusCode).toBe(403);
     expect(response.json()).toEqual({ error: "invalid_csrf_token" });
-    expect(projectManagement.createProjectForOrganization).not.toHaveBeenCalled();
+    expect(projectManagement.createProjectForUser).not.toHaveBeenCalled();
   });
 
   it("should validate project creation payload and map slug conflicts", async (): Promise<void> => {
     const projectManagement = {
-      listProjectsForOrganization: vi.fn().mockResolvedValue([]),
-      createProjectForOrganization: vi.fn().mockResolvedValue(null),
-      updateProjectForOrganization: vi.fn().mockResolvedValue(null),
-      deleteProjectForOrganization: vi.fn().mockResolvedValue(null)
+      listProjectsForUser: vi.fn().mockResolvedValue([]),
+      createProjectForUser: vi.fn().mockResolvedValue(null),
+      updateProjectForUser: vi.fn().mockResolvedValue(null),
+      deleteProjectForUser: vi.fn().mockResolvedValue(null)
     };
     const app = createServer({ projectManagement });
 
@@ -460,9 +473,9 @@ describe("api project routes", () => {
 
   it("should update a project for owner-role callers and map not-found and slug conflicts", async (): Promise<void> => {
     const projectManagement = {
-      listProjectsForOrganization: vi.fn().mockResolvedValue([]),
-      createProjectForOrganization: vi.fn().mockResolvedValue(null),
-      updateProjectForOrganization: vi
+      listProjectsForUser: vi.fn().mockResolvedValue([]),
+      createProjectForUser: vi.fn().mockResolvedValue(null),
+      updateProjectForUser: vi
         .fn()
         .mockResolvedValueOnce({
           project_id: "00000000-0000-4000-8000-000000000001",
@@ -477,7 +490,7 @@ describe("api project routes", () => {
         .mockResolvedValueOnce(null)
         .mockResolvedValueOnce("slug_taken")
         ,
-      deleteProjectForOrganization: vi.fn().mockResolvedValue(null)
+      deleteProjectForUser: vi.fn().mockResolvedValue(null)
     };
     const app = createServer({ projectManagement });
 
@@ -527,8 +540,8 @@ describe("api project routes", () => {
         updated_at: "2026-03-18T00:00:00.000Z"
       }
     });
-    expect(projectManagement.updateProjectForOrganization).toHaveBeenNthCalledWith(1, {
-      organization_id: "org_123",
+    expect(projectManagement.updateProjectForUser).toHaveBeenNthCalledWith(1, {
+      user_id: "usr_123",
       project_id: "00000000-0000-4000-8000-000000000001",
       name: "Main App API",
       slug: "main-app-api",
@@ -570,10 +583,10 @@ describe("api project routes", () => {
 
   it("should delete a project for owner-role callers and map missing projects", async (): Promise<void> => {
     const projectManagement = {
-      listProjectsForOrganization: vi.fn().mockResolvedValue([]),
-      createProjectForOrganization: vi.fn().mockResolvedValue(null),
-      updateProjectForOrganization: vi.fn().mockResolvedValue(null),
-      deleteProjectForOrganization: vi
+      listProjectsForUser: vi.fn().mockResolvedValue([]),
+      createProjectForUser: vi.fn().mockResolvedValue(null),
+      updateProjectForUser: vi.fn().mockResolvedValue(null),
+      deleteProjectForUser: vi
         .fn()
         .mockResolvedValueOnce({
           project_id: "00000000-0000-4000-8000-000000000001",
@@ -617,8 +630,8 @@ describe("api project routes", () => {
         updated_at: "2026-03-16T00:00:00.000Z"
       }
     });
-    expect(projectManagement.deleteProjectForOrganization).toHaveBeenNthCalledWith(1, {
-      organization_id: "org_123",
+    expect(projectManagement.deleteProjectForUser).toHaveBeenNthCalledWith(1, {
+      user_id: "usr_123",
       project_id: "00000000-0000-4000-8000-000000000001"
     });
     expect(missing.statusCode).toBe(404);
@@ -627,10 +640,11 @@ describe("api project routes", () => {
 
   it("should reject project deletion for member-role callers and validate the project id", async (): Promise<void> => {
     const projectManagement = {
-      listProjectsForOrganization: vi.fn().mockResolvedValue([]),
-      createProjectForOrganization: vi.fn().mockResolvedValue(null),
-      updateProjectForOrganization: vi.fn().mockResolvedValue(null),
-      deleteProjectForOrganization: vi.fn().mockResolvedValue(null)
+      listProjectsForUser: vi.fn().mockResolvedValue([]),
+      createProjectForUser: vi.fn().mockResolvedValue(null),
+      resolveProjectAccessForUser: vi.fn().mockResolvedValue({ effective_role: "member" }),
+      updateProjectForUser: vi.fn().mockResolvedValue(null),
+      deleteProjectForUser: vi.fn().mockResolvedValue(null)
     };
     const memberApp = createServer({
       memberAuth: {
@@ -663,6 +677,6 @@ describe("api project routes", () => {
     expect(forbidden.json()).toEqual({ error: "forbidden" });
     expect(invalidProjectId.statusCode).toBe(400);
     expect(invalidProjectId.json()).toEqual({ error: "invalid_project_id" });
-    expect(projectManagement.deleteProjectForOrganization).not.toHaveBeenCalled();
+    expect(projectManagement.deleteProjectForUser).not.toHaveBeenCalled();
   });
 });

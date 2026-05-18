@@ -23,6 +23,7 @@ import {
   createPostgresAlertDeliveryStore,
   createPostgresBillingStore,
   createPostgresGitHubStore,
+  createPostgresImprovementOpportunityStore,
   createPostgresSlackDestinationStore,
   createPostgresWebhookDeliveryStore,
   createPostgresMetadataStore,
@@ -1372,6 +1373,7 @@ export async function runWorkerFromEnv(envInput: Record<string, string | undefin
 
   const processedEventStore = createProcessedEventStore(queryable);
   const incidentStore = createPostgresMetadataStore(queryable);
+  const improvementOpportunityStore = createPostgresImprovementOpportunityStore(queryable);
   const billingStore = createPostgresBillingStore(queryable);
   const alertDeliveryStore = createPostgresAlertDeliveryStore(queryable);
   const slackDestinationStore = createPostgresSlackDestinationStore(queryable);
@@ -1453,6 +1455,8 @@ export async function runWorkerFromEnv(envInput: Record<string, string | undefin
     retentionStore,
     objectStore
   });
+  const docsBaseUrl = normalizeWorkerBaseUrl(envInput["DEBUGBUNDLE_DOCS_URL"])
+    ?? (normalizeWorkerBaseUrl(envInput["PUBLIC_SITE_URL"]) === null ? null : `${normalizeWorkerBaseUrl(envInput["PUBLIC_SITE_URL"])}/docs`);
 
   logger.info(
     {
@@ -1469,7 +1473,18 @@ export async function runWorkerFromEnv(envInput: Record<string, string | undefin
           queue,
           objectStore,
           processedEventStore,
-          requestAnomalyCounter
+          requestAnomalyCounter,
+          improvementBundleWorker: {
+            improvementOpportunityStore,
+            billingStore,
+            webhookDeliveryStore,
+            fallbackTargetUrl: env.LIFECYCLE_WEBHOOK_TARGET_URL ?? null,
+            fallbackSigningSecret: env.LIFECYCLE_WEBHOOK_SECRET ?? null,
+            objectStore,
+            apiBaseUrl: normalizeWorkerBaseUrl(envInput["DEBUGBUNDLE_API_URL"] ?? envInput["API_BASE_URL"] ?? envInput["VITE_API_URL"]),
+            appBaseUrl: normalizeWorkerBaseUrl(envInput["APP_BASE_URL"]),
+            docsBaseUrl
+          }
         })
       );
 
@@ -1483,7 +1498,18 @@ export async function runWorkerFromEnv(envInput: Record<string, string | undefin
             frequencyCounter,
             lifecycleWebhookPublisher,
             githubDispatchPublisher,
-            objectStore
+            objectStore,
+            improvementBundleWorker: {
+              improvementOpportunityStore,
+              billingStore,
+              webhookDeliveryStore,
+              fallbackTargetUrl: env.LIFECYCLE_WEBHOOK_TARGET_URL ?? null,
+              fallbackSigningSecret: env.LIFECYCLE_WEBHOOK_SECRET ?? null,
+              objectStore,
+              apiBaseUrl: normalizeWorkerBaseUrl(envInput["DEBUGBUNDLE_API_URL"] ?? envInput["API_BASE_URL"] ?? envInput["VITE_API_URL"]),
+              appBaseUrl: normalizeWorkerBaseUrl(envInput["APP_BASE_URL"]),
+              docsBaseUrl
+            }
           })
         );
 

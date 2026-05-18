@@ -256,6 +256,7 @@ export function ProjectCapturePolicyCard({ projectId, organizationPlan, canEdit 
               description="Raise or lower standalone log capture independently from the preset."
               disabled={isDisabled}
               value={policyDraft.capture_logs}
+              defaultValue={PRESET_DEFAULTS[policyDraft.preset].capture_logs}
               options={captureLogsOptions}
               onChange={(value) => {
                 setDraft((current) => ({ ...(current ?? policyDraft), capture_logs: value }));
@@ -267,6 +268,7 @@ export function ProjectCapturePolicyCard({ projectId, organizationPlan, canEdit 
               description="Control how broadly SDKs send standalone request events before worker classification and anomaly thresholds run."
               disabled={isDisabled}
               value={policyDraft.capture_request_events}
+              defaultValue={PRESET_DEFAULTS[policyDraft.preset].capture_request_events}
               options={captureRequestOptions}
               onChange={(value) => {
                 setDraft((current) => ({ ...(current ?? policyDraft), capture_request_events: value }));
@@ -289,6 +291,7 @@ export function ProjectCapturePolicyCard({ projectId, organizationPlan, canEdit 
               description="Decide whether breadcrumbs only enrich exceptions or persist as standalone events."
               disabled={isDisabled}
               value={policyDraft.capture_breadcrumbs}
+              defaultValue={PRESET_DEFAULTS[policyDraft.preset].capture_breadcrumbs}
               options={captureBreadcrumbOptions}
               onChange={(value) => {
                 setDraft((current) => ({ ...(current ?? policyDraft), capture_breadcrumbs: value }));
@@ -300,6 +303,7 @@ export function ProjectCapturePolicyCard({ projectId, organizationPlan, canEdit 
               description="Control whether activated probes stay bundle-only or also persist as standalone events."
               disabled={isDisabled}
               value={policyDraft.capture_probe_events}
+              defaultValue={PRESET_DEFAULTS[policyDraft.preset].capture_probe_events}
               options={captureProbeOptions}
               onChange={(value) => {
                 setDraft((current) => ({ ...(current ?? policyDraft), capture_probe_events: value }));
@@ -346,6 +350,7 @@ function OverrideField<T extends string>({
   label,
   description,
   value,
+  defaultValue,
   options,
   disabled,
   onChange,
@@ -354,10 +359,13 @@ function OverrideField<T extends string>({
   label: string;
   description: string;
   value: OverrideValue<T>;
+  defaultValue: T;
   options: Array<{ value: T; label: string }>;
   disabled: boolean;
   onChange: (value: OverrideValue<T>) => void;
 }): JSX.Element {
+  const presetDefaultLabel = options.find((option) => option.value === defaultValue)?.label ?? defaultValue;
+
   return (
     <Field>
       <FieldLabel id={`${id}-label`} htmlFor={id}>{label}</FieldLabel>
@@ -372,7 +380,7 @@ function OverrideField<T extends string>({
         </SelectTrigger>
         <SelectContent position="popper">
           <SelectGroup>
-            <SelectItem value={OVERRIDE_SELECT_DEFAULT_VALUE}>Use preset default</SelectItem>
+            <SelectItem value={OVERRIDE_SELECT_DEFAULT_VALUE}>{formatPresetDefaultOptionLabel(presetDefaultLabel)}</SelectItem>
             {options.map((option) => (
               <SelectItem key={option.value} value={option.value}>
                 {option.label}
@@ -398,6 +406,8 @@ function ClientErrorIncidentsField({
   onModeChange: (value: ClientErrorIncidentMode) => void;
   onCustomInputChange: (value: string) => void;
 }): JSX.Element {
+  const presetDefaultLabel = formatClientErrorStatusList(PRESET_DEFAULTS[draft.preset].immediate_client_error_statuses);
+
   return (
     <Field>
       <FieldLabel id="project-capture-policy-client-errors-label" htmlFor="project-capture-policy-client-errors">Client error incidents</FieldLabel>
@@ -416,7 +426,7 @@ function ClientErrorIncidentsField({
         </SelectTrigger>
         <SelectContent position="popper">
           <SelectGroup>
-            <SelectItem value="preset_default">Use preset default</SelectItem>
+            <SelectItem value="preset_default">{formatPresetDefaultOptionLabel(presetDefaultLabel)}</SelectItem>
             {clientErrorIncidentModeOptions.filter((option) => option.value !== "preset_default").map((option) => (
               <SelectItem key={option.value} value={option.value}>
                 {option.label}
@@ -639,6 +649,10 @@ function formatPreset(value: CapturePreset): string {
     case "investigative":
       return "Investigative";
   }
+}
+
+function formatPresetDefaultOptionLabel(defaultLabel: string): string {
+  return `Use preset default (${defaultLabel})`;
 }
 
 function formatLogs(value: CaptureLogs): string {

@@ -13,7 +13,7 @@ import {
   processNextDeliverWebhookJob,
   processNextGroupIncidentJob
 } from "../../../apps/worker/src/processor.js";
-import { buildBundleObjectKey, buildReproductionObjectKey } from "../../../packages/storage/src/index.js";
+import { buildBundleObjectKey, buildImprovementBundleObjectKey, buildReproductionObjectKey } from "../../../packages/storage/src/index.js";
 
 const deployMetadataGoldenFixture = readFileSync(
   new URL("../../fixtures/build-bundle.deploy-metadata.golden.json", import.meta.url),
@@ -677,10 +677,18 @@ describe("worker processor \u2013 bundle, delivery & sampling", () => {
 
   it("should prune oldest retained incidents after persisting a new bundle", async (): Promise<void> => {
     const deleteObject = vi.fn().mockResolvedValue(undefined);
-    const pruneRetainedIncidentsForProject = vi.fn().mockResolvedValue([
+    const pruneRetainedBundleOwnersForProject = vi.fn().mockResolvedValue([
       {
+        owner_type: "incident",
         project_id: "proj_old",
-        incident_id: "inc_old"
+        incident_id: "inc_old",
+        improvement_opportunity_id: null
+      },
+      {
+        owner_type: "improvement",
+        project_id: "proj_other",
+        incident_id: null,
+        improvement_opportunity_id: "imp_old"
       }
     ]);
 
@@ -716,7 +724,7 @@ describe("worker processor \u2013 bundle, delivery & sampling", () => {
         }),
         hasBundleGenerationForSourceEvent: vi.fn().mockResolvedValue(false),
         reserveBundleGeneration: vi.fn().mockResolvedValue(createReservedBundleGeneration()),
-        pruneRetainedIncidentsForProject
+        pruneRetainedBundleOwnersForProject
       },
       objectStore: {
         putObject: vi.fn().mockResolvedValue(undefined),
@@ -749,7 +757,7 @@ describe("worker processor \u2013 bundle, delivery & sampling", () => {
     });
 
     expect(result).toEqual({ processed: true });
-    expect(pruneRetainedIncidentsForProject).toHaveBeenCalledWith({
+    expect(pruneRetainedBundleOwnersForProject).toHaveBeenCalledWith({
       project_id: "proj_123",
       retained_bundle_limit: 450
     });
@@ -758,6 +766,9 @@ describe("worker processor \u2013 bundle, delivery & sampling", () => {
     });
     expect(deleteObject).toHaveBeenCalledWith({
       key: buildReproductionObjectKey("proj_old", "inc_old")
+    });
+    expect(deleteObject).toHaveBeenCalledWith({
+      key: buildImprovementBundleObjectKey("proj_other", "imp_old")
     });
   });
 

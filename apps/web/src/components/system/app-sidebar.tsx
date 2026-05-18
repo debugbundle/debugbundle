@@ -3,6 +3,7 @@ import {
   FolderKanbanIcon,
   HomeIcon,
   KeySquareIcon,
+  SparklesIcon,
   SirenIcon,
   UsersRoundIcon
 } from "lucide-react";
@@ -26,6 +27,7 @@ import {
 const navMain = [
   { to: "/dashboard", label: "Dashboard", icon: HomeIcon },
   { to: "/incidents", label: "Incidents", icon: SirenIcon },
+  { to: "/improvements", label: "Improvements", icon: SparklesIcon },
   { to: "/projects", label: "Projects", icon: FolderKanbanIcon },
   { to: "/billing", label: "Billing", icon: CreditCardIcon },
   { to: "/member-tokens", label: "Member tokens", icon: KeySquareIcon }

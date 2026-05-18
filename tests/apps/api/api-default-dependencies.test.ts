@@ -16,6 +16,8 @@ const {
   createPostgresBillingStoreMock,
   createPostgresBillingSyncStoreMock,
   createPostgresCapturePolicyStoreMock,
+  createPostgresImprovementOpportunityStoreMock,
+  createPostgresImprovementSettingsStoreMock,
   createMemberAuthServiceMock,
   createGitHubOAuthClientMock,
   createGitHubCliAuthServiceMock,
@@ -46,6 +48,8 @@ const {
   createPostgresBillingStoreMock: vi.fn(),
   createPostgresBillingSyncStoreMock: vi.fn(),
   createPostgresCapturePolicyStoreMock: vi.fn(),
+  createPostgresImprovementOpportunityStoreMock: vi.fn(),
+  createPostgresImprovementSettingsStoreMock: vi.fn(),
   createMemberAuthServiceMock: vi.fn(),
   createGitHubOAuthClientMock: vi.fn(),
   createGitHubCliAuthServiceMock: vi.fn(),
@@ -100,6 +104,8 @@ vi.mock("../../../packages/storage/src/index.js", () => ({
   createIngestionMetadataService: createIngestionMetadataServiceMock,
   createIncidentLifecycleService: createIncidentLifecycleServiceMock,
   createPostgresBillingSyncStore: createPostgresBillingSyncStoreMock,
+  createPostgresImprovementOpportunityStore: createPostgresImprovementOpportunityStoreMock,
+  createPostgresImprovementSettingsStore: createPostgresImprovementSettingsStoreMock,
 }));
 
 vi.mock("../../../packages/auth/src/index.js", () => ({
@@ -141,6 +147,8 @@ describe("api default dependencies", () => {
     createPostgresBillingStoreMock.mockReset();
     createPostgresBillingSyncStoreMock.mockReset();
     createPostgresCapturePolicyStoreMock.mockReset();
+    createPostgresImprovementOpportunityStoreMock.mockReset();
+    createPostgresImprovementSettingsStoreMock.mockReset();
     createMemberAuthServiceMock.mockReset();
     createGitHubOAuthClientMock.mockReset();
     createGitHubCliAuthServiceMock.mockReset();
@@ -191,6 +199,17 @@ describe("api default dependencies", () => {
       getCapturePolicyByProjectId: vi.fn(),
       upsertCapturePolicy: vi.fn(),
       createDefaultCapturePolicy: vi.fn()
+    });
+    createPostgresImprovementOpportunityStoreMock.mockReturnValue({
+      listImprovementsForOrganization: vi.fn(),
+      getImprovementForOrganization: vi.fn(),
+      resolveImprovementForOrganization: vi.fn(),
+      reopenImprovementForOrganization: vi.fn(),
+      snoozeImprovementForOrganization: vi.fn()
+    });
+    createPostgresImprovementSettingsStoreMock.mockReturnValue({
+      getImprovementSettingsForProject: vi.fn(),
+      updateImprovementSettingsForProject: vi.fn()
     });
     createMemberAuthServiceMock.mockReturnValue({ resolveMemberByTokenHash: vi.fn() });
     createGitHubOAuthClientMock.mockReturnValue({
@@ -759,6 +778,7 @@ describe("api default dependencies", () => {
     expect(metadataStore.createAlertForOrganization).toHaveBeenCalledWith({
       organization_id: "org_123",
       project_id: "proj_123",
+      created_by_user_id: "usr_123",
       channel: "email",
       condition_type: "new_incident",
       config: { to: "owner@example.com" },

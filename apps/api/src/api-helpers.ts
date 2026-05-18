@@ -7,7 +7,7 @@ import { isSelfHostMode } from "../../../packages/shared-types/src/index.js";
 import type { EventEnvelope } from "../../../packages/shared-types/src/index.js";
 import type { ProjectAccessRecord, ResolveMemberResult } from "../../../packages/storage/src/index.js";
 import type { ApiDependencies } from "./api-types.js";
-import { IncidentsCursorSchema, LogsCursorSchema } from "./schemas.js";
+import { ImprovementsCursorSchema, IncidentsCursorSchema, LogsCursorSchema } from "./schemas.js";
 
 export type RequestRateLimitBucket = "retrieval-read" | "retrieval-write" | "management-read" | "management-write";
 
@@ -73,6 +73,26 @@ export function parseIncidentsCursor(rawCursor: string | undefined): { last_seen
   const lastSeenAt = rawCursor.slice(0, separatorIndex);
   const incidentId = rawCursor.slice(separatorIndex + 1);
   const parsed = IncidentsCursorSchema.safeParse({ last_seen_at: lastSeenAt, incident_id: incidentId });
+  if (!parsed.success) {
+    return null;
+  }
+
+  return parsed.data;
+}
+
+export function parseImprovementsCursor(rawCursor: string | undefined): { last_detected_at: string; improvement_id: string } | null {
+  if (rawCursor === undefined) {
+    return null;
+  }
+
+  const separatorIndex = rawCursor.lastIndexOf("|");
+  if (separatorIndex <= 0 || separatorIndex >= rawCursor.length - 1) {
+    return null;
+  }
+
+  const lastDetectedAt = rawCursor.slice(0, separatorIndex);
+  const improvementId = rawCursor.slice(separatorIndex + 1);
+  const parsed = ImprovementsCursorSchema.safeParse({ last_detected_at: lastDetectedAt, improvement_id: improvementId });
   if (!parsed.success) {
     return null;
   }

@@ -37,6 +37,12 @@ Every capability must be available through all applicable interfaces. Operations
 | Get bundle | `GET /v1/incidents/{id}/bundle` | `bundle` | `get_bundle` | |
 | Get reproduction | `GET /v1/incidents/{id}/reproduction` | `reproduce` | `get_reproduction` | |
 | Get logs | `GET /v1/logs` | `logs` | `get_logs` | Query by incident_id |
+| List improvements | `GET /v1/improvements` | `improvements list` | `list_improvements` | Hosted deterministic improvement opportunities across the organization or a filtered project |
+| Get improvement | `GET /v1/improvements/{id}` | `improvements get` | `get_improvement` | |
+| Resolve improvement | `POST /v1/improvements/{id}/resolve` | `improvements resolve` | `resolve_improvement` | Explicit user action |
+| Reopen improvement | `POST /v1/improvements/{id}/reopen` | `improvements reopen` | `reopen_improvement` | Explicit user action |
+| Snooze improvement | `POST /v1/improvements/{id}/snooze` | `improvements snooze` | `snooze_improvement` | Explicit user action |
+| Get improvement bundle | `GET /v1/projects/{id}/improvements/{improvementId}/bundle` | `improvements bundle` | `get_improvement_bundle` | Hosted improvement artifact for a project-scoped opportunity |
 | List project members | `GET /v1/projects/{id}/members` | `project members list` | `list_project_members` | Browser Session or Member Token, owner/admin only |
 | Get project member avatar | `GET /v1/projects/{id}/members/{userId}/avatar` | — | — | Browser session or member token, authorized project viewers only |
 | List pending project invites | `GET /v1/projects/{id}/invites` | `project members invites` | `list_project_member_invites` | Browser Session or Member Token, owner/admin only |
@@ -93,6 +99,8 @@ Every capability must be available through all applicable interfaces. Operations
 | Deactivate probes (remote) | `POST /v1/projects/{id}/probes/deactivate` | `probe deactivate` | `deactivate_probe` | Solo+ only |
 | Get capture policy | `GET /v1/projects/{id}/capture-policy` | `capture-policy get` | `get_capture_policy` | Browser Session or Member Token; member receives preview-only payload |
 | Update capture policy | `PATCH /v1/projects/{id}/capture-policy` | `capture-policy set` | `update_capture_policy` | Browser Session or Member Token, owner/admin only |
+| Get improvement settings | `GET /v1/projects/{id}/improvement-settings` | `improvements settings get` | `get_improvement_settings` | Browser Session or Member Token; members receive preview-only payload and all tiers can inspect availability |
+| Update improvement settings | `PATCH /v1/projects/{id}/improvement-settings` | `improvements settings set` | `update_improvement_settings` | Browser Session or Member Token, owner/admin only, paid Solo+ or self-host |
 | SDK config | `GET /v1/sdk/config` | — | — | SDK-only (project token, includes resolved capture policy) |
 | Get GitHub App install URL | `GET /v1/github/app/install-url` | — | — | Browser Session or Member Token, owner/admin only on eligible Solo+ project; web convenience route for the install/reconnect CTA, optionally signed with a return path |
 | Get GitHub installation | `GET /v1/github/installation` | `github status` | `get_github_status` | Browser Session or Member Token, available to authorized members on eligible Solo+ project |
@@ -362,6 +370,28 @@ Current API implementation scope (Phase 1 continuation):
 **Bundle response:** Full bundle JSON or `{"status": "pending"}` / `{"status": "failed", "reason": "..."}`
 
 When hosted bundle generation is blocked by the shared `monthly_bundle_requests` allowance, `GET /v1/incidents/{id}/bundle` returns `200 { "status": "failed", "reason": "monthly_quota_exceeded" }` until the monthly window resets or allowance expands.
+
+### 1.2a Improvements
+
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| GET | `/v1/improvements` | Browser Session or Member Token | List hosted improvement opportunities (filterable) |
+| GET | `/v1/improvements/{id}` | Browser Session or Member Token | Get hosted improvement metadata |
+| POST | `/v1/improvements/{id}/resolve` | Browser Session or Member Token | Explicitly resolve a hosted improvement |
+| POST | `/v1/improvements/{id}/reopen` | Browser Session or Member Token | Reopen a hosted improvement |
+| POST | `/v1/improvements/{id}/snooze` | Browser Session or Member Token | Snooze a hosted improvement until a future ISO8601 timestamp |
+| GET | `/v1/projects/{id}/improvements/{improvementId}/bundle` | Browser Session or Member Token | Get the hosted improvement bundle artifact |
+
+**Query params (list improvements):** `project_id`, `environment`, `service`, `status` (open/resolved/snoozed), `severity`, `kind`, `limit`, `cursor`
+
+Current API implementation scope:
+- `GET /v1/improvements` response body: `{ improvements: ImprovementRetrievalRecord[], next_cursor: string | null }`
+- `GET /v1/improvements/{id}` response body: `{ improvement: ImprovementRetrievalRecord }`
+- `POST /v1/improvements/{id}/resolve` response body: `{ improvement: ImprovementRetrievalRecord }`
+- `POST /v1/improvements/{id}/reopen` response body: `{ improvement: ImprovementRetrievalRecord }`
+- `POST /v1/improvements/{id}/snooze` request body: `{ snoozed_until: string }`; response body: `{ improvement: ImprovementRetrievalRecord }`
+- `GET /v1/projects/{id}/improvements/{improvementId}/bundle` response body: hosted improvement artifact JSON when present; `{ "status": "pending" }` while an artifact is still expected; `{ "status": "failed", "reason": "..." }` when no artifact is currently available
+- `ImprovementRetrievalRecord` fields: `improvement_id`, `project_id`, `project_name`, `project_slug`, `service_id`, `service_name`, `service_runtime`, `service_framework`, `environment`, `kind`, `status`, `severity`, `confidence`, `fingerprint`, `title`, `summary`, `occurrence_count`, `evidence`, `first_detected_at`, `last_detected_at`, `resolved_at`, `snoozed_until`, `bundle_generation_number`, `bundle_created_at`, `bundle_updated_at`, `bundle_failure_reason`
 
 ### 1.3 Services
 
@@ -1340,6 +1370,61 @@ Response `200`: same shape as GET response with updated values.
 - `403` — insufficient role (non-owner) or tier restriction
 - `404` — project not found or not in caller's organization
 
+### 1.10 Improvement Settings
+
+Per-project improvement settings control whether hosted deterministic improvement analysis is enabled and how aggressively it fires on eligible paid tiers.
+
+**Get improvement settings:**
+
+```
+GET /v1/projects/{id}/improvement-settings
+Authorization: Bearer dbundle_member_...  (or browser session)
+```
+
+Response `200`:
+```json
+{
+  "access_mode": "manage | preview",
+  "cloud_automation_available": true,
+  "settings": {
+    "automated_improvement_bundles_enabled": true,
+    "improvement_bundle_sensitivity": "high_confidence | balanced | verbose"
+  }
+}
+```
+
+`cloud_automation_available` is capability-derived from the caller's effective plan (`false` on Free, `true` on Solo/Team/self-host). The stored `settings` object is project-backed and is returned to authorized viewers even when hosted automation is not available for the current tier.
+
+**Update improvement settings:**
+
+```
+PATCH /v1/projects/{id}/improvement-settings
+Authorization: Bearer dbundle_member_...  (or browser session, owner/admin only)
+Content-Type: application/json
+```
+
+Request body (all fields optional, but at least one is required):
+```json
+{
+  "automated_improvement_bundles_enabled": false,
+  "improvement_bundle_sensitivity": "balanced"
+}
+```
+
+Response `200`: same shape as GET response with updated values.
+
+**Validation rules:**
+- `automated_improvement_bundles_enabled` must be boolean when provided
+- `improvement_bundle_sensitivity` must be one of `high_confidence`, `balanced`, or `verbose`
+- request body must include at least one mutable field
+- plain members receive `403 { "error": "forbidden" }` on update attempts
+- Free-tier projects receive `403 { "error": "upgrade_required" }` on update attempts because hosted cloud automation is not available
+
+**Error responses:**
+- `401` — missing or invalid auth
+- `403` — insufficient role or tier restriction
+- `404` — project not found or improvement settings unavailable
+
 **SDK config integration:**
 
 `GET /v1/sdk/config` response now includes the resolved capture policy:
@@ -1792,7 +1877,21 @@ debugbundle capture-policy set [--project <id>] --client-error-incidents <preset
 
 `capture-policy get` displays the project's current resolved policy plus raw override semantics for client error incidents. `capture-policy set` updates the preset and/or individual override fields via `--override key=value` (use `null` to clear an override), and also supports the dedicated client-error incident mode flags shown above. Owner-only.
 
-### 2.13 Billing Commands
+### 2.13 Improvement Settings Commands
+```
+debugbundle improvements list [--project-id <id>] [--environment <name>] [--service <name>] [--status <status>] [--severity <level>] [--kind <kind>] [--cursor <cursor>] [--limit <n>] [--json]
+debugbundle improvements get <improvement-id> [--json]
+debugbundle improvements bundle <improvement-id> --project-id <id> [--json]
+debugbundle improvements resolve <improvement-id> [--json]
+debugbundle improvements reopen <improvement-id> [--json]
+debugbundle improvements snooze <improvement-id> --until <ISO8601> [--json]
+debugbundle improvements settings get --project <id> [--json]
+debugbundle improvements settings set --project <id> [--enabled <true|false>] [--sensitivity <high_confidence|balanced|verbose>] [--json]
+```
+
+`improvements list/get/bundle/resolve/reopen/snooze` are the hosted improvement-management surface and map directly to the corresponding improvement retrieval routes. `improvements settings get` displays project-backed hosted improvement automation settings plus a capability-derived `cloud_automation_available` flag. `improvements settings set` updates the enabled flag and/or sensitivity mode. Owner/admin only; Free-tier projects receive `upgrade_required`.
+
+### 2.14 Billing Commands
 ```
 debugbundle billing get [--json]
 debugbundle billing capacity increase --target-additional-capacity-units <n> [--json]
@@ -1947,7 +2046,21 @@ update_capture_policy         → same result as PATCH /v1/projects/{id}/capture
 
 These tools manage per-project capture policy (preset selection and advanced overrides). `get_capture_policy` returns a preview-only payload to plain members and an editable payload to owner/admin callers. `update_capture_policy` requires owner/admin authorization.
 
-### 3.6 Billing Tools
+### 3.6 Improvement Settings Tools
+```
+list_improvements            → same result as GET /v1/improvements
+get_improvement              → same result as GET /v1/improvements/{id}
+get_improvement_bundle       → same result as GET /v1/projects/{id}/improvements/{improvementId}/bundle
+resolve_improvement          → same result as POST /v1/improvements/{id}/resolve
+reopen_improvement           → same result as POST /v1/improvements/{id}/reopen
+snooze_improvement           → same result as POST /v1/improvements/{id}/snooze
+get_improvement_settings      → same result as GET /v1/projects/{id}/improvement-settings
+update_improvement_settings   → same result as PATCH /v1/projects/{id}/improvement-settings
+```
+
+These tools manage hosted improvement opportunities plus hosted improvement automation settings. `get_improvement_settings` returns the effective project-backed settings plus a capability-derived availability flag. `update_improvement_settings` requires owner/admin authorization and a Solo+ or self-host capable project.
+
+### 3.7 Billing Tools
 ```
 debugbundle_get_billing_summary          → same result as GET /v1/billing
 increase_capacity                        → same result as POST /v1/billing/capacity/increase

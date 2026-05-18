@@ -20,6 +20,8 @@ export const REQUIRED_API_TABLES = [
   "capture_policies",
   "services",
   "deployments",
+  "improvement_opportunities",
+  "improvement_opportunity_events",
   "bundle_generations",
   "weekly_report_channels",
   "github_installations",
@@ -39,6 +41,8 @@ export const REQUIRED_WORKER_TABLES = [
   "processed_events",
   "services",
   "deployments",
+  "improvement_opportunities",
+  "improvement_opportunity_events",
   "bundle_generations",
   "weekly_report_channels",
   "github_installations",
@@ -106,6 +110,9 @@ const STORAGE_BOOTSTRAP_STATEMENTS = [
       name text NOT NULL,
       slug text NOT NULL,
       environment_default text NOT NULL DEFAULT 'production',
+      automated_improvement_bundles_enabled boolean NOT NULL DEFAULT true,
+      improvement_bundle_sensitivity text NOT NULL DEFAULT 'balanced'
+        CHECK (improvement_bundle_sensitivity IN ('high_confidence', 'balanced', 'verbose')),
       created_at timestamptz NOT NULL DEFAULT now(),
       updated_at timestamptz NOT NULL DEFAULT now(),
       plan text NOT NULL DEFAULT 'free'
@@ -428,10 +435,69 @@ const STORAGE_BOOTSTRAP_STATEMENTS = [
     )
   `,
   `
+    CREATE TABLE improvement_opportunities (
+      id uuid PRIMARY KEY,
+      project_id uuid NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+      service_id uuid REFERENCES services(id) ON DELETE SET NULL,
+      service_name text NOT NULL,
+      environment text NOT NULL DEFAULT 'production',
+      kind text NOT NULL,
+      status text NOT NULL DEFAULT 'open',
+      severity text NOT NULL,
+      confidence numeric NOT NULL,
+      fingerprint text NOT NULL,
+      title text NOT NULL,
+      summary text NOT NULL,
+      occurrence_count integer NOT NULL DEFAULT 1,
+      evidence jsonb NOT NULL,
+      first_detected_at timestamptz NOT NULL,
+      last_detected_at timestamptz NOT NULL,
+      last_source_event_id uuid,
+      related_incident_ids uuid[] NOT NULL DEFAULT '{}',
+      bundle_generation_number integer NOT NULL DEFAULT 0,
+      bundle_created_at timestamptz,
+      bundle_updated_at timestamptz,
+      bundle_source_event_id uuid,
+      bundle_failure_reason text,
+      resolved_at timestamptz,
+      resolved_by_user_id uuid REFERENCES users(id) ON DELETE SET NULL,
+      snoozed_until timestamptz,
+      created_at timestamptz NOT NULL DEFAULT now(),
+      updated_at timestamptz NOT NULL DEFAULT now(),
+      UNIQUE (project_id, fingerprint)
+    )
+  `,
+  `
+    CREATE INDEX improvement_opportunities_project_status_detected_idx
+    ON improvement_opportunities (project_id, status, last_detected_at DESC)
+  `,
+  `
+    CREATE INDEX improvement_opportunities_project_kind_detected_idx
+    ON improvement_opportunities (project_id, kind, last_detected_at DESC)
+  `,
+  `
+    CREATE INDEX improvement_opportunities_project_service_env_idx
+    ON improvement_opportunities (project_id, service_id, environment)
+  `,
+  `
+    CREATE TABLE improvement_opportunity_events (
+      improvement_opportunity_id uuid NOT NULL REFERENCES improvement_opportunities(id) ON DELETE CASCADE,
+      event_id uuid NOT NULL,
+      event_type text NOT NULL,
+      occurred_at timestamptz NOT NULL,
+      PRIMARY KEY (improvement_opportunity_id, event_id)
+    )
+  `,
+  `
+    CREATE INDEX improvement_opportunity_events_detected_idx
+    ON improvement_opportunity_events (improvement_opportunity_id, occurred_at DESC, event_id DESC)
+  `,
+  `
     CREATE TABLE bundle_generations (
       id uuid PRIMARY KEY,
       project_id uuid NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
-      incident_id uuid NOT NULL REFERENCES incidents(id) ON DELETE CASCADE,
+      incident_id uuid REFERENCES incidents(id) ON DELETE CASCADE,
+      improvement_opportunity_id uuid REFERENCES improvement_opportunities(id) ON DELETE CASCADE,
       bundle_type text NOT NULL,
       generation_number integer NOT NULL,
       source_event_id uuid NOT NULL,
@@ -439,8 +505,21 @@ const STORAGE_BOOTSTRAP_STATEMENTS = [
       trigger text NOT NULL,
       created_at timestamptz NOT NULL,
       updated_at timestamptz NOT NULL,
-      UNIQUE (incident_id, source_event_id)
+      CHECK (
+        (incident_id IS NOT NULL AND improvement_opportunity_id IS NULL AND bundle_type = 'failure')
+        OR (incident_id IS NULL AND improvement_opportunity_id IS NOT NULL AND bundle_type = 'improvement')
+      )
     )
+  `,
+  `
+    CREATE UNIQUE INDEX bundle_generations_incident_source_idx
+    ON bundle_generations (incident_id, source_event_id)
+    WHERE incident_id IS NOT NULL
+  `,
+  `
+    CREATE UNIQUE INDEX bundle_generations_improvement_source_idx
+    ON bundle_generations (improvement_opportunity_id, source_event_id)
+    WHERE improvement_opportunity_id IS NOT NULL
   `,
   `
     CREATE INDEX bundle_generations_project_created_idx
@@ -449,6 +528,11 @@ const STORAGE_BOOTSTRAP_STATEMENTS = [
   `
     CREATE INDEX bundle_generations_incident_generation_idx
     ON bundle_generations (incident_id, generation_number DESC)
+  `,
+  `
+    CREATE INDEX bundle_generations_improvement_generation_idx
+    ON bundle_generations (improvement_opportunity_id, generation_number DESC)
+    WHERE improvement_opportunity_id IS NOT NULL
   `,
   `
     CREATE TABLE incident_events (

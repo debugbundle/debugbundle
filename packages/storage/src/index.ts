@@ -14,6 +14,7 @@ export type {
 export {
 	buildRawEventObjectKey,
 	buildBundleObjectKey,
+	buildImprovementBundleObjectKey,
 	buildReproductionObjectKey,
 	buildUserAvatarObjectKey,
 	buildBundleRegenerationLeaseKey,
@@ -29,6 +30,24 @@ export type { BillingSyncStore, BillingEntitlementUpdate } from "./billing-sync-
 export { createPostgresBillingSyncStore } from "./billing-sync-store.js";
 export type { CapturePolicyStore } from "./capture-policy-store.js";
 export { createPostgresCapturePolicyStore } from "./capture-policy-store.js";
+export type { ImprovementSettingsStore } from "./improvement-settings-store.js";
+export { createPostgresImprovementSettingsStore } from "./improvement-settings-store.js";
+export type {
+  ImprovementOpportunityKind,
+  ImprovementOpportunityStatus,
+  ImprovementOpportunitySeverity,
+  ImprovementBundleTrigger,
+  ProjectImprovementExecutionSettings,
+  ImprovementOpportunityRecord,
+  ImprovementEventReference,
+  RecordRequestPatternInput,
+  RecordRequestPatternResult,
+  RecordWarningHotspotInput,
+  RecordWarningHotspotResult,
+  ReservedImprovementBundleGeneration,
+  ImprovementOpportunityStore
+} from "./improvement-opportunity-store.js";
+export { createPostgresImprovementOpportunityStore } from "./improvement-opportunity-store.js";
 export { createPostgresGitHubStore } from "./github-store.js";
 export { createIncidentLifecycleService } from "./incident-lifecycle-service.js";
 export { createPostgresMetadataStore } from "./metadata-store.js";

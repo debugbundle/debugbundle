@@ -19,6 +19,10 @@ export function buildBundleObjectKey(projectId: string, incidentId: string): str
   return `bundles/${projectId}/${incidentId}/bundle.json.gz`;
 }
 
+export function buildImprovementBundleObjectKey(projectId: string, opportunityId: string): string {
+  return `improvement-bundles/${projectId}/${opportunityId}/bundle.json.gz`;
+}
+
 export function buildReproductionObjectKey(projectId: string, incidentId: string): string {
   return `reproductions/${projectId}/${incidentId}/reproduction.json.gz`;
 }
@@ -31,7 +35,7 @@ export function buildBundleRegenerationLeaseKey(incidentId: string): string {
   return `leases:bundle-regeneration:${incidentId}`;
 }
 
-const PROJECT_OBJECT_PREFIXES = ["raw-events", "bundles", "reproductions"] as const;
+const PROJECT_OBJECT_PREFIXES = ["raw-events", "bundles", "improvement-bundles", "reproductions"] as const;
 
 export async function deleteProjectObjects(
   objectStore: { deleteObjectsByPrefix(prefix: string): Promise<void> },

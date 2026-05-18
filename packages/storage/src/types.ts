@@ -736,6 +736,35 @@ export interface IncidentRetrievalRecord extends Record<string, unknown> {
   incident_reason?: IncidentReason;
 }
 
+export interface ImprovementRetrievalRecord extends Record<string, unknown> {
+  improvement_id: string;
+  project_id: string;
+  project_name: string;
+  project_slug: string;
+  service_id: string | null;
+  service_name: string;
+  service_runtime: string | null;
+  service_framework: string | null;
+  environment: string;
+  kind: "warning_hotspot";
+  status: "open" | "resolved" | "snoozed";
+  severity: "low" | "medium" | "high" | "critical";
+  confidence: number;
+  fingerprint: string;
+  title: string;
+  summary: string;
+  occurrence_count: number;
+  evidence: Record<string, unknown>;
+  first_detected_at: string;
+  last_detected_at: string;
+  resolved_at: string | null;
+  snoozed_until: string | null;
+  bundle_generation_number: number;
+  bundle_created_at: string | null;
+  bundle_updated_at: string | null;
+  bundle_failure_reason: string | null;
+}
+
 export interface ResolveIncidentForOrganizationInput {
   organization_id: string;
   incident_id: string;
@@ -746,6 +775,24 @@ export interface ResolveIncidentForOrganizationInput {
 export interface ReopenIncidentForOrganizationInput {
   organization_id: string;
   incident_id: string;
+}
+
+export interface ResolveImprovementForOrganizationInput {
+  organization_id: string;
+  improvement_id: string;
+  resolved_by_member_id: string;
+  resolved_at: string;
+}
+
+export interface ReopenImprovementForOrganizationInput {
+  organization_id: string;
+  improvement_id: string;
+}
+
+export interface SnoozeImprovementForOrganizationInput {
+  organization_id: string;
+  improvement_id: string;
+  snoozed_until: string;
 }
 
 export interface ServiceRetrievalRecord extends Record<string, unknown> {
@@ -773,6 +820,11 @@ export interface IncidentLogsCursor {
 export interface IncidentsCursor {
   last_seen_at: string;
   incident_id: string;
+}
+
+export interface ImprovementsCursor {
+  last_detected_at: string;
+  improvement_id: string;
 }
 
 export interface MarkIncidentSpikingInput {
@@ -835,6 +887,41 @@ export interface MetadataStore {
   markIncidentSpiking(input: MarkIncidentSpikingInput): Promise<boolean>;
 }
 
+export interface ImprovementRetrievalStore {
+  listImprovementsForOrganization(input: {
+    organization_id: string;
+    project_id?: string;
+    environment?: string;
+    service?: string;
+    status?: "open" | "resolved" | "snoozed";
+    severity?: "low" | "medium" | "high" | "critical";
+    kind?: "warning_hotspot" | "slow_request" | "request_failure_pattern" | "recurring_incident" | "post_deploy_regression";
+    cursor?: ImprovementsCursor;
+    limit: number;
+  }): Promise<ImprovementRetrievalRecord[]>;
+  getImprovementForOrganization(input: {
+    organization_id: string;
+    improvement_id: string;
+  }): Promise<ImprovementRetrievalRecord | null>;
+  resolveImprovementForOrganization(input: ResolveImprovementForOrganizationInput): Promise<ImprovementRetrievalRecord | null>;
+  reopenImprovementForOrganization(input: ReopenImprovementForOrganizationInput): Promise<ImprovementRetrievalRecord | null>;
+  snoozeImprovementForOrganization?(input: SnoozeImprovementForOrganizationInput): Promise<ImprovementRetrievalRecord | null>;
+}
+
+export type RetainedBundleOwnerReference =
+  | {
+      owner_type: "incident";
+      project_id: string;
+      incident_id: string;
+      improvement_opportunity_id: null;
+    }
+  | {
+      owner_type: "improvement";
+      project_id: string;
+      incident_id: null;
+      improvement_opportunity_id: string;
+    };
+
 export interface RetentionStore {
   listExpiredSampledRawEvents(input: { now: string; limit: number }): Promise<RetentionRawEventReference[]>;
   markRawEventsExpired(input: { references: RetentionRawEventReference[] }): Promise<void>;
@@ -879,10 +966,10 @@ export interface BundleBuildContextStore {
   getBundleBuildContext(input: { project_id: string; incident_id: string }): Promise<BundleBuildContext | null>;
   hasBundleGenerationForSourceEvent?(input: { incident_id: string; event_id: string }): Promise<boolean>;
   markBundleGenerationFailure?(input: { incident_id: string; reason: string | null }): Promise<void>;
-  pruneRetainedIncidentsForProject?(input: {
+  pruneRetainedBundleOwnersForProject?(input: {
     project_id: string;
     retained_bundle_limit: number;
-  }): Promise<Array<{ project_id: string; incident_id: string }>>;
+  }): Promise<RetainedBundleOwnerReference[]>;
   reserveBundleGeneration(input: {
     incident_id: string;
     event_id: string;
@@ -1444,7 +1531,7 @@ export interface ProjectCollaborationStore {
 export interface CreateWebhookDeliveryIntentInput {
   webhook_id: string;
   project_id: string;
-  incident_id: string;
+  incident_id: string | null;
   event_type: WebhookEventType;
   occurred_at: string;
   target_url: string;

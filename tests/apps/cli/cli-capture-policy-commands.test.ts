@@ -252,6 +252,7 @@ describe("cli capture-policy commands", () => {
       .mockResolvedValueOnce({
         status: 200,
         body: {
+          access_mode: "manage",
           policy: {
             preset: "minimal",
             capture_logs: "error",
@@ -272,6 +273,7 @@ describe("cli capture-policy commands", () => {
       .mockResolvedValueOnce({
         status: 200,
         body: {
+          access_mode: "manage",
           policy: {
             preset: "balanced",
             capture_logs: "warning",

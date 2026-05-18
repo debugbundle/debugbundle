@@ -668,3 +668,15 @@ export {
   getRequestAnomalyThreshold,
   shouldCaptureEvent,
 } from "./capture-policy.js";
+
+export {
+  ImprovementBundleSensitivityValues,
+  ImprovementBundleSensitivitySchema,
+  type ImprovementBundleSensitivity,
+  ImprovementSettingsSchema,
+  type ImprovementSettings,
+  ImprovementSettingsResponseSchema,
+  type ImprovementSettingsResponse,
+  ImprovementSettingsUpdateSchema,
+  type ImprovementSettingsUpdate
+} from "./improvement-settings.js";

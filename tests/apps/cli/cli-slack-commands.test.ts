@@ -184,6 +184,6 @@ describe("cli slack commands", () => {
     expect(authResult.exitCode).toBe(2);
     expect(authResult.output).toBe("Not logged in.");
     expect(apiResult.exitCode).toBe(4);
-    expect(apiResult.output).toContain("slack_api_error: 403:upgrade_required".replace(": ", ":"));
+    expect(apiResult.output).toContain("slack_api_error: 403:upgrade_required");
   });
 });

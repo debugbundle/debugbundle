@@ -8,6 +8,18 @@ import {
   getCapturePolicyWithAuthCommand as defaultGetCapturePolicyCommand,
   setCapturePolicyWithAuthCommand as defaultSetCapturePolicyCommand
 } from "./capture-policy-commands.js";
+import {
+  getImprovementBundleWithAuthCommand as defaultGetImprovementBundleCommand,
+  getImprovementWithAuthCommand as defaultGetImprovementCommand,
+  listImprovementsWithAuthCommand as defaultListImprovementsCommand,
+  reopenImprovementWithAuthCommand as defaultReopenImprovementCommand,
+  resolveImprovementWithAuthCommand as defaultResolveImprovementCommand,
+  snoozeImprovementWithAuthCommand as defaultSnoozeImprovementCommand
+} from "./improvement-commands.js";
+import {
+  getImprovementSettingsWithAuthCommand as defaultGetImprovementSettingsCommand,
+  setImprovementSettingsWithAuthCommand as defaultSetImprovementSettingsCommand
+} from "./improvement-settings-commands.js";
 import { RECOMMENDED_IMMEDIATE_CLIENT_ERROR_STATUSES } from "../../../packages/shared-types/src/index.js";
 import { deleteProjectWithAuthCommand as defaultDeleteProjectCommand, listProjectsWithAuthCommand as defaultListProjectsCommand, createProjectWithAuthCommand as defaultCreateProjectCommand, updateProjectWithAuthCommand as defaultUpdateProjectCommand } from "./project-commands.js";
 import {
@@ -125,6 +137,14 @@ export type ManagementCommandDependencies = {
   deleteSlackDestinationCommand?: typeof defaultDeleteSlackDestinationCommand;
   getCapturePolicyCommand?: typeof defaultGetCapturePolicyCommand;
   setCapturePolicyCommand?: typeof defaultSetCapturePolicyCommand;
+  listImprovementsCommand?: typeof defaultListImprovementsCommand;
+  getImprovementCommand?: typeof defaultGetImprovementCommand;
+  getImprovementBundleCommand?: typeof defaultGetImprovementBundleCommand;
+  resolveImprovementCommand?: typeof defaultResolveImprovementCommand;
+  reopenImprovementCommand?: typeof defaultReopenImprovementCommand;
+  snoozeImprovementCommand?: typeof defaultSnoozeImprovementCommand;
+  getImprovementSettingsCommand?: typeof defaultGetImprovementSettingsCommand;
+  setImprovementSettingsCommand?: typeof defaultSetImprovementSettingsCommand;
   activateProbeCommand?: typeof defaultActivateProbeCommand;
   listActiveProbesCommand?: typeof defaultListActiveProbesCommand;
   deactivateProbeCommand?: typeof defaultDeactivateProbeCommand;
@@ -395,6 +415,169 @@ export async function handleGithubCommand(parsedArgv: ParsedArgv, dependencies: 
   }
 
   throw new CliInputError("Unknown github repo command.");
+}
+
+export async function handleImprovementsCommand(
+  parsedArgv: ParsedArgv,
+  dependencies: ManagementCommandDependencies
+): Promise<CliCommandResult> {
+  const action = requirePositional(parsedArgv, 1, "action");
+  if (action === "list") {
+    expectNoUnknownOptions(parsedArgv, ["project-id", "environment", "service", "status", "severity", "kind", "cursor", "limit", "auth-file", "json"]);
+    ensureNoExtraPositionals(parsedArgv, 2);
+
+    const input = appendCommonAuthOptions(parsedArgv, {} as {
+      authFilePath?: string;
+      json?: boolean;
+      projectId?: string;
+      environment?: string;
+      service?: string;
+      status?: string;
+      severity?: string;
+      kind?: string;
+      cursor?: string;
+      limit?: number;
+    });
+    const projectId = readStringOption(parsedArgv, "project-id");
+    if (projectId !== undefined) input.projectId = projectId;
+    const environment = readStringOption(parsedArgv, "environment");
+    if (environment !== undefined) input.environment = environment;
+    const service = readStringOption(parsedArgv, "service");
+    if (service !== undefined) input.service = service;
+    const status = readStringOption(parsedArgv, "status");
+    if (status !== undefined) input.status = status;
+    const severity = readStringOption(parsedArgv, "severity");
+    if (severity !== undefined) input.severity = severity;
+    const kind = readStringOption(parsedArgv, "kind");
+    if (kind !== undefined) input.kind = kind;
+    const cursor = readStringOption(parsedArgv, "cursor");
+    if (cursor !== undefined) input.cursor = cursor;
+    const limit = readLimitOption(parsedArgv);
+    if (limit !== undefined) input.limit = limit;
+
+    return await (dependencies.listImprovementsCommand ?? defaultListImprovementsCommand)(input);
+  }
+
+  if (action === "get") {
+    expectNoUnknownOptions(parsedArgv, ["auth-file", "json"]);
+    ensureNoExtraPositionals(parsedArgv, 3);
+    return await (dependencies.getImprovementCommand ?? defaultGetImprovementCommand)(
+      appendCommonAuthOptions(parsedArgv, {
+        improvementId: requirePositional(parsedArgv, 2, "improvement-id")
+      })
+    );
+  }
+
+  if (action === "bundle") {
+    expectNoUnknownOptions(parsedArgv, ["project-id", "auth-file", "json"]);
+    ensureNoExtraPositionals(parsedArgv, 3);
+    const projectId = readStringOption(parsedArgv, "project-id");
+    if (projectId === undefined) {
+      throw new CliInputError("Missing required option --project-id.");
+    }
+
+    return await (dependencies.getImprovementBundleCommand ?? defaultGetImprovementBundleCommand)(
+      appendCommonAuthOptions(parsedArgv, {
+        projectId,
+        improvementId: requirePositional(parsedArgv, 2, "improvement-id")
+      })
+    );
+  }
+
+  if (action === "resolve") {
+    expectNoUnknownOptions(parsedArgv, ["auth-file", "json"]);
+    ensureNoExtraPositionals(parsedArgv, 3);
+    return await (dependencies.resolveImprovementCommand ?? defaultResolveImprovementCommand)(
+      appendCommonAuthOptions(parsedArgv, {
+        improvementId: requirePositional(parsedArgv, 2, "improvement-id")
+      })
+    );
+  }
+
+  if (action === "reopen") {
+    expectNoUnknownOptions(parsedArgv, ["auth-file", "json"]);
+    ensureNoExtraPositionals(parsedArgv, 3);
+    return await (dependencies.reopenImprovementCommand ?? defaultReopenImprovementCommand)(
+      appendCommonAuthOptions(parsedArgv, {
+        improvementId: requirePositional(parsedArgv, 2, "improvement-id")
+      })
+    );
+  }
+
+  if (action === "snooze") {
+    expectNoUnknownOptions(parsedArgv, ["until", "auth-file", "json"]);
+    ensureNoExtraPositionals(parsedArgv, 3);
+    const snoozedUntil = readStringOption(parsedArgv, "until");
+    if (snoozedUntil === undefined) {
+      throw new CliInputError("Missing required option --until.");
+    }
+
+    return await (dependencies.snoozeImprovementCommand ?? defaultSnoozeImprovementCommand)(
+      appendCommonAuthOptions(parsedArgv, {
+        improvementId: requirePositional(parsedArgv, 2, "improvement-id"),
+        snoozedUntil
+      })
+    );
+  }
+
+  if (action !== "settings") {
+    throw new CliInputError("Unknown improvements command.");
+  }
+
+  const settingsAction = requirePositional(parsedArgv, 2, "settings action");
+  if (settingsAction === "get") {
+    expectNoUnknownOptions(parsedArgv, ["project", "auth-file", "json"]);
+    ensureNoExtraPositionals(parsedArgv, 3);
+    const projectId = readStringOption(parsedArgv, "project");
+    if (projectId === undefined) {
+      throw new CliInputError("Missing required option --project.");
+    }
+
+    return await (dependencies.getImprovementSettingsCommand ?? defaultGetImprovementSettingsCommand)(
+      appendCommonAuthOptions(parsedArgv, {
+        projectId
+      })
+    );
+  }
+
+  if (settingsAction === "set") {
+    expectNoUnknownOptions(parsedArgv, ["project", "enabled", "sensitivity", "auth-file", "json"]);
+    ensureNoExtraPositionals(parsedArgv, 3);
+    const projectId = readStringOption(parsedArgv, "project");
+    if (projectId === undefined) {
+      throw new CliInputError("Missing required option --project.");
+    }
+
+    const update: {
+      automated_improvement_bundles_enabled?: boolean;
+      improvement_bundle_sensitivity?: "high_confidence" | "balanced" | "verbose";
+    } = {};
+    const enabled = readBooleanStringOption(parsedArgv, "enabled");
+    if (enabled !== undefined) {
+      update.automated_improvement_bundles_enabled = enabled;
+    }
+
+    const sensitivity = readStringOption(parsedArgv, "sensitivity");
+    if (sensitivity !== undefined) {
+      if (sensitivity !== "high_confidence" && sensitivity !== "balanced" && sensitivity !== "verbose") {
+        throw new CliInputError("Invalid value for --sensitivity.");
+      }
+      update.improvement_bundle_sensitivity = sensitivity;
+    }
+
+    if (Object.keys(update).length === 0) {
+      throw new CliInputError("At least one improvement settings field must be provided.");
+    }
+
+    return await (dependencies.setImprovementSettingsCommand ?? defaultSetImprovementSettingsCommand)(
+      appendCommonAuthOptions(parsedArgv, {
+        projectId,
+        update
+      })
+    );
+  }
+
+  throw new CliInputError("Unknown improvements settings command.");
 }
 
 export async function handleBillingCommand(parsedArgv: ParsedArgv, dependencies: ManagementCommandDependencies): Promise<CliCommandResult> {

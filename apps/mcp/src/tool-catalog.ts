@@ -5,6 +5,8 @@ import { ANALYZE_MCP_TOOL_NAMES } from './analyze-tools.js';
 import { BILLING_MCP_TOOL_NAMES } from './billing-tools.js';
 import { CAPTURE_POLICY_MCP_TOOL_NAMES } from './capture-policy-tools.js';
 import { GITHUB_MCP_TOOL_NAMES } from './github-tools.js';
+import { IMPROVEMENT_MCP_TOOL_NAMES } from './improvement-tools.js';
+import { IMPROVEMENT_SETTINGS_MCP_TOOL_NAMES } from './improvement-settings-tools.js';
 import { MEMBER_MCP_TOOL_NAMES } from './member-tools.js';
 import { PROBE_MCP_TOOL_NAMES } from './probe-tools.js';
 import { PROJECT_MCP_TOOL_NAMES } from './project-tools.js';
@@ -22,6 +24,8 @@ type McpToolName =
   | (typeof BILLING_MCP_TOOL_NAMES)[number]
   | (typeof CAPTURE_POLICY_MCP_TOOL_NAMES)[number]
   | (typeof GITHUB_MCP_TOOL_NAMES)[number]
+  | (typeof IMPROVEMENT_MCP_TOOL_NAMES)[number]
+  | (typeof IMPROVEMENT_SETTINGS_MCP_TOOL_NAMES)[number]
   | (typeof MEMBER_MCP_TOOL_NAMES)[number]
   | (typeof PROBE_MCP_TOOL_NAMES)[number]
   | (typeof PROJECT_MCP_TOOL_NAMES)[number]
@@ -39,6 +43,8 @@ type McpToolGroup =
   | 'billing'
   | 'capture_policy'
   | 'github'
+  | 'improvements'
+  | 'improvement_settings'
   | 'members'
   | 'probes'
   | 'projects'
@@ -83,6 +89,11 @@ const incidentLookupInputSchema = z.object({
   bearerToken: optionalBearerTokenSchema,
   source: sourceSchema,
   incidentId: z.string(),
+});
+
+const improvementLookupInputSchema = z.object({
+  bearerToken: z.string(),
+  improvementId: z.string(),
 });
 
 export const MCP_TOOL_CATALOG = [
@@ -196,6 +207,60 @@ export const MCP_TOOL_CATALOG = [
       level: z.string().optional(),
       cursor: z.string().optional(),
       limit: z.number().optional(),
+    }),
+  },
+  {
+    name: 'list_improvements',
+    group: 'improvements',
+    description: 'List hosted improvement opportunities for the current workspace or a specific project.',
+    inputSchema: z.object({
+      bearerToken: z.string(),
+      projectId: z.string().optional(),
+      environment: z.string().optional(),
+      service: z.string().optional(),
+      status: z.string().optional(),
+      severity: z.string().optional(),
+      kind: z.string().optional(),
+      cursor: z.string().optional(),
+      limit: z.number().optional(),
+    }),
+  },
+  {
+    name: 'get_improvement',
+    group: 'improvements',
+    description: 'Fetch a single hosted improvement opportunity by id.',
+    inputSchema: improvementLookupInputSchema,
+  },
+  {
+    name: 'get_improvement_bundle',
+    group: 'improvements',
+    description: 'Fetch the hosted improvement bundle artifact for a project improvement opportunity.',
+    inputSchema: z.object({
+      bearerToken: z.string(),
+      projectId: z.string(),
+      improvementId: z.string(),
+    }),
+  },
+  {
+    name: 'resolve_improvement',
+    group: 'improvements',
+    description: 'Resolve a hosted improvement opportunity.',
+    inputSchema: improvementLookupInputSchema,
+  },
+  {
+    name: 'reopen_improvement',
+    group: 'improvements',
+    description: 'Reopen a hosted improvement opportunity.',
+    inputSchema: improvementLookupInputSchema,
+  },
+  {
+    name: 'snooze_improvement',
+    group: 'improvements',
+    description: 'Snooze a hosted improvement opportunity until an ISO8601 timestamp.',
+    inputSchema: z.object({
+      bearerToken: z.string(),
+      improvementId: z.string(),
+      snoozedUntil: z.string(),
     }),
   },
   {
@@ -648,6 +713,28 @@ export const MCP_TOOL_CATALOG = [
         capture_breadcrumbs: z.string().nullable().optional(),
         capture_probe_events: z.string().nullable().optional(),
         immediate_client_error_statuses: z.array(z.number().int().min(400).max(499)).nullable().optional(),
+      }),
+    }),
+  },
+  {
+    name: 'get_improvement_settings',
+    group: 'improvement_settings',
+    description: 'Get automated improvement settings for a project.',
+    inputSchema: z.object({
+      bearerToken: z.string(),
+      projectId: z.string(),
+    }),
+  },
+  {
+    name: 'update_improvement_settings',
+    group: 'improvement_settings',
+    description: 'Update automated improvement settings for a project.',
+    inputSchema: z.object({
+      bearerToken: z.string(),
+      projectId: z.string(),
+      update: z.object({
+        automated_improvement_bundles_enabled: z.boolean().optional(),
+        improvement_bundle_sensitivity: z.enum(['high_confidence', 'balanced', 'verbose']).optional(),
       }),
     }),
   },

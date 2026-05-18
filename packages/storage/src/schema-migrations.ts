@@ -181,6 +181,116 @@ export const STORAGE_SCHEMA_MIGRATIONS = [
       "ALTER TABLE github_dispatch_deliveries DROP CONSTRAINT IF EXISTS github_dispatch_deliveries_status_check",
       "ALTER TABLE github_dispatch_deliveries ADD CONSTRAINT github_dispatch_deliveries_status_check CHECK (status IN ('pending', 'retrying', 'delivered', 'failed', 'skipped'))"
     ]
+  }),
+  defineStorageSchemaMigration({
+    id: "202605180002_add_project_improvement_settings",
+    description: "Add project-level automated improvement settings columns.",
+    statements: [
+      "ALTER TABLE projects ADD COLUMN IF NOT EXISTS automated_improvement_bundles_enabled boolean NOT NULL DEFAULT true",
+      "ALTER TABLE projects ADD COLUMN IF NOT EXISTS improvement_bundle_sensitivity text NOT NULL DEFAULT 'balanced'",
+      `
+        ALTER TABLE projects
+        DROP CONSTRAINT IF EXISTS projects_improvement_bundle_sensitivity_check
+      `,
+      `
+        ALTER TABLE projects
+        ADD CONSTRAINT projects_improvement_bundle_sensitivity_check
+        CHECK (improvement_bundle_sensitivity IN ('high_confidence', 'balanced', 'verbose'))
+      `
+    ]
+  }),
+  defineStorageSchemaMigration({
+    id: "202605180003_add_improvement_opportunities_and_bundle_generation_shape",
+    description: "Add hosted improvement opportunity storage and allow bundle generations to reference improvements directly.",
+    statements: [
+      `
+        CREATE TABLE IF NOT EXISTS improvement_opportunities (
+          id uuid PRIMARY KEY,
+          project_id uuid NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+          service_id uuid REFERENCES services(id) ON DELETE SET NULL,
+          service_name text NOT NULL,
+          environment text NOT NULL DEFAULT 'production',
+          kind text NOT NULL,
+          status text NOT NULL DEFAULT 'open',
+          severity text NOT NULL,
+          confidence numeric NOT NULL,
+          fingerprint text NOT NULL,
+          title text NOT NULL,
+          summary text NOT NULL,
+          occurrence_count integer NOT NULL DEFAULT 1,
+          evidence jsonb NOT NULL,
+          first_detected_at timestamptz NOT NULL,
+          last_detected_at timestamptz NOT NULL,
+          last_source_event_id uuid,
+          related_incident_ids uuid[] NOT NULL DEFAULT '{}',
+          bundle_generation_number integer NOT NULL DEFAULT 0,
+          bundle_created_at timestamptz,
+          bundle_updated_at timestamptz,
+          bundle_source_event_id uuid,
+          bundle_failure_reason text,
+          resolved_at timestamptz,
+          resolved_by_user_id uuid REFERENCES users(id) ON DELETE SET NULL,
+          snoozed_until timestamptz,
+          created_at timestamptz NOT NULL DEFAULT now(),
+          updated_at timestamptz NOT NULL DEFAULT now(),
+          UNIQUE (project_id, fingerprint)
+        )
+      `,
+      `
+        CREATE INDEX IF NOT EXISTS improvement_opportunities_project_status_detected_idx
+        ON improvement_opportunities (project_id, status, last_detected_at DESC)
+      `,
+      `
+        CREATE INDEX IF NOT EXISTS improvement_opportunities_project_kind_detected_idx
+        ON improvement_opportunities (project_id, kind, last_detected_at DESC)
+      `,
+      `
+        CREATE INDEX IF NOT EXISTS improvement_opportunities_project_service_env_idx
+        ON improvement_opportunities (project_id, service_id, environment)
+      `,
+      `
+        CREATE TABLE IF NOT EXISTS improvement_opportunity_events (
+          improvement_opportunity_id uuid NOT NULL REFERENCES improvement_opportunities(id) ON DELETE CASCADE,
+          event_id uuid NOT NULL,
+          event_type text NOT NULL,
+          occurred_at timestamptz NOT NULL,
+          PRIMARY KEY (improvement_opportunity_id, event_id)
+        )
+      `,
+      `
+        CREATE INDEX IF NOT EXISTS improvement_opportunity_events_detected_idx
+        ON improvement_opportunity_events (improvement_opportunity_id, occurred_at DESC, event_id DESC)
+      `,
+      "ALTER TABLE bundle_generations ALTER COLUMN incident_id DROP NOT NULL",
+      "ALTER TABLE bundle_generations ADD COLUMN IF NOT EXISTS improvement_opportunity_id uuid REFERENCES improvement_opportunities(id) ON DELETE CASCADE",
+      "ALTER TABLE bundle_generations DROP CONSTRAINT IF EXISTS bundle_generations_incident_id_source_event_id_key",
+      "DROP INDEX IF EXISTS bundle_generations_incident_source_idx",
+      "DROP INDEX IF EXISTS bundle_generations_improvement_source_idx",
+      `
+        CREATE UNIQUE INDEX IF NOT EXISTS bundle_generations_incident_source_idx
+        ON bundle_generations (incident_id, source_event_id)
+        WHERE incident_id IS NOT NULL
+      `,
+      `
+        CREATE UNIQUE INDEX IF NOT EXISTS bundle_generations_improvement_source_idx
+        ON bundle_generations (improvement_opportunity_id, source_event_id)
+        WHERE improvement_opportunity_id IS NOT NULL
+      `,
+      "DROP INDEX IF EXISTS bundle_generations_improvement_generation_idx",
+      `
+        CREATE INDEX IF NOT EXISTS bundle_generations_improvement_generation_idx
+        ON bundle_generations (improvement_opportunity_id, generation_number DESC)
+        WHERE improvement_opportunity_id IS NOT NULL
+      `,
+      "ALTER TABLE bundle_generations DROP CONSTRAINT IF EXISTS bundle_generations_owner_check",
+      `
+        ALTER TABLE bundle_generations
+        ADD CONSTRAINT bundle_generations_owner_check CHECK (
+          (incident_id IS NOT NULL AND improvement_opportunity_id IS NULL AND bundle_type = 'failure')
+          OR (incident_id IS NULL AND improvement_opportunity_id IS NOT NULL AND bundle_type = 'improvement')
+        )
+      `
+    ]
   })
 ] as const;
 

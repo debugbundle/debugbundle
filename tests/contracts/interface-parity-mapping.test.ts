@@ -58,10 +58,10 @@ describe("retrieval parity mapping contract", () => {
     const contract = await readFile(CONTRACT_PATH, "utf8");
 
     expect(contract).toContain(
-      "| List project tokens | `GET /v1/projects/{id}/tokens` | `token project list` | `list_project_tokens` | Member token scoped to organization |"
+      "| List project tokens | `GET /v1/projects/{id}/tokens` | `token project list` | `list_project_tokens` | Browser session or member token with project access |"
     );
     expect(contract).toContain(
-      "| Create project token | `POST /v1/projects/{id}/tokens` | `token project create` | `create_project_token` | Plaintext returned once |"
+      "| Create project token | `POST /v1/projects/{id}/tokens` | `token project create` | `create_project_token` | Owner/admin project access; plaintext returned once |"
     );
     expect(contract).toContain(
       "| List member tokens | `GET /v1/member/tokens` | `token member list` | `list_member_tokens` | Member token scoped to caller |"
@@ -72,19 +72,19 @@ describe("retrieval parity mapping contract", () => {
     const contract = await readFile(CONTRACT_PATH, "utf8");
 
     expect(contract).toContain(
-      "| List webhooks | `GET /v1/webhooks` | `webhook list` | `list_webhooks` | Browser Session or Member Token, scoped to organization/project |"
+      "| List webhooks | `GET /v1/webhooks` | `webhook list` | `list_webhooks` | Browser Session or Member Token, scoped to project |"
     );
     expect(contract).toContain(
       "| Create webhook | `POST /v1/webhooks` | `webhook create` | `create_webhook` | Signing secret returned once |"
     );
     expect(contract).toContain(
-      "| Update webhook | `PATCH /v1/webhooks/{id}` | `webhook update` | `update_webhook` | |"
+      "| Update webhook | `PATCH /v1/webhooks/{id}` | `webhook update` | `update_webhook` | Owner/admin may update any webhook; member may update only self-created webhooks |"
     );
     expect(contract).toContain(
-      "| Delete webhook | `DELETE /v1/webhooks/{id}` | `webhook delete` | `delete_webhook` | |"
+      "| Delete webhook | `DELETE /v1/webhooks/{id}` | `webhook delete` | `delete_webhook` | Owner/admin may delete any webhook; member may delete only self-created webhooks |"
     );
     expect(contract).toContain(
-      "| Test webhook | `POST /v1/webhooks/{id}/test` | `webhook test` | `test_webhook` | Queues a signed synthetic delivery |"
+      "| Test webhook | `POST /v1/webhooks/{id}/test` | `webhook test` | `test_webhook` | Queues a signed synthetic delivery; member may test only self-created webhooks |"
     );
     expect(contract).toContain(
       "| Webhook deliveries | `GET /v1/webhooks/{id}/deliveries` | `webhook deliveries` | `list_webhook_deliveries` | Statuses: pending, retrying, delivered, failed, disabled |"
@@ -101,7 +101,7 @@ describe("retrieval parity mapping contract", () => {
     const contract = await readFile(CONTRACT_PATH, "utf8");
 
     expect(contract).toContain(
-      "| Alert CRUD | `POST/GET/PATCH/DELETE /v1/alerts` | `alert list/create/update/delete` | `list_alerts/create_alert/update_alert/delete_alert` | Browser Session or Member Token, scoped to organization/project |"
+      "| Alert CRUD | `POST/GET/PATCH/DELETE /v1/alerts` | `alert list/create/update/delete` | `list_alerts/create_alert/update_alert/delete_alert` | Browser Session or Member Token, scoped to project; member may mutate only self-created rules |"
     );
     expect(contract).toContain("debugbundle_list_alerts          → same result as `GET /v1/alerts`");
     expect(contract).toContain("debugbundle_create_alert         → same result as `POST /v1/alerts`");
@@ -159,16 +159,16 @@ describe("retrieval parity mapping contract", () => {
     const contract = await readFile(CONTRACT_PATH, "utf8");
 
     expect(contract).toContain(
-      "| Get GitHub installation | `GET /v1/github/installation` | `github status` | `get_github_status` | Browser Session or Member Token, Solo+ only |"
+      "| Get GitHub installation | `GET /v1/github/installation` | `github status` | `get_github_status` | Browser Session or Member Token, available to authorized members on eligible Solo+ project |"
     );
     expect(contract).toContain(
-      "| List GitHub repositories | `GET /v1/github/repositories` | `github repos` | `list_github_repositories` | Browser Session or Member Token, Solo+ only |"
+      "| List GitHub repositories | `GET /v1/github/repositories` | `github repos` | `list_github_repositories` | Browser Session or Member Token, owner/admin only on eligible Solo+ project |"
     );
     expect(contract).toContain(
-      "| Set project GitHub repo | `PUT /v1/projects/{id}/github/repo` | `github repo set` | `set_project_github_repo` | Browser Session or Member Token, owner only, Solo+ only |"
+      "| Set project GitHub repo | `PUT /v1/projects/{id}/github/repo` | `github repo set` | `set_project_github_repo` | Browser Session or Member Token, owner/admin only, Solo+ only |"
     );
     expect(contract).toContain(
-      "| Remove project GitHub repo | `DELETE /v1/projects/{id}/github/repo` | `github repo remove` | `remove_project_github_repo` | Browser Session or Member Token, owner only, Solo+ only |"
+      "| Remove project GitHub repo | `DELETE /v1/projects/{id}/github/repo` | `github repo remove` | `remove_project_github_repo` | Browser Session or Member Token, owner/admin only, Solo+ only |"
     );
     expect(contract).toContain("debugbundle_get_github_status           → same result as GET /v1/github/installation");
     expect(contract).toContain("debugbundle_list_github_repositories    → same result as GET /v1/github/repositories");
@@ -180,16 +180,16 @@ describe("retrieval parity mapping contract", () => {
     const contract = await readFile(CONTRACT_PATH, "utf8");
 
     expect(contract).toContain(
-      "| List dispatch rules | `GET /v1/projects/{id}/github/rules` | `github rules` | `list_github_dispatch_rules` | Browser Session or Member Token, Solo+ only |"
+      "| List dispatch rules | `GET /v1/projects/{id}/github/rules` | `github rules` | `list_github_dispatch_rules` | Browser Session or Member Token, available to authorized members on eligible Solo+ project |"
     );
     expect(contract).toContain(
-      "| Create dispatch rule | `POST /v1/projects/{id}/github/rules` | `github rules create` | `create_github_dispatch_rule` | Browser Session or Member Token, owner only, Solo+ only |"
+      "| Create dispatch rule | `POST /v1/projects/{id}/github/rules` | `github rules create` | `create_github_dispatch_rule` | Browser Session or Member Token, any authorized project member on eligible Solo+ project |"
     );
     expect(contract).toContain(
-      "| Update dispatch rule | `PATCH /v1/projects/{id}/github/rules/{ruleId}` | `github rules update` | `update_github_dispatch_rule` | Browser Session or Member Token, owner only, Solo+ only |"
+      "| Update dispatch rule | `PATCH /v1/projects/{id}/github/rules/{ruleId}` | `github rules update` | `update_github_dispatch_rule` | Browser Session or Member Token, owner/admin may update any rule; member may update only self-created rules |"
     );
     expect(contract).toContain(
-      "| Delete dispatch rule | `DELETE /v1/projects/{id}/github/rules/{ruleId}` | `github rules delete` | `delete_github_dispatch_rule` | Browser Session or Member Token, owner only, Solo+ only |"
+      "| Delete dispatch rule | `DELETE /v1/projects/{id}/github/rules/{ruleId}` | `github rules delete` | `delete_github_dispatch_rule` | Browser Session or Member Token, owner/admin may delete any rule; member may delete only self-created rules |"
     );
     expect(contract).toContain("debugbundle_list_github_dispatch_rules  → same result as GET /v1/projects/{id}/github/rules");
     expect(contract).toContain("debugbundle_create_github_dispatch_rule → same result as POST /v1/projects/{id}/github/rules");
@@ -201,10 +201,10 @@ describe("retrieval parity mapping contract", () => {
     const contract = await readFile(CONTRACT_PATH, "utf8");
 
     expect(contract).toContain(
-      "| List dispatch deliveries | `GET /v1/projects/{id}/github/deliveries` | `github deliveries` | `list_github_deliveries` | Browser Session or Member Token, Solo+ only |"
+      "| List dispatch deliveries | `GET /v1/projects/{id}/github/deliveries` | `github deliveries` | `list_github_deliveries` | Browser Session or Member Token, available to authorized members on eligible Solo+ project |"
     );
     expect(contract).toContain(
-      "| Retry dispatch delivery | `POST /v1/projects/{id}/github/deliveries/{id}/retry` | `github deliveries retry` | `retry_github_delivery` | Browser Session or Member Token, Solo+ only |"
+      "| Retry dispatch delivery | `POST /v1/projects/{id}/github/deliveries/{id}/retry` | `github deliveries retry` | `retry_github_delivery` | Browser Session or Member Token, owner/admin or creator-owned-rule member on eligible Solo+ project |"
     );
     expect(contract).toContain("debugbundle_list_github_deliveries      → same result as GET /v1/projects/{id}/github/deliveries");
     expect(contract).toContain("debugbundle_retry_github_delivery       → same result as POST /v1/projects/{id}/github/deliveries/{id}/retry");
@@ -232,10 +232,10 @@ describe("retrieval parity mapping contract", () => {
     const contract = await readFile(CONTRACT_PATH, "utf8");
 
     expect(contract).toContain(
-      "| List project members | `GET /v1/projects/{id}/members` | `project members list` | `list_project_members` | Browser Session or Member Token, owner/admin/member |"
+      "| List project members | `GET /v1/projects/{id}/members` | `project members list` | `list_project_members` | Browser Session or Member Token, owner/admin only |"
     );
     expect(contract).toContain(
-      "| List pending project invites | `GET /v1/projects/{id}/invites` | `project members invites` | `list_project_member_invites` | Browser Session or Member Token, owner/admin/member |"
+      "| List pending project invites | `GET /v1/projects/{id}/invites` | `project members invites` | `list_project_member_invites` | Browser Session or Member Token, owner/admin only |"
     );
     expect(contract).toContain(
       "| Invite project member | `POST /v1/projects/{id}/invite` | `project members invite` | `invite_project_member` | Browser Session or Member Token, owner/admin only, Team tier |"

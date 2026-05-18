@@ -34,7 +34,11 @@ export function getProjectSharingState(project: ProjectRecord): ProjectSharingSt
   return getProjectRelationship(project) === "shared" ? "shared_with_you" : "private";
 }
 
-export function getProjectEffectiveRole(project: ProjectRecord): ProjectEffectiveRole {
+export function getProjectEffectiveRole(project: ProjectRecord | null | undefined): ProjectEffectiveRole {
+  if (project === null || project === undefined) {
+    return "owner";
+  }
+
   return asAccessibleProject(project).effective_role ?? "owner";
 }
 

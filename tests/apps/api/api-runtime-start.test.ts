@@ -93,6 +93,8 @@ function buildMigratedRuntimeSchemaRows(sql: string): { rows: Record<string, unk
         { table_name: "services" },
         { table_name: "deployments" },
         { table_name: "bundle_generations" },
+        { table_name: "improvement_opportunities" },
+        { table_name: "improvement_opportunity_events" },
         { table_name: "weekly_report_channels" },
         { table_name: "incidents" },
         { table_name: "incident_events" },

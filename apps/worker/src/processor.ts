@@ -46,6 +46,7 @@ import type {
 import {
   buildBundleRegenerationLeaseKey,
   buildBundleObjectKey,
+  buildImprovementBundleObjectKey,
   buildRawEventObjectKey,
   buildReproductionObjectKey
 } from "../../../packages/storage/src/index.js";
@@ -57,8 +58,46 @@ import {
   type EventEnvelope
 } from "../../../packages/shared-types/src/index.js";
 import { evaluateRequestAnomalyCandidate } from "./request-anomaly.js";
+import {
+  maybeGenerateHostedImprovementBundle,
+  maybeGenerateHostedIncidentImprovementBundle,
+  type ImprovementBundleWorkerDependencies
+} from "./improvement-bundles.js";
 
 type BundleLinkBaseUrls = NonNullable<BuildBundleInput["linkBaseUrls"]>;
+
+async function deletePrunedBundleArtifacts(input: {
+  objectStore: Pick<Partial<ObjectStoreClient>, "deleteObject">;
+  owner:
+    | {
+        owner_type: "incident";
+        project_id: string;
+        incident_id: string;
+        improvement_opportunity_id: null;
+      }
+    | {
+        owner_type: "improvement";
+        project_id: string;
+        incident_id: null;
+        improvement_opportunity_id: string;
+      };
+}): Promise<void> {
+  if (input.owner.owner_type === "incident") {
+    await input.objectStore.deleteObject?.({
+      key: buildBundleObjectKey(input.owner.project_id, input.owner.incident_id)
+    });
+
+    await input.objectStore.deleteObject?.({
+      key: buildReproductionObjectKey(input.owner.project_id, input.owner.incident_id)
+    });
+
+    return;
+  }
+
+  await input.objectStore.deleteObject?.({
+    key: buildImprovementBundleObjectKey(input.owner.project_id, input.owner.improvement_opportunity_id)
+  });
+}
 
 export interface WorkerQueue {
   dequeue(jobName: "normalize-events"): Promise<NormalizeEventsJob | null>;
@@ -96,9 +135,10 @@ export interface ProcessedEventStore {
 
 export interface NormalizeWorkerDependencies {
   queue: WorkerQueue;
-  objectStore: ObjectStoreReader;
+  objectStore: ObjectStoreReader & Partial<ObjectStoreClient>;
   processedEventStore: ProcessedEventStore;
   requestAnomalyCounter?: RequestAnomalyCounter;
+  improvementBundleWorker?: ImprovementBundleWorkerDependencies;
 }
 
 export interface IncidentLifecycleWebhookPublisher {
@@ -144,6 +184,7 @@ export interface GroupIncidentWorkerDependencies {
   lifecycleWebhookPublisher: IncidentLifecycleWebhookPublisher;
   githubDispatchPublisher?: IncidentLifecycleGitHubDispatchPublisher;
   objectStore?: Pick<ObjectStoreClient, "deleteObject">;
+  improvementBundleWorker?: ImprovementBundleWorkerDependencies;
 }
 
 export interface BuildBundleWorkerDependencies {
@@ -159,7 +200,7 @@ export interface BuildBundleWorkerDependencies {
         | "listLogEventCandidatesForServiceWindow"
         | "hasBundleGenerationForSourceEvent"
         | "markBundleGenerationFailure"
-        | "pruneRetainedIncidentsForProject"
+        | "pruneRetainedBundleOwnersForProject"
       >
     >;
   objectStore: ObjectStoreClient & Partial<ObjectStoreReader>;
@@ -465,6 +506,17 @@ export async function processNextNormalizeEventsJob(
     return { processed: true };
   }
 
+  await maybeGenerateHostedImprovementBundle({
+    project_id: job.project_id,
+    event: validated.data,
+    normalized,
+    event_class: eventClass,
+    dependencies: {
+      objectStore: dependencies.objectStore,
+      ...(dependencies.improvementBundleWorker ?? {})
+    }
+  });
+
   await dependencies.queue.enqueue("group-incident", {
     project_id: job.project_id,
     event_id: validated.data.event_id,
@@ -603,6 +655,24 @@ export async function processNextGroupIncidentJob(
         }
       }
     }
+  }
+
+  if (incident.duplicate_event !== true && dependencies.improvementBundleWorker !== undefined) {
+    await maybeGenerateHostedIncidentImprovementBundle({
+      project_id: job.project_id,
+      incident_id: incident.incident_id,
+      event_id: job.event_id,
+      event_type: job.event_type,
+      service_name: job.service_name,
+      environment: job.environment,
+      incident_title: job.normalized_message,
+      incident_severity: job.severity,
+      incident_occurrence_count: incident.occurrence_count,
+      occurred_at: job.occurred_at,
+      regressed_now: incident.regressed_now,
+      regression_deploy: incident.regression_deploy ?? null,
+      dependencies: dependencies.improvementBundleWorker
+    });
   }
 
   const reachedBundleThreshold = [1, 3, 10].includes(incident.occurrence_count);
@@ -1392,7 +1462,7 @@ export async function processNextBuildBundleJob(
 
     if (
       dependencies.billingStore !== undefined &&
-      dependencies.incidentStore.pruneRetainedIncidentsForProject !== undefined &&
+      dependencies.incidentStore.pruneRetainedBundleOwnersForProject !== undefined &&
       dependencies.objectStore.deleteObject !== undefined
     ) {
       billingSummary ??= await dependencies.billingStore.getBillingSummaryForProject({
@@ -1403,18 +1473,15 @@ export async function processNextBuildBundleJob(
       const retainedAllowance = billingSummary?.allowances.retained_bundle_cap;
 
       if (retainedAllowance !== undefined) {
-        const prunedIncidents = await dependencies.incidentStore.pruneRetainedIncidentsForProject({
+        const prunedOwners = await dependencies.incidentStore.pruneRetainedBundleOwnersForProject({
           project_id: incident.project_id,
           retained_bundle_limit: retainedAllowance.limit
         });
 
-        for (const prunedIncident of prunedIncidents) {
-          await dependencies.objectStore.deleteObject({
-            key: buildBundleObjectKey(prunedIncident.project_id, prunedIncident.incident_id)
-          });
-
-          await dependencies.objectStore.deleteObject({
-            key: buildReproductionObjectKey(prunedIncident.project_id, prunedIncident.incident_id)
+        for (const prunedOwner of prunedOwners) {
+          await deletePrunedBundleArtifacts({
+            objectStore: dependencies.objectStore,
+            owner: prunedOwner
           });
         }
       }

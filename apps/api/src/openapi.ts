@@ -14,6 +14,8 @@ import {
   CapturePolicyResponseSchema as SharedCapturePolicyResponseSchema,
   CapturePolicyUpdateSchema,
   EventEnvelopeSchema,
+  ImprovementSettingsResponseSchema,
+  ImprovementSettingsUpdateSchema,
   ResolvedCapturePolicySchema as SharedResolvedCapturePolicySchema,
 } from "../../../packages/shared-types/src/index.js";
 import {
@@ -25,6 +27,8 @@ import {
 import {
   IncidentResponseSchema,
   IncidentsResponseSchema,
+  ImprovementResponseSchema,
+  ImprovementsResponseSchema,
   LogsResponseSchema,
   ReproductionResponseSchema,
   ServicesResponseSchema,
@@ -63,6 +67,9 @@ import {
   GithubDevicePollBodySchema,
   GithubDeviceStartBodySchema,
   GithubTokenExchangeBodySchema,
+  ImprovementParamsSchema,
+  ImprovementSnoozeBodySchema,
+  ImprovementsQuerySchema,
   IncidentParamsSchema,
   IncidentsQuerySchema,
   LogsQuerySchema,
@@ -70,6 +77,7 @@ import {
   ProjectInviteParamsSchema,
   ProjectMemberParamsSchema,
   ProjectParamsSchema,
+  ProjectImprovementParamsSchema,
   ProjectScopedQuerySchema,
   ProjectSlackDestinationDeleteParamsSchema,
   ProjectsQuerySchema,
@@ -453,6 +461,9 @@ function buildPublicApiOperations(): OperationSpec[] {
   const ingestionResponse = component("IngestionAcceptedResponse", IngestionAcceptedResponseSchema);
   const incidentListResponse = component("IncidentListResponse", IncidentsResponseSchema);
   const incidentResponse = component("IncidentResponse", IncidentResponseSchema);
+  const improvementListResponse = component("ImprovementListResponse", ImprovementsResponseSchema);
+  const improvementResponse = component("ImprovementResponse", ImprovementResponseSchema);
+  const improvementSnoozeBody = component("ImprovementSnoozeBody", ImprovementSnoozeBodySchema);
   const bundleResponse = component("BundleDocument", BundleV1Schema);
   const bundlePending = component("PendingStatus", z.object({ status: z.literal("pending") }).strict());
   const bundleFailed = component("BundleFailedStatus", BundleFailureStatusSchema);
@@ -489,6 +500,8 @@ function buildPublicApiOperations(): OperationSpec[] {
   const probeDeactivationResponse = component("ProbeDeactivationResponse", ProbeDeactivationResponseSchema);
   const capturePolicyUpdate = component("CapturePolicyUpdate", CapturePolicyUpdateSchema);
   const capturePolicyResponse = component("CapturePolicyResponse", CapturePolicyResponseSchema);
+  const improvementSettingsUpdate = component("ImprovementSettingsUpdate", ImprovementSettingsUpdateSchema);
+  const improvementSettingsResponse = component("ImprovementSettingsResponse", ImprovementSettingsResponseSchema);
   const sdkConfigResponse = component("SdkConfigResponse", SdkConfigResponseSchema);
   const healthResponse = component("HealthResponse", HealthResponseSchema);
   const readyResponse = component("ReadyResponse", ReadyResponseSchema);
@@ -862,6 +875,100 @@ function buildPublicApiOperations(): OperationSpec[] {
         "400": { description: "Invalid incident id.", schema: apiError },
         "401": { description: "Member token is invalid.", schema: apiError },
         "404": { description: "Incident or reproduction artifact was not found.", schema: apiError },
+      },
+    },
+    {
+      method: "get",
+      path: "/v1/improvements",
+      operationId: "listImprovements",
+      summary: "List hosted improvement opportunities",
+      tags: ["Improvements"],
+      security: memberBearerAuth,
+      query: ImprovementsQuerySchema,
+      responses: {
+        "200": { description: "Improvement opportunity list.", schema: improvementListResponse },
+        "400": { description: "Invalid query parameters.", schema: apiError },
+        "401": { description: "Member token is invalid.", schema: apiError },
+        "404": { description: "Improvement management is unavailable.", schema: apiError },
+      },
+    },
+    {
+      method: "get",
+      path: "/v1/improvements/{id}",
+      operationId: "getImprovement",
+      summary: "Get a hosted improvement opportunity",
+      tags: ["Improvements"],
+      security: memberBearerAuth,
+      params: ImprovementParamsSchema,
+      responses: {
+        "200": { description: "Improvement opportunity details.", schema: improvementResponse },
+        "400": { description: "Invalid improvement id.", schema: apiError },
+        "401": { description: "Member token is invalid.", schema: apiError },
+        "404": { description: "Improvement opportunity was not found.", schema: apiError },
+      },
+    },
+    {
+      method: "post",
+      path: "/v1/improvements/{id}/resolve",
+      operationId: "resolveImprovement",
+      summary: "Resolve a hosted improvement opportunity",
+      tags: ["Improvements"],
+      security: memberBearerAuth,
+      params: ImprovementParamsSchema,
+      responses: {
+        "200": { description: "Resolved improvement opportunity.", schema: improvementResponse },
+        "400": { description: "Invalid improvement id.", schema: apiError },
+        "401": { description: "Member token is invalid.", schema: apiError },
+        "404": { description: "Improvement opportunity was not found or resolution is unavailable.", schema: apiError },
+      },
+    },
+    {
+      method: "post",
+      path: "/v1/improvements/{id}/reopen",
+      operationId: "reopenImprovement",
+      summary: "Reopen a hosted improvement opportunity",
+      tags: ["Improvements"],
+      security: memberBearerAuth,
+      params: ImprovementParamsSchema,
+      responses: {
+        "200": { description: "Reopened improvement opportunity.", schema: improvementResponse },
+        "400": { description: "Invalid improvement id.", schema: apiError },
+        "401": { description: "Member token is invalid.", schema: apiError },
+        "404": { description: "Improvement opportunity was not found or reopen is unavailable.", schema: apiError },
+      },
+    },
+    {
+      method: "post",
+      path: "/v1/improvements/{id}/snooze",
+      operationId: "snoozeImprovement",
+      summary: "Snooze a hosted improvement opportunity",
+      tags: ["Improvements"],
+      security: memberBearerAuth,
+      params: ImprovementParamsSchema,
+      requestBody: improvementSnoozeBody,
+      responses: {
+        "200": { description: "Snoozed improvement opportunity.", schema: improvementResponse },
+        "400": { description: "Invalid improvement id or snooze timestamp.", schema: apiError },
+        "401": { description: "Member token is invalid.", schema: apiError },
+        "404": { description: "Improvement opportunity was not found or snooze is unavailable.", schema: apiError },
+      },
+    },
+    {
+      method: "get",
+      path: "/v1/projects/{id}/improvements/{improvementId}/bundle",
+      operationId: "getImprovementBundle",
+      summary: "Get the hosted bundle for an improvement opportunity",
+      tags: ["Improvements"],
+      security: anyMemberAuth,
+      params: ProjectImprovementParamsSchema,
+      responses: {
+        "200": {
+          description: "Improvement bundle document or generation status.",
+          schema: { oneOf: [bundleResponse, bundlePending, bundleFailed] },
+        },
+        "400": { description: "Invalid project or improvement id.", schema: apiError },
+        "401": { description: "Authentication is invalid.", schema: apiError },
+        "404": { description: "Project or improvement opportunity was not found.", schema: apiError },
       },
     },
     {
@@ -1703,6 +1810,38 @@ function buildPublicApiOperations(): OperationSpec[] {
         "401": { description: "Authentication is invalid.", schema: apiError },
         "403": { description: "Owner access is required.", schema: apiError },
         "404": { description: "Project was not found or capture policy is unavailable.", schema: apiError },
+      },
+    },
+    {
+      method: "get",
+      path: "/v1/projects/{id}/improvement-settings",
+      operationId: "getImprovementSettings",
+      summary: "Get automated improvement settings for a project",
+      tags: ["Improvements"],
+      security: anyMemberAuth,
+      params: ProjectParamsSchema,
+      responses: {
+        "200": { description: "Automated improvement settings.", schema: improvementSettingsResponse },
+        "400": { description: "Invalid project id.", schema: apiError },
+        "401": { description: "Authentication is invalid.", schema: apiError },
+        "404": { description: "Project was not found.", schema: apiError },
+      },
+    },
+    {
+      method: "patch",
+      path: "/v1/projects/{id}/improvement-settings",
+      operationId: "updateImprovementSettings",
+      summary: "Update automated improvement settings for a project",
+      tags: ["Improvements"],
+      security: anyMemberAuth,
+      params: ProjectParamsSchema,
+      requestBody: improvementSettingsUpdate,
+      responses: {
+        "200": { description: "Updated automated improvement settings.", schema: improvementSettingsResponse },
+        "400": { description: "Invalid project id or request body.", schema: apiError },
+        "401": { description: "Authentication is invalid.", schema: apiError },
+        "403": { description: "Owner/admin access or an eligible paid tier is required.", schema: apiError },
+        "404": { description: "Project was not found or improvement settings are unavailable.", schema: apiError },
       },
     },
     {

@@ -4,6 +4,7 @@ import { generateProbeTriggerToken } from "../../auth/src/index.js";
 import { getTierCapabilities, type TierName } from "../../shared-types/src/index.js";
 import { buildBillableIncidentEventsPredicateSql, getRequiredStringField } from "./helpers.js";
 import { deriveIncidentReasonFromSignal } from "./incident-reason.js";
+import { pruneRetainedBundleOwnersForProject } from "./retained-bundle-pruning.js";
 import type {
   AlertRuleRecord,
   BuildBundleJob,
@@ -3036,47 +3037,8 @@ export function createPostgresMetadataStore(db: Queryable): PostgresMetadataStor
       );
     },
 
-    async pruneRetainedIncidentsForProject(input): Promise<Array<{ project_id: string; incident_id: string }>> {
-      const result = await db.query<{ project_id: string; incident_id: string }>(
-        `
-          WITH organization_scope AS (
-            SELECT organization_id
-            FROM projects
-            WHERE id = $1::uuid
-            LIMIT 1
-          ),
-          ranked_incidents AS (
-            SELECT
-              i.id AS incident_id,
-              i.project_id AS project_id,
-              MAX(bg.created_at) AS latest_bundle_created_at,
-              ROW_NUMBER() OVER (
-                ORDER BY MAX(bg.created_at) DESC, i.id DESC
-              ) AS bundle_rank
-            FROM bundle_generations bg
-            JOIN incidents i ON i.id = bg.incident_id
-            JOIN projects p ON p.id = i.project_id
-            JOIN organization_scope scope ON scope.organization_id = p.organization_id
-            GROUP BY i.id, i.project_id
-          ),
-          incidents_to_delete AS (
-            SELECT incident_id, project_id
-            FROM ranked_incidents
-            WHERE bundle_rank > $2::int
-          ),
-          deleted AS (
-            DELETE FROM incidents i
-            USING incidents_to_delete target
-            WHERE i.id = target.incident_id
-            RETURNING target.project_id::text AS project_id, target.incident_id::text AS incident_id
-          )
-          SELECT project_id, incident_id
-          FROM deleted
-        `,
-        [input.project_id, input.retained_bundle_limit]
-      );
-
-      return result.rows;
+    async pruneRetainedBundleOwnersForProject(input) {
+      return pruneRetainedBundleOwnersForProject(db, input);
     },
 
     async reserveBundleGeneration(input): Promise<{

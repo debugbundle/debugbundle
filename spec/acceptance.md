@@ -770,7 +770,7 @@ If CLI says something is healthy and MCP says something different, that is a pro
 ### AC-ANA-02: Free vs Paid Tier Analysis
 - **Given** a Free-tier user running local analysis
 - **Then** analysis uses only local bundles and the user’s own agent/LLM
-- **And** a Team-tier user receives automated improvement bundles generated cloud-side on every ingested event
+- **And** Solo and Team projects with automated improvements enabled receive deterministic cloud-generated improvement bundles only when supported telemetry crosses configured thresholds and dedupe gates
 
 ---
 

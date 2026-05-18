@@ -196,6 +196,7 @@ describe("resolvePolicy", () => {
 describe("capture policy response schema", () => {
   it("accepts resolved policy plus raw overrides", () => {
     expect(CapturePolicyResponseSchema.safeParse({
+      access_mode: "manage",
       policy: {
         preset: "investigative",
         capture_logs: "info",

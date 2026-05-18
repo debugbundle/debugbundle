@@ -210,7 +210,7 @@ export function createPostgresBillingStore(db: Queryable): BillingStore {
         readCount(
           db,
           `
-            SELECT COUNT(DISTINCT bg.incident_id)::int AS count
+            SELECT COUNT(DISTINCT COALESCE(bg.incident_id::text, bg.improvement_opportunity_id::text))::int AS count
             FROM bundle_generations bg
             JOIN projects p ON p.id = bg.project_id
             WHERE p.organization_id = $1

@@ -2566,6 +2566,49 @@ describe("postgres metadata store", () => {
     expect(query.mock.calls[0]?.[0]).toContain("INSERT INTO bundle_generations");
   });
 
+  it("should prune retained bundle owners across incident and improvement keyspaces", async (): Promise<void> => {
+    const query = vi.fn().mockResolvedValue({
+      rows: [
+        {
+          owner_type: "incident",
+          project_id: "proj_old",
+          incident_id: "inc_old",
+          improvement_opportunity_id: null
+        },
+        {
+          owner_type: "improvement",
+          project_id: "proj_other",
+          incident_id: null,
+          improvement_opportunity_id: "imp_old"
+        }
+      ]
+    });
+    const store = createPostgresMetadataStore({ query });
+    expect(store.pruneRetainedBundleOwnersForProject).toBeDefined();
+
+    const pruned = await store.pruneRetainedBundleOwnersForProject!({
+      project_id: "proj_123",
+      retained_bundle_limit: 450
+    });
+
+    expect(pruned).toEqual([
+      {
+        owner_type: "incident",
+        project_id: "proj_old",
+        incident_id: "inc_old",
+        improvement_opportunity_id: null
+      },
+      {
+        owner_type: "improvement",
+        project_id: "proj_other",
+        incident_id: null,
+        improvement_opportunity_id: "imp_old"
+      }
+    ]);
+    expect(String(query.mock.calls[0]?.[0] ?? "")).toContain("DELETE FROM incidents");
+    expect(String(query.mock.calls[0]?.[0] ?? "")).toContain("DELETE FROM improvement_opportunities");
+  });
+
   it("should aggregate weekly project report summary from bundle history and incident activity", async (): Promise<void> => {
     const query = vi.fn().mockResolvedValue({
       rows: [

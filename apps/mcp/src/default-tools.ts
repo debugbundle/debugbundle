@@ -11,6 +11,7 @@ import { analyzeCommand } from "../../cli/src/analyze-command.js";
 import { createCliHttpClient } from "../../cli/src/auth-context.js";
 import { readCliAuthState } from "../../cli/src/auth-state.js";
 import { createCapturePolicyApi } from "../../cli/src/capture-policy-commands.js";
+import { createImprovementSettingsApi } from "../../cli/src/improvement-settings-commands.js";
 import { createMemberApi } from "../../cli/src/member-commands.js";
 import { createProbeApi } from "../../cli/src/probe-commands.js";
 import { doctorCommand } from "../../cli/src/doctor-command.js";
@@ -22,6 +23,8 @@ import { createAnalyzeMcpTools } from "./analyze-tools.js";
 import { createBillingMcpTools } from "./billing-tools.js";
 import { createCapturePolicyMcpTools } from "./capture-policy-tools.js";
 import { createGitHubMcpTools } from "./github-tools.js";
+import { createImprovementMcpTools } from "./improvement-tools.js";
+import { createImprovementSettingsMcpTools } from "./improvement-settings-tools.js";
 import { createMemberMcpTools } from "./member-tools.js";
 import { createProbeMcpTools } from "./probe-tools.js";
 import { createProjectMcpTools } from "./project-tools.js";
@@ -82,6 +85,7 @@ export async function createDefaultMcpTools(input: { apiBaseUrl?: string } = {})
         ...retrievalApi,
         getLogs: (requestInput) => retrievalApi.listLogs(requestInput)
       }),
+      ...createImprovementMcpTools(retrievalApi),
       ...createServicesMcpTools(retrievalApi),
       ...createTokenMcpTools(createTokenManagementApi(httpClient)),
       ...createWebhookMcpTools(createWebhookApi(httpClient)),
@@ -90,6 +94,7 @@ export async function createDefaultMcpTools(input: { apiBaseUrl?: string } = {})
       ...createAlertMcpTools(createAlertApi(httpClient)),
       ...createProjectMcpTools(createProjectManagementApi(httpClient)),
       ...createCapturePolicyMcpTools(createCapturePolicyApi(httpClient)),
+      ...createImprovementSettingsMcpTools(createImprovementSettingsApi(httpClient)),
       ...createProbeMcpTools(createProbeApi(httpClient)),
       ...createBillingMcpTools(createBillingApi(httpClient)),
       ...createMemberMcpTools(createMemberApi(httpClient)),

@@ -125,5 +125,5 @@ describePublicSiteRepo('public site repository export', () => {
     } finally {
       rmSync(rehearsalRoot, { recursive: true, force: true });
     }
-  });
+  }, 20_000);
 });

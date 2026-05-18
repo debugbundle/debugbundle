@@ -37,7 +37,7 @@ export const TIER_CAPABILITIES = {
     remote_probes: true,
     github_automation: true,
     slack_integration: false,
-    cloud_improvement_bundles: false,
+    cloud_improvement_bundles: true,
     shared_dashboards: false,
     member_invites: false,
     included_capacity_units: 3,

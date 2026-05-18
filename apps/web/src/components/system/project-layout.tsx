@@ -12,6 +12,7 @@ import { getProjectEffectiveRole, getProjectRelationship } from "../../lib/proje
 const PROJECT_TABS = [
   { value: "overview", label: "Overview", suffix: "" },
   { value: "incidents", label: "Incidents", suffix: "/incidents" },
+  { value: "improvements", label: "Improvements", suffix: "/improvements" },
   { value: "bundles", label: "Bundles", suffix: "/bundles" },
   { value: "alerts", label: "Alerts", suffix: "/alerts" },
   { value: "webhooks", label: "Webhooks", suffix: "/webhooks" },

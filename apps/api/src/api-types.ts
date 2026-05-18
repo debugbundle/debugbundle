@@ -1,4 +1,10 @@
-import type { CapturePolicyRecord, CapturePolicyUpdate, EventEnvelope } from "../../../packages/shared-types/src/index.js";
+import type {
+  CapturePolicyRecord,
+  CapturePolicyUpdate,
+  EventEnvelope,
+  ImprovementSettings,
+  ImprovementSettingsUpdate
+} from "../../../packages/shared-types/src/index.js";
 import type { AuthEmailSender, GitHubCliAuthService, WebSessionAuthService } from "../../../packages/auth/src/index.js";
 import type {
   AccountDataExportRecord,
@@ -18,6 +24,7 @@ import type {
   ProjectTokenRecord,
   SlackDestinationRecord,
   IncidentRetrievalRecord,
+  ImprovementRetrievalRecord,
   RemoveProjectMemberResult,
   ServiceRetrievalRecord,
   UpdateProjectMemberRoleResult,
@@ -250,6 +257,49 @@ export interface ApiDependencies {
       actor_user_id: string;
       user_id: string;
     }): Promise<RemoveProjectMemberResult | null>;
+  } | undefined;
+  improvementSettingsManagement?: {
+    getImprovementSettingsForProject(input: {
+      organization_id: string;
+      project_id: string;
+    }): Promise<ImprovementSettings | null>;
+    updateImprovementSettingsForProject(input: {
+      organization_id: string;
+      project_id: string;
+      update: ImprovementSettingsUpdate;
+    }): Promise<ImprovementSettings | null>;
+  } | undefined;
+  improvementManagement?: {
+    listImprovementsForOrganization(input: {
+      organization_id: string;
+      project_id?: string;
+      environment?: string;
+      service?: string;
+      status?: "open" | "resolved" | "snoozed";
+      severity?: "low" | "medium" | "high" | "critical";
+      kind?: "warning_hotspot" | "slow_request" | "request_failure_pattern" | "recurring_incident" | "post_deploy_regression";
+      cursor?: { last_detected_at: string; improvement_id: string };
+      limit: number;
+    }): Promise<ImprovementRetrievalRecord[]>;
+    getImprovementForOrganization(input: {
+      organization_id: string;
+      improvement_id: string;
+    }): Promise<ImprovementRetrievalRecord | null>;
+    resolveImprovementForOrganization?(input: {
+      organization_id: string;
+      improvement_id: string;
+      resolved_by_member_id: string;
+      resolved_at: string;
+    }): Promise<ImprovementRetrievalRecord | null>;
+    reopenImprovementForOrganization?(input: {
+      organization_id: string;
+      improvement_id: string;
+    }): Promise<ImprovementRetrievalRecord | null>;
+    snoozeImprovementForOrganization?(input: {
+      organization_id: string;
+      improvement_id: string;
+      snoozed_until: string;
+    }): Promise<ImprovementRetrievalRecord | null>;
   } | undefined;
   githubManagement?: {
     getInstallUrl(): Promise<string>;
