@@ -2358,7 +2358,7 @@ describe("web app — management routes", () => {
     expect(screen.getAllByRole("button", { name: /create alert rule/i }).length).toBe(2);
   });
 
-  it("shows organization overview summary with entry points into project sharing and billing", async () => {
+  it("redirects the retired organization route back to projects", async () => {
     const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
       const url = requestUrl(input);
 
@@ -2399,16 +2399,11 @@ describe("web app — management routes", () => {
 
     render(<App initialEntries={["/organization"]} />);
 
-    expect(await screen.findByRole("heading", { name: /organization/i, level: 1 })).toBeInTheDocument();
-    expect(screen.getAllByText(/org_123/i).length).toBeGreaterThan(0);
-    expect(await screen.findByText(/2 active projects\. 1 project is shared\./i)).toBeInTheDocument();
-    expect(await screen.findByText(/team plan with 2 active projects and 17 allowance units/i)).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: /open projects/i })).toHaveAttribute("href", "/projects");
-    expect(screen.getByRole("link", { name: /open billing management/i })).toHaveAttribute("href", "/billing");
+    expect(await screen.findByRole("heading", { name: /projects/i, level: 1 })).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: /organization/i, level: 1 })).not.toBeInTheDocument();
   });
 
-  it("routes the app-shell organization navigation through the overview and shows member-role gates", async () => {
-    const user = userEvent.setup();
+  it("does not show an organization entry in the app sidebar", async () => {
     const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
       const url = requestUrl(input);
 
@@ -2433,17 +2428,13 @@ describe("web app — management routes", () => {
 
     vi.stubGlobal("fetch", fetchMock);
 
-    render(<App initialEntries={["/dashboard"]} />);
+    render(<App initialEntries={["/projects"]} />);
 
-    await user.click(await screen.findByRole("link", { name: /organization/i }));
-
-    expect(await screen.findByRole("heading", { name: /organization/i, level: 1 })).toBeInTheDocument();
-    expect(await screen.findAllByText(/1 active project/i)).toHaveLength(2);
-    expect(await screen.findByText(/manage sharing from each project/i)).toBeInTheDocument();
-    expect(await screen.findByText(/owner permissions are required to manage billing/i)).toBeInTheDocument();
+    await screen.findByRole("heading", { name: /projects/i, level: 1 });
+    expect(screen.queryByRole("link", { name: /^organization$/i })).not.toBeInTheDocument();
   });
 
-  it("hides organization navigation and gates organization routes outside the Team tier", async () => {
+  it("keeps the organization entry hidden outside the Team tier as well", async () => {
     const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
       const url = requestUrl(input);
 
@@ -2470,7 +2461,7 @@ describe("web app — management routes", () => {
 
     render(<App initialEntries={["/organization"]} />);
 
-    expect(await screen.findByRole("link", { name: /review plan options/i })).toHaveAttribute("href", "/billing");
+    expect(await screen.findByRole("heading", { name: /projects/i, level: 1 })).toBeInTheDocument();
     expect(screen.queryByRole("link", { name: /^organization$/i })).not.toBeInTheDocument();
   });
 
@@ -3199,38 +3190,6 @@ describe("web app — management routes", () => {
     expect(screen.getByRole("dialog")).toBeInTheDocument();
   });
 
-  it("shows owner-scope warnings on the organization overview when billing is forbidden", async () => {
-    const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
-      const url = requestUrl(input);
-
-      if (url.endsWith("/v1/auth/session")) {
-        return jsonResponse(200, {
-          session: createSession({ organization_plan: "team", role: "owner" })
-        });
-      }
-
-      if (url.endsWith("/v1/projects") && init?.method === undefined) {
-        return jsonResponse(200, {
-          projects: [createProject({ organization_plan: "team" })]
-        });
-      }
-
-      if (url.endsWith("/v1/billing") && init?.method === undefined) {
-        return jsonResponse(403, { error: "forbidden" });
-      }
-
-      return jsonResponse(404, { error: "not_found" });
-    });
-
-    vi.stubGlobal("fetch", fetchMock);
-
-    render(<App initialEntries={["/organization"]} />);
-
-    expect(await screen.findByRole("heading", { name: /organization/i, level: 1 })).toBeInTheDocument();
-    expect(await screen.findByText(/manage sharing from each project/i)).toBeInTheDocument();
-    expect(screen.getByText(/owner permissions are required to manage billing/i)).toBeInTheDocument();
-  });
-
   it("shows a canceled checkout return dialog on the billing page without confirming checkout", async () => {
     const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
       const url = requestUrl(input);
@@ -3395,50 +3354,6 @@ describe("web app — management routes", () => {
     await user.click(screen.getByRole("button", { name: /increase capacity now/i }));
 
     expect(await screen.findByText(/choose a unit count above your current purchased quantity/i)).toBeInTheDocument();
-  });
-
-  it("renders singular organization overview summaries for one project and three allowance units", async () => {
-    const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
-      const url = requestUrl(input);
-
-      if (url.endsWith("/v1/auth/session")) {
-        return jsonResponse(200, {
-          session: createSession({ organization_plan: "team" })
-        });
-      }
-
-      if (url.endsWith("/v1/projects") && init?.method === undefined) {
-        return jsonResponse(200, {
-          projects: [createProject({ organization_plan: "team" })]
-        });
-      }
-
-      if (url.endsWith("/v1/billing") && init?.method === undefined) {
-        return jsonResponse(200, {
-          billing: createBillingSummary({
-            plan: "solo",
-            active_projects: 1,
-            capacity_units: {
-              total: 3,
-              included: 3,
-              additional_purchased: 0,
-              pending_reduction: null
-            }
-          })
-        });
-      }
-
-      return jsonResponse(404, { error: "not_found" });
-    });
-
-    vi.stubGlobal("fetch", fetchMock);
-
-    render(<App initialEntries={["/organization"]} />);
-
-    expect(await screen.findByRole("heading", { name: /organization/i, level: 1 })).toBeInTheDocument();
-    expect(await screen.findByText(/^1 active project$/i)).toBeInTheDocument();
-    expect(await screen.findByText(/1 active project\. Sharing is managed from each project's Members tab\./i)).toBeInTheDocument();
-    expect(await screen.findByText(/solo plan with 1 active project and 3 allowance units/i)).toBeInTheDocument();
   });
 
   it("shows every project incident empty state when the scoped status filter changes", async () => {

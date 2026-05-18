@@ -201,8 +201,6 @@ app.debugbundle.com
 │   ├── Create token
 │   ├── Show plaintext once state
 │   └── Revoke token
-├── /organization
-│   └── Organization overview
 ├── /settings
 │   ├── Account profile
 │   ├── Password change
@@ -250,7 +248,7 @@ The tree above breaks into five UX zones:
    - login, signup, shared email-code verification, and GitHub callback under `app.`
 
 3. Signed-in app shell
-   - a minimal operational surface rooted at `/dashboard`, `/billing`, `/projects`, `/member-tokens`, `/organization`, and `/settings`
+   - a minimal operational surface rooted at `/dashboard`, `/billing`, `/projects`, `/member-tokens`, and `/settings`
 
 4. Documentation product
    - concepts, install guides, versioned product docs, reference docs, and agent workflow docs under `/docs`
@@ -270,7 +268,7 @@ Included in V1:
 - auth pages under `app.`
 - billing and usage pages in the app
 - project and token management
-- organization/member management
+- project member management
 - webhook and alert management pages
 - GitHub integration management (Solo+ only): connection, repo assignment, dispatch rules, delivery history
 - docs landing, concepts, install guides, versioned docs, and references

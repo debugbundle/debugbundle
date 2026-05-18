@@ -54,6 +54,7 @@ export interface ImprovementOpportunityRecord {
   summary: string;
   occurrence_count: number;
   evidence: Record<string, unknown>;
+  related_incident_ids: string[];
   first_detected_at: string;
   last_detected_at: string;
   last_source_event_id: string | null;
@@ -213,6 +214,7 @@ function buildImprovementSelectClause(): string {
     io.summary,
     io.occurrence_count,
     io.evidence,
+    io.related_incident_ids::text[] AS related_incident_ids,
     io.first_detected_at::text AS first_detected_at,
     io.last_detected_at::text AS last_detected_at,
     io.resolved_at::text AS resolved_at,
@@ -510,6 +512,7 @@ export function createPostgresImprovementOpportunityStore(db: Queryable): Improv
             updated.summary,
             updated.occurrence_count,
             updated.evidence,
+            updated.related_incident_ids::text[] AS related_incident_ids,
             updated.first_detected_at::text AS first_detected_at,
             updated.last_detected_at::text AS last_detected_at,
             updated.resolved_at::text AS resolved_at,
@@ -564,6 +567,7 @@ export function createPostgresImprovementOpportunityStore(db: Queryable): Improv
             updated.summary,
             updated.occurrence_count,
             updated.evidence,
+            updated.related_incident_ids::text[] AS related_incident_ids,
             updated.first_detected_at::text AS first_detected_at,
             updated.last_detected_at::text AS last_detected_at,
             updated.resolved_at::text AS resolved_at,
@@ -618,6 +622,7 @@ export function createPostgresImprovementOpportunityStore(db: Queryable): Improv
             updated.summary,
             updated.occurrence_count,
             updated.evidence,
+            updated.related_incident_ids::text[] AS related_incident_ids,
             updated.first_detected_at::text AS first_detected_at,
             updated.last_detected_at::text AS last_detected_at,
             updated.resolved_at::text AS resolved_at,
@@ -657,6 +662,7 @@ export function createPostgresImprovementOpportunityStore(db: Queryable): Improv
             io.summary,
             io.occurrence_count,
             io.evidence,
+            io.related_incident_ids::text[] AS related_incident_ids,
             io.first_detected_at::text AS first_detected_at,
             io.last_detected_at::text AS last_detected_at,
             io.last_source_event_id::text AS last_source_event_id,

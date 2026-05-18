@@ -138,7 +138,7 @@ describe("web app - auth routes", () => {
     expect(await screen.findByRole("heading", { name: /continue to debugbundle/i })).toBeInTheDocument();
   });
 
-  it("gates team-only organization routes for solo plans", async () => {
+  it("redirects the retired organization route to projects", async () => {
     const fetchMock = vi.fn((input: RequestInfo | URL) => {
       const url = requestUrl(input);
 
@@ -163,8 +163,8 @@ describe("web app - auth routes", () => {
 
     render(<App initialEntries={["/organization"]} />);
 
-    expect(await screen.findByText(/shared workspace requires team/i)).toBeInTheDocument();
-    expect(screen.getByText(/shared workspace views and project sharing are only available on team/i)).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: /projects/i, level: 1 })).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: /organization/i, level: 1 })).not.toBeInTheDocument();
   });
 
   it("requests and verifies an email code from the login screen before landing on the dashboard", async () => {

@@ -207,7 +207,7 @@ Last updated: 2026-03-27
 
 **FR-RET-08:** `GET /v1/improvements/{id}` plus `POST /v1/improvements/{id}/resolve|reopen` — hosted improvement metadata and lifecycle mutations.
 
-**FR-RET-09:** `GET /v1/projects/{projectId}/improvements/{improvementId}/bundle` — hosted improvement bundle artifact. Return `{"status": "pending"}` if still processing and `{"status": "failed", "reason": "..."}` if generation failed or no artifact is available.
+**FR-RET-09:** `GET /v1/projects/{projectId}/improvements/{improvementId}/bundle` — hosted improvement bundle artifact. Return `{"status": "pending"}` if still processing and `{"status": "failed", "reason": "..."}` if generation failed or no artifact is available. Incident-derived improvement opportunities that are covered by existing failure bundles must return `{"status": "failed", "reason": "covered_by_incident_bundle", "related_incident_ids": [...]}` when no standalone improvement artifact exists.
 
 **FR-RET-10:** Incident and improvement retrieval responses must include denormalized `project_name` and `service_name` values so API/CLI/MCP/web clients do not need follow-up lookups to render list or detail views.
 

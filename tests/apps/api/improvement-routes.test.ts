@@ -81,6 +81,7 @@ function createImprovementRecord(overrides: Partial<Record<string, unknown>> = {
       kind: "warning_hotspot",
       normalized_message: "payment provider warning"
     },
+    related_incident_ids: [],
     first_detected_at: "2026-05-18T12:00:00.000Z",
     last_detected_at: "2026-05-18T12:30:00.000Z",
     resolved_at: null,
@@ -471,10 +472,22 @@ describe("improvement routes", () => {
       bundle_generation_number: 2,
       bundle_failure_reason: "bundle_generation_failed"
     });
+    const incidentCovered = createImprovementRecord({
+      improvement_id: "imp_incident_covered",
+      kind: "recurring_incident",
+      bundle_generation_number: 0,
+      bundle_failure_reason: null,
+      related_incident_ids: ["00000000-0000-0000-0000-000000000501"],
+      evidence: {
+        kind: "recurring_incident",
+        incident_id: "00000000-0000-0000-0000-000000000501"
+      }
+    });
     const getImprovementForOrganization = vi
       .fn()
       .mockResolvedValueOnce(notGenerated)
       .mockResolvedValueOnce(failedBundle)
+      .mockResolvedValueOnce(incidentCovered)
       .mockResolvedValueOnce(createImprovementRecord({ improvement_id: "imp_unavailable" }));
     const app = createDependencies({
       improvementManagement: {
@@ -486,6 +499,7 @@ describe("improvement routes", () => {
       objectStoreReader: {
         getObject: vi
           .fn()
+          .mockRejectedValueOnce(new Error("s3_object_not_found"))
           .mockRejectedValueOnce(new Error("s3_object_not_found"))
           .mockRejectedValueOnce(new Error("s3_object_not_found"))
           .mockRejectedValueOnce(new Error("boom"))
@@ -500,6 +514,11 @@ describe("improvement routes", () => {
     const failedResponse = await app.inject({
       method: "GET",
       url: "/v1/projects/00000000-0000-0000-0000-000000000001/improvements/imp_failed/bundle",
+      headers: { authorization: "Bearer dbundle_mem_test_token" }
+    });
+    const incidentCoveredResponse = await app.inject({
+      method: "GET",
+      url: "/v1/projects/00000000-0000-0000-0000-000000000001/improvements/imp_incident_covered/bundle",
       headers: { authorization: "Bearer dbundle_mem_test_token" }
     });
     const unavailableResponse = await app.inject({
@@ -517,6 +536,12 @@ describe("improvement routes", () => {
     expect(failedResponse.json()).toEqual({
       status: "failed",
       reason: "bundle_generation_failed"
+    });
+    expect(incidentCoveredResponse.statusCode).toBe(200);
+    expect(incidentCoveredResponse.json()).toEqual({
+      status: "failed",
+      reason: "covered_by_incident_bundle",
+      related_incident_ids: ["00000000-0000-0000-0000-000000000501"]
     });
     expect(unavailableResponse.statusCode).toBe(200);
     expect(unavailableResponse.json()).toEqual({

@@ -51,6 +51,7 @@ function formatImprovementDetail(improvement: {
   project_name: string;
   last_detected_at: string;
   resolved_at: string | null;
+  related_incident_ids?: string[];
 }): string {
   return [
     `Improvement: ${improvement.improvement_id}`,
@@ -64,6 +65,9 @@ function formatImprovementDetail(improvement: {
     `Confidence: ${improvement.confidence}`,
     `Occurrences: ${improvement.occurrence_count}`,
     `Last detected: ${improvement.last_detected_at}`,
+    ...(improvement.related_incident_ids === undefined || improvement.related_incident_ids.length === 0
+      ? []
+      : [`Related incidents: ${improvement.related_incident_ids.join(", ")}`]),
     ...(improvement.resolved_at === null ? [] : [`Resolved at: ${improvement.resolved_at}`]),
     `Summary: ${improvement.summary}`
   ].join("\n");

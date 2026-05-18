@@ -4,8 +4,7 @@ import {
   HomeIcon,
   KeySquareIcon,
   SparklesIcon,
-  SirenIcon,
-  UsersRoundIcon
+  SirenIcon
 } from "lucide-react";
 import { NavLink, useLocation } from "react-router-dom";
 
@@ -40,10 +39,6 @@ interface AppSidebarProps extends React.ComponentProps<typeof Sidebar> {
 
 export function AppSidebar({ session, onSignOut, ...props }: AppSidebarProps): JSX.Element {
   const location = useLocation();
-  const navigationItems =
-    session.organization_plan === "team"
-      ? [...navMain.slice(0, 3), { to: "/organization", label: "Organization", icon: UsersRoundIcon }, ...navMain.slice(3)]
-      : navMain;
 
   return (
     <Sidebar collapsible="icon" {...props}>
@@ -61,7 +56,7 @@ export function AppSidebar({ session, onSignOut, ...props }: AppSidebarProps): J
         <SidebarGroup>
           <SidebarGroupContent>
             <SidebarMenu className="gap-2">
-              {navigationItems.map((item) => (
+              {navMain.map((item) => (
                 <SidebarMenuItem key={item.to}>
                   <SidebarMenuButton
                     asChild

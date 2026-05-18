@@ -31,6 +31,7 @@ function createImprovement(overrides: Partial<ImprovementRecord> = {}): Improvem
       kind: "warning_hotspot",
       normalized_message: "payment provider warning"
     },
+    related_incident_ids: [],
     first_detected_at: "2026-05-18T12:00:00.000Z",
     last_detected_at: "2026-05-18T12:30:00.000Z",
     resolved_at: null,
@@ -494,20 +495,20 @@ describe("web app — improvements", () => {
     const user = userEvent.setup();
     const improvement = createImprovement({
       improvement_id: "imp_ready",
-      kind: "post_deploy_regression",
+      kind: "slow_request",
       status: "resolved",
       resolved_at: "2026-05-18T13:00:00.000Z"
     });
     const reopenedImprovement = createImprovement({
       improvement_id: improvement.improvement_id,
-      kind: "post_deploy_regression",
+      kind: "slow_request",
       status: "open",
       resolved_at: null,
       snoozed_until: null
     });
     const snoozedImprovement = createImprovement({
       improvement_id: improvement.improvement_id,
-      kind: "post_deploy_regression",
+      kind: "slow_request",
       status: "snoozed",
       resolved_at: null,
       snoozed_until: "2026-05-25T13:00:00.000Z"
@@ -571,8 +572,8 @@ describe("web app — improvements", () => {
 
     render(<App initialEntries={[`/projects/${improvement.project_id}/improvements/${improvement.improvement_id}`]} />);
 
-    expect(await screen.findByText(/post-deploy regression/i)).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: /improvement bundle/i })).toBeInTheDocument();
+    expect(await screen.findByText(/slow request/i)).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: /improvement bundle/i })).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: /^reopen$/i }));
     expect(await screen.findByRole("button", { name: /snooze 7 days/i })).toBeInTheDocument();
@@ -692,6 +693,49 @@ describe("web app — improvements", () => {
 
     expect(await screen.findByText(/request failure/i)).toBeInTheDocument();
     expect(await screen.findByText(/bundle not available/i)).toBeInTheDocument();
+  });
+
+  it("points incident-derived improvements at their related incident bundle", async () => {
+    const improvement = createImprovement({
+      improvement_id: "imp_incident_backed",
+      kind: "recurring_incident",
+      related_incident_ids: ["inc_123"]
+    });
+    const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = requestUrl(input);
+
+      if (url.endsWith("/v1/auth/session")) {
+        return jsonResponse(200, { session: createSession({ organization_plan: "solo" }) });
+      }
+      if (url.endsWith("/v1/projects") && init?.method === undefined) {
+        return jsonResponse(200, {
+          projects: [createProject({ project_id: improvement.project_id, organization_plan: "solo" })]
+        });
+      }
+      if (url.endsWith(`/v1/improvements/${improvement.improvement_id}`) && init?.method === undefined) {
+        return jsonResponse(200, { improvement });
+      }
+      if (url.endsWith(`/v1/projects/${improvement.project_id}/improvements/${improvement.improvement_id}/bundle`)) {
+        return jsonResponse(200, {
+          status: "failed",
+          reason: "covered_by_incident_bundle",
+          related_incident_ids: ["inc_123"]
+        });
+      }
+
+      return jsonResponse(404, { error: "not_found" });
+    });
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<App initialEntries={[`/projects/${improvement.project_id}/improvements/${improvement.improvement_id}`]} />);
+
+    expect(await screen.findByText(/recurring incident/i)).toBeInTheDocument();
+    expect(await screen.findByText(/use the related incident bundle/i)).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /open incident inc_123/i })).toHaveAttribute(
+      "href",
+      `/projects/${improvement.project_id}/incidents/inc_123`
+    );
   });
 
   it("keeps the detail page stable when reopen, resolve, snooze, and copy actions fail", async () => {

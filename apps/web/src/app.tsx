@@ -1,4 +1,4 @@
-import { CreditCardIcon, KeySquareIcon, LoaderCircleIcon, PlusIcon } from "lucide-react";
+import { KeySquareIcon, LoaderCircleIcon, PlusIcon } from "lucide-react";
 import React, { useEffect, useRef, useState } from "react";
 import { BrowserRouter, Link, MemoryRouter, Navigate, Outlet, Route, Routes, useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { Toaster } from "sonner";
@@ -55,7 +55,6 @@ import { ImprovementsPage } from "./pages/improvements-page.js";
 import { ProjectsPage, ProjectTokensPage } from "./pages/management-pages.js";
 import { IncidentsPage } from "./pages/incidents-page.js";
 import { IncidentDetailPage } from "./pages/incident-detail-page.js";
-import { OrganizationOverviewPage } from "./pages/organization-overview-page.js";
 import { ProjectLayout } from "./components/system/project-layout.js";
 import { ProjectAlertsPage } from "./pages/project-alerts-page.js";
 import { ProjectInvitePage } from "./pages/project-invite-page.js";
@@ -150,17 +149,7 @@ export function App({ initialEntries }: AppProps): JSX.Element {
               <Route path="/billing" element={<BillingPage />} />
               <Route path="/projects" element={<ProjectsPage />} />
               {isSystemEmailReviewEnabled() ? <Route path="/__dev/system-emails" element={<SystemEmailReviewPage />} /> : null}
-              <Route
-                path="/organization"
-                element={
-                  <TeamPlanGate
-                    title="Shared workspace requires Team"
-                    description="Shared workspace views and project sharing are only available on Team. Free and Solo stay focused on project setup."
-                  >
-                    <OrganizationOverviewPage />
-                  </TeamPlanGate>
-                }
-              />
+              <Route path="/organization" element={<Navigate replace to="/projects" />} />
               <Route path="/projects/:projectId" element={<ProjectLayout />}>
                 <Route index element={<ProjectOverviewPage />} />
                 <Route path="incidents" element={<ProjectIncidentsPage />} />
@@ -199,17 +188,7 @@ export function App({ initialEntries }: AppProps): JSX.Element {
               <Route path="/billing" element={<BillingPage />} />
               <Route path="/projects" element={<ProjectsPage />} />
               {isSystemEmailReviewEnabled() ? <Route path="/__dev/system-emails" element={<SystemEmailReviewPage />} /> : null}
-              <Route
-                path="/organization"
-                element={
-                  <TeamPlanGate
-                    title="Shared workspace requires Team"
-                    description="Shared workspace views and project sharing are only available on Team. Free and Solo stay focused on project setup."
-                  >
-                    <OrganizationOverviewPage />
-                  </TeamPlanGate>
-                }
-              />
+              <Route path="/organization" element={<Navigate replace to="/projects" />} />
               <Route path="/projects/:projectId" element={<ProjectLayout />}>
                 <Route index element={<ProjectOverviewPage />} />
                 <Route path="incidents" element={<ProjectIncidentsPage />} />
@@ -286,37 +265,6 @@ function isPublicAuthPath(pathname: string): boolean {
 function RootRedirect(): JSX.Element {
   const { session } = useSession();
   return <Navigate replace to={session === null ? "/login" : "/dashboard"} />;
-}
-
-function TeamPlanGate({
-  title,
-  description,
-  children
-}: {
-  title: string;
-  description: string;
-  children: React.ReactNode;
-}): JSX.Element {
-  const { session } = useSession();
-
-  if (session === null) {
-    return <Navigate replace to="/login" />;
-  }
-
-  if (session.organization_plan === "team") {
-    return <>{children}</>;
-  }
-
-  return (
-    <CalloutCard eyebrow="Team plan" title={title} description={description} tone="warning">
-      <Button asChild type="button" variant="outline">
-        <Link to="/billing">
-          <CreditCardIcon data-icon="inline-start" />
-          Review plan options
-        </Link>
-      </Button>
-    </CalloutCard>
-  );
 }
 
 function ProtectedLayout(): JSX.Element {

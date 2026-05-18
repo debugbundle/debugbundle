@@ -747,7 +747,7 @@ export interface ImprovementRetrievalRecord extends Record<string, unknown> {
   service_runtime: string | null;
   service_framework: string | null;
   environment: string;
-  kind: "warning_hotspot";
+  kind: "warning_hotspot" | "slow_request" | "request_failure_pattern" | "recurring_incident" | "post_deploy_regression";
   status: "open" | "resolved" | "snoozed";
   severity: "low" | "medium" | "high" | "critical";
   confidence: number;
@@ -756,6 +756,7 @@ export interface ImprovementRetrievalRecord extends Record<string, unknown> {
   summary: string;
   occurrence_count: number;
   evidence: Record<string, unknown>;
+  related_incident_ids: string[];
   first_detected_at: string;
   last_detected_at: string;
   resolved_at: string | null;
@@ -1492,7 +1493,7 @@ export interface GitHubStore {
   }): Promise<GitHubDispatchDeliveryRecord | null>;
   listMatchingGitHubDispatchRules(input: {
     project_id: string;
-    event_type: "bundle.created" | "bundle.updated" | "bundle.reopened" | "incident.spike_detected";
+    event_type: "bundle.created" | "bundle.updated" | "bundle.reopened" | "improvement_bundle.created" | "incident.spike_detected";
     environment: string;
     service_name: string;
     severity: "low" | "medium" | "high" | "critical";

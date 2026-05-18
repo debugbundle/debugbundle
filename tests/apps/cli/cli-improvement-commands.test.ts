@@ -30,7 +30,8 @@ const baseImprovement = {
   occurrence_count: 7,
   summary: "Repeated warning log pattern detected.",
   last_detected_at: "2026-05-18T12:30:00.000Z",
-  resolved_at: null
+  resolved_at: null,
+  related_incident_ids: []
 };
 
 describe("cli improvement commands", () => {
@@ -63,6 +64,20 @@ describe("cli improvement commands", () => {
         getImprovement: vi.fn().mockResolvedValue(baseImprovement)
       }
     );
+    const incidentDetailResult = await getImprovementCommand(
+      {
+        bearerToken: "dbundle_mem_x",
+        improvementId: "imp_incident"
+      },
+      {
+        getImprovement: vi.fn().mockResolvedValue({
+          ...baseImprovement,
+          improvement_id: "imp_incident",
+          kind: "recurring_incident",
+          related_incident_ids: ["inc_123"]
+        })
+      }
+    );
 
     expect(listResult.exitCode).toBe(0);
     expect(listResult.output).toContain("imp_123 | medium | open | Warning hotspot: payment provider warning");
@@ -72,6 +87,7 @@ describe("cli improvement commands", () => {
     expect(detailResult.output).toContain("Project: Main App");
     expect(detailResult.output).toContain("Summary: Repeated warning log pattern detected.");
     expect(detailResult.output).not.toContain("Resolved at:");
+    expect(incidentDetailResult.output).toContain("Related incidents: inc_123");
   });
 
   it("renders empty list output and mutation or bundle results in json mode", async () => {

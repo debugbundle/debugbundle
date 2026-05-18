@@ -197,6 +197,7 @@ export interface ImprovementRecord {
   summary: string;
   occurrence_count: number;
   evidence: Record<string, unknown>;
+  related_incident_ids: string[];
   first_detected_at: string;
   last_detected_at: string;
   resolved_at: string | null;
@@ -1463,10 +1464,14 @@ export async function getIncidentBundle(incidentId: string): Promise<{ status: "
   return { status: "ready", bundle: body as BundleRecord };
 }
 
+export type ArtifactPendingOrFailedResponse =
+  | { status: "pending" }
+  | { status: "failed"; reason?: string; related_incident_ids?: string[] };
+
 export async function getImprovementBundle(
   projectId: string,
   improvementId: string
-): Promise<{ status: "ready"; bundle: BundleRecord } | { status: "pending" | "failed" }> {
+): Promise<{ status: "ready"; bundle: BundleRecord } | ArtifactPendingOrFailedResponse> {
   const response = await fetch(`${API_BASE}/v1/projects/${projectId}/improvements/${improvementId}/bundle`, {
     credentials: "include"
   });
@@ -1478,7 +1483,7 @@ export async function getImprovementBundle(
   const body = await response.json() as unknown;
 
   if (isArtifactPendingOrFailedResponse(body)) {
-    return { status: body.status };
+    return body;
   }
 
   return { status: "ready", bundle: body as BundleRecord };
@@ -1502,7 +1507,7 @@ export async function getIncidentReproduction(incidentId: string): Promise<{ sta
   return { status: "ready", reproduction: body as Record<string, unknown> };
 }
 
-function isArtifactPendingOrFailedResponse(value: unknown): value is { status: "pending" | "failed" } {
+function isArtifactPendingOrFailedResponse(value: unknown): value is ArtifactPendingOrFailedResponse {
   if (typeof value !== "object" || value === null || !("status" in value)) {
     return false;
   }

@@ -17,9 +17,19 @@ import {
 } from "../schemas.js";
 
 function buildBundlePendingOrFailureState(input: {
+  kind: string;
+  relatedIncidentIds: string[];
   bundleGenerationNumber: number;
   bundleFailureReason: string | null;
-}): { status: "pending" } | { status: "failed"; reason: string } {
+}): { status: "pending" } | { status: "failed"; reason: string; related_incident_ids?: string[] } {
+  if (input.kind === "recurring_incident" || input.kind === "post_deploy_regression") {
+    return {
+      status: "failed",
+      reason: "covered_by_incident_bundle",
+      related_incident_ids: input.relatedIncidentIds
+    };
+  }
+
   if (input.bundleFailureReason !== null) {
     return {
       status: "failed",
@@ -237,6 +247,8 @@ export function registerImprovementRoutes(app: FastifyInstance, dependencies: Ap
       if (isObjectNotFoundError(error)) {
         return reply.status(200).send(
           buildBundlePendingOrFailureState({
+            kind: typeof improvement.kind === "string" ? improvement.kind : "",
+            relatedIncidentIds: Array.isArray(improvement.related_incident_ids) ? improvement.related_incident_ids : [],
             bundleGenerationNumber: improvement.bundle_generation_number,
             bundleFailureReason: improvement.bundle_failure_reason
           })

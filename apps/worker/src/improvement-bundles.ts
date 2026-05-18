@@ -514,84 +514,7 @@ async function buildHostedImprovementBundle(input: {
   }
 
   if (input.context.kind === "recurring_incident" || input.context.kind === "post_deploy_regression") {
-    const severity = input.context.severity;
-    const confidence = input.context.confidence;
-    const incidentTitle = typeof input.context.evidence["incident_title"] === "string" ? input.context.evidence["incident_title"] : input.context.title;
-    const regressionDeploy =
-      typeof input.context.evidence["regression_deploy"] === "object" && input.context.evidence["regression_deploy"] !== null
-        ? (input.context.evidence["regression_deploy"] as Record<string, unknown>)
-        : null;
-    const deploy =
-      regressionDeploy === null
-        ? null
-        : {
-            version: 1 as const,
-            commit_sha: typeof regressionDeploy["commit_sha"] === "string" ? regressionDeploy["commit_sha"] : null,
-            deploy_version: typeof regressionDeploy["version"] === "string" ? regressionDeploy["version"] : null,
-            branch: typeof regressionDeploy["branch"] === "string" ? regressionDeploy["branch"] : null,
-            deployed_at: typeof regressionDeploy["deployed_at"] === "string" ? regressionDeploy["deployed_at"] : null,
-            regression_window: true
-          };
-    const regressionSuspected = input.context.kind === "post_deploy_regression";
-
-    return BundleV1Schema.parse({
-      ...baseBundle,
-      signal: {
-        signal_id: input.context.opportunity_id,
-        signal_type: regressionSuspected ? "performance_issue" : "warning",
-        severity,
-        fingerprint: input.context.fingerprint,
-        first_seen_at: input.context.first_detected_at,
-        last_seen_at: input.context.last_detected_at,
-        occurrence_count: input.context.occurrence_count,
-        source_event_types: input.references.map((reference) => reference.event_type)
-      },
-      summary: {
-        title: input.context.title,
-        description: input.context.summary,
-        likely_cause: regressionSuspected
-          ? "The incident reappeared inside the deploy regression window."
-          : "The same incident has crossed the recurring-incident threshold.",
-        confidence,
-        recommended_action: regressionSuspected
-          ? "Compare the deploy diff against the incident fingerprint, verify the changed code path, and ship a targeted fix or rollback."
-          : "Review the incident bundle history, remove the recurring trigger, and add a guardrail that prevents the same fingerprint from reopening.",
-        severity,
-        error_type: "incident",
-        error_message: incidentTitle,
-        first_application_frame: null,
-        primary_signal: regressionSuspected ? "post_deploy_regression" : "recurring_incident",
-        signals: {
-          new_deploy: regressionSuspected,
-          regression_suspected: regressionSuspected,
-          customer_visible: severity === "high" || severity === "critical"
-        }
-      },
-      impact: {
-        affected_users_estimate: null,
-        affected_requests_estimate: input.context.occurrence_count,
-        business_criticality: severity,
-        customer_visible: severity === "high" || severity === "critical",
-        regression_suspected: regressionSuspected
-      },
-      context: {
-        error: null,
-        request: null,
-        response: null,
-        logs: null,
-        frontend: null,
-        environment: null,
-        deploy,
-        runtime: null,
-        git: null,
-        dependencies: null,
-        probe_data: {
-          version: 1,
-          items: []
-        },
-        device: null
-      }
-    });
+    throw new Error("incident_derived_improvement_bundle_not_supported");
   }
 
   const representativeRequest = await loadRepresentativeRequestContext({
@@ -877,7 +800,7 @@ export async function maybeGenerateHostedIncidentImprovementBundle(input: {
   const isPostDeployRegression = input.regressed_now && regressionDeploy !== null;
   const kind = isPostDeployRegression ? "post_deploy_regression" : "recurring_incident";
   const threshold = isPostDeployRegression ? 1 : thresholds.occurrence_threshold;
-  const recorded = await store.recordIncidentPattern({
+  await store.recordIncidentPattern({
     project_id: input.project_id,
     kind,
     service_name: input.service_name,
@@ -896,18 +819,9 @@ export async function maybeGenerateHostedIncidentImprovementBundle(input: {
     regression_deploy: regressionDeploy
   });
 
-  if (recorded === null || !recorded.should_generate_bundle) {
-    return;
-  }
-
-  await generateRecordedHostedImprovementBundle({
-    project_id: input.project_id,
-    event_id: input.event_id,
-    occurred_at: input.occurred_at,
-    recorded,
-    thresholds,
-    dependencies: input.dependencies
-  });
+  // Incident-derived opportunities are prioritization metadata for agents. The
+  // authoritative debugging context remains the related incident bundle, so V1
+  // intentionally does not generate duplicate improvement bundle artifacts here.
 }
 
 async function generateRecordedHostedImprovementBundle(input: {

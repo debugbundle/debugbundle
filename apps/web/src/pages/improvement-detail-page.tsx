@@ -193,16 +193,24 @@ export function ImprovementDetailPage(): JSX.Element {
             </CardContent>
           </Card>
 
-          <ImprovementBundleCard projectId={improvement.project_id} improvementId={improvement.improvement_id} />
+          <ImprovementBundleCard
+            projectId={improvement.project_id}
+            improvementId={improvement.improvement_id}
+            relatedIncidentIds={improvement.related_incident_ids}
+          />
         </>
       )}
     </div>
   );
 }
 
-function ImprovementBundleCard(input: { projectId: string; improvementId: string }): JSX.Element {
+function ImprovementBundleCard(input: { projectId: string; improvementId: string; relatedIncidentIds: string[] }): JSX.Element {
   const [bundleState, setBundleState] = useState<
-    { status: "loading" } | { status: "ready"; bundle: BundleRecord } | { status: "pending" | "failed" | "error" }
+    | { status: "loading" }
+    | { status: "ready"; bundle: BundleRecord }
+    | { status: "pending" }
+    | { status: "failed"; reason?: string; related_incident_ids?: string[] }
+    | { status: "error" }
   >({ status: "loading" });
   const showLoading = useDelayedVisibility(bundleState.status === "loading");
 
@@ -237,6 +245,31 @@ function ImprovementBundleCard(input: { projectId: string; improvementId: string
         title="Bundle is being generated"
         description="The hosted improvement bundle is still being written for this opportunity."
       />
+    );
+  }
+
+  if (bundleState.status === "failed" && bundleState.reason === "covered_by_incident_bundle") {
+    const incidentIds =
+      bundleState.related_incident_ids !== undefined && bundleState.related_incident_ids.length > 0
+        ? bundleState.related_incident_ids
+        : input.relatedIncidentIds;
+    return (
+      <CalloutCard
+        eyebrow="Incident-backed"
+        title="Use the related incident bundle"
+        description="This improvement is a prioritization signal for an existing incident, so DebugBundle does not generate a duplicate improvement bundle."
+        tone="warning"
+      >
+        {incidentIds.length > 0 ? (
+          <div className="flex flex-wrap gap-2">
+            {incidentIds.map((incidentId) => (
+              <Button key={incidentId} asChild type="button" variant="outline" size="sm">
+                <Link to={`/projects/${input.projectId}/incidents/${incidentId}`}>Open incident {incidentId}</Link>
+              </Button>
+            ))}
+          </div>
+        ) : null}
+      </CalloutCard>
     );
   }
 

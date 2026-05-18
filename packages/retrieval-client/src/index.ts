@@ -55,6 +55,7 @@ export const ImprovementSchema = z
     summary: z.string(),
     occurrence_count: z.number().int(),
     evidence: z.record(z.unknown()),
+    related_incident_ids: z.array(z.string()),
     first_detected_at: z.string(),
     last_detected_at: z.string(),
     resolved_at: z.string().nullable(),

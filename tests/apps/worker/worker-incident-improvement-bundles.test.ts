@@ -1,10 +1,6 @@
-import { gunzipSync } from "node:zlib";
-
 import { describe, expect, it, vi } from "vitest";
 
 import { maybeGenerateHostedIncidentImprovementBundle } from "../../../apps/worker/src/improvement-bundles.js";
-import { buildImprovementBundleObjectKey } from "../../../packages/storage/src/index.js";
-import { BundleV1Schema } from "../../../packages/shared-types/src/index.js";
 
 function createBaseStore(overrides: Record<string, unknown> = {}) {
   return {
@@ -81,7 +77,7 @@ function createBaseStore(overrides: Record<string, unknown> = {}) {
 }
 
 describe("worker incident improvement bundles", () => {
-  it("generates a recurring-incident improvement bundle when the threshold is reached", async () => {
+  it("records a recurring-incident improvement opportunity without generating a duplicate improvement bundle", async () => {
     const putObject = vi.fn().mockResolvedValue(undefined);
     const store = createBaseStore();
 
@@ -116,43 +112,15 @@ describe("worker incident improvement bundles", () => {
         incident_occurrence_count: 5
       })
     );
-    expect(putObject).toHaveBeenCalledWith(
-      expect.objectContaining({
-        key: buildImprovementBundleObjectKey("00000000-0000-0000-0000-000000000001", "imp_incident")
-      })
-    );
-
-    const payload = putObject.mock.calls[0]?.[0] as { body: Buffer };
-    const parsed = BundleV1Schema.parse(JSON.parse(gunzipSync(payload.body).toString("utf8")));
-    expect(parsed.summary.primary_signal).toBe("recurring_incident");
-    expect(parsed.summary.recommended_action).toContain("incident bundle history");
+    expect(store.hasImprovementBundleGenerationForSourceEvent).not.toHaveBeenCalled();
+    expect(store.reserveImprovementBundleGeneration).not.toHaveBeenCalled();
+    expect(store.getImprovementBundleBuildContext).not.toHaveBeenCalled();
+    expect(putObject).not.toHaveBeenCalled();
   });
 
-  it("generates a post-deploy regression improvement bundle immediately for a regressed incident", async () => {
+  it("records a post-deploy regression improvement opportunity without generating a duplicate improvement bundle", async () => {
     const putObject = vi.fn().mockResolvedValue(undefined);
-    const store = createBaseStore({
-      getImprovementBundleBuildContext: vi.fn().mockResolvedValue({
-        ...(await createBaseStore().getImprovementBundleBuildContext()),
-        kind: "post_deploy_regression",
-        title: "Post-deploy regression: Checkout timeout",
-        summary: "Incident regressed after deploy for checkout-api in production.",
-        evidence: {
-          kind: "post_deploy_regression",
-          incident_id: "00000000-0000-0000-0000-000000000501",
-          incident_title: "Checkout timeout",
-          incident_occurrence_count: 2,
-          threshold: 1,
-          regression_deploy: {
-            deployment_id: "00000000-0000-0000-0000-000000000901",
-            commit_sha: "abc123",
-            version: "2026.05.18",
-            branch: "main",
-            deployed_at: "2026-05-18T11:50:00.000Z",
-            minutes_since_deploy: 10
-          }
-        }
-      })
-    });
+    const store = createBaseStore();
 
     await maybeGenerateHostedIncidentImprovementBundle({
       project_id: "00000000-0000-0000-0000-000000000001",
@@ -190,11 +158,10 @@ describe("worker incident improvement bundles", () => {
         confidence: 0.85
       })
     );
-
-    const payload = putObject.mock.calls[0]?.[0] as { body: Buffer };
-    const parsed = BundleV1Schema.parse(JSON.parse(gunzipSync(payload.body).toString("utf8")));
-    expect(parsed.summary.primary_signal).toBe("post_deploy_regression");
-    expect(parsed.context.deploy?.commit_sha).toBe("abc123");
+    expect(store.hasImprovementBundleGenerationForSourceEvent).not.toHaveBeenCalled();
+    expect(store.reserveImprovementBundleGeneration).not.toHaveBeenCalled();
+    expect(store.getImprovementBundleBuildContext).not.toHaveBeenCalled();
+    expect(putObject).not.toHaveBeenCalled();
   });
 
   it("returns early when incident improvement automation is unavailable or the recorded candidate does not trigger", async () => {
