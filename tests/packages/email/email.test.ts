@@ -29,8 +29,12 @@ import {
   formatProductFromEmail,
   renderAlertDigestEmail,
   renderAlertEmail,
+  renderAllowanceLimitReachedEmail,
+  renderAllowanceWarning80Email,
   renderEmailAuthCodeEmail,
   renderProjectInviteEmail,
+  renderRetentionRotationNoticeEmail,
+  renderWebhookAutoDisabledEmail,
   renderWeeklyReportEmail
 } from "../../../packages/email/src/index.js";
 
@@ -133,6 +137,72 @@ describe("email package", () => {
     expect(rendered.text).toContain("Alerts: New incident, Severity threshold reached");
     expect(rendered.html).toContain("Checkout crash");
     expect(rendered.html).toContain("checkout-&lt;api&gt;");
+  });
+
+  it("renders webhook auto-disabled emails with escaped content and management links", () => {
+    const rendered = renderWebhookAutoDisabledEmail({
+      organizationName: 'Acme <Prod>',
+      projectName: 'checkout-<api>',
+      webhookId: "wh_<123>",
+      targetUrl: "https://hooks.example.test/<danger>",
+      webhooksUrl: "https://app.debugbundle.test/projects/proj_123/webhooks?filter=<all>"
+    });
+
+    expect(rendered.subject).toContain("webhook auto-disabled");
+    expect(rendered.text).toContain('Acme <Prod>');
+    expect(rendered.text).toContain("Project: checkout-<api>");
+    expect(rendered.text).toContain("Webhook ID: wh_<123>");
+    expect(rendered.text).toContain("https://hooks.example.test/<danger>");
+    expect(rendered.text).toContain("Manage project webhooks: https://app.debugbundle.test/projects/proj_123/webhooks?filter=<all>");
+    expect(rendered.html).toContain("Acme &lt;Prod&gt;");
+    expect(rendered.html).toContain("checkout-&lt;api&gt;");
+    expect(rendered.html).toContain("wh_&lt;123&gt;");
+    expect(rendered.html).toContain("&lt;danger&gt;");
+    expect(rendered.html).toContain("Manage project webhooks");
+  });
+
+  it("renders allowance and retention operational emails with scoped usage copy", () => {
+    const warning = renderAllowanceWarning80Email({
+      organizationName: "Acme <Prod>",
+      projectName: "checkout-<api>",
+      meterLabel: "Raw ingested events",
+      used: 8400,
+      limit: 10500,
+      currentBehavior: "new ingestion requests are rejected until the usage window resets",
+      usageWindowEndsAt: "2026-06-01T00:00:00.000Z",
+      billingUrl: "https://app.debugbundle.test/billing?view=<usage>"
+    });
+    const limit = renderAllowanceLimitReachedEmail({
+      organizationName: "Acme <Prod>",
+      projectName: "checkout-<api>",
+      meterLabel: "Lifecycle webhook deliveries",
+      used: 750,
+      limit: 750,
+      currentBehavior: "new lifecycle webhook deliveries and synthetic test deliveries are suppressed until the usage window resets",
+      usageWindowEndsAt: "2026-06-01T00:00:00.000Z",
+      billingUrl: "https://app.debugbundle.test/billing?view=<usage>"
+    });
+    const retention = renderRetentionRotationNoticeEmail({
+      organizationName: "Acme <Prod>",
+      projectName: "checkout-<api>",
+      rotatedOwnerCount: 3,
+      retainedBundleLimit: 450,
+      billingUrl: "https://app.debugbundle.test/billing?view=<usage>"
+    });
+
+    expect(warning.subject).toContain("80%");
+    expect(warning.text).toContain("Usage: 8400 of 10500");
+    expect(warning.text).toContain("wait for the usage window to reset or expand allowance capacity");
+    expect(warning.html).toContain("Acme &lt;Prod&gt;");
+    expect(warning.html).toContain("checkout-&lt;api&gt;");
+    expect(limit.subject).toContain("limit reached");
+    expect(limit.text).toContain("Lifecycle webhook deliveries");
+    expect(limit.html).toContain("suppressed until the usage window resets");
+    expect(limit.html).toContain("expand allowance capacity from billing");
+    expect(retention.subject).toContain("rotated out");
+    expect(retention.text).toContain("Rotated bundle owners: 3");
+    expect(retention.text).toContain("expand allowance capacity from billing");
+    expect(retention.html).toContain("Retention cap:</strong> 450");
   });
 
   it("formats the product from email with a DebugBundle display name", () => {

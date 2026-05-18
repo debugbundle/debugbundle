@@ -1,7 +1,7 @@
 # System Emails
 
 Version: v1
-Last updated: 2026-03-19
+Last updated: 2026-05-18
 
 ---
 
@@ -165,7 +165,7 @@ Recommended v1 or shortly after:
 - Trigger: webhook auto-disabled after repeated delivery failures
 - Recipient: project or organization owner
 - Required in v1: yes
-- Current implementation status: required by existing product rules
+- Current implementation status: exists
 
 ### 4.13 Allowance Warning 80%
 
@@ -173,7 +173,8 @@ Recommended v1 or shortly after:
 - Trigger: allowance usage reaches 80% for a meter
 - Recipient: organization owner
 - Required in v1: yes
-- Notes: applies to every allowance meter defined in `/spec/tiers.md`
+- Notes: applies to every allowance meter defined in `/spec/local/tiers.md`
+- Current implementation status: exists
 
 ### 4.14 Allowance Limit Reached 100%
 
@@ -182,6 +183,7 @@ Recommended v1 or shortly after:
 - Recipient: organization owner
 - Required in v1: yes
 - Notes: must explain resulting behavior such as rejection, pause, or block
+- Current implementation status: exists
 
 ### 4.15 Retention Rotation Notice
 
@@ -190,6 +192,7 @@ Recommended v1 or shortly after:
 - Recipient: organization owner
 - Required in v1: yes
 - Notes: should explain that this is expected policy behavior, not corruption
+- Current implementation status: exists
 
 ### 4.16 Weekly Report
 

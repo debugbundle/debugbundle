@@ -1,0 +1,360 @@
+import {
+  renderAlertDigestEmail,
+  renderAlertEmail,
+  renderAllowanceLimitReachedEmail,
+  renderAllowanceWarning80Email,
+  renderCapacityQuantityChangeEmail,
+  renderEmailAuthCodeEmail,
+  renderEntitlementDowngradeConfirmationEmail,
+  renderEntitlementDowngradeWarningEmail,
+  renderPaymentFailureEmail,
+  renderPaymentFailureReminderEmail,
+  renderPlanChangeConfirmationEmail,
+  renderProjectInviteEmail,
+  renderPurchaseConfirmationEmail,
+  renderRetentionRotationNoticeEmail,
+  renderRenewalSuccessEmail,
+  renderWebhookAutoDisabledEmail,
+  renderWeeklyReportEmail
+} from "../../../../packages/email/src/index.js";
+
+export interface InternalReviewEnv {
+  DEV?: boolean;
+  MODE?: string;
+}
+
+export interface RenderedSystemEmailPreview {
+  subject: string;
+  text: string;
+  html: string;
+}
+
+export interface SystemEmailReviewEntry {
+  id: string;
+  title: string;
+  category: "auth" | "billing" | "operational" | "alerts";
+  recipient: string;
+  trigger: string;
+  requiredInV1: boolean;
+  implementationStatus: "implemented" | "missing";
+  notes?: string;
+  preview?: RenderedSystemEmailPreview;
+}
+
+const SAMPLE_PORTAL_URL = "https://app.debugbundle.local/billing";
+const SAMPLE_INCIDENT_URL = "https://app.debugbundle.local/incidents/inc_123";
+const SAMPLE_BUNDLE_URL = "https://app.debugbundle.local/incidents/inc_123/bundle";
+
+export function isSystemEmailReviewEnabled(env: InternalReviewEnv = import.meta.env): boolean {
+  return env.DEV === true || env.MODE === "test";
+}
+
+export const SYSTEM_EMAIL_REVIEW_ENTRIES: readonly SystemEmailReviewEntry[] = [
+  {
+    id: "email-sign-in-code",
+    title: "Email sign-in code",
+    category: "auth",
+    recipient: "Signing-in user",
+    trigger: "Browser email-code request for signup or login",
+    requiredInV1: true,
+    implementationStatus: "implemented",
+    preview: renderEmailAuthCodeEmail({
+      code: "481902",
+      appUrl: "https://app.debugbundle.local/login",
+      expiresInMinutes: 15
+    })
+  },
+  {
+    id: "project-invite",
+    title: "Project invite",
+    category: "auth",
+    recipient: "Invited email address",
+    trigger: "Project invite created successfully",
+    requiredInV1: true,
+    implementationStatus: "implemented",
+    preview: renderProjectInviteEmail({
+      acceptUrl: "https://app.debugbundle.local/invite?token=dbundle_invite_preview_123"
+    })
+  },
+  {
+    id: "purchase-confirmation",
+    title: "Purchase confirmation",
+    category: "billing",
+    recipient: "Organization owner billing contact",
+    trigger: "First successful paid checkout or extra-capacity purchase confirmation",
+    requiredInV1: true,
+    implementationStatus: "implemented",
+    preview: renderPurchaseConfirmationEmail({
+      organizationName: "Acme Production",
+      plan: "team",
+      extraCapacity: 4,
+      portalUrl: SAMPLE_PORTAL_URL
+    })
+  },
+  {
+    id: "renewal-success",
+    title: "Renewal success",
+    category: "billing",
+    recipient: "Organization owner billing contact",
+    trigger: "Recurring invoice paid for an active subscription",
+    requiredInV1: true,
+    implementationStatus: "implemented",
+    preview: renderRenewalSuccessEmail({
+      organizationName: "Acme Production",
+      plan: "team",
+      extraCapacity: 4,
+      nextRenewalDate: "2026-06-01"
+    })
+  },
+  {
+    id: "payment-failure",
+    title: "Payment failure",
+    category: "billing",
+    recipient: "Organization owner billing contact",
+    trigger: "Recurring invoice payment failure",
+    requiredInV1: true,
+    implementationStatus: "implemented",
+    preview: renderPaymentFailureEmail({
+      organizationName: "Acme Production",
+      plan: "team",
+      portalUrl: SAMPLE_PORTAL_URL
+    })
+  },
+  {
+    id: "payment-failure-reminder",
+    title: "Payment failure reminder",
+    category: "billing",
+    recipient: "Organization owner billing contact",
+    trigger: "Payment remains unresolved after initial failure",
+    requiredInV1: true,
+    implementationStatus: "implemented",
+    preview: renderPaymentFailureReminderEmail({
+      organizationName: "Acme Production",
+      plan: "team",
+      portalUrl: SAMPLE_PORTAL_URL,
+      daysUntilDowngrade: 5
+    })
+  },
+  {
+    id: "entitlement-downgrade-warning",
+    title: "Entitlement downgrade warning",
+    category: "billing",
+    recipient: "Organization owner billing contact",
+    trigger: "System is about to remove paid capacity after unresolved billing failure or cancellation",
+    requiredInV1: true,
+    implementationStatus: "implemented",
+    preview: renderEntitlementDowngradeWarningEmail({
+      organizationName: "Acme Production",
+      currentPlan: "team",
+      currentCapacityUnits: 10,
+      effectiveDate: "2026-06-08",
+      portalUrl: SAMPLE_PORTAL_URL
+    })
+  },
+  {
+    id: "entitlement-downgrade-confirmation",
+    title: "Entitlement downgrade confirmation",
+    category: "billing",
+    recipient: "Organization owner billing contact",
+    trigger: "Paid capacity units or plan entitlements were actually reduced",
+    requiredInV1: true,
+    implementationStatus: "implemented",
+    preview: renderEntitlementDowngradeConfirmationEmail({
+      organizationName: "Acme Production",
+      previousPlan: "team",
+      previousCapacityUnits: 10,
+      newCapacityUnits: 1
+    })
+  },
+  {
+    id: "plan-change-confirmation",
+    title: "Plan change confirmation",
+    category: "billing",
+    recipient: "Organization owner billing contact",
+    trigger: "Plan changed between free, solo, or team",
+    requiredInV1: true,
+    implementationStatus: "implemented",
+    preview: renderPlanChangeConfirmationEmail({
+      organizationName: "Acme Production",
+      previousPlan: "solo",
+      newPlan: "team",
+      extraCapacity: 4
+    })
+  },
+  {
+    id: "extra-capacity-quantity-change-confirmation",
+    title: "Extra capacity quantity change confirmation",
+    category: "billing",
+    recipient: "Organization owner billing contact",
+    trigger: "Extra capacity-unit quantity changed",
+    requiredInV1: true,
+    implementationStatus: "implemented",
+    preview: renderCapacityQuantityChangeEmail({
+      organizationName: "Acme Production",
+      plan: "team",
+      previousCapacity: 2,
+      newCapacity: 4,
+      totalCapacityUnits: 10
+    })
+  },
+  {
+    id: "webhook-auto-disabled",
+    title: "Webhook auto-disabled",
+    category: "operational",
+    recipient: "Project or organization owner",
+    trigger: "Webhook auto-disabled after repeated delivery failures",
+    requiredInV1: true,
+    implementationStatus: "implemented",
+    preview: renderWebhookAutoDisabledEmail({
+      organizationName: "Acme Production",
+      projectName: "Checkout API",
+      webhookId: "wh_01hrf91h0v8g6sz8g4ng1q7nq8",
+      targetUrl: "https://hooks.example.test/debugbundle",
+      webhooksUrl: "https://app.debugbundle.local/projects/proj_checkout/webhooks"
+    })
+  },
+  {
+    id: "allowance-warning-80",
+    title: "Allowance warning 80%",
+    category: "operational",
+    recipient: "Organization owner",
+    trigger: "Allowance usage reaches 80% for a tracked meter",
+    requiredInV1: true,
+    implementationStatus: "implemented",
+    preview: renderAllowanceWarning80Email({
+      organizationName: "Acme Production",
+      projectName: "Checkout API",
+      meterLabel: "Raw ingested events",
+      used: 8400,
+      limit: 10500,
+      currentBehavior: "new ingestion requests are rejected until the usage window resets",
+      usageWindowEndsAt: "2026-06-01T00:00:00.000Z",
+      billingUrl: SAMPLE_PORTAL_URL
+    })
+  },
+  {
+    id: "allowance-limit-reached-100",
+    title: "Allowance limit reached 100%",
+    category: "operational",
+    recipient: "Organization owner",
+    trigger: "Allowance usage reaches 100% for a tracked meter",
+    requiredInV1: true,
+    implementationStatus: "implemented",
+    preview: renderAllowanceLimitReachedEmail({
+      organizationName: "Acme Production",
+      projectName: "Checkout API",
+      meterLabel: "Lifecycle webhook deliveries",
+      used: 750,
+      limit: 750,
+      currentBehavior: "new lifecycle webhook deliveries and synthetic test deliveries are suppressed until the usage window resets",
+      usageWindowEndsAt: "2026-06-01T00:00:00.000Z",
+      billingUrl: SAMPLE_PORTAL_URL
+    })
+  },
+  {
+    id: "retention-rotation-notice",
+    title: "Retention rotation notice",
+    category: "operational",
+    recipient: "Organization owner",
+    trigger: "Oldest retained bundles are rotated out because retention cap is exceeded",
+    requiredInV1: true,
+    implementationStatus: "implemented",
+    preview: renderRetentionRotationNoticeEmail({
+      organizationName: "Acme Production",
+      projectName: "Checkout API",
+      rotatedOwnerCount: 3,
+      retainedBundleLimit: 450,
+      billingUrl: SAMPLE_PORTAL_URL
+    })
+  },
+  {
+    id: "weekly-report",
+    title: "Weekly report",
+    category: "operational",
+    recipient: "Configured report channel recipient",
+    trigger: "Scheduled weekly-report delivery",
+    requiredInV1: true,
+    implementationStatus: "implemented",
+    preview: renderWeeklyReportEmail({
+      projectId: "proj_acme_web",
+      windowStart: "2026-05-11T00:00:00.000Z",
+      windowEnd: "2026-05-18T00:00:00.000Z",
+      bundleCounts: {
+        failure: 6,
+        improvement: 2
+      },
+      newIncidents: 3,
+      regressions: 1,
+      topSpikingIncidents: [
+        {
+          incident_id: "inc_123",
+          title: "Checkout API returned 500",
+          occurrence_count: 24,
+          spike_detected_at: "2026-05-15T09:17:00.000Z"
+        },
+        {
+          incident_id: "inc_456",
+          title: "Worker timeout during bundle generation",
+          occurrence_count: 8,
+          spike_detected_at: "2026-05-16T14:02:00.000Z"
+        }
+      ]
+    })
+  },
+  {
+    id: "alert-email",
+    title: "Alert delivery email",
+    category: "alerts",
+    recipient: "Configured alert recipient",
+    trigger: "A user-created alert rule matches an incident lifecycle event",
+    requiredInV1: false,
+    implementationStatus: "implemented",
+    notes: "User-configured alert channel, not a fixed system lifecycle email.",
+    preview: renderAlertEmail({
+      conditionType: "new_incident",
+      incidentId: "inc_123",
+      occurredAt: "2026-05-18T09:12:00.000Z",
+      serviceName: "checkout-api",
+      environment: "production",
+      severity: "high",
+      incidentUrl: SAMPLE_INCIDENT_URL,
+      bundleUrl: SAMPLE_BUNDLE_URL
+    })
+  },
+  {
+    id: "alert-digest-email",
+    title: "Alert digest email",
+    category: "alerts",
+    recipient: "Configured alert recipient",
+    trigger: "Multiple matched alert emails are batched into a per-project, per-recipient digest",
+    requiredInV1: false,
+    implementationStatus: "implemented",
+    notes: "User-configured alert channel, not a fixed system lifecycle email.",
+    preview: renderAlertDigestEmail({
+      alerts: [
+        {
+          conditionType: "new_incident",
+          incidentId: "inc_123",
+          occurredAt: "2026-05-18T09:12:00.000Z",
+          serviceName: "checkout-api",
+          environment: "production",
+          severity: "high",
+          incidentUrl: SAMPLE_INCIDENT_URL,
+          bundleUrl: SAMPLE_BUNDLE_URL,
+          summary: "Checkout API returned 500 for payment capture."
+        },
+        {
+          conditionType: "error_spike",
+          incidentId: "inc_456",
+          occurredAt: "2026-05-18T09:19:00.000Z",
+          serviceName: "bundle-worker",
+          environment: "production",
+          severity: "critical",
+          incidentUrl: "https://app.debugbundle.local/incidents/inc_456",
+          bundleUrl: "https://app.debugbundle.local/incidents/inc_456/bundle",
+          summary: "Bundle worker timeouts spiked after deploy."
+        }
+      ]
+    })
+  }
+] as const;

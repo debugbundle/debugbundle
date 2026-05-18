@@ -32,6 +32,7 @@ export const REQUIRED_API_TABLES = [
   "incident_events",
   "alert_rules",
   "slack_destinations",
+  "operational_email_deliveries",
   "agent_webhooks",
   "webhook_deliveries",
   "processed_billing_events"
@@ -56,6 +57,7 @@ export const REQUIRED_WORKER_TABLES = [
   "alert_deliveries",
   "alert_email_digests",
   "alert_email_digest_items",
+  "operational_email_deliveries",
   "weekly_report_deliveries",
   "agent_webhooks",
   "webhook_deliveries"
@@ -854,6 +856,30 @@ const STORAGE_BOOTSTRAP_STATEMENTS = [
       updated_at timestamptz NOT NULL DEFAULT now(),
       PRIMARY KEY (organization_id, period_starts_at)
     )
+  `,
+  `
+    CREATE TABLE operational_email_deliveries (
+      id uuid PRIMARY KEY,
+      organization_id uuid NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+      project_id uuid NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+      kind text NOT NULL
+        CHECK (kind IN ('webhook_auto_disabled', 'allowance_warning_80', 'allowance_limit_reached', 'retention_rotation_notice')),
+      dedupe_key text NOT NULL,
+      payload jsonb NOT NULL DEFAULT '{}'::jsonb,
+      status text NOT NULL DEFAULT 'pending'
+        CHECK (status IN ('pending', 'retrying', 'delivered', 'failed')),
+      attempt_count integer NOT NULL DEFAULT 0,
+      next_attempt_at timestamptz,
+      last_error text,
+      delivered_at timestamptz,
+      created_at timestamptz NOT NULL DEFAULT now(),
+      updated_at timestamptz NOT NULL DEFAULT now(),
+      UNIQUE (organization_id, kind, dedupe_key)
+    )
+  `,
+  `
+    CREATE INDEX operational_email_deliveries_status_next_attempt_idx
+    ON operational_email_deliveries (status, next_attempt_at, created_at)
   `
 ] as const;
 

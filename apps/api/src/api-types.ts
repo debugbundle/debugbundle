@@ -42,6 +42,7 @@ import type {
   GitHubDispatchRuleRecord,
   GitHubInstallationRecord,
   GitHubRepositoryRecord,
+  OperationalEmailDeliveryStore,
   ProjectGitHubRepoRecord,
   WebhookEventType,
   WebhookDeliveryStore
@@ -604,6 +605,7 @@ export interface ApiDependencies {
     | "updateWebhookForOrganization"
     | "deleteWebhookForOrganization"
   > | undefined;
+  operationalEmailDelivery?: Pick<OperationalEmailDeliveryStore, "queueProjectOperationalEmailDelivery"> | undefined;
   /** Optional CDN cache purge function, called with project_id after probe activate/deactivate. */
   cdnPurge?: ((projectId: string) => void | Promise<void>) | undefined;
   probeManagement?: {

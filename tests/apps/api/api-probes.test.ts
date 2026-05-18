@@ -17,6 +17,7 @@ function createServer(overrides: {
   capturePolicyManagement?: CapturePolicyManagementDependency;
   billingManagement?: Partial<BillingManagementDependency>;
   probeManagement?: ProbeManagementDependency;
+  operationalEmailDelivery?: ApiServerDependencies["operationalEmailDelivery"];
   memberAuth?: MemberAuthDependency;
   authRateLimiter?: ApiServerDependencies["authRateLimiter"];
 } = {}): ReturnType<typeof createApiServer> {
@@ -93,6 +94,7 @@ function createServer(overrides: {
     webhookDelivery: {
       listDeliveriesForWebhookInOrganization: vi.fn().mockResolvedValue({ deliveries: [] })
     },
+    operationalEmailDelivery: overrides.operationalEmailDelivery,
     capturePolicyManagement: overrides.capturePolicyManagement,
     billingManagement
   });
@@ -353,6 +355,7 @@ describe("api probe routes", () => {
 
   it("should reject remote probe activation when monthly activation quota is exhausted", async (): Promise<void> => {
     const createProbeActivationForProjectInOrganization = vi.fn();
+    const queueProjectOperationalEmailDelivery = vi.fn().mockResolvedValue({ delivery_id: "op_123", created: true });
     const app = createServer({
       billingManagement: {
         getBillingSummaryForOrganization: vi.fn().mockResolvedValue({
@@ -383,7 +386,8 @@ describe("api probe routes", () => {
         listActiveProbesForProjectInOrganization: vi.fn().mockResolvedValue({ organization_plan: "solo", activations: [] }),
         createProbeActivationForProjectInOrganization,
         deactivateProbeActivationForProjectInOrganization: vi.fn().mockResolvedValue(null)
-      }
+      },
+      operationalEmailDelivery: { queueProjectOperationalEmailDelivery }
     });
 
     const response = await app.inject({
@@ -403,6 +407,64 @@ describe("api probe routes", () => {
     expect(response.json()).toMatchObject({ error: "monthly_quota_exceeded" });
     expect(response.headers["retry-after"]).toBeDefined();
     expect(createProbeActivationForProjectInOrganization).not.toHaveBeenCalled();
+    expect(queueProjectOperationalEmailDelivery).toHaveBeenCalledWith(
+      expect.objectContaining({
+        project_id: "00000000-0000-4000-8000-000000000001",
+        kind: "allowance_limit_reached"
+      })
+    );
+  });
+
+  it("queues an 80 percent allowance warning after a successful remote probe activation", async (): Promise<void> => {
+    const queueProjectOperationalEmailDelivery = vi.fn().mockResolvedValue({ delivery_id: "op_123", created: true });
+    const app = createServer({
+      billingManagement: {
+        getBillingSummaryForOrganization: vi.fn().mockResolvedValue({
+          plan: "solo",
+          stripe_customer_id: null,
+          active_projects: 1,
+          capacity_units: {
+            total: 3,
+            included: 3,
+            additional_purchased: 0
+          },
+          usage_window: {
+            starts_at: "2026-03-01T00:00:00.000Z",
+            ends_at: "2026-04-01T00:00:00.000Z"
+          },
+          allowances: {
+            monthly_bundle_requests: { used: 0, limit: 750 },
+            monthly_raw_ingested_events: { used: 0, limit: 10500 },
+            retained_bundle_cap: { used: 0, limit: 450 },
+            monthly_remote_activations: { used: 59, limit: 75 },
+            monthly_alert_deliveries: { used: 0, limit: 225 },
+            monthly_webhook_deliveries: { used: 0, limit: 750 }
+          }
+        })
+      },
+      operationalEmailDelivery: { queueProjectOperationalEmailDelivery }
+    });
+
+    const response = await app.inject({
+      method: "POST",
+      url: "/v1/projects/00000000-0000-4000-8000-000000000001/probes/activate",
+      headers: { authorization: "Bearer dbundle_mem_test" },
+      payload: {
+        label_pattern: "checkout.*",
+        service: "*",
+        environment: "*",
+        ttl_seconds: 300,
+        trigger_ttl_seconds: 300
+      }
+    });
+
+    expect(response.statusCode).toBe(201);
+    expect(queueProjectOperationalEmailDelivery).toHaveBeenCalledWith(
+      expect.objectContaining({
+        project_id: "00000000-0000-4000-8000-000000000001",
+        kind: "allowance_warning_80"
+      })
+    );
   });
 
   it("should validate activation project id and payload", async (): Promise<void> => {

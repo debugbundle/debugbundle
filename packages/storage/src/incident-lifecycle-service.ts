@@ -1,5 +1,7 @@
 import type { BillingStore } from "./billing-store.js";
 import type { IncidentLifecycleService, IncidentRetrievalRecord, WebhookEventType } from "./types.js";
+import { queueAllowanceLimitReachedNotification, queueAllowanceThresholdNotifications } from "./operational-email-notifications.js";
+import type { OperationalEmailDeliveryStore } from "./types.js";
 
 type IncidentResolutionInput = {
   organization_id: string;
@@ -46,6 +48,7 @@ interface CreateIncidentLifecycleServiceInput {
   fallbackTargetUrl: string | null;
   fallbackSigningSecret: string | null;
   billingStore?: Pick<BillingStore, "getBillingSummaryForProject">;
+  operationalEmailDeliveryStore?: Pick<OperationalEmailDeliveryStore, "queueProjectOperationalEmailDelivery">;
 }
 
 function buildLifecyclePayload(eventType: WebhookEventType, incident: IncidentRetrievalRecord): Record<string, unknown> {
@@ -111,6 +114,10 @@ async function publishResolvedWebhook(
 
   const payload = buildLifecyclePayload("bundle.resolved", incident);
   let remainingWebhookDeliveries: number | null = null;
+  let webhookAllowanceUsed: number | null = null;
+  let webhookAllowanceLimit: number | null = null;
+  let webhookUsageWindowStartsAt: string | null = null;
+  let webhookUsageWindowEndsAt: string | null = null;
   if (input.billingStore !== undefined) {
     const billingSummary = await input.billingStore.getBillingSummaryForProject({
       project_id: incident.project_id,
@@ -119,11 +126,26 @@ async function publishResolvedWebhook(
     const allowance = billingSummary?.allowances.monthly_webhook_deliveries;
     if (billingSummary !== null && allowance !== undefined) {
       remainingWebhookDeliveries = Math.max(0, allowance.limit - allowance.used);
+      webhookAllowanceUsed = allowance.used;
+      webhookAllowanceLimit = allowance.limit;
+      webhookUsageWindowStartsAt = billingSummary.usage_window.starts_at;
+      webhookUsageWindowEndsAt = billingSummary.usage_window.ends_at;
     }
   }
 
   for (const target of targets) {
     if (remainingWebhookDeliveries !== null && remainingWebhookDeliveries <= 0) {
+      if (input.operationalEmailDeliveryStore !== undefined && webhookAllowanceLimit !== null) {
+        await queueAllowanceLimitReachedNotification({
+          store: input.operationalEmailDeliveryStore,
+          project_id: incident.project_id,
+          meter: "monthly_webhook_deliveries",
+          used: webhookAllowanceUsed ?? webhookAllowanceLimit,
+          limit: webhookAllowanceLimit,
+          usage_window_starts_at: webhookUsageWindowStartsAt,
+          usage_window_ends_at: webhookUsageWindowEndsAt
+        });
+      }
       break;
     }
 
@@ -138,7 +160,21 @@ async function publishResolvedWebhook(
       payload
     });
     if (remainingWebhookDeliveries !== null) {
+      const previousUsed = webhookAllowanceUsed ?? 0;
       remainingWebhookDeliveries -= 1;
+      webhookAllowanceUsed = previousUsed + 1;
+      if (input.operationalEmailDeliveryStore !== undefined && webhookAllowanceLimit !== null) {
+        await queueAllowanceThresholdNotifications({
+          store: input.operationalEmailDeliveryStore,
+          project_id: incident.project_id,
+          meter: "monthly_webhook_deliveries",
+          previous_used: previousUsed,
+          next_used: webhookAllowanceUsed,
+          limit: webhookAllowanceLimit,
+          usage_window_starts_at: webhookUsageWindowStartsAt,
+          usage_window_ends_at: webhookUsageWindowEndsAt
+        });
+      }
     }
   }
 }

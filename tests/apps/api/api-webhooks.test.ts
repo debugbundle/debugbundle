@@ -30,6 +30,7 @@ function createServer(overrides: {
   webhookManagement?: WebhookManagementDependency | undefined;
   webhookTesting?: WebhookTestingDependency | undefined;
   billingManagement?: BillingManagementDependency | undefined;
+  operationalEmailDelivery?: ApiServerDependencies["operationalEmailDelivery"];
 } = {}): ReturnType<typeof createApiServer> {
   const hasWebhookManagementOverride = Object.prototype.hasOwnProperty.call(overrides, "webhookManagement");
 
@@ -83,6 +84,9 @@ function createServer(overrides: {
       getObject: vi.fn()
     },
     ...(overrides.billingManagement === undefined ? {} : { billingManagement: overrides.billingManagement }),
+    ...(overrides.operationalEmailDelivery === undefined
+      ? {}
+      : { operationalEmailDelivery: overrides.operationalEmailDelivery }),
     webhookDelivery: {
       listDeliveriesForWebhookInOrganization: vi.fn().mockResolvedValue({ deliveries: [] }),
       retryDeliveryForOrganization: vi.fn().mockResolvedValue(null)
@@ -891,6 +895,7 @@ describe("api webhook routes", () => {
         event_type: "verification.passed"
       })
     };
+    const queueProjectOperationalEmailDelivery = vi.fn().mockResolvedValue({ delivery_id: "op_123", created: true });
     const billingManagement = mockedObject<NonNullable<ApiServerDependencies["billingManagement"]>>({
       getBillingSummaryForOrganization: vi.fn().mockResolvedValue({
         plan: "free",
@@ -918,7 +923,11 @@ describe("api webhook routes", () => {
       createCheckoutLink: vi.fn().mockResolvedValue(null),
       createPortalLink: vi.fn().mockResolvedValue(null)
     });
-    const app = createServer({ webhookTesting, billingManagement });
+    const app = createServer({
+      webhookTesting,
+      billingManagement,
+      operationalEmailDelivery: { queueProjectOperationalEmailDelivery }
+    });
 
     const response = await app.inject({
       method: "POST",
@@ -939,6 +948,70 @@ describe("api webhook routes", () => {
       now: expect.any(String)
     });
     expect(webhookTesting.triggerTestDelivery).not.toHaveBeenCalled();
+    expect(queueProjectOperationalEmailDelivery).toHaveBeenCalledWith(
+      expect.objectContaining({
+        project_id: "00000000-0000-4000-8000-000000000001",
+        kind: "allowance_limit_reached"
+      })
+    );
+  });
+
+  it("queues an 80 percent webhook allowance warning after a successful test delivery", async (): Promise<void> => {
+    const webhookTesting = {
+      triggerTestDelivery: vi.fn().mockResolvedValue({
+        delivery_id: "del_123",
+        event_type: "verification.passed"
+      })
+    };
+    const queueProjectOperationalEmailDelivery = vi.fn().mockResolvedValue({ delivery_id: "op_123", created: true });
+    const billingManagement = mockedObject<NonNullable<ApiServerDependencies["billingManagement"]>>({
+      getBillingSummaryForOrganization: vi.fn().mockResolvedValue({
+        plan: "solo",
+        stripe_customer_id: null,
+        active_projects: 1,
+        capacity_units: {
+          total: 3,
+          included: 3,
+          additional_purchased: 0,
+          pending_reduction: null
+        },
+        usage_window: {
+          starts_at: "2026-05-01T00:00:00.000Z",
+          ends_at: "2099-01-01T00:00:00.000Z"
+        },
+        allowances: {
+          monthly_bundle_requests: { used: 0, limit: 750 },
+          monthly_raw_ingested_events: { used: 0, limit: 10500 },
+          retained_bundle_cap: { used: 0, limit: 450 },
+          monthly_remote_activations: { used: 0, limit: 75 },
+          monthly_alert_deliveries: { used: 0, limit: 225 },
+          monthly_webhook_deliveries: { used: 599, limit: 750 }
+        }
+      }),
+      createCheckoutLink: vi.fn().mockResolvedValue(null),
+      createPortalLink: vi.fn().mockResolvedValue(null)
+    });
+    const app = createServer({
+      webhookTesting,
+      billingManagement,
+      operationalEmailDelivery: { queueProjectOperationalEmailDelivery }
+    });
+
+    const response = await app.inject({
+      method: "POST",
+      url: "/v1/webhooks/11111111-1111-4111-8111-111111111111/test?project_id=00000000-0000-4000-8000-000000000001",
+      headers: {
+        authorization: "Bearer dbundle_mem_test"
+      }
+    });
+
+    expect(response.statusCode).toBe(202);
+    expect(queueProjectOperationalEmailDelivery).toHaveBeenCalledWith(
+      expect.objectContaining({
+        project_id: "00000000-0000-4000-8000-000000000001",
+        kind: "allowance_warning_80"
+      })
+    );
   });
 
   it("should enqueue webhook test delivery with verification.passed default", async (): Promise<void> => {

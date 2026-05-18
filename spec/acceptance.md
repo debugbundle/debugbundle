@@ -608,12 +608,20 @@ If CLI says something is healthy and MCP says something different, that is a pro
 - **And** the code is valid for 10 minutes
 
 ### AC-EMAIL-02: Email Anti-Spam
-- **Given** an event that would trigger repeated email notifications
-- **When** multiple notifications would fire within a short window
-- **Then** they are batched into a digest rather than sent individually
+- **Given** an event that would trigger repeated system email notifications
+- **When** multiple equivalent notifications would fire within the same dedupe window
+- **Then** repeated sends are suppressed by durable dedupe rather than sent individually
+- **And** user-configured alert emails are batched into digests instead of sent as bursty individual messages
 - **And** critical emails (email sign-in codes and security alerts) are never suppressed
 
-### AC-EMAIL-03: Email Provider Abstraction
+### AC-EMAIL-03: Operational Owner Notifications
+- **Given** a webhook is auto-disabled, an allowance reaches 80%, an allowance reaches 100%, or retained bundles are rotated out
+- **When** the triggering product event is processed
+- **Then** an operational email delivery is queued for the owning organization owner
+- **And** the delivery has both HTML and plain-text versions
+- **And** transient email transport failures are retried without blocking the primary product workflow
+
+### AC-EMAIL-04: Email Provider Abstraction
 - **Given** the email system configured
 - **When** the transport implementation is refactored behind the same provider abstraction
 - **Then** no email-sending code outside the email package needs to change

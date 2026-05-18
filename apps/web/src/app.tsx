@@ -67,8 +67,10 @@ import { ProjectSettingsPage } from "./pages/project-settings-page.js";
 import { SettingsPage } from "./pages/settings-page.js";
 import { ProjectWebhooksPage } from "./pages/project-webhooks-page.js";
 import { SidebarInset, SidebarProvider } from "./components/ui/sidebar.js";
+import { isSystemEmailReviewEnabled } from "./lib/system-email-previews.js";
 import { ThemeProvider, useTheme } from "./lib/theme.js";
 import { TooltipProvider } from "./components/ui/tooltip.js";
+import { SystemEmailReviewPage } from "./pages/system-email-review-page.js";
 
 const GITHUB_START_HREF = buildApiUrl("/v1/auth/github/start");
 const TERMS_OF_SERVICE_URL = "https://debugbundle.com/terms";
@@ -147,6 +149,7 @@ export function App({ initialEntries }: AppProps): JSX.Element {
               <Route path="/improvements" element={<ImprovementsPage />} />
               <Route path="/billing" element={<BillingPage />} />
               <Route path="/projects" element={<ProjectsPage />} />
+              {isSystemEmailReviewEnabled() ? <Route path="/__dev/system-emails" element={<SystemEmailReviewPage />} /> : null}
               <Route
                 path="/organization"
                 element={
@@ -195,6 +198,7 @@ export function App({ initialEntries }: AppProps): JSX.Element {
               <Route path="/improvements" element={<ImprovementsPage />} />
               <Route path="/billing" element={<BillingPage />} />
               <Route path="/projects" element={<ProjectsPage />} />
+              {isSystemEmailReviewEnabled() ? <Route path="/__dev/system-emails" element={<SystemEmailReviewPage />} /> : null}
               <Route
                 path="/organization"
                 element={

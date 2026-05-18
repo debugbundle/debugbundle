@@ -244,6 +244,116 @@ describe("worker improvement bundles", () => {
     expect(recordWarningHotspot).not.toHaveBeenCalled();
   });
 
+  it("returns early when settings are missing or automation is disabled", async () => {
+    const recordWarningHotspot = vi.fn();
+
+    await maybeGenerateHostedImprovementBundle({
+      project_id: "proj_missing",
+      event: createEventEnvelope({
+        event_id: "00000000-0000-0000-0000-000000000012",
+        event_type: "log_event",
+        occurred_at: "2026-05-18T12:00:00.000Z",
+        service: {
+          name: "checkout-api",
+          environment: "production"
+        },
+        payload: {
+          level: "warning",
+          message: "Missing settings warning",
+          attributes: {}
+        }
+      }),
+      normalized: {
+        event_type: "log_event",
+        environment: "production",
+        error_type: null,
+        normalized_message: "Missing settings warning",
+        route_template: null,
+        http_method: null,
+        http_status: null,
+        top_frames: [],
+        payload: {}
+      },
+      event_class: "context_signal",
+      dependencies: {
+        improvementOpportunityStore: {
+          getImprovementExecutionSettings: vi.fn().mockResolvedValue(null),
+          listImprovementsForOrganization: vi.fn(),
+          getImprovementForOrganization: vi.fn(),
+          resolveImprovementForOrganization: vi.fn(),
+          reopenImprovementForOrganization: vi.fn(),
+          recordWarningHotspot,
+          recordRequestPattern: vi.fn(),
+          getImprovementBundleBuildContext: vi.fn(),
+          listImprovementEventReferences: vi.fn(),
+          hasImprovementBundleGenerationForSourceEvent: vi.fn(),
+          reserveImprovementBundleGeneration: vi.fn(),
+          markImprovementBundleGenerationFailure: vi.fn(),
+          pruneRetainedBundleOwnersForProject: vi.fn().mockResolvedValue([])
+        },
+        objectStore: {
+          getObject: vi.fn()
+        }
+      }
+    });
+
+    await maybeGenerateHostedImprovementBundle({
+      project_id: "proj_disabled",
+      event: createEventEnvelope({
+        event_id: "00000000-0000-0000-0000-000000000013",
+        event_type: "log_event",
+        occurred_at: "2026-05-18T12:00:00.000Z",
+        service: {
+          name: "checkout-api",
+          environment: "production"
+        },
+        payload: {
+          level: "warning",
+          message: "Disabled automation warning",
+          attributes: {}
+        }
+      }),
+      normalized: {
+        event_type: "log_event",
+        environment: "production",
+        error_type: null,
+        normalized_message: "Disabled automation warning",
+        route_template: null,
+        http_method: null,
+        http_status: null,
+        top_frames: [],
+        payload: {}
+      },
+      event_class: "context_signal",
+      dependencies: {
+        improvementOpportunityStore: {
+          getImprovementExecutionSettings: vi.fn().mockResolvedValue({
+            plan: "solo",
+            automated_improvement_bundles_enabled: false,
+            improvement_bundle_sensitivity: "balanced"
+          }),
+          listImprovementsForOrganization: vi.fn(),
+          getImprovementForOrganization: vi.fn(),
+          resolveImprovementForOrganization: vi.fn(),
+          reopenImprovementForOrganization: vi.fn(),
+          recordWarningHotspot,
+          recordRequestPattern: vi.fn(),
+          getImprovementBundleBuildContext: vi.fn(),
+          listImprovementEventReferences: vi.fn(),
+          hasImprovementBundleGenerationForSourceEvent: vi.fn(),
+          reserveImprovementBundleGeneration: vi.fn(),
+          markImprovementBundleGenerationFailure: vi.fn(),
+          pruneRetainedBundleOwnersForProject: vi.fn().mockResolvedValue([])
+        },
+        objectStore: {
+          getObject: vi.fn()
+        }
+      }
+    });
+
+    expect(recordWarningHotspot).not.toHaveBeenCalled();
+  });
+
   it("marks generation failure and stops when quota is exhausted", async () => {
     const markImprovementBundleGenerationFailure = vi.fn().mockResolvedValue(undefined);
     const putObject = vi.fn();
@@ -727,6 +837,341 @@ describe("worker improvement bundles", () => {
     });
 
     expect(recordRequestPattern).not.toHaveBeenCalled();
+  });
+
+  it("applies hosted improvement thresholds for high-confidence and verbose sensitivities", async () => {
+    const highConfidenceRecord = vi.fn().mockResolvedValue({
+      opportunity_id: "imp_high_confidence",
+      occurrence_count: 1,
+      bundle_generation_number: 0,
+      should_generate_bundle: false
+    });
+    const verboseRecord = vi.fn().mockResolvedValue({
+      opportunity_id: "imp_verbose",
+      occurrence_count: 1,
+      bundle_generation_number: 0,
+      should_generate_bundle: false
+    });
+
+    await maybeGenerateHostedImprovementBundle({
+      project_id: "proj_high_confidence",
+      event: createEventEnvelope({
+        event_id: "00000000-0000-0000-0000-000000000036",
+        event_type: "log_event",
+        occurred_at: "2026-05-18T12:00:00.000Z",
+        service: {
+          name: "checkout-api",
+          environment: "production"
+        },
+        payload: {
+          level: "warning",
+          message: "High confidence warning",
+          attributes: {}
+        }
+      }),
+      normalized: {
+        event_type: "log_event",
+        environment: "production",
+        error_type: null,
+        normalized_message: "High confidence warning",
+        route_template: null,
+        http_method: null,
+        http_status: null,
+        top_frames: [],
+        payload: {}
+      },
+      event_class: "context_signal",
+      dependencies: {
+        improvementOpportunityStore: {
+          getImprovementExecutionSettings: vi.fn().mockResolvedValue({
+            plan: "solo",
+            automated_improvement_bundles_enabled: true,
+            improvement_bundle_sensitivity: "high_confidence"
+          }),
+          listImprovementsForOrganization: vi.fn(),
+          getImprovementForOrganization: vi.fn(),
+          resolveImprovementForOrganization: vi.fn(),
+          reopenImprovementForOrganization: vi.fn(),
+          recordWarningHotspot: highConfidenceRecord,
+          recordRequestPattern: vi.fn(),
+          getImprovementBundleBuildContext: vi.fn(),
+          listImprovementEventReferences: vi.fn(),
+          hasImprovementBundleGenerationForSourceEvent: vi.fn(),
+          reserveImprovementBundleGeneration: vi.fn(),
+          markImprovementBundleGenerationFailure: vi.fn(),
+          pruneRetainedBundleOwnersForProject: vi.fn().mockResolvedValue([])
+        },
+        objectStore: {
+          getObject: vi.fn()
+        }
+      }
+    });
+
+    await maybeGenerateHostedImprovementBundle({
+      project_id: "proj_verbose",
+      event: createEventEnvelope({
+        event_id: "00000000-0000-0000-0000-000000000037",
+        event_type: "log_event",
+        occurred_at: "2026-05-18T12:00:00.000Z",
+        service: {
+          name: "checkout-api",
+          environment: "production"
+        },
+        payload: {
+          level: "warning",
+          message: "Verbose warning",
+          attributes: {}
+        }
+      }),
+      normalized: {
+        event_type: "log_event",
+        environment: "production",
+        error_type: null,
+        normalized_message: "Verbose warning",
+        route_template: null,
+        http_method: null,
+        http_status: null,
+        top_frames: [],
+        payload: {}
+      },
+      event_class: "context_signal",
+      dependencies: {
+        improvementOpportunityStore: {
+          getImprovementExecutionSettings: vi.fn().mockResolvedValue({
+            plan: "solo",
+            automated_improvement_bundles_enabled: true,
+            improvement_bundle_sensitivity: "verbose"
+          }),
+          listImprovementsForOrganization: vi.fn(),
+          getImprovementForOrganization: vi.fn(),
+          resolveImprovementForOrganization: vi.fn(),
+          reopenImprovementForOrganization: vi.fn(),
+          recordWarningHotspot: verboseRecord,
+          recordRequestPattern: vi.fn(),
+          getImprovementBundleBuildContext: vi.fn(),
+          listImprovementEventReferences: vi.fn(),
+          hasImprovementBundleGenerationForSourceEvent: vi.fn(),
+          reserveImprovementBundleGeneration: vi.fn(),
+          markImprovementBundleGenerationFailure: vi.fn(),
+          pruneRetainedBundleOwnersForProject: vi.fn().mockResolvedValue([])
+        },
+        objectStore: {
+          getObject: vi.fn()
+        }
+      }
+    });
+
+    expect(highConfidenceRecord).toHaveBeenCalledWith(
+      expect.objectContaining({
+        threshold: 10
+      })
+    );
+    expect(verboseRecord).toHaveBeenCalledWith(
+      expect.objectContaining({
+        threshold: 3
+      })
+    );
+  });
+
+  it("does not record request improvements when request signals do not satisfy hosted rules", async () => {
+    const recordRequestPattern = vi.fn();
+
+    await maybeGenerateHostedImprovementBundle({
+      project_id: "proj_123",
+      event: createEventEnvelope({
+        event_id: "00000000-0000-0000-0000-000000000033",
+        event_type: "request_event",
+        occurred_at: "2026-05-18T12:00:00.000Z",
+        service: {
+          name: "checkout-api",
+          environment: "production"
+        },
+        payload: {
+          method: "GET",
+          path: "/health",
+          query: {},
+          headers: {},
+          body: null,
+          response_status: 200,
+          duration_ms: 250,
+          route_template: null
+        }
+      }),
+      normalized: {
+        event_type: "request_event",
+        environment: "production",
+        error_type: null,
+        normalized_message: "request GET /health",
+        route_template: null,
+        http_method: "GET",
+        http_status: 200,
+        top_frames: [],
+        payload: {}
+      },
+      event_class: "context_signal",
+      dependencies: {
+        improvementOpportunityStore: {
+          getImprovementExecutionSettings: vi.fn().mockResolvedValue({
+            plan: "solo",
+            automated_improvement_bundles_enabled: true,
+            improvement_bundle_sensitivity: "balanced"
+          }),
+          listImprovementsForOrganization: vi.fn(),
+          getImprovementForOrganization: vi.fn(),
+          resolveImprovementForOrganization: vi.fn(),
+          reopenImprovementForOrganization: vi.fn(),
+          recordWarningHotspot: vi.fn(),
+          recordRequestPattern,
+          getImprovementBundleBuildContext: vi.fn(),
+          listImprovementEventReferences: vi.fn(),
+          hasImprovementBundleGenerationForSourceEvent: vi.fn(),
+          reserveImprovementBundleGeneration: vi.fn(),
+          markImprovementBundleGenerationFailure: vi.fn(),
+          pruneRetainedBundleOwnersForProject: vi.fn().mockResolvedValue([])
+        },
+        objectStore: {
+          getObject: vi.fn()
+        }
+      }
+    });
+
+    expect(recordRequestPattern).not.toHaveBeenCalled();
+  });
+
+  it("stops before persisting when a recorded candidate does not trigger or context is missing", async () => {
+    const reserveImprovementBundleGeneration = vi.fn().mockResolvedValue({
+      generation_number: 1,
+      created_at: "2026-05-18T12:00:00.000Z",
+      updated_at: "2026-05-18T12:00:00.000Z",
+      source_event_id: "00000000-0000-0000-0000-000000000034",
+      source_occurred_at: "2026-05-18T12:00:00.000Z",
+      trigger: "occurrence_threshold"
+    });
+    const putObject = vi.fn();
+
+    await maybeGenerateHostedImprovementBundle({
+      project_id: "proj_123",
+      event: createEventEnvelope({
+        event_id: "00000000-0000-0000-0000-000000000034",
+        event_type: "log_event",
+        occurred_at: "2026-05-18T12:00:00.000Z",
+        service: {
+          name: "checkout-api",
+          environment: "production"
+        },
+        payload: {
+          level: "warning",
+          message: "Below threshold warning",
+          attributes: {}
+        }
+      }),
+      normalized: {
+        event_type: "log_event",
+        environment: "production",
+        error_type: null,
+        normalized_message: "Below threshold warning",
+        route_template: null,
+        http_method: null,
+        http_status: null,
+        top_frames: [],
+        payload: {}
+      },
+      event_class: "context_signal",
+      dependencies: {
+        improvementOpportunityStore: {
+          getImprovementExecutionSettings: vi.fn().mockResolvedValue({
+            plan: "solo",
+            automated_improvement_bundles_enabled: true,
+            improvement_bundle_sensitivity: "balanced"
+          }),
+          listImprovementsForOrganization: vi.fn(),
+          getImprovementForOrganization: vi.fn(),
+          resolveImprovementForOrganization: vi.fn(),
+          reopenImprovementForOrganization: vi.fn(),
+          recordWarningHotspot: vi.fn().mockResolvedValue({
+            opportunity_id: "imp_below_threshold",
+            occurrence_count: 4,
+            bundle_generation_number: 0,
+            should_generate_bundle: false
+          }),
+          recordRequestPattern: vi.fn(),
+          getImprovementBundleBuildContext: vi.fn(),
+          listImprovementEventReferences: vi.fn(),
+          hasImprovementBundleGenerationForSourceEvent: vi.fn(),
+          reserveImprovementBundleGeneration,
+          markImprovementBundleGenerationFailure: vi.fn(),
+          pruneRetainedBundleOwnersForProject: vi.fn().mockResolvedValue([])
+        },
+        objectStore: {
+          getObject: vi.fn(),
+          putObject
+        }
+      }
+    });
+
+    expect(reserveImprovementBundleGeneration).not.toHaveBeenCalled();
+
+    await maybeGenerateHostedImprovementBundle({
+      project_id: "proj_123",
+      event: createEventEnvelope({
+        event_id: "00000000-0000-0000-0000-000000000035",
+        event_type: "log_event",
+        occurred_at: "2026-05-18T12:00:00.000Z",
+        service: {
+          name: "checkout-api",
+          environment: "production"
+        },
+        payload: {
+          level: "warning",
+          message: "Missing context warning",
+          attributes: {}
+        }
+      }),
+      normalized: {
+        event_type: "log_event",
+        environment: "production",
+        error_type: null,
+        normalized_message: "Missing context warning",
+        route_template: null,
+        http_method: null,
+        http_status: null,
+        top_frames: [],
+        payload: {}
+      },
+      event_class: "context_signal",
+      dependencies: {
+        improvementOpportunityStore: {
+          getImprovementExecutionSettings: vi.fn().mockResolvedValue({
+            plan: "solo",
+            automated_improvement_bundles_enabled: true,
+            improvement_bundle_sensitivity: "balanced"
+          }),
+          listImprovementsForOrganization: vi.fn(),
+          getImprovementForOrganization: vi.fn(),
+          resolveImprovementForOrganization: vi.fn(),
+          reopenImprovementForOrganization: vi.fn(),
+          recordWarningHotspot: vi.fn().mockResolvedValue({
+            opportunity_id: "imp_missing_context",
+            occurrence_count: 5,
+            bundle_generation_number: 0,
+            should_generate_bundle: true
+          }),
+          recordRequestPattern: vi.fn(),
+          hasImprovementBundleGenerationForSourceEvent: vi.fn().mockResolvedValue(false),
+          reserveImprovementBundleGeneration,
+          getImprovementBundleBuildContext: vi.fn().mockResolvedValue(null),
+          listImprovementEventReferences: vi.fn(),
+          markImprovementBundleGenerationFailure: vi.fn(),
+          pruneRetainedBundleOwnersForProject: vi.fn().mockResolvedValue([])
+        },
+        objectStore: {
+          getObject: vi.fn(),
+          putObject
+        }
+      }
+    });
+
+    expect(putObject).not.toHaveBeenCalled();
   });
 
   it("prunes retained incident and improvement artifacts after persisting a hosted improvement bundle", async () => {

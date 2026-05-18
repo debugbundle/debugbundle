@@ -89,7 +89,7 @@
 
 ### `packages/email`
 - **Owns:** Email template rendering and sending abstraction
-- **Exports:** Weekly report email rendering, billing lifecycle email rendering (purchase confirmation, renewal, payment failure, entitlement downgrade, plan/capacity changes), plus transport adapters
+- **Exports:** Weekly report email rendering, billing lifecycle email rendering (purchase confirmation, renewal, payment failure, entitlement downgrade, plan/capacity changes), operational email rendering (webhook auto-disable, allowance thresholds, retention rotation), plus transport adapters
 - **Depends on:** `shared-types`
 - **Adapter:** Transport adapters remain behind the same abstraction; provider choice is intentionally outside this public map
 
@@ -251,9 +251,9 @@ The public documentation/marketing/blog site lives in the standalone public repo
 
 ### `apps/worker`
 - **Owns:** Background job processing via BullMQ
-- **Jobs:** `normalize-events`, `group-incident`, `build-bundle`, `build-reproduction`, `evaluate-alerts`, `deliver-alert-email-digest`, `deliver-webhook`, `generate-weekly-report`, `cleanup-retention`, `dispatch-github`
+- **Jobs:** `normalize-events`, `group-incident`, `build-bundle`, `build-reproduction`, `evaluate-alerts`, `deliver-alert-email-digest`, `deliver-operational-email`, `deliver-webhook`, `generate-weekly-report`, `cleanup-retention`, `dispatch-github`
 - **Imports:** `bundle-engine`, `repro-engine`, `event-normalizer`, `shared-types`, `redaction`, `email`
-- **Key constraint:** All jobs must be idempotent; lifecycle webhooks gate new intents against `monthly_webhook_deliveries` before queue insertion, alert evaluation achieves this by persisting one internal `alert_deliveries` row per alert/incident/dedupe key before immediate non-email delivery plus an `alert_email_digests` / `alert_email_digest_items` queue for fixed 10-second email batching, resolving reusable Slack destinations only after the claim row is written, weekly reporting now relies on persisted `bundle_generations` history plus `weekly_report_deliveries` claim rows before email or Slack transport is attempted, hosted improvement bundles share the same retained-bundle-cap pruning path as failure bundles across one combined incident/improvement inventory, and GitHub dispatch achieves idempotency via `github_dispatch_deliveries` claim rows with cooldown enforcement before `repository_dispatch` API calls and non-retryable `skipped` rows for DebugBundle-side hourly suppressions
+- **Key constraint:** All jobs must be idempotent; lifecycle webhooks gate new intents against `monthly_webhook_deliveries` before queue insertion, alert evaluation achieves this by persisting one internal `alert_deliveries` row per alert/incident/dedupe key before immediate non-email delivery plus an `alert_email_digests` / `alert_email_digest_items` queue for fixed 10-second email batching, operational owner notifications are persisted in `operational_email_deliveries` before email transport attempts so webhook auto-disable, allowance, and retention notices can retry independently, resolving reusable Slack destinations only after the claim row is written, weekly reporting now relies on persisted `bundle_generations` history plus `weekly_report_deliveries` claim rows before email or Slack transport is attempted, hosted improvement bundles share the same retained-bundle-cap pruning path as failure bundles across one combined incident/improvement inventory, and GitHub dispatch achieves idempotency via `github_dispatch_deliveries` claim rows with cooldown enforcement before `repository_dispatch` API calls and non-retryable `skipped` rows for DebugBundle-side hourly suppressions
 - **Local dev note:** the top-level `docker-compose.yml` `dev` profile now starts the worker alongside API and web so local dogfooding can exercise the full ingestion-to-bundle path without a separate manual worker launch
 
 ### `apps/cli`
@@ -308,6 +308,7 @@ The public documentation/marketing/blog site lives in the standalone public repo
   - `slack-destination-store.ts` — Postgres reusable Slack destination CRUD plus worker-side encrypted-secret lookup
   - `billing-store.ts` — Postgres billing summary queries derived from organization plan, active-project counts, shared allowance-capacity units, and monthly usage counters
   - `alert-delivery-store.ts` — Postgres alert evaluation queries, immediate alert delivery-intent persistence, and queued email-digest persistence/claiming
+  - `operational-email-delivery-store.ts` — Postgres operational email delivery ledger with dedupe and retry state for system-triggered owner notifications
   - `webhook-delivery-store.ts` — Postgres webhook delivery persistence
   - `weekly-report-channel-store.ts` — Postgres weekly-report channel CRUD and scheduler lookup
   - `frequency-counter.ts` — Redis rolling frequency counter (1m/5m/1h/24h buckets)

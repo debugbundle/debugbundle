@@ -1,5 +1,9 @@
 import type { FastifyInstance } from "fastify";
 
+import {
+  queueAllowanceLimitReachedNotification,
+  queueAllowanceThresholdNotifications
+} from "../../../../packages/storage/src/index.js";
 import { getTierCapabilities } from "../../../../packages/shared-types/src/index.js";
 import type { ApiDependencies } from "../api-types.js";
 import { requireRateLimitedMemberAuth } from "../api-helpers.js";
@@ -33,6 +37,10 @@ export function registerProbeRoutes(app: FastifyInstance, dependencies: ApiDepen
     }
 
     const now = new Date();
+    let previousRemoteActivationUsed: number | null = null;
+    let remoteActivationLimit: number | null = null;
+    let usageWindowStartsAt: string | null = null;
+    let usageWindowEndsAt: string | null = null;
     if (dependencies.billingManagement !== undefined) {
       const billingSummary = await dependencies.billingManagement.getBillingSummaryForOrganization({
         organization_id: member.organization_id,
@@ -45,11 +53,29 @@ export function registerProbeRoutes(app: FastifyInstance, dependencies: ApiDepen
 
       const allowance = billingSummary?.allowances.monthly_remote_activations;
       if (billingSummary !== null && allowance !== undefined && allowance.used + 1 > allowance.limit) {
+        if (dependencies.operationalEmailDelivery !== undefined) {
+          await queueAllowanceLimitReachedNotification({
+            store: dependencies.operationalEmailDelivery,
+            project_id: parsedParams.data.id,
+            meter: "monthly_remote_activations",
+            used: allowance.used,
+            limit: allowance.limit,
+            usage_window_starts_at: billingSummary.usage_window.starts_at,
+            usage_window_ends_at: billingSummary.usage_window.ends_at
+          });
+        }
         const retryAfterMs = getQuotaRetryAfterMs(billingSummary.usage_window.ends_at, now);
         return reply.header("Retry-After", toRetryAfterSeconds(retryAfterMs)).status(429).send({
           error: "monthly_quota_exceeded",
           retry_after_ms: retryAfterMs
         });
+      }
+
+      if (billingSummary !== null && allowance !== undefined) {
+        previousRemoteActivationUsed = allowance.used;
+        remoteActivationLimit = allowance.limit;
+        usageWindowStartsAt = billingSummary.usage_window.starts_at;
+        usageWindowEndsAt = billingSummary.usage_window.ends_at;
       }
     }
 
@@ -77,6 +103,23 @@ export function registerProbeRoutes(app: FastifyInstance, dependencies: ApiDepen
 
     if (dependencies.cdnPurge !== undefined) {
       await dependencies.cdnPurge(parsedParams.data.id);
+    }
+
+    if (
+      previousRemoteActivationUsed !== null &&
+      remoteActivationLimit !== null &&
+      dependencies.operationalEmailDelivery !== undefined
+    ) {
+      await queueAllowanceThresholdNotifications({
+        store: dependencies.operationalEmailDelivery,
+        project_id: parsedParams.data.id,
+        meter: "monthly_remote_activations",
+        previous_used: previousRemoteActivationUsed,
+        next_used: previousRemoteActivationUsed + 1,
+        limit: remoteActivationLimit,
+        usage_window_starts_at: usageWindowStartsAt,
+        usage_window_ends_at: usageWindowEndsAt
+      });
     }
 
     return reply.status(201).send({ activation: created.activation, trigger_token: created.trigger_token });

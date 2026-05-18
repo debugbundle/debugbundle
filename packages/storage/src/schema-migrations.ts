@@ -291,6 +291,52 @@ export const STORAGE_SCHEMA_MIGRATIONS = [
         )
       `
     ]
+  }),
+  defineStorageSchemaMigration({
+    id: "202605180004_add_operational_email_deliveries",
+    description: "Add durable operational email delivery queue with retries and dedupe.",
+    statements: [
+      `
+        CREATE TABLE IF NOT EXISTS operational_email_deliveries (
+          id uuid PRIMARY KEY,
+          organization_id uuid NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+          project_id uuid NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+          kind text NOT NULL,
+          dedupe_key text NOT NULL,
+          payload jsonb NOT NULL DEFAULT '{}'::jsonb,
+          status text NOT NULL DEFAULT 'pending',
+          attempt_count integer NOT NULL DEFAULT 0,
+          next_attempt_at timestamptz,
+          last_error text,
+          delivered_at timestamptz,
+          created_at timestamptz NOT NULL DEFAULT now(),
+          updated_at timestamptz NOT NULL DEFAULT now(),
+          UNIQUE (organization_id, kind, dedupe_key)
+        )
+      `,
+      `
+        ALTER TABLE operational_email_deliveries
+        DROP CONSTRAINT IF EXISTS operational_email_deliveries_kind_check
+      `,
+      `
+        ALTER TABLE operational_email_deliveries
+        ADD CONSTRAINT operational_email_deliveries_kind_check
+        CHECK (kind IN ('webhook_auto_disabled', 'allowance_warning_80', 'allowance_limit_reached', 'retention_rotation_notice'))
+      `,
+      `
+        ALTER TABLE operational_email_deliveries
+        DROP CONSTRAINT IF EXISTS operational_email_deliveries_status_check
+      `,
+      `
+        ALTER TABLE operational_email_deliveries
+        ADD CONSTRAINT operational_email_deliveries_status_check
+        CHECK (status IN ('pending', 'retrying', 'delivered', 'failed'))
+      `,
+      `
+        CREATE INDEX IF NOT EXISTS operational_email_deliveries_status_next_attempt_idx
+        ON operational_email_deliveries (status, next_attempt_at, created_at)
+      `
+    ]
   })
 ] as const;
 

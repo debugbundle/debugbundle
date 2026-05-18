@@ -194,6 +194,7 @@ describe("api ingestion route", () => {
   it("should reject captured incident-signal events when the monthly ingestion allowance is exhausted", async (): Promise<void> => {
     const persistAndEnqueue = vi.fn().mockResolvedValue({ object_key: "raw-events/proj_123/path.json.gz" });
     const resolveProjectByTokenHash = vi.fn().mockResolvedValue({ project_id: "proj_123", organization_id: "org_123", organization_plan: "free" });
+    const queueProjectOperationalEmailDelivery = vi.fn().mockResolvedValue({ delivery_id: "op_123", created: true });
     const getBillingSummaryForOrganization = vi.fn().mockResolvedValue({
       usage_window: {
         starts_at: "2026-03-01T00:00:00.000Z",
@@ -222,7 +223,8 @@ describe("api ingestion route", () => {
       tokenManagement: createTokenManagementDependency(),
       incidentRetrieval: createIncidentRetrievalDependency(),
       objectStoreReader: createObjectStoreReaderDependency(),
-      webhookDelivery: createWebhookDeliveryDependency()
+      webhookDelivery: createWebhookDeliveryDependency(),
+      operationalEmailDelivery: { queueProjectOperationalEmailDelivery }
     });
 
     const event = createEventEnvelope({
@@ -283,6 +285,102 @@ describe("api ingestion route", () => {
       now: expect.any(String)
     });
     expect(persistAndEnqueue).not.toHaveBeenCalled();
+    expect(queueProjectOperationalEmailDelivery).toHaveBeenCalledWith(
+      expect.objectContaining({
+        project_id: "proj_123",
+        kind: "allowance_limit_reached"
+      })
+    );
+  });
+
+  it("queues an 80 percent raw-ingestion allowance warning after accepting counted events", async (): Promise<void> => {
+    const persistAndEnqueue = vi.fn().mockResolvedValue({ object_key: "raw-events/proj_123/path.json.gz" });
+    const queueProjectOperationalEmailDelivery = vi.fn().mockResolvedValue({ delivery_id: "op_123", created: true });
+
+    const app = createApiServer({
+      ingestionPersistence: { persistAndEnqueue },
+      ingestionMetadata: {
+        resolveProjectByTokenHash: vi.fn().mockResolvedValue({
+          project_id: "proj_123",
+          organization_id: "org_123",
+          organization_plan: "solo"
+        })
+      },
+      billingManagement: createBillingManagementDependency({
+        getBillingSummaryForOrganization: vi.fn().mockResolvedValue({
+          usage_window: {
+            starts_at: "2026-03-01T00:00:00.000Z",
+            ends_at: "2026-04-01T00:00:00.000Z"
+          },
+          allowances: {
+            monthly_bundle_requests: { used: 0, limit: 750 },
+            monthly_raw_ingested_events: {
+              used: 8399,
+              limit: 10500
+            },
+            retained_bundle_cap: { used: 0, limit: 450 },
+            monthly_remote_activations: { used: 0, limit: 75 },
+            monthly_alert_deliveries: { used: 0, limit: 225 },
+            monthly_webhook_deliveries: { used: 0, limit: 750 }
+          }
+        })
+      }),
+      memberAuth: createMemberAuthDependency(),
+      tokenManagement: createTokenManagementDependency(),
+      incidentRetrieval: createIncidentRetrievalDependency(),
+      objectStoreReader: createObjectStoreReaderDependency(),
+      webhookDelivery: createWebhookDeliveryDependency(),
+      operationalEmailDelivery: { queueProjectOperationalEmailDelivery }
+    });
+
+    const event = createEventEnvelope({
+      event_type: "backend_exception",
+      project_token: "dbundle_proj_test",
+      service: {
+        name: "checkout-api",
+        environment: "production",
+        runtime: "node",
+        framework: "fastify"
+      },
+      payload: {
+        name: "TypeError",
+        message: "boom",
+        stack: "TypeError: boom",
+        handled: false,
+        request: {
+          method: "GET",
+          path: "/users/123",
+          query: {},
+          headers: {},
+          body: null
+        },
+        response: {
+          status_code: 500
+        },
+        runtime: {
+          version: "22.0.0"
+        }
+      }
+    });
+
+    const response = await app.inject({
+      method: "POST",
+      url: "/v1/events",
+      headers: {
+        authorization: "Bearer dbundle_proj_test"
+      },
+      payload: {
+        events: [event]
+      }
+    });
+
+    expect(response.statusCode).toBe(202);
+    expect(queueProjectOperationalEmailDelivery).toHaveBeenCalledWith(
+      expect.objectContaining({
+        project_id: "proj_123",
+        kind: "allowance_warning_80"
+      })
+    );
   });
 
   it("should reject valid events with 429 when the ingestion rate limit is exceeded", async (): Promise<void> => {

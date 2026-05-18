@@ -21,6 +21,18 @@ export type {
   PlanChangeConfirmationInput,
   CapacityQuantityChangeInput
 } from "./billing-emails.js";
+export {
+  renderAllowanceLimitReachedEmail,
+  renderAllowanceWarning80Email,
+  renderRetentionRotationNoticeEmail,
+  renderWebhookAutoDisabledEmail
+} from "./operational-emails.js";
+export type {
+  AllowanceThresholdEmailInput,
+  OperationalEmailRendered,
+  RetentionRotationNoticeEmailInput,
+  WebhookAutoDisabledEmailInput
+} from "./operational-emails.js";
 
 export class EmailDeliveryError extends Error {
   constructor(message: string) {

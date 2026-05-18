@@ -42,6 +42,7 @@ import {
   createPostgresImprovementOpportunityStore,
   createPostgresImprovementSettingsStore,
   createPostgresGitHubStore,
+  createPostgresOperationalEmailDeliveryStore,
   createIncidentLifecycleService,
   createMemberAuthService,
   createIngestionMetadataService,
@@ -754,6 +755,7 @@ export function createApiDependencies(input: CreateApiDependenciesInput): {
   >;
   slackManagement: ReturnType<typeof createPostgresSlackDestinationStore>;
   weeklyReportManagement: ReturnType<typeof createPostgresWeeklyReportChannelStore>;
+  operationalEmailDelivery: ReturnType<typeof createPostgresOperationalEmailDeliveryStore>;
   webhookDelivery: ReturnType<typeof createPostgresWebhookDeliveryStore>;
   webhookTesting: {
     triggerTestDelivery(input: {
@@ -838,13 +840,15 @@ export function createApiDependencies(input: CreateApiDependenciesInput): {
     ...(signupEmailAllowlist === undefined ? {} : { signupEmailAllowlist }),
     ...(input.githubOAuth === undefined ? {} : { githubOAuth: input.githubOAuth })
   });
+  const operationalEmailDelivery = createPostgresOperationalEmailDeliveryStore(input.db);
   const webhookDelivery = createPostgresWebhookDeliveryStore(input.db);
   const incidentLifecycle = createIncidentLifecycleService({
     incidentStore: metadataStore,
     webhookDeliveryStore: webhookDelivery,
     fallbackTargetUrl: input.lifecycleWebhookFallbackTargetUrl ?? null,
     fallbackSigningSecret: input.lifecycleWebhookFallbackSigningSecret ?? null,
-    billingStore
+    billingStore,
+    operationalEmailDeliveryStore: operationalEmailDelivery
   });
   const webhookTesting = {
     triggerTestDelivery: async (request: {
@@ -1811,6 +1815,7 @@ export function createApiDependencies(input: CreateApiDependenciesInput): {
     },
     slackManagement: slackDestinationStore,
     weeklyReportManagement: weeklyReportChannelStore,
+    operationalEmailDelivery,
     webhookDelivery,
     webhookTesting,
     webhookManagement: {
@@ -1923,6 +1928,7 @@ export function createApiDependenciesFromEnv(env: Record<string, string | undefi
   >;
   slackManagement: ReturnType<typeof createPostgresSlackDestinationStore>;
   weeklyReportManagement: ReturnType<typeof createPostgresWeeklyReportChannelStore>;
+  operationalEmailDelivery: ReturnType<typeof createPostgresOperationalEmailDeliveryStore>;
   webhookDelivery: ReturnType<typeof createPostgresWebhookDeliveryStore>;
   webhookTesting: {
     triggerTestDelivery(input: {

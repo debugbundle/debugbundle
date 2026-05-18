@@ -1115,6 +1115,66 @@ export interface WeeklyReportDeliveryStore {
   }): Promise<{ status: "delivered" | "failed" }>;
 }
 
+export type OperationalEmailDeliveryKind =
+  | "webhook_auto_disabled"
+  | "allowance_warning_80"
+  | "allowance_limit_reached"
+  | "retention_rotation_notice";
+
+export type OperationalEmailDeliveryStatus = "pending" | "retrying" | "delivered" | "failed";
+
+export interface OperationalEmailDeliveryRecord {
+  delivery_id: string;
+  organization_id: string;
+  project_id: string;
+  kind: OperationalEmailDeliveryKind;
+  dedupe_key: string;
+  payload: Record<string, unknown>;
+  status: OperationalEmailDeliveryStatus;
+  attempt_count: number;
+  next_attempt_at: string | null;
+  last_error: string | null;
+  delivered_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface OperationalEmailRecipientContext {
+  organization_name: string;
+  project_name: string;
+  recipient_email: string;
+}
+
+export interface MarkOperationalEmailDeliveryAttemptInput {
+  delivery_id: string;
+  attempt: number;
+  delivered: boolean;
+  error_message: string | null;
+}
+
+export interface MarkOperationalEmailDeliveryAttemptResult {
+  status: "retrying" | "delivered" | "failed";
+  next_attempt: number | null;
+}
+
+export interface OperationalEmailDeliveryStore {
+  queueProjectOperationalEmailDelivery(input: {
+    project_id: string;
+    kind: OperationalEmailDeliveryKind;
+    dedupe_key: string;
+    payload: Record<string, unknown>;
+  }): Promise<{ delivery_id: string | null; created: boolean }>;
+  claimDueOperationalEmailDeliveries(limit: number): Promise<Array<{ delivery_id: string; attempt: number }>>;
+  getOperationalEmailDelivery(input: { delivery_id: string }): Promise<OperationalEmailDeliveryRecord | null>;
+  resolveOperationalEmailRecipientContext(input: {
+    organization_id: string;
+    project_id: string;
+  }): Promise<OperationalEmailRecipientContext | null>;
+  markOperationalEmailDeliveryAttempt(
+    input: MarkOperationalEmailDeliveryAttemptInput
+  ): Promise<MarkOperationalEmailDeliveryAttemptResult>;
+}
+
 export interface TokenManagementStore {
   listProjectTokensForOrganization(input: {
     organization_id: string;

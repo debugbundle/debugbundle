@@ -2,6 +2,10 @@ import type { FastifyInstance } from "fastify";
 
 import { hashToken, readBearerToken, requireProjectToken } from "../../../../packages/auth/src/index.js";
 import { classifyEvent, validateEvent } from "../../../../packages/event-normalizer/src/index.js";
+import {
+  queueAllowanceLimitReachedNotification,
+  queueAllowanceThresholdNotifications
+} from "../../../../packages/storage/src/index.js";
 import { getTierCapabilities, resolvePolicy, PRESET_DEFAULTS, shouldCaptureEvent, getDefaultPreset, isSelfHostMode } from "../../../../packages/shared-types/src/index.js";
 import type { ResolvedCapturePolicy } from "../../../../packages/shared-types/src/index.js";
 import type { ApiDependencies } from "../api-types.js";
@@ -149,6 +153,9 @@ export function registerIngestionRoutes(app: FastifyInstance, dependencies: ApiD
 
     let billingCountedEventsCount = 0;
     let usageWindowStartsAt: string | null = null;
+    let usageWindowEndsAt: string | null = null;
+    let previousRawIngestAllowanceUsed: number | null = null;
+    let rawIngestAllowanceLimit: number | null = null;
 
     if (
       capturedEvents.length > 0 &&
@@ -168,6 +175,17 @@ export function registerIngestionRoutes(app: FastifyInstance, dependencies: ApiD
 
         const allowance = billingSummary?.allowances.monthly_raw_ingested_events;
         if (billingSummary !== null && allowance !== undefined && allowance.used + countedEvents.length > allowance.limit) {
+          if (dependencies.operationalEmailDelivery !== undefined) {
+            await queueAllowanceLimitReachedNotification({
+              store: dependencies.operationalEmailDelivery,
+              project_id: project.project_id,
+              meter: "monthly_raw_ingested_events",
+              used: allowance.used,
+              limit: allowance.limit,
+              usage_window_starts_at: billingSummary.usage_window.starts_at,
+              usage_window_ends_at: billingSummary.usage_window.ends_at
+            });
+          }
           const retryAfterMs = getQuotaRetryAfterMs(billingSummary.usage_window.ends_at, now);
           errors.push(
             ...capturedEvents.map(({ index }) => ({
@@ -187,6 +205,9 @@ export function registerIngestionRoutes(app: FastifyInstance, dependencies: ApiD
         billingCountedEventsCount = countedEvents.length;
         if (billingSummary !== null) {
           usageWindowStartsAt = billingSummary.usage_window.starts_at;
+          usageWindowEndsAt = billingSummary.usage_window.ends_at;
+          previousRawIngestAllowanceUsed = allowance?.used ?? null;
+          rawIngestAllowanceLimit = allowance?.limit ?? null;
         }
       }
     }
@@ -210,6 +231,24 @@ export function registerIngestionRoutes(app: FastifyInstance, dependencies: ApiD
         organization_id: project.organization_id,
         period_starts_at: usageWindowStartsAt,
         count: billingCountedEventsCount
+      });
+    }
+
+    if (
+      billingCountedEventsCount > 0 &&
+      previousRawIngestAllowanceUsed !== null &&
+      rawIngestAllowanceLimit !== null &&
+      dependencies.operationalEmailDelivery !== undefined
+    ) {
+      await queueAllowanceThresholdNotifications({
+        store: dependencies.operationalEmailDelivery,
+        project_id: project.project_id,
+        meter: "monthly_raw_ingested_events",
+        previous_used: previousRawIngestAllowanceUsed,
+        next_used: previousRawIngestAllowanceUsed + billingCountedEventsCount,
+        limit: rawIngestAllowanceLimit,
+        usage_window_starts_at: usageWindowStartsAt,
+        usage_window_ends_at: usageWindowEndsAt
       });
     }
 

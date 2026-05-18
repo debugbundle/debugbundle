@@ -1,5 +1,12 @@
 import { gunzipSync, gzipSync } from "node:zlib";
 
+import {
+  renderAllowanceLimitReachedEmail,
+  renderAllowanceWarning80Email,
+  renderRetentionRotationNoticeEmail,
+  renderWebhookAutoDisabledEmail,
+  type EmailTransport
+} from "../../../packages/email/src/index.js";
 import type { RuntimeLogger } from "../../../packages/runtime-logger/src/index.js";
 import {
   FINGERPRINT_VERSION,
@@ -32,6 +39,7 @@ import type {
   MetadataStore,
   ObjectStoreClient,
   ObjectStoreReader,
+  OperationalEmailDeliveryStore,
   RequestAnomalyCounter,
   RegressionDeployCorrelation,
   WeeklyReportChannelRecord,
@@ -48,7 +56,12 @@ import {
   buildBundleObjectKey,
   buildImprovementBundleObjectKey,
   buildRawEventObjectKey,
-  buildReproductionObjectKey
+  buildReproductionObjectKey,
+  getAllowanceLimitBehavior,
+  getAllowanceMeterLabel,
+  queueAllowanceLimitReachedNotification,
+  queueAllowanceThresholdNotifications,
+  queueRetentionRotationNotice
 } from "../../../packages/storage/src/index.js";
 import {
   BundleV1Schema,
@@ -205,6 +218,7 @@ export interface BuildBundleWorkerDependencies {
     >;
   objectStore: ObjectStoreClient & Partial<ObjectStoreReader>;
   billingStore?: Pick<BillingStore, "getBillingSummaryForProject">;
+  operationalEmailDeliveryStore?: Pick<OperationalEmailDeliveryStore, "queueProjectOperationalEmailDelivery">;
 }
 
 function normalizeWorkerBaseUrl(value: string | undefined): string | null {
@@ -379,12 +393,26 @@ export interface EvaluateAlertsWorkerDependencies {
   alertStore: AlertDeliveryStore;
   alertTransport: AlertDeliveryTransport;
   billingStore?: Pick<BillingStore, "getBillingSummaryForProject">;
+  operationalEmailDeliveryStore?: Pick<OperationalEmailDeliveryStore, "queueProjectOperationalEmailDelivery">;
 }
 
 export interface DeliverAlertEmailDigestWorkerDependencies {
   queue: WorkerQueue;
   alertStore: Pick<AlertDeliveryStore, "getAlertEmailDigest" | "markAlertEmailDigestResult">;
   alertEmailDigestTransport: AlertEmailDigestTransport;
+}
+
+export interface DeliverOperationalEmailWorkerDependencies {
+  logger?: Pick<RuntimeLogger, "warn">;
+  appBaseUrl?: string | null;
+  operationalEmailDeliveryStore: Pick<
+    OperationalEmailDeliveryStore,
+    | "claimDueOperationalEmailDeliveries"
+    | "getOperationalEmailDelivery"
+    | "resolveOperationalEmailRecipientContext"
+    | "markOperationalEmailDeliveryAttempt"
+  >;
+  emailTransport: EmailTransport;
 }
 
 export interface GenerateWeeklyReportWorkerDependencies {
@@ -413,8 +441,36 @@ export interface WorkerProcessResult {
 
 const ALERT_EMAIL_DIGEST_WINDOW_SECONDS = 10;
 
+type AllowanceNotificationPayload = {
+  meter: string;
+  used: number;
+  limit: number;
+  usage_window_ends_at?: string | null;
+} & Record<string, unknown>;
+
+type RetentionRotationNotificationPayload = {
+  rotated_owner_count: number;
+  retained_bundle_limit: number;
+} & Record<string, unknown>;
+
+type WebhookAutoDisabledNotificationPayload = {
+  webhook_id: string;
+  target_url: string;
+} & Record<string, unknown>;
+
 function getWorkerErrorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
+}
+
+function isAllowanceMeter(value: string): value is Parameters<typeof getAllowanceMeterLabel>[0] {
+  return (
+    value === "monthly_bundle_requests" ||
+    value === "monthly_raw_ingested_events" ||
+    value === "retained_bundle_cap" ||
+    value === "monthly_remote_activations" ||
+    value === "monthly_alert_deliveries" ||
+    value === "monthly_webhook_deliveries"
+  );
 }
 
 async function enqueueAlertEvaluation(
@@ -929,6 +985,10 @@ export async function processNextEvaluateAlertsJob(
   });
 
   let remainingAlertDeliveries: number | null = null;
+  let alertAllowanceUsed: number | null = null;
+  let alertAllowanceLimit: number | null = null;
+  let alertUsageWindowStartsAt: string | null = null;
+  let alertUsageWindowEndsAt: string | null = null;
   if (dependencies.billingStore !== undefined) {
     const billingSummary = await dependencies.billingStore.getBillingSummaryForProject({
       project_id: job.project_id,
@@ -937,6 +997,10 @@ export async function processNextEvaluateAlertsJob(
     const allowance = billingSummary?.allowances.monthly_alert_deliveries;
     if (billingSummary !== null && allowance !== undefined) {
       remainingAlertDeliveries = Math.max(0, allowance.limit - allowance.used);
+      alertAllowanceUsed = allowance.used;
+      alertAllowanceLimit = allowance.limit;
+      alertUsageWindowStartsAt = billingSummary.usage_window.starts_at;
+      alertUsageWindowEndsAt = billingSummary.usage_window.ends_at;
     }
   }
 
@@ -979,12 +1043,60 @@ export async function processNextEvaluateAlertsJob(
       });
 
       if (queued.created && queued.created_digest && remainingAlertDeliveries !== null) {
+        const previousUsed = alertAllowanceUsed ?? 0;
         remainingAlertDeliveries -= 1;
+        alertAllowanceUsed = previousUsed + 1;
+        if (
+          dependencies.operationalEmailDeliveryStore !== undefined &&
+          alertAllowanceLimit !== null
+        ) {
+          await queueAllowanceThresholdNotifications({
+            store: dependencies.operationalEmailDeliveryStore,
+            project_id: job.project_id,
+            meter: "monthly_alert_deliveries",
+            previous_used: previousUsed,
+            next_used: alertAllowanceUsed,
+            limit: alertAllowanceLimit,
+            usage_window_starts_at: alertUsageWindowStartsAt,
+            usage_window_ends_at: alertUsageWindowEndsAt
+          });
+        }
+      } else if (
+        queued.created === false &&
+        queued.digest_id === null &&
+        dependencies.operationalEmailDeliveryStore !== undefined &&
+        alertAllowanceLimit !== null &&
+        remainingAlertDeliveries !== null &&
+        remainingAlertDeliveries <= 0
+      ) {
+        await queueAllowanceLimitReachedNotification({
+          store: dependencies.operationalEmailDeliveryStore,
+          project_id: job.project_id,
+          meter: "monthly_alert_deliveries",
+          used: alertAllowanceUsed ?? alertAllowanceLimit,
+          limit: alertAllowanceLimit,
+          usage_window_starts_at: alertUsageWindowStartsAt,
+          usage_window_ends_at: alertUsageWindowEndsAt
+        });
       }
       continue;
     }
 
     if (remainingAlertDeliveries !== null && remainingAlertDeliveries <= 0) {
+      if (
+        dependencies.operationalEmailDeliveryStore !== undefined &&
+        alertAllowanceLimit !== null
+      ) {
+        await queueAllowanceLimitReachedNotification({
+          store: dependencies.operationalEmailDeliveryStore,
+          project_id: job.project_id,
+          meter: "monthly_alert_deliveries",
+          used: alertAllowanceUsed ?? alertAllowanceLimit,
+          limit: alertAllowanceLimit,
+          usage_window_starts_at: alertUsageWindowStartsAt,
+          usage_window_ends_at: alertUsageWindowEndsAt
+        });
+      }
       continue;
     }
 
@@ -1003,7 +1115,24 @@ export async function processNextEvaluateAlertsJob(
     }
 
     if (remainingAlertDeliveries !== null) {
+      const previousUsed = alertAllowanceUsed ?? 0;
       remainingAlertDeliveries -= 1;
+      alertAllowanceUsed = previousUsed + 1;
+      if (
+        dependencies.operationalEmailDeliveryStore !== undefined &&
+        alertAllowanceLimit !== null
+      ) {
+        await queueAllowanceThresholdNotifications({
+          store: dependencies.operationalEmailDeliveryStore,
+          project_id: job.project_id,
+          meter: "monthly_alert_deliveries",
+          previous_used: previousUsed,
+          next_used: alertAllowanceUsed,
+          limit: alertAllowanceLimit,
+          usage_window_starts_at: alertUsageWindowStartsAt,
+          usage_window_ends_at: alertUsageWindowEndsAt
+        });
+      }
     }
 
     try {
@@ -1080,6 +1209,152 @@ export async function processNextDeliverAlertEmailDigestJob(
       digest_id: digest.digest.digest_id,
       delivered: false,
       error_message: message
+    });
+  }
+
+  return { processed: true };
+}
+
+export async function processNextDeliverOperationalEmailJob(
+  dependencies: DeliverOperationalEmailWorkerDependencies
+): Promise<WorkerProcessResult> {
+  const claimed = await dependencies.operationalEmailDeliveryStore.claimDueOperationalEmailDeliveries(1);
+  const next = claimed[0];
+  if (next === undefined) {
+    return { processed: false, reason: "no_jobs" };
+  }
+
+  const delivery = await dependencies.operationalEmailDeliveryStore.getOperationalEmailDelivery({
+    delivery_id: next.delivery_id
+  });
+  if (delivery === null) {
+    return { processed: true };
+  }
+
+  const recipientContext = await dependencies.operationalEmailDeliveryStore.resolveOperationalEmailRecipientContext({
+    organization_id: delivery.organization_id,
+    project_id: delivery.project_id
+  });
+  if (recipientContext === null) {
+    await dependencies.operationalEmailDeliveryStore.markOperationalEmailDeliveryAttempt({
+      delivery_id: delivery.delivery_id,
+      attempt: next.attempt,
+      delivered: false,
+      error_message: "operational_email_recipient_missing"
+    });
+    return { processed: true };
+  }
+
+  try {
+    const billingUrl = dependencies.appBaseUrl === null || dependencies.appBaseUrl === undefined
+      ? undefined
+      : `${dependencies.appBaseUrl}/billing`;
+    const webhooksUrl = dependencies.appBaseUrl === null || dependencies.appBaseUrl === undefined
+      ? undefined
+      : `${dependencies.appBaseUrl}/projects/${delivery.project_id}/webhooks`;
+
+    let rendered: ReturnType<typeof renderWebhookAutoDisabledEmail>;
+    switch (delivery.kind) {
+      case "webhook_auto_disabled": {
+        const payload = delivery.payload as WebhookAutoDisabledNotificationPayload;
+        if (typeof payload.webhook_id !== "string" || typeof payload.target_url !== "string") {
+          throw new Error("operational_email_invalid_webhook_auto_disabled_payload");
+        }
+        rendered = renderWebhookAutoDisabledEmail({
+          organizationName: recipientContext.organization_name,
+          projectName: recipientContext.project_name,
+          webhookId: payload.webhook_id,
+          targetUrl: payload.target_url,
+          ...(webhooksUrl === undefined ? {} : { webhooksUrl })
+        });
+        break;
+      }
+      case "allowance_warning_80":
+      case "allowance_limit_reached": {
+        const payload = delivery.payload as AllowanceNotificationPayload;
+        if (
+          typeof payload.meter !== "string" ||
+          !isAllowanceMeter(payload.meter) ||
+          typeof payload.used !== "number" ||
+          typeof payload.limit !== "number"
+        ) {
+          throw new Error("operational_email_invalid_allowance_payload");
+        }
+
+        const input = {
+          organizationName: recipientContext.organization_name,
+          projectName: recipientContext.project_name,
+          meterLabel: getAllowanceMeterLabel(payload.meter),
+          used: payload.used,
+          limit: payload.limit,
+          currentBehavior: getAllowanceLimitBehavior(payload.meter)
+        };
+        const usageWindowEndsAt =
+          typeof payload.usage_window_ends_at === "string" || payload.usage_window_ends_at === null
+            ? payload.usage_window_ends_at
+            : undefined;
+        const allowanceInput = {
+          ...input,
+          ...(usageWindowEndsAt === undefined ? {} : { usageWindowEndsAt }),
+          ...(billingUrl === undefined ? {} : { billingUrl })
+        };
+
+        rendered = delivery.kind === "allowance_warning_80"
+          ? renderAllowanceWarning80Email(allowanceInput)
+          : renderAllowanceLimitReachedEmail(allowanceInput);
+        break;
+      }
+      case "retention_rotation_notice": {
+        const payload = delivery.payload as RetentionRotationNotificationPayload;
+        if (
+          typeof payload.rotated_owner_count !== "number" ||
+          typeof payload.retained_bundle_limit !== "number"
+        ) {
+          throw new Error("operational_email_invalid_retention_rotation_payload");
+        }
+
+        rendered = renderRetentionRotationNoticeEmail({
+          organizationName: recipientContext.organization_name,
+          projectName: recipientContext.project_name,
+          rotatedOwnerCount: payload.rotated_owner_count,
+          retainedBundleLimit: payload.retained_bundle_limit,
+          ...(billingUrl === undefined ? {} : { billingUrl })
+        });
+        break;
+      }
+    }
+
+    await dependencies.emailTransport.send({
+      to: [recipientContext.recipient_email],
+      subject: rendered.subject,
+      text: rendered.text,
+      html: rendered.html
+    });
+
+    await dependencies.operationalEmailDeliveryStore.markOperationalEmailDeliveryAttempt({
+      delivery_id: delivery.delivery_id,
+      attempt: next.attempt,
+      delivered: true,
+      error_message: null
+    });
+  } catch (error) {
+    const errorMessage = getWorkerErrorMessage(error);
+    dependencies.logger?.warn(
+      {
+        attempt: next.attempt,
+        delivery_id: delivery.delivery_id,
+        kind: delivery.kind,
+        error_message: errorMessage,
+        organization_id: delivery.organization_id,
+        project_id: delivery.project_id
+      },
+      "worker_operational_email_delivery_failed"
+    );
+    await dependencies.operationalEmailDeliveryStore.markOperationalEmailDeliveryAttempt({
+      delivery_id: delivery.delivery_id,
+      attempt: next.attempt,
+      delivered: false,
+      error_message: errorMessage
     });
   }
 
@@ -1400,6 +1675,17 @@ export async function processNextBuildBundleJob(
       const allowance = billingSummary?.allowances.monthly_bundle_requests;
 
       if (billingSummary !== null && allowance !== undefined && allowance.used >= allowance.limit) {
+        if (dependencies.operationalEmailDeliveryStore !== undefined) {
+          await queueAllowanceLimitReachedNotification({
+            store: dependencies.operationalEmailDeliveryStore,
+            project_id: incident.project_id,
+            meter: "monthly_bundle_requests",
+            used: allowance.used,
+            limit: allowance.limit,
+            usage_window_starts_at: billingSummary.usage_window.starts_at,
+            usage_window_ends_at: billingSummary.usage_window.ends_at
+          });
+        }
         await dependencies.incidentStore.markBundleGenerationFailure?.({
           incident_id: incident.incident_id,
           reason: "monthly_quota_exceeded"
@@ -1460,11 +1746,26 @@ export async function processNextBuildBundleJob(
       contentEncoding: "gzip"
     });
 
+    if (!alreadyRecorded && billingSummary !== null && dependencies.operationalEmailDeliveryStore !== undefined) {
+      const bundleAllowance = billingSummary.allowances.monthly_bundle_requests;
+      await queueAllowanceThresholdNotifications({
+        store: dependencies.operationalEmailDeliveryStore,
+        project_id: incident.project_id,
+        meter: "monthly_bundle_requests",
+        previous_used: bundleAllowance.used,
+        next_used: bundleAllowance.used + 1,
+        limit: bundleAllowance.limit,
+        usage_window_starts_at: billingSummary.usage_window.starts_at,
+        usage_window_ends_at: billingSummary.usage_window.ends_at
+      });
+    }
+
     if (
       dependencies.billingStore !== undefined &&
       dependencies.incidentStore.pruneRetainedBundleOwnersForProject !== undefined &&
       dependencies.objectStore.deleteObject !== undefined
     ) {
+      const hadPreBuildBillingSummary = billingSummary !== null;
       billingSummary ??= await dependencies.billingStore.getBillingSummaryForProject({
         project_id: incident.project_id,
         now: new Date().toISOString()
@@ -1473,6 +1774,23 @@ export async function processNextBuildBundleJob(
       const retainedAllowance = billingSummary?.allowances.retained_bundle_cap;
 
       if (retainedAllowance !== undefined) {
+        if (dependencies.operationalEmailDeliveryStore !== undefined) {
+          const previousRetainedUsed = hadPreBuildBillingSummary
+            ? retainedAllowance.used
+            : Math.max(0, retainedAllowance.used - 1);
+          const nextRetainedUsed = hadPreBuildBillingSummary
+            ? Math.min(retainedAllowance.limit, retainedAllowance.used + 1)
+            : retainedAllowance.used;
+          await queueAllowanceThresholdNotifications({
+            store: dependencies.operationalEmailDeliveryStore,
+            project_id: incident.project_id,
+            meter: "retained_bundle_cap",
+            previous_used: previousRetainedUsed,
+            next_used: nextRetainedUsed,
+            limit: retainedAllowance.limit
+          });
+        }
+
         const prunedOwners = await dependencies.incidentStore.pruneRetainedBundleOwnersForProject({
           project_id: incident.project_id,
           retained_bundle_limit: retainedAllowance.limit
@@ -1482,6 +1800,16 @@ export async function processNextBuildBundleJob(
           await deletePrunedBundleArtifacts({
             objectStore: dependencies.objectStore,
             owner: prunedOwner
+          });
+        }
+
+        if (dependencies.operationalEmailDeliveryStore !== undefined && prunedOwners.length > 0) {
+          await queueRetentionRotationNotice({
+            store: dependencies.operationalEmailDeliveryStore,
+            project_id: incident.project_id,
+            rotated_owner_count: prunedOwners.length,
+            retained_bundle_limit: retainedAllowance.limit,
+            dedupe_date: new Date().toISOString().slice(0, 10)
           });
         }
       }

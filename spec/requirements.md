@@ -353,7 +353,7 @@ See `/spec/billing.md` and `/spec/system-emails.md` for the detailed source-of-t
 
 ### 1.13 Email System
 
-**FR-EMAIL-01:** Transactional emails only: email sign-in codes, security alerts, billing events, invites.
+**FR-EMAIL-01:** Transactional and product-critical lifecycle emails only: email sign-in codes, security alerts, billing events, invites, weekly reports, and mandatory operational owner notifications listed in `/spec/system-emails.md`.
 
 **FR-EMAIL-02:** Provider abstraction (interface) with AWS SES as the default provider and support for alternate transports behind the same interface.
 
@@ -361,11 +361,11 @@ See `/spec/billing.md` and `/spec/system-emails.md` for the detailed source-of-t
 
 **FR-EMAIL-04:** DNS: SPF, DKIM, DMARC required.
 
-**FR-EMAIL-05:** Free plan: minimal operational email (webhook failures → daily digest only). Paid plans (Solo+): configurable operational alerts.
+**FR-EMAIL-05:** User-configured operational alert email should stay low-noise: Free uses minimal alert email, and paid plans (Solo+) may add configurable operational alerts. Mandatory system emails from `/spec/system-emails.md`, including allowance and retention notices, apply across tiers.
 
 **FR-EMAIL-06:** Email templates must use simple HTML with plain-text fallback. React email optional for future enhancement. No marketing template systems.
 
-**FR-EMAIL-07:** Anti-spam guardrails: throttle repeated notifications, use digest emails instead of frequent sends, prioritize webhook/Slack over email for operational alerts. Critical emails (email sign-in codes, security alerts) must not silently fail.
+**FR-EMAIL-07:** Anti-spam guardrails: throttle or dedupe repeated system notifications, use digest emails instead of frequent sends for bursty user-configured alert emails, and prioritize webhook/Slack over email for configurable operational alerts. Critical emails (email sign-in codes and security alerts) must not silently fail.
 
 ### 1.14 Project Profile
 

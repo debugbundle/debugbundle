@@ -196,4 +196,64 @@ describe("worker incident improvement bundles", () => {
     expect(parsed.summary.primary_signal).toBe("post_deploy_regression");
     expect(parsed.context.deploy?.commit_sha).toBe("abc123");
   });
+
+  it("returns early when incident improvement automation is unavailable or the recorded candidate does not trigger", async () => {
+    const putObject = vi.fn();
+    const missingSettingsStore = createBaseStore({
+      getImprovementExecutionSettings: vi.fn().mockResolvedValue(null)
+    });
+
+    await maybeGenerateHostedIncidentImprovementBundle({
+      project_id: "00000000-0000-0000-0000-000000000001",
+      incident_id: "00000000-0000-0000-0000-000000000501",
+      event_id: "00000000-0000-0000-0000-000000000703",
+      event_type: "backend_exception",
+      service_name: "checkout-api",
+      environment: "production",
+      incident_title: "Checkout timeout",
+      incident_severity: "high",
+      incident_occurrence_count: 5,
+      occurred_at: "2026-05-18T12:00:00.000Z",
+      regressed_now: false,
+      dependencies: {
+        improvementOpportunityStore: missingSettingsStore,
+        objectStore: {
+          getObject: vi.fn(),
+          putObject
+        }
+      }
+    });
+
+    const noTriggerStore = createBaseStore({
+      recordIncidentPattern: vi.fn().mockResolvedValue({
+        opportunity_id: "imp_incident",
+        occurrence_count: 2,
+        bundle_generation_number: 0,
+        should_generate_bundle: false
+      })
+    });
+
+    await maybeGenerateHostedIncidentImprovementBundle({
+      project_id: "00000000-0000-0000-0000-000000000001",
+      incident_id: "00000000-0000-0000-0000-000000000501",
+      event_id: "00000000-0000-0000-0000-000000000704",
+      event_type: "backend_exception",
+      service_name: "checkout-api",
+      environment: "production",
+      incident_title: "Checkout timeout",
+      incident_severity: "high",
+      incident_occurrence_count: 2,
+      occurred_at: "2026-05-18T12:00:00.000Z",
+      regressed_now: false,
+      dependencies: {
+        improvementOpportunityStore: noTriggerStore,
+        objectStore: {
+          getObject: vi.fn(),
+          putObject
+        }
+      }
+    });
+
+    expect(putObject).not.toHaveBeenCalled();
+  });
 });

@@ -62,6 +62,26 @@ function createDependencies(overrides: {
 
 describe("improvement settings routes", () => {
   describe("GET /v1/projects/:id/improvement-settings", () => {
+    it("returns default settings when project settings storage is unavailable", async () => {
+      const app = createDependencies();
+
+      const response = await app.inject({
+        method: "GET",
+        url: "/v1/projects/00000000-0000-0000-0000-000000000001/improvement-settings",
+        headers: { authorization: "Bearer dbundle_mem_test_token" }
+      });
+
+      expect(response.statusCode).toBe(200);
+      expect(response.json()).toEqual({
+        access_mode: "manage",
+        cloud_automation_available: true,
+        settings: {
+          automated_improvement_bundles_enabled: true,
+          improvement_bundle_sensitivity: "balanced"
+        }
+      });
+    });
+
     it("returns project improvement settings for Solo projects", async () => {
       const app = createDependencies({
         improvementSettingsManagement: {
@@ -175,6 +195,19 @@ describe("improvement settings routes", () => {
         }
       });
     });
+
+    it("rejects invalid project ids", async () => {
+      const app = createDependencies();
+
+      const response = await app.inject({
+        method: "GET",
+        url: "/v1/projects/not-a-uuid/improvement-settings",
+        headers: { authorization: "Bearer dbundle_mem_test_token" }
+      });
+
+      expect(response.statusCode).toBe(400);
+      expect(response.json()).toEqual({ error: "invalid_project_id" });
+    });
   });
 
   describe("PATCH /v1/projects/:id/improvement-settings", () => {
@@ -211,6 +244,58 @@ describe("improvement settings routes", () => {
           improvement_bundle_sensitivity: "verbose"
         }
       });
+    });
+
+    it("rejects project members from updating improvement settings", async () => {
+      const app = createDependencies({
+        projectManagement: {
+          resolveProjectAccessForUser: vi.fn().mockResolvedValue({
+            project_id: "00000000-0000-0000-0000-000000000001",
+            organization_id: "org_123",
+            owner_user_id: "usr_owner",
+            owner_email: "owner@example.com",
+            relationship: "shared",
+            effective_role: "member",
+            organization_plan: "team"
+          }),
+          listProjectsForOrganization: vi.fn().mockResolvedValue([]),
+          createProjectForOrganization: vi.fn(),
+          updateProjectForOrganization: vi.fn(),
+          deleteProjectForOrganization: vi.fn()
+        },
+        improvementSettingsManagement: {
+          getImprovementSettingsForProject: vi.fn(),
+          updateImprovementSettingsForProject: vi.fn()
+        }
+      });
+
+      const response = await app.inject({
+        method: "PATCH",
+        url: "/v1/projects/00000000-0000-0000-0000-000000000001/improvement-settings",
+        headers: { authorization: "Bearer dbundle_mem_test_token" },
+        payload: {
+          automated_improvement_bundles_enabled: false
+        }
+      });
+
+      expect(response.statusCode).toBe(403);
+      expect(response.json()).toEqual({ error: "forbidden" });
+    });
+
+    it("returns improvement_settings_not_available when the settings surface is disabled", async () => {
+      const app = createDependencies();
+
+      const response = await app.inject({
+        method: "PATCH",
+        url: "/v1/projects/00000000-0000-0000-0000-000000000001/improvement-settings",
+        headers: { authorization: "Bearer dbundle_mem_test_token" },
+        payload: {
+          automated_improvement_bundles_enabled: false
+        }
+      });
+
+      expect(response.statusCode).toBe(404);
+      expect(response.json()).toEqual({ error: "improvement_settings_not_available" });
     });
 
     it("returns upgrade_required for Free-tier projects", async () => {
@@ -266,6 +351,32 @@ describe("improvement settings routes", () => {
 
       expect(response.statusCode).toBe(400);
       expect(response.json()).toEqual({ error: "invalid_payload" });
+    });
+
+    it("returns project_not_found when the backing store cannot update the project", async () => {
+      const createAuditLog = vi.fn().mockResolvedValue(undefined);
+      const app = createDependencies({
+        auditLogging: {
+          createAuditLog
+        },
+        improvementSettingsManagement: {
+          getImprovementSettingsForProject: vi.fn(),
+          updateImprovementSettingsForProject: vi.fn().mockResolvedValue(null)
+        }
+      });
+
+      const response = await app.inject({
+        method: "PATCH",
+        url: "/v1/projects/00000000-0000-0000-0000-000000000001/improvement-settings",
+        headers: { authorization: "Bearer dbundle_mem_test_token" },
+        payload: {
+          automated_improvement_bundles_enabled: false
+        }
+      });
+
+      expect(response.statusCode).toBe(404);
+      expect(response.json()).toEqual({ error: "project_not_found" });
+      expect(createAuditLog).toHaveBeenCalledOnce();
     });
   });
 });

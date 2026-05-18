@@ -24,6 +24,7 @@ import {
   createPostgresBillingStore,
   createPostgresGitHubStore,
   createPostgresImprovementOpportunityStore,
+  createPostgresOperationalEmailDeliveryStore,
   createPostgresSlackDestinationStore,
   createPostgresWebhookDeliveryStore,
   createPostgresMetadataStore,
@@ -37,8 +38,11 @@ import {
   createS3ObjectStoreClient,
   assertIntegrationSecretEncryptionKey,
   decryptIntegrationSecret,
+  queueAllowanceLimitReachedNotification,
+  queueAllowanceThresholdNotifications,
   type AlertDeliveryStore,
   type BillingStore,
+  type OperationalEmailDeliveryStore,
   type WeeklyReportChannelRecord,
   type GitHubStore,
   type SlackDestinationStore,
@@ -54,6 +58,7 @@ import {
   processNextCleanupRetentionJob,
   processNextDeliverAlertEmailDigestJob,
   processNextDeliverGitHubDispatchJob,
+  processNextDeliverOperationalEmailJob,
   processNextDeliverWebhookJob,
   processNextGenerateWeeklyReportJob,
   AlertDeliveryError,
@@ -122,6 +127,59 @@ function normalizeWorkerBaseUrl(value: string | undefined): string | null {
   }
 
   return trimmed.replace(/\/+$/, "");
+}
+
+interface WebhookOwnerNotificationRecipient {
+  organizationName: string;
+  projectId: string;
+  projectName: string;
+  recipientEmail: string;
+}
+
+async function getWebhookOwnerNotificationRecipient(
+  queryable: Queryable,
+  webhookId: string
+): Promise<WebhookOwnerNotificationRecipient | null> {
+  const result = await queryable.query<{
+    organization_name: string;
+    project_id: string;
+    project_name: string;
+    recipient_email: string;
+  }>(
+    `
+      SELECT
+        o.name AS organization_name,
+        p.id::text AS project_id,
+        p.name AS project_name,
+        u.email AS recipient_email
+      FROM agent_webhooks aw
+      JOIN projects p
+        ON p.id = aw.project_id
+      JOIN organizations o
+        ON o.id = p.organization_id
+      JOIN organization_members om
+        ON om.organization_id = o.id
+       AND om.role = 'owner'
+      JOIN users u
+        ON u.id = om.user_id
+      WHERE aw.id = $1
+      ORDER BY om.created_at ASC, om.user_id ASC
+      LIMIT 1
+    `,
+    [webhookId]
+  );
+
+  const row = result.rows[0];
+  if (row === undefined) {
+    return null;
+  }
+
+  return {
+    organizationName: row.organization_name,
+    projectId: row.project_id,
+    projectName: row.project_name,
+    recipientEmail: row.recipient_email
+  };
 }
 
 export function parseWorkerEnv(env: Record<string, string | undefined>): WorkerEnv {
@@ -286,6 +344,7 @@ interface CreateLifecycleWebhookPublisherInput {
   fallbackSigningSecret: string | null;
   webhookDeliveryStore: Pick<WebhookDeliveryStore, "listMatchingWebhooks" | "createDeliveryIntent">;
   billingStore?: Pick<BillingStore, "getBillingSummaryForProject">;
+  operationalEmailDeliveryStore?: Pick<OperationalEmailDeliveryStore, "queueProjectOperationalEmailDelivery">;
 }
 
 interface GitHubDispatchTokenCache {
@@ -464,6 +523,10 @@ export function createLifecycleWebhookPublisher(input: CreateLifecycleWebhookPub
 
       const targets = matching.length > 0 ? matching : fallback;
       let remainingWebhookDeliveries: number | null = null;
+      let webhookAllowanceUsed: number | null = null;
+      let webhookAllowanceLimit: number | null = null;
+      let webhookUsageWindowStartsAt: string | null = null;
+      let webhookUsageWindowEndsAt: string | null = null;
       if (input.billingStore !== undefined) {
         const billingSummary = await input.billingStore.getBillingSummaryForProject({
           project_id: event.project_id,
@@ -472,11 +535,26 @@ export function createLifecycleWebhookPublisher(input: CreateLifecycleWebhookPub
         const allowance = billingSummary?.allowances.monthly_webhook_deliveries;
         if (billingSummary !== null && allowance !== undefined) {
           remainingWebhookDeliveries = Math.max(0, allowance.limit - allowance.used);
+          webhookAllowanceUsed = allowance.used;
+          webhookAllowanceLimit = allowance.limit;
+          webhookUsageWindowStartsAt = billingSummary.usage_window.starts_at;
+          webhookUsageWindowEndsAt = billingSummary.usage_window.ends_at;
         }
       }
 
       for (const target of targets) {
         if (remainingWebhookDeliveries !== null && remainingWebhookDeliveries <= 0) {
+          if (input.operationalEmailDeliveryStore !== undefined && webhookAllowanceLimit !== null) {
+            await queueAllowanceLimitReachedNotification({
+              store: input.operationalEmailDeliveryStore,
+              project_id: event.project_id,
+              meter: "monthly_webhook_deliveries",
+              used: webhookAllowanceUsed ?? webhookAllowanceLimit,
+              limit: webhookAllowanceLimit,
+              usage_window_starts_at: webhookUsageWindowStartsAt,
+              usage_window_ends_at: webhookUsageWindowEndsAt
+            });
+          }
           break;
         }
 
@@ -513,7 +591,21 @@ export function createLifecycleWebhookPublisher(input: CreateLifecycleWebhookPub
           }
         });
         if (remainingWebhookDeliveries !== null) {
+          const previousUsed = webhookAllowanceUsed ?? 0;
           remainingWebhookDeliveries -= 1;
+          webhookAllowanceUsed = previousUsed + 1;
+          if (input.operationalEmailDeliveryStore !== undefined && webhookAllowanceLimit !== null) {
+            await queueAllowanceThresholdNotifications({
+              store: input.operationalEmailDeliveryStore,
+              project_id: event.project_id,
+              meter: "monthly_webhook_deliveries",
+              previous_used: previousUsed,
+              next_used: webhookAllowanceUsed,
+              limit: webhookAllowanceLimit,
+              usage_window_starts_at: webhookUsageWindowStartsAt,
+              usage_window_ends_at: webhookUsageWindowEndsAt
+            });
+          }
         }
       }
     }
@@ -1376,6 +1468,7 @@ export async function runWorkerFromEnv(envInput: Record<string, string | undefin
   const improvementOpportunityStore = createPostgresImprovementOpportunityStore(queryable);
   const billingStore = createPostgresBillingStore(queryable);
   const alertDeliveryStore = createPostgresAlertDeliveryStore(queryable);
+  const operationalEmailDeliveryStore = createPostgresOperationalEmailDeliveryStore(queryable);
   const slackDestinationStore = createPostgresSlackDestinationStore(queryable);
   const webhookDeliveryStore = createPostgresWebhookDeliveryStore(queryable);
   const githubStore = createPostgresGitHubStore(queryable);
@@ -1393,7 +1486,8 @@ export async function runWorkerFromEnv(envInput: Record<string, string | undefin
     fallbackTargetUrl: env.LIFECYCLE_WEBHOOK_TARGET_URL ?? null,
     fallbackSigningSecret: env.LIFECYCLE_WEBHOOK_SECRET ?? null,
     webhookDeliveryStore,
-    billingStore
+    billingStore,
+    operationalEmailDeliveryStore
   });
   const githubDispatchPublisher = createGitHubDispatchPublisher({
     githubStore
@@ -1451,6 +1545,7 @@ export async function runWorkerFromEnv(envInput: Record<string, string | undefin
       ? {}
       : { integrationSecretEncryptionKey: env.INTEGRATION_SECRET_ENCRYPTION_KEY })
   });
+  const appBaseUrl = normalizeWorkerBaseUrl(envInput["APP_BASE_URL"]);
   const retentionCleanupRunner = createRetentionCleanupService({
     retentionStore,
     objectStore
@@ -1478,6 +1573,7 @@ export async function runWorkerFromEnv(envInput: Record<string, string | undefin
             improvementOpportunityStore,
             billingStore,
             webhookDeliveryStore,
+            operationalEmailDeliveryStore,
             fallbackTargetUrl: env.LIFECYCLE_WEBHOOK_TARGET_URL ?? null,
             fallbackSigningSecret: env.LIFECYCLE_WEBHOOK_SECRET ?? null,
             objectStore,
@@ -1503,6 +1599,7 @@ export async function runWorkerFromEnv(envInput: Record<string, string | undefin
               improvementOpportunityStore,
               billingStore,
               webhookDeliveryStore,
+              operationalEmailDeliveryStore,
               fallbackTargetUrl: env.LIFECYCLE_WEBHOOK_TARGET_URL ?? null,
               fallbackSigningSecret: env.LIFECYCLE_WEBHOOK_SECRET ?? null,
               objectStore,
@@ -1521,7 +1618,8 @@ export async function runWorkerFromEnv(envInput: Record<string, string | undefin
               env: envInput,
               incidentStore,
               objectStore,
-              billingStore
+              billingStore,
+              operationalEmailDeliveryStore
             })
           );
 
@@ -1539,7 +1637,8 @@ export async function runWorkerFromEnv(envInput: Record<string, string | undefin
                   queue,
                   alertStore: alertDeliveryStore,
                   alertTransport,
-                  billingStore
+                  billingStore,
+                  operationalEmailDeliveryStore
                 })
               );
 
@@ -1596,6 +1695,17 @@ export async function runWorkerFromEnv(envInput: Record<string, string | undefin
                     });
                   });
 
+                  if (emailTransport !== null) {
+                    await runWorkerStep(logger, "deliver-operational-email", async () => {
+                      await processNextDeliverOperationalEmailJob({
+                        logger,
+                        appBaseUrl,
+                        operationalEmailDeliveryStore,
+                        emailTransport
+                      });
+                    });
+                  }
+
                   await runWorkerStep(logger, "deliver-webhook", async () => {
                     await processNextDeliverWebhookJob({
                       queue,
@@ -1603,20 +1713,22 @@ export async function runWorkerFromEnv(envInput: Record<string, string | undefin
                       webhookDeliveryStore,
                       lifecycleWebhookTransport,
                       async onWebhookDisabled({ webhook_id, target_url }) {
-                        if (emailTransport === null || env.SES_FROM_EMAIL === undefined) {
-                          return;
-                        }
                         try {
-                          const subject = `Webhook auto-disabled: ${target_url}`;
-                          const body = `Webhook ${webhook_id} targeting ${target_url} was automatically disabled after 50 consecutive delivery failures. Re-enable it from the dashboard or API once the endpoint is healthy.`;
-                          await emailTransport.send({
-                            to: [env.SES_FROM_EMAIL],
-                            subject,
-                            text: body,
-                            html: `<p>${body}</p>`
+                          const webhook = await getWebhookOwnerNotificationRecipient(queryable, webhook_id);
+                          if (webhook === null) {
+                            return;
+                          }
+                          await operationalEmailDeliveryStore.queueProjectOperationalEmailDelivery({
+                            project_id: webhook.projectId,
+                            kind: "webhook_auto_disabled",
+                            dedupe_key: `webhook_auto_disabled:${webhook_id}:${new Date().toISOString().slice(0, 10)}`,
+                            payload: {
+                              webhook_id,
+                              target_url
+                            }
                           });
                         } catch {
-                          // Best-effort notification — failure must not block delivery processing.
+                          // Notification enqueue failure must not block delivery processing.
                         }
                       }
                     });

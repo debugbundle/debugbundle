@@ -5,6 +5,7 @@ import type {
   ImprovementOpportunityStore,
   ObjectStoreClient,
   ObjectStoreReader,
+  OperationalEmailDeliveryStore,
   RetainedBundleOwnerReference,
   WebhookDeliveryStore
 } from "../../../packages/storage/src/index.js";
@@ -12,7 +13,10 @@ import {
   buildBundleObjectKey,
   buildImprovementBundleObjectKey,
   buildRawEventObjectKey,
-  buildReproductionObjectKey
+  buildReproductionObjectKey,
+  queueAllowanceLimitReachedNotification,
+  queueAllowanceThresholdNotifications,
+  queueRetentionRotationNotice
 } from "../../../packages/storage/src/index.js";
 import { BundleV1Schema, getTierCapabilities, type EventClass, type EventEnvelope } from "../../../packages/shared-types/src/index.js";
 import type { NormalizedEvent } from "../../../packages/event-normalizer/src/index.js";
@@ -45,6 +49,7 @@ export interface ImprovementBundleWorkerDependencies {
   improvementOpportunityStore?: ImprovementOpportunityStore;
   billingStore?: Pick<BillingStore, "getBillingSummaryForProject">;
   webhookDeliveryStore?: ImprovementWebhookStore;
+  operationalEmailDeliveryStore?: Pick<OperationalEmailDeliveryStore, "queueProjectOperationalEmailDelivery">;
   fallbackTargetUrl?: string | null;
   fallbackSigningSecret?: string | null;
   objectStore: ObjectStoreReader & Partial<ObjectStoreClient>;
@@ -234,6 +239,7 @@ async function loadRepresentativeRequestContext(input: {
 async function publishImprovementBundleCreated(input: {
   webhookDeliveryStore?: ImprovementWebhookStore;
   billingStore?: Pick<BillingStore, "getBillingSummaryForProject">;
+  operationalEmailDeliveryStore?: Pick<OperationalEmailDeliveryStore, "queueProjectOperationalEmailDelivery">;
   fallbackTargetUrl?: string | null;
   fallbackSigningSecret?: string | null;
   project_id: string;
@@ -273,6 +279,10 @@ async function publishImprovementBundleCreated(input: {
 
   const targets = matching.length > 0 ? matching : fallback;
   let remainingWebhookDeliveries: number | null = null;
+  let webhookAllowanceUsed: number | null = null;
+  let webhookAllowanceLimit: number | null = null;
+  let webhookUsageWindowStartsAt: string | null = null;
+  let webhookUsageWindowEndsAt: string | null = null;
   if (input.billingStore !== undefined) {
     const billingSummary = await input.billingStore.getBillingSummaryForProject({
       project_id: input.project_id,
@@ -281,11 +291,26 @@ async function publishImprovementBundleCreated(input: {
     const allowance = billingSummary?.allowances.monthly_webhook_deliveries;
     if (billingSummary !== null && allowance !== undefined) {
       remainingWebhookDeliveries = Math.max(0, allowance.limit - allowance.used);
+      webhookAllowanceUsed = allowance.used;
+      webhookAllowanceLimit = allowance.limit;
+      webhookUsageWindowStartsAt = billingSummary.usage_window.starts_at;
+      webhookUsageWindowEndsAt = billingSummary.usage_window.ends_at;
     }
   }
 
   for (const target of targets) {
     if (remainingWebhookDeliveries !== null && remainingWebhookDeliveries <= 0) {
+      if (input.operationalEmailDeliveryStore !== undefined && webhookAllowanceLimit !== null) {
+        await queueAllowanceLimitReachedNotification({
+          store: input.operationalEmailDeliveryStore,
+          project_id: input.project_id,
+          meter: "monthly_webhook_deliveries",
+          used: webhookAllowanceUsed ?? webhookAllowanceLimit,
+          limit: webhookAllowanceLimit,
+          usage_window_starts_at: webhookUsageWindowStartsAt,
+          usage_window_ends_at: webhookUsageWindowEndsAt
+        });
+      }
       break;
     }
 
@@ -324,7 +349,21 @@ async function publishImprovementBundleCreated(input: {
     });
 
     if (remainingWebhookDeliveries !== null) {
+      const previousUsed = webhookAllowanceUsed ?? 0;
       remainingWebhookDeliveries -= 1;
+      webhookAllowanceUsed = previousUsed + 1;
+      if (input.operationalEmailDeliveryStore !== undefined && webhookAllowanceLimit !== null) {
+        await queueAllowanceThresholdNotifications({
+          store: input.operationalEmailDeliveryStore,
+          project_id: input.project_id,
+          meter: "monthly_webhook_deliveries",
+          previous_used: previousUsed,
+          next_used: webhookAllowanceUsed,
+          limit: webhookAllowanceLimit,
+          usage_window_starts_at: webhookUsageWindowStartsAt,
+          usage_window_ends_at: webhookUsageWindowEndsAt
+        });
+      }
     }
   }
 }
@@ -886,13 +925,27 @@ async function generateRecordedHostedImprovementBundle(input: {
     event_id: input.event_id
   });
 
+  let bundleRequestBillingSummary: Awaited<
+    ReturnType<NonNullable<ImprovementBundleWorkerDependencies["billingStore"]>["getBillingSummaryForProject"]>
+  > | null = null;
   if (!alreadyRecorded && input.dependencies.billingStore !== undefined) {
-    const billingSummary = await input.dependencies.billingStore.getBillingSummaryForProject({
+    bundleRequestBillingSummary = await input.dependencies.billingStore.getBillingSummaryForProject({
       project_id: input.project_id,
       now: new Date().toISOString()
     });
-    const allowance = billingSummary?.allowances.monthly_bundle_requests;
-    if (billingSummary !== null && allowance !== undefined && allowance.used >= allowance.limit) {
+    const allowance = bundleRequestBillingSummary?.allowances.monthly_bundle_requests;
+    if (bundleRequestBillingSummary !== null && allowance !== undefined && allowance.used >= allowance.limit) {
+      if (input.dependencies.operationalEmailDeliveryStore !== undefined) {
+        await queueAllowanceLimitReachedNotification({
+          store: input.dependencies.operationalEmailDeliveryStore,
+          project_id: input.project_id,
+          meter: "monthly_bundle_requests",
+          used: allowance.used,
+          limit: allowance.limit,
+          usage_window_starts_at: bundleRequestBillingSummary.usage_window.starts_at,
+          usage_window_ends_at: bundleRequestBillingSummary.usage_window.ends_at
+        });
+      }
       await input.dependencies.improvementOpportunityStore.markImprovementBundleGenerationFailure({
         opportunity_id: input.recorded.opportunity_id,
         reason: "monthly_quota_exceeded"
@@ -944,6 +997,24 @@ async function generateRecordedHostedImprovementBundle(input: {
     contentEncoding: "gzip"
   });
 
+  if (
+    !alreadyRecorded &&
+    bundleRequestBillingSummary !== null &&
+    input.dependencies.operationalEmailDeliveryStore !== undefined
+  ) {
+    const allowance = bundleRequestBillingSummary.allowances.monthly_bundle_requests;
+      await queueAllowanceThresholdNotifications({
+        store: input.dependencies.operationalEmailDeliveryStore,
+        project_id: context.project_id,
+        meter: "monthly_bundle_requests",
+        previous_used: allowance.used,
+        next_used: allowance.used + 1,
+        limit: allowance.limit,
+        usage_window_starts_at: bundleRequestBillingSummary.usage_window.starts_at,
+        usage_window_ends_at: bundleRequestBillingSummary.usage_window.ends_at
+      });
+  }
+
   if (input.dependencies.billingStore !== undefined && input.dependencies.objectStore.deleteObject !== undefined) {
     const billingSummary = await input.dependencies.billingStore.getBillingSummaryForProject({
       project_id: context.project_id,
@@ -952,6 +1023,17 @@ async function generateRecordedHostedImprovementBundle(input: {
     const retainedAllowance = billingSummary?.allowances.retained_bundle_cap;
 
     if (retainedAllowance !== undefined) {
+      if (input.dependencies.operationalEmailDeliveryStore !== undefined) {
+        await queueAllowanceThresholdNotifications({
+          store: input.dependencies.operationalEmailDeliveryStore,
+          project_id: context.project_id,
+          meter: "retained_bundle_cap",
+          previous_used: Math.max(0, retainedAllowance.used - 1),
+          next_used: retainedAllowance.used,
+          limit: retainedAllowance.limit
+        });
+      }
+
       const prunedOwners = await input.dependencies.improvementOpportunityStore.pruneRetainedBundleOwnersForProject({
         project_id: context.project_id,
         retained_bundle_limit: retainedAllowance.limit
@@ -961,6 +1043,16 @@ async function generateRecordedHostedImprovementBundle(input: {
         await deletePrunedBundleArtifacts({
           objectStore: input.dependencies.objectStore,
           owner: prunedOwner
+        });
+      }
+
+      if (input.dependencies.operationalEmailDeliveryStore !== undefined && prunedOwners.length > 0) {
+        await queueRetentionRotationNotice({
+          store: input.dependencies.operationalEmailDeliveryStore,
+          project_id: context.project_id,
+          rotated_owner_count: prunedOwners.length,
+          retained_bundle_limit: retainedAllowance.limit,
+          dedupe_date: new Date().toISOString().slice(0, 10)
         });
       }
     }
@@ -978,6 +1070,9 @@ async function generateRecordedHostedImprovementBundle(input: {
     project_link: projectLink,
     ...(input.dependencies.webhookDeliveryStore === undefined ? {} : { webhookDeliveryStore: input.dependencies.webhookDeliveryStore }),
     ...(input.dependencies.billingStore === undefined ? {} : { billingStore: input.dependencies.billingStore }),
+    ...(input.dependencies.operationalEmailDeliveryStore === undefined
+      ? {}
+      : { operationalEmailDeliveryStore: input.dependencies.operationalEmailDeliveryStore }),
     ...(input.dependencies.fallbackTargetUrl === undefined ? {} : { fallbackTargetUrl: input.dependencies.fallbackTargetUrl }),
     ...(input.dependencies.fallbackSigningSecret === undefined ? {} : { fallbackSigningSecret: input.dependencies.fallbackSigningSecret })
   });

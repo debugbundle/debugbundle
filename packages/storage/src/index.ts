@@ -51,6 +51,14 @@ export { createPostgresImprovementOpportunityStore } from "./improvement-opportu
 export { createPostgresGitHubStore } from "./github-store.js";
 export { createIncidentLifecycleService } from "./incident-lifecycle-service.js";
 export { createPostgresMetadataStore } from "./metadata-store.js";
+export { createPostgresOperationalEmailDeliveryStore } from "./operational-email-delivery-store.js";
+export {
+  getAllowanceLimitBehavior,
+  getAllowanceMeterLabel,
+  queueAllowanceLimitReachedNotification,
+  queueAllowanceThresholdNotifications,
+  queueRetentionRotationNotice
+} from "./operational-email-notifications.js";
 export { createPostgresRetentionStore, createRetentionCleanupService } from "./retention-store.js";
 export type {
 	SlackDestinationRecord,

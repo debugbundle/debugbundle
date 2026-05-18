@@ -9,6 +9,7 @@ import {
   LifecycleWebhookDeliveryError,
   processNextBuildBundleJob,
   processNextBuildReproductionJob,
+  processNextDeliverOperationalEmailJob,
   processNextDeliverGitHubDispatchJob,
   processNextDeliverWebhookJob,
   processNextGroupIncidentJob
@@ -178,6 +179,118 @@ function createReproductionBundle(input: { includeRequest: boolean }): unknown {
 }
 
 describe("worker processor \u2013 bundle, delivery & sampling", () => {
+  it("should deliver a queued operational allowance email and mark it delivered", async (): Promise<void> => {
+    const markOperationalEmailDeliveryAttempt = vi.fn().mockResolvedValue({ status: "delivered", next_attempt: null });
+    const emailSend = vi.fn().mockResolvedValue(undefined);
+
+    const result = await processNextDeliverOperationalEmailJob({
+      appBaseUrl: "https://app.debugbundle.test",
+      operationalEmailDeliveryStore: {
+        claimDueOperationalEmailDeliveries: vi.fn().mockResolvedValue([{ delivery_id: "opem_123", attempt: 1 }]),
+        getOperationalEmailDelivery: vi.fn().mockResolvedValue({
+          delivery_id: "opem_123",
+          organization_id: "org_123",
+          project_id: "proj_123",
+          kind: "allowance_warning_80",
+          dedupe_key: "allowance_warning_80:monthly_raw_ingested_events:window:2026-05-01T00:00:00.000Z",
+          payload: {
+            meter: "monthly_raw_ingested_events",
+            used: 8400,
+            limit: 10500,
+            usage_window_ends_at: "2026-06-01T00:00:00.000Z"
+          },
+          status: "retrying",
+          attempt_count: 0,
+          next_attempt_at: null,
+          last_error: null,
+          delivered_at: null,
+          created_at: "2026-05-18T12:00:00.000Z",
+          updated_at: "2026-05-18T12:00:00.000Z"
+        }),
+        resolveOperationalEmailRecipientContext: vi.fn().mockResolvedValue({
+          organization_name: "Acme Production",
+          project_name: "Checkout API",
+          recipient_email: "owner@example.com"
+        }),
+        markOperationalEmailDeliveryAttempt
+      },
+      emailTransport: {
+        send: emailSend
+      }
+    });
+
+    expect(result).toEqual({ processed: true });
+    expect(emailSend).toHaveBeenCalledWith(
+      expect.objectContaining({
+        to: ["owner@example.com"],
+        subject: "DebugBundle: 80% of raw ingested events allowance used",
+        text: expect.stringContaining("Usage: 8400 of 10500"),
+        html: expect.stringContaining("Raw ingested events allowance at 80%")
+      })
+    );
+    expect(markOperationalEmailDeliveryAttempt).toHaveBeenCalledWith({
+      delivery_id: "opem_123",
+      attempt: 1,
+      delivered: true,
+      error_message: null
+    });
+  });
+
+  it("should mark queued operational email failures for retry", async (): Promise<void> => {
+    const markOperationalEmailDeliveryAttempt = vi.fn().mockResolvedValue({ status: "retrying", next_attempt: 2 });
+    const loggerWarn = vi.fn();
+
+    const result = await processNextDeliverOperationalEmailJob({
+      logger: { warn: loggerWarn },
+      operationalEmailDeliveryStore: {
+        claimDueOperationalEmailDeliveries: vi.fn().mockResolvedValue([{ delivery_id: "opem_123", attempt: 1 }]),
+        getOperationalEmailDelivery: vi.fn().mockResolvedValue({
+          delivery_id: "opem_123",
+          organization_id: "org_123",
+          project_id: "proj_123",
+          kind: "allowance_limit_reached",
+          dedupe_key: "allowance_limit_reached:monthly_raw_ingested_events:window:2026-05-01T00:00:00.000Z",
+          payload: {
+            meter: "monthly_raw_ingested_events",
+            used: 10500
+          },
+          status: "retrying",
+          attempt_count: 0,
+          next_attempt_at: null,
+          last_error: null,
+          delivered_at: null,
+          created_at: "2026-05-18T12:00:00.000Z",
+          updated_at: "2026-05-18T12:00:00.000Z"
+        }),
+        resolveOperationalEmailRecipientContext: vi.fn().mockResolvedValue({
+          organization_name: "Acme Production",
+          project_name: "Checkout API",
+          recipient_email: "owner@example.com"
+        }),
+        markOperationalEmailDeliveryAttempt
+      },
+      emailTransport: {
+        send: vi.fn()
+      }
+    });
+
+    expect(result).toEqual({ processed: true });
+    expect(markOperationalEmailDeliveryAttempt).toHaveBeenCalledWith({
+      delivery_id: "opem_123",
+      attempt: 1,
+      delivered: false,
+      error_message: "operational_email_invalid_allowance_payload"
+    });
+    expect(loggerWarn).toHaveBeenCalledWith(
+      expect.objectContaining({
+        delivery_id: "opem_123",
+        kind: "allowance_limit_reached",
+        error_message: "operational_email_invalid_allowance_payload"
+      }),
+      "worker_operational_email_delivery_failed"
+    );
+  });
+
   it("should return no_jobs when group-incident queue is empty", async (): Promise<void> => {
     const result = await processNextGroupIncidentJob({
       queue: {

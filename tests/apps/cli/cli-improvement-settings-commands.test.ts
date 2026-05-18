@@ -69,6 +69,57 @@ describe("cli improvement settings commands", () => {
     });
   });
 
+  it("renders the remaining direct get/set output branches", async () => {
+    const getResult = await getImprovementSettingsCommand(
+      {
+        bearerToken: "dbundle_mem_x",
+        projectId: "proj_1",
+        json: true
+      },
+      {
+        getImprovementSettings: vi.fn().mockResolvedValue({
+          access_mode: "preview",
+          cloud_automation_available: false,
+          settings: {
+            automated_improvement_bundles_enabled: false,
+            improvement_bundle_sensitivity: "high_confidence"
+          }
+        })
+      }
+    );
+    const setResult = await setImprovementSettingsCommand(
+      {
+        bearerToken: "dbundle_mem_owner",
+        projectId: "proj_1",
+        update: {
+          automated_improvement_bundles_enabled: true,
+          improvement_bundle_sensitivity: "balanced"
+        }
+      },
+      {
+        updateImprovementSettings: vi.fn().mockResolvedValue({
+          access_mode: "manage",
+          cloud_automation_available: true,
+          settings: {
+            automated_improvement_bundles_enabled: true,
+            improvement_bundle_sensitivity: "balanced"
+          }
+        })
+      }
+    );
+
+    expect(JSON.parse(getResult.output)).toEqual({
+      access_mode: "preview",
+      cloud_automation_available: false,
+      settings: {
+        automated_improvement_bundles_enabled: false,
+        improvement_bundle_sensitivity: "high_confidence"
+      }
+    });
+    expect(setResult.output).toContain("Improvement settings updated.");
+    expect(setResult.output).toContain("automated_improvement_bundles_enabled: true");
+  });
+
   it("loads stored auth state and forwards it into get/set commands", async () => {
     const readAuthState = vi.fn().mockResolvedValue({
       bearer_token: "dbundle_mem_saved",
@@ -143,6 +194,52 @@ describe("cli improvement settings commands", () => {
     expect(setResult.output).toContain("Improvement settings updated.");
   });
 
+  it("supports authenticated settings commands without explicit auth paths", async () => {
+    const readAuthState = vi.fn().mockResolvedValue({
+      bearer_token: "dbundle_mem_saved",
+      base_url: "https://selfhost.debugbundle.test"
+    });
+    const createHttpClient = vi.fn().mockReturnValue({ request: vi.fn() });
+    const createApi = vi.fn().mockReturnValue({
+      getImprovementSettings: vi.fn().mockResolvedValue({
+        access_mode: "preview",
+        cloud_automation_available: true,
+        settings: {
+          automated_improvement_bundles_enabled: true,
+          improvement_bundle_sensitivity: "balanced"
+        }
+      }),
+      updateImprovementSettings: vi.fn().mockResolvedValue({
+        access_mode: "manage",
+        cloud_automation_available: true,
+        settings: {
+          automated_improvement_bundles_enabled: false,
+          improvement_bundle_sensitivity: "verbose"
+        }
+      })
+    });
+
+    const result = await setImprovementSettingsWithAuthCommand(
+      {
+        projectId: "proj_1",
+        update: { improvement_bundle_sensitivity: "verbose" },
+        json: true
+      },
+      { readAuthState, createHttpClient, createApi }
+    );
+
+    expect(readAuthState).toHaveBeenCalledWith({});
+    expect(createHttpClient).toHaveBeenCalledWith({ baseUrl: "https://selfhost.debugbundle.test" });
+    expect(JSON.parse(result.output)).toEqual({
+      access_mode: "manage",
+      cloud_automation_available: true,
+      settings: {
+        automated_improvement_bundles_enabled: false,
+        improvement_bundle_sensitivity: "verbose"
+      }
+    });
+  });
+
   it("maps auth state failures to exit code 2", async () => {
     const result = await getImprovementSettingsWithAuthCommand(
       {
@@ -178,6 +275,28 @@ describe("cli improvement settings commands", () => {
     expect(unauthorized.exitCode).toBe(2);
     expect(notFound.exitCode).toBe(3);
     expect(badRequest.exitCode).toBe(4);
+  });
+
+  it("maps invalid responses and unknown failures to exit code 1", async () => {
+    const invalidResponse = await getImprovementSettingsCommand(
+      { bearerToken: "dbundle_mem_x", projectId: "proj_1" },
+      {
+        getImprovementSettings: vi.fn().mockRejectedValue(new ImprovementSettingsApiError(500, "Invalid improvement settings response."))
+      }
+    );
+    const unknownFailure = await setImprovementSettingsCommand(
+      {
+        bearerToken: "dbundle_mem_x",
+        projectId: "proj_1",
+        update: { automated_improvement_bundles_enabled: true }
+      },
+      {
+        updateImprovementSettings: vi.fn().mockRejectedValue(new Error("boom"))
+      }
+    );
+
+    expect(invalidResponse).toEqual({ exitCode: 1, output: "Invalid improvement settings response." });
+    expect(unknownFailure).toEqual({ exitCode: 1, output: "boom" });
   });
 
   it("validates update payloads before calling the API", async () => {
@@ -251,6 +370,63 @@ describe("cli improvement settings commands", () => {
         automated_improvement_bundles_enabled: false,
         improvement_bundle_sensitivity: "verbose"
       }
+    });
+  });
+
+  it("surfaces fallback and invalid-response API errors from the raw improvement settings client", async () => {
+    const request = vi.fn()
+      .mockResolvedValueOnce({
+        status: 503,
+        body: { message: "temporary outage" }
+      })
+      .mockResolvedValueOnce({
+        status: 200,
+        body: {
+          access_mode: "manage"
+        }
+      });
+
+    const api = createImprovementSettingsApi({ request });
+
+    await expect(
+      api.getImprovementSettings({
+        bearerToken: "dbundle_mem_x",
+        projectId: "proj_1"
+      })
+    ).rejects.toMatchObject({
+      status: 503,
+      message: "Failed to get improvement settings."
+    });
+
+    await expect(
+      api.updateImprovementSettings({
+        bearerToken: "dbundle_mem_x",
+        projectId: "proj_1",
+        update: { automated_improvement_bundles_enabled: false }
+      })
+    ).rejects.toMatchObject({
+      status: 500,
+      message: "Invalid improvement settings response."
+    });
+  });
+
+  it("surfaces explicit API error bodies from the raw improvement settings client", async () => {
+    const request = vi.fn().mockResolvedValue({
+      status: 401,
+      body: { error: "invalid_member_token" }
+    });
+
+    const api = createImprovementSettingsApi({ request });
+
+    await expect(
+      api.updateImprovementSettings({
+        bearerToken: "dbundle_mem_x",
+        projectId: "proj_1",
+        update: { automated_improvement_bundles_enabled: false }
+      })
+    ).rejects.toMatchObject({
+      status: 401,
+      message: "invalid_member_token"
     });
   });
 });

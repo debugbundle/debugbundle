@@ -1,6 +1,10 @@
 import { randomBytes } from "node:crypto";
 import type { FastifyInstance } from "fastify";
 
+import {
+  queueAllowanceLimitReachedNotification,
+  queueAllowanceThresholdNotifications
+} from "../../../../packages/storage/src/index.js";
 import type { WebhookEventType, WebhookFilters } from "../../../../packages/storage/src/index.js";
 import type { ApiDependencies } from "../api-types.js";
 import { recordAuditLog, resolveAuditActorType } from "../audit-logging.js";
@@ -379,6 +383,10 @@ export function registerWebhookRoutes(app: FastifyInstance, dependencies: ApiDep
     }
 
     const now = new Date();
+    let previousWebhookAllowanceUsed: number | null = null;
+    let webhookAllowanceLimit: number | null = null;
+    let usageWindowStartsAt: string | null = null;
+    let usageWindowEndsAt: string | null = null;
     if (dependencies.billingManagement !== undefined) {
       const billingSummary = await dependencies.billingManagement.getBillingSummaryForOrganization({
         organization_id: auth.access.organization_id,
@@ -386,11 +394,29 @@ export function registerWebhookRoutes(app: FastifyInstance, dependencies: ApiDep
       });
       const allowance = billingSummary?.allowances.monthly_webhook_deliveries;
       if (billingSummary !== null && allowance !== undefined && allowance.used + 1 > allowance.limit) {
+        if (dependencies.operationalEmailDelivery !== undefined) {
+          await queueAllowanceLimitReachedNotification({
+            store: dependencies.operationalEmailDelivery,
+            project_id: parsedQuery.data.project_id,
+            meter: "monthly_webhook_deliveries",
+            used: allowance.used,
+            limit: allowance.limit,
+            usage_window_starts_at: billingSummary.usage_window.starts_at,
+            usage_window_ends_at: billingSummary.usage_window.ends_at
+          });
+        }
         const retryAfterMs = getQuotaRetryAfterMs(billingSummary.usage_window.ends_at, now);
         return reply.header("Retry-After", toRetryAfterSeconds(retryAfterMs)).status(429).send({
           error: "monthly_quota_exceeded",
           retry_after_ms: retryAfterMs
         });
+      }
+
+      if (billingSummary !== null && allowance !== undefined) {
+        previousWebhookAllowanceUsed = allowance.used;
+        webhookAllowanceLimit = allowance.limit;
+        usageWindowStartsAt = billingSummary.usage_window.starts_at;
+        usageWindowEndsAt = billingSummary.usage_window.ends_at;
       }
     }
 
@@ -405,6 +431,23 @@ export function registerWebhookRoutes(app: FastifyInstance, dependencies: ApiDep
 
     if (delivery === null) {
       return reply.status(404).send({ error: "webhook_not_found" });
+    }
+
+    if (
+      previousWebhookAllowanceUsed !== null &&
+      webhookAllowanceLimit !== null &&
+      dependencies.operationalEmailDelivery !== undefined
+    ) {
+      await queueAllowanceThresholdNotifications({
+        store: dependencies.operationalEmailDelivery,
+        project_id: parsedQuery.data.project_id,
+        meter: "monthly_webhook_deliveries",
+        previous_used: previousWebhookAllowanceUsed,
+        next_used: previousWebhookAllowanceUsed + 1,
+        limit: webhookAllowanceLimit,
+        usage_window_starts_at: usageWindowStartsAt,
+        usage_window_ends_at: usageWindowEndsAt
+      });
     }
 
     return reply.status(202).send({ delivery });

@@ -16,6 +16,7 @@ const {
 }));
 
 const {
+  emailTransportSendMock,
   poolQueryMock,
   poolEndMock,
   queueEnqueueMock,
@@ -29,6 +30,7 @@ const {
   processNextBuildReproductionJobMock,
   processNextEvaluateAlertsJobMock,
   processNextDeliverAlertEmailDigestJobMock,
+  processNextDeliverOperationalEmailJobMock,
   processNextCleanupRetentionJobMock,
   processNextDeliverWebhookJobMock,
   processNextDeliverGitHubDispatchJobMock,
@@ -43,10 +45,12 @@ const {
   createPostgresWebhookDeliveryStoreMock,
   createPostgresGitHubStoreMock,
   createPostgresAlertDeliveryStoreMock,
+  createPostgresOperationalEmailDeliveryStoreMock,
   createPostgresSlackDestinationStoreMock,
   createPostgresWeeklyReportDeliveryStoreMock,
   createPostgresWeeklyReportChannelStoreMock
 } = vi.hoisted(() => ({
+  emailTransportSendMock: vi.fn().mockResolvedValue(undefined),
   poolQueryMock: vi.fn(),
   poolEndMock: vi.fn().mockResolvedValue(undefined),
   queueEnqueueMock: vi.fn().mockResolvedValue(undefined),
@@ -60,6 +64,7 @@ const {
   processNextBuildReproductionJobMock: vi.fn(),
   processNextEvaluateAlertsJobMock: vi.fn(),
   processNextDeliverAlertEmailDigestJobMock: vi.fn(),
+  processNextDeliverOperationalEmailJobMock: vi.fn(),
   processNextCleanupRetentionJobMock: vi.fn(),
   processNextDeliverWebhookJobMock: vi.fn(),
   processNextDeliverGitHubDispatchJobMock: vi.fn(),
@@ -125,6 +130,13 @@ const {
     getAlertEmailDigest: vi.fn().mockResolvedValue(null),
     markAlertEmailDigestResult: vi.fn()
   }),
+  createPostgresOperationalEmailDeliveryStoreMock: vi.fn().mockReturnValue({
+    queueProjectOperationalEmailDelivery: vi.fn(),
+    claimDueOperationalEmailDeliveries: vi.fn().mockResolvedValue([]),
+    getOperationalEmailDelivery: vi.fn().mockResolvedValue(null),
+    resolveOperationalEmailRecipientContext: vi.fn().mockResolvedValue(null),
+    markOperationalEmailDeliveryAttempt: vi.fn()
+  }),
   createPostgresSlackDestinationStoreMock: vi.fn().mockReturnValue({
     getSlackDestinationSecretForDelivery: vi.fn().mockResolvedValue(null)
   }),
@@ -141,6 +153,17 @@ const {
     deleteWeeklyReportChannelForOrganization: vi.fn().mockResolvedValue(null)
   })
 }));
+
+vi.mock("../../../packages/email/src/index.js", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../../../packages/email/src/index.js")>();
+
+  return {
+    ...actual,
+    createSesEmailTransport: vi.fn().mockReturnValue({
+      send: emailTransportSendMock
+    })
+  };
+});
 
 vi.mock("pg", () => ({
   Pool: vi.fn(function MockPool() {
@@ -213,6 +236,7 @@ vi.mock("../../../packages/storage/src/index.js", async (importOriginal) => {
   createPostgresWebhookDeliveryStore: createPostgresWebhookDeliveryStoreMock,
   createPostgresGitHubStore: createPostgresGitHubStoreMock,
   createPostgresAlertDeliveryStore: createPostgresAlertDeliveryStoreMock,
+  createPostgresOperationalEmailDeliveryStore: createPostgresOperationalEmailDeliveryStoreMock,
   createPostgresSlackDestinationStore: createPostgresSlackDestinationStoreMock,
   createPostgresWeeklyReportDeliveryStore: createPostgresWeeklyReportDeliveryStoreMock,
   createPostgresWeeklyReportChannelStore: createPostgresWeeklyReportChannelStoreMock
@@ -245,6 +269,7 @@ vi.mock("../../../apps/worker/src/processor.js", () => ({
   processNextBuildReproductionJob: processNextBuildReproductionJobMock,
   processNextEvaluateAlertsJob: processNextEvaluateAlertsJobMock,
   processNextDeliverAlertEmailDigestJob: processNextDeliverAlertEmailDigestJobMock,
+  processNextDeliverOperationalEmailJob: processNextDeliverOperationalEmailJobMock,
   processNextCleanupRetentionJob: processNextCleanupRetentionJobMock,
   processNextDeliverWebhookJob: processNextDeliverWebhookJobMock,
   processNextDeliverGitHubDispatchJob: processNextDeliverGitHubDispatchJobMock,
@@ -337,6 +362,7 @@ describe("worker runtime", () => {
   beforeEach(() => {
     vi.unstubAllGlobals();
     poolQueryMock.mockReset();
+    emailTransportSendMock.mockClear();
     poolEndMock.mockClear();
     queueEnqueueMock.mockClear();
     queueAcquireLeaseMock.mockClear();
@@ -350,6 +376,7 @@ describe("worker runtime", () => {
     processNextBuildReproductionJobMock.mockReset();
     processNextEvaluateAlertsJobMock.mockReset();
     processNextDeliverAlertEmailDigestJobMock.mockReset();
+    processNextDeliverOperationalEmailJobMock.mockReset();
     processNextCleanupRetentionJobMock.mockReset();
     processNextDeliverWebhookJobMock.mockReset();
     processNextDeliverGitHubDispatchJobMock.mockReset();
@@ -360,6 +387,7 @@ describe("worker runtime", () => {
     processNextBuildReproductionJobMock.mockResolvedValue({ processed: false, reason: "no_jobs" });
     processNextEvaluateAlertsJobMock.mockResolvedValue({ processed: false, reason: "no_jobs" });
     processNextDeliverAlertEmailDigestJobMock.mockResolvedValue({ processed: false, reason: "no_jobs" });
+    processNextDeliverOperationalEmailJobMock.mockResolvedValue({ processed: false, reason: "no_jobs" });
     processNextDeliverWebhookJobMock.mockResolvedValue({ processed: false, reason: "no_jobs" });
     processNextDeliverGitHubDispatchJobMock.mockResolvedValue({ processed: false, reason: "no_jobs" });
     processNextGenerateWeeklyReportJobMock.mockResolvedValue({ processed: false, reason: "no_jobs" });
@@ -374,6 +402,7 @@ describe("worker runtime", () => {
     createPostgresWebhookDeliveryStoreMock.mockClear();
     createPostgresGitHubStoreMock.mockClear();
     createPostgresAlertDeliveryStoreMock.mockClear();
+    createPostgresOperationalEmailDeliveryStoreMock.mockClear();
     createPostgresSlackDestinationStoreMock.mockClear();
     createPostgresWeeklyReportDeliveryStoreMock.mockClear();
     createPostgresWeeklyReportChannelStoreMock.mockClear();
@@ -778,6 +807,56 @@ describe("worker runtime", () => {
     expect(processNextDeliverWebhookJobMock).not.toHaveBeenCalled();
   });
 
+  it("queues the webhook auto-disabled operational email for later delivery", async (): Promise<void> => {
+    poolQueryMock.mockImplementation(async (sql: string) => {
+      if (sql.includes("FROM agent_webhooks aw")) {
+        return {
+          rows: [
+            {
+              organization_name: "Acme Production",
+              project_id: "proj_123",
+              project_name: "Checkout API",
+              recipient_email: "owner@example.com"
+            }
+          ]
+        };
+      }
+
+      return buildMigratedWorkerSchemaRows(sql);
+    });
+
+    processNextDeliverWebhookJobMock.mockImplementationOnce(async (input: {
+      onWebhookDisabled?: (payload: { webhook_id: string; target_url: string }) => Promise<void>;
+    }) => {
+      await input.onWebhookDisabled?.({
+        webhook_id: "wh_123",
+        target_url: "https://hooks.example.test/debugbundle"
+      });
+
+      return { processed: true };
+    });
+
+    await runWorkerFromEnv({
+      WORKER_RUN_ONCE: "1",
+      APP_BASE_URL: "https://app.debugbundle.test"
+    });
+
+    expect(processNextDeliverWebhookJobMock).toHaveBeenCalledOnce();
+    const queuedOperationalEmails = createPostgresOperationalEmailDeliveryStoreMock.mock.results[0]?.value
+      .queueProjectOperationalEmailDelivery;
+    expect(queuedOperationalEmails).toHaveBeenCalledWith(
+      expect.objectContaining({
+        project_id: "proj_123",
+        kind: "webhook_auto_disabled",
+        payload: {
+          webhook_id: "wh_123",
+          target_url: "https://hooks.example.test/debugbundle"
+        }
+      })
+    );
+    expect(emailTransportSendMock).not.toHaveBeenCalled();
+  });
+
   it("should run build-bundle processor when normalize/group queues are empty", async (): Promise<void> => {
     poolQueryMock.mockResolvedValueOnce({
       rows: [
@@ -1140,13 +1219,19 @@ describe("worker runtime", () => {
       }
     ]);
     const createDeliveryIntent = vi.fn();
+    const queueProjectOperationalEmailDelivery = vi.fn().mockResolvedValue({ delivery_id: "op_123", created: true });
 
     const publisher = createLifecycleWebhookPublisher({
       fallbackTargetUrl: null,
       fallbackSigningSecret: null,
       webhookDeliveryStore: { listMatchingWebhooks, createDeliveryIntent },
+      operationalEmailDeliveryStore: { queueProjectOperationalEmailDelivery },
       billingStore: {
         getBillingSummaryForProject: vi.fn().mockResolvedValue({
+          usage_window: {
+            starts_at: "2026-03-01T00:00:00.000Z",
+            ends_at: "2026-04-01T00:00:00.000Z"
+          },
           allowances: {
             monthly_webhook_deliveries: { used: 100, limit: 100 }
           }
@@ -1165,6 +1250,60 @@ describe("worker runtime", () => {
     });
 
     expect(createDeliveryIntent).not.toHaveBeenCalled();
+    expect(queueProjectOperationalEmailDelivery).toHaveBeenCalledWith(
+      expect.objectContaining({
+        project_id: "proj_123",
+        kind: "allowance_limit_reached"
+      })
+    );
+  });
+
+  it("should queue webhook allowance threshold notifications when lifecycle deliveries cross 80 percent", async (): Promise<void> => {
+    const listMatchingWebhooks = vi.fn().mockResolvedValue([
+      {
+        webhook_id: "wh_123",
+        target_url: "https://hooks.example.test/debugbundle",
+        signing_secret: "secret_123"
+      }
+    ]);
+    const createDeliveryIntent = vi.fn().mockResolvedValue({ delivery_id: "del_123" });
+    const queueProjectOperationalEmailDelivery = vi.fn().mockResolvedValue({ delivery_id: "op_123", created: true });
+
+    const publisher = createLifecycleWebhookPublisher({
+      fallbackTargetUrl: null,
+      fallbackSigningSecret: null,
+      webhookDeliveryStore: { listMatchingWebhooks, createDeliveryIntent },
+      operationalEmailDeliveryStore: { queueProjectOperationalEmailDelivery },
+      billingStore: {
+        getBillingSummaryForProject: vi.fn().mockResolvedValue({
+          usage_window: {
+            starts_at: "2026-03-01T00:00:00.000Z",
+            ends_at: "2026-04-01T00:00:00.000Z"
+          },
+          allowances: {
+            monthly_webhook_deliveries: { used: 79, limit: 100 }
+          }
+        })
+      }
+    });
+
+    await publisher.publish({
+      event_type: "bundle.created",
+      incident_id: "inc_123",
+      project_id: "proj_123",
+      occurred_at: "2026-03-11T00:00:00.000Z",
+      service_name: "checkout-api",
+      environment: "production",
+      severity: "high"
+    });
+
+    expect(createDeliveryIntent).toHaveBeenCalledOnce();
+    expect(queueProjectOperationalEmailDelivery).toHaveBeenCalledWith(
+      expect.objectContaining({
+        project_id: "proj_123",
+        kind: "allowance_warning_80"
+      })
+    );
   });
 
   it("should persist github dispatch intent when a rule matches", async (): Promise<void> => {
