@@ -822,8 +822,9 @@ const STORAGE_BOOTSTRAP_STATEMENTS = [
       id uuid PRIMARY KEY,
       rule_id uuid NOT NULL REFERENCES github_dispatch_rules(id) ON DELETE CASCADE,
       project_id uuid NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
-      incident_id uuid NOT NULL,
-      incident_fingerprint text NOT NULL,
+      incident_id uuid REFERENCES incidents(id) ON DELETE CASCADE,
+      improvement_opportunity_id uuid REFERENCES improvement_opportunities(id) ON DELETE CASCADE,
+      target_fingerprint text NOT NULL,
       installation_id bigint NOT NULL,
       repo_owner text NOT NULL,
       repo_name text NOT NULL,
@@ -837,7 +838,11 @@ const STORAGE_BOOTSTRAP_STATEMENTS = [
       dispatch_payload jsonb NOT NULL DEFAULT '{}'::jsonb,
       created_at timestamptz NOT NULL DEFAULT now(),
       updated_at timestamptz NOT NULL DEFAULT now(),
-      dedupe_key text NOT NULL
+      dedupe_key text NOT NULL,
+      CHECK (
+        (incident_id IS NOT NULL AND improvement_opportunity_id IS NULL)
+        OR (incident_id IS NULL AND improvement_opportunity_id IS NOT NULL)
+      )
     )
   `,
   `
@@ -846,7 +851,7 @@ const STORAGE_BOOTSTRAP_STATEMENTS = [
   `,
   `
     CREATE UNIQUE INDEX github_dispatch_deliveries_rule_dedupe_key_idx
-    ON github_dispatch_deliveries (rule_id, incident_id, dedupe_key)
+    ON github_dispatch_deliveries (rule_id, target_fingerprint, dedupe_key)
   `,
   `
     CREATE TABLE org_usage_counters (

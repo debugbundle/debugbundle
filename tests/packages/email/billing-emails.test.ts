@@ -181,6 +181,7 @@ describe("billing email templates", () => {
 
       expect(result.html).not.toContain("<script>");
       expect(result.html).toContain("&lt;script&gt;");
+      expect(result.html).toContain("DebugBundle");
     });
   });
 });

@@ -365,7 +365,7 @@ interface CreateGitHubDispatchPublisherInput {
 }
 
 export function getIncidentStatusForDispatchEvent(
-  eventType: "bundle.created" | "bundle.updated" | "bundle.reopened" | "incident.spike_detected"
+  eventType: "bundle.created" | "bundle.updated" | "bundle.reopened" | "incident.spike_detected" | "improvement_bundle.created"
 ): "new_only" | "reopened_only" | "new_or_reopened" {
   if (eventType === "bundle.created") {
     return "new_or_reopened";
@@ -379,7 +379,7 @@ export function getIncidentStatusForDispatchEvent(
 }
 
 function getGitHubDispatchDedupeKey(event: {
-  event_type: "bundle.created" | "bundle.updated" | "bundle.reopened" | "incident.spike_detected";
+  event_type: "bundle.created" | "bundle.updated" | "bundle.reopened" | "incident.spike_detected" | "improvement_bundle.created";
   occurred_at: string;
   bundle_version?: number;
 }): string {
@@ -402,22 +402,33 @@ export function createGitHubDispatchPublisher(input: CreateGitHubDispatchPublish
       const since = new Date(Date.parse(event.occurred_at) - 60 * 60 * 1000).toISOString();
 
       for (const rule of matching) {
-        const incidentFingerprint = `${event.incident_id}:${event.event_type}`;
+        const targetFingerprint = `${event.improvement_id ?? event.incident_id}:${event.event_type}`;
         const dedupeKey = getGitHubDispatchDedupeKey(event);
+        const incidentId = event.incident_id ?? null;
+        const improvementId = event.improvement_id ?? null;
+        const bundleType = event.bundle_type ?? "failure";
+        const links = bundleType === "improvement" && improvementId !== null
+          ? {
+              bundle: `/v1/projects/${event.project_id}/improvements/${improvementId}/bundle`,
+              reproduction: null,
+              dashboard: `/projects/${event.project_id}/improvements/${improvementId}`
+            }
+          : {
+              bundle: `/v1/incidents/${incidentId}/bundle`,
+              reproduction: `/v1/incidents/${incidentId}/reproduction`,
+              dashboard: `/incidents/${incidentId}`
+            };
         const dispatchPayload = {
           debugbundle_event: event.event_type,
-          incident_id: event.incident_id,
-          bundle_type: event.bundle_type ?? "failure",
+          incident_id: incidentId,
+          improvement_id: improvementId,
+          bundle_type: bundleType,
           bundle_version: event.bundle_version ?? 1,
           severity: event.severity,
           service: event.service_name,
           environment: event.environment,
           title: event.title ?? null,
-          links: {
-            bundle: `/v1/incidents/${event.incident_id}/bundle`,
-            reproduction: `/v1/incidents/${event.incident_id}/reproduction`,
-            dashboard: `/incidents/${event.incident_id}`
-          },
+          links,
           debugbundle: {
             project_id: event.project_id,
             occurrence_count: event.occurrence_count ?? 1,
@@ -427,7 +438,7 @@ export function createGitHubDispatchPublisher(input: CreateGitHubDispatchPublish
 
         const withinCooldown = await input.githubStore.hasRecentGitHubDispatch({
           rule_id: rule.rule_id,
-          incident_fingerprint: incidentFingerprint,
+          incident_fingerprint: targetFingerprint,
           cooldown_seconds: rule.cooldown_seconds
         });
         if (withinCooldown) {
@@ -442,8 +453,9 @@ export function createGitHubDispatchPublisher(input: CreateGitHubDispatchPublish
           await input.githubStore.createSkippedGitHubDispatchDelivery({
             rule_id: rule.rule_id,
             project_id: event.project_id,
-            incident_id: event.incident_id,
-            incident_fingerprint: incidentFingerprint,
+            incident_id: incidentId,
+            improvement_id: improvementId,
+            target_fingerprint: targetFingerprint,
             dedupe_key: dedupeKey,
             installation_id: rule.installation_id,
             repo_owner: rule.repo_owner,
@@ -462,8 +474,9 @@ export function createGitHubDispatchPublisher(input: CreateGitHubDispatchPublish
           await input.githubStore.createSkippedGitHubDispatchDelivery({
             rule_id: rule.rule_id,
             project_id: event.project_id,
-            incident_id: event.incident_id,
-            incident_fingerprint: incidentFingerprint,
+            incident_id: incidentId,
+            improvement_id: improvementId,
+            target_fingerprint: targetFingerprint,
             dedupe_key: dedupeKey,
             installation_id: rule.installation_id,
             repo_owner: rule.repo_owner,
@@ -477,8 +490,9 @@ export function createGitHubDispatchPublisher(input: CreateGitHubDispatchPublish
         await input.githubStore.createGitHubDispatchDeliveryIntent({
           rule_id: rule.rule_id,
           project_id: event.project_id,
-          incident_id: event.incident_id,
-          incident_fingerprint: incidentFingerprint,
+          incident_id: incidentId,
+          improvement_id: improvementId,
+          target_fingerprint: targetFingerprint,
           dedupe_key: dedupeKey,
           installation_id: rule.installation_id,
           repo_owner: rule.repo_owner,

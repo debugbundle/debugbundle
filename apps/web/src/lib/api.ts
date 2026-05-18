@@ -370,8 +370,9 @@ export interface GitHubDispatchDeliveryRecord {
   delivery_id: string;
   rule_id: string;
   rule_name: string;
-  incident_id: string;
-  incident_title: string;
+  incident_id: string | null;
+  improvement_id: string | null;
+  target_title: string;
   status: "pending" | "retrying" | "delivered" | "failed" | "skipped";
   attempt_count: number;
   last_attempt_at: string | null;

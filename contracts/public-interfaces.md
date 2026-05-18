@@ -1567,6 +1567,22 @@ GitHub automation eligibility is determined from the target project's owner plan
 }
 ```
 
+Rules may also subscribe to hosted improvement bundle creation:
+```json
+{
+  "name": "Hosted improvements",
+  "event_types": ["improvement_bundle.created"],
+  "environments": ["production"],
+  "services": [],
+  "severity_min": "medium",
+  "bundle_type": "improvement",
+  "incident_status": "new_or_reopened",
+  "cooldown_seconds": 300
+}
+```
+
+`incident_status` only affects incident lifecycle events. Hosted improvement rules send `incident_status: "new_or_reopened"` for schema consistency and match on `bundle_type: "improvement"` plus the selected `improvement_bundle.created` event.
+
 **Rule response:**
 ```json
 {
@@ -1615,8 +1631,9 @@ GitHub automation eligibility is determined from the target project's owner plan
       "delivery_id": "uuid",
       "rule_id": "uuid",
       "rule_name": "High severity incidents",
-      "incident_id": "uuid",
-      "incident_title": "TypeError in checkout",
+      "incident_id": "uuid-or-null",
+      "improvement_id": "uuid-or-null",
+      "target_title": "TypeError in checkout",
       "status": "delivered | skipped",
       "attempt_count": 1,
       "last_attempt_at": "ISO8601",
@@ -1627,6 +1644,8 @@ GitHub automation eligibility is determined from the target project's owner plan
   ]
 }
 ```
+
+Exactly one of `incident_id` or `improvement_id` is present. `target_title` is the incident title for failure-bundle dispatches and the improvement title for hosted improvement dispatches.
 
 **Retry response:** Same shape as single delivery.
 
@@ -1650,6 +1669,7 @@ Owner and admin may manage any dispatch rule. Plain members may create dispatch 
 {
   "debugbundle_event": "bundle.created",
   "incident_id": "inc_abc123",
+  "improvement_id": null,
   "bundle_type": "failure",
   "bundle_version": 3,
   "severity": "high",
@@ -1671,11 +1691,11 @@ Owner and admin may manage any dispatch rule. Plain members may create dispatch 
 }
 ```
 
-The `event_type` on the `repository_dispatch` is always `debugbundle.incident`. The specific lifecycle event is in `debugbundle_event` inside `client_payload`, and delivery metadata lives under `client_payload.debugbundle`. `dispatch_id` is globally unique per delivery attempt for workflow deduplication.
+The `event_type` on the `repository_dispatch` is always `debugbundle.incident` for both incident and hosted improvement dispatches. The specific lifecycle event is in `debugbundle_event` inside `client_payload`, and delivery metadata lives under `client_payload.debugbundle`. `dispatch_id` is globally unique per delivery attempt for workflow deduplication. For hosted improvement dispatches, `incident_id` is `null`, `improvement_id` is set, `bundle_type` is `"improvement"`, `links.bundle` points at the project-scoped improvement bundle route, and `links.reproduction` is `null`.
 
 A GitHub delivery with `status: "delivered"` and `github_status_code: 204` means GitHub accepted DebugBundle's `repository_dispatch` API request. It does not mean a GitHub Actions workflow ran or completed successfully; the receiving repository must contain a matching workflow and owns its run status.
 
-Reference action distribution: external repositories consume `debugbundle/action@v1`. The action lives in the dedicated public `debugbundle/action` repository and fetches the bundle and reproduction artifact into `.debugbundle/bundles/cloud/` using `incident-id`, `debugbundle-token`, optional `api-base-url`, and optional `workspace-root` inputs.
+Reference action distribution: external repositories consume `debugbundle/action@v1` for incident dispatches. The action lives in the dedicated public `debugbundle/action` repository and fetches the bundle and reproduction artifact into `.debugbundle/bundles/cloud/` using `incident-id`, `debugbundle-token`, optional `api-base-url`, and optional `workspace-root` inputs. Hosted improvement dispatches expose `links.bundle` directly in the payload for repository-owned workflows to fetch with a member token.
 
 ### API Response Rules
 - JSON only

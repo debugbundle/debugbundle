@@ -279,7 +279,8 @@ describe("github management api client", () => {
               rule_id: "11111111-1111-4111-8111-111111111111",
               rule_name: "High severity incidents",
               incident_id: "33333333-3333-4333-8333-333333333333",
-              incident_title: "TypeError in checkout",
+              improvement_id: null,
+              target_title: "TypeError in checkout",
               status: "failed",
               attempt_count: 2,
               last_attempt_at: "2026-03-26T00:10:00.000Z",
@@ -298,7 +299,8 @@ describe("github management api client", () => {
             rule_id: "11111111-1111-4111-8111-111111111111",
             rule_name: "High severity incidents",
             incident_id: "33333333-3333-4333-8333-333333333333",
-            incident_title: "TypeError in checkout",
+            improvement_id: null,
+            target_title: "TypeError in checkout",
             status: "retrying",
             attempt_count: 2,
             last_attempt_at: "2026-03-26T00:10:00.000Z",
@@ -323,7 +325,7 @@ describe("github management api client", () => {
       deliveryId: "22222222-2222-4222-8222-222222222222"
     });
 
-    expect(deliveries[0]?.incident_title).toBe("TypeError in checkout");
+    expect(deliveries[0]?.target_title).toBe("TypeError in checkout");
     expect(retried.status).toBe("retrying");
     expect(request).toHaveBeenNthCalledWith(1, {
       method: "GET",

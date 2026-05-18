@@ -21,6 +21,7 @@ import {
 import { BundleV1Schema, getTierCapabilities, type EventClass, type EventEnvelope } from "../../../packages/shared-types/src/index.js";
 import type { NormalizedEvent } from "../../../packages/event-normalizer/src/index.js";
 import { validateEvent } from "../../../packages/event-normalizer/src/index.js";
+import type { IncidentLifecycleGitHubDispatchPublisher } from "./processor.js";
 
 type ImprovementWebhookStore = Pick<WebhookDeliveryStore, "listMatchingWebhooks" | "createDeliveryIntent">;
 
@@ -49,6 +50,7 @@ export interface ImprovementBundleWorkerDependencies {
   improvementOpportunityStore?: ImprovementOpportunityStore;
   billingStore?: Pick<BillingStore, "getBillingSummaryForProject">;
   webhookDeliveryStore?: ImprovementWebhookStore;
+  githubDispatchPublisher?: IncidentLifecycleGitHubDispatchPublisher;
   operationalEmailDeliveryStore?: Pick<OperationalEmailDeliveryStore, "queueProjectOperationalEmailDelivery">;
   fallbackTargetUrl?: string | null;
   fallbackSigningSecret?: string | null;
@@ -1075,5 +1077,20 @@ async function generateRecordedHostedImprovementBundle(input: {
       : { operationalEmailDeliveryStore: input.dependencies.operationalEmailDeliveryStore }),
     ...(input.dependencies.fallbackTargetUrl === undefined ? {} : { fallbackTargetUrl: input.dependencies.fallbackTargetUrl }),
     ...(input.dependencies.fallbackSigningSecret === undefined ? {} : { fallbackSigningSecret: input.dependencies.fallbackSigningSecret })
+  });
+
+  await input.dependencies.githubDispatchPublisher?.publish({
+    event_type: "improvement_bundle.created",
+    improvement_id: context.opportunity_id,
+    project_id: context.project_id,
+    occurred_at: input.occurred_at,
+    service_name: context.service_name,
+    environment: context.environment,
+    severity,
+    bundle_type: "improvement",
+    title: context.title,
+    occurrence_count: context.occurrence_count,
+    first_seen_at: context.first_detected_at,
+    bundle_version: reserved.generation_number
   });
 }

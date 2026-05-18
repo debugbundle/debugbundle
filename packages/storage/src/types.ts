@@ -1342,8 +1342,9 @@ export interface GitHubDispatchDeliveryRecord extends Record<string, unknown> {
   delivery_id: string;
   rule_id: string;
   rule_name: string;
-  incident_id: string;
-  incident_title: string;
+  incident_id: string | null;
+  improvement_id: string | null;
+  target_title: string;
   status: "pending" | "retrying" | "delivered" | "failed" | "skipped";
   attempt_count: number;
   last_attempt_at: string | null;
@@ -1365,7 +1366,8 @@ export interface GitHubDispatchDeliveryIntent {
   delivery_id: string;
   rule_id: string;
   project_id: string;
-  incident_id: string;
+  incident_id: string | null;
+  improvement_id: string | null;
   installation_id: number;
   repo_owner: string;
   repo_name: string;
@@ -1512,8 +1514,9 @@ export interface GitHubStore {
   createGitHubDispatchDeliveryIntent(input: {
     rule_id: string;
     project_id: string;
-    incident_id: string;
-    incident_fingerprint: string;
+    incident_id: string | null;
+    improvement_id: string | null;
+    target_fingerprint: string;
     dedupe_key: string;
     installation_id: number;
     repo_owner: string;
@@ -1523,8 +1526,9 @@ export interface GitHubStore {
   createSkippedGitHubDispatchDelivery(input: {
     rule_id: string;
     project_id: string;
-    incident_id: string;
-    incident_fingerprint: string;
+    incident_id: string | null;
+    improvement_id: string | null;
+    target_fingerprint: string;
     dedupe_key: string;
     installation_id: number;
     repo_owner: string;

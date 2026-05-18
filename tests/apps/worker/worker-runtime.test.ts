@@ -1363,7 +1363,8 @@ describe("worker runtime", () => {
         rule_id: "ghr_123",
         project_id: "proj_123",
         incident_id: "inc_123",
-        incident_fingerprint: "inc_123:bundle.created",
+        improvement_id: null,
+        target_fingerprint: "inc_123:bundle.created",
         dedupe_key: "bundle.created:3",
         installation_id: 99,
         repo_owner: "debugbundle",
@@ -1371,6 +1372,7 @@ describe("worker runtime", () => {
         dispatch_payload: {
           debugbundle_event: "bundle.created",
           incident_id: "inc_123",
+          improvement_id: null,
           bundle_type: "failure",
           bundle_version: 3,
           severity: "high",
@@ -1396,6 +1398,7 @@ describe("worker runtime", () => {
     expect(getIncidentStatusForDispatchEvent("bundle.created")).toBe("new_or_reopened");
     expect(getIncidentStatusForDispatchEvent("bundle.reopened")).toBe("new_or_reopened");
     expect(getIncidentStatusForDispatchEvent("incident.spike_detected")).toBe("new_or_reopened");
+    expect(getIncidentStatusForDispatchEvent("improvement_bundle.created")).toBe("new_or_reopened");
 
     const baseRule = {
       rule_id: "ghr_123",
@@ -1485,6 +1488,92 @@ describe("worker runtime", () => {
         reason: "installation_hourly_rate_limited"
       })
     );
+  });
+
+  it("should persist github dispatch intent for improvement bundles", async (): Promise<void> => {
+    const listMatchingGitHubDispatchRules = vi.fn().mockResolvedValue([
+      {
+        rule_id: "ghr_123",
+        installation_id: 99,
+        repo_owner: "debugbundle",
+        repo_name: "app",
+        default_branch: "main",
+        cooldown_seconds: 300
+      }
+    ]);
+    const hasRecentGitHubDispatch = vi.fn().mockResolvedValue(false);
+    const countProjectGitHubDispatchesSince = vi.fn().mockResolvedValue(1);
+    const countInstallationGitHubDispatchesSince = vi.fn().mockResolvedValue(25);
+    const createGitHubDispatchDeliveryIntent = vi.fn().mockResolvedValue({ delivery_id: "gdd_123", created: true });
+    const createSkippedGitHubDispatchDelivery = vi.fn();
+
+    const publisher = createGitHubDispatchPublisher({
+      githubStore: {
+        listMatchingGitHubDispatchRules,
+        hasRecentGitHubDispatch,
+        countProjectGitHubDispatchesSince,
+        countInstallationGitHubDispatchesSince,
+        createGitHubDispatchDeliveryIntent,
+        createSkippedGitHubDispatchDelivery
+      }
+    });
+
+    await publisher.publish({
+      event_type: "improvement_bundle.created",
+      improvement_id: "imp_123",
+      project_id: "proj_123",
+      occurred_at: "2026-03-11T00:00:00.000Z",
+      service_name: "checkout-api",
+      environment: "production",
+      severity: "medium",
+      bundle_type: "improvement",
+      title: "Repeated warning hotspot",
+      occurrence_count: 7,
+      first_seen_at: "2026-03-10T23:00:00.000Z",
+      bundle_version: 2
+    });
+
+    expect(listMatchingGitHubDispatchRules).toHaveBeenCalledWith({
+      project_id: "proj_123",
+      event_type: "improvement_bundle.created",
+      environment: "production",
+      service_name: "checkout-api",
+      severity: "medium",
+      bundle_type: "improvement",
+      incident_status: "new_or_reopened"
+    });
+    expect(createGitHubDispatchDeliveryIntent).toHaveBeenCalledWith({
+      rule_id: "ghr_123",
+      project_id: "proj_123",
+      incident_id: null,
+      improvement_id: "imp_123",
+      target_fingerprint: "imp_123:improvement_bundle.created",
+      dedupe_key: "improvement_bundle.created:2",
+      installation_id: 99,
+      repo_owner: "debugbundle",
+      repo_name: "app",
+      dispatch_payload: {
+        debugbundle_event: "improvement_bundle.created",
+        incident_id: null,
+        improvement_id: "imp_123",
+        bundle_type: "improvement",
+        bundle_version: 2,
+        severity: "medium",
+        service: "checkout-api",
+        environment: "production",
+        title: "Repeated warning hotspot",
+        links: {
+          bundle: "/v1/projects/proj_123/improvements/imp_123/bundle",
+          reproduction: null,
+          dashboard: "/projects/proj_123/improvements/imp_123"
+        },
+        debugbundle: {
+          project_id: "proj_123",
+          occurrence_count: 7,
+          first_seen_at: "2026-03-10T23:00:00.000Z"
+        }
+      }
+    });
   });
 
   it("should derive github dispatch dedupe keys from occurred_at when bundle version is absent", async (): Promise<void> => {

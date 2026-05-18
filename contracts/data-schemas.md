@@ -1045,8 +1045,9 @@ Dispatch rules reuse the same filter field semantics as webhook filters (`event_
 | id | uuid | PK, DEFAULT gen_random_uuid() |
 | rule_id | uuid | NOT NULL, FK → github_dispatch_rules |
 | project_id | uuid | NOT NULL, FK → projects |
-| incident_id | uuid | NOT NULL |
-| incident_fingerprint | text | NOT NULL |
+| incident_id | uuid | NULL, FK → incidents |
+| improvement_opportunity_id | uuid | NULL, FK → improvement_opportunities |
+| target_fingerprint | text | NOT NULL |
 | status | text | NOT NULL, DEFAULT 'pending', CHECK IN ('pending', 'delivered', 'failed', 'retrying', 'skipped') |
 | attempt_count | integer | NOT NULL, DEFAULT 0 |
 | last_attempt_at | timestamptz | |
@@ -1054,8 +1055,12 @@ Dispatch rules reuse the same filter field semantics as webhook filters (`event_
 | github_status_code | integer | |
 | dispatch_payload | jsonb | NOT NULL |
 | created_at | timestamptz | NOT NULL DEFAULT now() |
+| updated_at | timestamptz | NOT NULL DEFAULT now() |
+| dedupe_key | text | NOT NULL |
 
-**Index:** `idx_dispatch_deliveries_cooldown` on `(rule_id, incident_fingerprint, created_at DESC)` supports efficient cooldown lookups ("has this fingerprint been dispatched within cooldown_seconds?").
+Exactly one of `incident_id` or `improvement_opportunity_id` must be present. Incident dispatches target a failure incident; hosted improvement dispatches target an improvement opportunity.
+
+**Index:** `github_dispatch_deliveries_rule_dedupe_key_idx` on `(rule_id, target_fingerprint, dedupe_key)` suppresses duplicate delivery intents for the same rule, target lifecycle event, and dedupe key. Cooldown lookups use `target_fingerprint` so incident and hosted improvement dispatches share the same suppression model without requiring fake incident rows.
 
 Delivery statuses: `pending` → `delivered` or `retrying` → `delivered` or `failed`. `skipped` records are non-retryable history rows for dispatches suppressed by DebugBundle-side hourly rate limits. Retry strategy: 1s → 5s → 30s → 2min → 10min (5 attempts). Rules are NOT auto-disabled after failures.
 

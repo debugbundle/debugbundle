@@ -697,7 +697,7 @@ describe("web app — management routes", () => {
             createGitHubDispatchDelivery({
               delivery_id: "gdd_456",
               incident_id: "inc_456",
-              incident_title: "Backend timeout in worker sync",
+              target_title: "Backend timeout in worker sync",
               status: "delivered",
               attempt_count: 1,
               last_attempt_at: "2026-03-26T00:20:00.000Z",
@@ -758,6 +758,93 @@ describe("web app — management routes", () => {
     });
 
     expect(await screen.findByText(/^retrying$/i)).toBeInTheDocument();
+  });
+
+  it("creates an improvement github dispatch rule with the improvement bundle type", async () => {
+    const user = userEvent.setup();
+    const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = requestUrl(input);
+
+      if (url.endsWith("/v1/auth/session")) {
+        return jsonResponse(200, { session: createSession() });
+      }
+
+      if (url.endsWith("/v1/projects") && init?.method === undefined) {
+        return jsonResponse(200, {
+          projects: [createProject({ organization_plan: "team" })]
+        });
+      }
+
+      if (url.endsWith("/v1/github/installation?project_id=proj_123") && init?.method === undefined) {
+        return jsonResponse(200, {
+          installation: createGitHubInstallation()
+        });
+      }
+
+      if (url.endsWith("/v1/github/repositories?project_id=proj_123") && init?.method === undefined) {
+        return jsonResponse(200, {
+          repositories: [createGitHubRepository()]
+        });
+      }
+
+      if (url.endsWith("/v1/projects/proj_123/github/repo") && init?.method === undefined) {
+        return jsonResponse(200, {
+          repo: createProjectGitHubRepo()
+        });
+      }
+
+      if (url.endsWith("/v1/projects/proj_123/github/rules") && init?.method === undefined) {
+        return jsonResponse(200, { rules: [] });
+      }
+
+      if (url.endsWith("/v1/projects/proj_123/github/deliveries?limit=20") && init?.method === undefined) {
+        return jsonResponse(200, { deliveries: [] });
+      }
+
+      if (url.endsWith("/v1/projects/proj_123/github/rules") && init?.method === "POST") {
+        expect(init.body).toBeDefined();
+        expect(JSON.parse(String(init.body))).toEqual(
+          expect.objectContaining({
+            name: "Hosted improvements",
+            event_types: ["improvement_bundle.created"],
+            bundle_type: "improvement",
+            incident_status: "new_or_reopened"
+          })
+        );
+
+        return jsonResponse(201, {
+          rule: createGitHubDispatchRule({
+            rule_id: "ghr_999",
+            name: "Hosted improvements",
+            event_types: ["improvement_bundle.created"],
+            severity_min: "medium",
+            bundle_type: "improvement",
+            incident_status: "new_or_reopened",
+            cooldown_seconds: 600
+          })
+        });
+      }
+
+      return jsonResponse(404, { error: "not_found" });
+    });
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<App initialEntries={["/projects/proj_123/github"]} />);
+
+    expect(await screen.findByText(/no github dispatch rules are configured yet/i)).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: /create rule/i }));
+    await user.type(screen.getByLabelText(/^rule name$/i), "Hosted improvements");
+    await chooseSelectOption(user, /event type/i, /^improvement_bundle\.created$/i);
+    expect(screen.queryByLabelText(/incident state/i)).toBeNull();
+    expect(screen.getByText(/hosted improvement bundle rules always use new_or_reopened/i)).toBeInTheDocument();
+    await chooseSelectOption(user, /minimum severity/i, /^medium$/i);
+    await user.clear(screen.getByLabelText(/cooldown seconds/i));
+    await user.type(screen.getByLabelText(/cooldown seconds/i), "600");
+    await user.click(screen.getByRole("button", { name: /^create rule$/i }));
+
+    expect(await screen.findByText(/^hosted improvements$/i)).toBeInTheDocument();
   });
 
   it("shows a github connection lost warning for suspended installations", async () => {

@@ -64,7 +64,8 @@ describe("email package", () => {
     expect(rendered.subject).toContain("proj_<123>");
     expect(rendered.text).toContain("Top spiking incidents:\nNone");
     expect(rendered.html).toContain("proj_&lt;123&gt;");
-    expect(rendered.html).toContain("<p>None</p>");
+    expect(rendered.html).toContain("DebugBundle weekly report");
+    expect(rendered.html).toContain(">None</p>");
   });
 
   it("renders email auth code and invite emails with escaped content", () => {
@@ -159,6 +160,7 @@ describe("email package", () => {
     expect(rendered.html).toContain("wh_&lt;123&gt;");
     expect(rendered.html).toContain("&lt;danger&gt;");
     expect(rendered.html).toContain("Manage project webhooks");
+    expect(rendered.html).toContain("DebugBundle");
   });
 
   it("renders allowance and retention operational emails with scoped usage copy", () => {
@@ -202,7 +204,8 @@ describe("email package", () => {
     expect(retention.subject).toContain("rotated out");
     expect(retention.text).toContain("Rotated bundle owners: 3");
     expect(retention.text).toContain("expand allowance capacity from billing");
-    expect(retention.html).toContain("Retention cap:</strong> 450");
+    expect(retention.html).toContain("Retention cap");
+    expect(retention.html).toContain(">450<");
   });
 
   it("formats the product from email with a DebugBundle display name", () => {

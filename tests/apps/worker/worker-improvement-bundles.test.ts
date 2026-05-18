@@ -31,6 +31,7 @@ describe("worker improvement bundles", () => {
 
     const putObject = vi.fn().mockResolvedValue(undefined);
     const createDeliveryIntent = vi.fn().mockResolvedValue({ delivery_id: "del_123" });
+  const githubDispatchPublish = vi.fn().mockResolvedValue(undefined);
 
     await maybeGenerateHostedImprovementBundle({
       project_id: "proj_123",
@@ -151,6 +152,9 @@ describe("worker improvement bundles", () => {
           ]),
           createDeliveryIntent
         },
+        githubDispatchPublisher: {
+          publish: githubDispatchPublish
+        },
         objectStore: {
           getObject: vi.fn().mockResolvedValue(gzipSync(Buffer.from(JSON.stringify(sampleEvent), "utf8"))),
           putObject
@@ -180,6 +184,13 @@ describe("worker improvement bundles", () => {
       expect.objectContaining({
         incident_id: null,
         event_type: "improvement_bundle.created"
+      })
+    );
+    expect(githubDispatchPublish).toHaveBeenCalledWith(
+      expect.objectContaining({
+        event_type: "improvement_bundle.created",
+        improvement_id: "imp_123",
+        bundle_type: "improvement"
       })
     );
   });

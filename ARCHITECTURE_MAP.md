@@ -410,13 +410,13 @@ build-bundle reservation → append deterministic `bundle_generations` history r
 
 ### GitHub Dispatch Flow
 ```
-Worker lifecycle event (bundle.created / bundle.reopened / incident.spike_detected) → match enabled `github_dispatch_rules` by event + filters (environment/service/severity/incident_status) + cooldown check → enforce DebugBundle hourly dispatch caps (100/project/hour, 4000/installation/hour) and persist non-retryable `skipped` history rows for suppressed matches → persist delivery intent (Postgres `github_dispatch_deliveries`) → claim due deliveries by `next_attempt_at` → acquire GitHub App installation token (Redis cache, 50m TTL) → POST `repository_dispatch` with event_type "debugbundle.incident" and client_payload (summary fields + API links) → update delivery status/retry state → retry on failure (1s → 5s → 30s → 2m → 10m, 5 attempts max)
+Worker lifecycle event (bundle.created / bundle.reopened / incident.spike_detected / improvement_bundle.created) → match enabled `github_dispatch_rules` by event + filters (environment/service/severity/bundle_type and incident_status when applicable) + target cooldown check → enforce DebugBundle hourly dispatch caps (100/project/hour, 4000/installation/hour) and persist non-retryable `skipped` history rows for suppressed matches → persist delivery intent targeting either an incident or improvement opportunity (Postgres `github_dispatch_deliveries`) → claim due deliveries by `next_attempt_at` → acquire GitHub App installation token (Redis cache, 50m TTL) → POST `repository_dispatch` with event_type "debugbundle.incident" and client_payload (summary fields + API links, including `improvement_id` for hosted improvements) → update delivery status/retry state → retry on failure (1s → 5s → 30s → 2m → 10m, 5 attempts max)
 ```
 
 ### Agent Automation Flow
 ```
 Webhook (bundle.created) → Agent receives → GET bundle → GET reproduction → analyze repo → propose patch → open PR
-GitHub dispatch (debugbundle.incident) → GitHub Actions workflow triggers → public `debugbundle/action@v1` writes `.debugbundle/bundles/cloud/*.json` → repository-owned automation analyzes → proposes fix / opens issue / creates PR
+GitHub dispatch (debugbundle.incident) → GitHub Actions workflow triggers → public `debugbundle/action@v1` can fetch incident failure-bundle context when `incident_id` is present, while hosted improvement workflows can use `links.bundle` and a member token to fetch the improvement bundle when `improvement_id` is present → repository-owned automation analyzes → proposes fix / opens issue / creates PR
 
 The action now lives in its own public repository, `debugbundle/action`. This core workspace keeps the workflow examples under `examples/github-actions/`, while local action-source work happens in the standalone clone at `.local-repos/action`.
 ```

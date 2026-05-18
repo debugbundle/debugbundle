@@ -564,15 +564,15 @@ This ensures Free behaves as **failure-first, not telemetry-first**.
 
 **FR-GHA-06:** Reuse the existing webhook filter evaluation pipeline for GitHub dispatch rule matching. The shared filter evaluation function must be used by both webhook delivery and GitHub dispatch rules to prevent filter behavior divergence.
 
-**FR-GHA-07:** On incident lifecycle events, the worker must evaluate matching GitHub dispatch rules, enforce cooldown per `incident_fingerprint + rule_id`, persist a delivery record, and enqueue a `github-dispatch` job.
+**FR-GHA-07:** On supported lifecycle events, including incident lifecycle events and hosted `improvement_bundle.created` events, the worker must evaluate matching GitHub dispatch rules, enforce cooldown per `target_fingerprint + rule_id`, persist a delivery record, and enqueue a `github-dispatch` job.
 
 **FR-GHA-08:** The worker must obtain GitHub App installation access tokens by signing a JWT with the App private key, exchanging it via `POST /app/installations/{id}/access_tokens`, and caching the token in Redis with a 50-minute TTL.
 
 **FR-GHA-09:** The worker must send `repository_dispatch` events to the project's assigned repository via `POST /repos/{owner}/{repo}/dispatches` with `event_type: "debugbundle.incident"` and a `client_payload` containing summary fields and API links (no full bundle data).
 
-**FR-GHA-10:** The dispatch `client_payload` must follow the stable payload contract: `debugbundle_event`, `incident_id`, `project_id`, `bundle_type`, `bundle_version`, `severity`, `service`, `environment`, `title`, `occurrence_count`, `first_seen_at`, `links` (bundle, reproduction, dashboard), `dispatch_id`, `dispatched_at`. Fields may be added but never removed or renamed without a major version bump.
+**FR-GHA-10:** The dispatch `client_payload` must follow the stable payload contract: `debugbundle_event`, `incident_id`, `improvement_id`, `project_id`, `bundle_type`, `bundle_version`, `severity`, `service`, `environment`, `title`, `occurrence_count`, `first_seen_at`, `links` (bundle, reproduction, dashboard), `dispatch_id`, `dispatched_at`. Incident dispatches set `incident_id`; hosted improvement dispatches set `improvement_id`, set `incident_id` to `null`, use `bundle_type: "improvement"`, and set `links.reproduction` to `null`. Fields may be added but never removed or renamed without a major version bump.
 
-**FR-GHA-11:** Persist dispatch delivery history with: `rule_id`, `project_id`, `incident_id`, `incident_fingerprint`, `status` (`pending`, `delivered`, `failed`, `retrying`), `attempt_count`, `last_error`, `github_status_code`, and `dispatch_payload`.
+**FR-GHA-11:** Persist dispatch delivery history with: `rule_id`, `project_id`, exactly one target reference (`incident_id` or `improvement_opportunity_id`), `target_fingerprint`, `dedupe_key`, `status` (`pending`, `delivered`, `failed`, `retrying`, `skipped`), `attempt_count`, `last_error`, `github_status_code`, and `dispatch_payload`.
 
 **FR-GHA-12:** Implement retry strategy for failed dispatches: 1s → 5s → 30s → 2min → 10min (5 attempts). After 5 failed attempts, mark delivery as `failed`. Do not auto-disable rules.
 
@@ -580,7 +580,7 @@ This ensures Free behaves as **failure-first, not telemetry-first**.
 
 **FR-GHA-14:** When a user connects a repo for the first time, offer a default automation rule preset: `event_types: [bundle.created, bundle.reopened]`, `severity_min: high`, `incident_status: new_or_reopened`, `cooldown_seconds: 300`.
 
-**FR-GHA-15:** Provide delivery history UI in the web app's project GitHub tab, including rule name, incident title, timestamp, status, attempt count, last error, and a "Retry" button for failed deliveries.
+**FR-GHA-15:** Provide delivery history UI in the web app's project GitHub tab, including rule name, target title, timestamp, status, attempt count, last error, and a "Retry" button for failed deliveries. The target title is an incident title for failure dispatches and an improvement title for hosted improvement dispatches.
 
 **FR-GHA-16:** If the GitHub installation becomes suspended or removed, show a "GitHub connection lost" banner in the project GitHub tab with a "Reconnect" action.
 

@@ -337,6 +337,28 @@ export const STORAGE_SCHEMA_MIGRATIONS = [
         ON operational_email_deliveries (status, next_attempt_at, created_at)
       `
     ]
+  }),
+  defineStorageSchemaMigration({
+    id: "202605180005_add_github_improvement_dispatch_targets",
+    description: "Allow GitHub dispatch deliveries to target either incidents or hosted improvements.",
+    statements: [
+      "ALTER TABLE github_dispatch_deliveries ALTER COLUMN incident_id DROP NOT NULL",
+      "ALTER TABLE github_dispatch_deliveries RENAME COLUMN incident_fingerprint TO target_fingerprint",
+      "ALTER TABLE github_dispatch_deliveries ADD COLUMN IF NOT EXISTS improvement_opportunity_id uuid REFERENCES improvement_opportunities(id) ON DELETE CASCADE",
+      "DROP INDEX IF EXISTS github_dispatch_deliveries_rule_dedupe_key_idx",
+      `
+        CREATE UNIQUE INDEX IF NOT EXISTS github_dispatch_deliveries_rule_dedupe_key_idx
+        ON github_dispatch_deliveries (rule_id, target_fingerprint, dedupe_key)
+      `,
+      "ALTER TABLE github_dispatch_deliveries DROP CONSTRAINT IF EXISTS github_dispatch_deliveries_check",
+      `
+        ALTER TABLE github_dispatch_deliveries
+        ADD CONSTRAINT github_dispatch_deliveries_check CHECK (
+          (incident_id IS NOT NULL AND improvement_opportunity_id IS NULL)
+          OR (incident_id IS NULL AND improvement_opportunity_id IS NOT NULL)
+        )
+      `
+    ]
   })
 ] as const;
 

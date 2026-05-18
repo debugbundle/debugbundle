@@ -1,4 +1,15 @@
 import { SESv2Client, SendEmailCommand } from "@aws-sdk/client-sesv2";
+import {
+  escapeHtml,
+  renderEmailButton,
+  renderEmailKeyValueList,
+  renderEmailLayout,
+  renderEmailOrderedList,
+  renderEmailPanel,
+  renderEmailParagraph,
+  renderEmailSubheading,
+  renderEmailTextLink
+} from "./email-layout.js";
 
 export {
   renderPurchaseConfirmationEmail,
@@ -102,30 +113,6 @@ function formatTopSpikesText(input: WeeklyReportEmailInput["topSpikingIncidents"
     .join("\n");
 }
 
-function formatTopSpikesHtml(input: WeeklyReportEmailInput["topSpikingIncidents"]): string {
-  if (input.length === 0) {
-    return "<p>None</p>";
-  }
-
-  const items = input
-    .map(
-      (incident) =>
-        `<li><strong>${escapeHtml(incident.title)}</strong> (${incident.occurrence_count} occurrences, spike at ${escapeHtml(incident.spike_detected_at)})</li>`
-    )
-    .join("");
-
-  return `<ol>${items}</ol>`;
-}
-
-function escapeHtml(value: string): string {
-  return value
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("'", "&#39;");
-}
-
 function titleCase(value: string): string {
   if (value.length === 0) {
     return value;
@@ -216,13 +203,28 @@ export function renderEmailAuthCodeEmail(input: {
       "",
       ...(input.appUrl === undefined ? [] : [`Return to ${input.appUrl} to enter the code.`])
     ].join("\n"),
-    html: [
-      "<h1>Your DebugBundle sign-in code</h1>",
-      "<p>Use this code to continue with DebugBundle.</p>",
-      `<p style=\"font-size:32px;font-weight:700;letter-spacing:0.18em;\">${escapeHtml(input.code)}</p>`,
-      `<p>This code expires in ${input.expiresInMinutes} minutes.</p>`,
-      ...(input.appUrl === undefined ? [] : [`<p>Return to <a href=\"${escapeHtml(input.appUrl)}\">${escapeHtml(input.appUrl)}</a> to enter the code.</p>`])
-    ].join("")
+    html: renderEmailLayout({
+      eyebrow: "Sign-in",
+      title: "Your DebugBundle sign-in code",
+      intro: "Use this code to continue with DebugBundle.",
+      bodyHtml: [
+        renderEmailPanel(
+          [
+            '<p style="margin:0;color:#78716c;font-size:12px;line-height:16px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;text-align:center;">Verification code</p>',
+            `<p style="margin:12px 0 0;color:#1c1917;font-size:32px;line-height:36px;font-weight:700;letter-spacing:0.18em;text-align:center;">${escapeHtml(input.code)}</p>`
+          ].join("")
+        ),
+        renderEmailParagraph(`This code expires in ${input.expiresInMinutes} minutes.`),
+        ...(input.appUrl === undefined
+          ? []
+          : [
+              renderEmailButton({
+                label: "Return to DebugBundle",
+                url: input.appUrl
+              })
+            ])
+      ].join("")
+    })
   };
 }
 
@@ -234,11 +236,18 @@ export function renderProjectInviteEmail(input: { acceptUrl: string }): { subjec
       "",
       input.acceptUrl
     ].join("\n"),
-    html: [
-      "<h1>A DebugBundle project was shared with you</h1>",
-      "<p>Open the invite link to accept access to the shared project.</p>",
-      `<p><a href=\"${escapeHtml(input.acceptUrl)}\">${escapeHtml(input.acceptUrl)}</a></p>`
-    ].join("")
+    html: renderEmailLayout({
+      eyebrow: "Project invite",
+      title: "A DebugBundle project was shared with you",
+      intro: "Open the invite link to accept access to the shared project.",
+      bodyHtml: [
+        renderEmailButton({
+          label: "Open invite",
+          url: input.acceptUrl
+        }),
+        renderEmailParagraph(renderEmailTextLink({ label: input.acceptUrl, url: input.acceptUrl }))
+      ].join("")
+    })
   };
 }
 
@@ -256,19 +265,30 @@ export function renderWeeklyReportEmail(input: WeeklyReportEmailInput): { subjec
     "Top spiking incidents:",
     formatTopSpikesText(input.topSpikingIncidents)
   ].join("\n");
-  const html = [
-    `<h1>DebugBundle weekly report</h1>`,
-    `<p><strong>Project:</strong> ${escapeHtml(input.projectId)}</p>`,
-    `<p><strong>Window:</strong> ${escapeHtml(input.windowStart)} to ${escapeHtml(input.windowEnd)}</p>`,
-    `<ul>`,
-    `<li><strong>Failure bundles:</strong> ${input.bundleCounts.failure}</li>`,
-    `<li><strong>Improvement bundles:</strong> ${input.bundleCounts.improvement}</li>`,
-    `<li><strong>New incidents:</strong> ${input.newIncidents}</li>`,
-    `<li><strong>Regressions:</strong> ${input.regressions}</li>`,
-    `</ul>`,
-    `<h2>Top spiking incidents</h2>`,
-    formatTopSpikesHtml(input.topSpikingIncidents)
-  ].join("");
+  const html = renderEmailLayout({
+    eyebrow: "Weekly report",
+    title: "DebugBundle weekly report",
+    intro: `Project ${escapeHtml(input.projectId)} from ${escapeHtml(input.windowStart)} to ${escapeHtml(input.windowEnd)}.`,
+    bodyHtml: [
+      renderEmailKeyValueList([
+        { label: "Project", valueHtml: escapeHtml(input.projectId) },
+        { label: "Window", valueHtml: `${escapeHtml(input.windowStart)} to ${escapeHtml(input.windowEnd)}` },
+        { label: "Failure bundles", valueHtml: input.bundleCounts.failure.toString() },
+        { label: "Improvement bundles", valueHtml: input.bundleCounts.improvement.toString() },
+        { label: "New incidents", valueHtml: input.newIncidents.toString() },
+        { label: "Regressions", valueHtml: input.regressions.toString() }
+      ]),
+      renderEmailSubheading("Top spiking incidents"),
+      input.topSpikingIncidents.length === 0
+        ? renderEmailParagraph("None")
+        : renderEmailOrderedList(
+            input.topSpikingIncidents.map(
+              (incident) =>
+                `<strong>${escapeHtml(incident.title)}</strong> (${incident.occurrence_count} occurrences, spike at ${escapeHtml(incident.spike_detected_at)})`
+            )
+          )
+    ].join("")
+  });
 
   return { subject, text, html };
 }
@@ -371,24 +391,32 @@ export function renderAlertEmail(input: AlertEmailInput): { subject: string; tex
     ...(input.incidentUrl === undefined || input.incidentUrl === null ? [] : ["", `Open incident: ${input.incidentUrl}`]),
     ...(input.bundleUrl === undefined || input.bundleUrl === null ? [``, "Use the incident ID above to inspect the bundle in DebugBundle."] : ["", `View bundle: ${input.bundleUrl}`])
   ].join("\n");
-  const html = [
-    "<h1>DebugBundle alert</h1>",
-    `<p>${escapeHtml(formatAlertIntro(input.conditionType))}</p>`,
-    "<ul>",
-    `<li><strong>Alert:</strong> ${escapeHtml(conditionLabel)}</li>`,
-    `<li><strong>Service:</strong> ${escapeHtml(input.serviceName)}</li>`,
-    `<li><strong>Environment:</strong> ${escapeHtml(input.environment)}</li>`,
-    `<li><strong>Severity:</strong> ${escapeHtml(severityLabel)}</li>`,
-    `<li><strong>Incident ID:</strong> ${escapeHtml(input.incidentId)}</li>`,
-    `<li><strong>Detected at:</strong> ${escapeHtml(input.occurredAt)}</li>`,
-    "</ul>",
-    ...(input.incidentUrl === undefined || input.incidentUrl === null
-      ? []
-      : [`<p><a href="${escapeHtml(input.incidentUrl)}">Open incident in DebugBundle</a></p>`]),
-    ...(input.bundleUrl === undefined || input.bundleUrl === null
-      ? []
-      : [`<p><a href="${escapeHtml(input.bundleUrl)}">View bundle JSON</a></p>`])
-  ].join("");
+  const html = renderEmailLayout({
+    eyebrow: "Alert",
+    title: formatAlertHeadline(input.conditionType),
+    intro: formatAlertIntro(input.conditionType),
+    bodyHtml: [
+      renderEmailKeyValueList([
+        { label: "Alert", valueHtml: escapeHtml(conditionLabel) },
+        { label: "Service", valueHtml: escapeHtml(input.serviceName) },
+        { label: "Environment", valueHtml: escapeHtml(input.environment) },
+        { label: "Severity", valueHtml: escapeHtml(severityLabel) },
+        { label: "Incident ID", valueHtml: escapeHtml(input.incidentId) },
+        { label: "Detected at", valueHtml: escapeHtml(input.occurredAt) }
+      ]),
+      ...(input.incidentUrl === undefined || input.incidentUrl === null
+        ? []
+        : [
+            renderEmailButton({
+              label: "Open incident in DebugBundle",
+              url: input.incidentUrl
+            })
+          ]),
+      ...(input.bundleUrl === undefined || input.bundleUrl === null
+        ? [renderEmailParagraph("Use the incident ID above to inspect the bundle in DebugBundle.")]
+        : [renderEmailParagraph(renderEmailTextLink({ label: "View bundle JSON", url: input.bundleUrl }))])
+    ].join("")
+  });
 
   return { subject, text, html };
 }
@@ -446,37 +474,42 @@ export function renderAlertDigestEmail(input: {
     ])
   ].join("\n").trimEnd();
 
-  const html = [
-    "<h1>DebugBundle alert digest</h1>",
-    `<p>${escapeHtml(
+  const html = renderEmailLayout({
+    eyebrow: "Alert digest",
+    title: "DebugBundle alert digest",
+    intro:
       incidentCount === 1
         ? "DebugBundle batched 1 incident into this alert digest."
-        : `DebugBundle batched ${incidentCount} incidents into this alert digest.`
-    )}</p>`,
-    "<ol>",
-    ...alerts.map((alert) =>
-      [
-        "<li>",
-        `<p><strong>${escapeHtml(alert.summary ?? "Alert triggered")}</strong></p>`,
-        "<ul>",
-        `<li><strong>Incident ID:</strong> ${escapeHtml(alert.incidentId)}</li>`,
-        `<li><strong>Alerts:</strong> ${escapeHtml(alert.conditionLabels.join(", "))}</li>`,
-        `<li><strong>Service:</strong> ${escapeHtml(alert.serviceName)}</li>`,
-        `<li><strong>Environment:</strong> ${escapeHtml(alert.environment)}</li>`,
-        `<li><strong>Severity:</strong> ${escapeHtml(titleCase(alert.severity))}</li>`,
-        `<li><strong>Detected at:</strong> ${escapeHtml(alert.occurredAt)}</li>`,
-        "</ul>",
-        ...(alert.incidentUrl === undefined || alert.incidentUrl === null
-          ? []
-          : [`<p><a href="${escapeHtml(alert.incidentUrl)}">Open incident in DebugBundle</a></p>`]),
-        ...(alert.bundleUrl === undefined || alert.bundleUrl === null
-          ? []
-          : [`<p><a href="${escapeHtml(alert.bundleUrl)}">View bundle JSON</a></p>`]),
-        "</li>"
-      ].join("")
-    ),
-    "</ol>"
-  ].join("");
+        : `DebugBundle batched ${incidentCount} incidents into this alert digest.`,
+    bodyHtml: alerts
+      .map((alert, index) =>
+        renderEmailPanel(
+          [
+            `<p style="margin:0 0 14px;color:#1c1917;font-size:16px;line-height:24px;font-weight:600;">${index + 1}. ${escapeHtml(alert.summary ?? "Alert triggered")}</p>`,
+            renderEmailKeyValueList([
+              { label: "Incident ID", valueHtml: escapeHtml(alert.incidentId) },
+              { label: "Alerts", valueHtml: escapeHtml(alert.conditionLabels.join(", ")) },
+              { label: "Service", valueHtml: escapeHtml(alert.serviceName) },
+              { label: "Environment", valueHtml: escapeHtml(alert.environment) },
+              { label: "Severity", valueHtml: escapeHtml(titleCase(alert.severity)) },
+              { label: "Detected at", valueHtml: escapeHtml(alert.occurredAt) }
+            ]),
+            ...(alert.incidentUrl === undefined || alert.incidentUrl === null
+              ? []
+              : [
+                  renderEmailButton({
+                    label: "Open incident in DebugBundle",
+                    url: alert.incidentUrl
+                  })
+                ]),
+            ...(alert.bundleUrl === undefined || alert.bundleUrl === null
+              ? []
+              : [renderEmailParagraph(renderEmailTextLink({ label: "View bundle JSON", url: alert.bundleUrl }))])
+          ].join("")
+        )
+      )
+      .join("")
+  });
 
   return { subject, text, html };
 }

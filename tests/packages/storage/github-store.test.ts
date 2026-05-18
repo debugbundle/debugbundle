@@ -289,7 +289,8 @@ describe("github store", () => {
             rule_id: "11111111-1111-4111-8111-111111111111",
             rule_name: "High severity incidents",
             incident_id: "33333333-3333-4333-8333-333333333333",
-            incident_title: "TypeError in checkout",
+            improvement_id: null,
+            target_title: "TypeError in checkout",
             status: "failed",
             attempt_count: 2,
             last_attempt_at: "2026-03-26T00:10:00.000Z",
@@ -306,7 +307,8 @@ describe("github store", () => {
             rule_id: "11111111-1111-4111-8111-111111111111",
             rule_name: "High severity incidents",
             incident_id: "33333333-3333-4333-8333-333333333333",
-            incident_title: "TypeError in checkout",
+            improvement_id: null,
+            target_title: "TypeError in checkout",
             status: "retrying",
             attempt_count: 2,
             last_attempt_at: "2026-03-26T00:10:00.000Z",
@@ -334,7 +336,9 @@ describe("github store", () => {
     expect(deliveries).toEqual([
       expect.objectContaining({
         delivery_id: "22222222-2222-4222-8222-222222222222",
-        incident_title: "TypeError in checkout"
+        incident_id: "33333333-3333-4333-8333-333333333333",
+        improvement_id: null,
+        target_title: "TypeError in checkout"
       })
     ]);
     expect(retried?.status).toBe("retrying");
@@ -380,7 +384,8 @@ describe("github store", () => {
       rule_id: "11111111-1111-4111-8111-111111111111",
       project_id: "proj_123",
       incident_id: "inc_123",
-      incident_fingerprint: "fp_123",
+      improvement_id: null,
+      target_fingerprint: "fp_123",
       dedupe_key: "bundle.created:3",
       installation_id: 99,
       repo_owner: "debugbundle",
@@ -532,6 +537,7 @@ describe("github store", () => {
           rule_id: "11111111-1111-4111-8111-111111111111",
           project_id: "proj_123",
           incident_id: "inc_123",
+          improvement_id: null,
           installation_id: "99",
           repo_owner: "debugbundle",
           repo_name: "app",
@@ -553,6 +559,7 @@ describe("github store", () => {
       rule_id: "11111111-1111-4111-8111-111111111111",
       project_id: "proj_123",
       incident_id: "inc_123",
+      improvement_id: null,
       installation_id: 99,
       repo_owner: "debugbundle",
       repo_name: "app",
@@ -578,7 +585,8 @@ describe("github store", () => {
       rule_id: "11111111-1111-4111-8111-111111111111",
       project_id: "proj_123",
       incident_id: "inc_123",
-      incident_fingerprint: "inc_123:bundle.created",
+      improvement_id: null,
+      target_fingerprint: "inc_123:bundle.created",
       dedupe_key: "bundle.created:3",
       installation_id: 99,
       repo_owner: "debugbundle",
@@ -597,7 +605,8 @@ describe("github store", () => {
       rule_id: "11111111-1111-4111-8111-111111111111",
       project_id: "proj_123",
       incident_id: "inc_123",
-      incident_fingerprint: "inc_123:bundle.created",
+      improvement_id: null,
+      target_fingerprint: "inc_123:bundle.created",
       dedupe_key: "bundle.created:4",
       installation_id: 99,
       repo_owner: "debugbundle",
@@ -616,6 +625,52 @@ describe("github store", () => {
     expect(duplicate.delivery_id).toMatch(/^[0-9a-f-]+$/i);
     expect(created.created).toBe(true);
     expect(created.delivery_id).toMatch(/^[0-9a-f-]+$/i);
+  });
+
+  it("lists improvement github dispatch deliveries with the improvement target title", async () => {
+    const query = vi.fn().mockResolvedValueOnce({
+      rows: [
+        {
+          delivery_id: "44444444-4444-4444-8444-444444444444",
+          rule_id: "11111111-1111-4111-8111-111111111111",
+          rule_name: "Hosted improvements",
+          incident_id: null,
+          improvement_id: "imp_123",
+          target_title: "Repeated warning hotspot",
+          status: "failed",
+          attempt_count: "2",
+          last_attempt_at: "2026-03-26T00:10:00.000Z",
+          last_error: "Repository not found",
+          github_status_code: "404",
+          created_at: "2026-03-26T00:00:00.000Z"
+        }
+      ]
+    });
+
+    const store = createPostgresGitHubStore({ query });
+
+    await expect(
+      store.listProjectGitHubDeliveriesForOrganization({
+        organization_id: "org_123",
+        project_id: "proj_123",
+        limit: 20
+      })
+    ).resolves.toEqual([
+      {
+        delivery_id: "44444444-4444-4444-8444-444444444444",
+        rule_id: "11111111-1111-4111-8111-111111111111",
+        rule_name: "Hosted improvements",
+        incident_id: null,
+        improvement_id: "imp_123",
+        target_title: "Repeated warning hotspot",
+        status: "failed",
+        attempt_count: 2,
+        last_attempt_at: "2026-03-26T00:10:00.000Z",
+        last_error: "Repository not found",
+        github_status_code: 404,
+        created_at: "2026-03-26T00:00:00.000Z"
+      }
+    ]);
   });
 
   it("uses explicit Retry-After overrides for github dispatch retries", async () => {

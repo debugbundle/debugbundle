@@ -172,8 +172,9 @@ export interface IncidentLifecycleWebhookPublisher {
 
 export interface IncidentLifecycleGitHubDispatchPublisher {
   publish(input: {
-    event_type: "bundle.created" | "bundle.updated" | "bundle.reopened" | "incident.spike_detected";
-    incident_id: string;
+    event_type: "bundle.created" | "bundle.updated" | "bundle.reopened" | "incident.spike_detected" | "improvement_bundle.created";
+    incident_id?: string | null;
+    improvement_id?: string;
     project_id: string;
     occurred_at: string;
     service_name: string;

@@ -1341,7 +1341,7 @@ If CLI says something is healthy and MCP says something different, that is a pro
 - **Then** the worker evaluates the matching rule
 - **And** a delivery record is persisted with status `pending`
 - **And** a `repository_dispatch` is sent to the assigned repo with `event_type: "debugbundle.incident"`
-- **And** the `client_payload` contains `debugbundle_event`, `incident_id`, `severity`, `title`, `links`, and a nested `debugbundle.dispatch_id`
+- **And** the `client_payload` contains `debugbundle_event`, `incident_id`, `improvement_id`, `severity`, `title`, `links`, and a nested `debugbundle.dispatch_id`
 - **And** the delivery record status is updated to `delivered`
 - **And** `delivered` means GitHub accepted the dispatch request, not that a receiving workflow completed
 
@@ -1391,7 +1391,7 @@ If CLI says something is healthy and MCP says something different, that is a pro
 ### AC-GHA-13: Delivery History
 - **Given** a project with dispatch deliveries
 - **When** an authorized project member views the project GitHub tab → Delivery History
-- **Then** each delivery shows rule name, incident title, timestamp, status, attempt count, and last error
+- **Then** each delivery shows rule name, target title, timestamp, status, attempt count, and last error
 - **And** failed deliveries show the HTTP status code from GitHub
 - **And** a "Retry" button is available on failed deliveries
 

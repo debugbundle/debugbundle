@@ -50,6 +50,10 @@ interface GitHubSettingsState {
   deliveries: GitHubDispatchDeliveryRecord[];
 }
 
+type GitHubRuleEventType = "bundle.created" | "bundle.reopened" | "improvement_bundle.created";
+
+const DEFAULT_GITHUB_RULE_EVENT_TYPE: GitHubRuleEventType = "bundle.created";
+
 async function loadOptionalGitHubInstallUrl(projectId: string): Promise<{ installUrl: string | null; installUrlLoadFailed: boolean }> {
   try {
     return {
@@ -82,7 +86,7 @@ export function ProjectGitHubPage(): JSX.Element {
   const [isRemovingRepository, setIsRemovingRepository] = useState(false);
   const [isCreateRuleOpen, setIsCreateRuleOpen] = useState(false);
   const [ruleName, setRuleName] = useState("");
-  const [ruleEventType, setRuleEventType] = useState("bundle.created");
+  const [ruleEventType, setRuleEventType] = useState<GitHubRuleEventType>(DEFAULT_GITHUB_RULE_EVENT_TYPE);
   const [ruleEnvironments, setRuleEnvironments] = useState("production");
   const [ruleServices, setRuleServices] = useState("");
   const [ruleSeverityMin, setRuleSeverityMin] = useState("high");
@@ -99,7 +103,7 @@ export function ProjectGitHubPage(): JSX.Element {
     if (!isCreateRuleOpen) {
       setEditingRuleId(null);
       setRuleName("");
-      setRuleEventType("bundle.created");
+      setRuleEventType(DEFAULT_GITHUB_RULE_EVENT_TYPE);
       setRuleEnvironments("production");
       setRuleServices("");
       setRuleSeverityMin("high");
@@ -272,14 +276,15 @@ export function ProjectGitHubPage(): JSX.Element {
     }
 
     try {
+      const isImprovementEvent = isImprovementGitHubRuleEventType(ruleEventType);
       const payload = {
         name: ruleName,
         event_types: [ruleEventType],
         environments: splitCsvInput(ruleEnvironments),
         services: splitCsvInput(ruleServices),
         severity_min: ruleSeverityMin as GitHubDispatchRuleRecord["severity_min"],
-        bundle_type: "failure" as const,
-        incident_status: ruleIncidentStatus as GitHubDispatchRuleRecord["incident_status"],
+        bundle_type: getBundleTypeForGitHubRuleEventType(ruleEventType),
+        incident_status: (isImprovementEvent ? "new_or_reopened" : ruleIncidentStatus) as GitHubDispatchRuleRecord["incident_status"],
         cooldown_seconds: cooldownSeconds,
         enabled: true
       };
@@ -307,7 +312,7 @@ export function ProjectGitHubPage(): JSX.Element {
   function handleStartCreateRule(): void {
     setEditingRuleId(null);
     setRuleName("");
-    setRuleEventType("bundle.created");
+    setRuleEventType(DEFAULT_GITHUB_RULE_EVENT_TYPE);
     setRuleEnvironments("production");
     setRuleServices("");
     setRuleSeverityMin("high");
@@ -319,7 +324,7 @@ export function ProjectGitHubPage(): JSX.Element {
   function handleStartEditRule(rule: GitHubDispatchRuleRecord): void {
     setEditingRuleId(rule.rule_id);
     setRuleName(rule.name);
-    setRuleEventType(rule.event_types[0] ?? "bundle.created");
+    setRuleEventType(normalizeGitHubRuleEventType(rule.event_types[0]));
     setRuleEnvironments(rule.environments.join(", "));
     setRuleServices(rule.services.join(", "));
     setRuleSeverityMin(rule.severity_min ?? "high");
@@ -588,7 +593,7 @@ export function ProjectGitHubPage(): JSX.Element {
                       <TableHeader>
                         <TableRow>
                           <TableHead>Rule</TableHead>
-                          <TableHead>Incident</TableHead>
+                          <TableHead>Target</TableHead>
                           <TableHead>Status</TableHead>
                           <TableHead>Error</TableHead>
                           <TableHead className="text-right">Action</TableHead>
@@ -598,7 +603,7 @@ export function ProjectGitHubPage(): JSX.Element {
                         {githubSettings.deliveries.map((delivery) => (
                           <TableRow key={delivery.delivery_id}>
                             <TableCell className="font-medium">{delivery.rule_name}</TableCell>
-                            <TableCell>{delivery.incident_title}</TableCell>
+                            <TableCell>{delivery.target_title}</TableCell>
                             <TableCell>
                               <Badge variant={getGitHubDeliveryBadgeVariant(delivery.status)}>{delivery.status}</Badge>
                             </TableCell>
@@ -647,7 +652,7 @@ export function ProjectGitHubPage(): JSX.Element {
               <FieldLabel id="github-rule-event-type-label" htmlFor="github-rule-event-type">Event type</FieldLabel>
               <Select
                 value={ruleEventType}
-                onValueChange={setRuleEventType}
+                onValueChange={(value) => setRuleEventType(normalizeGitHubRuleEventType(value))}
               >
                 <SelectTrigger id="github-rule-event-type" aria-labelledby="github-rule-event-type-label github-rule-event-type" className="w-full">
                   <SelectValue />
@@ -656,6 +661,7 @@ export function ProjectGitHubPage(): JSX.Element {
                   <SelectGroup>
                     <SelectItem value="bundle.created">bundle.created</SelectItem>
                     <SelectItem value="bundle.reopened">bundle.reopened</SelectItem>
+                    <SelectItem value="improvement_bundle.created">improvement_bundle.created</SelectItem>
                   </SelectGroup>
                 </SelectContent>
               </Select>
@@ -689,28 +695,35 @@ export function ProjectGitHubPage(): JSX.Element {
                 </SelectContent>
               </Select>
             </Field>
-            <Field>
-              <FieldLabel id="github-rule-incident-status-label" htmlFor="github-rule-incident-status">Incident state</FieldLabel>
-              <Select
-                value={ruleIncidentStatus}
-                onValueChange={setRuleIncidentStatus}
-              >
-                <SelectTrigger
-                  id="github-rule-incident-status"
-                  aria-labelledby="github-rule-incident-status-label github-rule-incident-status"
-                  className="w-full"
+            {isImprovementGitHubRuleEventType(ruleEventType) ? (
+              <Field>
+                <FieldLabel>Lifecycle state</FieldLabel>
+                <FieldDescription>Hosted improvement bundle rules always use new_or_reopened.</FieldDescription>
+              </Field>
+            ) : (
+              <Field>
+                <FieldLabel id="github-rule-incident-status-label" htmlFor="github-rule-incident-status">Incident state</FieldLabel>
+                <Select
+                  value={ruleIncidentStatus}
+                  onValueChange={setRuleIncidentStatus}
                 >
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent position="popper">
-                  <SelectGroup>
-                    <SelectItem value="new_only">new_only</SelectItem>
-                    <SelectItem value="reopened_only">reopened_only</SelectItem>
-                    <SelectItem value="new_or_reopened">new_or_reopened</SelectItem>
-                  </SelectGroup>
-                </SelectContent>
-              </Select>
-            </Field>
+                  <SelectTrigger
+                    id="github-rule-incident-status"
+                    aria-labelledby="github-rule-incident-status-label github-rule-incident-status"
+                    className="w-full"
+                  >
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent position="popper">
+                    <SelectGroup>
+                      <SelectItem value="new_only">new_only</SelectItem>
+                      <SelectItem value="reopened_only">reopened_only</SelectItem>
+                      <SelectItem value="new_or_reopened">new_or_reopened</SelectItem>
+                    </SelectGroup>
+                  </SelectContent>
+                </Select>
+              </Field>
+            )}
             <Field>
               <FieldLabel htmlFor="github-rule-cooldown-seconds">Cooldown seconds</FieldLabel>
               <Input
@@ -734,6 +747,22 @@ function splitCsvInput(value: string): string[] {
     .split(",")
     .map((entry) => entry.trim())
     .filter((entry) => entry.length > 0);
+}
+
+function normalizeGitHubRuleEventType(eventType: string | undefined): GitHubRuleEventType {
+  if (eventType === "bundle.reopened" || eventType === "improvement_bundle.created") {
+    return eventType;
+  }
+
+  return DEFAULT_GITHUB_RULE_EVENT_TYPE;
+}
+
+function isImprovementGitHubRuleEventType(eventType: GitHubRuleEventType): boolean {
+  return eventType === "improvement_bundle.created";
+}
+
+function getBundleTypeForGitHubRuleEventType(eventType: GitHubRuleEventType): "failure" | "improvement" {
+  return isImprovementGitHubRuleEventType(eventType) ? "improvement" : "failure";
 }
 
 function canManageGitHubRule(

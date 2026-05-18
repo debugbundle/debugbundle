@@ -74,7 +74,8 @@ function mapGitHubDispatchDeliveryRow(
     rule_id: row.rule_id,
     rule_name: row.rule_name,
     incident_id: row.incident_id,
-    incident_title: row.incident_title,
+    improvement_id: row.improvement_id,
+    target_title: row.target_title,
     status: row.status,
     attempt_count: Number(row.attempt_count),
     last_attempt_at: row.last_attempt_at,
@@ -103,6 +104,7 @@ function mapGitHubDispatchDeliveryIntent(
     rule_id: row.rule_id,
     project_id: row.project_id,
     incident_id: row.incident_id,
+    improvement_id: row.improvement_id,
     installation_id: Number(row.installation_id),
     repo_owner: row.repo_owner,
     repo_name: row.repo_name,
@@ -620,7 +622,8 @@ export function createPostgresGitHubStore(db: Queryable): GitHubStore {
             gdd.rule_id,
             gdr.name AS rule_name,
             gdd.incident_id,
-            i.title AS incident_title,
+            gdd.improvement_opportunity_id AS improvement_id,
+            COALESCE(i.title, io.title) AS target_title,
             gdd.status,
             gdd.attempt_count,
             gdd.last_attempt_at::text AS last_attempt_at,
@@ -630,7 +633,8 @@ export function createPostgresGitHubStore(db: Queryable): GitHubStore {
           FROM github_dispatch_deliveries gdd
           JOIN github_dispatch_rules gdr ON gdr.id = gdd.rule_id
           JOIN projects p ON p.id = gdd.project_id
-          JOIN incidents i ON i.id = gdd.incident_id
+          LEFT JOIN incidents i ON i.id = gdd.incident_id
+          LEFT JOIN improvement_opportunities io ON io.id = gdd.improvement_opportunity_id
           WHERE p.organization_id = $1
             AND gdd.project_id = $2
             AND ($3::text IS NULL OR gdd.status = $3)
@@ -655,7 +659,6 @@ export function createPostgresGitHubStore(db: Queryable): GitHubStore {
             updated_at = now()
           FROM github_dispatch_rules gdr
           JOIN projects p ON p.id = gdr.project_id
-          JOIN incidents i ON i.id = gdd.incident_id
           WHERE gdd.rule_id = gdr.id
             AND p.id = gdd.project_id
             AND p.organization_id = $1
@@ -672,7 +675,11 @@ export function createPostgresGitHubStore(db: Queryable): GitHubStore {
             gdd.rule_id,
             gdr.name AS rule_name,
             gdd.incident_id,
-            i.title AS incident_title,
+            gdd.improvement_opportunity_id AS improvement_id,
+            COALESCE(
+              (SELECT incidents.title FROM incidents WHERE incidents.id = gdd.incident_id),
+              (SELECT improvement_opportunities.title FROM improvement_opportunities WHERE improvement_opportunities.id = gdd.improvement_opportunity_id)
+            ) AS target_title,
             gdd.status,
             gdd.attempt_count,
             gdd.last_attempt_at::text AS last_attempt_at,
@@ -763,7 +770,7 @@ export function createPostgresGitHubStore(db: Queryable): GitHubStore {
           SELECT id
           FROM github_dispatch_deliveries
           WHERE rule_id = $1
-            AND incident_fingerprint = $2
+            AND target_fingerprint = $2
             AND created_at >= now() - ($3::text || ' seconds')::interval
           LIMIT 1
         `,
@@ -812,7 +819,8 @@ export function createPostgresGitHubStore(db: Queryable): GitHubStore {
             rule_id,
             project_id,
             incident_id,
-            incident_fingerprint,
+            improvement_opportunity_id,
+            target_fingerprint,
             dedupe_key,
             installation_id,
             repo_owner,
@@ -823,8 +831,8 @@ export function createPostgresGitHubStore(db: Queryable): GitHubStore {
             created_at,
             updated_at
           )
-          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'pending', 0, $10::jsonb, now(), now())
-          ON CONFLICT (rule_id, incident_id, dedupe_key) DO NOTHING
+          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'pending', 0, $11::jsonb, now(), now())
+          ON CONFLICT (rule_id, target_fingerprint, dedupe_key) DO NOTHING
           RETURNING id
         `,
         [
@@ -832,7 +840,8 @@ export function createPostgresGitHubStore(db: Queryable): GitHubStore {
           input.rule_id,
           input.project_id,
           input.incident_id,
-          input.incident_fingerprint,
+          input.improvement_id,
+          input.target_fingerprint,
           input.dedupe_key,
           input.installation_id,
           input.repo_owner,
@@ -853,7 +862,8 @@ export function createPostgresGitHubStore(db: Queryable): GitHubStore {
             rule_id,
             project_id,
             incident_id,
-            incident_fingerprint,
+            improvement_opportunity_id,
+            target_fingerprint,
             dedupe_key,
             installation_id,
             repo_owner,
@@ -865,8 +875,8 @@ export function createPostgresGitHubStore(db: Queryable): GitHubStore {
             created_at,
             updated_at
           )
-          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'skipped', 0, $10, $11::jsonb, now(), now())
-          ON CONFLICT (rule_id, incident_id, dedupe_key) DO NOTHING
+          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'skipped', 0, $11, $12::jsonb, now(), now())
+          ON CONFLICT (rule_id, target_fingerprint, dedupe_key) DO NOTHING
           RETURNING id
         `,
         [
@@ -874,7 +884,8 @@ export function createPostgresGitHubStore(db: Queryable): GitHubStore {
           input.rule_id,
           input.project_id,
           input.incident_id,
-          input.incident_fingerprint,
+          input.improvement_id,
+          input.target_fingerprint,
           input.dedupe_key,
           input.installation_id,
           input.repo_owner,
@@ -922,6 +933,7 @@ export function createPostgresGitHubStore(db: Queryable): GitHubStore {
             rule_id,
             project_id,
             incident_id,
+            improvement_opportunity_id AS improvement_id,
             installation_id,
             repo_owner,
             repo_name,
