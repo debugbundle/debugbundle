@@ -446,9 +446,10 @@ function createAuthEmailSender(input: { emailTransport: EmailTransport; appBaseU
       });
     },
 
-    async sendProjectInviteEmail({ email, token }): Promise<void> {
+    async sendProjectInviteEmail({ email, token, inviter_name }): Promise<void> {
       const rendered = renderProjectInviteEmail({
-        acceptUrl: `${baseUrl}/invite?token=${encodeURIComponent(token)}`
+        acceptUrl: `${baseUrl}/invite?token=${encodeURIComponent(token)}`,
+        inviterName: inviter_name
       });
       await input.emailTransport.send({
         to: [email],

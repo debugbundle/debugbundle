@@ -15,6 +15,20 @@ import {
 
 const INVITE_LIFETIME_MS = 1000 * 60 * 60 * 24 * 7;
 
+function deriveInviteSenderName(email: string): string {
+  const parts = (email.trim().toLowerCase().split("@")[0] ?? "")
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim()
+    .split(/\s+/)
+    .filter((part) => part.length > 0);
+
+  if (parts.length === 0) {
+    return email.trim();
+  }
+
+  return parts.map((part) => part.charAt(0).toUpperCase() + part.slice(1)).join(" ");
+}
+
 function toPublicProjectMember(
   projectId: string,
   member: {
@@ -273,7 +287,8 @@ export function registerProjectMemberRoutes(app: FastifyInstance, dependencies: 
 
     await dependencies.inviteEmails?.sendProjectInviteEmail({
       email: result.invite.email,
-      token: inviteToken.plaintext
+      token: inviteToken.plaintext,
+      inviter_name: deriveInviteSenderName(auth.member.email ?? auth.access.owner_email)
     });
 
     return reply.status(201).send({ invite: result.invite });

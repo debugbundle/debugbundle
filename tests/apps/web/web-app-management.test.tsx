@@ -172,6 +172,13 @@ describe("web app — management routes", () => {
     expect(screen.queryByRole("button", { name: /next/i })).toBeNull();
     expect(screen.queryByRole("button", { name: /previous/i })).toBeNull();
 
+    const brandLink = screen.getByRole("link", { name: /^debugbundle$/i });
+    expect(brandLink).toHaveClass("group-data-[collapsible=icon]:!p-1.5");
+
+    await user.click(screen.getByRole("button", { name: /toggle sidebar/i }));
+
+    expect(document.querySelector('[data-slot="sidebar"][data-state="collapsed"]')).not.toBeNull();
+
     await chooseSelectOption(user, /status/i, /all statuses/i);
     expect(await screen.findByText(/database timeout during signin/i)).toBeInTheDocument();
     expect(screen.getByText(/^critical$/i)).toBeInTheDocument();

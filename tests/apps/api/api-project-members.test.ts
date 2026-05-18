@@ -51,6 +51,7 @@ function createServer(overrides: {
         resolveMemberByTokenHash: vi.fn().mockResolvedValue({
           member_id: "usr_123",
           organization_id: "org_123",
+          email: "owner@example.com",
           role: "owner"
         })
       } as { resolveMemberByTokenHash: ReturnType<typeof vi.fn> }),
@@ -341,7 +342,8 @@ describe("api project member routes", () => {
     });
     expect(inviteEmails.sendProjectInviteEmail).toHaveBeenCalledWith({
       email: "new@example.com",
-      token: expect.stringMatching(/^dbundle_invite_/)
+      token: expect.stringMatching(/^dbundle_invite_/),
+      inviter_name: "Owner"
     });
   });
 

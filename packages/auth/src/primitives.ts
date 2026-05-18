@@ -151,7 +151,7 @@ export type AcceptProjectInviteStoreResult =
 
 export interface AuthEmailSender {
   sendEmailAuthCode(input: { email: string; code: string; expires_in_minutes: number }): Promise<void>;
-  sendProjectInviteEmail(input: { email: string; token: string }): Promise<void>;
+  sendProjectInviteEmail(input: { email: string; token: string; inviter_name: string }): Promise<void>;
 }
 
 export interface CookieOptions {

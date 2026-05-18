@@ -50,7 +50,7 @@ export function AppSidebar({ session, onSignOut, ...props }: AppSidebarProps): J
       <SidebarHeader>
         <SidebarMenu>
           <SidebarMenuItem>
-            <SidebarMenuButton asChild className="data-[slot=sidebar-menu-button]:!p-1.5">
+            <SidebarMenuButton asChild className="data-[slot=sidebar-menu-button]:!p-1.5 group-data-[collapsible=icon]:!p-1.5">
               <BrandLockup href="/dashboard" imageClassName="size-5" labelClassName="text-base font-semibold" />
             </SidebarMenuButton>
           </SidebarMenuItem>

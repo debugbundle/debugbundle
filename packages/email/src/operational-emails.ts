@@ -1,5 +1,6 @@
 import {
   escapeHtml,
+  formatEmailDate,
   renderEmailButton,
   renderEmailKeyValueList,
   renderEmailLayout,
@@ -44,7 +45,7 @@ export function renderWebhookAutoDisabledEmail(input: WebhookAutoDisabledEmailIn
   return {
     subject: "DebugBundle: webhook auto-disabled after repeated failures",
     text: [
-      `DebugBundle automatically disabled a webhook in "${input.organizationName}" after repeated delivery failures.`,
+      `DebugBundle automatically disabled a webhook in account "${input.organizationName}" after repeated delivery failures.`,
       "",
       `Project: ${input.projectName}`,
       `Webhook ID: ${input.webhookId}`,
@@ -57,7 +58,7 @@ export function renderWebhookAutoDisabledEmail(input: WebhookAutoDisabledEmailIn
     html: renderEmailLayout({
       eyebrow: "Operational",
       title: "Webhook auto-disabled",
-      intro: `DebugBundle automatically disabled a webhook in "${escapeHtml(input.organizationName)}" after repeated delivery failures.`,
+      intro: `DebugBundle automatically disabled a webhook in account "${escapeHtml(input.organizationName)}" after repeated delivery failures.`,
       bodyHtml: [
         renderEmailKeyValueList([
           { label: "Project", valueHtml: escapeHtml(input.projectName) },
@@ -85,23 +86,24 @@ export function renderAllowanceWarning80Email(input: AllowanceThresholdEmailInpu
   return {
     subject: `DebugBundle: 80% of ${input.meterLabel.toLowerCase()} allowance used`,
     text: [
-      `DebugBundle reached 80% of the ${input.meterLabel.toLowerCase()} allowance for "${input.organizationName}".`,
+      `DebugBundle reached 80% of the ${input.meterLabel.toLowerCase()} allowance for account "${input.organizationName}".`,
       "",
       `Project: ${input.projectName}`,
       `Allowance: ${input.meterLabel}`,
       `Usage: ${input.used} of ${input.limit}`,
       ...(input.usageWindowEndsAt === undefined || input.usageWindowEndsAt === null
         ? []
-        : [`Usage window ends: ${input.usageWindowEndsAt}`]),
+        : [`Usage window ends: ${formatEmailDate(input.usageWindowEndsAt)}`]),
       "",
       `If this allowance reaches 100%, ${input.currentBehavior}.`,
-      "You can wait for the usage window to reset or expand allowance capacity from billing.",
-      ...(input.billingUrl === undefined ? [] : ["", `Review billing and allowance usage: ${input.billingUrl}`])
+      "Increasing capacity units from billing raises this allowance immediately.",
+      "You can also wait for the usage window to reset.",
+      ...(input.billingUrl === undefined ? [] : ["", `Open billing to increase capacity units: ${input.billingUrl}`])
     ].join("\n"),
     html: renderEmailLayout({
       eyebrow: "Operational",
       title: `${input.meterLabel} allowance at 80%`,
-      intro: `DebugBundle reached 80% of the ${escapeHtml(input.meterLabel.toLowerCase())} allowance for "${escapeHtml(input.organizationName)}".`,
+      intro: `DebugBundle reached 80% of the ${escapeHtml(input.meterLabel.toLowerCase())} allowance for account "${escapeHtml(input.organizationName)}".`,
       bodyHtml: [
         renderEmailKeyValueList([
           { label: "Project", valueHtml: escapeHtml(input.projectName) },
@@ -109,15 +111,16 @@ export function renderAllowanceWarning80Email(input: AllowanceThresholdEmailInpu
           { label: "Usage", valueHtml: `${input.used} of ${input.limit}` },
           ...(input.usageWindowEndsAt === undefined || input.usageWindowEndsAt === null
             ? []
-            : [{ label: "Usage window ends", valueHtml: escapeHtml(input.usageWindowEndsAt) }])
+            : [{ label: "Usage window ends", valueHtml: escapeHtml(formatEmailDate(input.usageWindowEndsAt)) }])
         ]),
         renderEmailParagraph(`If this allowance reaches 100%, ${escapeHtml(input.currentBehavior)}.`),
-        renderEmailParagraph("You can wait for the usage window to reset or expand allowance capacity from billing."),
+        renderEmailParagraph("Increasing capacity units from billing raises this allowance immediately."),
+        renderEmailParagraph("You can also wait for the usage window to reset."),
         ...(input.billingUrl === undefined
           ? []
           : [
               renderEmailButton({
-                label: "Review billing and allowance usage",
+                label: "Open billing to increase capacity",
                 url: input.billingUrl
               })
             ])
@@ -130,23 +133,24 @@ export function renderAllowanceLimitReachedEmail(input: AllowanceThresholdEmailI
   return {
     subject: `DebugBundle: ${input.meterLabel} allowance limit reached`,
     text: [
-      `DebugBundle reached the ${input.meterLabel.toLowerCase()} allowance limit for "${input.organizationName}".`,
+      `DebugBundle reached the ${input.meterLabel.toLowerCase()} allowance limit for account "${input.organizationName}".`,
       "",
       `Project: ${input.projectName}`,
       `Allowance: ${input.meterLabel}`,
       `Usage: ${input.used} of ${input.limit}`,
       ...(input.usageWindowEndsAt === undefined || input.usageWindowEndsAt === null
         ? []
-        : [`Usage window ends: ${input.usageWindowEndsAt}`]),
+        : [`Usage window ends: ${formatEmailDate(input.usageWindowEndsAt)}`]),
       "",
       `Current behavior: ${input.currentBehavior}.`,
-      "You can wait for the usage window to reset or expand allowance capacity from billing.",
-      ...(input.billingUrl === undefined ? [] : ["", `Review billing and allowance usage: ${input.billingUrl}`])
+      "Increasing capacity units from billing raises this allowance immediately.",
+      "You can also wait for the usage window to reset.",
+      ...(input.billingUrl === undefined ? [] : ["", `Open billing to increase capacity units: ${input.billingUrl}`])
     ].join("\n"),
     html: renderEmailLayout({
       eyebrow: "Operational",
       title: `${input.meterLabel} allowance limit reached`,
-      intro: `DebugBundle reached the ${escapeHtml(input.meterLabel.toLowerCase())} allowance limit for "${escapeHtml(input.organizationName)}".`,
+      intro: `DebugBundle reached the ${escapeHtml(input.meterLabel.toLowerCase())} allowance limit for account "${escapeHtml(input.organizationName)}".`,
       bodyHtml: [
         renderEmailKeyValueList([
           { label: "Project", valueHtml: escapeHtml(input.projectName) },
@@ -154,15 +158,16 @@ export function renderAllowanceLimitReachedEmail(input: AllowanceThresholdEmailI
           { label: "Usage", valueHtml: `${input.used} of ${input.limit}` },
           ...(input.usageWindowEndsAt === undefined || input.usageWindowEndsAt === null
             ? []
-            : [{ label: "Usage window ends", valueHtml: escapeHtml(input.usageWindowEndsAt) }])
+            : [{ label: "Usage window ends", valueHtml: escapeHtml(formatEmailDate(input.usageWindowEndsAt)) }])
         ]),
         renderEmailParagraph(`<strong>Current behavior:</strong> ${escapeHtml(input.currentBehavior)}.`),
-        renderEmailParagraph("You can wait for the usage window to reset or expand allowance capacity from billing."),
+        renderEmailParagraph("Increasing capacity units from billing raises this allowance immediately."),
+        renderEmailParagraph("You can also wait for the usage window to reset."),
         ...(input.billingUrl === undefined
           ? []
           : [
               renderEmailButton({
-                label: "Review billing and allowance usage",
+                label: "Open billing to increase capacity",
                 url: input.billingUrl
               })
             ])
@@ -177,7 +182,7 @@ export function renderRetentionRotationNoticeEmail(
   return {
     subject: "DebugBundle: retained bundles rotated out at the storage cap",
     text: [
-      `DebugBundle rotated out the oldest retained bundles in "${input.organizationName}" after the retained bundle cap was reached.`,
+      `DebugBundle rotated out the oldest retained bundles in account "${input.organizationName}" after the retained bundle cap was reached.`,
       "",
       `Project: ${input.projectName}`,
       `Rotated bundle owners: ${input.rotatedOwnerCount}`,
@@ -185,13 +190,13 @@ export function renderRetentionRotationNoticeEmail(
       "",
       "This is expected retention policy behavior, not data corruption.",
       "New bundles continue to be generated, and the oldest retained bundles are removed first to stay within the configured cap.",
-      "You can expand allowance capacity from billing to raise the retained bundle cap.",
-      ...(input.billingUrl === undefined ? [] : ["", `Review billing and allowance usage: ${input.billingUrl}`])
+      "Increasing capacity units from billing raises the retained bundle cap immediately.",
+      ...(input.billingUrl === undefined ? [] : ["", `Open billing to increase capacity units: ${input.billingUrl}`])
     ].join("\n"),
     html: renderEmailLayout({
       eyebrow: "Operational",
       title: "Retained bundles rotated out",
-      intro: `DebugBundle rotated out the oldest retained bundles in "${escapeHtml(input.organizationName)}" after the retained bundle cap was reached.`,
+      intro: `DebugBundle rotated out the oldest retained bundles in account "${escapeHtml(input.organizationName)}" after the retained bundle cap was reached.`,
       bodyHtml: [
         renderEmailKeyValueList([
           { label: "Project", valueHtml: escapeHtml(input.projectName) },
@@ -202,12 +207,12 @@ export function renderRetentionRotationNoticeEmail(
         renderEmailParagraph(
           "New bundles continue to be generated, and the oldest retained bundles are removed first to stay within the configured cap."
         ),
-        renderEmailParagraph("You can expand allowance capacity from billing to raise the retained bundle cap."),
+        renderEmailParagraph("Increasing capacity units from billing raises the retained bundle cap immediately."),
         ...(input.billingUrl === undefined
           ? []
           : [
               renderEmailButton({
-                label: "Review billing and allowance usage",
+                label: "Open billing to increase capacity",
                 url: input.billingUrl
               })
             ])

@@ -251,7 +251,7 @@ export function SystemEmailReviewPage(): JSX.Element {
                       <iframe
                         title={`${selectedEntry.title} HTML preview`}
                         srcDoc={renderPreviewDocument(selectedEntry.preview.html)}
-                        className="min-h-[460px] w-full rounded-lg border bg-background"
+                        className="min-h-[460px] w-full rounded-lg bg-background"
                         sandbox=""
                       />
                     </TabsContent>

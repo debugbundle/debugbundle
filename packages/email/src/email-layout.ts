@@ -19,6 +19,37 @@ export function escapeHtml(value: string): string {
     .replaceAll("'", "&#39;");
 }
 
+export function formatEmailDate(value: string): string {
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) {
+    return value;
+  }
+
+  const datePart = new Intl.DateTimeFormat("en-US", {
+    timeZone: "UTC",
+    month: "long",
+    day: "numeric",
+    year: "numeric"
+  }).format(parsed);
+  const hasTime =
+    parsed.getUTCHours() !== 0 ||
+    parsed.getUTCMinutes() !== 0 ||
+    parsed.getUTCSeconds() !== 0 ||
+    parsed.getUTCMilliseconds() !== 0;
+
+  if (!hasTime) {
+    return datePart;
+  }
+
+  const timePart = new Intl.DateTimeFormat("en-US", {
+    timeZone: "UTC",
+    hour: "numeric",
+    minute: "2-digit"
+  }).format(parsed);
+
+  return `${datePart}, ${timePart} UTC`;
+}
+
 export function renderEmailParagraph(content: string): string {
   return `<p style="margin:0 0 16px;color:${EMAIL_TEXT_MUTED};font-size:16px;line-height:24px;">${content}</p>`;
 }
@@ -102,14 +133,14 @@ export function renderEmailLayout(input: {
     '<td style="padding:0 0 14px 0;">',
     '<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;">',
     "<tr>",
-    `<td style="width:28px;height:28px;vertical-align:middle;">${DEBUGBUNDLE_EMAIL_MARK_SVG}</td>`,
-    `<td style="padding-left:10px;vertical-align:middle;color:${EMAIL_TEXT};font-size:18px;line-height:24px;font-weight:600;">DebugBundle</td>`,
+    `<td style="width:24px;height:24px;vertical-align:middle;">${DEBUGBUNDLE_EMAIL_MARK_SVG}</td>`,
+    `<td style="padding-left:12px;vertical-align:middle;color:${EMAIL_TEXT};font-size:18px;line-height:24px;font-weight:650;">DebugBundle</td>`,
     "</tr>",
     "</table>",
     "</td>",
     "</tr>",
     "<tr>",
-    `<td style="background-color:${EMAIL_CARD_BACKGROUND};border:1px solid ${EMAIL_BORDER};border-radius:16px;padding:32px 28px;">`,
+    `<td style="background-color:${EMAIL_CARD_BACKGROUND};border-radius:16px;padding:32px 28px;">`,
     ...(input.eyebrow === undefined
       ? []
       : [

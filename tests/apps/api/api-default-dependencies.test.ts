@@ -25,6 +25,7 @@ const {
   createIngestionPersistenceServiceMock,
   createPostgresMetadataStoreMock,
   createPostgresSlackDestinationStoreMock,
+  createPostgresOperationalEmailDeliveryStoreMock,
   createPostgresWeeklyReportChannelStoreMock,
   createPostgresWebhookDeliveryStoreMock,
   createPostgresGitHubStoreMock,
@@ -57,6 +58,7 @@ const {
   createIngestionPersistenceServiceMock: vi.fn(),
   createPostgresMetadataStoreMock: vi.fn(),
   createPostgresSlackDestinationStoreMock: vi.fn(),
+  createPostgresOperationalEmailDeliveryStoreMock: vi.fn(),
   createPostgresWeeklyReportChannelStoreMock: vi.fn(),
   createPostgresWebhookDeliveryStoreMock: vi.fn(),
   createPostgresGitHubStoreMock: vi.fn(),
@@ -98,6 +100,7 @@ vi.mock("../../../packages/storage/src/index.js", () => ({
   createIngestionPersistenceService: createIngestionPersistenceServiceMock,
   createPostgresMetadataStore: createPostgresMetadataStoreMock,
   createPostgresSlackDestinationStore: createPostgresSlackDestinationStoreMock,
+  createPostgresOperationalEmailDeliveryStore: createPostgresOperationalEmailDeliveryStoreMock,
   createPostgresWeeklyReportChannelStore: createPostgresWeeklyReportChannelStoreMock,
   createPostgresWebhookDeliveryStore: createPostgresWebhookDeliveryStoreMock,
   createPostgresGitHubStore: createPostgresGitHubStoreMock,
@@ -156,6 +159,7 @@ describe("api default dependencies", () => {
     createIngestionPersistenceServiceMock.mockReset();
     createPostgresMetadataStoreMock.mockReset();
     createPostgresSlackDestinationStoreMock.mockReset();
+    createPostgresOperationalEmailDeliveryStoreMock.mockReset();
     createPostgresWeeklyReportChannelStoreMock.mockReset();
     createPostgresWebhookDeliveryStoreMock.mockReset();
     createIngestionMetadataServiceMock.mockReset();
@@ -265,6 +269,13 @@ describe("api default dependencies", () => {
       deactivateProbeActivationForProjectInOrganization: vi.fn()
     });
     createPostgresSlackDestinationStoreMock.mockReturnValue({});
+    createPostgresOperationalEmailDeliveryStoreMock.mockReturnValue({
+      listPendingDeliveries: vi.fn(),
+      createDelivery: vi.fn(),
+      markDeliveryAttempt: vi.fn(),
+      markDeliverySucceeded: vi.fn(),
+      markDeliveryFailed: vi.fn()
+    });
     createPostgresWeeklyReportChannelStoreMock.mockReturnValue({
       listWeeklyReportChannelsForOrganization: vi.fn(),
       createWeeklyReportChannelForOrganization: vi.fn(),
@@ -1130,10 +1141,10 @@ describe("api default dependencies", () => {
     });
 
     const serviceOptions = createWebSessionAuthServiceMock.mock.calls.at(-1)?.[1] as
-      | {
+        | {
           authEmails?: {
             sendEmailAuthCode(input: { email: string; code: string; expires_in_minutes: number }): Promise<void>;
-            sendProjectInviteEmail(input: { email: string; token: string }): Promise<void>;
+            sendProjectInviteEmail(input: { email: string; token: string; inviter_name: string }): Promise<void>;
           };
         }
       | undefined;
@@ -1147,7 +1158,8 @@ describe("api default dependencies", () => {
     });
     await serviceOptions?.authEmails?.sendProjectInviteEmail({
       email: "invitee@example.com",
-      token: "invite-token"
+      token: "invite-token",
+      inviter_name: "Owen Example"
     });
 
     expect(renderEmailAuthCodeEmailMock).toHaveBeenCalledWith({
@@ -1156,7 +1168,8 @@ describe("api default dependencies", () => {
       expiresInMinutes: 10
     });
     expect(renderProjectInviteEmailMock).toHaveBeenCalledWith({
-      acceptUrl: "https://app.debugbundle.test/invite?token=invite-token"
+      acceptUrl: "https://app.debugbundle.test/invite?token=invite-token",
+      inviterName: "Owen Example"
     });
     expect(emailTransportSendMock).toHaveBeenCalledTimes(2);
   });

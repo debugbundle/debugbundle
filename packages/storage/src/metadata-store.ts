@@ -560,10 +560,13 @@ export function createPostgresMetadataStore(db: Queryable): PostgresMetadataStor
           SELECT
             mt.user_id AS member_id,
             mt.organization_id,
+            u.email,
             om.role,
             mt.revoked_at::text AS revoked_at,
             mt.expires_at::text AS expires_at
           FROM member_tokens mt
+          JOIN users u
+            ON u.id = mt.user_id
           JOIN organization_members om
             ON om.organization_id = mt.organization_id
            AND om.user_id = mt.user_id

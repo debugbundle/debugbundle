@@ -223,6 +223,7 @@ export interface ProbeActivationCreateRecord {
 export interface ResolveMemberResult {
   member_id: string;
   organization_id: string;
+  email?: string;
   role?: "owner" | "member";
   revoked_at?: string | null;
   expires_at?: string | null;

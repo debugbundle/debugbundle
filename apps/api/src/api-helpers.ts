@@ -113,6 +113,7 @@ export async function requireMemberAuth(
       return {
         member_id: browserAuth.user_id,
         organization_id: browserAuth.organization_id,
+        email: browserAuth.email,
         role: browserAuth.role
       };
     }

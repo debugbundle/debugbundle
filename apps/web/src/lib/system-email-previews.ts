@@ -73,7 +73,8 @@ export const SYSTEM_EMAIL_REVIEW_ENTRIES: readonly SystemEmailReviewEntry[] = [
     requiredInV1: true,
     implementationStatus: "implemented",
     preview: renderProjectInviteEmail({
-      acceptUrl: "https://app.debugbundle.local/invite?token=dbundle_invite_preview_123"
+      acceptUrl: "https://app.debugbundle.local/invite?token=dbundle_invite_preview_123",
+      inviterName: "Owen Example"
     })
   },
   {

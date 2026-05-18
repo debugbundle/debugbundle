@@ -1,6 +1,7 @@
 import { SESv2Client, SendEmailCommand } from "@aws-sdk/client-sesv2";
 import {
   escapeHtml,
+  formatEmailDate,
   renderEmailButton,
   renderEmailKeyValueList,
   renderEmailLayout,
@@ -108,7 +109,7 @@ function formatTopSpikesText(input: WeeklyReportEmailInput["topSpikingIncidents"
   return input
     .map(
       (incident, index) =>
-        `${index + 1}. ${incident.title} (${incident.occurrence_count} occurrences, spike at ${incident.spike_detected_at})`
+        `${index + 1}. ${incident.title} (${incident.occurrence_count} occurrences, spike at ${formatEmailDate(incident.spike_detected_at)})`
     )
     .join("\n");
 }
@@ -228,18 +229,21 @@ export function renderEmailAuthCodeEmail(input: {
   };
 }
 
-export function renderProjectInviteEmail(input: { acceptUrl: string }): { subject: string; text: string; html: string } {
+export function renderProjectInviteEmail(input: {
+  acceptUrl: string;
+  inviterName: string;
+}): { subject: string; text: string; html: string } {
   return {
     subject: "A DebugBundle project was shared with you",
     text: [
-      "A DebugBundle project was shared with you.",
+      `${input.inviterName} shared a DebugBundle project with you.`,
       "",
       input.acceptUrl
     ].join("\n"),
     html: renderEmailLayout({
       eyebrow: "Project invite",
       title: "A DebugBundle project was shared with you",
-      intro: "Open the invite link to accept access to the shared project.",
+      intro: `${escapeHtml(input.inviterName)} shared a DebugBundle project with you. Open the invite link to accept access to the shared project.`,
       bodyHtml: [
         renderEmailButton({
           label: "Open invite",
@@ -253,9 +257,10 @@ export function renderProjectInviteEmail(input: { acceptUrl: string }): { subjec
 
 export function renderWeeklyReportEmail(input: WeeklyReportEmailInput): { subject: string; text: string; html: string } {
   const subject = `DebugBundle weekly report for ${input.projectId}`;
+  const formattedWindow = `${formatEmailDate(input.windowStart)} to ${formatEmailDate(input.windowEnd)}`;
   const text = [
     `Project: ${input.projectId}`,
-    `Window: ${input.windowStart} to ${input.windowEnd}`,
+    `Window: ${formattedWindow}`,
     "",
     `Failure bundles: ${input.bundleCounts.failure}`,
     `Improvement bundles: ${input.bundleCounts.improvement}`,
@@ -268,11 +273,11 @@ export function renderWeeklyReportEmail(input: WeeklyReportEmailInput): { subjec
   const html = renderEmailLayout({
     eyebrow: "Weekly report",
     title: "DebugBundle weekly report",
-    intro: `Project ${escapeHtml(input.projectId)} from ${escapeHtml(input.windowStart)} to ${escapeHtml(input.windowEnd)}.`,
+    intro: `Project ${escapeHtml(input.projectId)} from ${escapeHtml(formatEmailDate(input.windowStart))} to ${escapeHtml(formatEmailDate(input.windowEnd))}.`,
     bodyHtml: [
       renderEmailKeyValueList([
         { label: "Project", valueHtml: escapeHtml(input.projectId) },
-        { label: "Window", valueHtml: `${escapeHtml(input.windowStart)} to ${escapeHtml(input.windowEnd)}` },
+        { label: "Window", valueHtml: escapeHtml(formattedWindow) },
         { label: "Failure bundles", valueHtml: input.bundleCounts.failure.toString() },
         { label: "Improvement bundles", valueHtml: input.bundleCounts.improvement.toString() },
         { label: "New incidents", valueHtml: input.newIncidents.toString() },
@@ -284,7 +289,7 @@ export function renderWeeklyReportEmail(input: WeeklyReportEmailInput): { subjec
         : renderEmailOrderedList(
             input.topSpikingIncidents.map(
               (incident) =>
-                `<strong>${escapeHtml(incident.title)}</strong> (${incident.occurrence_count} occurrences, spike at ${escapeHtml(incident.spike_detected_at)})`
+                `<strong>${escapeHtml(incident.title)}</strong> (${incident.occurrence_count} occurrences, spike at ${escapeHtml(formatEmailDate(incident.spike_detected_at))})`
             )
           )
     ].join("")
@@ -379,6 +384,7 @@ export function renderAlertEmail(input: AlertEmailInput): { subject: string; tex
   const subject = formatAlertSubject(input.conditionType);
   const conditionLabel = formatAlertConditionLabel(input.conditionType);
   const severityLabel = titleCase(input.severity);
+  const detectedAt = formatEmailDate(input.occurredAt);
   const text = [
     formatAlertIntro(input.conditionType),
     "",
@@ -387,7 +393,7 @@ export function renderAlertEmail(input: AlertEmailInput): { subject: string; tex
     `Environment: ${input.environment}`,
     `Severity: ${severityLabel}`,
     `Incident ID: ${input.incidentId}`,
-    `Detected at: ${input.occurredAt}`,
+    `Detected at: ${detectedAt}`,
     ...(input.incidentUrl === undefined || input.incidentUrl === null ? [] : ["", `Open incident: ${input.incidentUrl}`]),
     ...(input.bundleUrl === undefined || input.bundleUrl === null ? [``, "Use the incident ID above to inspect the bundle in DebugBundle."] : ["", `View bundle: ${input.bundleUrl}`])
   ].join("\n");
@@ -402,7 +408,7 @@ export function renderAlertEmail(input: AlertEmailInput): { subject: string; tex
         { label: "Environment", valueHtml: escapeHtml(input.environment) },
         { label: "Severity", valueHtml: escapeHtml(severityLabel) },
         { label: "Incident ID", valueHtml: escapeHtml(input.incidentId) },
-        { label: "Detected at", valueHtml: escapeHtml(input.occurredAt) }
+        { label: "Detected at", valueHtml: escapeHtml(detectedAt) }
       ]),
       ...(input.incidentUrl === undefined || input.incidentUrl === null
         ? []
@@ -467,7 +473,7 @@ export function renderAlertDigestEmail(input: {
       `   Service: ${alert.serviceName}`,
       `   Environment: ${alert.environment}`,
       `   Severity: ${titleCase(alert.severity)}`,
-      `   Detected at: ${alert.occurredAt}`,
+      `   Detected at: ${formatEmailDate(alert.occurredAt)}`,
       ...(alert.incidentUrl === undefined || alert.incidentUrl === null ? [] : [`   Open incident: ${alert.incidentUrl}`]),
       ...(alert.bundleUrl === undefined || alert.bundleUrl === null ? [] : [`   View bundle: ${alert.bundleUrl}`]),
       ""
@@ -492,7 +498,7 @@ export function renderAlertDigestEmail(input: {
               { label: "Service", valueHtml: escapeHtml(alert.serviceName) },
               { label: "Environment", valueHtml: escapeHtml(alert.environment) },
               { label: "Severity", valueHtml: escapeHtml(titleCase(alert.severity)) },
-              { label: "Detected at", valueHtml: escapeHtml(alert.occurredAt) }
+              { label: "Detected at", valueHtml: escapeHtml(formatEmailDate(alert.occurredAt)) }
             ]),
             ...(alert.incidentUrl === undefined || alert.incidentUrl === null
               ? []

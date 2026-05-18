@@ -27,17 +27,17 @@ export function renderPurchaseConfirmationEmail(input: PurchaseConfirmationInput
   return {
     subject: `DebugBundle: ${input.plan} plan activated`,
     text: [
-      `Your DebugBundle organization "${input.organizationName}" is now on the ${input.plan} plan${capacity}.`,
+      `Your DebugBundle account "${input.organizationName}" is now on the ${input.plan} plan${capacity}.`,
       "",
       `Manage your subscription: ${input.portalUrl}`
     ].join("\n"),
     html: renderEmailLayout({
       eyebrow: "Billing",
       title: "Subscription confirmed",
-      intro: `Your organization "${escapeHtml(input.organizationName)}" is now on the ${escapeHtml(input.plan)} plan${escapeHtml(capacity)}.`,
+      intro: `Your account "${escapeHtml(input.organizationName)}" is now on the ${escapeHtml(input.plan)} plan${escapeHtml(capacity)}.`,
       bodyHtml: [
         renderEmailKeyValueList([
-          { label: "Organization", valueHtml: escapeHtml(input.organizationName) },
+          { label: "Account", valueHtml: escapeHtml(input.organizationName) },
           { label: "Plan", valueHtml: escapeHtml(input.plan) },
           { label: "Extra capacity", valueHtml: input.extraCapacity.toString() }
         ]),
@@ -64,15 +64,15 @@ export function renderRenewalSuccessEmail(input: RenewalSuccessInput): BillingEm
   return {
     subject: `DebugBundle: subscription renewed`,
     text: [
-      `Your ${input.plan} plan${capacity} for "${input.organizationName}" has been renewed.`,
+      `Your ${input.plan} plan${capacity} for account "${input.organizationName}" has been renewed.`,
       `Next renewal: ${input.nextRenewalDate}.`
     ].join("\n"),
     html: renderEmailLayout({
       eyebrow: "Billing",
       title: "Subscription renewed",
-      intro: `Your ${escapeHtml(input.plan)} plan${escapeHtml(capacity)} for "${escapeHtml(input.organizationName)}" has been renewed.`,
+      intro: `Your ${escapeHtml(input.plan)} plan${escapeHtml(capacity)} for account "${escapeHtml(input.organizationName)}" has been renewed.`,
       bodyHtml: renderEmailKeyValueList([
-        { label: "Organization", valueHtml: escapeHtml(input.organizationName) },
+        { label: "Account", valueHtml: escapeHtml(input.organizationName) },
         { label: "Plan", valueHtml: escapeHtml(input.plan) },
         { label: "Next renewal", valueHtml: escapeHtml(input.nextRenewalDate) }
       ])
@@ -92,7 +92,7 @@ export function renderPaymentFailureEmail(input: PaymentFailureInput): BillingEm
   return {
     subject: `DebugBundle: payment failed`,
     text: [
-      `A payment for your ${input.plan} plan on "${input.organizationName}" could not be processed.`,
+      `A payment for your ${input.plan} plan on account "${input.organizationName}" could not be processed.`,
       "",
       "Your paid features remain active while Stripe retries the charge.",
       "If payment continues to fail, your entitlements may be reduced to the free tier.",
@@ -102,7 +102,7 @@ export function renderPaymentFailureEmail(input: PaymentFailureInput): BillingEm
     html: renderEmailLayout({
       eyebrow: "Billing",
       title: "Payment failed",
-      intro: `A payment for your ${escapeHtml(input.plan)} plan on "${escapeHtml(input.organizationName)}" could not be processed.`,
+      intro: `A payment for your ${escapeHtml(input.plan)} plan on account "${escapeHtml(input.organizationName)}" could not be processed.`,
       bodyHtml: [
         renderEmailParagraph(
           "Your paid features remain active while Stripe retries the charge. If payment continues to fail, your entitlements may be reduced to the free tier."
@@ -129,19 +129,19 @@ export function renderPaymentFailureReminderEmail(input: PaymentFailureReminderI
   return {
     subject: `DebugBundle: payment still unresolved`,
     text: [
-      `Payment for your ${input.plan} plan on "${input.organizationName}" remains unresolved.`,
+      `Payment for your ${input.plan} plan on account "${input.organizationName}" remains unresolved.`,
       "",
-      `If not resolved within ${input.daysUntilDowngrade} day(s), your organization will be downgraded to the free tier.`,
+      `If not resolved within ${input.daysUntilDowngrade} day(s), your account will be downgraded to the free tier.`,
       "",
       `Update your payment method: ${input.portalUrl}`
     ].join("\n"),
     html: renderEmailLayout({
       eyebrow: "Billing",
       title: "Payment still unresolved",
-      intro: `Payment for your ${escapeHtml(input.plan)} plan on "${escapeHtml(input.organizationName)}" remains unresolved.`,
+      intro: `Payment for your ${escapeHtml(input.plan)} plan on account "${escapeHtml(input.organizationName)}" remains unresolved.`,
       bodyHtml: [
         renderEmailParagraph(
-          `If not resolved within <strong>${input.daysUntilDowngrade} day(s)</strong>, your organization will be downgraded to the free tier.`
+          `If not resolved within <strong>${input.daysUntilDowngrade} day(s)</strong>, your account will be downgraded to the free tier.`
         ),
         renderEmailButton({
           label: "Update payment method",
@@ -166,7 +166,7 @@ export function renderEntitlementDowngradeWarningEmail(input: EntitlementDowngra
   return {
     subject: `DebugBundle: entitlement downgrade pending`,
     text: [
-      `Due to unresolved billing, your organization "${input.organizationName}" (currently ${input.currentPlan} with ${input.currentCapacityUnits} capacity unit(s)) will be downgraded to the free tier on ${input.effectiveDate}.`,
+      `Due to unresolved billing, your account "${input.organizationName}" (currently ${input.currentPlan} with ${input.currentCapacityUnits} capacity unit(s)) will be downgraded to the free tier on ${input.effectiveDate}.`,
       "",
       "Free tier allowance limits will apply. Existing projects remain available, but your shared capacity will be reduced.",
       "",
@@ -175,7 +175,7 @@ export function renderEntitlementDowngradeWarningEmail(input: EntitlementDowngra
     html: renderEmailLayout({
       eyebrow: "Billing",
       title: "Entitlement downgrade pending",
-      intro: `Due to unresolved billing, your organization "${escapeHtml(input.organizationName)}" (currently ${escapeHtml(input.currentPlan)} with ${input.currentCapacityUnits} capacity unit(s)) will be downgraded to the free tier on ${escapeHtml(input.effectiveDate)}.`,
+      intro: `Due to unresolved billing, your account "${escapeHtml(input.organizationName)}" (currently ${escapeHtml(input.currentPlan)} with ${input.currentCapacityUnits} capacity unit(s)) will be downgraded to the free tier on ${escapeHtml(input.effectiveDate)}.`,
       bodyHtml: [
         renderEmailKeyValueList([
           { label: "Current plan", valueHtml: escapeHtml(input.currentPlan) },
@@ -207,14 +207,14 @@ export function renderEntitlementDowngradeConfirmationEmail(input: EntitlementDo
   return {
     subject: `DebugBundle: entitlements reduced`,
     text: [
-      `Your organization "${input.organizationName}" has been downgraded from ${input.previousPlan} (${input.previousCapacityUnits} capacity unit(s)) to the free tier (${input.newCapacityUnits} capacity unit(s)).`,
+      `Your account "${input.organizationName}" has been downgraded from ${input.previousPlan} (${input.previousCapacityUnits} capacity unit(s)) to the free tier (${input.newCapacityUnits} capacity unit(s)).`,
       "",
       "Your shared allowance capacity has been reduced. Existing projects remain available, and you can re-subscribe at any time to expand capacity again."
     ].join("\n"),
     html: renderEmailLayout({
       eyebrow: "Billing",
       title: "Entitlements reduced",
-      intro: `Your organization "${escapeHtml(input.organizationName)}" has been downgraded from ${escapeHtml(input.previousPlan)} (${input.previousCapacityUnits} capacity unit(s)) to the free tier (${input.newCapacityUnits} capacity unit(s)).`,
+      intro: `Your account "${escapeHtml(input.organizationName)}" has been downgraded from ${escapeHtml(input.previousPlan)} (${input.previousCapacityUnits} capacity unit(s)) to the free tier (${input.newCapacityUnits} capacity unit(s)).`,
       bodyHtml: [
         renderEmailKeyValueList([
           { label: "Previous plan", valueHtml: escapeHtml(input.previousPlan) },
@@ -243,14 +243,14 @@ export function renderPlanChangeConfirmationEmail(input: PlanChangeConfirmationI
   return {
     subject: `DebugBundle: plan changed to ${input.newPlan}`,
     text: [
-      `Your organization "${input.organizationName}" plan has been changed from ${input.previousPlan} to ${input.newPlan}${capacity}.`,
+      `Your account "${input.organizationName}" plan has been changed from ${input.previousPlan} to ${input.newPlan}${capacity}.`,
       "",
       "Your entitlements have been updated to reflect the new plan."
     ].join("\n"),
     html: renderEmailLayout({
       eyebrow: "Billing",
       title: "Plan changed",
-      intro: `Your organization "${escapeHtml(input.organizationName)}" plan has been changed from ${escapeHtml(input.previousPlan)} to ${escapeHtml(input.newPlan)}${escapeHtml(capacity)}.`,
+      intro: `Your account "${escapeHtml(input.organizationName)}" plan has been changed from ${escapeHtml(input.previousPlan)} to ${escapeHtml(input.newPlan)}${escapeHtml(capacity)}.`,
       bodyHtml: [
         renderEmailKeyValueList([
           { label: "Previous plan", valueHtml: escapeHtml(input.previousPlan) },
@@ -277,13 +277,13 @@ export function renderCapacityQuantityChangeEmail(input: CapacityQuantityChangeI
   return {
     subject: `DebugBundle: capacity quantity updated`,
     text: [
-      `Extra capacity units for "${input.organizationName}" (${input.plan}) changed from ${input.previousCapacity} to ${input.newCapacity}.`,
+      `Extra capacity units for account "${input.organizationName}" (${input.plan}) changed from ${input.previousCapacity} to ${input.newCapacity}.`,
       `Total allowance capacity is now ${input.totalCapacityUnits}.`
     ].join("\n"),
     html: renderEmailLayout({
       eyebrow: "Billing",
       title: "Capacity quantity updated",
-      intro: `Extra capacity units for "${escapeHtml(input.organizationName)}" (${escapeHtml(input.plan)}) changed from ${input.previousCapacity} to ${input.newCapacity}.`,
+      intro: `Extra capacity units for account "${escapeHtml(input.organizationName)}" (${escapeHtml(input.plan)}) changed from ${input.previousCapacity} to ${input.newCapacity}.`,
       bodyHtml: renderEmailKeyValueList([
         { label: "Plan", valueHtml: escapeHtml(input.plan) },
         { label: "Previous extra capacity", valueHtml: input.previousCapacity.toString() },
