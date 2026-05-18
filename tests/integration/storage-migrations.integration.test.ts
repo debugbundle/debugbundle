@@ -164,4 +164,70 @@ runIntegration("storage bootstrap integration", () => {
     expect(secondMigration.already_applied).toEqual(STORAGE_SCHEMA_MIGRATIONS.map((migration) => migration.id));
     await expect(assertStorageSchemaMigrationsApplied(createQueryable(pool))).resolves.toBeUndefined();
   });
+
+  it("migrates an existing schema missing creator ownership and incident bundle tracking columns", async (): Promise<void> => {
+    await pool.query("DROP SCHEMA IF EXISTS public CASCADE");
+    await pool.query("CREATE SCHEMA public");
+
+    await bootstrapStorageSchema(createQueryable(pool));
+
+    await pool.query("ALTER TABLE incidents DROP COLUMN bundle_source_occurred_at");
+    await pool.query("ALTER TABLE incidents DROP COLUMN bundle_trigger");
+    await pool.query("ALTER TABLE alert_rules DROP CONSTRAINT alert_rules_created_by_user_id_fkey");
+    await pool.query("ALTER TABLE alert_rules DROP COLUMN created_by_user_id");
+    await pool.query("ALTER TABLE agent_webhooks DROP CONSTRAINT agent_webhooks_created_by_user_id_fkey");
+    await pool.query("ALTER TABLE agent_webhooks DROP COLUMN created_by_user_id");
+    await pool.query("ALTER TABLE github_dispatch_rules DROP CONSTRAINT github_dispatch_rules_created_by_user_id_fkey");
+    await pool.query("ALTER TABLE github_dispatch_rules DROP COLUMN created_by_user_id");
+
+    const migrated = await migrateStorageSchema(createQueryable(pool));
+    expect(migrated.applied).toEqual(STORAGE_SCHEMA_MIGRATIONS.map((migration) => migration.id));
+
+    const columnResult = await pool.query<{
+      table_name: string;
+      column_name: string;
+      is_nullable: "YES" | "NO";
+    }>(
+      `
+        SELECT table_name, column_name, is_nullable
+        FROM information_schema.columns
+        WHERE table_schema = 'public'
+          AND (
+            (table_name = 'incidents' AND column_name IN ('bundle_source_occurred_at', 'bundle_trigger'))
+            OR (table_name = 'alert_rules' AND column_name = 'created_by_user_id')
+            OR (table_name = 'agent_webhooks' AND column_name = 'created_by_user_id')
+            OR (table_name = 'github_dispatch_rules' AND column_name = 'created_by_user_id')
+          )
+        ORDER BY table_name ASC, column_name ASC
+      `
+    );
+
+    expect(columnResult.rows).toEqual([
+      { table_name: "agent_webhooks", column_name: "created_by_user_id", is_nullable: "NO" },
+      { table_name: "alert_rules", column_name: "created_by_user_id", is_nullable: "NO" },
+      { table_name: "github_dispatch_rules", column_name: "created_by_user_id", is_nullable: "NO" },
+      { table_name: "incidents", column_name: "bundle_source_occurred_at", is_nullable: "YES" },
+      { table_name: "incidents", column_name: "bundle_trigger", is_nullable: "YES" }
+    ]);
+
+    const constraintResult = await pool.query<{ conname: string }>(
+      `
+        SELECT conname
+        FROM pg_constraint
+        WHERE conname = ANY($1::text[])
+        ORDER BY conname ASC
+      `,
+      [[
+        "alert_rules_created_by_user_id_fkey",
+        "agent_webhooks_created_by_user_id_fkey",
+        "github_dispatch_rules_created_by_user_id_fkey"
+      ]]
+    );
+
+    expect(constraintResult.rows).toEqual([
+      { conname: "agent_webhooks_created_by_user_id_fkey" },
+      { conname: "alert_rules_created_by_user_id_fkey" },
+      { conname: "github_dispatch_rules_created_by_user_id_fkey" }
+    ]);
+  });
 });

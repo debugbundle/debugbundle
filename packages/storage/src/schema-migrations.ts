@@ -359,6 +359,64 @@ export const STORAGE_SCHEMA_MIGRATIONS = [
         )
       `
     ]
+  }),
+  defineStorageSchemaMigration({
+    id: "202605180006_add_missing_bundle_and_creator_columns",
+    description: "Backfill creator ownership columns and incident bundle tracking columns that existed only in bootstrap schema.",
+    statements: [
+      "ALTER TABLE incidents ADD COLUMN IF NOT EXISTS bundle_generation_number integer NOT NULL DEFAULT 0",
+      "ALTER TABLE incidents ADD COLUMN IF NOT EXISTS bundle_created_at timestamptz",
+      "ALTER TABLE incidents ADD COLUMN IF NOT EXISTS bundle_updated_at timestamptz",
+      "ALTER TABLE incidents ADD COLUMN IF NOT EXISTS bundle_source_event_id uuid",
+      "ALTER TABLE incidents ADD COLUMN IF NOT EXISTS bundle_source_occurred_at timestamptz",
+      "ALTER TABLE incidents ADD COLUMN IF NOT EXISTS bundle_trigger text",
+      "ALTER TABLE incidents ADD COLUMN IF NOT EXISTS bundle_failure_reason text",
+      "ALTER TABLE alert_rules ADD COLUMN IF NOT EXISTS created_by_user_id uuid",
+      `
+        UPDATE alert_rules ar
+        SET created_by_user_id = p.owner_user_id
+        FROM projects p
+        WHERE ar.project_id = p.id
+          AND ar.created_by_user_id IS NULL
+      `,
+      "ALTER TABLE alert_rules DROP CONSTRAINT IF EXISTS alert_rules_created_by_user_id_fkey",
+      `
+        ALTER TABLE alert_rules
+        ADD CONSTRAINT alert_rules_created_by_user_id_fkey
+        FOREIGN KEY (created_by_user_id) REFERENCES users(id) ON DELETE CASCADE
+      `,
+      "ALTER TABLE alert_rules ALTER COLUMN created_by_user_id SET NOT NULL",
+      "ALTER TABLE agent_webhooks ADD COLUMN IF NOT EXISTS created_by_user_id uuid",
+      `
+        UPDATE agent_webhooks aw
+        SET created_by_user_id = p.owner_user_id
+        FROM projects p
+        WHERE aw.project_id = p.id
+          AND aw.created_by_user_id IS NULL
+      `,
+      "ALTER TABLE agent_webhooks DROP CONSTRAINT IF EXISTS agent_webhooks_created_by_user_id_fkey",
+      `
+        ALTER TABLE agent_webhooks
+        ADD CONSTRAINT agent_webhooks_created_by_user_id_fkey
+        FOREIGN KEY (created_by_user_id) REFERENCES users(id) ON DELETE CASCADE
+      `,
+      "ALTER TABLE agent_webhooks ALTER COLUMN created_by_user_id SET NOT NULL",
+      "ALTER TABLE github_dispatch_rules ADD COLUMN IF NOT EXISTS created_by_user_id uuid",
+      `
+        UPDATE github_dispatch_rules gdr
+        SET created_by_user_id = p.owner_user_id
+        FROM projects p
+        WHERE gdr.project_id = p.id
+          AND gdr.created_by_user_id IS NULL
+      `,
+      "ALTER TABLE github_dispatch_rules DROP CONSTRAINT IF EXISTS github_dispatch_rules_created_by_user_id_fkey",
+      `
+        ALTER TABLE github_dispatch_rules
+        ADD CONSTRAINT github_dispatch_rules_created_by_user_id_fkey
+        FOREIGN KEY (created_by_user_id) REFERENCES users(id) ON DELETE CASCADE
+      `,
+      "ALTER TABLE github_dispatch_rules ALTER COLUMN created_by_user_id SET NOT NULL"
+    ]
   })
 ] as const;
 
