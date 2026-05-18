@@ -1833,10 +1833,11 @@ export async function processNextBuildBundleJob(
     } else {
       await dependencies.queue.enqueue("build-reproduction", reproductionJob);
     }
-  } catch {
+  } catch (error) {
     dependencies.logger?.error(
       {
         event_id: job.event_id,
+        error_message: getWorkerErrorMessage(error),
         incident_id: job.incident_id,
         project_id: job.project_id,
         trigger: job.trigger

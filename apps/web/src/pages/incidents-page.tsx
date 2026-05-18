@@ -1,10 +1,15 @@
 import { ChevronRightIcon, SirenIcon } from "lucide-react";
 import { useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 
 import { CursorPaginationControls } from "../components/system/cursor-pagination-controls.js";
 import { PageHeader } from "../components/system/page-header.js";
 import { ResourceListState } from "../components/system/resource-list-state.js";
+import {
+  SelectableTableActions,
+  shouldIgnoreTableRowActivation,
+  useVisibleRowSelection
+} from "../components/system/selectable-table-actions.js";
 import { SortableTableHead, toggleSort, type SortState } from "../components/system/sortable-table-head.js";
 import { TableRefreshButton } from "../components/system/table-refresh-button.js";
 import { Badge } from "../components/ui/badge.js";
@@ -13,17 +18,20 @@ import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card.
 import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "../components/ui/empty.js";
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select.js";
 import { Skeleton } from "../components/ui/skeleton.js";
-import { Table, TableBody, TableCell, TableHeader, TableRow } from "../components/ui/table.js";
-import { listIncidents, type IncidentRecord } from "../lib/api.js";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../components/ui/table.js";
+import { listIncidents, reopenIncident, resolveIncident, type IncidentRecord } from "../lib/api.js";
 import { formatIncidentMatchedFields } from "../lib/incident-copy.js";
+import { showErrorToast, showInfoToast, showSuccessToast } from "../lib/notify.js";
 import { useCursorPagination } from "../lib/use-cursor-pagination.js";
 
 export function IncidentsPage(): JSX.Element {
+  const navigate = useNavigate();
   const [statusFilter, setStatusFilter] = useState<IncidentStatusFilter>("open");
   const [sort, setSort] = useState<SortState<IncidentSortField>>({
     field: "last_seen_at",
     direction: "desc"
   });
+  const [bulkAction, setBulkAction] = useState<"resolved" | "unresolved" | null>(null);
   const { items: incidents, isLoading, page, hasNextPage, goToNextPage, goToPreviousPage, refreshPage } = useCursorPagination(
     async (cursor) => {
       const response = await listIncidents({
@@ -41,6 +49,49 @@ export function IncidentsPage(): JSX.Element {
 
   const sortedIncidents = useMemo(() => sortIncidents(incidents, sort), [incidents, sort]);
   const emptyState = getWorkspaceIncidentEmptyState(statusFilter);
+  const selection = useVisibleRowSelection(useMemo(() => sortedIncidents.map((incident) => incident.incident_id), [sortedIncidents]));
+  const selectedIncidents = useMemo(
+    () => sortedIncidents.filter((incident) => selection.selectedIdSet.has(incident.incident_id)),
+    [sortedIncidents, selection.selectedIdSet]
+  );
+
+  async function handleBulkIncidentAction(action: "resolved" | "unresolved"): Promise<void> {
+    const incidentsToUpdate = selectedIncidents.filter((incident) =>
+      action === "resolved" ? incident.status !== "resolved" : incident.status === "resolved"
+    );
+
+    if (incidentsToUpdate.length === 0) {
+      return;
+    }
+
+    setBulkAction(action);
+
+    try {
+      const results = await Promise.allSettled(
+        incidentsToUpdate.map((incident) =>
+          action === "resolved" ? resolveIncident(incident.incident_id) : reopenIncident(incident.incident_id)
+        )
+      );
+      const successCount = results.filter((result) => result.status === "fulfilled").length;
+
+      if (successCount > 0) {
+        selection.clearSelection();
+        await refreshPage();
+      }
+
+      if (successCount === incidentsToUpdate.length) {
+        showSuccessToast(`Marked ${successCount} incident${successCount === 1 ? "" : "s"} as ${action}.`);
+      } else if (successCount > 0) {
+        showInfoToast(`Marked ${successCount} of ${incidentsToUpdate.length} incidents as ${action}.`);
+      } else {
+        showErrorToast(`Could not mark the selected incidents as ${action}.`);
+      }
+    } catch {
+      showErrorToast(`Could not mark the selected incidents as ${action}.`);
+    } finally {
+      setBulkAction(null);
+    }
+  }
 
   return (
     <div className="space-y-6">
@@ -105,9 +156,31 @@ export function IncidentsPage(): JSX.Element {
           >
             {() => (
               <div className="space-y-4">
+                <SelectableTableActions
+                  itemLabel="incident"
+                  totalCount={sortedIncidents.length}
+                  selectedCount={selection.selectedCount}
+                  allSelected={selection.allSelected}
+                  isBusy={bulkAction !== null}
+                  primaryActionLabel={bulkAction === "resolved" ? "Marking resolved..." : "Mark selected resolved"}
+                  secondaryActionLabel={bulkAction === "unresolved" ? "Marking unresolved..." : "Mark selected unresolved"}
+                  primaryActionDisabled={selection.selectedCount === 0 || selectedIncidents.every((incident) => incident.status === "resolved")}
+                  secondaryActionDisabled={selection.selectedCount === 0 || selectedIncidents.every((incident) => incident.status !== "resolved")}
+                  onToggleSelectAll={selection.toggleSelectAll}
+                  onClearSelection={selection.clearSelection}
+                  onPrimaryAction={() => {
+                    void handleBulkIncidentAction("resolved");
+                  }}
+                  onSecondaryAction={() => {
+                    void handleBulkIncidentAction("unresolved");
+                  }}
+                />
                 <Table className="min-w-[860px]">
                   <TableHeader>
                     <TableRow>
+                      <TableHead className="w-10">
+                        <span className="sr-only">Select incidents</span>
+                      </TableHead>
                       <SortableTableHead label="Incident" field="title" sort={sort} onSortChange={(field) => setSort((current) => toggleSort(current, field))} className="w-[28%]" />
                       <SortableTableHead label="Project" field="project_name" sort={sort} onSortChange={(field) => setSort((current) => toggleSort(current, field))} className="w-[13%]" />
                       <SortableTableHead label="Service" field="service_name" sort={sort} onSortChange={(field) => setSort((current) => toggleSort(current, field))} className="w-[13%]" />
@@ -119,9 +192,33 @@ export function IncidentsPage(): JSX.Element {
                   </TableHeader>
                   <TableBody>
                     {sortedIncidents.map((incident) => (
-                      <TableRow key={incident.incident_id} className="cursor-pointer">
+                      <TableRow
+                        key={incident.incident_id}
+                        className="cursor-pointer"
+                        data-state={selection.selectedIdSet.has(incident.incident_id) ? "selected" : undefined}
+                        onClick={(event) => {
+                          if (shouldIgnoreTableRowActivation(event.target)) {
+                            return;
+                          }
+
+                          void navigate(`/incidents/${incident.incident_id}`);
+                        }}
+                      >
+                        <TableCell className="align-middle" data-row-interactive="true">
+                          <input
+                            type="checkbox"
+                            aria-label={`Select incident ${incident.title}`}
+                            checked={selection.selectedIdSet.has(incident.incident_id)}
+                            onChange={() => {
+                              selection.toggleId(incident.incident_id);
+                            }}
+                            onClick={(event) => {
+                              event.stopPropagation();
+                            }}
+                          />
+                        </TableCell>
                         <TableCell className="align-top whitespace-normal">
-                          <Link to={`/incidents/${incident.incident_id}`} className="font-medium text-foreground hover:underline">
+                          <Link to={`/incidents/${incident.incident_id}`} className="font-medium text-foreground hover:underline" data-row-interactive="true">
                             {incident.title}
                           </Link>
                           <p className="mt-1 text-xs text-muted-foreground whitespace-normal break-words">
@@ -129,7 +226,7 @@ export function IncidentsPage(): JSX.Element {
                           </p>
                         </TableCell>
                         <TableCell className="text-sm text-muted-foreground whitespace-normal break-words align-middle">
-                          <Link to={`/projects/${incident.project_id}`} className="hover:underline">
+                          <Link to={`/projects/${incident.project_id}`} className="hover:underline" data-row-interactive="true">
                             {incident.project_name}
                           </Link>
                         </TableCell>

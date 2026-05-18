@@ -45,11 +45,18 @@ async function readBundleArtifactForIncident(input: {
       }
 
       if (input.dependencies.bundleRegeneration !== undefined) {
-        await input.dependencies.bundleRegeneration.requestRegeneration({
+        const regenerationQueued = await input.dependencies.bundleRegeneration.requestRegeneration({
           organization_id: input.organizationId,
           project_id: input.projectId,
           incident_id: input.incidentId
         });
+
+        if (!regenerationQueued) {
+          return {
+            status: "failed",
+            reason: "bundle_source_unavailable"
+          };
+        }
       }
 
       return {
@@ -360,11 +367,18 @@ export function registerIncidentRoutes(app: FastifyInstance, dependencies: ApiDe
 
         // Attempt auto-regeneration: the events still exist, so re-enqueue a build.
         if (dependencies.bundleRegeneration !== undefined) {
-          await dependencies.bundleRegeneration.requestRegeneration({
+          const regenerationQueued = await dependencies.bundleRegeneration.requestRegeneration({
             organization_id: member.organization_id,
             project_id: incident.project_id,
             incident_id: incident.incident_id
           });
+
+          if (!regenerationQueued) {
+            return reply.status(200).send({
+              status: "failed",
+              reason: "bundle_source_unavailable"
+            });
+          }
         }
 
         return reply.status(200).send({

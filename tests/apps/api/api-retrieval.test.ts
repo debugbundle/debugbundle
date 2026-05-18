@@ -1343,6 +1343,74 @@ describe("api retrieval routes", () => {
     });
   });
 
+  it("should return failed when missing bundle cannot be regenerated", async (): Promise<void> => {
+    const requestRegeneration = vi.fn().mockResolvedValue(false);
+    const app = createApiServer({
+      ingestionPersistence: {
+        persistAndEnqueue: vi.fn()
+      },
+      ingestionMetadata: {
+        resolveProjectByTokenHash: vi.fn()
+      },
+      memberAuth: {
+        resolveMemberByTokenHash: vi.fn().mockResolvedValue({ member_id: "mem_123", organization_id: "org_123" })
+      },
+      tokenManagement: createTokenManagementDependency(),
+      incidentRetrieval: {
+        listIncidentsForOrganization: vi.fn().mockResolvedValue([]),
+        getIncidentForOrganization: vi.fn().mockResolvedValue({
+          incident_id: "inc_123",
+          project_id: "proj_123",
+          service_id: null,
+          environment: "production",
+          fingerprint: "fp_123",
+          fingerprint_version: "v1",
+          title: "TypeError",
+          severity: "high",
+          status: "open",
+          first_seen_at: "2026-03-11T00:00:00.000Z",
+          last_seen_at: "2026-03-11T00:10:00.000Z",
+          occurrence_count: 3,
+          spike_detected_at: null,
+          regressed_at: null,
+          matched_fields: []
+        }),
+        getBundleFailureReasonForOrganization: vi.fn().mockResolvedValue(null),
+        listServicesForOrganization: vi.fn().mockResolvedValue([]),
+        listIncidentLogsForOrganization: vi.fn().mockResolvedValue([])
+      },
+      objectStoreReader: {
+        getObject: vi.fn().mockRejectedValue(new Error("s3_object_not_found"))
+      },
+      bundleRegeneration: {
+        requestRegeneration
+      },
+      webhookDelivery: {
+        listDeliveriesForWebhookInOrganization: vi.fn().mockResolvedValue({ deliveries: [] }),
+        retryDeliveryForOrganization: vi.fn().mockResolvedValue(null)
+      }
+    });
+
+    const response = await app.inject({
+      method: "GET",
+      url: "/v1/incidents/inc_123/bundle",
+      headers: {
+        authorization: "Bearer dbundle_mem_test"
+      }
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toEqual({
+      status: "failed",
+      reason: "bundle_source_unavailable"
+    });
+    expect(requestRegeneration).toHaveBeenCalledWith({
+      organization_id: "org_123",
+      project_id: "proj_123",
+      incident_id: "inc_123"
+    });
+  });
+
   it("should reject incidents list with invalid query", async (): Promise<void> => {
     const app = createServer();
 

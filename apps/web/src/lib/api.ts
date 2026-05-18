@@ -1397,6 +1397,18 @@ export async function resolveIncident(incidentId: string): Promise<IncidentRecor
   return body.incident;
 }
 
+export async function reopenIncident(incidentId: string): Promise<IncidentRecord> {
+  const body = await readJson<{ incident: IncidentRecord }>(
+    await fetch(`${API_BASE}/v1/incidents/${incidentId}/reopen`, {
+      method: "POST",
+      credentials: "include",
+      headers: buildBrowserSessionHeaders()
+    })
+  );
+
+  return body.incident;
+}
+
 export async function resolveImprovement(improvementId: string): Promise<ImprovementRecord> {
   const body = await readJson<{ improvement: ImprovementRecord }>(
     await fetch(`${API_BASE}/v1/improvements/${improvementId}/resolve`, {

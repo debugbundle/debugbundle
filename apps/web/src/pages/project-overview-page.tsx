@@ -1,9 +1,14 @@
 import { ActivityIcon, BugIcon, DownloadIcon, InboxIcon, PackageIcon, SirenIcon, TrendingDownIcon, TrendingUpIcon } from "lucide-react";
-import { useMemo, useState } from "react";
-import { Link, useOutletContext } from "react-router-dom";
+import { useMemo, useState, type MouseEvent } from "react";
+import { Link, useNavigate, useOutletContext } from "react-router-dom";
 
 import { CursorPaginationControls } from "../components/system/cursor-pagination-controls.js";
 import { ResourceListState } from "../components/system/resource-list-state.js";
+import {
+  SelectableTableActions,
+  shouldIgnoreTableRowActivation,
+  useVisibleRowSelection
+} from "../components/system/selectable-table-actions.js";
 import { SortableTableHead, toggleSort, type SortState } from "../components/system/sortable-table-head.js";
 import { TableRefreshButton } from "../components/system/table-refresh-button.js";
 import type { ProjectContext } from "../components/system/project-layout.js";
@@ -17,6 +22,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from ".
 import {
   getIncidentBundle,
   listProjectIncidents,
+  reopenIncident,
+  resolveIncident,
   type IncidentRecord,
   type ProjectRecord
 } from "../lib/api.js";
@@ -120,12 +127,14 @@ function ProjectStatCards({ project }: { project: ProjectRecord }): JSX.Element 
 }
 
 export function ProjectIncidentsPage(): JSX.Element {
+  const navigate = useNavigate();
   const { projectId } = useOutletContext<ProjectContext>();
   const [statusFilter, setStatusFilter] = useState<ProjectIncidentStatusFilter>("open");
   const [sort, setSort] = useState<SortState<ProjectIncidentSortField>>({
     field: "last_seen_at",
     direction: "desc"
   });
+  const [bulkAction, setBulkAction] = useState<"resolved" | "unresolved" | null>(null);
   const { items: incidents, isLoading, page, hasNextPage, goToNextPage, goToPreviousPage, refreshPage } = useCursorPagination(
     async (cursor) => {
       const response = await listProjectIncidents(projectId, 20, cursor ?? undefined, statusFilter === "all" ? undefined : statusFilter);
@@ -138,6 +147,49 @@ export function ProjectIncidentsPage(): JSX.Element {
   );
   const sortedIncidents = useMemo(() => sortProjectIncidents(incidents, sort), [incidents, sort]);
   const emptyState = getProjectIncidentEmptyState(statusFilter);
+  const selection = useVisibleRowSelection(useMemo(() => sortedIncidents.map((incident) => incident.incident_id), [sortedIncidents]));
+  const selectedIncidents = useMemo(
+    () => sortedIncidents.filter((incident) => selection.selectedIdSet.has(incident.incident_id)),
+    [sortedIncidents, selection.selectedIdSet]
+  );
+
+  async function handleBulkIncidentAction(action: "resolved" | "unresolved"): Promise<void> {
+    const incidentsToUpdate = selectedIncidents.filter((incident) =>
+      action === "resolved" ? incident.status !== "resolved" : incident.status === "resolved"
+    );
+
+    if (incidentsToUpdate.length === 0) {
+      return;
+    }
+
+    setBulkAction(action);
+
+    try {
+      const results = await Promise.allSettled(
+        incidentsToUpdate.map((incident) =>
+          action === "resolved" ? resolveIncident(incident.incident_id) : reopenIncident(incident.incident_id)
+        )
+      );
+      const successCount = results.filter((result) => result.status === "fulfilled").length;
+
+      if (successCount > 0) {
+        selection.clearSelection();
+        await refreshPage();
+      }
+
+      if (successCount === incidentsToUpdate.length) {
+        showSuccessToast(`Marked ${successCount} incident${successCount === 1 ? "" : "s"} as ${action}.`);
+      } else if (successCount > 0) {
+        showInfoToast(`Marked ${successCount} of ${incidentsToUpdate.length} incidents as ${action}.`);
+      } else {
+        showErrorToast(`Could not mark the selected incidents as ${action}.`);
+      }
+    } catch {
+      showErrorToast(`Could not mark the selected incidents as ${action}.`);
+    } finally {
+      setBulkAction(null);
+    }
+  }
 
   return (
     <div className="space-y-4">
@@ -195,7 +247,39 @@ export function ProjectIncidentsPage(): JSX.Element {
           >
             {() => (
               <div className="space-y-4">
-                <IncidentTable incidents={sortedIncidents} sort={sort} onSortChange={(field) => setSort((current) => toggleSort(current, field))} />
+                <SelectableTableActions
+                  itemLabel="incident"
+                  totalCount={sortedIncidents.length}
+                  selectedCount={selection.selectedCount}
+                  allSelected={selection.allSelected}
+                  isBusy={bulkAction !== null}
+                  primaryActionLabel={bulkAction === "resolved" ? "Marking resolved..." : "Mark selected resolved"}
+                  secondaryActionLabel={bulkAction === "unresolved" ? "Marking unresolved..." : "Mark selected unresolved"}
+                  primaryActionDisabled={selection.selectedCount === 0 || selectedIncidents.every((incident) => incident.status === "resolved")}
+                  secondaryActionDisabled={selection.selectedCount === 0 || selectedIncidents.every((incident) => incident.status !== "resolved")}
+                  onToggleSelectAll={selection.toggleSelectAll}
+                  onClearSelection={selection.clearSelection}
+                  onPrimaryAction={() => {
+                    void handleBulkIncidentAction("resolved");
+                  }}
+                  onSecondaryAction={() => {
+                    void handleBulkIncidentAction("unresolved");
+                  }}
+                />
+                <IncidentTable
+                  incidents={sortedIncidents}
+                  sort={sort}
+                  onSortChange={(field) => setSort((current) => toggleSort(current, field))}
+                  selectedIncidentIds={selection.selectedIdSet}
+                  onToggleIncidentSelection={selection.toggleId}
+                  onIncidentRowClick={(event, incident) => {
+                    if (shouldIgnoreTableRowActivation(event.target)) {
+                      return;
+                    }
+
+                    void navigate(`/projects/${incident.project_id}/incidents/${incident.incident_id}`);
+                  }}
+                />
                 <CursorPaginationControls
                   page={page}
                   hasNextPage={hasNextPage}
@@ -358,16 +442,25 @@ export function ProjectBundlesPage(): JSX.Element {
 export function IncidentTable({
   incidents,
   sort,
-  onSortChange
+  onSortChange,
+  selectedIncidentIds,
+  onToggleIncidentSelection,
+  onIncidentRowClick
 }: {
   incidents: IncidentRecord[];
   sort: SortState<ProjectIncidentSortField>;
   onSortChange: (field: ProjectIncidentSortField) => void;
+  selectedIncidentIds: Set<string>;
+  onToggleIncidentSelection: (incidentId: string) => void;
+  onIncidentRowClick: (event: MouseEvent<HTMLTableRowElement>, incident: IncidentRecord) => void;
 }): JSX.Element {
   return (
     <Table className="min-w-[760px] md:min-w-0 md:table-fixed">
       <TableHeader>
         <TableRow>
+          <TableHead className="w-10">
+            <span className="sr-only">Select incidents</span>
+          </TableHead>
           <SortableTableHead label="Incident" field="title" sort={sort} onSortChange={onSortChange} className="w-[34%]" />
           <SortableTableHead label="Service" field="service_name" sort={sort} onSortChange={onSortChange} className="w-[16%]" />
           <SortableTableHead label="Severity" field="severity" sort={sort} onSortChange={onSortChange} />
@@ -378,9 +471,33 @@ export function IncidentTable({
       </TableHeader>
       <TableBody>
         {incidents.map((incident) => (
-          <TableRow key={incident.incident_id}>
+          <TableRow
+            key={incident.incident_id}
+            className="cursor-pointer"
+            data-state={selectedIncidentIds.has(incident.incident_id) ? "selected" : undefined}
+            onClick={(event) => {
+              onIncidentRowClick(event, incident);
+            }}
+          >
+            <TableCell className="align-middle" data-row-interactive="true">
+              <input
+                type="checkbox"
+                aria-label={`Select incident ${incident.title}`}
+                checked={selectedIncidentIds.has(incident.incident_id)}
+                onChange={() => {
+                  onToggleIncidentSelection(incident.incident_id);
+                }}
+                onClick={(event) => {
+                  event.stopPropagation();
+                }}
+              />
+            </TableCell>
             <TableCell className="align-top whitespace-normal">
-              <Link to={`/projects/${incident.project_id}/incidents/${incident.incident_id}`} className="font-medium text-foreground hover:underline">
+              <Link
+                to={`/projects/${incident.project_id}/incidents/${incident.incident_id}`}
+                className="font-medium text-foreground hover:underline"
+                data-row-interactive="true"
+              >
                 {incident.title}
               </Link>
               <p className="mt-1 text-xs text-muted-foreground whitespace-normal break-words">

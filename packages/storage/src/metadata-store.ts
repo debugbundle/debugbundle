@@ -537,15 +537,28 @@ export function createPostgresMetadataStore(db: Queryable): PostgresMetadataStor
       }>(
         `
           SELECT
-            i.bundle_source_event_id::text AS event_id,
-            i.bundle_source_occurred_at::text AS occurred_at,
+            COALESCE(i.bundle_source_event_id, fallback_event.event_id)::text AS event_id,
+            COALESCE(i.bundle_source_occurred_at, fallback_event.occurred_at)::text AS occurred_at,
             i.occurrence_count,
-            i.bundle_trigger AS trigger
+            COALESCE(i.bundle_trigger, 'regeneration') AS trigger
           FROM incidents i
           JOIN projects p ON p.id = i.project_id
+          LEFT JOIN LATERAL (
+            SELECT
+              ie.event_id,
+              ie.occurred_at
+            FROM incident_events ie
+            WHERE ie.incident_id = i.id
+            ORDER BY
+              (ie.event_class = 'incident_signal') DESC,
+              ie.is_sampled DESC,
+              ie.occurred_at DESC,
+              ie.event_id DESC
+            LIMIT 1
+          ) fallback_event ON TRUE
           WHERE p.organization_id = $1
             AND i.id = $2
-            AND i.bundle_source_event_id IS NOT NULL
+            AND COALESCE(i.bundle_source_event_id, fallback_event.event_id) IS NOT NULL
           LIMIT 1
         `,
         [input.organization_id, input.incident_id]
@@ -3137,6 +3150,7 @@ export function createPostgresMetadataStore(db: Queryable): PostgresMetadataStor
               reserved.updated_at::timestamptz
             FROM reserved
             ON CONFLICT (incident_id, source_event_id)
+            WHERE incident_id IS NOT NULL
             DO UPDATE SET
               generation_number = EXCLUDED.generation_number,
               trigger = EXCLUDED.trigger,

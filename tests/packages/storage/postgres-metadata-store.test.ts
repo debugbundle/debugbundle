@@ -2563,7 +2563,9 @@ describe("postgres metadata store", () => {
       trigger: "regression_reopen"
     });
     expect(query).toHaveBeenCalledOnce();
-    expect(query.mock.calls[0]?.[0]).toContain("INSERT INTO bundle_generations");
+    const sql = String(query.mock.calls[0]?.[0] ?? "");
+    expect(sql).toContain("INSERT INTO bundle_generations");
+    expect(sql).toContain("ON CONFLICT (incident_id, source_event_id)\n            WHERE incident_id IS NOT NULL");
   });
 
   it("should prune retained bundle owners across incident and improvement keyspaces", async (): Promise<void> => {
@@ -2948,6 +2950,35 @@ describe("postgres metadata store", () => {
         occurred_at: "2026-03-10T00:05:00.000Z"
       }
     ]);
+  });
+
+  it("should fall back to retained incident events when bundle source metadata is missing", async (): Promise<void> => {
+    const query = vi.fn().mockResolvedValue({
+      rows: [
+        {
+          event_id: "550e8400-e29b-41d4-a716-446655440000",
+          occurred_at: "2026-03-10T00:00:00.000Z",
+          occurrence_count: 3,
+          trigger: "regeneration"
+        }
+      ]
+    });
+    const store = createPostgresMetadataStore({ query });
+
+    await expect(
+      store.getBundleSourceForOrganization?.({
+        organization_id: "org_123",
+        incident_id: "inc_123"
+      })
+    ).resolves.toEqual({
+      event_id: "550e8400-e29b-41d4-a716-446655440000",
+      occurred_at: "2026-03-10T00:00:00.000Z",
+      occurrence_count: 3,
+      trigger: "regeneration"
+    });
+    const sql = String(query.mock.calls[0]?.[0] ?? "");
+    expect(sql).toContain("LEFT JOIN LATERAL");
+    expect(sql).toContain("fallback_event");
   });
 
   it("should default missing weekly report spike lists to an empty array", async (): Promise<void> => {

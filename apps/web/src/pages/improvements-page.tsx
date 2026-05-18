@@ -1,11 +1,16 @@
 import { ChevronRightIcon, SparklesIcon } from "lucide-react";
-import { useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { useMemo, useState, type MouseEvent } from "react";
+import { Link, useNavigate } from "react-router-dom";
 
 import { CursorPaginationControls } from "../components/system/cursor-pagination-controls.js";
 import { HostedImprovementsUpgradeCallout } from "../components/system/hosted-improvements-upgrade-callout.js";
 import { PageHeader } from "../components/system/page-header.js";
 import { ResourceListState } from "../components/system/resource-list-state.js";
+import {
+  SelectableTableActions,
+  shouldIgnoreTableRowActivation,
+  useVisibleRowSelection
+} from "../components/system/selectable-table-actions.js";
 import { SortableTableHead, toggleSort, type SortState } from "../components/system/sortable-table-head.js";
 import { TableRefreshButton } from "../components/system/table-refresh-button.js";
 import { Badge } from "../components/ui/badge.js";
@@ -14,18 +19,21 @@ import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card.
 import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "../components/ui/empty.js";
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select.js";
 import { Skeleton } from "../components/ui/skeleton.js";
-import { Table, TableBody, TableCell, TableHeader, TableRow } from "../components/ui/table.js";
-import { listImprovements, type ImprovementRecord } from "../lib/api.js";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../components/ui/table.js";
+import { listImprovements, reopenImprovement, resolveImprovement, type ImprovementRecord } from "../lib/api.js";
+import { showErrorToast, showInfoToast, showSuccessToast } from "../lib/notify.js";
 import { useCursorPagination } from "../lib/use-cursor-pagination.js";
 import { useSession } from "../lib/session.js";
 
 export function ImprovementsPage(): JSX.Element {
+  const navigate = useNavigate();
   const { session } = useSession();
   const [statusFilter, setStatusFilter] = useState<ImprovementStatusFilter>("open");
   const [sort, setSort] = useState<SortState<ImprovementSortField>>({
     field: "last_detected_at",
     direction: "desc"
   });
+  const [bulkAction, setBulkAction] = useState<"resolved" | "unresolved" | null>(null);
   const hostedImprovementsEnabled = session?.organization_plan === "solo" || session?.organization_plan === "team";
   const { items: improvements, isLoading, page, hasNextPage, goToNextPage, goToPreviousPage, refreshPage } = useCursorPagination(
     async (cursor) => {
@@ -51,6 +59,51 @@ export function ImprovementsPage(): JSX.Element {
 
   const sortedImprovements = useMemo(() => sortImprovements(improvements, sort), [improvements, sort]);
   const emptyState = getWorkspaceImprovementEmptyState(statusFilter);
+  const selection = useVisibleRowSelection(useMemo(() => sortedImprovements.map((improvement) => improvement.improvement_id), [sortedImprovements]));
+  const selectedImprovements = useMemo(
+    () => sortedImprovements.filter((improvement) => selection.selectedIdSet.has(improvement.improvement_id)),
+    [sortedImprovements, selection.selectedIdSet]
+  );
+
+  async function handleBulkImprovementAction(action: "resolved" | "unresolved"): Promise<void> {
+    const improvementsToUpdate = selectedImprovements.filter((improvement) =>
+      action === "resolved" ? improvement.status !== "resolved" : improvement.status !== "open"
+    );
+
+    if (improvementsToUpdate.length === 0) {
+      return;
+    }
+
+    setBulkAction(action);
+
+    try {
+      const results = await Promise.allSettled(
+        improvementsToUpdate.map((improvement) =>
+          action === "resolved"
+            ? resolveImprovement(improvement.improvement_id)
+            : reopenImprovement(improvement.improvement_id)
+        )
+      );
+      const successCount = results.filter((result) => result.status === "fulfilled").length;
+
+      if (successCount > 0) {
+        selection.clearSelection();
+        await refreshPage();
+      }
+
+      if (successCount === improvementsToUpdate.length) {
+        showSuccessToast(`Marked ${successCount} improvement${successCount === 1 ? "" : "s"} as ${action}.`);
+      } else if (successCount > 0) {
+        showInfoToast(`Marked ${successCount} of ${improvementsToUpdate.length} improvements as ${action}.`);
+      } else {
+        showErrorToast(`Could not mark the selected improvements as ${action}.`);
+      }
+    } catch {
+      showErrorToast(`Could not mark the selected improvements as ${action}.`);
+    } finally {
+      setBulkAction(null);
+    }
+  }
 
   return (
     <div className="space-y-6">
@@ -118,7 +171,39 @@ export function ImprovementsPage(): JSX.Element {
             >
               {() => (
                 <div className="space-y-4">
-                  <ImprovementsTable improvements={sortedImprovements} sort={sort} onSortChange={(field) => setSort((current) => toggleSort(current, field))} />
+                  <SelectableTableActions
+                    itemLabel="improvement"
+                    totalCount={sortedImprovements.length}
+                    selectedCount={selection.selectedCount}
+                    allSelected={selection.allSelected}
+                    isBusy={bulkAction !== null}
+                    primaryActionLabel={bulkAction === "resolved" ? "Marking resolved..." : "Mark selected resolved"}
+                    secondaryActionLabel={bulkAction === "unresolved" ? "Marking unresolved..." : "Mark selected unresolved"}
+                    primaryActionDisabled={selection.selectedCount === 0 || selectedImprovements.every((improvement) => improvement.status === "resolved")}
+                    secondaryActionDisabled={selection.selectedCount === 0 || selectedImprovements.every((improvement) => improvement.status === "open")}
+                    onToggleSelectAll={selection.toggleSelectAll}
+                    onClearSelection={selection.clearSelection}
+                    onPrimaryAction={() => {
+                      void handleBulkImprovementAction("resolved");
+                    }}
+                    onSecondaryAction={() => {
+                      void handleBulkImprovementAction("unresolved");
+                    }}
+                  />
+                  <ImprovementsTable
+                    improvements={sortedImprovements}
+                    sort={sort}
+                    onSortChange={(field) => setSort((current) => toggleSort(current, field))}
+                    selectedImprovementIds={selection.selectedIdSet}
+                    onToggleImprovementSelection={selection.toggleId}
+                    onImprovementRowClick={(event, improvement) => {
+                      if (shouldIgnoreTableRowActivation(event.target)) {
+                        return;
+                      }
+
+                      void navigate(`/projects/${improvement.project_id}/improvements/${improvement.improvement_id}`);
+                    }}
+                  />
                   <CursorPaginationControls
                     page={page}
                     hasNextPage={hasNextPage}
@@ -140,14 +225,28 @@ export function ImprovementsTable(input: {
   improvements: ImprovementRecord[];
   sort: SortState<ImprovementSortField>;
   onSortChange: (field: ImprovementSortField) => void;
+  selectedImprovementIds: Set<string>;
+  onToggleImprovementSelection: (improvementId: string) => void;
+  onImprovementRowClick: (event: MouseEvent<HTMLTableRowElement>, improvement: ImprovementRecord) => void;
   projectScoped?: boolean;
 }): JSX.Element {
-  const { improvements, sort, onSortChange, projectScoped = false } = input;
+  const {
+    improvements,
+    sort,
+    onSortChange,
+    selectedImprovementIds,
+    onToggleImprovementSelection,
+    onImprovementRowClick,
+    projectScoped = false
+  } = input;
 
   return (
     <Table className="min-w-[920px]">
       <TableHeader>
         <TableRow>
+          <TableHead className="w-10">
+            <span className="sr-only">Select improvements</span>
+          </TableHead>
           <SortableTableHead label="Improvement" field="title" sort={sort} onSortChange={onSortChange} className="w-[30%]" />
           {!projectScoped ? (
             <SortableTableHead label="Project" field="project_name" sort={sort} onSortChange={onSortChange} className="w-[15%]" />
@@ -161,11 +260,32 @@ export function ImprovementsTable(input: {
       </TableHeader>
       <TableBody>
         {improvements.map((improvement) => (
-          <TableRow key={improvement.improvement_id}>
+          <TableRow
+            key={improvement.improvement_id}
+            className="cursor-pointer"
+            data-state={selectedImprovementIds.has(improvement.improvement_id) ? "selected" : undefined}
+            onClick={(event) => {
+              onImprovementRowClick(event, improvement);
+            }}
+          >
+            <TableCell className="align-middle" data-row-interactive="true">
+              <input
+                type="checkbox"
+                aria-label={`Select improvement ${improvement.title}`}
+                checked={selectedImprovementIds.has(improvement.improvement_id)}
+                onChange={() => {
+                  onToggleImprovementSelection(improvement.improvement_id);
+                }}
+                onClick={(event) => {
+                  event.stopPropagation();
+                }}
+              />
+            </TableCell>
             <TableCell className="align-top whitespace-normal">
               <Link
                 to={projectScoped ? `/projects/${improvement.project_id}/improvements/${improvement.improvement_id}` : `/projects/${improvement.project_id}/improvements/${improvement.improvement_id}`}
                 className="font-medium text-foreground hover:underline"
+                data-row-interactive="true"
               >
                 {improvement.title}
               </Link>
@@ -173,7 +293,7 @@ export function ImprovementsTable(input: {
             </TableCell>
             {!projectScoped ? (
               <TableCell className="text-sm text-muted-foreground whitespace-normal break-words align-middle">
-                <Link to={`/projects/${improvement.project_id}`} className="hover:underline">
+                <Link to={`/projects/${improvement.project_id}`} className="hover:underline" data-row-interactive="true">
                   {improvement.project_name}
                 </Link>
               </TableCell>
