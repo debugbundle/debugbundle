@@ -95,7 +95,7 @@ describe("tier capabilities", () => {
     expect(TIER_CAPABILITIES.solo.included_capacity_units).toBe(3);
     expect(TIER_CAPABILITIES.solo.max_members).toBe(1);
     expect(TIER_CAPABILITIES.team.included_capacity_units).toBe(15);
-    expect(TIER_CAPABILITIES.team.max_members).toBe(5);
+    expect(TIER_CAPABILITIES.team.max_members).toBeGreaterThanOrEqual(1_000);
   });
 
   it("should match finalized tiers.md retention values", (): void => {

@@ -62,7 +62,7 @@ export const TIER_CAPABILITIES = {
     shared_dashboards: true,
     member_invites: true,
     included_capacity_units: 15,
-    max_members: 5,
+    max_members: 1_000,
     ingestion_rate_per_min: 10_000,
     retrieval_rate_per_min: 500,
     bundle_retention_days: 90,
