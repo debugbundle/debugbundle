@@ -22,6 +22,8 @@ import { useDelayedVisibility } from "../lib/use-delayed-visibility.js";
 import { cn } from "../lib/utils.js";
 import { formatDate, severityVariantMap, statusVariantMap } from "./improvements-page.js";
 
+const ARTIFACT_POLL_INTERVAL_MS = 2_000;
+
 export function ImprovementDetailPage(): JSX.Element {
   const { improvementId, projectId } = useParams<{ improvementId: string; projectId?: string }>();
   const [improvement, setImprovement] = useState<ImprovementRecord | null | undefined>(undefined);
@@ -215,14 +217,12 @@ function ImprovementBundleCard(input: { projectId: string; improvementId: string
   const showLoading = useDelayedVisibility(bundleState.status === "loading");
 
   useEffect(() => {
-    void (async () => {
-      try {
-        const result = await getImprovementBundle(input.projectId, input.improvementId);
-        setBundleState(result);
-      } catch {
-        setBundleState({ status: "error" });
-      }
-    })();
+    setBundleState({ status: "loading" });
+
+    return startArtifactPolling({
+      load: () => getImprovementBundle(input.projectId, input.improvementId),
+      setState: setBundleState
+    });
   }, [input.improvementId, input.projectId]);
 
   if (bundleState.status === "loading") {
@@ -244,6 +244,8 @@ function ImprovementBundleCard(input: { projectId: string; improvementId: string
         eyebrow="Processing"
         title="Bundle is being generated"
         description="The hosted improvement bundle is still being written for this opportunity."
+        tone="neutral"
+        titleAccessory={<LoaderCircleIcon className="size-4 animate-spin text-muted-foreground" aria-hidden="true" />}
       />
     );
   }
@@ -357,6 +359,39 @@ function DetailRow({
       <CardContent>{content}</CardContent>
     </Card>
   );
+}
+
+function startArtifactPolling<TArtifactState extends { status: "ready" | "pending" | "failed" }>(input: {
+  load: () => Promise<TArtifactState>;
+  setState: (state: TArtifactState | { status: "error" }) => void;
+}): () => void {
+  let cancelled = false;
+  let timeout: ReturnType<typeof setTimeout> | undefined;
+
+  async function loadArtifact(): Promise<void> {
+    try {
+      const result = await input.load();
+      if (cancelled) return;
+
+      input.setState(result);
+      if (result.status === "pending") {
+        timeout = setTimeout(() => { void loadArtifact(); }, ARTIFACT_POLL_INTERVAL_MS);
+      }
+    } catch {
+      if (!cancelled) {
+        input.setState({ status: "error" });
+      }
+    }
+  }
+
+  void loadArtifact();
+
+  return () => {
+    cancelled = true;
+    if (timeout !== undefined) {
+      clearTimeout(timeout);
+    }
+  };
 }
 
 function formatImprovementKind(kind: ImprovementRecord["kind"]): string {

@@ -1,4 +1,4 @@
-import type { HTMLAttributes } from "react";
+import type { HTMLAttributes, ReactNode } from "react";
 
 import { cn } from "../../lib/utils.js";
 import { Badge } from "../ui/badge.js";
@@ -19,6 +19,7 @@ export interface CalloutCardProps extends HTMLAttributes<HTMLDivElement> {
   title: string;
   description: string;
   tone?: CalloutTone;
+  titleAccessory?: ReactNode;
 }
 
 export function CalloutCard({
@@ -27,6 +28,7 @@ export function CalloutCard({
   title,
   description,
   tone = "info",
+  titleAccessory,
   children,
   ...props
 }: CalloutCardProps): JSX.Element {
@@ -48,7 +50,10 @@ export function CalloutCard({
         >
           {eyebrow}
         </Badge>
-        <CardTitle>{title}</CardTitle>
+        <div className="flex items-center gap-2">
+          <CardTitle>{title}</CardTitle>
+          {titleAccessory}
+        </div>
       </CardHeader>
       <CardContent className="flex flex-col gap-4">
         <p className="text-sm text-muted-foreground">{description}</p>

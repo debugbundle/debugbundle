@@ -686,7 +686,10 @@ describe("web app — improvements", () => {
     );
 
     expect(await screen.findByText(/slow request/i)).toBeInTheDocument();
-    expect(await screen.findByText(/bundle is being generated/i)).toBeInTheDocument();
+    const pendingTitle = await screen.findByText(/bundle is being generated/i);
+    expect(pendingTitle).toBeInTheDocument();
+    expect(pendingTitle.closest("[data-tone='neutral']")).not.toBeNull();
+    expect(pendingTitle.closest("[data-tone='neutral']")?.querySelector(".animate-spin")).not.toBeNull();
 
     unmount();
     render(<App initialEntries={[`/projects/${unavailableImprovement.project_id}/improvements/${unavailableImprovement.improvement_id}`]} />);

@@ -21,6 +21,8 @@ import { showErrorToast, showSuccessToast } from "../lib/notify.js";
 import { useDelayedVisibility } from "../lib/use-delayed-visibility.js";
 import { cn } from "../lib/utils.js";
 
+const ARTIFACT_POLL_INTERVAL_MS = 2_000;
+
 export function IncidentDetailPage(): JSX.Element {
   const { incidentId, projectId } = useParams<{ incidentId: string; projectId?: string }>();
   const location = useLocation();
@@ -165,14 +167,12 @@ function BundleTab({ incidentId }: { incidentId: string }): JSX.Element {
   const showBundleLoading = useDelayedVisibility(bundleState.status === "loading");
 
   useEffect(() => {
-    void (async () => {
-      try {
-        const result = await getIncidentBundle(incidentId);
-        setBundleState(result);
-      } catch {
-        setBundleState({ status: "error" });
-      }
-    })();
+    setBundleState({ status: "loading" });
+
+    return startArtifactPolling({
+      load: () => getIncidentBundle(incidentId),
+      setState: setBundleState
+    });
   }, [incidentId]);
 
   if (bundleState.status === "loading") {
@@ -194,6 +194,8 @@ function BundleTab({ incidentId }: { incidentId: string }): JSX.Element {
         eyebrow="Processing"
         title="Bundle is being generated"
         description="The worker is still processing this incident. The debug bundle will appear here once generation completes."
+        tone="neutral"
+        titleAccessory={<LoaderCircleIcon className="size-4 animate-spin text-muted-foreground" aria-hidden="true" />}
       />
     );
   }
@@ -243,14 +245,12 @@ function ReproductionTab({ incidentId }: { incidentId: string }): JSX.Element {
   const showReproductionLoading = useDelayedVisibility(reproState.status === "loading");
 
   useEffect(() => {
-    void (async () => {
-      try {
-        const result = await getIncidentReproduction(incidentId);
-        setReproState(result);
-      } catch {
-        setReproState({ status: "error" });
-      }
-    })();
+    setReproState({ status: "loading" });
+
+    return startArtifactPolling({
+      load: () => getIncidentReproduction(incidentId),
+      setState: setReproState
+    });
   }, [incidentId]);
 
   if (reproState.status === "loading") {
@@ -272,6 +272,8 @@ function ReproductionTab({ incidentId }: { incidentId: string }): JSX.Element {
         eyebrow="Processing"
         title="Reproduction is being generated"
         description="The reproduction artifact will appear here once the worker finishes processing."
+        tone="neutral"
+        titleAccessory={<LoaderCircleIcon className="size-4 animate-spin text-muted-foreground" aria-hidden="true" />}
       />
     );
   }
@@ -365,6 +367,39 @@ function DetailRow({
       )}
     </div>
   );
+}
+
+function startArtifactPolling<TArtifactState extends { status: "ready" | "pending" | "failed" }>(input: {
+  load: () => Promise<TArtifactState>;
+  setState: (state: TArtifactState | { status: "error" }) => void;
+}): () => void {
+  let cancelled = false;
+  let timeout: ReturnType<typeof setTimeout> | undefined;
+
+  async function loadArtifact(): Promise<void> {
+    try {
+      const result = await input.load();
+      if (cancelled) return;
+
+      input.setState(result);
+      if (result.status === "pending") {
+        timeout = setTimeout(() => { void loadArtifact(); }, ARTIFACT_POLL_INTERVAL_MS);
+      }
+    } catch {
+      if (!cancelled) {
+        input.setState({ status: "error" });
+      }
+    }
+  }
+
+  void loadArtifact();
+
+  return () => {
+    cancelled = true;
+    if (timeout !== undefined) {
+      clearTimeout(timeout);
+    }
+  };
 }
 
 function formatDate(value: string): string {

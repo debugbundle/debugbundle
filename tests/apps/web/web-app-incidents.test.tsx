@@ -232,7 +232,60 @@ describe("web app — incident and project detail routes", () => {
     render(<App initialEntries={[`/incidents/${incident.incident_id}`]} />);
 
     expect(await screen.findByText(/typeerror in checkout handler/i)).toBeInTheDocument();
+    const pendingTitle = await screen.findByText(/bundle is being generated/i);
+    expect(pendingTitle).toBeInTheDocument();
+    expect(pendingTitle.closest("[data-tone='neutral']")).not.toBeNull();
+    expect(pendingTitle.closest("[data-tone='neutral']")?.querySelector(".animate-spin")).not.toBeNull();
+  });
+
+  it("polls a pending bundle until the artifact is ready", async () => {
+    const incident = createIncident();
+    let bundleRequestCount = 0;
+    const fetchMock = vi.fn((input: RequestInfo | URL) => {
+      const url = requestUrl(input);
+
+      if (url.endsWith("/v1/auth/session")) {
+        return jsonResponse(200, { session: createSession() });
+      }
+
+      if (url.endsWith(`/v1/incidents/${incident.incident_id}`)) {
+        return jsonResponse(200, { incident });
+      }
+
+      if (url.endsWith(`/v1/incidents/${incident.incident_id}/bundle`)) {
+        bundleRequestCount += 1;
+        if (bundleRequestCount === 1) {
+          return jsonResponse(200, { status: "pending" });
+        }
+
+        return jsonResponse(200, {
+          bundle_id: "bundle_123",
+          incident_id: incident.incident_id,
+          project_id: incident.project_id,
+          version: "v1",
+          summary: {
+            title: incident.title,
+            severity: incident.severity,
+            environment: incident.environment
+          }
+        });
+      }
+
+      if (url.endsWith(`/v1/incidents/${incident.incident_id}/reproduction`)) {
+        return jsonResponse(200, { status: "pending" });
+      }
+
+      return jsonResponse(404, { error: "not_found" });
+    });
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<App initialEntries={[`/incidents/${incident.incident_id}`]} />);
+
     expect(await screen.findByText(/bundle is being generated/i)).toBeInTheDocument();
+
+    expect(await screen.findByText(/full bundle artifact for this incident/i, undefined, { timeout: 4_000 })).toBeInTheDocument();
+    expect(bundleRequestCount).toBe(2);
   });
 
   it("shows unavailable bundle and reproduction callouts when artifact generation fails", async () => {
