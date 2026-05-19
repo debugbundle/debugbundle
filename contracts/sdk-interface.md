@@ -959,7 +959,7 @@ All relay implementations must enforce these security controls:
    - `sdk_name` — forced to `@debugbundle/sdk-browser`.
    - `organization_id` — never accept from browser.
 6. **Field passthrough policy:** Preserve these browser-owned fields:
-   - `correlation.trace_id` — required for cross-context linking.
+  - `correlation.request_id`, `correlation.trace_id`, `correlation.session_id`, `correlation.user_id_hash` when supplied as strings or `null`.
    - `service`, `environment` — accepted unless relay has explicit overrides.
    - `occurred_at` — browser timestamp (relay may annotate `received_at`).
 7. **Rate limiting:** Default 60 requests per minute per IP. Configurable via `rateLimitPerMinute`.
@@ -990,6 +990,7 @@ All full relay handlers must support language-idiomatic equivalents for these op
 | `service` | Optional relay-level service override. |
 | `environment` | Optional relay-level environment override. |
 | `rateLimitPerMinute` | Per-IP relay request limit. Defaults to 60. |
+| `rateLimitStore` | Optional language-idiomatic persistent/shared rate-limit store for runtimes where in-memory request state is insufficient. |
 
 The handler may still expose an `onAccept` callback for instrumentation or custom extension, but callback-only delivery is a relay foundation, not full relay parity.
 
@@ -1005,7 +1006,7 @@ This ensures `debugbundle process` handles browser-originated and backend-origin
 
 ### 13.8 Cross-Context Correlation (Invariant)
 
-The browser SDK attaches `correlation.trace_id` (UUID v4) to events. The relay must preserve this field without modification. Backend SDK middleware reads the same `X-DebugBundle-Trace-Id` header from incoming requests. When both browser and backend events share a `trace_id`, `debugbundle process` links them into a single full-stack incident bundle.
+The browser SDK attaches `correlation.trace_id` (UUID v4) to events and may also include `request_id`, `session_id`, and `user_id_hash` when the browser context has them. The relay must preserve the browser-supplied correlation fields without modification when they are strings or `null`. Backend SDK middleware reads the same `X-DebugBundle-Trace-Id` header from incoming requests. When both browser and backend events share a `trace_id`, `debugbundle process` links them into a single full-stack incident bundle.
 
 The relay must never strip, overwrite, or regenerate `correlation.trace_id`.
 

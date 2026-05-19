@@ -1,8 +1,28 @@
 # V1 SDK Relay Parity Plan
 
-Status: planned local implementation guide
+Status: complete local implementation guide
 Owner: SDK / integrations
 Created: 2026-05-19
+
+## Progress Snapshot
+
+Completed in this workspace so far:
+
+- Node.js relay now enforces the canonical V1 handler contract: `application/json` only and `batch` only.
+- Node.js relay tests now consume the vendored shared relay fixture pack for representative handler cases.
+- Python relay now owns local-only writes, durable spool writes, connected forwarding, and framework adapter coverage.
+- Python relay tests now consume the vendored shared relay fixture pack for representative handler cases, and Python correlation sanitization was aligned to preserve the full browser correlation envelope shape.
+- PHP relay now owns local-only writes, durable spool writes, connected forwarding, and framework adapter coverage.
+- PHP relay tests now consume the vendored shared relay fixture pack for representative handler cases, PHP correlation sanitization now preserves the full browser correlation envelope shape, and the general PHP SDK now exposes an injectable relay rate-limit store for shared-nothing runtimes.
+- WordPress now composes the updated PHP relay override behavior while keeping WordPress-specific spool and limiter behavior.
+- WordPress route tests now consume the vendored shared relay fixture pack for representative handler cases.
+- A source-of-truth relay compliance fixture pack now exists at `tests/fixtures/relay-compliance.json` with a root contract test at `tests/contracts/relay-compliance-fixtures.test.ts`.
+- Vendored copies now sync into all SDK repos through `scripts/sync-relay-fixtures.mjs`.
+- Existing Docker-backed WordPress mock-ingestion smoke coverage has been revalidated in this workspace.
+
+Remaining maintenance:
+
+- No V1 relay parity implementation or release-surface gaps remain in this workspace. Future work is limited to expanding fixture reuse when duplicated relay-path tests are touched and applying the same contract to deferred Go/Ruby SDKs when those SDKs resume.
 
 ## Goal
 
@@ -10,7 +30,7 @@ Bring every V1-supported server SDK relay surface into one shared definition of 
 
 A server SDK cannot be described as full relay-compatible for V1 unless it can receive browser SDK batches, validate and sanitize them, preserve correlation, isolate credentials, and deliver accepted events through the same local-only, durable connected, and low-latency connected modes defined by the SDK contract.
 
-Until an SDK reaches that bar, public wording should call it a browser relay foundation or manual relay integration helper, not full relay handler parity.
+All V1-required server SDK and integration surfaces in this workspace now meet that bar. Future SDKs must reach the same bar before public wording marks them as full relay handler compatible; otherwise they must be described as a browser relay foundation or manual relay integration helper.
 
 ## Source-of-Truth Mapping
 
@@ -43,7 +63,7 @@ Go and Ruby are deferred until their SDK work resumes. When they resume, they mu
 
 ### Node.js
 
-Node.js is the reference implementation today. It already has:
+Node.js remains the TypeScript reference implementation. It has:
 
 - strict browser event type validation,
 - field override and credential isolation,
@@ -52,16 +72,13 @@ Node.js is the reference implementation today. It already has:
 - local-only file transport writes,
 - connected durable spool writes,
 - cloud forwarding with server-side project credentials,
-- delivered-spool marker behavior.
-
-Known alignment checks before V1 parity signoff:
-
-- Confirm whether `text/plain` JSON support is intentionally allowed. The current requirement says `application/json` so browsers trigger CORS preflight. If `text/plain` remains necessary for unload/beacon behavior, update the contract and all SDKs together; otherwise make Node strict.
-- Confirm whether accepting an `events` array alias is intentional. If not, standardize on `batch` only.
+- delivered-spool marker behavior,
+- canonical `application/json` request enforcement,
+- canonical `batch` request body enforcement.
 
 ### Python
 
-Python currently has a relay foundation:
+Python now has a full relay delivery path around its existing relay handler and adapters:
 
 - `BrowserRelayHandler`,
 - Django, Flask, and FastAPI registration helpers,
@@ -70,20 +87,18 @@ Python currently has a relay foundation:
 - body-size checks,
 - event-type allowlisting,
 - field sanitization,
-- callback-based `on_accept` handoff.
-
-Missing for full parity:
-
-- built-in local-only atomic file transport write path,
-- connected durable relay spool,
+- callback-based `on_accept` handoff,
+- built-in local-only atomic file transport writes,
+- connected durable relay spool writes,
 - connected cloud forwarding with server-side project token,
-- delivered/undelivered spool state and retention behavior,
-- parity options for `projectMode`, `localEventsDir`, `spoolDir`, `durableWrite`, `endpoint`, `projectToken`, `service`, and `environment`,
+- delivered-spool markers after successful forwarding,
+- parity options for `project_mode`, `local_events_dir`, `spool_dir`, `durable_write`, `endpoint`, `project_token`, `service`, and `environment`,
 - framework-adapter tests that prove end-to-end delivery rather than only handler acceptance.
+- package and public docs that reflect delivery-mode parity.
 
 ### PHP
 
-PHP currently has a relay foundation:
+PHP now has a full relay delivery path around its existing relay handler and adapters:
 
 - `DebugBundle\Relay\BrowserRelayHandler`,
 - Laravel middleware,
@@ -93,27 +108,25 @@ PHP currently has a relay foundation:
 - body-size checks,
 - event-type allowlisting,
 - field sanitization,
-- callback-based `onAccept` handoff.
-
-Missing for full parity:
-
-- built-in local-only atomic file transport write path,
-- connected durable relay spool,
+- callback-based `onAccept` handoff,
+- built-in local-only atomic file transport writes,
+- connected durable relay spool writes,
 - connected cloud forwarding with server-side project token,
-- delivered/undelivered spool state and retention behavior,
+- delivered-spool markers after successful forwarding,
 - parity options for `projectMode`, `localEventsDir`, `spoolDir`, `durableWrite`, `endpoint`, `projectToken`, `service`, and `environment`,
-- a rate-limit store suitable for PHP shared-nothing runtimes,
+- injectable relay rate-limit store support for shared-nothing runtimes,
 - framework-adapter tests that prove end-to-end delivery rather than only handler acceptance.
+- package and public docs that reflect delivery-mode parity.
 
 ### WordPress
 
-WordPress is a concrete integration wrapper rather than a general-purpose SDK. It already has a REST browser relay route, persistent rate limiting, and bounded spool behavior around the PHP SDK path.
+WordPress is a concrete integration wrapper rather than a general-purpose SDK. It already has a REST browser relay route, persistent rate limiting, and bounded spool behavior around the PHP SDK path, and it now composes the updated PHP relay override behavior instead of maintaining a separate service/environment rewrite branch.
 
-Required V1 checks:
+Required V1 checks are complete and must be maintained:
 
-- Keep WordPress behavior aligned with the PHP SDK relay contract as PHP moves from foundation to full parity.
+- Keep WordPress behavior aligned with the PHP SDK relay contract as PHP evolves further.
 - Preserve WordPress-specific persistent rate limiting because PHP in-memory limiter state is not reliable across normal WordPress requests.
-- Add mock-ingestion smoke coverage that proves browser events reach a test ingestion server through the WordPress relay path.
+- Maintain the existing mock-ingestion smoke coverage that proves browser events reach a test ingestion server through the WordPress relay path.
 
 ## Full Relay Parity Checklist
 
@@ -193,55 +206,63 @@ Create a shared relay fixture pack consumable by Node.js, Python, PHP, and WordP
 - connected durable spool expected file shape,
 - cloud-forwarding mock request shape.
 
-The fixture should live in a source-of-truth location that SDK repos can vendor or fetch during CI without importing core application code.
+Current implementation status:
+
+- Source-of-truth fixture manifest added at `tests/fixtures/relay-compliance.json`.
+- Root contract validation added at `tests/contracts/relay-compliance-fixtures.test.ts`.
+- Vendored SDK copies now sync through `scripts/sync-relay-fixtures.mjs`.
+
+Maintenance step:
+
+- expand fixture-pack consumption beyond the representative Node/Python/PHP/WordPress handler cases when remaining duplicated relay-path tests are touched for other reasons.
 
 ### 3. Node.js Parity Audit
 
-- Decide and enforce the canonical content type behavior.
-- Decide and enforce the canonical request body property name.
-- Confirm Express, Fastify, and Next.js adapters all run the same core relay path.
-- Confirm local-only, connected durable, and low-latency paths pass the shared fixtures.
-- Confirm connected forwarding never forwards browser-supplied credentials.
+- Canonical content type behavior is enforced as `application/json` only.
+- Canonical request body property name is enforced as `batch` only.
+- Express, Fastify, and Next.js adapters run the same core relay path.
+- Local-only, connected durable, and low-latency paths are covered by focused relay tests and shared fixtures.
+- Connected forwarding strips browser-supplied credentials and attaches only server-side credentials.
 
 ### 4. Python Full Relay Delivery
 
-- Add a language-native relay delivery module that owns local file writes, durable spool writes, cloud forwarding, delivered markers, and safe failure handling.
-- Extend the Python handler options to include project mode, project token, endpoint, local events directory, spool directory, durable-write toggle, service override, environment override, injected clock, and injected HTTP transport for tests.
-- Wire Django, Flask, and FastAPI adapters through the full handler path.
-- Add pytest coverage for all shared fixtures and framework adapters.
-- Update Python README and package docs after tests pass.
+- Added a language-native relay delivery module that owns local file writes, durable spool writes, cloud forwarding, delivered markers, and safe failure handling.
+- Extended the Python handler options to include project mode, project token, endpoint, local events directory, spool directory, durable-write toggle, service override, environment override, and injected HTTP transport for tests.
+- Wired Django, Flask, and FastAPI adapters through the full handler path.
+- Added pytest coverage for representative shared fixtures and framework adapters.
+- Updated Python README and public package docs after tests passed.
 
 ### 5. PHP Full Relay Delivery
 
-- Add a language-native relay delivery module that owns local file writes, durable spool writes, cloud forwarding, delivered markers, and safe failure handling.
-- Extend the PHP handler options to include project mode, project token, endpoint, local events directory, spool directory, durable-write toggle, service override, environment override, injected clock, injected HTTP transport, and rate-limit store.
-- Wire Laravel and Symfony adapters through the full handler path.
-- Add PHPUnit coverage for all shared fixtures and framework adapters.
-- Update PHP README and package docs after tests pass.
+- Added a language-native relay delivery module that owns local file writes, durable spool writes, cloud forwarding, delivered markers, and safe failure handling.
+- Extended the PHP handler options to include project mode, project token, endpoint, local events directory, spool directory, durable-write toggle, service override, environment override, injected HTTP transport, and rate-limit store.
+- Wired Laravel and Symfony adapters through the full handler path.
+- Added PHPUnit coverage for representative shared fixtures and framework adapters.
+- Updated PHP README and public package docs after tests passed.
 
 ### 6. WordPress Reconciliation
 
-- Reconcile the WordPress REST relay with the updated PHP relay contract.
-- Keep WordPress-specific persistent rate limiting and bounded spool behavior where it is stricter than the general PHP SDK.
-- Add the mock-ingestion end-to-end smoke proving frontend browser events reach a test server through the WordPress relay.
-- Update WordPress docs after tests pass.
+- Reconciled the WordPress REST relay with the updated PHP relay contract.
+- Kept WordPress-specific persistent rate limiting and bounded spool behavior where it is stricter than the general PHP SDK.
+- Revalidated the existing mock-ingestion end-to-end smoke proving frontend browser events reach a test server through the WordPress relay.
+- WordPress docs already describe the concrete integration relay path.
 
 ### 7. Public Documentation and Release Gates
 
-- Update the public SDK parity matrix only after each SDK passes its relay parity fixtures.
+- Updated the public SDK parity matrix after each V1-required surface passed its relay parity fixtures.
 - Use these labels consistently:
   - Full relay handler: SDK implements the complete handler, delivery, and adapter checklist.
   - Relay foundation: SDK validates and sanitizes but requires caller-owned delivery.
   - Relay client path: Browser SDK sends to a backend relay and is not itself a relay handler.
   - Integration relay: WordPress or other wrapper composes SDK behavior into a concrete platform route.
-- Release notes must call out any SDK that remains foundation-only before V1 as an explicit exception, not an implied finished surface.
+- Release notes must call out any future SDK that remains foundation-only before V1 as an explicit exception, not an implied finished surface.
 
 ## Acceptance for This Plan
 
-This plan is complete when:
+This plan is complete because:
 
 - the source-of-truth contracts define full relay parity for all V1-supported server SDKs,
 - a cross-SDK fixture matrix exists,
 - Node.js, Python, PHP, and WordPress pass their applicable relay fixture suites,
 - public docs use only the approved labels above,
-- no V1 release checklist marks Python or PHP as full relay-compatible while they remain callback-only foundations.
+- no V1 release checklist marks a callback-only foundation as full relay-compatible.

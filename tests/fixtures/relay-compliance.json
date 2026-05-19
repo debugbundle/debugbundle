@@ -1,0 +1,635 @@
+{
+  "version": 1,
+  "cases": [
+    {
+      "id": "valid-browser-batch",
+      "kind": "handler",
+      "request": {
+        "method": "POST",
+        "headers": {
+          "content-type": "application/json; charset=utf-8",
+          "host": "app.example.com",
+          "origin": "https://app.example.com"
+        },
+        "ipAddress": "203.0.113.10",
+        "bodyJson": {
+          "batch": [
+            {
+              "schema_version": "2026-03-01",
+              "event_id": "00000000-0000-4000-8000-000000000401",
+              "event_type": "frontend_exception",
+              "sdk_name": "evil-browser-sdk",
+              "sdk_version": "1.2.3",
+              "occurred_at": "2026-05-19T10:00:00.000Z",
+              "service": {
+                "name": "checkout-web",
+                "runtime": "browser",
+                "framework": "react",
+                "environment": "production"
+              },
+              "correlation": {
+                "request_id": null,
+                "trace_id": "11111111-1111-4111-8111-111111111111",
+                "session_id": null,
+                "user_id_hash": null
+              },
+              "payload": {
+                "name": "TypeError",
+                "message": "Cannot read properties of undefined",
+                "stack": "TypeError: Cannot read properties of undefined\n    at CheckoutButton.tsx:12:5",
+                "route": "/checkout",
+                "browser": {
+                  "name": "Chrome",
+                  "version": "135.0.0"
+                },
+                "breadcrumbs": [
+                  {
+                    "breadcrumb_type": "route_change",
+                    "route": "/checkout",
+                    "data": {},
+                    "ts": "2026-05-19T09:59:59.000Z"
+                  }
+                ],
+                "device": {
+                  "user_agent": "Mozilla/5.0",
+                  "os": {
+                    "name": "macOS",
+                    "version": "15.0"
+                  },
+                  "device_type": "desktop",
+                  "screen": {
+                    "width": 1728,
+                    "height": 1117
+                  },
+                  "viewport": {
+                    "width": 1440,
+                    "height": 900
+                  },
+                  "device_pixel_ratio": 2,
+                  "touch_capable": false,
+                  "language": "en-US",
+                  "connection_type": "4g",
+                  "color_scheme_preference": "light"
+                },
+                "dom_context": {
+                  "mode": "lightweight",
+                  "html_excerpt": "<button>Checkout</button>"
+                }
+              }
+            }
+          ]
+        }
+      },
+      "expected": {
+        "status": 202,
+        "accepted": 1,
+        "rejected": 0,
+        "errors": []
+      }
+    },
+    {
+      "id": "mixed-valid-invalid-batch",
+      "kind": "handler",
+      "request": {
+        "method": "POST",
+        "headers": {
+          "content-type": "application/json; charset=utf-8",
+          "host": "app.example.com",
+          "origin": "https://app.example.com"
+        },
+        "ipAddress": "203.0.113.10",
+        "bodyJson": {
+          "batch": [
+            {
+              "schema_version": "2026-03-01",
+              "event_id": "00000000-0000-4000-8000-000000000402",
+              "event_type": "frontend_exception",
+              "sdk_name": "@debugbundle/sdk-browser",
+              "sdk_version": "1.2.3",
+              "occurred_at": "2026-05-19T10:01:00.000Z",
+              "service": {
+                "name": "checkout-web",
+                "runtime": "browser",
+                "framework": "react",
+                "environment": "production"
+              },
+              "payload": {
+                "name": "TypeError",
+                "message": "Cannot read properties of undefined",
+                "stack": "TypeError: Cannot read properties of undefined\n    at CheckoutButton.tsx:12:5",
+                "route": "/checkout",
+                "browser": {
+                  "name": "Chrome",
+                  "version": "135.0.0"
+                }
+              }
+            },
+            {
+              "schema_version": "2026-03-01",
+              "event_id": "00000000-0000-4000-8000-000000000403",
+              "event_type": "backend_exception",
+              "sdk_name": "@debugbundle/sdk-node",
+              "sdk_version": "0.1.0",
+              "occurred_at": "2026-05-19T10:01:30.000Z",
+              "service": {
+                "name": "checkout-api",
+                "runtime": "node",
+                "framework": "fastify",
+                "environment": "production"
+              },
+              "payload": {
+                "name": "Error",
+                "message": "boom",
+                "stack": "Error: boom"
+              }
+            }
+          ]
+        }
+      },
+      "expected": {
+        "status": 400,
+        "accepted": 1,
+        "rejected": 1,
+        "errors": [
+          "batch[1]: Unsupported browser relay event type backend_exception."
+        ]
+      }
+    },
+    {
+      "id": "credential-smuggling-payload",
+      "kind": "handler",
+      "request": {
+        "method": "POST",
+        "headers": {
+          "content-type": "application/json; charset=utf-8",
+          "host": "app.example.com",
+          "origin": "https://app.example.com",
+          "authorization": "Bearer browser-should-not-send-this",
+          "cookie": "session=browser-cookie",
+          "x-api-key": "browser-key"
+        },
+        "ipAddress": "203.0.113.11",
+        "bodyJson": {
+          "batch": [
+            {
+              "schema_version": "2026-03-01",
+              "event_id": "00000000-0000-4000-8000-000000000404",
+              "event_type": "frontend_exception",
+              "project_token": "dbundle_proj_stolen",
+              "organization_id": "org_123",
+              "sdk_name": "spoofed-sdk",
+              "sdk_version": "1.2.3",
+              "occurred_at": "2026-05-19T10:02:00.000Z",
+              "service": {
+                "name": "checkout-web",
+                "runtime": "browser",
+                "framework": "react",
+                "environment": "production"
+              },
+              "correlation": {
+                "request_id": null,
+                "trace_id": "11111111-1111-4111-8111-111111111111",
+                "session_id": null,
+                "user_id_hash": null
+              },
+              "payload": {
+                "name": "TypeError",
+                "message": "Cannot read properties of undefined",
+                "stack": "TypeError: Cannot read properties of undefined\n    at CheckoutButton.tsx:12:5",
+                "route": "/checkout",
+                "browser": {
+                  "name": "Chrome",
+                  "version": "135.0.0"
+                }
+              }
+            }
+          ]
+        }
+      },
+      "expected": {
+        "status": 202,
+        "accepted": 1,
+        "rejected": 0,
+        "errors": []
+      },
+      "expectedEventFile": [
+        {
+          "schema_version": "2026-03-01",
+          "event_id": "00000000-0000-4000-8000-000000000404",
+          "event_type": "frontend_exception",
+          "sdk_name": "@debugbundle/sdk-browser",
+          "sdk_version": "1.2.3",
+          "occurred_at": "2026-05-19T10:02:00.000Z",
+          "service": {
+            "name": "checkout-web",
+            "runtime": "browser",
+            "framework": "react",
+            "environment": "production"
+          },
+          "correlation": {
+            "request_id": null,
+            "trace_id": "11111111-1111-4111-8111-111111111111",
+            "session_id": null,
+            "user_id_hash": null
+          },
+          "payload": {
+            "name": "TypeError",
+            "message": "Cannot read properties of undefined",
+            "stack": "TypeError: Cannot read properties of undefined\n    at CheckoutButton.tsx:12:5",
+            "route": "/checkout",
+            "browser": {
+              "name": "Chrome",
+              "version": "135.0.0"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "wrong-origin-request",
+      "kind": "handler",
+      "request": {
+        "method": "POST",
+        "headers": {
+          "content-type": "application/json; charset=utf-8",
+          "host": "app.example.com",
+          "origin": "https://evil.example.com"
+        },
+        "ipAddress": "203.0.113.12",
+        "bodyJson": {
+          "batch": []
+        }
+      },
+      "expected": {
+        "status": 403
+      }
+    },
+    {
+      "id": "missing-origin-request",
+      "kind": "handler",
+      "request": {
+        "method": "POST",
+        "headers": {
+          "content-type": "application/json; charset=utf-8",
+          "host": "app.example.com"
+        },
+        "ipAddress": "203.0.113.13",
+        "bodyJson": {
+          "batch": []
+        }
+      },
+      "expected": {
+        "status": 403
+      }
+    },
+    {
+      "id": "oversized-body",
+      "kind": "handler",
+      "request": {
+        "method": "POST",
+        "headers": {
+          "content-type": "application/json; charset=utf-8",
+          "host": "app.example.com",
+          "origin": "https://app.example.com"
+        },
+        "ipAddress": "203.0.113.14",
+        "bodyGenerator": {
+          "kind": "repeat",
+          "char": "x",
+          "length": 262145
+        }
+      },
+      "expected": {
+        "status": 413
+      }
+    },
+    {
+      "id": "rate-limit-sequence",
+      "kind": "sequence",
+      "relayOptions": {
+        "rateLimitPerMinute": 3
+      },
+      "requests": [
+        {
+          "atMs": 0,
+          "request": {
+            "method": "POST",
+            "headers": {
+              "content-type": "application/json; charset=utf-8",
+              "host": "app.example.com",
+              "origin": "https://app.example.com"
+            },
+            "ipAddress": "203.0.113.15",
+            "bodyJson": {
+              "batch": []
+            }
+          },
+          "expectedStatus": 202
+        },
+        {
+          "atMs": 1,
+          "request": {
+            "method": "POST",
+            "headers": {
+              "content-type": "application/json; charset=utf-8",
+              "host": "app.example.com",
+              "origin": "https://app.example.com"
+            },
+            "ipAddress": "203.0.113.15",
+            "bodyJson": {
+              "batch": []
+            }
+          },
+          "expectedStatus": 202
+        },
+        {
+          "atMs": 2,
+          "request": {
+            "method": "POST",
+            "headers": {
+              "content-type": "application/json; charset=utf-8",
+              "host": "app.example.com",
+              "origin": "https://app.example.com"
+            },
+            "ipAddress": "203.0.113.15",
+            "bodyJson": {
+              "batch": []
+            }
+          },
+          "expectedStatus": 202
+        },
+        {
+          "atMs": 3,
+          "request": {
+            "method": "POST",
+            "headers": {
+              "content-type": "application/json; charset=utf-8",
+              "host": "app.example.com",
+              "origin": "https://app.example.com"
+            },
+            "ipAddress": "203.0.113.15",
+            "bodyJson": {
+              "batch": []
+            }
+          },
+          "expectedStatus": 429
+        },
+        {
+          "atMs": 60005,
+          "request": {
+            "method": "POST",
+            "headers": {
+              "content-type": "application/json; charset=utf-8",
+              "host": "app.example.com",
+              "origin": "https://app.example.com"
+            },
+            "ipAddress": "203.0.113.15",
+            "bodyJson": {
+              "batch": []
+            }
+          },
+          "expectedStatus": 202
+        }
+      ]
+    },
+    {
+      "id": "local-only-write",
+      "kind": "delivery",
+      "relayOptions": {
+        "projectMode": "local-only",
+        "service": "checkout-web",
+        "environment": "production"
+      },
+      "request": {
+        "method": "POST",
+        "headers": {
+          "content-type": "application/json; charset=utf-8",
+          "host": "app.example.com",
+          "origin": "https://app.example.com"
+        },
+        "ipAddress": "203.0.113.16",
+        "bodyJson": {
+          "batch": [
+            {
+              "schema_version": "2026-03-01",
+              "event_id": "00000000-0000-4000-8000-000000000405",
+              "event_type": "frontend_exception",
+              "sdk_name": "@debugbundle/sdk-browser",
+              "sdk_version": "1.2.3",
+              "occurred_at": "2026-05-19T10:03:00.000Z",
+              "service": {
+                "name": "ignored-browser-service",
+                "runtime": "browser",
+                "framework": "react",
+                "environment": "ignored-browser-env"
+              },
+              "payload": {
+                "name": "TypeError",
+                "message": "Cannot read properties of undefined",
+                "stack": "TypeError: Cannot read properties of undefined\n    at CheckoutButton.tsx:12:5",
+                "route": "/checkout",
+                "browser": {
+                  "name": "Chrome",
+                  "version": "135.0.0"
+                }
+              }
+            }
+          ]
+        }
+      },
+      "expected": {
+        "status": 202,
+        "accepted": 1,
+        "rejected": 0,
+        "errors": []
+      },
+      "expectedEventFile": [
+        {
+          "schema_version": "2026-03-01",
+          "event_id": "00000000-0000-4000-8000-000000000405",
+          "event_type": "frontend_exception",
+          "sdk_name": "@debugbundle/sdk-browser",
+          "sdk_version": "1.2.3",
+          "occurred_at": "2026-05-19T10:03:00.000Z",
+          "service": {
+            "name": "checkout-web",
+            "runtime": "browser",
+            "framework": "react",
+            "environment": "production"
+          },
+          "payload": {
+            "name": "TypeError",
+            "message": "Cannot read properties of undefined",
+            "stack": "TypeError: Cannot read properties of undefined\n    at CheckoutButton.tsx:12:5",
+            "route": "/checkout",
+            "browser": {
+              "name": "Chrome",
+              "version": "135.0.0"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "connected-durable-spool",
+      "kind": "delivery",
+      "relayOptions": {
+        "projectMode": "connected",
+        "projectToken": "dbundle_proj_test",
+        "durableWrite": true
+      },
+      "request": {
+        "method": "POST",
+        "headers": {
+          "content-type": "application/json; charset=utf-8",
+          "host": "app.example.com",
+          "origin": "https://app.example.com"
+        },
+        "ipAddress": "203.0.113.17",
+        "bodyJson": {
+          "batch": [
+            {
+              "schema_version": "2026-03-01",
+              "event_id": "00000000-0000-4000-8000-000000000406",
+              "event_type": "frontend_exception",
+              "sdk_name": "@debugbundle/sdk-browser",
+              "sdk_version": "1.2.3",
+              "occurred_at": "2026-05-19T10:04:00.000Z",
+              "service": {
+                "name": "checkout-web",
+                "runtime": "browser",
+                "framework": "react",
+                "environment": "production"
+              },
+              "payload": {
+                "name": "TypeError",
+                "message": "Cannot read properties of undefined",
+                "stack": "TypeError: Cannot read properties of undefined\n    at CheckoutButton.tsx:12:5",
+                "route": "/checkout",
+                "browser": {
+                  "name": "Chrome",
+                  "version": "135.0.0"
+                }
+              }
+            }
+          ]
+        }
+      },
+      "expected": {
+        "status": 202,
+        "accepted": 1,
+        "rejected": 0,
+        "errors": []
+      },
+      "expectedEventFile": [
+        {
+          "schema_version": "2026-03-01",
+          "event_id": "00000000-0000-4000-8000-000000000406",
+          "event_type": "frontend_exception",
+          "sdk_name": "@debugbundle/sdk-browser",
+          "sdk_version": "1.2.3",
+          "occurred_at": "2026-05-19T10:04:00.000Z",
+          "service": {
+            "name": "checkout-web",
+            "runtime": "browser",
+            "framework": "react",
+            "environment": "production"
+          },
+          "payload": {
+            "name": "TypeError",
+            "message": "Cannot read properties of undefined",
+            "stack": "TypeError: Cannot read properties of undefined\n    at CheckoutButton.tsx:12:5",
+            "route": "/checkout",
+            "browser": {
+              "name": "Chrome",
+              "version": "135.0.0"
+            }
+          }
+        }
+      ],
+      "expectedDeliveredMarker": true
+    },
+    {
+      "id": "connected-cloud-forwarding",
+      "kind": "delivery",
+      "relayOptions": {
+        "projectMode": "connected",
+        "projectToken": "dbundle_proj_test",
+        "durableWrite": false,
+        "endpoint": "https://api.debugbundle.com/v1/events"
+      },
+      "request": {
+        "method": "POST",
+        "headers": {
+          "content-type": "application/json; charset=utf-8",
+          "host": "app.example.com",
+          "origin": "https://app.example.com"
+        },
+        "ipAddress": "203.0.113.18",
+        "bodyJson": {
+          "batch": [
+            {
+              "schema_version": "2026-03-01",
+              "event_id": "00000000-0000-4000-8000-000000000407",
+              "event_type": "frontend_exception",
+              "sdk_name": "@debugbundle/sdk-browser",
+              "sdk_version": "1.2.3",
+              "occurred_at": "2026-05-19T10:05:00.000Z",
+              "service": {
+                "name": "checkout-web",
+                "runtime": "browser",
+                "framework": "react",
+                "environment": "production"
+              },
+              "payload": {
+                "name": "TypeError",
+                "message": "Cannot read properties of undefined",
+                "stack": "TypeError: Cannot read properties of undefined\n    at CheckoutButton.tsx:12:5",
+                "route": "/checkout",
+                "browser": {
+                  "name": "Chrome",
+                  "version": "135.0.0"
+                }
+              }
+            }
+          ]
+        }
+      },
+      "expected": {
+        "status": 202,
+        "accepted": 1,
+        "rejected": 0,
+        "errors": []
+      },
+      "expectedForwardRequest": {
+        "events": [
+          {
+            "schema_version": "2026-03-01",
+            "event_id": "00000000-0000-4000-8000-000000000407",
+            "event_type": "frontend_exception",
+            "sdk_name": "@debugbundle/sdk-browser",
+            "sdk_version": "1.2.3",
+            "project_token": "dbundle_proj_test",
+            "occurred_at": "2026-05-19T10:05:00.000Z",
+            "service": {
+              "name": "checkout-web",
+              "runtime": "browser",
+              "framework": "react",
+              "environment": "production"
+            },
+            "payload": {
+              "name": "TypeError",
+              "message": "Cannot read properties of undefined",
+              "stack": "TypeError: Cannot read properties of undefined\n    at CheckoutButton.tsx:12:5",
+              "route": "/checkout",
+              "browser": {
+                "name": "Chrome",
+                "version": "135.0.0"
+              }
+            }
+          }
+        ]
+      }
+    }
+  ]
+}

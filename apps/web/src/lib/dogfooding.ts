@@ -130,7 +130,7 @@ export function initializeWebDogfooding(
     }
 
     sdk.init({
-      ...(config.projectToken === null ? {} : { projectToken: config.projectToken }),
+      ...(config.projectToken === null || isRelayEndpoint(config.endpoint) ? {} : { projectToken: config.projectToken }),
       endpoint: config.endpoint,
       environment: config.environment,
       service: config.service,

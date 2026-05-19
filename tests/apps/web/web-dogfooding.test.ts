@@ -119,7 +119,6 @@ describe("web dogfooding", () => {
     );
 
     expect(sdk.init).toHaveBeenCalledWith({
-      projectToken: "dbundle_proj_browser",
       endpoint: relayEndpoint,
       environment: "development",
       service: "debugbundle-web",
@@ -134,6 +133,28 @@ describe("web dogfooding", () => {
     expect(sdk.captureException).toHaveBeenCalledWith(expect.objectContaining({ message: "manual browser dogfood" }));
     expect(sdk.flush).toHaveBeenCalledOnce();
     expect(scheduledCallback).toBeNull();
+  });
+
+  it("keeps relay-mode dogfooding credentials out of browser sdk init", () => {
+    const sdk = {
+      init: vi.fn()
+    };
+    const target: DogfoodingWindowTarget = {
+      setTimeout: vi.fn()
+    };
+
+    initializeWebDogfooding(
+      {
+        DEV: true,
+        MODE: "development",
+        VITE_DEBUGBUNDLE_DOGFOOD_PROJECT_TOKEN: "dbundle_proj_browser",
+        VITE_DEBUGBUNDLE_DOGFOOD_ENDPOINT: "/debugbundle/browser"
+      },
+      target,
+      sdk
+    );
+
+    expect(sdk.init).toHaveBeenCalledWith(expect.not.objectContaining({ projectToken: expect.any(String) }));
   });
 
   it("does not expose the manual bridge when trigger access is disabled", () => {

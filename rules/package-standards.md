@@ -124,7 +124,7 @@ Every published `package.json` must include:
 name = "debugbundle-python"
 description = "DebugBundle SDK for Python — production debugging bundles for AI agents"
 license = "AGPL-3.0-only"
-requires-python = ">=3.9"
+requires-python = ">=3.10"
 keywords = ["debugbundle", "debugging", "ai-agent", "error-tracking"]
 classifiers = [
     "Framework :: Django",
@@ -134,9 +134,9 @@ classifiers = [
 ]
 
 [project.urls]
-Homepage = "https://debugbundle.com/docs/sdk-python"
-Repository = "https://github.com/debugbundle/debugbundle"
-Issues = "https://github.com/debugbundle/debugbundle/issues"
+Homepage = "https://debugbundle.com/docs/sdks/python"
+Repository = "https://github.com/debugbundle/debugbundle-python"
+Issues = "https://github.com/debugbundle/debugbundle-python/issues"
 ```
 
 ### Packagist (`composer.json`)
@@ -147,7 +147,7 @@ Issues = "https://github.com/debugbundle/debugbundle/issues"
   "description": "DebugBundle SDK for PHP — production debugging bundles for AI agents",
   "license": "AGPL-3.0-only",
   "type": "library",
-  "require": { "php": ">=8.1" },
+  "require": { "php": ">=8.2" },
   "autoload": { "psr-4": { "DebugBundle\\": "src/" } },
   "keywords": ["debugbundle", "debugging", "ai-agent", "error-tracking", "laravel", "symfony"]
 }
