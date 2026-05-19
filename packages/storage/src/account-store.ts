@@ -196,12 +196,26 @@ export function createPostgresAccountStore(db: Queryable): AccountLifecycleStore
         return typeof projectId === "string" ? [projectId] : [];
       });
 
+      const projectMembers = await queryProjectScopedRows(
+        db,
+        "project_members",
+        projectIds,
+        "created_at ASC, id ASC",
+        "project_members.*, project_members.id AS project_member_id",
+      );
       const projectTokens = await queryProjectScopedRows(
         db,
         "project_tokens",
         projectIds,
         "created_at ASC, id ASC",
         "project_tokens.*, project_tokens.id AS token_id",
+      );
+      const probeActivations = await queryProjectScopedRows(
+        db,
+        "probe_activations",
+        projectIds,
+        "created_at ASC, id ASC",
+        "probe_activations.*, probe_activations.id AS activation_id",
       );
       const capturePolicies = await queryProjectScopedRows(
         db,
@@ -228,6 +242,13 @@ export function createPostgresAccountStore(db: Queryable): AccountLifecycleStore
         "processed_events",
         projectIds,
         "processed_at ASC, event_id ASC",
+      );
+      const improvementOpportunities = await queryProjectScopedRows(
+        db,
+        "improvement_opportunities",
+        projectIds,
+        "created_at ASC, id ASC",
+        "improvement_opportunities.*, improvement_opportunities.id AS improvement_opportunity_id",
       );
       const incidents = await queryProjectScopedRows(
         db,
@@ -269,6 +290,20 @@ export function createPostgresAccountStore(db: Queryable): AccountLifecycleStore
         projectIds,
         "created_at ASC, id ASC",
         "alert_deliveries.*, alert_deliveries.id AS delivery_id",
+      );
+      const alertEmailDigests = await queryProjectScopedRows(
+        db,
+        "alert_email_digests",
+        projectIds,
+        "created_at ASC, id ASC",
+        "alert_email_digests.*, alert_email_digests.id AS digest_id",
+      );
+      const alertEmailDigestItems = await queryProjectScopedRows(
+        db,
+        "alert_email_digest_items",
+        projectIds,
+        "created_at ASC, id ASC",
+        "alert_email_digest_items.*, alert_email_digest_items.id AS digest_item_id",
       );
       const weeklyReportChannels = await queryProjectScopedRows(
         db,
@@ -340,6 +375,27 @@ export function createPostgresAccountStore(db: Queryable): AccountLifecycleStore
               [projectIds],
             );
 
+      const improvementOpportunityEvents =
+        projectIds.length === 0
+          ? []
+          : await queryJsonRows(
+              db,
+              `
+                SELECT to_jsonb(t) AS data
+                FROM (
+                  SELECT
+                    improvement_opportunity_events.*,
+                    improvement_opportunities.project_id
+                  FROM improvement_opportunity_events
+                  JOIN improvement_opportunities
+                    ON improvement_opportunities.id = improvement_opportunity_events.improvement_opportunity_id
+                  WHERE improvement_opportunities.project_id = ANY($1::uuid[])
+                  ORDER BY improvement_opportunity_events.occurred_at ASC, improvement_opportunity_events.event_id ASC
+                ) t
+              `,
+              [projectIds],
+            );
+
       const githubInstallations = await queryJsonRows(
         db,
         `
@@ -382,6 +438,14 @@ export function createPostgresAccountStore(db: Queryable): AccountLifecycleStore
         [input.organization_id],
       );
 
+      const operationalEmailDeliveries = await queryProjectScopedRows(
+        db,
+        "operational_email_deliveries",
+        projectIds,
+        "created_at ASC, id ASC",
+        "operational_email_deliveries.*, operational_email_deliveries.id AS delivery_id",
+      );
+
       const auditLogs = await queryJsonRows(
         db,
         `
@@ -397,24 +461,31 @@ export function createPostgresAccountStore(db: Queryable): AccountLifecycleStore
       );
 
       return {
+        export_version: 1,
         exported_at: input.exported_at,
         user,
         organization,
         members,
+        project_members: projectMembers,
         project_invites: projectInvites,
         member_tokens: memberTokens,
         projects,
         project_tokens: projectTokens,
+        probe_activations: probeActivations,
         capture_policies: capturePolicies,
         services,
         deployments,
         processed_events: processedEvents,
+        improvement_opportunities: improvementOpportunities,
+        improvement_opportunity_events: improvementOpportunityEvents,
         incidents,
         incident_events: incidentEvents,
         bundle_generations: bundleGenerations,
         alert_rules: alertRules,
         slack_destinations: slackDestinations,
         alert_deliveries: alertDeliveries,
+        alert_email_digests: alertEmailDigests,
+        alert_email_digest_items: alertEmailDigestItems,
         weekly_report_channels: weeklyReportChannels,
         weekly_report_deliveries: weeklyReportDeliveries,
         agent_webhooks: agentWebhooks,
@@ -425,6 +496,7 @@ export function createPostgresAccountStore(db: Queryable): AccountLifecycleStore
         github_dispatch_deliveries: githubDispatchDeliveries,
         org_usage_counters: orgUsageCounters,
         processed_billing_events: processedBillingEvents,
+        operational_email_deliveries: operationalEmailDeliveries,
         audit_logs: auditLogs,
         artifacts: {
           raw_events: [],

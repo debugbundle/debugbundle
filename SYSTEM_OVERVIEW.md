@@ -154,7 +154,7 @@ apps/
       slack-app.ts           — Slack OAuth state/cookie, redirect handling, and code exchange helpers
       openapi.ts             — API-owned OpenAPI 3.1 generator reused by the site/ artifact pipeline
       stripe-config.ts       — Stripe client factory, price-to-plan mapping, billing state derivation
-      default-dependencies.ts — Dependency composition (wires storage/auth/queue, including account export artifact assembly + project-object cleanup on account deletion, queued webhook tests, dynamic Stripe checkout/portal sessions, and Stripe-backed capacity mutations)
+      default-dependencies.ts — Dependency composition (wires storage/auth/queue, including account export artifact assembly for retained raw events, failure bundles, improvement bundles, and reproductions; project-object cleanup on account deletion; queued webhook tests; dynamic Stripe checkout/portal sessions; and Stripe-backed capacity mutations)
       audit-logging.ts       — Fail-open audit log recording with actor-type resolution and request IP hashing
       runtime.ts             — Server bootstrap and graceful shutdown (conditionally wires Stripe webhook when env vars present)
       main.ts                — Entry point
@@ -183,7 +183,7 @@ packages/
       types.ts               — All storage type definitions and interfaces
       helpers.ts             — Object key builders, token hashing
       auth-store.ts          — Postgres auth persistence (account creation, passwords, sessions, verification/reset tokens, and session auth-method flags)
-      account-store.ts       — Postgres account export and account-deletion lifecycle persistence
+      account-store.ts       — Postgres account export aggregation for retained organization/project records and account-deletion lifecycle persistence
       integration-secret-crypto.ts — Shared encryption/decryption helpers for stored integration secrets such as Slack webhook URLs
       metadata-store.ts      — Postgres metadata store (incidents, projects, tokens, probes, alerts)
       slack-destination-store.ts — Postgres reusable Slack destination CRUD and worker delivery-secret lookup

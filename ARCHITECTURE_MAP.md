@@ -245,7 +245,7 @@ The public documentation/marketing/blog site lives in the standalone public repo
   - `stripe-config.ts` — Stripe client factory, price-to-plan mapping, billing state derivation, entitlement eligibility checks
   - `billing-slot-management.ts` — Stripe subscription state loading, projected billing summary computation, subscription-item quantity building for immediate allowance-capacity increases, and subscription-schedule phase building for deferred allowance-capacity reductions
   - `billing-links.ts` — env-based static billing URL fallback when Stripe API is not configured
-  - `default-dependencies.ts` — dependency composition including account export artifact hydration, project-object cleanup on account deletion, dynamic Stripe checkout session, customer portal creation, projected billing summaries, and Stripe-backed allowance-capacity mutations
+  - `default-dependencies.ts` — dependency composition including account export artifact hydration for retained raw events, failure bundles, improvement bundles, and reproductions; project-object cleanup on account deletion; dynamic Stripe checkout session; customer portal creation; projected billing summaries; and Stripe-backed allowance-capacity mutations
   - shared client packages under `packages/*-client` — thin typed HTTP adapters reused by CLI and MCP parity flows; billing allowance-capacity management uses `packages/billing-client`
   - `runtime.ts` — server bootstrap, graceful shutdown, and conditional Stripe webhook wiring (creates separate connection pool for billing sync)
 
@@ -300,7 +300,7 @@ The public documentation/marketing/blog site lives in the standalone public repo
   - `types.ts` — all storage type definitions and interfaces
   - `helpers.ts` — object key builders, token hashing
   - `auth-store.ts` — Postgres account creation, password credential, session, one-time token persistence, and session auth-method flags
-  - `account-store.ts` — Postgres account export aggregation and destructive account-deletion lifecycle persistence
+  - `account-store.ts` — Postgres account export aggregation for retained organization/project records and destructive account-deletion lifecycle persistence
   - `integration-secret-crypto.ts` — shared encryption/decryption helpers for stored integration secrets such as Slack webhook URLs
   - `metadata-store.ts` — Postgres metadata store (account membership, explicit project ownership + `project_members`, invite-token-backed `project_invites`, invite cancellation/acceptance, project list/create + tokens, incidents, probes, deployments, alerts, weekly-report aggregation, incident-event retention reasons)
   - `improvement-opportunity-store.ts` — Postgres hosted improvement automation persistence (project execution settings lookup, deterministic warning-hotspot/slow-request/request-failure opportunity storage, incident-derived opportunity storage with `related_incident_ids`, improvement-event sampling, improvement bundle generation reservation/failure tracking, retained-bundle-cap pruning for improvement/incident owners)

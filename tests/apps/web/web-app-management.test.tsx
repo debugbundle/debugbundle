@@ -513,7 +513,13 @@ describe("web app — management routes", () => {
 
       if (url.endsWith("/v1/projects") && init?.method === undefined) {
         return jsonResponse(200, {
-          projects: [createProject()]
+          projects: [
+            createProject({
+              relationship: "shared",
+              sharing_state: "shared_with_you",
+              effective_role: "member"
+            })
+          ]
         });
       }
 
@@ -1887,7 +1893,13 @@ describe("web app — management routes", () => {
 
       if (url.endsWith("/v1/projects") && init?.method === undefined) {
         return jsonResponse(200, {
-          projects: [createProject()]
+          projects: [
+            createProject({
+              relationship: "shared",
+              sharing_state: "shared_with_you",
+              effective_role: "member"
+            })
+          ]
         });
       }
 
@@ -1897,6 +1909,7 @@ describe("web app — management routes", () => {
             createAlert(),
             createAlert({
               alert_id: "alert_456",
+              created_by_user_id: "usr_999",
               channel: "webhook",
               condition_type: "error_spike",
               severity_min: "high"
@@ -1915,6 +1928,8 @@ describe("web app — management routes", () => {
     expect(await screen.findByText(/new incident/i)).toBeInTheDocument();
     expect(await screen.findByText(/error spike/i)).toBeInTheDocument();
     expect(screen.getByText(/high/i)).toBeInTheDocument();
+    expect(screen.getByText(/^-$/)).toBeInTheDocument();
+    expect(screen.queryByText(/only the creator or a project admin can delete this rule/i)).not.toBeInTheDocument();
   });
 
   it("deletes a project alert rule from the web route", async () => {

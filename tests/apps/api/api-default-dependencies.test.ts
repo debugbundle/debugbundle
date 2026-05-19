@@ -84,6 +84,8 @@ vi.mock("pg", () => {
 vi.mock("../../../packages/storage/src/index.js", () => ({
   buildRawEventObjectKey: ({ projectId, eventId }: { projectId: string; eventId: string }) => `events/${projectId}/${eventId}.json.gz`,
   buildBundleObjectKey: (projectId: string, incidentId: string) => `bundles/${projectId}/${incidentId}.json.gz`,
+  buildImprovementBundleObjectKey: (projectId: string, opportunityId: string) =>
+    `improvement-bundles/${projectId}/${opportunityId}.json.gz`,
   buildReproductionObjectKey: (projectId: string, incidentId: string) => `reproductions/${projectId}/${incidentId}.json.gz`,
   buildBundleRegenerationLeaseKey: (incidentId: string) => `leases:bundle-regeneration:${incidentId}`,
   createRedisQueueClient: createRedisQueueClientMock,
@@ -1355,18 +1357,35 @@ describe("api default dependencies", () => {
   it("should enrich account exports with stored artifacts and error fallbacks", async (): Promise<void> => {
     createPostgresAccountStoreMock.mockReturnValue({
       exportAccountForOrganization: vi.fn().mockResolvedValue({
+        export_version: 1,
         exported_at: "2026-03-20T00:00:00.000Z",
         user: { user_id: "usr_123" },
         organization: { organization_id: "org_123" },
         members: [],
+        project_members: [],
         project_invites: [],
         member_tokens: [],
         projects: [],
         project_tokens: [],
+        probe_activations: [],
         capture_policies: [],
         services: [],
         deployments: [],
         processed_events: [],
+        improvement_opportunities: [
+          {
+            improvement_opportunity_id: "imp_123",
+            project_id: "proj_123",
+            bundle_generation_number: 1
+          }
+        ],
+        improvement_opportunity_events: [
+          {
+            event_id: "evt_imp_123",
+            project_id: "proj_123",
+            occurred_at: "2026-03-20T00:01:00.000Z"
+          }
+        ],
         incidents: [{ incident_id: "inc_123", project_id: "proj_123" }],
         incident_events: [
           {
@@ -1381,10 +1400,20 @@ describe("api default dependencies", () => {
         audit_logs: [],
         alert_rules: [],
         alert_deliveries: [],
+        alert_email_digests: [],
+        alert_email_digest_items: [],
         weekly_report_channels: [],
         weekly_report_deliveries: [],
         webhooks: [],
-        webhook_deliveries: []
+        webhook_deliveries: [],
+        agent_webhooks: [],
+        github_installations: [],
+        project_github_repos: [],
+        github_dispatch_rules: [],
+        github_dispatch_deliveries: [],
+        org_usage_counters: [],
+        processed_billing_events: [],
+        operational_email_deliveries: []
       }),
       deleteAccountForOrganization: vi.fn()
     });
@@ -1394,7 +1423,9 @@ describe("api default dependencies", () => {
       getObject: vi
         .fn()
         .mockResolvedValueOnce(gzipSync(Buffer.from(JSON.stringify({ event: "raw" }))))
+        .mockResolvedValueOnce(gzipSync(Buffer.from(JSON.stringify({ event: "improvement-raw" }))))
         .mockResolvedValueOnce(Buffer.from("invalid-gzip"))
+        .mockResolvedValueOnce(gzipSync(Buffer.from(JSON.stringify({ bundle_type: "improvement" }))))
         .mockRejectedValueOnce(new Error("s3_object_not_found")),
       deleteObjectsByPrefix: vi.fn()
     };
@@ -1412,8 +1443,8 @@ describe("api default dependencies", () => {
       })
     ).resolves.toMatchObject({
       artifacts: {
-        raw_events: [{ content: { event: "raw" } }],
-        bundles: [{ content: { error: "artifact_invalid" } }],
+        raw_events: [{ content: { event: "raw" } }, { content: { event: "improvement-raw" } }],
+        bundles: [{ content: { error: "artifact_invalid" } }, { content: { bundle_type: "improvement" } }],
         reproductions: [{ content: { error: "artifact_not_found" } }]
       }
     });

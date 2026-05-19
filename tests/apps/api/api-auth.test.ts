@@ -1349,6 +1349,7 @@ describe("account routes backed by browser auth", () => {
   it("exports account data for owner browser sessions", async (): Promise<void> => {
     const accountManagement = {
       exportAccountForOrganization: vi.fn().mockResolvedValue({
+        export_version: 1,
         exported_at: "2026-04-06T00:00:00.000Z",
         user: { user_id: "usr_123" },
         organization: { organization_id: "org_123" },
@@ -1404,6 +1405,7 @@ describe("account routes backed by browser auth", () => {
     expect(response.statusCode).toBe(200);
     expect(response.json()).toEqual(
       expect.objectContaining({
+        export_version: 1,
         exported_at: "2026-04-06T00:00:00.000Z",
         organization: { organization_id: "org_123" }
       })

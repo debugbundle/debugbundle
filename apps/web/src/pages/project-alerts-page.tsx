@@ -613,7 +613,7 @@ export function ProjectAlertsPage(): JSX.Element {
                             </AlertDialogContent>
                           </AlertDialog>
                         ) : (
-                          <span className="text-sm text-muted-foreground">Only the creator or a project admin can delete this rule.</span>
+                          <span className="text-sm text-muted-foreground">-</span>
                         )}
                       </TableCell>
                     </TableRow>

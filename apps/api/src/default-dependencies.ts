@@ -29,6 +29,7 @@ import { buildPostgresSslConfig } from "../../../packages/storage/src/postgres-s
 import {
   buildBundleObjectKey,
   buildBundleRegenerationLeaseKey,
+  buildImprovementBundleObjectKey,
   buildRawEventObjectKey,
   buildReproductionObjectKey,
   buildUserAvatarObjectKey,
@@ -279,13 +280,15 @@ async function buildAccountExportArtifacts(
   exportData: {
     incidents: Record<string, unknown>[];
     incident_events: Record<string, unknown>[];
+    improvement_opportunities: Record<string, unknown>[];
+    improvement_opportunity_events: Record<string, unknown>[];
   },
 ): Promise<{
   raw_events: Array<{ key: string; content: unknown }>;
   bundles: Array<{ key: string; content: unknown }>;
   reproductions: Array<{ key: string; content: unknown }>;
 }> {
-  const rawEventRefs = exportData.incident_events.flatMap((record) => {
+  const rawEventRefs = new Set(exportData.incident_events.flatMap((record) => {
     if (!getBooleanField(record, "is_sampled")) {
       return [];
     }
@@ -304,7 +307,24 @@ async function buildAccountExportArtifacts(
         occurredAt: new Date(occurredAt),
       }),
     ];
-  });
+  }));
+
+  for (const record of exportData.improvement_opportunity_events) {
+    const projectId = getStringField(record, "project_id");
+    const eventId = getStringField(record, "event_id");
+    const occurredAt = getStringField(record, "occurred_at");
+    if (projectId === null || eventId === null || occurredAt === null) {
+      continue;
+    }
+
+    rawEventRefs.add(
+      buildRawEventObjectKey({
+        projectId,
+        eventId,
+        occurredAt: new Date(occurredAt),
+      }),
+    );
+  }
 
   const incidentRefs = exportData.incidents.flatMap((record) => {
     const projectId = getStringField(record, "project_id");
@@ -321,8 +341,22 @@ async function buildAccountExportArtifacts(
     ];
   });
 
-  const raw_events = await Promise.all(rawEventRefs.map((key) => readStoredJsonArtifact(objectStoreReader, key)));
-  const bundles = await Promise.all(incidentRefs.map((record) => readStoredJsonArtifact(objectStoreReader, record.bundleKey)));
+  const improvementBundleRefs = exportData.improvement_opportunities.flatMap((record) => {
+    const projectId = getStringField(record, "project_id");
+    const opportunityId = getStringField(record, "improvement_opportunity_id");
+    const generationNumber = Number(record["bundle_generation_number"] ?? 0);
+    if (projectId === null || opportunityId === null || generationNumber <= 0) {
+      return [];
+    }
+
+    return [buildImprovementBundleObjectKey(projectId, opportunityId)];
+  });
+
+  const raw_events = await Promise.all([...rawEventRefs].map((key) => readStoredJsonArtifact(objectStoreReader, key)));
+  const bundles = await Promise.all([
+    ...incidentRefs.map((record) => readStoredJsonArtifact(objectStoreReader, record.bundleKey)),
+    ...improvementBundleRefs.map((key) => readStoredJsonArtifact(objectStoreReader, key)),
+  ]);
   const reproductions = await Promise.all(
     incidentRefs.map((record) => readStoredJsonArtifact(objectStoreReader, record.reproductionKey)),
   );

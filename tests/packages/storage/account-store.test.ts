@@ -41,8 +41,14 @@ describe("postgres account store", () => {
       if (sqlText.includes("FROM projects")) {
         return rowsResult([{ data: { project_id: "proj_123", name: "Main App" } }]);
       }
+      if (sqlText.includes("FROM project_members")) {
+        return rowsResult([{ data: { project_member_id: "pm_123", project_id: "proj_123", user_id: "usr_456" } }]);
+      }
       if (sqlText.includes("FROM project_tokens")) {
         return rowsResult([{ data: { token_id: "proj_tok_123", project_id: "proj_123" } }]);
+      }
+      if (sqlText.includes("FROM probe_activations")) {
+        return rowsResult([{ data: { activation_id: "probe_123", project_id: "proj_123" } }]);
       }
       if (sqlText.includes("FROM capture_policies")) {
         return rowsResult([{ data: { project_id: "proj_123", preset: "balanced" } }]);
@@ -55,6 +61,9 @@ describe("postgres account store", () => {
       }
       if (sqlText.includes("FROM processed_events")) {
         return rowsResult([{ data: { project_id: "proj_123", event_id: "evt_123" } }]);
+      }
+      if (sqlText.includes("FROM improvement_opportunities") && !sqlText.includes("JOIN improvement_opportunities")) {
+        return rowsResult([{ data: { improvement_opportunity_id: "imp_123", project_id: "proj_123" } }]);
       }
       if (sqlText.includes("FROM incidents") && !sqlText.includes("JOIN incidents ON")) {
         return rowsResult([{ data: { incident_id: "inc_123", project_id: "proj_123" } }]);
@@ -70,6 +79,12 @@ describe("postgres account store", () => {
       }
       if (sqlText.includes("FROM alert_deliveries")) {
         return rowsResult([{ data: { delivery_id: "alert_delivery_123", project_id: "proj_123" } }]);
+      }
+      if (sqlText.includes("FROM alert_email_digests")) {
+        return rowsResult([{ data: { digest_id: "aed_123", project_id: "proj_123" } }]);
+      }
+      if (sqlText.includes("FROM alert_email_digest_items")) {
+        return rowsResult([{ data: { digest_item_id: "aedi_123", project_id: "proj_123" } }]);
       }
       if (sqlText.includes("FROM weekly_report_channels")) {
         return rowsResult([{ data: { weekly_report_channel_id: "wrc_123", project_id: "proj_123" } }]);
@@ -95,6 +110,9 @@ describe("postgres account store", () => {
       if (sqlText.includes("FROM incident_events")) {
         return rowsResult([{ data: { incident_id: "inc_123", project_id: "proj_123", event_id: "evt_123", is_sampled: true } }]);
       }
+      if (sqlText.includes("FROM improvement_opportunity_events")) {
+        return rowsResult([{ data: { improvement_opportunity_id: "imp_123", project_id: "proj_123", event_id: "evt_imp_123" } }]);
+      }
       if (sqlText.includes("FROM github_installations")) {
         return rowsResult([{ data: { github_installation_id: "ghi_123", organization_id: "org_123" } }]);
       }
@@ -103,6 +121,9 @@ describe("postgres account store", () => {
       }
       if (sqlText.includes("FROM processed_billing_events")) {
         return rowsResult([{ data: { organization_id: "org_123", event_id: "bill_123" } }]);
+      }
+      if (sqlText.includes("FROM operational_email_deliveries")) {
+        return rowsResult([{ data: { delivery_id: "op_email_123", organization_id: "org_123", project_id: "proj_123" } }]);
       }
       if (sqlText.includes("FROM audit_logs")) {
         return rowsResult([{ data: { audit_log_id: "audit_123", organization_id: "org_123" } }]);
@@ -121,12 +142,20 @@ describe("postgres account store", () => {
 
     expect(result).toEqual(
       expect.objectContaining({
+        export_version: 1,
         exported_at: "2026-04-06T00:00:00.000Z",
         user: expect.objectContaining({ user_id: "usr_123" }),
         organization: expect.objectContaining({ organization_id: "org_123" }),
         projects: [expect.objectContaining({ project_id: "proj_123" })],
+        project_members: [expect.objectContaining({ project_member_id: "pm_123" })],
+        probe_activations: [expect.objectContaining({ activation_id: "probe_123" })],
+        improvement_opportunities: [expect.objectContaining({ improvement_opportunity_id: "imp_123" })],
+        improvement_opportunity_events: [expect.objectContaining({ event_id: "evt_imp_123" })],
         incidents: [expect.objectContaining({ incident_id: "inc_123" })],
         incident_events: [expect.objectContaining({ event_id: "evt_123" })],
+        alert_email_digests: [expect.objectContaining({ digest_id: "aed_123" })],
+        alert_email_digest_items: [expect.objectContaining({ digest_item_id: "aedi_123" })],
+        operational_email_deliveries: [expect.objectContaining({ delivery_id: "op_email_123" })],
         artifacts: {
           raw_events: [],
           bundles: [],

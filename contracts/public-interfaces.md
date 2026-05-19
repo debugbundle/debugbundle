@@ -186,7 +186,7 @@ When GitHub sign-in returns a profile image URL, the API may fetch and cache tha
 
 The CLI bootstrap flow is additive and issues the same member-token credential used by normal CLI/MCP auth. `POST /v1/auth/github/device/start` plus `poll`/`claim` implement the official GitHub device flow. `POST /v1/auth/github/token/exchange` accepts an already-authenticated GitHub access token such as the output of `gh auth token`.
 
-`GET /v1/account/export` returns a JSON attachment covering the retained organization-account record set, including members, projects, tokens, reusable Slack destinations, incidents, audit logs, billing-processing rows, and retained raw-event, bundle, and reproduction artifacts when present in object storage.
+`GET /v1/account/export` returns a JSON attachment with top-level `export_version: 1` plus the retained organization-account record set, including organization and project members, projects, tokens, capture policies, probes, hosted improvement opportunities, reusable Slack destinations, alerts, weekly reports, webhooks, GitHub automation, incidents, audit logs, billing-processing rows, operational email rows, and retained raw-event, bundle, improvement-bundle, and reproduction artifacts when present in object storage.
 
 `GET /v1/account/avatar` returns the signed-in user's cached avatar bytes with a first-party URL shape of `/v1/account/avatar`. `POST /v1/account/avatar/import-gravatar` performs a server-side fetch against Gravatar only after explicit user action, stores the resulting avatar in object storage, and returns:
 

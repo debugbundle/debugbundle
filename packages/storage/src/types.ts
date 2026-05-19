@@ -270,24 +270,31 @@ export interface AccountStoredArtifactRecord extends Record<string, unknown> {
 }
 
 export interface AccountDataExportRecord extends Record<string, unknown> {
+  export_version: 1;
   exported_at: string;
   user: Record<string, unknown>;
   organization: Record<string, unknown>;
   members: Record<string, unknown>[];
+  project_members: Record<string, unknown>[];
   project_invites: Record<string, unknown>[];
   member_tokens: Record<string, unknown>[];
   projects: Record<string, unknown>[];
   project_tokens: Record<string, unknown>[];
+  probe_activations: Record<string, unknown>[];
   capture_policies: Record<string, unknown>[];
   services: Record<string, unknown>[];
   deployments: Record<string, unknown>[];
   processed_events: Record<string, unknown>[];
+  improvement_opportunities: Record<string, unknown>[];
+  improvement_opportunity_events: Record<string, unknown>[];
   incidents: Record<string, unknown>[];
   incident_events: Record<string, unknown>[];
   bundle_generations: Record<string, unknown>[];
   alert_rules: Record<string, unknown>[];
   slack_destinations: Record<string, unknown>[];
   alert_deliveries: Record<string, unknown>[];
+  alert_email_digests: Record<string, unknown>[];
+  alert_email_digest_items: Record<string, unknown>[];
   weekly_report_channels: Record<string, unknown>[];
   weekly_report_deliveries: Record<string, unknown>[];
   agent_webhooks: Record<string, unknown>[];
@@ -298,6 +305,7 @@ export interface AccountDataExportRecord extends Record<string, unknown> {
   github_dispatch_deliveries: Record<string, unknown>[];
   org_usage_counters: Record<string, unknown>[];
   processed_billing_events: Record<string, unknown>[];
+  operational_email_deliveries: Record<string, unknown>[];
   audit_logs: Record<string, unknown>[];
   artifacts: {
     raw_events: AccountStoredArtifactRecord[];
