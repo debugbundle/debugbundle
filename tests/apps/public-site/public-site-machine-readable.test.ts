@@ -1,39 +1,11 @@
 import { describe, expect, it } from 'vitest';
 
 import { SESSION_COOKIE_NAME } from '../../../packages/auth/src/index.js';
-import { ALERT_MCP_TOOL_NAMES } from '../../../apps/mcp/src/alert-tools.js';
-import { ANALYZE_MCP_TOOL_NAMES } from '../../../apps/mcp/src/analyze-tools.js';
-import { BILLING_MCP_TOOL_NAMES } from '../../../apps/mcp/src/billing-tools.js';
-import { CAPTURE_POLICY_MCP_TOOL_NAMES } from '../../../apps/mcp/src/capture-policy-tools.ts';
-import { GITHUB_MCP_TOOL_NAMES } from '../../../apps/mcp/src/github-tools.js';
-import { MEMBER_MCP_TOOL_NAMES } from '../../../apps/mcp/src/member-tools.js';
-import { PROBE_MCP_TOOL_NAMES } from '../../../apps/mcp/src/probe-tools.js';
-import { PROJECT_MCP_TOOL_NAMES } from '../../../apps/mcp/src/project-tools.js';
-import { RETRIEVAL_MCP_TOOL_NAMES } from '../../../apps/mcp/src/retrieval-tools.js';
-import { SERVICE_MCP_TOOL_NAMES } from '../../../apps/mcp/src/services-tools.js';
-import { SETUP_MCP_TOOL_NAMES } from '../../../apps/mcp/src/setup-tools.js';
-import { TOKEN_MCP_TOOL_NAMES } from '../../../apps/mcp/src/token-tools.js';
-import { WEBHOOK_MCP_TOOL_NAMES } from '../../../apps/mcp/src/webhook-tools.js';
-import { WEEKLY_REPORT_MCP_TOOL_NAMES } from '../../../apps/mcp/src/weekly-report-tools.js';
+import { MCP_TOOL_NAMES } from '../../../apps/mcp/src/tool-catalog.js';
 import { buildMachineReadableArtifacts } from '../../../scripts/public-site-artifacts.ts';
 import { BundleV1Schema } from '../../../packages/shared-types/src/index.js';
 
-const EXPECTED_MCP_TOOL_NAMES = [
-  ...SETUP_MCP_TOOL_NAMES,
-  ...ANALYZE_MCP_TOOL_NAMES,
-  ...RETRIEVAL_MCP_TOOL_NAMES,
-  ...TOKEN_MCP_TOOL_NAMES,
-  ...WEBHOOK_MCP_TOOL_NAMES,
-  ...WEEKLY_REPORT_MCP_TOOL_NAMES,
-  ...ALERT_MCP_TOOL_NAMES,
-  ...PROJECT_MCP_TOOL_NAMES,
-  ...SERVICE_MCP_TOOL_NAMES,
-  ...BILLING_MCP_TOOL_NAMES,
-  ...PROBE_MCP_TOOL_NAMES,
-  ...CAPTURE_POLICY_MCP_TOOL_NAMES,
-  ...GITHUB_MCP_TOOL_NAMES,
-  ...MEMBER_MCP_TOOL_NAMES,
-].sort();
+const EXPECTED_MCP_TOOL_NAMES = [...MCP_TOOL_NAMES].sort();
 
 describe('public site machine-readable artifacts', () => {
   it('publishes the first source-backed schema and example artifacts', async () => {
@@ -189,12 +161,23 @@ describe('public site machine-readable artifacts', () => {
 
     expect(lines[0]).toBe('# DebugBundle');
     expect(content).toContain('Primary docs: https://debugbundle.com/docs/');
-    expect(content).toContain('- Core concepts: https://debugbundle.com/docs/v1/overview/');
-    expect(content).toContain('- API reference: https://debugbundle.com/docs/v1/api/');
-    expect(content).toContain('- CLI reference: https://debugbundle.com/docs/v1/cli/');
-    expect(content).toContain('- MCP reference: https://debugbundle.com/docs/v1/mcp/');
-    expect(content).toContain('- Webhook events: https://debugbundle.com/docs/v1/webhooks/');
+    expect(content).toContain('- Quickstart: https://debugbundle.com/docs/quickstart/');
+    expect(content).toContain('- Installation: https://debugbundle.com/docs/installation/');
+    expect(content).toContain('- Local-only mode: https://debugbundle.com/docs/project-setup/local-only/');
+    expect(content).toContain('- Connect to Cloud: https://debugbundle.com/docs/project-setup/connect-to-cloud/');
+    expect(content).toContain('- SDK overview: https://debugbundle.com/docs/sdks/');
+    expect(content).toContain('- Browser relay: https://debugbundle.com/docs/sdks/browser-relay/');
+    expect(content).toContain('- WordPress integration: https://debugbundle.com/docs/integrations/wordpress/');
+    expect(content).toContain('- CLI local workflow: https://debugbundle.com/docs/cli/local-workflow/');
+    expect(content).toContain('- CLI cloud workflow: https://debugbundle.com/docs/cli/cloud-workflow/');
+    expect(content).toContain('- API overview: https://debugbundle.com/docs/api/');
+    expect(content).toContain('- MCP tools: https://debugbundle.com/docs/mcp/tools/');
+    expect(content).toContain('- GitHub automation: https://debugbundle.com/docs/agent-workflows/automation-recipes/');
     expect(content).toContain('- Agent workflows: https://debugbundle.com/docs/agent-workflows/');
+    expect(content).toContain('- Reference index: https://debugbundle.com/docs/v1/reference/');
+    expect(content).toContain('- API endpoints: https://debugbundle.com/docs/v1/reference/api-endpoints/');
+    expect(content).toContain('- CLI commands: https://debugbundle.com/docs/v1/reference/cli-commands/');
+    expect(content).toContain('- MCP tools reference: https://debugbundle.com/docs/v1/reference/mcp-tools/');
     expect(content).toContain('- OpenAPI: https://debugbundle.com/openapi.json');
     expect(content).toContain('- Bundle schema: https://debugbundle.com/schemas/bundle.json');
     expect(content).toContain('- Webhook events schema: https://debugbundle.com/schemas/webhook-events.json');
@@ -202,5 +185,6 @@ describe('public site machine-readable artifacts', () => {
     expect(content).toContain('- MCP tools schema: https://debugbundle.com/schemas/mcp-tools.json');
     expect(content).toContain('- Failure bundle example: https://debugbundle.com/examples/bundle.failure.json');
     expect(content).toContain('- Improvement bundle example: https://debugbundle.com/examples/bundle.improvement.json');
+    expect(content).toContain('- Prefer MCP tools when the environment exposes the DebugBundle MCP server.');
   });
 });
