@@ -31,6 +31,7 @@ Every SDK must unit-test the following behaviors by **mocking the HTTP transport
 | Vanilla hooks | Language-native error/exception hooks capture correctly |
 | Log capture | Logger integration captures at configured level; auto-detection works |
 | Framework integrations | Middleware/handlers capture request metadata, unhandled errors, response status |
+| Browser relay handlers | Server SDK relay handlers validate origin, content type, body size, event type, trust fields, rate limits, local-only file writes, connected durable spool, connected cloud forwarding, and credential isolation per `contracts/sdk-interface.md` §13 |
 | Probes | Always-on probe buffers in ring buffer, flushes with errors; heavy probe dormant until remote activation |
 | Config polling (paid tiers) | Polls `/v1/sdk/config` at configured interval; caches with ETag/304; deactivates expired remote probes |
 | Capture policy | Respects `GET /v1/sdk/config` capture-policy directives (mode, overrides) per `contracts/sdk-interface.md` §12 |
@@ -50,6 +51,25 @@ Each SDK must include a test suite that validates compliance against `contracts/
 2. **Universal interface existence** — Assert all 9 core methods exist and accept the documented parameter signatures.
 3. **Safety invariants** — Assert `INV-2` (SDK never crashes host): invalid config, null inputs, network failures, and malformed server responses all result in silent degradation.
 4. **Redaction contract** — Default sensitive fields list matches `contracts/sdk-interface.md` §6.
+5. **Relay parity contract** — Server SDKs with backend framework integrations must pass the shared browser relay compliance fixtures for all supported V1 adapters. Foundation-only callback handlers must not be marked full relay-compatible.
+
+### Relay Compliance Fixtures
+
+All V1 server SDKs that expose browser relay handlers must share a fixture suite covering:
+
+- valid browser batch,
+- mixed valid and invalid browser events,
+- credential-smuggling payloads containing browser-supplied `project_token`, `organization_id`, and auth headers,
+- wrong-origin and missing-origin requests,
+- unsupported content type,
+- oversized body,
+- per-IP rate limiting,
+- local-only file write shape,
+- connected durable spool write and retained-undelivered behavior,
+- connected cloud forwarding with server-side project credentials only,
+- framework adapter routing for each V1 framework in `spec/sdk-language-targets.md`.
+
+The expected local file and spool shape must be language-neutral so `debugbundle process` and `debugbundle doctor --check-relay` can consume relay artifacts without knowing which SDK wrote them.
 
 ### Tier 3 — Integration Tests (optional, CI-only)
 

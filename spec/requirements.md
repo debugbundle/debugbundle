@@ -522,7 +522,7 @@ This ensures Free behaves as **failure-first, not telemetry-first**.
 
 ### 1.12 Browser Relay
 
-**FR-REL-01:** The Node.js SDK must provide a browser relay handler as subpath exports (`@debugbundle/sdk-node/relay`, `@debugbundle/sdk-node/relay/express`, `@debugbundle/sdk-node/relay/fastify`, `@debugbundle/sdk-node/relay/nextjs`) that accepts browser-originated events via a same-origin `POST /debugbundle/browser` endpoint on the user's own backend.
+**FR-REL-01:** Every V1 server SDK or integration surface with backend framework support must provide a full browser relay handler that accepts browser-originated events via a same-origin `POST /debugbundle/browser` endpoint on the user's own backend. V1 required surfaces are Node.js (Express, Fastify, Next.js), Python (Django, Flask, FastAPI), PHP (Laravel, Symfony), and the WordPress plugin REST relay. Node.js must expose the relay as subpath exports (`@debugbundle/sdk-node/relay`, `@debugbundle/sdk-node/relay/express`, `@debugbundle/sdk-node/relay/fastify`, `@debugbundle/sdk-node/relay/nextjs`). Other SDKs must expose equivalent language-idiomatic handlers and framework adapters.
 
 **FR-REL-02:** The relay handler must validate incoming payloads against a strict schema, accepting only known browser event types: `frontend_exception`, `error_suppressed`, `frontend_breadcrumb`, `request_event`, `probe_event`. Unknown event types and unknown fields must be rejected/stripped.
 
@@ -536,11 +536,11 @@ This ensures Free behaves as **failure-first, not telemetry-first**.
 
 **FR-REL-07:** The relay handler must apply per-IP rate limiting. Default: 60 requests per minute per IP. Configurable via `rateLimitPerMinute` option. Requests exceeding the limit must return `429`.
 
-**FR-REL-08:** In local-only mode (Node SDK `projectMode: "local-only"`), the relay must write validated browser events to `.debugbundle/local/events/` using the same atomic file transport and naming convention as the Node SDK file transport (`<timestamp>-<sequence>-<service>.events.json`).
+**FR-REL-08:** In local-only mode, every full relay handler must write validated browser events to `.debugbundle/local/events/` using the same atomic file transport and naming convention as the Node SDK file transport (`<timestamp>-<sequence>-<service>.events.json`).
 
-**FR-REL-09:** In connected mode, the relay must default to durable delivery: write browser events to `.debugbundle/local/browser-relay-spool/` before forwarding to DebugBundle cloud. Spool files survive cloud failures for retry/manual recovery. A `durableWrite: false` option enables low-latency forwarding without local spool.
+**FR-REL-09:** In connected mode, every full relay handler must default to durable delivery: write browser events to `.debugbundle/local/browser-relay-spool/` before forwarding to DebugBundle cloud. Spool files survive cloud failures for retry/manual recovery. A `durableWrite: false` option, or language-idiomatic equivalent, enables low-latency forwarding without local spool.
 
-**FR-REL-10:** The relay must implement credential isolation: the browser must never send DebugBundle cloud credentials. The relay attaches `project_token` and auth headers server-side when forwarding to cloud. For local-only relay, no cloud credentials are needed.
+**FR-REL-10:** Every relay handler must implement credential isolation: the browser must never send DebugBundle cloud credentials. The relay attaches `project_token` and auth headers server-side when forwarding to cloud. For local-only relay, no cloud credentials are needed.
 
 **FR-REL-11:** The browser SDK must determine its transport mode from the `endpoint` configuration value. A relative path (e.g., `/debugbundle/browser`) triggers relay mode with no `Authorization` header. An absolute URL triggers direct-to-cloud mode with `projectToken`. No `endpoint` + `projectToken` defaults to direct-to-cloud. No `endpoint` + no `projectToken` disables the SDK.
 
@@ -548,7 +548,7 @@ This ensures Free behaves as **failure-first, not telemetry-first**.
 
 **FR-REL-13:** Connected relay spool retention: delivered spool files pruned after 24 hours (default). Undelivered spool files retained for 7 days (default, configurable). `debugbundle doctor --check-relay` must report undelivered spool file counts and ages.
 
-**FR-REL-14:** `debugbundle setup` must detect backend frameworks (Express, Fastify, Next.js) and scaffold the relay route when the user's project includes both backend and browser SDKs.
+**FR-REL-14:** `debugbundle setup` must detect supported backend frameworks and scaffold or print exact relay-route instructions when the user's project includes both backend and browser SDKs. V1 detection must support Express, Fastify, and Next.js. Python, PHP, and WordPress SDK docs or setup helpers must provide equivalent copy-paste relay wiring until CLI framework detection covers those ecosystems.
 
 ### 1.19 GitHub Repository Automation
 

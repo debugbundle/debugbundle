@@ -1,7 +1,7 @@
 # SDK Interface Contract — DebugBundle
 
 Version: v1
-Last updated: 2026-03-27
+Last updated: 2026-05-19
 
 This contract defines the standard interface that ALL DebugBundle SDKs must implement, regardless of language. It ensures behavioral consistency across Node.js, browser, Python, PHP, Go, Ruby, and all future language SDKs.
 
@@ -869,7 +869,7 @@ SDKs do not assign `event_class` — that is the responsibility of the event-nor
 
 ---
 
-## 13. Browser Relay Handler (Server-SDK Responsibility)
+## 13. Browser Relay Handler Parity (Server-SDK Responsibility)
 
 Server-side SDKs that support backend frameworks must provide relay handler adapters for receiving browser SDK events via a same-origin endpoint. This enables CSP-compatible, ad-blocker-resistant, privacy-preserving browser event capture without requiring the browser SDK to communicate directly with DebugBundle cloud.
 
@@ -877,11 +877,24 @@ Server-side SDKs that support backend frameworks must provide relay handler adap
 **Acceptance criteria:** `AC-REL-01` through `AC-REL-10` in `/spec/acceptance.md`
 **Phase:** 13a (Browser SDK Relay & Durable Delivery) in `/spec/implementation-roadmap.md`
 
-### 13.1 Why Relay Is a Server-SDK Concern
+### 13.1 Compatibility Terms
+
+Use these terms consistently in contracts, docs, release notes, and parity matrices:
+
+| Term | Meaning |
+|------|---------|
+| Full relay handler | Server SDK implements request validation, sanitization, framework adapters, local-only file writes, connected durable spool writes, connected cloud forwarding, credential isolation, and relay diagnostics using this contract. |
+| Relay foundation | Server SDK validates and sanitizes relay requests but leaves delivery to caller-owned callbacks or custom code. This is not full relay parity. |
+| Relay client path | Browser SDK sends events to a same-origin relay endpoint. The Browser SDK is not a backend relay handler. |
+| Integration relay | Platform integration, such as WordPress, composes a server SDK relay path into a concrete framework or CMS route. |
+
+Only a full relay handler may be marked as relay-handler compatible for V1. Foundation-only SDKs may be documented as manual relay integration helpers, but must not be presented as complete relay parity.
+
+### 13.2 Why Relay Is a Server-SDK Concern
 
 The relay handler runs on the user's backend and bridges browser events into the same event pipeline that the server SDK uses. It shares the server SDK's file transport, configuration, and credentials. Therefore, relay is a subpath export of the server SDK package, not a separate dependency.
 
-### 13.2 Transport Selection (Browser SDK Side)
+### 13.3 Transport Selection (Browser SDK Side)
 
 The browser SDK determines its transport from the `endpoint` config value:
 
@@ -895,7 +908,7 @@ The browser SDK determines its transport from the `endpoint` config value:
 
 The browser SDK wire format is identical regardless of transport mode. Only the target URL and auth header presence differ.
 
-### 13.3 Relay Handler Contract
+### 13.4 Relay Handler Contract
 
 **Route:** `POST /debugbundle/browser`
 
@@ -907,10 +920,15 @@ The browser SDK wire format is identical regardless of transport mode. Only the 
 {
   "batch": [
     {
+      "schema_version": "2026-03-01",
+      "event_id": "uuid-v4",
       "event_type": "frontend_exception",
+      "sdk_version": "0.1.0",
       "occurred_at": "ISO8601",
-      "service": "checkout-web",
-      "environment": "production",
+      "service": {
+        "name": "checkout-web",
+        "environment": "production"
+      },
       "correlation": { "trace_id": "uuid-v4" },
       "payload": { }
     }
@@ -923,16 +941,16 @@ The browser SDK wire format is identical regardless of transport mode. Only the 
 | Status | Body | Meaning |
 |--------|------|---------|
 | 202 | `{ "accepted": N, "rejected": 0, "errors": [] }` | Events processed |
-| 400 | `{ "accepted": 0, "rejected": N, "errors": ["..."] }` | Validation failure |
+| 400 | `{ "accepted": N, "rejected": M, "errors": ["..."] }` | Validation failure; valid events in the same batch may already be accepted |
 | 413 | — | Request body exceeds 256 KB limit |
 | 403 | — | Origin validation failed |
 | 429 | — | Rate limited |
 
-### 13.4 Security Requirements (Mandatory)
+### 13.5 Security Requirements (Mandatory)
 
 All relay implementations must enforce these security controls:
 
-1. **Origin validation:** Validate `Origin` header (fallback: `Referer`) against a configured allowlist. Default: same-origin derived from `Host` header. Reject `403` on mismatch.
+1. **Origin validation:** Validate `Origin` header (fallback: `Referer`) against a configured allowlist. Default: same-origin derived from `Host` header. Framework adapters may use a trusted forwarded host only when the host framework already treats that forwarded host as trusted. Reject `403` on mismatch.
 2. **Content-Type enforcement:** Reject requests without `Content-Type: application/json`. This ensures browsers trigger CORS preflight, preventing simple cross-origin form submissions.
 3. **Payload size limit:** Hard limit 256 KB per request body. Reject `413` on overflow.
 4. **Schema validation:** Only known event types accepted. Unknown fields stripped.
@@ -947,7 +965,35 @@ All relay implementations must enforce these security controls:
 7. **Rate limiting:** Default 60 requests per minute per IP. Configurable via `rateLimitPerMinute`.
 8. **Credential isolation:** Browser never sends DebugBundle cloud credentials. Relay attaches credentials server-side when forwarding to cloud.
 
-### 13.5 Wire Format Alignment (Invariant)
+### 13.6 Delivery Requirements (Mandatory for Full Relay Handlers)
+
+Full relay handlers must implement these delivery modes without requiring caller-owned callbacks:
+
+| Mode | Behavior | Write destination |
+|------|----------|-------------------|
+| Local-only | Write validated events to local events directory | `.debugbundle/local/events/` |
+| Connected (durable) | Write to spool, then forward to cloud. Spool survives cloud failures. | `.debugbundle/local/browser-relay-spool/` |
+| Connected (low-latency) | Forward to cloud without local spool. `durableWrite: false` or the language-idiomatic equivalent. | No local write |
+
+Default: connected durable (`durableWrite: true`). Local-only mode is selected by the server SDK's project-mode setting or language-idiomatic equivalent.
+
+All full relay handlers must support language-idiomatic equivalents for these options:
+
+| Option | Meaning |
+|--------|---------|
+| `projectMode` | `connected` or `local-only` delivery selection. |
+| `projectToken` | Server-side project token used only for connected forwarding. |
+| `endpoint` | Cloud or self-host ingestion endpoint for connected forwarding. |
+| `localEventsDir` | Destination for local-only relay event files. |
+| `spoolDir` | Destination for connected durable relay spool files. |
+| `durableWrite` | Whether connected mode writes to spool before forwarding. Defaults to true. |
+| `service` | Optional relay-level service override. |
+| `environment` | Optional relay-level environment override. |
+| `rateLimitPerMinute` | Per-IP relay request limit. Defaults to 60. |
+
+The handler may still expose an `onAccept` callback for instrumentation or custom extension, but callback-only delivery is a relay foundation, not full relay parity.
+
+### 13.7 Wire Format Alignment (Invariant)
 
 Relay-written event files must use the **same format and naming convention** as the server SDK file transport:
 
@@ -957,23 +1003,13 @@ Relay-written event files must use the **same format and naming convention** as 
 
 This ensures `debugbundle process` handles browser-originated and backend-originated event files identically. The only distinction is `event_type` and `sdk_name` inside the envelope.
 
-### 13.6 Cross-Context Correlation (Invariant)
+### 13.8 Cross-Context Correlation (Invariant)
 
 The browser SDK attaches `correlation.trace_id` (UUID v4) to events. The relay must preserve this field without modification. Backend SDK middleware reads the same `X-DebugBundle-Trace-Id` header from incoming requests. When both browser and backend events share a `trace_id`, `debugbundle process` links them into a single full-stack incident bundle.
 
 The relay must never strip, overwrite, or regenerate `correlation.trace_id`.
 
-### 13.7 Relay Modes
-
-| Mode | Behavior | Write destination |
-|------|----------|-------------------|
-| Local-only | Write validated events to local events directory | `.debugbundle/local/events/` |
-| Connected (durable) | Write to spool, then forward to cloud. Spool survives cloud failures. | `.debugbundle/local/browser-relay-spool/` |
-| Connected (low-latency) | Forward to cloud without local spool. `durableWrite: false`. | No local write |
-
-Default: connected durable (`durableWrite: true`). Local-only mode is selected when the Node SDK's `projectMode` is `"local-only"`.
-
-### 13.8 Packaging
+### 13.9 Packaging
 
 Relay handlers are subpath exports of the server SDK package:
 
@@ -999,15 +1035,23 @@ app.register(debugBundleRelayPlugin);
 export { debugBundleRelay as POST } from '@debugbundle/sdk-node/relay/nextjs';
 ```
 
-### 13.9 Multi-Language Requirement
+### 13.10 Multi-Language Requirement
 
 Any server-side SDK that provides framework integrations must also provide relay handler adapters following the same contract. The relay request/response schema, security requirements, wire format, and correlation invariant are language-agnostic and must be implemented consistently.
 
+For V1, full relay parity applies to the shipped server SDK and integration surfaces:
+
+| Surface | Required relay adapters or route |
+|---------|----------------------------------|
+| Node.js SDK | Express middleware, Fastify plugin, Next.js route handler |
+| Python SDK | Django middleware, Flask route, FastAPI endpoint |
+| PHP SDK | Laravel middleware, Symfony controller |
+| WordPress plugin | WordPress REST route that composes the PHP relay behavior and adds WordPress-appropriate persistent rate limiting/spool handling |
+
+Future server SDKs must implement the same full relay handler contract before they are marked relay-handler compatible:
+
 | SDK | Relay adapters |
 |-----|---------------|
-| Node.js | Express, Fastify, Next.js |
-| Python | Django middleware, Flask route, FastAPI endpoint |
-| PHP | Laravel middleware, Symfony controller |
 | Go | `net/http` handler |
 | Ruby | Rack middleware, Rails engine |
 | Java | Spring Boot filter |

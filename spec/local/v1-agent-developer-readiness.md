@@ -53,7 +53,7 @@ This closes the earlier product gap where a handled production 5xx could be user
 | Agent entry points | MCP exposes setup, retrieval, analyze, probes, services, alerts, webhooks, projects, tokens, capture policy, GitHub, members, billing | Strong |
 | Agent explanation | Bundles, matched fields, deterministic `incident_reason`, reproduction artifacts, logs, local `analyze`, and one-call incident context via CLI/MCP/API | Strong |
 | Privacy and redaction | shared redaction, SDK sanitizer, browser privacy hardening, data schema redaction block, plus first-run CLI/MCP privacy preview | Strong |
-| SDK parity | Node.js, Browser, Python, and PHP parity is now visible in the published V1 matrix and aligns on 5xx capture preservation and relay acceptance | Strong |
+| SDK parity | Node.js, Browser, Python, and PHP parity is visible in the published V1 matrix and aligns on 5xx capture preservation. Full relay handler parity across Node.js, Python, PHP, and WordPress is tracked separately in `spec/local/v1-sdk-relay-parity-plan.md` so foundation-only relay support is not mistaken for V1 completion. | Strong for request-failure parity; relay parity planned |
 
 ## Resolved V1 Gaps
 

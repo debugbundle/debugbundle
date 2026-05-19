@@ -1247,7 +1247,7 @@ If CLI says something is healthy and MCP says something different, that is a pro
 ## 24. Browser Relay Acceptance
 
 ### AC-REL-01: Local-Only Relay End-to-End
-- **Given** a full-stack app with `@debugbundle/sdk-browser` configured with `endpoint: '/debugbundle/browser'` and `@debugbundle/sdk-node` relay handler mounted at `POST /debugbundle/browser` in local-only mode
+- **Given** a full-stack app with `@debugbundle/sdk-browser` configured with `endpoint: '/debugbundle/browser'` and any V1 full relay handler mounted at `POST /debugbundle/browser` in local-only mode
 - **When** a `frontend_exception` occurs in the browser
 - **Then** the browser SDK sends the event to the same-origin relay endpoint
 - **And** the relay writes a valid event file to `.debugbundle/local/events/`
@@ -1308,6 +1308,12 @@ If CLI says something is healthy and MCP says something different, that is a pro
 - **When** a `frontend_exception` occurs
 - **Then** the browser SDK sends directly to DebugBundle cloud (no relay involved)
 - **And** the `Authorization` header includes the project token
+
+### AC-REL-11: V1 Relay Parity Matrix
+- **Given** the shared relay compliance fixtures for a valid browser batch, mixed valid/invalid batch, credential-smuggling payload, wrong-origin request, missing-origin request, oversized body, rate-limit sequence, local-only write, connected durable spool, and connected cloud forwarding
+- **When** the Node.js, Python, PHP, and WordPress relay surfaces run their applicable fixture suites
+- **Then** all full relay handler surfaces produce equivalent status codes, accepted/rejected counts, sanitized event envelopes, file formats, spool behavior, and cloud-forwarding request shapes
+- **And** a server SDK that only exposes callback-based acceptance without built-in local-only, durable spool, and cloud-forwarding delivery is marked as relay foundation rather than full relay handler parity
 
 ---
 
