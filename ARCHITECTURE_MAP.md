@@ -146,7 +146,7 @@ The `debugbundle-js` repo now consumes published `@debugbundle/shared-types` and
 
 ### Non-TypeScript SDKs
 
-All non-TS SDKs implement the same universal SDK interface (`init`, `captureException`, `captureError`, `captureLog`, `captureRequest`, `captureMessage`, `setContext`, `flush`, `probe`) with language-idiomatic naming. See `contracts/sdk-interface.md` for the full contract and `spec/sdk-language-targets.md` for the rollout plan.
+All non-TS SDKs implement the same universal SDK interface (`init`, `captureException`, `captureError`, `captureLog`, `captureRequest`, `captureMessage`, `setContext`, `flush`, `probe`) with language-idiomatic naming. See `contracts/sdk-interface.md` for the full contract and `spec/sdk-language-targets.md` for the rollout plan. V1 relay parity requires Python, PHP, and WordPress to move beyond relay foundations: each full relay-compatible surface must validate/sanitize browser batches, preserve correlation, isolate credentials, write local-only event files, write connected durable spool files, and forward connected events with server-side credentials using the shared relay contract.
 
 All non-TypeScript SDKs live in separate repositories under `github.com/debugbundle/`, each with its own language-native toolchain, CI pipeline, and independent release cycle.
 
@@ -158,6 +158,7 @@ All non-TypeScript SDKs live in separate repositories under `github.com/debugbun
 |-----|-----------|-----------------|------------|
 | Python | `github.com/debugbundle/debugbundle-python` | PyPI (`debugbundle-python`) | Django, Flask, FastAPI |
 | PHP | `github.com/debugbundle/debugbundle-php` | Packagist (`debugbundle/sdk-php`) | Laravel, Symfony |
+| WordPress | `github.com/debugbundle/debugbundle-wordpress` | WordPress.org plugin + GitHub releases | WordPress plugin wrapper over PHP SDK + browser SDK relay |
 
 **Deferred until further notice:**
 

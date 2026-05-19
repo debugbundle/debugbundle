@@ -19,11 +19,11 @@ DebugBundle captures production failures from backend and browser applications, 
 - API, CLI, and MCP parity for retrieval, lifecycle, and automation workflows.
 - Local-first onboarding with connected cloud upgrade paths.
 - Self-hostable Compose stack for hosted-parity development and evaluation.
-- SDK coverage for Node and browser now, with Python and PHP tracked in-repo pre-launch.
+- SDK coverage for Node, browser, Python, and PHP, plus an official WordPress plugin integration.
 
 ## Quick Start
 
-1. Install the SDK you need in your app: `npm install @debugbundle/sdk-node` for backend services or `npm install @debugbundle/sdk-browser` for browser apps.
+1. Install the SDK you need in your app: `npm install @debugbundle/sdk-node` for backend services, `npm install @debugbundle/sdk-browser` for browser apps, `pip install debugbundle-python`, `composer require debugbundle/sdk-php`, or the DebugBundle WordPress plugin for WordPress sites.
 2. Initialize the SDK with your project token, service name, environment, and DebugBundle endpoint. See `examples/express-basic/`, `examples/fastify-basic/`, and `examples/nextjs-basic/` for minimal working setups.
 3. Trigger a sample error in your app, or use one of the example routes to emit an incident.
 4. Run `debugbundle setup --non-interactive` anywhere you want CLI access to the project.

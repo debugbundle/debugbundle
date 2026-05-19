@@ -17,12 +17,14 @@ site/
 .tmp/
 /STATUS.md
 /TODO.md
-spec/local/
+spec/local/*
+!spec/local/v1-sdk-relay-parity-plan.md
 
 # SDK clone roots (managed by scripts/bootstrap-sdks.sh)
 sdks/debugbundle-js/
 sdks/debugbundle-python/
 sdks/debugbundle-php/
+sdks/debugbundle-wordpress/
 sdks/debugbundle-action/
 
 # DebugBundle (managed by debugbundle setup)

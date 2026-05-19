@@ -11,12 +11,13 @@ This document defines the language and platform targets for DebugBundle SDK impl
 
 The goal is not just to pick the most popular languages overall, but to prioritize the ecosystems where DebugBundle is most likely to deliver strong value:
 
-- production backends,
-- SaaS applications,
-- API-heavy products,
-- client/server debugging correlation,
-- crash and exception workflows,
-- environments where developers need more than isolated logs.
+- production backends
+- SaaS applications
+- API-heavy products
+- client/server debugging correlation
+- crash and exception workflows
+- CMS platforms with high install friction
+- environments where developers need more than isolated logs
 
 ---
 
@@ -237,8 +238,12 @@ DebugBundle can be useful here because many PHP issues are workflow-level produc
 
 ### Future framework targets (post-V1)
 
-- WordPress, Drupal, Magento (CMS-platform integrations — different adoption motion, best suited for community contributions)
+- Drupal, Magento (CMS-platform integrations — different adoption motion, best suited for community contributions)
 - Slim, Laminas (niche frameworks)
+
+### Official CMS integration
+
+- **WordPress** now lives as a dedicated plugin repository at `github.com/debugbundle/debugbundle-wordpress`. It wraps `debugbundle/sdk-php` plus the browser SDK relay path rather than becoming a separate PHP SDK framework adapter.
 
 ### Implementation notes
 
@@ -472,6 +477,7 @@ Flutter creates a useful expansion path into cross-platform mobile and multi-pla
 - TypeScript / JavaScript
 - Python
 - PHP
+- WordPress plugin
 
 ### Why
 
@@ -737,7 +743,7 @@ For the next phase of SDK implementation, DebugBundle should prioritize these tw
 
 ### Practical rollout interpretation
 
-- **Immediate implementation focus (Wave 1):** TS/JS (shipped), Python, PHP
+- **Immediate implementation focus (Wave 1):** TS/JS (shipped), Python, PHP, WordPress plugin
 - **Deferred until further notice:** Go, Ruby
 - **Next depth layer (Wave 2):** Java, C#, Kotlin server, Rust
 - **Strategic product expansion (Wave 3):** Kotlin Android, Swift iOS, React Native, Dart/Flutter
@@ -751,7 +757,8 @@ Each SDK ships with 1–3 first-class framework integrations. Additional framewo
 | Node.js | Express, Fastify, Next.js | NestJS, Hono, Remix, Astro, edge runtimes |
 | Python | Django, Flask, FastAPI | Celery, RQ, Dramatiq, Starlette, Lambda |
 | Go | net/http, Gin, Echo | Fiber, Chi, gRPC, Go kit, Lambda |
-| PHP | Laravel, Symfony | WordPress, Drupal, Magento (community) |
+| PHP | Laravel, Symfony | Drupal, Magento (community) |
+| WordPress plugin | Backend PHP capture, frontend browser capture, REST relay | Network-wide settings, deeper admin diagnostics |
 | Ruby | Rails, Rack, Sidekiq | Sinatra, Hanami, Resque, Delayed Job |
 | Java | Spring Boot | Spring WebFlux, Micronaut, Quarkus |
 | C# | ASP.NET Core | Blazor, Azure Functions, Worker Services |
