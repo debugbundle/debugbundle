@@ -97,6 +97,7 @@ describe("web app — management routes", () => {
     expect(screen.getByRole("tab", { name: /overview/i })).toBeInTheDocument();
     expect(screen.getByRole("tab", { name: /incidents/i })).toBeInTheDocument();
     expect(screen.getByRole("tab", { name: /bundles/i })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: /probes/i })).toBeInTheDocument();
     expect(screen.getByRole("tab", { name: /alerts/i })).toBeInTheDocument();
     expect(screen.getByRole("tab", { name: /webhooks/i })).toBeInTheDocument();
     expect(screen.getByRole("tab", { name: /github/i })).toBeInTheDocument();
@@ -152,10 +153,14 @@ describe("web app — management routes", () => {
 
     render(<App initialEntries={["/incidents"]} />);
 
-    expect(await screen.findByRole("heading", { name: /incidents/i, level: 1 })).toBeInTheDocument();
+    expect(
+      await screen.findByRole("heading", { name: /incidents/i, level: 1 })
+    ).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /incidents/i })).toHaveAttribute("href", "/incidents");
     expect(screen.getByRole("combobox", { name: /status/i })).toHaveTextContent(/^open$/i);
-    expect(await screen.findByText(/request anomaly: get \/checkout\/:orderid returned 404 repeatedly/i)).toBeInTheDocument();
+    expect(
+      await screen.findByText(/request anomaly: get \/checkout\/:orderid returned 404 repeatedly/i)
+    ).toBeInTheDocument();
     expect(screen.queryByText(/database timeout during signin/i)).toBeNull();
     expect((await screen.findAllByRole("link", { name: /main app/i })).length).toBeGreaterThan(0);
     expect((await screen.findAllByText(/^checkout-api$/i)).length).toBeGreaterThan(0);
@@ -163,9 +168,13 @@ describe("web app — management routes", () => {
     expect(screen.queryByText(/^svc_123$/i)).toBeNull();
     expect(screen.getByText(/^high$/i)).toBeInTheDocument();
     expect(
-      screen.getByText("Request anomaly threshold crossed. Grouped by route template, HTTP method, and HTTP status.")
+      screen.getByText(
+        "Request anomaly threshold crossed. Grouped by route template, HTTP method, and HTTP status."
+      )
     ).toBeInTheDocument();
-    expect(screen.queryByText(/request_anomaly, route_template, http_method, http_status/i)).toBeNull();
+    expect(
+      screen.queryByText(/request_anomaly, route_template, http_method, http_status/i)
+    ).toBeNull();
     const incidentTable = screen.getByRole("table");
     expect(within(incidentTable).getByText(/^open$/i)).toBeInTheDocument();
     expect(screen.getByText(/7 occurrences/i)).toBeInTheDocument();
@@ -271,7 +280,9 @@ describe("web app — management routes", () => {
 
     render(<App initialEntries={["/incidents"]} />);
 
-    expect(await screen.findByRole("heading", { name: /incidents/i, level: 1 })).toBeInTheDocument();
+    expect(
+      await screen.findByRole("heading", { name: /incidents/i, level: 1 })
+    ).toBeInTheDocument();
     expect(await screen.findByText(/no open incidents/i)).toBeInTheDocument();
     expect(screen.getByText(/incoming open incidents will appear here/i)).toBeInTheDocument();
   });
@@ -309,11 +320,14 @@ describe("web app — management routes", () => {
           "Content-Type": "application/json",
           "X-CSRF-Token": "csrf-token-123"
         });
-        expect(init.body).toBe(JSON.stringify({
-          name: "Ops API",
-          slug: "ops-api",
-          environment_default: "staging"
-        }));
+        expect(init.body).toBe(
+          JSON.stringify({
+            name: "Ops API",
+            slug: "ops-api",
+            environment_default: "staging",
+            weekly_report_timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC"
+          })
+        );
 
         const createdProject = createProject({
           project_id: "proj_456",
@@ -394,11 +408,14 @@ describe("web app — management routes", () => {
       }
 
       if (url.endsWith("/v1/projects") && init?.method === "POST") {
-        expect(init.body).toBe(JSON.stringify({
-          name: "Ops Platform",
-          slug: "ops-control-plane",
-          environment_default: "preview"
-        }));
+        expect(init.body).toBe(
+          JSON.stringify({
+            name: "Ops Platform",
+            slug: "ops-control-plane",
+            environment_default: "preview",
+            weekly_report_timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC"
+          })
+        );
 
         const createdProject = createProject({
           project_id: "proj_789",
@@ -513,13 +530,7 @@ describe("web app — management routes", () => {
 
       if (url.endsWith("/v1/projects") && init?.method === undefined) {
         return jsonResponse(200, {
-          projects: [
-            createProject({
-              relationship: "shared",
-              sharing_state: "shared_with_you",
-              effective_role: "member"
-            })
-          ]
+          projects: [createProject()]
         });
       }
 
@@ -529,7 +540,10 @@ describe("web app — management routes", () => {
         });
       }
 
-      if (url.endsWith("/v1/projects/proj_123/tokens/proj_tok_123/revoke") && init?.method === "POST") {
+      if (
+        url.endsWith("/v1/projects/proj_123/tokens/proj_tok_123/revoke") &&
+        init?.method === "POST"
+      ) {
         expect(init.credentials).toBe("include");
         return jsonResponse(200, { success: true });
       }
@@ -549,7 +563,9 @@ describe("web app — management routes", () => {
     await waitFor(() => {
       expect(
         fetchMock.mock.calls.some(
-          ([input, init]) => requestUrl(input).endsWith("/v1/projects/proj_123/tokens/proj_tok_123/revoke") && init?.method === "POST"
+          ([input, init]) =>
+            requestUrl(input).endsWith("/v1/projects/proj_123/tokens/proj_tok_123/revoke") &&
+            init?.method === "POST"
         )
       ).toBe(true);
     });
@@ -588,7 +604,9 @@ describe("web app — management routes", () => {
     render(<App initialEntries={["/projects/proj_123/tokens"]} />);
 
     expect(await screen.findByText(/no project tokens yet/i)).toBeInTheDocument();
-    expect(screen.getByText(/connect an sdk or environment-specific deploy flow/i)).toBeInTheDocument();
+    expect(
+      screen.getByText(/connect an sdk or environment-specific deploy flow/i)
+    ).toBeInTheDocument();
     expect(screen.getAllByRole("button", { name: /create project token/i }).length).toBe(2);
   });
 
@@ -673,7 +691,10 @@ describe("web app — management routes", () => {
         });
       }
 
-      if (url.endsWith("/v1/github/installation?project_id=proj_123") && init?.method === undefined) {
+      if (
+        url.endsWith("/v1/github/installation?project_id=proj_123") &&
+        init?.method === undefined
+      ) {
         return jsonResponse(200, {
           installation: createGitHubInstallation()
         });
@@ -685,7 +706,10 @@ describe("web app — management routes", () => {
         });
       }
 
-      if (url.endsWith("/v1/github/repositories?project_id=proj_123") && init?.method === undefined) {
+      if (
+        url.endsWith("/v1/github/repositories?project_id=proj_123") &&
+        init?.method === undefined
+      ) {
         return jsonResponse(200, {
           repositories: [createGitHubRepository()]
         });
@@ -703,7 +727,10 @@ describe("web app — management routes", () => {
         });
       }
 
-      if (url.endsWith("/v1/projects/proj_123/github/deliveries?limit=20") && init?.method === undefined) {
+      if (
+        url.endsWith("/v1/projects/proj_123/github/deliveries?limit=20") &&
+        init?.method === undefined
+      ) {
         return jsonResponse(200, {
           deliveries: [
             createGitHubDispatchDelivery(),
@@ -721,7 +748,10 @@ describe("web app — management routes", () => {
         });
       }
 
-      if (url.endsWith("/v1/projects/proj_123/github/deliveries/gdd_123/retry") && init?.method === "POST") {
+      if (
+        url.endsWith("/v1/projects/proj_123/github/deliveries/gdd_123/retry") &&
+        init?.method === "POST"
+      ) {
         return jsonResponse(200, {
           delivery: createGitHubDispatchDelivery({
             status: "retrying",
@@ -755,10 +785,16 @@ describe("web app — management routes", () => {
 
     expect(failedRow).toBeDefined();
     expect(deliveredRow).toBeDefined();
-    expect(within(failedRow as HTMLTableRowElement).getByRole("button", { name: /retry delivery/i })).toBeInTheDocument();
-    expect(within(deliveredRow as HTMLTableRowElement).queryByRole("button", { name: /retry delivery/i })).toBeNull();
+    expect(
+      within(failedRow as HTMLTableRowElement).getByRole("button", { name: /retry delivery/i })
+    ).toBeInTheDocument();
+    expect(
+      within(deliveredRow as HTMLTableRowElement).queryByRole("button", { name: /retry delivery/i })
+    ).toBeNull();
 
-    await user.click(within(failedRow as HTMLTableRowElement).getByRole("button", { name: /retry delivery/i }));
+    await user.click(
+      within(failedRow as HTMLTableRowElement).getByRole("button", { name: /retry delivery/i })
+    );
 
     await waitFor(() => {
       expect(
@@ -788,13 +824,19 @@ describe("web app — management routes", () => {
         });
       }
 
-      if (url.endsWith("/v1/github/installation?project_id=proj_123") && init?.method === undefined) {
+      if (
+        url.endsWith("/v1/github/installation?project_id=proj_123") &&
+        init?.method === undefined
+      ) {
         return jsonResponse(200, {
           installation: createGitHubInstallation()
         });
       }
 
-      if (url.endsWith("/v1/github/repositories?project_id=proj_123") && init?.method === undefined) {
+      if (
+        url.endsWith("/v1/github/repositories?project_id=proj_123") &&
+        init?.method === undefined
+      ) {
         return jsonResponse(200, {
           repositories: [createGitHubRepository()]
         });
@@ -810,13 +852,19 @@ describe("web app — management routes", () => {
         return jsonResponse(200, { rules: [] });
       }
 
-      if (url.endsWith("/v1/projects/proj_123/github/deliveries?limit=20") && init?.method === undefined) {
+      if (
+        url.endsWith("/v1/projects/proj_123/github/deliveries?limit=20") &&
+        init?.method === undefined
+      ) {
         return jsonResponse(200, { deliveries: [] });
       }
 
       if (url.endsWith("/v1/projects/proj_123/github/rules") && init?.method === "POST") {
-        expect(init.body).toBeDefined();
-        expect(JSON.parse(String(init.body))).toEqual(
+        const requestBody = init.body;
+        if (typeof requestBody !== "string") {
+          throw new Error("expected GitHub dispatch rule request body");
+        }
+        expect(JSON.parse(requestBody)).toEqual(
           expect.objectContaining({
             name: "Hosted improvements",
             event_types: ["improvement_bundle.created"],
@@ -845,13 +893,17 @@ describe("web app — management routes", () => {
 
     render(<App initialEntries={["/projects/proj_123/github"]} />);
 
-    expect(await screen.findByText(/no github dispatch rules are configured yet/i)).toBeInTheDocument();
+    expect(
+      await screen.findByText(/no github dispatch rules are configured yet/i)
+    ).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: /create rule/i }));
     await user.type(screen.getByLabelText(/^rule name$/i), "Hosted improvements");
     await chooseSelectOption(user, /event type/i, /^improvement_bundle\.created$/i);
     expect(screen.queryByLabelText(/incident state/i)).toBeNull();
-    expect(screen.getByText(/hosted improvement bundle rules always use new_or_reopened/i)).toBeInTheDocument();
+    expect(
+      screen.getByText(/hosted improvement bundle rules always use new_or_reopened/i)
+    ).toBeInTheDocument();
     await chooseSelectOption(user, /minimum severity/i, /^medium$/i);
     await user.clear(screen.getByLabelText(/cooldown seconds/i));
     await user.type(screen.getByLabelText(/cooldown seconds/i), "600");
@@ -876,7 +928,10 @@ describe("web app — management routes", () => {
         });
       }
 
-      if (url.endsWith("/v1/github/installation?project_id=proj_123") && init?.method === undefined) {
+      if (
+        url.endsWith("/v1/github/installation?project_id=proj_123") &&
+        init?.method === undefined
+      ) {
         return jsonResponse(200, {
           installation: createGitHubInstallation({ status: "suspended" })
         });
@@ -888,7 +943,10 @@ describe("web app — management routes", () => {
         });
       }
 
-      if (url.endsWith("/v1/github/repositories?project_id=proj_123") && init?.method === undefined) {
+      if (
+        url.endsWith("/v1/github/repositories?project_id=proj_123") &&
+        init?.method === undefined
+      ) {
         return jsonResponse(200, {
           repositories: [createGitHubRepository()]
         });
@@ -906,7 +964,10 @@ describe("web app — management routes", () => {
         });
       }
 
-      if (url.endsWith("/v1/projects/proj_123/github/deliveries?limit=20") && init?.method === undefined) {
+      if (
+        url.endsWith("/v1/projects/proj_123/github/deliveries?limit=20") &&
+        init?.method === undefined
+      ) {
         return jsonResponse(200, {
           deliveries: []
         });
@@ -920,7 +981,9 @@ describe("web app — management routes", () => {
     render(<App initialEntries={["/projects/proj_123/github"]} />);
 
     expect(await screen.findByText(/github connection lost/i)).toBeInTheDocument();
-    expect(screen.getByText(/dispatches are paused until the installation is active again/i)).toBeInTheDocument();
+    expect(
+      screen.getByText(/dispatches are paused until the installation is active again/i)
+    ).toBeInTheDocument();
     const reconnectLink = screen.getByRole("link", { name: /reconnect github app/i });
     expect(reconnectLink).toHaveAttribute(
       "href",
@@ -945,7 +1008,10 @@ describe("web app — management routes", () => {
         });
       }
 
-      if (url.endsWith("/v1/github/installation?project_id=proj_123") && init?.method === undefined) {
+      if (
+        url.endsWith("/v1/github/installation?project_id=proj_123") &&
+        init?.method === undefined
+      ) {
         return jsonResponse(200, { installation: null });
       }
 
@@ -963,7 +1029,10 @@ describe("web app — management routes", () => {
         return jsonResponse(200, { rules: [] });
       }
 
-      if (url.endsWith("/v1/projects/proj_123/github/deliveries?limit=20") && init?.method === undefined) {
+      if (
+        url.endsWith("/v1/projects/proj_123/github/deliveries?limit=20") &&
+        init?.method === undefined
+      ) {
         return jsonResponse(200, { deliveries: [] });
       }
 
@@ -974,8 +1043,12 @@ describe("web app — management routes", () => {
 
     render(<App initialEntries={["/projects/proj_123/github"]} />);
 
-    expect(await screen.findByText(/connect the github app to start automation/i)).toBeInTheDocument();
-    expect(screen.getByText(/no github app installation is connected to this workspace yet/i)).toBeInTheDocument();
+    expect(
+      await screen.findByText(/connect the github app to start automation/i)
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(/no github app installation is connected to this workspace yet/i)
+    ).toBeInTheDocument();
     const installLink = screen.getByRole("link", { name: /install github app/i });
     expect(installLink).toHaveAttribute(
       "href",
@@ -984,13 +1057,31 @@ describe("web app — management routes", () => {
     expect(installLink).not.toHaveAttribute("target");
     expect(
       fetchMock.mock.calls.some(([input]) =>
-        requestUrl(input).includes("/v1/github/app/install-url?return_to=%2Fprojects%2Fproj_123%2Fgithub&project_id=proj_123")
+        requestUrl(input).includes(
+          "/v1/github/app/install-url?return_to=%2Fprojects%2Fproj_123%2Fgithub&project_id=proj_123"
+        )
       )
     ).toBe(true);
-    expect(fetchMock.mock.calls.some(([input]) => requestUrl(input).endsWith("/v1/github/repositories?project_id=proj_123"))).toBe(false);
-    expect(fetchMock.mock.calls.some(([input]) => requestUrl(input).endsWith("/v1/projects/proj_123/github/repo"))).toBe(false);
-    expect(fetchMock.mock.calls.some(([input]) => requestUrl(input).endsWith("/v1/projects/proj_123/github/rules"))).toBe(false);
-    expect(fetchMock.mock.calls.some(([input]) => requestUrl(input).endsWith("/v1/projects/proj_123/github/deliveries?limit=20"))).toBe(false);
+    expect(
+      fetchMock.mock.calls.some(([input]) =>
+        requestUrl(input).endsWith("/v1/github/repositories?project_id=proj_123")
+      )
+    ).toBe(false);
+    expect(
+      fetchMock.mock.calls.some(([input]) =>
+        requestUrl(input).endsWith("/v1/projects/proj_123/github/repo")
+      )
+    ).toBe(false);
+    expect(
+      fetchMock.mock.calls.some(([input]) =>
+        requestUrl(input).endsWith("/v1/projects/proj_123/github/rules")
+      )
+    ).toBe(false);
+    expect(
+      fetchMock.mock.calls.some(([input]) =>
+        requestUrl(input).endsWith("/v1/projects/proj_123/github/deliveries?limit=20")
+      )
+    ).toBe(false);
   });
 
   it("keeps setup actionable and explicit when the install-url helper route is unavailable", async () => {
@@ -1009,7 +1100,10 @@ describe("web app — management routes", () => {
         });
       }
 
-      if (url.endsWith("/v1/github/installation?project_id=proj_123") && init?.method === undefined) {
+      if (
+        url.endsWith("/v1/github/installation?project_id=proj_123") &&
+        init?.method === undefined
+      ) {
         return jsonResponse(200, { installation: null });
       }
 
@@ -1025,7 +1119,10 @@ describe("web app — management routes", () => {
         return jsonResponse(200, { rules: [] });
       }
 
-      if (url.endsWith("/v1/projects/proj_123/github/deliveries?limit=20") && init?.method === undefined) {
+      if (
+        url.endsWith("/v1/projects/proj_123/github/deliveries?limit=20") &&
+        init?.method === undefined
+      ) {
         return jsonResponse(200, { deliveries: [] });
       }
 
@@ -1036,13 +1133,31 @@ describe("web app — management routes", () => {
 
     render(<App initialEntries={["/projects/proj_123/github"]} />);
 
-    expect(await screen.findByText(/connect the github app to start automation/i)).toBeInTheDocument();
-    expect(screen.getByText(/no github app installation is connected to this workspace yet/i)).toBeInTheDocument();
-    expect(screen.getByText(/the github app install link could not be loaded/i)).toBeInTheDocument();
+    expect(
+      await screen.findByText(/connect the github app to start automation/i)
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(/no github app installation is connected to this workspace yet/i)
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(/the github app install link could not be loaded/i)
+    ).toBeInTheDocument();
     expect(screen.queryByRole("link", { name: /install github app/i })).not.toBeInTheDocument();
-    expect(fetchMock.mock.calls.some(([input]) => requestUrl(input).endsWith("/v1/projects/proj_123/github/repo"))).toBe(false);
-    expect(fetchMock.mock.calls.some(([input]) => requestUrl(input).endsWith("/v1/projects/proj_123/github/rules"))).toBe(false);
-    expect(fetchMock.mock.calls.some(([input]) => requestUrl(input).endsWith("/v1/projects/proj_123/github/deliveries?limit=20"))).toBe(false);
+    expect(
+      fetchMock.mock.calls.some(([input]) =>
+        requestUrl(input).endsWith("/v1/projects/proj_123/github/repo")
+      )
+    ).toBe(false);
+    expect(
+      fetchMock.mock.calls.some(([input]) =>
+        requestUrl(input).endsWith("/v1/projects/proj_123/github/rules")
+      )
+    ).toBe(false);
+    expect(
+      fetchMock.mock.calls.some(([input]) =>
+        requestUrl(input).endsWith("/v1/projects/proj_123/github/deliveries?limit=20")
+      )
+    ).toBe(false);
   });
 
   it("shows a specific message when github automation is not configured on the api", async () => {
@@ -1061,7 +1176,10 @@ describe("web app — management routes", () => {
         });
       }
 
-      if (url.endsWith("/v1/github/installation?project_id=proj_123") && init?.method === undefined) {
+      if (
+        url.endsWith("/v1/github/installation?project_id=proj_123") &&
+        init?.method === undefined
+      ) {
         return jsonResponse(503, { error: "github_not_configured" });
       }
 
@@ -1072,7 +1190,9 @@ describe("web app — management routes", () => {
 
     render(<App initialEntries={["/projects/proj_123/github"]} />);
 
-    expect(await screen.findByText(/github automation is not configured on the api yet/i)).toBeInTheDocument();
+    expect(
+      await screen.findByText(/github automation is not configured on the api yet/i)
+    ).toBeInTheDocument();
   });
 
   it("routes free-plan github automation upsells to billing", async () => {
@@ -1098,7 +1218,9 @@ describe("web app — management routes", () => {
 
     render(<App initialEntries={["/projects/proj_123/github"]} />);
 
-    expect(await screen.findByText(/upgrade to solo or team to connect github automation/i)).toBeInTheDocument();
+    expect(
+      await screen.findByText(/upgrade to solo or team to connect github automation/i)
+    ).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /open billing/i })).toHaveAttribute("href", "/billing");
   });
 
@@ -1117,7 +1239,10 @@ describe("web app — management routes", () => {
         });
       }
 
-      if (url.endsWith("/v1/github/installation?project_id=proj_123") && init?.method === undefined) {
+      if (
+        url.endsWith("/v1/github/installation?project_id=proj_123") &&
+        init?.method === undefined
+      ) {
         return jsonResponse(200, {
           installation: createGitHubInstallation()
         });
@@ -1129,9 +1254,15 @@ describe("web app — management routes", () => {
         });
       }
 
-      if (url.endsWith("/v1/github/repositories?project_id=proj_123") && init?.method === undefined) {
+      if (
+        url.endsWith("/v1/github/repositories?project_id=proj_123") &&
+        init?.method === undefined
+      ) {
         return jsonResponse(200, {
-          repositories: [createGitHubRepository(), createGitHubRepository({ id: 2, name: "worker", full_name: "debugbundle/worker" })]
+          repositories: [
+            createGitHubRepository(),
+            createGitHubRepository({ id: 2, name: "worker", full_name: "debugbundle/worker" })
+          ]
         });
       }
 
@@ -1143,7 +1274,10 @@ describe("web app — management routes", () => {
         return jsonResponse(200, { rules: [] });
       }
 
-      if (url.endsWith("/v1/projects/proj_123/github/deliveries?limit=20") && init?.method === undefined) {
+      if (
+        url.endsWith("/v1/projects/proj_123/github/deliveries?limit=20") &&
+        init?.method === undefined
+      ) {
         return jsonResponse(200, { deliveries: [] });
       }
 
@@ -1165,14 +1299,22 @@ describe("web app — management routes", () => {
 
     render(<App initialEntries={["/projects/proj_123/github"]} />);
 
-    expect(await screen.findByText(/no github repository is assigned to this project yet/i)).toBeInTheDocument();
-    expect(screen.getByText(/choose one repository from the repos currently granted/i)).toBeInTheDocument();
+    expect(
+      await screen.findByText(/no github repository is assigned to this project yet/i)
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(/choose one repository from the repos currently granted/i)
+    ).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /manage repositories in github/i })).toHaveAttribute(
       "href",
       "https://github.com/apps/debugbundle-automation/installations/new"
     );
 
-    await chooseSelectOption(user, /repositories accessible to this github app installation/i, /^debugbundle\/worker$/i);
+    await chooseSelectOption(
+      user,
+      /repositories accessible to this github app installation/i,
+      /^debugbundle\/worker$/i
+    );
     await user.click(screen.getByRole("button", { name: /connect to this project/i }));
 
     expect((await screen.findAllByText(/debugbundle\/worker/i)).length).toBeGreaterThan(0);
@@ -1183,12 +1325,15 @@ describe("web app — management routes", () => {
       expect(
         fetchMock.mock.calls.some(
           ([input, requestInit]) =>
-            requestUrl(input).endsWith("/v1/projects/proj_123/github/repo") && requestInit?.method === "DELETE"
+            requestUrl(input).endsWith("/v1/projects/proj_123/github/repo") &&
+            requestInit?.method === "DELETE"
         )
       ).toBe(true);
     });
 
-    expect(await screen.findByText(/no github repository is assigned to this project yet/i)).toBeInTheDocument();
+    expect(
+      await screen.findByText(/no github repository is assigned to this project yet/i)
+    ).toBeInTheDocument();
   });
 
   it("refreshes the accessible repository list after github-side installation changes", async () => {
@@ -1207,7 +1352,10 @@ describe("web app — management routes", () => {
         });
       }
 
-      if (url.endsWith("/v1/github/installation?project_id=proj_123") && init?.method === undefined) {
+      if (
+        url.endsWith("/v1/github/installation?project_id=proj_123") &&
+        init?.method === undefined
+      ) {
         return jsonResponse(200, {
           installation: createGitHubInstallation()
         });
@@ -1219,14 +1367,20 @@ describe("web app — management routes", () => {
         });
       }
 
-      if (url.endsWith("/v1/github/repositories?project_id=proj_123") && init?.method === undefined) {
+      if (
+        url.endsWith("/v1/github/repositories?project_id=proj_123") &&
+        init?.method === undefined
+      ) {
         repositoryListRequestCount += 1;
 
         return jsonResponse(200, {
           repositories:
             repositoryListRequestCount === 1
               ? [createGitHubRepository()]
-              : [createGitHubRepository(), createGitHubRepository({ id: 2, name: "worker", full_name: "debugbundle/worker" })]
+              : [
+                  createGitHubRepository(),
+                  createGitHubRepository({ id: 2, name: "worker", full_name: "debugbundle/worker" })
+                ]
         });
       }
 
@@ -1238,7 +1392,10 @@ describe("web app — management routes", () => {
         return jsonResponse(200, { rules: [] });
       }
 
-      if (url.endsWith("/v1/projects/proj_123/github/deliveries?limit=20") && init?.method === undefined) {
+      if (
+        url.endsWith("/v1/projects/proj_123/github/deliveries?limit=20") &&
+        init?.method === undefined
+      ) {
         return jsonResponse(200, { deliveries: [] });
       }
 
@@ -1249,7 +1406,9 @@ describe("web app — management routes", () => {
 
     render(<App initialEntries={["/projects/proj_123/github"]} />);
 
-    expect(await screen.findByText(/no github repository is assigned to this project yet/i)).toBeInTheDocument();
+    expect(
+      await screen.findByText(/no github repository is assigned to this project yet/i)
+    ).toBeInTheDocument();
     expect(screen.queryByRole("option", { name: "debugbundle/worker" })).not.toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: /refresh list/i }));
@@ -1273,13 +1432,19 @@ describe("web app — management routes", () => {
         });
       }
 
-      if (url.endsWith("/v1/github/installation?project_id=proj_123") && init?.method === undefined) {
+      if (
+        url.endsWith("/v1/github/installation?project_id=proj_123") &&
+        init?.method === undefined
+      ) {
         return jsonResponse(200, {
           installation: createGitHubInstallation()
         });
       }
 
-      if (url.endsWith("/v1/github/repositories?project_id=proj_123") && init?.method === undefined) {
+      if (
+        url.endsWith("/v1/github/repositories?project_id=proj_123") &&
+        init?.method === undefined
+      ) {
         return jsonResponse(200, {
           repositories: [createGitHubRepository()]
         });
@@ -1295,7 +1460,10 @@ describe("web app — management routes", () => {
         return jsonResponse(200, { rules: [] });
       }
 
-      if (url.endsWith("/v1/projects/proj_123/github/deliveries?limit=20") && init?.method === undefined) {
+      if (
+        url.endsWith("/v1/projects/proj_123/github/deliveries?limit=20") &&
+        init?.method === undefined
+      ) {
         return jsonResponse(200, { deliveries: [] });
       }
 
@@ -1325,7 +1493,9 @@ describe("web app — management routes", () => {
 
     render(<App initialEntries={["/projects/proj_123/github"]} />);
 
-    expect(await screen.findByText(/no github dispatch rules are configured yet/i)).toBeInTheDocument();
+    expect(
+      await screen.findByText(/no github dispatch rules are configured yet/i)
+    ).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: /create rule/i }));
     await user.type(screen.getByLabelText(/^rule name$/i), "Critical incidents");
@@ -1342,7 +1512,8 @@ describe("web app — management routes", () => {
       expect(
         fetchMock.mock.calls.some(
           ([input, requestInit]) =>
-            requestUrl(input).endsWith("/v1/projects/proj_123/github/rules") && requestInit?.method === "POST"
+            requestUrl(input).endsWith("/v1/projects/proj_123/github/rules") &&
+            requestInit?.method === "POST"
         )
       ).toBe(true);
     });
@@ -1355,12 +1526,15 @@ describe("web app — management routes", () => {
       expect(
         fetchMock.mock.calls.some(
           ([input, requestInit]) =>
-            requestUrl(input).endsWith("/v1/projects/proj_123/github/rules/ghr_999") && requestInit?.method === "DELETE"
+            requestUrl(input).endsWith("/v1/projects/proj_123/github/rules/ghr_999") &&
+            requestInit?.method === "DELETE"
         )
       ).toBe(true);
     });
 
-    expect(await screen.findByText(/no github dispatch rules are configured yet/i)).toBeInTheDocument();
+    expect(
+      await screen.findByText(/no github dispatch rules are configured yet/i)
+    ).toBeInTheDocument();
   });
 
   it("lets owners edit a github dispatch rule from the project github page", async () => {
@@ -1378,13 +1552,19 @@ describe("web app — management routes", () => {
         });
       }
 
-      if (url.endsWith("/v1/github/installation?project_id=proj_123") && init?.method === undefined) {
+      if (
+        url.endsWith("/v1/github/installation?project_id=proj_123") &&
+        init?.method === undefined
+      ) {
         return jsonResponse(200, {
           installation: createGitHubInstallation()
         });
       }
 
-      if (url.endsWith("/v1/github/repositories?project_id=proj_123") && init?.method === undefined) {
+      if (
+        url.endsWith("/v1/github/repositories?project_id=proj_123") &&
+        init?.method === undefined
+      ) {
         return jsonResponse(200, {
           repositories: [createGitHubRepository()]
         });
@@ -1402,7 +1582,10 @@ describe("web app — management routes", () => {
         });
       }
 
-      if (url.endsWith("/v1/projects/proj_123/github/deliveries?limit=20") && init?.method === undefined) {
+      if (
+        url.endsWith("/v1/projects/proj_123/github/deliveries?limit=20") &&
+        init?.method === undefined
+      ) {
         return jsonResponse(200, { deliveries: [] });
       }
 
@@ -1439,7 +1622,8 @@ describe("web app — management routes", () => {
       expect(
         fetchMock.mock.calls.some(
           ([input, requestInit]) =>
-            requestUrl(input).endsWith("/v1/projects/proj_123/github/rules/ghr_123") && requestInit?.method === "PATCH"
+            requestUrl(input).endsWith("/v1/projects/proj_123/github/rules/ghr_123") &&
+            requestInit?.method === "PATCH"
         )
       ).toBe(true);
     });
@@ -1494,7 +1678,9 @@ describe("web app — management routes", () => {
     await user.click(deleteButton);
     const confirmationDialog = await screen.findByRole("alertdialog");
     const confirmationInput = within(confirmationDialog).getByLabelText(/confirmation phrase/i);
-    const confirmDeleteButton = within(confirmationDialog).getByRole("button", { name: /^delete project$/i });
+    const confirmDeleteButton = within(confirmationDialog).getByRole("button", {
+      name: /^delete project$/i
+    });
 
     expect(confirmDeleteButton).toBeDisabled();
 
@@ -1506,7 +1692,8 @@ describe("web app — management routes", () => {
     await waitFor(() => {
       expect(
         fetchMock.mock.calls.some(
-          ([input, init]) => requestUrl(input).endsWith("/v1/projects/proj_123") && init?.method === "DELETE"
+          ([input, init]) =>
+            requestUrl(input).endsWith("/v1/projects/proj_123") && init?.method === "DELETE"
         )
       ).toBe(true);
     });
@@ -1533,11 +1720,13 @@ describe("web app — management routes", () => {
 
       if (url.endsWith("/v1/projects/proj_123") && init?.method === "PATCH") {
         expect(init.credentials).toBe("include");
-        expect(init.body).toBe(JSON.stringify({
-          name: "Main API",
-          slug: "main-api",
-          environment_default: "preview"
-        }));
+        expect(init.body).toBe(
+          JSON.stringify({
+            name: "Main API",
+            slug: "main-api",
+            environment_default: "preview"
+          })
+        );
 
         return jsonResponse(200, {
           project: createProject({
@@ -1569,7 +1758,8 @@ describe("web app — management routes", () => {
     await waitFor(() => {
       expect(
         fetchMock.mock.calls.some(
-          ([input, init]) => requestUrl(input).endsWith("/v1/projects/proj_123") && init?.method === "PATCH"
+          ([input, init]) =>
+            requestUrl(input).endsWith("/v1/projects/proj_123") && init?.method === "PATCH"
         )
       ).toBe(true);
     });
@@ -1612,7 +1802,9 @@ describe("web app — management routes", () => {
 
     await user.click(await screen.findByRole("tab", { name: /settings/i }));
 
-    expect(await screen.findByRole("heading", { name: /capture policy/i, level: 3 })).toBeInTheDocument();
+    expect(
+      await screen.findByRole("heading", { name: /capture policy/i, level: 3 })
+    ).toBeInTheDocument();
   });
 
   it("shows project webhooks with recent delivery status and triggers a synthetic test delivery", async () => {
@@ -1638,7 +1830,10 @@ describe("web app — management routes", () => {
         });
       }
 
-      if (url.endsWith("/v1/webhooks/wh_123/deliveries?project_id=proj_123&limit=5") && init?.method === undefined) {
+      if (
+        url.endsWith("/v1/webhooks/wh_123/deliveries?project_id=proj_123&limit=5") &&
+        init?.method === undefined
+      ) {
         return jsonResponse(200, {
           deliveries: [createWebhookDelivery()]
         });
@@ -1669,7 +1864,9 @@ describe("web app — management routes", () => {
     await screen.findByRole("button", { name: /send test webhook/i });
     await waitFor(() => {
       expect(
-        fetchMock.mock.calls.some(([input]) => requestUrl(input).includes("/v1/webhooks/wh_123/deliveries?project_id=proj_123&limit=5"))
+        fetchMock.mock.calls.some(([input]) =>
+          requestUrl(input).includes("/v1/webhooks/wh_123/deliveries?project_id=proj_123&limit=5")
+        )
       ).toBe(true);
     });
 
@@ -1678,7 +1875,109 @@ describe("web app — management routes", () => {
     await waitFor(() => {
       expect(
         fetchMock.mock.calls.some(
-          ([input, init]) => requestUrl(input).endsWith("/v1/webhooks/wh_123/test?project_id=proj_123") && init?.method === "POST"
+          ([input, init]) =>
+            requestUrl(input).endsWith("/v1/webhooks/wh_123/test?project_id=proj_123") &&
+            init?.method === "POST"
+        )
+      ).toBe(true);
+    });
+  });
+
+  it("updates weekly report settings from the project settings page", async () => {
+    const user = userEvent.setup();
+    const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = requestUrl(input);
+
+      if (url.endsWith("/v1/auth/session")) {
+        return jsonResponse(200, {
+          session: createSession({ role: "member" })
+        });
+      }
+
+      if (url.endsWith("/v1/projects") && init?.method === undefined) {
+        return jsonResponse(200, {
+          projects: [createProject({ relationship: "shared", effective_role: "admin" })]
+        });
+      }
+
+      if (
+        url.endsWith("/v1/weekly-report-channels?project_id=proj_123&limit=50") &&
+        init?.method === undefined
+      ) {
+        return jsonResponse(200, {
+          channels: [
+            {
+              channel_id: "wr_123",
+              project_id: "proj_123",
+              channel: "email",
+              config: { to: ["owner@example.com"] },
+              schedule: { day_of_week: "monday", hour_of_day: 9, timezone: "UTC" },
+              is_enabled: true,
+              created_at: "2026-03-15T00:00:00.000Z",
+              updated_at: "2026-03-15T00:00:00.000Z"
+            }
+          ]
+        });
+      }
+
+      if (url.endsWith("/v1/weekly-report-channels/wr_123") && init?.method === "PATCH") {
+        expect(init.body).toBe(
+          JSON.stringify({
+            config: { to: ["owner@example.com", "team@example.com"] },
+            schedule: { day_of_week: "friday", hour_of_day: 16, timezone: "Europe/Ljubljana" },
+            is_enabled: false
+          })
+        );
+
+        return jsonResponse(200, {
+          channel: {
+            channel_id: "wr_123",
+            project_id: "proj_123",
+            channel: "email",
+            config: { to: ["owner@example.com", "team@example.com"] },
+            schedule: { day_of_week: "friday", hour_of_day: 16, timezone: "Europe/Ljubljana" },
+            is_enabled: false,
+            created_at: "2026-03-15T00:00:00.000Z",
+            updated_at: "2026-03-18T00:00:00.000Z"
+          }
+        });
+      }
+
+      return jsonResponse(404, { error: "not_found" });
+    });
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<App initialEntries={["/projects/proj_123/settings"]} />);
+
+    expect(
+      await screen.findByRole("heading", { name: /weekly reports/i, level: 3 })
+    ).toBeInTheDocument();
+
+    const enabledSwitches = await screen.findAllByRole("switch", { name: /enabled/i });
+    await user.click(enabledSwitches[enabledSwitches.length - 1]!);
+    await user.clear(screen.getByLabelText(/recipients/i));
+    await user.type(
+      screen.getByLabelText(/recipients/i),
+      "owner@example.com, team@example.com, ops@example.com, bulk@example.com"
+    );
+    expect(screen.getByText(/use 3 or fewer recipients/i)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /save weekly report/i })).toBeDisabled();
+
+    await user.clear(screen.getByLabelText(/recipients/i));
+    await user.type(screen.getByLabelText(/recipients/i), "owner@example.com, team@example.com");
+    await chooseSelectOption(user, /^day$/i, /friday/i);
+    await chooseSelectOption(user, /^hour$/i, /16:00/i);
+    await user.clear(screen.getByLabelText(/timezone/i));
+    await user.type(screen.getByLabelText(/timezone/i), "Europe/Ljubljana");
+    await user.click(screen.getByRole("button", { name: /save weekly report/i }));
+
+    await waitFor(() => {
+      expect(
+        fetchMock.mock.calls.some(
+          ([request, requestInit]) =>
+            requestUrl(request).endsWith("/v1/weekly-report-channels/wr_123") &&
+            requestInit?.method === "PATCH"
         )
       ).toBe(true);
     });
@@ -1742,7 +2041,10 @@ describe("web app — management routes", () => {
     render(<App initialEntries={["/projects/proj_123/webhooks"]} />);
 
     await user.click(await screen.findByRole("button", { name: /create webhook/i }));
-    await user.type(await screen.findByLabelText(/endpoint url/i), "https://hooks.example.test/created");
+    await user.type(
+      await screen.findByLabelText(/endpoint url/i),
+      "https://hooks.example.test/created"
+    );
     await user.click(screen.getByRole("button", { name: /^create webhook$/i }));
 
     const revealRegion = await screen.findByRole("region", { name: /new webhook signing secret/i });
@@ -1832,7 +2134,10 @@ describe("web app — management routes", () => {
     expect(within(dialog).getByText(/verification\.passed/i)).toBeInTheDocument();
     expect(within(dialog).getByText(/improvement_bundle\.created/i)).toBeInTheDocument();
 
-    await user.type(await screen.findByLabelText(/endpoint url/i), "https://hooks.example.test/filtered");
+    await user.type(
+      await screen.findByLabelText(/endpoint url/i),
+      "https://hooks.example.test/filtered"
+    );
     await user.click(screen.getByLabelText(/bundle\.reopened/i));
     await user.type(screen.getByLabelText(/environments/i), "production, staging");
     await user.type(screen.getByLabelText(/services/i), "checkout-api, worker");
@@ -1876,9 +2181,13 @@ describe("web app — management routes", () => {
     render(<App initialEntries={["/projects/proj_123/webhooks"]} />);
 
     expect(await screen.findByText(/no webhook endpoints yet/i)).toBeInTheDocument();
-    expect(screen.getByText(/create a webhook to send lifecycle, verification, or automation events/i)).toBeInTheDocument();
+    expect(
+      screen.getByText(/create a webhook to send lifecycle, verification, or automation events/i)
+    ).toBeInTheDocument();
     expect(screen.getByText(/no delivery attempts yet/i)).toBeInTheDocument();
-    expect(screen.getByText(/send a test webhook to create the first delivery record/i)).toBeInTheDocument();
+    expect(
+      screen.getByText(/send a test webhook to create the first delivery record/i)
+    ).toBeInTheDocument();
   });
 
   it("shows project alerts and existing rule visibility from the project-scoped route", async () => {
@@ -1929,7 +2238,9 @@ describe("web app — management routes", () => {
     expect(await screen.findByText(/error spike/i)).toBeInTheDocument();
     expect(screen.getByText(/high/i)).toBeInTheDocument();
     expect(screen.getByText(/^-$/)).toBeInTheDocument();
-    expect(screen.queryByText(/only the creator or a project admin can delete this rule/i)).not.toBeInTheDocument();
+    expect(
+      screen.queryByText(/only the creator or a project admin can delete this rule/i)
+    ).not.toBeInTheDocument();
   });
 
   it("deletes a project alert rule from the web route", async () => {
@@ -1975,7 +2286,9 @@ describe("web app — management routes", () => {
     await waitFor(() => {
       expect(
         fetchMock.mock.calls.some(
-          ([input, init]) => requestUrl(input).endsWith("/v1/alerts/alert_123?project_id=proj_123") && init?.method === "DELETE"
+          ([input, init]) =>
+            requestUrl(input).endsWith("/v1/alerts/alert_123?project_id=proj_123") &&
+            init?.method === "DELETE"
         )
       ).toBe(true);
     });
@@ -2110,14 +2423,20 @@ describe("web app — management routes", () => {
         });
       }
 
-      if (url.endsWith("/v1/projects/proj_123/slack/destinations/sd_123/test") && init?.method === "POST") {
+      if (
+        url.endsWith("/v1/projects/proj_123/slack/destinations/sd_123/test") &&
+        init?.method === "POST"
+      ) {
         expect(init.headers).toEqual({
           "X-CSRF-Token": "csrf-token-123"
         });
         return jsonResponse(200, { delivered: true });
       }
 
-      if (url.endsWith("/v1/projects/proj_123/slack/destinations/sd_123") && init?.method === "DELETE") {
+      if (
+        url.endsWith("/v1/projects/proj_123/slack/destinations/sd_123") &&
+        init?.method === "DELETE"
+      ) {
         expect(init.headers).toEqual({
           "X-CSRF-Token": "csrf-token-123"
         });
@@ -2284,7 +2603,9 @@ describe("web app — management routes", () => {
     expect(createForm).not.toBeNull();
     fireEvent.submit(createForm as HTMLFormElement);
 
-    expect(await screen.findByText(/add a destination url for this alert channel/i)).toBeInTheDocument();
+    expect(
+      await screen.findByText(/add a destination url for this alert channel/i)
+    ).toBeInTheDocument();
 
     await user.type(destinationInput, "https://alerts.example.test/project-webhook");
     await user.click(createButton);
@@ -2369,7 +2690,9 @@ describe("web app — management routes", () => {
     render(<App initialEntries={["/projects/proj_123/alerts"]} />);
 
     expect(await screen.findByText(/no alert rules yet/i)).toBeInTheDocument();
-    expect(screen.getByText(/create a rule to send incident events where your team will see them/i)).toBeInTheDocument();
+    expect(
+      screen.getByText(/create a rule to send incident events where your team will see them/i)
+    ).toBeInTheDocument();
     expect(screen.getAllByRole("button", { name: /create alert rule/i }).length).toBe(2);
   });
 
@@ -2387,7 +2710,13 @@ describe("web app — management routes", () => {
         return jsonResponse(200, {
           projects: [
             createProject(),
-            createProject({ project_id: "proj_456", name: "Worker", slug: "worker", relationship: "shared", sharing_state: "shared_by_you" })
+            createProject({
+              project_id: "proj_456",
+              name: "Worker",
+              slug: "worker",
+              relationship: "shared",
+              sharing_state: "shared_by_you"
+            })
           ]
         });
       }
@@ -2415,7 +2744,9 @@ describe("web app — management routes", () => {
     render(<App initialEntries={["/organization"]} />);
 
     expect(await screen.findByRole("heading", { name: /projects/i, level: 1 })).toBeInTheDocument();
-    expect(screen.queryByRole("heading", { name: /organization/i, level: 1 })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("heading", { name: /organization/i, level: 1 })
+    ).not.toBeInTheDocument();
   });
 
   it("does not show an organization entry in the app sidebar", async () => {
@@ -2619,7 +2950,9 @@ describe("web app — management routes", () => {
 
     expect(screen.getAllByText(/this month across all projects/i)).toHaveLength(3);
     expect(screen.getByText(/current total across all projects/i)).toBeInTheDocument();
-    expect(fetchMock.mock.calls.some(([input]) => requestUrl(input).endsWith("/v1/billing"))).toBe(false);
+    expect(fetchMock.mock.calls.some(([input]) => requestUrl(input).endsWith("/v1/billing"))).toBe(
+      false
+    );
   });
 
   it("renders billing summary for owners and starts the Stripe checkout entry point from the billing page", async () => {
@@ -2668,7 +3001,9 @@ describe("web app — management routes", () => {
     expect((await screen.findAllByText(/current plan/i)).length).toBeGreaterThan(0);
     expect(screen.getByText(/active projects/i)).toBeInTheDocument();
     expect(screen.getByText(/total allowance units/i)).toBeInTheDocument();
-    expect(screen.getByText(/projects stay unlimited\. this account currently has 1 active project\./i)).toBeInTheDocument();
+    expect(
+      screen.getByText(/projects stay unlimited\. this account currently has 1 active project\./i)
+    ).toBeInTheDocument();
 
     await user.click(await screen.findByRole("button", { name: /upgrade to solo/i }));
 
@@ -2736,7 +3071,9 @@ describe("web app — management routes", () => {
 
     expect(await screen.findByRole("heading", { name: /billing/i, level: 1 })).toBeInTheDocument();
     expect(await screen.findByText(/^Webhook deliveries$/i)).toBeInTheDocument();
-    expect(screen.getByText(/lifecycle webhook deliveries created this month\./i)).toBeInTheDocument();
+    expect(
+      screen.getByText(/lifecycle webhook deliveries created this month\./i)
+    ).toBeInTheDocument();
   });
 
   it("confirms billing and shows a success dialog after a successful Stripe checkout return", async () => {
@@ -2791,7 +3128,10 @@ describe("web app — management routes", () => {
 
     expect(
       fetchMock.mock.calls.filter(([input, requestInit]) => {
-        return requestUrl(input).endsWith("/v1/billing/checkout/confirm") && requestInit?.method === "POST";
+        return (
+          requestUrl(input).endsWith("/v1/billing/checkout/confirm") &&
+          requestInit?.method === "POST"
+        );
       }).length
     ).toBe(1);
   });
@@ -2845,7 +3185,10 @@ describe("web app — management routes", () => {
 
     expect(
       fetchMock.mock.calls.filter(([input, requestInit]) => {
-        return requestUrl(input).endsWith("/v1/billing/checkout/confirm") && requestInit?.method === "POST";
+        return (
+          requestUrl(input).endsWith("/v1/billing/checkout/confirm") &&
+          requestInit?.method === "POST"
+        );
       }).length
     ).toBe(1);
   });
@@ -2901,13 +3244,18 @@ describe("web app — management routes", () => {
 
     expect(
       fetchMock.mock.calls.filter(([input, requestInit]) => {
-        return requestUrl(input).endsWith("/v1/billing/checkout/confirm") && requestInit?.method === "POST";
+        return (
+          requestUrl(input).endsWith("/v1/billing/checkout/confirm") &&
+          requestInit?.method === "POST"
+        );
       }).length
     ).toBe(1);
 
     expect(resolveRefreshSession).not.toBeNull();
     resolveRefreshSession!(
-      new Response(JSON.stringify({ session: createSession({ organization_plan: "team" }) }), { status: 200 })
+      new Response(JSON.stringify({ session: createSession({ organization_plan: "team" }) }), {
+        status: 200
+      })
     );
 
     await waitFor(() => {
@@ -2916,7 +3264,10 @@ describe("web app — management routes", () => {
 
     expect(
       fetchMock.mock.calls.filter(([input, requestInit]) => {
-        return requestUrl(input).endsWith("/v1/billing/checkout/confirm") && requestInit?.method === "POST";
+        return (
+          requestUrl(input).endsWith("/v1/billing/checkout/confirm") &&
+          requestInit?.method === "POST"
+        );
       }).length
     ).toBe(1);
   });
@@ -2981,7 +3332,9 @@ describe("web app — management routes", () => {
     const ownerView = render(<App initialEntries={["/billing"]} />);
 
     expect(await screen.findByRole("button", { name: /manage subscription/i })).toBeEnabled();
-    expect(screen.queryByText(/verify your email before enabling billing changes/i)).not.toBeInTheDocument();
+    expect(
+      screen.queryByText(/verify your email before enabling billing changes/i)
+    ).not.toBeInTheDocument();
     expect(screen.getByText(/^solo$/i).className.includes("border-border")).toBe(true);
     expect(screen.getByText(/^solo$/i).className.includes("text-primary")).toBe(false);
     ownerView.unmount();
@@ -3006,7 +3359,9 @@ describe("web app — management routes", () => {
 
     render(<App initialEntries={["/billing"]} />);
 
-    expect(await screen.findByText(/owner permissions are required to manage billing/i)).toBeInTheDocument();
+    expect(
+      await screen.findByText(/owner permissions are required to manage billing/i)
+    ).toBeInTheDocument();
   });
 
   it("lets owners schedule a capacity reduction from the billing page", async () => {
@@ -3076,7 +3431,9 @@ describe("web app — management routes", () => {
 
     expect(await screen.findByRole("heading", { name: /billing/i, level: 1 })).toBeInTheDocument();
     await user.click(await screen.findByRole("button", { name: /manage capacity/i }));
-    expect(await screen.findByRole("heading", { name: /manage allowance capacity/i })).toBeInTheDocument();
+    expect(
+      await screen.findByRole("heading", { name: /manage allowance capacity/i })
+    ).toBeInTheDocument();
 
     const reductionInput = screen.getByLabelText(/purchased extra units after renewal/i);
     await user.clear(reductionInput);
@@ -3158,12 +3515,16 @@ describe("web app — management routes", () => {
     await waitFor(() => {
       expect(
         fetchMock.mock.calls.some(
-          ([input, init]) => requestUrl(input).endsWith("/v1/billing/capacity/scheduled-reduction") && init?.method === "DELETE"
+          ([input, init]) =>
+            requestUrl(input).endsWith("/v1/billing/capacity/scheduled-reduction") &&
+            init?.method === "DELETE"
         )
       ).toBe(true);
     });
 
-    expect(await screen.findByText(/scheduled capacity reduction cancelled successfully/i)).toBeInTheDocument();
+    expect(
+      await screen.findByText(/scheduled capacity reduction cancelled successfully/i)
+    ).toBeInTheDocument();
     expect(screen.queryByText(/dropping to 3 total units/i)).toBeNull();
   });
 
@@ -3234,7 +3595,9 @@ describe("web app — management routes", () => {
 
     expect(await screen.findByRole("heading", { name: /billing/i, level: 1 })).toBeInTheDocument();
     expect(await screen.findByRole("dialog", { name: /checkout canceled/i })).toBeInTheDocument();
-    expect(screen.getByText(/no payment was completed and your plan has not changed/i)).toBeInTheDocument();
+    expect(
+      screen.getByText(/no payment was completed and your plan has not changed/i)
+    ).toBeInTheDocument();
   });
 
   it("shows an error toast when opening the billing portal fails", async () => {
@@ -3277,7 +3640,9 @@ describe("web app — management routes", () => {
     await screen.findByRole("heading", { name: /billing/i, level: 1 });
     await user.click(await screen.findByRole("button", { name: /manage subscription/i }));
 
-    expect(await screen.findByText(/subscription management is unavailable right now/i)).toBeInTheDocument();
+    expect(
+      await screen.findByText(/subscription management is unavailable right now/i)
+    ).toBeInTheDocument();
   });
 
   it("shows an error toast when deleting a project alert rule fails", async () => {
@@ -3368,7 +3733,9 @@ describe("web app — management routes", () => {
     await user.type(increaseInput, "2");
     await user.click(screen.getByRole("button", { name: /increase capacity now/i }));
 
-    expect(await screen.findByText(/choose a unit count above your current purchased quantity/i)).toBeInTheDocument();
+    expect(
+      await screen.findByText(/choose a unit count above your current purchased quantity/i)
+    ).toBeInTheDocument();
   });
 
   it("shows every project incident empty state when the scoped status filter changes", async () => {
@@ -3497,7 +3864,9 @@ describe("web app — management routes", () => {
 
     render(<App initialEntries={[`/projects/${project.project_id}/bundles`]} />);
 
-    const incidentRow = (await screen.findByRole("link", { name: /typeerror in checkout handler/i })).closest("tr");
+    const incidentRow = (
+      await screen.findByRole("link", { name: /typeerror in checkout handler/i })
+    ).closest("tr");
     expect(incidentRow).not.toBeNull();
     const rowButtons = within(incidentRow as HTMLTableRowElement).getAllByRole("button");
     expect(rowButtons.length).toBeGreaterThan(0);
@@ -3512,5 +3881,4 @@ describe("web app — management routes", () => {
     expect(createObjectUrlMock).not.toHaveBeenCalled();
     expect(revokeObjectUrlMock).not.toHaveBeenCalled();
   });
-
 });

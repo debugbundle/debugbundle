@@ -146,6 +146,9 @@ describe("weekly report channel store", () => {
     const schedulerChannels = await store.listEnabledWeeklyReportChannels({ limit: 50 });
     const loaded = await store.getWeeklyReportChannelById({ channel_id: "wr_2" });
 
+    if (created === "email_channel_exists") {
+      throw new Error("expected weekly report channel record");
+    }
     expect(created?.channel_id).toBe("wr_1");
     expect(updated?.schedule).toEqual({ day_of_week: "tuesday", hour_of_day: 11, timezone: "UTC" });
     expect(deleted).toEqual({ channel_id: "wr_1" });
@@ -192,6 +195,25 @@ describe("weekly report channel store", () => {
     expect(emptyUpdate).toBeNull();
     expect(missingDelete).toBeNull();
     expect(missingLoad).toBeNull();
+  });
+
+  it("maps duplicate email weekly report channels to a domain result", async (): Promise<void> => {
+    const query = vi.fn().mockRejectedValue({
+      code: "23505",
+      constraint: "weekly_report_channels_project_email_unique_idx"
+    });
+    const store = createPostgresWeeklyReportChannelStore({ query });
+
+    const result = await store.createWeeklyReportChannelForOrganization({
+      organization_id: "org_123",
+      project_id: "proj_123",
+      channel: "email",
+      config: { to: ["team@example.com"] },
+      schedule: { day_of_week: "monday", hour_of_day: 9, timezone: "UTC" },
+      is_enabled: true
+    });
+
+    expect(result).toBe("email_channel_exists");
   });
 
   it("updates config-only changes", async (): Promise<void> => {

@@ -443,7 +443,13 @@ See `/spec/billing.md` and `/spec/system-emails.md` for the detailed source-of-t
 
 ### 1.17 Weekly Reporting
 
-**FR-RPT-01:** Weekly email/Slack report of bundles generated (by type).
+**FR-RPT-01:** Weekly email/Slack report of bundles generated (by type), new incidents, resolved incidents, regressions, and top spiking incidents.
+
+**FR-RPT-02:** Weekly report enablement is project-scoped. Project owner/admin settings must be able to enable or disable email weekly reporting for a project, configure up to 3 recipients, and choose day/hour/timezone.
+
+**FR-RPT-03:** Email weekly reports due for the same recipient set and weekly window should be combined into one email with per-project sections. Slack weekly reports remain project/channel scoped.
+
+**FR-RPT-04:** New projects must create one enabled default email weekly report for the project owner. Browser-created projects use the browser timezone for that default schedule; non-browser creation paths fall back to UTC. A project may have at most one email weekly report channel.
 
 ### 1.18a Event Classification & Capture Policy
 

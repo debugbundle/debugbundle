@@ -52,7 +52,8 @@ export function registerProjectRoutes(app: FastifyInstance, dependencies: ApiDep
       organization_id: member.organization_id,
       name: parsedBody.data.name,
       slug: parsedBody.data.slug,
-      environment_default: parsedBody.data.environment_default
+      environment_default: parsedBody.data.environment_default,
+      weekly_report_timezone: parsedBody.data.weekly_report_timezone
     });
 
     if (project === null) {

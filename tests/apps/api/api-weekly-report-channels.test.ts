@@ -8,17 +8,20 @@ type MemberAuthDependency = MockedMethods<ApiServerDependencies["memberAuth"]>;
 type WeeklyReportManagementDependency = MockedMethods<NonNullable<ApiServerDependencies["weeklyReportManagement"]>>;
 type SlackManagementDependency = MockedMethods<NonNullable<ApiServerDependencies["slackManagement"]>>;
 type BillingManagementDependency = MockedMethods<NonNullable<ApiServerDependencies["billingManagement"]>>;
+type ProjectManagementDependency = MockedMethods<NonNullable<ApiServerDependencies["projectManagement"]>>;
 
 function createServer(overrides: {
   memberAuth?: MemberAuthDependency | undefined;
-  weeklyReportManagement?: WeeklyReportManagementDependency | undefined;
+  weeklyReportManagement?: Partial<WeeklyReportManagementDependency> | undefined;
   slackManagement?: SlackManagementDependency | undefined;
   billingManagement?: BillingManagementDependency | undefined;
+  projectManagement?: Partial<ProjectManagementDependency> | undefined;
   authRateLimiter?: ApiServerDependencies["authRateLimiter"];
 } = {}): ReturnType<typeof createApiServer> {
   const hasWeeklyReportManagementOverride = Object.prototype.hasOwnProperty.call(overrides, "weeklyReportManagement");
   const hasSlackManagementOverride = Object.prototype.hasOwnProperty.call(overrides, "slackManagement");
   const hasBillingManagementOverride = Object.prototype.hasOwnProperty.call(overrides, "billingManagement");
+  const hasProjectManagementOverride = Object.prototype.hasOwnProperty.call(overrides, "projectManagement");
 
   return createApiServer({
     ingestionPersistence: {
@@ -34,6 +37,24 @@ function createServer(overrides: {
       overrides.memberAuth ?? mockedObject<ApiServerDependencies["memberAuth"]>({
         resolveMemberByTokenHash: vi.fn().mockResolvedValue({ member_id: "usr_123", organization_id: "org_123" })
       }),
+    projectManagement:
+      hasProjectManagementOverride && overrides.projectManagement === undefined
+        ? undefined
+        : mockedObject<NonNullable<ApiServerDependencies["projectManagement"]>>({
+            resolveProjectAccessForUser: vi.fn().mockResolvedValue({
+              project_id: "00000000-0000-4000-8000-000000000001",
+              organization_id: "org_123",
+              owner_user_id: "usr_123",
+              owner_email: "owner@example.com",
+              relationship: "owned",
+              sharing_state: "private",
+              effective_role: "owner",
+              organization_plan: "team"
+            }),
+            listProjectsForOrganization: vi.fn().mockResolvedValue([]),
+            createProjectForOrganization: vi.fn().mockResolvedValue(null),
+            ...overrides.projectManagement
+          }),
     tokenManagement: mockedObject<ApiServerDependencies["tokenManagement"]>({
       listProjectTokensForOrganization: vi.fn().mockResolvedValue([]),
       createProjectTokenForOrganization: vi.fn().mockResolvedValue(null),
@@ -73,15 +94,25 @@ function createServer(overrides: {
             getSlackDestinationSecretForOrganization: vi.fn().mockResolvedValue(null)
           }),
     weeklyReportManagement:
-      hasWeeklyReportManagementOverride
-        ? overrides.weeklyReportManagement
-        :
-      mockedObject<NonNullable<ApiServerDependencies["weeklyReportManagement"]>>({
-        listWeeklyReportChannelsForOrganization: vi.fn().mockResolvedValue([]),
-        createWeeklyReportChannelForOrganization: vi.fn().mockResolvedValue(null),
-        updateWeeklyReportChannelForOrganization: vi.fn().mockResolvedValue(null),
-        deleteWeeklyReportChannelForOrganization: vi.fn().mockResolvedValue(null)
-      })
+      hasWeeklyReportManagementOverride && overrides.weeklyReportManagement === undefined
+        ? undefined
+        : mockedObject<NonNullable<ApiServerDependencies["weeklyReportManagement"]>>({
+            listWeeklyReportChannelsForOrganization: vi.fn().mockResolvedValue([]),
+            createWeeklyReportChannelForOrganization: vi.fn().mockResolvedValue(null),
+            updateWeeklyReportChannelForOrganization: vi.fn().mockResolvedValue(null),
+            deleteWeeklyReportChannelForOrganization: vi.fn().mockResolvedValue(null),
+            getWeeklyReportChannelById: vi.fn().mockResolvedValue({
+              channel_id: "11111111-1111-4111-8111-111111111111",
+              project_id: "00000000-0000-4000-8000-000000000001",
+              channel: "email",
+              config: { to: ["team@example.com"] },
+              schedule: { day_of_week: "monday", hour_of_day: 9, timezone: "UTC" },
+              is_enabled: true,
+              created_at: "2026-03-15T00:00:00.000Z",
+              updated_at: "2026-03-15T00:00:00.000Z"
+            }),
+            ...overrides.weeklyReportManagement
+          })
   });
 }
 
@@ -142,6 +173,79 @@ describe("api weekly report channel routes", () => {
       project_id: "00000000-0000-4000-8000-000000000001",
       limit: 10
     });
+  });
+
+  it("allows project members to list weekly reports but rejects weekly report writes", async (): Promise<void> => {
+    const weeklyReportManagement = {
+      listWeeklyReportChannelsForOrganization: vi.fn().mockResolvedValue([]),
+      createWeeklyReportChannelForOrganization: vi.fn().mockResolvedValue(null),
+      updateWeeklyReportChannelForOrganization: vi.fn().mockResolvedValue(null),
+      deleteWeeklyReportChannelForOrganization: vi.fn().mockResolvedValue(null),
+      getWeeklyReportChannelById: vi.fn().mockResolvedValue({
+        channel_id: "11111111-1111-4111-8111-111111111111",
+        project_id: "00000000-0000-4000-8000-000000000001",
+        channel: "email",
+        config: { to: ["team@example.com"] },
+        schedule: { day_of_week: "monday", hour_of_day: 9, timezone: "UTC" },
+        is_enabled: true,
+        created_at: "2026-03-15T00:00:00.000Z",
+        updated_at: "2026-03-15T00:00:00.000Z"
+      })
+    };
+    const app = createServer({
+      weeklyReportManagement,
+      projectManagement: {
+        resolveProjectAccessForUser: vi.fn().mockResolvedValue({
+          project_id: "00000000-0000-4000-8000-000000000001",
+          organization_id: "org_123",
+          owner_user_id: "owner_123",
+          owner_email: "owner@example.com",
+          relationship: "shared",
+          sharing_state: "shared_with_you",
+          effective_role: "member",
+          organization_plan: "team"
+        })
+      }
+    });
+
+    const listed = await app.inject({
+      method: "GET",
+      url: "/v1/weekly-report-channels?project_id=00000000-0000-4000-8000-000000000001",
+      headers: { authorization: "Bearer dbundle_mem_test" }
+    });
+    const created = await app.inject({
+      method: "POST",
+      url: "/v1/weekly-report-channels",
+      headers: { authorization: "Bearer dbundle_mem_test" },
+      payload: {
+        project_id: "00000000-0000-4000-8000-000000000001",
+        channel: "email",
+        config: { to: ["team@example.com"] },
+        schedule: { day_of_week: "monday", hour_of_day: 9, timezone: "UTC" }
+      }
+    });
+    const updated = await app.inject({
+      method: "PATCH",
+      url: "/v1/weekly-report-channels/11111111-1111-4111-8111-111111111111",
+      headers: { authorization: "Bearer dbundle_mem_test" },
+      payload: { is_enabled: false }
+    });
+    const deleted = await app.inject({
+      method: "DELETE",
+      url: "/v1/weekly-report-channels/11111111-1111-4111-8111-111111111111",
+      headers: { authorization: "Bearer dbundle_mem_test" }
+    });
+
+    expect(listed.statusCode).toBe(200);
+    expect(created.statusCode).toBe(403);
+    expect(created.json()).toEqual({ error: "forbidden" });
+    expect(updated.statusCode).toBe(403);
+    expect(updated.json()).toEqual({ error: "forbidden" });
+    expect(deleted.statusCode).toBe(403);
+    expect(deleted.json()).toEqual({ error: "forbidden" });
+    expect(weeklyReportManagement.createWeeklyReportChannelForOrganization).not.toHaveBeenCalled();
+    expect(weeklyReportManagement.updateWeeklyReportChannelForOrganization).not.toHaveBeenCalled();
+    expect(weeklyReportManagement.deleteWeeklyReportChannelForOrganization).not.toHaveBeenCalled();
   });
 
   it("validates list query and returns project_not_found when the project is out of scope", async (): Promise<void> => {
@@ -208,6 +312,19 @@ describe("api weekly report channel routes", () => {
         schedule: { day_of_week: "monday", hour_of_day: 9, timezone: "UTC" }
       }
     });
+    const tooManyRecipients = await app.inject({
+      method: "POST",
+      url: "/v1/weekly-report-channels",
+      headers: { authorization: "Bearer dbundle_mem_test" },
+      payload: {
+        project_id: "00000000-0000-4000-8000-000000000001",
+        channel: "email",
+        config: {
+          to: ["owner@example.com", "team@example.com", "ops@example.com", "bulk@example.com"]
+        },
+        schedule: { day_of_week: "monday", hour_of_day: 9, timezone: "UTC" }
+      }
+    });
     const created = await app.inject({
       method: "POST",
       url: "/v1/weekly-report-channels",
@@ -235,6 +352,8 @@ describe("api weekly report channel routes", () => {
     });
 
     expect(invalid.statusCode).toBe(400);
+    expect(tooManyRecipients.statusCode).toBe(400);
+    expect(tooManyRecipients.json()).toEqual({ error: "invalid_payload" });
     expect(created.statusCode).toBe(201);
     expect(updated.statusCode).toBe(200);
     expect(deleted.statusCode).toBe(204);
@@ -389,6 +508,16 @@ describe("api weekly report channel routes", () => {
       headers: { authorization: "Bearer dbundle_mem_test" },
       payload: {}
     });
+    const tooManyRecipientsUpdate = await app.inject({
+      method: "PATCH",
+      url: "/v1/weekly-report-channels/11111111-1111-4111-8111-111111111111",
+      headers: { authorization: "Bearer dbundle_mem_test" },
+      payload: {
+        config: {
+          to: ["owner@example.com", "team@example.com", "ops@example.com", "bulk@example.com"]
+        }
+      }
+    });
     const missingUpdateTarget = await app.inject({
       method: "PATCH",
       url: "/v1/weekly-report-channels/11111111-1111-4111-8111-111111111111",
@@ -405,6 +534,8 @@ describe("api weekly report channel routes", () => {
 
     expect(invalidUpdatePayload.statusCode).toBe(400);
     expect(invalidUpdatePayload.json()).toEqual({ error: "invalid_payload" });
+    expect(tooManyRecipientsUpdate.statusCode).toBe(400);
+    expect(tooManyRecipientsUpdate.json()).toEqual({ error: "invalid_payload" });
     expect(missingUpdateTarget.statusCode).toBe(404);
     expect(missingUpdateTarget.json()).toEqual({ error: "weekly_report_channel_not_found" });
     expect(missingDeleteTarget.statusCode).toBe(404);
@@ -448,6 +579,31 @@ describe("api weekly report channel routes", () => {
       schedule: { day_of_week: "friday", hour_of_day: 15, timezone: "UTC" },
       is_enabled: true
     });
+  });
+
+  it("returns a conflict when an email weekly report already exists for the project", async (): Promise<void> => {
+    const weeklyReportManagement = {
+      listWeeklyReportChannelsForOrganization: vi.fn().mockResolvedValue([]),
+      createWeeklyReportChannelForOrganization: vi.fn().mockResolvedValue("email_channel_exists"),
+      updateWeeklyReportChannelForOrganization: vi.fn().mockResolvedValue(null),
+      deleteWeeklyReportChannelForOrganization: vi.fn().mockResolvedValue(null)
+    };
+    const app = createServer({ weeklyReportManagement });
+
+    const response = await app.inject({
+      method: "POST",
+      url: "/v1/weekly-report-channels",
+      headers: { authorization: "Bearer dbundle_mem_test" },
+      payload: {
+        project_id: "00000000-0000-4000-8000-000000000001",
+        channel: "email",
+        config: { to: ["team@example.com"] },
+        schedule: { day_of_week: "monday", hour_of_day: 9, timezone: "UTC" }
+      }
+    });
+
+    expect(response.statusCode).toBe(409);
+    expect(response.json()).toEqual({ error: "weekly_report_email_channel_exists" });
   });
 
   it("returns weekly_report_channel_not_found when patch/delete routes are mounted without weekly report management", async (): Promise<void> => {

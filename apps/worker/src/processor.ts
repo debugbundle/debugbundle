@@ -432,6 +432,11 @@ export interface WeeklyReportTransport {
     delivery_id: string;
     channel: WeeklyReportChannelRecord;
     report: WeeklyProjectReportSummary;
+    deliveries?: Array<{
+      delivery_id: string;
+      channel: WeeklyReportChannelRecord;
+      report: WeeklyProjectReportSummary;
+    }>;
   }): Promise<void>;
 }
 
@@ -1967,57 +1972,96 @@ export async function processNextGenerateWeeklyReportJob(
     return { processed: false, reason: "no_jobs" };
   }
 
-  const report = await dependencies.weeklyReportingStore.getWeeklyProjectReport({
-    project_id: job.project_id,
-    window_start: job.window_start,
-    window_end: job.window_end
-  });
+  const deliveryIds = job.delivery_ids ?? [job.delivery_id];
+  const channelIds = job.weekly_report_channel_ids ?? [job.weekly_report_channel_id];
+  const projectIds = job.project_ids ?? [job.project_id];
+  const deliveries: Array<{
+    delivery_id: string;
+    channel: WeeklyReportChannelRecord;
+    report: WeeklyProjectReportSummary;
+  }> = [];
 
-  if (report === null) {
-    return { processed: false, reason: "no_activity" };
-  }
+  for (let index = 0; index < deliveryIds.length; index += 1) {
+    const deliveryId = deliveryIds[index] ?? job.delivery_id;
+    const channelId = channelIds[index] ?? job.weekly_report_channel_id;
+    const projectId = projectIds[index] ?? job.project_id;
 
-  const channel = await dependencies.weeklyReportChannelStore.getWeeklyReportChannelById({
-    channel_id: job.weekly_report_channel_id
-  });
-  if (channel === null || channel.is_enabled === false) {
-    await dependencies.weeklyReportDeliveryStore.markWeeklyReportDeliveryResult({
-      delivery_id: job.delivery_id,
-      delivered: false,
-      error_message: "weekly_report_channel_not_found"
+    const report = await dependencies.weeklyReportingStore.getWeeklyProjectReport({
+      project_id: projectId,
+      window_start: job.window_start,
+      window_end: job.window_end
     });
 
+    if (report === null) {
+      if (deliveryIds.length === 1) {
+        return { processed: false, reason: "no_activity" };
+      }
+
+      await dependencies.weeklyReportDeliveryStore.markWeeklyReportDeliveryResult({
+        delivery_id: deliveryId,
+        delivered: false,
+        error_message: "weekly_report_no_activity"
+      });
+      continue;
+    }
+
+    const channel = await dependencies.weeklyReportChannelStore.getWeeklyReportChannelById({
+      channel_id: channelId
+    });
+    if (channel === null || channel.is_enabled === false) {
+      await dependencies.weeklyReportDeliveryStore.markWeeklyReportDeliveryResult({
+        delivery_id: deliveryId,
+        delivered: false,
+        error_message: "weekly_report_channel_not_found"
+      });
+      continue;
+    }
+
+    deliveries.push({
+      delivery_id: deliveryId,
+      channel,
+      report
+    });
+  }
+
+  const primaryDelivery = deliveries[0];
+  if (primaryDelivery === undefined) {
     return { processed: true };
   }
 
   try {
     await dependencies.weeklyReportTransport.deliver({
-      delivery_id: job.delivery_id,
-      channel,
-      report
+      delivery_id: primaryDelivery.delivery_id,
+      channel: primaryDelivery.channel,
+      report: primaryDelivery.report,
+      deliveries
     });
 
-    await dependencies.weeklyReportDeliveryStore.markWeeklyReportDeliveryResult({
-      delivery_id: job.delivery_id,
-      delivered: true,
-      error_message: null
-    });
+    for (const delivery of deliveries) {
+      await dependencies.weeklyReportDeliveryStore.markWeeklyReportDeliveryResult({
+        delivery_id: delivery.delivery_id,
+        delivered: true,
+        error_message: null
+      });
+    }
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     dependencies.logger?.warn(
       {
-        channel_id: channel.channel_id,
-        delivery_id: job.delivery_id,
+        channel_id: primaryDelivery.channel.channel_id,
+        delivery_id: primaryDelivery.delivery_id,
         error_message: message,
         project_id: job.project_id
       },
       "worker_weekly_report_delivery_failed"
     );
-    await dependencies.weeklyReportDeliveryStore.markWeeklyReportDeliveryResult({
-      delivery_id: job.delivery_id,
-      delivered: false,
-      error_message: message
-    });
+    for (const delivery of deliveries) {
+      await dependencies.weeklyReportDeliveryStore.markWeeklyReportDeliveryResult({
+        delivery_id: delivery.delivery_id,
+        delivered: false,
+        error_message: message
+      });
+    }
   }
 
   return { processed: true };

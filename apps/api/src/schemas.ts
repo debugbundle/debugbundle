@@ -242,7 +242,7 @@ const WeeklyReportScheduleSchema = z
 
 const WeeklyReportEmailConfigSchema = z
   .object({
-    to: z.array(z.string().email()).min(1)
+    to: z.array(z.string().email()).min(1).max(3)
   })
   .strict();
 
@@ -667,7 +667,8 @@ export const CreateProjectBodySchema = z
   .object({
     name: z.string().min(1).max(120),
     slug: z.string().min(1).max(80).regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/),
-    environment_default: z.string().min(1).max(50).default("production")
+    environment_default: z.string().min(1).max(50).default("production"),
+    weekly_report_timezone: z.string().min(1).default("UTC").refine((value) => isValidTimeZone(value), "invalid_timezone")
   })
   .strict();
 

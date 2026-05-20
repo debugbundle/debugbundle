@@ -567,7 +567,7 @@ export const MCP_TOOL_CATALOG = [
   {
     name: 'create_weekly_report_channel',
     group: 'weekly_reports',
-    description: 'Create a weekly report delivery channel.',
+    description: 'Create a weekly report delivery channel. Email channel config supports up to 3 recipients in config.to.',
     inputSchema: z.object({
       bearerToken: z.string(),
       projectId: z.string(),
@@ -580,7 +580,7 @@ export const MCP_TOOL_CATALOG = [
   {
     name: 'update_weekly_report_channel',
     group: 'weekly_reports',
-    description: 'Update a weekly report delivery channel.',
+    description: 'Update a weekly report delivery channel. Email channel config supports up to 3 recipients in config.to.',
     inputSchema: z.object({
       bearerToken: z.string(),
       channelId: z.string(),

@@ -4,6 +4,7 @@ import { useNavigate, useOutletContext } from "react-router-dom";
 import { DialogFormContent } from "../components/system/dialog-form-content.js";
 import { ProjectCapturePolicyCard } from "../components/system/project-capture-policy-card.js";
 import { ProjectImprovementSettingsCard } from "../components/system/project-improvement-settings-card.js";
+import { ProjectWeeklyReportSettingsCard } from "../components/system/project-weekly-report-settings-card.js";
 import type { ProjectContext } from "../components/system/project-layout.js";
 import { getProjectEffectiveRole } from "../lib/project-access.js";
 import { Button } from "../components/ui/button.js";
@@ -161,6 +162,7 @@ export function ProjectSettingsPage(): JSX.Element {
               </div>
             </CardContent>
           </Card>
+          <ProjectWeeklyReportSettingsCard projectId={project.project_id} canEdit={canManageProject} />
         </div>
 
         <div className="space-y-4">

@@ -145,6 +145,9 @@ export interface GenerateWeeklyReportJob {
   delivery_id: string;
   weekly_report_channel_id: string;
   project_id: string;
+  delivery_ids?: string[];
+  weekly_report_channel_ids?: string[];
+  project_ids?: string[];
   window_start: string;
   window_end: string;
 }
@@ -1019,6 +1022,7 @@ export interface WeeklyReportTopSpikingIncident {
 
 export interface WeeklyProjectReportSummary {
   project_id: string;
+  project_name: string;
   window_start: string;
   window_end: string;
   bundle_counts: {
@@ -1026,6 +1030,8 @@ export interface WeeklyProjectReportSummary {
     improvement: number;
   };
   new_incidents: number;
+  resolved_incidents: number;
+  opened_incidents_resolved: number;
   regressions: number;
   top_spiking_incidents: WeeklyReportTopSpikingIncident[];
 }
@@ -1090,7 +1096,7 @@ export interface WeeklyReportChannelStore {
       timezone: string;
     };
     is_enabled: boolean;
-  }): Promise<WeeklyReportChannelRecord | null>;
+  }): Promise<WeeklyReportChannelRecord | "email_channel_exists" | null>;
   updateWeeklyReportChannelForOrganization(input: {
     organization_id: string;
     channel_id: string;
@@ -1234,6 +1240,7 @@ export interface ProjectManagementStore {
     name: string;
     slug: string;
     environment_default: string;
+    weekly_report_timezone: string;
   }): Promise<ProjectRecord | null>;
   updateProjectForUser?(input: {
     user_id: string;
@@ -1256,6 +1263,7 @@ export interface ProjectManagementStore {
     name: string;
     slug: string;
     environment_default: string;
+    weekly_report_timezone?: string;
   }): Promise<ProjectRecord | null>;
   updateProjectForOrganization(input: {
     organization_id: string;

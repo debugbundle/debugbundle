@@ -7,12 +7,16 @@ type WeeklyReportJob = {
   delivery_id: string;
   weekly_report_channel_id: string;
   project_id: string;
+  delivery_ids?: string[];
+  weekly_report_channel_ids?: string[];
+  project_ids?: string[];
   window_start: string;
   window_end: string;
 };
 
 type WeeklyProjectReport = {
   project_id: string;
+  project_name: string;
   window_start: string;
   window_end: string;
   bundle_counts: {
@@ -20,6 +24,8 @@ type WeeklyProjectReport = {
     improvement: number;
   };
   new_incidents: number;
+  resolved_incidents: number;
+  opened_incidents_resolved: number;
   regressions: number;
   top_spiking_incidents: Array<{
     incident_id: string;
@@ -138,6 +144,7 @@ describe("worker weekly reporting", () => {
       .fn<(input: { project_id: string; window_start: string; window_end: string }) => Promise<WeeklyProjectReport | null>>()
       .mockResolvedValue({
         project_id: "proj_123",
+        project_name: "Checkout API",
         window_start: "2026-03-09T00:00:00.000Z",
         window_end: "2026-03-16T00:00:00.000Z",
         bundle_counts: {
@@ -145,6 +152,8 @@ describe("worker weekly reporting", () => {
           improvement: 0
         },
         new_incidents: 2,
+        resolved_incidents: 1,
+        opened_incidents_resolved: 1,
         regressions: 1,
         top_spiking_incidents: []
       });
@@ -182,31 +191,20 @@ describe("worker weekly reporting", () => {
     });
 
     expect(result).toEqual({ processed: true });
-    expect(deliver).toHaveBeenCalledWith({
-      delivery_id: "wrd_123",
-      channel: {
-        channel_id: "wr_123",
-        project_id: "proj_123",
-        channel: "email",
-        config: { to: ["team@example.com"] },
-        schedule: { day_of_week: "monday", hour_of_day: 9, timezone: "UTC" },
-        is_enabled: true,
-        created_at: "2026-03-15T00:00:00.000Z",
-        updated_at: "2026-03-15T00:00:00.000Z"
-      },
-      report: {
-        project_id: "proj_123",
-        window_start: "2026-03-09T00:00:00.000Z",
-        window_end: "2026-03-16T00:00:00.000Z",
-        bundle_counts: {
-          failure: 3,
-          improvement: 0
-        },
-        new_incidents: 2,
-        regressions: 1,
-        top_spiking_incidents: []
-      }
-    });
+    expect(deliver).toHaveBeenCalledWith(
+      expect.objectContaining({
+        delivery_id: "wrd_123",
+        deliveries: [
+          expect.objectContaining({
+            delivery_id: "wrd_123",
+            report: expect.objectContaining({
+              project_id: "proj_123",
+              project_name: "Checkout API"
+            })
+          })
+        ]
+      })
+    );
     expect(markWeeklyReportDeliveryResult).toHaveBeenCalledWith({
       delivery_id: "wrd_123",
       delivered: true,
@@ -226,6 +224,7 @@ describe("worker weekly reporting", () => {
       .fn<(input: { project_id: string; window_start: string; window_end: string }) => Promise<WeeklyProjectReport | null>>()
       .mockResolvedValue({
         project_id: "proj_123",
+        project_name: "Checkout API",
         window_start: "2026-03-09T00:00:00.000Z",
         window_end: "2026-03-16T00:00:00.000Z",
         bundle_counts: {
@@ -233,6 +232,8 @@ describe("worker weekly reporting", () => {
           improvement: 0
         },
         new_incidents: 1,
+        resolved_incidents: 1,
+        opened_incidents_resolved: 1,
         regressions: 0,
         top_spiking_incidents: []
       });
@@ -279,6 +280,7 @@ describe("worker weekly reporting", () => {
       .fn<(input: { project_id: string; window_start: string; window_end: string }) => Promise<WeeklyProjectReport | null>>()
       .mockResolvedValue({
         project_id: "proj_123",
+        project_name: "Checkout API",
         window_start: "2026-03-09T00:00:00.000Z",
         window_end: "2026-03-16T00:00:00.000Z",
         bundle_counts: {
@@ -286,6 +288,8 @@ describe("worker weekly reporting", () => {
           improvement: 1
         },
         new_incidents: 1,
+        resolved_incidents: 1,
+        opened_incidents_resolved: 1,
         regressions: 1,
         top_spiking_incidents: []
       });
@@ -338,6 +342,7 @@ describe("worker weekly reporting", () => {
       .fn<(input: { project_id: string; window_start: string; window_end: string }) => Promise<WeeklyProjectReport | null>>()
       .mockResolvedValue({
         project_id: "proj_123",
+        project_name: "Checkout API",
         window_start: "2026-03-09T00:00:00.000Z",
         window_end: "2026-03-16T00:00:00.000Z",
         bundle_counts: {
@@ -345,6 +350,8 @@ describe("worker weekly reporting", () => {
           improvement: 0
         },
         new_incidents: 1,
+        resolved_incidents: 1,
+        opened_incidents_resolved: 1,
         regressions: 0,
         top_spiking_incidents: []
       });
@@ -449,6 +456,74 @@ describe("worker weekly reporting", () => {
       delivery_id: "wrd_123",
       weekly_report_channel_id: "wr_123",
       project_id: "proj_123",
+      window_start: "2026-03-09T00:00:00.000Z",
+      window_end: "2026-03-16T00:00:00.000Z"
+    });
+    vi.useRealTimers();
+  });
+
+  it("should combine due email weekly reports for the same recipients and window", async (): Promise<void> => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-03-16T10:30:00.000Z"));
+    const enqueue = vi
+      .fn<(jobName: "generate-weekly-report", payload: WeeklyReportJob) => Promise<void>>()
+      .mockResolvedValue(undefined);
+    const listProjectsWithWeeklyActivity = vi
+      .fn<(input: { window_start: string; window_end: string; limit: number }) => Promise<string[]>>()
+      .mockResolvedValue(["proj_123", "proj_456"]);
+    const claimWeeklyReportDelivery = vi
+      .fn<(input: {
+        weekly_report_channel_id: string;
+        project_id: string;
+        window_start: string;
+        window_end: string;
+        channel: "email" | "slack";
+      }) => Promise<WeeklyReportDelivery>>()
+      .mockImplementation(async (input) => ({
+        delivery_id: input.project_id === "proj_123" ? "wrd_123" : "wrd_456",
+        created: true
+      }));
+
+    const count = await scheduleWeeklyReports({
+      queue: { enqueue },
+      weeklyReportingStore: { listProjectsWithWeeklyActivity },
+      weeklyReportChannelStore: {
+        listEnabledWeeklyReportChannels: vi.fn().mockResolvedValue([
+          {
+            channel_id: "wr_123",
+            project_id: "proj_123",
+            channel: "email",
+            config: { to: ["team@example.com", "owner@example.com"] },
+            schedule: { day_of_week: "monday", hour_of_day: 9, timezone: "UTC" },
+            is_enabled: true,
+            created_at: "2026-03-15T00:00:00.000Z",
+            updated_at: "2026-03-15T00:00:00.000Z"
+          },
+          {
+            channel_id: "wr_456",
+            project_id: "proj_456",
+            channel: "email",
+            config: { to: ["owner@example.com", "team@example.com"] },
+            schedule: { day_of_week: "monday", hour_of_day: 9, timezone: "UTC" },
+            is_enabled: true,
+            created_at: "2026-03-15T00:00:00.000Z",
+            updated_at: "2026-03-15T00:00:00.000Z"
+          }
+        ])
+      },
+      weeklyReportDeliveryStore: { claimWeeklyReportDelivery },
+      batchSize: 25,
+      now: new Date("2026-03-16T10:30:00.000Z")
+    });
+
+    expect(count).toBe(1);
+    expect(enqueue).toHaveBeenCalledWith("generate-weekly-report", {
+      delivery_id: "wrd_123",
+      weekly_report_channel_id: "wr_123",
+      project_id: "proj_123",
+      delivery_ids: ["wrd_123", "wrd_456"],
+      weekly_report_channel_ids: ["wr_123", "wr_456"],
+      project_ids: ["proj_123", "proj_456"],
       window_start: "2026-03-09T00:00:00.000Z",
       window_end: "2026-03-16T00:00:00.000Z"
     });

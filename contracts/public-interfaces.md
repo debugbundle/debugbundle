@@ -1093,6 +1093,8 @@ Owner and admin may manage any webhook in the project. Plain members may create 
 | PATCH | `/v1/weekly-report-channels/{id}` | Browser Session or Member Token | Update weekly report channel |
 | DELETE | `/v1/weekly-report-channels/{id}` | Browser Session or Member Token | Delete weekly report channel |
 
+Project members with access may list weekly report channels. Only project owners and admins may create, update, or delete weekly report channels.
+
 **Query params (list weekly report channels):** `project_id` (required UUID), `limit` (optional, integer 1-100, default 20)
 
 **Create weekly report channel request:**

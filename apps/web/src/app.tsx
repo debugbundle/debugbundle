@@ -1,6 +1,17 @@
 import { KeySquareIcon, LoaderCircleIcon, PlusIcon } from "lucide-react";
 import React, { useEffect, useRef, useState } from "react";
-import { BrowserRouter, Link, MemoryRouter, Navigate, Outlet, Route, Routes, useLocation, useNavigate, useSearchParams } from "react-router-dom";
+import {
+  BrowserRouter,
+  Link,
+  MemoryRouter,
+  Navigate,
+  Outlet,
+  Route,
+  Routes,
+  useLocation,
+  useNavigate,
+  useSearchParams
+} from "react-router-dom";
 import { Toaster } from "sonner";
 
 import { AppSidebar } from "./components/system/app-sidebar.js";
@@ -29,13 +40,27 @@ import {
 import { Button } from "./components/ui/button.js";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./components/ui/card.js";
 import { Dialog, DialogTrigger } from "./components/ui/dialog.js";
-import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "./components/ui/empty.js";
+import {
+  Empty,
+  EmptyContent,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle
+} from "./components/ui/empty.js";
 import { Field, FieldDescription, FieldGroup, FieldLabel } from "./components/ui/field.js";
 import { Input } from "./components/ui/input.js";
 import { Notice } from "./components/ui/notice.js";
 import { Separator } from "./components/ui/separator.js";
 import { Skeleton } from "./components/ui/skeleton.js";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "./components/ui/table.js";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow
+} from "./components/ui/table.js";
 import {
   buildApiUrl,
   createMemberToken,
@@ -60,8 +85,13 @@ import { ProjectAlertsPage } from "./pages/project-alerts-page.js";
 import { ProjectInvitePage } from "./pages/project-invite-page.js";
 import { ProjectMembersPage } from "./pages/project-members-page.js";
 import { ProjectGitHubPage } from "./pages/project-github-page.js";
-import { ProjectBundlesPage, ProjectIncidentsPage, ProjectOverviewPage } from "./pages/project-overview-page.js";
+import {
+  ProjectBundlesPage,
+  ProjectIncidentsPage,
+  ProjectOverviewPage
+} from "./pages/project-overview-page.js";
 import { ProjectImprovementsPage } from "./pages/project-improvements-page.js";
+import { ProjectProbesPage } from "./pages/project-probes-page.js";
 import { ProjectSettingsPage } from "./pages/project-settings-page.js";
 import { SettingsPage } from "./pages/settings-page.js";
 import { ProjectWebhooksPage } from "./pages/project-webhooks-page.js";
@@ -125,7 +155,10 @@ function getAuthFieldErrors(step: AuthStep, email: string, code: string): AuthFi
   };
 }
 
-function omitAuthFieldError(errors: AuthFieldErrors, field: keyof AuthFieldErrors): AuthFieldErrors {
+function omitAuthFieldError(
+  errors: AuthFieldErrors,
+  field: keyof AuthFieldErrors
+): AuthFieldErrors {
   const remaining = { ...errors };
   delete remaining[field];
   return remaining;
@@ -148,7 +181,9 @@ export function App({ initialEntries }: AppProps): JSX.Element {
               <Route path="/improvements" element={<ImprovementsPage />} />
               <Route path="/billing" element={<BillingPage />} />
               <Route path="/projects" element={<ProjectsPage />} />
-              {isSystemEmailReviewEnabled() ? <Route path="/__dev/system-emails" element={<SystemEmailReviewPage />} /> : null}
+              {isSystemEmailReviewEnabled() ? (
+                <Route path="/__dev/system-emails" element={<SystemEmailReviewPage />} />
+              ) : null}
               <Route path="/organization" element={<Navigate replace to="/projects" />} />
               <Route path="/projects/:projectId" element={<ProjectLayout />}>
                 <Route index element={<ProjectOverviewPage />} />
@@ -158,6 +193,7 @@ export function App({ initialEntries }: AppProps): JSX.Element {
                 <Route path="improvements/:improvementId" element={<ImprovementDetailPage />} />
                 <Route path="bundles" element={<ProjectBundlesPage />} />
                 <Route path="bundles/:incidentId" element={<IncidentDetailPage />} />
+                <Route path="probes" element={<ProjectProbesPage />} />
                 <Route path="github" element={<ProjectGitHubPage />} />
                 <Route path="members" element={<ProjectMembersPage />} />
                 <Route path="settings" element={<ProjectSettingsPage />} />
@@ -187,7 +223,9 @@ export function App({ initialEntries }: AppProps): JSX.Element {
               <Route path="/improvements" element={<ImprovementsPage />} />
               <Route path="/billing" element={<BillingPage />} />
               <Route path="/projects" element={<ProjectsPage />} />
-              {isSystemEmailReviewEnabled() ? <Route path="/__dev/system-emails" element={<SystemEmailReviewPage />} /> : null}
+              {isSystemEmailReviewEnabled() ? (
+                <Route path="/__dev/system-emails" element={<SystemEmailReviewPage />} />
+              ) : null}
               <Route path="/organization" element={<Navigate replace to="/projects" />} />
               <Route path="/projects/:projectId" element={<ProjectLayout />}>
                 <Route index element={<ProjectOverviewPage />} />
@@ -197,6 +235,7 @@ export function App({ initialEntries }: AppProps): JSX.Element {
                 <Route path="improvements/:improvementId" element={<ImprovementDetailPage />} />
                 <Route path="bundles" element={<ProjectBundlesPage />} />
                 <Route path="bundles/:incidentId" element={<IncidentDetailPage />} />
+                <Route path="probes" element={<ProjectProbesPage />} />
                 <Route path="github" element={<ProjectGitHubPage />} />
                 <Route path="members" element={<ProjectMembersPage />} />
                 <Route path="settings" element={<ProjectSettingsPage />} />
@@ -259,7 +298,12 @@ function RootGate(): JSX.Element {
 }
 
 function isPublicAuthPath(pathname: string): boolean {
-  return pathname === "/login" || pathname === "/signup" || pathname === "/invite" || pathname.startsWith("/auth/github/callback");
+  return (
+    pathname === "/login" ||
+    pathname === "/signup" ||
+    pathname === "/invite" ||
+    pathname.startsWith("/auth/github/callback")
+  );
 }
 
 function RootRedirect(): JSX.Element {
@@ -342,13 +386,24 @@ function AuthLayout({
 
         <FieldDescription className="px-6 text-center text-balance">
           By continuing, you agree to our{" "}
-          <a href={TERMS_OF_SERVICE_URL} className="underline underline-offset-4 hover:text-foreground" target="_blank" rel="noreferrer">
+          <a
+            href={TERMS_OF_SERVICE_URL}
+            className="underline underline-offset-4 hover:text-foreground"
+            target="_blank"
+            rel="noreferrer"
+          >
             Terms of Service
           </a>{" "}
           and{" "}
-          <a href={PRIVACY_POLICY_URL} className="underline underline-offset-4 hover:text-foreground" target="_blank" rel="noreferrer">
+          <a
+            href={PRIVACY_POLICY_URL}
+            className="underline underline-offset-4 hover:text-foreground"
+            target="_blank"
+            rel="noreferrer"
+          >
             Privacy Policy
-          </a>.
+          </a>
+          .
         </FieldDescription>
       </div>
     </div>
@@ -450,7 +505,9 @@ function EmailAuthPage({
   }
 
   function clearFieldError(field: keyof AuthFieldErrors): void {
-    setFieldErrors((current) => (current[field] === undefined ? current : omitAuthFieldError(current, field)));
+    setFieldErrors((current) =>
+      current[field] === undefined ? current : omitAuthFieldError(current, field)
+    );
   }
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>): Promise<void> {
@@ -488,7 +545,8 @@ function EmailAuthPage({
         step === "request"
           ? {
               title: "Code could not be sent",
-              description: "We could not send a sign-in code right now. Check the address and try again."
+              description:
+                "We could not send a sign-in code right now. Check the address and try again."
             }
           : {
               title: "Code was not accepted",
@@ -567,7 +625,9 @@ function EmailAuthPage({
                   setRequestError(null);
                 }}
               />
-              <FieldDescription>Codes expire quickly. Request a new one if you switch emails or wait too long.</FieldDescription>
+              <FieldDescription>
+                Codes expire quickly. Request a new one if you switch emails or wait too long.
+              </FieldDescription>
               {fieldErrors.code === undefined ? null : (
                 <Notice id={codeErrorId} tone="destructive">
                   {fieldErrors.code}
@@ -582,7 +642,9 @@ function EmailAuthPage({
               <AuthMethodDivider />
               <div className="space-y-1">
                 <p className="text-sm font-medium">Continue with email</p>
-                <FieldDescription>We&apos;ll send a six-digit code so you can sign in without a password.</FieldDescription>
+                <FieldDescription>
+                  We&apos;ll send a six-digit code so you can sign in without a password.
+                </FieldDescription>
               </div>
               <Field data-invalid={fieldErrors.email !== undefined || undefined}>
                 <FieldLabel htmlFor="email-auth-email">
@@ -616,22 +678,45 @@ function EmailAuthPage({
             </Notice>
           )}
           <Field>
-            <Button type="submit" className="w-full" disabled={isSubmitting} aria-describedby={requestErrorId}>
+            <Button
+              type="submit"
+              className="w-full"
+              disabled={isSubmitting}
+              aria-describedby={requestErrorId}
+            >
               {isSubmitting ? <LoaderCircleIcon className="animate-spin" /> : null}
               {isVerifyStep ? "Verify code" : "Send code"}
             </Button>
             {isVerifyStep ? (
               <div className="mt-3 flex flex-col gap-3 sm:flex-row">
-                <Button type="button" variant="outline" className="sm:flex-1" disabled={isSubmitting} onClick={() => void handleResendCode()}>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="sm:flex-1"
+                  disabled={isSubmitting}
+                  onClick={() => void handleResendCode()}
+                >
                   Resend code
                 </Button>
-                <Button type="button" variant="ghost" className="sm:flex-1" disabled={isSubmitting} onClick={handleUseDifferentEmail}>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  className="sm:flex-1"
+                  disabled={isSubmitting}
+                  onClick={handleUseDifferentEmail}
+                >
                   Use a different email
                 </Button>
               </div>
             ) : (
               <FieldDescription className="text-center">
-                {alternatePrompt} <Link className="underline underline-offset-4 hover:text-foreground" to={alternateHref}>{alternateLinkLabel}</Link>
+                {alternatePrompt}{" "}
+                <Link
+                  className="underline underline-offset-4 hover:text-foreground"
+                  to={alternateHref}
+                >
+                  {alternateLinkLabel}
+                </Link>
               </FieldDescription>
             )}
           </Field>
@@ -693,15 +778,24 @@ function GithubAuthCallbackPage(): JSX.Element {
   }
 
   const descriptionByError: Record<string, string> = {
-    invalid_oauth_state: "The GitHub sign-in state expired or did not match this browser session. Start the sign-in flow again.",
-    oauth_exchange_failed: "GitHub sign-in could not be completed. Check the local OAuth app configuration and try again."
+    invalid_oauth_state:
+      "The GitHub sign-in state expired or did not match this browser session. Start the sign-in flow again.",
+    oauth_exchange_failed:
+      "GitHub sign-in could not be completed. Check the local OAuth app configuration and try again."
   };
 
   return (
-    <AuthLayout title="Continue with GitHub" description="Complete GitHub sign-in to start a browser session.">
+    <AuthLayout
+      title="Continue with GitHub"
+      description="Complete GitHub sign-in to start a browser session."
+    >
       <div className="space-y-5">
         {isRefreshing ? (
-          <CalloutCard eyebrow="GitHub sign-in" title="Completing sign-in" description="We are finalizing your GitHub session now.">
+          <CalloutCard
+            eyebrow="GitHub sign-in"
+            title="Completing sign-in"
+            description="We are finalizing your GitHub session now."
+          >
             <div className="flex items-center gap-3 text-sm text-muted-foreground">
               <LoaderCircleIcon className="animate-spin" />
               Finalizing browser session
@@ -711,7 +805,12 @@ function GithubAuthCallbackPage(): JSX.Element {
           <CalloutCard
             eyebrow="GitHub sign-in"
             title="Sign-in was not completed"
-            description={error === null ? "No active browser session was created. Start GitHub sign-in again." : (descriptionByError[error] ?? "GitHub sign-in could not be completed. Start the flow again.")}
+            description={
+              error === null
+                ? "No active browser session was created. Start GitHub sign-in again."
+                : (descriptionByError[error] ??
+                  "GitHub sign-in could not be completed. Start the flow again.")
+            }
             tone="warning"
           />
         )}
@@ -809,11 +908,17 @@ function MemberTokensPage(): JSX.Element {
               footer={<Button type="submit">Create token</Button>}
               onSubmit={(event) => void handleCreate(event)}
             >
-                <Field>
-                  <FieldLabel htmlFor="member-token-label">Token label</FieldLabel>
-                  <Input id="member-token-label" value={label} onChange={(event) => setLabel(event.currentTarget.value)} />
-                  <FieldDescription>Use a label that identifies the automation client or environment.</FieldDescription>
-                </Field>
+              <Field>
+                <FieldLabel htmlFor="member-token-label">Token label</FieldLabel>
+                <Input
+                  id="member-token-label"
+                  value={label}
+                  onChange={(event) => setLabel(event.currentTarget.value)}
+                />
+                <FieldDescription>
+                  Use a label that identifies the automation client or environment.
+                </FieldDescription>
+              </Field>
             </DialogFormContent>
           </Dialog>
         }
@@ -828,7 +933,9 @@ function MemberTokensPage(): JSX.Element {
         />
       ) : null}
 
-      {createdToken?.plaintext === undefined ? null : <PlaintextTokenReveal value={createdToken.plaintext} />}
+      {createdToken?.plaintext === undefined ? null : (
+        <PlaintextTokenReveal value={createdToken.plaintext} />
+      )}
 
       <Card>
         <CardHeader>
@@ -850,7 +957,10 @@ function MemberTokensPage(): JSX.Element {
                     <KeySquareIcon />
                   </EmptyMedia>
                   <EmptyTitle>No member tokens yet</EmptyTitle>
-                  <EmptyDescription>Issue a member token when you need CLI or MCP access outside the signed-in browser workspace.</EmptyDescription>
+                  <EmptyDescription>
+                    Issue a member token when you need CLI or MCP access outside the signed-in
+                    browser workspace.
+                  </EmptyDescription>
                 </EmptyHeader>
                 <EmptyContent>
                   <Button type="button" onClick={() => setIsCreateOpen(true)} disabled={!canCreate}>
@@ -876,22 +986,29 @@ function MemberTokensPage(): JSX.Element {
                     <TableRow key={token.token_id}>
                       <TableCell className="font-medium">{token.label}</TableCell>
                       <TableCell>{formatDate(token.created_at)}</TableCell>
-                      <TableCell>{token.last_used_at === null ? "Never" : formatDate(token.last_used_at)}</TableCell>
+                      <TableCell>
+                        {token.last_used_at === null ? "Never" : formatDate(token.last_used_at)}
+                      </TableCell>
                       <TableCell className="text-right">
                         <AlertDialog>
                           <AlertDialogTrigger asChild>
-                            <Button type="button" variant="ghost" size="sm">Revoke</Button>
+                            <Button type="button" variant="ghost" size="sm">
+                              Revoke
+                            </Button>
                           </AlertDialogTrigger>
                           <AlertDialogContent>
                             <AlertDialogHeader>
                               <AlertDialogTitle>Revoke member token</AlertDialogTitle>
                               <AlertDialogDescription>
-                                This will immediately invalidate the token for CLI and MCP authentication.
+                                This will immediately invalidate the token for CLI and MCP
+                                authentication.
                               </AlertDialogDescription>
                             </AlertDialogHeader>
                             <AlertDialogFooter>
                               <AlertDialogCancel>Cancel</AlertDialogCancel>
-                              <AlertDialogAction onClick={() => void handleRevoke(token.token_id)}>Revoke token</AlertDialogAction>
+                              <AlertDialogAction onClick={() => void handleRevoke(token.token_id)}>
+                                Revoke token
+                              </AlertDialogAction>
                             </AlertDialogFooter>
                           </AlertDialogContent>
                         </AlertDialog>

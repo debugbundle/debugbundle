@@ -96,6 +96,20 @@ export interface CreatedProjectToken extends ProjectTokenRecord {
   plaintext?: string;
 }
 
+export interface ProbeActivationRecord {
+  activation_id: string;
+  label_pattern: string;
+  service: string;
+  environment: string;
+  expires_at: string;
+  trigger_expires_at: string;
+}
+
+export interface CreatedProbeActivation {
+  activation: ProbeActivationRecord;
+  trigger_token: string;
+}
+
 export type CapturePreset = "minimal" | "balanced" | "investigative";
 
 export type CaptureLogs = "off" | "error" | "warning" | "info";
@@ -188,7 +202,12 @@ export interface ImprovementRecord {
   service_runtime: string | null;
   service_framework: string | null;
   environment: string;
-  kind: "warning_hotspot" | "slow_request" | "request_failure_pattern" | "recurring_incident" | "post_deploy_regression";
+  kind:
+    | "warning_hotspot"
+    | "slow_request"
+    | "request_failure_pattern"
+    | "recurring_incident"
+    | "post_deploy_regression";
   status: "open" | "resolved" | "snoozed";
   severity: "low" | "medium" | "high" | "critical";
   confidence: number;
@@ -268,6 +287,32 @@ export interface AlertRecord {
   condition_type: AlertConditionType;
   severity_min: "low" | "medium" | "high" | "critical" | null;
   config: Record<string, unknown>;
+  is_enabled: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export type WeeklyReportChannel = "email" | "slack";
+
+export type WeeklyReportDayOfWeek =
+  | "monday"
+  | "tuesday"
+  | "wednesday"
+  | "thursday"
+  | "friday"
+  | "saturday"
+  | "sunday";
+
+export interface WeeklyReportChannelRecord {
+  channel_id: string;
+  project_id: string;
+  channel: WeeklyReportChannel;
+  config: Record<string, unknown>;
+  schedule: {
+    day_of_week: WeeklyReportDayOfWeek;
+    hour_of_day: number;
+    timezone: string;
+  };
   is_enabled: boolean;
   created_at: string;
   updated_at: string;
@@ -403,7 +448,10 @@ export function buildApiUrl(path: string, env: WebApiEnv = import.meta.env): str
   return `${resolveApiBaseUrl(env)}${path}`;
 }
 
-export function resolveApiResourceUrl(value: string | null, env: WebApiEnv = import.meta.env): string | null {
+export function resolveApiResourceUrl(
+  value: string | null,
+  env: WebApiEnv = import.meta.env
+): string | null {
   if (value === null) {
     return null;
   }
@@ -428,7 +476,10 @@ export class InvalidSessionError extends Error {
 }
 
 export function isInvalidSessionError(error: unknown): error is InvalidSessionError {
-  return error instanceof InvalidSessionError || (error instanceof Error && error.message === "invalid_session");
+  return (
+    error instanceof InvalidSessionError ||
+    (error instanceof Error && error.message === "invalid_session")
+  );
 }
 
 function clearBrowserSessionState(): void {
@@ -477,7 +528,9 @@ function parseAttachmentFilename(contentDisposition: string | null): string | nu
   return asciiMatch?.[1] ?? null;
 }
 
-function normalizeProjectRecord(project: Omit<ProjectRecord, "metrics"> & { metrics?: Partial<ProjectRecord["metrics"]> }): ProjectRecord {
+function normalizeProjectRecord(
+  project: Omit<ProjectRecord, "metrics"> & { metrics?: Partial<ProjectRecord["metrics"]> }
+): ProjectRecord {
   return {
     ...project,
     metrics: {
@@ -489,6 +542,10 @@ function normalizeProjectRecord(project: Omit<ProjectRecord, "metrics"> & { metr
   };
 }
 
+function getBrowserTimeZone(): string {
+  return Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
+}
+
 function normalizeBillingUsageMetric(metric?: Partial<BillingUsageMetric>): BillingUsageMetric {
   return {
     used: metric?.used ?? 0,
@@ -497,17 +554,29 @@ function normalizeBillingUsageMetric(metric?: Partial<BillingUsageMetric>): Bill
 }
 
 function normalizeBillingSummary(
-  billing: Omit<BillingSummaryRecord, "allowances"> & { allowances?: Partial<BillingSummaryRecord["allowances"]> }
+  billing: Omit<BillingSummaryRecord, "allowances"> & {
+    allowances?: Partial<BillingSummaryRecord["allowances"]>;
+  }
 ): BillingSummaryRecord {
   return {
     ...billing,
     allowances: {
-      monthly_bundle_requests: normalizeBillingUsageMetric(billing.allowances?.monthly_bundle_requests),
-      monthly_raw_ingested_events: normalizeBillingUsageMetric(billing.allowances?.monthly_raw_ingested_events),
+      monthly_bundle_requests: normalizeBillingUsageMetric(
+        billing.allowances?.monthly_bundle_requests
+      ),
+      monthly_raw_ingested_events: normalizeBillingUsageMetric(
+        billing.allowances?.monthly_raw_ingested_events
+      ),
       retained_bundle_cap: normalizeBillingUsageMetric(billing.allowances?.retained_bundle_cap),
-      monthly_remote_activations: normalizeBillingUsageMetric(billing.allowances?.monthly_remote_activations),
-      monthly_alert_deliveries: normalizeBillingUsageMetric(billing.allowances?.monthly_alert_deliveries),
-      monthly_webhook_deliveries: normalizeBillingUsageMetric(billing.allowances?.monthly_webhook_deliveries)
+      monthly_remote_activations: normalizeBillingUsageMetric(
+        billing.allowances?.monthly_remote_activations
+      ),
+      monthly_alert_deliveries: normalizeBillingUsageMetric(
+        billing.allowances?.monthly_alert_deliveries
+      ),
+      monthly_webhook_deliveries: normalizeBillingUsageMetric(
+        billing.allowances?.monthly_webhook_deliveries
+      )
     }
   };
 }
@@ -564,7 +633,10 @@ export async function getSession(): Promise<SessionRecord | null> {
   return rememberSession(body.session);
 }
 
-export async function requestEmailCode(payload: { email: string; accepted_terms: true }): Promise<void> {
+export async function requestEmailCode(payload: {
+  email: string;
+  accepted_terms: true;
+}): Promise<void> {
   await readJson(
     await fetch(`${API_BASE}/v1/auth/request-code`, {
       method: "POST",
@@ -577,7 +649,10 @@ export async function requestEmailCode(payload: { email: string; accepted_terms:
   );
 }
 
-export async function verifyEmailCode(payload: { email: string; code: string }): Promise<SessionRecord> {
+export async function verifyEmailCode(payload: {
+  email: string;
+  code: string;
+}): Promise<SessionRecord> {
   const body = await readJson<{ session: SessionRecord }>(
     await fetch(`${API_BASE}/v1/auth/verify-code`, {
       method: "POST",
@@ -619,7 +694,9 @@ export async function exportAccountData(): Promise<{ blob: Blob; filename: strin
 
   return {
     blob: await response.blob(),
-    filename: parseAttachmentFilename(response.headers.get("Content-Disposition")) ?? "debugbundle-account-export.json"
+    filename:
+      parseAttachmentFilename(response.headers.get("Content-Disposition")) ??
+      "debugbundle-account-export.json"
   };
 }
 
@@ -661,7 +738,11 @@ export async function listMemberTokens(): Promise<MemberTokenRecord[]> {
 }
 
 export async function listProjects(): Promise<ProjectRecord[]> {
-  const body = await readJson<{ projects: Array<Omit<ProjectRecord, "metrics"> & { metrics?: Partial<ProjectRecord["metrics"]> }> }>(
+  const body = await readJson<{
+    projects: Array<
+      Omit<ProjectRecord, "metrics"> & { metrics?: Partial<ProjectRecord["metrics"]> }
+    >;
+  }>(
     await fetch(`${API_BASE}/v1/projects`, {
       credentials: "include"
     })
@@ -727,16 +808,18 @@ export async function listIncidents(
   };
 }
 
-export async function listImprovements(input: {
-  limit?: number;
-  cursor?: string;
-  projectId?: string;
-  environment?: string;
-  service?: string;
-  status?: ImprovementRecord["status"];
-  severity?: ImprovementRecord["severity"];
-  kind?: ImprovementRecord["kind"];
-} = {}): Promise<{ improvements: ImprovementRecord[]; nextCursor: string | null }> {
+export async function listImprovements(
+  input: {
+    limit?: number;
+    cursor?: string;
+    projectId?: string;
+    environment?: string;
+    service?: string;
+    status?: ImprovementRecord["status"];
+    severity?: ImprovementRecord["severity"];
+    kind?: ImprovementRecord["kind"];
+  } = {}
+): Promise<{ improvements: ImprovementRecord[]; nextCursor: string | null }> {
   const searchParams = new URLSearchParams({
     limit: String(input.limit ?? 20)
   });
@@ -792,7 +875,9 @@ export async function listServices(projectId: string, limit = 100): Promise<Serv
 
 export async function getBillingSummary(): Promise<BillingSummaryRecord> {
   const body = await readJson<{
-    billing: Omit<BillingSummaryRecord, "allowances"> & { allowances?: Partial<BillingSummaryRecord["allowances"]> };
+    billing: Omit<BillingSummaryRecord, "allowances"> & {
+      allowances?: Partial<BillingSummaryRecord["allowances"]>;
+    };
   }>(
     await fetch(`${API_BASE}/v1/billing`, {
       credentials: "include"
@@ -817,7 +902,9 @@ export async function startBillingCheckout(targetPlan: "solo" | "team"): Promise
 
 export async function confirmBillingCheckout(sessionId: string): Promise<BillingSummaryRecord> {
   const body = await readJson<{
-    billing: Omit<BillingSummaryRecord, "allowances"> & { allowances?: Partial<BillingSummaryRecord["allowances"]> };
+    billing: Omit<BillingSummaryRecord, "allowances"> & {
+      allowances?: Partial<BillingSummaryRecord["allowances"]>;
+    };
   }>(
     await fetch(`${API_BASE}/v1/billing/checkout/confirm`, {
       method: "POST",
@@ -842,9 +929,13 @@ export async function openBillingPortal(): Promise<string> {
   return body.url;
 }
 
-export async function increaseBillingCapacity(targetAdditionalCapacityUnits: number): Promise<BillingSummaryRecord> {
+export async function increaseBillingCapacity(
+  targetAdditionalCapacityUnits: number
+): Promise<BillingSummaryRecord> {
   const body = await readJson<{
-    billing: Omit<BillingSummaryRecord, "allowances"> & { allowances?: Partial<BillingSummaryRecord["allowances"]> };
+    billing: Omit<BillingSummaryRecord, "allowances"> & {
+      allowances?: Partial<BillingSummaryRecord["allowances"]>;
+    };
   }>(
     await fetch(`${API_BASE}/v1/billing/capacity/increase`, {
       method: "POST",
@@ -857,9 +948,13 @@ export async function increaseBillingCapacity(targetAdditionalCapacityUnits: num
   return normalizeBillingSummary(body.billing);
 }
 
-export async function scheduleBillingCapacityReduction(targetAdditionalCapacityUnits: number): Promise<BillingSummaryRecord> {
+export async function scheduleBillingCapacityReduction(
+  targetAdditionalCapacityUnits: number
+): Promise<BillingSummaryRecord> {
   const body = await readJson<{
-    billing: Omit<BillingSummaryRecord, "allowances"> & { allowances?: Partial<BillingSummaryRecord["allowances"]> };
+    billing: Omit<BillingSummaryRecord, "allowances"> & {
+      allowances?: Partial<BillingSummaryRecord["allowances"]>;
+    };
   }>(
     await fetch(`${API_BASE}/v1/billing/capacity/scheduled-reduction`, {
       method: "POST",
@@ -874,7 +969,9 @@ export async function scheduleBillingCapacityReduction(targetAdditionalCapacityU
 
 export async function cancelBillingCapacityReduction(): Promise<BillingSummaryRecord> {
   const body = await readJson<{
-    billing: Omit<BillingSummaryRecord, "allowances"> & { allowances?: Partial<BillingSummaryRecord["allowances"]> };
+    billing: Omit<BillingSummaryRecord, "allowances"> & {
+      allowances?: Partial<BillingSummaryRecord["allowances"]>;
+    };
   }>(
     await fetch(`${API_BASE}/v1/billing/capacity/scheduled-reduction`, {
       method: "DELETE",
@@ -890,13 +987,19 @@ export async function createProject(payload: {
   name: string;
   slug: string;
   environment_default: string;
+  weekly_report_timezone?: string;
 }): Promise<ProjectRecord> {
-  const body = await readJson<{ project: Omit<ProjectRecord, "metrics"> & { metrics?: Partial<ProjectRecord["metrics"]> } }>(
+  const body = await readJson<{
+    project: Omit<ProjectRecord, "metrics"> & { metrics?: Partial<ProjectRecord["metrics"]> };
+  }>(
     await fetch(`${API_BASE}/v1/projects`, {
       method: "POST",
       credentials: "include",
       headers: buildBrowserSessionHeaders(true),
-      body: JSON.stringify(payload)
+      body: JSON.stringify({
+        ...payload,
+        weekly_report_timezone: payload.weekly_report_timezone ?? getBrowserTimeZone()
+      })
     })
   );
 
@@ -911,7 +1014,9 @@ export async function updateProject(
     environment_default?: string;
   }
 ): Promise<ProjectRecord> {
-  const body = await readJson<{ project: Omit<ProjectRecord, "metrics"> & { metrics?: Partial<ProjectRecord["metrics"]> } }>(
+  const body = await readJson<{
+    project: Omit<ProjectRecord, "metrics"> & { metrics?: Partial<ProjectRecord["metrics"]> };
+  }>(
     await fetch(`${API_BASE}/v1/projects/${projectId}`, {
       method: "PATCH",
       credentials: "include",
@@ -935,7 +1040,9 @@ export async function deleteProject(projectId: string): Promise<DeletedProjectRe
   return body.project;
 }
 
-export async function getProjectCapturePolicy(projectId: string): Promise<ProjectCapturePolicyResponse> {
+export async function getProjectCapturePolicy(
+  projectId: string
+): Promise<ProjectCapturePolicyResponse> {
   return readJson<ProjectCapturePolicyResponse>(
     await fetch(`${API_BASE}/v1/projects/${projectId}/capture-policy`, {
       credentials: "include"
@@ -957,7 +1064,9 @@ export async function updateProjectCapturePolicy(
   );
 }
 
-export async function getProjectImprovementSettings(projectId: string): Promise<ProjectImprovementSettingsResponse> {
+export async function getProjectImprovementSettings(
+  projectId: string
+): Promise<ProjectImprovementSettingsResponse> {
   return readJson<ProjectImprovementSettingsResponse>(
     await fetch(`${API_BASE}/v1/projects/${projectId}/improvement-settings`, {
       credentials: "include"
@@ -1004,6 +1113,69 @@ export async function listProjectAlerts(projectId: string, limit = 20): Promise<
   return body.alerts;
 }
 
+export async function listProjectWeeklyReportChannels(
+  projectId: string,
+  limit = 20
+): Promise<WeeklyReportChannelRecord[]> {
+  const searchParams = new URLSearchParams({
+    project_id: projectId,
+    limit: String(limit)
+  });
+
+  const body = await readJson<{ channels: WeeklyReportChannelRecord[] }>(
+    await fetch(`${API_BASE}/v1/weekly-report-channels?${searchParams.toString()}`, {
+      credentials: "include"
+    })
+  );
+
+  return body.channels;
+}
+
+export async function createProjectWeeklyReportChannel(payload: {
+  project_id: string;
+  channel: "email";
+  config: { to: string[] };
+  schedule: WeeklyReportChannelRecord["schedule"];
+  is_enabled?: boolean;
+}): Promise<WeeklyReportChannelRecord> {
+  const body = await readJson<{ channel: WeeklyReportChannelRecord }>(
+    await fetch(`${API_BASE}/v1/weekly-report-channels`, {
+      method: "POST",
+      credentials: "include",
+      headers: buildBrowserSessionHeaders(true),
+      body: JSON.stringify({
+        project_id: payload.project_id,
+        channel: payload.channel,
+        config: payload.config,
+        schedule: payload.schedule,
+        is_enabled: payload.is_enabled ?? true
+      })
+    })
+  );
+
+  return body.channel;
+}
+
+export async function updateProjectWeeklyReportChannel(
+  channelId: string,
+  payload: {
+    config?: { to: string[] };
+    schedule?: WeeklyReportChannelRecord["schedule"];
+    is_enabled?: boolean;
+  }
+): Promise<WeeklyReportChannelRecord> {
+  const body = await readJson<{ channel: WeeklyReportChannelRecord }>(
+    await fetch(`${API_BASE}/v1/weekly-report-channels/${channelId}`, {
+      method: "PATCH",
+      credentials: "include",
+      headers: buildBrowserSessionHeaders(true),
+      body: JSON.stringify(payload)
+    })
+  );
+
+  return body.channel;
+}
+
 export async function createProjectAlert(payload: {
   project_id: string;
   service_id?: string;
@@ -1048,16 +1220,21 @@ export async function listProjectWebhooks(projectId: string, limit = 20): Promis
   return body.webhooks;
 }
 
-export async function getGitHubInstallation(projectId?: string): Promise<GitHubInstallationRecord | null> {
+export async function getGitHubInstallation(
+  projectId?: string
+): Promise<GitHubInstallationRecord | null> {
   const searchParams = new URLSearchParams();
   if (projectId !== undefined) {
     searchParams.set("project_id", projectId);
   }
 
   const body = await readJson<{ installation: GitHubInstallationRecord | null }>(
-    await fetch(`${API_BASE}/v1/github/installation${searchParams.size === 0 ? "" : `?${searchParams.toString()}`}`, {
-      credentials: "include"
-    })
+    await fetch(
+      `${API_BASE}/v1/github/installation${searchParams.size === 0 ? "" : `?${searchParams.toString()}`}`,
+      {
+        credentials: "include"
+      }
+    )
   );
 
   return body.installation;
@@ -1084,22 +1261,29 @@ export async function getGitHubInstallUrl(returnTo?: string, projectId?: string)
   return body.install_url;
 }
 
-export async function listGitHubRepositories(projectId?: string): Promise<GitHubRepositoryRecord[]> {
+export async function listGitHubRepositories(
+  projectId?: string
+): Promise<GitHubRepositoryRecord[]> {
   const searchParams = new URLSearchParams();
   if (projectId !== undefined) {
     searchParams.set("project_id", projectId);
   }
 
   const body = await readJson<{ repositories: GitHubRepositoryRecord[] }>(
-    await fetch(`${API_BASE}/v1/github/repositories${searchParams.size === 0 ? "" : `?${searchParams.toString()}`}`, {
-      credentials: "include"
-    })
+    await fetch(
+      `${API_BASE}/v1/github/repositories${searchParams.size === 0 ? "" : `?${searchParams.toString()}`}`,
+      {
+        credentials: "include"
+      }
+    )
   );
 
   return body.repositories;
 }
 
-export async function getProjectGitHubRepo(projectId: string): Promise<ProjectGitHubRepoRecord | null> {
+export async function getProjectGitHubRepo(
+  projectId: string
+): Promise<ProjectGitHubRepoRecord | null> {
   const body = await readJson<{ repo: ProjectGitHubRepoRecord | null }>(
     await fetch(`${API_BASE}/v1/projects/${projectId}/github/repo`, {
       credentials: "include"
@@ -1109,7 +1293,9 @@ export async function getProjectGitHubRepo(projectId: string): Promise<ProjectGi
   return body.repo;
 }
 
-export async function listProjectGitHubRules(projectId: string): Promise<GitHubDispatchRuleRecord[]> {
+export async function listProjectGitHubRules(
+  projectId: string
+): Promise<GitHubDispatchRuleRecord[]> {
   const body = await readJson<{ rules: GitHubDispatchRuleRecord[] }>(
     await fetch(`${API_BASE}/v1/projects/${projectId}/github/rules`, {
       credentials: "include"
@@ -1187,15 +1373,21 @@ export async function deleteProjectGitHubRule(projectId: string, ruleId: string)
   }
 }
 
-export async function listProjectGitHubDeliveries(projectId: string, limit = 20): Promise<GitHubDispatchDeliveryRecord[]> {
+export async function listProjectGitHubDeliveries(
+  projectId: string,
+  limit = 20
+): Promise<GitHubDispatchDeliveryRecord[]> {
   const searchParams = new URLSearchParams({
     limit: String(limit)
   });
 
   const body = await readJson<{ deliveries: GitHubDispatchDeliveryRecord[] }>(
-    await fetch(`${API_BASE}/v1/projects/${projectId}/github/deliveries?${searchParams.toString()}`, {
-      credentials: "include"
-    })
+    await fetch(
+      `${API_BASE}/v1/projects/${projectId}/github/deliveries?${searchParams.toString()}`,
+      {
+        credentials: "include"
+      }
+    )
   );
 
   return body.deliveries;
@@ -1292,21 +1484,30 @@ export async function listProjectWebhookDeliveries(
 export async function testProjectWebhook(
   webhookId: string,
   projectId: string,
-  eventType: Extract<WebhookEventType, "verification.passed" | "verification.failed"> = "verification.passed"
+  eventType: Extract<
+    WebhookEventType,
+    "verification.passed" | "verification.failed"
+  > = "verification.passed"
 ): Promise<WebhookDeliveryRecord> {
   const body = await readJson<{ delivery: WebhookDeliveryRecord }>(
-    await fetch(`${API_BASE}/v1/webhooks/${webhookId}/test?project_id=${encodeURIComponent(projectId)}`, {
-      method: "POST",
-      credentials: "include",
-      headers: buildBrowserSessionHeaders(true),
-      body: JSON.stringify({ event_type: eventType })
-    })
+    await fetch(
+      `${API_BASE}/v1/webhooks/${webhookId}/test?project_id=${encodeURIComponent(projectId)}`,
+      {
+        method: "POST",
+        credentials: "include",
+        headers: buildBrowserSessionHeaders(true),
+        body: JSON.stringify({ event_type: eventType })
+      }
+    )
   );
 
   return body.delivery;
 }
 
-export async function createProjectToken(projectId: string, payload: { label: string }): Promise<CreatedProjectToken> {
+export async function createProjectToken(
+  projectId: string,
+  payload: { label: string }
+): Promise<CreatedProjectToken> {
   const body = await readJson<{ token: CreatedProjectToken }>(
     await fetch(`${API_BASE}/v1/projects/${projectId}/tokens`, {
       method: "POST",
@@ -1327,6 +1528,54 @@ export async function revokeProjectToken(projectId: string, tokenId: string): Pr
       headers: buildBrowserSessionHeaders()
     })
   );
+}
+
+export async function listProjectProbeActivations(
+  projectId: string
+): Promise<ProbeActivationRecord[]> {
+  const body = await readJson<{ activations: ProbeActivationRecord[] }>(
+    await fetch(`${API_BASE}/v1/projects/${projectId}/probes`, {
+      credentials: "include"
+    })
+  );
+
+  return body.activations;
+}
+
+export async function createProjectProbeActivation(
+  projectId: string,
+  payload: {
+    label_pattern: string;
+    service: string;
+    environment: string;
+    ttl_seconds: number;
+    trigger_ttl_seconds: number;
+  }
+): Promise<CreatedProbeActivation> {
+  return readJson<CreatedProbeActivation>(
+    await fetch(`${API_BASE}/v1/projects/${projectId}/probes/activate`, {
+      method: "POST",
+      credentials: "include",
+      headers: buildBrowserSessionHeaders(true),
+      body: JSON.stringify(payload)
+    })
+  );
+}
+
+export async function deactivateProjectProbeActivation(
+  projectId: string,
+  activationId: string
+): Promise<ProbeActivationRecord> {
+  const body = await readJson<{ deactivated: ProbeActivationRecord }>(
+    await fetch(`${API_BASE}/v1/projects/${projectId}/probes/deactivate`, {
+      method: "POST",
+      credentials: "include",
+      headers: buildBrowserSessionHeaders(true),
+      body: JSON.stringify({ activation_id: activationId })
+    })
+  );
+
+  return body.deactivated;
 }
 
 export async function createMemberToken(payload: { label: string }): Promise<CreatedMemberToken> {
@@ -1353,11 +1602,14 @@ export async function revokeMemberToken(tokenId: string): Promise<void> {
 }
 
 export async function deleteAlert(alertId: string, projectId: string): Promise<void> {
-  const response = await fetch(`${API_BASE}/v1/alerts/${alertId}?project_id=${encodeURIComponent(projectId)}`, {
-    method: "DELETE",
-    credentials: "include",
-    headers: buildBrowserSessionHeaders()
-  });
+  const response = await fetch(
+    `${API_BASE}/v1/alerts/${alertId}?project_id=${encodeURIComponent(projectId)}`,
+    {
+      method: "DELETE",
+      credentials: "include",
+      headers: buildBrowserSessionHeaders()
+    }
+  );
 
   if (!response.ok) {
     const body = (await response.json().catch(() => null)) as { error?: string } | null;
@@ -1433,7 +1685,10 @@ export async function reopenImprovement(improvementId: string): Promise<Improvem
   return body.improvement;
 }
 
-export async function snoozeImprovement(improvementId: string, snoozedUntil: string): Promise<ImprovementRecord> {
+export async function snoozeImprovement(
+  improvementId: string,
+  snoozedUntil: string
+): Promise<ImprovementRecord> {
   const body = await readJson<{ improvement: ImprovementRecord }>(
     await fetch(`${API_BASE}/v1/improvements/${improvementId}/snooze`, {
       method: "POST",
@@ -1458,7 +1713,9 @@ export interface BundleRecord {
   [key: string]: unknown;
 }
 
-export async function getIncidentBundle(incidentId: string): Promise<{ status: "ready"; bundle: BundleRecord } | { status: "pending" | "failed" }> {
+export async function getIncidentBundle(
+  incidentId: string
+): Promise<{ status: "ready"; bundle: BundleRecord } | { status: "pending" | "failed" }> {
   const response = await fetch(`${API_BASE}/v1/incidents/${incidentId}/bundle`, {
     credentials: "include"
   });
@@ -1467,7 +1724,7 @@ export async function getIncidentBundle(incidentId: string): Promise<{ status: "
     throw new Error(`request_failed_${response.status}`);
   }
 
-  const body = await response.json() as unknown;
+  const body = (await response.json()) as unknown;
 
   if (isArtifactPendingOrFailedResponse(body)) {
     return { status: body.status };
@@ -1484,15 +1741,18 @@ export async function getImprovementBundle(
   projectId: string,
   improvementId: string
 ): Promise<{ status: "ready"; bundle: BundleRecord } | ArtifactPendingOrFailedResponse> {
-  const response = await fetch(`${API_BASE}/v1/projects/${projectId}/improvements/${improvementId}/bundle`, {
-    credentials: "include"
-  });
+  const response = await fetch(
+    `${API_BASE}/v1/projects/${projectId}/improvements/${improvementId}/bundle`,
+    {
+      credentials: "include"
+    }
+  );
 
   if (!response.ok) {
     throw new Error(`request_failed_${response.status}`);
   }
 
-  const body = await response.json() as unknown;
+  const body = (await response.json()) as unknown;
 
   if (isArtifactPendingOrFailedResponse(body)) {
     return body;
@@ -1501,7 +1761,11 @@ export async function getImprovementBundle(
   return { status: "ready", bundle: body as BundleRecord };
 }
 
-export async function getIncidentReproduction(incidentId: string): Promise<{ status: "ready"; reproduction: Record<string, unknown> } | { status: "pending" | "failed" }> {
+export async function getIncidentReproduction(
+  incidentId: string
+): Promise<
+  { status: "ready"; reproduction: Record<string, unknown> } | { status: "pending" | "failed" }
+> {
   const response = await fetch(`${API_BASE}/v1/incidents/${incidentId}/reproduction`, {
     credentials: "include"
   });
@@ -1510,7 +1774,7 @@ export async function getIncidentReproduction(incidentId: string): Promise<{ sta
     throw new Error(`request_failed_${response.status}`);
   }
 
-  const body = await response.json() as unknown;
+  const body = (await response.json()) as unknown;
 
   if (isArtifactPendingOrFailedResponse(body)) {
     return { status: body.status };
@@ -1519,7 +1783,9 @@ export async function getIncidentReproduction(incidentId: string): Promise<{ sta
   return { status: "ready", reproduction: body as Record<string, unknown> };
 }
 
-function isArtifactPendingOrFailedResponse(value: unknown): value is ArtifactPendingOrFailedResponse {
+function isArtifactPendingOrFailedResponse(
+  value: unknown
+): value is ArtifactPendingOrFailedResponse {
   if (typeof value !== "object" || value === null || !("status" in value)) {
     return false;
   }

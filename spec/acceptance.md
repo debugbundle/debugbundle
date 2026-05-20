@@ -1082,6 +1082,12 @@ If CLI says something is healthy and MCP says something different, that is a pro
 - **Then** a summary report is delivered via the configured channel (email or Slack)
 - **And** the report includes: total bundles generated (by type), new incidents, regressions, top spiking incidents
 - **And** projects with zero activity receive no report (no noise)
+- **And** the report includes resolved incident counts and a plain-language outcome sentence for incidents opened during the week
+- **And** email reports due for the same recipient set and weekly window are combined into one email with per-project sections
+- **And** project owners/admins can enable or disable the project email report from project settings
+- **And** weekly email report channels are limited to 3 recipients
+- **And** new projects create one enabled owner-recipient email weekly report by default
+- **And** a second email weekly report channel cannot be created for the same project
 
 ---
 

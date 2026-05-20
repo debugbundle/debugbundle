@@ -1456,7 +1456,7 @@ export function createPostgresMetadataStore(db: Queryable): PostgresMetadataStor
                 $6,
                 now(),
                 now()
-              )
+            )
               RETURNING
                 id AS project_id,
                 organization_id,
@@ -1466,6 +1466,34 @@ export function createPostgresMetadataStore(db: Queryable): PostgresMetadataStor
                 environment_default,
                 created_at,
                 updated_at
+            )
+            , created_weekly_report AS (
+              INSERT INTO weekly_report_channels (
+                id,
+                project_id,
+                channel,
+                config,
+                schedule_day_of_week,
+                schedule_hour_of_day,
+                schedule_timezone,
+                is_enabled,
+                created_at,
+                updated_at
+              )
+              SELECT
+                $7::uuid,
+                cp.project_id,
+                'email',
+                jsonb_build_object('to', jsonb_build_array(owner_user.email)),
+                'monday',
+                9,
+                $8,
+                true,
+                now(),
+                now()
+              FROM created_project cp
+              JOIN users owner_user ON owner_user.id = cp.owner_user_id
+              RETURNING project_id
             )
             SELECT
               cp.project_id,
@@ -1488,6 +1516,7 @@ export function createPostgresMetadataStore(db: Queryable): PostgresMetadataStor
               cp.created_at::text AS created_at,
               cp.updated_at::text AS updated_at
             FROM created_project cp
+            JOIN created_weekly_report cwr ON cwr.project_id = cp.project_id
             JOIN organizations o ON o.id = cp.organization_id
             JOIN users owner_user ON owner_user.id = cp.owner_user_id
           `,
@@ -1497,7 +1526,9 @@ export function createPostgresMetadataStore(db: Queryable): PostgresMetadataStor
             input.user_id,
             input.name,
             input.slug,
-            input.environment_default
+            input.environment_default,
+            randomUUID(),
+            input.weekly_report_timezone
           ]
         );
 
@@ -1736,6 +1767,7 @@ export function createPostgresMetadataStore(db: Queryable): PostgresMetadataStor
               INSERT INTO projects (
                 id,
                 organization_id,
+                owner_user_id,
                 name,
                 slug,
                 environment_default,
@@ -1770,6 +1802,34 @@ export function createPostgresMetadataStore(db: Queryable): PostgresMetadataStor
                 created_at,
                 updated_at
             )
+            , created_weekly_report AS (
+              INSERT INTO weekly_report_channels (
+                id,
+                project_id,
+                channel,
+                config,
+                schedule_day_of_week,
+                schedule_hour_of_day,
+                schedule_timezone,
+                is_enabled,
+                created_at,
+                updated_at
+              )
+              SELECT
+                $6::uuid,
+                cp.project_id,
+                'email',
+                jsonb_build_object('to', jsonb_build_array(owner_user.email)),
+                'monday',
+                9,
+                $7,
+                true,
+                now(),
+                now()
+              FROM created_project cp
+              JOIN users owner_user ON owner_user.id = cp.owner_user_id
+              RETURNING project_id
+            )
             SELECT
               cp.project_id,
               cp.organization_id,
@@ -1791,6 +1851,7 @@ export function createPostgresMetadataStore(db: Queryable): PostgresMetadataStor
               cp.created_at::text AS created_at,
               cp.updated_at::text AS updated_at
             FROM created_project cp
+            JOIN created_weekly_report cwr ON cwr.project_id = cp.project_id
             JOIN organizations o ON o.id = cp.organization_id
             JOIN users owner_user ON owner_user.id = cp.owner_user_id
           `,
@@ -1799,7 +1860,9 @@ export function createPostgresMetadataStore(db: Queryable): PostgresMetadataStor
             input.organization_id,
             input.name,
             input.slug,
-            input.environment_default
+            input.environment_default,
+            randomUUID(),
+            input.weekly_report_timezone ?? "UTC"
           ]
         );
 
@@ -3279,6 +3342,14 @@ export function createPostgresMetadataStore(db: Queryable): PostgresMetadataStor
 
             SELECT i.project_id::text AS project_id
             FROM incidents i
+            WHERE i.resolved_at IS NOT NULL
+              AND i.resolved_at >= $1::timestamptz
+              AND i.resolved_at < $2::timestamptz
+
+            UNION
+
+            SELECT i.project_id::text AS project_id
+            FROM incidents i
             WHERE i.spike_detected_at IS NOT NULL
               AND i.spike_detected_at >= $1::timestamptz
               AND i.spike_detected_at < $2::timestamptz
@@ -3295,11 +3366,14 @@ export function createPostgresMetadataStore(db: Queryable): PostgresMetadataStor
     async getWeeklyProjectReport(input): Promise<WeeklyProjectReportSummary | null> {
       const result = await db.query<{
         project_id: string;
+        project_name: string;
         window_start: string;
         window_end: string;
         failure_bundles: number;
         improvement_bundles: number;
         new_incidents: number;
+        resolved_incidents: number;
+        opened_incidents_resolved: number;
         regressions: number;
         top_spiking_incidents: WeeklyProjectReportSummary["top_spiking_incidents"];
       } & Record<string, unknown>>(
@@ -3333,6 +3407,15 @@ export function createPostgresMetadataStore(db: Queryable): PostgresMetadataStor
             SELECT 1
             FROM incidents i
             WHERE i.project_id = $1::uuid
+              AND i.resolved_at IS NOT NULL
+              AND i.resolved_at >= $2::timestamptz
+              AND i.resolved_at < $3::timestamptz
+
+            UNION ALL
+
+            SELECT 1
+            FROM incidents i
+            WHERE i.project_id = $1::uuid
               AND i.spike_detected_at IS NOT NULL
               AND i.spike_detected_at >= $2::timestamptz
               AND i.spike_detected_at < $3::timestamptz
@@ -3354,6 +3437,7 @@ export function createPostgresMetadataStore(db: Queryable): PostgresMetadataStor
           )
           SELECT
             $1::text AS project_id,
+            p.name AS project_name,
             $2::timestamptz::text AS window_start,
             $3::timestamptz::text AS window_end,
             COALESCE((
@@ -3383,6 +3467,24 @@ export function createPostgresMetadataStore(db: Queryable): PostgresMetadataStor
               SELECT COUNT(*)::integer
               FROM incidents i
               WHERE i.project_id = $1::uuid
+                AND i.resolved_at IS NOT NULL
+                AND i.resolved_at >= $2::timestamptz
+                AND i.resolved_at < $3::timestamptz
+            ), 0) AS resolved_incidents,
+            COALESCE((
+              SELECT COUNT(*)::integer
+              FROM incidents i
+              WHERE i.project_id = $1::uuid
+                AND i.first_seen_at >= $2::timestamptz
+                AND i.first_seen_at < $3::timestamptz
+                AND i.resolved_at IS NOT NULL
+                AND i.resolved_at >= $2::timestamptz
+                AND i.resolved_at < $3::timestamptz
+            ), 0) AS opened_incidents_resolved,
+            COALESCE((
+              SELECT COUNT(*)::integer
+              FROM incidents i
+              WHERE i.project_id = $1::uuid
                 AND i.regressed_at IS NOT NULL
                 AND i.regressed_at >= $2::timestamptz
                 AND i.regressed_at < $3::timestamptz
@@ -3400,6 +3502,7 @@ export function createPostgresMetadataStore(db: Queryable): PostgresMetadataStor
               FROM top_spikes
             ), '[]'::jsonb) AS top_spiking_incidents
           FROM activity
+          JOIN projects p ON p.id = $1::uuid
           LIMIT 1
         `,
         [input.project_id, input.window_start, input.window_end]
@@ -3412,6 +3515,7 @@ export function createPostgresMetadataStore(db: Queryable): PostgresMetadataStor
 
       return {
         project_id: row.project_id,
+        project_name: row.project_name,
         window_start: row.window_start,
         window_end: row.window_end,
         bundle_counts: {
@@ -3419,6 +3523,8 @@ export function createPostgresMetadataStore(db: Queryable): PostgresMetadataStor
           improvement: row.improvement_bundles
         },
         new_incidents: row.new_incidents,
+        resolved_incidents: row.resolved_incidents,
+        opened_incidents_resolved: row.opened_incidents_resolved,
         regressions: row.regressions,
         top_spiking_incidents: row.top_spiking_incidents ?? []
       };

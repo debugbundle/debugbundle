@@ -1112,6 +1112,9 @@ export async function scheduleWeeklyReports(input: {
       delivery_id: string;
       weekly_report_channel_id: string;
       project_id: string;
+      delivery_ids?: string[];
+      weekly_report_channel_ids?: string[];
+      project_ids?: string[];
       window_start: string;
       window_end: string;
     }): Promise<void>;
@@ -1137,6 +1140,16 @@ export async function scheduleWeeklyReports(input: {
   });
   const now = input.now ?? new Date();
   let scheduledCount = 0;
+  const pendingEmailGroups = new Map<
+    string,
+    Array<{
+      delivery_id: string;
+      weekly_report_channel_id: string;
+      project_id: string;
+      window_start: string;
+      window_end: string;
+    }>
+  >();
 
   for (const channel of channels) {
     const weeklyWindow = getWeeklyWindowForChannel(channel, now);
@@ -1164,12 +1177,43 @@ export async function scheduleWeeklyReports(input: {
       continue;
     }
 
-    await input.queue.enqueue("generate-weekly-report", {
+    const payload = {
       delivery_id: delivery.delivery_id,
       weekly_report_channel_id: channel.channel_id,
       project_id: channel.project_id,
       window_start: weeklyWindow.window_start,
       window_end: weeklyWindow.window_end
+    };
+
+    if (channel.channel === "email") {
+      const groupKey = getWeeklyEmailGroupKey(channel, weeklyWindow);
+      const group = pendingEmailGroups.get(groupKey) ?? [];
+      group.push(payload);
+      pendingEmailGroups.set(groupKey, group);
+      continue;
+    }
+
+    await input.queue.enqueue("generate-weekly-report", payload);
+    scheduledCount += 1;
+  }
+
+  for (const group of pendingEmailGroups.values()) {
+    const [first] = group;
+    if (first === undefined) {
+      continue;
+    }
+
+    if (group.length === 1) {
+      await input.queue.enqueue("generate-weekly-report", first);
+      scheduledCount += 1;
+      continue;
+    }
+
+    await input.queue.enqueue("generate-weekly-report", {
+      ...first,
+      delivery_ids: group.map((entry) => entry.delivery_id),
+      weekly_report_channel_ids: group.map((entry) => entry.weekly_report_channel_id),
+      project_ids: group.map((entry) => entry.project_id)
     });
     scheduledCount += 1;
   }
@@ -1257,6 +1301,18 @@ function isStringArray(value: unknown): value is string[] {
   return Array.isArray(value) && value.every((entry) => typeof entry === "string");
 }
 
+function getWeeklyEmailGroupKey(
+  channel: Pick<WeeklyReportChannelRecord, "channel_id" | "config">,
+  weeklyWindow: { window_start: string; window_end: string }
+): string {
+  const recipients = channel.config["to"];
+  const recipientKey = isStringArray(recipients)
+    ? recipients.map((recipient) => recipient.trim().toLowerCase()).filter((recipient) => recipient.length > 0).sort().join(",")
+    : `channel:${channel.channel_id}`;
+
+  return `${weeklyWindow.window_start}:${weeklyWindow.window_end}:${recipientKey}`;
+}
+
 function getWeeklyWindowForChannel(
   channel: Pick<WeeklyReportChannelRecord, "schedule" | "channel_id">,
   now: Date
@@ -1289,14 +1345,26 @@ export function createWeeklyReportTransport(input: {
 }): WeeklyReportTransport {
   return {
     async deliver(event): Promise<void> {
+      const deliveries = event.deliveries ?? [
+        {
+          delivery_id: event.delivery_id,
+          channel: event.channel,
+          report: event.report
+        }
+      ];
       const rendered = renderWeeklyReportEmail({
-        projectId: event.report.project_id,
         windowStart: event.report.window_start,
         windowEnd: event.report.window_end,
-        bundleCounts: event.report.bundle_counts,
-        newIncidents: event.report.new_incidents,
-        regressions: event.report.regressions,
-        topSpikingIncidents: event.report.top_spiking_incidents
+        projects: deliveries.map((delivery) => ({
+          projectId: delivery.report.project_id,
+          projectName: delivery.report.project_name,
+          bundleCounts: delivery.report.bundle_counts,
+          newIncidents: delivery.report.new_incidents,
+          resolvedIncidents: delivery.report.resolved_incidents,
+          openedIncidentsResolved: delivery.report.opened_incidents_resolved,
+          regressions: delivery.report.regressions,
+          topSpikingIncidents: delivery.report.top_spiking_incidents
+        }))
       });
 
       if (event.channel.channel === "email") {

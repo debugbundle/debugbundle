@@ -122,6 +122,7 @@ export interface ApiDependencies {
       name: string;
       slug: string;
       environment_default: string;
+      weekly_report_timezone: string;
     }): Promise<ProjectRecord | null>;
     updateProjectForUser?(input: {
       user_id: string;
@@ -144,6 +145,7 @@ export interface ApiDependencies {
       name: string;
       slug: string;
       environment_default: string;
+      weekly_report_timezone?: string;
     }): Promise<ProjectRecord | null>;
     updateProjectForOrganization(input: {
       organization_id: string;
@@ -567,7 +569,7 @@ export interface ApiDependencies {
         timezone: string;
       };
       is_enabled: boolean;
-    }): Promise<WeeklyReportChannelRecord | null>;
+    }): Promise<WeeklyReportChannelRecord | "email_channel_exists" | null>;
     updateWeeklyReportChannelForOrganization(input: {
       organization_id: string;
       channel_id: string;
@@ -583,6 +585,9 @@ export interface ApiDependencies {
       organization_id: string;
       channel_id: string;
     }): Promise<{ channel_id: string } | null>;
+    getWeeklyReportChannelById?(input: {
+      channel_id: string;
+    }): Promise<WeeklyReportChannelRecord | null>;
   } | undefined;
   webhookDelivery: Pick<WebhookDeliveryStore, "listDeliveriesForWebhookInOrganization"> & {
     retryDeliveryForOrganization?: WebhookDeliveryStore["retryDeliveryForOrganization"];

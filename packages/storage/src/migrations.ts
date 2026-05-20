@@ -585,6 +585,11 @@ const STORAGE_BOOTSTRAP_STATEMENTS = [
     ON weekly_report_channels (project_id, created_at ASC)
   `,
   `
+    CREATE UNIQUE INDEX weekly_report_channels_project_email_unique_idx
+    ON weekly_report_channels (project_id)
+    WHERE channel = 'email'
+  `,
+  `
     CREATE TABLE weekly_report_deliveries (
       id uuid PRIMARY KEY,
       project_id uuid NOT NULL REFERENCES projects(id) ON DELETE CASCADE,

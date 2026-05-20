@@ -69,6 +69,7 @@ export const CLI_USAGE_LINES = [
   '  debugbundle webhook retry <webhook-id> <delivery-id> --project-id <id> [--auth-file <path>] [--json]',
   '  debugbundle weekly-report list --project-id <id> [--limit <n>] [--auth-file <path>] [--json]',
   '  debugbundle weekly-report create --project-id <id> --channel <email|slack> --day-of-week <day> --hour-of-day <0-23> --timezone <iana> --config-json <json> [--is-enabled <true|false>] [--auth-file <path>] [--json]',
+  '      email --config-json uses {"to":["owner@example.com"]} with up to 3 recipients',
   '  debugbundle weekly-report update <channel-id> [--day-of-week <day>] [--hour-of-day <0-23>] [--timezone <iana>] [--config-json <json>] [--is-enabled <true|false>] [--auth-file <path>] [--json]',
   '  debugbundle weekly-report delete <channel-id> [--auth-file <path>] [--json]',
   '  debugbundle capture-policy get --project <id> [--auth-file <path>] [--json]',

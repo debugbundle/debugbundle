@@ -277,27 +277,47 @@ export const SYSTEM_EMAIL_REVIEW_ENTRIES: readonly SystemEmailReviewEntry[] = [
     requiredInV1: true,
     implementationStatus: "implemented",
     preview: renderWeeklyReportEmail({
-      projectId: "proj_acme_web",
       windowStart: "2026-05-11T00:00:00.000Z",
       windowEnd: "2026-05-18T00:00:00.000Z",
-      bundleCounts: {
-        failure: 6,
-        improvement: 2
-      },
-      newIncidents: 3,
-      regressions: 1,
-      topSpikingIncidents: [
+      projects: [
         {
-          incident_id: "inc_123",
-          title: "Checkout API returned 500",
-          occurrence_count: 24,
-          spike_detected_at: "2026-05-15T09:17:00.000Z"
+          projectId: "proj_checkout",
+          projectName: "Checkout API",
+          bundleCounts: {
+            failure: 6,
+            improvement: 2
+          },
+          newIncidents: 3,
+          resolvedIncidents: 5,
+          openedIncidentsResolved: 3,
+          regressions: 1,
+          topSpikingIncidents: [
+            {
+              incident_id: "inc_123",
+              title: "Checkout API returned 500",
+              occurrence_count: 24,
+              spike_detected_at: "2026-05-15T09:17:00.000Z"
+            },
+            {
+              incident_id: "inc_456",
+              title: "Worker timeout during bundle generation",
+              occurrence_count: 8,
+              spike_detected_at: "2026-05-16T14:02:00.000Z"
+            }
+          ]
         },
         {
-          incident_id: "inc_456",
-          title: "Worker timeout during bundle generation",
-          occurrence_count: 8,
-          spike_detected_at: "2026-05-16T14:02:00.000Z"
+          projectId: "proj_web",
+          projectName: "Marketing site",
+          bundleCounts: {
+            failure: 1,
+            improvement: 1
+          },
+          newIncidents: 4,
+          resolvedIncidents: 2,
+          openedIncidentsResolved: 2,
+          regressions: 0,
+          topSpikingIncidents: []
         }
       ]
     })

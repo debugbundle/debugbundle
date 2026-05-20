@@ -51,30 +51,35 @@
 > **Note:** `shared-types`, `redaction`, `sdk-node`, and `sdk-browser` have moved to the separate JS SDK monorepo (`github.com/debugbundle/debugbundle-js`). Their package boundaries are documented below for reference since core monorepo packages (`event-normalizer`, `bundle-engine`, etc.) still depend on the published npm packages. See the "JavaScript SDK Monorepo" section for the full repo layout.
 
 ### `packages/shared-types` _(lives in `debugbundle-js` repo)_
+
 - **Owns:** All Zod schemas, TypeScript type exports, enums, constants, **tier capabilities config**, **event class enum**, **capture policy types**, **improvement settings types**, and the canonical preset-aware plus project-override-aware request-failure classifier used by ingestion, workers, and SDKs
 - **Exports:** `BundleV1Schema`, `BundleV1`, `EventEnvelopeSchema`, `EventEnvelope`, `createEventEnvelope`, `TIER_CAPABILITIES`, `getTierCapabilities`, `TierName`, `TierCapabilities`, `EventClass`, `CapturePreset`, `CapturePolicy`, event payload schemas, `DeviceInfoSchema`, `ContextDeviceSchema`, DB row types, API request/response types, webhook payload types, profile schema, severity enum, signal type enum, all context-block sub-schemas
 - **Depends on:** nothing (leaf package)
 - **Test fixtures:** `__fixtures__/` for canonical schema samples
 
 ### `packages/redaction` _(lives in `debugbundle-js` repo)_
+
 - **Owns:** Sensitive data detection and scrubbing logic
 - **Exports:** `redact(payload, rules)`, default rules, custom rule builder
 - **Depends on:** `shared-types`
 - **Invariant:** Must redact passwords, auth headers, cookies, card numbers, SSN, custom patterns
 
 ### `packages/auth`
+
 - **Owns:** Password hashing, session issuance/revocation, verification flows, token generation, hashing, validation, middleware factories
 - **Exports:** `generateProjectToken()`, `generateMemberToken()`, `hashToken()`, `validateProjectToken()`, `validateMemberToken()`, session helpers, password helpers, verification helpers, auth middleware for Fastify
 - **Depends on:** `shared-types`
 - **Invariant:** Member/project tokens stored as SHA-256 hashes. Plaintext returned once at creation. SPA auth uses first-party cookie sessions rather than browser-stored bearer auth.
 
 ### `packages/event-normalizer`
+
 - **Owns:** Raw event validation, normalization to canonical form, fingerprinting, **event class classification**
 - **Exports:** `validateEvent()`, `normalizeEvent()`, `fingerprint()`, `classifyEvent()`
 - **Depends on:** `shared-types`, `redaction`
 - **Invariant:** Fingerprint is deterministic. Same failure → same fingerprint. `event_class` assignment is deterministic and immutable after normalization (INV-15), including preset-aware request-event classification when worker jobs carry the resolved capture preset from ingestion.
 
 ### `packages/bundle-engine`
+
 - **Owns:** Deterministic bundle assembly from normalized events + incident context
 - **Exports:** `buildBundle(incident, events, context): BundleV1`
 - **Depends on:** `shared-types`, `storage`
@@ -82,36 +87,42 @@
 - **Runtime wiring:** Consumed by `apps/worker` `build-bundle` stage for persisted bundle artifacts.
 
 ### `packages/repro-engine`
+
 - **Owns:** Reproduction artifact generation from bundles
 - **Exports:** `buildReproduction(bundle): ReproductionArtifact`
 - **Depends on:** `shared-types`, `bundle-engine`
 - **Invariant:** Confidence field always explicit (`high`/`medium`/`low`).
 
 ### `packages/email`
+
 - **Owns:** Email template rendering and sending abstraction
 - **Exports:** Weekly report email rendering, billing lifecycle email rendering (purchase confirmation, renewal, payment failure, entitlement downgrade, plan/capacity changes), operational email rendering (webhook auto-disable, allowance thresholds, retention rotation), plus transport adapters
 - **Depends on:** `shared-types`
 - **Adapter:** Transport adapters remain behind the same abstraction; provider choice is intentionally outside this public map
 
 ### `packages/runtime-logger`
+
 - **Owns:** Shared structured runtime logging substrate for `apps/api` and `apps/worker`
 - **Exports:** Runtime logger creation helpers, log-level/env/service resolution, safe error-message extraction
 - **Depends on:** external `pino` only
 - **Invariant:** Internal operability only. This package must not grow into product-facing log storage/search/dashboard behavior.
 
 ### `packages/retrieval-client`
+
 - **Owns:** Shared HTTP client helpers for retrieval parity surfaces consumed by CLI and MCP
 - **Exports:** `createRetrievalApi()`, `RetrievalApiError`
 - **Depends on:** no internal packages
 - **Invariant:** CLI and MCP remain thin adapters over shared retrieval API client behavior
 
 ### `packages/log-parser`
+
 - **Owns:** Shared CLI log parser registry, canonical `debugbundle-ndjson` handling, and first-party parsers for existing server log formats
 - **Exports:** `CANONICAL_LOG_FORMAT`, `ACCEPTED_LOG_FORMATS`, `formatAcceptedLogFormats()`, `parseAcceptedLogFormat()`, `parseLogFile()`, `buildProjectId()`
 - **Depends on:** `shared-types`
 - **Invariant:** Parsers are package-owned and registry-driven; command modules do not embed parser-specific regex logic. `debugbundle-ndjson` remains the canonical structured interchange format for zero-install capture across unsupported languages.
 
 ### `packages/sdk-node` _(lives in `debugbundle-js` repo)_
+
 - **Owns:** Node.js SDK core capture client, framework/logger adapters, in-memory buffering, failure isolation, vanilla runtime hooks, always-on probe ring buffers, request-scoped trigger-token probe activation, duplicate suppression, ingestion-backoff handling, file transport for local-only mode, and browser relay handler (same-origin endpoint that receives browser events, validates/sanitizes, and writes to local events or spool for durable delivery)
 - **Exports:** `debugbundle`, `createDebugBundleSdk()`, universal capture methods, `captureExceptions()`, `captureRejections()`, `captureConsole()`, `express()`, `fastify()`, `nextjs()`
 - **Subpath exports (relay):** `@debugbundle/sdk-node/relay` (core relay handler factory), `@debugbundle/sdk-node/relay/express` (Express middleware), `@debugbundle/sdk-node/relay/fastify` (Fastify plugin), `@debugbundle/sdk-node/relay/nextjs` (Next.js API route handler)
@@ -121,6 +132,7 @@
 - **Internal structure:** `core.ts` owns transport/buffering/runtime state plus request-context lookup; `file-transport.ts` owns atomic file-write transport for local events; `framework-integrations.ts` owns Express/Fastify/Next.js wrappers; `logger-integrations.ts` owns logger detection and method patching; `suppression.ts` owns duplicate suppression and loop-protection state; `remote-probes.ts` owns config parsing and directive matching; `trigger-token.ts` owns request token extraction/validation; `relay.ts` owns core relay handler logic (validation, sanitization, field override, write/forward, durable spool management); `relay-express.ts`, `relay-fastify.ts`, `relay-nextjs.ts` own framework-specific relay adapters; `utils.ts` and `types.ts` hold shared helpers/contracts
 
 ### `packages/sdk-browser` _(lives in `debugbundle-js` repo)_
+
 - **Owns:** Browser SDK core capture client, browser-native auto-capture hooks, breadcrumb buffering and standalone breadcrumb shipping, preset-aware first-party network response promotion to `request_event`, always-on probe ring buffers, zero-poll remote probe directive intake, page-load trigger-token probe activation, session-governance controls, network filtering, cross-context trace-header injection for browser requests, privacy-default frontend event capture, unload-safe flushing, device-context collection, duplicate suppression, and transport backoff
 - **Exports:** `createDebugBundleBrowserSdk()`, universal browser capture methods, `init()`, `captureException()`, `captureError()`, `captureLog()`, `captureRequest()`, `captureMessage()`, `setContext()`, `probe()`, `flush()`, `dispose()`
 - **Depends on:** `shared-types`, `redaction`
@@ -133,6 +145,7 @@
 The TypeScript/JavaScript SDKs live in a separate JS SDK repo: `github.com/debugbundle/debugbundle-js`. This follows the industry convention used by other established services — the product-facing JS SDK packages live together in one dedicated repo while shared cross-product libraries can remain core-owned when source coupling still exists.
 
 **`debugbundle-js` repo contents:**
+
 - `packages/sdk-node` (`@debugbundle/sdk-node`) — Node.js backend SDK
 - `packages/sdk-browser` (`@debugbundle/sdk-browser`) — Browser SDK
 
@@ -154,36 +167,36 @@ All non-TypeScript SDKs live in separate repositories under `github.com/debugbun
 
 **Wave 1 (active pre-launch scope):**
 
-| SDK | Repository | Package Registry | Frameworks |
-|-----|-----------|-----------------|------------|
-| Python | `github.com/debugbundle/debugbundle-python` | PyPI (`debugbundle-python`) | Django, Flask, FastAPI |
-| PHP | `github.com/debugbundle/debugbundle-php` | Packagist (`debugbundle/sdk-php`) | Laravel, Symfony |
+| SDK       | Repository                                     | Package Registry                       | Frameworks                                                |
+| --------- | ---------------------------------------------- | -------------------------------------- | --------------------------------------------------------- |
+| Python    | `github.com/debugbundle/debugbundle-python`    | PyPI (`debugbundle-python`)            | Django, Flask, FastAPI                                    |
+| PHP       | `github.com/debugbundle/debugbundle-php`       | Packagist (`debugbundle/sdk-php`)      | Laravel, Symfony                                          |
 | WordPress | `github.com/debugbundle/debugbundle-wordpress` | WordPress.org plugin + GitHub releases | WordPress plugin wrapper over PHP SDK + browser SDK relay |
 
 **Deferred until further notice:**
 
-| SDK | Repository | Package Registry | Frameworks |
-|-----|-----------|-----------------|------------|
-| Go | `github.com/debugbundle/debugbundle-go` | pkg.go.dev | net/http, Gin, Echo |
+| SDK  | Repository                                | Package Registry         | Frameworks           |
+| ---- | ----------------------------------------- | ------------------------ | -------------------- |
+| Go   | `github.com/debugbundle/debugbundle-go`   | pkg.go.dev               | net/http, Gin, Echo  |
 | Ruby | `github.com/debugbundle/debugbundle-ruby` | RubyGems (`debugbundle`) | Rails, Rack, Sidekiq |
 
 **Wave 2 (post-launch):**
 
-| SDK | Repository | Package Registry | Frameworks |
-|-----|-----------|-----------------|------------|
-| Java | `github.com/debugbundle/debugbundle-java` | Maven Central | Spring Boot |
-| C# | `github.com/debugbundle/debugbundle-dotnet` | NuGet (`DebugBundle`) | ASP.NET Core |
-| Kotlin (server) | `github.com/debugbundle/debugbundle-kotlin` | Maven Central | Ktor |
-| Rust | `github.com/debugbundle/debugbundle-rust` | crates.io (`debugbundle`) | Axum, Actix Web |
+| SDK             | Repository                                  | Package Registry          | Frameworks      |
+| --------------- | ------------------------------------------- | ------------------------- | --------------- |
+| Java            | `github.com/debugbundle/debugbundle-java`   | Maven Central             | Spring Boot     |
+| C#              | `github.com/debugbundle/debugbundle-dotnet` | NuGet (`DebugBundle`)     | ASP.NET Core    |
+| Kotlin (server) | `github.com/debugbundle/debugbundle-kotlin` | Maven Central             | Ktor            |
+| Rust            | `github.com/debugbundle/debugbundle-rust`   | crates.io (`debugbundle`) | Axum, Actix Web |
 
 **Wave 3 (post-launch, requires Mobile Correlation Contract):**
 
-| SDK | Repository | Package Registry | Frameworks |
-|-----|-----------|-----------------|------------|
-| Kotlin (Android) | `github.com/debugbundle/debugbundle-android` | Maven Central | Android lifecycle |
-| Swift (iOS) | `github.com/debugbundle/debugbundle-swift` | Swift Package Manager | UIKit / SwiftUI |
-| React Native | `github.com/debugbundle/debugbundle-react-native` | npm | React Navigation |
-| Dart / Flutter | `github.com/debugbundle/debugbundle-flutter` | pub.dev (`debugbundle`) | Flutter |
+| SDK              | Repository                                        | Package Registry        | Frameworks        |
+| ---------------- | ------------------------------------------------- | ----------------------- | ----------------- |
+| Kotlin (Android) | `github.com/debugbundle/debugbundle-android`      | Maven Central           | Android lifecycle |
+| Swift (iOS)      | `github.com/debugbundle/debugbundle-swift`        | Swift Package Manager   | UIKit / SwiftUI   |
+| React Native     | `github.com/debugbundle/debugbundle-react-native` | npm                     | React Navigation  |
+| Dart / Flutter   | `github.com/debugbundle/debugbundle-flutter`      | pub.dev (`debugbundle`) | Flutter           |
 
 ### Public Site
 
@@ -192,6 +205,7 @@ The public documentation/marketing/blog site lives in the standalone public repo
 **Build-time boundary:** The standalone site repo no longer imports core apps/packages. Core now owns `scripts/public-site-artifacts.ts`, which generates vendorable static JSON artifacts into `site/public/` before the site build runs. The site-owned `generate:artifacts` script is limited to search-index generation. At runtime (after `next build`), the site has zero workspace dependencies — it's a fully static Next.js export.
 
 **Core-owned artifact inputs (build-time only):**
+
 - `apps/api/src/openapi.ts` — OpenAPI 3.1 spec
 - `apps/cli/src/profile-validation.ts` — ProfileSchema
 - `apps/cli/src/usage.ts` — CLI usage lines for reference docs
@@ -208,6 +222,7 @@ The public documentation/marketing/blog site lives in the standalone public repo
 ## App Boundaries
 
 ### `apps/api`
+
 - **Owns:** HTTP route handlers, request/response lifecycle, ingestion endpoint
 - **Routes:** See `/contracts/public-interfaces.md`
 - **Imports:** `auth`, `shared-types`, `event-normalizer`, `redaction`, `storage`
@@ -251,6 +266,7 @@ The public documentation/marketing/blog site lives in the standalone public repo
   - `runtime.ts` — server bootstrap, graceful shutdown, and conditional Stripe webhook wiring (creates separate connection pool for billing sync)
 
 ### `apps/worker`
+
 - **Owns:** Background job processing via BullMQ
 - **Jobs:** `normalize-events`, `group-incident`, `build-bundle`, `build-reproduction`, `evaluate-alerts`, `deliver-alert-email-digest`, `deliver-operational-email`, `deliver-webhook`, `generate-weekly-report`, `cleanup-retention`, `dispatch-github`
 - **Imports:** `bundle-engine`, `repro-engine`, `event-normalizer`, `shared-types`, `redaction`, `email`
@@ -258,6 +274,7 @@ The public documentation/marketing/blog site lives in the standalone public repo
 - **Local dev note:** the top-level `docker-compose.yml` `dev` profile now starts the worker alongside API and web so local dogfooding can exercise the full ingestion-to-bundle path without a separate manual worker launch
 
 ### `apps/cli`
+
 - **Owns:** CLI command parsing, terminal I/O, interactive flows, local processing pipeline
 - **Commands:** See `/contracts/public-interfaces.md` and `/spec/local-first-onboarding.md` §11
 - **Imports:** `shared-types`, `auth`, `event-normalizer`, `bundle-engine`, `repro-engine` (for local processing), `github-client` (for GitHub automation management)
@@ -267,6 +284,7 @@ The public documentation/marketing/blog site lives in the standalone public repo
 - **Internal structure:** `main.ts` owns top-level argv routing; `argv-helpers.ts` owns shared CLI parsing and option coercion; `login-command.ts` now owns all bootstrap login paths including direct member-token persistence, GitHub device flow polling, and `gh auth token` exchange; `cli-fs-helpers.ts` owns shared filesystem utility helpers (`isRecord`, `isMissingPathError`, `resolveWorkspacePath`) used across CLI command modules; `management-command-handlers.ts` owns token/project/alert/slack/webhook/weekly-report/capture-policy/billing/probe/project-members/github/improvements subcommand routing; `auth-context.ts` owns stored-auth HTTP client creation for shared API clients including `createAuthenticatedBillingApi`, `createAuthenticatedSlackApi`, and `createAuthenticatedGitHubManagementApi`; `billing-commands.ts` owns billing summary retrieval and capacity-management commands (get, capacity increase, capacity schedule-reduction, capacity cancel-reduction) via `packages/billing-client`; `slack-commands.ts` owns connected Slack destination list/connect-url/test/delete flows via `packages/slack-client`; `improvement-commands.ts` owns hosted improvement list/get/bundle/resolve/reopen flows while `improvement-settings-commands.ts` owns project-scoped hosted-improvement automation settings; `setup-command.ts` owns the public `setup` scaffold flow; `connect-command.ts` owns the local-only to connected-mode upgrade flow (profile validation, cloud project selection/creation, project-token minting, and connection-config rewrite); `verify-command.ts` owns local proof generation plus passive cloud verification and active cloud 5xx verification through temporary project-token creation, real `/v1/events` ingestion, token cleanup, incident polling, and bundle-status retrieval; `project-commands.ts` owns project lifecycle mutations (list, create, update, delete) exposed through the CLI via `packages/project-management-client`; `github-commands.ts` owns GitHub installation-status, repository-listing, project repo assignment/removal, dispatch-rule CRUD, and delivery history/retry commands via `packages/github-client`; `probe-commands.ts` owns remote probe activation/deactivation/listing exposed through the CLI with inline API client; `member-commands.ts` owns project collaborator management (list, invites, invite, cancel-invite, update-role, remove) with inline API client; `ingest-command.ts` owns one-shot local event-batch writes plus handoff into the existing process pipeline while delegating format parsing to `packages/log-parser`; `watch-command.ts` owns incremental log tailing from EOF, rewrite/truncation detection, repeated registry-backed parsing, and the mode-specific fanout between local event-batch writes plus `process` handoff and connected-mode direct shipment to `POST /v1/events`; `local-scaffold.ts` owns generated scaffold templates plus cleanup of older DebugBundle-generated scaffold paths required by onboarding spec; `local-retrieval-store.ts` owns local incident/bundle/reproduction reads plus local resolve/reopen state mutations against `.debugbundle/local/state.json` and `.debugbundle/bundles/local/`; `retrieval-source.ts` owns shared source-tagging plus merged incident pagination helpers used by CLI and MCP retrieval; `cloud-artifact-cache.ts` owns persistence of explicit cloud bundle/reproduction fetches into `.debugbundle/bundles/cloud/`, cache-status sync for cloud resolve, and opportunistic 30-day expiry pruning; `clean-command.ts` owns the operator-facing local retention surface for processed local events, local incident-cap trimming with resolved-first eviction, explicit cloud-cache pruning, and scaffold-preserving `--all` runtime reset; `doctor-command.ts`, `validate-command.ts`, `profile-command.ts`, and `analyze-command.ts` own local-first validation and analysis workflows; `process-command.ts` owns the local file-transport pipeline, preset-aware full reprocessing, local request-anomaly synthesis, and state/bundle writing; `retrieval-commands.ts`, `token-commands.ts`, `project-commands.ts`, `services-command.ts`, `alert-commands.ts`, `slack-commands.ts`, `webhook-commands.ts`, `weekly-report-commands.ts`, `capture-policy-commands.ts`, `probe-commands.ts`, `member-commands.ts`, `github-commands.ts`, `improvement-commands.ts`, and `improvement-settings-commands.ts` are thin command adapters over shared clients or local orchestration modules, including explicit `source` routing, default merged local/cloud retrieval behavior in connected mode, and cloud artifact cache refresh on explicit fetch
 
 ### `apps/mcp`
+
 - **Owns:** MCP protocol adapter (stdio transport)
 - **Tools:** See `/contracts/public-interfaces.md`
 - **Imports:** `shared-types`, `auth`, `github-client` (for GitHub automation management)
@@ -275,15 +293,17 @@ The public documentation/marketing/blog site lives in the standalone public repo
 - **Internal structure:** `main.ts` owns the external stdio entrypoint for the publishable `@debugbundle/mcp` package; `server.ts` owns MCP JSON-RPC request handling for initialize, tool listing, and tool calls; `default-tools.ts` composes the default runtime tool registry over shared HTTP clients, CLI auth state, and local CLI modules; `retrieval-tools.ts`, `token-tools.ts`, `project-tools.ts`, `services-tools.ts`, `setup-tools.ts`, `analyze-tools.ts`, `alert-tools.ts`, `slack-tools.ts`, `webhook-tools.ts`, `weekly-report-tools.ts`, `billing-tools.ts`, `capture-policy-tools.ts`, `probe-tools.ts`, `member-tools.ts`, `github-tools.ts`, `improvement-tools.ts`, and `improvement-settings-tools.ts` expose thin MCP tool factories over shared clients or existing CLI modules; GitHub MCP coverage now includes installation status, repository listing, project repo assignment/removal, dispatch-rule CRUD, and delivery history/retry. `tool-catalog.ts` owns the source-of-truth MCP tool catalog with Zod input schemas for all shipped tools, used by the public-site artifact pipeline to generate `/schemas/mcp-tools.json`; retrieval tools now reuse the CLI local-store reader plus `retrieval-source.ts` helpers for merged connected-mode incident listing, local-first detail/artifact/lifecycle lookup, explicit source tagging, and `cloud-artifact-cache.ts` persistence so cloud bundle/reproduction fetches refresh `.debugbundle/bundles/cloud/`, cloud resolve updates cached status snapshots, and stale cloud-cache files are pruned during explicit cache activity
 
 ### `apps/web`
-- **Owns:** Implemented first seven web management slices plus hosted improvement management: `/login`, `/signup`, `/verify-email`, `/forgot-password`, `/reset-password`, `/dashboard`, `/settings`, `/member-tokens`, `/projects`, `/improvements`, `/projects/:projectId/improvements`, `/projects/:projectId/improvements/:improvementId`, `/projects/:projectId/settings`, `/projects/:projectId/members`, `/projects/:projectId/tokens`, `/projects/:projectId/webhooks`, `/projects/:projectId/alerts`, `/projects/:projectId/github`, `/invite`, and `/billing`
+
+- **Owns:** Implemented first seven web management slices plus hosted improvement management: `/login`, `/signup`, `/verify-email`, `/forgot-password`, `/reset-password`, `/dashboard`, `/settings`, `/member-tokens`, `/projects`, `/improvements`, `/projects/:projectId/improvements`, `/projects/:projectId/improvements/:improvementId`, `/projects/:projectId/settings`, `/projects/:projectId/members`, `/projects/:projectId/tokens`, `/projects/:projectId/probes`, `/projects/:projectId/webhooks`, `/projects/:projectId/alerts`, `/projects/:projectId/github`, `/invite`, and `/billing`
 - **Framework:** React + Vite SPA deployed to `app.debugbundle.com`
 - **Imports:** `shared-types`
 - **Communication:** Calls HTTP API at `api.debugbundle.com` (cross-origin, same-site)
 - **Key constraint:** Web is NOT the product core. Agent/CLI/API are primary interfaces. UI must stay reusable, shadcn-based, theme-capable, and use cookie-backed session auth. The public site remains a separate static-exported Next.js + Fumadocs deployment on `debugbundle.com` with marketing pages, `/docs`, and `/blog`. Focused frontend validation runs through `make web-check`.
 - **Dogfooding note:** Dogfooding is now re-enabled against the published `@debugbundle/sdk-browser` prerelease. `src/main.tsx` optionally initializes the npm-published browser SDK during startup when `VITE_DEBUGBUNDLE_DOGFOOD_PROJECT_TOKEN` is present, and the manual dev-only console bridge `window.__DEBUGBUNDLE_DOGFOOD__.triggerFrontendException()` remains gated by `VITE_DEBUGBUNDLE_DOGFOOD_EXPOSE_TRIGGERS=true`.
-- **Internal structure:** `src/app.tsx` owns route composition and protected-page gating for the auth, projects, improvements, project-settings, project-token, project-webhook, project-alert, organization-member, billing, and incidents surfaces; `src/pages/management-pages.tsx` owns the general management-route page implementations; `src/pages/settings-page.tsx` owns account settings including auth-method-aware password controls, account export, and destructive account deletion; `src/pages/organization-overview-page.tsx` remains a dormant future-facing page component that is not currently routed in the app shell; `src/pages/project-settings-page.tsx` owns the project-scoped settings page including destructive deletion and hosted improvement automation controls; `src/pages/improvements-page.tsx`, `src/pages/project-improvements-page.tsx`, and `src/pages/improvement-detail-page.tsx` own the hosted improvement queue and detail workflows; `src/pages/project-webhooks-page.tsx` owns the project-scoped webhook management page; `src/pages/project-alerts-page.tsx` owns the project-scoped alert management page including Team-tier Slack connected-destination setup and selection; `src/pages/incidents-page.tsx` owns the incidents inventory page; `src/pages/incident-detail-page.tsx` owns the incident detail workflow including explicit resolve actions and scoped back-navigation; `src/lib/api.ts` owns cookie-backed auth/session/member-token/project/project-token/project-webhook/project-alert/organization-member/billing/account/incident/improvement requests, including session auth-method metadata, account export/deletion, resolve-incident mutation, project deletion, improvement lifecycle mutations, and incident payload denormalization fields (`project_name`, `service_name`, `resolved_at`), with project-settings details currently resolved from existing project/member/invite/billing responses; `src/lib/slack-api.ts` owns the browser Slack connect/install-url helper plus reusable destination listing for the alerts UI; `src/lib/dogfooding.ts` owns env-gated browser SDK bootstrap and the manual trigger bridge; `src/lib/session.tsx` owns session bootstrap and refresh state; `src/lib/theme.tsx` owns theme state and DOM synchronization; `src/components/ui/*` holds shadcn-based primitives; `src/components/system/*` holds the reusable app shell, page header, callout, theme-toggle, one-time plaintext-secret reveal, and billing presentation components.
+- **Internal structure:** `src/app.tsx` owns route composition and protected-page gating for the auth, projects, improvements, project-settings, project-token, project-probe, project-webhook, project-alert, organization-member, billing, and incidents surfaces; `src/pages/management-pages.tsx` owns the general management-route page implementations; `src/pages/settings-page.tsx` owns account settings including auth-method-aware password controls, account export, and destructive account deletion; `src/pages/organization-overview-page.tsx` remains a dormant future-facing page component that is not currently routed in the app shell; `src/pages/project-settings-page.tsx` owns the project-scoped settings page including destructive deletion and hosted improvement automation controls; `src/pages/improvements-page.tsx`, `src/pages/project-improvements-page.tsx`, and `src/pages/improvement-detail-page.tsx` own the hosted improvement queue and detail workflows; `src/pages/project-probes-page.tsx` owns paid-tier remote probe activation/listing/deactivation and one-time trigger token display; `src/pages/project-webhooks-page.tsx` owns the project-scoped webhook management page; `src/pages/project-alerts-page.tsx` owns the project-scoped alert management page including Team-tier Slack connected-destination setup and selection; `src/pages/incidents-page.tsx` owns the incidents inventory page; `src/pages/incident-detail-page.tsx` owns the incident detail workflow including explicit resolve actions and scoped back-navigation; `src/lib/api.ts` owns cookie-backed auth/session/member-token/project/project-token/project-probe/project-webhook/project-alert/organization-member/billing/account/incident/improvement requests, including session auth-method metadata, account export/deletion, resolve-incident mutation, project deletion, improvement lifecycle mutations, and incident payload denormalization fields (`project_name`, `service_name`, `resolved_at`), with project-settings details currently resolved from existing project/member/invite/billing responses; `src/lib/slack-api.ts` owns the browser Slack connect/install-url helper plus reusable destination listing for the alerts UI; `src/lib/dogfooding.ts` owns env-gated browser SDK bootstrap and the manual trigger bridge; `src/lib/session.tsx` owns session bootstrap and refresh state; `src/lib/theme.tsx` owns theme state and DOM synchronization; `src/components/ui/*` holds shadcn-based primitives; `src/components/system/*` holds the reusable app shell, page header, callout, theme-toggle, one-time plaintext-secret reveal, and billing presentation components.
 
 ### `site/` (public-site)
+
 - **Owns:** The static public-site surface for `debugbundle.com`, including route-group boundaries for marketing pages (landing with product hero/how-it-works/value-props/SEO, pricing with full Free/Solo/Team tier data, legal/informational pages), MDX-backed `/docs` and `/blog` routes (4 authored blog posts: launch announcement, product thesis, agent-first debugging, local-first development), build-time publication of machine-readable public artifacts, and the generated `/docs/v1/reference/*` subtree. Documentation content authored per `spec/documentation.md` (65-page surface with `meta.json` navigation, P0/P1/P2 priority slices, Orama static search).
 - **Framework:** Next.js App Router with static export and a live Fumadocs-backed MDX docs/blog content pipeline
 - **Imports:** Internal site config and site-owned presentation components only
@@ -294,6 +314,7 @@ The public documentation/marketing/blog site lives in the standalone public repo
 ---
 
 ### `packages/storage`
+
 - **Owns:** All storage adapters: Postgres metadata, hosted improvement opportunity persistence, S3 object store, Redis queue, Redis frequency counters
 - **Exports (via barrel `index.ts`):** All types, adapters, and service factories
 - **Depends on:** `shared-types`, `auth`
@@ -328,36 +349,43 @@ The public documentation/marketing/blog site lives in the standalone public repo
 **Production DB rule:** After first public release, schema changes must never rely on bootstrap SQL or restart ordering alone. Use forward migrations, run them before API/worker consume the schema, and ship destructive cleanup only after compatible code has already been live.
 
 ### `packages/retrieval-client`
+
 - **Owns:** Authenticated retrieval HTTP client shared by CLI and MCP
 - **Exports:** `createRetrievalApi()`, response/error contracts
 - **Key constraint:** Owns all retrieval path/query construction and response-shape validation
 
 ### `packages/token-management`
+
 - **Owns:** Authenticated token lifecycle HTTP client shared by CLI and MCP
 - **Exports:** `createTokenManagementApi()`, response/error contracts
 - **Key constraint:** Owns all token-management path construction and response-shape validation
 
 ### `packages/project-management-client`
+
 - **Owns:** Authenticated project list/create HTTP client used by CLI connect flows
 - **Exports:** `createProjectManagementApi()`, response/error contracts
 - **Key constraint:** Owns project-management path construction and response-shape validation so connect logic stays out of raw HTTP route strings
 
 ### `packages/alert-client`
+
 - **Owns:** Authenticated alert lifecycle HTTP client shared by CLI and MCP
 - **Exports:** `createAlertApi()`, alert response contracts, structured API errors
 - **Key constraint:** Owns alert path/query construction, delete success mapping, and response-shape validation for list/create/update/delete alert-rule surfaces
 
 ### `packages/webhook-client`
+
 - **Owns:** Authenticated webhook lifecycle HTTP client shared by CLI and MCP
 - **Exports:** `createWebhookApi()`, webhook/delivery response contracts, structured API errors
 - **Key constraint:** Owns webhook path/query construction, delete success mapping, synthetic test-delivery request shaping, and response-shape validation for list/create/get/update/delete/test/delivery-history surfaces
 
 ### `packages/billing-client`
+
 - **Owns:** Authenticated billing HTTP client shared by CLI and MCP parity flows
 - **Exports:** `createBillingApi()`, `BillingApiError`, `expectBilling()`, billing summary Zod schemas
 - **Key constraint:** Owns billing path construction, response-shape validation, and error mapping for billing summary retrieval and allowance-capacity management (increase, schedule reduction, cancel reduction). Does not expose checkout/portal (browser-session-only surfaces).
 
 ### `packages/github-client`
+
 - **Owns:** Authenticated GitHub automation HTTP client shared by CLI and MCP for managing GitHub App installations, repository connections, dispatch rules, and dispatch delivery history/retry
 - **Exports:** `createGitHubManagementApi()`, `GitHubManagementApiError`, response/error contracts, GitHub automation Zod schemas
 - **Depends on:** none (internal packages)
@@ -365,17 +393,18 @@ The public documentation/marketing/blog site lives in the standalone public repo
 
 ## Storage Boundaries
 
-| Store | Owned By | Contents |
-|-------|----------|----------|
-| PostgreSQL | `apps/api`, `apps/worker` | 37 relational tables (users, organizations, organization_members, projects, project_tokens, member_tokens, services, incidents, incident_events, processed_events, improvement_opportunities, improvement_opportunity_events, bundle_generations, alert_rules, alert_deliveries, alert_email_digests, alert_email_digest_items, agent_webhooks, webhook_deliveries, weekly_report_channels, weekly_report_deliveries, probe_activations, deployments, org_usage_counters, capture_policies, github_installations, project_github_repos, github_dispatch_rules, github_dispatch_deliveries, audit_logs, password_credentials, sessions, email_verification_tokens, password_reset_tokens, invites, oauth_identities, processed_billing_events) |
-| Amazon S3 | `apps/api` (write), `apps/worker` (read/write/delete) | Raw events (`raw/{project_id}/{date}/{event_id}.json`) for retained sampled occurrences, bundles (`bundles/{project_id}/{incident_id}/bundle.json.gz`), reproductions (`reproductions/{project_id}/{incident_id}/reproduction.json.gz`) |
-| Redis | `apps/api`, `apps/worker` | BullMQ job queues, incident frequency counters, ingestion rate-limit counters, GitHub App installation token cache (50m TTL), optional caches |
+| Store      | Owned By                                              | Contents                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| ---------- | ----------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| PostgreSQL | `apps/api`, `apps/worker`                             | 37 relational tables (users, organizations, organization_members, projects, project_tokens, member_tokens, services, incidents, incident_events, processed_events, improvement_opportunities, improvement_opportunity_events, bundle_generations, alert_rules, alert_deliveries, alert_email_digests, alert_email_digest_items, agent_webhooks, webhook_deliveries, weekly_report_channels, weekly_report_deliveries, probe_activations, deployments, org_usage_counters, capture_policies, github_installations, project_github_repos, github_dispatch_rules, github_dispatch_deliveries, audit_logs, password_credentials, sessions, email_verification_tokens, password_reset_tokens, invites, oauth_identities, processed_billing_events) |
+| Amazon S3  | `apps/api` (write), `apps/worker` (read/write/delete) | Raw events (`raw/{project_id}/{date}/{event_id}.json`) for retained sampled occurrences, bundles (`bundles/{project_id}/{incident_id}/bundle.json.gz`), reproductions (`reproductions/{project_id}/{incident_id}/reproduction.json.gz`)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| Redis      | `apps/api`, `apps/worker`                             | BullMQ job queues, incident frequency counters, ingestion rate-limit counters, GitHub App installation token cache (50m TTL), optional caches                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
 
 ---
 
 ## Data Flow Summary
 
 ### Ingestion Flow
+
 ```
 SDK → POST /v1/events → API validates → enforce capture policy (reject policy-violating events) → S3 (raw) → Redis queue → Worker processes
 
@@ -383,6 +412,7 @@ Current execution detail: API request path does not persist incident metadata sy
 ```
 
 ### Retrieval Flow
+
 ```
 CLI/API/MCP → GET /v1/incidents/{id}/bundle → API reads Postgres metadata → S3 (bundle artifact) → response
 
@@ -396,6 +426,7 @@ Current retrieval implementation includes scoped artifact and log surfaces: `GET
 ```
 
 ### Webhook Flow
+
 ```
 Worker lifecycle event (bundle.reopened / incident.spike_detected) → match enabled `agent_webhooks` by event + filters (environment/service/severity) → persist delivery intent (Postgres) → claim due deliveries by `next_attempt_at` → enqueue `deliver-webhook` jobs → real HTTP delivery attempt with HMAC signature + retry-state/observability updates → after 50 consecutive final failures auto-disable the webhook (`is_enabled = false`)
 
@@ -405,16 +436,19 @@ CLI/MCP parity for synthetic tests stays thin: `debugbundle webhook test` and `t
 ```
 
 ### Weekly Reporting Flow
+
 ```
-build-bundle reservation → append deterministic `bundle_generations` history row → API/CLI/MCP manage explicit per-project `weekly_report_channels` → runtime scheduler evaluates enabled channels in their configured timezone/day/hour → aggregate weekly bundle counts + new incidents + regressions + top spikes for the computed 7-day window → suppress zero-activity projects → claim idempotent `weekly_report_deliveries` row per channel window → render/send email via `packages/email` or post Slack webhook text → mark delivery `delivered` or `failed`
+build-bundle reservation → append deterministic `bundle_generations` history row → project creation seeds one enabled owner-recipient email `weekly_report_channels` row using browser timezone when available, otherwise UTC → API/CLI/MCP/web project settings manage explicit per-project `weekly_report_channels` with at most one email channel per project → runtime scheduler evaluates enabled channels in their configured timezone/day/hour → aggregate weekly bundle counts + new incidents + resolved incidents + regressions + top spikes for the computed 7-day window → suppress zero-activity projects → claim idempotent `weekly_report_deliveries` row per channel window → combine due email deliveries for the same recipient set and weekly window into one email with per-project sections while Slack remains project/channel scoped → render/send email via `packages/email` or post Slack webhook text → mark each delivery `delivered` or `failed`
 ```
 
 ### GitHub Dispatch Flow
+
 ```
 Worker lifecycle event (bundle.created / bundle.reopened / incident.spike_detected / improvement_bundle.created) → match enabled `github_dispatch_rules` by event + filters (environment/service/severity/bundle_type and incident_status when applicable) + target cooldown check → enforce DebugBundle hourly dispatch caps (100/project/hour, 4000/installation/hour) and persist non-retryable `skipped` history rows for suppressed matches → persist delivery intent targeting either an incident or improvement opportunity (Postgres `github_dispatch_deliveries`) → claim due deliveries by `next_attempt_at` → acquire GitHub App installation token (Redis cache, 50m TTL) → POST `repository_dispatch` with event_type "debugbundle.incident" and client_payload (summary fields + API links, including `improvement_id` for hosted improvements) → update delivery status/retry state → retry on failure (1s → 5s → 30s → 2m → 10m, 5 attempts max)
 ```
 
 ### Agent Automation Flow
+
 ```
 Webhook (bundle.created) → Agent receives → GET bundle → GET reproduction → analyze repo → propose patch → open PR
 GitHub dispatch (debugbundle.incident) → GitHub Actions workflow triggers → public `debugbundle/action@v1` can fetch incident failure-bundle context when `incident_id` is present, while hosted improvement workflows can use `links.bundle` and a member token to fetch the improvement bundle when `improvement_id` is present → repository-owned automation analyzes → proposes fix / opens issue / creates PR
@@ -522,20 +556,20 @@ Environment-specific deployment configuration, operations runbooks, and other pr
 
 ## Key Contract & Rule Files
 
-| File | Governs |
-|------|---------|
-| `/spec/local-first-onboarding.md` | Local-first product model, onboarding flow, SDK transport strategy, log-based capture, local processing pipeline, agent skill structure |
-| `/spec/auth-architecture.md` | First-party auth model: sessions, member tokens, project tokens, auth surfaces, credential flows, data model, API contract shape |
-| `/spec/tech-stack.md` | Frontend framework, UI system, hosted cloud direction, deployment shape, sizing, operational baseline |
-| `/contracts/public-interfaces.md` | API, CLI, MCP, webhook, SDK interface definitions + parity matrix |
-| `/contracts/data-schemas.md` | Database tables, event envelope, bundle schema |
-| `/contracts/sdk-interface.md` | Universal SDK interface: core methods, vanilla hooks, log capture, framework integration |
-| `/rules/coding-standards.md` | Code style, documentation style, environment detection, git conventions |
-| `/rules/design-discipline.md` | Frontend/UI/UX, accessibility, layout, interaction, and design-system rules |
-| `/rules/domain-invariants.md` | Hard business rules (23 invariants) |
-| `/rules/architectural-constraints.md` | Module boundaries, Docker-first, open-source rules |
-| `/rules/package-standards.md` | Multi-registry naming (npm/PyPI/Packagist), semver, CHANGELOG, error codes, type safety |
-| `/rules/release-governance.md` | Governance files, CI/CD spec, breaking change policy, test coverage targets |
-| `/rules/sdk-testing-strategy.md` | Cross-SDK testing tiers, transport mocking, contract compliance, CI pipeline per language |
-| `/rules/tdd-discipline.md` | Red/green TDD protocol, test-before-code mandate, verification workflow |
-| `/rules/test-organization.md` | Test directory layout, placement rules, naming conventions |
+| File                                  | Governs                                                                                                                                 |
+| ------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| `/spec/local-first-onboarding.md`     | Local-first product model, onboarding flow, SDK transport strategy, log-based capture, local processing pipeline, agent skill structure |
+| `/spec/auth-architecture.md`          | First-party auth model: sessions, member tokens, project tokens, auth surfaces, credential flows, data model, API contract shape        |
+| `/spec/tech-stack.md`                 | Frontend framework, UI system, hosted cloud direction, deployment shape, sizing, operational baseline                                   |
+| `/contracts/public-interfaces.md`     | API, CLI, MCP, webhook, SDK interface definitions + parity matrix                                                                       |
+| `/contracts/data-schemas.md`          | Database tables, event envelope, bundle schema                                                                                          |
+| `/contracts/sdk-interface.md`         | Universal SDK interface: core methods, vanilla hooks, log capture, framework integration                                                |
+| `/rules/coding-standards.md`          | Code style, documentation style, environment detection, git conventions                                                                 |
+| `/rules/design-discipline.md`         | Frontend/UI/UX, accessibility, layout, interaction, and design-system rules                                                             |
+| `/rules/domain-invariants.md`         | Hard business rules (23 invariants)                                                                                                     |
+| `/rules/architectural-constraints.md` | Module boundaries, Docker-first, open-source rules                                                                                      |
+| `/rules/package-standards.md`         | Multi-registry naming (npm/PyPI/Packagist), semver, CHANGELOG, error codes, type safety                                                 |
+| `/rules/release-governance.md`        | Governance files, CI/CD spec, breaking change policy, test coverage targets                                                             |
+| `/rules/sdk-testing-strategy.md`      | Cross-SDK testing tiers, transport mocking, contract compliance, CI pipeline per language                                               |
+| `/rules/tdd-discipline.md`            | Red/green TDD protocol, test-before-code mandate, verification workflow                                                                 |
+| `/rules/test-organization.md`         | Test directory layout, placement rules, naming conventions                                                                              |

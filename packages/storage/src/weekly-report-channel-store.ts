@@ -84,61 +84,76 @@ export function createPostgresWeeklyReportChannelStore(db: Queryable): WeeklyRep
     },
 
     async createWeeklyReportChannelForOrganization(input) {
-      const result = await db.query<WeeklyReportChannelRow>(
-        `
-          INSERT INTO weekly_report_channels (
-            id,
-            project_id,
-            channel,
-            config,
-            schedule_day_of_week,
-            schedule_hour_of_day,
-            schedule_timezone,
-            is_enabled,
-            created_at,
-            updated_at
-          )
-          SELECT
-            $3,
-            p.id,
-            $4,
-            $5::jsonb,
-            $6,
-            $7,
-            $8,
-            $9,
-            now(),
-            now()
-          FROM projects p
-          WHERE p.organization_id = $1
-            AND p.id = $2
-          RETURNING
-            id AS channel_id,
-            project_id,
-            channel,
-            config,
-            schedule_day_of_week,
-            schedule_hour_of_day,
-            schedule_timezone,
-            is_enabled,
-            created_at::text AS created_at,
-            updated_at::text AS updated_at
-        `,
-        [
-          input.organization_id,
-          input.project_id,
-          randomUUID(),
-          input.channel,
-          JSON.stringify(input.config),
-          input.schedule.day_of_week,
-          input.schedule.hour_of_day,
-          input.schedule.timezone,
-          input.is_enabled
-        ]
-      );
+      try {
+        const result = await db.query<WeeklyReportChannelRow>(
+          `
+            INSERT INTO weekly_report_channels (
+              id,
+              project_id,
+              channel,
+              config,
+              schedule_day_of_week,
+              schedule_hour_of_day,
+              schedule_timezone,
+              is_enabled,
+              created_at,
+              updated_at
+            )
+            SELECT
+              $3,
+              p.id,
+              $4,
+              $5::jsonb,
+              $6,
+              $7,
+              $8,
+              $9,
+              now(),
+              now()
+            FROM projects p
+            WHERE p.organization_id = $1
+              AND p.id = $2
+            RETURNING
+              id AS channel_id,
+              project_id,
+              channel,
+              config,
+              schedule_day_of_week,
+              schedule_hour_of_day,
+              schedule_timezone,
+              is_enabled,
+              created_at::text AS created_at,
+              updated_at::text AS updated_at
+          `,
+          [
+            input.organization_id,
+            input.project_id,
+            randomUUID(),
+            input.channel,
+            JSON.stringify(input.config),
+            input.schedule.day_of_week,
+            input.schedule.hour_of_day,
+            input.schedule.timezone,
+            input.is_enabled
+          ]
+        );
 
-      const row = result.rows[0];
-      return row === undefined ? null : mapWeeklyReportChannel(row);
+        const row = result.rows[0];
+        return row === undefined ? null : mapWeeklyReportChannel(row);
+      } catch (error) {
+        if (
+          typeof error === "object" &&
+          error !== null &&
+          "code" in error &&
+          error.code === "23505" &&
+          "constraint" in error &&
+          error.constraint === "weekly_report_channels_project_email_unique_idx"
+        ) {
+          return "email_channel_exists";
+        }
+
+        throw error;
+      }
     },
 
     async updateWeeklyReportChannelForOrganization(input) {

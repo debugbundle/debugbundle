@@ -247,7 +247,8 @@ describe("api project routes", () => {
       organization_id: "org_123",
       name: "Main App",
       slug: "main-app",
-      environment_default: "production"
+      environment_default: "production",
+      weekly_report_timezone: "UTC"
     });
   });
 
@@ -373,7 +374,8 @@ describe("api project routes", () => {
       payload: {
         name: "Main App",
         slug: "main-app",
-        environment_default: "staging"
+        environment_default: "staging",
+        weekly_report_timezone: "Europe/Ljubljana"
       }
     });
 
@@ -383,7 +385,8 @@ describe("api project routes", () => {
       organization_id: "org_123",
       name: "Main App",
       slug: "main-app",
-      environment_default: "staging"
+      environment_default: "staging",
+      weekly_report_timezone: "Europe/Ljubljana"
     });
   });
 
@@ -464,9 +467,23 @@ describe("api project routes", () => {
         slug: "main-app"
       }
     });
+    const invalidTimezone = await app.inject({
+      method: "POST",
+      url: "/v1/projects",
+      headers: {
+        authorization: "Bearer dbundle_mem_test"
+      },
+      payload: {
+        name: "Main App",
+        slug: "main-app",
+        weekly_report_timezone: "Not/AZone"
+      }
+    });
 
     expect(invalidPayload.statusCode).toBe(400);
     expect(invalidPayload.json()).toEqual({ error: "invalid_payload" });
+    expect(invalidTimezone.statusCode).toBe(400);
+    expect(invalidTimezone.json()).toEqual({ error: "invalid_payload" });
     expect(slugTaken.statusCode).toBe(409);
     expect(slugTaken.json()).toEqual({ error: "project_slug_taken" });
   });

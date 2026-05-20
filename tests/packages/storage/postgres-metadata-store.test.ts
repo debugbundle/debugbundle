@@ -302,6 +302,8 @@ describe("postgres metadata store", () => {
 
     expect(createSql).toContain("JOIN organizations o ON o.id = cp.organization_id");
     expect(createSql).toContain("COALESCE(o.plan, 'free') AS organization_plan");
+    expect(createSql).toContain("INSERT INTO weekly_report_channels");
+    expect(createSql).toContain("jsonb_build_object('to', jsonb_build_array(owner_user.email))");
 
     expect(updateSql).toContain("JOIN organizations o ON o.id = up.organization_id");
     expect(updateSql).toContain("COALESCE(o.plan, 'free') AS organization_plan");
@@ -2616,11 +2618,14 @@ describe("postgres metadata store", () => {
       rows: [
         {
           project_id: "proj_123",
+          project_name: "Main App",
           window_start: "2026-03-09T00:00:00.000Z",
           window_end: "2026-03-16T00:00:00.000Z",
           failure_bundles: 3,
           improvement_bundles: 0,
           new_incidents: 2,
+          resolved_incidents: 2,
+          opened_incidents_resolved: 1,
           regressions: 1,
           top_spiking_incidents: [
             {
@@ -2643,6 +2648,7 @@ describe("postgres metadata store", () => {
 
     expect(summary).toEqual({
       project_id: "proj_123",
+      project_name: "Main App",
       window_start: "2026-03-09T00:00:00.000Z",
       window_end: "2026-03-16T00:00:00.000Z",
       bundle_counts: {
@@ -2650,6 +2656,8 @@ describe("postgres metadata store", () => {
         improvement: 0
       },
       new_incidents: 2,
+      resolved_incidents: 2,
+      opened_incidents_resolved: 1,
       regressions: 1,
       top_spiking_incidents: [
         {

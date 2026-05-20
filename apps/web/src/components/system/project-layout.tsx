@@ -14,12 +14,13 @@ const PROJECT_TABS = [
   { value: "incidents", label: "Incidents", suffix: "/incidents" },
   { value: "improvements", label: "Improvements", suffix: "/improvements" },
   { value: "bundles", label: "Bundles", suffix: "/bundles" },
+  { value: "probes", label: "Probes", suffix: "/probes" },
   { value: "alerts", label: "Alerts", suffix: "/alerts" },
   { value: "webhooks", label: "Webhooks", suffix: "/webhooks" },
   { value: "github", label: "GitHub", suffix: "/github" },
   { value: "tokens", label: "Tokens", suffix: "/tokens" },
   { value: "members", label: "Members", suffix: "/members" },
-  { value: "settings", label: "Settings", suffix: "/settings" },
+  { value: "settings", label: "Settings", suffix: "/settings" }
 ] as const;
 
 function canViewProjectMembers(project: ProjectRecord): boolean {
@@ -100,9 +101,10 @@ export function ProjectLayout(): JSX.Element {
     });
   }
 
-  const visibleTabs = project === null || project === undefined
-    ? PROJECT_TABS
-    : PROJECT_TABS.filter((tab) => tab.value !== "members" || canViewProjectMembers(project));
+  const visibleTabs =
+    project === null || project === undefined
+      ? PROJECT_TABS
+      : PROJECT_TABS.filter((tab) => tab.value !== "members" || canViewProjectMembers(project));
 
   if (projectId === undefined) {
     return <Navigate replace to="/projects" />;
@@ -155,7 +157,11 @@ export function ProjectLayout(): JSX.Element {
         </TabsList>
       </Tabs>
 
-      <Outlet context={{ project, projectId, onProjectUpdated: handleProjectUpdated } satisfies ProjectContext} />
+      <Outlet
+        context={
+          { project, projectId, onProjectUpdated: handleProjectUpdated } satisfies ProjectContext
+        }
+      />
     </div>
   );
 }

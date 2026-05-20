@@ -49,22 +49,44 @@ describe("email package", () => {
 
   it("renders weekly report emails with escaped html and empty spike fallback", () => {
     const rendered = renderWeeklyReportEmail({
-      projectId: "proj_<123>",
       windowStart: "2026-03-09T00:00:00.000Z",
       windowEnd: "2026-03-16T00:00:00.000Z",
-      bundleCounts: {
-        failure: 2,
-        improvement: 1
-      },
-      newIncidents: 3,
-      regressions: 1,
-      topSpikingIncidents: []
+      projects: [
+        {
+          projectId: "proj_123",
+          projectName: "Checkout <API>",
+          bundleCounts: {
+            failure: 2,
+            improvement: 1
+          },
+          newIncidents: 3,
+          resolvedIncidents: 2,
+          openedIncidentsResolved: 2,
+          regressions: 1,
+          topSpikingIncidents: []
+        },
+        {
+          projectId: "proj_456",
+          projectName: "Worker",
+          bundleCounts: {
+            failure: 1,
+            improvement: 0
+          },
+          newIncidents: 0,
+          resolvedIncidents: 1,
+          openedIncidentsResolved: 0,
+          regressions: 0,
+          topSpikingIncidents: []
+        }
+      ]
     });
 
-    expect(rendered.subject).toContain("proj_<123>");
+    expect(rendered.subject).toContain("2 projects");
     expect(rendered.text).toContain("Window: March 9, 2026 to March 16, 2026");
+    expect(rendered.text).toContain("Across 2 projects, you closed 2 of the 3 incidents opened this week.");
+    expect(rendered.text).toContain("Project: Checkout <API>");
     expect(rendered.text).toContain("Top spiking incidents:\nNone");
-    expect(rendered.html).toContain("proj_&lt;123&gt;");
+    expect(rendered.html).toContain("Checkout &lt;API&gt;");
     expect(rendered.html).toContain("DebugBundle weekly report");
     expect(rendered.html).toContain("March 9, 2026 to March 16, 2026");
     expect(rendered.html).toContain(">None</p>");

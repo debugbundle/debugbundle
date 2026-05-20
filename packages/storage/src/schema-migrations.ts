@@ -417,6 +417,31 @@ export const STORAGE_SCHEMA_MIGRATIONS = [
       `,
       "ALTER TABLE github_dispatch_rules ALTER COLUMN created_by_user_id SET NOT NULL"
     ]
+  }),
+  defineStorageSchemaMigration({
+    id: "202605200001_limit_weekly_report_email_channel_per_project",
+    description: "Keep weekly email reports singular per project.",
+    statements: [
+      `
+        DELETE FROM weekly_report_channels
+        WHERE id IN (
+          SELECT id
+          FROM (
+            SELECT
+              id,
+              row_number() OVER (PARTITION BY project_id ORDER BY created_at ASC, id ASC) AS row_number
+            FROM weekly_report_channels
+            WHERE channel = 'email'
+          ) ranked
+          WHERE ranked.row_number > 1
+        )
+      `,
+      `
+        CREATE UNIQUE INDEX IF NOT EXISTS weekly_report_channels_project_email_unique_idx
+        ON weekly_report_channels (project_id)
+        WHERE channel = 'email'
+      `
+    ]
   })
 ] as const;
 

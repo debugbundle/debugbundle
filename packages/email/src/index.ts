@@ -64,8 +64,35 @@ export interface EmailTransport {
   send(message: EmailMessage): Promise<void>;
 }
 
-export interface WeeklyReportEmailInput {
+export interface WeeklyReportProjectInput {
   projectId: string;
+  projectName: string;
+  bundleCounts: {
+    failure: number;
+    improvement: number;
+  };
+  newIncidents: number;
+  resolvedIncidents: number;
+  openedIncidentsResolved: number;
+  regressions: number;
+  topSpikingIncidents: Array<{
+    incident_id: string;
+    title: string;
+    occurrence_count: number;
+    spike_detected_at: string;
+  }>;
+}
+
+export interface WeeklyReportEmailInput {
+  organizationName?: string;
+  windowStart: string;
+  windowEnd: string;
+  projects: WeeklyReportProjectInput[];
+}
+
+export interface LegacyWeeklyReportEmailInput {
+  projectId: string;
+  projectName?: string;
   windowStart: string;
   windowEnd: string;
   bundleCounts: {
@@ -73,6 +100,8 @@ export interface WeeklyReportEmailInput {
     improvement: number;
   };
   newIncidents: number;
+  resolvedIncidents?: number;
+  openedIncidentsResolved?: number;
   regressions: number;
   topSpikingIncidents: Array<{
     incident_id: string;
@@ -101,7 +130,7 @@ function escapeSlackMrkdwn(value: string): string {
   return value.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;");
 }
 
-function formatTopSpikesText(input: WeeklyReportEmailInput["topSpikingIncidents"]): string {
+function formatTopSpikesText(input: WeeklyReportProjectInput["topSpikingIncidents"]): string {
   if (input.length === 0) {
     return "None";
   }
@@ -112,6 +141,71 @@ function formatTopSpikesText(input: WeeklyReportEmailInput["topSpikingIncidents"
         `${index + 1}. ${incident.title} (${incident.occurrence_count} occurrences, spike at ${formatEmailDate(incident.spike_detected_at)})`
     )
     .join("\n");
+}
+
+function normalizeWeeklyReportInput(input: WeeklyReportEmailInput | LegacyWeeklyReportEmailInput): WeeklyReportEmailInput {
+  if ("projects" in input) {
+    return input;
+  }
+
+  return {
+    windowStart: input.windowStart,
+    windowEnd: input.windowEnd,
+    projects: [
+      {
+        projectId: input.projectId,
+        projectName: input.projectName ?? input.projectId,
+        bundleCounts: input.bundleCounts,
+        newIncidents: input.newIncidents,
+        resolvedIncidents: input.resolvedIncidents ?? 0,
+        openedIncidentsResolved: input.openedIncidentsResolved ?? 0,
+        regressions: input.regressions,
+        topSpikingIncidents: input.topSpikingIncidents
+      }
+    ]
+  };
+}
+
+function formatIncidentOutcome(project: WeeklyReportProjectInput): string {
+  if (project.newIncidents === 0) {
+    if (project.resolvedIncidents === 0) {
+      return "No new incidents opened this week.";
+    }
+
+    return `You resolved ${project.resolvedIncidents} existing ${project.resolvedIncidents === 1 ? "incident" : "incidents"} this week.`;
+  }
+
+  if (project.openedIncidentsResolved >= project.newIncidents) {
+    return `You resolved all ${project.newIncidents} ${project.newIncidents === 1 ? "incident" : "incidents"} opened this week.`;
+  }
+
+  return `You closed ${project.openedIncidentsResolved} of the ${project.newIncidents} incidents opened this week.`;
+}
+
+function formatWeeklyReportLead(projects: WeeklyReportProjectInput[]): string {
+  if (projects.length === 0) {
+    return "No project activity was reported this week.";
+  }
+
+  if (projects.length === 1) {
+    return formatIncidentOutcome(projects[0]!);
+  }
+
+  const opened = projects.reduce((total, project) => total + project.newIncidents, 0);
+  const openedResolved = projects.reduce((total, project) => total + project.openedIncidentsResolved, 0);
+  const resolved = projects.reduce((total, project) => total + project.resolvedIncidents, 0);
+
+  if (opened === 0) {
+    return resolved === 0
+      ? `${projects.length} projects had reportable activity and no new incidents opened this week.`
+      : `Across ${projects.length} projects, you resolved ${resolved} existing ${resolved === 1 ? "incident" : "incidents"} this week.`;
+  }
+
+  if (openedResolved >= opened) {
+    return `Across ${projects.length} projects, you resolved all ${opened} ${opened === 1 ? "incident" : "incidents"} opened this week.`;
+  }
+
+  return `Across ${projects.length} projects, you closed ${openedResolved} of the ${opened} incidents opened this week.`;
 }
 
 function titleCase(value: string): string {
@@ -255,43 +349,64 @@ export function renderProjectInviteEmail(input: {
   };
 }
 
-export function renderWeeklyReportEmail(input: WeeklyReportEmailInput): { subject: string; text: string; html: string } {
-  const subject = `DebugBundle weekly report for ${input.projectId}`;
-  const formattedWindow = `${formatEmailDate(input.windowStart)} to ${formatEmailDate(input.windowEnd)}`;
+export function renderWeeklyReportEmail(input: WeeklyReportEmailInput | LegacyWeeklyReportEmailInput): { subject: string; text: string; html: string } {
+  const normalized = normalizeWeeklyReportInput(input);
+  const projectCount = normalized.projects.length;
+  const primaryProject = normalized.projects[0];
+  const subject =
+    projectCount === 1 && primaryProject !== undefined
+      ? `DebugBundle weekly report for ${primaryProject.projectName}`
+      : `DebugBundle weekly report for ${projectCount} projects`;
+  const formattedWindow = `${formatEmailDate(normalized.windowStart)} to ${formatEmailDate(normalized.windowEnd)}`;
+  const lead = formatWeeklyReportLead(normalized.projects);
   const text = [
-    `Project: ${input.projectId}`,
+    lead,
     `Window: ${formattedWindow}`,
     "",
-    `Failure bundles: ${input.bundleCounts.failure}`,
-    `Improvement bundles: ${input.bundleCounts.improvement}`,
-    `New incidents: ${input.newIncidents}`,
-    `Regressions: ${input.regressions}`,
-    "",
-    "Top spiking incidents:",
-    formatTopSpikesText(input.topSpikingIncidents)
-  ].join("\n");
+    ...normalized.projects.flatMap((project) => [
+      `Project: ${project.projectName}`,
+      `Failure bundles: ${project.bundleCounts.failure}`,
+      `Improvement bundles: ${project.bundleCounts.improvement}`,
+      `New incidents: ${project.newIncidents}`,
+      `Resolved incidents: ${project.resolvedIncidents}`,
+      `Opened incidents resolved: ${project.openedIncidentsResolved}`,
+      `Regressions: ${project.regressions}`,
+      "Top spiking incidents:",
+      formatTopSpikesText(project.topSpikingIncidents),
+      ""
+    ])
+  ].join("\n").trimEnd();
   const html = renderEmailLayout({
     eyebrow: "Weekly report",
     title: "DebugBundle weekly report",
-    intro: `Project ${escapeHtml(input.projectId)} from ${escapeHtml(formatEmailDate(input.windowStart))} to ${escapeHtml(formatEmailDate(input.windowEnd))}.`,
+    intro: `${escapeHtml(lead)} ${escapeHtml(formattedWindow)}.`,
     bodyHtml: [
       renderEmailKeyValueList([
-        { label: "Project", valueHtml: escapeHtml(input.projectId) },
         { label: "Window", valueHtml: escapeHtml(formattedWindow) },
-        { label: "Failure bundles", valueHtml: input.bundleCounts.failure.toString() },
-        { label: "Improvement bundles", valueHtml: input.bundleCounts.improvement.toString() },
-        { label: "New incidents", valueHtml: input.newIncidents.toString() },
-        { label: "Regressions", valueHtml: input.regressions.toString() }
+        { label: "Projects", valueHtml: projectCount.toString() }
       ]),
-      renderEmailSubheading("Top spiking incidents"),
-      input.topSpikingIncidents.length === 0
-        ? renderEmailParagraph("None")
-        : renderEmailOrderedList(
-            input.topSpikingIncidents.map(
-              (incident) =>
-                `<strong>${escapeHtml(incident.title)}</strong> (${incident.occurrence_count} occurrences, spike at ${escapeHtml(formatEmailDate(incident.spike_detected_at))})`
-            )
-          )
+      ...normalized.projects.map((project) =>
+        renderEmailPanel([
+          renderEmailSubheading(project.projectName),
+          renderEmailParagraph(escapeHtml(formatIncidentOutcome(project))),
+          renderEmailKeyValueList([
+            { label: "Failure bundles", valueHtml: project.bundleCounts.failure.toString() },
+            { label: "Improvement bundles", valueHtml: project.bundleCounts.improvement.toString() },
+            { label: "New incidents", valueHtml: project.newIncidents.toString() },
+            { label: "Resolved incidents", valueHtml: project.resolvedIncidents.toString() },
+            { label: "Regressions", valueHtml: project.regressions.toString() }
+          ]),
+          renderEmailSubheading("Top spiking incidents"),
+          project.topSpikingIncidents.length === 0
+            ? renderEmailParagraph("None")
+            : renderEmailOrderedList(
+                project.topSpikingIncidents.map(
+                  (incident) =>
+                    `<strong>${escapeHtml(incident.title)}</strong> (${incident.occurrence_count} occurrences, spike at ${escapeHtml(formatEmailDate(incident.spike_detected_at))})`
+                )
+              )
+        ].join(""))
+      )
     ].join("")
   });
 
