@@ -305,6 +305,16 @@ It may not be your earliest startup-facing wedge, but it is a major long-term cr
 
 - **Spring Boot** — Servlet filter + exception handler
 
+### Runtime baseline
+
+- Java >=17.
+- Compile/release target: Java 17.
+- Java 21 tested and recommended for current LTS deployments.
+- Java 25 and Java 26 compatibility should be tested where the selected Spring Boot line supports them.
+- Spring Boot 3.x / Spring Framework 6.x / `jakarta.servlet` is the first implementation target.
+- Spring Boot 4.x / Spring Framework 7.x compatibility should be included as a validation lane for Java 26 support when the adapter code remains compatible.
+- No Java 8, Java 11, Spring Boot 2.x, or `javax.servlet` support in V1.
+
 ### Future framework targets (post-V1)
 
 - Spring WebFlux (reactive), Jakarta Servlet / Tomcat / Jetty (standalone), Micronaut, Quarkus, Dropwizard, gRPC Java
@@ -312,8 +322,12 @@ It may not be your earliest startup-facing wedge, but it is a major long-term cr
 ### Implementation notes
 
 - Spring Boot is the first-class framework target.
+- Build as a Spring Boot starter backed by a lower-level Java core SDK.
 - Support exceptions, request context, MDC/log correlation, and async propagation.
+- Preserve existing application request IDs and MDC values while also reading `X-DebugBundle-Trace-Id` for browser/backend correlation.
+- Default to conservative privacy behavior: no request/response bodies, allowlisted headers only, aggressive redaction, and explicit opt-in for payload capture.
 - Minimize friction in enterprise deployments.
+- Detailed implementation plan: `spec/sdks/java-spring-boot-sdk.md`.
 
 ---
 

@@ -3,6 +3,7 @@ import { useMemo, useState, type MouseEvent } from "react";
 import { Link, useNavigate, useOutletContext } from "react-router-dom";
 
 import { CursorPaginationControls } from "../components/system/cursor-pagination-controls.js";
+import { ProjectSetupSummaryGrid } from "../components/system/project-setup-summary-grid.js";
 import { ResourceListState } from "../components/system/resource-list-state.js";
 import {
   SelectableTableActions,
@@ -53,6 +54,16 @@ export function ProjectOverviewPage(): JSX.Element {
           <DetailRow label="Slug" value={project.slug} />
           <DetailRow label="Project default environment" value={project.environment_default} />
           <DetailRow label="Created" value={formatDate(project.created_at)} />
+
+          <div className="space-y-4 border-t border-border/80 pt-4">
+            <div className="space-y-1">
+              <h3 className="text-sm font-medium text-foreground">Setup at a glance</h3>
+              <p className="text-sm text-muted-foreground">
+                Current counts and enabled states for the main automation and capture surfaces on this project.
+              </p>
+            </div>
+            <ProjectSetupSummaryGrid project={project} />
+          </div>
         </CardContent>
       </Card>
     </div>

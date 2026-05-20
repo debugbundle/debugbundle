@@ -606,13 +606,13 @@ Framework integrations must auto-register log capture alongside error/request ca
 | Python | FastAPI | Middleware |
 | PHP | Laravel | Middleware + exception handler + service provider |
 | PHP | Symfony | Event subscriber + bundle |
+| Java | Spring Boot | Servlet filter + exception handler |
 | Go | net/http | Middleware |
 | Go | Gin | Middleware |
 | Go | Echo | Middleware |
 | Ruby | Ruby on Rails | Middleware + Railtie |
 | Ruby | Rack | Middleware |
 | Ruby | Sidekiq | Server middleware |
-| Java | Spring Boot | Servlet filter + exception handler |
 | C# | ASP.NET Core | Middleware |
 | Kotlin (server) | Ktor | Plugin |
 | Kotlin (Android) | Android | Application lifecycle hooks |

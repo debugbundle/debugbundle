@@ -1,3 +1,6 @@
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+
 import { describe, expect, it } from 'vitest';
 
 import { referenceRouteEntries } from '../../../site/src/reference-content.js';
@@ -11,6 +14,9 @@ type ReferenceRouteEntry = {
 };
 
 const typedReferenceRouteEntries: readonly ReferenceRouteEntry[] = referenceRouteEntries;
+const workspacePackageJson = JSON.parse(
+  readFileSync(join(process.cwd(), 'package.json'), 'utf8'),
+) as { version: string };
 
 describe('public site reference documentation', () => {
   it('exposes the planned reference routes in the docs tree', () => {
@@ -30,7 +36,11 @@ describe('public site reference documentation', () => {
   });
 
   it('builds API endpoint reference entries from the published OpenAPI source', async () => {
-    const { apiEntries: entries } = await buildReferenceData();
+    const { apiEntries: entries, release } = await buildReferenceData();
+
+    expect(release).toEqual({
+      coreVersion: workspacePackageJson.version,
+    });
 
     expect(entries).toEqual(
       expect.arrayContaining([

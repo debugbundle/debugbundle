@@ -1,0 +1,502 @@
+import { useEffect, useState } from "react";
+
+import {
+  getProjectCapturePolicy,
+  getProjectImprovementSettings,
+  listProjectAlerts,
+  listProjectWeeklyReportChannels,
+  listProjectWebhooks,
+  type AlertRecord,
+  type ProjectCapturePolicyResponse,
+  type ProjectImprovementSettingsResponse,
+  type ProjectRecord,
+  type WebhookRecord,
+  type WeeklyReportChannelRecord
+} from "../../lib/api.js";
+import { Badge } from "../ui/badge.js";
+import { Skeleton } from "../ui/skeleton.js";
+
+const PROJECT_SETUP_SUMMARY_LIST_LIMIT = 100;
+
+type SummaryLoadState<T> =
+  | { status: "loading" }
+  | { status: "ready"; data: T }
+  | { status: "error" };
+
+type GitHubSummaryLoadState =
+  | { status: "available" }
+  | { status: "unsupported" };
+
+interface ProjectSetupSummaryState {
+  alerts: SummaryLoadState<AlertRecord[]>;
+  webhooks: SummaryLoadState<WebhookRecord[]>;
+  github: GitHubSummaryLoadState;
+  weeklyReports: SummaryLoadState<WeeklyReportChannelRecord[]>;
+  capturePolicy: SummaryLoadState<ProjectCapturePolicyResponse>;
+  improvementSettings: SummaryLoadState<ProjectImprovementSettingsResponse>;
+}
+
+export function ProjectSetupSummaryGrid({ project }: { project: ProjectRecord }): JSX.Element {
+  const [summary, setSummary] = useState<ProjectSetupSummaryState>(() => buildLoadingProjectSetupSummary(project.organization_plan));
+
+  useEffect(() => {
+    let isActive = true;
+
+    setSummary(buildLoadingProjectSetupSummary(project.organization_plan));
+
+    void (async () => {
+      const [
+        alertsResult,
+        webhooksResult,
+        capturePolicyResult,
+        improvementSettingsResult,
+        weeklyReportsResult
+      ] = await Promise.allSettled([
+        listProjectAlerts(project.project_id, PROJECT_SETUP_SUMMARY_LIST_LIMIT),
+        listProjectWebhooks(project.project_id, PROJECT_SETUP_SUMMARY_LIST_LIMIT),
+        getProjectCapturePolicy(project.project_id),
+        getProjectImprovementSettings(project.project_id),
+        listProjectWeeklyReportChannels(project.project_id, PROJECT_SETUP_SUMMARY_LIST_LIMIT)
+      ]);
+
+      if (!isActive) {
+        return;
+      }
+
+      setSummary({
+        alerts: toSummaryLoadState(alertsResult),
+        webhooks: toSummaryLoadState(webhooksResult),
+        capturePolicy: toSummaryLoadState(capturePolicyResult),
+        improvementSettings: toSummaryLoadState(improvementSettingsResult),
+        weeklyReports: toSummaryLoadState(weeklyReportsResult),
+        github: project.organization_plan === "free" ? { status: "unsupported" } : { status: "available" }
+      });
+    })();
+
+    return () => {
+      isActive = false;
+    };
+  }, [project.organization_plan, project.project_id]);
+
+  if (isProjectSetupSummaryLoading(summary)) {
+    return <ProjectSetupSummarySkeleton />;
+  }
+
+  return (
+    <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+      {renderAlertsSummaryBlock(summary.alerts)}
+      {renderWebhooksSummaryBlock(summary.webhooks)}
+      {renderGitHubSummaryBlock(summary.github)}
+      {renderWeeklyReportsSummaryBlock(summary.weeklyReports)}
+      {renderCapturePolicySummaryBlock(summary.capturePolicy)}
+      {renderImprovementSummaryBlock(summary.improvementSettings)}
+    </div>
+  );
+}
+
+function buildLoadingProjectSetupSummary(
+  organizationPlan: ProjectRecord["organization_plan"]
+): ProjectSetupSummaryState {
+  return {
+    alerts: { status: "loading" },
+    webhooks: { status: "loading" },
+    github: organizationPlan === "free" ? { status: "unsupported" } : { status: "available" },
+    weeklyReports: { status: "loading" },
+    capturePolicy: { status: "loading" },
+    improvementSettings: { status: "loading" }
+  };
+}
+
+function toSummaryLoadState<T>(result: PromiseSettledResult<T>): SummaryLoadState<T> {
+  return result.status === "fulfilled" ? { status: "ready", data: result.value } : { status: "error" };
+}
+
+function isProjectSetupSummaryLoading(summary: ProjectSetupSummaryState): boolean {
+  return (
+    summary.alerts.status === "loading" ||
+    summary.webhooks.status === "loading" ||
+    summary.weeklyReports.status === "loading" ||
+    summary.capturePolicy.status === "loading" ||
+    summary.improvementSettings.status === "loading"
+  );
+}
+
+function ProjectSetupSummarySkeleton(): JSX.Element {
+  return (
+    <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+      {Array.from({ length: 6 }, (_, index) => (
+        <div key={index} className="rounded-lg border border-border/80 bg-background/60 p-4">
+          <Skeleton className="h-3 w-24" />
+          <Skeleton className="mt-3 h-7 w-28" />
+          <Skeleton className="mt-3 h-4 w-full" />
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function renderAlertsSummaryBlock(summary: SummaryLoadState<AlertRecord[]>): JSX.Element {
+  if (summary.status === "loading") {
+    return <SetupSummaryBlock label="Alerts" value="Loading..." badge={{ label: "Loading", variant: "outline" }} description="Loading alert rule status." />;
+  }
+
+  if (summary.status === "error") {
+    return (
+      <SetupSummaryBlock
+        label="Alerts"
+        value="Unavailable"
+        badge={{ label: "Could not load", variant: "outline" }}
+        description="Alert rule counts could not be loaded for this project."
+      />
+    );
+  }
+
+  const totalAlerts = summary.data.length;
+  const enabledAlerts = summary.data.filter((alert) => alert.is_enabled).length;
+
+  return (
+    <SetupSummaryBlock
+      label="Alerts"
+      value={`${formatBoundedCount(totalAlerts, PROJECT_SETUP_SUMMARY_LIST_LIMIT)} rule${totalAlerts === 1 ? "" : "s"}`}
+      badge={{
+        label: enabledAlerts > 0 ? `${enabledAlerts} enabled` : "None enabled",
+        variant: enabledAlerts > 0 ? "success" : "secondary"
+      }}
+      description={
+        totalAlerts === 0
+          ? "No alert rules are configured yet."
+          : `${formatAlertChannelSummary(summary.data)} configured for this project.`
+      }
+    />
+  );
+}
+
+function renderWebhooksSummaryBlock(summary: SummaryLoadState<WebhookRecord[]>): JSX.Element {
+  if (summary.status === "loading") {
+    return <SetupSummaryBlock label="Webhooks" value="Loading..." badge={{ label: "Loading", variant: "outline" }} description="Loading webhook status." />;
+  }
+
+  if (summary.status === "error") {
+    return (
+      <SetupSummaryBlock
+        label="Webhooks"
+        value="Unavailable"
+        badge={{ label: "Could not load", variant: "outline" }}
+        description="Webhook endpoint counts could not be loaded for this project."
+      />
+    );
+  }
+
+  const totalWebhooks = summary.data.length;
+  const enabledWebhooks = summary.data.filter((webhook) => webhook.is_enabled).length;
+  const distinctEventCount = countDistinctWebhookEvents(summary.data);
+
+  return (
+    <SetupSummaryBlock
+      label="Webhooks"
+      value={`${formatBoundedCount(totalWebhooks, PROJECT_SETUP_SUMMARY_LIST_LIMIT)} endpoint${totalWebhooks === 1 ? "" : "s"}`}
+      badge={{
+        label: enabledWebhooks > 0 ? `${enabledWebhooks} enabled` : "None enabled",
+        variant: enabledWebhooks > 0 ? "success" : "secondary"
+      }}
+      description={
+        totalWebhooks === 0
+          ? "No project webhooks are configured yet."
+          : `${distinctEventCount} event type${distinctEventCount === 1 ? "" : "s"} subscribed across endpoints.`
+      }
+    />
+  );
+}
+
+function renderGitHubSummaryBlock(summary: GitHubSummaryLoadState): JSX.Element {
+  if (summary.status === "unsupported") {
+    return (
+      <SetupSummaryBlock
+        label="GitHub automation"
+        value="Solo+ only"
+        badge={{ label: "Unavailable", variant: "outline" }}
+        description="Repository dispatch automation is not available on the Free plan."
+      />
+    );
+  }
+
+  return (
+    <SetupSummaryBlock
+      label="GitHub automation"
+      value="Available"
+      badge={{ label: "GitHub tab", variant: "outline" }}
+      description="Repository connection and dispatch rules are managed from this project's GitHub tab."
+    />
+  );
+}
+
+function renderWeeklyReportsSummaryBlock(summary: SummaryLoadState<WeeklyReportChannelRecord[]>): JSX.Element {
+  if (summary.status === "loading") {
+    return <SetupSummaryBlock label="Weekly reports" value="Loading..." badge={{ label: "Loading", variant: "outline" }} description="Loading weekly report status." />;
+  }
+
+  if (summary.status === "error") {
+    return (
+      <SetupSummaryBlock
+        label="Weekly reports"
+        value="Unavailable"
+        badge={{ label: "Could not load", variant: "outline" }}
+        description="Weekly report channel status could not be loaded."
+      />
+    );
+  }
+
+  const emailChannel = summary.data.find((channel) => channel.channel === "email") ?? null;
+  const recipientCount = emailChannel === null ? 0 : readWeeklyReportRecipients(emailChannel).length;
+
+  if (emailChannel === null) {
+    return (
+      <SetupSummaryBlock
+        label="Weekly reports"
+        value="Not configured"
+        badge={{ label: "Off", variant: "secondary" }}
+        description="No weekly report schedule has been saved yet."
+      />
+    );
+  }
+
+  return (
+    <SetupSummaryBlock
+      label="Weekly reports"
+      value={emailChannel.is_enabled ? "Enabled" : "Off"}
+      badge={{
+        label: recipientCount > 0 ? `${recipientCount} recipient${recipientCount === 1 ? "" : "s"}` : "No recipients",
+        variant: emailChannel.is_enabled ? "success" : "secondary"
+      }}
+      description={
+        emailChannel.is_enabled
+          ? formatWeeklyReportSchedule(emailChannel)
+          : `Scheduled for ${formatWeeklyReportSchedule(emailChannel)}, but currently disabled.`
+      }
+    />
+  );
+}
+
+function renderCapturePolicySummaryBlock(summary: SummaryLoadState<ProjectCapturePolicyResponse>): JSX.Element {
+  if (summary.status === "loading") {
+    return <SetupSummaryBlock label="Capture policy" value="Loading..." badge={{ label: "Loading", variant: "outline" }} description="Loading capture policy." />;
+  }
+
+  if (summary.status === "error") {
+    return (
+      <SetupSummaryBlock
+        label="Capture policy"
+        value="Unavailable"
+        badge={{ label: "Could not load", variant: "outline" }}
+        description="Capture policy details could not be loaded."
+      />
+    );
+  }
+
+  const clientErrorStatuses = summary.data.policy.immediate_client_error_statuses;
+
+  return (
+    <SetupSummaryBlock
+      label="Capture policy"
+      value={`${formatCapturePreset(summary.data.policy.preset)} preset`}
+      badge={{
+        label: clientErrorStatuses.length > 0 ? `${clientErrorStatuses.length} client 4xx` : "Preset defaults",
+        variant: clientErrorStatuses.length > 0 ? "warning" : "outline"
+      }}
+      description={formatCapturePolicySummary(summary.data)}
+    />
+  );
+}
+
+function renderImprovementSummaryBlock(summary: SummaryLoadState<ProjectImprovementSettingsResponse>): JSX.Element {
+  if (summary.status === "loading") {
+    return <SetupSummaryBlock label="Improvement bundles" value="Loading..." badge={{ label: "Loading", variant: "outline" }} description="Loading improvement settings." />;
+  }
+
+  if (summary.status === "error") {
+    return (
+      <SetupSummaryBlock
+        label="Improvement bundles"
+        value="Unavailable"
+        badge={{ label: "Could not load", variant: "outline" }}
+        description="Improvement bundle settings could not be loaded."
+      />
+    );
+  }
+
+  if (!summary.data.cloud_automation_available) {
+    return (
+      <SetupSummaryBlock
+        label="Improvement bundles"
+        value="Local only"
+        badge={{ label: "Hosted off", variant: "outline" }}
+        description="Hosted automated improvement bundles are not available on this plan."
+      />
+    );
+  }
+
+  return (
+    <SetupSummaryBlock
+      label="Improvement bundles"
+      value={summary.data.settings.automated_improvement_bundles_enabled ? "Enabled" : "Off"}
+      badge={{
+        label: `${formatImprovementSensitivity(summary.data.settings.improvement_bundle_sensitivity)} sensitivity`,
+        variant: summary.data.settings.automated_improvement_bundles_enabled ? "success" : "secondary"
+      }}
+      description="Hosted improvement detection uses the shared retained bundle allowance."
+    />
+  );
+}
+
+function SetupSummaryBlock({
+  label,
+  value,
+  badge,
+  description
+}: {
+  label: string;
+  value: string;
+  badge: {
+    label: string;
+    variant: "secondary" | "outline" | "warning" | "success";
+  };
+  description: string;
+}): JSX.Element {
+  return (
+    <div className="rounded-lg border border-border/80 bg-background/60 p-4">
+      <p className="text-xs font-medium uppercase tracking-[0.18em] text-muted-foreground">{label}</p>
+      <div className="mt-3 flex flex-wrap items-start justify-between gap-3">
+        <p className="text-base font-semibold text-foreground">{value}</p>
+        <Badge variant={badge.variant}>{badge.label}</Badge>
+      </div>
+      <p className="mt-3 text-sm leading-6 text-muted-foreground">{description}</p>
+    </div>
+  );
+}
+
+function formatBoundedCount(value: number, limit: number): string {
+  return value >= limit ? `${limit}+` : value.toLocaleString();
+}
+
+function formatAlertChannelSummary(alerts: AlertRecord[]): string {
+  const channelCounts = new Map<string, number>();
+
+  for (const alert of alerts) {
+    channelCounts.set(alert.channel, (channelCounts.get(alert.channel) ?? 0) + 1);
+  }
+
+  return Array.from(channelCounts.entries())
+    .map(([channel, count]) => `${count} ${channel}`)
+    .join(", ");
+}
+
+function countDistinctWebhookEvents(webhooks: WebhookRecord[]): number {
+  const eventTypes = new Set<string>();
+
+  for (const webhook of webhooks) {
+    for (const eventType of webhook.events) {
+      eventTypes.add(eventType);
+    }
+  }
+
+  return eventTypes.size;
+}
+
+function readWeeklyReportRecipients(channel: WeeklyReportChannelRecord): string[] {
+  const recipients = channel.config["to"];
+  return Array.isArray(recipients) && recipients.every((recipient) => typeof recipient === "string") ? recipients : [];
+}
+
+function formatWeeklyReportSchedule(channel: WeeklyReportChannelRecord): string {
+  return `${formatDayOfWeek(channel.schedule.day_of_week)} at ${channel.schedule.hour_of_day
+    .toString()
+    .padStart(2, "0")}:00 ${channel.schedule.timezone}`;
+}
+
+function formatDayOfWeek(value: WeeklyReportChannelRecord["schedule"]["day_of_week"]): string {
+  switch (value) {
+    case "monday":
+      return "Monday";
+    case "tuesday":
+      return "Tuesday";
+    case "wednesday":
+      return "Wednesday";
+    case "thursday":
+      return "Thursday";
+    case "friday":
+      return "Friday";
+    case "saturday":
+      return "Saturday";
+    case "sunday":
+      return "Sunday";
+  }
+}
+
+function formatCapturePreset(value: ProjectCapturePolicyResponse["policy"]["preset"]): string {
+  switch (value) {
+    case "minimal":
+      return "Minimal";
+    case "balanced":
+      return "Balanced";
+    case "investigative":
+      return "Investigative";
+  }
+}
+
+function formatCapturePolicySummary(summary: ProjectCapturePolicyResponse): string {
+  return [
+    formatCaptureLogs(summary.policy.capture_logs),
+    formatCaptureRequests(summary.policy.capture_request_events),
+    formatCaptureBreadcrumbs(summary.policy.capture_breadcrumbs)
+  ].join(", ");
+}
+
+function formatCaptureLogs(value: ProjectCapturePolicyResponse["policy"]["capture_logs"]): string {
+  switch (value) {
+    case "off":
+      return "no log capture";
+    case "error":
+      return "error logs";
+    case "warning":
+      return "warning logs";
+    case "info":
+      return "info logs";
+  }
+}
+
+function formatCaptureRequests(value: ProjectCapturePolicyResponse["policy"]["capture_request_events"]): string {
+  switch (value) {
+    case "off":
+      return "no request events";
+    case "failures_only":
+      return "failed requests";
+    case "filtered":
+      return "filtered requests";
+    case "all":
+      return "all requests";
+  }
+}
+
+function formatCaptureBreadcrumbs(value: ProjectCapturePolicyResponse["policy"]["capture_breadcrumbs"]): string {
+  switch (value) {
+    case "local_only":
+      return "local-only breadcrumbs";
+    case "exception_only":
+      return "exception breadcrumb trails";
+    case "standalone":
+      return "standalone breadcrumbs";
+  }
+}
+
+function formatImprovementSensitivity(
+  value: ProjectImprovementSettingsResponse["settings"]["improvement_bundle_sensitivity"]
+): string {
+  switch (value) {
+    case "high_confidence":
+      return "High confidence";
+    case "balanced":
+      return "Balanced";
+    case "verbose":
+      return "Verbose";
+  }
+}

@@ -71,6 +71,9 @@ type ErrorCodeReference = {
 };
 
 type ReferenceData = {
+  release: {
+    coreVersion: string;
+  };
   apiEntries: ApiReferenceEntry[];
   cliEntries: CliReferenceEntry[];
   mcpGroups: McpToolReferenceGroup[];
@@ -522,8 +525,17 @@ export async function writeMachineReadableArtifacts(outputDirectory: string = pu
   }
 }
 
+async function readWorkspacePackageVersion(): Promise<string> {
+  const raw = await readFile(join(workspaceRoot, 'package.json'), 'utf8');
+  const parsed = z.object({ version: z.string().min(1) }).parse(JSON.parse(raw));
+  return parsed.version;
+}
+
 export async function buildReferenceData(): Promise<ReferenceData> {
   return {
+    release: {
+      coreVersion: await readWorkspacePackageVersion(),
+    },
     apiEntries: buildApiReferenceEntries(),
     cliEntries: buildCliReferenceEntries(),
     mcpGroups: buildMcpToolReferenceGroups(),

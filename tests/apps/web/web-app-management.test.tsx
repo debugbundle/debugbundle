@@ -106,6 +106,213 @@ describe("web app — management routes", () => {
     expect(screen.getByRole("tab", { name: /settings/i })).toBeInTheDocument();
   });
 
+  it("shows project setup at a glance on the overview route", async () => {
+    const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = requestUrl(input);
+
+      if (url.endsWith("/v1/auth/session")) {
+        return jsonResponse(200, {
+          session: createSession({ organization_plan: "team" })
+        });
+      }
+
+      if (url.endsWith("/v1/projects") && init?.method === undefined) {
+        return jsonResponse(200, {
+          projects: [createProject({ organization_plan: "team" })]
+        });
+      }
+
+      if (url.endsWith("/v1/alerts?project_id=proj_123&limit=100")) {
+        return jsonResponse(200, {
+          alerts: [
+            createAlert({
+              alert_id: "alert_enabled",
+              channel: "email",
+              is_enabled: true
+            }),
+            createAlert({
+              alert_id: "alert_disabled",
+              channel: "webhook",
+              is_enabled: false
+            })
+          ]
+        });
+      }
+
+      if (url.endsWith("/v1/webhooks?project_id=proj_123&limit=100")) {
+        return jsonResponse(200, {
+          webhooks: [
+            createWebhook({
+              webhook_id: "wh_enabled",
+              is_enabled: true,
+              events: ["bundle.created", "bundle.updated"]
+            }),
+            createWebhook({
+              webhook_id: "wh_disabled",
+              is_enabled: false,
+              events: ["incident.spike_detected"]
+            })
+          ]
+        });
+      }
+
+      if (url.endsWith("/v1/projects/proj_123/capture-policy")) {
+        return jsonResponse(200, {
+          access_mode: "manage",
+          policy: {
+            preset: "balanced",
+            capture_logs: "warning",
+            capture_request_events: "failures_only",
+            capture_breadcrumbs: "exception_only",
+            capture_probe_events: "buffer_only",
+            immediate_client_error_statuses: [401, 403]
+          },
+          overrides: {
+            capture_logs: null,
+            capture_request_events: null,
+            capture_breadcrumbs: null,
+            capture_probe_events: null,
+            immediate_client_error_statuses: [401, 403]
+          }
+        });
+      }
+
+      if (url.endsWith("/v1/projects/proj_123/improvement-settings")) {
+        return jsonResponse(200, {
+          access_mode: "manage",
+          cloud_automation_available: true,
+          settings: {
+            automated_improvement_bundles_enabled: true,
+            improvement_bundle_sensitivity: "verbose"
+          }
+        });
+      }
+
+      if (url.endsWith("/v1/weekly-report-channels?project_id=proj_123&limit=100")) {
+        return jsonResponse(200, {
+          channels: [
+            {
+              channel_id: "weekly_email_123",
+              project_id: "proj_123",
+              channel: "email",
+              config: { to: ["owen@example.com", "alerts@example.com"] },
+              schedule: {
+                day_of_week: "monday",
+                hour_of_day: 9,
+                timezone: "UTC"
+              },
+              is_enabled: true,
+              created_at: "2026-03-17T00:00:00.000Z",
+              updated_at: "2026-03-17T00:00:00.000Z"
+            }
+          ]
+        });
+      }
+
+      return jsonResponse(404, { error: "not_found" });
+    });
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<App initialEntries={["/projects/proj_123"]} />);
+
+    expect(await screen.findByText(/setup at a glance/i)).toBeInTheDocument();
+    expect(await screen.findByText(/^2 rules$/i)).toBeInTheDocument();
+    expect(screen.getByText(/^2 endpoints$/i)).toBeInTheDocument();
+    expect(screen.getByText(/^available$/i)).toBeInTheDocument();
+    expect(screen.getByText(/^github tab$/i)).toBeInTheDocument();
+    expect(screen.getByText(/^balanced preset$/i)).toBeInTheDocument();
+    expect(screen.getAllByText(/^1 enabled$/i)).toHaveLength(2);
+    expect(screen.getByText(/^2 recipients$/i)).toBeInTheDocument();
+    expect(screen.getByText(/^2 client 4xx$/i)).toBeInTheDocument();
+    expect(screen.getByText(/^3 event types subscribed across endpoints\.$/i)).toBeInTheDocument();
+    expect(screen.getByText(/^repository connection and dispatch rules are managed from this project's github tab\.$/i)).toBeInTheDocument();
+    expect(screen.getByText(/^monday at 09:00 utc$/i)).toBeInTheDocument();
+    expect(screen.getByText(/^warning logs, failed requests, exception breadcrumb trails$/i)).toBeInTheDocument();
+    expect(screen.getByText(/^hosted improvement detection uses the shared retained bundle allowance\.$/i)).toBeInTheDocument();
+    expect(screen.getByText(/^verbose sensitivity$/i)).toBeInTheDocument();
+    expect(fetchMock.mock.calls.some(([input]) => requestUrl(input).includes("/github/"))).toBe(false);
+  });
+
+  it("does not probe optional github endpoints from the overview route", async () => {
+    const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = requestUrl(input);
+
+      if (url.endsWith("/v1/auth/session")) {
+        return jsonResponse(200, {
+          session: createSession({ organization_plan: "team" })
+        });
+      }
+
+      if (url.endsWith("/v1/projects") && init?.method === undefined) {
+        return jsonResponse(200, {
+          projects: [createProject({ organization_plan: "team" })]
+        });
+      }
+
+      if (url.endsWith("/v1/alerts?project_id=proj_123&limit=100")) {
+        return jsonResponse(200, { alerts: [] });
+      }
+
+      if (url.endsWith("/v1/webhooks?project_id=proj_123&limit=100")) {
+        return jsonResponse(200, { webhooks: [] });
+      }
+
+      if (url.endsWith("/v1/weekly-report-channels?project_id=proj_123&limit=100")) {
+        return jsonResponse(200, { channels: [] });
+      }
+
+      if (url.endsWith("/v1/projects/proj_123/capture-policy")) {
+        return jsonResponse(200, {
+          access_mode: "manage",
+          policy: {
+            preset: "balanced",
+            capture_logs: "warning",
+            capture_request_events: "failures_only",
+            capture_breadcrumbs: "exception_only",
+            capture_probe_events: "buffer_only",
+            immediate_client_error_statuses: []
+          },
+          overrides: {
+            capture_logs: null,
+            capture_request_events: null,
+            capture_breadcrumbs: null,
+            capture_probe_events: null,
+            immediate_client_error_statuses: null
+          }
+        });
+      }
+
+      if (url.endsWith("/v1/projects/proj_123/improvement-settings")) {
+        return jsonResponse(200, {
+          access_mode: "manage",
+          cloud_automation_available: true,
+          settings: {
+            automated_improvement_bundles_enabled: true,
+            improvement_bundle_sensitivity: "balanced"
+          }
+        });
+      }
+
+      return jsonResponse(404, { error: "not_found" });
+    });
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<App initialEntries={["/projects/proj_123"]} />);
+
+    expect(await screen.findByText(/setup at a glance/i)).toBeInTheDocument();
+    expect(await screen.findByText(/^available$/i)).toBeInTheDocument();
+    expect(screen.getByText(/^github tab$/i)).toBeInTheDocument();
+    expect(screen.queryByText(/^unavailable$/i)).toBeNull();
+    expect(
+      fetchMock.mock.calls.some(([input]) =>
+        requestUrl(input).endsWith("/v1/alerts?project_id=proj_123&limit=100")
+      )
+    ).toBe(true);
+    expect(fetchMock.mock.calls.some(([input]) => requestUrl(input).includes("/github/"))).toBe(false);
+  });
+
   it("shows incident inventory from the signed-in incidents route and exposes the sidebar entry", async () => {
     const user = userEvent.setup();
     const anomalyIncident = createIncident({
