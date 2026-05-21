@@ -202,4 +202,70 @@ describe("cli validate command", () => {
     expect(await readFile(join(rootDirectory, ".gitignore"), "utf8")).toContain(".debugbundle/local/*");
     expect(await readFile(join(rootDirectory, ".gitignore"), "utf8")).toContain("!.debugbundle/local/connection.json");
   });
+
+  it("reports and refreshes stale generated skill guidance", async () => {
+    const rootDirectory = await createValidateFixtureRepository();
+
+    await setupCommand(
+      {},
+      {
+        cwd: () => rootDirectory,
+        now: () => new Date("2026-03-14T00:00:00.000Z")
+      }
+    );
+
+    await writeFile(join(rootDirectory, ".agents", "skills", "debugbundle", "SKILL.md"), "---\nname: debugbundle\ndescription: stale\n---\n", "utf8");
+
+    const staleResult = await validateCommand(
+      {
+        json: true
+      },
+      {
+        cwd: () => rootDirectory
+      }
+    );
+
+    const staleParsed = JSON.parse(staleResult.output) as {
+      status: string;
+      checks: Array<{ name: string; status: string; message: string }>;
+      warnings: string[];
+      auto_fix_available: boolean;
+    };
+
+    expect(staleResult.exitCode).toBe(0);
+    expect(staleParsed.status).toBe("warning");
+    expect(staleParsed.auto_fix_available).toBe(true);
+    expect(staleParsed.checks).toContainEqual({
+      name: "agent-skill",
+      status: "warning",
+      message: "Stale .agents/skills/debugbundle/SKILL.md; run debugbundle validate --fix to refresh it."
+    });
+    expect(staleParsed.warnings).toContain("Stale .agents/skills/debugbundle/SKILL.md; run debugbundle validate --fix to refresh it.");
+
+    const fixedResult = await validateCommand(
+      {
+        fix: true,
+        json: true
+      },
+      {
+        cwd: () => rootDirectory
+      }
+    );
+
+    const fixedParsed = JSON.parse(fixedResult.output) as {
+      status: string;
+      checks: Array<{ name: string; status: string; message: string }>;
+      auto_fix_available: boolean;
+    };
+
+    expect(fixedResult.exitCode).toBe(0);
+    expect(fixedParsed.status).toBe("healthy");
+    expect(fixedParsed.auto_fix_available).toBe(false);
+    expect(fixedParsed.checks).toContainEqual({
+      name: "agent-skill",
+      status: "ok",
+      message: "Updated stale .agents/skills/debugbundle/SKILL.md"
+    });
+    expect(await readFile(join(rootDirectory, ".agents", "skills", "debugbundle", "SKILL.md"), "utf8")).toContain("Investigation Quickstart");
+  });
 });

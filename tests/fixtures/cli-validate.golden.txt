@@ -15,4 +15,4 @@ Checks:
 Suggested actions:
 - Run debugbundle setup if .debugbundle/profile.json is missing.
 - Run debugbundle profile validate for field-level profile errors.
-- Run debugbundle validate --fix to recreate missing local DebugBundle stubs when safe.
+- Run debugbundle validate --fix to recreate missing or stale local DebugBundle stubs when safe.

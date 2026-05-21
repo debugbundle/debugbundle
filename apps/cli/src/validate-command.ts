@@ -49,54 +49,63 @@ type ValidateCommandDependencies = {
 const SUGGESTED_ACTIONS = [
   "Run debugbundle setup if .debugbundle/profile.json is missing.",
   "Run debugbundle profile validate for field-level profile errors.",
-  "Run debugbundle validate --fix to recreate missing local DebugBundle stubs when safe."
+  "Run debugbundle validate --fix to recreate missing or stale local DebugBundle stubs when safe."
 ] as const;
 
 const FIXABLE_FILES = [
   {
     name: "connection-config",
     filePath: CONNECTION_FILE_PATH,
-    buildContent: buildConnectionConfig
+    buildContent: buildConnectionConfig,
+    checkContent: false
   },
   {
     name: "agent-skill",
     filePath: SKILL_FILE_PATH,
-    buildContent: buildSkill
+    buildContent: buildSkill,
+    checkContent: true
   },
   {
     name: "cli-reference",
     filePath: CLI_REFERENCE_FILE_PATH,
-    buildContent: buildCliReference
+    buildContent: buildCliReference,
+    checkContent: true
   },
   {
     name: "mcp-reference",
     filePath: MCP_REFERENCE_FILE_PATH,
-    buildContent: buildMcpReference
+    buildContent: buildMcpReference,
+    checkContent: true
   },
   {
     name: "bundle-schema-reference",
     filePath: BUNDLE_SCHEMA_REFERENCE_FILE_PATH,
-    buildContent: buildBundleSchemaReference
+    buildContent: buildBundleSchemaReference,
+    checkContent: true
   },
   {
     name: "profile-enrichment-reference",
     filePath: PROFILE_ENRICHMENT_REFERENCE_FILE_PATH,
-    buildContent: buildProfileEnrichmentReference
+    buildContent: buildProfileEnrichmentReference,
+    checkContent: true
   },
   {
     name: "improvement-analysis-recipe",
     filePath: IMPROVEMENT_ANALYSIS_RECIPE_FILE_PATH,
-    buildContent: buildImprovementAnalysisRecipe
+    buildContent: buildImprovementAnalysisRecipe,
+    checkContent: true
   },
   {
     name: "performance-analysis-recipe",
     filePath: PERFORMANCE_ANALYSIS_RECIPE_FILE_PATH,
-    buildContent: buildPerformanceAnalysisRecipe
+    buildContent: buildPerformanceAnalysisRecipe,
+    checkContent: true
   },
   {
     name: "skill-evals",
     filePath: EVALS_FILE_PATH,
-    buildContent: buildSkillEvals
+    buildContent: buildSkillEvals,
+    checkContent: true
   }
 ] as const;
 
@@ -239,6 +248,30 @@ export async function validateCommand(
   for (const fixableFile of FIXABLE_FILES) {
     const absoluteFilePath = join(rootDirectory, fixableFile.filePath);
     if (await pathExists(absoluteFilePath, stat)) {
+      if (fixableFile.checkContent) {
+        const currentContents = await readFile(absoluteFilePath);
+        const expectedContents = fixableFile.buildContent();
+        if (currentContents !== expectedContents) {
+          if (input.fix === true) {
+            await writeFile(absoluteFilePath, expectedContents);
+            checks.push({
+              name: fixableFile.name,
+              status: "ok",
+              message: `Updated stale ${fixableFile.filePath}`
+            });
+            continue;
+          }
+
+          autoFixAvailable = true;
+          checks.push({
+            name: fixableFile.name,
+            status: "warning",
+            message: `Stale ${fixableFile.filePath}; run debugbundle validate --fix to refresh it.`
+          });
+          continue;
+        }
+      }
+
       checks.push({
         name: fixableFile.name,
         status: "ok",

@@ -1,7 +1,7 @@
 # SDK Interface Contract — DebugBundle
 
 Version: v1
-Last updated: 2026-05-19
+Last updated: 2026-05-21
 
 This contract defines the standard interface that ALL DebugBundle SDKs must implement, regardless of language. It ensures behavioral consistency across Node.js, browser, Python, PHP, Go, Ruby, and all future language SDKs.
 
@@ -573,6 +573,7 @@ Framework integrations must auto-register log capture alongside error/request ca
 | Browser | `@debugbundle/sdk-browser` | npm | Phase 9 | Shipped (in `debugbundle-js` repo) |
 | Python | `debugbundle-python` | PyPI | Phase 18 | Shipped |
 | PHP | `debugbundle/sdk-php` | Packagist | Phase 18a | Shipped |
+| Java | `com.debugbundle:debugbundle-spring-boot-starter` (`com.debugbundle:debugbundle-java-core` companion module) | Maven Central | Java SDK | Pre-release |
 | Go | `github.com/debugbundle/debugbundle-go` | Go modules | Phase 18b | Planned |
 | Ruby | `debugbundle` | RubyGems | Phase 18c | Planned |
 
@@ -580,7 +581,6 @@ Framework integrations must auto-register log capture alongside error/request ca
 
 | Language | Package | Registry | Status |
 |----------|---------|----------|--------|
-| Java | `com.debugbundle:sdk-java` | Maven Central | Planned |
 | C# | `DebugBundle.Sdk` | NuGet | Planned |
 | Kotlin (server) | `com.debugbundle:sdk-kotlin` | Maven Central | Planned |
 | Rust | `debugbundle` | crates.io | Planned |
@@ -1048,6 +1048,7 @@ For V1, full relay parity applies to the shipped server SDK and integration surf
 | Python SDK | Django middleware, Flask route, FastAPI endpoint |
 | PHP SDK | Laravel middleware, Symfony controller |
 | WordPress plugin | WordPress REST route that composes the PHP relay behavior and adds WordPress-appropriate persistent rate limiting/spool handling |
+| Java SDK | Spring Boot relay route |
 
 Future server SDKs must implement the same full relay handler contract before they are marked relay-handler compatible:
 
@@ -1055,7 +1056,6 @@ Future server SDKs must implement the same full relay handler contract before th
 |-----|---------------|
 | Go | `net/http` handler |
 | Ruby | Rack middleware, Rails engine |
-| Java | Spring Boot filter |
 | C# | ASP.NET Core middleware |
 | Kotlin (server) | Ktor plugin |
 

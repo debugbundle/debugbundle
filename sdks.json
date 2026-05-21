@@ -19,6 +19,11 @@
       "path": "sdks/debugbundle-wordpress",
       "cloneUrl": "https://github.com/debugbundle/debugbundle-wordpress.git",
       "branch": "main"
+    },
+    {
+      "path": "sdks/debugbundle-java",
+      "cloneUrl": "https://github.com/debugbundle/debugbundle-java.git",
+      "branch": "main"
     }
   ]
 }

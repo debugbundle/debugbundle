@@ -1,7 +1,7 @@
 # Java Spring Boot SDK Implementation Plan
 
 Version: v1
-Last updated: 2026-05-20
+Last updated: 2026-05-21
 
 ---
 
@@ -65,7 +65,7 @@ Suggested Java package roots:
 | `com.debugbundle.sdk.probe` | Probe ring buffers and activation state. |
 | `com.debugbundle.spring.boot` | Spring Boot starter and auto-configuration. |
 
-Consumer installation examples must be documented for both Maven and Gradle, even if the SDK repo itself chooses one build tool.
+The repository build uses Maven as a multi-module project. Consumer installation examples must still be documented for both Maven and Gradle.
 
 ---
 
@@ -385,7 +385,7 @@ The SDK must not assign `event_class`; classification remains worker-owned.
 ## Implementation Slices
 
 1. Repository scaffold and build
-   - Create `debugbundle-java` with CI on Java 17 and Java 21.
+   - Create `debugbundle-java` with CI on Java 17, Java 21, Java 25, and Java 26.
    - Add core and Spring Boot starter modules.
    - Add publishing metadata for Maven Central.
 
@@ -478,27 +478,26 @@ The Java SDK must not require the full DebugBundle Docker stack for tests. Integ
 
 ## Release Readiness Checklist
 
-- Universal Java API implemented.
-- Spring Boot starter auto-configures cleanly with one property block.
-- Java 17, Java 21, Java 25, and Java 26 CI lanes are green for the applicable core/starter matrix.
-- Request, exception, log, probe, and relay behavior covered by tests.
-- Relay handler passes the shared relay compliance fixtures.
-- Capture policy is enforced locally with ingestion as a backstop.
-- SDK failures never throw into host application code.
-- Request and response bodies are off by default.
-- Header capture is allowlist-based by default.
-- Existing `X-Request-Id` and MDC `requestId` are preserved.
-- `X-DebugBundle-Trace-Id` links browser and backend events.
-- Maven Central artifacts build and include source/javadoc jars.
-- Public docs include Maven, Gradle, Spring Boot, Spring Security, local-only, connected, and privacy examples.
+- [x] Universal Java API implemented.
+- [x] Spring Boot starter auto-configures cleanly with one property block.
+- [x] Java 17, Java 21, Java 25, and Java 26 Docker-backed verification lanes are green for the applicable core/starter matrix.
+- [x] Request, exception, log, probe, and relay behavior covered by tests.
+- [x] Relay handler covers the shared relay contract: origin validation, content type, body size, schema, credential stripping, local-only writes, durable spool, connected forwarding, and rate limiting.
+- [x] Capture policy is enforced locally with ingestion as a backstop.
+- [x] SDK failures never throw into host application code.
+- [x] Request and response bodies are off by default.
+- [x] Header capture is allowlist-based by default.
+- [x] Existing `X-Request-Id` and MDC `requestId` are preserved.
+- [x] `X-DebugBundle-Trace-Id` links browser and backend events.
+- [x] Maven artifacts build with source/javadoc jars and Maven Central metadata; release signing profile is present.
+- [x] Public docs include Maven, Gradle, Spring Boot, Spring Security, local-only, connected, and privacy examples.
 
 ---
 
 ## Open Decisions
 
-- Whether the SDK repo should use Maven or Gradle internally for its own build and release automation.
-- Whether `debugbundle-java-core` should replace the current `com.debugbundle:sdk-java` placeholder in `contracts/sdk-interface.md`, or whether `sdk-java` should remain as a convenience aggregate artifact.
+- Whether the repo should later publish an aggregate convenience artifact in addition to `debugbundle-java-core` and `debugbundle-spring-boot-starter`.
 - Whether Log4j2 support should ship with V1 or follow after Logback.
 - Whether generated Java event model classes should be produced from DebugBundle schemas or maintained manually.
 - Whether route template extraction should rely on Spring MVC best-matching-pattern attributes only, or include a fallback normalizer in the starter.
-- Whether the Spring relay endpoint path should be configurable beyond `/debugbundle/browser` in V1.
+- Whether the Spring relay endpoint path should become configurable beyond `/debugbundle/browser` after V1.

@@ -159,11 +159,12 @@ The `debugbundle-js` repo now consumes published `@debugbundle/shared-types` and
 
 ### Non-TypeScript SDKs
 
-All non-TS SDKs implement the same universal SDK interface (`init`, `captureException`, `captureError`, `captureLog`, `captureRequest`, `captureMessage`, `setContext`, `flush`, `probe`) with language-idiomatic naming. See `contracts/sdk-interface.md` for the full contract and `spec/sdk-language-targets.md` for the rollout plan. V1 relay parity is implemented for Python, PHP, and WordPress: each full relay-compatible surface validates and sanitizes browser batches, preserves correlation, isolates credentials, writes local-only event files, writes connected durable spool files, and forwards connected events with server-side credentials using the shared relay contract.
+All non-TS SDKs implement the same universal SDK interface (`init`, `captureException`, `captureError`, `captureLog`, `captureRequest`, `captureMessage`, `setContext`, `flush`, `probe`) with language-idiomatic naming. See `contracts/sdk-interface.md` for the full contract and `spec/sdk-language-targets.md` for the rollout plan. V1 relay parity is implemented for Python, PHP, WordPress, and Java Spring Boot: each full relay-compatible surface validates and sanitizes browser batches, preserves correlation, isolates credentials, writes local-only event files, writes connected durable spool files, and forwards connected events with server-side credentials using the shared relay contract.
 
 All non-TypeScript SDKs live in separate repositories under `github.com/debugbundle/`, each with its own language-native toolchain, CI pipeline, and independent release cycle.
 
 **Local workspace convention:** Separate SDK repos live as independent clones under `sdks/` for single-workspace development. The core repo now ships `sdks.json` plus `scripts/bootstrap-sdks.sh`, root workspace/test/typecheck wiring no longer hardcodes the staged JS SDK tree, and the legacy tracked SDK snapshot directories have been removed from the core repo index. The public site repo lives as a real local clone at the root `site/` path for day-to-day work, while lower-touch companion repos such as `debugbundle/action` live under ignored `.local-repos/` clones. Temporary operator notes and local execution checklists live under ignored `.local-notes/`. On an older long-lived checkout, remove any pre-cutover `sdks/debugbundle-js`, `sdks/debugbundle-python`, or `sdks/debugbundle-php` directories from disk before the first bootstrap run so those paths can be recloned cleanly.
+The current local SDK clone set includes `debugbundle-js`, `debugbundle-python`, `debugbundle-php`, `debugbundle-wordpress`, and `debugbundle-java`.
 
 **Wave 1 (active pre-launch scope):**
 
@@ -172,6 +173,7 @@ All non-TypeScript SDKs live in separate repositories under `github.com/debugbun
 | Python    | `github.com/debugbundle/debugbundle-python`    | PyPI (`debugbundle-python`)            | Django, Flask, FastAPI                                    |
 | PHP       | `github.com/debugbundle/debugbundle-php`       | Packagist (`debugbundle/sdk-php`)      | Laravel, Symfony                                          |
 | WordPress | `github.com/debugbundle/debugbundle-wordpress` | WordPress.org plugin + GitHub releases | WordPress plugin wrapper over PHP SDK + browser SDK relay |
+| Java      | `github.com/debugbundle/debugbundle-java`      | Maven Central                          | Spring Boot                                               |
 
 **Deferred until further notice:**
 
@@ -184,7 +186,6 @@ All non-TypeScript SDKs live in separate repositories under `github.com/debugbun
 
 | SDK             | Repository                                  | Package Registry          | Frameworks      |
 | --------------- | ------------------------------------------- | ------------------------- | --------------- |
-| Java            | `github.com/debugbundle/debugbundle-java`   | Maven Central             | Spring Boot     |
 | C#              | `github.com/debugbundle/debugbundle-dotnet` | NuGet (`DebugBundle`)     | ASP.NET Core    |
 | Kotlin (server) | `github.com/debugbundle/debugbundle-kotlin` | Maven Central             | Ktor            |
 | Rust            | `github.com/debugbundle/debugbundle-rust`   | crates.io (`debugbundle`) | Axum, Actix Web |
@@ -476,10 +477,12 @@ The action now lives in its own public repository, `debugbundle/action`. This co
   skills/
     debugbundle/
       SKILL.md                 — Agent skill per agentskills.io spec (committed)
-      references/              — CLI, MCP, bundle-schema, NDJSON-schema docs
+      references/              — CLI, MCP, bundle-schema, profile-enrichment docs
       assets/                  — Analysis schemas and examples
       evals/                   — Evaluation fixtures
 ```
+
+`debugbundle validate --fix` owns drift repair for generated skill content: it recreates missing files and refreshes stale managed skill references, schemas, and evals to the current CLI templates while preserving the reviewed profile.
 
 See `/spec/local-first-onboarding.md` for the full layout rationale, gitignore policy, and artifact lifecycle.
 

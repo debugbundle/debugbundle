@@ -62,16 +62,14 @@ So while the list is expressed as “top 12 languages,” the actual SDK rollout
 **Already shipped (Wave 1, complete):**
 - `@debugbundle/sdk-node` — Node.js backend SDK with Express, Fastify, Next.js integrations (Phase 8)
 - `@debugbundle/sdk-browser` — Browser SDK with auto-capture hooks, breadcrumbs, device context, trace correlation (Phase 9)
-
-Both live in the JS SDK monorepo: `github.com/debugbundle/debugbundle-js` (alongside `@debugbundle/shared-types` and `@debugbundle/redaction`).
-
-TypeScript and JavaScript are delivered as one shared npm SDK surface, exactly as this document recommends.
-
-**Already specified (Wave 1, ready for implementation):**
 - `debugbundle-python` — Python SDK with Django, Flask, FastAPI integrations (Phase 18)
 - `debugbundle/sdk-php` — PHP SDK with Laravel, Symfony integrations (Phase 18a)
+- `debugbundle-wordpress` — WordPress plugin wrapper over the PHP SDK plus browser relay
+- `com.debugbundle:debugbundle-spring-boot-starter` — Java SDK with Spring Boot MVC starter backed by `debugbundle-java-core`
 
-Both Python and PHP SDKs are fully specified in the implementation roadmap with the universal interface contract, vanilla hooks, probe support, logger integrations, and capture policy enforcement. The specifications in this document are consistent with those existing plans.
+The JS packages live in the JS SDK monorepo: `github.com/debugbundle/debugbundle-js` (alongside `@debugbundle/shared-types` and `@debugbundle/redaction`). Python, PHP, WordPress, and Java live in their own dedicated repositories.
+
+TypeScript and JavaScript are delivered as one shared npm SDK surface, exactly as this document recommends.
 
 **Deferred from pre-launch v1 until further notice:**
 - `github.com/debugbundle/debugbundle-go` — Go SDK (planned Phase 18b, postponed while v1 hardening and validation take priority)
@@ -492,6 +490,7 @@ Flutter creates a useful expansion path into cross-platform mobile and multi-pla
 - Python
 - PHP
 - WordPress plugin
+- Java Spring Boot
 
 ### Why
 
@@ -501,6 +500,7 @@ This group gives DebugBundle strong access to:
 - SaaS backends,
 - agent-built services,
 - API-heavy systems,
+- enterprise Spring MVC systems,
 - high-context production debugging problems.
 
 These ecosystems are especially likely to benefit from DebugBundle’s bundle-first model instead of simple log collection.
@@ -516,7 +516,6 @@ These remain strong future targets, but they are postponed until further notice 
 
 ## Wave 2: enterprise and platform depth
 
-- Java
 - C#
 - Kotlin (server)
 - Rust
@@ -757,9 +756,9 @@ For the next phase of SDK implementation, DebugBundle should prioritize these tw
 
 ### Practical rollout interpretation
 
-- **Immediate implementation focus (Wave 1):** TS/JS (shipped), Python, PHP, WordPress plugin
+- **Immediate implementation focus (Wave 1):** TS/JS, Python, PHP, WordPress plugin, Java Spring Boot
 - **Deferred until further notice:** Go, Ruby
-- **Next depth layer (Wave 2):** Java, C#, Kotlin server, Rust
+- **Next depth layer (Wave 2):** C#, Kotlin server, Rust
 - **Strategic product expansion (Wave 3):** Kotlin Android, Swift iOS, React Native, Dart/Flutter
 
 ### V1 framework scope per SDK

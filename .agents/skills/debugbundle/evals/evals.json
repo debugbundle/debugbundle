@@ -17,6 +17,30 @@
         "Read .debugbundle/profile.json.",
         "Update validation_status when the profile has been reviewed."
       ]
+    },
+    {
+      "name": "incident_resolution_hygiene",
+      "prompt": "A bug was fixed and a smoke-test incident was intentionally triggered during verification. Confirm the skill teaches the agent to resolve that incident once the check passes.",
+      "expected_behavior": [
+        "Resolve verified or intentionally generated incidents after the workflow is complete.",
+        "Leave unresolved incidents open when the failure is still live or unverified."
+      ]
+    },
+    {
+      "name": "artifact_path_discovery",
+      "prompt": "The user reports an unknown local runtime error. Confirm the skill tells the agent which DebugBundle paths and commands to inspect first.",
+      "expected_behavior": [
+        "Run doctor and list local open incidents before broad source exploration.",
+        "Use .debugbundle/local/state.json, .debugbundle/bundles/local/, and reproduction artifact paths as the local evidence map."
+      ]
+    },
+    {
+      "name": "connected_incident_fetch",
+      "prompt": "The user says a production incident fired in the hosted DebugBundle project. Confirm the skill points the agent to the cloud retrieval path.",
+      "expected_behavior": [
+        "List cloud open incidents or use MCP list_incidents with source cloud.",
+        "Fetch inspect, context, bundle, and reproduction artifacts before editing code."
+      ]
     }
   ]
 }
