@@ -22,6 +22,7 @@ spec/local/*
 
 # SDK clone roots (managed by scripts/bootstrap-sdks.sh)
 sdks/debugbundle-js/
+sdks/debugbundle-java/
 sdks/debugbundle-python/
 sdks/debugbundle-php/
 sdks/debugbundle-wordpress/
