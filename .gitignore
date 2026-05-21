@@ -20,13 +20,8 @@ site/
 spec/local/*
 !spec/local/v1-sdk-relay-parity-plan.md
 
-# SDK clone roots (managed by scripts/bootstrap-sdks.sh)
-sdks/debugbundle-js/
-sdks/debugbundle-java/
-sdks/debugbundle-python/
-sdks/debugbundle-php/
-sdks/debugbundle-wordpress/
-sdks/debugbundle-action/
+# SDK clone roots (managed outside the core repo)
+sdks/
 
 # DebugBundle (managed by debugbundle setup)
 .debugbundle/local/*
