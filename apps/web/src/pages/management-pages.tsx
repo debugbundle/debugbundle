@@ -30,6 +30,7 @@ import { Input } from "../components/ui/input.js";
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select.js";
 import { Skeleton } from "../components/ui/skeleton.js";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../components/ui/table.js";
+import { Textarea } from "../components/ui/textarea.js";
 import {
   createProject,
   createProjectToken,
@@ -287,6 +288,7 @@ export function ProjectTokensPage(): JSX.Element {
   const [tokens, setTokens] = useState<ProjectTokenRecord[] | null>(null);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [label, setLabel] = useState("");
+  const [allowedOriginsInput, setAllowedOriginsInput] = useState("");
   const [createdToken, setCreatedToken] = useState<CreatedProjectToken | null>(null);
   const effectiveRole = getProjectEffectiveRole(project);
   const canManageProjectTokens = effectiveRole === "owner" || effectiveRole === "admin";
@@ -312,10 +314,15 @@ export function ProjectTokensPage(): JSX.Element {
     event.preventDefault();
 
     try {
-      const created = await createProjectToken(resolvedProjectId, { label });
+      const allowedOrigins = parseAllowedOriginsInput(allowedOriginsInput);
+      const created = await createProjectToken(resolvedProjectId, {
+        label,
+        ...(allowedOrigins.length === 0 ? {} : { allowed_origins: allowedOrigins })
+      });
       setCreatedToken(created);
       setTokens((current) => [...(current ?? []), { ...created, plaintext: undefined }]);
       setLabel("");
+      setAllowedOriginsInput("");
       setIsCreateOpen(false);
       showSuccessToast("Project token created successfully.");
     } catch {
@@ -351,10 +358,27 @@ export function ProjectTokensPage(): JSX.Element {
                 footer={<Button type="submit">Create token</Button>}
                 onSubmit={(event) => void handleCreateToken(event)}
               >
-                  <Field>
-                    <FieldLabel htmlFor="project-token-label">Token label</FieldLabel>
-                    <Input id="project-token-label" value={label} onChange={(event) => setLabel(event.currentTarget.value)} />
-                  </Field>
+                  <FieldGroup>
+                    <Field>
+                      <FieldLabel htmlFor="project-token-label">Token label</FieldLabel>
+                      <Input id="project-token-label" value={label} onChange={(event) => setLabel(event.currentTarget.value)} />
+                    </Field>
+                    <Field>
+                      <FieldLabel htmlFor="project-token-allowed-origins">Allowed browser origins for static-site tokens</FieldLabel>
+                      <FieldDescription>
+                        Leave empty for server-side SDKs and relay tokens.
+                      </FieldDescription>
+                      <Textarea
+                        id="project-token-allowed-origins"
+                        value={allowedOriginsInput}
+                        onChange={(event) => setAllowedOriginsInput(event.currentTarget.value)}
+                        placeholder={"https://www.example.com\nhttps://preview.example.com"}
+                        autoCapitalize="none"
+                        autoCorrect="off"
+                        spellCheck={false}
+                      />
+                    </Field>
+                  </FieldGroup>
               </DialogFormContent>
             </Dialog>
         ) : null}
@@ -402,7 +426,12 @@ export function ProjectTokensPage(): JSX.Element {
               <TableBody>
                 {tokens.map((token) => (
                   <TableRow key={token.token_id}>
-                    <TableCell className="font-medium">{token.label}</TableCell>
+                    <TableCell>
+                      <div className="font-medium">{token.label}</div>
+                      <div className="mt-1 text-sm text-muted-foreground">
+                        {formatProjectTokenAllowedOrigins(token.allowed_origins)}
+                      </div>
+                    </TableCell>
                     <TableCell>{formatDate(token.created_at)}</TableCell>
                     <TableCell>{token.last_used_at === null ? "Never" : formatDate(token.last_used_at)}</TableCell>
                     {canManageProjectTokens ? (
@@ -443,6 +472,21 @@ function formatDate(value: string): string {
     day: "numeric",
     year: "numeric"
   }).format(new Date(value));
+}
+
+function parseAllowedOriginsInput(value: string): string[] {
+  return value
+    .split(/[\n,]+/)
+    .map((origin) => origin.trim())
+    .filter((origin) => origin.length > 0);
+}
+
+function formatProjectTokenAllowedOrigins(allowedOrigins: string[]): string {
+  if (allowedOrigins.length === 0) {
+    return "Browser origins: unrestricted";
+  }
+
+  return `Browser origins: ${allowedOrigins.join(", ")}`;
 }
 
 type ProjectSortField = "name" | "slug" | "environment_default" | "monthly_bundle_requests" | "monthly_raw_ingested_events";

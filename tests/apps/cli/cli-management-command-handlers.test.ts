@@ -116,6 +116,60 @@ describe("cli management command handlers", () => {
     });
   });
 
+  it("forwards project member management commands", async () => {
+    const listMembersCommand = vi.fn().mockResolvedValue({ exitCode: 0, output: "members" });
+    const listInvitesCommand = vi.fn().mockResolvedValue({ exitCode: 0, output: "invites" });
+    const inviteMemberCommand = vi.fn().mockResolvedValue({ exitCode: 0, output: "invite" });
+    const cancelInviteCommand = vi.fn().mockResolvedValue({ exitCode: 0, output: "cancel" });
+    const updateMemberRoleCommand = vi.fn().mockResolvedValue({ exitCode: 0, output: "update-role" });
+    const removeMemberCommand = vi.fn().mockResolvedValue({ exitCode: 0, output: "remove" });
+
+    await handleProjectCommand(parseArgv(["projects", "members", "list", "--project-id", "proj_1", "--json"]), { listMembersCommand });
+    await handleProjectCommand(parseArgv(["projects", "members", "invites", "--project-id", "proj_1"]), { listInvitesCommand });
+    await handleProjectCommand(
+      parseArgv(["projects", "members", "invite", "--project-id", "proj_1", "--email", "dev@example.com", "--role", "admin"]),
+      { inviteMemberCommand }
+    );
+    await handleProjectCommand(parseArgv(["projects", "members", "cancel-invite", "inv_1", "--project-id", "proj_1"]), {
+      cancelInviteCommand
+    });
+    await handleProjectCommand(parseArgv(["projects", "members", "update-role", "usr_2", "--project-id", "proj_1", "--role", "member"]), {
+      updateMemberRoleCommand
+    });
+    await handleProjectCommand(parseArgv(["projects", "members", "remove", "usr_3", "--project-id", "proj_1", "--json"]), {
+      removeMemberCommand
+    });
+
+    expect(listMembersCommand).toHaveBeenCalledWith({ authFilePath: undefined, json: true, projectId: "proj_1" });
+    expect(listInvitesCommand).toHaveBeenCalledWith({ authFilePath: undefined, json: undefined, projectId: "proj_1" });
+    expect(inviteMemberCommand).toHaveBeenCalledWith({
+      authFilePath: undefined,
+      json: undefined,
+      projectId: "proj_1",
+      email: "dev@example.com",
+      role: "admin"
+    });
+    expect(cancelInviteCommand).toHaveBeenCalledWith({
+      authFilePath: undefined,
+      json: undefined,
+      projectId: "proj_1",
+      inviteId: "inv_1"
+    });
+    expect(updateMemberRoleCommand).toHaveBeenCalledWith({
+      authFilePath: undefined,
+      json: undefined,
+      projectId: "proj_1",
+      userId: "usr_2",
+      role: "member"
+    });
+    expect(removeMemberCommand).toHaveBeenCalledWith({
+      authFilePath: undefined,
+      json: true,
+      projectId: "proj_1",
+      userId: "usr_3"
+    });
+  });
+
   it("rejects removed top-level member management commands", () => {
     expect(() => handleMemberCommand(parseArgv(["members", "list"]), {})).toThrow(
       "Use `debugbundle project members ... --project-id <id>` for project collaboration commands."
@@ -375,7 +429,10 @@ describe("cli management command handlers", () => {
     await handleProjectCommand(parseArgv(["projects", "delete", "proj_1", "--json"]), { deleteProjectCommand });
 
     await handleTokenCommand(parseArgv(["tokens", "project", "list", "proj_1", "--limit", "20"]), { listProjectTokensCommand });
-    await handleTokenCommand(parseArgv(["tokens", "project", "create", "proj_1", "--label", "CI token", "--json"]), { createProjectTokenCommand });
+    await handleTokenCommand(
+      parseArgv(["tokens", "project", "create", "proj_1", "--label", "CI token", "--allowed-origin", "https://static.example.com", "--json"]),
+      { createProjectTokenCommand }
+    );
     await handleTokenCommand(parseArgv(["tokens", "project", "revoke", "proj_1", "tok_1"]), { revokeProjectTokenCommand });
     await handleTokenCommand(parseArgv(["tokens", "member", "list", "--limit", "10", "--json"]), { listMemberTokensCommand });
     await handleTokenCommand(parseArgv(["tokens", "member", "create", "--label", "Local MCP"]), { createMemberTokenCommand });
@@ -531,7 +588,13 @@ describe("cli management command handlers", () => {
     expect(deleteProjectCommand).toHaveBeenCalledWith({ authFilePath: undefined, json: true, projectId: "proj_1" });
 
     expect(listProjectTokensCommand).toHaveBeenCalledWith({ authFilePath: undefined, json: undefined, projectId: "proj_1", limit: 20 });
-    expect(createProjectTokenCommand).toHaveBeenCalledWith({ authFilePath: undefined, json: true, projectId: "proj_1", label: "CI token" });
+    expect(createProjectTokenCommand).toHaveBeenCalledWith({
+      authFilePath: undefined,
+      json: true,
+      projectId: "proj_1",
+      label: "CI token",
+      allowedOrigins: ["https://static.example.com"]
+    });
     expect(revokeProjectTokenCommand).toHaveBeenCalledWith({ authFilePath: undefined, json: undefined, projectId: "proj_1", tokenId: "tok_1" });
     expect(listMemberTokensCommand).toHaveBeenCalledWith({ authFilePath: undefined, json: true, limit: 10 });
     expect(createMemberTokenCommand).toHaveBeenCalledWith({ authFilePath: undefined, json: undefined, label: "Local MCP" });
@@ -623,6 +686,9 @@ describe("cli management command handlers", () => {
     await expect(handleGithubCommand(parseArgv(["github", "repo", "set", "owner/repo"]), {})).rejects.toThrow(
       "Missing required option --project-id."
     );
+    await expect(handleGithubCommand(parseArgv(["github", "repo", "remove"]), {})).rejects.toThrow(
+      "Missing required option --project-id."
+    );
 
     await expect(handleBillingCommand(parseArgv(["billing", "capacity", "increase"]), {})).rejects.toThrow(
       "Missing required option --target-additional-capacity-units."
@@ -631,6 +697,9 @@ describe("cli management command handlers", () => {
 
     await expect(handleProjectCommand(parseArgv(["projects", "create", "--slug", "proj-1"]), {})).rejects.toThrow(
       "Missing required option --name."
+    );
+    await expect(handleProjectCommand(parseArgv(["projects", "create", "--name", "Project only"]), {})).rejects.toThrow(
+      "Missing required option --slug."
     );
     await expect(handleProjectCommand(parseArgv(["projects", "update", "proj_1"]), {})).rejects.toThrow(
       "At least one project field must be provided."
@@ -689,6 +758,22 @@ describe("cli management command handlers", () => {
       "Unknown github rules command."
     );
 
+    await expect(handleProjectCommand(parseArgv(["projects", "members", "list"]), {})).rejects.toThrow(
+      "Missing required option --project-id."
+    );
+    await expect(handleProjectCommand(parseArgv(["projects", "members", "invite", "--project-id", "proj_1", "--role", "admin"]), {})).rejects.toThrow(
+      "Missing required option --email."
+    );
+    await expect(
+      handleProjectCommand(parseArgv(["projects", "members", "invite", "--project-id", "proj_1", "--email", "dev@example.com"]), {})
+    ).rejects.toThrow("Missing required option --role.");
+    await expect(handleProjectCommand(parseArgv(["projects", "members", "unknown", "--project-id", "proj_1"]), {})).rejects.toThrow(
+      "Unknown project members command."
+    );
+    await expect(handleProjectCommand(parseArgv(["projects", "members", "update-role", "usr_2", "--project-id", "proj_1"]), {})).rejects.toThrow(
+      "Missing required option --role."
+    );
+
     expect(() => handleMemberCommand(parseArgv(["members", "invite", "--role", "owner"]), {})).toThrow(
       "Use `debugbundle project members ... --project-id <id>` for project collaboration commands."
     );
@@ -705,5 +790,158 @@ describe("cli management command handlers", () => {
     await expect(handleWeeklyReportCommand(parseArgv(["weekly-report", "unknown"]), {})).rejects.toThrow(
       "Unknown weekly-report command."
     );
+  });
+
+  it("validates capture policy client error incident modes", async () => {
+    const setCapturePolicyCommand = vi.fn().mockResolvedValue({ exitCode: 0, output: "set" });
+
+    await handleCapturePolicyCommand(
+      parseArgv([
+        "capture-policy",
+        "set",
+        "--project",
+        "proj_1",
+        "--client-error-incidents",
+        "custom",
+        "--client-error-statuses",
+        "404, 400, 404"
+      ]),
+      { setCapturePolicyCommand }
+    );
+
+    expect(setCapturePolicyCommand).toHaveBeenCalledWith({
+      authFilePath: undefined,
+      json: undefined,
+      projectId: "proj_1",
+      update: {
+        immediate_client_error_statuses: [400, 404]
+      }
+    });
+
+    await handleCapturePolicyCommand(
+      parseArgv(["capture-policy", "set", "--project", "proj_1", "--client-error-incidents", "preset-default"]),
+      { setCapturePolicyCommand }
+    );
+    await handleCapturePolicyCommand(
+      parseArgv(["capture-policy", "set", "--project", "proj_1", "--client-error-incidents", "none"]),
+      { setCapturePolicyCommand }
+    );
+    await handleCapturePolicyCommand(
+      parseArgv([
+        "capture-policy",
+        "set",
+        "--project",
+        "proj_1",
+        "--override",
+        "capture_logs=true",
+        "--override",
+        "capture_probe_events=null"
+      ]),
+      { setCapturePolicyCommand }
+    );
+
+    await expect(
+      handleCapturePolicyCommand(parseArgv(["capture-policy", "set"]), {})
+    ).rejects.toThrow("Missing required option --project.");
+    await expect(
+      handleCapturePolicyCommand(
+        parseArgv(["capture-policy", "set", "--project", "proj_1", "--client-error-incidents", "custom"]),
+        {}
+      )
+    ).rejects.toThrow("Missing required option --client-error-statuses.");
+    await expect(
+      handleCapturePolicyCommand(
+        parseArgv([
+          "capture-policy",
+          "set",
+          "--project",
+          "proj_1",
+          "--client-error-incidents",
+          "recommended",
+          "--client-error-statuses",
+          "404"
+        ]),
+        {}
+      )
+    ).rejects.toThrow("Use --client-error-statuses only with --client-error-incidents custom.");
+    await expect(
+      handleCapturePolicyCommand(
+        parseArgv([
+          "capture-policy",
+          "set",
+          "--project",
+          "proj_1",
+          "--client-error-incidents",
+          "custom",
+          "--client-error-statuses",
+          "abc"
+        ]),
+        {}
+      )
+    ).rejects.toThrow("Invalid value for --client-error-statuses.");
+    await expect(
+      handleCapturePolicyCommand(
+        parseArgv([
+          "capture-policy",
+          "set",
+          "--project",
+          "proj_1",
+          "--client-error-incidents",
+          "custom",
+          "--client-error-statuses",
+          ",,,"
+        ]),
+        {}
+      )
+    ).rejects.toThrow("Invalid value for --client-error-statuses.");
+    await expect(
+      handleCapturePolicyCommand(
+        parseArgv([
+          "capture-policy",
+          "set",
+          "--project",
+          "proj_1",
+          "--client-error-incidents",
+          "custom",
+          "--client-error-statuses",
+          "399"
+        ]),
+        {}
+      )
+    ).rejects.toThrow("Invalid value for --client-error-statuses.");
+    await expect(
+      handleCapturePolicyCommand(
+        parseArgv([
+          "capture-policy",
+          "set",
+          "--project",
+          "proj_1",
+          "--client-error-incidents",
+          "custom",
+          "--client-error-statuses",
+          "400,401,402,403,404,405,406,407,408,409,410,411,412"
+        ]),
+        {}
+      )
+    ).rejects.toThrow("Invalid value for --client-error-statuses.");
+    await expect(
+      handleCapturePolicyCommand(
+        parseArgv([
+          "capture-policy",
+          "set",
+          "--project",
+          "proj_1",
+          "--override",
+          "not_real=true"
+        ]),
+        {}
+      )
+    ).rejects.toThrow("Invalid value for --override.");
+    await expect(
+      handleCapturePolicyCommand(
+        parseArgv(["capture-policy", "set", "--project", "proj_1", "--client-error-incidents", "invalid-mode"]),
+        {}
+      )
+    ).rejects.toThrow("Invalid value for --client-error-incidents.");
   });
 });

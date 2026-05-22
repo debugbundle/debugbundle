@@ -138,6 +138,7 @@ describe("api token management routes", () => {
           token_id: "11111111-1111-4111-8111-111111111111",
           project_id: "00000000-0000-4000-8000-000000000001",
           label: "ci",
+          allowed_origins: ["https://static.example.com"],
           created_at: "2026-03-11T00:00:00.000Z",
           last_used_at: null,
           revoked_at: null,
@@ -167,6 +168,7 @@ describe("api token management routes", () => {
           token_id: "11111111-1111-4111-8111-111111111111",
           project_id: "00000000-0000-4000-8000-000000000001",
           label: "ci",
+          allowed_origins: ["https://static.example.com"],
           created_at: "2026-03-11T00:00:00.000Z",
           last_used_at: null,
           revoked_at: null,
@@ -280,6 +282,7 @@ describe("api token management routes", () => {
         token_id: "11111111-1111-4111-8111-111111111111",
         project_id: "00000000-0000-4000-8000-000000000001",
         label: "ci",
+        allowed_origins: ["https://static.example.com"],
         created_at: "2026-03-11T00:00:00.000Z",
         last_used_at: null,
         revoked_at: null,
@@ -299,7 +302,8 @@ describe("api token management routes", () => {
         authorization: "Bearer dbundle_mem_test"
       },
       payload: {
-        label: "ci"
+        label: "ci",
+        allowed_origins: ["https://static.example.com/app", "https://STATIC.example.com"]
       }
     });
 
@@ -313,7 +317,11 @@ describe("api token management routes", () => {
 
     expect(body.token.token_id).toBe("11111111-1111-4111-8111-111111111111");
     expect(body.token.plaintext.startsWith("dbundle_proj_")).toBe(true);
-    expect(tokenManagement.createProjectTokenForOrganization).toHaveBeenCalledOnce();
+    expect(tokenManagement.createProjectTokenForOrganization).toHaveBeenCalledWith(
+      expect.objectContaining({
+        allowed_origins: ["https://static.example.com"]
+      })
+    );
     expect(createAuditLog).toHaveBeenCalledWith(
       expect.objectContaining({
         organization_id: "org_123",
@@ -352,6 +360,7 @@ describe("api token management routes", () => {
         token_id: "11111111-1111-4111-8111-111111111111",
         project_id: "00000000-0000-4000-8000-000000000001",
         label: "ci",
+        allowed_origins: [],
         created_at: "2026-03-11T00:00:00.000Z",
         last_used_at: null,
         revoked_at: null,
@@ -380,7 +389,8 @@ describe("api token management routes", () => {
       expect.objectContaining({
         organization_id: "org_shared",
         project_id: "00000000-0000-4000-8000-000000000001",
-        label: "ci"
+        label: "ci",
+        allowed_origins: []
       })
     );
   });
@@ -465,9 +475,22 @@ describe("api token management routes", () => {
         label: "ci"
       }
     });
+    const invalidOrigins = await app.inject({
+      method: "POST",
+      url: "/v1/projects/00000000-0000-4000-8000-000000000001/tokens",
+      headers: {
+        authorization: "Bearer dbundle_mem_test"
+      },
+      payload: {
+        label: "static browser",
+        allowed_origins: ["not-an-origin"]
+      }
+    });
 
     expect(invalidBody.statusCode).toBe(400);
     expect(invalidBody.json()).toEqual({ error: "invalid_payload" });
+    expect(invalidOrigins.statusCode).toBe(400);
+    expect(invalidOrigins.json()).toEqual({ error: "invalid_allowed_origins" });
     expect(missingProject.statusCode).toBe(404);
     expect(missingProject.json()).toEqual({ error: "project_not_found" });
   });
@@ -480,6 +503,7 @@ describe("api token management routes", () => {
         token_id: "11111111-1111-4111-8111-111111111111",
         project_id: "00000000-0000-4000-8000-000000000001",
         label: "ci",
+        allowed_origins: [],
         created_at: "2026-03-11T00:00:00.000Z",
         last_used_at: null,
         revoked_at: "2026-03-11T01:00:00.000Z",

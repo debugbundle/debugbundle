@@ -235,6 +235,7 @@ async function main(): Promise<void> {
         token_id: "ptok_load",
         project_id: "proj_valid_load",
         label: "load",
+        allowed_origins: [],
         token_preview: VALID_TOKEN,
         created_at: "2026-04-04T00:00:00.000Z",
         last_used_at: null,

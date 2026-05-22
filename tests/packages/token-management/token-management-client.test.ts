@@ -87,6 +87,7 @@ describe("token-management api client", () => {
             token_id: "ptok_1",
             project_id: "proj_1",
             label: "ci",
+            allowed_origins: ["https://static.example.com"],
             created_at: "2024-01-01T00:00:00.000Z",
             last_used_at: null,
             revoked_at: null,
@@ -111,7 +112,12 @@ describe("token-management api client", () => {
       });
 
     const api = createTokenManagementApi({ request });
-    const created = await api.createProjectToken({ bearerToken: "dbundle_mem_x", projectId: "proj_1", label: "ci" });
+    const created = await api.createProjectToken({
+      bearerToken: "dbundle_mem_x",
+      projectId: "proj_1",
+      label: "ci",
+      allowedOrigins: ["https://static.example.com"]
+    });
     const revoked = await api.revokeProjectToken({ bearerToken: "dbundle_mem_x", projectId: "proj_1", tokenId: "ptok_1" });
 
     expect(created.token_id).toBe("ptok_1");
@@ -121,7 +127,8 @@ describe("token-management api client", () => {
       path: "/v1/projects/proj_1/tokens",
       bearerToken: "dbundle_mem_x",
       body: {
-        label: "ci"
+        label: "ci",
+        allowed_origins: ["https://static.example.com"]
       }
     });
     expect(request).toHaveBeenNthCalledWith(2, {

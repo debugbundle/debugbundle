@@ -61,11 +61,11 @@ Every capability must be available through all applicable interfaces. Operations
 | Schedule capacity reduction | `POST /v1/billing/capacity/scheduled-reduction` | `billing capacity schedule-reduction` | `schedule_capacity_reduction` | Browser Session or Member Token, owner only |
 | Cancel scheduled capacity reduction | `DELETE /v1/billing/capacity/scheduled-reduction` | `billing capacity cancel-reduction` | `cancel_capacity_reduction` | Browser Session or Member Token, owner only |
 | List project tokens | `GET /v1/projects/{id}/tokens` | `token project list` | `list_project_tokens` | Browser session or member token with project access |
-| Create project token | `POST /v1/projects/{id}/tokens` | `token project create` | `create_project_token` | Owner/admin project access; plaintext returned once |
+| Create project token | `POST /v1/projects/{id}/tokens` | `token project create` | `create_project_token` | Owner/admin project access; plaintext returned once; optional static-browser origin allowlist |
 | Revoke project token | `POST /v1/projects/{id}/tokens/{tokenId}/revoke` | `token project revoke` | `revoke_project_token` | Owner/admin project access |
-| List member tokens | `GET /v1/member/tokens` | `token member list` | `list_member_tokens` | Member token scoped to caller |
-| Create member token | `POST /v1/member/tokens` | `token member create` | `create_member_token` | Plaintext returned once |
-| Revoke member token | `POST /v1/member/tokens/{tokenId}/revoke` | `token member revoke` | `revoke_member_token` | |
+| List member tokens | `GET /v1/member/tokens` | `token member list` | `list_member_tokens` | Browser session or member token scoped to caller |
+| Create member token | `POST /v1/member/tokens` | `token member create` | `create_member_token` | Browser session or member token; plaintext returned once |
+| Revoke member token | `POST /v1/member/tokens/{tokenId}/revoke` | `token member revoke` | `revoke_member_token` | Browser session or caller-owned member token |
 | List services | `GET /v1/services` | `services` | `list_services` | |
 | Alert CRUD | `POST/GET/PATCH/DELETE /v1/alerts` | `alert list/create/update/delete` | `list_alerts/create_alert/update_alert/delete_alert` | Browser Session or Member Token, scoped to project; member may mutate only self-created rules |
 | Project Slack destinations | `GET /v1/projects/{id}/slack/destinations` | `slack list` | `list_slack_destinations` | Browser Session or Member Token, Team tier, reusable Slack channel list for alert setup |
@@ -737,9 +737,12 @@ Checkout confirmation returns the standard billing summary response after the AP
 **Create token request:**
 ```json
 {
-  "label": "ci"
+  "label": "ci",
+  "allowed_origins": ["https://app.example.com"]
 }
 ```
+
+`allowed_origins` is optional and applies only to project tokens. It can be set through the dashboard's **Allowed browser origins** field or through CLI/API/MCP automation. The dashboard accepts one origin per line or comma-separated. When present, `POST /v1/events` and `GET /v1/sdk/config` require an `Origin` header matching one of the normalized origins; requests without `Origin` are rejected. This is intended for direct/static browser ingestion abuse reduction and should not be used for server SDK or relay-forwarding tokens. It is not a replacement for the same-origin browser relay because non-browser clients can still spoof `Origin`.
 
 **Create token response:**
 ```json
@@ -747,6 +750,7 @@ Checkout confirmation returns the standard billing summary response after the AP
   "token": {
     "token_id": "uuid",
     "label": "ci",
+    "allowed_origins": ["https://app.example.com"],
     "created_at": "ISO8601",
     "last_used_at": null,
     "revoked_at": null,

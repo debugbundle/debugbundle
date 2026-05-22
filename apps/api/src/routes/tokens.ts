@@ -15,8 +15,17 @@ import {
   ProjectTokenParamsSchema,
   MemberTokenParamsSchema,
   TokenListQuerySchema,
+  CreateProjectTokenBodySchema,
   CreateTokenBodySchema,
 } from "../schemas.js";
+import { normalizeProjectTokenAllowedOrigins } from "../project-token-origins.js";
+
+function serializeProjectToken<T extends { allowed_origins?: string[] }>(token: T): T & { allowed_origins: string[] } {
+  return {
+    ...token,
+    allowed_origins: token.allowed_origins ?? []
+  };
+}
 
 export function registerTokenRoutes(app: FastifyInstance, dependencies: ApiDependencies): void {
   app.get("/v1/projects/:id/tokens", async (request, reply) => {
@@ -54,7 +63,7 @@ export function registerTokenRoutes(app: FastifyInstance, dependencies: ApiDepen
       });
     }
 
-    return reply.status(200).send({ tokens });
+    return reply.status(200).send({ tokens: tokens.map(serializeProjectToken) });
   });
 
   app.post("/v1/projects/:id/tokens", async (request, reply) => {
@@ -76,10 +85,17 @@ export function registerTokenRoutes(app: FastifyInstance, dependencies: ApiDepen
       return reply.status(403).send({ error: "forbidden" });
     }
 
-    const parsedBody = CreateTokenBodySchema.safeParse(request.body);
+    const parsedBody = CreateProjectTokenBodySchema.safeParse(request.body);
     if (!parsedBody.success) {
       return reply.status(400).send({
         error: "invalid_payload"
+      });
+    }
+
+    const allowedOrigins = normalizeProjectTokenAllowedOrigins(parsedBody.data.allowed_origins ?? []);
+    if (allowedOrigins === null) {
+      return reply.status(400).send({
+        error: "invalid_allowed_origins"
       });
     }
 
@@ -88,6 +104,7 @@ export function registerTokenRoutes(app: FastifyInstance, dependencies: ApiDepen
       organization_id: auth.access.organization_id,
       project_id: parsedParams.data.id,
       label: parsedBody.data.label,
+      allowed_origins: allowedOrigins,
       token_hash: generated.hash
     });
 
@@ -131,6 +148,7 @@ export function registerTokenRoutes(app: FastifyInstance, dependencies: ApiDepen
     return reply.status(201).send({
       token: {
         ...created,
+        allowed_origins: created.allowed_origins ?? [],
         plaintext: generated.plaintext
       }
     });
@@ -198,7 +216,7 @@ export function registerTokenRoutes(app: FastifyInstance, dependencies: ApiDepen
       }
     });
 
-    return reply.status(200).send({ token: revoked });
+    return reply.status(200).send({ token: serializeProjectToken(revoked) });
   });
 
   app.get("/v1/member/tokens", async (request, reply) => {

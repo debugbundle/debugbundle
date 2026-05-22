@@ -54,9 +54,10 @@ describe("mcp token tools", () => {
   });
 
   it("invokes all remaining token tool handlers", async () => {
+    const createProjectToken = vi.fn().mockResolvedValue({ token_id: "ptok_2" });
     const tools = createTokenMcpTools({
       listProjectTokens: vi.fn().mockResolvedValue([{ token_id: "ptok_1" }]),
-      createProjectToken: vi.fn().mockResolvedValue({ token_id: "ptok_2" }),
+      createProjectToken,
       revokeProjectToken: vi.fn().mockResolvedValue({ token_id: "ptok_2", revoked_at: "2026-03-11T00:00:00.000Z" }),
       listMemberTokens: vi.fn().mockResolvedValue([{ token_id: "mtok_1" }]),
       createMemberToken: vi.fn().mockResolvedValue({ token_id: "mtok_2" }),
@@ -67,9 +68,16 @@ describe("mcp token tools", () => {
       tools.create_project_token({
         bearerToken: "dbundle_mem_x",
         projectId: "proj_1",
-        label: "ci"
+        label: "ci",
+        allowedOrigins: ["https://static.example.com"]
       })
     ).resolves.toEqual({ token: { token_id: "ptok_2" } });
+    expect(createProjectToken).toHaveBeenCalledWith({
+      bearerToken: "dbundle_mem_x",
+      projectId: "proj_1",
+      label: "ci",
+      allowedOrigins: ["https://static.example.com"]
+    });
 
     await expect(
       tools.revoke_project_token({

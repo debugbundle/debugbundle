@@ -912,6 +912,84 @@ describe("api ingestion route", () => {
     expect(resolveProjectByTokenHash).toHaveBeenCalledOnce();
   });
 
+  it("should enforce project token allowed origins when configured", async (): Promise<void> => {
+    const persistAndEnqueue = vi.fn().mockResolvedValue({ object_key: "raw-events/proj_123/path.json.gz" });
+    const resolveProjectByTokenHash = vi.fn().mockResolvedValue({
+      project_id: "proj_123",
+      organization_id: "org_123",
+      organization_plan: "free",
+      allowed_origins: ["https://static.example.com"]
+    });
+
+    const app = createApiServer({
+      ingestionPersistence: { persistAndEnqueue },
+      ingestionMetadata: { resolveProjectByTokenHash },
+      memberAuth: createMemberAuthDependency(),
+      tokenManagement: createTokenManagementDependency(),
+      incidentRetrieval: createIncidentRetrievalDependency(),
+      objectStoreReader: createObjectStoreReaderDependency(),
+      webhookDelivery: createWebhookDeliveryDependency()
+    });
+
+    const event = createEventEnvelope({
+      event_type: "log_event",
+      project_token: "dbundle_proj_test",
+      service: {
+        name: "static-site",
+        environment: "production",
+        runtime: "browser",
+        framework: null
+      },
+      payload: {
+        level: "error",
+        message: "boom",
+        attributes: {}
+      }
+    });
+
+    const rejected = await app.inject({
+      method: "POST",
+      url: "/v1/events",
+      headers: {
+        authorization: "Bearer dbundle_proj_test",
+        origin: "https://evil.example.com"
+      },
+      payload: { events: [event] }
+    });
+    const missingOrigin = await app.inject({
+      method: "POST",
+      url: "/v1/events",
+      headers: {
+        authorization: "Bearer dbundle_proj_test"
+      },
+      payload: { events: [event] }
+    });
+    const accepted = await app.inject({
+      method: "POST",
+      url: "/v1/events",
+      headers: {
+        authorization: "Bearer dbundle_proj_test",
+        origin: "https://static.example.com"
+      },
+      payload: { events: [event] }
+    });
+
+    expect(rejected.statusCode).toBe(403);
+    expect(rejected.json()).toEqual({
+      accepted: 0,
+      rejected: 0,
+      errors: [{ index: -1, reason: "origin_not_allowed" }]
+    });
+    expect(missingOrigin.statusCode).toBe(403);
+    expect(missingOrigin.json()).toEqual({
+      accepted: 0,
+      rejected: 0,
+      errors: [{ index: -1, reason: "origin_not_allowed" }]
+    });
+    expect(accepted.statusCode).toBe(202);
+    expect(persistAndEnqueue).toHaveBeenCalledOnce();
+  });
+
   it("should partially reject malformed events with explicit errors", async (): Promise<void> => {
     const persistAndEnqueue = vi.fn().mockResolvedValue({ object_key: "raw-events/proj_123/path.json.gz" });
     const resolveProjectByTokenHash = vi.fn().mockResolvedValue({ project_id: "proj_123" });

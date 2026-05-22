@@ -498,6 +498,7 @@ describe("api default dependencies", () => {
       organization_id: "org_123",
       project_id: "proj_123",
       label: "ci",
+      allowed_origins: [],
       token_hash: "hash_proj"
     });
     void deps.tokenManagement.revokeProjectTokenForOrganization({
@@ -716,6 +717,7 @@ describe("api default dependencies", () => {
       organization_id: "org_123",
       project_id: "proj_123",
       label: "ci",
+      allowed_origins: [],
       token_hash: "hash_proj"
     });
     expect(metadataStore.revokeProjectTokenForOrganization).toHaveBeenCalledWith({

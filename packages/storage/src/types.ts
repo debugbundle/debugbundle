@@ -205,6 +205,7 @@ export interface ResolveProjectResult {
   project_id: string;
   organization_id?: string;
   organization_plan?: string;
+  allowed_origins?: string[] | null;
   revoked_at?: string | null;
   expires_at?: string | null;
 }
@@ -599,6 +600,7 @@ export interface ProjectTokenRecord {
   token_id: string;
   project_id: string;
   label: string;
+  allowed_origins: string[];
   created_at: string;
   last_used_at: string | null;
   revoked_at: string | null;
@@ -1201,6 +1203,7 @@ export interface TokenManagementStore {
     organization_id: string;
     project_id: string;
     label: string;
+    allowed_origins: string[];
     token_hash: string;
   }): Promise<ProjectTokenRecord | null>;
   revokeProjectTokenForOrganization(input: {

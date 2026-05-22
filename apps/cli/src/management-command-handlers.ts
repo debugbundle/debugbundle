@@ -838,18 +838,20 @@ export async function handleTokenCommand(parsedArgv: ParsedArgv, dependencies: M
     }
 
     if (action === "create") {
-      expectNoUnknownOptions(parsedArgv, ["auth-file", "json", "label"]);
+      expectNoUnknownOptions(parsedArgv, ["auth-file", "json", "label", "allowed-origin"]);
       ensureNoExtraPositionals(parsedArgv, 4);
 
       const label = readStringOption(parsedArgv, "label");
       if (label === undefined) {
         throw new CliInputError("Missing required option --label.");
       }
+      const allowedOrigins = readStringListOption(parsedArgv, "allowed-origin");
 
       return await (dependencies.createProjectTokenCommand ?? defaultCreateProjectTokenCommand)(
         appendCommonAuthOptions(parsedArgv, {
           projectId: requirePositional(parsedArgv, 3, "project-id"),
-          label
+          label,
+          ...(allowedOrigins === undefined ? {} : { allowedOrigins })
         })
       );
     }

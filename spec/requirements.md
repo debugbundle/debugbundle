@@ -126,7 +126,7 @@ Last updated: 2026-03-27
 
 **FR-ING-05:** The ingestion API must remain lightweight — no heavy synchronous processing in the request path.
 
-**FR-ING-06:** Support frontend-only deployments (browser SDK → ingestion API directly). Requires CORS headers, public project token model, per-token rate limiting, and optional origin restrictions.
+**FR-ING-06:** Support frontend-only deployments (browser SDK → ingestion API directly). Requires SDK-route CORS headers, public write-only project token model, per-token rate limiting, and optional per-token origin restrictions. Origin restrictions are an abuse-reduction control for browsers, not a secret boundary, because non-browser clients can spoof `Origin`.
 
 ### 1.3 Processing Pipeline
 
@@ -346,6 +346,8 @@ See `/spec/billing.md` and `/spec/system-emails.md` for the detailed source-of-t
 **FR-AUTH-11:** Member-authorized API operations must accept either a valid browser session or a valid member token. After principal resolution, both auth paths must run through the same authorization and domain logic.
 
 **FR-AUTH-12:** CLI and MCP must reuse member-token auth through the API. The SPA must use cookie-backed sessions. SDK ingestion must use project tokens only.
+
+**FR-AUTH-12a:** Optional project-token browser origin allowlists must be available from the dashboard, API, CLI, and MCP creation surfaces. The allowlist is abuse reduction for direct/static browser ingestion only, rejects requests without a matching `Origin`, and must not be documented or treated as a secret boundary.
 
 **FR-AUTH-13:** GitHub CLI bootstrap must be additive, not a replacement for browser auth. The existing email-code and browser GitHub session flows remain the primary interactive path for humans without GitHub accounts or without local CLI access.
 

@@ -126,6 +126,53 @@ describe("api probe routes", () => {
     expect(response.json()).toEqual({ error: "invalid_project_token" });
   });
 
+  it("should enforce project token origins for sdk config", async (): Promise<void> => {
+    const app = createServer({
+      ingestionMetadata: {
+        resolveProjectByTokenHash: vi.fn().mockResolvedValue({
+          project_id: "proj_123",
+          organization_plan: "free",
+          allowed_origins: ["https://static.example.com"]
+        })
+      }
+    });
+
+    const response = await app.inject({
+      method: "GET",
+      url: "/v1/sdk/config",
+      headers: {
+        authorization: "Bearer dbundle_proj_test",
+        origin: "https://evil.example.com"
+      }
+    });
+
+    expect(response.statusCode).toBe(403);
+    expect(response.json()).toEqual({ error: "origin_not_allowed" });
+  });
+
+  it("should reject sdk config without origin when project token origins are configured", async (): Promise<void> => {
+    const app = createServer({
+      ingestionMetadata: {
+        resolveProjectByTokenHash: vi.fn().mockResolvedValue({
+          project_id: "proj_123",
+          organization_plan: "free",
+          allowed_origins: ["https://static.example.com"]
+        })
+      }
+    });
+
+    const response = await app.inject({
+      method: "GET",
+      url: "/v1/sdk/config",
+      headers: {
+        authorization: "Bearer dbundle_proj_test"
+      }
+    });
+
+    expect(response.statusCode).toBe(403);
+    expect(response.json()).toEqual({ error: "origin_not_allowed" });
+  });
+
   it("should return sdk config for free tier projects", async (): Promise<void> => {
     const probeManagement = {
       listActiveProbesForProject: vi.fn().mockResolvedValue([

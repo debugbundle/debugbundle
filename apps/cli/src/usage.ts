@@ -47,7 +47,7 @@ export const CLI_USAGE_LINES = [
   '  debugbundle project update <project-id> [--name <name>] [--slug <slug>] [--environment-default <env>] [--auth-file <path>] [--json]',
   '  debugbundle project delete <project-id> [--auth-file <path>] [--json]',
   '  debugbundle token project list <project-id> [--limit <n>] [--auth-file <path>] [--json]',
-  '  debugbundle token project create <project-id> --label <label> [--auth-file <path>] [--json]',
+  '  debugbundle token project create <project-id> --label <label> [--allowed-origin <origin> ...] [--auth-file <path>] [--json]',
   '  debugbundle token project revoke <project-id> <token-id> [--auth-file <path>] [--json]',
   '  debugbundle token member list [--limit <n>] [--auth-file <path>] [--json]',
   '  debugbundle token member create --label <label> [--auth-file <path>] [--json]',

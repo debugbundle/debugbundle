@@ -396,6 +396,7 @@ export const MCP_TOOL_CATALOG = [
       bearerToken: z.string(),
       projectId: z.string(),
       label: z.string(),
+      allowedOrigins: z.array(z.string()).optional(),
     }),
   },
   {

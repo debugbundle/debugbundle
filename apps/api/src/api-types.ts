@@ -80,6 +80,7 @@ export interface ApiDependencies {
       organization_id: string;
       project_id: string;
       label: string;
+      allowed_origins: string[];
       token_hash: string;
     }): Promise<ProjectTokenRecord | null>;
     revokeProjectTokenForOrganization(input: {

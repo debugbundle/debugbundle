@@ -42,6 +42,7 @@ export interface ApiServerOptions {
 
 const ALLOWED_CORS_HEADERS = ["Authorization", "Content-Type", "X-CSRF-Token"];
 const ALLOWED_CORS_METHODS = ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"];
+const SDK_PROJECT_TOKEN_CORS_PATHS = new Set(["/v1/events", "/v1/sdk/config"]);
 const DEFAULT_API_REQUEST_TIMEOUT_MS = 30_000;
 const apiRequestTimeouts = new WeakMap<object, NodeJS.Timeout>();
 const CSRF_EXEMPT_ROUTE_KEYS = new Set([
@@ -99,6 +100,18 @@ function appendVaryHeader(existing: string | string[] | number | undefined, valu
 
 function isCorsPreflightRequest(request: { method: string; headers: Record<string, unknown> }): boolean {
   return request.method === "OPTIONS" && typeof request.headers["access-control-request-method"] === "string";
+}
+
+function getRequestPath(url: string): string {
+  try {
+    return new URL(url, "http://debugbundle.local").pathname;
+  } catch {
+    return url;
+  }
+}
+
+function isSdkProjectTokenCorsRequest(request: { url: string }): boolean {
+  return SDK_PROJECT_TOKEN_CORS_PATHS.has(getRequestPath(request.url));
 }
 
 function isStateChangingMethod(method: string): boolean {
@@ -174,6 +187,22 @@ function registerApiCors(app: FastifyInstance, allowedOrigins: string[]): void {
     reply.header("Vary", appendVaryHeader(reply.getHeader("Vary"), "Origin"));
 
     if (!allowedOrigins.includes(requestOrigin)) {
+      if (isSdkProjectTokenCorsRequest(request) && normalizeOrigin(requestOrigin) !== null) {
+        reply.header("Access-Control-Allow-Origin", requestOrigin);
+
+        if (!isCorsPreflightRequest(request)) {
+          return;
+        }
+
+        reply.header("Vary", appendVaryHeader(reply.getHeader("Vary"), "Access-Control-Request-Method"));
+        reply.header("Vary", appendVaryHeader(reply.getHeader("Vary"), "Access-Control-Request-Headers"));
+        reply.header("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+        reply.header("Access-Control-Allow-Headers", "Authorization, Content-Type");
+        reply.header("Access-Control-Max-Age", "86400");
+
+        return reply.status(204).send();
+      }
+
       if (isCorsPreflightRequest(request)) {
         return reply.status(403).send({ error: "cors_origin_not_allowed" });
       }

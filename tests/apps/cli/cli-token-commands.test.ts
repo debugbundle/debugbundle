@@ -39,6 +39,48 @@ describe("cli token commands", () => {
     expect(result.output).toContain("ptok_1 | default | active");
   });
 
+  it("renders member and project token list output in human mode with formatted states", async () => {
+    const memberResult = await listMemberTokensCommand(
+      {
+        bearerToken: "dbundle_mem_x"
+      },
+      {
+        listMemberTokens: vi.fn().mockResolvedValue([
+          {
+            token_id: "mtok_1",
+            label: "ops",
+            revoked_at: null
+          },
+          {
+            token_id: "mtok_2",
+            label: "old",
+            revoked_at: "2026-03-11T00:00:00.000Z"
+          }
+        ])
+      }
+    );
+
+    const projectResult = await listProjectTokensCommand(
+      {
+        bearerToken: "dbundle_mem_x",
+        projectId: "proj_1"
+      },
+      {
+        listProjectTokens: vi.fn().mockResolvedValue([
+          {
+            token_id: "ptok_2",
+            label: "browser",
+            allowed_origins: [],
+            revoked_at: "2026-03-11T00:00:00.000Z"
+          }
+        ])
+      }
+    );
+
+    expect(memberResult.output).toBe("mtok_1 | ops | active\nmtok_2 | old | revoked");
+    expect(projectResult.output).toBe("ptok_2 | browser | revoked | origins: none");
+  });
+
   it("loads stored auth state and forwards it into project token listing", async () => {
     const readAuthState = vi.fn().mockResolvedValue({
       bearer_token: "dbundle_mem_saved",
@@ -83,6 +125,92 @@ describe("cli token commands", () => {
     });
     expect(result.exitCode).toBe(0);
     expect(result.output).toContain("ptok_1 | default | active");
+  });
+
+  it("forwards optional project token listing and revoke wrapper fields", async () => {
+    const readAuthState = vi.fn().mockResolvedValue({
+      bearer_token: "dbundle_mem_saved",
+      base_url: "https://selfhost.debugbundle.test"
+    });
+    const httpClient = { request: vi.fn() };
+    const createHttpClient = vi.fn().mockReturnValue(httpClient);
+    const listProjectTokens = vi.fn().mockResolvedValue([
+      {
+        token_id: "ptok_1",
+        label: "browser",
+        allowed_origins: ["https://static.example.com"],
+        revoked_at: null
+      }
+    ]);
+    const revokeProjectToken = vi.fn().mockResolvedValue({
+      token_id: "ptok_1",
+      label: "browser",
+      revoked_at: "2026-03-11T00:00:00.000Z"
+    });
+    const createApi = vi.fn().mockReturnValue({
+      listProjectTokens,
+      createProjectToken: vi.fn(),
+      revokeProjectToken,
+      listMemberTokens: vi.fn(),
+      createMemberToken: vi.fn(),
+      revokeMemberToken: vi.fn()
+    });
+
+    const listed = await listProjectTokensWithAuthCommand(
+      {
+        authFilePath: "/tmp/auth.json",
+        projectId: "proj_1",
+        limit: 5,
+        json: true
+      },
+      {
+        readAuthState,
+        createHttpClient,
+        createApi
+      }
+    );
+
+    const revoked = await revokeProjectTokenWithAuthCommand(
+      {
+        authFilePath: "/tmp/auth.json",
+        projectId: "proj_1",
+        tokenId: "ptok_1",
+        json: true
+      },
+      {
+        readAuthState,
+        createHttpClient,
+        createApi
+      }
+    );
+
+    expect(listProjectTokens).toHaveBeenCalledWith({
+      bearerToken: "dbundle_mem_saved",
+      projectId: "proj_1",
+      limit: 5
+    });
+    expect(revokeProjectToken).toHaveBeenCalledWith({
+      bearerToken: "dbundle_mem_saved",
+      projectId: "proj_1",
+      tokenId: "ptok_1"
+    });
+    expect(JSON.parse(listed.output)).toEqual({
+      tokens: [
+        {
+          token_id: "ptok_1",
+          label: "browser",
+          allowed_origins: ["https://static.example.com"],
+          revoked_at: null
+        }
+      ]
+    });
+    expect(JSON.parse(revoked.output)).toEqual({
+      token: {
+        token_id: "ptok_1",
+        label: "browser",
+        revoked_at: "2026-03-11T00:00:00.000Z"
+      }
+    });
   });
 
   it("loads stored auth state and forwards it into member token creation", async () => {
@@ -211,6 +339,7 @@ describe("cli token commands", () => {
         createProjectToken: vi.fn().mockResolvedValue({
           token_id: "ptok_1",
           label: "ci",
+          allowed_origins: ["https://static.example.com"],
           revoked_at: null,
           plaintext: "dbundle_proj_secret"
         })
@@ -235,6 +364,7 @@ describe("cli token commands", () => {
     expect(emptyList.exitCode).toBe(0);
     expect(emptyList.output).toBe("No tokens found.");
     expect(created.output).toContain("Project token created: ptok_1");
+    expect(created.output).toContain("Allowed origins: https://static.example.com");
     expect(created.output).toContain("Plaintext: dbundle_proj_secret");
     expect(revoked.output).toContain("Project token revoked: ptok_1");
   });
@@ -595,6 +725,7 @@ describe("cli token commands", () => {
         authFilePath: "/tmp/auth.json",
         projectId: "proj_1",
         label: "ci",
+        allowedOrigins: ["https://static.example.com"],
         json: true
       },
       {
@@ -623,7 +754,8 @@ describe("cli token commands", () => {
     expect(createProjectToken).toHaveBeenCalledWith({
       bearerToken: "dbundle_mem_saved",
       projectId: "proj_1",
-      label: "ci"
+      label: "ci",
+      allowedOrigins: ["https://static.example.com"]
     });
     expect(revokeProjectToken).toHaveBeenCalledWith({
       bearerToken: "dbundle_mem_saved",

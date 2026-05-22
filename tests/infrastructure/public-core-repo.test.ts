@@ -133,15 +133,23 @@ describe('public core repository export', () => {
         cloneUrl: 'https://github.com/debugbundle/debugbundle-php.git',
         branch: 'main',
       },
+      {
+        path: 'sdks/debugbundle-wordpress',
+        cloneUrl: 'https://github.com/debugbundle/debugbundle-wordpress.git',
+        branch: 'main',
+      },
+      {
+        path: 'sdks/debugbundle-java',
+        cloneUrl: 'https://github.com/debugbundle/debugbundle-java.git',
+        branch: 'main',
+      },
     ]);
 
     expect(sdkBootstrapScript).toContain('sdks.json');
     expect(sdkBootstrapScript).toContain('git clone');
     expect(sdkBootstrapScript).toContain('fetch --prune origin');
     expect(sdkBootstrapScript).toContain('checkout "$branch"');
-    expect(gitignore).toContain('sdks/debugbundle-js/');
-    expect(gitignore).toContain('sdks/debugbundle-python/');
-    expect(gitignore).toContain('sdks/debugbundle-php/');
+    expect(gitignore).toContain('sdks/');
     expect(gitignore).toContain('site/');
     expect(gitignore).toContain('dist/');
     expect(gitignore).toContain('.source/');

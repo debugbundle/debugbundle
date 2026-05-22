@@ -692,12 +692,18 @@ describe("web app — management routes", () => {
 
       if (url.endsWith("/v1/projects/proj_123/tokens") && init?.method === "POST") {
         expect(init.credentials).toBe("include");
-        expect(init.body).toBe(JSON.stringify({ label: "CI deploy" }));
+        expect(init.body).toBe(
+          JSON.stringify({
+            label: "CI deploy",
+            allowed_origins: ["https://app.example.com", "https://preview.example.com"]
+          })
+        );
 
         return jsonResponse(201, {
           token: createProjectToken({
             token_id: "proj_tok_456",
             label: "CI deploy",
+            allowed_origins: ["https://app.example.com", "https://preview.example.com"],
             plaintext: "dbundle_proj_secret_123"
           })
         });
@@ -714,6 +720,10 @@ describe("web app — management routes", () => {
 
     await user.click(screen.getByRole("button", { name: /create project token/i }));
     await user.type(await screen.findByLabelText(/token label/i), "CI deploy");
+    await user.type(
+      screen.getByLabelText(/allowed browser origins/i),
+      "https://app.example.com\nhttps://preview.example.com"
+    );
     await user.click(screen.getByRole("button", { name: /^create token$/i }));
 
     const revealRegion = await screen.findByRole("region", { name: /new token secret/i });
@@ -722,6 +732,7 @@ describe("web app — management routes", () => {
     await waitFor(() => {
       expect(screen.getByText(/ci deploy/i)).toBeInTheDocument();
     });
+    expect(screen.getByText(/browser origins: https:\/\/app\.example\.com, https:\/\/preview\.example\.com/i)).toBeInTheDocument();
   });
 
   it("revokes a project token from the project tokens page", async () => {

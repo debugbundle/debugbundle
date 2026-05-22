@@ -143,6 +143,7 @@ const STORAGE_BOOTSTRAP_STATEMENTS = [
       project_id uuid NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
       token_hash text UNIQUE NOT NULL,
       label text NOT NULL,
+      allowed_origins jsonb NOT NULL DEFAULT '[]'::jsonb,
       last_used_at timestamptz,
       created_at timestamptz NOT NULL DEFAULT now(),
       revoked_at timestamptz,

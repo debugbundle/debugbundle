@@ -490,6 +490,7 @@ export function createPostgresMetadataStore(db: Queryable): PostgresMetadataStor
             pt.project_id,
             p.organization_id,
             COALESCE(o.plan, 'free') AS organization_plan,
+            COALESCE(pt.allowed_origins, '[]'::jsonb) AS allowed_origins,
             revoked_at::text AS revoked_at,
             expires_at::text AS expires_at
           FROM project_tokens pt
@@ -2092,6 +2093,7 @@ export function createPostgresMetadataStore(db: Queryable): PostgresMetadataStor
             id AS token_id,
             project_id,
             label,
+            COALESCE(allowed_origins, '[]'::jsonb) AS allowed_origins,
             created_at::text AS created_at,
             last_used_at::text AS last_used_at,
             revoked_at::text AS revoked_at,
@@ -2126,18 +2128,19 @@ export function createPostgresMetadataStore(db: Queryable): PostgresMetadataStor
 
       const result = await db.query<ProjectTokenRecord & Record<string, unknown>>(
         `
-          INSERT INTO project_tokens (id, project_id, token_hash, label, created_at)
-          VALUES ($1, $2, $3, $4, now())
+          INSERT INTO project_tokens (id, project_id, token_hash, label, allowed_origins, created_at)
+          VALUES ($1, $2, $3, $4, $5::jsonb, now())
           RETURNING
             id AS token_id,
             project_id,
             label,
+            COALESCE(allowed_origins, '[]'::jsonb) AS allowed_origins,
             created_at::text AS created_at,
             last_used_at::text AS last_used_at,
             revoked_at::text AS revoked_at,
             expires_at::text AS expires_at
         `,
-        [randomUUID(), input.project_id, input.token_hash, input.label]
+        [randomUUID(), input.project_id, input.token_hash, input.label, JSON.stringify(input.allowed_origins)]
       );
 
       return result.rows[0] ?? null;
@@ -2158,6 +2161,7 @@ export function createPostgresMetadataStore(db: Queryable): PostgresMetadataStor
             pt.id AS token_id,
             pt.project_id,
             pt.label,
+            COALESCE(pt.allowed_origins, '[]'::jsonb) AS allowed_origins,
             pt.created_at::text AS created_at,
             pt.last_used_at::text AS last_used_at,
             pt.revoked_at::text AS revoked_at,

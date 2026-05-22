@@ -61,10 +61,10 @@ describe("retrieval parity mapping contract", () => {
       "| List project tokens | `GET /v1/projects/{id}/tokens` | `token project list` | `list_project_tokens` | Browser session or member token with project access |"
     );
     expect(contract).toContain(
-      "| Create project token | `POST /v1/projects/{id}/tokens` | `token project create` | `create_project_token` | Owner/admin project access; plaintext returned once |"
+      "| Create project token | `POST /v1/projects/{id}/tokens` | `token project create` | `create_project_token` | Owner/admin project access; plaintext returned once; optional static-browser origin allowlist |"
     );
     expect(contract).toContain(
-      "| List member tokens | `GET /v1/member/tokens` | `token member list` | `list_member_tokens` | Member token scoped to caller |"
+      "| List member tokens | `GET /v1/member/tokens` | `token member list` | `list_member_tokens` | Browser session or member token scoped to caller |"
     );
   });
 

@@ -28,6 +28,7 @@ const API_TABLE_ROWS = [
   { table_name: "alert_rules" },
   { table_name: "agent_webhooks" },
   { table_name: "webhook_deliveries" },
+  { table_name: "operational_email_deliveries" },
   { table_name: "slack_destinations" },
   { table_name: "capture_policies" },
   { table_name: "audit_logs" },

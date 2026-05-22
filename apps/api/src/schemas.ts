@@ -702,6 +702,13 @@ export const CreateTokenBodySchema = z
   })
   .strict();
 
+export const CreateProjectTokenBodySchema = z
+  .object({
+    label: z.string().min(1).max(120),
+    allowed_origins: z.array(z.string().min(1).max(2048)).max(20).optional()
+  })
+  .strict();
+
 export const LogsQuerySchema = z
   .object({
     incident_id: z.string().min(1),

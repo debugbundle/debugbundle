@@ -68,6 +68,7 @@ function createTokenManagementDependency() {
       token_id: "ptok_perf",
       project_id: "proj_perf",
       label: "perf",
+      allowed_origins: [],
       token_preview: "dbundle_proj_perf",
       created_at: "2026-04-04T00:00:00.000Z",
       last_used_at: null,

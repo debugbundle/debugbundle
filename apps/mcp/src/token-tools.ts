@@ -19,7 +19,7 @@ function mapMcpError(error: unknown): never {
 
 export function createTokenMcpTools(api: {
   listProjectTokens(input: { bearerToken: string; projectId: string; limit?: number }): Promise<unknown[]>;
-  createProjectToken(input: { bearerToken: string; projectId: string; label: string }): Promise<unknown>;
+  createProjectToken(input: { bearerToken: string; projectId: string; label: string; allowedOrigins?: string[] }): Promise<unknown>;
   revokeProjectToken(input: { bearerToken: string; projectId: string; tokenId: string }): Promise<unknown>;
   listMemberTokens(input: { bearerToken: string; limit?: number }): Promise<unknown[]>;
   createMemberToken(input: { bearerToken: string; label: string }): Promise<unknown>;
@@ -46,11 +46,16 @@ export function createTokenMcpTools(api: {
 
     async create_project_token(input) {
       try {
+        const allowedOrigins = Array.isArray(input["allowedOrigins"])
+          ? input["allowedOrigins"].map((value) => String(value))
+          : undefined;
+
         return {
           token: await api.createProjectToken({
             bearerToken: String(input["bearerToken"]),
             projectId: String(input["projectId"]),
-            label: String(input["label"])
+            label: String(input["label"]),
+            ...(allowedOrigins === undefined ? {} : { allowedOrigins })
           })
         };
       } catch (error) {

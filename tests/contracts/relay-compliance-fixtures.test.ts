@@ -125,7 +125,10 @@ describe("relay compliance fixtures", () => {
     expect(oversizedBodyFixture?.kind).toBe("handler");
     if (oversizedBodyFixture?.kind === "handler") {
       expect("bodyGenerator" in oversizedBodyFixture.request).toBe(true);
-      if ("bodyGenerator" in oversizedBodyFixture.request) {
+      if (
+        "bodyGenerator" in oversizedBodyFixture.request &&
+        typeof oversizedBodyFixture.request.bodyGenerator === "string"
+      ) {
         expect(oversizedBodyFixture.request.bodyGenerator.length).toBeGreaterThan(256 * 1024);
       }
       expect(oversizedBodyFixture.expected.status).toBe(413);

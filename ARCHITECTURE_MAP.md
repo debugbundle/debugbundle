@@ -69,7 +69,7 @@
 - **Owns:** Password hashing, session issuance/revocation, verification flows, token generation, hashing, validation, middleware factories
 - **Exports:** `generateProjectToken()`, `generateMemberToken()`, `hashToken()`, `validateProjectToken()`, `validateMemberToken()`, session helpers, password helpers, verification helpers, auth middleware for Fastify
 - **Depends on:** `shared-types`
-- **Invariant:** Member/project tokens stored as SHA-256 hashes. Plaintext returned once at creation. SPA auth uses first-party cookie sessions rather than browser-stored bearer auth.
+- **Invariant:** Member/project tokens stored as SHA-256 hashes. Plaintext returned once at creation. Project tokens may carry optional `allowed_origins` for direct/static browser ingestion abuse reduction, enforced by project-token API routes after token authentication. SPA auth uses first-party cookie sessions rather than browser-stored bearer auth.
 
 ### `packages/event-normalizer`
 
@@ -229,7 +229,7 @@ The public documentation/marketing/blog site lives in the standalone public repo
 - **Imports:** `auth`, `shared-types`, `event-normalizer`, `redaction`, `storage`
 - **Does NOT own:** Bundle generation, reproduction, webhook delivery (those are worker)
 - **Key constraint:** Ingestion (`POST /v1/events`) must be lightweight — validate, rate-limit, enforce capture policy, persist raw, and enqueue only
-- **Key constraint:** Ingestion (`POST /v1/events`) must be lightweight — validate, rate-limit, enforce capture policy, persist raw, enqueue only, and include the resolved capture preset plus resolved `immediate_client_error_statuses` on normalize jobs so request-event classification stays stable in the worker
+- **Key constraint:** Ingestion (`POST /v1/events`) must be lightweight — authenticate project token, enforce optional token `allowed_origins` when configured, validate, rate-limit, enforce capture policy, persist raw, enqueue only, and include the resolved capture preset plus resolved `immediate_client_error_statuses` on normalize jobs so request-event classification stays stable in the worker
 - **Dogfooding note:** Dogfooding is now re-enabled against the published `@debugbundle/sdk-node` prerelease. `server.ts` optionally initializes the npm-published SDK during bootstrap when `DEBUGBUNDLE_DOGFOOD_PROJECT_TOKEN` is present, the manual dev-only backend trigger route `GET /__dogfood/backend-error` remains gated by `DEBUGBUNDLE_DOGFOOD_EXPOSE_TRIGGERS=true`, and the hosted owner-authenticated verification route `POST /v1/internal/dogfooding/backend-error` is separately gated by `DEBUGBUNDLE_DOGFOOD_EXPOSE_OWNER_TRIGGER=true`.
 - **Local dev note:** the top-level `docker-compose.yml` `dev` profile now publishes the API on host port `3003`, so the backend dogfood trigger is reachable directly at `http://localhost:3003/__dogfood/backend-error`
 - **Internal structure:**

@@ -32,6 +32,7 @@ export interface ProjectTokenContext {
   project_id: string;
   organization_id?: string;
   organization_plan?: string;
+  allowed_origins?: string[] | null;
   revoked_at?: string | null;
   expires_at?: string | null;
 }

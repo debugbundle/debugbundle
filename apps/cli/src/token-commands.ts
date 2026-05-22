@@ -7,6 +7,7 @@ import {
 interface ProjectTokenLike {
   token_id: string;
   label: string;
+  allowed_origins?: string[] | undefined;
   revoked_at: string | null;
   plaintext?: string | undefined;
 }
@@ -53,6 +54,27 @@ function formatTokenTable(tokens: Array<{ token_id: string; label: string; revok
     .join("\n");
 }
 
+function formatAllowedOrigins(allowedOrigins: string[] | undefined): string {
+  if (allowedOrigins === undefined || allowedOrigins.length === 0) {
+    return "none";
+  }
+
+  return allowedOrigins.join(", ");
+}
+
+function formatProjectTokenTable(tokens: ProjectTokenLike[]): string {
+  if (tokens.length === 0) {
+    return "No tokens found.";
+  }
+
+  return tokens
+    .map(
+      (token) =>
+        `${token.token_id} | ${token.label} | ${token.revoked_at === null ? "active" : "revoked"} | origins: ${formatAllowedOrigins(token.allowed_origins)}`
+    )
+    .join("\n");
+}
+
 export async function listProjectTokensCommand(
   input: {
     bearerToken: string;
@@ -81,7 +103,7 @@ export async function listProjectTokensCommand(
 
     return {
       exitCode: 0,
-      output: formatTokenTable(tokens)
+      output: formatProjectTokenTable(tokens)
     };
   } catch (error) {
     return { exitCode: mapErrorToExitCode(error), output: error instanceof Error ? error.message : String(error) };
@@ -120,25 +142,31 @@ export async function createProjectTokenCommand(
     bearerToken: string;
     projectId: string;
     label: string;
+    allowedOrigins?: string[];
     json?: boolean;
   },
   api: {
-    createProjectToken(input: { bearerToken: string; projectId: string; label: string }): Promise<ProjectTokenLike>;
+    createProjectToken(input: { bearerToken: string; projectId: string; label: string; allowedOrigins?: string[] }): Promise<ProjectTokenLike>;
   }
 ): Promise<CliCommandResult> {
   try {
-    const token = await api.createProjectToken({
+    const requestInput: { bearerToken: string; projectId: string; label: string; allowedOrigins?: string[] } = {
       bearerToken: input.bearerToken,
       projectId: input.projectId,
       label: input.label
-    });
+    };
+    if (input.allowedOrigins !== undefined) {
+      requestInput.allowedOrigins = input.allowedOrigins;
+    }
+
+    const token = await api.createProjectToken(requestInput);
     if (input.json) {
       return { exitCode: 0, output: JSON.stringify({ token }) };
     }
 
     return {
       exitCode: 0,
-      output: `Project token created: ${token.token_id}\nPlaintext: ${token.plaintext ?? "<none>"}`
+      output: `Project token created: ${token.token_id}\nAllowed origins: ${formatAllowedOrigins(token.allowed_origins)}\nPlaintext: ${token.plaintext ?? "<none>"}`
     };
   } catch (error) {
     return { exitCode: mapErrorToExitCode(error), output: error instanceof Error ? error.message : String(error) };
@@ -146,19 +174,22 @@ export async function createProjectTokenCommand(
 }
 
 export async function createProjectTokenWithAuthCommand(
-  input: { authFilePath?: string; projectId: string; label: string; json?: boolean },
+  input: { authFilePath?: string; projectId: string; label: string; allowedOrigins?: string[]; json?: boolean },
   dependencies?: Parameters<typeof createAuthenticatedTokenManagementApi>[1]
 ): Promise<CliCommandResult> {
   return runAuthenticatedCliCommand(input, {
     createApi: createAuthenticatedTokenManagementApi,
     dependencies,
     runCommand: (authState, api) => {
-      const commandInput: { bearerToken: string; projectId: string; label: string; json?: boolean } = {
+      const commandInput: { bearerToken: string; projectId: string; label: string; allowedOrigins?: string[]; json?: boolean } = {
         bearerToken: authState.bearer_token,
         projectId: input.projectId,
         label: input.label
       };
 
+      if (input.allowedOrigins !== undefined) {
+        commandInput.allowedOrigins = input.allowedOrigins;
+      }
       if (input.json !== undefined) {
         commandInput.json = input.json;
       }

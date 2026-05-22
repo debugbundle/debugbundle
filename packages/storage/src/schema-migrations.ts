@@ -442,6 +442,13 @@ export const STORAGE_SCHEMA_MIGRATIONS = [
         WHERE channel = 'email'
       `
     ]
+  }),
+  defineStorageSchemaMigration({
+    id: "202605220001_add_project_token_allowed_origins",
+    description: "Add optional browser-origin allowlists to project ingestion tokens.",
+    statements: [
+      "ALTER TABLE project_tokens ADD COLUMN IF NOT EXISTS allowed_origins jsonb NOT NULL DEFAULT '[]'::jsonb"
+    ]
   })
 ] as const;
 

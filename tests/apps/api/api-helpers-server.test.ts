@@ -212,6 +212,31 @@ describe("api server version context", () => {
     expect(response.headers["vary"]).toContain("Origin");
   });
 
+  it("should answer SDK project-token route preflights from static-site origins without credentialed CORS", async (): Promise<void> => {
+    const app = createApiServer(createDependencies(), {
+      dogfoodingEnv: {
+        APP_BASE_URL: "https://app.debugbundle.com"
+      }
+    });
+
+    const response = await app.inject({
+      method: "OPTIONS",
+      url: "/v1/events",
+      headers: {
+        origin: "https://static.example.com",
+        "access-control-request-method": "POST",
+        "access-control-request-headers": "authorization,content-type"
+      }
+    });
+
+    expect(response.statusCode).toBe(204);
+    expect(response.headers["access-control-allow-origin"]).toBe("https://static.example.com");
+    expect(response.headers["access-control-allow-credentials"]).toBeUndefined();
+    expect(response.headers["access-control-allow-methods"]).toContain("POST");
+    expect(response.headers["access-control-allow-headers"]).toContain("Authorization");
+    expect(response.headers["vary"]).toContain("Origin");
+  });
+
   it("should reject preflight requests from unapproved origins", async (): Promise<void> => {
     const app = createApiServer(createDependencies(), {
       dogfoodingEnv: {

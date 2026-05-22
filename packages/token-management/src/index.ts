@@ -5,6 +5,7 @@ export const ProjectTokenSchema = z
     token_id: z.string(),
     project_id: z.string(),
     label: z.string(),
+    allowed_origins: z.array(z.string()).default([]),
     created_at: z.string(),
     last_used_at: z.string().nullable(),
     revoked_at: z.string().nullable(),
@@ -111,7 +112,7 @@ async function expectToken(responsePromise: Promise<HttpResponse>): Promise<z.in
 
 export function createTokenManagementApi(client: HttpClient): {
   listProjectTokens(input: { bearerToken: string; projectId: string; limit?: number }): Promise<Array<z.infer<typeof ProjectTokenSchema>>>;
-  createProjectToken(input: { bearerToken: string; projectId: string; label: string }): Promise<z.infer<typeof ProjectTokenSchema>>;
+  createProjectToken(input: { bearerToken: string; projectId: string; label: string; allowedOrigins?: string[] }): Promise<z.infer<typeof ProjectTokenSchema>>;
   revokeProjectToken(input: { bearerToken: string; projectId: string; tokenId: string }): Promise<z.infer<typeof ProjectTokenSchema>>;
   listMemberTokens(input: { bearerToken: string; limit?: number }): Promise<Array<z.infer<typeof MemberTokenSchema>>>;
   createMemberToken(input: { bearerToken: string; label: string }): Promise<z.infer<typeof MemberTokenSchema>>;
@@ -138,7 +139,8 @@ export function createTokenManagementApi(client: HttpClient): {
           path: `/v1/projects/${input.projectId}/tokens`,
           bearerToken: input.bearerToken,
           body: {
-            label: input.label
+            label: input.label,
+            ...(input.allowedOrigins === undefined ? {} : { allowed_origins: input.allowedOrigins })
           }
         })
       );

@@ -86,6 +86,7 @@ export interface ProjectTokenRecord {
   token_id: string;
   project_id: string;
   label: string;
+  allowed_origins: string[];
   created_at: string;
   last_used_at: string | null;
   revoked_at: string | null;
@@ -1506,7 +1507,7 @@ export async function testProjectWebhook(
 
 export async function createProjectToken(
   projectId: string,
-  payload: { label: string }
+  payload: { label: string; allowed_origins?: string[] }
 ): Promise<CreatedProjectToken> {
   const body = await readJson<{ token: CreatedProjectToken }>(
     await fetch(`${API_BASE}/v1/projects/${projectId}/tokens`, {

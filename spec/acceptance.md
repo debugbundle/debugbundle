@@ -1315,6 +1315,15 @@ If CLI says something is healthy and MCP says something different, that is a pro
 - **Then** the browser SDK sends directly to DebugBundle cloud (no relay involved)
 - **And** the `Authorization` header includes the project token
 
+### AC-REL-10a: Static-Only Origin Allowlist
+- **Given** a project token created with `allowed_origins: ["https://static.example.com"]`
+- **When** the browser SDK sends directly to `POST /v1/events` or calls `GET /v1/sdk/config` with `Origin: https://evil.example.com`
+- **Then** the API rejects the request with `403 origin_not_allowed`
+- **And** the same request with `Origin: https://static.example.com` is allowed to proceed through normal token, payload, rate-limit, quota, and capture-policy checks
+- **And** a request using the same token without an `Origin` header is rejected with `403 origin_not_allowed`
+- **And** the dashboard, API, CLI, and MCP project-token creation surfaces can set the same origin allowlist
+- **And** the documentation states this is browser abuse reduction only, because non-browser clients can spoof `Origin`
+
 ### AC-REL-11: V1 Relay Parity Matrix
 - **Given** the shared relay compliance fixtures for a valid browser batch, mixed valid/invalid batch, credential-smuggling payload, wrong-origin request, missing-origin request, oversized body, rate-limit sequence, local-only write, connected durable spool, and connected cloud forwarding
 - **When** the Node.js, Python, PHP, and WordPress relay surfaces run their applicable fixture suites

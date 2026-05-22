@@ -11,6 +11,7 @@ import type { ResolvedCapturePolicy } from "../../../../packages/shared-types/sr
 import type { ApiDependencies } from "../api-types.js";
 import { redactEvent } from "../api-helpers.js";
 import { SMALL_REQUEST_BODY_LIMIT_BYTES } from "../http-limits.js";
+import { isProjectTokenOriginAllowed } from "../project-token-origins.js";
 import { IngestionRequestSchema } from "../schemas.js";
 
 function toRetryAfterSeconds(retryAfterMs: number): string {
@@ -66,6 +67,19 @@ export function registerIngestionRoutes(app: FastifyInstance, dependencies: ApiD
     }
 
     const project = projectAuth.context;
+    if (!isProjectTokenOriginAllowed({ headers: request.headers, projectToken: project })) {
+      return reply.status(403).send({
+        accepted: 0,
+        rejected: 0,
+        errors: [
+          {
+            index: -1,
+            reason: "origin_not_allowed"
+          }
+        ]
+      });
+    }
+
     const now = new Date();
 
     const parsedBody = IngestionRequestSchema.safeParse(request.body);

@@ -16,6 +16,8 @@ They apply to **every future change** — not just the initial hardening pass.
 ### SEC-01: Explicit CORS Configuration
 The API must use an explicit CORS origin allowlist derived from environment configuration (`APP_BASE_URL`). Open CORS (`*`) is never permitted. New API deployments must configure CORS before accepting cross-origin requests. Preflight requests from non-allowed origins must receive `403`.
 
+Exception: SDK project-token routes (`POST /v1/events`, `GET /v1/sdk/config`) may reflect a syntactically valid request `Origin` for browser direct/static ingestion because CORS preflight requests do not include bearer-token values. Those routes must not enable credentialed CORS for reflected origins, must still reject invalid project tokens, and must enforce any token-level `allowed_origins` check in the authenticated route handler. This is abuse reduction only, not a secret boundary.
+
 ### SEC-02: Body Size Limits On All Routes
 Every API route must operate under an explicit body size limit. The server-wide default is 256 KB. Routes that need larger payloads must set an explicit per-route override with documented rationale. New routes inherit the global limit automatically — do not remove or raise it without security review.
 

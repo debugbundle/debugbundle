@@ -56,6 +56,7 @@ export interface ProjectTokenRecord {
   token_id: string;
   project_id: string;
   label: string;
+  allowed_origins: string[];
   created_at: string;
   last_used_at: string | null;
   revoked_at: string | null;
@@ -330,6 +331,7 @@ export function createProjectToken(overrides: Partial<ProjectTokenRecord> = {}):
     token_id: "proj_tok_123",
     project_id: "proj_123",
     label: "Production ingest",
+    allowed_origins: [],
     created_at: "2026-03-17T00:00:00.000Z",
     last_used_at: null,
     revoked_at: null,

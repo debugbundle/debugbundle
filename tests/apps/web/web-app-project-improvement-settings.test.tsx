@@ -106,17 +106,20 @@ describe("web app — project improvement settings", () => {
 
     expect(await screen.findByRole("heading", { name: /automated improvement bundles/i, level: 3 })).toBeInTheDocument();
 
-    const enabledSwitch = await screen.findByRole("switch", { name: /enabled/i });
+    const enabledSwitch = document.getElementById("project-improvement-bundles-enabled") as HTMLButtonElement | null;
     await findSelectTrigger(/sensitivity/i);
     const saveButton = await screen.findByRole("button", { name: /save improvement settings/i });
 
-    expect(enabledSwitch).toHaveAttribute("aria-checked", "true");
+    expect(enabledSwitch).not.toBeNull();
+    const improvementEnabledSwitch = enabledSwitch as HTMLButtonElement;
+
+    expect(improvementEnabledSwitch).toHaveAttribute("aria-checked", "true");
     expect(saveButton).toBeDisabled();
     expect(screen.getByText(/counts toward the existing bundle allowance/i)).toBeInTheDocument();
 
     await openSelect(/sensitivity/i);
     await user.click(await screen.findByRole("option", { name: /verbose/i }));
-    await user.click(enabledSwitch);
+    await user.click(improvementEnabledSwitch);
 
     await waitFor(() => {
       expect(screen.queryByLabelText(/sensitivity/i)).toBeNull();
@@ -196,7 +199,7 @@ describe("web app — project improvement settings", () => {
     expect(await screen.findByRole("heading", { name: /automated improvement bundles/i, level: 3 })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: /upgrade to solo or team to unlock hosted improvements/i })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /open billing/i })).toHaveAttribute("href", "/billing");
-    expect(screen.queryByRole("switch", { name: /enabled/i })).toBeNull();
+    expect(document.getElementById("project-improvement-bundles-enabled")).toBeNull();
     expect(screen.queryByText(/counts toward the existing bundle allowance/i)).toBeNull();
   });
 

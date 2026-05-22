@@ -5,6 +5,7 @@ import { deriveProbeTriggerTokenKey, requireProjectToken } from "../../../../pac
 import { getTierCapabilities, resolvePolicy, PRESET_DEFAULTS, getDefaultPreset } from "../../../../packages/shared-types/src/index.js";
 import type { ResolvedCapturePolicy } from "../../../../packages/shared-types/src/index.js";
 import type { ApiDependencies, ApiServerContext } from "../api-types.js";
+import { isProjectTokenOriginAllowed } from "../project-token-origins.js";
 
 const API_SECURITY_TXT = [
   "Contact: https://github.com/debugbundle/debugbundle/security/advisories/new",
@@ -60,6 +61,11 @@ export function registerHealthRoutes(app: FastifyInstance, dependencies: ApiDepe
     if (!projectAuth.ok) {
       return reply.status(401).send({
         error: "invalid_project_token"
+      });
+    }
+    if (!isProjectTokenOriginAllowed({ headers: request.headers, projectToken: projectAuth.context })) {
+      return reply.status(403).send({
+        error: "origin_not_allowed"
       });
     }
 

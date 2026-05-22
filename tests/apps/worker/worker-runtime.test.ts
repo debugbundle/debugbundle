@@ -2115,10 +2115,13 @@ describe("worker runtime", () => {
       },
       report: {
         project_id: "proj_123",
+        project_name: "Main app",
         window_start: "2026-03-09T00:00:00.000Z",
         window_end: "2026-03-16T00:00:00.000Z",
         bundle_counts: { failure: 3, improvement: 1 },
         new_incidents: 2,
+        resolved_incidents: 1,
+        opened_incidents_resolved: 1,
         regressions: 1,
         top_spiking_incidents: []
       }

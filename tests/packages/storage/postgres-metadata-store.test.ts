@@ -882,6 +882,7 @@ describe("postgres metadata store", () => {
       organization_id: "org_123",
       project_id: "proj_123",
       label: "agent",
+      allowed_origins: ["https://static.example.com"],
       token_hash: "hash_abc"
     });
 
@@ -904,6 +905,7 @@ describe("postgres metadata store", () => {
       organization_id: "org_123",
       project_id: "proj_123",
       label: "ci",
+      allowed_origins: [],
       token_hash: "hash_abc"
     });
 

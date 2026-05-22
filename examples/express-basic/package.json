@@ -6,7 +6,7 @@
     "start": "node server.mjs"
   },
   "dependencies": {
-    "@debugbundle/sdk-node": "0.1.6",
+    "@debugbundle/sdk-node": "0.1.8",
     "express": "^5.1.0"
   }
 }
