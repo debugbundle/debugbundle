@@ -98,10 +98,10 @@ jobs:
             exit 0
           fi
 
-          cli_version="$(node --input-type=module -e 'import { readFileSync } from \"node:fs\"; console.log(JSON.parse(readFileSync(\"apps/cli/package.json\", \"utf8\")).version)')"
-          mcp_version="$(node --input-type=module -e 'import { readFileSync } from \"node:fs\"; console.log(JSON.parse(readFileSync(\"apps/mcp/package.json\", \"utf8\")).version)')"
-          shared_types_version="$(node --input-type=module -e 'import { readFileSync } from \"node:fs\"; console.log(JSON.parse(readFileSync(\"packages/shared-types/package.json\", \"utf8\")).version)')"
-          redaction_version="$(node --input-type=module -e 'import { readFileSync } from \"node:fs\"; console.log(JSON.parse(readFileSync(\"packages/redaction/package.json\", \"utf8\")).version)')"
+          cli_version="$(node --input-type=module -e "import { readFileSync } from 'node:fs'; console.log(JSON.parse(readFileSync(process.argv[1], 'utf8')).version)" apps/cli/package.json)"
+          mcp_version="$(node --input-type=module -e "import { readFileSync } from 'node:fs'; console.log(JSON.parse(readFileSync(process.argv[1], 'utf8')).version)" apps/mcp/package.json)"
+          shared_types_version="$(node --input-type=module -e "import { readFileSync } from 'node:fs'; console.log(JSON.parse(readFileSync(process.argv[1], 'utf8')).version)" packages/shared-types/package.json)"
+          redaction_version="$(node --input-type=module -e "import { readFileSync } from 'node:fs'; console.log(JSON.parse(readFileSync(process.argv[1], 'utf8')).version)" packages/redaction/package.json)"
 
           notes="$(cat <<EOF
           This is the canonical product release for the DebugBundle core monorepo.
