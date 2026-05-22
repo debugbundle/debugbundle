@@ -179,7 +179,7 @@ The complete docs page tree for `/docs`. Every entry below is a page that must e
 |---|------|-------|------|---------|
 | 1 | `/docs/troubleshooting` | Troubleshooting | Guide | Common issues and fixes: SDK not capturing, events not appearing, bundle pending, webhook failures, auth errors, self-host problems. |
 | 2 | `/docs/faq` | FAQ | Reference | Frequently asked questions covering product positioning, pricing, security, data handling, SDK compatibility, self-hosting. |
-| 3 | `/docs/changelog` | Changelog | Reference | Version history for the product, SDKs, and API. Links to `/changelog` on the main site. |
+| 3 | `/docs/changelog` | Changelog | Reference | Version history for the product, SDKs, and API. The canonical product release number comes from the root `debugbundle` repository release (`v*`), while package- and SDK-specific releases link to their own release notes. |
 | 4 | `/docs/llms-txt` | llms.txt | Concept | What `llms.txt` is and how AI agents can discover DebugBundle capabilities via `/llms.txt`. |
 
 ---
