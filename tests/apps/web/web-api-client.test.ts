@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
+  buildApiUrl,
   createProjectAlert,
   createProjectWebhook,
   deleteAlert,
@@ -73,7 +74,7 @@ describe("web api client", () => {
 
     expect(fetchMock).toHaveBeenNthCalledWith(
       3,
-      "http://localhost:3003/v1/alerts",
+      buildApiUrl("/v1/alerts"),
       expect.objectContaining({
         headers: {
           "Content-Type": "application/json"
@@ -115,7 +116,7 @@ describe("web api client", () => {
 
     expect(alert.alert_id).toBe("al_1");
     expect(fetchMock).toHaveBeenCalledWith(
-      "http://localhost:3003/v1/alerts",
+      buildApiUrl("/v1/alerts"),
       expect.objectContaining({
         method: "POST",
         body: JSON.stringify({
@@ -159,15 +160,17 @@ describe("web api client", () => {
     expect(incidents).toEqual({ incidents: [], nextCursor: "cursor_2" });
     expect(fetchMock).toHaveBeenNthCalledWith(
       1,
-      "http://localhost:3003/v1/incidents?limit=5&cursor=cursor_1&project_id=proj_1&environment=production&service=checkout-api&status=resolved&severity=high",
+      buildApiUrl(
+        "/v1/incidents?limit=5&cursor=cursor_1&project_id=proj_1&environment=production&service=checkout-api&status=resolved&severity=high"
+      ),
       { credentials: "include" }
     );
     expect(installUrl).toBe("https://github.com/apps/debugbundle/installations/new");
-    expect(fetchMock).toHaveBeenNthCalledWith(2, "http://localhost:3003/v1/github/app/install-url", { credentials: "include" });
+    expect(fetchMock).toHaveBeenNthCalledWith(2, buildApiUrl("/v1/github/app/install-url"), { credentials: "include" });
     expect(installUrlWithReturnTo).toBe("https://github.com/apps/debugbundle/installations/new?state=return");
     expect(fetchMock).toHaveBeenNthCalledWith(
       3,
-      "http://localhost:3003/v1/github/app/install-url?return_to=%2Fprojects%2Fproj_1%2Fgithub&project_id=proj_1",
+      buildApiUrl("/v1/github/app/install-url?return_to=%2Fprojects%2Fproj_1%2Fgithub&project_id=proj_1"),
       { credentials: "include" }
     );
   });
@@ -225,7 +228,7 @@ describe("web api client", () => {
     expect(webhook.webhook_id).toBe("wh_1");
     expect(fetchMock).toHaveBeenNthCalledWith(
       1,
-      "http://localhost:3003/v1/webhooks",
+      buildApiUrl("/v1/webhooks"),
       expect.objectContaining({
         method: "POST",
         body: JSON.stringify({
@@ -239,12 +242,12 @@ describe("web api client", () => {
     );
     expect(fetchMock).toHaveBeenNthCalledWith(
       2,
-      "http://localhost:3003/v1/webhooks/wh_1/test?project_id=proj_1",
+      buildApiUrl("/v1/webhooks/wh_1/test?project_id=proj_1"),
       expect.objectContaining({ body: JSON.stringify({ event_type: "verification.passed" }) })
     );
     expect(fetchMock).toHaveBeenNthCalledWith(
       3,
-      "http://localhost:3003/v1/webhooks/wh_1/test?project_id=proj_1",
+      buildApiUrl("/v1/webhooks/wh_1/test?project_id=proj_1"),
       expect.objectContaining({ body: JSON.stringify({ event_type: "verification.failed" }) })
     );
   });
