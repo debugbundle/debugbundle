@@ -72,9 +72,11 @@ describe("release governance baseline", () => {
 
     expect(readme).toContain("DebugBundle");
     expect(readme).toContain("Production debugging bundles for AI agents");
-    expect(readme).toContain("## What Is DebugBundle?");
-    expect(readme).toContain("## Key Features");
+    expect(readme).toContain("## Why DebugBundle?");
+    expect(readme).toContain("Key properties:");
     expect(readme).toContain("## Quick Start");
+    expect(readme).toContain("## Install an SDK");
+    expect(readme).toContain("## CLI, API, and MCP");
     expect(readme).toContain("## Documentation");
     expect(readme).toContain("## Self-Hosting");
     expect(readme).toContain("## Contributing");

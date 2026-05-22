@@ -3,8 +3,8 @@
 Production debugging bundles for AI agents.
 
 ![CI](https://img.shields.io/github/actions/workflow/status/debugbundle/debugbundle/ci.yml?branch=main&label=ci)
-![CLI](https://img.shields.io/npm/v/%40debugbundle%2Fcli?label=cli)
-![MCP](https://img.shields.io/npm/v/%40debugbundle%2Fmcp?label=mcp)
+![CLI](https://img.shields.io/npm/v/%40debugbundle%2Fcli?label=cli&color=blue)
+![MCP](https://img.shields.io/npm/v/%40debugbundle%2Fmcp?label=mcp&color=blue)
 ![License](https://img.shields.io/badge/license-AGPL--3.0--only-blue)
 ![Community](https://img.shields.io/badge/community-GitHub%20Discussions-black)
 
