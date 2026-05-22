@@ -6,6 +6,7 @@ import {
   buildClearedGitHubAppInstallStateCookie,
   buildGitHubAppInstallStateCookie,
   GITHUB_APP_INSTALL_STATE_COOKIE_NAME,
+  isTimingSafeEqualUtf8,
   readCookieValue
 } from "../../../../packages/auth/src/index.js";
 import { getTierCapabilities } from "../../../../packages/shared-types/src/index.js";
@@ -826,12 +827,18 @@ export function registerGitHubRoutes(app: FastifyInstance, dependencies: ApiDepe
 
     const stateSecret = resolveGitHubAppInstallStateSecret();
     const stateCookie = readCookieValue(request.headers.cookie, GITHUB_APP_INSTALL_STATE_COOKIE_NAME);
-    if (stateSecret === null || parsedQuery.data.state === undefined || stateCookie === null || stateCookie !== parsedQuery.data.state) {
+    const queryState = parsedQuery.data.state;
+    if (
+      stateSecret === null ||
+      queryState === undefined ||
+      stateCookie === null ||
+      !isTimingSafeEqualUtf8(stateCookie, queryState)
+    ) {
       reply.header("Set-Cookie", buildClearedGitHubAppInstallStateCookie({ secure: shouldUseSecureCookies() }));
       return reply.status(400).send({ error: "invalid_state" });
     }
 
-    const installState = readGitHubInstallState(parsedQuery.data.state, stateSecret);
+    const installState = readGitHubInstallState(queryState, stateSecret);
     if (installState === null) {
       reply.header("Set-Cookie", buildClearedGitHubAppInstallStateCookie({ secure: shouldUseSecureCookies() }));
       return reply.status(400).send({ error: "invalid_state" });

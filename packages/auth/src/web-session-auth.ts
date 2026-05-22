@@ -410,9 +410,10 @@ export function createWebSessionAuthService(
       }
 
       const now = input.now ?? new Date();
+      const stateMatches =
+        input.stateCookieValue !== null && isTimingSafeEqualUtf8(input.stateCookieValue, input.state);
       if (
-        input.stateCookieValue === null ||
-        input.stateCookieValue !== input.state ||
+        !stateMatches ||
         !validateGithubOauthState(input.state, { now, secret: githubOAuth.stateSecret })
       ) {
         return {
