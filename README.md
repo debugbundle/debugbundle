@@ -2,15 +2,13 @@
 
 Production debugging bundles for AI agents.
 
-Source-of-truth product repository: <https://github.com/debugbundle/debugbundle>
-
 ![CI](https://img.shields.io/github/actions/workflow/status/debugbundle/debugbundle/ci.yml?branch=main&label=ci)
 ![CLI](https://img.shields.io/npm/v/%40debugbundle%2Fcli?label=cli)
-![Node SDK](https://img.shields.io/npm/v/%40debugbundle%2Fsdk-node?label=sdk-node)
+![MCP](https://img.shields.io/npm/v/%40debugbundle%2Fmcp?label=mcp)
 ![License](https://img.shields.io/badge/license-AGPL--3.0--only-blue)
 ![Community](https://img.shields.io/badge/community-GitHub%20Discussions-black)
 
-DebugBundle captures production failures, logs, request context, frontend breadcrumbs, runtime facts, and diagnostic probe data, then turns them into deterministic debug bundles that agents and engineers can inspect through the same API, CLI, and MCP surfaces.
+DebugBundle captures runtime failures, groups them into incidents, and publishes deterministic debug bundles for humans and AI agents.
 
 ## Why DebugBundle?
 
