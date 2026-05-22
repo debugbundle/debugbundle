@@ -6,6 +6,21 @@ The format is based on Keep a Changelog and this project follows Semantic Versio
 
 ## [Unreleased]
 
+## [0.1.3] - 2026-05-22
+
+### Added
+
+- Canonical root-repository GitHub Releases on `v*` tags so the core monorepo now has a public product-level release surface alongside the package-specific CLI, MCP, and shared-package releases.
+
+### Changed
+
+- Defined the root `debugbundle` repository version as the canonical public DebugBundle product release number, while keeping `cli-v*`, `mcp-v*`, and `shared-js-v*` as package-specific distribution tags.
+
+### Security
+
+- Hardened OAuth state validation by switching the GitHub install and web-session callback comparisons to constant-time checks.
+- Hardened browser trace propagation matching by dropping caller-provided regular expressions from the allowlist path and allowing string-only matching.
+
 ## [0.1.2] - 2026-05-13
 
 ### Added

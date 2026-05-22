@@ -1,0 +1,139 @@
+name: Release Core
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Core DebugBundle release version to publish (for example 0.1.3)
+        required: true
+        type: string
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+
+      - name: Setup pnpm via Corepack
+        run: |
+          corepack enable
+          corepack prepare pnpm@10.32.1 --activate
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Resolve release version
+        id: release_version
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]; then
+            version="${{ inputs.version }}"
+          else
+            version="${GITHUB_REF_NAME#v}"
+          fi
+
+          if [[ -z "$version" ]]; then
+            echo "missing_version" >&2
+            exit 1
+          fi
+
+          echo "value=$version" >> "$GITHUB_OUTPUT"
+
+      - name: Validate core release version
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          node --input-type=module <<'EOF'
+          import { readFileSync } from "node:fs";
+
+          const expectedVersion = process.env.RELEASE_VERSION;
+          if (!expectedVersion) {
+            throw new Error("missing_release_version");
+          }
+
+          if (expectedVersion.includes("-")) {
+            throw new Error(`unexpected_prerelease_version:${expectedVersion}`);
+          }
+
+          const packageJson = JSON.parse(readFileSync("package.json", "utf8"));
+          if (packageJson.version !== expectedVersion) {
+            throw new Error(`package_version_mismatch:${packageJson.version}:${expectedVersion}`);
+          }
+          EOF
+        env:
+          RELEASE_VERSION: ${{ steps.release_version.outputs.value }}
+
+      - name: Run core release quality gates
+        run: |
+          pnpm lint
+          pnpm typecheck
+          pnpm api:check
+          pnpm worker:check
+          pnpm vitest run tests/apps/cli/cli-workspace-package.test.ts tests/apps/mcp/mcp-workspace-package.test.ts tests/apps/mcp/mcp-stdio-server.test.ts
+          pnpm public-site:artifacts
+
+      - name: Create GitHub release
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          tag="v${RELEASE_VERSION}"
+          if gh release view "$tag" >/dev/null 2>&1; then
+            echo "Release $tag already exists; skipping create."
+            exit 0
+          fi
+
+          cli_version="$(node --input-type=module -e 'import { readFileSync } from \"node:fs\"; console.log(JSON.parse(readFileSync(\"apps/cli/package.json\", \"utf8\")).version)')"
+          mcp_version="$(node --input-type=module -e 'import { readFileSync } from \"node:fs\"; console.log(JSON.parse(readFileSync(\"apps/mcp/package.json\", \"utf8\")).version)')"
+          shared_types_version="$(node --input-type=module -e 'import { readFileSync } from \"node:fs\"; console.log(JSON.parse(readFileSync(\"packages/shared-types/package.json\", \"utf8\")).version)')"
+          redaction_version="$(node --input-type=module -e 'import { readFileSync } from \"node:fs\"; console.log(JSON.parse(readFileSync(\"packages/redaction/package.json\", \"utf8\")).version)')"
+
+          notes="$(cat <<EOF
+          This is the canonical product release for the DebugBundle core monorepo.
+
+          Component versions:
+          - Core monorepo: ${RELEASE_VERSION}
+          - CLI package: @debugbundle/cli@${cli_version}
+          - MCP package: @debugbundle/mcp@${mcp_version}
+          - Shared JS packages: @debugbundle/shared-types@${shared_types_version}, @debugbundle/redaction@${redaction_version}
+
+          Package-specific distribution tags remain separate:
+          - cli-v* for @debugbundle/cli
+          - mcp-v* for @debugbundle/mcp
+          - shared-js-v* for @debugbundle/shared-types and @debugbundle/redaction
+          EOF
+          )"
+
+          release_args=(
+            "$tag"
+            --title "$tag"
+            --generate-notes
+            --latest
+            --notes "$notes"
+          )
+
+          if [[ "${GITHUB_EVENT_NAME}" == "push" ]]; then
+            release_args+=(--verify-tag)
+          else
+            release_args+=(--target "$GITHUB_SHA")
+          fi
+
+          gh release create "${release_args[@]}"
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_VERSION: ${{ steps.release_version.outputs.value }}

@@ -55,6 +55,18 @@ Useful local runtime notes:
 - Public site repository: `https://github.com/debugbundle/site`
 - Local companion site clone: `site/` when cloned alongside the core repo
 
+## Release Model
+
+The canonical public product release for DebugBundle is the root `debugbundle` repository tag and GitHub Release (`v*`). That version is the one the public site should present as the current DebugBundle release.
+
+Package-specific distribution releases remain separate:
+
+- `cli-v*` for `@debugbundle/cli`
+- `mcp-v*` for `@debugbundle/mcp`
+- `shared-js-v*` for `@debugbundle/shared-types` and `@debugbundle/redaction`
+
+The standalone SDK repositories (`debugbundle-js`, `debugbundle-python`, `debugbundle-php`, `debugbundle-java`, `debugbundle-wordpress`) continue to publish and version their own release surfaces independently.
+
 ## Self-Hosting
 
 Use `deploy/selfhost/docker-compose.yml` and `deploy/selfhost/README.md` for the supported self-host bootstrap flow. The Compose stack includes Postgres, Redis, LocalStack S3, the API, the worker, and the web app with documented readiness and smoke-check behavior.
