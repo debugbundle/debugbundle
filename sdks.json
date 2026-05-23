@@ -24,6 +24,16 @@
       "path": "sdks/debugbundle-java",
       "cloneUrl": "https://github.com/debugbundle/debugbundle-java.git",
       "branch": "main"
+    },
+    {
+      "path": "sdks/debugbundle-go",
+      "cloneUrl": "https://github.com/debugbundle/debugbundle-go.git",
+      "branch": "main"
+    },
+    {
+      "path": "sdks/debugbundle-ruby",
+      "cloneUrl": "https://github.com/debugbundle/debugbundle-ruby.git",
+      "branch": "main"
     }
   ]
 }

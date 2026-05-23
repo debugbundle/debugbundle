@@ -82,6 +82,7 @@ All SDKs follow the same universal interface: `init`, `captureException`, `captu
 | Browser | `@debugbundle/sdk-browser` | `npm install @debugbundle/sdk-browser` | [Browser SDK](https://debugbundle.com/docs/sdks/browser) |
 | Python | `debugbundle-python` | `pip install debugbundle-python` | [Python SDK](https://debugbundle.com/docs/sdks/python) |
 | PHP | `debugbundle/sdk-php` | `composer require debugbundle/sdk-php` | [PHP SDK](https://debugbundle.com/docs/sdks/php) |
+| Ruby | `debugbundle` | `gem install debugbundle` | [Ruby SDK](https://debugbundle.com/docs/sdks/ruby) |
 | Java | `com.debugbundle:debugbundle-spring-boot-starter` | Maven or Gradle dependency | [Java SDK](https://debugbundle.com/docs/sdks/java) |
 | WordPress | `debugbundle-wordpress` | GitHub Release ZIP | [WordPress plugin](https://debugbundle.com/docs/integrations/wordpress) |
 
@@ -172,6 +173,26 @@ DebugBundle::captureShutdown();
 
 Laravel, Symfony, Monolog, local file transport, remote capture policy, probes, and browser relay adapters are supported.
 
+### Ruby
+
+```bash
+gem install debugbundle
+```
+
+```ruby
+require "debugbundle"
+
+DebugBundle.init(
+  project_token: ENV["DEBUGBUNDLE_PROJECT_TOKEN"],
+  environment: "production",
+  service: "api"
+)
+
+DebugBundle.capture_exceptions
+```
+
+Rails, Rack, Sidekiq, Ruby Logger, Semantic Logger, local file transport, remote capture policy, probes, and browser relay handlers are supported.
+
 ### Java
 
 ```xml
@@ -241,6 +262,7 @@ sdks/
   debugbundle-php/        Local clone of the PHP SDK repo
   debugbundle-java/       Local clone of the Java SDK repo
   debugbundle-wordpress/  Local clone of the WordPress plugin repo
+  debugbundle-ruby/       Local clone of the Ruby SDK repo
 site/
   Public docs, marketing, reference, and blog site clone
 ```

@@ -159,12 +159,12 @@ The `debugbundle-js` repo now consumes published `@debugbundle/shared-types` and
 
 ### Non-TypeScript SDKs
 
-All non-TS SDKs implement the same universal SDK interface (`init`, `captureException`, `captureError`, `captureLog`, `captureRequest`, `captureMessage`, `setContext`, `flush`, `probe`) with language-idiomatic naming. See `contracts/sdk-interface.md` for the full contract and `spec/sdk-language-targets.md` for the rollout plan. V1 relay parity is implemented for Python, PHP, WordPress, and Java Spring Boot: each full relay-compatible surface validates and sanitizes browser batches, preserves correlation, isolates credentials, writes local-only event files, writes connected durable spool files, and forwards connected events with server-side credentials using the shared relay contract.
+All non-TS SDKs implement the same universal SDK interface (`init`, `captureException`, `captureError`, `captureLog`, `captureRequest`, `captureMessage`, `setContext`, `flush`, `probe`) with language-idiomatic naming. See `contracts/sdk-interface.md` for the full contract and `spec/sdk-language-targets.md` for the rollout plan. V1 relay parity is implemented for Python, PHP, WordPress, Java Spring Boot, and Ruby Rack/Rails: each full relay-compatible surface validates and sanitizes browser batches, preserves correlation, isolates credentials, writes local-only event files, writes connected durable spool files, and forwards connected events with server-side credentials using the shared relay contract.
 
 All non-TypeScript SDKs live in separate repositories under `github.com/debugbundle/`, each with its own language-native toolchain, CI pipeline, and independent release cycle.
 
 **Local workspace convention:** Separate SDK repos live as independent clones under `sdks/` for single-workspace development. The core repo now ships `sdks.json` plus `scripts/bootstrap-sdks.sh`, root workspace/test/typecheck wiring no longer hardcodes the staged JS SDK tree, and the legacy tracked SDK snapshot directories have been removed from the core repo index. The public site repo lives as a real local clone at the root `site/` path for day-to-day work, while lower-touch companion repos such as `debugbundle/action` live under ignored `.local-repos/` clones. Temporary operator notes and local execution checklists live under ignored `.local-notes/`. On an older long-lived checkout, remove any pre-cutover `sdks/debugbundle-js`, `sdks/debugbundle-python`, or `sdks/debugbundle-php` directories from disk before the first bootstrap run so those paths can be recloned cleanly.
-The current local SDK clone set includes `debugbundle-js`, `debugbundle-python`, `debugbundle-php`, `debugbundle-wordpress`, and `debugbundle-java`.
+The current local SDK clone set includes `debugbundle-js`, `debugbundle-python`, `debugbundle-php`, `debugbundle-wordpress`, `debugbundle-java`, `debugbundle-go`, and `debugbundle-ruby`.
 
 **Wave 1 (active pre-launch scope):**
 
@@ -174,15 +174,15 @@ The current local SDK clone set includes `debugbundle-js`, `debugbundle-python`,
 | PHP       | `github.com/debugbundle/debugbundle-php`       | Packagist (`debugbundle/sdk-php`)      | Laravel, Symfony                                          |
 | WordPress | `github.com/debugbundle/debugbundle-wordpress` | WordPress.org plugin + GitHub releases | WordPress plugin wrapper over PHP SDK + browser SDK relay |
 | Java      | `github.com/debugbundle/debugbundle-java`      | Maven Central                          | Spring Boot                                               |
+| Ruby      | `github.com/debugbundle/debugbundle-ruby`      | RubyGems (`debugbundle`)               | Rails, Rack, Sidekiq                                     |
 
-**Planned next SDK expansion:**
+**In-progress next SDK expansion:**
 
 | SDK  | Repository                                | Package Registry         | Frameworks           |
 | ---- | ----------------------------------------- | ------------------------ | -------------------- |
 | Go   | `github.com/debugbundle/debugbundle-go`   | pkg.go.dev               | net/http, Gin, Echo  |
-| Ruby | `github.com/debugbundle/debugbundle-ruby` | RubyGems (`debugbundle`) | Rails, Rack, Sidekiq |
 
-Detailed implementation plans live in `spec/sdks/go-sdk.md` and `spec/sdks/ruby-sdk.md`.
+Detailed implementation plans live in `spec/sdks/go-sdk.md` and `spec/sdks/ruby-sdk.md`; Ruby's implementation now follows that plan in the local standalone repo and remains in pre-publish review until the RubyGems release is cut.
 
 **Wave 2 (post-launch):**
 

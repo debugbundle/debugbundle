@@ -516,33 +516,33 @@ Quality gates:
 
 ## Release Readiness Checklist
 
-- [ ] Universal Ruby API implemented.
-- [ ] Instance client and singleton facade implemented.
-- [ ] Rails Railtie and middleware auto-configure cleanly with one configuration block.
-- [ ] Rack middleware captures requests, exceptions, trace IDs, and request IDs.
-- [ ] Sidekiq server middleware captures job exceptions and preserves retry/failure behavior.
-- [ ] Ruby Logger, Rails logger, and Semantic Logger integrations capture structured logs without recursion.
-- [ ] Local-only and connected transports are implemented.
-- [ ] Secure local file writes enforce owner-only permissions, path validation, symlink protection, and unpredictable temp names.
-- [ ] Duplicate suppression and loop protection match the universal contract.
-- [ ] Capture policy is fetched, cached, polled, and enforced locally with ingestion as a backstop.
-- [ ] Always-on probes, remote probes, heavy probes, and trigger tokens are implemented.
-- [ ] Browser relay covers the shared relay contract: origin validation, content type, body size, schema, credential stripping, local-only writes, durable spool, connected forwarding, and rate limiting.
-- [ ] SDK failures never raise into host application code.
-- [ ] Request and response bodies are off by default.
-- [ ] Header capture is allowlist-based by default.
-- [ ] Existing Rails/Rack `X-Request-Id` and `request_id` are preserved.
-- [ ] `X-DebugBundle-Trace-Id` links browser and backend events.
-- [ ] Public docs include install, Rails, Rack, Sidekiq, browser relay, local-only, connected, logging, probes, and privacy examples.
-- [ ] CI passes all supported Ruby/Rails/Rack/Sidekiq lanes.
+- [x] Universal Ruby API implemented.
+- [x] Instance client and singleton facade implemented.
+- [x] Rails Railtie and middleware auto-configure cleanly with one configuration block.
+- [x] Rack middleware captures requests, exceptions, trace IDs, and request IDs.
+- [x] Sidekiq server middleware captures job exceptions and preserves retry/failure behavior.
+- [x] Ruby Logger, Rails logger, and Semantic Logger integrations capture structured logs without recursion.
+- [x] Local-only and connected transports are implemented.
+- [x] Secure local file writes enforce owner-only permissions, path validation, symlink protection, and unpredictable temp names.
+- [x] Duplicate suppression and loop protection match the universal contract.
+- [x] Capture policy is fetched, cached, polled, and enforced locally with ingestion as a backstop.
+- [x] Always-on probes, remote probes, heavy probes, and trigger tokens are implemented.
+- [x] Browser relay covers the shared relay contract: origin validation, content type, body size, schema, credential stripping, local-only writes, durable spool, connected forwarding, and rate limiting.
+- [x] SDK failures never raise into host application code.
+- [x] Request and response bodies are off by default.
+- [x] Header capture is allowlist-based by default.
+- [x] Existing Rails/Rack `X-Request-Id` and `request_id` are preserved.
+- [x] `X-DebugBundle-Trace-Id` links browser and backend events.
+- [x] Public docs include install, Rails, Rack, Sidekiq, browser relay, local-only, connected, logging, probes, and privacy examples.
+- [x] CI passes all supported Ruby/Rails/Rack/Sidekiq lanes.
 
 ---
 
-## Open Decisions
+## Release Decisions
 
-- Whether Rails 8.x support should be a V1 requirement or a compatibility lane that may initially be allowed to fail until Rails dependency constraints settle.
-- Whether Semantic Logger should ship in V1 or follow after Ruby Logger and Rails logger are proven.
-- Whether the Rails relay endpoint should be mounted automatically by the Railtie or require explicit route mounting for clarity.
-- Whether Sidekiq should capture sanitized job args by default as a summary only, or require opt-in for any args-derived fields.
-- Whether Rails 6.1 should receive best-effort Rack-only documentation for legacy installations without becoming a first-class Railtie support target.
-- Whether Sinatra should be the first post-V1 integration or be handled through generic Rack guidance until demand appears.
+- Rails 7.0 and 7.1 are the first-class V1 Rails compatibility lanes; Rails 8.x can be added after dependency compatibility is proven.
+- Semantic Logger ships in V1 with explicit recursion protection.
+- The Rails relay endpoint is mounted automatically by the Railtie and remains configurable or disableable.
+- Sidekiq captures sanitized job argument type summaries by default, not raw job arguments.
+- Rails 6.1 is handled through generic Rack guidance rather than first-class Railtie support.
+- Sinatra is handled through generic Rack guidance until demand justifies a dedicated helper.

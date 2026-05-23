@@ -523,9 +523,8 @@ These ecosystems are especially likely to benefit from DebugBundle’s bundle-fi
 ### Planned next expansion
 
 - Go
-- Ruby
 
-These are the next SDK expansion targets after the completed Java release-readiness work. Detailed plans live in `spec/sdks/go-sdk.md` and `spec/sdks/ruby-sdk.md` so implementation can begin from the same parity, relay, security, and testing baseline used for Java.
+Go is the next SDK expansion target after the completed Java release-readiness work and the Ruby pre-publish implementation. Detailed plans live in `spec/sdks/go-sdk.md` and `spec/sdks/ruby-sdk.md` so implementation and review can stay aligned to the same parity, relay, security, and testing baseline used for Java.
 
 ---
 
@@ -771,8 +770,8 @@ For the next phase of SDK implementation, DebugBundle should prioritize these tw
 
 ### Practical rollout interpretation
 
-- **Immediate implementation focus (Wave 1):** TS/JS, Python, PHP, WordPress plugin, Java Spring Boot
-- **Planned next expansion:** Go, Ruby
+- **Immediate implementation focus (Wave 1):** TS/JS, Python, PHP, WordPress plugin, Java Spring Boot, Ruby
+- **Planned next expansion:** Go
 - **Next depth layer (Wave 2):** C#, Kotlin server, Rust
 - **Strategic product expansion (Wave 3):** Kotlin Android, Swift iOS, React Native, Dart/Flutter
 
