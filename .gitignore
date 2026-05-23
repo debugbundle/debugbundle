@@ -8,6 +8,7 @@ dist/
 .source/
 .env
 .env.local
+.next/
 .venv/
 .DS_Store
 *.tsbuildinfo
@@ -22,6 +23,7 @@ spec/local/*
 
 # SDK clone roots (managed outside the core repo)
 sdks/
+!spec/sdks/
 
 # DebugBundle (managed by debugbundle setup)
 .debugbundle/local/*

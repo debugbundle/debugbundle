@@ -1,4 +1,4 @@
-import { DownloadIcon, KeySquareIcon, ShieldAlertIcon, Trash2Icon } from "lucide-react";
+import { DownloadIcon, ShieldAlertIcon, Trash2Icon } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Navigate, useNavigate } from "react-router-dom";
 import { CalloutCard } from "../components/system/callout-card.js";
@@ -210,29 +210,6 @@ export function SettingsPage(): JSX.Element {
         </div>
 
         <div className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Email access</CardTitle>
-              <CardDescription>Browser sessions are issued through explicit one-time email codes.</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="rounded-lg border border-border/80 bg-background/70 p-4 text-sm text-muted-foreground">
-                <div className="flex items-center gap-2 font-medium text-foreground">
-                  <KeySquareIcon className="size-4" />
-                  One-time code sign-in
-                </div>
-                <p className="mt-2 leading-6">Each browser sign-in requires a fresh email code. There is no reusable browser password to rotate or recover.</p>
-              </div>
-              <div className="rounded-lg border border-border/80 bg-background/70 p-4 text-sm text-muted-foreground">
-                <div className="flex items-center gap-2 font-medium text-foreground">
-                  <KeySquareIcon className="size-4" />
-                  Recovery path
-                </div>
-                <p className="mt-2 leading-6">If a session remains unverified, sign out and request a new email code from the login screen to finish verification with a fresh browser session.</p>
-              </div>
-            </CardContent>
-          </Card>
-
           <Card>
             <CardHeader>
               <CardTitle>Account data export</CardTitle>

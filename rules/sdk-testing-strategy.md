@@ -103,6 +103,8 @@ Each SDK repo runs its own GitHub Actions CI with these gates:
 4. **Coverage** — 80% per-file minimum (matching core monorepo standard)
 5. **Build/package** — Validates the publishable artifact builds (npm pack, python build, etc.)
 
+Each SDK CI matrix must also encode the version support policy from `spec/sdk-language-targets.md`: test the minimum compatibility runtime, important intermediate installed-base lanes, current stable, and previous stable or LTS where applicable. Framework adapters must include version lanes for the framework versions claimed by the SDK plan. When a tested runtime or framework is upstream EOL but intentionally supported for installed-base reach, mark it as compatibility coverage and keep the public docs clear that it is not the recommended production posture.
+
 ---
 
 ## 5. Shared Test Fixtures

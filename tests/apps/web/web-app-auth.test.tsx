@@ -511,7 +511,8 @@ describe("web app - auth routes", () => {
     expect(await screen.findByRole("heading", { name: /settings/i })).toBeInTheDocument();
     expect(screen.getByText(/^Email code$/i)).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /change password/i })).toBeNull();
-    expect(screen.getByText(/one-time code sign-in/i)).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: /account data export/i })).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: /email access/i })).toBeNull();
   });
 
   it("supports resending codes and switching back to the email step", async () => {
@@ -581,6 +582,8 @@ describe("web app - auth routes", () => {
 
     expect(await screen.findByRole("heading", { name: /settings/i })).toBeInTheDocument();
     expect(screen.getByText(/this account currently relies on github only/i)).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: /account data export/i })).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: /email access/i })).toBeNull();
   });
 
   it("downloads the account export from settings", async () => {

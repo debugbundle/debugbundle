@@ -26,10 +26,10 @@ DebugBundle supports two runtime modes: **local-only** (no cloud account require
 │    @debugbundle/sdk-node, @debugbundle/sdk-browser              │
 │  JS packages still published from core today:                   │
 │    @debugbundle/shared-types, @debugbundle/redaction            │
-│  Active non-TS/integration pre-launch scope:                    │
+│  Completed non-TS/integration pre-launch scope:                 │
 │    debugbundle-python, debugbundle/sdk-php,                     │
 │    debugbundle-wordpress, com.debugbundle Java SDK              │
-│  Deferred until after v1 hardening:                             │
+│  Planned next SDK expansion:                                    │
 │    github.com/debugbundle/debugbundle-go, debugbundle (RubyGems)│
 │  Wave 2 (post-launch): C#, Kotlin server, Rust                 │
 │  Wave 3 (post-launch): Kotlin Android, Swift iOS, React Native,│
@@ -207,8 +207,8 @@ packages/
   — debugbundle-python → github.com/debugbundle/debugbundle-python (Python SDK: Django + Flask + FastAPI + optional structlog/loguru capture)
   — debugbundle-php    → github.com/debugbundle/debugbundle-php (PHP SDK: Laravel + Symfony + remote config / capture policy)
   — debugbundle-java   → github.com/debugbundle/debugbundle-java (Java SDK: core SDK + Spring Boot MVC starter)
-  — debugbundle-go     → github.com/debugbundle/debugbundle-go (Go SDK: net/http + Gin + Echo; postponed until further notice)
-  — debugbundle-ruby   → github.com/debugbundle/debugbundle-ruby (Ruby SDK: Rails + Rack + Sidekiq; postponed until further notice)
+  — debugbundle-go     → github.com/debugbundle/debugbundle-go (Go SDK: net/http + Gin + Echo; planned next)
+  — debugbundle-ruby   → github.com/debugbundle/debugbundle-ruby (Ruby SDK: Rails + Rack + Sidekiq; planned after Go)
   — site               → github.com/debugbundle/site (public docs/blog/marketing site)
   — Wave 2/3 SDKs (C#, Kotlin, Swift, Rust, Dart, React Native) → separate repos per spec/sdk-language-targets.md
 
@@ -218,8 +218,8 @@ sdks/                    — Local standalone SDK clone roots managed by `sdks.j
   debugbundle-php/       — github.com/debugbundle/debugbundle-php (public standalone repo; cloned on demand for single-workspace development)
   debugbundle-wordpress/ — github.com/debugbundle/debugbundle-wordpress (public standalone repo; cloned on demand for single-workspace development)
   debugbundle-java/      — github.com/debugbundle/debugbundle-java (public standalone repo; Spring Boot starter + Java core SDK)
-  debugbundle-go/        — github.com/debugbundle/debugbundle-go (when built; postponed until further notice)
-  debugbundle-ruby/      — github.com/debugbundle/debugbundle-ruby (when built; postponed until further notice)
+  debugbundle-go/        — github.com/debugbundle/debugbundle-go (when built; planned next)
+  debugbundle-ruby/      — github.com/debugbundle/debugbundle-ruby (when built; planned after Go)
   (older local checkouts may still carry pre-cutover `sdks/` directories on disk until they are manually removed and re-bootstrapped)
 
 .local-repos/            — Ignored companion clones for less-frequent non-core repos when working from the core root

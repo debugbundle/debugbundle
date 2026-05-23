@@ -175,12 +175,14 @@ The current local SDK clone set includes `debugbundle-js`, `debugbundle-python`,
 | WordPress | `github.com/debugbundle/debugbundle-wordpress` | WordPress.org plugin + GitHub releases | WordPress plugin wrapper over PHP SDK + browser SDK relay |
 | Java      | `github.com/debugbundle/debugbundle-java`      | Maven Central                          | Spring Boot                                               |
 
-**Deferred until further notice:**
+**Planned next SDK expansion:**
 
 | SDK  | Repository                                | Package Registry         | Frameworks           |
 | ---- | ----------------------------------------- | ------------------------ | -------------------- |
 | Go   | `github.com/debugbundle/debugbundle-go`   | pkg.go.dev               | net/http, Gin, Echo  |
 | Ruby | `github.com/debugbundle/debugbundle-ruby` | RubyGems (`debugbundle`) | Rails, Rack, Sidekiq |
+
+Detailed implementation plans live in `spec/sdks/go-sdk.md` and `spec/sdks/ruby-sdk.md`.
 
 **Wave 2 (post-launch):**
 

@@ -55,6 +55,17 @@ Similarly:
 
 So while the list is expressed as “top 12 languages,” the actual SDK rollout may be better modeled as **SDK surfaces / platform families** rather than fully separate implementations for every language.
 
+### Version support discipline
+
+Before implementing any new SDK, the plan must explicitly separate:
+
+- **Minimum compatibility version** — the oldest language/runtime version the SDK promises to install, compile, and test against.
+- **Recommended production version** — the current or upstream-maintained version DebugBundle recommends for security and support.
+- **Installed-base compatibility lanes** — older but still common runtime, framework, or platform versions supported to avoid leaving a large user footprint behind. If a lane is upstream EOL, the SDK docs must say so clearly and frame it as compatibility support, not a secure production recommendation.
+- **Rolling CI lanes** — the concrete runtime and framework versions tested at release time, including the minimum supported version, important intermediate versions, current stable, and previous stable or LTS where the ecosystem has that concept.
+
+Do not start a new SDK implementation until its plan documents the relevant language/runtime versions, framework versions, package-manager constraints, and EOL/support status. Refresh those lanes before every SDK release so matrices do not age into stale promises.
+
 ---
 
 ## Alignment with existing implementation
@@ -71,9 +82,9 @@ The JS packages live in the JS SDK monorepo: `github.com/debugbundle/debugbundle
 
 TypeScript and JavaScript are delivered as one shared npm SDK surface, exactly as this document recommends.
 
-**Deferred from pre-launch v1 until further notice:**
-- `github.com/debugbundle/debugbundle-go` — Go SDK (planned Phase 18b, postponed while v1 hardening and validation take priority)
-- `debugbundle` (RubyGems) — Ruby SDK (planned Phase 18c, postponed while v1 hardening and validation take priority)
+**Planned next SDK expansion:**
+- `github.com/debugbundle/debugbundle-go` — Go SDK. Detailed implementation plan: `spec/sdks/go-sdk.md`.
+- `debugbundle` (RubyGems) — Ruby SDK. Detailed implementation plan: `spec/sdks/ruby-sdk.md`.
 
 ---
 
@@ -195,6 +206,7 @@ Go teams often care about operational clarity, request flow, and production debu
 - Context propagation should feel natural with `context.Context`.
 - Panic handling and error wrapping support are important.
 - The SDK should not feel heavy or magical.
+- Keep Go 1.21 as the V1 compatibility floor for `log/slog`, but test every claimed minor through current stable and recommend the current or previous officially supported Go release for production.
 
 ### V1 framework integrations
 
@@ -212,6 +224,7 @@ Go teams often care about operational clarity, request flow, and production debu
 - Support panic recovery hooks via `recover()`.
 - Use `context.Context` for per-request correlation.
 - Support request correlation and structured metadata cleanly.
+- Detailed implementation plan: `spec/sdks/go-sdk.md`.
 
 ---
 
@@ -265,6 +278,7 @@ Ruby/Rails incidents are often highly contextual: user flow issues, background j
 - Convention-over-configuration ergonomics matter.
 - Job systems are important, not just web requests.
 - Middleware and rack-level integration should be clean.
+- Keep Ruby 3.1+ compatibility for the Rails installed base, but label EOL Ruby branches as footprint support and recommend current upstream-maintained Ruby branches for production.
 
 ### V1 framework integrations
 
@@ -282,6 +296,7 @@ Ruby/Rails incidents are often highly contextual: user flow issues, background j
 - Rails is the first-class integration target.
 - Sidekiq support matters almost as much as request capture for background job debugging.
 - Attach user/account/request/job context elegantly.
+- Detailed implementation plan: `spec/sdks/ruby-sdk.md`.
 
 ---
 
@@ -505,12 +520,12 @@ This group gives DebugBundle strong access to:
 
 These ecosystems are especially likely to benefit from DebugBundle’s bundle-first model instead of simple log collection.
 
-### Deferred from active pre-launch execution
+### Planned next expansion
 
 - Go
 - Ruby
 
-These remain strong future targets, but they are postponed until further notice so pre-launch effort stays concentrated on shipping a rock-solid v1 and completing additional hardening, testing, and validation first.
+These are the next SDK expansion targets after the completed Java release-readiness work. Detailed plans live in `spec/sdks/go-sdk.md` and `spec/sdks/ruby-sdk.md` so implementation can begin from the same parity, relay, security, and testing baseline used for Java.
 
 ---
 
@@ -757,7 +772,7 @@ For the next phase of SDK implementation, DebugBundle should prioritize these tw
 ### Practical rollout interpretation
 
 - **Immediate implementation focus (Wave 1):** TS/JS, Python, PHP, WordPress plugin, Java Spring Boot
-- **Deferred until further notice:** Go, Ruby
+- **Planned next expansion:** Go, Ruby
 - **Next depth layer (Wave 2):** C#, Kotlin server, Rust
 - **Strategic product expansion (Wave 3):** Kotlin Android, Swift iOS, React Native, Dart/Flutter
 
