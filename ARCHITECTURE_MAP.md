@@ -159,7 +159,7 @@ The `debugbundle-js` repo now consumes published `@debugbundle/shared-types` and
 
 ### Non-TypeScript SDKs
 
-All non-TS SDKs implement the same universal SDK interface (`init`, `captureException`, `captureError`, `captureLog`, `captureRequest`, `captureMessage`, `setContext`, `flush`, `probe`) with language-idiomatic naming. See `contracts/sdk-interface.md` for the full contract and `spec/sdk-language-targets.md` for the rollout plan. V1 relay parity is implemented for Python, PHP, WordPress, Java Spring Boot, and Ruby Rack/Rails: each full relay-compatible surface validates and sanitizes browser batches, preserves correlation, isolates credentials, writes local-only event files, writes connected durable spool files, and forwards connected events with server-side credentials using the shared relay contract.
+All non-TS SDKs implement the same universal SDK interface (`init`, `captureException`, `captureError`, `captureLog`, `captureRequest`, `captureMessage`, `setContext`, `flush`, `probe`) with language-idiomatic naming. See `contracts/sdk-interface.md` for the full contract and `spec/sdk-language-targets.md` for the rollout plan. V1 relay parity is implemented for Python, PHP, WordPress, Java Spring Boot, Go net/http, and Ruby Rack/Rails: each full relay-compatible surface validates and sanitizes browser batches, preserves correlation, isolates credentials, writes local-only event files, writes connected durable spool files, and forwards connected events with server-side credentials using the shared relay contract.
 
 All non-TypeScript SDKs live in separate repositories under `github.com/debugbundle/`, each with its own language-native toolchain, CI pipeline, and independent release cycle.
 
@@ -175,14 +175,9 @@ The current local SDK clone set includes `debugbundle-js`, `debugbundle-python`,
 | WordPress | `github.com/debugbundle/debugbundle-wordpress` | WordPress.org plugin + GitHub releases | WordPress plugin wrapper over PHP SDK + browser SDK relay |
 | Java      | `github.com/debugbundle/debugbundle-java`      | Maven Central                          | Spring Boot                                               |
 | Ruby      | `github.com/debugbundle/debugbundle-ruby`      | RubyGems (`debugbundle`)               | Rails, Rack, Sidekiq                                     |
+| Go        | `github.com/debugbundle/debugbundle-go`        | pkg.go.dev                             | net/http, Gin, Echo                                      |
 
-**In-progress next SDK expansion:**
-
-| SDK  | Repository                                | Package Registry         | Frameworks           |
-| ---- | ----------------------------------------- | ------------------------ | -------------------- |
-| Go   | `github.com/debugbundle/debugbundle-go`   | pkg.go.dev               | net/http, Gin, Echo  |
-
-Detailed implementation plans live in `spec/sdks/go-sdk.md` and `spec/sdks/ruby-sdk.md`; Ruby's implementation now follows that plan in the local standalone repo and remains in pre-publish review until the RubyGems release is cut.
+Detailed implementation plans live in `spec/sdks/go-sdk.md` and `spec/sdks/ruby-sdk.md`; Ruby and Go now follow those plans in local standalone repos and remain pre-release until their public package publication handoffs are cut.
 
 **Wave 2 (post-launch):**
 

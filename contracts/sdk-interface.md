@@ -574,7 +574,7 @@ Framework integrations must auto-register log capture alongside error/request ca
 | Python | `debugbundle-python` | PyPI | Phase 18 | Shipped |
 | PHP | `debugbundle/sdk-php` | Packagist | Phase 18a | Shipped |
 | Java | `com.debugbundle:debugbundle-spring-boot-starter` (`com.debugbundle:debugbundle-java-core` companion module) | Maven Central | Java SDK | Pre-release |
-| Go | `github.com/debugbundle/debugbundle-go` | Go modules | Phase 18b | Planned |
+| Go | `github.com/debugbundle/debugbundle-go` | Go modules | Phase 18b | Pre-release |
 | Ruby | `debugbundle` | RubyGems | Phase 18c | Pre-release |
 
 ### V1 SDK Targets (Wave 2 — Enterprise & Platform Depth)

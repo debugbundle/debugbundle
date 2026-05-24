@@ -209,7 +209,7 @@ packages/
   — debugbundle-php    → github.com/debugbundle/debugbundle-php (PHP SDK: Laravel + Symfony + remote config / capture policy)
   — debugbundle-java   → github.com/debugbundle/debugbundle-java (Java SDK: core SDK + Spring Boot MVC starter)
   — debugbundle-ruby   → github.com/debugbundle/debugbundle-ruby (Ruby SDK: Rails + Rack + Sidekiq; release-ready local standalone repo)
-  — debugbundle-go     → github.com/debugbundle/debugbundle-go (Go SDK: local scaffold active under sdks/ with core, relay, net/http, Gin, Echo, and slog slices in progress)
+  — debugbundle-go     → github.com/debugbundle/debugbundle-go (Go SDK: pre-release local standalone repo with core, secure transports, relay, net/http, Gin, Echo, slog, zap, zerolog, remote config, probes, examples, CI, and release workflow)
   — site               → github.com/debugbundle/site (public docs/blog/marketing site)
   — Wave 2/3 SDKs (C#, Kotlin, Swift, Rust, Dart, React Native) → separate repos per spec/sdk-language-targets.md
 
@@ -219,7 +219,7 @@ sdks/                    — Local standalone SDK clone roots managed by `sdks.j
   debugbundle-php/       — github.com/debugbundle/debugbundle-php (public standalone repo; cloned on demand for single-workspace development)
   debugbundle-wordpress/ — github.com/debugbundle/debugbundle-wordpress (public standalone repo; cloned on demand for single-workspace development)
   debugbundle-java/      — github.com/debugbundle/debugbundle-java (public standalone repo; Spring Boot starter + Java core SDK)
-  debugbundle-go/        — github.com/debugbundle/debugbundle-go (local standalone repo scaffold now active for day-to-day Go SDK development)
+  debugbundle-go/        — github.com/debugbundle/debugbundle-go (local standalone repo; net/http, Gin, Echo, logging integrations, relay, probes, and Go release prep)
   debugbundle-ruby/      — github.com/debugbundle/debugbundle-ruby (local standalone repo; Rails, Rack, Sidekiq, Logger, relay, probes, and RubyGems release prep)
   (older local checkouts may still carry pre-cutover `sdks/` directories on disk until they are manually removed and re-bootstrapped)
 

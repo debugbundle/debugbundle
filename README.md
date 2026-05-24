@@ -84,6 +84,7 @@ All SDKs follow the same universal interface: `init`, `captureException`, `captu
 | PHP | `debugbundle/sdk-php` | `composer require debugbundle/sdk-php` | [PHP SDK](https://debugbundle.com/docs/sdks/php) |
 | Ruby | `debugbundle` | `gem install debugbundle` | [Ruby SDK](https://debugbundle.com/docs/sdks/ruby) |
 | Java | `com.debugbundle:debugbundle-spring-boot-starter` | Maven or Gradle dependency | [Java SDK](https://debugbundle.com/docs/sdks/java) |
+| Go | `github.com/debugbundle/debugbundle-go` | `go get github.com/debugbundle/debugbundle-go` | [Go SDK](https://debugbundle.com/docs/sdks/go) |
 | WordPress | `debugbundle-wordpress` | GitHub Release ZIP | [WordPress plugin](https://debugbundle.com/docs/integrations/wordpress) |
 
 ### Node.js
@@ -213,6 +214,23 @@ debugbundle:
 
 The Spring Boot starter supports servlet request capture, MVC exception capture, Logback capture, remote config, probes, and an optional browser relay route.
 
+### Go
+
+```bash
+go get github.com/debugbundle/debugbundle-go
+```
+
+```go
+client := debugbundle.New(debugbundle.Config{
+  ProjectToken: os.Getenv("DEBUGBUNDLE_PROJECT_TOKEN"),
+  Environment:  "production",
+  Service:      "api",
+})
+defer func() { _ = client.Flush(context.Background()) }()
+```
+
+net/http, Gin, Echo, slog, zap, zerolog, local file transport, remote capture policy, probes, and browser relay handlers are supported.
+
 ### WordPress
 
 Install the plugin ZIP from the `debugbundle-wordpress` GitHub Release, then open **Settings -> DebugBundle** and save your project token. The plugin bundles backend PHP capture, frontend browser capture, and a WordPress REST relay so the project token stays server-side.
@@ -261,6 +279,7 @@ sdks/
   debugbundle-python/     Local clone of the Python SDK repo
   debugbundle-php/        Local clone of the PHP SDK repo
   debugbundle-java/       Local clone of the Java SDK repo
+  debugbundle-go/         Local clone of the Go SDK repo
   debugbundle-wordpress/  Local clone of the WordPress plugin repo
   debugbundle-ruby/       Local clone of the Ruby SDK repo
 site/
@@ -342,6 +361,7 @@ Standalone SDK repositories publish and version their own release surfaces indep
 - `debugbundle-python` for `debugbundle-python`
 - `debugbundle-php` for `debugbundle/sdk-php`
 - `debugbundle-java` for Maven artifacts
+- `debugbundle-go` for Go modules
 - `debugbundle-wordpress` for the WordPress plugin
 
 ## Contributing

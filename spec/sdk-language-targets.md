@@ -78,11 +78,11 @@ Do not start a new SDK implementation until its plan documents the relevant lang
 - `debugbundle-wordpress` — WordPress plugin wrapper over the PHP SDK plus browser relay
 - `com.debugbundle:debugbundle-spring-boot-starter` — Java SDK with Spring Boot MVC starter backed by `debugbundle-java-core`
 
-The JS packages live in the JS SDK monorepo: `github.com/debugbundle/debugbundle-js` (alongside `@debugbundle/shared-types` and `@debugbundle/redaction`). Python, PHP, WordPress, and Java live in their own dedicated repositories.
+The JS packages live in the JS SDK monorepo: `github.com/debugbundle/debugbundle-js` (alongside `@debugbundle/shared-types` and `@debugbundle/redaction`). Python, PHP, WordPress, Java, Ruby, and Go live in their own dedicated repositories.
 
 TypeScript and JavaScript are delivered as one shared npm SDK surface, exactly as this document recommends.
 
-**Planned next SDK expansion:**
+**Pre-release SDK expansion:**
 - `github.com/debugbundle/debugbundle-go` — Go SDK. Detailed implementation plan: `spec/sdks/go-sdk.md`.
 - `debugbundle` (RubyGems) — Ruby SDK. Detailed implementation plan: `spec/sdks/ruby-sdk.md`.
 
@@ -520,11 +520,11 @@ This group gives DebugBundle strong access to:
 
 These ecosystems are especially likely to benefit from DebugBundle’s bundle-first model instead of simple log collection.
 
-### Planned next expansion
+### Pre-release expansion
 
 - Go
 
-Go is the next SDK expansion target after the completed Java release-readiness work and the Ruby pre-publish implementation. Detailed plans live in `spec/sdks/go-sdk.md` and `spec/sdks/ruby-sdk.md` so implementation and review can stay aligned to the same parity, relay, security, and testing baseline used for Java.
+Go is now implemented in the local standalone SDK repo and is in pre-release review alongside Ruby publication work. Detailed plans live in `spec/sdks/go-sdk.md` and `spec/sdks/ruby-sdk.md` so review stays aligned to the same parity, relay, security, and testing baseline used for Java.
 
 ---
 
@@ -770,8 +770,8 @@ For the next phase of SDK implementation, DebugBundle should prioritize these tw
 
 ### Practical rollout interpretation
 
-- **Immediate implementation focus (Wave 1):** TS/JS, Python, PHP, WordPress plugin, Java Spring Boot, Ruby
-- **Planned next expansion:** Go
+- **Immediate implementation focus (Wave 1):** TS/JS, Python, PHP, WordPress plugin, Java Spring Boot, Ruby, Go
+- **Pre-release expansion:** Ruby and Go publication handoff
 - **Next depth layer (Wave 2):** C#, Kotlin server, Rust
 - **Strategic product expansion (Wave 3):** Kotlin Android, Swift iOS, React Native, Dart/Flutter
 
