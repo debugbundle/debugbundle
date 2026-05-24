@@ -159,7 +159,7 @@ The `debugbundle-js` repo now consumes published `@debugbundle/shared-types` and
 
 ### Non-TypeScript SDKs
 
-All non-TS SDKs implement the same universal SDK interface (`init`, `captureException`, `captureError`, `captureLog`, `captureRequest`, `captureMessage`, `setContext`, `flush`, `probe`) with language-idiomatic naming. See `contracts/sdk-interface.md` for the full contract and `spec/sdk-language-targets.md` for the rollout plan. V1 relay parity is implemented for Python, PHP, WordPress, Java Spring Boot, Go net/http, and Ruby Rack/Rails: each full relay-compatible surface validates and sanitizes browser batches, preserves correlation, isolates credentials, writes local-only event files, writes connected durable spool files, and forwards connected events with server-side credentials using the shared relay contract.
+All non-TS SDKs implement the same universal SDK interface (`init`, `captureException`, `captureError`, `captureLog`, `captureRequest`, `captureMessage`, `setContext`, `flush`, `probe`) with language-idiomatic naming. See `contracts/sdk-interface.md` for the full contract and `spec/sdk-language-targets.md` for the rollout plan. V1 relay parity is implemented for Python, PHP, WordPress, Java Spring Boot, Java servlet/JAX-RS app-server adapters, Go net/http, and Ruby Rack/Rails. Each full relay-compatible surface validates and sanitizes browser batches, preserves correlation, isolates credentials, writes local-only event files, writes connected durable spool files, and forwards connected events with server-side credentials using the shared relay contract.
 
 All non-TypeScript SDKs live in separate repositories under `github.com/debugbundle/`, each with its own language-native toolchain, CI pipeline, and independent release cycle.
 
@@ -173,7 +173,7 @@ The current local SDK clone set includes `debugbundle-js`, `debugbundle-python`,
 | Python    | `github.com/debugbundle/debugbundle-python`    | PyPI (`debugbundle-python`)            | Django, Flask, FastAPI                                    |
 | PHP       | `github.com/debugbundle/debugbundle-php`       | Packagist (`debugbundle/sdk-php`)      | Laravel, Symfony                                          |
 | WordPress | `github.com/debugbundle/debugbundle-wordpress` | WordPress.org plugin + GitHub releases | WordPress plugin wrapper over PHP SDK + browser SDK relay |
-| Java      | `github.com/debugbundle/debugbundle-java`      | Maven Central                          | Spring Boot                                               |
+| Java      | `github.com/debugbundle/debugbundle-java`      | Maven Central                          | Spring Boot, Servlet/JAX-RS app servers, javaagent bootstrap |
 | Ruby      | `github.com/debugbundle/debugbundle-ruby`      | RubyGems (`debugbundle`)               | Rails, Rack, Sidekiq                                     |
 | Go        | `github.com/debugbundle/debugbundle-go`        | pkg.go.dev                             | net/http, Gin, Echo                                      |
 

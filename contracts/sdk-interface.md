@@ -555,6 +555,8 @@ Framework integrations must auto-register log capture alongside error/request ca
 | FastAPI | stdlib `logging` / loguru | Middleware auto-detects and hooks |
 | Laravel | Monolog (built-in) | Service provider registers log channel |
 | Symfony | Monolog (built-in) | Bundle registers handler in monolog config |
+| Spring Boot | Logback (default) / SLF4J backend | Starter registers DebugBundle appender/helper without replacing existing appenders |
+| Servlet/JAX-RS app servers | Java Util Logging / JBoss LogManager | Servlet/app-server adapter or javaagent registers handler where available |
 | Gin / Echo / net/http | Detected (slog/zerolog/zap) | `Init()` auto-detects and hooks |
 | Ruby on Rails | Rails logger (built-in) | Railtie registers broadcast subscriber |
 | Rack / Sidekiq | Detected (Ruby Logger / Semantic Logger) | `init` auto-detects and hooks |
@@ -573,7 +575,7 @@ Framework integrations must auto-register log capture alongside error/request ca
 | Browser | `@debugbundle/sdk-browser` | npm | Phase 9 | Shipped (in `debugbundle-js` repo) |
 | Python | `debugbundle-python` | PyPI | Phase 18 | Shipped |
 | PHP | `debugbundle/sdk-php` | Packagist | Phase 18a | Shipped |
-| Java | `com.debugbundle:debugbundle-spring-boot-starter` (`com.debugbundle:debugbundle-java-core` companion module) | Maven Central | Java SDK | Pre-release |
+| Java | `com.debugbundle:debugbundle-java-core`, servlet/JAX-RS adapters, `com.debugbundle:debugbundle-spring-boot-starter`, and `com.debugbundle:debugbundle-java-agent` | Maven Central | Java SDK | Pre-release |
 | Go | `github.com/debugbundle/debugbundle-go` | Go modules | Phase 18b | Pre-release |
 | Ruby | `debugbundle` | RubyGems | Phase 18c | Pre-release |
 
@@ -606,7 +608,9 @@ Framework integrations must auto-register log capture alongside error/request ca
 | Python | FastAPI | Middleware |
 | PHP | Laravel | Middleware + exception handler + service provider |
 | PHP | Symfony | Event subscriber + bundle |
-| Java | Spring Boot | Servlet filter + exception handler |
+| Java | Spring Boot | Starter: servlet filter + MVC exception resolver + relay route |
+| Java | Servlet app servers (`jakarta.servlet`, `javax.servlet`) | Filter/listener + relay servlet |
+| Java | JAX-RS / RESTEasy (`jakarta.ws.rs`, `javax.ws.rs`) | Request/response filters + exception providers |
 | Go | net/http | Middleware |
 | Go | Gin | Middleware |
 | Go | Echo | Middleware |
@@ -1048,7 +1052,7 @@ For V1, full relay parity applies to the shipped server SDK and integration surf
 | Python SDK | Django middleware, Flask route, FastAPI endpoint |
 | PHP SDK | Laravel middleware, Symfony controller |
 | WordPress plugin | WordPress REST route that composes the PHP relay behavior and adds WordPress-appropriate persistent rate limiting/spool handling |
-| Java SDK | Spring Boot relay route |
+| Java SDK | Spring Boot relay route plus servlet relay servlet for supported `jakarta.servlet` and `javax.servlet` app-server adapters |
 
 Future server SDKs must implement the same full relay handler contract before they are marked relay-handler compatible:
 

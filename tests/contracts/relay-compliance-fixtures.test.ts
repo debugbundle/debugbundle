@@ -10,7 +10,8 @@ const vendoredRelayFixturePaths = [
   new URL("../../sdks/debugbundle-js/tests/fixtures/relay-compliance.json", import.meta.url),
   new URL("../../sdks/debugbundle-python/tests/fixtures/relay-compliance.json", import.meta.url),
   new URL("../../sdks/debugbundle-php/tests/fixtures/relay-compliance.json", import.meta.url),
-  new URL("../../sdks/debugbundle-wordpress/tests/fixtures/relay-compliance.json", import.meta.url)
+  new URL("../../sdks/debugbundle-wordpress/tests/fixtures/relay-compliance.json", import.meta.url),
+  new URL("../../sdks/debugbundle-java/tests/fixtures/relay-compliance.json", import.meta.url)
 ];
 
 const RelayHeadersSchema = z.record(z.string(), z.string());
