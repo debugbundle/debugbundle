@@ -366,16 +366,35 @@ It is a strong commercial target even if it is not the first startup-focused SDK
 
 ### V1 framework integrations
 
-- **ASP.NET Core** — Middleware
+- **ASP.NET Core** — Middleware plus relay endpoint for Minimal APIs, MVC/Web API, and Razor Pages
+- **ASP.NET Core gRPC** — Server interceptor
+- **.NET Generic Host / Worker Service** — Hosted-service helpers
+- **Hangfire** — Server filter
+- **Azure Functions isolated worker** — Middleware where the Functions runtime supports the selected .NET LTS lane
+
+### Runtime baseline
+
+- Full server SDK minimum runtime: .NET 8 LTS.
+- Recommended production runtime: .NET 10 LTS for new services, or .NET 8 LTS while it remains upstream-supported.
+- Core/manual installed-base footprint may target `netstandard2.0` for .NET Framework 4.8/4.8.1 where feasible.
+- Do not claim .NET 6 or .NET 7 support because both are upstream EOL.
+- Do not claim .NET 9 as a supported production lane after its STS support window; newer LTS lanes are preferred.
+- ASP.NET Core validation should cover 8.0 and 10.0, with optional non-blocking preview lanes only as early warning signals.
 
 ### Future framework targets (post-V1)
 
-- Minimal APIs (built on ASP.NET Core, mostly automatic), Blazor, Azure Functions, Worker Services, gRPC .NET
+- SignalR hub filters, MassTransit, Quartz.NET, Azure Service Bus processors, Orleans, Dapr, MAUI, WPF/WinForms desktop helpers, classic ASP.NET `System.Web` if customer demand justifies it
 
 ### Implementation notes
 
 - ASP.NET Core middleware is the center of the integration strategy.
 - Good integration with dependency injection and `ILogger` logging abstractions will help adoption.
+- Treat the SDK as a .NET package family with C#-first documentation.
+- Preserve ASP.NET Core request IDs, `System.Diagnostics.Activity` context, `ILogger` scopes, and `X-DebugBundle-Trace-Id` without forcing response headers.
+- Keep the core dependency footprint small; Serilog, NLog, log4net, gRPC, Hangfire, and Azure Functions support should live in optional packages.
+- Default to conservative privacy behavior: no request/response bodies, no raw claims capture, allowlisted headers only, aggressive redaction, and explicit opt-in for payload capture.
+- Account for Windows and Linux file-system security differences in local event and relay spool transports.
+- Detailed implementation plan: `spec/sdks/csharp-sdk.md`.
 
 ---
 

@@ -177,13 +177,13 @@ The current local SDK clone set includes `debugbundle-js`, `debugbundle-python`,
 | Ruby      | `github.com/debugbundle/debugbundle-ruby`      | RubyGems (`debugbundle`)               | Rails, Rack, Sidekiq                                     |
 | Go        | `github.com/debugbundle/debugbundle-go`        | pkg.go.dev                             | net/http, Gin, Echo                                      |
 
-Detailed implementation plans live in `spec/sdks/go-sdk.md` and `spec/sdks/ruby-sdk.md`; Ruby and Go now follow those plans in local standalone repos and remain pre-release until their public package publication handoffs are cut.
+Detailed implementation plans live in `spec/sdks/java-sdk.md`, `spec/sdks/go-sdk.md`, `spec/sdks/ruby-sdk.md`, and `spec/sdks/csharp-sdk.md`; Java, Ruby, and Go now follow their plans in local standalone repos, while C#/.NET is planned as the next Wave 2 SDK repository.
 
 **Wave 2 (post-launch):**
 
 | SDK             | Repository                                  | Package Registry          | Frameworks      |
 | --------------- | ------------------------------------------- | ------------------------- | --------------- |
-| C#              | `github.com/debugbundle/debugbundle-dotnet` | NuGet (`DebugBundle`)     | ASP.NET Core    |
+| C#              | `github.com/debugbundle/debugbundle-dotnet` | NuGet (`DebugBundle.Sdk` + `DebugBundle.*`) | ASP.NET Core / .NET |
 | Kotlin (server) | `github.com/debugbundle/debugbundle-kotlin` | Maven Central             | Ktor            |
 | Rust            | `github.com/debugbundle/debugbundle-rust`   | crates.io (`debugbundle`) | Axum, Actix Web |
 

@@ -32,7 +32,8 @@ DebugBundle supports two runtime modes: **local-only** (no cloud account require
 │    debugbundle Ruby SDK                                         │
 │  In-progress SDK expansion:                                     │
 │    github.com/debugbundle/debugbundle-go                        │
-│  Wave 2 (post-launch): C#, Kotlin server, Rust                 │
+│  Wave 2 (post-launch; C# plan prepared): C#, Kotlin server,    │
+│    Rust                                                        │
 │  Wave 3 (post-launch): Kotlin Android, Swift iOS, React Native,│
 │    Dart/Flutter                                                 │
 │  See spec/sdk-language-targets.md for full rollout plan         │
@@ -211,7 +212,7 @@ packages/
   — debugbundle-ruby   → github.com/debugbundle/debugbundle-ruby (Ruby SDK: Rails + Rack + Sidekiq; release-ready local standalone repo)
   — debugbundle-go     → github.com/debugbundle/debugbundle-go (Go SDK: pre-release local standalone repo with core, secure transports, relay, net/http, Gin, Echo, slog, zap, zerolog, remote config, probes, examples, CI, and release workflow)
   — site               → github.com/debugbundle/site (public docs/blog/marketing site)
-  — Wave 2/3 SDKs (C#, Kotlin, Swift, Rust, Dart, React Native) → separate repos per spec/sdk-language-targets.md
+  — Wave 2/3 SDKs (C#, Kotlin, Swift, Rust, Dart, React Native) → separate repos per spec/sdk-language-targets.md; C#/.NET detailed plan lives in spec/sdks/csharp-sdk.md
 
 sdks/                    — Local standalone SDK clone roots managed by `sdks.json` and `scripts/bootstrap-sdks.sh`
   debugbundle-js/        — github.com/debugbundle/debugbundle-js (public standalone repo; cloned on demand for single-workspace development)
