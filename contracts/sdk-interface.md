@@ -1,7 +1,7 @@
 # SDK Interface Contract — DebugBundle
 
 Version: v1
-Last updated: 2026-05-21
+Last updated: 2026-05-25
 
 This contract defines the standard interface that ALL DebugBundle SDKs must implement, regardless of language. It ensures behavioral consistency across Node.js, browser, Python, PHP, Go, Ruby, and all future language SDKs.
 
@@ -14,7 +14,7 @@ Every SDK must expose an init function that accepts a configuration object and r
 **Required config fields:**
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
-| `projectToken` | string | — | Required. Project token for ingestion auth. |
+| `projectToken` | string | — | Required for connected ingestion. SDKs that support explicit `local-only` or file-only delivery may allow it to be omitted in that mode. |
 | `environment` | string | auto-detect | `production`, `staging`, `development`, etc. |
 | `service` | string | auto-detect | Service name for multi-service projects. |
 | `enabled` | boolean | `true` | Kill switch. When false, SDK is a no-op. |

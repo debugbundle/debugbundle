@@ -204,7 +204,7 @@ Optional<Instant> DebugBundle.lastEventAt();
 Minimum instance API:
 
 ```java
-DebugBundleClient client = DebugBundleClient.create(config);
+DebugBundleClient client = DebugBundle.create(config);
 client.captureException(error, context);
 client.captureLog("message", LogLevel.WARNING, context);
 client.probe("checkout.pricing", () -> pricingSnapshot);

@@ -20,6 +20,7 @@ site/
 /TODO.md
 spec/local/*
 !spec/local/v1-sdk-relay-parity-plan.md
+debugbundle-multirepo.code-workspace
 
 # SDK clone roots (managed outside the core repo)
 sdks/
