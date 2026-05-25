@@ -43,11 +43,11 @@ describe("mcp workspace package", () => {
     expect(packageJson.homepage).toBe("https://debugbundle.com/docs/mcp");
     expect(packageJson.bugs).toEqual({ url: "https://github.com/debugbundle/debugbundle/issues" });
     expect(packageJson.keywords).toEqual(["debugbundle", "debugging", "ai-agent", "mcp", "model-context-protocol"]);
-    expect(packageJson.engines).toEqual({ node: ">=24 <25" });
+    expect(packageJson.engines).toEqual({ node: ">=22 <27" });
     expect(packageJson.type).toBe("module");
     expect(packageJson.scripts).toMatchObject({
       start: "tsx src/entrypoint.ts",
-      build: "esbuild src/entrypoint.ts --bundle --platform=node --format=cjs --target=node24 --external:@node-rs/argon2 --outfile=dist/main.cjs",
+      build: "esbuild src/entrypoint.ts --bundle --platform=node --format=cjs --target=node22 --external:@node-rs/argon2 --outfile=dist/main.cjs",
       prepack: "npm run build"
     });
     expect(packageJson.bin).toEqual({
@@ -121,8 +121,12 @@ describe("mcp workspace package", () => {
     expect(workflow).toContain("apps/mcp/release-manifest.json");
     expect(workflow).toContain('mcp-v*');
     expect(workflow).toContain('0.1.0');
+    expect(workflow).toContain('node-version: [22, 24, 26]');
+    expect(workflow).toContain('needs: validate');
     expect(workflow).toContain('steps.published_state.outputs.state == \'all\'');
     expect(workflow).toContain('unexpected_prerelease_version');
+    expect(workflow).toContain('tests/apps/mcp/mcp-workspace-package.test.ts');
+    expect(workflow).toContain('tests/apps/mcp/mcp-stdio-server.test.ts');
     expect(workflow).toContain("npm pack ./apps/mcp");
     expect(workflow).toContain("npm publish ./apps/mcp --tag latest --access public");
     expect(workflow).toContain('npm view "@debugbundle/mcp@${RELEASE_VERSION}" version');
@@ -140,6 +144,7 @@ describe("mcp workspace package", () => {
   it("wires the root workspace to consume the mcp package through workspace linking", () => {
     const packageJson = readPackageJson("../../../package.json");
 
+    expect(packageJson.engines).toEqual({ node: ">=22 <27" });
     expect(packageJson.devDependencies).toMatchObject({
       "@debugbundle/mcp": "workspace:*"
     });

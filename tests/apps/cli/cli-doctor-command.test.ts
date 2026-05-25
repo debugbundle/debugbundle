@@ -192,6 +192,67 @@ describe("cli doctor command", () => {
     });
   });
 
+  it("fails doctor validation when the full profile schema is invalid despite agent validation status", async () => {
+    const rootDirectory = await createDoctorFixtureRepository();
+
+    await setupCommand(
+      {},
+      {
+        cwd: () => rootDirectory,
+        now: () => new Date("2026-03-14T00:00:00.000Z")
+      }
+    );
+
+    const profilePath = join(rootDirectory, ".debugbundle", "profile.json");
+    const generatedProfile = JSON.parse(await readFile(profilePath, "utf8")) as {
+      debugbundle: Record<string, unknown>;
+    } & Record<string, unknown>;
+    generatedProfile.debugbundle = {
+      ...generatedProfile.debugbundle,
+      validation_status: "agent-validated"
+    };
+    generatedProfile["critical_paths"] = ["checkout"];
+    await writeFile(profilePath, `${JSON.stringify(generatedProfile, null, 2)}\n`, "utf8");
+
+    const result = await doctorCommand(
+      {
+        json: true
+      },
+      {
+        cwd: () => rootDirectory,
+        now: () => new Date("2026-03-14T00:00:00.000Z"),
+        readAuthState: vi.fn().mockResolvedValue({
+          bearer_token: "dbundle_mem_secret_token",
+          base_url: "https://api.debugbundle.com"
+        })
+      }
+    );
+
+    const parsed = JSON.parse(result.output) as {
+      status: string;
+      checks: Array<{ name: string; status: string; message: string }>;
+      errors: string[];
+    };
+
+    expect(result.exitCode).toBe(0);
+    expect(parsed.status).toBe("error");
+    expect(parsed.checks).toEqual(
+      expect.arrayContaining([
+        {
+          name: "profile",
+          status: "ok",
+          message: "Found .debugbundle/profile.json"
+        },
+        {
+          name: "profile-validation",
+          status: "error",
+          message: "Profile schema validation failed at critical_paths.0: Expected object, received string."
+        }
+      ])
+    );
+    expect(parsed.errors).toContain("Profile schema validation failed at critical_paths.0: Expected object, received string.");
+  });
+
   it("reports undelivered relay spool counts and ages when --check-relay is enabled", async () => {
     const rootDirectory = await createDoctorFixtureRepository();
     const now = new Date("2026-03-14T12:00:00.000Z");
@@ -915,12 +976,24 @@ describe("cli doctor command", () => {
     };
 
     expect(parsed.status).toBe("error");
-    expect(parsed.checks[6]).toEqual({
-      name: "profile-freshness",
-      status: "error",
-      message: "Profile has an invalid debugbundle.last_reviewed_at value."
-    });
-    expect(parsed.errors).toEqual(["Profile has an invalid debugbundle.last_reviewed_at value."]);
+    expect(parsed.checks).toEqual(
+      expect.arrayContaining([
+        {
+          name: "profile-validation",
+          status: "error",
+          message: expect.stringContaining("Profile schema validation failed at profile_version:")
+        },
+        {
+          name: "profile-freshness",
+          status: "error",
+          message: "Profile has an invalid debugbundle.last_reviewed_at value."
+        }
+      ])
+    );
+    expect(parsed.errors).toEqual([
+      expect.stringContaining("Profile schema validation failed at profile_version:"),
+      "Profile has an invalid debugbundle.last_reviewed_at value."
+    ]);
   });
 
   it("renders the privacy preview in human output using the default auth-state wiring", async () => {

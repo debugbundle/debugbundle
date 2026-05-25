@@ -1,6 +1,12 @@
+import { readFileSync } from "node:fs";
+
 import { describe, expect, it, vi } from "vitest";
 
 import { runCli } from "../../../apps/cli/src/main.js";
+
+const cliPackageJson = JSON.parse(
+  readFileSync(new URL("../../../apps/cli/package.json", import.meta.url), "utf8")
+) as { version: string };
 
 describe("cli main core routing", () => {
   it("routes doctor --check-relay arguments into the doctor command", async () => {
@@ -239,7 +245,8 @@ describe("cli main core routing", () => {
     });
   });
 
-  it("supports help, empty argv, and equals-style option parsing", async () => {
+  it("supports version, help, empty argv, and equals-style option parsing", async () => {
+    const versionResult = await runCli(["--version"]);
     const helpResult = await runCli(["help"]);
     const emptyResult = await runCli([]);
     const analyzeCommand = vi.fn().mockResolvedValue({ exitCode: 0, output: "analyze-equals" });
@@ -252,8 +259,13 @@ describe("cli main core routing", () => {
       analyzeCommand
     });
 
+    expect(versionResult).toEqual({
+      exitCode: 0,
+      output: cliPackageJson.version
+    });
     expect(helpResult.exitCode).toBe(0);
     expect(helpResult.output).toContain("Usage:");
+    expect(helpResult.output).toContain("debugbundle --version");
     expect(emptyResult.exitCode).toBe(4);
     expect(emptyResult.output).toContain("No command provided.");
     expect(analyzeCommand).toHaveBeenCalledWith({

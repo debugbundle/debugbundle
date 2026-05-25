@@ -17,6 +17,8 @@ npm install -g @debugbundle/mcp
 debugbundle-mcp
 ```
 
+Supported Node.js versions: 22.x through 26.x.
+
 ## MCP Client Configuration
 
 ```json

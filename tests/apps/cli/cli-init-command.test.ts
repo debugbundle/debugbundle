@@ -341,6 +341,9 @@ describe("cli setup command", () => {
     const skillContents = await readFile(join(rootDirectory, ".agents", "skills", "debugbundle", "SKILL.md"), "utf8");
     expect(skillContents).toContain("name: debugbundle");
     expect(skillContents).toContain("resolve it with `debugbundle resolve <incident-id>` or MCP `resolve_incident`");
+    expect(skillContents).toContain("## Browser Capture and Relay Setup");
+    expect(skillContents).toContain("Add `@debugbundle/sdk-browser` to each browser app");
+    expect(skillContents).toContain("For split frontend/backend hosts, configure the browser endpoint to the API host relay URL");
 
     const cliReferenceContents = await readFile(join(rootDirectory, ".agents", "skills", "debugbundle", "references", "cli.md"), "utf8");
     expect(cliReferenceContents).toContain("debugbundle setup");

@@ -145,6 +145,37 @@ Primary acceptance coverage includes `AC-SDK-04`, `AC-SDK-05`, `AC-SDK-09`, `AC-
 
 ---
 
+## Manual Validation Hardening
+
+Manual SDK setup feedback reinforces several release requirements already implied by the Java plan. These are durable product-hardening gates, not one-off customer accommodations.
+
+The Java SDK release must include a complete configuration reference. The reference must list every supported builder option, Spring property, environment variable, JVM system property, servlet init/context parameter, and javaagent properties-file key, including default values and source precedence. It must explicitly document that capture-policy fields are server-owned and are not accepted from local config.
+
+The Java SDK release must publish install examples for every supported setup mode rather than only the Spring Boot starter path:
+
+- Spring Boot auto-configuration with Maven and Gradle snippets.
+- Explicit Spring bean configuration for teams that cannot use property-only setup.
+- WAR-level servlet filter/listener and relay servlet setup for both `jakarta.servlet` and `javax.servlet` deployments.
+- JAX-RS and RESTEasy setup for both namespace families.
+- WildFly/JBoss Docker and startup-script javaagent injection.
+- Local-only, connected, and zero-install `debugbundle-ndjson` fallback setup.
+
+The compatibility docs must use consistent support labels: supported, recommended, validation lane, installed-base compatibility, and out of scope. Spring Boot 2.x remains out of scope for V1; documentation should say that plainly instead of implying partial or untested support. Likewise, `javax` support means Java EE namespace compatibility on Java 17+ app-server lanes, not Java 8 or Java 11 runtime support.
+
+Published artifacts must include a Maven BOM or equivalent dependency-alignment guidance for Maven and Gradle so consumers can keep `core`, `web`, servlet, JAX-RS, starter, and agent modules on one coherent version. Examples must avoid mixed-version snippets.
+
+Browser relay documentation must be first-class in the Java SDK docs because Java is a server-side relay host for browser events. The docs must include production-ready Spring Security and Java EE/Jakarta EE security examples for `POST /debugbundle/browser`, including same-origin defaults, explicit allowed origins for split frontend/backend hosts, content-type enforcement, request-size limits, rate limiting, credential isolation, local-only behavior, connected durable spool behavior, connected forwarding, and the behavior when relay is disabled.
+
+Service naming guidance must cover multi-surface applications. A Java backend service, a browser frontend service, and multiple WARs in one JVM must be able to keep distinct service identities while sharing correlation through `X-DebugBundle-Trace-Id`. Public examples should recommend explicit service names for production and show how a backend relay preserves browser-owned service fields unless an operator intentionally configures a relay-level override.
+
+The Java SDK must expose safe startup diagnostics. If connected mode is enabled but the project token is missing or invalid, the SDK must not crash the host application or throw into request handling. It must enter a disabled or degraded state, expose that state through `DebugBundle.status()` and setup/doctor diagnostics, and avoid silently reporting a healthy connected state. Local-only mode must remain usable without a project token.
+
+Java release verification must include an app-driven smoke path in addition to CLI synthetic checks. A minimal supported Java application must initialize the SDK, call `captureException`, call `flush`, and verify that the event reaches a hosted or mock ingestion project with the expected service, environment, and correlation fields. This check proves the public dependency snippets, configuration precedence, transport, and flush behavior together.
+
+These gates do not add Spring Boot 2.x, deployment automation for specific customer infrastructure, or framework coverage outside V1 scope. They make the supported Java surfaces easier to install correctly and harder to publish in a partially documented state.
+
+---
+
 ## Public API
 
 The core SDK must expose a singleton-style API and an instance-based API. Spring Boot can use dependency injection, app-server deployments can create one client per deployment, and vanilla Java users can still use a simple static entry point.

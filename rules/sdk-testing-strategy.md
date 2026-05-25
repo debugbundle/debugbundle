@@ -1,7 +1,7 @@
 # SDK Testing Strategy — DebugBundle
 
 Version: v1
-Last updated: 2026-03-30
+Last updated: 2026-05-25
 
 ---
 
@@ -71,12 +71,15 @@ All V1 server SDKs that expose browser relay handlers must share a fixture suite
 
 The expected local file and spool shape must be language-neutral so `debugbundle process` and `debugbundle doctor --check-relay` can consume relay artifacts without knowing which SDK wrote them.
 
-### Tier 3 — Integration Tests (optional, CI-only)
+### Tier 3 — App-Driven Integration Tests (mandatory before release)
 
-For SDKs that want end-to-end validation against a real ingestion endpoint:
+Every SDK release must include at least one minimal application-level smoke test that exercises the published installation path, not only the internal client API. This test may run in CI against a mock ingestion endpoint, and release validation may additionally run against a hosted staging project when credentials are available.
 
-- A lightweight `docker-compose.yml` in the SDK repo spins up a **mock ingestion server** (a simple HTTP server that validates `POST /v1/events` payloads and stores them in memory).
-- Tests init the SDK, trigger events, call `flush()`, and assert the mock server received correctly shaped payloads.
+- The smoke app installs the SDK the same way a consumer would install it from the built package artifact.
+- The smoke app initializes the SDK with documented config, triggers one application-owned event through the public capture API, calls `flush()` or the language-equivalent bounded flush, and asserts the mock or hosted ingestion endpoint received the event.
+- The assertion must include event envelope shape, `service`, `environment`, SDK name/version, and correlation fields when the smoke path includes an HTTP request.
+- For server SDKs with browser relay handlers, at least one smoke path must submit a browser relay batch through the framework route and prove credential isolation plus delivery through the same transport path used by server events.
+- A lightweight `docker-compose.yml`, in-process test server, or language-native test host in the SDK repo may provide a **mock ingestion server** that validates `POST /v1/events` payloads and stores them in memory.
 - This does **not** require the full DebugBundle stack (no Postgres, Redis, S3).
 
 ---
@@ -102,12 +105,32 @@ Each SDK repo runs its own GitHub Actions CI with these gates:
 3. **Unit tests** — Tier 1 + Tier 2 tests pass
 4. **Coverage** — 80% per-file minimum (matching core monorepo standard)
 5. **Build/package** — Validates the publishable artifact builds (npm pack, python build, etc.)
+6. **Clean install smoke** — Installs the built artifact into a fresh fixture and runs the Tier 3 app-driven smoke path.
 
 Each SDK CI matrix must also encode the version support policy from `spec/sdk-language-targets.md`: test the minimum compatibility runtime, important intermediate installed-base lanes, current stable, and previous stable or LTS where applicable. Framework adapters must include version lanes for the framework versions claimed by the SDK plan. When a tested runtime or framework is upstream EOL but intentionally supported for installed-base reach, mark it as compatibility coverage and keep the public docs clear that it is not the recommended production posture.
 
 ---
 
-## 5. Shared Test Fixtures
+## 5. Release Documentation Gates
+
+Every SDK release must ship docs that remove first-install ambiguity across the surfaces the SDK claims to support.
+
+Required documentation gates:
+
+1. **Configuration reference** — List every supported config option, environment variable, system property, framework-native setting, and package-manager-specific source where applicable. Include defaults, accepted values, and source precedence. State that capture-policy fields are server-owned and are not accepted from local SDK config.
+2. **Install examples for claimed modes** — Provide minimal examples for each first-class framework, vanilla/manual capture path, logger integration, local-only mode, connected mode, and zero-install fallback where the SDK plan includes one.
+3. **Runtime and framework support labels** — Use the same labels from `spec/sdk-language-targets.md`: minimum compatibility version, recommended production version, installed-base compatibility lane, rolling CI lane, and out of scope. EOL lanes must be named as compatibility support, not secure production recommendations.
+4. **Dependency alignment guidance** — Multi-package SDK families must provide package-manager-native alignment guidance, such as an npm package family version rule, Maven BOM, Gradle platform, NuGet package version table, Composer constraint guidance, or equivalent. Public snippets must not mix SDK package versions.
+5. **Relay documentation** — Server SDKs with full relay handlers must document same-origin defaults, explicit allowed-origin configuration for split frontend/backend hosts, content-type enforcement, payload-size limits, rate limiting, credential isolation, local-only delivery, connected durable spool behavior, connected forwarding, disabled mode, and missing-token behavior.
+6. **Service naming guidance** — Docs must explain how to name services in multi-surface systems, including browser frontend plus backend relay and multiple backend deployables sharing one project.
+7. **Safe startup behavior** — Docs must describe what happens when connected mode is configured without a usable project token. SDKs must not crash the host, must expose degraded or disabled status through the public status API, and must not silently report healthy connected capture.
+8. **First-event verification** — Docs must include a language-idiomatic pattern that initializes the SDK, captures an explicit test exception or message, flushes, and confirms receipt through a mock endpoint, CLI/cloud verification command, or hosted staging project.
+
+These gates are cross-SDK requirements. Language-specific plans may add stricter docs or smoke paths, but they should not weaken these release floors.
+
+---
+
+## 6. Shared Test Fixtures
 
 The core monorepo publishes golden fixtures that SDK repos can consume:
 
@@ -121,7 +144,7 @@ SDK repos can fetch these from the public site URL or vendor them as test fixtur
 
 ---
 
-## 6. JS SDK (debugbundle-js) — Current Setup
+## 7. JS SDK (debugbundle-js) — Current Setup
 
 The JS SDK tests run as part of the core monorepo's Vitest suite during the workspace-bridge period:
 

@@ -556,7 +556,7 @@ This ensures Free behaves as **failure-first, not telemetry-first**.
 
 **FR-REL-13:** Connected relay spool retention: delivered spool files pruned after 24 hours (default). Undelivered spool files retained for 7 days (default, configurable). `debugbundle doctor --check-relay` must report undelivered spool file counts and ages.
 
-**FR-REL-14:** `debugbundle setup` must detect supported backend frameworks and scaffold or print exact relay-route instructions when the user's project includes both backend and browser SDKs. V1 detection must support Express, Fastify, and Next.js. Python, PHP, and WordPress SDK docs or setup helpers must provide equivalent copy-paste relay wiring until CLI framework detection covers those ecosystems.
+**FR-REL-14:** `debugbundle setup` must detect supported backend frameworks and scaffold or print exact relay-route instructions when the user's project includes both backend and browser SDKs. Auto-scaffolding must be limited to deterministic insertion points with test coverage and must not imply that one runtime family is the product default. For every shipped relay-capable runtime that the CLI cannot safely patch yet, setup must still provide exact runtime-specific relay instructions through CLI output and generated agent guidance. Relay guidance must cover credential isolation, origin allowlisting, content type and body-size validation, schema validation, rate limiting, auth/CSRF exemptions, local versus connected delivery, and split frontend/backend endpoint selection.
 
 ### 1.19 GitHub Repository Automation
 

@@ -8,6 +8,10 @@ Command-line interface for DebugBundle.
 npm install -g @debugbundle/cli
 ```
 
+Supported Node.js versions: 22.x through 26.x.
+
+Check the installed CLI version with `debugbundle --version`.
+
 Or install it as a project development dependency:
 
 ```sh

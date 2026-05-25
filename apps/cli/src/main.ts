@@ -28,6 +28,7 @@ import { appendCommonAuthOptions, CliInputError, ensureNoExtraPositionals, expec
 import { handleAlertCommand, handleBillingCommand, handleCapturePolicyCommand, handleGithubCommand, handleImprovementsCommand, handleMemberCommand, handleProbeCommand, handleProjectCommand, handleSlackCommand, handleTokenCommand, handleWebhookCommand, handleWeeklyReportCommand, type ManagementCommandDependencies } from "./management-command-handlers.js";
 import type { CliCommandResult } from "./token-commands.js";
 import { CapturePresetSchema } from "../../../packages/shared-types/src/index.js";
+import packageJson from "../package.json" with { type: "json" };
 
 export type CliDependencies = ManagementCommandDependencies & {
   analyzeCommand?: typeof defaultAnalyzeCommand;
@@ -84,6 +85,13 @@ export async function runCli(argv: string[], dependencies: CliDependencies = {})
       return {
         exitCode: 4,
         output: `No command provided.\n\n${formatUsage()}`
+      };
+    }
+
+    if (readBooleanOption(parsedArgv, "version")) {
+      return {
+        exitCode: 0,
+        output: packageJson.version
       };
     }
 

@@ -15,7 +15,128 @@ permissions:
   contents: read
 
 jobs:
+  validate:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        node-version: [22, 24, 26]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: ${{ matrix.node-version }}
+          registry-url: https://registry.npmjs.org
+
+      - name: Setup pnpm via Corepack
+        run: |
+          corepack enable
+          corepack prepare pnpm@10.32.1 --activate
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Resolve release version
+        id: release_version
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]; then
+            version="${{ inputs.version }}"
+          else
+            version="${GITHUB_REF_NAME#cli-v}"
+          fi
+
+          if [[ -z "$version" ]]; then
+            echo "missing_version" >&2
+            exit 1
+          fi
+
+          echo "value=$version" >> "$GITHUB_OUTPUT"
+
+      - name: Validate CLI release manifest
+        run: |
+          node --input-type=module <<'EOF'
+          import { existsSync, readFileSync } from "node:fs";
+          import { join } from "node:path";
+
+          const expectedVersion = process.env.RELEASE_VERSION;
+          const manifest = JSON.parse(readFileSync("apps/cli/release-manifest.json", "utf8"));
+          const packageJson = JSON.parse(readFileSync("apps/cli/package.json", "utf8"));
+
+          if (!expectedVersion) {
+            throw new Error("missing_release_version");
+          }
+
+          if (manifest.package !== packageJson.name) {
+            throw new Error("manifest_package_mismatch");
+          }
+
+          if (manifest.sourceDirectory !== "apps/cli") {
+            throw new Error(`unexpected_source_directory:${manifest.sourceDirectory}`);
+          }
+
+          if (manifest.tagPrefix !== "cli-v") {
+            throw new Error(`unexpected_tag_prefix:${manifest.tagPrefix}`);
+          }
+
+          if (manifest.npmTag !== "latest") {
+            throw new Error(`unexpected_npm_tag:${manifest.npmTag}`);
+          }
+
+          if (packageJson.version !== expectedVersion) {
+            throw new Error(`package_version_mismatch:${packageJson.version}:${expectedVersion}`);
+          }
+
+          if (expectedVersion.includes("-")) {
+            throw new Error(`unexpected_prerelease_version:${expectedVersion}`);
+          }
+
+          for (const fileName of manifest.requiredReleaseFiles) {
+            if (!existsSync(join(manifest.sourceDirectory, fileName))) {
+              throw new Error(`missing_release_file:${fileName}`);
+            }
+          }
+          EOF
+        env:
+          RELEASE_VERSION: ${{ steps.release_version.outputs.value }}
+
+      - name: Run focused CLI package tests
+        run: pnpm vitest run tests/apps/cli/cli-main-core.test.ts tests/apps/cli/cli-workspace-package.test.ts tests/apps/cli/cli-smoke-command.test.ts
+
+      - name: Pack CLI artifact
+        run: |
+          rm -rf .tmp/cli-release
+          mkdir -p .tmp/cli-release
+          npm pack ./apps/cli --pack-destination .tmp/cli-release
+
+      - name: Smoke test packed CLI install
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          tmpdir="$(mktemp -d)"
+          cat > "$tmpdir/package.json" <<'EOF'
+          {
+            "name": "debugbundle-cli-release-smoke",
+            "private": true
+          }
+          EOF
+
+          npm install --prefix "$tmpdir" --no-package-lock \
+            "$PWD/.tmp/cli-release/debugbundle-cli-${RELEASE_VERSION}.tgz"
+
+          "$tmpdir/node_modules/.bin/debugbundle" --version >/dev/null
+          "$tmpdir/node_modules/.bin/debugbundle" --help >/dev/null
+        env:
+          RELEASE_VERSION: ${{ steps.release_version.outputs.value }}
+
   release:
+    needs: validate
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -165,6 +286,7 @@ jobs:
           npm install --prefix "$tmpdir" --no-package-lock \
             "$PWD/.tmp/cli-release/debugbundle-cli-${RELEASE_VERSION}.tgz"
 
+          "$tmpdir/node_modules/.bin/debugbundle" --version >/dev/null
           "$tmpdir/node_modules/.bin/debugbundle" --help >/dev/null
         env:
           RELEASE_VERSION: ${{ steps.release_version.outputs.value }}
@@ -205,6 +327,7 @@ jobs:
           EOF
 
           npm install --prefix "$tmpdir" --no-package-lock "@debugbundle/cli@${RELEASE_VERSION}"
+          "$tmpdir/node_modules/.bin/debugbundle" --version >/dev/null
           "$tmpdir/node_modules/.bin/debugbundle" --help >/dev/null
         env:
           RELEASE_VERSION: ${{ steps.release_version.outputs.value }}

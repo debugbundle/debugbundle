@@ -10,6 +10,7 @@ import { CliAuthStateError, readCliAuthState } from "./auth-state.js";
 import type { CliAuthState } from "./auth-state.js";
 import { ConnectionConfigSchema } from "./connection-config.js";
 import { CONNECTION_FILE_PATH, PROFILE_FILE_PATH, SKILL_FILE_PATH } from "./local-scaffold.js";
+import { ProfileSchema, type ProfileValidationError } from "./profile-validation.js";
 import type { CliCommandResult } from "./token-commands.js";
 
 type FileReader = (path: string) => Promise<string>;
@@ -51,13 +52,6 @@ type DoctorPrivacyPreview = {
   };
 };
 
-const ProfileSchema = z.object({
-  debugbundle: z.object({
-    last_reviewed_at: z.string(),
-    validation_status: z.enum(["static-analysis-only", "agent-validated"])
-  })
-});
-
 const HealthResponseSchema = z.object({
   status: z.literal("ok")
 });
@@ -65,6 +59,15 @@ const HealthResponseSchema = z.object({
 const IncidentsProbeResponseSchema = z.object({
   incidents: z.array(z.unknown())
 });
+
+const DoctorProfileSchema = z.object({
+  debugbundle: z.object({
+    last_reviewed_at: z.string(),
+    validation_status: z.enum(["static-analysis-only", "agent-validated"])
+  })
+});
+
+type DoctorProfile = z.infer<typeof DoctorProfileSchema>;
 
 const PROFILE_STALENESS_THRESHOLD_DAYS = 30;
 const LOCAL_RELAY_SPOOL_DIRECTORY_PATH = ".debugbundle/local/browser-relay-spool";
@@ -227,7 +230,18 @@ async function buildFileCheck(rootDirectory: string, name: string, filePath: str
   };
 }
 
-async function loadProfile(rootDirectory: string, dependencies: { readFile: FileReader; stat: StatReader }): Promise<{ check: DoctorCheck; profile: z.infer<typeof ProfileSchema> | null }> {
+function formatZodErrors(error: z.ZodError): ProfileValidationError[] {
+  return error.issues.map((issue) => ({
+    path: issue.path.join("."),
+    message: issue.message
+  }));
+}
+
+async function loadProfile(rootDirectory: string, dependencies: { readFile: FileReader; stat: StatReader }): Promise<{
+  check: DoctorCheck;
+  profile: DoctorProfile | null;
+  validationErrors: ProfileValidationError[];
+}> {
   const profilePath = join(rootDirectory, PROFILE_FILE_PATH);
   if (!(await pathExists(profilePath, dependencies.stat))) {
     return {
@@ -236,20 +250,14 @@ async function loadProfile(rootDirectory: string, dependencies: { readFile: File
         status: "missing",
         message: `Missing ${PROFILE_FILE_PATH}`
       },
-      profile: null
+      profile: null,
+      validationErrors: []
     };
   }
 
+  let parsedJson: unknown;
   try {
-    const parsedProfile = ProfileSchema.parse(JSON.parse(await dependencies.readFile(profilePath)));
-    return {
-      check: {
-        name: "profile",
-        status: "ok",
-        message: `Found ${PROFILE_FILE_PATH}`
-      },
-      profile: parsedProfile
-    };
+    parsedJson = JSON.parse(await dependencies.readFile(profilePath));
   } catch {
     return {
       check: {
@@ -257,9 +265,34 @@ async function loadProfile(rootDirectory: string, dependencies: { readFile: File
         status: "error",
         message: `Invalid ${PROFILE_FILE_PATH}`
       },
-      profile: null
+      profile: null,
+      validationErrors: []
     };
   }
+
+  const parsedDoctorProfile = DoctorProfileSchema.safeParse(parsedJson);
+  if (!parsedDoctorProfile.success) {
+    return {
+      check: {
+        name: "profile",
+        status: "error",
+        message: `Invalid ${PROFILE_FILE_PATH}`
+      },
+      profile: null,
+      validationErrors: formatZodErrors(parsedDoctorProfile.error)
+    };
+  }
+
+  const parsedFullProfile = ProfileSchema.safeParse(parsedJson);
+  return {
+    check: {
+      name: "profile",
+      status: "ok",
+      message: `Found ${PROFILE_FILE_PATH}`
+    },
+    profile: parsedDoctorProfile.data,
+    validationErrors: parsedFullProfile.success ? [] : formatZodErrors(parsedFullProfile.error)
+  };
 }
 
 async function loadConnection(rootDirectory: string, dependencies: { readFile: FileReader; stat: StatReader }): Promise<{ check: DoctorCheck; connection: z.infer<typeof ConnectionConfigSchema> | null }> {
@@ -317,7 +350,22 @@ function buildProjectModeCheck(connection: z.infer<typeof ConnectionConfigSchema
   };
 }
 
-function buildProfileValidationCheck(profile: z.infer<typeof ProfileSchema> | null): DoctorCheck {
+function formatProfileValidationError(errors: ProfileValidationError[]): string {
+  const firstError = errors[0]!;
+  const path = firstError.path.length === 0 ? PROFILE_FILE_PATH : firstError.path;
+  const totalErrors = errors.length === 1 ? "" : ` (${errors.length} total errors)`;
+  return `Profile schema validation failed at ${path}: ${firstError.message}${totalErrors}.`;
+}
+
+function buildProfileValidationCheck(profile: DoctorProfile | null, validationErrors: ProfileValidationError[]): DoctorCheck {
+  if (validationErrors.length > 0) {
+    return {
+      name: "profile-validation",
+      status: "error",
+      message: formatProfileValidationError(validationErrors)
+    };
+  }
+
   if (profile === null) {
     return {
       name: "profile-validation",
@@ -341,7 +389,7 @@ function buildProfileValidationCheck(profile: z.infer<typeof ProfileSchema> | nu
   };
 }
 
-function buildProfileFreshnessCheck(profile: z.infer<typeof ProfileSchema> | null, now: Date): DoctorCheck {
+function buildProfileFreshnessCheck(profile: DoctorProfile | null, now: Date): DoctorCheck {
   if (profile === null) {
     return {
       name: "profile-freshness",
@@ -613,7 +661,7 @@ export async function doctorCommand(
   const rootDirectory = cwd();
   const currentTime = now();
 
-  const { check: profileCheck, profile } = await loadProfile(rootDirectory, { readFile, stat });
+  const { check: profileCheck, profile, validationErrors } = await loadProfile(rootDirectory, { readFile, stat });
   const { check: connectionCheck, connection } = await loadConnection(rootDirectory, { readFile, stat });
   const { check: authCheck, authState } = await buildAuthCheck(input, readAuthStateImpl);
   const connectedApiCheck = await buildConnectedApiCheck({
@@ -629,7 +677,7 @@ export async function doctorCommand(
     authCheck,
     buildProjectModeCheck(connection),
     ...(connectedApiCheck === null ? [] : [connectedApiCheck]),
-    buildProfileValidationCheck(profile),
+    buildProfileValidationCheck(profile, validationErrors),
     buildProfileFreshnessCheck(profile, currentTime),
     ...(input.checkRelay === true ? [await buildRelaySpoolCheck(rootDirectory, currentTime, { readdir, stat })] : [])
   ] satisfies DoctorCheck[];

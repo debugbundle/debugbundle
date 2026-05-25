@@ -1,6 +1,6 @@
 {
   "name": "@debugbundle/cli",
-  "version": "0.1.9",
+  "version": "0.1.10",
   "private": false,
   "description": "Command-line interface for DebugBundle",
   "license": "AGPL-3.0-only",
@@ -15,12 +15,12 @@
   },
   "keywords": ["debugbundle", "debugging", "ai-agent", "cli", "incident-response"],
   "engines": {
-    "node": ">=24 <25"
+    "node": ">=22 <27"
   },
   "type": "module",
   "scripts": {
     "start": "tsx src/entrypoint.ts",
-    "build": "esbuild src/entrypoint.ts --bundle --platform=node --format=cjs --target=node24 --external:@node-rs/argon2 --outfile=dist/main.cjs",
+    "build": "esbuild src/entrypoint.ts --bundle --platform=node --format=cjs --target=node22 --external:@node-rs/argon2 --outfile=dist/main.cjs",
     "prepack": "npm run build"
   },
   "bin": {
