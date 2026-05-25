@@ -157,6 +157,20 @@ describe("cli verify cloud configured client-error command", () => {
       json: true
     });
 
+    const conflictingAppEvent = await verifyCloudCommand({
+      projectId: "proj_123",
+      trigger5xx: true,
+      expectAppEvent: true,
+      service: "checkout-api",
+      json: true
+    });
+
+    const unscopedAppEvent = await verifyCloudCommand({
+      projectId: "proj_123",
+      expectAppEvent: true,
+      json: true
+    });
+
     expect(conflicting.exitCode).toBe(4);
     expect(JSON.parse(conflicting.output)).toEqual({
       status: "error",
@@ -193,6 +207,18 @@ describe("cli verify cloud configured client-error command", () => {
         "Generate a live cloud request, then re-run debugbundle verify cloud with the correct project and service filters."
       ],
       auto_fix_available: false
+    });
+
+    expect(conflictingAppEvent.exitCode).toBe(4);
+    expect(JSON.parse(conflictingAppEvent.output)).toMatchObject({
+      status: "error",
+      errors: ["Choose either a synthetic trigger run or --expect-app-event, not both."]
+    });
+
+    expect(unscopedAppEvent.exitCode).toBe(4);
+    expect(JSON.parse(unscopedAppEvent.output)).toMatchObject({
+      status: "error",
+      errors: ["App-event verification requires --service, --trace-id, or --request-id so the check stays scoped."]
     });
   });
 });

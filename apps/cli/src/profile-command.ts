@@ -5,11 +5,23 @@ type ProfileValidateDependencies = {
   cwd?: () => string;
 };
 
-function formatProfileValidationErrors(errors: Array<{ path: string; message: string }>): string {
+function formatProfileValidationErrors(errors: Array<{ path: string; message: string; suggestion?: string; example?: string }>): string {
   return [
     "DebugBundle profile validation failed.",
     "Errors:",
-    ...errors.map((error) => `- ${error.path}: ${error.message}`)
+    ...errors.flatMap((error) => {
+      const lines = [`- ${error.path}: ${error.message}`];
+
+      if (error.suggestion !== undefined) {
+        lines.push(`  Suggestion: ${error.suggestion}`);
+      }
+
+      if (error.example !== undefined) {
+        lines.push(`  Example: ${error.example}`);
+      }
+
+      return lines;
+    })
   ].join("\n");
 }
 

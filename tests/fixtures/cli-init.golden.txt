@@ -20,6 +20,9 @@ Ensured directories:
 Updated files:
 - .gitignore
 - AGENTS.md
+Selected targets:
+- api
+- worker
 Warnings:
 - Profile generated from static analysis; validate it before relying on framework or ownership details.
 Next steps:

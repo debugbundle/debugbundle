@@ -382,6 +382,46 @@ describe("cli main core routing", () => {
     });
   });
 
+  it("routes verify cloud app-event arguments into the verify-cloud command", async () => {
+    const verifyCloudCommand = vi.fn().mockResolvedValue({
+      exitCode: 0,
+      output: "verify-cloud"
+    });
+
+    const result = await runCli([
+      "verify",
+      "cloud",
+      "--project-id",
+      "proj_123",
+      "--expect-app-event",
+      "--service",
+      "checkout-api",
+      "--environment",
+      "production",
+      "--trace-id",
+      "trace-123",
+      "--request-id",
+      "req-456",
+      "--json"
+    ], {
+      verifyCloudCommand
+    });
+
+    expect(verifyCloudCommand).toHaveBeenCalledWith({
+      projectId: "proj_123",
+      expectAppEvent: true,
+      service: "checkout-api",
+      environment: "production",
+      traceId: "trace-123",
+      requestId: "req-456",
+      json: true
+    });
+    expect(result).toEqual({
+      exitCode: 0,
+      output: "verify-cloud"
+    });
+  });
+
   it("routes verify local arguments into the verify-local command", async () => {
     const verifyLocalCommand = vi.fn().mockResolvedValue({
       exitCode: 0,

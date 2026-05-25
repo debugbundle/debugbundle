@@ -11,6 +11,8 @@ type StatReader = (path: string) => Promise<{ isDirectory(): boolean }>;
 export type ProfileValidationError = {
   path: string;
   message: string;
+  suggestion?: string;
+  example?: string;
 };
 
 type ValidateProfileDependencies = {
@@ -83,10 +85,41 @@ async function pathExists(path: string, stat: StatReader): Promise<boolean> {
 }
 
 function formatZodErrors(error: z.ZodError): ProfileValidationError[] {
-  return error.issues.map((issue) => ({
-    path: issue.path.join("."),
-    message: issue.message
-  }));
+  return error.issues.map((issue) => {
+    const path = issue.path.join(".");
+
+    if (path === "services" || path.startsWith("services.")) {
+      return {
+        path,
+        message: issue.message,
+        suggestion: "Add service entries with name, kind, runtime, framework, paths, owns_routes, and depends_on.",
+        example: '[{"name":"api","kind":"backend","runtime":"Node.js","framework":"Fastify","paths":["apps/api"],"owns_routes":["POST /checkout"],"depends_on":["worker"]}]'
+      };
+    }
+
+    if (path === "critical_paths" || path.startsWith("critical_paths.")) {
+      return {
+        path,
+        message: issue.message,
+        suggestion: "Use object entries so each critical path records its owner_service and review notes.",
+        example: '[{"name":"checkout","owner_service":"api","notes":"Creates the order, charges the card, and enqueues fulfillment."}]'
+      };
+    }
+
+    if (path === "developer_workflows" || path.startsWith("developer_workflows.")) {
+      return {
+        path,
+        message: issue.message,
+        suggestion: "Provide install, build, test, and lint as command strings so agents can run the standard repo workflows.",
+        example: '{"install":"pnpm install","build":"pnpm build","test":"pnpm test","lint":"pnpm lint"}'
+      };
+    }
+
+    return {
+      path,
+      message: issue.message
+    };
+  });
 }
 
 export async function validateProfile(

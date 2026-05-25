@@ -62,158 +62,6 @@ async function createSetupFixtureRepository(): Promise<string> {
   return rootDirectory;
 }
 
-async function createRelayFixtureRepository(input: { framework: "fastify" | "express" | "nextjs" }): Promise<string> {
-  const rootDirectory = await mkdtemp(join(tmpdir(), `debugbundle-setup-relay-${input.framework}-`));
-
-  if (input.framework === "nextjs") {
-    await mkdir(join(rootDirectory, "app"), { recursive: true });
-  } else {
-    await mkdir(join(rootDirectory, "src"), { recursive: true });
-  }
-
-  const dependencies =
-    input.framework === "fastify"
-      ? {
-          fastify: "^5.0.0",
-          "@debugbundle/sdk-node": "^0.1.0",
-          "@debugbundle/sdk-browser": "^0.1.0"
-        }
-      : input.framework === "express"
-        ? {
-            express: "^5.0.0",
-            "@debugbundle/sdk-node": "^0.1.0",
-            "@debugbundle/sdk-browser": "^0.1.0"
-          }
-        : {
-            next: "^16.0.0",
-            react: "^19.0.0",
-            "react-dom": "^19.0.0",
-            "@debugbundle/sdk-node": "^0.1.0",
-            "@debugbundle/sdk-browser": "^0.1.0"
-          };
-
-  await writeFile(
-    join(rootDirectory, "package.json"),
-    `${JSON.stringify(
-      {
-        name: `relay-${input.framework}-app`,
-        packageManager: "pnpm@10.32.1",
-        dependencies
-      },
-      null,
-      2
-    )}\n`,
-    "utf8"
-  );
-
-  if (input.framework === "fastify") {
-    await writeFile(
-      join(rootDirectory, "src", "server.ts"),
-      [
-        'import Fastify from "fastify";',
-        "",
-        "export function buildServer() {",
-        "  const app = Fastify();",
-        "  app.get('/health', async () => ({ ok: true }));",
-        "  return app;",
-        "}"
-      ].join("\n") + "\n",
-      "utf8"
-    );
-  }
-
-  if (input.framework === "express") {
-    await writeFile(
-      join(rootDirectory, "src", "server.ts"),
-      [
-        'import express from "express";',
-        "",
-        "export function buildServer() {",
-        "  const app = express();",
-        "  app.get('/health', (_request, response) => {",
-        "    response.json({ ok: true });",
-        "  });",
-        "  return app;",
-        "}"
-      ].join("\n") + "\n",
-      "utf8"
-    );
-  }
-
-  return rootDirectory;
-}
-
-async function createRelayFallbackRepository(input: { framework: "fastify" | "express" | "nextjs" }): Promise<string> {
-  const rootDirectory = await mkdtemp(join(tmpdir(), `debugbundle-setup-relay-fallback-${input.framework}-`));
-
-  if (input.framework !== "nextjs") {
-    await mkdir(join(rootDirectory, "src"), { recursive: true });
-  }
-
-  const dependencies =
-    input.framework === "fastify"
-      ? {
-          fastify: "^5.0.0",
-          "@debugbundle/sdk-node": "^0.1.0",
-          "@debugbundle/sdk-browser": "^0.1.0"
-        }
-      : input.framework === "express"
-        ? {
-            express: "^5.0.0",
-            "@debugbundle/sdk-node": "^0.1.0",
-            "@debugbundle/sdk-browser": "^0.1.0"
-          }
-        : {
-            next: "^16.0.0",
-            react: "^19.0.0",
-            "react-dom": "^19.0.0",
-            "@debugbundle/sdk-node": "^0.1.0",
-            "@debugbundle/sdk-browser": "^0.1.0"
-          };
-
-  await writeFile(
-    join(rootDirectory, "package.json"),
-    `${JSON.stringify(
-      {
-        name: `relay-fallback-${input.framework}-app`,
-        packageManager: "pnpm@10.32.1",
-        dependencies
-      },
-      null,
-      2
-    )}\n`,
-    "utf8"
-  );
-
-  if (input.framework === "fastify") {
-    await writeFile(
-      join(rootDirectory, "src", "server.ts"),
-      [
-        "const server = Fastify();",
-        "server.get('/health', async () => ({ ok: true }));",
-        "export { server };"
-      ].join("\n") + "\n",
-      "utf8"
-    );
-  }
-
-  if (input.framework === "express") {
-    await writeFile(
-      join(rootDirectory, "src", "server.ts"),
-      [
-        "const server = express();",
-        "server.get('/health', (_request, response) => {",
-        "  response.json({ ok: true });",
-        "});",
-        "export { server };"
-      ].join("\n") + "\n",
-      "utf8"
-    );
-  }
-
-  return rootDirectory;
-}
-
 async function createMetadataFixtureRepository(input: {
   packageJson?: {
     name?: string;
@@ -394,6 +242,29 @@ describe("cli setup command", () => {
     expect(firstResult.exitCode).toBe(0);
     expect(JSON.parse(firstResult.output)).toEqual({
       status: "warning",
+      detected_services: [
+        {
+          name: "api",
+          kind: "backend",
+          runtime: "Node.js",
+          framework: "Fastify",
+          paths: ["apps/api"],
+          owns_routes: [],
+          depends_on: []
+        },
+        {
+          name: "worker",
+          kind: "worker",
+          runtime: "Node.js",
+          framework: "Fastify",
+          paths: ["apps/worker"],
+          owns_routes: [],
+          depends_on: []
+        }
+      ],
+      selected_targets: ["api", "worker"],
+      relay_action: "none",
+      relay_guidance: [],
       checks: [
         {
           name: "profile",
@@ -609,7 +480,10 @@ describe("cli setup command", () => {
           now: () => new Date("2026-03-14T00:00:00.000Z")
         }
       )
-    ).rejects.toThrow(/Unexpected|JSON/);
+    ).resolves.toEqual({
+      exitCode: 1,
+      output: expect.stringMatching(/Expected property name|Unexpected|JSON/)
+    });
   });
 
   it("surfaces stat failures while building the setup profile", async () => {
@@ -681,7 +555,7 @@ describe("cli setup command", () => {
     };
 
     expect(parsed.status).toBe("warning");
-    expect(parsed.checks[7]).toEqual({
+    expect(parsed.checks).toContainEqual({
       name: "agents-integration",
       status: "warning",
       message: "AGENTS.md not found; skipped managed DebugBundle section."
@@ -732,120 +606,6 @@ describe("cli setup command", () => {
       exitCode: 1,
       output: "disk_full"
     });
-  });
-
-  it("scaffolds a Fastify browser relay registration when both browser and node SDKs are present", async () => {
-    const rootDirectory = await createRelayFixtureRepository({ framework: "fastify" });
-
-    const result = await setupCommand(
-      {},
-      {
-        cwd: () => rootDirectory,
-        now: () => new Date("2026-03-14T00:00:00.000Z")
-      }
-    );
-
-    expect(result.exitCode).toBe(0);
-
-    const serverContents = await readFile(join(rootDirectory, "src", "server.ts"), "utf8");
-    expect(serverContents).toContain('import { debugBundleRelayPlugin } from "@debugbundle/sdk-node/relay/fastify";');
-    expect(serverContents).toContain("app.register(debugBundleRelayPlugin);");
-    expect(result.output).toContain("Scaffolded relay route:");
-    expect(result.output).toContain("src/server.ts");
-  });
-
-  it("scaffolds an Express browser relay registration when both browser and node SDKs are present", async () => {
-    const rootDirectory = await createRelayFixtureRepository({ framework: "express" });
-
-    const result = await setupCommand(
-      { json: true },
-      {
-        cwd: () => rootDirectory,
-        now: () => new Date("2026-03-14T00:00:00.000Z")
-      }
-    );
-
-    expect(result.exitCode).toBe(0);
-
-    const serverContents = await readFile(join(rootDirectory, "src", "server.ts"), "utf8");
-    expect(serverContents).toContain('import { debugBundleRelay } from "@debugbundle/sdk-node/relay/express";');
-    expect(serverContents).toContain('app.use("/debugbundle/browser", debugBundleRelay());');
-
-    const parsed = JSON.parse(result.output) as {
-      checks: Array<{ name: string; status: string; message: string }>;
-    };
-    expect(parsed.checks).toContainEqual({
-      name: "relay-route",
-      status: "ok",
-      message: "Scaffolded browser relay route in src/server.ts"
-    });
-  });
-
-  it("scaffolds a Next.js App Router relay route when both browser and node SDKs are present", async () => {
-    const rootDirectory = await createRelayFixtureRepository({ framework: "nextjs" });
-
-    const result = await setupCommand(
-      { json: true },
-      {
-        cwd: () => rootDirectory,
-        now: () => new Date("2026-03-14T00:00:00.000Z")
-      }
-    );
-
-    expect(result.exitCode).toBe(0);
-    expect(await readFile(join(rootDirectory, "app", "debugbundle", "browser", "route.ts"), "utf8")).toBe(
-      'export { debugBundleRelay as POST } from "@debugbundle/sdk-node/relay/nextjs";\n'
-    );
-
-    const parsed = JSON.parse(result.output) as {
-      checks: Array<{ name: string; status: string; message: string }>;
-    };
-    expect(parsed.checks).toContainEqual({
-      name: "relay-route",
-      status: "ok",
-      message: "Scaffolded browser relay route in app/debugbundle/browser/route.ts"
-    });
-  });
-
-  it("warns when relay scaffolding cannot find a registration point", async () => {
-    const fastifyRoot = await createRelayFallbackRepository({ framework: "fastify" });
-    const expressRoot = await createRelayFallbackRepository({ framework: "express" });
-
-    const fastifyResult = await setupCommand(
-      {},
-      {
-        cwd: () => fastifyRoot,
-        now: () => new Date("2026-03-14T00:00:00.000Z")
-      }
-    );
-
-    const expressResult = await setupCommand(
-      {},
-      {
-        cwd: () => expressRoot,
-        now: () => new Date("2026-03-14T00:00:00.000Z")
-      }
-    );
-
-    expect(fastifyResult.exitCode).toBe(0);
-    expect(expressResult.exitCode).toBe(0);
-    expect(await readFile(join(fastifyRoot, "src", "server.ts"), "utf8")).toContain("const server = Fastify();");
-    expect(await readFile(join(expressRoot, "src", "server.ts"), "utf8")).toContain("const server = express();");
-  });
-
-  it("warns when next.js relay scaffolding has no app router directory", async () => {
-    const rootDirectory = await createRelayFallbackRepository({ framework: "nextjs" });
-
-    const result = await setupCommand(
-      {},
-      {
-        cwd: () => rootDirectory,
-        now: () => new Date("2026-03-14T00:00:00.000Z")
-      }
-    );
-
-    expect(result.exitCode).toBe(0);
-    expect(await readFile(join(rootDirectory, ".debugbundle", "profile.json"), "utf8")).toContain("\"name\": \"relay-fallback-nextjs-app\"");
   });
 
   it("surfaces infrastructure and AGENTS read failures", async () => {

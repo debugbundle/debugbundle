@@ -264,7 +264,7 @@ export async function runCli(argv: string[], dependencies: CliDependencies = {})
       }
 
       if (subcommand === "cloud") {
-        expectNoUnknownOptions(parsedArgv, ["auth-file", "json", "project-id", "service", "environment", "max-age-minutes", "trigger-5xx", "trigger-4xx"]);
+        expectNoUnknownOptions(parsedArgv, ["auth-file", "json", "project-id", "service", "environment", "max-age-minutes", "trigger-5xx", "trigger-4xx", "expect-app-event", "trace-id", "request-id"]);
         ensureNoExtraPositionals(parsedArgv, 2);
 
         const projectId = readStringOption(parsedArgv, "project-id");
@@ -283,6 +283,9 @@ export async function runCli(argv: string[], dependencies: CliDependencies = {})
           maxAgeMinutes?: number;
           trigger5xx?: boolean;
           trigger4xxStatus?: number;
+          expectAppEvent?: boolean;
+          traceId?: string;
+          requestId?: string;
           authFilePath?: string;
           json?: boolean;
         });
@@ -297,6 +300,17 @@ export async function runCli(argv: string[], dependencies: CliDependencies = {})
         const trigger4xxStatus = readIntegerOption(parsedArgv, "trigger-4xx");
         if (trigger4xxStatus !== undefined) {
           input.trigger4xxStatus = trigger4xxStatus;
+        }
+        if (readBooleanOption(parsedArgv, "expect-app-event") === true) {
+          input.expectAppEvent = true;
+        }
+        const traceId = readStringOption(parsedArgv, "trace-id");
+        if (traceId !== undefined) {
+          input.traceId = traceId;
+        }
+        const requestId = readStringOption(parsedArgv, "request-id");
+        if (requestId !== undefined) {
+          input.requestId = requestId;
         }
 
         return await (dependencies.verifyCloudCommand ?? defaultVerifyCloudCommand)(input);

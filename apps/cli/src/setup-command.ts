@@ -2,6 +2,19 @@ import { mkdir as mkdirFromFs, readdir as readdirFromFs, readFile as readFileFro
 import { join } from "node:path";
 
 import {
+  detectServices,
+  type DetectedService,
+  type PackageJsonLike
+} from "./setup-service-discovery.js";
+import {
+  determineRelayAction,
+  resolveRelaySetup,
+  type RelayGuidance,
+  type SetupCheck
+} from "./setup-relay-guidance.js";
+import { selectSetupTargets } from "./setup-target-selection.js";
+
+import {
   BUNDLE_SCHEMA_REFERENCE_FILE_PATH,
   CLI_REFERENCE_FILE_PATH,
   CONNECTION_FILE_PATH,
@@ -39,34 +52,25 @@ type StatReader = (path: string) => Promise<{ isDirectory(): boolean }>;
 
 type SetupCommandDependencies = {
   cwd?: () => string;
+  isInteractive?: () => boolean;
   now?: () => Date;
   mkdir?: DirectoryMaker;
+  promptUser?: (prompt: string) => Promise<string>;
   readFile?: FileReader;
   readdir?: DirectoryReader;
   remove?: Remover;
+  selectTargetNames?: (services: DetectedService[]) => Promise<string[]>;
   stat?: StatReader;
   writeFile?: FileWriter;
-};
-
-type PackageJsonLike = {
-  name?: string;
-  packageManager?: string;
-  scripts?: Record<string, string>;
-  dependencies?: Record<string, string>;
-  devDependencies?: Record<string, string>;
-};
-
-type SetupCheck = {
-  name: string;
-  status: "ok" | "warning" | "missing" | "error";
-  message: string;
 };
 
 const MANAGED_AGENTS_START = "<!-- debugbundle:start -->";
 const MANAGED_AGENTS_END = "<!-- debugbundle:end -->";
 const STATIC_ANALYSIS_WARNING = "Profile generated from static analysis; validate it before relying on framework or ownership details.";
 
-function formatSetupOutput(updatedAgents: boolean, relayRouteMessage?: string): string {
+function formatSetupOutput(updatedAgents: boolean, selectedTargets: string[], relayGuidance: RelayGuidance[]): string {
+  const scaffoldedRelayGuidance = relayGuidance.filter((guidance) => guidance.action === "scaffolded");
+  const instructionRelayGuidance = relayGuidance.filter((guidance) => guidance.action !== "scaffolded");
   const lines = [
     "Completed DebugBundle setup.",
     "Created files:",
@@ -81,10 +85,21 @@ function formatSetupOutput(updatedAgents: boolean, relayRouteMessage?: string): 
     lines.push("- AGENTS.md");
   }
 
-  if (relayRouteMessage !== undefined) {
+  if (selectedTargets.length > 0) {
+    lines.push("Selected targets:", ...selectedTargets.map((target) => `- ${target}`));
+  }
+
+  if (scaffoldedRelayGuidance.length > 0) {
     lines.push(
       "Scaffolded relay route:",
-      `- ${relayRouteMessage}`
+      ...scaffoldedRelayGuidance.map((guidance) => `- ${guidance.summary}`)
+    );
+  }
+
+  if (instructionRelayGuidance.length > 0) {
+    lines.push(
+      "Relay guidance:",
+      ...instructionRelayGuidance.map((guidance) => `- ${guidance.summary}`)
     );
   }
 
@@ -100,9 +115,18 @@ function formatSetupOutput(updatedAgents: boolean, relayRouteMessage?: string): 
   return lines.join("\n");
 }
 
-function buildSetupJsonOutput(checks: SetupCheck[]): string {
+function buildSetupJsonOutput(
+  checks: SetupCheck[],
+  services: DetectedService[],
+  selectedTargetNames: string[],
+  relayGuidance: RelayGuidance[]
+): string {
   return JSON.stringify({
     status: checks.some((check) => check.status === "error") ? "error" : checks.some((check) => check.status === "warning") ? "warning" : "healthy",
+    detected_services: services,
+    selected_targets: selectedTargetNames,
+    relay_action: determineRelayAction(relayGuidance),
+    relay_guidance: relayGuidance,
     checks,
     warnings: checks.filter((check) => check.status === "warning").map((check) => check.message),
     errors: checks.filter((check) => check.status === "error").map((check) => check.message),
@@ -119,7 +143,6 @@ function buildManagedAgentsSection(): string {
   return [
     MANAGED_AGENTS_START,
     "## DebugBundle",
-    "- Check DebugBundle for existing incidents before investigating bugs.",
     "- Read `.agents/skills/debugbundle/SKILL.md` for the full debugging workflow.",
     "- Use `debugbundle inspect <incident-id>` or MCP `get_bundle` when a user reports an issue.",
     "- Run reproduction artifacts from `.debugbundle/bundles/local/reproductions/` before proposing a fix.",
@@ -127,116 +150,6 @@ function buildManagedAgentsSection(): string {
     "- Use `debugbundle doctor` to validate local DebugBundle setup or connectivity issues.",
     MANAGED_AGENTS_END
   ].join("\n");
-}
-
-function inferServiceKind(serviceName: string): "frontend" | "backend" | "worker" {
-  if (serviceName.includes("worker")) {
-    return "worker";
-  }
-
-  if (serviceName.includes("web") || serviceName.includes("frontend")) {
-    return "frontend";
-  }
-
-  return "backend";
-}
-
-function inferRuntime(primaryLanguages: string[]): string {
-  if (primaryLanguages.includes("TypeScript") || primaryLanguages.includes("JavaScript")) {
-    return "Node.js";
-  }
-
-  if (primaryLanguages.includes("Python")) {
-    return "Python";
-  }
-
-  if (primaryLanguages.includes("PHP")) {
-    return "PHP";
-  }
-
-  return "unknown";
-}
-
-function inferFramework(packageJson: PackageJsonLike | null): string {
-  const dependencyNames = new Set<string>([
-    ...Object.keys(packageJson?.dependencies ?? {}),
-    ...Object.keys(packageJson?.devDependencies ?? {})
-  ]);
-
-  if (dependencyNames.has("next")) {
-    return "Next.js";
-  }
-
-  if (dependencyNames.has("fastify")) {
-    return "Fastify";
-  }
-
-  if (dependencyNames.has("express")) {
-    return "Express";
-  }
-
-  return "unknown";
-}
-
-function collectDependencyNames(packageJson: PackageJsonLike | null): Set<string> {
-  return new Set<string>([
-    ...Object.keys(packageJson?.dependencies ?? {}),
-    ...Object.keys(packageJson?.devDependencies ?? {})
-  ]);
-}
-
-function hasRelayScaffoldDependencies(packageJson: PackageJsonLike | null): boolean {
-  const dependencyNames = collectDependencyNames(packageJson);
-  return dependencyNames.has("@debugbundle/sdk-browser") && dependencyNames.has("@debugbundle/sdk-node");
-}
-
-function insertImport(contents: string, importLine: string): string {
-  if (contents.includes(importLine)) {
-    return contents;
-  }
-
-  const lines = contents.split("\n");
-  let lastImportIndex = -1;
-  for (let index = 0; index < lines.length; index += 1) {
-    if (lines[index]?.startsWith("import ")) {
-      lastImportIndex = index;
-    }
-  }
-
-  if (lastImportIndex >= 0) {
-    lines.splice(lastImportIndex + 1, 0, importLine);
-    return lines.join("\n");
-  }
-
-  return `${importLine}\n${contents}`;
-}
-
-function insertAfterMatch(contents: string, matcher: RegExp, lineToInsert: string): string | null {
-  if (contents.includes(lineToInsert)) {
-    return contents;
-  }
-
-  const lines = contents.split("\n");
-  for (let index = 0; index < lines.length; index += 1) {
-    const line = lines[index];
-    if (line !== undefined && matcher.test(line)) {
-      const indentation = line.match(/^\s*/u)?.[0] ?? "";
-      lines.splice(index + 1, 0, `${indentation}${lineToInsert}`);
-      return lines.join("\n");
-    }
-  }
-
-  return null;
-}
-
-async function findFirstExistingPath(candidatePaths: string[], stat: StatReader): Promise<string | null> {
-  for (const candidatePath of candidatePaths) {
-    if (await pathExists(candidatePath, stat)) {
-      return candidatePath;
-    }
-  }
-
-  return null;
 }
 
 function detectPackageManagers(rootDirectory: string, packageJson: PackageJsonLike | null, existingPaths: Set<string>): string[] {
@@ -376,44 +289,6 @@ async function pathExists(filePath: string, stat: StatReader): Promise<boolean> 
   }
 }
 
-async function detectServices(
-  rootDirectory: string,
-  readdir: DirectoryReader,
-  stat: StatReader,
-  packageJson: PackageJsonLike | null,
-  primaryLanguages: string[]
-): Promise<Array<{ name: string; kind: "frontend" | "backend" | "worker"; runtime: string; framework: string; paths: string[]; owns_routes: string[]; depends_on: string[] }>> {
-  const appsDirectory = join(rootDirectory, "apps");
-  if (!(await pathExists(appsDirectory, stat))) {
-    return [];
-  }
-
-  const entries = (await readdir(appsDirectory)).sort();
-  const runtime = inferRuntime(primaryLanguages);
-  const framework = inferFramework(packageJson);
-  const services: Array<{ name: string; kind: "frontend" | "backend" | "worker"; runtime: string; framework: string; paths: string[]; owns_routes: string[]; depends_on: string[] }> = [];
-
-  for (const entry of entries) {
-    const entryPath = join(appsDirectory, entry);
-    const entryStats = await stat(entryPath);
-    if (!entryStats.isDirectory()) {
-      continue;
-    }
-
-    services.push({
-      name: entry,
-      kind: inferServiceKind(entry),
-      runtime,
-      framework,
-      paths: [`apps/${entry}`],
-      owns_routes: [],
-      depends_on: []
-    });
-  }
-
-  return services;
-}
-
 async function detectRootPaths(rootDirectory: string, readdir: DirectoryReader, stat: StatReader): Promise<string[]> {
   const entries = (await readdir(rootDirectory)).sort();
   const rootPaths: string[] = [];
@@ -472,155 +347,6 @@ async function detectInfrastructure(rootDirectory: string, readFile: FileReader)
     queues: [...queues].sort(),
     object_storage: [...objectStorage].sort(),
     external_services: []
-  };
-}
-
-async function scaffoldFastifyRelayRoute(
-  rootDirectory: string,
-  dependencies: { readFile: FileReader; stat: StatReader; writeFile: FileWriter }
-): Promise<SetupCheck> {
-  const candidatePath = await findFirstExistingPath([
-    join(rootDirectory, "src", "server.ts"),
-    join(rootDirectory, "src", "main.ts"),
-    join(rootDirectory, "apps", "api", "src", "server.ts"),
-    join(rootDirectory, "apps", "api", "src", "main.ts")
-  ], dependencies.stat);
-
-  if (candidatePath === null) {
-    return {
-      name: "relay-route",
-      status: "warning",
-      message: "Detected Fastify plus DebugBundle browser/node SDKs, but no supported Fastify server entry file was found."
-    };
-  }
-
-  const relativePath = candidatePath.replace(`${rootDirectory}/`, "");
-  const originalContents = await dependencies.readFile(candidatePath);
-  const withImport = insertImport(originalContents, 'import { debugBundleRelayPlugin } from "@debugbundle/sdk-node/relay/fastify";');
-  const withRegistration = insertAfterMatch(withImport, /const\s+app\s*=\s*(?:Fastify|fastify)\(/u, "app.register(debugBundleRelayPlugin);");
-  if (withRegistration === null) {
-    return {
-      name: "relay-route",
-      status: "warning",
-      message: `Detected Fastify plus DebugBundle browser/node SDKs, but could not place the relay registration in ${relativePath}.`
-    };
-  }
-
-  if (withRegistration !== originalContents) {
-    await dependencies.writeFile(candidatePath, withRegistration);
-  }
-
-  return {
-    name: "relay-route",
-    status: "ok",
-    message: `Scaffolded browser relay route in ${relativePath}`
-  };
-}
-
-async function scaffoldExpressRelayRoute(
-  rootDirectory: string,
-  dependencies: { readFile: FileReader; stat: StatReader; writeFile: FileWriter }
-): Promise<SetupCheck> {
-  const candidatePath = await findFirstExistingPath([
-    join(rootDirectory, "src", "server.ts"),
-    join(rootDirectory, "src", "app.ts"),
-    join(rootDirectory, "server.ts"),
-    join(rootDirectory, "apps", "api", "src", "server.ts")
-  ], dependencies.stat);
-
-  if (candidatePath === null) {
-    return {
-      name: "relay-route",
-      status: "warning",
-      message: "Detected Express plus DebugBundle browser/node SDKs, but no supported Express server entry file was found."
-    };
-  }
-
-  const relativePath = candidatePath.replace(`${rootDirectory}/`, "");
-  const originalContents = await dependencies.readFile(candidatePath);
-  const withImport = insertImport(originalContents, 'import { debugBundleRelay } from "@debugbundle/sdk-node/relay/express";');
-  const withRegistration = insertAfterMatch(withImport, /const\s+app\s*=\s*express\(/u, 'app.use("/debugbundle/browser", debugBundleRelay());');
-  if (withRegistration === null) {
-    return {
-      name: "relay-route",
-      status: "warning",
-      message: `Detected Express plus DebugBundle browser/node SDKs, but could not place the relay registration in ${relativePath}.`
-    };
-  }
-
-  if (withRegistration !== originalContents) {
-    await dependencies.writeFile(candidatePath, withRegistration);
-  }
-
-  return {
-    name: "relay-route",
-    status: "ok",
-    message: `Scaffolded browser relay route in ${relativePath}`
-  };
-}
-
-async function scaffoldNextJsRelayRoute(
-  rootDirectory: string,
-  dependencies: { mkdir: DirectoryMaker; stat: StatReader; writeFile: FileWriter }
-): Promise<SetupCheck> {
-  const candidateAppRoot = await findFirstExistingPath([
-    join(rootDirectory, "app"),
-    join(rootDirectory, "src", "app"),
-    join(rootDirectory, "apps", "web", "app"),
-    join(rootDirectory, "apps", "web", "src", "app")
-  ], dependencies.stat);
-
-  if (candidateAppRoot === null) {
-    return {
-      name: "relay-route",
-      status: "warning",
-      message: "Detected Next.js plus DebugBundle browser/node SDKs, but no supported App Router directory was found."
-    };
-  }
-
-  const routeDirectory = join(candidateAppRoot, "debugbundle", "browser");
-  const routePath = join(routeDirectory, "route.ts");
-  await dependencies.mkdir(routeDirectory, { recursive: true });
-  await dependencies.writeFile(routePath, 'export { debugBundleRelay as POST } from "@debugbundle/sdk-node/relay/nextjs";\n');
-
-  return {
-    name: "relay-route",
-    status: "ok",
-    message: `Scaffolded browser relay route in ${routePath.replace(`${rootDirectory}/`, "")}`
-  };
-}
-
-async function scaffoldRelayRoute(
-  rootDirectory: string,
-  packageJson: PackageJsonLike | null,
-  dependencies: {
-    mkdir: DirectoryMaker;
-    readFile: FileReader;
-    stat: StatReader;
-    writeFile: FileWriter;
-  }
-): Promise<SetupCheck | null> {
-  if (!hasRelayScaffoldDependencies(packageJson)) {
-    return null;
-  }
-
-  const framework = inferFramework(packageJson);
-  if (framework === "Fastify") {
-    return scaffoldFastifyRelayRoute(rootDirectory, dependencies);
-  }
-
-  if (framework === "Express") {
-    return scaffoldExpressRelayRoute(rootDirectory, dependencies);
-  }
-
-  if (framework === "Next.js") {
-    return scaffoldNextJsRelayRoute(rootDirectory, dependencies);
-  }
-
-  return {
-    name: "relay-route",
-    status: "warning",
-    message: "Detected DebugBundle browser/node SDKs, but no supported backend framework was found for relay scaffolding."
   };
 }
 
@@ -684,7 +410,7 @@ async function buildProfile(rootDirectory: string, dependencies: Required<Pick<S
     package_managers: string[];
     deployment_targets: string[];
   };
-  services: Array<{ name: string; kind: "frontend" | "backend" | "worker"; runtime: string; framework: string; paths: string[]; owns_routes: string[]; depends_on: string[] }>;
+  services: DetectedService[];
   infrastructure: {
     databases: string[];
     queues: string[];
@@ -747,7 +473,7 @@ async function buildProfile(rootDirectory: string, dependencies: Required<Pick<S
       package_managers: packageManagers,
       deployment_targets: detectDeploymentTargets(rootDirectory, confirmedExistingPaths)
     },
-    services: await detectServices(rootDirectory, dependencies.readdir, dependencies.stat, packageJson, primaryLanguages),
+    services: await detectServices(rootDirectory, dependencies.readdir, dependencies.readFile, dependencies.stat, packageJson, primaryLanguages),
     infrastructure: await detectInfrastructure(rootDirectory, dependencies.readFile),
     critical_paths: [],
     repo: {
@@ -789,9 +515,9 @@ export async function setupCommand(
   const writeFile = dependencies.writeFile ?? (async (path: string, content: string) => writeFileFromFs(path, content, "utf8"));
   const now = dependencies.now ?? (() => new Date());
   const rootDirectory = cwd();
-  const packageJson = await readJsonFile<PackageJsonLike>(join(rootDirectory, "package.json"), readFile);
-
   try {
+    const packageJson = await readJsonFile<PackageJsonLike>(join(rootDirectory, "package.json"), readFile);
+
     for (const directoryPath of ENSURED_DIRECTORY_PATHS) {
       await mkdir(join(rootDirectory, directoryPath), { recursive: true });
     }
@@ -804,6 +530,13 @@ export async function setupCommand(
       readdir,
       stat
     });
+    const targetSelectionDependencies = {
+      ...(dependencies.isInteractive === undefined ? {} : { isInteractive: dependencies.isInteractive }),
+      ...(dependencies.promptUser === undefined ? {} : { promptUser: dependencies.promptUser })
+    };
+    const selectedTargetNames = dependencies.selectTargetNames !== undefined
+      ? await dependencies.selectTargetNames(profile.services)
+      : await selectSetupTargets(profile.services, input, targetSelectionDependencies);
 
     await writeFile(join(rootDirectory, PROFILE_FILE_PATH), `${JSON.stringify(profile, null, 2)}\n`);
     await writeFile(join(rootDirectory, CONNECTION_FILE_PATH), buildConnectionConfig());
@@ -816,7 +549,7 @@ export async function setupCommand(
     await writeFile(join(rootDirectory, PERFORMANCE_ANALYSIS_RECIPE_FILE_PATH), buildPerformanceAnalysisRecipe());
     await writeFile(join(rootDirectory, EVALS_FILE_PATH), buildSkillEvals());
 
-    const relayRouteCheck = await scaffoldRelayRoute(rootDirectory, packageJson, {
+    const { relayCheck, relayGuidance } = await resolveRelaySetup(rootDirectory, profile.services, selectedTargetNames, packageJson, {
       mkdir,
       readFile,
       stat,
@@ -862,7 +595,7 @@ export async function setupCommand(
         status: "ok",
         message: `Updated ${GITIGNORE_FILE_PATH}`
       },
-      ...(relayRouteCheck === null ? [] : [relayRouteCheck]),
+      ...(relayCheck === null ? [] : [relayCheck]),
       updatedAgents
         ? {
             name: "agents-integration",
@@ -884,11 +617,8 @@ export async function setupCommand(
     return {
       exitCode: 0,
       output: input.json
-        ? buildSetupJsonOutput(checks)
-        : formatSetupOutput(
-            updatedAgents,
-            relayRouteCheck?.status === "ok" ? relayRouteCheck.message.replace("Scaffolded browser relay route in ", "") : undefined
-          )
+        ? buildSetupJsonOutput(checks, profile.services, selectedTargetNames, relayGuidance)
+        : formatSetupOutput(updatedAgents, selectedTargetNames, relayGuidance)
     };
   } catch (error) {
     return {

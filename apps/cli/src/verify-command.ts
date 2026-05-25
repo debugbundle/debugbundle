@@ -31,13 +31,22 @@ type ProductionIncidentLike = {
 };
 
 type CloudVerificationDetails = {
-  mode: "active_4xx" | "active_5xx" | "passive_recent_incident";
+  mode: "active_4xx" | "active_5xx" | "passive_recent_incident" | "app_event";
   accepted_event_count?: number;
   incident_id?: string;
   bundle_status?: "ready" | "pending" | "unknown";
   classification_reason?: IncidentReason;
   suggested_next_command?: string;
+  correlation_hints?: {
+    service?: string;
+    environment?: string;
+    trace_id?: string;
+    request_id?: string;
+  };
+  matched_hints?: string[];
 };
+
+type CloudCorrelationHints = NonNullable<CloudVerificationDetails["correlation_hints"]>;
 
 type DirectoryMaker = (path: string, options: { recursive: true }) => Promise<void>;
 type FileRenamer = (sourcePath: string, destinationPath: string) => Promise<void>;
@@ -147,7 +156,12 @@ function formatResult(
   };
 }
 
-function buildCloudSuggestedActions(status: "healthy" | "warning" | "error", incidentId?: string, mode: CloudVerificationDetails["mode"] = "passive_recent_incident"): string[] {
+function buildCloudSuggestedActions(
+  status: "healthy" | "warning" | "error",
+  incidentId?: string,
+  verification?: CloudVerificationDetails
+): string[] {
+  const mode = verification?.mode ?? "passive_recent_incident";
   if (status === "healthy" && incidentId !== undefined && (mode === "active_5xx" || mode === "active_4xx")) {
     return [
       `Run debugbundle inspect ${incidentId} --source cloud to inspect why the incident fired.`,
@@ -155,10 +169,24 @@ function buildCloudSuggestedActions(status: "healthy" | "warning" | "error", inc
     ];
   }
 
+  if (status === "healthy" && incidentId !== undefined && mode === "app_event") {
+    return [
+      `Run debugbundle inspect ${incidentId} --source cloud to inspect the captured app event.`,
+      "Re-run debugbundle verify cloud --expect-app-event after instrumentation or deploy changes, using the same service, environment, and correlation hints when available."
+    ];
+  }
+
   if (status === "healthy" && incidentId !== undefined) {
     return [
       `Review incident ${incidentId} if you want to inspect the latest production bundle.`,
       "Re-run debugbundle verify cloud after a fresh deploy or instrumentation change."
+    ];
+  }
+
+  if (mode === "app_event") {
+    return [
+      "Trigger a real SDK event from the target app, then re-run debugbundle verify cloud --expect-app-event with the same service and environment filters.",
+      "Add --trace-id or --request-id when you have a correlation hint so the verification can match the hosted bundle deterministically."
     ];
   }
 
@@ -183,7 +211,7 @@ function buildCloudJsonOutput(checks: VerifyCheck[], errors: string[], incidentI
     checks,
     warnings: collectWarnings(checks),
     errors,
-    suggested_actions: buildCloudSuggestedActions(status, incidentId, verification?.mode),
+    suggested_actions: buildCloudSuggestedActions(status, incidentId, verification),
     auto_fix_available: false
   };
 
@@ -201,7 +229,7 @@ function formatCloudHumanOutput(checks: VerifyCheck[], incidentId?: string, veri
     "Checks:",
     ...checks.map((check) => `- ${check.name}: ${check.status} - ${check.message}`),
     "Suggested actions:",
-    ...buildCloudSuggestedActions(status, incidentId, verification?.mode).map((action) => `- ${action}`)
+    ...buildCloudSuggestedActions(status, incidentId, verification).map((action) => `- ${action}`)
   ].join("\n");
 }
 
@@ -323,6 +351,70 @@ function validateActiveCloudVerificationInput(input: {
   }
 
   return null;
+}
+
+function validateCloudVerificationInput(input: {
+  trigger5xx?: boolean;
+  trigger4xxStatus?: number;
+  expectAppEvent?: boolean;
+  service?: string;
+  traceId?: string;
+  requestId?: string;
+}): string | null {
+  const activeInputError = validateActiveCloudVerificationInput(input);
+  if (activeInputError !== null) {
+    return activeInputError;
+  }
+
+  const appEventVerificationEnabled = input.expectAppEvent === true || input.traceId !== undefined || input.requestId !== undefined;
+  if (appEventVerificationEnabled && (input.trigger5xx === true || input.trigger4xxStatus !== undefined)) {
+    return "Choose either a synthetic trigger run or --expect-app-event, not both.";
+  }
+
+  if (appEventVerificationEnabled && input.service === undefined && input.traceId === undefined && input.requestId === undefined) {
+    return "App-event verification requires --service, --trace-id, or --request-id so the check stays scoped.";
+  }
+
+  return null;
+}
+
+function buildCorrelationHints(input: {
+  environment: string;
+  service?: string;
+  traceId?: string;
+  requestId?: string;
+}): CloudCorrelationHints {
+  return {
+    ...(input.service === undefined ? {} : { service: input.service }),
+    environment: input.environment,
+    ...(input.traceId === undefined ? {} : { trace_id: input.traceId }),
+    ...(input.requestId === undefined ? {} : { request_id: input.requestId })
+  };
+}
+
+function collectBundleHintMatches(
+  bundle: unknown,
+  input: { traceId?: string; requestId?: string }
+): string[] {
+  const serializedBundle = JSON.stringify(bundle);
+  const matches: string[] = [];
+
+  if (input.traceId !== undefined && serializedBundle.includes(input.traceId)) {
+    matches.push("trace_id");
+  }
+
+  if (input.requestId !== undefined && serializedBundle.includes(input.requestId)) {
+    matches.push("request_id");
+  }
+
+  return matches;
+}
+
+function requestedBundleHints(input: { traceId?: string; requestId?: string }): string[] {
+  return [
+    ...(input.traceId === undefined ? [] : ["trace_id"]),
+    ...(input.requestId === undefined ? [] : ["request_id"])
+  ];
 }
 
 async function sendEventsToApi(
@@ -559,6 +651,9 @@ export async function verifyCloudCommand(
     maxAgeMinutes?: number;
     trigger5xx?: boolean;
     trigger4xxStatus?: number;
+    expectAppEvent?: boolean;
+    traceId?: string;
+    requestId?: string;
     authFilePath?: string;
     json?: boolean;
   },
@@ -568,7 +663,7 @@ export async function verifyCloudCommand(
   const checks: VerifyCheck[] = [];
   const environment = input.environment ?? "production";
   const maxAgeMinutes = input.maxAgeMinutes ?? 15;
-  const activeInputError = validateActiveCloudVerificationInput(input);
+  const activeInputError = validateCloudVerificationInput(input);
 
   if (activeInputError !== null) {
     checks.push({
@@ -621,6 +716,132 @@ export async function verifyCloudCommand(
       requestInput,
       dependencies.fetchImpl === undefined ? {} : { fetchImpl: dependencies.fetchImpl }
     ));
+  const appEventVerificationEnabled = input.expectAppEvent === true || input.traceId !== undefined || input.requestId !== undefined;
+
+  if (appEventVerificationEnabled) {
+    const verificationStartedAt = now();
+    const pollAttempts = dependencies.pollAttempts ?? 6;
+    const pollIntervalMs = dependencies.pollIntervalMs ?? 2_000;
+    const sleep = dependencies.sleep ?? ((milliseconds: number) => new Promise<void>((resolve) => setTimeout(resolve, milliseconds)));
+    const requestedHints = requestedBundleHints(input);
+    const verification: CloudVerificationDetails = {
+      mode: "app_event",
+      bundle_status: "unknown",
+      correlation_hints: buildCorrelationHints({
+        environment,
+        ...(input.service === undefined ? {} : { service: input.service }),
+        ...(input.traceId === undefined ? {} : { traceId: input.traceId }),
+        ...(input.requestId === undefined ? {} : { requestId: input.requestId })
+      })
+    };
+    const oldestAcceptedIncidentTimestamp = verificationStartedAt.getTime() - (maxAgeMinutes * 60_000);
+    let incidentId: string | undefined;
+    let exitCode = 0;
+    let activeStep: VerifyCheck["name"] = "app-event-visibility";
+    const errors: string[] = [];
+
+    try {
+      for (let attempt = 1; attempt <= pollAttempts; attempt += 1) {
+        const result = await listIncidents({
+          bearerToken: authState.bearer_token,
+          projectId: input.projectId,
+          environment,
+          ...(input.service === undefined ? {} : { service: input.service }),
+          limit: 5
+        });
+
+        const recentIncidents = result.incidents.filter((candidate) => {
+          const lastSeenAt = new Date(candidate.last_seen_at);
+          return !Number.isNaN(lastSeenAt.getTime()) && lastSeenAt.getTime() >= oldestAcceptedIncidentTimestamp;
+        });
+
+        for (const candidate of recentIncidents) {
+          const lastSeenAt = new Date(candidate.last_seen_at);
+          if (requestedHints.length === 0 && lastSeenAt.getTime() < verificationStartedAt.getTime()) {
+            continue;
+          }
+
+          if (requestedHints.length === 0) {
+            incidentId = candidate.incident_id;
+            verification.incident_id = candidate.incident_id;
+            break;
+          }
+
+          activeStep = "bundle-status";
+          const bundle = await getBundle({
+            bearerToken: authState.bearer_token,
+            incidentId: candidate.incident_id
+          });
+          verification.bundle_status = "status" in bundle && bundle.status === "pending" ? "pending" : "ready";
+          if (verification.bundle_status !== "ready") {
+            continue;
+          }
+
+          const matchedHints = collectBundleHintMatches(bundle, input);
+          verification.matched_hints = matchedHints;
+          if (requestedHints.every((hint) => matchedHints.includes(hint))) {
+            incidentId = candidate.incident_id;
+            verification.incident_id = candidate.incident_id;
+            verification.suggested_next_command = `debugbundle inspect ${candidate.incident_id} --source cloud`;
+            break;
+          }
+        }
+
+        if (incidentId !== undefined) {
+          break;
+        }
+
+        if (attempt < pollAttempts) {
+          await sleep(pollIntervalMs);
+        }
+      }
+
+      if (incidentId === undefined) {
+        if (requestedHints.length > 0) {
+          throw new Error(`No recent cloud incident matched the requested ${requestedHints.join(" and ")} hints within the ${maxAgeMinutes} minute verification window.`);
+        }
+
+        throw new Error(`No new ${environment} app event was visible within the ${maxAgeMinutes} minute verification window.`);
+      }
+
+      checks.push({
+        name: "app-event-visibility",
+        status: "ok",
+        message: `Observed cloud incident ${incidentId} for the requested app-driven verification window.`
+      });
+
+      if (requestedHints.length > 0) {
+        checks.push({
+          name: "bundle-hint-match",
+          status: "ok",
+          message: `Matched ${verification.matched_hints?.join(" and ")} in bundle ${incidentId}.`
+        });
+      } else {
+        const bundle = await getBundle({
+          bearerToken: authState.bearer_token,
+          incidentId
+        });
+        verification.bundle_status = "status" in bundle && bundle.status === "pending" ? "pending" : "ready";
+        verification.suggested_next_command = `debugbundle inspect ${incidentId} --source cloud`;
+        checks.push({
+          name: "bundle-status",
+          status: verification.bundle_status === "ready" ? "ok" : "warning",
+          message: verification.bundle_status === "ready" ? `Bundle for incident ${incidentId} is ready.` : `Bundle for incident ${incidentId} is still pending.`
+        });
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      checks.push({
+        name: activeStep,
+        status: "error",
+        message
+      });
+      errors.push(message);
+      exitCode = 1;
+    }
+
+    return formatCloudResult(input, exitCode, checks, errors, incidentId, verification);
+  }
 
   if (input.trigger5xx === true || input.trigger4xxStatus !== undefined) {
     const verificationStartedAt = now();

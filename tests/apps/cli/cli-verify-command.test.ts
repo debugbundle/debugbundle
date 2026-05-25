@@ -829,4 +829,101 @@ describe("cli verify cloud command", () => {
       }
     });
   });
+
+  it("waits for a real app event and matches bundle correlation hints", async () => {
+    const listIncidents = vi.fn().mockResolvedValue({
+      incidents: [
+        {
+          incident_id: "inc_app_event_123",
+          last_seen_at: "2026-03-14T00:10:05.000Z"
+        }
+      ],
+      next_cursor: null
+    });
+    const getBundle = vi.fn().mockResolvedValue({
+      bundle_version: 1,
+      context: {
+        request: {
+          trace_id: "trace-123",
+          request_id: "req-456"
+        }
+      }
+    });
+
+    const result = await verifyCloudCommand(
+      {
+        projectId: "proj_123",
+        service: "checkout-api",
+        environment: "production",
+        expectAppEvent: true,
+        traceId: "trace-123",
+        requestId: "req-456",
+        json: true
+      },
+      {
+        now: () => new Date("2026-03-14T00:10:00.000Z"),
+        readAuthState: vi.fn().mockResolvedValue({
+          bearer_token: "dbundle_mem_secret_token",
+          base_url: "https://api.debugbundle.com"
+        }),
+        listIncidents,
+        getBundle,
+        sleep: vi.fn().mockResolvedValue(undefined),
+        pollAttempts: 1
+      }
+    );
+
+    expect(result.exitCode).toBe(0);
+    expect(listIncidents).toHaveBeenCalledWith({
+      bearerToken: "dbundle_mem_secret_token",
+      projectId: "proj_123",
+      environment: "production",
+      service: "checkout-api",
+      limit: 5
+    });
+    expect(getBundle).toHaveBeenCalledWith({
+      bearerToken: "dbundle_mem_secret_token",
+      incidentId: "inc_app_event_123"
+    });
+    expect(JSON.parse(result.output)).toEqual({
+      status: "healthy",
+      checks: [
+        {
+          name: "auth-state",
+          status: "ok",
+          message: "Found valid auth state."
+        },
+        {
+          name: "app-event-visibility",
+          status: "ok",
+          message: "Observed cloud incident inc_app_event_123 for the requested app-driven verification window."
+        },
+        {
+          name: "bundle-hint-match",
+          status: "ok",
+          message: "Matched trace_id and request_id in bundle inc_app_event_123."
+        }
+      ],
+      warnings: [],
+      errors: [],
+      suggested_actions: [
+        "Run debugbundle inspect inc_app_event_123 --source cloud to inspect the captured app event.",
+        "Re-run debugbundle verify cloud --expect-app-event after instrumentation or deploy changes, using the same service, environment, and correlation hints when available."
+      ],
+      auto_fix_available: false,
+      verification: {
+        mode: "app_event",
+        incident_id: "inc_app_event_123",
+        bundle_status: "ready",
+        correlation_hints: {
+          service: "checkout-api",
+          environment: "production",
+          trace_id: "trace-123",
+          request_id: "req-456"
+        },
+        matched_hints: ["trace_id", "request_id"],
+        suggested_next_command: "debugbundle inspect inc_app_event_123 --source cloud"
+      }
+    });
+  });
 });

@@ -1054,6 +1054,8 @@ For V1, full relay parity applies to the shipped server SDK and integration surf
 | WordPress plugin | WordPress REST route that composes the PHP relay behavior and adds WordPress-appropriate persistent rate limiting/spool handling |
 | Java SDK | Spring Boot relay route plus servlet relay servlet for supported `jakarta.servlet` and `javax.servlet` app-server adapters |
 
+When a runtime or integration is added to the shipped relay-capable surface list above, the core product follow-through is mandatory in the same change: update `debugbundle setup` service discovery and relay-guidance coverage, update the relevant CLI/public docs and interface contracts, and add focused CLI regression coverage proving the new surface is detected and receives exact relay guidance or deterministic scaffolding.
+
 Future server SDKs must implement the same full relay handler contract before they are marked relay-handler compatible:
 
 | SDK | Relay adapters |
