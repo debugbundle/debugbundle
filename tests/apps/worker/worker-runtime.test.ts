@@ -48,7 +48,9 @@ const {
   createPostgresOperationalEmailDeliveryStoreMock,
   createPostgresSlackDestinationStoreMock,
   createPostgresWeeklyReportDeliveryStoreMock,
-  createPostgresWeeklyReportChannelStoreMock
+  createPostgresWeeklyReportChannelStoreMock,
+  registerWorkerDogfoodingMock,
+  captureWorkerDogfoodingStepFailureMock
 } = vi.hoisted(() => ({
   emailTransportSendMock: vi.fn().mockResolvedValue(undefined),
   poolQueryMock: vi.fn(),
@@ -151,7 +153,14 @@ const {
     createWeeklyReportChannelForOrganization: vi.fn().mockResolvedValue(null),
     updateWeeklyReportChannelForOrganization: vi.fn().mockResolvedValue(null),
     deleteWeeklyReportChannelForOrganization: vi.fn().mockResolvedValue(null)
-  })
+  }),
+  registerWorkerDogfoodingMock: vi.fn().mockReturnValue(null),
+  captureWorkerDogfoodingStepFailureMock: vi.fn()
+}));
+
+vi.mock("../../../apps/worker/src/dogfooding.js", () => ({
+  registerWorkerDogfooding: registerWorkerDogfoodingMock,
+  captureWorkerDogfoodingStepFailure: captureWorkerDogfoodingStepFailureMock
 }));
 
 vi.mock("../../../packages/email/src/index.js", async (importOriginal) => {
@@ -406,6 +415,9 @@ describe("worker runtime", () => {
     createPostgresSlackDestinationStoreMock.mockClear();
     createPostgresWeeklyReportDeliveryStoreMock.mockClear();
     createPostgresWeeklyReportChannelStoreMock.mockClear();
+    registerWorkerDogfoodingMock.mockReset();
+    registerWorkerDogfoodingMock.mockReturnValue(null);
+    captureWorkerDogfoodingStepFailureMock.mockReset();
     redisPingMock.mockReset();
     redisPingMock.mockResolvedValue("PONG");
     redisQuitMock.mockClear();
@@ -421,6 +433,12 @@ describe("worker runtime", () => {
     expect(env.DB_SSL_MODE).toBe("disable");
     expect(env.WORKER_POLL_INTERVAL_MS).toBe(1000);
     expect(env.RETENTION_CLEANUP_INTERVAL_MS).toBe(6 * 60 * 60 * 1000);
+  });
+
+  it("registers worker dogfooding during startup", async (): Promise<void> => {
+    await runWorkerFromEnv({ WORKER_RUN_ONCE: "1" });
+
+    expect(registerWorkerDogfoodingMock).toHaveBeenCalledWith({ WORKER_RUN_ONCE: "1" });
   });
 
   it("should parse require DB SSL mode", (): void => {
@@ -1075,6 +1093,29 @@ describe("worker runtime", () => {
     });
     expect(processNextDeliverWebhookJobMock).toHaveBeenCalledOnce();
     expect(processNextGenerateWeeklyReportJobMock).toHaveBeenCalledOnce();
+
+    vi.useRealTimers();
+  });
+
+  it("should continue alert digest delivery when weekly scheduling fails", async (): Promise<void> => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-03-16T12:00:00.000Z"));
+    createPostgresWeeklyReportChannelStoreMock.mockReturnValueOnce({
+      listEnabledWeeklyReportChannels: vi.fn().mockRejectedValue(new Error("weekly_conflict")),
+      getWeeklyReportChannelById: vi.fn().mockResolvedValue(null),
+      listWeeklyReportChannelsForOrganization: vi.fn().mockResolvedValue([]),
+      createWeeklyReportChannelForOrganization: vi.fn().mockResolvedValue(null),
+      updateWeeklyReportChannelForOrganization: vi.fn().mockResolvedValue(null),
+      deleteWeeklyReportChannelForOrganization: vi.fn().mockResolvedValue(null)
+    });
+
+    await runWorkerFromEnv({ WORKER_RUN_ONCE: "1" });
+
+    expect(processNextDeliverAlertEmailDigestJobMock).toHaveBeenCalledOnce();
+    expect(captureWorkerDogfoodingStepFailureMock).toHaveBeenCalledWith(
+      "schedule-weekly-reports",
+      expect.any(Error)
+    );
 
     vi.useRealTimers();
   });

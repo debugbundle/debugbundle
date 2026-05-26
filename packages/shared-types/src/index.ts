@@ -171,6 +171,23 @@ const DeviceInfoSchema = z
   })
   .strict();
 
+const BrowserExceptionEventSchema = z
+  .object({
+    kind: z.enum(["window_error", "resource_error"]),
+    message: z.string().nullable(),
+    file_name: z.string().nullable(),
+    line_number: z.number().int().nonnegative().nullable(),
+    column_number: z.number().int().nonnegative().nullable(),
+    target: z
+      .object({
+        tag_name: z.string().nullable(),
+        source_url: z.string().nullable()
+      })
+      .nullable(),
+    opaque: z.boolean()
+  })
+  .strict();
+
 const FrontendExceptionPayloadSchema = z
   .object({
     name: z.string().min(1),
@@ -183,6 +200,7 @@ const FrontendExceptionPayloadSchema = z
     }),
     breadcrumbs: z.array(FrontendExceptionBreadcrumbSchema).optional(),
     device: DeviceInfoSchema.nullable().optional(),
+    browser_event: BrowserExceptionEventSchema.optional(),
     dom_context: z
       .object({
         mode: z.literal("lightweight"),

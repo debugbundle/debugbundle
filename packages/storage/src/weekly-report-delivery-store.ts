@@ -29,6 +29,7 @@ export function createPostgresWeeklyReportDeliveryStore(db: Queryable): WeeklyRe
             )
             VALUES ($1, $2, $3, $4::timestamptz, $5::timestamptz, $6, 'pending', NULL, NULL, now(), now())
             ON CONFLICT (weekly_report_channel_id, window_start, window_end)
+            WHERE weekly_report_channel_id IS NOT NULL
             DO UPDATE
             SET
               status = 'pending',

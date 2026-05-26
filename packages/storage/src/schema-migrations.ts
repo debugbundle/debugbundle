@@ -449,6 +449,34 @@ export const STORAGE_SCHEMA_MIGRATIONS = [
     statements: [
       "ALTER TABLE project_tokens ADD COLUMN IF NOT EXISTS allowed_origins jsonb NOT NULL DEFAULT '[]'::jsonb"
     ]
+  }),
+  defineStorageSchemaMigration({
+    id: "202605260001_fix_weekly_report_delivery_conflict_index",
+    description: "Ensure weekly report delivery dedupe rows and partial unique index exist for conflict claims.",
+    statements: [
+      `
+        DELETE FROM weekly_report_deliveries
+        WHERE id IN (
+          SELECT id
+          FROM (
+            SELECT
+              id,
+              row_number() OVER (
+                PARTITION BY weekly_report_channel_id, window_start, window_end
+                ORDER BY created_at ASC, id ASC
+              ) AS row_number
+            FROM weekly_report_deliveries
+            WHERE weekly_report_channel_id IS NOT NULL
+          ) ranked
+          WHERE ranked.row_number > 1
+        )
+      `,
+      `
+        CREATE UNIQUE INDEX IF NOT EXISTS weekly_report_deliveries_channel_window_idx
+        ON weekly_report_deliveries (weekly_report_channel_id, window_start, window_end)
+        WHERE weekly_report_channel_id IS NOT NULL
+      `
+    ]
   })
 ] as const;
 

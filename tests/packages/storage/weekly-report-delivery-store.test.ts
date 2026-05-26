@@ -32,6 +32,9 @@ describe("weekly report delivery store", () => {
 
     expect(created).toEqual({ delivery_id: "weekly_123", created: true });
     expect(alreadyDelivered).toEqual({ delivery_id: "weekly_123", created: false });
+    expect(String(query.mock.calls[0]?.[0] ?? "")).toMatch(
+      /ON CONFLICT \(weekly_report_channel_id, window_start, window_end\)\s+WHERE weekly_report_channel_id IS NOT NULL/
+    );
   });
 
   it("marks weekly report deliveries delivered or failed", async (): Promise<void> => {

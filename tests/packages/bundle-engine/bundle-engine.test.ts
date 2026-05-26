@@ -449,6 +449,99 @@ describe("bundle-engine", () => {
     expect(bundle.context.device?.browser.name).toBe("Chrome");
   });
 
+  it("should describe opaque browser window errors without using the SDK fallback frame as app code", (): void => {
+    const bundle = buildBundle({
+      job: {
+        trigger: "occurrence_threshold"
+      },
+      incident: {
+        incident_id: "inc_opaque_browser_error",
+        project_id: "proj_opaque_browser_error",
+        service_id: "svc_opaque_browser_error",
+        service_name: "browser-app",
+        service_runtime: "browser",
+        service_framework: null,
+        environment: "production",
+        fingerprint: "fp_opaque_browser_error",
+        title: "frontend_exception",
+        severity: "high",
+        first_seen_at: "2026-05-25T18:23:44.380Z",
+        last_seen_at: "2026-05-25T18:34:04.235Z",
+        occurrence_count: 4,
+        source_event_types: ["frontend_exception"]
+      },
+      bundleMetadata: {
+        generation_number: 2,
+        created_at: "2026-05-25T18:34:14.859Z",
+        updated_at: "2026-05-25T18:34:14.859Z",
+        source_event_id: "00000000-0000-4000-8000-000000000601",
+        source_occurred_at: "2026-05-25T18:34:04.235Z"
+      },
+      sourceEnvelopes: [
+        createEventEnvelope({
+          event_id: "00000000-0000-4000-8000-000000000601",
+          event_type: "frontend_exception",
+          occurred_at: "2026-05-25T18:34:04.235Z",
+          service: {
+            name: "browser-app",
+            environment: "production",
+            runtime: "browser",
+            framework: null
+          },
+          payload: {
+            name: "Error",
+            message: "Window error",
+            stack:
+              "Error: Window error\n" +
+              "    at onError (https://app.example/debugbundle-browser-sdk.js:6208:81)",
+            route: "/collaborate/index.xhtml",
+            browser: {
+              name: "Chrome",
+              version: "147.0.0.0"
+            },
+            browser_event: {
+              kind: "window_error",
+              message: null,
+              file_name: "https://app.example/assets/app.js",
+              line_number: 12,
+              column_number: 4,
+              target: null,
+              opaque: true
+            }
+          }
+        })
+      ],
+      probeDataItems: []
+    });
+
+    expect(bundle.summary.first_application_frame).toBeNull();
+    expect(bundle.summary.likely_cause).toBe(
+      "The browser reported an opaque window error without a usable application stack."
+    );
+    expect(bundle.summary.recommended_action).toBe(
+      "Inspect browser console output, resource loading, cross-origin script settings, and framework-level error boundaries for the affected route."
+    );
+    expect(bundle.context.frontend?.exceptions[0]).toEqual({
+      name: "Error",
+      message: "Window error",
+      route: "/collaborate/index.xhtml",
+      browser: {
+        name: "Chrome",
+        version: "147.0.0.0"
+      },
+      ts: "2026-05-25T18:34:04.235Z",
+      browser_event: {
+        kind: "window_error",
+        message: null,
+        file_name: "https://app.example/assets/app.js",
+        line_number: 12,
+        column_number: 4,
+        target: null,
+        opaque: true
+      }
+    });
+  });
+
   it("should enrich backend exception bundles with agent-ready context from existing fields", (): void => {
     const bundle = buildBundle({
       job: {

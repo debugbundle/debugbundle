@@ -46,6 +46,7 @@ type BundleRequestContext = Exclude<BundleV1["context"]["request"], null | undef
 type BundleResponseContext = Exclude<BundleV1["context"]["response"], null | undefined>;
 type BundleDependenciesContext = Exclude<BundleV1["context"]["dependencies"], null | undefined>;
 type BundleRuntimeMemory = NonNullable<Exclude<BundleV1["context"]["runtime"], null | undefined>["memory"]>;
+type BrowserExceptionEventContext = NonNullable<FrontendExceptionEnvelope["payload"]["browser_event"]>;
 type BackendRuntimePayload = BackendExceptionEnvelope["payload"]["runtime"] & {
   platform?: string | null;
   arch?: string | null;
@@ -216,9 +217,17 @@ function normalizeRouteTemplate(path: string | null): string | null {
   return normalizedSegments.length === 0 ? "/" : `/${normalizedSegments.join("/")}`;
 }
 
+function isBrowserSdkFallbackFrame(frame: string): boolean {
+  return frame.includes("debugbundle-browser-sdk") && frame.includes("onError");
+}
+
 function deriveFirstApplicationFrame(errorContext: BundleErrorContext | null): BundleV1["summary"]["first_application_frame"] {
   const firstFrame = errorContext?.top_frames[0];
   if (firstFrame === undefined) {
+    return null;
+  }
+
+  if (isBrowserSdkFallbackFrame(firstFrame)) {
     return null;
   }
 
@@ -244,6 +253,30 @@ function deriveFirstApplicationFrame(errorContext: BundleErrorContext | null): B
     file: match[1] ?? null,
     line: Number(match[2])
   };
+}
+
+function getPrimaryBrowserExceptionEvent(
+  envelopes: EventEnvelope[],
+  primarySignalEnvelope: EventEnvelope | null
+): BrowserExceptionEventContext | null {
+  if (primarySignalEnvelope !== null && isFrontendExceptionEnvelope(primarySignalEnvelope)) {
+    return primarySignalEnvelope.payload.browser_event ?? null;
+  }
+
+  const envelope = selectLatestEnvelopeByType(envelopes, isFrontendExceptionEnvelope);
+  return envelope?.payload.browser_event ?? null;
+}
+
+function isOpaqueBrowserError(
+  errorContext: BundleErrorContext | null,
+  browserEvent: BrowserExceptionEventContext | null
+): boolean {
+  if (browserEvent?.opaque === true) {
+    return true;
+  }
+
+  const firstFrame = errorContext?.top_frames[0];
+  return errorContext?.message === "Window error" && firstFrame !== undefined && isBrowserSdkFallbackFrame(firstFrame);
 }
 
 function buildErrorContext(
@@ -402,12 +435,32 @@ function buildSummaryGuidance(input: {
   responseContext: BundleResponseContext | null;
   dependenciesContext: BundleDependenciesContext | null;
   firstApplicationFrame: BundleV1["summary"]["first_application_frame"];
+  browserEvent: BrowserExceptionEventContext | null;
+  opaqueBrowserError: boolean;
 }): Pick<BundleV1["summary"], "likely_cause" | "confidence" | "recommended_action"> {
   if (input.errorContext === null) {
     return {
       likely_cause: null,
       confidence: 0,
       recommended_action: null
+    };
+  }
+
+  if (input.opaqueBrowserError) {
+    if (input.browserEvent?.kind === "resource_error") {
+      return {
+        likely_cause: "The browser reported a resource load error without a usable application stack.",
+        confidence: 0.35,
+        recommended_action:
+          "Inspect the captured resource target, browser network failures, CSP rules, and cross-origin asset configuration."
+      };
+    }
+
+    return {
+      likely_cause: "The browser reported an opaque window error without a usable application stack.",
+      confidence: 0.35,
+      recommended_action:
+        "Inspect browser console output, resource loading, cross-origin script settings, and framework-level error boundaries for the affected route."
     };
   }
 
@@ -653,7 +706,8 @@ function buildFrontendContext(envelopes: EventEnvelope[]): BundleV1["context"]["
         message: envelope.payload.message,
         route: envelope.payload.route ?? null,
         browser: envelope.payload.browser,
-        ts: toIsoTimestamp(envelope.occurred_at)
+        ts: toIsoTimestamp(envelope.occurred_at),
+        ...(envelope.payload.browser_event !== undefined ? { browser_event: envelope.payload.browser_event } : {})
       });
     }
   }
@@ -828,6 +882,8 @@ export function buildBundle(input: BuildBundleInput): BundleV1 {
   const gitContext = buildGitContext(sourceEnvelopes, input.configuredDeploy);
   const deviceContext = buildDeviceContext(sourceEnvelopes);
   const dependenciesContext = buildDependenciesContext(input.incident, errorContext, requestContext);
+  const browserEvent = getPrimaryBrowserExceptionEvent(sourceEnvelopes, primarySignalEnvelope);
+  const opaqueBrowserError = isOpaqueBrowserError(errorContext, browserEvent);
   const primarySignalType =
     primarySignalEnvelope !== null
       ? mapSignalType(primarySignalEnvelope.event_type)
@@ -854,7 +910,9 @@ export function buildBundle(input: BuildBundleInput): BundleV1 {
     requestContext,
     responseContext,
     dependenciesContext,
-    firstApplicationFrame
+    firstApplicationFrame,
+    browserEvent,
+    opaqueBrowserError
   });
 
   const candidate = {

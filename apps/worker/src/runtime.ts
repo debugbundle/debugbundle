@@ -74,6 +74,7 @@ import {
   type ProcessedEventStore,
   type WeeklyReportTransport
 } from "./processor.js";
+import { captureWorkerDogfoodingStepFailure, registerWorkerDogfooding } from "./dogfooding.js";
 
 const RETENTION_CLEANUP_LEASE_KEY = "leases:cleanup-retention:schedule";
 
@@ -1462,6 +1463,7 @@ async function runWorkerStep(
     return true;
   } catch (error) {
     logger.error({ error_message: getErrorMessage(error, "unknown_worker_step_error"), job_name: jobName }, "worker_step_failed");
+    captureWorkerDogfoodingStepFailure(jobName, error);
     return false;
   }
 }
@@ -1475,6 +1477,7 @@ async function runWorkerProcessStep<Result extends { processed: boolean; reason?
     return await work();
   } catch (error) {
     logger.error({ error_message: getErrorMessage(error, "unknown_worker_step_error"), job_name: jobName }, "worker_step_failed");
+    captureWorkerDogfoodingStepFailure(jobName, error);
     return {
       processed: false,
       reason: "step_error"
@@ -1484,6 +1487,7 @@ async function runWorkerProcessStep<Result extends { processed: boolean; reason?
 
 export async function runWorkerFromEnv(envInput: Record<string, string | undefined>): Promise<void> {
   const env = parseWorkerEnv(envInput);
+  registerWorkerDogfooding(envInput);
   const logger = createRuntimeLoggerFromEnv({
     app: "worker",
     defaultService: "debugbundle-worker",
@@ -1725,28 +1729,28 @@ export async function runWorkerFromEnv(envInput: Record<string, string | undefin
               );
 
               if (!evaluateAlertsResult.processed) {
-                const alertDigestSchedulingOk = await runWorkerStep(logger, "schedule-alert-email-digests", async () => {
+                await runWorkerStep(logger, "schedule-alert-email-digests", async () => {
                   await scheduleDueAlertEmailDigests({
                     queue,
                     alertStore: alertDeliveryStore,
                     batchSize: env.WEBHOOK_DELIVERY_SCHEDULER_BATCH_SIZE
                   });
                 });
-                const webhookSchedulingOk = await runWorkerStep(logger, "schedule-webhook-deliveries", async () => {
+                await runWorkerStep(logger, "schedule-webhook-deliveries", async () => {
                   await scheduleDueWebhookDeliveries({
                     queue,
                     webhookDeliveryStore,
                     batchSize: env.WEBHOOK_DELIVERY_SCHEDULER_BATCH_SIZE
                   });
                 });
-                const githubSchedulingOk = await runWorkerStep(logger, "schedule-github-dispatches", async () => {
+                await runWorkerStep(logger, "schedule-github-dispatches", async () => {
                   await scheduleDueGitHubDispatches({
                     queue,
                     githubStore,
                     batchSize: env.WEBHOOK_DELIVERY_SCHEDULER_BATCH_SIZE
                   });
                 });
-                const weeklySchedulingOk = await runWorkerStep(logger, "schedule-weekly-reports", async () => {
+                await runWorkerStep(logger, "schedule-weekly-reports", async () => {
                   await scheduleWeeklyReports({
                     queue,
                     weeklyReportingStore: incidentStore,
@@ -1755,97 +1759,89 @@ export async function runWorkerFromEnv(envInput: Record<string, string | undefin
                     batchSize: env.WEEKLY_REPORT_SCHEDULER_BATCH_SIZE
                   });
                 });
-                const retentionSchedulingOk = await runWorkerStep(logger, "schedule-retention-cleanup", async () => {
+                await runWorkerStep(logger, "schedule-retention-cleanup", async () => {
                   await scheduleRetentionCleanup({
                     queue,
                     intervalMs: env.RETENTION_CLEANUP_INTERVAL_MS
                   });
                 });
 
-                if (
-                  alertDigestSchedulingOk &&
-                  webhookSchedulingOk &&
-                  githubSchedulingOk &&
-                  weeklySchedulingOk &&
-                  retentionSchedulingOk
-                ) {
-                  await runWorkerStep(logger, "deliver-alert-email-digest", async () => {
-                    await processNextDeliverAlertEmailDigestJob({
-                      queue,
-                      alertStore: alertDeliveryStore,
-                      alertEmailDigestTransport
+                await runWorkerStep(logger, "deliver-alert-email-digest", async () => {
+                  await processNextDeliverAlertEmailDigestJob({
+                    queue,
+                    alertStore: alertDeliveryStore,
+                    alertEmailDigestTransport
+                  });
+                });
+
+                if (emailTransport !== null) {
+                  await runWorkerStep(logger, "deliver-operational-email", async () => {
+                    await processNextDeliverOperationalEmailJob({
+                      logger,
+                      appBaseUrl,
+                      operationalEmailDeliveryStore,
+                      emailTransport
                     });
                   });
+                }
 
-                  if (emailTransport !== null) {
-                    await runWorkerStep(logger, "deliver-operational-email", async () => {
-                      await processNextDeliverOperationalEmailJob({
-                        logger,
-                        appBaseUrl,
-                        operationalEmailDeliveryStore,
-                        emailTransport
-                      });
-                    });
-                  }
-
-                  await runWorkerStep(logger, "deliver-webhook", async () => {
-                    await processNextDeliverWebhookJob({
-                      queue,
-                      logger,
-                      webhookDeliveryStore,
-                      lifecycleWebhookTransport,
-                      async onWebhookDisabled({ webhook_id, target_url }) {
-                        try {
-                          const webhook = await getWebhookOwnerNotificationRecipient(queryable, webhook_id);
-                          if (webhook === null) {
-                            return;
-                          }
-                          await operationalEmailDeliveryStore.queueProjectOperationalEmailDelivery({
-                            project_id: webhook.projectId,
-                            kind: "webhook_auto_disabled",
-                            dedupe_key: `webhook_auto_disabled:${webhook_id}:${new Date().toISOString().slice(0, 10)}`,
-                            payload: {
-                              webhook_id,
-                              target_url
-                            }
-                          });
-                        } catch {
-                          // Notification enqueue failure must not block delivery processing.
+                await runWorkerStep(logger, "deliver-webhook", async () => {
+                  await processNextDeliverWebhookJob({
+                    queue,
+                    logger,
+                    webhookDeliveryStore,
+                    lifecycleWebhookTransport,
+                    async onWebhookDisabled({ webhook_id, target_url }) {
+                      try {
+                        const webhook = await getWebhookOwnerNotificationRecipient(queryable, webhook_id);
+                        if (webhook === null) {
+                          return;
                         }
+                        await operationalEmailDeliveryStore.queueProjectOperationalEmailDelivery({
+                          project_id: webhook.projectId,
+                          kind: "webhook_auto_disabled",
+                          dedupe_key: `webhook_auto_disabled:${webhook_id}:${new Date().toISOString().slice(0, 10)}`,
+                          payload: {
+                            webhook_id,
+                            target_url
+                          }
+                        });
+                      } catch {
+                        // Notification enqueue failure must not block delivery processing.
                       }
-                    });
+                    }
                   });
+                });
 
-                  if (githubDispatchTransport !== null) {
-                    await runWorkerStep(logger, "deliver-github-dispatch", async () => {
-                      await processNextDeliverGitHubDispatchJob({
-                        queue,
-                        logger,
-                        githubStore,
-                        githubDispatchTransport
-                      });
-                    });
-                  }
-
-                  const weeklyReportResult = await runWorkerProcessStep(logger, "generate-weekly-report", async () =>
-                    processNextGenerateWeeklyReportJob({
+                if (githubDispatchTransport !== null) {
+                  await runWorkerStep(logger, "deliver-github-dispatch", async () => {
+                    await processNextDeliverGitHubDispatchJob({
                       queue,
                       logger,
-                      weeklyReportingStore: incidentStore,
-                      weeklyReportChannelStore,
-                      weeklyReportDeliveryStore,
-                      weeklyReportTransport
-                    })
-                  );
-
-                  if (!weeklyReportResult.processed) {
-                    await runWorkerStep(logger, "cleanup-retention", async () => {
-                      await processNextCleanupRetentionJob({
-                        queue,
-                        retentionCleanupRunner
-                      });
+                      githubStore,
+                      githubDispatchTransport
                     });
-                  }
+                  });
+                }
+
+                const weeklyReportResult = await runWorkerProcessStep(logger, "generate-weekly-report", async () =>
+                  processNextGenerateWeeklyReportJob({
+                    queue,
+                    logger,
+                    weeklyReportingStore: incidentStore,
+                    weeklyReportChannelStore,
+                    weeklyReportDeliveryStore,
+                    weeklyReportTransport
+                  })
+                );
+
+                if (!weeklyReportResult.processed) {
+                  await runWorkerStep(logger, "cleanup-retention", async () => {
+                    await processNextCleanupRetentionJob({
+                      queue,
+                      retentionCleanupRunner
+                    });
+                  });
                 }
               }
             }

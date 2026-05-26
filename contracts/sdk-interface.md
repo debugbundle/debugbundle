@@ -106,6 +106,8 @@ fetch("/v1/auth/session", {
 
 When present, the browser SDK must copy this metadata into the captured `network_request` breadcrumb payload and must not forward the `debugbundle` field to the actual HTTP request.
 
+Browser `window` `error` captures must preserve browser-native event metadata when available. If the browser does not expose a usable `Error` object, the SDK may synthesize a fallback error message, but it must also attach `payload.browser_event` with `kind`, `message`, `file_name`, `line_number`, `column_number`, `target`, and `opaque` fields so bundles can explain the signal without attributing it to the SDK listener frame. Resource-load errors should use `kind: "resource_error"` and include `target.source_url` when the browser exposes a failing script, stylesheet, image, or similar target.
+
 ---
 
 ## 2. Universal SDK Interface

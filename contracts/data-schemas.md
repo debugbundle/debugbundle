@@ -592,6 +592,18 @@ Note: `data` fields shown above are for `network_request` breadcrumbs. Other bre
   "stack": "string",
   "route": "string",
   "browser": { "name": "string", "version": "string" },
+  "browser_event": {
+    "kind": "window_error | resource_error",
+    "message": "string | null",
+    "file_name": "string | null",
+    "line_number": "number | null",
+    "column_number": "number | null",
+    "target": {
+      "tag_name": "string | null",
+      "source_url": "string | null"
+    },
+    "opaque": true
+  },
   "device": {
     "user_agent": "string | null",
     "os": { "name": "string | null", "version": "string | null" },
@@ -607,6 +619,8 @@ Note: `data` fields shown above are for `network_request` breadcrumbs. Other bre
   "dom_context": { "mode": "lightweight", "html_excerpt": "string" }
 }
 ```
+
+`browser_event` is present when the Browser SDK captured the exception through a browser-native global hook such as `window` `error`. When `opaque` is `true`, the browser did not provide a usable JavaScript `Error` object; inspect `file_name`, `line_number`, `column_number`, or `target.source_url` for the best available source clue.
 
 ### 3.6 `deploy_metadata`
 ```json
