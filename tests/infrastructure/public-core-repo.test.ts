@@ -94,7 +94,7 @@ describe('public core repository export', () => {
 
     expect(packageJson.private).toBe(true);
     expect(packageJson.license).toBe('AGPL-3.0-only');
-    expect(packageJson.packageManager).toBe('pnpm@10.32.1');
+    expect(packageJson.packageManager).toBe('pnpm@11.3.0');
     expect(packageJson.repository?.url).toBe('git+https://github.com/debugbundle/debugbundle.git');
     expect(packageJson.bugs?.url).toBe('https://github.com/debugbundle/debugbundle/issues');
     expect(packageJson.homepage).toBe('https://github.com/debugbundle/debugbundle#readme');
@@ -141,6 +141,16 @@ describe('public core repository export', () => {
       {
         path: 'sdks/debugbundle-java',
         cloneUrl: 'https://github.com/debugbundle/debugbundle-java.git',
+        branch: 'main',
+      },
+      {
+        path: 'sdks/debugbundle-go',
+        cloneUrl: 'https://github.com/debugbundle/debugbundle-go.git',
+        branch: 'main',
+      },
+      {
+        path: 'sdks/debugbundle-ruby',
+        cloneUrl: 'https://github.com/debugbundle/debugbundle-ruby.git',
         branch: 'main',
       },
     ]);

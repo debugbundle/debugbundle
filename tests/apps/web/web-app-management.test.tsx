@@ -209,6 +209,36 @@ describe("web app — management routes", () => {
         });
       }
 
+      if (url.endsWith("/v1/github/installation?project_id=proj_123")) {
+        return jsonResponse(200, {
+          installation: createGitHubInstallation()
+        });
+      }
+
+      if (url.endsWith("/v1/projects/proj_123/github/repo")) {
+        return jsonResponse(200, {
+          repo: createProjectGitHubRepo({
+            repo_owner: "debugbundle",
+            repo_name: "app"
+          })
+        });
+      }
+
+      if (url.endsWith("/v1/projects/proj_123/github/rules")) {
+        return jsonResponse(200, {
+          rules: [
+            createGitHubDispatchRule({
+              rule_id: "ghr_enabled",
+              enabled: true
+            }),
+            createGitHubDispatchRule({
+              rule_id: "ghr_disabled",
+              enabled: false
+            })
+          ]
+        });
+      }
+
       return jsonResponse(404, { error: "not_found" });
     });
 
@@ -219,34 +249,33 @@ describe("web app — management routes", () => {
     expect(await screen.findByText(/setup at a glance/i)).toBeInTheDocument();
     expect(await screen.findByText(/^2 rules$/i)).toBeInTheDocument();
     expect(screen.getByText(/^2 endpoints$/i)).toBeInTheDocument();
-    expect(screen.getByText(/^available$/i)).toBeInTheDocument();
-    expect(screen.getByText(/^github tab$/i)).toBeInTheDocument();
+    expect(screen.getByText(/^connected$/i)).toBeInTheDocument();
     expect(screen.getByText(/^balanced preset$/i)).toBeInTheDocument();
-    expect(screen.getAllByText(/^1 enabled$/i)).toHaveLength(2);
+    expect(screen.getAllByText(/^1 enabled$/i)).toHaveLength(3);
     expect(screen.getByText(/^2 recipients$/i)).toBeInTheDocument();
     expect(screen.getByText(/^2 client 4xx$/i)).toBeInTheDocument();
     expect(screen.getByText(/^3 event types subscribed across endpoints\.$/i)).toBeInTheDocument();
-    expect(screen.getByText(/^repository connection and dispatch rules are managed from this project's github tab\.$/i)).toBeInTheDocument();
+    expect(screen.getByText(/^2 dispatch rules configured for debugbundle\/app\.$/i)).toBeInTheDocument();
     expect(screen.getByText(/^monday at 09:00 utc$/i)).toBeInTheDocument();
     expect(screen.getByText(/^warning logs, failed requests, exception breadcrumb trails$/i)).toBeInTheDocument();
     expect(screen.getByText(/^hosted improvement detection uses the shared retained bundle allowance\.$/i)).toBeInTheDocument();
     expect(screen.getByText(/^verbose sensitivity$/i)).toBeInTheDocument();
-    expect(fetchMock.mock.calls.some(([input]) => requestUrl(input).includes("/github/"))).toBe(false);
+    expect(fetchMock.mock.calls.some(([input]) => requestUrl(input).includes("/github/"))).toBe(true);
   });
 
-  it("does not probe optional github endpoints from the overview route", async () => {
+  it("keeps github automation unavailable on free projects without probing github endpoints", async () => {
     const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
       const url = requestUrl(input);
 
       if (url.endsWith("/v1/auth/session")) {
         return jsonResponse(200, {
-          session: createSession({ organization_plan: "team" })
+          session: createSession({ organization_plan: "free" })
         });
       }
 
       if (url.endsWith("/v1/projects") && init?.method === undefined) {
         return jsonResponse(200, {
-          projects: [createProject({ organization_plan: "team" })]
+          projects: [createProject({ organization_plan: "free" })]
         });
       }
 
@@ -302,9 +331,8 @@ describe("web app — management routes", () => {
     render(<App initialEntries={["/projects/proj_123"]} />);
 
     expect(await screen.findByText(/setup at a glance/i)).toBeInTheDocument();
-    expect(await screen.findByText(/^available$/i)).toBeInTheDocument();
-    expect(screen.getByText(/^github tab$/i)).toBeInTheDocument();
-    expect(screen.queryByText(/^unavailable$/i)).toBeNull();
+    expect(await screen.findByText(/^solo\+ only$/i)).toBeInTheDocument();
+    expect(screen.getByText(/^unavailable$/i)).toBeInTheDocument();
     expect(
       fetchMock.mock.calls.some(([input]) =>
         requestUrl(input).endsWith("/v1/alerts?project_id=proj_123&limit=100")

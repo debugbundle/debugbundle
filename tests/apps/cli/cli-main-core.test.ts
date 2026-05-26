@@ -247,7 +247,9 @@ describe("cli main core routing", () => {
 
   it("supports version, help, empty argv, and equals-style option parsing", async () => {
     const versionResult = await runCli(["--version"]);
+    const shortVersionResult = await runCli(["-v"]);
     const helpResult = await runCli(["help"]);
+    const shortHelpResult = await runCli(["-h"]);
     const emptyResult = await runCli([]);
     const analyzeCommand = vi.fn().mockResolvedValue({ exitCode: 0, output: "analyze-equals" });
     const equalsResult = await runCli([
@@ -263,9 +265,15 @@ describe("cli main core routing", () => {
       exitCode: 0,
       output: cliPackageJson.version
     });
+    expect(shortVersionResult).toEqual({
+      exitCode: 0,
+      output: cliPackageJson.version
+    });
     expect(helpResult.exitCode).toBe(0);
     expect(helpResult.output).toContain("Usage:");
     expect(helpResult.output).toContain("debugbundle --version");
+    expect(shortHelpResult.exitCode).toBe(0);
+    expect(shortHelpResult.output).toContain("debugbundle -h");
     expect(emptyResult.exitCode).toBe(4);
     expect(emptyResult.output).toContain("No command provided.");
     expect(analyzeCommand).toHaveBeenCalledWith({

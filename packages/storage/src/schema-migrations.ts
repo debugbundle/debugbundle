@@ -488,6 +488,13 @@ export const STORAGE_SCHEMA_MIGRATIONS = [
     ]
   }),
   defineStorageSchemaMigration({
+    id: "202605260001_set_high_confidence_as_project_improvement_default",
+    description: "Make high-confidence the default hosted improvement sensitivity for new projects.",
+    statements: [
+      "ALTER TABLE projects ALTER COLUMN improvement_bundle_sensitivity SET DEFAULT 'high_confidence'"
+    ]
+  }),
+  defineStorageSchemaMigration({
     id: "202605260002_add_capture_rules",
     description: "Add persisted project capture rules for dynamic demote/sample/drop handling.",
     statements: [

@@ -1,13 +1,19 @@
 import { useEffect, useState } from "react";
 
 import {
+  getGitHubInstallation,
   getProjectCapturePolicy,
+  getProjectGitHubRepo,
   getProjectImprovementSettings,
+  listProjectGitHubRules,
   listProjectAlerts,
   listProjectWeeklyReportChannels,
   listProjectWebhooks,
   type AlertRecord,
+  type GitHubDispatchRuleRecord,
+  type GitHubInstallationRecord,
   type ProjectCapturePolicyResponse,
+  type ProjectGitHubRepoRecord,
   type ProjectImprovementSettingsResponse,
   type ProjectRecord,
   type WebhookRecord,
@@ -24,8 +30,16 @@ type SummaryLoadState<T> =
   | { status: "error" };
 
 type GitHubSummaryLoadState =
-  | { status: "available" }
+  | { status: "loading" }
+  | { status: "ready"; data: GitHubOverviewSummary }
+  | { status: "error" }
   | { status: "unsupported" };
+
+interface GitHubOverviewSummary {
+  installation: GitHubInstallationRecord | null;
+  repo: ProjectGitHubRepoRecord | null;
+  rules: GitHubDispatchRuleRecord[];
+}
 
 interface ProjectSetupSummaryState {
   alerts: SummaryLoadState<AlertRecord[]>;
@@ -50,13 +64,17 @@ export function ProjectSetupSummaryGrid({ project }: { project: ProjectRecord })
         webhooksResult,
         capturePolicyResult,
         improvementSettingsResult,
-        weeklyReportsResult
+        weeklyReportsResult,
+        githubResult
       ] = await Promise.allSettled([
         listProjectAlerts(project.project_id, PROJECT_SETUP_SUMMARY_LIST_LIMIT),
         listProjectWebhooks(project.project_id, PROJECT_SETUP_SUMMARY_LIST_LIMIT),
         getProjectCapturePolicy(project.project_id),
         getProjectImprovementSettings(project.project_id),
-        listProjectWeeklyReportChannels(project.project_id, PROJECT_SETUP_SUMMARY_LIST_LIMIT)
+        listProjectWeeklyReportChannels(project.project_id, PROJECT_SETUP_SUMMARY_LIST_LIMIT),
+        project.organization_plan === "free"
+          ? Promise.resolve<GitHubOverviewSummary>({ installation: null, repo: null, rules: [] })
+          : loadGitHubOverviewSummary(project.project_id)
       ]);
 
       if (!isActive) {
@@ -69,7 +87,7 @@ export function ProjectSetupSummaryGrid({ project }: { project: ProjectRecord })
         capturePolicy: toSummaryLoadState(capturePolicyResult),
         improvementSettings: toSummaryLoadState(improvementSettingsResult),
         weeklyReports: toSummaryLoadState(weeklyReportsResult),
-        github: project.organization_plan === "free" ? { status: "unsupported" } : { status: "available" }
+        github: project.organization_plan === "free" ? { status: "unsupported" } : toSummaryLoadState(githubResult)
       });
     })();
 
@@ -100,10 +118,33 @@ function buildLoadingProjectSetupSummary(
   return {
     alerts: { status: "loading" },
     webhooks: { status: "loading" },
-    github: organizationPlan === "free" ? { status: "unsupported" } : { status: "available" },
+    github: organizationPlan === "free" ? { status: "unsupported" } : { status: "loading" },
     weeklyReports: { status: "loading" },
     capturePolicy: { status: "loading" },
     improvementSettings: { status: "loading" }
+  };
+}
+
+async function loadGitHubOverviewSummary(projectId: string): Promise<GitHubOverviewSummary> {
+  const installation = await getGitHubInstallation(projectId);
+
+  if (installation === null) {
+    return {
+      installation: null,
+      repo: null,
+      rules: []
+    };
+  }
+
+  const [repo, rules] = await Promise.all([
+    getProjectGitHubRepo(projectId),
+    listProjectGitHubRules(projectId)
+  ]);
+
+  return {
+    installation,
+    repo,
+    rules
   };
 }
 
@@ -117,7 +158,8 @@ function isProjectSetupSummaryLoading(summary: ProjectSetupSummaryState): boolea
     summary.webhooks.status === "loading" ||
     summary.weeklyReports.status === "loading" ||
     summary.capturePolicy.status === "loading" ||
-    summary.improvementSettings.status === "loading"
+    summary.improvementSettings.status === "loading" ||
+    summary.github.status === "loading"
   );
 }
 
@@ -209,6 +251,10 @@ function renderWebhooksSummaryBlock(summary: SummaryLoadState<WebhookRecord[]>):
 }
 
 function renderGitHubSummaryBlock(summary: GitHubSummaryLoadState): JSX.Element {
+  if (summary.status === "loading") {
+    return <SetupSummaryBlock label="GitHub automation" value="Loading..." badge={{ label: "Loading", variant: "outline" }} description="Loading GitHub automation status." />;
+  }
+
   if (summary.status === "unsupported") {
     return (
       <SetupSummaryBlock
@@ -220,12 +266,67 @@ function renderGitHubSummaryBlock(summary: GitHubSummaryLoadState): JSX.Element 
     );
   }
 
+  if (summary.status === "error") {
+    return (
+      <SetupSummaryBlock
+        label="GitHub automation"
+        value="Unavailable"
+        badge={{ label: "Could not load", variant: "outline" }}
+        description="GitHub automation settings could not be loaded for this project."
+      />
+    );
+  }
+
+  const { installation, repo, rules } = summary.data;
+
+  if (installation === null) {
+    return (
+      <SetupSummaryBlock
+        label="GitHub automation"
+        value="Not configured"
+        badge={{ label: "Setup required", variant: "secondary" }}
+        description="No GitHub App installation is connected to this workspace yet."
+      />
+    );
+  }
+
+  if (installation.status === "suspended" || installation.status === "removed") {
+    return (
+      <SetupSummaryBlock
+        label="GitHub automation"
+        value="Connection lost"
+        badge={{ label: "Reconnect required", variant: "warning" }}
+        description="The GitHub App installation is no longer active, so dispatch automation is paused."
+      />
+    );
+  }
+
+  if (repo === null) {
+    return (
+      <SetupSummaryBlock
+        label="GitHub automation"
+        value="Not configured"
+        badge={{ label: "No repository", variant: "secondary" }}
+        description="GitHub App access is available, but no repository is assigned to this project yet."
+      />
+    );
+  }
+
+  const enabledRules = rules.filter((rule) => rule.enabled).length;
+
   return (
     <SetupSummaryBlock
       label="GitHub automation"
-      value="Available"
-      badge={{ label: "GitHub tab", variant: "outline" }}
-      description="Repository connection and dispatch rules are managed from this project's GitHub tab."
+      value="Connected"
+      badge={{
+        label: enabledRules > 0 ? `${enabledRules} enabled` : "No rules",
+        variant: enabledRules > 0 ? "success" : "secondary"
+      }}
+      description={
+        rules.length === 0
+          ? `${repo.repo_owner}/${repo.repo_name} is connected, but no dispatch rules are configured yet.`
+          : `${formatBoundedCount(rules.length, PROJECT_SETUP_SUMMARY_LIST_LIMIT)} dispatch rule${rules.length === 1 ? "" : "s"} configured for ${repo.repo_owner}/${repo.repo_name}.`
+      }
     />
   );
 }

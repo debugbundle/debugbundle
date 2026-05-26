@@ -171,7 +171,7 @@ describe("storage bootstrap schema", () => {
   it("should encode improvement constraints directly in the bootstrap schema", (): void => {
     expect(
       STORAGE_BOOTSTRAP_SQL.includes(
-        "improvement_bundle_sensitivity text NOT NULL DEFAULT 'balanced'\n        CHECK (improvement_bundle_sensitivity IN ('high_confidence', 'balanced', 'verbose'))"
+        "improvement_bundle_sensitivity text NOT NULL DEFAULT 'high_confidence'\n        CHECK (improvement_bundle_sensitivity IN ('high_confidence', 'balanced', 'verbose'))"
       )
     ).toBe(true);
     expect(

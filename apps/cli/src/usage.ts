@@ -1,6 +1,8 @@
 export const CLI_USAGE_LINES = [
   'Usage:',
   '  debugbundle --version',
+  '  debugbundle -v',
+  '  debugbundle -h',
   '  debugbundle analyze [--type <improvement|failure|performance>] [--local] [--json]',
   '  debugbundle doctor [--check-relay] [--json]',
   '  debugbundle setup [--non-interactive] [--json]',

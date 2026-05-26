@@ -3,8 +3,8 @@ Checks:
 - profile-schema: ok - Validated .debugbundle/profile.json
 - local-event-batch: ok - Wrote synthetic local event batch.
 - local-processing: ok - Processed synthetic local event batch into local artifacts.
-- incident-retrieval: ok - Retrieved local incident inc_local_a644445550fffe73.
-- bundle-retrieval: ok - Retrieved local bundle for incident inc_local_a644445550fffe73.
+- incident-retrieval: ok - Retrieved local incident inc_local_02dd2abe91de9b87.
+- bundle-retrieval: ok - Retrieved local bundle for incident inc_local_02dd2abe91de9b87.
 Suggested actions:
-- Review incident inc_local_a644445550fffe73 if you want to inspect the generated local bundle.
+- Review incident inc_local_02dd2abe91de9b87 if you want to inspect the generated local bundle.
 - Re-run debugbundle verify local after changing local DebugBundle configuration.

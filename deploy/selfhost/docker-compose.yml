@@ -59,7 +59,7 @@ services:
     working_dir: /workspace
     volumes:
       - ../..:/workspace
-    command: sh -lc "corepack enable && corepack pnpm install --frozen-lockfile"
+    command: sh -lc "corepack enable && corepack pnpm install --force --frozen-lockfile"
 
   db-bootstrap:
     image: node:24-alpine

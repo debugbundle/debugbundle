@@ -115,7 +115,7 @@ const STORAGE_BOOTSTRAP_STATEMENTS = [
       slug text NOT NULL,
       environment_default text NOT NULL DEFAULT 'production',
       automated_improvement_bundles_enabled boolean NOT NULL DEFAULT true,
-      improvement_bundle_sensitivity text NOT NULL DEFAULT 'balanced'
+      improvement_bundle_sensitivity text NOT NULL DEFAULT 'high_confidence'
         CHECK (improvement_bundle_sensitivity IN ('high_confidence', 'balanced', 'verbose')),
       created_at timestamptz NOT NULL DEFAULT now(),
       updated_at timestamptz NOT NULL DEFAULT now(),

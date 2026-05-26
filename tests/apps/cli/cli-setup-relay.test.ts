@@ -41,7 +41,7 @@ async function createRelayFixtureRepository(input: { framework: "fastify" | "exp
     `${JSON.stringify(
       {
         name: `relay-${input.framework}-app`,
-        packageManager: "pnpm@10.32.1",
+        packageManager: "pnpm@11.3.0",
         dependencies
       },
       null,
@@ -120,7 +120,7 @@ async function createRelayFallbackRepository(input: { framework: "fastify" | "ex
     `${JSON.stringify(
       {
         name: `relay-fallback-${input.framework}-app`,
-        packageManager: "pnpm@10.32.1",
+        packageManager: "pnpm@11.3.0",
         dependencies
       },
       null,
@@ -167,7 +167,7 @@ async function createMixedRuntimeFixtureRepository(input: { pythonBackend?: bool
     `${JSON.stringify(
       {
         name: "mixed-runtime-platform",
-        packageManager: "pnpm@10.32.1",
+        packageManager: "pnpm@11.3.0",
         scripts: {
           build: "pnpm -r build",
           test: "pnpm -r test",
@@ -245,7 +245,7 @@ async function createWordPressRelayFixtureRepository(): Promise<string> {
     `${JSON.stringify(
       {
         name: "wordpress-platform",
-        packageManager: "pnpm@10.32.1"
+        packageManager: "pnpm@11.3.0"
       },
       null,
       2
@@ -287,7 +287,7 @@ async function createRuntimeGuidanceFixtureRepository(input: { runtime: "go" | "
     `${JSON.stringify(
       {
         name: `${input.runtime}-platform`,
-        packageManager: "pnpm@10.32.1"
+        packageManager: "pnpm@11.3.0"
       },
       null,
       2

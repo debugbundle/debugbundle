@@ -65,7 +65,7 @@ describePublicSiteRepo('public site repository export', () => {
     const nextEnv = readFileSync(join(siteRoot, 'next-env.d.ts'), 'utf8');
     const securityTxtPath = join(siteRoot, 'public', '.well-known', 'security.txt');
 
-    expect(packageJson.packageManager).toBe('pnpm@10.32.1');
+    expect(packageJson.packageManager).toBe('pnpm@11.3.0');
     expect(packageJson.repository?.url).toBe('git+https://github.com/debugbundle/site.git');
     expect(packageJson.homepage).toBe('https://debugbundle.com');
     expect(packageJson.devDependencies?.['typescript']).toBe('^6.0.2');

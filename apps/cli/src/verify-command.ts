@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { mkdir as mkdirFromFs, readFile as readFileFromFs, rename as renameFromFs, writeFile as writeFileFromFs } from "node:fs/promises";
 import { join } from "node:path";
 
@@ -65,6 +66,7 @@ type VerifyLocalDependencies = {
 
 type VerifyCloudDependencies = {
   now?: () => Date;
+  randomId?: () => string;
   readAuthState?: typeof readCliAuthState;
   createProjectToken?: (input: { bearerToken: string; projectId: string; label: string }) => Promise<{ token_id: string; plaintext?: string }>;
   revokeProjectToken?: (input: { bearerToken: string; projectId: string; tokenId: string }) => Promise<unknown>;
@@ -274,6 +276,23 @@ function cloudVerificationRunId(now: Date): string {
   return now.toISOString().replace(/[-:.TZ]/g, "").slice(0, 14);
 }
 
+function defaultCloudVerificationSuffix(): string {
+  return randomUUID().replace(/-/g, "").slice(0, 12);
+}
+
+function normalizeCloudVerificationSuffix(suffix: string): string {
+  const normalized = suffix.toLowerCase().replace(/[^a-z0-9]/g, "").slice(0, 12);
+  if (normalized.length > 0) {
+    return normalized;
+  }
+
+  return defaultCloudVerificationSuffix();
+}
+
+function buildCloudVerificationRunId(now: Date, suffix: string): string {
+  return `${cloudVerificationRunId(now)}-${normalizeCloudVerificationSuffix(suffix)}`;
+}
+
 function requestFailureReason(responseStatus: number): IncidentReason {
   const incidentReason = deriveIncidentReasonFromSignal({
     event_type: "request_event",
@@ -290,11 +309,11 @@ function requestFailureReason(responseStatus: number): IncidentReason {
 
 function buildCloudVerificationEvent(input: {
   now: Date;
+  runId: string;
   serviceName: string;
   environment: string;
   responseStatus: number;
 }): ReturnType<typeof createEventEnvelope> {
-  const runId = cloudVerificationRunId(input.now);
   const is5xxVerification = input.responseStatus >= 500;
   const routeTemplate = is5xxVerification
     ? "/debugbundle/verify/cloud"
@@ -317,7 +336,7 @@ function buildCloudVerificationEvent(input: {
       route_template: routeTemplate,
       query: {
         debugbundle_verification: true,
-        run_id: runId,
+        run_id: input.runId,
         synthetic_status: input.responseStatus
       },
       headers: {
@@ -331,7 +350,7 @@ function buildCloudVerificationEvent(input: {
       response_body: {
         error: is5xxVerification ? "debugbundle_cloud_verification" : "debugbundle_cloud_client_error_verification",
         synthetic: true,
-        run_id: runId,
+        run_id: input.runId,
         response_status: input.responseStatus
       }
     }
@@ -845,7 +864,10 @@ export async function verifyCloudCommand(
 
   if (input.trigger5xx === true || input.trigger4xxStatus !== undefined) {
     const verificationStartedAt = now();
-    const runId = cloudVerificationRunId(verificationStartedAt);
+    const runId = buildCloudVerificationRunId(
+      verificationStartedAt,
+      (dependencies.randomId ?? defaultCloudVerificationSuffix)()
+    );
     const serviceName = input.service ?? `debugbundle-verify-cloud-${runId}`;
     const tokenLabel = `debugbundle verify cloud ${runId}`;
     const pollAttempts = dependencies.pollAttempts ?? 6;
@@ -879,6 +901,7 @@ export async function verifyCloudCommand(
 
       const event = buildCloudVerificationEvent({
         now: verificationStartedAt,
+        runId,
         serviceName,
         environment,
         responseStatus

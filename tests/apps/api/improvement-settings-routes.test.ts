@@ -77,7 +77,7 @@ describe("improvement settings routes", () => {
         cloud_automation_available: true,
         settings: {
           automated_improvement_bundles_enabled: true,
-          improvement_bundle_sensitivity: "balanced"
+          improvement_bundle_sensitivity: "high_confidence"
         }
       });
     });

@@ -7,12 +7,24 @@ export type ParsedArgv = {
 
 export class CliInputError extends Error {}
 
+function normalizeShortOption(token: string): string {
+  if (token === "-h") {
+    return "--help";
+  }
+
+  if (token === "-v") {
+    return "--version";
+  }
+
+  return token;
+}
+
 export function parseArgv(argv: string[]): ParsedArgv {
   const positionals: string[] = [];
   const options = new Map<string, ParsedOptionValue>();
 
   for (let index = 0; index < argv.length; index += 1) {
-    const token = argv[index];
+    const token = normalizeShortOption(argv[index] ?? "");
     if (token === undefined) {
       break;
     }
@@ -26,7 +38,7 @@ export function parseArgv(argv: string[]): ParsedArgv {
       token === "--fix"
       || token === "--json"
       || token === "--check-relay"
-        || token === "--privacy"
+      || token === "--privacy"
       || token === "--help"
       || token === "--version"
       || token === "--non-interactive"

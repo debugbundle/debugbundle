@@ -34,6 +34,8 @@ NODE_RUN = docker run --rm -t \
 	-v "$(PWD):$(WORKDIR)" \
 	-w "$(WORKDIR)" \
 	$(NODE_IMAGE) sh -lc
+PNPM_INSTALL = corepack pnpm install --force
+PNPM_INSTALL_RELAXED = $(PNPM_INSTALL) --frozen-lockfile=false
 
 .PHONY: help
 help:
@@ -103,7 +105,7 @@ db-bootstrap: infra-up
 		-e DB_USER=debugbundle \
 		-e DB_PASSWORD=debugbundle \
 		-e DB_NAME=debugbundle \
-			$(NODE_IMAGE) sh -lc "corepack enable && corepack pnpm install --frozen-lockfile=false && corepack pnpm db:bootstrap"
+			$(NODE_IMAGE) sh -lc "corepack enable && $(PNPM_INSTALL_RELAXED) && corepack pnpm db:bootstrap"
 
 .PHONY: db-migrate
 db-migrate: db-bootstrap
@@ -116,7 +118,7 @@ db-migrate: db-bootstrap
 		-e DB_USER=debugbundle \
 		-e DB_PASSWORD=debugbundle \
 		-e DB_NAME=debugbundle \
-			$(NODE_IMAGE) sh -lc "corepack enable && corepack pnpm install --frozen-lockfile=false && corepack pnpm db:migrate"
+			$(NODE_IMAGE) sh -lc "corepack enable && $(PNPM_INSTALL_RELAXED) && corepack pnpm db:migrate"
 
 .PHONY: s3-bootstrap
 s3-bootstrap: infra-up
@@ -127,7 +129,7 @@ infra-bootstrap: db-migrate s3-bootstrap
 
 .PHONY: install
 install:
-	$(NODE_RUN) "corepack enable && corepack pnpm install"
+	$(NODE_RUN) "corepack enable && $(PNPM_INSTALL)"
 
 .PHONY: lint
 lint:
@@ -139,15 +141,15 @@ typecheck:
 
 .PHONY: web-check
 web-check:
-	$(NODE_RUN) "corepack enable && corepack pnpm install --frozen-lockfile=false && corepack pnpm vitest run tests/apps/web/web-app-auth.test.tsx tests/apps/web/web-app-management.test.tsx tests/apps/web/web-app-incidents.test.tsx tests/apps/web/web-dogfooding.test.ts && corepack pnpm typecheck"
+	$(NODE_RUN) "corepack enable && $(PNPM_INSTALL_RELAXED) && corepack pnpm vitest run tests/apps/web/web-app-auth.test.tsx tests/apps/web/web-app-management.test.tsx tests/apps/web/web-app-incidents.test.tsx tests/apps/web/web-dogfooding.test.ts && corepack pnpm typecheck"
 
 .PHONY: perf-check
 perf-check:
-	$(NODE_RUN) "corepack enable && corepack pnpm install --frozen-lockfile=false && node --import tsx scripts/perf-check.ts"
+	$(NODE_RUN) "corepack enable && $(PNPM_INSTALL_RELAXED) && node --import tsx scripts/perf-check.ts"
 
 .PHONY: load-check
 load-check:
-	$(NODE_RUN) "corepack enable && corepack pnpm install --frozen-lockfile=false && node --import tsx scripts/ingestion-load-check.ts"
+	$(NODE_RUN) "corepack enable && $(PNPM_INSTALL_RELAXED) && node --import tsx scripts/ingestion-load-check.ts"
 
 .PHONY: test-unit
 test-unit:
@@ -192,7 +194,7 @@ test-integration:
 		-e S3_ENDPOINT=http://localstack:4566 \
 		-e S3_REGION=us-east-1 \
 		-e S3_BUCKET=debugbundle-raw-events \
-			$(NODE_IMAGE) sh -lc "corepack enable && corepack pnpm install --frozen-lockfile=false && corepack pnpm db:bootstrap && corepack pnpm db:migrate && corepack pnpm vitest run --no-file-parallelism --maxWorkers=1 tests/integration/ingestion-core.integration.test.ts tests/integration/ingestion-bundle-triggers.integration.test.ts tests/integration/ingestion-replay-idempotency.integration.test.ts tests/integration/ingestion-lifecycle-webhooks.integration.test.ts tests/integration/billing-sync.integration.test.ts tests/integration/project-deletion.integration.test.ts tests/integration/retention-cleanup.integration.test.ts tests/integration/retention-sampling.integration.test.ts tests/integration/storage-migrations.integration.test.ts"
+			$(NODE_IMAGE) sh -lc "corepack enable && $(PNPM_INSTALL_RELAXED) && corepack pnpm db:bootstrap && corepack pnpm db:migrate && corepack pnpm vitest run --no-file-parallelism --maxWorkers=1 tests/integration/ingestion-core.integration.test.ts tests/integration/ingestion-bundle-triggers.integration.test.ts tests/integration/ingestion-replay-idempotency.integration.test.ts tests/integration/ingestion-lifecycle-webhooks.integration.test.ts tests/integration/billing-sync.integration.test.ts tests/integration/project-deletion.integration.test.ts tests/integration/retention-cleanup.integration.test.ts tests/integration/retention-sampling.integration.test.ts tests/integration/storage-migrations.integration.test.ts"
 
 .PHONY: test-integration-down
 test-integration-down:
@@ -208,7 +210,7 @@ selfhost-smoke:
 
 .PHONY: api-check
 api-check:
-	$(NODE_RUN) "corepack enable && corepack pnpm install --frozen-lockfile=false && corepack pnpm api:check"
+	$(NODE_RUN) "corepack enable && $(PNPM_INSTALL_RELAXED) && corepack pnpm api:check"
 
 .PHONY: dev
 dev: ensure-probe-trigger-secret install
@@ -229,7 +231,7 @@ dev-public:
 		-v "$(PWD):$(WORKDIR)" \
 		-w "$(WORKDIR)" \
 		-p $(PUBLIC_SITE_PORT):$(PUBLIC_SITE_PORT) \
-		$(NODE_IMAGE) sh -lc "corepack enable && corepack pnpm install --frozen-lockfile=false && cd site && corepack pnpm exec next dev --hostname 0.0.0.0 --port $(PUBLIC_SITE_PORT)"
+		$(NODE_IMAGE) sh -lc "corepack enable && $(PNPM_INSTALL_RELAXED) && cd site && corepack pnpm exec next dev --hostname 0.0.0.0 --port $(PUBLIC_SITE_PORT)"
 
 .PHONY: backend-restart
 backend-restart: ensure-probe-trigger-secret install
@@ -265,7 +267,7 @@ api-run: infra-bootstrap
 		-e S3_BUCKET=debugbundle-raw-events \
 		-e AWS_ACCESS_KEY_ID=test \
 		-e AWS_SECRET_ACCESS_KEY=test \
-		$(NODE_IMAGE) sh -lc "corepack enable && corepack pnpm install --frozen-lockfile=false && corepack pnpm api:start"
+		$(NODE_IMAGE) sh -lc "corepack enable && $(PNPM_INSTALL_RELAXED) && corepack pnpm api:start"
 
 .PHONY: worker-check
 worker-check:
@@ -290,7 +292,7 @@ worker-run: infra-bootstrap
 		-e AWS_SECRET_ACCESS_KEY=test \
 		-e WORKER_POLL_INTERVAL_MS=$(WORKER_POLL_INTERVAL_MS) \
 		-e WORKER_RUN_ONCE=$(WORKER_RUN_ONCE) \
-		$(NODE_IMAGE) sh -lc "corepack enable && corepack pnpm install --frozen-lockfile=false && corepack pnpm worker:start"
+		$(NODE_IMAGE) sh -lc "corepack enable && $(PNPM_INSTALL_RELAXED) && corepack pnpm worker:start"
 
 .PHONY: shell
 shell:

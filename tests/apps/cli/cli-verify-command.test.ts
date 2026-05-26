@@ -22,7 +22,7 @@ async function createVerifyFixtureRepository(): Promise<string> {
     `${JSON.stringify(
       {
         name: "checkout-app",
-        packageManager: "pnpm@10.32.1",
+        packageManager: "pnpm@11.3.0",
         scripts: {
           build: "tsc --noEmit -p tsconfig.json",
           test: "vitest run",
@@ -614,7 +614,8 @@ describe("cli verify cloud command", () => {
         listIncidents,
         getBundle,
         sleep: vi.fn().mockResolvedValue(undefined),
-        pollAttempts: 1
+        pollAttempts: 1,
+        randomId: vi.fn().mockReturnValue("a1b2c3d4")
       }
     );
 
@@ -622,7 +623,7 @@ describe("cli verify cloud command", () => {
     expect(createProjectToken).toHaveBeenCalledWith({
       bearerToken: "dbundle_mem_secret_token",
       projectId: "proj_123",
-      label: "debugbundle verify cloud 20260314001000"
+      label: "debugbundle verify cloud 20260314001000-a1b2c3d4"
     });
     expect(sendEvents).toHaveBeenCalledWith({
       baseUrl: "https://api.debugbundle.com",
@@ -714,6 +715,124 @@ describe("cli verify cloud command", () => {
         suggested_next_command: "debugbundle inspect inc_verify_5xx --source cloud"
       }
     });
+  });
+
+  it("derives collision-resistant synthetic run IDs for default cloud verification service names and token labels", async () => {
+    const createProjectToken = vi.fn().mockResolvedValue({
+      token_id: "tok_verify_123",
+      plaintext: "dbundle_proj_verify"
+    });
+    const revokeProjectToken = vi.fn().mockResolvedValue({});
+    const sendEvents = vi.fn().mockResolvedValue({ accepted: 1, rejected: 0, errors: [] });
+    const listIncidents = vi.fn().mockResolvedValue({
+      incidents: [
+        {
+          incident_id: "inc_verify_5xx",
+          last_seen_at: "2026-03-14T00:10:03.000Z",
+          incident_reason: {
+            kind: "request_failure",
+            description: "request_event matched the 5xx request incident rule",
+            event_type: "request_event",
+            event_class: "incident_signal",
+            matched_policy: "Immediate request failure statuses bypass capture_request_events suppression"
+          }
+        }
+      ],
+      next_cursor: null
+    });
+    const getBundle = vi.fn().mockResolvedValue({ bundle_version: 1 });
+    const fixedNow = new Date("2026-03-14T00:10:00.000Z");
+
+    await verifyCloudCommand(
+      {
+        projectId: "proj_123",
+        trigger5xx: true,
+        json: true
+      },
+      {
+        now: () => fixedNow,
+        readAuthState: vi.fn().mockResolvedValue({
+          bearer_token: "dbundle_mem_secret_token",
+          base_url: "https://api.debugbundle.com"
+        }),
+        createProjectToken,
+        revokeProjectToken,
+        sendEvents,
+        listIncidents,
+        getBundle,
+        sleep: vi.fn().mockResolvedValue(undefined),
+        pollAttempts: 1,
+        randomId: vi.fn().mockReturnValueOnce("a1b2c3d4")
+      }
+    );
+
+    await verifyCloudCommand(
+      {
+        projectId: "proj_123",
+        trigger5xx: true,
+        json: true
+      },
+      {
+        now: () => fixedNow,
+        readAuthState: vi.fn().mockResolvedValue({
+          bearer_token: "dbundle_mem_secret_token",
+          base_url: "https://api.debugbundle.com"
+        }),
+        createProjectToken,
+        revokeProjectToken,
+        sendEvents,
+        listIncidents,
+        getBundle,
+        sleep: vi.fn().mockResolvedValue(undefined),
+        pollAttempts: 1,
+        randomId: vi.fn().mockReturnValueOnce("e5f6g7h8")
+      }
+    );
+
+    expect(createProjectToken).toHaveBeenNthCalledWith(1, {
+      bearerToken: "dbundle_mem_secret_token",
+      projectId: "proj_123",
+      label: "debugbundle verify cloud 20260314001000-a1b2c3d4"
+    });
+    expect(createProjectToken).toHaveBeenNthCalledWith(2, {
+      bearerToken: "dbundle_mem_secret_token",
+      projectId: "proj_123",
+      label: "debugbundle verify cloud 20260314001000-e5f6g7h8"
+    });
+    expect(sendEvents).toHaveBeenNthCalledWith(1, expect.objectContaining({
+      events: [
+        expect.objectContaining({
+          service: expect.objectContaining({
+            name: "debugbundle-verify-cloud-20260314001000-a1b2c3d4"
+          }),
+          payload: expect.objectContaining({
+            query: expect.objectContaining({
+              run_id: "20260314001000-a1b2c3d4"
+            }),
+            response_body: expect.objectContaining({
+              run_id: "20260314001000-a1b2c3d4"
+            })
+          })
+        })
+      ]
+    }));
+    expect(sendEvents).toHaveBeenNthCalledWith(2, expect.objectContaining({
+      events: [
+        expect.objectContaining({
+          service: expect.objectContaining({
+            name: "debugbundle-verify-cloud-20260314001000-e5f6g7h8"
+          }),
+          payload: expect.objectContaining({
+            query: expect.objectContaining({
+              run_id: "20260314001000-e5f6g7h8"
+            }),
+            response_body: expect.objectContaining({
+              run_id: "20260314001000-e5f6g7h8"
+            })
+          })
+        })
+      ]
+    }));
   });
 
   it("can run active cloud verification through the default HTTP clients", async () => {

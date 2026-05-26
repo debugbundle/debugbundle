@@ -62,7 +62,8 @@ describe("cli verify cloud configured client-error command", () => {
         listIncidents,
         getBundle,
         sleep: vi.fn().mockResolvedValue(undefined),
-        pollAttempts: 1
+        pollAttempts: 1,
+        randomId: vi.fn().mockReturnValue("a1b2c3d4")
       }
     );
 

@@ -19,7 +19,7 @@ async function createSetupFixtureRepository(): Promise<string> {
     `${JSON.stringify(
       {
         name: "checkout-app",
-        packageManager: "pnpm@10.32.1",
+        packageManager: "pnpm@11.3.0",
         scripts: {
           build: "tsc --noEmit -p tsconfig.json",
           test: "vitest run",

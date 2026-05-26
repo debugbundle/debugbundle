@@ -1190,6 +1190,8 @@ The `.debugbundle/local/browser-relay-spool/` directory is intentionally separat
   "debugbundle": {
     "profile_owner": "string",
     "last_reviewed_at": "ISO8601",
+    "validation_status": "static-analysis-only | agent-validated",
+    "skill_path": "string",
     "notes": "string"
   }
 }

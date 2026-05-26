@@ -58,7 +58,7 @@ function buildDefaultDraft(
     access_mode: canEdit ? "manage" : "preview",
     cloud_automation_available: organizationPlan !== "free",
     automated_improvement_bundles_enabled: true,
-    improvement_bundle_sensitivity: "balanced"
+    improvement_bundle_sensitivity: "high_confidence"
   };
 }
 

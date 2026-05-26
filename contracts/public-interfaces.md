@@ -1503,7 +1503,7 @@ Request body (all fields optional, but at least one is required):
 ```json
 {
   "automated_improvement_bundles_enabled": false,
-  "improvement_bundle_sensitivity": "balanced"
+  "improvement_bundle_sensitivity": "high_confidence"
 }
 ```
 
