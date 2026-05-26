@@ -66,6 +66,20 @@ Before implementing any new SDK, the plan must explicitly separate:
 
 Do not start a new SDK implementation until its plan documents the relevant language/runtime versions, framework versions, package-manager constraints, and EOL/support status. Refresh those lanes before every SDK release so matrices do not age into stale promises.
 
+### Release-gate discipline for all future SDKs
+
+Every future SDK plan must also inherit the release-hardening pattern now used by the shipped SDK surfaces:
+
+- package-level README or registry-native docs shipped in the published artifact
+- configuration source precedence documented explicitly, including server-owned capture policy
+- runtime support labels for minimum compatibility, recommended production, installed-base lanes, and rolling CI lanes
+- install examples for every claimed setup mode
+- service naming guidance and safe startup/status semantics
+- first-event verification instructions
+- staged-artifact smoke before publish and clean-install registry smoke after publish
+
+Do not treat an SDK as release-ready until those gates are defined in the plan and implemented in the repository.
+
 ---
 
 ## Alignment with existing implementation
@@ -79,6 +93,8 @@ Do not start a new SDK implementation until its plan documents the relevant lang
 - `com.debugbundle:debugbundle-spring-boot-starter` — Java SDK with Spring Boot MVC starter backed by `debugbundle-java-core`
 
 The JS packages live in the JS SDK monorepo: `github.com/debugbundle/debugbundle-js` (alongside `@debugbundle/shared-types` and `@debugbundle/redaction`). Python, PHP, WordPress, Java, Ruby, and Go live in their own dedicated repositories.
+
+Current cross-repo release sequencing for the JS family is intentional: publish core-owned `@debugbundle/shared-types` and `@debugbundle/redaction` first, then publish `@debugbundle/sdk-node` and `@debugbundle/sdk-browser` from `debugbundle-js`, then update dependent wrappers such as WordPress after their prerequisite packages are live and verified.
 
 **Java scope update:** The Java SDK's expanded V1 target now includes servlet/JAX-RS app-server adapters and a startup javaagent bootstrap in addition to the existing core plus Spring Boot starter path. See `spec/sdks/java-sdk.md` for the app-server parity plan.
 

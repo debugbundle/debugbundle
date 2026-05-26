@@ -69,6 +69,33 @@ Any SDK or package published to an external registry must satisfy these minimum 
 3. The release workflow validates staged artifacts before publish and then validates a clean install from the target registry after publish.
 4. Registry-specific provenance/signing settings must match the actual hosting constraints. For npm releases from private GitHub repositories, do not enable GitHub provenance until the source repository is public or the registry/provider supports that private-source flow.
 
+### Cross-Repo SDK Release Discipline
+
+Every standalone SDK repository must adopt the same release-hardening pattern before it counts as release-ready:
+
+1. Package-level documentation must be shipped inside the published artifact and must cover configuration source precedence, runtime support labels, install examples for every claimed setup mode, service naming guidance, safe startup/status semantics, and first-event verification.
+2. Release workflows must validate the staged artifact before publish and rerun an application-driven clean-install smoke from the target registry after publish.
+3. Any package family that is documented as version-aligned must publish as one coherent family and must avoid mixed-version public snippets.
+4. New SDK plans in `spec/sdks/*.md` must describe their release workflow, clean-install smoke path, and publish-time compatibility matrix before implementation starts.
+
+### Current Pre-Launch Release Order
+
+The current pre-launch package sequence for the JavaScript and CMS surfaces is:
+
+1. Publish core-owned shared packages from `debugbundle/debugbundle`: `@debugbundle/shared-types` and `@debugbundle/redaction`.
+2. Publish the JS SDK family from `debugbundle/debugbundle-js`: `@debugbundle/sdk-node` and `@debugbundle/sdk-browser` at the same version, after the matching shared-package version is already on npm.
+3. Publish dependent wrappers after their prerequisites are live and verified. Today that means the WordPress plugin follows the SDK releases it bundles or documents, rather than shipping ahead of them.
+
+### Internal Dogfooding Version Touchpoints
+
+Our own source-deployed surfaces intentionally dogfood the published JS packages instead of workspace-linking them implicitly. After a successful registry publish, bump these manifests in the same release-prep slice before hosted validation:
+
+- Root `package.json`: `@debugbundle/shared-types`, `@debugbundle/redaction`, `@debugbundle/sdk-node`
+- Hosted app `apps/web/package.json`: `@debugbundle/sdk-browser`
+- Public site `site/package.json`: `@debugbundle/sdk-browser`
+
+Do not bump those dogfooding manifests ahead of a registry publish. The hosted source deploy workflow installs from those manifests and should always resolve packages that already exist in the target registry.
+
 ### Private Repository (`debugbundle-cloud`)
 
 Handles production deployment, container publishing to private registries, and infrastructure provisioning. See `/rules/architectural-constraints.md` section 6a.

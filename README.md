@@ -364,6 +364,14 @@ Standalone SDK repositories publish and version their own release surfaces indep
 - `debugbundle-go` for Go modules
 - `debugbundle-wordpress` for the WordPress plugin
 
+Current pre-launch sequencing for the JS family is intentional:
+
+1. Publish `@debugbundle/shared-types` and `@debugbundle/redaction` from the core repo first.
+2. Publish `@debugbundle/sdk-node` and `@debugbundle/sdk-browser` from `debugbundle-js` after the matching shared-package version exists on npm.
+3. Publish dependent wrappers such as the WordPress plugin after the prerequisite SDK releases are live and verified.
+
+Our own hosted/source-deployed dogfooding surfaces intentionally consume published packages rather than implicit workspace links. After a successful registry publish, bump the pinned versions in the root `package.json`, hosted app `apps/web/package.json`, and public-site `site/package.json` before running hosted validation or deployment.
+
 ## Contributing
 
 Read [CONTRIBUTING.md](CONTRIBUTING.md) before opening a pull request. The short version:

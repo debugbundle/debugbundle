@@ -119,6 +119,13 @@ Suggested namespace roots:
 
 The repository uses the .NET SDK, xUnit, Microsoft test host packages, coverlet, Roslyn analyzers, `dotnet format`, SourceLink, deterministic builds, NuGet package validation, and GitHub Actions release workflow for NuGet publishing.
 
+The C#/.NET SDK must also inherit the shared DebugBundle SDK release discipline now used by the current pre-launch SDK surfaces:
+
+- every published NuGet package must include package-level README and license metadata in the final artifact
+- docs must explicitly cover configuration source precedence, runtime support labels, install examples for every claimed setup mode, service naming guidance, safe startup/status behavior, and first-event verification
+- release automation must validate staged `.nupkg` artifacts before publish and rerun clean-install application smoke after publish
+- if the .NET SDK later grows multiple version-aligned packages, public docs and examples must keep those package versions aligned rather than mixing versions across snippets
+
 Consumer installation examples:
 
 ```bash
@@ -264,6 +271,8 @@ Request-scoped context must use `AsyncLocal`, `HttpContext.Items`, `ILogger` sco
 
 Future releases must refresh the concrete .NET, ASP.NET Core, Azure Functions, Hangfire, Serilog, NLog, and log4net version lists before cutting the SDK.
 
+Release preparation must also refresh the clean-install smoke fixtures and documentation examples so published package metadata, runtime claims, and consumer snippets do not drift apart.
+
 ---
 
 ## Configuration
@@ -308,6 +317,8 @@ Configuration sources must include:
 - Azure Functions isolated worker configuration.
 
 Capture policy fields must not be accepted in local config. The SDK must fetch and enforce server-owned capture policy from `GET /v1/sdk/config`.
+
+The release docs must state that server-owned capture policy and future project capture rules come from `GET /v1/sdk/config` rather than local app configuration, matching the cross-SDK contract.
 
 ---
 
@@ -736,6 +747,7 @@ Quality gates:
 - `dotnet pack --configuration Release` validates publishable artifacts.
 - NuGet package validation checks metadata, license, README, SourceLink, symbols, deterministic builds, and dependency boundaries.
 - A clean install smoke verifies package installation in fresh ASP.NET Core and Worker Service fixtures.
+- A published-package smoke reruns the same application-driven verification against the target NuGet feed before the release is considered complete.
 
 ---
 
@@ -761,8 +773,11 @@ Quality gates:
 - [ ] Existing request IDs and `Activity` trace context are preserved.
 - [ ] `X-DebugBundle-Trace-Id` links browser and backend events.
 - [ ] NuGet packages build with SourceLink, symbols, README, license metadata, and deterministic build settings.
+- [ ] Release docs cover config precedence, support labels, install modes, service naming, safe startup semantics, and first-event verification.
 - [ ] Public docs include install, ASP.NET Core, Minimal APIs, MVC, Razor Pages, gRPC, Worker Service, Hangfire, Azure Functions, browser relay, local-only, connected, logging, probes, and privacy examples.
 - [ ] CI passes all supported .NET, ASP.NET Core, framework, logging, OS, and hardening lanes.
+- [ ] Clean-install smoke passes for ASP.NET Core and Worker Service fixtures.
+- [ ] Published-package smoke passes against the target NuGet feed.
 
 ---
 
@@ -788,3 +803,4 @@ Quality gates:
 - Whether MassTransit, Quartz.NET, or Azure Service Bus processors should follow Hangfire as the next background job integrations.
 - Whether generated .NET event model classes should be produced from DebugBundle schemas or maintained manually.
 - Whether NativeAOT compatibility should be a hard release gate for all packages or a supported subset of core and ASP.NET Core packages.
+- Whether future post-launch SDK waves beyond .NET should receive local project capture-rule enforcement at initial release or rely on server-side enforcement first and add runtime parity later.
