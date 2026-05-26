@@ -130,6 +130,19 @@ runIntegration("storage bootstrap integration", () => {
     expect(deleteBehaviorByConstraint.get("org_usage_counters_organization_id_fkey")).toBe("c");
   });
 
+  it("seeds the migration ledger for a current bootstrap schema instead of replaying historical migrations", async (): Promise<void> => {
+    await pool.query("DROP SCHEMA IF EXISTS public CASCADE");
+    await pool.query("CREATE SCHEMA public");
+
+    await bootstrapStorageSchema(createQueryable(pool));
+
+    const migrated = await migrateStorageSchema(createQueryable(pool));
+
+    expect(migrated.applied).toEqual([]);
+    expect(migrated.already_applied).toEqual(STORAGE_SCHEMA_MIGRATIONS.map((migration) => migration.id));
+    await expect(assertStorageSchemaMigrationsApplied(createQueryable(pool))).resolves.toBeUndefined();
+  });
+
   it("migrates an existing schema missing required auth suspension columns", async (): Promise<void> => {
     await pool.query("DROP SCHEMA IF EXISTS public CASCADE");
     await pool.query("CREATE SCHEMA public");

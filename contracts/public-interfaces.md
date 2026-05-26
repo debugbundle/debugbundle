@@ -36,6 +36,8 @@ Every capability must be available through all applicable interfaces. Operations
 | Reopen incident | `POST /v1/incidents/{id}/reopen` | `reopen` | `reopen_incident` | Cloud incidents use the API route; local incidents still reopen directly from `.debugbundle/local/state.json` |
 | Get bundle | `GET /v1/incidents/{id}/bundle` | `bundle` | `get_bundle` | |
 | Get reproduction | `GET /v1/incidents/{id}/reproduction` | `reproduce` | `get_reproduction` | |
+| Suggest capture rules from incident | `POST /v1/incidents/{id}/capture-rule-suggestion` | `capture-rule suggest` | `suggest_capture_rules_from_incident` | Browser Session or Member Token; deterministic bundle-derived suggestions |
+| Create capture rule from incident suggestion | `POST /v1/incidents/{id}/capture-rules` | `capture-rule create-from-suggestion` | `create_capture_rule_from_incident_suggestion` | Browser Session or Member Token, owner/admin only |
 | Get logs | `GET /v1/logs` | `logs` | `get_logs` | Query by incident_id |
 | List improvements | `GET /v1/improvements` | `improvements list` | `list_improvements` | Hosted deterministic improvement opportunities across the organization or a filtered project |
 | Get improvement | `GET /v1/improvements/{id}` | `improvements get` | `get_improvement` | |
@@ -99,6 +101,10 @@ Every capability must be available through all applicable interfaces. Operations
 | Deactivate probes (remote) | `POST /v1/projects/{id}/probes/deactivate` | `probe deactivate` | `deactivate_probe` | Solo+ only |
 | Get capture policy | `GET /v1/projects/{id}/capture-policy` | `capture-policy get` | `get_capture_policy` | Browser Session or Member Token; member receives preview-only payload |
 | Update capture policy | `PATCH /v1/projects/{id}/capture-policy` | `capture-policy set` | `update_capture_policy` | Browser Session or Member Token, owner/admin only |
+| List capture rules | `GET /v1/projects/{id}/capture-rules` | `capture-rule list` | `list_capture_rules` | Browser Session or Member Token; members receive preview-only payload |
+| Create capture rule | `POST /v1/projects/{id}/capture-rules` | `capture-rule create` | `create_capture_rule` | Browser Session or Member Token, owner/admin only |
+| Update capture rule | `PATCH /v1/projects/{id}/capture-rules/{ruleId}` | `capture-rule update` | `update_capture_rule` | Browser Session or Member Token, owner/admin only |
+| Delete capture rule | `DELETE /v1/projects/{id}/capture-rules/{ruleId}` | `capture-rule delete` | `delete_capture_rule` | Browser Session or Member Token, owner/admin only |
 | Get improvement settings | `GET /v1/projects/{id}/improvement-settings` | `improvements settings get` | `get_improvement_settings` | Browser Session or Member Token; members receive preview-only payload and all tiers can inspect availability |
 | Update improvement settings | `PATCH /v1/projects/{id}/improvement-settings` | `improvements settings set` | `update_improvement_settings` | Browser Session or Member Token, owner/admin only, paid Solo+ or self-host |
 | SDK config | `GET /v1/sdk/config` | — | — | SDK-only (project token, includes resolved capture policy) |
@@ -1376,6 +1382,90 @@ Response `200`: same shape as GET response with updated values.
 - `403` — insufficient role (non-owner) or tier restriction
 - `404` — project not found or not in caller's organization
 
+### 1.9a Capture Rules
+
+Per-project capture rules let operators manually `demote`, `sample`, or `drop` known noisy event patterns after they appear in real incidents.
+
+**List capture rules:**
+
+```
+GET /v1/projects/{id}/capture-rules
+Authorization: Bearer dbundle_member_...  (or browser session)
+```
+
+Response `200`:
+```json
+{
+  "access_mode": "manage | preview",
+  "rules": []
+}
+```
+
+**Create capture rule:**
+
+```
+POST /v1/projects/{id}/capture-rules
+Authorization: Bearer dbundle_member_...  (or browser session, owner/admin only)
+Content-Type: application/json
+```
+
+Request body matches the shared capture-rule schema and supports `action: "demote" | "sample" | "drop"` plus matcher fields such as `event_types`, `browser_event_kind`, `resource_url`, `request_url`, `status_codes`, `first_party`, and optional `fingerprint`.
+
+**Suggest capture rules from an incident:**
+
+```
+POST /v1/incidents/{id}/capture-rule-suggestion
+Authorization: Bearer dbundle_member_...  (or browser session)
+```
+
+Response `200`:
+```json
+{
+  "bundle_status": "ready | pending | failed",
+  "bundle_reason": "string | null",
+  "suggestions": [
+    {
+      "suggestion_id": "primary_resource_host_demote",
+      "label": "Demote resource errors from analytics.example.com",
+      "recommended_action": "demote",
+      "confidence": "high | medium | low",
+      "reason": "string",
+      "requires_confirmation": false,
+      "rule": {}
+    }
+  ]
+}
+```
+
+Suggestions are deterministic from stored incident + bundle evidence. `pending` indicates the bundle is not ready yet. `failed` indicates the bundle cannot currently support suggestion generation.
+
+**Create a capture rule from a suggestion:**
+
+```
+POST /v1/incidents/{id}/capture-rules
+Authorization: Bearer dbundle_member_...  (or browser session, owner/admin only)
+Content-Type: application/json
+```
+
+Request body:
+```json
+{
+  "suggestion_id": "primary_resource_host_demote",
+  "name": "Demote analytics resource noise",
+  "description": null,
+  "enabled": true,
+  "expires_at": null
+}
+```
+
+Response `201`: same `{"rule": ...}` shape as direct capture-rule creation.
+
+**Error responses:**
+- `401` — missing or invalid auth
+- `403` — insufficient role for create/update/delete
+- `404` — incident, project, or suggestion not found
+- `409` — suggestion generation unavailable because the incident bundle is not ready
+
 ### 1.10 Improvement Settings
 
 Per-project improvement settings control whether hosted deterministic improvement analysis is enabled and how aggressively it fires on eligible paid tiers.
@@ -1903,6 +1993,18 @@ debugbundle capture-policy set [--project <id>] --client-error-incidents <preset
 
 `capture-policy get` displays the project's current resolved policy plus raw override semantics for client error incidents. `capture-policy set` updates the preset and/or individual override fields via `--override key=value` (use `null` to clear an override), and also supports the dedicated client-error incident mode flags shown above. Owner-only.
 
+### 2.12a Capture Rule Commands
+```
+debugbundle capture-rule list --project-id <id> [--auth-file <path>] [--json]
+debugbundle capture-rule suggest <incident-id> [--auth-file <path>] [--json]
+debugbundle capture-rule create-from-suggestion <incident-id> --suggestion-id <id> [--name <name>] [--description <text>] [--enabled <true|false>] [--expires-at <ISO8601>] [--auth-file <path>] [--json]
+debugbundle capture-rule create --project-id <id> --name <name> --action <demote|sample|drop> --matcher-json <json> [--description <text>] [--enabled <true|false>] [--sample-rate <0-1>] [--sample-event-class <preserve|context>] [--expires-at <ISO8601>] [--auth-file <path>] [--json]
+debugbundle capture-rule update <rule-id> --project-id <id> [--name <name>] [--description <text>] [--enabled <true|false>] [--action <demote|sample|drop>] [--matcher-json <json>] [--sample-rate <0-1>] [--sample-event-class <preserve|context>] [--expires-at <ISO8601>] [--auth-file <path>] [--json]
+debugbundle capture-rule delete <rule-id> --project-id <id> [--auth-file <path>] [--json]
+```
+
+`capture-rule suggest` exposes the deterministic incident suggestion surface without mutating project state. `capture-rule create-from-suggestion` applies one of those suggestions with optional local overrides like `name`, `description`, or `expires-at`. Direct `create/update/delete` remain the explicit project-management surface and require owner/admin authorization.
+
 ### 2.13 Improvement Settings Commands
 ```
 debugbundle improvements list [--project-id <id>] [--environment <name>] [--service <name>] [--status <status>] [--severity <level>] [--kind <kind>] [--cursor <cursor>] [--limit <n>] [--json]
@@ -2071,6 +2173,18 @@ update_capture_policy         → same result as PATCH /v1/projects/{id}/capture
 ```
 
 These tools manage per-project capture policy (preset selection and advanced overrides). `get_capture_policy` returns a preview-only payload to plain members and an editable payload to owner/admin callers. `update_capture_policy` requires owner/admin authorization.
+
+### 3.5a Capture Rule Tools
+```
+list_capture_rules                         → same result as GET /v1/projects/{id}/capture-rules
+create_capture_rule                        → same result as POST /v1/projects/{id}/capture-rules
+update_capture_rule                        → same result as PATCH /v1/projects/{id}/capture-rules/{ruleId}
+delete_capture_rule                        → same result as DELETE /v1/projects/{id}/capture-rules/{ruleId}
+suggest_capture_rules_from_incident        → same result as POST /v1/incidents/{id}/capture-rule-suggestion
+create_capture_rule_from_incident_suggestion → same result as POST /v1/incidents/{id}/capture-rules
+```
+
+These tools expose the same manual capture-rule workflow as the API and CLI. Suggestions are deterministic and read-only. Rule creation, update, deletion, and create-from-suggestion require owner/admin authorization.
 
 ### 3.6 Improvement Settings Tools
 ```

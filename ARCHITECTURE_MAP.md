@@ -52,8 +52,8 @@
 
 ### `packages/shared-types` _(lives in `debugbundle-js` repo)_
 
-- **Owns:** All Zod schemas, TypeScript type exports, enums, constants, **tier capabilities config**, **event class enum**, **capture policy types**, **improvement settings types**, and the canonical preset-aware plus project-override-aware request-failure classifier used by ingestion, workers, and SDKs
-- **Exports:** `BundleV1Schema`, `BundleV1`, `EventEnvelopeSchema`, `EventEnvelope`, `createEventEnvelope`, `TIER_CAPABILITIES`, `getTierCapabilities`, `TierName`, `TierCapabilities`, `EventClass`, `CapturePreset`, `CapturePolicy`, event payload schemas, `DeviceInfoSchema`, `ContextDeviceSchema`, DB row types, API request/response types, webhook payload types, profile schema, severity enum, signal type enum, all context-block sub-schemas
+- **Owns:** All Zod schemas, TypeScript type exports, enums, constants, **tier capabilities config**, **event class enum**, **capture policy types**, **capture rule types and suggestion logic**, **improvement settings types**, and the canonical preset-aware plus project-override-aware request-failure classifier used by ingestion, workers, and SDKs
+- **Exports:** `BundleV1Schema`, `BundleV1`, `EventEnvelopeSchema`, `EventEnvelope`, `createEventEnvelope`, `TIER_CAPABILITIES`, `getTierCapabilities`, `TierName`, `TierCapabilities`, `EventClass`, `CapturePreset`, `CapturePolicy`, capture-rule schemas and evaluators, event payload schemas, `DeviceInfoSchema`, `ContextDeviceSchema`, DB row types, API request/response types, webhook payload types, profile schema, severity enum, signal type enum, all context-block sub-schemas
 - **Depends on:** nothing (leaf package)
 - **Test fixtures:** `__fixtures__/` for canonical schema samples
 
@@ -123,11 +123,11 @@
 
 ### `packages/sdk-node` _(lives in `debugbundle-js` repo)_
 
-- **Owns:** Node.js SDK core capture client, framework/logger adapters, in-memory buffering, failure isolation, vanilla runtime hooks, always-on probe ring buffers, request-scoped trigger-token probe activation, duplicate suppression, ingestion-backoff handling, file transport for local-only mode, and browser relay handler (same-origin endpoint that receives browser events, validates/sanitizes, and writes to local events or spool for durable delivery)
+- **Owns:** Node.js SDK core capture client, framework/logger adapters, in-memory buffering, failure isolation, vanilla runtime hooks, always-on probe ring buffers, request-scoped trigger-token probe activation, duplicate suppression, ingestion-backoff handling, remote config polling for capture policy plus project capture rules, file transport for local-only mode, and browser relay handler (same-origin endpoint that receives browser events, validates/sanitizes, and writes to local events or spool for durable delivery)
 - **Exports:** `debugbundle`, `createDebugBundleSdk()`, universal capture methods, `captureExceptions()`, `captureRejections()`, `captureConsole()`, `express()`, `fastify()`, `nextjs()`
 - **Subpath exports (relay):** `@debugbundle/sdk-node/relay` (core relay handler factory), `@debugbundle/sdk-node/relay/express` (Express middleware), `@debugbundle/sdk-node/relay/fastify` (Fastify plugin), `@debugbundle/sdk-node/relay/nextjs` (Next.js API route handler)
 - **Depends on:** `shared-types`, `redaction`
-- **Invariant:** SDK failures never throw into host code; failed or throttled flushes keep buffered events in memory, honor retry backoff, suppress duplicate/looping failures locally, keep remote probe directives process-local, and resolve trigger-token activations from request-local state only. Relay handler must validate Origin, enforce body size limits, strip/override protected fields, and never expose server-side credentials to browser clients (INV-17, INV-18, INV-19).
+- **Invariant:** SDK failures never throw into host code; failed or throttled flushes keep buffered events in memory, honor retry backoff, suppress duplicate/looping failures locally, keep remote probe directives process-local, and resolve trigger-token activations from request-local state only. Capture policy and project capture rules remain server-owned; the Node runtime currently enforces local `drop` plus sampled-out `sample` outcomes before buffering while leaving `demote` to ingestion/worker backstop enforcement until a backend-local context downgrade path exists. Relay handler must validate Origin, enforce body size limits, strip/override protected fields, and never expose server-side credentials to browser clients (INV-17, INV-18, INV-19).
 - **Transport selection:** File transport for `local`/`development` environments (writes to `.debugbundle/local/events/`), HTTP transport for `staging`/`production` in connected mode. Warns on staging/production without cloud connection. Browser relay writes to `.debugbundle/local/events/` (local-only) or `.debugbundle/local/browser-relay-spool/` (connected durable).
 - **Internal structure:** `core.ts` owns transport/buffering/runtime state plus request-context lookup; `file-transport.ts` owns atomic file-write transport for local events; `framework-integrations.ts` owns Express/Fastify/Next.js wrappers; `logger-integrations.ts` owns logger detection and method patching; `suppression.ts` owns duplicate suppression and loop-protection state; `remote-probes.ts` owns config parsing and directive matching; `trigger-token.ts` owns request token extraction/validation; `relay.ts` owns core relay handler logic (validation, sanitization, field override, write/forward, durable spool management); `relay-express.ts`, `relay-fastify.ts`, `relay-nextjs.ts` own framework-specific relay adapters; `utils.ts` and `types.ts` hold shared helpers/contracts
 
@@ -225,8 +225,8 @@ The public documentation/marketing/blog site lives in the standalone public repo
 - **Routes:** See `/contracts/public-interfaces.md`
 - **Imports:** `auth`, `shared-types`, `event-normalizer`, `redaction`, `storage`
 - **Does NOT own:** Bundle generation, reproduction, webhook delivery (those are worker)
-- **Key constraint:** Ingestion (`POST /v1/events`) must be lightweight — validate, rate-limit, enforce capture policy, persist raw, and enqueue only
-- **Key constraint:** Ingestion (`POST /v1/events`) must be lightweight — authenticate project token, enforce optional token `allowed_origins` when configured, validate, rate-limit, enforce capture policy, persist raw, enqueue only, and include the resolved capture preset plus resolved `immediate_client_error_statuses` on normalize jobs so request-event classification stays stable in the worker
+- **Key constraint:** Ingestion (`POST /v1/events`) must be lightweight — validate, rate-limit, enforce capture policy and capture rules, persist accepted raw events, and enqueue only
+- **Key constraint:** Ingestion (`POST /v1/events`) must be lightweight — authenticate project token, enforce optional token `allowed_origins` when configured, validate, rate-limit, enforce capture policy, apply project capture rules, persist accepted raw events, enqueue only, and include the resolved capture preset plus resolved `immediate_client_error_statuses` on normalize jobs so request-event classification stays stable in the worker
 - **Dogfooding note:** Dogfooding is now re-enabled against the published `@debugbundle/sdk-node` prerelease. `server.ts` optionally initializes the npm-published SDK during bootstrap when `DEBUGBUNDLE_DOGFOOD_PROJECT_TOKEN` is present, the manual dev-only backend trigger route `GET /__dogfood/backend-error` remains gated by `DEBUGBUNDLE_DOGFOOD_EXPOSE_TRIGGERS=true`, and the hosted owner-authenticated verification route `POST /v1/internal/dogfooding/backend-error` is separately gated by `DEBUGBUNDLE_DOGFOOD_EXPOSE_OWNER_TRIGGER=true`.
 - **Local dev note:** the top-level `docker-compose.yml` `dev` profile now publishes the API on host port `3003`, so the backend dogfood trigger is reachable directly at `http://localhost:3003/__dogfood/backend-error`
 - **Internal structure:**
@@ -247,6 +247,7 @@ The public documentation/marketing/blog site lives in the standalone public repo
   - `routes/slack.ts` — Slack OAuth connect flow plus reusable Slack destination list/test/delete routes shared by web, CLI, and MCP
   - `routes/probes.ts` — remote probe activation/deactivation and trigger-token issuance
   - `routes/capture-policy.ts` — per-project capture policy GET/PATCH
+  - `routes/capture-rules.ts` — per-project capture-rule CRUD plus incident-derived suggestion/create-from-suggestion flows
   - `routes/tokens.ts` — token lifecycle CRUD
   - `routes/webhooks.ts` — webhook CRUD, synthetic test delivery, delivery history retrieval, and manual delivery retry
   - `routes/weekly-report-channels.ts` — per-project weekly report channel CRUD
@@ -404,7 +405,7 @@ The public documentation/marketing/blog site lives in the standalone public repo
 ### Ingestion Flow
 
 ```
-SDK → POST /v1/events → API validates → enforce capture policy (reject policy-violating events) → S3 (raw) → Redis queue → Worker processes
+SDK → POST /v1/events → API validates → enforce capture policy and capture rules → S3 (raw accepted events only) → Redis queue → Worker processes
 
 Current execution detail: API request path does not persist incident metadata synchronously; worker-owned `normalize-events` and `group-incident` jobs perform normalization, event_class classification, grouping lifecycle persistence, sampled-occurrence retention decisions, raw-object pruning for demoted summary-only events, and transition evaluation. Exceptions, `error`/`fatal`/`critical` logs, and request events in the preset-specific immediate request-failure set classify as `incident_signal`; other request events remain `context_signal`. A dedicated request-anomaly counter in Redis can enqueue a deterministic anomaly-triggered `group-incident` job for repeated contextual request failures without changing the stored `event_class`. Free-tier billing counts only `incident_signal` events (INV-15).
 ```

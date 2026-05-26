@@ -18,6 +18,9 @@ export interface NormalizedEvent {
   http_method: string | null;
   http_status: number | null;
   top_frames: string[];
+  browser_event_kind?: "window_error" | "resource_error" | null;
+  resource_host?: string | null;
+  resource_path?: string | null;
   payload: unknown;
 }
 
@@ -36,6 +39,18 @@ export function inferMatchedFields(event: NormalizedEvent): string[] {
 
   if (event.top_frames.length > 0) {
     matchedFields.push("top_frames");
+  }
+
+  if (event.browser_event_kind != null) {
+    matchedFields.push("browser_event_kind");
+  }
+
+  if (event.resource_host != null) {
+    matchedFields.push("resource_host");
+  }
+
+  if (event.resource_path != null) {
+    matchedFields.push("resource_path");
   }
 
   if (event.http_method !== null) {
@@ -132,6 +147,44 @@ function selectTopFrames(stack: string, limit = 5): string[] {
   return frames;
 }
 
+function normalizeResourceIdentity(value: string | null): { host: string | null; path: string | null } {
+  if (value === null) {
+    return { host: null, path: null };
+  }
+
+  const trimmed = value.trim();
+  if (trimmed.length === 0) {
+    return { host: null, path: null };
+  }
+
+  if (trimmed.startsWith("/")) {
+    return {
+      host: null,
+      path: normalizeRoute(trimmed)
+    };
+  }
+
+  try {
+    const parsed = new URL(trimmed);
+    if (parsed.protocol === "http:" || parsed.protocol === "https:") {
+      return {
+        host: parsed.hostname.length > 0 ? parsed.hostname.toLowerCase() : null,
+        path: normalizeRoute(parsed.pathname)
+      };
+    }
+
+    return {
+      host: null,
+      path: parsed.protocol.replace(/:$/, "")
+    };
+  } catch {
+    return {
+      host: null,
+      path: normalizeRoute(trimmed) ?? trimmed
+    };
+  }
+}
+
 function stableJson(value: unknown): string {
   if (value === null || typeof value !== "object") {
     return JSON.stringify(value);
@@ -166,6 +219,9 @@ export function normalizeEvent(event: EventEnvelope): NormalizedEvent {
       http_method: event.payload.request.method,
       http_status: event.payload.response.status_code,
       top_frames: selectTopFrames(event.payload.stack),
+      browser_event_kind: null,
+      resource_host: null,
+      resource_path: null,
       payload: redactedPayload
     };
   }
@@ -180,6 +236,9 @@ export function normalizeEvent(event: EventEnvelope): NormalizedEvent {
       http_method: event.payload.method,
       http_status: event.payload.response_status,
       top_frames: [],
+      browser_event_kind: null,
+      resource_host: null,
+      resource_path: null,
       payload: redactedPayload
     };
   }
@@ -194,6 +253,33 @@ export function normalizeEvent(event: EventEnvelope): NormalizedEvent {
       http_method: null,
       http_status: null,
       top_frames: [],
+      browser_event_kind: null,
+      resource_host: null,
+      resource_path: null,
+      payload: redactedPayload
+    };
+  }
+
+  if (event.event_type === "frontend_exception") {
+    const browserEvent = event.payload.browser_event;
+    const resourceIdentity =
+      browserEvent?.kind === "resource_error"
+        ? normalizeResourceIdentity(browserEvent.target?.source_url ?? browserEvent.file_name)
+        : { host: null, path: null };
+    const topFrames = browserEvent?.opaque === true ? [] : selectTopFrames(event.payload.stack);
+
+    return {
+      event_type: event.event_type,
+      environment: event.service.environment,
+      error_type: event.payload.name,
+      normalized_message: normalizeMessage(event.payload.message),
+      route_template: normalizeRoute(event.payload.route ?? null),
+      http_method: null,
+      http_status: null,
+      top_frames: topFrames,
+      browser_event_kind: browserEvent?.kind ?? null,
+      resource_host: resourceIdentity.host,
+      resource_path: resourceIdentity.path,
       payload: redactedPayload
     };
   }
@@ -207,6 +293,9 @@ export function normalizeEvent(event: EventEnvelope): NormalizedEvent {
     http_method: null,
     http_status: null,
     top_frames: [],
+    browser_event_kind: null,
+    resource_host: null,
+    resource_path: null,
     payload: redactedPayload
   };
 }
@@ -217,6 +306,9 @@ export function fingerprint(event: NormalizedEvent): string {
     normalized_message: event.normalized_message,
     top_frames: event.top_frames,
     route_template: event.route_template,
+    browser_event_kind: event.browser_event_kind,
+    resource_host: event.resource_host,
+    resource_path: event.resource_path,
     http_method: event.http_method,
     http_status: event.http_status,
     environment: event.environment

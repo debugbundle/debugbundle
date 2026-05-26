@@ -575,6 +575,13 @@ export const ProjectParamsSchema = z
   })
   .strict();
 
+export const ProjectCaptureRuleParamsSchema = z
+  .object({
+    id: z.string().uuid(),
+    ruleId: z.string().uuid()
+  })
+  .strict();
+
 export const ProjectImprovementParamsSchema = z
   .object({
     id: z.string().uuid(),

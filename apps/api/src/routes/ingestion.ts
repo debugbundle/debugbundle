@@ -7,7 +7,14 @@ import {
   queueAllowanceThresholdNotifications
 } from "../../../../packages/storage/src/index.js";
 import { getTierCapabilities, resolvePolicy, PRESET_DEFAULTS, shouldCaptureEvent, getDefaultPreset, isSelfHostMode } from "../../../../packages/shared-types/src/index.js";
-import type { ResolvedCapturePolicy } from "../../../../packages/shared-types/src/index.js";
+import {
+  applyCaptureRuleEventClass,
+  buildCaptureRuleEvaluationContext,
+  evaluateCaptureRules,
+  type CaptureRuleEvaluationResult,
+  type EventClass,
+  type ResolvedCapturePolicy
+} from "../../../../packages/shared-types/src/index.js";
 import type { ApiDependencies } from "../api-types.js";
 import { redactEvent } from "../api-helpers.js";
 import { SMALL_REQUEST_BODY_LIMIT_BYTES } from "../http-limits.js";
@@ -20,18 +27,8 @@ function toRetryAfterSeconds(retryAfterMs: number): string {
 
 function countsTowardMonthlyIngestAllowance(
   organizationPlan: string | undefined,
-  event: ReturnType<typeof redactEvent>,
-  capturePolicy: ResolvedCapturePolicy
+  eventClass: EventClass
 ): boolean {
-  const eventClass = classifyEvent(
-    event.event_type,
-    event.event_type === "log_event" ? event.payload.level : undefined,
-    event.event_type === "probe_event" && "activation_id" in event.payload ? event.payload.activation_id : undefined,
-    event.payload as Record<string, unknown>,
-    capturePolicy.preset,
-    capturePolicy.immediate_client_error_statuses
-  );
-
   if (eventClass === "operational_signal") {
     return false;
   }
@@ -157,8 +154,77 @@ export function registerIngestionRoutes(app: FastifyInstance, dependencies: ApiD
     }
 
     const capturedEvents: typeof validEvents = [];
+    const activeCaptureRules =
+      dependencies.captureRuleManagement === undefined
+        ? []
+        : await dependencies.captureRuleManagement.listActiveCaptureRulesForProject({
+            project_id: project.project_id,
+            now: now.toISOString()
+          });
+    const matchedRuleHits: Array<{ rule_id: string; matched_at: string }> = [];
+    const acceptedEvents: Array<{
+      index: number;
+      event: ReturnType<typeof redactEvent>;
+      captureRule: CaptureRuleEvaluationResult | null;
+      eventClass: EventClass;
+    }> = [];
+
     for (const entry of validEvents) {
       if (shouldCaptureEvent(capturePolicy, entry.event.event_type, entry.event.payload as Record<string, unknown>)) {
+        const baseEventClass = classifyEvent(
+          entry.event.event_type,
+          entry.event.event_type === "log_event" ? entry.event.payload.level : undefined,
+          entry.event.event_type === "probe_event" && "activation_id" in entry.event.payload ? entry.event.payload.activation_id : undefined,
+          entry.event.payload as Record<string, unknown>,
+          capturePolicy.preset,
+          capturePolicy.immediate_client_error_statuses
+        );
+        const captureRule =
+          activeCaptureRules.length === 0
+            ? null
+            : evaluateCaptureRules(
+                activeCaptureRules,
+                buildCaptureRuleEvaluationContext({
+                  project_id: project.project_id,
+                  event: {
+                    event_id: entry.event.event_id,
+                    event_type: entry.event.event_type,
+                    service: {
+                      name: entry.event.service.name,
+                      environment: entry.event.service.environment,
+                      ...(entry.event.service.runtime === undefined ? {} : { runtime: entry.event.service.runtime })
+                    },
+                    payload: entry.event.payload as Record<string, unknown>
+                  }
+                }),
+                now.toISOString()
+              );
+
+        if (captureRule?.outcome === "drop") {
+          errors.push({ index: entry.index, reason: "capture_rule_dropped" });
+          matchedRuleHits.push({ rule_id: captureRule.rule_id, matched_at: now.toISOString() });
+          continue;
+        }
+
+        if (captureRule?.outcome === "sampled_out") {
+          errors.push({ index: entry.index, reason: "capture_rule_sampled_out" });
+          matchedRuleHits.push({ rule_id: captureRule.rule_id, matched_at: now.toISOString() });
+          continue;
+        }
+
+        if (captureRule !== null) {
+          matchedRuleHits.push({ rule_id: captureRule.rule_id, matched_at: now.toISOString() });
+        }
+
+        acceptedEvents.push({
+          index: entry.index,
+          event: entry.event,
+          captureRule,
+          eventClass: applyCaptureRuleEventClass({
+            event_class: baseEventClass,
+            capture_rule: captureRule
+          })
+        });
         capturedEvents.push(entry);
       } else {
         errors.push({ index: entry.index, reason: "capture_policy_rejected" });
@@ -177,8 +243,8 @@ export function registerIngestionRoutes(app: FastifyInstance, dependencies: ApiD
       dependencies.billingManagement !== undefined &&
       !isSelfHostMode()
     ) {
-      const countedEvents = capturedEvents.filter(({ event }) =>
-        countsTowardMonthlyIngestAllowance(project.organization_plan, event, capturePolicy)
+      const countedEvents = acceptedEvents.filter(({ eventClass }) =>
+        countsTowardMonthlyIngestAllowance(project.organization_plan, eventClass)
       );
 
       if (countedEvents.length > 0) {
@@ -202,7 +268,7 @@ export function registerIngestionRoutes(app: FastifyInstance, dependencies: ApiD
           }
           const retryAfterMs = getQuotaRetryAfterMs(billingSummary.usage_window.ends_at, now);
           errors.push(
-            ...capturedEvents.map(({ index }) => ({
+            ...acceptedEvents.map(({ index }) => ({
               index,
               reason: "monthly_quota_exceeded"
             }))
@@ -227,12 +293,31 @@ export function registerIngestionRoutes(app: FastifyInstance, dependencies: ApiD
     }
 
     let accepted = 0;
-    for (const { event } of capturedEvents) {
+    for (const { event, captureRule } of acceptedEvents) {
       await dependencies.ingestionPersistence.persistAndEnqueue(event, project.project_id, {
         capturePreset: capturePolicy.preset,
-        immediateClientErrorStatuses: capturePolicy.immediate_client_error_statuses
+        immediateClientErrorStatuses: capturePolicy.immediate_client_error_statuses,
+        ...(captureRule === null ? {} : { captureRule })
       });
       accepted += 1;
+    }
+
+    const captureRuleManagement = dependencies.captureRuleManagement;
+    if (
+      captureRuleManagement !== undefined &&
+      captureRuleManagement.recordCaptureRuleMatch !== undefined &&
+      matchedRuleHits.length > 0
+    ) {
+      const recordCaptureRuleMatch = captureRuleManagement.recordCaptureRuleMatch.bind(captureRuleManagement);
+      await Promise.allSettled(
+        matchedRuleHits.map((match) =>
+          recordCaptureRuleMatch({
+            project_id: project.project_id,
+            rule_id: match.rule_id,
+            matched_at: match.matched_at
+          })
+        )
+      );
     }
 
     if (

@@ -91,12 +91,21 @@ export function registerHealthRoutes(app: FastifyInstance, dependencies: ApiDepe
       }
     }
 
+    const captureRules =
+      dependencies.captureRuleManagement === undefined
+        ? []
+        : await dependencies.captureRuleManagement.listActiveCaptureRulesForProject({
+            project_id: projectAuth.context.project_id,
+            now: nowIso
+          });
+
     const responseBody = {
       probes_enabled: true,
       remote_probes_enabled: caps.remote_probes,
       active_probes: caps.remote_probes ? activations : [],
       poll_interval_ms: 60000,
       capture_policy: capturePolicy,
+      capture_rules: captureRules,
       ...(caps.remote_probes
         ? { trigger_token_key: deriveProbeTriggerTokenKey(projectAuth.context.project_id) }
         : {})

@@ -1046,4 +1046,121 @@ describe("worker processor \u2013 normalize-events", () => {
     );
   });
 
+  it("should demote matched capture-rule events before group-incident processing", async (): Promise<void> => {
+    const event = createEventEnvelope({
+      event_type: "frontend_exception",
+      service: { name: "web", environment: "production", runtime: "browser", framework: "react" },
+      payload: {
+        name: "ResourceLoadError",
+        message: "Failed to load resource",
+        stack: "ResourceLoadError: Failed to load resource",
+        route: "/checkout",
+        browser: { name: "Chrome", version: "125.0.0.0" },
+        browser_event: {
+          kind: "resource_error",
+          message: "Failed to load resource",
+          file_name: "https://analytics.example.com/tag.js",
+          line_number: null,
+          column_number: null,
+          target: {
+            tag_name: "SCRIPT",
+            source_url: "https://analytics.example.com/tag.js"
+          },
+          opaque: true
+        }
+      }
+    });
+
+    const queue = {
+      enqueue: vi.fn().mockResolvedValue(undefined),
+      dequeue: vi.fn().mockResolvedValue({
+        project_id: "proj_1",
+        event_id: event.event_id,
+        object_key: "raw-events/proj_1/file.json.gz",
+        capture_rule: {
+          rule_id: "00000000-0000-4000-8000-000000000101",
+          action: "demote",
+          outcome: "demote",
+          sample_rate: null,
+          sample_event_class: null
+        }
+      })
+    };
+
+    await processNextNormalizeEventsJob({
+      queue,
+      objectStore: { getObject: vi.fn().mockResolvedValue(gzipSync(Buffer.from(JSON.stringify(event), "utf8"))) },
+      processedEventStore: { upsertProcessedEvent: vi.fn().mockResolvedValue(undefined) }
+    });
+
+    expect(queue.enqueue).toHaveBeenCalledWith(
+      "group-incident",
+      expect.objectContaining({
+        event_class: "context_signal",
+        matched_fields: expect.arrayContaining(["browser_event_kind", "resource_host", "capture_rule_demote"])
+      })
+    );
+  });
+
+  it("should skip request-anomaly promotion for demoted request events", async (): Promise<void> => {
+    const event = createEventEnvelope({
+      event_type: "request_event",
+      service: { name: "api", environment: "production", runtime: "node", framework: "fastify" },
+      payload: {
+        method: "GET",
+        path: "/v1/checkout/orders/123",
+        query: {},
+        headers: {},
+        response_status: 404,
+        duration_ms: 12
+      }
+    });
+
+    const queue = {
+      enqueue: vi.fn().mockResolvedValue(undefined),
+      dequeue: vi.fn().mockResolvedValue({
+        project_id: "proj_1",
+        event_id: event.event_id,
+        object_key: "raw-events/proj_1/file.json.gz",
+        capture_preset: "balanced",
+        capture_rule: {
+          rule_id: "00000000-0000-4000-8000-000000000102",
+          action: "demote",
+          outcome: "demote",
+          sample_rate: null,
+          sample_event_class: null
+        }
+      })
+    };
+
+    const requestAnomalyCounter = {
+      recordObservation: vi.fn().mockResolvedValue({
+        occurrences_1m: 5,
+        occurrences_5m: 24,
+        occurrences_1h: 60,
+        occurrences_24h: 240,
+        baseline_1h_per_5m: 5,
+        spike_ratio_5m_to_1h: 4.8,
+        has_sufficient_baseline: true,
+        is_spiking: true
+      })
+    };
+
+    await processNextNormalizeEventsJob({
+      queue,
+      objectStore: { getObject: vi.fn().mockResolvedValue(gzipSync(Buffer.from(JSON.stringify(event), "utf8"))) },
+      processedEventStore: { upsertProcessedEvent: vi.fn().mockResolvedValue(undefined) },
+      requestAnomalyCounter
+    });
+
+    expect(queue.enqueue).toHaveBeenCalledTimes(1);
+    expect(queue.enqueue).toHaveBeenCalledWith(
+      "group-incident",
+      expect.objectContaining({
+        event_class: "context_signal",
+        matched_fields: expect.arrayContaining(["capture_rule_demote"])
+      })
+    );
+  });
+
 });

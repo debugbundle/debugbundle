@@ -12,6 +12,7 @@ import { registerAlertRoutes } from "./routes/alerts.js";
 import { registerAccountRoutes } from "./routes/account.js";
 import { registerBillingRoutes } from "./routes/billing.js";
 import { registerCapturePolicyRoutes } from "./routes/capture-policy.js";
+import { registerCaptureRuleRoutes } from "./routes/capture-rules.js";
 import { registerGitHubRoutes } from "./routes/github.js";
 import { registerHealthRoutes } from "./routes/health.js";
 import { registerImprovementRoutes } from "./routes/improvements.js";
@@ -276,6 +277,7 @@ export function createApiServer(dependencies: ApiDependencies, options: ApiServe
   registerTokenRoutes(app, dependencies);
   registerAlertRoutes(app, dependencies);
   registerCapturePolicyRoutes(app, dependencies);
+  registerCaptureRuleRoutes(app, dependencies);
   registerImprovementSettingsRoutes(app, dependencies);
   registerWeeklyReportChannelRoutes(app, dependencies);
   registerWebhookRoutes(app, dependencies);

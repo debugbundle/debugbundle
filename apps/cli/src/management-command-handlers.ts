@@ -9,6 +9,12 @@ import {
   setCapturePolicyWithAuthCommand as defaultSetCapturePolicyCommand
 } from "./capture-policy-commands.js";
 import {
+  createCaptureRuleWithAuthCommand as defaultCreateCaptureRuleCommand,
+  deleteCaptureRuleWithAuthCommand as defaultDeleteCaptureRuleCommand,
+  listCaptureRulesWithAuthCommand as defaultListCaptureRulesCommand,
+  updateCaptureRuleWithAuthCommand as defaultUpdateCaptureRuleCommand
+} from "./capture-rule-commands.js";
+import {
   getImprovementBundleWithAuthCommand as defaultGetImprovementBundleCommand,
   getImprovementWithAuthCommand as defaultGetImprovementCommand,
   listImprovementsWithAuthCommand as defaultListImprovementsCommand,
@@ -99,7 +105,7 @@ import {
   requirePositional,
   type ParsedArgv
 } from "./argv-helpers.js";
-import type { CapturePolicyUpdate } from "../../../packages/shared-types/src/index.js";
+import type { CapturePolicyUpdate, CaptureRuleCreate, CaptureRuleUpdate } from "../../../packages/shared-types/src/index.js";
 
 export type ManagementCommandDependencies = {
   getBillingSummaryCommand?: typeof defaultGetBillingSummaryCommand;
@@ -137,6 +143,10 @@ export type ManagementCommandDependencies = {
   deleteSlackDestinationCommand?: typeof defaultDeleteSlackDestinationCommand;
   getCapturePolicyCommand?: typeof defaultGetCapturePolicyCommand;
   setCapturePolicyCommand?: typeof defaultSetCapturePolicyCommand;
+  listCaptureRulesCommand?: typeof defaultListCaptureRulesCommand;
+  createCaptureRuleCommand?: typeof defaultCreateCaptureRuleCommand;
+  updateCaptureRuleCommand?: typeof defaultUpdateCaptureRuleCommand;
+  deleteCaptureRuleCommand?: typeof defaultDeleteCaptureRuleCommand;
   listImprovementsCommand?: typeof defaultListImprovementsCommand;
   getImprovementCommand?: typeof defaultGetImprovementCommand;
   getImprovementBundleCommand?: typeof defaultGetImprovementBundleCommand;
@@ -1047,6 +1057,202 @@ export async function handleCapturePolicyCommand(
   }
 
   throw new CliInputError("Unknown capture-policy command.");
+}
+
+export async function handleCaptureRuleCommand(
+  parsedArgv: ParsedArgv,
+  dependencies: ManagementCommandDependencies
+): Promise<CliCommandResult> {
+  const action = requirePositional(parsedArgv, 1, "action");
+
+  if (action === "list") {
+    expectNoUnknownOptions(parsedArgv, ["auth-file", "json", "project-id"]);
+    ensureNoExtraPositionals(parsedArgv, 2);
+
+    const projectId = readStringOption(parsedArgv, "project-id");
+    if (projectId === undefined) {
+      throw new CliInputError("Missing required option --project-id.");
+    }
+
+    return await (dependencies.listCaptureRulesCommand ?? defaultListCaptureRulesCommand)(
+      appendCommonAuthOptions(parsedArgv, { projectId })
+    );
+  }
+
+  if (action === "create") {
+    expectNoUnknownOptions(parsedArgv, [
+      "auth-file",
+      "json",
+      "project-id",
+      "name",
+      "description",
+      "enabled",
+      "action",
+      "matcher-json",
+      "sample-rate",
+      "sample-event-class",
+      "expires-at"
+    ]);
+    ensureNoExtraPositionals(parsedArgv, 2);
+
+    const projectId = readStringOption(parsedArgv, "project-id");
+    if (projectId === undefined) {
+      throw new CliInputError("Missing required option --project-id.");
+    }
+    const name = readStringOption(parsedArgv, "name");
+    if (name === undefined) {
+      throw new CliInputError("Missing required option --name.");
+    }
+    const actionValue = readStringOption(parsedArgv, "action");
+    if (actionValue === undefined) {
+      throw new CliInputError("Missing required option --action.");
+    }
+    if (actionValue !== "demote" && actionValue !== "sample" && actionValue !== "drop") {
+      throw new CliInputError("Invalid value for --action.");
+    }
+    const matcher = readJsonOption(parsedArgv, "matcher-json");
+    if (matcher === undefined) {
+      throw new CliInputError("Missing required option --matcher-json.");
+    }
+    if (matcher === null || typeof matcher !== "object" || Array.isArray(matcher)) {
+      throw new CliInputError("Invalid value for --matcher-json.");
+    }
+
+    const create: CaptureRuleCreate = {
+      name,
+      description: readStringOption(parsedArgv, "description") ?? null,
+      enabled: readBooleanStringOption(parsedArgv, "enabled") ?? true,
+      action: actionValue,
+      matcher,
+      sample_rate: null as number | null,
+      sample_event_class: null as "preserve" | "context" | null,
+      created_by_user_id: null,
+      created_from_incident_id: null,
+      created_from_event_id: null,
+      expires_at: readStringOption(parsedArgv, "expires-at") ?? null
+    };
+
+    const sampleRate = readStringOption(parsedArgv, "sample-rate");
+    if (sampleRate !== undefined) {
+      const parsed = Number(sampleRate);
+      if (!Number.isFinite(parsed)) {
+        throw new CliInputError("Invalid value for --sample-rate.");
+      }
+      create.sample_rate = parsed;
+    }
+
+    const sampleEventClass = readStringOption(parsedArgv, "sample-event-class");
+    if (sampleEventClass !== undefined) {
+      if (sampleEventClass !== "preserve" && sampleEventClass !== "context") {
+        throw new CliInputError("Invalid value for --sample-event-class.");
+      }
+      create.sample_event_class = sampleEventClass;
+    }
+
+    return await (dependencies.createCaptureRuleCommand ?? defaultCreateCaptureRuleCommand)(
+      appendCommonAuthOptions(parsedArgv, { projectId, create })
+    );
+  }
+
+  if (action === "update") {
+    expectNoUnknownOptions(parsedArgv, [
+      "auth-file",
+      "json",
+      "project-id",
+      "name",
+      "description",
+      "enabled",
+      "action",
+      "matcher-json",
+      "sample-rate",
+      "sample-event-class",
+      "expires-at"
+    ]);
+    ensureNoExtraPositionals(parsedArgv, 3);
+
+    const projectId = readStringOption(parsedArgv, "project-id");
+    if (projectId === undefined) {
+      throw new CliInputError("Missing required option --project-id.");
+    }
+
+    const update: CaptureRuleUpdate = {};
+    const name = readStringOption(parsedArgv, "name");
+    if (name !== undefined) {
+      update["name"] = name;
+    }
+    const description = readStringOption(parsedArgv, "description");
+    if (description !== undefined) {
+      update["description"] = description;
+    }
+    const enabled = readBooleanStringOption(parsedArgv, "enabled");
+    if (enabled !== undefined) {
+      update["enabled"] = enabled;
+    }
+    const actionValue = readStringOption(parsedArgv, "action");
+    if (actionValue !== undefined) {
+      if (actionValue !== "demote" && actionValue !== "sample" && actionValue !== "drop") {
+        throw new CliInputError("Invalid value for --action.");
+      }
+      update["action"] = actionValue;
+    }
+    const matcher = readJsonOption(parsedArgv, "matcher-json");
+    if (matcher !== undefined) {
+      if (matcher === null || typeof matcher !== "object" || Array.isArray(matcher)) {
+        throw new CliInputError("Invalid value for --matcher-json.");
+      }
+      update["matcher"] = matcher;
+    }
+    const sampleRate = readStringOption(parsedArgv, "sample-rate");
+    if (sampleRate !== undefined) {
+      const parsed = Number(sampleRate);
+      if (!Number.isFinite(parsed)) {
+        throw new CliInputError("Invalid value for --sample-rate.");
+      }
+      update["sample_rate"] = parsed;
+    }
+    const sampleEventClass = readStringOption(parsedArgv, "sample-event-class");
+    if (sampleEventClass !== undefined) {
+      if (sampleEventClass !== "preserve" && sampleEventClass !== "context") {
+        throw new CliInputError("Invalid value for --sample-event-class.");
+      }
+      update["sample_event_class"] = sampleEventClass;
+    }
+    const expiresAt = readStringOption(parsedArgv, "expires-at");
+    if (expiresAt !== undefined) {
+      update["expires_at"] = expiresAt;
+    }
+
+    if (Object.keys(update).length === 0) {
+      throw new CliInputError("At least one capture rule field must be provided.");
+    }
+
+    return await (dependencies.updateCaptureRuleCommand ?? defaultUpdateCaptureRuleCommand)(
+      appendCommonAuthOptions(parsedArgv, {
+        projectId,
+        ruleId: requirePositional(parsedArgv, 2, "rule-id"),
+        update
+      })
+    );
+  }
+
+  if (action === "delete") {
+    expectNoUnknownOptions(parsedArgv, ["auth-file", "json", "project-id"]);
+    ensureNoExtraPositionals(parsedArgv, 3);
+
+    const projectId = readStringOption(parsedArgv, "project-id");
+    if (projectId === undefined) {
+      throw new CliInputError("Missing required option --project-id.");
+    }
+
+    return await (dependencies.deleteCaptureRuleCommand ?? defaultDeleteCaptureRuleCommand)(
+      appendCommonAuthOptions(parsedArgv, {
+        projectId,
+        ruleId: requirePositional(parsedArgv, 2, "rule-id")
+      })
+    );
+  }
+
+  throw new CliInputError("Unknown capture-rule command.");
 }
 
 export async function handleProbeCommand(parsedArgv: ParsedArgv, dependencies: ManagementCommandDependencies): Promise<CliCommandResult> {

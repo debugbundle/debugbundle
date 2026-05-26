@@ -88,6 +88,127 @@ describe("web app — incident table interactions", () => {
     expect(screen.getByRole("link", { name: /back to incidents/i })).toHaveAttribute("href", "/incidents");
   });
 
+  it("creates a capture rule from an incident suggestion on the detail page", async () => {
+    const user = userEvent.setup();
+    const project = createProject();
+    const incident = createIncident({
+      project_id: project.project_id,
+      project_name: project.name,
+      service_name: "Checkout API"
+    });
+
+    const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = requestUrl(input);
+
+      if (url.endsWith("/v1/auth/session")) {
+        return jsonResponse(200, { session: createSession() });
+      }
+
+      if (url.endsWith(`/v1/incidents/${incident.incident_id}`) && init?.method === undefined) {
+        return jsonResponse(200, { incident });
+      }
+
+      if (url.endsWith(`/v1/incidents/${incident.incident_id}/bundle`)) {
+        return jsonResponse(200, { status: "pending" });
+      }
+
+      if (url.endsWith(`/v1/incidents/${incident.incident_id}/reproduction`)) {
+        return jsonResponse(200, { status: "pending" });
+      }
+
+      if (url.endsWith(`/v1/incidents/${incident.incident_id}/capture-rule-suggestion`) && init?.method === "POST") {
+        return jsonResponse(200, {
+          bundle_status: "ready",
+          suggestions: [
+            {
+              suggestion_id: "primary_resource_host_demote",
+              label: "Demote resource errors from analytics.example.com",
+              recommended_action: "demote",
+              confidence: "high",
+              reason: "Known third-party resource noise.",
+              requires_confirmation: false,
+              rule: {
+                name: "Demote resource errors from analytics.example.com",
+                description: null,
+                enabled: true,
+                action: "demote",
+                matcher: {
+                  event_types: ["frontend_exception"],
+                  browser_event_kind: "resource_error",
+                  resource_url: { host: "analytics.example.com" }
+                },
+                sample_rate: null,
+                sample_event_class: null,
+                created_by_user_id: null,
+                created_from_incident_id: incident.incident_id,
+                created_from_event_id: null,
+                expires_at: null
+              }
+            }
+          ]
+        });
+      }
+
+      if (url.endsWith(`/v1/incidents/${incident.incident_id}/capture-rules`) && init?.method === "POST") {
+        expect(init.body).toBe(JSON.stringify({ suggestion_id: "primary_resource_host_demote" }));
+        return jsonResponse(201, {
+          rule: {
+            id: "rule_1",
+            project_id: project.project_id,
+            name: "Demote resource errors from analytics.example.com",
+            description: null,
+            enabled: true,
+            action: "demote",
+            matcher: {
+              event_types: ["frontend_exception"],
+              browser_event_kind: "resource_error",
+              resource_url: { host: "analytics.example.com" }
+            },
+            sample_rate: null,
+            sample_event_class: null,
+            created_by_user_id: null,
+            created_from_incident_id: incident.incident_id,
+            created_from_event_id: null,
+            expires_at: null,
+            hit_count: 0,
+            last_matched_at: null,
+            created_at: "2026-05-26T10:00:00.000Z",
+            updated_at: "2026-05-26T10:00:00.000Z"
+          }
+        });
+      }
+
+      return jsonResponse(404, { error: "not_found" });
+    });
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<App initialEntries={[`/incidents/${incident.incident_id}`]} />);
+
+    await screen.findByRole("button", { name: /mark resolved/i });
+    await user.click(screen.getByRole("button", { name: /capture rules/i }));
+
+    expect(await screen.findByText(/demote resource errors from analytics\.example\.com/i)).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: /create rule/i }));
+
+    await waitFor(() => {
+      expect(
+        fetchMock.mock.calls.some(
+          ([input, init]) =>
+            requestUrl(input).endsWith(`/v1/incidents/${incident.incident_id}/capture-rules`) && init?.method === "POST"
+        )
+      ).toBe(true);
+    });
+
+    expect(await screen.findByRole("button", { name: /^created$/i })).toBeInTheDocument();
+
+    await user.click(screen.getAllByRole("button", { name: /^close$/i }).at(-1) as HTMLButtonElement);
+    await user.click(screen.getByRole("button", { name: /capture rules/i }));
+
+    expect(await screen.findByRole("button", { name: /^create rule$/i })).toBeInTheDocument();
+  });
+
   it("bulk resolves and bulk reopens workspace incidents from the table", async () => {
     const user = userEvent.setup();
     const project = createProject();

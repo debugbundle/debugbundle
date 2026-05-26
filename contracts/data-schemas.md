@@ -1004,7 +1004,35 @@ One row per project. Created on project creation with tier-appropriate defaults 
 
 **Resolved policy:** For each control, use the explicit override if non-null, otherwise the preset default. This resolved policy is served via `GET /v1/sdk/config` and `GET /v1/projects/{id}/capture-policy`.
 
-### 5.16 github_installations
+### 5.16 capture_rules
+
+| Column | Type | Constraints |
+|--------|------|-------------|
+| id | uuid | PK |
+| project_id | text | NOT NULL, FK -> projects, CASCADE |
+| name | text | NOT NULL |
+| description | text | |
+| enabled | boolean | NOT NULL DEFAULT true |
+| action | text | NOT NULL, CHECK IN (`demote`, `sample`, `drop`) |
+| matcher | jsonb | NOT NULL |
+| sample_rate | double precision | Required only when `action = 'sample'` |
+| sample_event_class | text | Required only when `action = 'sample'`, CHECK IN (`preserve`, `context`) |
+| created_by_user_id | text | |
+| created_from_incident_id | text | |
+| created_from_event_id | uuid | |
+| expires_at | timestamptz | |
+| hit_count | integer | NOT NULL DEFAULT 0 |
+| last_matched_at | timestamptz | |
+| created_at | timestamptz | NOT NULL DEFAULT now() |
+| updated_at | timestamptz | NOT NULL DEFAULT now() |
+
+Capture rules are project-level manual decisions for known noisy event patterns. `demote` keeps matching events as context, `sample` deterministically retains a fraction of matching events, and `drop` rejects matching events before raw persistence where possible. Active rules are served in `GET /v1/sdk/config` as `capture_rules`.
+
+**Indexes:**
+- `capture_rules_project_enabled_idx` on (project_id, enabled)
+- `capture_rules_project_updated_idx` on (project_id, updated_at DESC)
+
+### 5.17 github_installations
 
 | Column | Type | Constraints |
 |--------|------|-------------|
@@ -1019,7 +1047,7 @@ One row per project. Created on project creation with tier-appropriate defaults 
 
 One row per GitHub App installation. Scoped to one DebugBundle organization. `installation_id` is the GitHub-assigned numeric ID. `status` tracks installation lifecycle from GitHub App webhook events.
 
-### 5.17 project_github_repos
+### 5.18 project_github_repos
 
 | Column | Type | Constraints |
 |--------|------|-------------|
@@ -1034,7 +1062,7 @@ One row per GitHub App installation. Scoped to one DebugBundle organization. `in
 
 One primary repo per project, enforced by `UNIQUE` on `project_id`. `installation_id` references the GitHub App installation (not the GitHub numeric ID).
 
-### 5.18 github_dispatch_rules
+### 5.19 github_dispatch_rules
 
 | Column | Type | Constraints |
 |--------|------|-------------|
@@ -1054,7 +1082,7 @@ One primary repo per project, enforced by `UNIQUE` on `project_id`. `installatio
 
 Dispatch rules reuse the same filter field semantics as webhook filters (`event_types`, `environments`, `services`, `severity_min`, `bundle_type`). `incident_status` and `cooldown_seconds` are dispatch-specific. `cooldown_seconds` minimum configurable value is 60.
 
-### 5.19 github_dispatch_deliveries
+### 5.20 github_dispatch_deliveries
 
 | Column | Type | Constraints |
 |--------|------|-------------|

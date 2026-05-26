@@ -30,6 +30,8 @@ export type { BillingSyncStore, BillingEntitlementUpdate } from "./billing-sync-
 export { createPostgresBillingSyncStore } from "./billing-sync-store.js";
 export type { CapturePolicyStore } from "./capture-policy-store.js";
 export { createPostgresCapturePolicyStore } from "./capture-policy-store.js";
+export type { CaptureRuleStore } from "./capture-rule-store.js";
+export { createPostgresCaptureRuleStore } from "./capture-rule-store.js";
 export type { ImprovementSettingsStore } from "./improvement-settings-store.js";
 export { createPostgresImprovementSettingsStore } from "./improvement-settings-store.js";
 export type {
@@ -80,6 +82,7 @@ export { buildGravatarAvatarUrl, importUserAvatarFromUrl } from "./user-avatar-s
 export { createRedisQueueClient } from "./redis-queue.js";
 export {
 	migrateStorageSchema,
+	seedStorageMigrationLedgerForCurrentSchema,
 	assertStorageSchemaMigrationsApplied,
 	STORAGE_SCHEMA_MIGRATIONS
 } from "./schema-migrations.js";

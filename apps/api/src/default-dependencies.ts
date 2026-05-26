@@ -14,6 +14,8 @@ import {
 } from "../../../packages/auth/src/index.js";
 import {
   getDefaultPreset,
+  type CaptureRuleCreate,
+  type CaptureRuleUpdate,
   type CapturePolicyUpdate,
   type ImprovementSettingsUpdate
 } from "../../../packages/shared-types/src/index.js";
@@ -40,6 +42,7 @@ import {
   createPostgresBillingSyncStore,
   createPostgresAuthStore,
   createPostgresCapturePolicyStore,
+  createPostgresCaptureRuleStore,
   createPostgresImprovementOpportunityStore,
   createPostgresImprovementSettingsStore,
   createPostgresGitHubStore,
@@ -733,6 +736,48 @@ export function createApiDependencies(input: CreateApiDependenciesInput): {
       | null
     >;
   };
+  captureRuleManagement: {
+    listCaptureRulesForProject(input: {
+      organization_id: string;
+      project_id: string;
+    }): Promise<ReturnType<typeof createPostgresCaptureRuleStore>["listCaptureRulesByProjectId"] extends (...args: never[]) => Promise<infer TResult> ? TResult : never>;
+    listActiveCaptureRulesForProject(input: {
+      project_id: string;
+      now: string;
+    }): Promise<ReturnType<typeof createPostgresCaptureRuleStore>["listActiveCaptureRulesByProjectId"] extends (...args: never[]) => Promise<infer TResult> ? TResult : never>;
+    createCaptureRuleForProject(input: {
+      organization_id: string;
+      project_id: string;
+      id: string;
+      create: CaptureRuleCreate;
+    }): Promise<
+      | (ReturnType<typeof createPostgresCaptureRuleStore>["createCaptureRule"] extends (...args: never[]) => Promise<infer TResult>
+          ? TResult
+          : never)
+      | null
+    >;
+    updateCaptureRuleForProject(input: {
+      organization_id: string;
+      project_id: string;
+      rule_id: string;
+      update: CaptureRuleUpdate;
+    }): Promise<
+      | (ReturnType<typeof createPostgresCaptureRuleStore>["updateCaptureRule"] extends (...args: never[]) => Promise<infer TResult>
+          ? TResult
+          : never)
+      | null
+    >;
+    deleteCaptureRuleForProject(input: {
+      organization_id: string;
+      project_id: string;
+      rule_id: string;
+    }): Promise<boolean>;
+    recordCaptureRuleMatch(input: {
+      project_id: string;
+      rule_id: string;
+      matched_at: string;
+    }): Promise<void>;
+  };
   improvementSettingsManagement: {
     getImprovementSettingsForProject(input: {
       organization_id: string;
@@ -844,6 +889,7 @@ export function createApiDependencies(input: CreateApiDependenciesInput): {
   const billingStore = createPostgresBillingStore(input.db);
   const billingSyncStore = createPostgresBillingSyncStore(input.db);
   const capturePolicyStore = createPostgresCapturePolicyStore(input.db);
+  const captureRuleStore = createPostgresCaptureRuleStore(input.db);
   const improvementOpportunityStore = createPostgresImprovementOpportunityStore(input.db);
   const improvementSettingsStore = createPostgresImprovementSettingsStore(input.db);
   const metadataStore = createPostgresMetadataStore(input.db);
@@ -1746,6 +1792,117 @@ export function createApiDependencies(input: CreateApiDependenciesInput): {
         });
         return record;
       }
+    },
+    captureRuleManagement: {
+      listCaptureRulesForProject: (input: { organization_id: string; project_id: string }) => {
+        void input.organization_id;
+        return captureRuleStore.listCaptureRulesByProjectId(input.project_id);
+      },
+      listActiveCaptureRulesForProject: (input: { project_id: string; now: string }) =>
+        captureRuleStore.listActiveCaptureRulesByProjectId(input),
+      createCaptureRuleForProject: async (input: {
+        organization_id: string;
+        project_id: string;
+        id: string;
+        create: CaptureRuleCreate;
+      }) => {
+        const projects = await metadataStore.listProjectsForOrganization({
+          organization_id: input.organization_id,
+          now: new Date().toISOString(),
+          limit: 1_000
+        });
+        const project = projects.find((candidate) => candidate.project_id === input.project_id);
+        if (project === undefined) {
+          return null;
+        }
+
+        return captureRuleStore.createCaptureRule({
+          id: input.id,
+          project_id: input.project_id,
+          name: input.create.name,
+          description: input.create.description,
+          enabled: input.create.enabled,
+          action: input.create.action,
+          matcher: input.create.matcher,
+          sample_rate: input.create.sample_rate,
+          sample_event_class: input.create.sample_event_class,
+          created_by_user_id: input.create.created_by_user_id,
+          created_from_incident_id: input.create.created_from_incident_id,
+          created_from_event_id: input.create.created_from_event_id,
+          expires_at: input.create.expires_at
+        });
+      },
+      updateCaptureRuleForProject: (input: {
+        organization_id: string;
+        project_id: string;
+        rule_id: string;
+        update: CaptureRuleUpdate;
+      }) => {
+        void input.organization_id;
+        const update: {
+          id: string;
+          project_id: string;
+          name?: string;
+          description?: string | null;
+          enabled?: boolean;
+          action?: "demote" | "sample" | "drop";
+          matcher?: CaptureRuleCreate["matcher"];
+          sample_rate?: number | null;
+          sample_event_class?: "preserve" | "context" | null;
+          expires_at?: string | null;
+        } = {
+          id: input.rule_id,
+          project_id: input.project_id
+        };
+
+        if (input.update.name !== undefined) {
+          update.name = input.update.name;
+        }
+        if (input.update.description !== undefined) {
+          update.description = input.update.description;
+        }
+        if (input.update.enabled !== undefined) {
+          update.enabled = input.update.enabled;
+        }
+        if (input.update.action !== undefined) {
+          update.action = input.update.action;
+          if (input.update.action !== "sample") {
+            update.sample_rate = null;
+            update.sample_event_class = null;
+          }
+        }
+        if (input.update.matcher !== undefined) {
+          update.matcher = input.update.matcher;
+        }
+        if (input.update.sample_rate !== undefined) {
+          update.sample_rate = input.update.sample_rate;
+        }
+        if (input.update.sample_event_class !== undefined) {
+          update.sample_event_class = input.update.sample_event_class;
+        }
+        if (input.update.expires_at !== undefined) {
+          update.expires_at = input.update.expires_at;
+        }
+
+        return captureRuleStore.updateCaptureRule(update);
+      },
+      deleteCaptureRuleForProject: (input: {
+        organization_id: string;
+        project_id: string;
+        rule_id: string;
+      }) => {
+        void input.organization_id;
+        return captureRuleStore.deleteCaptureRule({
+          id: input.rule_id,
+          project_id: input.project_id
+        });
+      },
+      recordCaptureRuleMatch: (input: { project_id: string; rule_id: string; matched_at: string }) =>
+        captureRuleStore.recordCaptureRuleMatch({
+          id: input.rule_id,
+          project_id: input.project_id,
+          matched_at: input.matched_at
+        })
     },
     improvementSettingsManagement: {
       getImprovementSettingsForProject: (input: { organization_id: string; project_id: string }) => {

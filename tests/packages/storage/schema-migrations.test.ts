@@ -1,11 +1,18 @@
 import { describe, expect, it, vi } from "vitest";
 
 import {
+  REQUIRED_API_TABLES,
+  REQUIRED_WORKER_TABLES
+} from "../../../packages/storage/src/migrations.js";
+import {
   assertStorageSchemaMigrationsApplied,
   migrateStorageSchema,
+  seedStorageMigrationLedgerForCurrentSchema,
   STORAGE_SCHEMA_MIGRATIONS
 } from "../../../packages/storage/src/schema-migrations.js";
 import type { Queryable } from "../../../packages/storage/src/migrations.js";
+
+const ALL_REQUIRED_TABLES = Array.from(new Set([...REQUIRED_API_TABLES, ...REQUIRED_WORKER_TABLES]));
 
 describe("storage schema migrations", () => {
   it("should apply pending migrations once and persist checksums", async (): Promise<void> => {
@@ -21,7 +28,9 @@ describe("storage schema migrations", () => {
     expect(result.applied).toEqual(STORAGE_SCHEMA_MIGRATIONS.map((migration) => migration.id));
     expect(query).toHaveBeenCalledWith("BEGIN", []);
     expect(query).toHaveBeenCalledWith("COMMIT", []);
-    expect(String(query.mock.calls[3]?.[0] ?? "")).toContain("ALTER TABLE organizations ADD COLUMN IF NOT EXISTS suspended_at timestamptz");
+    expect(query.mock.calls.map((call) => String(call[0]))).toContainEqual(
+      expect.stringContaining("ALTER TABLE organizations ADD COLUMN IF NOT EXISTS suspended_at timestamptz")
+    );
     expect(query.mock.calls.map((call) => String(call[0]))).toContainEqual(expect.stringContaining("CREATE TABLE IF NOT EXISTS slack_destinations"));
   });
 
@@ -76,6 +85,44 @@ describe("storage schema migrations", () => {
     );
     await expect(assertStorageSchemaMigrationsApplied({ query: checksumMismatchQuery } as Queryable)).rejects.toThrow(
       "storage_migration_checksum_mismatch"
+    );
+  });
+
+  it("should seed the migration ledger instead of replaying history for a current bootstrap schema", async (): Promise<void> => {
+    const currentSchemaColumns = [
+      { table_name: "agent_webhooks", column_name: "created_by_user_id" },
+      { table_name: "alert_rules", column_name: "created_by_user_id" },
+      { table_name: "capture_policies", column_name: "immediate_client_error_statuses" },
+      { table_name: "github_dispatch_rules", column_name: "created_by_user_id" },
+      { table_name: "github_dispatch_deliveries", column_name: "target_fingerprint" },
+      { table_name: "incidents", column_name: "bundle_source_occurred_at" },
+      { table_name: "incidents", column_name: "bundle_trigger" },
+      { table_name: "organization_members", column_name: "suspended_at" },
+      { table_name: "organizations", column_name: "suspended_at" },
+      { table_name: "project_tokens", column_name: "allowed_origins" },
+      { table_name: "projects", column_name: "improvement_bundle_sensitivity" },
+      { table_name: "users", column_name: "avatar_source" }
+    ];
+    const query = vi
+      .fn()
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({
+        rows: ALL_REQUIRED_TABLES.map((table_name) => ({ table_name }))
+      })
+      .mockResolvedValueOnce({
+        rows: currentSchemaColumns
+      })
+      .mockResolvedValue({ rows: [] });
+
+    const result = await migrateStorageSchema({ query } as Queryable);
+
+    expect(result.applied).toEqual([]);
+    expect(result.already_applied).toEqual(STORAGE_SCHEMA_MIGRATIONS.map((migration) => migration.id));
+    expect(query).not.toHaveBeenCalledWith(
+      expect.stringContaining("ALTER TABLE github_dispatch_deliveries RENAME COLUMN incident_fingerprint TO target_fingerprint"),
+      []
     );
   });
 
@@ -152,5 +199,21 @@ describe("storage schema migrations", () => {
     } finally {
       mutatedMigrations.splice(0, mutatedMigrations.length, ...originalMigrations);
     }
+  });
+
+  it("should leave the ledger empty when the schema is not at the current baseline", async (): Promise<void> => {
+    const query = vi
+      .fn()
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({
+        rows: [{ table_name: "capture_rules" }]
+      })
+      .mockResolvedValue({ rows: [] });
+
+    const status = await seedStorageMigrationLedgerForCurrentSchema({ query } as Queryable);
+
+    expect(status).toBe("not_current_schema");
   });
 });

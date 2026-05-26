@@ -18,6 +18,7 @@ export const REQUIRED_API_TABLES = [
   "audit_logs",
   "probe_activations",
   "capture_policies",
+  "capture_rules",
   "services",
   "deployments",
   "improvement_opportunities",
@@ -40,6 +41,7 @@ export const REQUIRED_API_TABLES = [
 
 export const REQUIRED_WORKER_TABLES = [
   "processed_events",
+  "capture_rules",
   "services",
   "deployments",
   "improvement_opportunities",
@@ -365,6 +367,35 @@ const STORAGE_BOOTSTRAP_STATEMENTS = [
       immediate_client_error_statuses jsonb,
       updated_at timestamptz NOT NULL DEFAULT now()
     )
+  `,
+  `
+    CREATE TABLE capture_rules (
+      id uuid PRIMARY KEY,
+      project_id uuid NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+      name text NOT NULL,
+      description text,
+      enabled boolean NOT NULL DEFAULT true,
+      action text NOT NULL,
+      matcher jsonb NOT NULL,
+      sample_rate double precision,
+      sample_event_class text,
+      created_by_user_id uuid REFERENCES users(id) ON DELETE SET NULL,
+      created_from_incident_id text,
+      created_from_event_id text,
+      expires_at timestamptz,
+      hit_count bigint NOT NULL DEFAULT 0,
+      last_matched_at timestamptz,
+      created_at timestamptz NOT NULL DEFAULT now(),
+      updated_at timestamptz NOT NULL DEFAULT now()
+    )
+  `,
+  `
+    CREATE INDEX capture_rules_project_enabled_idx
+    ON capture_rules (project_id, enabled)
+  `,
+  `
+    CREATE INDEX capture_rules_project_updated_idx
+    ON capture_rules (project_id, updated_at DESC)
   `,
   `
     CREATE TABLE deployments (

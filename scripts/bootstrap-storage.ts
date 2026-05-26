@@ -3,6 +3,7 @@ import { pathToFileURL } from "url";
 import { z } from "zod";
 
 import { bootstrapStorageSchema } from "../packages/storage/src/migrations.js";
+import { seedStorageMigrationLedgerForCurrentSchema } from "../packages/storage/src/schema-migrations.js";
 import { buildPostgresSslConfig } from "../packages/storage/src/postgres-ssl.js";
 
 const StorageBootstrapEnvSchema = z.object({
@@ -35,8 +36,11 @@ export async function runStorageBootstrapScript(
     const result = await bootstrapStorageSchema({
       query: async <Row extends Record<string, unknown>>(sql: string, params: unknown[]) => client.query<Row>(sql, params)
     });
+    const ledgerStatus = await seedStorageMigrationLedgerForCurrentSchema({
+      query: async <Row extends Record<string, unknown>>(sql: string, params: unknown[]) => client.query<Row>(sql, params)
+    });
 
-    console.log(`db_bootstrap_ok: ${result.status}`);
+    console.log(`db_bootstrap_ok: ${result.status}; migration_ledger=${ledgerStatus}`);
   } finally {
     client.release();
     await pool.end();

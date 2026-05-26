@@ -64,6 +64,7 @@ import {
   queueRetentionRotationNotice
 } from "../../../packages/storage/src/index.js";
 import {
+  applyCaptureRuleEventClass,
   BundleV1Schema,
   classifyRequestStatus,
   getRequestAnomalyThreshold,
@@ -543,9 +544,10 @@ export async function processNextNormalizeEventsJob(
 
   const normalized = normalizeEvent(validated.data);
   const computedFingerprint = fingerprint(normalized);
+  const captureRule = job.capture_rule ?? null;
   const capturePreset = job.capture_preset ?? "minimal";
   const immediateClientErrorStatuses = job.immediate_client_error_statuses ?? [];
-  const eventClass = classifyEvent(
+  const baseEventClass = classifyEvent(
     validated.data.event_type,
     validated.data.event_type === "log_event" ? validated.data.payload?.level : undefined,
     validated.data.event_type === "probe_event" ? validated.data.payload?.activation_id : undefined,
@@ -553,7 +555,16 @@ export async function processNextNormalizeEventsJob(
     capturePreset,
     immediateClientErrorStatuses
   );
+  const eventClass = applyCaptureRuleEventClass({
+    event_class: baseEventClass,
+    capture_rule: captureRule
+  });
   const matchedFields = inferMatchedFields(normalized);
+  if (captureRule?.outcome === "demote") {
+    matchedFields.push("capture_rule_demote");
+  } else if (captureRule?.action === "sample" && captureRule.sample_event_class === "context") {
+    matchedFields.push("capture_rule_sample_context");
+  }
   const severity = inferSeverity(validated.data, capturePreset, immediateClientErrorStatuses);
 
   const processedEvent = await dependencies.processedEventStore.upsertProcessedEvent({
@@ -608,6 +619,8 @@ export async function processNextNormalizeEventsJob(
     dependencies.requestAnomalyCounter !== undefined &&
     validated.data.event_type === "request_event" &&
     eventClass === "context_signal" &&
+    captureRule?.outcome !== "demote" &&
+    !(captureRule?.action === "sample" && captureRule.sample_event_class === "context") &&
     getRequestAnomalyThreshold({ responseStatus: normalized.http_status, capturePreset }) !== null
   ) {
     const anomalyJob = await evaluateRequestAnomalyCandidate({

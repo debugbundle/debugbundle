@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { useNavigate, useOutletContext } from "react-router-dom";
 import { DialogFormContent } from "../components/system/dialog-form-content.js";
 import { ProjectCapturePolicyCard } from "../components/system/project-capture-policy-card.js";
+import { ProjectCaptureRulesCard } from "../components/system/project-capture-rules-card.js";
 import { ProjectImprovementSettingsCard } from "../components/system/project-improvement-settings-card.js";
 import { ProjectWeeklyReportSettingsCard } from "../components/system/project-weekly-report-settings-card.js";
 import type { ProjectContext } from "../components/system/project-layout.js";
@@ -133,6 +134,7 @@ export function ProjectSettingsPage(): JSX.Element {
   return (
     <div className="space-y-4">
       <ProjectCapturePolicyCard projectId={project.project_id} organizationPlan={project.organization_plan} canEdit={canManageProject} />
+      <ProjectCaptureRulesCard projectId={project.project_id} canEdit={canManageProject} />
       <ProjectImprovementSettingsCard
         projectId={project.project_id}
         organizationPlan={project.organization_plan}

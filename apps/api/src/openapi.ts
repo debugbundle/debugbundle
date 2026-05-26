@@ -11,6 +11,12 @@ import {
 } from "../../../packages/billing-client/src/index.js";
 import {
   BundleV1Schema,
+  CaptureRuleSuggestionsResponseSchema as SharedCaptureRuleSuggestionsResponseSchema,
+  CaptureRuleCreateSchema as SharedCaptureRuleCreateSchema,
+  CreateCaptureRuleFromSuggestionSchema as SharedCreateCaptureRuleFromSuggestionSchema,
+  CaptureRuleResponseSchema as SharedCaptureRuleResponseSchema,
+  CaptureRulesResponseSchema as SharedCaptureRulesResponseSchema,
+  CaptureRuleUpdateSchema as SharedCaptureRuleUpdateSchema,
   CapturePolicyResponseSchema as SharedCapturePolicyResponseSchema,
   CapturePolicyUpdateSchema,
   EventEnvelopeSchema,
@@ -77,6 +83,7 @@ import {
   MemberTokenParamsSchema,
   ProjectInviteParamsSchema,
   ProjectMemberParamsSchema,
+  ProjectCaptureRuleParamsSchema,
   ProjectParamsSchema,
   ProjectImprovementParamsSchema,
   ProjectScopedQuerySchema,
@@ -377,6 +384,8 @@ const ProbeDeactivationResponseSchema = z
     deactivated: z.object({ activation_id: z.string().uuid(), deactivated_at: z.string().datetime() }).strict(),
   })
   .strict();
+const CaptureRuleResponseSchema = SharedCaptureRuleResponseSchema;
+const CaptureRulesResponseSchema = SharedCaptureRulesResponseSchema;
 const ResolvedCapturePolicySchema = SharedResolvedCapturePolicySchema;
 const CapturePolicyResponseSchema = SharedCapturePolicyResponseSchema;
 const SdkConfigResponseSchema = z
@@ -386,6 +395,7 @@ const SdkConfigResponseSchema = z
     active_probes: z.array(ProbeActivationSchema),
     poll_interval_ms: z.number().int().nonnegative(),
     capture_policy: ResolvedCapturePolicySchema,
+    capture_rules: z.array(CaptureRuleResponseSchema.shape.rule),
     trigger_token_key: z.string().optional(),
   })
   .strict();
@@ -507,6 +517,12 @@ function buildPublicApiOperations(): OperationSpec[] {
   const probeActivationResponse = component("ProbeActivationResponse", ProbeActivationResponseSchema);
   const probeActivationListResponse = component("ProbeActivationListResponse", ProbeActivationListResponseSchema);
   const probeDeactivationResponse = component("ProbeDeactivationResponse", ProbeDeactivationResponseSchema);
+  const captureRuleCreate = component("CaptureRuleCreate", SharedCaptureRuleCreateSchema);
+  const createCaptureRuleFromSuggestion = component("CreateCaptureRuleFromSuggestion", SharedCreateCaptureRuleFromSuggestionSchema);
+  const captureRuleUpdate = component("CaptureRuleUpdate", SharedCaptureRuleUpdateSchema);
+  const captureRuleResponse = component("CaptureRuleResponse", CaptureRuleResponseSchema);
+  const captureRulesResponse = component("CaptureRulesResponse", CaptureRulesResponseSchema);
+  const captureRuleSuggestionsResponse = component("CaptureRuleSuggestionsResponse", SharedCaptureRuleSuggestionsResponseSchema);
   const capturePolicyUpdate = component("CapturePolicyUpdate", CapturePolicyUpdateSchema);
   const capturePolicyResponse = component("CapturePolicyResponse", CapturePolicyResponseSchema);
   const improvementSettingsUpdate = component("ImprovementSettingsUpdate", ImprovementSettingsUpdateSchema);
@@ -1789,6 +1805,104 @@ function buildPublicApiOperations(): OperationSpec[] {
         "401": { description: "Member token is invalid.", schema: apiError },
         "403": { description: "Remote probes are not available for the caller tier.", schema: apiError },
         "404": { description: "Activation was not found.", schema: apiError },
+      },
+    },
+    {
+      method: "post",
+      path: "/v1/incidents/{id}/capture-rule-suggestion",
+      operationId: "suggestCaptureRule",
+      summary: "Generate deterministic capture rule suggestions from an incident bundle",
+      tags: ["Capture Rules"],
+      security: anyMemberAuth,
+      params: IncidentParamsSchema,
+      responses: {
+        "200": { description: "Capture rule suggestions.", schema: captureRuleSuggestionsResponse },
+        "400": { description: "Invalid incident id.", schema: apiError },
+        "401": { description: "Authentication is invalid.", schema: apiError },
+        "404": { description: "Incident was not found.", schema: apiError },
+      },
+    },
+    {
+      method: "post",
+      path: "/v1/incidents/{id}/capture-rules",
+      operationId: "createCaptureRuleFromSuggestion",
+      summary: "Create a project capture rule from an incident suggestion",
+      tags: ["Capture Rules"],
+      security: anyMemberAuth,
+      params: IncidentParamsSchema,
+      requestBody: createCaptureRuleFromSuggestion,
+      responses: {
+        "201": { description: "Capture rule created.", schema: captureRuleResponse },
+        "400": { description: "Invalid incident id or request body.", schema: apiError },
+        "401": { description: "Authentication is invalid.", schema: apiError },
+        "403": { description: "Owner/admin access is required.", schema: apiError },
+        "404": { description: "Incident, suggestion, or project was not found.", schema: apiError },
+        "409": { description: "Suggestion generation is unavailable until a bundle is ready.", schema: apiError },
+      },
+    },
+    {
+      method: "get",
+      path: "/v1/projects/{id}/capture-rules",
+      operationId: "listCaptureRules",
+      summary: "List project capture rules",
+      tags: ["Capture Rules"],
+      security: anyMemberAuth,
+      params: ProjectParamsSchema,
+      responses: {
+        "200": { description: "Project capture rules.", schema: captureRulesResponse },
+        "400": { description: "Invalid project id.", schema: apiError },
+        "401": { description: "Authentication is invalid.", schema: apiError },
+        "404": { description: "Project was not found.", schema: apiError },
+      },
+    },
+    {
+      method: "post",
+      path: "/v1/projects/{id}/capture-rules",
+      operationId: "createCaptureRule",
+      summary: "Create a project capture rule",
+      tags: ["Capture Rules"],
+      security: anyMemberAuth,
+      params: ProjectParamsSchema,
+      requestBody: captureRuleCreate,
+      responses: {
+        "201": { description: "Capture rule created.", schema: captureRuleResponse },
+        "400": { description: "Invalid project id or request body.", schema: apiError },
+        "401": { description: "Authentication is invalid.", schema: apiError },
+        "403": { description: "Owner/admin access is required.", schema: apiError },
+        "404": { description: "Project was not found or capture rules are unavailable.", schema: apiError },
+      },
+    },
+    {
+      method: "patch",
+      path: "/v1/projects/{id}/capture-rules/{ruleId}",
+      operationId: "updateCaptureRule",
+      summary: "Update a project capture rule",
+      tags: ["Capture Rules"],
+      security: anyMemberAuth,
+      params: ProjectCaptureRuleParamsSchema,
+      requestBody: captureRuleUpdate,
+      responses: {
+        "200": { description: "Capture rule updated.", schema: captureRuleResponse },
+        "400": { description: "Invalid project id, rule id, or request body.", schema: apiError },
+        "401": { description: "Authentication is invalid.", schema: apiError },
+        "403": { description: "Owner/admin access is required.", schema: apiError },
+        "404": { description: "Capture rule was not found or capture rules are unavailable.", schema: apiError },
+      },
+    },
+    {
+      method: "delete",
+      path: "/v1/projects/{id}/capture-rules/{ruleId}",
+      operationId: "deleteCaptureRule",
+      summary: "Delete a project capture rule",
+      tags: ["Capture Rules"],
+      security: anyMemberAuth,
+      params: ProjectCaptureRuleParamsSchema,
+      responses: {
+        "200": { description: "Capture rule deleted.", schema: successResponse },
+        "400": { description: "Invalid project id or rule id.", schema: apiError },
+        "401": { description: "Authentication is invalid.", schema: apiError },
+        "403": { description: "Owner/admin access is required.", schema: apiError },
+        "404": { description: "Capture rule was not found or capture rules are unavailable.", schema: apiError },
       },
     },
     {

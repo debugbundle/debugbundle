@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   fingerprint,
+  inferMatchedFields,
   normalizeEvent,
   validateEvent
 } from "../../../packages/event-normalizer/src/index.js";
@@ -460,5 +461,153 @@ describe("event-normalizer", () => {
     expect(normalizedA.route_template).toBe("/users/{param}/orders/{param}");
     expect(normalizedB.route_template).toBe("/users/{param}/orders/{param}");
     expect(fingerprint(normalizedA)).toBe(fingerprint(normalizedB));
+  });
+
+  it("should normalize frontend resource-load errors to stable fingerprints and matched fields", (): void => {
+    const eventA = createEventEnvelope({
+      event_type: "frontend_exception",
+      service: {
+        name: "checkout-web",
+        environment: "production",
+        runtime: "browser",
+        framework: "react"
+      },
+      payload: {
+        name: "Error",
+        message: "Browser resource load error",
+        stack: "Error: Browser resource load error\\n    at chunkLoader (https://app.example/assets/chunk.js:42:1)",
+        route: "/checkout",
+        browser: {
+          name: "Chrome",
+          version: "126.0.0.0"
+        },
+        browser_event: {
+          kind: "resource_error",
+          message: null,
+          file_name: null,
+          line_number: null,
+          column_number: null,
+          target: {
+            tag_name: "script",
+            source_url: "https://cdn.example/assets/app.js?token=one#chunk"
+          },
+          opaque: true
+        }
+      }
+    });
+
+    const eventB = createEventEnvelope({
+      event_type: "frontend_exception",
+      service: {
+        name: "checkout-web",
+        environment: "production",
+        runtime: "browser",
+        framework: "react"
+      },
+      payload: {
+        name: "Error",
+        message: "Browser resource load error",
+        stack: "Error: Browser resource load error\\n    at chunkLoader (https://app.example/assets/chunk.js:99:1)",
+        route: "/checkout",
+        browser: {
+          name: "Chrome",
+          version: "126.0.0.0"
+        },
+        browser_event: {
+          kind: "resource_error",
+          message: null,
+          file_name: null,
+          line_number: null,
+          column_number: null,
+          target: {
+            tag_name: "script",
+            source_url: "https://cdn.example/assets/app.js?token=two#bootstrap"
+          },
+          opaque: true
+        }
+      }
+    });
+
+    const normalizedA = normalizeEvent(eventA);
+    const normalizedB = normalizeEvent(eventB);
+
+    expect(normalizedA.error_type).toBe("Error");
+    expect(normalizedA.route_template).toBe("/checkout");
+    expect(normalizedA.browser_event_kind).toBe("resource_error");
+    expect(normalizedA.resource_host).toBe("cdn.example");
+    expect(normalizedA.resource_path).toBe("/assets/app.js");
+    expect(normalizedA.top_frames).toEqual([]);
+    expect(inferMatchedFields(normalizedA)).toEqual(
+      expect.arrayContaining(["error_type", "route_template", "browser_event_kind", "resource_host", "resource_path"])
+    );
+    expect(fingerprint(normalizedA)).toBe(fingerprint(normalizedB));
+  });
+
+  it("should distinguish frontend resource-load errors from different hosts", (): void => {
+    const eventA = createEventEnvelope({
+      event_type: "frontend_exception",
+      service: {
+        name: "checkout-web",
+        environment: "production",
+        runtime: "browser",
+        framework: "react"
+      },
+      payload: {
+        name: "Error",
+        message: "Browser resource load error",
+        stack: "Error: Browser resource load error\\n    at onError (https://app.example/debugbundle.js:10:1)",
+        route: "/checkout",
+        browser: {
+          name: "Chrome",
+          version: "126.0.0.0"
+        },
+        browser_event: {
+          kind: "resource_error",
+          message: null,
+          file_name: null,
+          line_number: null,
+          column_number: null,
+          target: {
+            tag_name: "script",
+            source_url: "https://cdn-one.example/assets/app.js"
+          },
+          opaque: true
+        }
+      }
+    });
+
+    const eventB = createEventEnvelope({
+      event_type: "frontend_exception",
+      service: {
+        name: "checkout-web",
+        environment: "production",
+        runtime: "browser",
+        framework: "react"
+      },
+      payload: {
+        name: "Error",
+        message: "Browser resource load error",
+        stack: "Error: Browser resource load error\\n    at onError (https://app.example/debugbundle.js:10:1)",
+        route: "/checkout",
+        browser: {
+          name: "Chrome",
+          version: "126.0.0.0"
+        },
+        browser_event: {
+          kind: "resource_error",
+          message: null,
+          file_name: null,
+          line_number: null,
+          column_number: null,
+          target: {
+            tag_name: "script",
+            source_url: "https://cdn-two.example/assets/app.js"
+          },
+          opaque: true
+        }
+      }
+    });
+
+    expect(fingerprint(normalizeEvent(eventA))).not.toBe(fingerprint(normalizeEvent(eventB)));
   });
 });

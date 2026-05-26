@@ -1,6 +1,9 @@
 import type {
+  CaptureRule,
+  CaptureRuleCreate,
   CapturePolicyRecord,
   CapturePolicyUpdate,
+  CaptureRuleUpdate,
   EventEnvelope,
   ImprovementSettings,
   ImprovementSettingsUpdate
@@ -694,6 +697,38 @@ export interface ApiDependencies {
       project_id: string;
       update: CapturePolicyUpdate;
     }): Promise<CapturePolicyRecord | null>;
+  } | undefined;
+  captureRuleManagement?: {
+    listCaptureRulesForProject(input: {
+      organization_id: string;
+      project_id: string;
+    }): Promise<CaptureRule[]>;
+    listActiveCaptureRulesForProject(input: {
+      project_id: string;
+      now: string;
+    }): Promise<CaptureRule[]>;
+    createCaptureRuleForProject(input: {
+      organization_id: string;
+      project_id: string;
+      id: string;
+      create: CaptureRuleCreate;
+    }): Promise<CaptureRule | null>;
+    updateCaptureRuleForProject(input: {
+      organization_id: string;
+      project_id: string;
+      rule_id: string;
+      update: CaptureRuleUpdate;
+    }): Promise<CaptureRule | null>;
+    deleteCaptureRuleForProject(input: {
+      organization_id: string;
+      project_id: string;
+      rule_id: string;
+    }): Promise<boolean>;
+    recordCaptureRuleMatch?(input: {
+      project_id: string;
+      rule_id: string;
+      matched_at: string;
+    }): Promise<void>;
   } | undefined;
 }
 

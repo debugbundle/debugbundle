@@ -1,6 +1,10 @@
 import { createHash } from "node:crypto";
 
-import type { Queryable } from "./migrations.js";
+import {
+  REQUIRED_API_TABLES,
+  REQUIRED_WORKER_TABLES,
+  type Queryable
+} from "./migrations.js";
 
 export interface StorageSchemaMigration {
   id: string;
@@ -13,6 +17,11 @@ export interface StorageMigrationResult {
   applied: string[];
   already_applied: string[];
 }
+
+type StorageMigrationLedgerReconcileStatus =
+  | "already_present"
+  | "seeded_current_schema"
+  | "not_current_schema";
 
 const STORAGE_MIGRATION_LEDGER_TABLE = "storage_migration_ledger";
 
@@ -477,6 +486,41 @@ export const STORAGE_SCHEMA_MIGRATIONS = [
         WHERE weekly_report_channel_id IS NOT NULL
       `
     ]
+  }),
+  defineStorageSchemaMigration({
+    id: "202605260002_add_capture_rules",
+    description: "Add persisted project capture rules for dynamic demote/sample/drop handling.",
+    statements: [
+      `
+        CREATE TABLE IF NOT EXISTS capture_rules (
+          id uuid PRIMARY KEY,
+          project_id uuid NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+          name text NOT NULL,
+          description text,
+          enabled boolean NOT NULL DEFAULT true,
+          action text NOT NULL,
+          matcher jsonb NOT NULL,
+          sample_rate double precision,
+          sample_event_class text,
+          created_by_user_id uuid REFERENCES users(id) ON DELETE SET NULL,
+          created_from_incident_id text,
+          created_from_event_id text,
+          expires_at timestamptz,
+          hit_count bigint NOT NULL DEFAULT 0,
+          last_matched_at timestamptz,
+          created_at timestamptz NOT NULL DEFAULT now(),
+          updated_at timestamptz NOT NULL DEFAULT now()
+        )
+      `,
+      `
+        CREATE INDEX IF NOT EXISTS capture_rules_project_enabled_idx
+        ON capture_rules (project_id, enabled)
+      `,
+      `
+        CREATE INDEX IF NOT EXISTS capture_rules_project_updated_idx
+        ON capture_rules (project_id, updated_at DESC)
+      `
+    ]
   })
 ] as const;
 
@@ -510,6 +554,148 @@ function validateStorageSchemaMigrations(migrations: readonly StorageSchemaMigra
     ids.add(migration.id);
     previousId = migration.id;
   }
+}
+
+const CURRENT_SCHEMA_SENTINEL_COLUMNS = [
+  { table_name: "agent_webhooks", column_name: "created_by_user_id" },
+  { table_name: "alert_rules", column_name: "created_by_user_id" },
+  { table_name: "capture_policies", column_name: "immediate_client_error_statuses" },
+  { table_name: "github_dispatch_rules", column_name: "created_by_user_id" },
+  { table_name: "github_dispatch_deliveries", column_name: "target_fingerprint" },
+  { table_name: "incidents", column_name: "bundle_source_occurred_at" },
+  { table_name: "incidents", column_name: "bundle_trigger" },
+  { table_name: "organization_members", column_name: "suspended_at" },
+  { table_name: "organizations", column_name: "suspended_at" },
+  { table_name: "project_tokens", column_name: "allowed_origins" },
+  { table_name: "projects", column_name: "improvement_bundle_sensitivity" },
+  { table_name: "users", column_name: "avatar_source" }
+] as const;
+
+async function listRequiredStorageTables(db: Queryable): Promise<Set<string>> {
+  const requiredTables = Array.from(new Set([...REQUIRED_API_TABLES, ...REQUIRED_WORKER_TABLES]));
+  const rows = await db.query<{ table_name: string }>(
+    `
+      SELECT table_name
+      FROM information_schema.tables
+      WHERE table_schema = 'public'
+        AND table_name = ANY($1::text[])
+    `,
+    [requiredTables]
+  );
+
+  return new Set(rows.rows.map((row) => row.table_name));
+}
+
+async function listCurrentSchemaSentinelColumns(
+  db: Queryable
+): Promise<Set<string>> {
+  const tableNames = Array.from(
+    new Set(
+      CURRENT_SCHEMA_SENTINEL_COLUMNS.map((column) => column.table_name).concat(
+        "github_dispatch_deliveries"
+      )
+    )
+  );
+  const rows = await db.query<{ table_name: string; column_name: string }>(
+    `
+      SELECT table_name, column_name
+      FROM information_schema.columns
+      WHERE table_schema = 'public'
+        AND table_name = ANY($1::text[])
+    `,
+    [tableNames]
+  );
+
+  return new Set(rows.rows.map((row) => `${row.table_name}.${row.column_name}`));
+}
+
+async function isCurrentStorageSchemaBaseline(db: Queryable): Promise<boolean> {
+  const requiredTables = await listRequiredStorageTables(db);
+  const expectedRequiredTables = new Set([...REQUIRED_API_TABLES, ...REQUIRED_WORKER_TABLES]);
+
+  for (const tableName of expectedRequiredTables) {
+    if (!requiredTables.has(tableName)) {
+      return false;
+    }
+  }
+
+  const sentinelColumns = await listCurrentSchemaSentinelColumns(db);
+  for (const sentinel of CURRENT_SCHEMA_SENTINEL_COLUMNS) {
+    if (!sentinelColumns.has(`${sentinel.table_name}.${sentinel.column_name}`)) {
+      return false;
+    }
+  }
+
+  if (sentinelColumns.has("github_dispatch_deliveries.incident_fingerprint")) {
+    return false;
+  }
+
+  return true;
+}
+
+async function recordAppliedMigrations(
+  db: Queryable,
+  migrations: readonly StorageSchemaMigration[]
+): Promise<void> {
+  for (const migration of migrations) {
+    await db.query(
+      `
+        INSERT INTO ${STORAGE_MIGRATION_LEDGER_TABLE} (id, description, checksum, applied_at)
+        VALUES ($1, $2, $3, now())
+      `,
+      [migration.id, migration.description, migration.checksum]
+    );
+  }
+}
+
+async function reconcileMigrationLedgerInTransaction(
+  db: Queryable,
+  appliedChecksums: Map<string, string>
+): Promise<StorageMigrationLedgerReconcileStatus> {
+  if (appliedChecksums.size > 0) {
+    return "already_present";
+  }
+
+  if (!(await isCurrentStorageSchemaBaseline(db))) {
+    return "not_current_schema";
+  }
+
+  await recordAppliedMigrations(db, STORAGE_SCHEMA_MIGRATIONS);
+  appliedChecksums.clear();
+  for (const migration of STORAGE_SCHEMA_MIGRATIONS) {
+    appliedChecksums.set(migration.id, migration.checksum);
+  }
+  return "seeded_current_schema";
+}
+
+async function ensureLegacyGitHubDispatchFingerprintCompatibility(
+  db: Queryable,
+  appliedChecksums: Map<string, string>
+): Promise<void> {
+  if (appliedChecksums.size > 0) {
+    return;
+  }
+
+  const rows = await db.query<{ column_name: string }>(
+    `
+      SELECT column_name
+      FROM information_schema.columns
+      WHERE table_schema = 'public'
+        AND table_name = 'github_dispatch_deliveries'
+        AND column_name IN ('incident_fingerprint', 'target_fingerprint')
+    `,
+    []
+  );
+
+  const columns = new Set(rows.rows.map((row) => row.column_name));
+  if (!columns.has("target_fingerprint") || columns.has("incident_fingerprint")) {
+    return;
+  }
+
+  await db.query(
+    "ALTER TABLE github_dispatch_deliveries RENAME COLUMN target_fingerprint TO incident_fingerprint",
+    []
+  );
 }
 
 async function ensureMigrationLedger(db: Queryable): Promise<void> {
@@ -548,8 +734,20 @@ export async function migrateStorageSchema(db: Queryable): Promise<StorageMigrat
   try {
     await ensureMigrationLedger(db);
     const appliedChecksums = await readAppliedMigrations(db);
+    const ledgerStatus = await reconcileMigrationLedgerInTransaction(db, appliedChecksums);
     const applied: string[] = [];
     const alreadyApplied: string[] = [];
+
+    if (ledgerStatus === "seeded_current_schema") {
+      await db.query("COMMIT", []);
+
+      return {
+        applied,
+        already_applied: STORAGE_SCHEMA_MIGRATIONS.map((migration) => migration.id)
+      };
+    }
+
+    await ensureLegacyGitHubDispatchFingerprintCompatibility(db, appliedChecksums);
 
     for (const migration of STORAGE_SCHEMA_MIGRATIONS) {
       const appliedChecksum = appliedChecksums.get(migration.id);
@@ -566,13 +764,7 @@ export async function migrateStorageSchema(db: Queryable): Promise<StorageMigrat
         await db.query(statement, []);
       }
 
-      await db.query(
-        `
-          INSERT INTO ${STORAGE_MIGRATION_LEDGER_TABLE} (id, description, checksum, applied_at)
-          VALUES ($1, $2, $3, now())
-        `,
-        [migration.id, migration.description, migration.checksum]
-      );
+      await recordAppliedMigrations(db, [migration]);
       applied.push(migration.id);
     }
 
@@ -590,6 +782,34 @@ export async function migrateStorageSchema(db: Queryable): Promise<StorageMigrat
       const rollbackMessage = rollbackError instanceof Error ? rollbackError.message : String(rollbackError);
       throw new Error(
         `storage_migration_rollback_failed: migration_error=${migrationError}; rollback_error=${rollbackMessage}`
+      );
+    }
+
+    throw error;
+  }
+}
+
+export async function seedStorageMigrationLedgerForCurrentSchema(
+  db: Queryable
+): Promise<StorageMigrationLedgerReconcileStatus> {
+  validateStorageSchemaMigrations(STORAGE_SCHEMA_MIGRATIONS);
+
+  await db.query("BEGIN", []);
+
+  try {
+    await ensureMigrationLedger(db);
+    const appliedChecksums = await readAppliedMigrations(db);
+    const status = await reconcileMigrationLedgerInTransaction(db, appliedChecksums);
+    await db.query("COMMIT", []);
+    return status;
+  } catch (error) {
+    try {
+      await db.query("ROLLBACK", []);
+    } catch (rollbackError) {
+      const reconcileError = error instanceof Error ? error.message : String(error);
+      const rollbackMessage = rollbackError instanceof Error ? rollbackError.message : String(rollbackError);
+      throw new Error(
+        `storage_migration_ledger_reconcile_rollback_failed: reconcile_error=${reconcileError}; rollback_error=${rollbackMessage}`
       );
     }
 

@@ -7,6 +7,7 @@ const {
   connectMock,
   releaseMock,
   bootstrapStorageSchemaMock,
+  seedStorageMigrationLedgerForCurrentSchemaMock,
   poolConstructorMock
 } = vi.hoisted(() => ({
   queryMock: vi.fn(),
@@ -14,6 +15,7 @@ const {
   releaseMock: vi.fn(),
   connectMock: vi.fn(),
   bootstrapStorageSchemaMock: vi.fn(),
+  seedStorageMigrationLedgerForCurrentSchemaMock: vi.fn(),
   poolConstructorMock: vi.fn()
 }));
 
@@ -31,6 +33,10 @@ vi.mock("../../packages/storage/src/migrations.js", () => ({
   bootstrapStorageSchema: bootstrapStorageSchemaMock
 }));
 
+vi.mock("../../packages/storage/src/schema-migrations.js", () => ({
+  seedStorageMigrationLedgerForCurrentSchema: seedStorageMigrationLedgerForCurrentSchemaMock
+}));
+
 import { isDirectExecution, runStorageBootstrapScript } from "../../scripts/bootstrap-storage.ts";
 
 describe("storage bootstrap script", () => {
@@ -44,6 +50,7 @@ describe("storage bootstrap script", () => {
       release: releaseMock
     });
     bootstrapStorageSchemaMock.mockReset();
+    seedStorageMigrationLedgerForCurrentSchemaMock.mockReset();
     poolConstructorMock.mockReset();
     delete process.env["DB_HOST"];
     delete process.env["DB_PORT"];
@@ -55,12 +62,14 @@ describe("storage bootstrap script", () => {
 
   it("should log when bootstrap creates the schema", async (): Promise<void> => {
     bootstrapStorageSchemaMock.mockResolvedValueOnce({ status: "bootstrapped" });
+    seedStorageMigrationLedgerForCurrentSchemaMock.mockResolvedValueOnce("seeded_current_schema");
     const logSpy = vi.spyOn(console, "log").mockImplementation(() => undefined);
 
     await runStorageBootstrapScript({});
 
-    expect(logSpy).toHaveBeenCalledWith("db_bootstrap_ok: bootstrapped");
+    expect(logSpy).toHaveBeenCalledWith("db_bootstrap_ok: bootstrapped; migration_ledger=seeded_current_schema");
     expect(bootstrapStorageSchemaMock).toHaveBeenCalledOnce();
+    expect(seedStorageMigrationLedgerForCurrentSchemaMock).toHaveBeenCalledOnce();
     expect(releaseMock).toHaveBeenCalledOnce();
     expect(endMock).toHaveBeenCalledOnce();
     logSpy.mockRestore();
@@ -68,12 +77,13 @@ describe("storage bootstrap script", () => {
 
   it("should log when the schema is already bootstrapped", async (): Promise<void> => {
     bootstrapStorageSchemaMock.mockResolvedValueOnce({ status: "already_bootstrapped" });
+    seedStorageMigrationLedgerForCurrentSchemaMock.mockResolvedValueOnce("already_present");
 
     const logSpy = vi.spyOn(console, "log").mockImplementation(() => undefined);
 
     await runStorageBootstrapScript({});
 
-    expect(logSpy).toHaveBeenCalledWith("db_bootstrap_ok: already_bootstrapped");
+    expect(logSpy).toHaveBeenCalledWith("db_bootstrap_ok: already_bootstrapped; migration_ledger=already_present");
     expect(releaseMock).toHaveBeenCalledOnce();
     expect(endMock).toHaveBeenCalledOnce();
     logSpy.mockRestore();
@@ -88,6 +98,7 @@ describe("storage bootstrap script", () => {
     process.env["DB_SSL_MODE"] = "require";
 
     bootstrapStorageSchemaMock.mockResolvedValueOnce({ status: "already_bootstrapped" });
+    seedStorageMigrationLedgerForCurrentSchemaMock.mockResolvedValueOnce("already_present");
 
     await runStorageBootstrapScript(process.env);
 
@@ -116,6 +127,7 @@ describe("storage bootstrap script", () => {
       await db.query("SELECT 1", ["x"]);
       return { status: "already_bootstrapped" };
     });
+    seedStorageMigrationLedgerForCurrentSchemaMock.mockResolvedValueOnce("already_present");
 
     await runStorageBootstrapScript({});
 

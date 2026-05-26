@@ -118,7 +118,7 @@ export function createIngestionPersistenceService(
     async persistAndEnqueue(
       event: EventEnvelope,
       projectId: string,
-      options?: { capturePreset?: CapturePreset; immediateClientErrorStatuses?: number[] }
+      options?: { capturePreset?: CapturePreset; immediateClientErrorStatuses?: number[]; captureRule?: import("../../shared-types/src/index.js").CaptureRuleEvaluationResult }
     ): Promise<{ object_key: string }> {
       const objectKey = buildRawEventObjectKey({
         projectId,
@@ -146,7 +146,8 @@ export function createIngestionPersistenceService(
               immediate_client_error_statuses: normalizeImmediateClientErrorStatuses(
                 options.immediateClientErrorStatuses
               )
-            })
+            }),
+        ...(options?.captureRule === undefined ? {} : { capture_rule: options.captureRule })
       });
 
       return {

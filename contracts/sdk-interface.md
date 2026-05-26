@@ -821,13 +821,13 @@ All SDKs must implement sections 1–8, section 11, section 12, and section 13 (
 
 ---
 
-## 12. Capture Policy Integration
+## 12. Capture Policy And Capture Rule Integration
 
-SDKs must respect the server-side capture policy delivered via `GET /v1/sdk/config`. The capture policy controls what event types are captured and shipped remotely.
+SDKs must respect the server-side capture policy and project capture rules delivered via `GET /v1/sdk/config`. The capture policy controls broad event capture behavior. Capture rules apply manual project decisions to known noisy patterns.
 
 ### Policy Delivery
 
-The `GET /v1/sdk/config` response includes a `capture_policy` field:
+The `GET /v1/sdk/config` response includes `capture_policy` and `capture_rules` fields:
 
 ```json
 {
@@ -838,11 +838,12 @@ The `GET /v1/sdk/config` response includes a `capture_policy` field:
     "capture_breadcrumbs": "local_only",
     "capture_probe_events": "buffer_only",
     "immediate_client_error_statuses": []
-  }
+  },
+  "capture_rules": []
 }
 ```
 
-SDKs fetch this on `init()` alongside probe config. The policy is cached and refreshed on the same schedule as probe config (backend: polling interval; browser: session-start + piggybacking).
+SDKs fetch this on `init()` alongside probe config. The policy and active rules are cached and refreshed on the same schedule as probe config (backend: polling interval; browser: session-start + piggybacking).
 
 ### SDK Enforcement Rules
 
@@ -871,7 +872,23 @@ SDKs fetch this on `init()` alongside probe config. The policy is cached and ref
 
 ### Event Classification
 
-SDKs do not assign `event_class` — that is the responsibility of the event-normalizer in the worker. SDKs only filter based on the capture policy controls above. The ingestion API performs server-side enforcement as a backstop: events that violate the project's capture policy are rejected with reason `capture_policy_rejected`.
+SDKs do not assign `event_class` — that is the responsibility of the event-normalizer in the worker. SDKs only filter based on the capture policy controls and local capture-rule outcomes above. The ingestion API performs server-side enforcement as a backstop: events that violate the project's capture policy are rejected with reason `capture_policy_rejected`.
+
+### Capture Rule Actions
+
+| Action | SDK Behavior | Server Backstop |
+|--------|--------------|-----------------|
+| `demote` | Browser SDK converts matching incident-eligible browser events into context where possible. Node and other backend SDKs may send the event normally until local context-preservation parity exists. | Worker stores matching events as `context_signal`; they cannot create, reopen, regress, alert, or dispatch automation. |
+| `sample` | SDKs use deterministic sampling keyed by `project_id`, `rule_id`, and `event_id`. Sampled-out events are discarded locally where implemented. | Ingestion rejects sampled-out events with `capture_rule_sampled_out`; sampled-in events can optionally become context when `sample_event_class` is `context`. |
+| `drop` | SDKs discard matching events before buffering where implemented. | Ingestion rejects matching events with `capture_rule_dropped` before raw persistence. |
+
+### Capture Rule Runtime Parity
+
+| SDK | Local rule enforcement |
+|-----|------------------------|
+| Browser | `demote`, `sample`, and `drop` |
+| Node.js | `drop` and sampled-out `sample`; `demote` is server-enforced |
+| Python, PHP, Java, Go, Ruby | Server-side enforcement until local parity is added |
 
 ---
 

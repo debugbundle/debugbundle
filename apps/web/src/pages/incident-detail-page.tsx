@@ -2,6 +2,7 @@ import { ArrowLeftIcon, ClipboardCopyIcon, DownloadIcon, LoaderCircleIcon } from
 import { useEffect, useState } from "react";
 import { Link, Navigate, useLocation, useParams } from "react-router-dom";
 import { CalloutCard } from "../components/system/callout-card.js";
+import { IncidentCaptureRuleSuggestionsDialog } from "../components/system/incident-capture-rule-suggestions-dialog.js";
 import { HighlightedCodeBlock } from "../components/system/highlighted-code-block.js";
 import { Badge } from "../components/ui/badge.js";
 import { Button } from "../components/ui/button.js";
@@ -29,6 +30,7 @@ export function IncidentDetailPage(): JSX.Element {
   const [incident, setIncident] = useState<IncidentRecord | null | undefined>(undefined);
   const [error, setError] = useState(false);
   const [isResolving, setIsResolving] = useState(false);
+  const [isCaptureRulesOpen, setIsCaptureRulesOpen] = useState(false);
   const backDestination = resolveIncidentBackDestination(location.pathname, projectId);
   const backLabel = resolveIncidentBackLabel(location.pathname, projectId);
   const showIncidentLoading = useDelayedVisibility(incident === undefined);
@@ -112,6 +114,9 @@ export function IncidentDetailPage(): JSX.Element {
                   {isResolving ? "Resolving..." : "Mark resolved"}
                 </Button>
               ) : null}
+              <Button type="button" variant="outline" size="sm" onClick={() => setIsCaptureRulesOpen(true)}>
+                Capture rules
+              </Button>
               <Badge variant={severityVariantMap[incident.severity]}>{incident.severity}</Badge>
               <Badge variant={statusVariantMap[incident.status]}>{incident.status}</Badge>
             </div>
@@ -154,6 +159,13 @@ export function IncidentDetailPage(): JSX.Element {
               <ReproductionTab incidentId={incidentId} />
             </TabsContent>
           </Tabs>
+
+          <IncidentCaptureRuleSuggestionsDialog
+            incidentId={incident.incident_id}
+            open={isCaptureRulesOpen}
+            onOpenChange={setIsCaptureRulesOpen}
+            {...(projectId === undefined ? {} : { projectId })}
+          />
         </>
       )}
     </div>

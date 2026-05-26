@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { ALERT_MCP_TOOL_NAMES } from './alert-tools.js';
 import { ANALYZE_MCP_TOOL_NAMES } from './analyze-tools.js';
 import { BILLING_MCP_TOOL_NAMES } from './billing-tools.js';
+import { CAPTURE_RULE_MCP_TOOL_NAMES } from './capture-rule-tools.js';
 import { CAPTURE_POLICY_MCP_TOOL_NAMES } from './capture-policy-tools.js';
 import { GITHUB_MCP_TOOL_NAMES } from './github-tools.js';
 import { IMPROVEMENT_MCP_TOOL_NAMES } from './improvement-tools.js';
@@ -22,6 +23,7 @@ type McpToolName =
   | (typeof ALERT_MCP_TOOL_NAMES)[number]
   | (typeof ANALYZE_MCP_TOOL_NAMES)[number]
   | (typeof BILLING_MCP_TOOL_NAMES)[number]
+  | (typeof CAPTURE_RULE_MCP_TOOL_NAMES)[number]
   | (typeof CAPTURE_POLICY_MCP_TOOL_NAMES)[number]
   | (typeof GITHUB_MCP_TOOL_NAMES)[number]
   | (typeof IMPROVEMENT_MCP_TOOL_NAMES)[number]
@@ -41,6 +43,7 @@ type McpToolGroup =
   | 'alerts'
   | 'analyze'
   | 'billing'
+  | 'capture_rules'
   | 'capture_policy'
   | 'github'
   | 'improvements'
@@ -689,6 +692,65 @@ export const MCP_TOOL_CATALOG = [
     inputSchema: z.object({
       bearerToken: z.string(),
       projectId: z.string(),
+    }),
+  },
+  {
+    name: 'list_capture_rules',
+    group: 'capture_rules',
+    description: 'List project capture rules.',
+    inputSchema: z.object({
+      bearerToken: z.string(),
+      projectId: z.string(),
+    }),
+  },
+  {
+    name: 'create_capture_rule',
+    group: 'capture_rules',
+    description: 'Create a project capture rule.',
+    inputSchema: z.object({
+      bearerToken: z.string(),
+      projectId: z.string(),
+      create: jsonObjectSchema,
+    }),
+  },
+  {
+    name: 'update_capture_rule',
+    group: 'capture_rules',
+    description: 'Update a project capture rule.',
+    inputSchema: z.object({
+      bearerToken: z.string(),
+      projectId: z.string(),
+      ruleId: z.string(),
+      update: jsonObjectSchema,
+    }),
+  },
+  {
+    name: 'delete_capture_rule',
+    group: 'capture_rules',
+    description: 'Delete a project capture rule.',
+    inputSchema: z.object({
+      bearerToken: z.string(),
+      projectId: z.string(),
+      ruleId: z.string(),
+    }),
+  },
+  {
+    name: 'suggest_capture_rules_from_incident',
+    group: 'capture_rules',
+    description: 'Generate deterministic capture rule suggestions from an incident bundle.',
+    inputSchema: z.object({
+      bearerToken: z.string(),
+      incidentId: z.string(),
+    }),
+  },
+  {
+    name: 'create_capture_rule_from_incident_suggestion',
+    group: 'capture_rules',
+    description: 'Create a capture rule from an incident-derived suggestion.',
+    inputSchema: z.object({
+      bearerToken: z.string(),
+      incidentId: z.string(),
+      create: jsonObjectSchema,
     }),
   },
   {

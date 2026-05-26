@@ -65,6 +65,8 @@ All three interfaces must use the same underlying domain service functions. No i
 
 **Enforcement:** Parity matrix test — enumerate operations and verify each exists in all interfaces.
 
+Capture-rule management is a core operation: list, create, update, delete, suggest-from-incident, and create-from-suggestion must remain available through API, CLI, and MCP. Dashboard actions may wrap those operations but must not become the only management path.
+
 ---
 
 ## INV-6: Token Security

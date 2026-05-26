@@ -16,6 +16,7 @@ const {
   createPostgresBillingStoreMock,
   createPostgresBillingSyncStoreMock,
   createPostgresCapturePolicyStoreMock,
+  createPostgresCaptureRuleStoreMock,
   createPostgresImprovementOpportunityStoreMock,
   createPostgresImprovementSettingsStoreMock,
   createMemberAuthServiceMock,
@@ -49,6 +50,7 @@ const {
   createPostgresBillingStoreMock: vi.fn(),
   createPostgresBillingSyncStoreMock: vi.fn(),
   createPostgresCapturePolicyStoreMock: vi.fn(),
+  createPostgresCaptureRuleStoreMock: vi.fn(),
   createPostgresImprovementOpportunityStoreMock: vi.fn(),
   createPostgresImprovementSettingsStoreMock: vi.fn(),
   createMemberAuthServiceMock: vi.fn(),
@@ -111,6 +113,7 @@ vi.mock("../../../packages/storage/src/index.js", () => ({
   createPostgresBillingSyncStore: createPostgresBillingSyncStoreMock,
   createPostgresImprovementOpportunityStore: createPostgresImprovementOpportunityStoreMock,
   createPostgresImprovementSettingsStore: createPostgresImprovementSettingsStoreMock,
+  createPostgresCaptureRuleStore: createPostgresCaptureRuleStoreMock,
 }));
 
 vi.mock("../../../packages/auth/src/index.js", () => ({
@@ -152,6 +155,7 @@ describe("api default dependencies", () => {
     createPostgresBillingStoreMock.mockReset();
     createPostgresBillingSyncStoreMock.mockReset();
     createPostgresCapturePolicyStoreMock.mockReset();
+    createPostgresCaptureRuleStoreMock.mockReset();
     createPostgresImprovementOpportunityStoreMock.mockReset();
     createPostgresImprovementSettingsStoreMock.mockReset();
     createMemberAuthServiceMock.mockReset();
@@ -205,6 +209,14 @@ describe("api default dependencies", () => {
       getCapturePolicyByProjectId: vi.fn(),
       upsertCapturePolicy: vi.fn(),
       createDefaultCapturePolicy: vi.fn()
+    });
+    createPostgresCaptureRuleStoreMock.mockReturnValue({
+      listCaptureRulesByProjectId: vi.fn(),
+      listActiveCaptureRulesByProjectId: vi.fn(),
+      createCaptureRule: vi.fn(),
+      updateCaptureRule: vi.fn(),
+      deleteCaptureRule: vi.fn(),
+      recordCaptureRuleMatch: vi.fn()
     });
     createPostgresImprovementOpportunityStoreMock.mockReturnValue({
       listImprovementsForOrganization: vi.fn(),
@@ -447,6 +459,12 @@ describe("api default dependencies", () => {
     expect(typeof deps.probeManagement.listActiveProbesForProjectInOrganization).toBe("function");
     expect(typeof deps.probeManagement.createProbeActivationForProjectInOrganization).toBe("function");
     expect(typeof deps.probeManagement.deactivateProbeActivationForProjectInOrganization).toBe("function");
+    expect(typeof deps.captureRuleManagement.listCaptureRulesForProject).toBe("function");
+    expect(typeof deps.captureRuleManagement.listActiveCaptureRulesForProject).toBe("function");
+    expect(typeof deps.captureRuleManagement.createCaptureRuleForProject).toBe("function");
+    expect(typeof deps.captureRuleManagement.updateCaptureRuleForProject).toBe("function");
+    expect(typeof deps.captureRuleManagement.deleteCaptureRuleForProject).toBe("function");
+    expect(typeof deps.captureRuleManagement.recordCaptureRuleMatch).toBe("function");
     expect(typeof deps.projectManagement.listProjectsForOrganization).toBe("function");
     expect(typeof deps.projectManagement.createProjectForOrganization).toBe("function");
     expect(typeof deps.projectManagement.updateProjectForOrganization).toBe("function");
@@ -3196,6 +3214,41 @@ describe("api default dependencies", () => {
     expect(githubStore.deleteProjectGitHubRepoForOrganization).toHaveBeenCalledWith({
       organization_id: "org_1",
       project_id: "proj_1"
+    });
+  });
+
+  it("clears sample-only fields when changing a capture rule to a non-sample action", async (): Promise<void> => {
+    const updateCaptureRule = vi.fn().mockResolvedValue(null);
+    createPostgresCaptureRuleStoreMock.mockReturnValueOnce({
+      listCaptureRulesByProjectId: vi.fn(),
+      listActiveCaptureRulesByProjectId: vi.fn(),
+      createCaptureRule: vi.fn(),
+      updateCaptureRule,
+      deleteCaptureRule: vi.fn(),
+      recordCaptureRuleMatch: vi.fn()
+    });
+
+    const deps = createApiDependencies({
+      objectStore: { putObject: vi.fn(), getObject: vi.fn(), deleteObjectsByPrefix: vi.fn() },
+      queue: { enqueue: vi.fn() },
+      db: { query: vi.fn() }
+    });
+
+    await deps.captureRuleManagement.updateCaptureRuleForProject({
+      organization_id: "org_123",
+      project_id: "proj_123",
+      rule_id: "00000000-0000-4000-8000-000000000101",
+      update: {
+        action: "drop"
+      }
+    });
+
+    expect(updateCaptureRule).toHaveBeenCalledWith({
+      id: "00000000-0000-4000-8000-000000000101",
+      project_id: "proj_123",
+      action: "drop",
+      sample_rate: null,
+      sample_event_class: null
     });
   });
 });

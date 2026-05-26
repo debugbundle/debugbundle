@@ -1,5 +1,5 @@
 import type { NormalizedEvent } from "../../event-normalizer/src/index.js";
-import type { CapturePreset, EventClass, EventEnvelope, TierName } from "../../shared-types/src/index.js";
+import type { CapturePreset, CaptureRuleEvaluationResult, EventClass, EventEnvelope, TierName } from "../../shared-types/src/index.js";
 import type { IncidentReason } from "./incident-reason.js";
 
 export interface ObjectStorePutInput {
@@ -67,6 +67,7 @@ export interface NormalizeEventsJob {
   object_key: string;
   capture_preset?: CapturePreset;
   immediate_client_error_statuses?: number[];
+  capture_rule?: CaptureRuleEvaluationResult;
 }
 
 export interface GroupIncidentJob {
@@ -171,7 +172,7 @@ export interface IngestionPersistenceService {
   persistAndEnqueue(
     event: EventEnvelope,
     projectId: string,
-    options?: { capturePreset?: CapturePreset; immediateClientErrorStatuses?: number[] }
+    options?: { capturePreset?: CapturePreset; immediateClientErrorStatuses?: number[]; captureRule?: CaptureRuleEvaluationResult }
   ): Promise<{ object_key: string }>;
 }
 

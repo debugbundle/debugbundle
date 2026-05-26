@@ -1169,12 +1169,43 @@ If CLI says something is healthy and MCP says something different, that is a pro
 - **Then** the response includes a `capture_policy` object with all resolved control values
 - **And** the SDK uses these controls to filter events before sending
 
+### AC-EVT-07a: SDK Config Includes Active Capture Rules
+- **Given** a project with enabled, unexpired capture rules
+- **When** an SDK calls `GET /v1/sdk/config` with a valid project token
+- **Then** the response includes `capture_rules`
+- **And** expired or disabled rules are omitted
+- **And** Browser SDK applies local `demote`, `sample`, and `drop` outcomes where possible
+- **And** Node SDK applies local `drop` and sampled-out `sample` outcomes before buffering
+
 ### AC-EVT-08: Ingestion Enforces Capture Policy Server-Side
 - **Given** a project with preset `minimal` (which sets `capture_request_events: "failures_only"`)
 - **When** an SDK sends a `request_event` with `response_status: 200` to `POST /v1/events`
 - **Then** the event is rejected with reason `capture_policy_rejected`
 - **And** the accepted count does not include rejected events
 - **And** rejected events are not persisted to S3
+
+### AC-EVT-08e: Ingestion Enforces Capture Rules Server-Side
+- **Given** a project with an active `drop` capture rule matching a valid event
+- **When** the SDK sends the event to `POST /v1/events`
+- **Then** the event is rejected with reason `capture_rule_dropped`
+- **And** the raw event is not persisted
+- **Given** the same project has an active `sample` capture rule with a deterministic sampled-out decision
+- **When** the SDK sends a matching event
+- **Then** the event is rejected with reason `capture_rule_sampled_out`
+- **And** the raw event is not persisted
+
+### AC-EVT-08f: Capture Rule Demotion Cannot Drive Incidents
+- **Given** a project with an active `demote` capture rule matching an incident-eligible event
+- **When** a matching event is accepted and processed
+- **Then** worker normalization stores the event as `context_signal`
+- **And** no incident is created, reopened, regressed, alerted, or dispatched from that event
+
+### AC-EVT-08g: Capture Rule Suggestions Are Interface-Portable
+- **Given** an incident with a ready bundle
+- **When** capture-rule suggestions are requested via API, CLI, MCP, or web
+- **Then** each interface exposes deterministic suggestions derived from the incident and bundle
+- **And** owner/admin users can create a selected rule from the suggestion
+- **And** plain members can preview rules but cannot create, update, or delete them
 
 ### AC-EVT-08a: Ingestion Always Accepts 5xx Request Failures
 - **Given** a project with any capture preset or `capture_request_events` override

@@ -209,6 +209,7 @@ describe("api probe routes", () => {
       remote_probes_enabled: false,
       active_probes: [],
       poll_interval_ms: 60000,
+      capture_rules: [],
       capture_policy: {
         preset: "balanced",
         capture_logs: "warning",
@@ -269,6 +270,7 @@ describe("api probe routes", () => {
 
     expect(response.statusCode).toBe(200);
     expect(response.json()).toMatchObject({
+      capture_rules: [],
       capture_policy: {
         preset: "investigative",
         capture_logs: "info",
@@ -353,6 +355,7 @@ describe("api probe routes", () => {
 
     expect(response.statusCode).toBe(200);
     expect(response.json()).toMatchObject({
+      capture_rules: [],
       capture_policy: {
         preset: "balanced",
         capture_logs: "warning",
