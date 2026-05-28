@@ -20,7 +20,8 @@ import {
   SidebarHeader,
   SidebarMenu,
   SidebarMenuButton,
-  SidebarMenuItem
+  SidebarMenuItem,
+  useSidebar
 } from "../ui/sidebar.js";
 
 const navMain = [
@@ -39,6 +40,7 @@ interface AppSidebarProps extends React.ComponentProps<typeof Sidebar> {
 
 export function AppSidebar({ session, onSignOut, ...props }: AppSidebarProps): JSX.Element {
   const location = useLocation();
+  const { isMobile, setOpenMobile } = useSidebar();
 
   return (
     <Sidebar collapsible="icon" {...props}>
@@ -63,7 +65,14 @@ export function AppSidebar({ session, onSignOut, ...props }: AppSidebarProps): J
                     isActive={location.pathname === item.to || location.pathname.startsWith(item.to + "/")}
                     tooltip={item.label}
                   >
-                    <NavLink to={item.to}>
+                    <NavLink
+                      to={item.to}
+                      onClick={() => {
+                        if (isMobile) {
+                          setOpenMobile(false);
+                        }
+                      }}
+                    >
                       <item.icon />
                       <span>{item.label}</span>
                     </NavLink>
