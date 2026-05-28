@@ -190,6 +190,46 @@ describe("api system email review route", () => {
     expect(response.json()).toEqual({ error: "email_transport_not_configured" });
   });
 
+  it("requires an email address before sending a preview", async () => {
+    const dependencies = createDependencies();
+    const send = vi.fn().mockResolvedValue(undefined);
+    dependencies.memberAuth.resolveMemberByTokenHash.mockResolvedValue({
+      member_id: "usr_owner",
+      organization_id: "org_123",
+      role: "owner"
+    });
+
+    const app = createApiServer(
+      {
+        ...dependencies,
+        billingEmails: {
+          getBillingContactForOrganization: vi.fn().mockResolvedValue(null),
+          send
+        }
+      },
+      {
+        dogfoodingEnv: {
+          NODE_ENV: "development"
+        }
+      }
+    );
+
+    const response = await app.inject({
+      method: "POST",
+      url: "/v1/internal/system-email-previews/send",
+      headers: {
+        authorization: "Bearer dbundle_mem_test"
+      },
+      payload: {
+        id: "payment-failure"
+      }
+    });
+
+    expect(response.statusCode).toBe(400);
+    expect(response.json()).toEqual({ error: "member_email_required" });
+    expect(send).not.toHaveBeenCalled();
+  });
+
   it("deduplicates the mirrored inbox when the signed-in owner already uses it", async () => {
     const dependencies = createDependencies();
     const send = vi.fn().mockResolvedValue(undefined);

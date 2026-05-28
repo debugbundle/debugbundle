@@ -76,6 +76,10 @@ export function registerSystemEmailReviewRoutes(
       return reply.status(503).send({ error: "email_transport_not_configured" });
     }
 
+    if (member.email === undefined) {
+      return reply.status(400).send({ error: "member_email_required" });
+    }
+
     const recipientEmails = resolvePreviewRecipients(member.email);
 
     await dependencies.billingEmails.send({
