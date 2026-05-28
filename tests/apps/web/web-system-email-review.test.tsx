@@ -54,6 +54,15 @@ describe("web app — system email review", () => {
     await waitFor(() => {
       expect(screen.getByText(/retained bundles rotated out/i)).toBeInTheDocument();
     });
+
+    expect(screen.getByRole("tab", { name: /html preview/i })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: /mobile view/i })).toBeInTheDocument();
+    expect(screen.getByTitle(/html desktop preview/i)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /send preview email/i })).toBeInTheDocument();
+
+    await user.click(screen.getByRole("tab", { name: /mobile view/i }));
+
+    expect(screen.getByTitle(/html mobile preview/i)).toBeInTheDocument();
   });
 
   it("shows an owner-only gate for member sessions", async () => {

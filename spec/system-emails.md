@@ -253,6 +253,12 @@ At minimum, test coverage must verify that the system triggers the correct email
 - allowance threshold notifications
 - retention rotation notification
 
+### 8.1 Local Review Tooling
+
+- The dev-only review surface at `app.debugbundle.com/__dev/system-emails` must render from the same sample email catalog used by any local preview-send flow.
+- The dev-only preview-send route `POST /v1/internal/system-email-previews/send` is owner-only and exists strictly for local/test review workflows.
+- Preview-send must deliver the selected sample email to the signed-in owner session email plus any mirrored internal review recipients configured for the local review workflow, and must fail clearly when transactional email transport is not configured.
+
 ---
 
 ## 9. Cross-References

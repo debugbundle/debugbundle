@@ -9,6 +9,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../co
 import { Notice } from "../components/ui/notice.js";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../components/ui/table.js";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../components/ui/tabs.js";
+import { sendSystemEmailPreview } from "../lib/api.js";
+import { showErrorToast, showSuccessToast } from "../lib/notify.js";
 import { useSession } from "../lib/session.js";
 import { SYSTEM_EMAIL_REVIEW_ENTRIES, type SystemEmailReviewEntry } from "../lib/system-email-previews.js";
 
@@ -68,6 +70,37 @@ function SummaryCard({
   );
 }
 
+function EmailPreviewFrame({
+  title,
+  html,
+  mode
+}: {
+  title: string;
+  html: string;
+  mode: "desktop" | "mobile";
+}): JSX.Element {
+  if (mode === "mobile") {
+    return (
+      <div className="rounded-lg border bg-muted/20 p-3">
+        <div className="mx-auto w-full max-w-[390px] overflow-hidden rounded-md border bg-background shadow-sm">
+          <iframe title={title} srcDoc={renderPreviewDocument(html)} className="min-h-[720px] w-full bg-background" sandbox="" />
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="overflow-x-auto rounded-lg border bg-muted/20 p-3">
+      <iframe
+        title={title}
+        srcDoc={renderPreviewDocument(html)}
+        className="min-h-[460px] min-w-[720px] w-full rounded-md bg-background"
+        sandbox=""
+      />
+    </div>
+  );
+}
+
 function DetailRow({
   label,
   value
@@ -83,9 +116,22 @@ function DetailRow({
   );
 }
 
+function formatRecipientList(recipients: string[]): string {
+  if (recipients.length <= 1) {
+    return recipients[0] ?? "the configured inbox";
+  }
+
+  if (recipients.length === 2) {
+    return `${recipients[0]} and ${recipients[1]}`;
+  }
+
+  return `${recipients.slice(0, -1).join(", ")}, and ${recipients.at(-1)}`;
+}
+
 export function SystemEmailReviewPage(): JSX.Element {
   const { session } = useSession();
   const [selectedId, setSelectedId] = useState(SYSTEM_EMAIL_REVIEW_ENTRIES[0]?.id ?? "");
+  const [isSendingPreview, setIsSendingPreview] = useState(false);
 
   const selectedEntry = useMemo(
     () => SYSTEM_EMAIL_REVIEW_ENTRIES.find((entry) => entry.id === selectedId) ?? SYSTEM_EMAIL_REVIEW_ENTRIES[0] ?? null,
@@ -108,6 +154,26 @@ export function SystemEmailReviewPage(): JSX.Element {
         tone="warning"
       />
     );
+  }
+
+  async function handleSendPreviewEmail(): Promise<void> {
+    if (selectedEntry === null || selectedEntry.preview === undefined || isSendingPreview) {
+      return;
+    }
+
+    setIsSendingPreview(true);
+    try {
+      const delivered = await sendSystemEmailPreview(selectedEntry.id);
+      showSuccessToast(`Preview email sent to ${formatRecipientList(delivered.recipient_emails)}.`);
+    } catch (error) {
+      const message =
+        error instanceof Error && error.message === "email_transport_not_configured"
+          ? "Local email transport is not configured."
+          : "Preview email could not be sent.";
+      showErrorToast(message);
+    } finally {
+      setIsSendingPreview(false);
+    }
   }
 
   return (
@@ -148,7 +214,7 @@ export function SystemEmailReviewPage(): JSX.Element {
         />
       </div>
 
-      <div className="grid gap-6 xl:grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)]">
+      <div className="grid gap-6 xl:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
         <Card>
           <CardHeader>
             <CardTitle>Email inventory</CardTitle>
@@ -237,22 +303,47 @@ export function SystemEmailReviewPage(): JSX.Element {
               ) : (
                 <>
                   <div className="space-y-2 rounded-lg border bg-muted/20 p-4">
-                    <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Subject</p>
-                    <p className="text-sm font-medium text-foreground">{selectedEntry.preview.subject}</p>
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                      <div className="space-y-2">
+                        <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Subject</p>
+                        <p className="text-sm font-medium text-foreground">{selectedEntry.preview.subject}</p>
+                        <p className="text-xs text-muted-foreground">
+                          Send this sample email to {session.email} and owenfar1@gmail.com for device testing.
+                        </p>
+                      </div>
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        size="sm"
+                        onClick={() => {
+                          void handleSendPreviewEmail();
+                        }}
+                        disabled={isSendingPreview}
+                      >
+                        {isSendingPreview ? "Sending..." : "Send preview email"}
+                      </Button>
+                    </div>
                   </div>
 
                   <Tabs defaultValue="html">
                     <TabsList>
                       <TabsTrigger value="html">HTML preview</TabsTrigger>
+                      <TabsTrigger value="mobile">Mobile view</TabsTrigger>
                       <TabsTrigger value="text">Plain text</TabsTrigger>
                       <TabsTrigger value="source">HTML source</TabsTrigger>
                     </TabsList>
                     <TabsContent value="html">
-                      <iframe
-                        title={`${selectedEntry.title} HTML preview`}
-                        srcDoc={renderPreviewDocument(selectedEntry.preview.html)}
-                        className="min-h-[460px] w-full rounded-lg bg-background"
-                        sandbox=""
+                      <EmailPreviewFrame
+                        title={`${selectedEntry.title} HTML desktop preview`}
+                        html={selectedEntry.preview.html}
+                        mode="desktop"
+                      />
+                    </TabsContent>
+                    <TabsContent value="mobile">
+                      <EmailPreviewFrame
+                        title={`${selectedEntry.title} HTML mobile preview`}
+                        html={selectedEntry.preview.html}
+                        mode="mobile"
                       />
                     </TabsContent>
                     <TabsContent value="text">

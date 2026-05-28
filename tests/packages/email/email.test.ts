@@ -171,6 +171,7 @@ describe("email package", () => {
     expect(rendered.html).toContain("Checkout crash");
     expect(rendered.html).toContain("checkout-&lt;api&gt;");
     expect(rendered.html).toContain("May 17, 2026, 10:00 AM UTC");
+    expect(rendered.html.match(/background-color:#fafaf9;/g)?.length ?? 0).toBe(2);
   });
 
   it("renders webhook auto-disabled emails with escaped content and management links", () => {
@@ -194,6 +195,31 @@ describe("email package", () => {
     expect(rendered.html).toContain("&lt;danger&gt;");
     expect(rendered.html).toContain("Manage project webhooks");
     expect(rendered.html).toContain("DebugBundle");
+  });
+
+  it("renders mobile-safe email layout styles for narrow clients", () => {
+    const rendered = renderWebhookAutoDisabledEmail({
+      organizationName: "Acme Production",
+      projectName: "Checkout API",
+      webhookId: "wh_01hrf91h0v8g6sz8g4ng1q7nq8",
+      targetUrl:
+        "https://hooks.example.test/debugbundle/really/long/path/that/should/wrap/in/mobile/mail/clients/without/blowing/out/the/layout",
+      webhooksUrl: "https://app.debugbundle.test/projects/proj_123/webhooks"
+    });
+
+    expect(rendered.html).toContain('class="db-email-root" style="margin:0;padding:0;background-color:#f5f5f4;"');
+    expect(rendered.html).toContain('class="db-email-frame" role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="width:100%;border-collapse:collapse;background-color:#f5f5f4;"');
+    expect(rendered.html).toContain('class="db-email-shell" style="padding:20px 0;"');
+    expect(rendered.html).toContain('class="db-email-card" style="background-color:#ffffff;border-radius:0;padding:0;"');
+    expect(rendered.html).toContain("@media only screen and (min-width: 641px)");
+    expect(rendered.html).toContain(".db-email-shell { padding: 32px 16px !important; }");
+    expect(rendered.html).toContain(".db-email-card { padding: 32px 28px !important; border-radius: 16px !important; }");
+    expect(rendered.html).toContain('style="display:block;width:100%;padding:0 0 8px 0;');
+    expect(rendered.html).toContain(".db-email-kv-value {");
+    expect(rendered.html).toContain(".db-email-kv-label, .db-email-kv-value { display: table-cell !important; width: auto !important; }");
+    expect(rendered.html).toContain("word-break:break-word;overflow-wrap:anywhere;");
+    expect(rendered.html).toContain("text-align:left;");
+    expect(rendered.html).toContain(".db-email-kv-value { text-align: right !important; }");
   });
 
   it("renders allowance and retention operational emails with scoped usage copy", () => {

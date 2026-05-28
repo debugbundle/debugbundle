@@ -9,6 +9,7 @@ import type {
   ImprovementSettingsUpdate
 } from "../../../packages/shared-types/src/index.js";
 import type { AuthEmailSender, GitHubCliAuthService, WebSessionAuthService } from "../../../packages/auth/src/index.js";
+import type { EmailMessage } from "../../../packages/email/src/index.js";
 import type {
   AccountDataExportRecord,
   AuditLogStore,
@@ -73,6 +74,13 @@ export interface ApiDependencies {
     "beginDeviceAuth" | "pollDeviceAuth" | "claimDeviceAuth" | "exchangeGitHubAccessToken"
   > | undefined;
   inviteEmails?: Pick<AuthEmailSender, "sendProjectInviteEmail">;
+  billingEmails?: {
+    getBillingContactForOrganization(input: { organization_id: string }): Promise<{
+      organizationName: string;
+      recipientEmail: string;
+    } | null>;
+    send(message: EmailMessage): Promise<void>;
+  };
   tokenManagement: {
     listProjectTokensForOrganization(input: {
       organization_id: string;

@@ -21,6 +21,12 @@ export const VerifyEmailCodeBodySchema = z
   })
   .strict();
 
+export const SendSystemEmailPreviewBodySchema = z
+  .object({
+    id: z.string().min(1)
+  })
+  .strict();
+
 export const AccountDeleteBodySchema = z
   .object({
     email: z.string().email()

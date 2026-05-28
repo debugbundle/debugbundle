@@ -20,6 +20,7 @@ import { registerImprovementSettingsRoutes } from "./routes/improvement-settings
 import { registerProjectMemberRoutes } from "./routes/project-members.js";
 import { registerProjectRoutes } from "./routes/projects.js";
 import { registerProbeRoutes } from "./routes/probes.js";
+import { registerSystemEmailReviewRoutes } from "./routes/system-email-review.js";
 import { registerServicesRoutes } from "./routes/services.js";
 import { registerSlackRoutes } from "./routes/slack.js";
 import { registerStripeWebhookRoute, type StripeWebhookDependencies } from "./routes/stripe-webhook.js";
@@ -273,6 +274,7 @@ export function createApiServer(dependencies: ApiDependencies, options: ApiServe
   registerProjectMemberRoutes(app, dependencies);
   registerProjectRoutes(app, dependencies);
   registerProbeRoutes(app, dependencies);
+  registerSystemEmailReviewRoutes(app, dependencies, dogfoodingEnv);
   registerSlackRoutes(app, dependencies);
   registerTokenRoutes(app, dependencies);
   registerAlertRoutes(app, dependencies);

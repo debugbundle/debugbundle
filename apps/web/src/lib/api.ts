@@ -29,6 +29,12 @@ export interface DeletedAccountRecord {
   user_deleted: boolean;
 }
 
+export interface SentSystemEmailPreviewRecord {
+  delivered: true;
+  recipient_emails: string[];
+  preview_id: string;
+}
+
 export interface MemberTokenRecord {
   token_id: string;
   user_id: string;
@@ -726,6 +732,19 @@ export async function deleteAccount(payload: { email: string }): Promise<Deleted
   clearBrowserSessionState();
   browserSessionInvalidated = false;
   return body.account;
+}
+
+export async function sendSystemEmailPreview(previewId: string): Promise<SentSystemEmailPreviewRecord> {
+  const body = await readJson<SentSystemEmailPreviewRecord>(
+    await fetch(`${API_BASE}/v1/internal/system-email-previews/send`, {
+      method: "POST",
+      credentials: "include",
+      headers: buildBrowserSessionHeaders(true),
+      body: JSON.stringify({ id: previewId })
+    })
+  );
+
+  return body;
 }
 
 export async function listMemberTokens(): Promise<MemberTokenRecord[]> {

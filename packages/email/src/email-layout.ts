@@ -51,7 +51,7 @@ export function formatEmailDate(value: string): string {
 }
 
 export function renderEmailParagraph(content: string): string {
-  return `<p style="margin:0 0 16px;color:${EMAIL_TEXT_MUTED};font-size:16px;line-height:24px;">${content}</p>`;
+  return `<p style="margin:0 0 16px;color:${EMAIL_TEXT_MUTED};font-size:16px;line-height:24px;word-break:break-word;overflow-wrap:anywhere;">${content}</p>`;
 }
 
 export function renderEmailSubheading(text: string): string {
@@ -59,7 +59,7 @@ export function renderEmailSubheading(text: string): string {
 }
 
 export function renderEmailPanel(contentHtml: string): string {
-  return `<div style="margin:0 0 20px;padding:16px 18px;border:1px solid ${EMAIL_BORDER};border-radius:12px;background-color:${EMAIL_PANEL_BACKGROUND};">${contentHtml}</div>`;
+  return `<div class="db-email-panel" style="margin:0 0 20px;padding:14px;border:1px solid ${EMAIL_BORDER};border-radius:12px;background-color:${EMAIL_PANEL_BACKGROUND};">${contentHtml}</div>`;
 }
 
 export function renderEmailButton(input: { label: string; url: string }): string {
@@ -75,7 +75,7 @@ export function renderEmailButton(input: { label: string; url: string }): string
 }
 
 export function renderEmailTextLink(input: { label: string; url: string }): string {
-  return `<a href="${escapeHtml(input.url)}" style="color:${EMAIL_TEXT};text-decoration:underline;">${escapeHtml(input.label)}</a>`;
+  return `<a href="${escapeHtml(input.url)}" style="color:${EMAIL_TEXT};text-decoration:underline;word-break:break-word;overflow-wrap:anywhere;">${escapeHtml(input.label)}</a>`;
 }
 
 export function renderEmailBulletList(items: string[]): string {
@@ -94,21 +94,24 @@ export function renderEmailOrderedList(items: string[]): string {
   ].join("");
 }
 
-export function renderEmailKeyValueList(items: Array<{ label: string; valueHtml: string }>): string {
-  return renderEmailPanel(
-    [
-      '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="width:100%;border-collapse:collapse;">',
-      ...items.map((item, index) =>
-        [
-          `<tr${index > 0 ? ` style="border-top:1px solid ${EMAIL_BORDER};"` : ""}>`,
-          `<td style="padding:${index === 0 ? "0 12px 0 0" : "12px 12px 0 0"};vertical-align:top;color:${EMAIL_TEXT_QUIET};font-size:13px;line-height:18px;font-weight:600;letter-spacing:0.02em;text-transform:uppercase;">${escapeHtml(item.label)}</td>`,
-          `<td style="padding:${index === 0 ? "0" : "12px 0 0 0"};vertical-align:top;color:${EMAIL_TEXT};font-size:15px;line-height:22px;text-align:right;">${item.valueHtml}</td>`,
-          "</tr>"
-        ].join("")
-      ),
-      "</table>"
-    ].join("")
-  );
+export function renderEmailKeyValueList(
+  items: Array<{ label: string; valueHtml: string }>,
+  options: { framed?: boolean } = {}
+): string {
+  const contentHtml = [
+    '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="width:100%;border-collapse:collapse;">',
+    ...items.map((item, index) =>
+      [
+        `<tr class="db-email-kv-row"${index > 0 ? ` style="border-top:1px solid ${EMAIL_BORDER};"` : ""}>`,
+        `<td class="db-email-kv-label db-email-kv-label-${index === 0 ? "first" : "rest"}" style="display:block;width:100%;padding:${index === 0 ? "0 0 8px 0" : "14px 0 8px 0"};vertical-align:top;color:${EMAIL_TEXT_QUIET};font-size:13px;line-height:18px;font-weight:600;letter-spacing:0.02em;text-transform:uppercase;text-align:left;">${escapeHtml(item.label)}</td>`,
+        `<td class="db-email-kv-value db-email-kv-value-${index === 0 ? "first" : "rest"}" style="display:block;width:100%;padding:0 0 ${index === items.length - 1 ? "0" : "16px"} 0;vertical-align:top;color:${EMAIL_TEXT};font-size:15px;line-height:22px;text-align:left;"><div class="db-email-kv-value-wrap" style="word-break:break-word;overflow-wrap:anywhere;">${item.valueHtml}</div></td>`,
+        "</tr>"
+      ].join("")
+    ),
+    "</table>"
+  ].join("");
+
+  return options.framed === false ? contentHtml : renderEmailPanel(contentHtml);
 }
 
 export function renderEmailLayout(input: {
@@ -124,10 +127,24 @@ export function renderEmailLayout(input: {
     `<p style="margin:0;color:${EMAIL_TEXT_QUIET};font-size:13px;line-height:20px;">This is an automated email from DebugBundle.</p>`;
 
   return [
-    `<div style="margin:0;padding:0;background-color:${EMAIL_BACKGROUND};">`,
-    `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="width:100%;border-collapse:collapse;background-color:${EMAIL_BACKGROUND};">`,
+    "<style>",
+    "@media only screen and (min-width: 641px) {",
+    "  .db-email-shell { padding: 32px 16px !important; }",
+    "  .db-email-card { padding: 32px 28px !important; border-radius: 16px !important; }",
+    "  .db-email-title { font-size: 28px !important; line-height: 34px !important; }",
+    "  .db-email-panel { padding: 16px 18px !important; }",
+    "  .db-email-kv-label, .db-email-kv-value { display: table-cell !important; width: auto !important; }",
+    "  .db-email-kv-label-first { padding: 0 12px 0 0 !important; }",
+    "  .db-email-kv-label-rest { padding: 12px 12px 0 0 !important; }",
+    "  .db-email-kv-value-first { padding: 0 !important; }",
+    "  .db-email-kv-value-rest { padding: 12px 0 0 0 !important; }",
+    "  .db-email-kv-value { text-align: right !important; }",
+    "}",
+    "</style>",
+    `<div class="db-email-root" style="margin:0;padding:0;background-color:${EMAIL_BACKGROUND};">`,
+    `<table class="db-email-frame" role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="width:100%;border-collapse:collapse;background-color:${EMAIL_BACKGROUND};">`,
     "<tr>",
-    '<td align="center" style="padding:32px 16px;">',
+    '<td align="center" class="db-email-shell" style="padding:20px 0;">',
     '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="width:100%;max-width:640px;border-collapse:collapse;">',
     "<tr>",
     '<td style="padding:0 0 14px 0;">',
@@ -140,16 +157,16 @@ export function renderEmailLayout(input: {
     "</td>",
     "</tr>",
     "<tr>",
-    `<td style="background-color:${EMAIL_CARD_BACKGROUND};border-radius:16px;padding:32px 28px;">`,
+    `<td class="db-email-card" style="background-color:${EMAIL_CARD_BACKGROUND};border-radius:0;padding:0;">`,
     ...(input.eyebrow === undefined
       ? []
       : [
           `<p style="margin:0 0 10px;color:${EMAIL_TEXT_QUIET};font-size:12px;line-height:16px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;">${escapeHtml(input.eyebrow)}</p>`
         ]),
-    `<h1 style="margin:0 0 12px;color:${EMAIL_TEXT};font-size:28px;line-height:34px;font-weight:650;">${escapeHtml(input.title)}</h1>`,
+    `<h1 class="db-email-title" style="margin:0 0 12px;color:${EMAIL_TEXT};font-size:26px;line-height:32px;font-weight:650;">${escapeHtml(input.title)}</h1>`,
     introHtml,
     `<div style="color:${EMAIL_TEXT_MUTED};font-size:16px;line-height:24px;">${input.bodyHtml}</div>`,
-    `<div style="margin-top:28px;padding-top:18px;border-top:1px solid ${EMAIL_BORDER};">${footerHtml}</div>`,
+    `<div class="db-email-footer" style="margin-top:28px;padding-top:18px;border-top:1px solid ${EMAIL_BORDER};">${footerHtml}</div>`,
     "</td>",
     "</tr>",
     "</table>",
