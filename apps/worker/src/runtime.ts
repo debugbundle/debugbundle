@@ -40,6 +40,7 @@ import {
   decryptIntegrationSecret,
   queueAllowanceLimitReachedNotification,
   queueAllowanceThresholdNotifications,
+  type RedisQueueClient,
   type AlertDeliveryStore,
   type BillingStore,
   type OperationalEmailDeliveryStore,
@@ -72,11 +73,13 @@ import {
   type LifecycleWebhookTransport,
   type IncidentLifecycleWebhookPublisher,
   type ProcessedEventStore,
+  type WorkerQueue,
   type WeeklyReportTransport
 } from "./processor.js";
 import { captureWorkerDogfoodingStepFailure, registerWorkerDogfooding } from "./dogfooding.js";
 
 const RETENTION_CLEANUP_LEASE_KEY = "leases:cleanup-retention:schedule";
+const WORKER_SHUTDOWN_GRACE_MS = 30_000;
 
 const WorkerEnvSchema = z.object({
   DB_HOST: z.string().min(1).default("localhost"),
@@ -119,6 +122,53 @@ function readOptionalEnv(value: string | undefined): string | undefined {
 
   const trimmed = value.trim();
   return trimmed.length === 0 ? undefined : trimmed;
+}
+
+export interface WorkerShutdownState {
+  isShuttingDown(): boolean;
+  requestShutdown(): void;
+  waitForShutdown(): Promise<void>;
+  readinessCheck(readinessCheck: () => Promise<void>): Promise<void>;
+}
+
+export function createWorkerShutdownState(): WorkerShutdownState {
+  let shuttingDown = false;
+  let resolveShutdown: (() => void) | null = null;
+  const shutdownPromise = new Promise<void>((resolve) => {
+    resolveShutdown = resolve;
+  });
+
+  return {
+    isShuttingDown() {
+      return shuttingDown;
+    },
+    requestShutdown() {
+      if (shuttingDown) {
+        return;
+      }
+
+      shuttingDown = true;
+      resolveShutdown?.();
+    },
+    async waitForShutdown() {
+      await shutdownPromise;
+    },
+    async readinessCheck(readinessCheck: () => Promise<void>) {
+      if (shuttingDown) {
+        throw new Error("worker_draining");
+      }
+
+      await readinessCheck();
+    }
+  };
+}
+
+async function delayUntilNextPollOrShutdown(ms: number, shutdownState: WorkerShutdownState): Promise<void> {
+  if (shutdownState.isShuttingDown()) {
+    return;
+  }
+
+  await Promise.race([delay(ms), shutdownState.waitForShutdown()]);
 }
 
 function normalizeWorkerBaseUrl(value: string | undefined): string | null {
@@ -1471,11 +1521,15 @@ async function runWorkerStep(
 async function runWorkerProcessStep<Result extends { processed: boolean; reason?: string }>(
   logger: RuntimeLogger,
   jobName: string,
-  work: () => Promise<Result>
+  work: () => Promise<Result>,
+  claimTracker?: { ackClaimedJobs(): Promise<void>; dropClaimedJobs(): void }
 ): Promise<Result> {
   try {
-    return await work();
+    const result = await work();
+    await claimTracker?.ackClaimedJobs();
+    return result;
   } catch (error) {
+    claimTracker?.dropClaimedJobs();
     logger.error({ error_message: getErrorMessage(error, "unknown_worker_step_error"), job_name: jobName }, "worker_step_failed");
     captureWorkerDogfoodingStepFailure(jobName, error);
     return {
@@ -1483,6 +1537,39 @@ async function runWorkerProcessStep<Result extends { processed: boolean; reason?
       reason: "step_error"
     } as Result;
   }
+}
+
+interface ClaimTrackingWorkerQueue extends WorkerQueue {
+  ackClaimedJobs(): Promise<void>;
+  close(): Promise<void>;
+  dropClaimedJobs(): void;
+}
+
+function createClaimTrackingWorkerQueue(queue: RedisQueueClient): ClaimTrackingWorkerQueue {
+  let pendingAcks: Array<() => Promise<void>> = [];
+
+  return {
+    ...queue,
+    dequeue: (async (jobName: Parameters<RedisQueueClient["claim"]>[0]) => {
+      const claimed = await queue.claim(jobName);
+      if (claimed === null) {
+        return null;
+      }
+
+      pendingAcks.push(claimed.ack);
+      return claimed.payload;
+    }) as WorkerQueue["dequeue"],
+    async ackClaimedJobs(): Promise<void> {
+      const acks = pendingAcks;
+      pendingAcks = [];
+      for (const ack of acks) {
+        await ack();
+      }
+    },
+    dropClaimedJobs(): void {
+      pendingAcks = [];
+    }
+  };
 }
 
 export async function runWorkerFromEnv(envInput: Record<string, string | undefined>): Promise<void> {
@@ -1528,17 +1615,23 @@ export async function runWorkerFromEnv(envInput: Record<string, string | undefin
   const queryable: Queryable = {
     query: async <Row extends Record<string, unknown>>(sql: string, params: unknown[]) => pool.query<Row>(sql, params)
   };
+  const shutdownState = createWorkerShutdownState();
   const readinessCheck = buildWorkerReadinessCheck({ env, queryable });
+  const drainingReadinessCheck = async (): Promise<void> => {
+    await shutdownState.readinessCheck(readinessCheck);
+  };
   const healthServer = env.WORKER_HEALTH_PORT > 0
     ? createWorkerHealthServer({
         port: env.WORKER_HEALTH_PORT,
-        readinessCheck
+        readinessCheck: drainingReadinessCheck
       })
     : null;
 
-  const queue = createRedisQueueClient({
-    redisUrl: env.REDIS_URL
-  });
+  const queue = createClaimTrackingWorkerQueue(
+    createRedisQueueClient({
+      redisUrl: env.REDIS_URL
+    })
+  );
 
   const objectStore = createS3ObjectStoreClient({
     endpoint: env.S3_ENDPOINT,
@@ -1647,9 +1740,45 @@ export async function runWorkerFromEnv(envInput: Record<string, string | undefin
     "worker_started"
   );
 
+  const runClaimedProcessStep = async <Result extends { processed: boolean; reason?: string }>(
+    jobName: string,
+    work: () => Promise<Result>
+  ): Promise<Result> => runWorkerProcessStep(logger, jobName, work, queue);
+
+  let workerShutdownStarted = false;
+  let workerForceExitTimer: NodeJS.Timeout | null = null;
+  function requestWorkerShutdown(signal: NodeJS.Signals): void {
+    if (workerShutdownStarted) {
+      return;
+    }
+
+    workerShutdownStarted = true;
+    shutdownState.requestShutdown();
+    logger.info({ signal }, "worker_draining");
+
+    workerForceExitTimer = setTimeout(() => {
+      logger.error({ signal }, "worker_shutdown_timeout");
+      process.exit(1);
+    }, WORKER_SHUTDOWN_GRACE_MS);
+    workerForceExitTimer.unref();
+  }
+
+  if (process.env["NODE_ENV"] !== "test") {
+    process.once("SIGTERM", () => {
+      requestWorkerShutdown("SIGTERM");
+    });
+    process.once("SIGINT", () => {
+      requestWorkerShutdown("SIGINT");
+    });
+  }
+
   try {
     do {
-      const normalizeResult = await runWorkerProcessStep(logger, "normalize-events", async () =>
+      if (shutdownState.isShuttingDown()) {
+        break;
+      }
+
+      const normalizeResult = await runClaimedProcessStep("normalize-events", async () =>
         processNextNormalizeEventsJob({
           queue,
           objectStore,
@@ -1671,7 +1800,7 @@ export async function runWorkerFromEnv(envInput: Record<string, string | undefin
       );
 
       if (!normalizeResult.processed) {
-        const groupResult = await runWorkerProcessStep(logger, "group-incident", async () =>
+          const groupResult = await runClaimedProcessStep("group-incident", async () =>
           processNextGroupIncidentJob({
             queue,
             alertEvaluationQueue: queue,
@@ -1697,7 +1826,7 @@ export async function runWorkerFromEnv(envInput: Record<string, string | undefin
         );
 
         if (!groupResult.processed) {
-          const buildBundleResult = await runWorkerProcessStep(logger, "build-bundle", async () =>
+            const buildBundleResult = await runClaimedProcessStep("build-bundle", async () =>
             processNextBuildBundleJob({
               queue,
               logger,
@@ -1710,7 +1839,7 @@ export async function runWorkerFromEnv(envInput: Record<string, string | undefin
           );
 
           if (!buildBundleResult.processed) {
-            const buildReproductionResult = await runWorkerProcessStep(logger, "build-reproduction", async () =>
+              const buildReproductionResult = await runClaimedProcessStep("build-reproduction", async () =>
               processNextBuildReproductionJob({
                 queue,
                 objectStore
@@ -1718,7 +1847,7 @@ export async function runWorkerFromEnv(envInput: Record<string, string | undefin
             );
 
             if (!buildReproductionResult.processed) {
-              const evaluateAlertsResult = await runWorkerProcessStep(logger, "evaluate-alerts", async () =>
+              const evaluateAlertsResult = await runClaimedProcessStep("evaluate-alerts", async () =>
                 processNextEvaluateAlertsJob({
                   queue,
                   alertStore: alertDeliveryStore,
@@ -1766,13 +1895,13 @@ export async function runWorkerFromEnv(envInput: Record<string, string | undefin
                   });
                 });
 
-                await runWorkerStep(logger, "deliver-alert-email-digest", async () => {
-                  await processNextDeliverAlertEmailDigestJob({
+                await runClaimedProcessStep("deliver-alert-email-digest", async () =>
+                  processNextDeliverAlertEmailDigestJob({
                     queue,
                     alertStore: alertDeliveryStore,
                     alertEmailDigestTransport
-                  });
-                });
+                  })
+                );
 
                 if (emailTransport !== null) {
                   await runWorkerStep(logger, "deliver-operational-email", async () => {
@@ -1785,8 +1914,8 @@ export async function runWorkerFromEnv(envInput: Record<string, string | undefin
                   });
                 }
 
-                await runWorkerStep(logger, "deliver-webhook", async () => {
-                  await processNextDeliverWebhookJob({
+                await runClaimedProcessStep("deliver-webhook", async () =>
+                  processNextDeliverWebhookJob({
                     queue,
                     logger,
                     webhookDeliveryStore,
@@ -1810,21 +1939,21 @@ export async function runWorkerFromEnv(envInput: Record<string, string | undefin
                         // Notification enqueue failure must not block delivery processing.
                       }
                     }
-                  });
-                });
+                  })
+                );
 
                 if (githubDispatchTransport !== null) {
-                  await runWorkerStep(logger, "deliver-github-dispatch", async () => {
-                    await processNextDeliverGitHubDispatchJob({
+                  await runClaimedProcessStep("deliver-github-dispatch", async () =>
+                    processNextDeliverGitHubDispatchJob({
                       queue,
                       logger,
                       githubStore,
                       githubDispatchTransport
-                    });
-                  });
+                    })
+                  );
                 }
 
-                const weeklyReportResult = await runWorkerProcessStep(logger, "generate-weekly-report", async () =>
+                const weeklyReportResult = await runClaimedProcessStep("generate-weekly-report", async () =>
                   processNextGenerateWeeklyReportJob({
                     queue,
                     logger,
@@ -1836,12 +1965,12 @@ export async function runWorkerFromEnv(envInput: Record<string, string | undefin
                 );
 
                 if (!weeklyReportResult.processed) {
-                  await runWorkerStep(logger, "cleanup-retention", async () => {
-                    await processNextCleanupRetentionJob({
+                  await runClaimedProcessStep("cleanup-retention", async () =>
+                    processNextCleanupRetentionJob({
                       queue,
                       retentionCleanupRunner
-                    });
-                  });
+                    })
+                  );
                 }
               }
             }
@@ -1853,8 +1982,8 @@ export async function runWorkerFromEnv(envInput: Record<string, string | undefin
         break;
       }
 
-      await delay(env.WORKER_POLL_INTERVAL_MS);
-    } while (true);
+      await delayUntilNextPollOrShutdown(env.WORKER_POLL_INTERVAL_MS, shutdownState);
+    } while (!shutdownState.isShuttingDown());
   } finally {
     if (healthServer !== null) {
       healthServer.close();
@@ -1866,5 +1995,11 @@ export async function runWorkerFromEnv(envInput: Record<string, string | undefin
     await requestAnomalyCounter.close();
     await queue.close();
     await pool.end();
+    if (workerForceExitTimer !== null) {
+      clearTimeout(workerForceExitTimer);
+    }
+    if (workerShutdownStarted) {
+      logger.info("worker_shutdown_complete");
+    }
   }
 }

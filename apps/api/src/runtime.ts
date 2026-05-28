@@ -38,6 +38,32 @@ export interface Queryable {
   query<Row extends Record<string, unknown>>(sql: string, params: unknown[]): Promise<{ rows: Row[] }>;
 }
 
+export interface DrainingReadinessState {
+  isDraining(): boolean;
+  markDraining(): void;
+  readinessCheck(): Promise<void>;
+}
+
+export function createDrainingReadinessState(baseReadinessCheck: () => Promise<void>): DrainingReadinessState {
+  let draining = false;
+
+  return {
+    isDraining() {
+      return draining;
+    },
+    markDraining() {
+      draining = true;
+    },
+    async readinessCheck() {
+      if (draining) {
+        throw new Error("api_draining");
+      }
+
+      await baseReadinessCheck();
+    }
+  };
+}
+
 export function parseApiRuntimeEnv(env: Record<string, string | undefined>): ApiRuntimeEnv {
   const result = ApiRuntimeEnvSchema.safeParse({
     API_HOST: env["API_HOST"],
@@ -179,9 +205,9 @@ export async function startApiServerFromEnv(envInput: Record<string, string | un
     env: envInput,
     ...(process.env["npm_package_version"] === undefined ? {} : { version: process.env["npm_package_version"] })
   });
-  const readinessCheck = buildApiReadinessCheck(env);
+  const readinessState = createDrainingReadinessState(buildApiReadinessCheck(env));
 
-  await readinessCheck();
+  await readinessState.readinessCheck();
 
   const dependencies = createApiDependenciesFromEnv({
     ...envInput,
@@ -228,8 +254,56 @@ export async function startApiServerFromEnv(envInput: Record<string, string | un
   const app = createApiServer(dependencies, {
     ...serverOptions,
     logger,
-    readinessCheck
+    readinessCheck: readinessState.readinessCheck
   });
+
+  let shutdownStarted = false;
+  const closeDependencies =
+    "close" in dependencies && typeof dependencies.close === "function"
+      ? (dependencies.close.bind(dependencies) as () => Promise<void>)
+      : undefined;
+
+  async function shutdown(signal: NodeJS.Signals): Promise<void> {
+    if (shutdownStarted) {
+      return;
+    }
+
+    shutdownStarted = true;
+    readinessState.markDraining();
+    logger.info({ signal }, "api_server_draining");
+
+    const forceExitTimer = setTimeout(() => {
+      logger.error({ signal }, "api_server_shutdown_timeout");
+      process.exit(1);
+    }, 30_000);
+    forceExitTimer.unref();
+
+    try {
+      await app.close();
+      if (closeDependencies !== undefined) {
+        await closeDependencies();
+      }
+      clearTimeout(forceExitTimer);
+      logger.info({ signal }, "api_server_shutdown_complete");
+    } catch (error) {
+      clearTimeout(forceExitTimer);
+      logger.error(
+        { signal, error: error instanceof Error ? error.message : String(error) },
+        "api_server_shutdown_failed"
+      );
+      process.exit(1);
+    }
+  }
+
+  if (process.env["NODE_ENV"] !== "test") {
+    process.once("SIGTERM", () => {
+      void shutdown("SIGTERM");
+    });
+    process.once("SIGINT", () => {
+      void shutdown("SIGINT");
+    });
+  }
+
   logger.info({ host: env.API_HOST, port: env.API_PORT }, "api_server_starting");
   await app.listen({ host: env.API_HOST, port: env.API_PORT });
   logger.info({ host: env.API_HOST, port: env.API_PORT }, "api_server_listening");

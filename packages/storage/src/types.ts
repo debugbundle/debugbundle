@@ -58,7 +58,23 @@ export interface RedisQueueClient extends QueueClient {
   dequeue(jobName: "deliver-github-dispatch"): Promise<DeliverGitHubDispatchJob | null>;
   dequeue(jobName: "generate-weekly-report"): Promise<GenerateWeeklyReportJob | null>;
   dequeue(jobName: "cleanup-retention"): Promise<CleanupRetentionJob | null>;
+  claim(jobName: "normalize-events"): Promise<ClaimedRedisJob<NormalizeEventsJob> | null>;
+  claim(jobName: "group-incident"): Promise<ClaimedRedisJob<GroupIncidentJob> | null>;
+  claim(jobName: "build-bundle"): Promise<ClaimedRedisJob<BuildBundleJob> | null>;
+  claim(jobName: "build-reproduction"): Promise<ClaimedRedisJob<BuildReproductionJob> | null>;
+  claim(jobName: "evaluate-alerts"): Promise<ClaimedRedisJob<EvaluateAlertsJob> | null>;
+  claim(jobName: "deliver-alert-email-digest"): Promise<ClaimedRedisJob<DeliverAlertEmailDigestJob> | null>;
+  claim(jobName: "deliver-webhook"): Promise<ClaimedRedisJob<DeliverWebhookJob> | null>;
+  claim(jobName: "deliver-github-dispatch"): Promise<ClaimedRedisJob<DeliverGitHubDispatchJob> | null>;
+  claim(jobName: "generate-weekly-report"): Promise<ClaimedRedisJob<GenerateWeeklyReportJob> | null>;
+  claim(jobName: "cleanup-retention"): Promise<ClaimedRedisJob<CleanupRetentionJob> | null>;
+  reclaimStaleProcessingJobs(jobName: "normalize-events" | "group-incident" | "build-bundle" | "build-reproduction" | "evaluate-alerts" | "deliver-alert-email-digest" | "deliver-webhook" | "deliver-github-dispatch" | "generate-weekly-report" | "cleanup-retention", olderThanMs: number): Promise<number>;
   close(): Promise<void>;
+}
+
+export interface ClaimedRedisJob<Payload> {
+  payload: Payload;
+  ack(): Promise<void>;
 }
 
 export interface NormalizeEventsJob {

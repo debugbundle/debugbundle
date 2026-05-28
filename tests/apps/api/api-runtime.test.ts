@@ -31,6 +31,7 @@ const API_TABLE_ROWS = [
   { table_name: "operational_email_deliveries" },
   { table_name: "slack_destinations" },
   { table_name: "capture_policies" },
+  { table_name: "capture_rules" },
   { table_name: "audit_logs" },
   { table_name: "processed_billing_events" },
   { table_name: "github_installations" },

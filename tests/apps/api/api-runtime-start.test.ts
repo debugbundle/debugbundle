@@ -68,7 +68,7 @@ vi.mock("../../../apps/api/src/stripe-config.js", () => ({
   createStripeConfig: createStripeConfigMock
 }));
 
-import { startApiServerFromEnv } from "../../../apps/api/src/runtime.js";
+import { createDrainingReadinessState, startApiServerFromEnv } from "../../../apps/api/src/runtime.js";
 
 function buildMigratedRuntimeSchemaRows(sql: string): { rows: Record<string, unknown>[] } {
   if (sql.includes("information_schema.tables")) {
@@ -104,6 +104,7 @@ function buildMigratedRuntimeSchemaRows(sql: string): { rows: Record<string, unk
         { table_name: "webhook_deliveries" },
         { table_name: "slack_destinations" },
         { table_name: "capture_policies" },
+        { table_name: "capture_rules" },
         { table_name: "audit_logs" },
         { table_name: "processed_billing_events" },
         { table_name: "github_installations" },
@@ -178,6 +179,18 @@ describe("api runtime start", () => {
     expect(s3SendMock).toHaveBeenCalledOnce();
     expect(endMock).toHaveBeenCalledOnce();
     expect(listenMock).toHaveBeenCalledWith({ host: "0.0.0.0", port: 3010 });
+  });
+
+  it("should report not-ready after draining starts", async (): Promise<void> => {
+    const readiness = vi.fn().mockResolvedValue(undefined);
+    const state = createDrainingReadinessState(readiness);
+
+    await expect(state.readinessCheck()).resolves.toBeUndefined();
+
+    state.markDraining();
+
+    await expect(state.readinessCheck()).rejects.toThrow("api_draining");
+    expect(readiness).toHaveBeenCalledOnce();
   });
 
   it("should fail startup before dependency checks when the probe trigger secret is missing", async (): Promise<void> => {

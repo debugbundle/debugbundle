@@ -8,6 +8,9 @@ let redisLpopMock = vi.fn();
 let redisSetMock = vi.fn();
 let redisQuitMock = vi.fn();
 let redisMultiMock = vi.fn();
+let redisEvalMock = vi.fn();
+let redisZrangebyscoreMock = vi.fn();
+let redisZremMock = vi.fn();
 
 vi.mock("@aws-sdk/client-s3", () => {
   class S3Client {
@@ -73,6 +76,9 @@ vi.mock("ioredis", () => {
     set = redisSetMock;
     quit = redisQuitMock;
     multi = redisMultiMock;
+    eval = redisEvalMock;
+    zrangebyscore = redisZrangebyscoreMock;
+    zrem = redisZremMock;
 
     constructor() {}
   }
@@ -100,6 +106,9 @@ describe("storage adapters", () => {
     redisSetMock = vi.fn().mockResolvedValue("OK");
     redisQuitMock = vi.fn().mockResolvedValue("OK");
     redisMultiMock = vi.fn();
+    redisEvalMock = vi.fn().mockResolvedValue(null);
+    redisZrangebyscoreMock = vi.fn().mockResolvedValue([]);
+    redisZremMock = vi.fn().mockResolvedValue(1);
   });
 
   it("should put and get objects with S3 adapter", async (): Promise<void> => {
@@ -366,7 +375,7 @@ describe("storage adapters", () => {
     expect(redisRpushMock).toHaveBeenCalledOnce();
     expect(redisLrangeMock).toHaveBeenCalledOnce();
     expect(redisLpopMock).toHaveBeenCalledOnce();
-    expect(redisDelMock).toHaveBeenCalledOnce();
+    expect(redisDelMock).toHaveBeenCalledWith("jobs:normalize-events", "jobs:normalize-events:processing");
     expect(redisQuitMock).toHaveBeenCalledOnce();
   });
 
@@ -466,7 +475,49 @@ describe("storage adapters", () => {
     expect(acquired).toBe(true);
     expect(redisSetMock).toHaveBeenCalledWith("leases:cleanup-retention:schedule", "1", "EX", 3600, "NX");
     expect(redisDelMock).toHaveBeenCalledWith("leases:cleanup-retention:schedule");
-    expect(redisDelMock).toHaveBeenCalledWith("jobs:cleanup-retention");
+    expect(redisDelMock).toHaveBeenCalledWith("jobs:cleanup-retention", "jobs:cleanup-retention:processing");
+  });
+
+  it("should claim and ack Redis jobs through the processing set", async (): Promise<void> => {
+    const payload = '{"project_id":"proj_123","event_id":"evt_123","object_key":"raw-events/proj_123/e.json.gz"}';
+    const envelope = JSON.stringify({ claim_id: "claim_123", payload });
+    redisEvalMock = vi.fn().mockResolvedValue([payload, envelope]);
+
+    const queue = createRedisQueueClient({ redisUrl: "redis://redis:6379" });
+    const claimed = await queue.claim("normalize-events");
+
+    expect(claimed?.payload).toEqual({
+      project_id: "proj_123",
+      event_id: "evt_123",
+      object_key: "raw-events/proj_123/e.json.gz"
+    });
+
+    await claimed?.ack();
+
+    expect(redisZrangebyscoreMock).toHaveBeenCalledWith("jobs:normalize-events:processing", "-inf", expect.any(String));
+    expect(redisEvalMock).toHaveBeenCalledWith(
+      expect.stringContaining("LPOP"),
+      2,
+      "jobs:normalize-events",
+      "jobs:normalize-events:processing",
+      expect.any(String),
+      expect.any(String)
+    );
+    expect(redisZremMock).toHaveBeenCalledWith("jobs:normalize-events:processing", envelope);
+  });
+
+  it("should reclaim stale processing jobs", async (): Promise<void> => {
+    const payload = '{"project_id":"proj_123","event_id":"evt_123","object_key":"raw-events/proj_123/e.json.gz"}';
+    const envelope = JSON.stringify({ claim_id: "claim_123", payload });
+    redisZrangebyscoreMock = vi.fn().mockResolvedValue([envelope]);
+
+    const queue = createRedisQueueClient({ redisUrl: "redis://redis:6379" });
+    const reclaimed = await queue.reclaimStaleProcessingJobs("normalize-events", 123456);
+
+    expect(reclaimed).toBe(1);
+    expect(redisZrangebyscoreMock).toHaveBeenCalledWith("jobs:normalize-events:processing", "-inf", "123456");
+    expect(redisZremMock).toHaveBeenCalledWith("jobs:normalize-events:processing", envelope);
+    expect(redisRpushMock).toHaveBeenCalledWith("jobs:normalize-events", payload);
   });
 
   it("should track rolling incident frequencies and compute spike ratio scaffolding", async (): Promise<void> => {

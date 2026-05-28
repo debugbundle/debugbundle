@@ -313,6 +313,7 @@ import {
   createLifecycleWebhookTransport,
   createLifecycleWebhookPublisher,
   createWorkerHealthServer,
+  createWorkerShutdownState,
   createWeeklyReportTransport,
   encodeBase64Url,
   getIncidentStatusForDispatchEvent,
@@ -2422,6 +2423,31 @@ describe("worker runtime", () => {
 
       expect(response.status).toBe(503);
       expect(body).toEqual({ status: "not_ready", reason: "worker_s3_bucket_unreachable" });
+    } finally {
+      server.close();
+    }
+  });
+
+  it("should return not-ready status while worker shutdown is draining", async (): Promise<void> => {
+    const shutdownState = createWorkerShutdownState();
+    const readinessCheck = vi.fn().mockResolvedValue(undefined);
+    const server = createWorkerHealthServer({
+      port: 0,
+      readinessCheck: () => shutdownState.readinessCheck(readinessCheck)
+    });
+
+    try {
+      shutdownState.requestShutdown();
+
+      const address = server.address();
+      const port = typeof address === "object" && address !== null ? address.port : 0;
+      const response = await fetch(`http://127.0.0.1:${port}/ready`);
+      const text = await response.text();
+      const body = JSON.parse(text) as { status: string; reason: string };
+
+      expect(response.status).toBe(503);
+      expect(body).toEqual({ status: "not_ready", reason: "worker_draining" });
+      expect(readinessCheck).not.toHaveBeenCalled();
     } finally {
       server.close();
     }

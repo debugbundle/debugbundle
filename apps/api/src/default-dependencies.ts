@@ -2140,6 +2140,7 @@ export function createApiDependenciesFromEnv(env: Record<string, string | undefi
     | "updateWebhookForOrganization"
     | "deleteWebhookForOrganization"
   >;
+  close(): Promise<void>;
 } {
   const githubOAuth = createGithubOAuthConfigFromEnv(env);
   const dbSsl = buildPostgresSslConfig(env["DB_SSL_MODE"]);
@@ -2211,6 +2212,13 @@ export function createApiDependenciesFromEnv(env: Record<string, string | undefi
   const lifecycleWebhookFallbackSigningSecret = readNonEmptyEnv(env, "LIFECYCLE_WEBHOOK_SECRET");
   const signupEmailAllowlist = readSignupEmailAllowlistFromEnv(env);
 
+  const authRateLimiter = createRedisAuthRateLimiter({
+    redisUrl: env["REDIS_URL"] ?? "redis://localhost:6379"
+  });
+  const ingestionRateLimiter = createRedisIngestionRateLimiter({
+    redisUrl: env["REDIS_URL"] ?? "redis://localhost:6379"
+  });
+
   const dependencies = createApiDependencies({
     db: {
       query: async <Row extends Record<string, unknown>>(sql: string, params: unknown[]) => dbPool.query<Row>(sql, params)
@@ -2226,13 +2234,18 @@ export function createApiDependenciesFromEnv(env: Record<string, string | undefi
     ...(stripeConfig === undefined ? {} : { stripeConfig }),
     ...(lifecycleWebhookFallbackTargetUrl === undefined ? {} : { lifecycleWebhookFallbackTargetUrl }),
     ...(lifecycleWebhookFallbackSigningSecret === undefined ? {} : { lifecycleWebhookFallbackSigningSecret }),
-    authRateLimiter: createRedisAuthRateLimiter({
-      redisUrl: env["REDIS_URL"] ?? "redis://localhost:6379"
-    }),
-    ingestionRateLimiter: createRedisIngestionRateLimiter({
-      redisUrl: env["REDIS_URL"] ?? "redis://localhost:6379"
-    })
+    authRateLimiter,
+    ingestionRateLimiter
   });
 
-  return dependencies;
+  return {
+    ...dependencies,
+    async close(): Promise<void> {
+      await authRateLimiter.close();
+      await ingestionRateLimiter.close();
+      await frequencyCounter.close();
+      await queue.close();
+      await dbPool.end();
+    }
+  };
 }
