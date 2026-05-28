@@ -626,8 +626,8 @@ export const ProbeActivateBodySchema = z
     label_pattern: z.string().min(1).max(200),
     service: z.string().min(1).max(200).default("*"),
     environment: z.string().min(1).max(200).default("*"),
-    ttl_seconds: z.coerce.number().int().min(60).max(3600).default(3600),
-    trigger_ttl_seconds: z.coerce.number().int().min(60).max(86400).default(86400)
+    ttl_seconds: z.coerce.number().int().min(60).max(3600),
+    trigger_ttl_seconds: z.coerce.number().int().min(60).max(86400).optional()
   })
   .strict();
 

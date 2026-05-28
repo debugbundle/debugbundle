@@ -103,7 +103,7 @@ TypeScript and JavaScript are delivered as one shared npm SDK surface, exactly a
 **Pre-release SDK expansion and prepared plans:**
 - `github.com/debugbundle/debugbundle-go` — Go SDK. Detailed implementation plan: `spec/sdks/go-sdk.md`.
 - `debugbundle` (RubyGems) — Ruby SDK. Detailed implementation plan: `spec/sdks/ruby-sdk.md`.
-- `github.com/debugbundle/debugbundle-android` — Kotlin Android SDK plan prepared in `spec/sdks/kotlin-sdk.md`.
+- `github.com/debugbundle/debugbundle-android` — Kotlin Android SDK local standalone repo now includes the implemented core/runtime module family (`debugbundle-android-core`, `debugbundle-android`, OkHttp/Ktor, Navigation/Compose, Timber, testkit, BOM), offline queueing, crash/ANR replay, native trace propagation, capture-policy enforcement, and remote probe directive/trigger-token support; the detailed plan lives in `spec/sdks/kotlin-sdk.md`.
 - `github.com/debugbundle/debugbundle-swift` — Swift iOS SDK plan prepared in `spec/sdks/swift-sdk.md`.
 
 ---
@@ -446,6 +446,7 @@ This makes Kotlin strategically valuable because it can participate in both serv
 
 - Kotlin server and Kotlin Android are separate SDK surfaces (`debugbundle-kotlin` and `debugbundle-android`).
 - The detailed Kotlin Android implementation plan lives in `spec/sdks/kotlin-sdk.md`.
+- The current local Android repo already covers the core/runtime slice: lifecycle/process capture, WorkManager flushing, ANR/process-exit replay, offline queueing, capture-policy enforcement, OkHttp/Ktor request instrumentation, Navigation/Compose/Timber adapters, contract-shaped inline probe data, remote probe directives, piggybacked ingestion directives, standalone `probe_event` shipping, and trigger-token validation.
 - The Ktor/server SDK still needs a separate server-focused plan before implementation.
 - KMP is strategically interesting later, but should not block native-first support.
 

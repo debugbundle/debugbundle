@@ -269,7 +269,7 @@ The CLI bootstrap flow is additive and issues the same member-token credential u
   "probe_directives": {
     "active_probes": [
       {
-        "id": "uuid",
+        "activation_id": "uuid",
         "label_pattern": "checkout.*",
         "service": "* | service-name",
         "environment": "* | production",
@@ -1256,7 +1256,7 @@ If the shared `monthly_remote_activations` allowance is exhausted, activation re
 {
   "activations": [
     {
-      "id": "uuid",
+      "activation_id": "uuid",
       "label_pattern": "checkout.*",
       "service": "checkout-api",
       "environment": "production",
@@ -1283,16 +1283,19 @@ Response header: `Cache-Control: public, s-maxage=30` (CDN-edge-cacheable). Purg
   "remote_probes_enabled": true,
   "active_probes": [
     {
-      "id": "uuid",
+      "activation_id": "uuid",
       "label_pattern": "checkout.*",
       "service": "checkout-api | *",
       "environment": "production | *",
       "expires_at": "ISO8601"
     }
   ],
-  "poll_interval_ms": 60000
+  "poll_interval_ms": 60000,
+  "trigger_token_key": "project-scoped signing key for trigger-token validation"
 }
 ```
+
+`trigger_token_key` is present only when remote probes are enabled for the project. SDKs use it to validate `dbundle_probe_...` trigger tokens locally without an API call.
 
 Free-tier projects receive: `{ "probes_enabled": true, "remote_probes_enabled": false, "active_probes": [], "poll_interval_ms": 0 }` — probes are enabled (always-on ring buffer works) but remote activation is not available.
 

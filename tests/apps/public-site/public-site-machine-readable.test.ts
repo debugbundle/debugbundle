@@ -167,6 +167,7 @@ describe('public site machine-readable artifacts', () => {
     expect(content).toContain('- Connect to Cloud: https://debugbundle.com/docs/project-setup/connect-to-cloud/');
     expect(content).toContain('- SDK overview: https://debugbundle.com/docs/sdks/');
     expect(content).toContain('- Browser relay: https://debugbundle.com/docs/sdks/browser-relay/');
+    expect(content).toContain('- Android SDK: https://debugbundle.com/docs/sdks/android/');
     expect(content).toContain('- WordPress integration: https://debugbundle.com/docs/integrations/wordpress/');
     expect(content).toContain('- CLI local workflow: https://debugbundle.com/docs/cli/local-workflow/');
     expect(content).toContain('- CLI cloud workflow: https://debugbundle.com/docs/cli/cloud-workflow/');

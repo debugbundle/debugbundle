@@ -395,7 +395,8 @@ describe("api probe routes", () => {
       payload: {
         label_pattern: "checkout.*",
         service: "*",
-        environment: "*"
+        environment: "*",
+        ttl_seconds: 300
       }
     });
 
@@ -591,6 +592,46 @@ describe("api probe routes", () => {
     });
   });
 
+  it("should default trigger token ttl to the passive activation ttl", async (): Promise<void> => {
+    const createProbeActivationForProjectInOrganization = vi.fn().mockResolvedValue({
+      organization_plan: "solo",
+      activation: {
+        activation_id: "11111111-1111-4111-8111-111111111111",
+        label_pattern: "checkout.*",
+        service: "checkout-api",
+        environment: "production",
+        expires_at: "2026-03-11T00:05:00.000Z",
+        trigger_expires_at: "2026-03-11T00:05:00.000Z"
+      },
+      trigger_token: "dbundle_probe_test"
+    });
+    const app = createServer({
+      probeManagement: {
+        listActiveProbesForProject: vi.fn().mockResolvedValue([]),
+        listActiveProbesForProjectInOrganization: vi.fn().mockResolvedValue({ organization_plan: "solo", activations: [] }),
+        createProbeActivationForProjectInOrganization,
+        deactivateProbeActivationForProjectInOrganization: vi.fn().mockResolvedValue(null)
+      }
+    });
+
+    const response = await app.inject({
+      method: "POST",
+      url: "/v1/projects/00000000-0000-4000-8000-000000000001/probes/activate",
+      headers: { authorization: "Bearer dbundle_mem_test" },
+      payload: {
+        label_pattern: "checkout.*",
+        service: "checkout-api",
+        environment: "production",
+        ttl_seconds: 300
+      }
+    });
+
+    expect(response.statusCode).toBe(201);
+    const activationInput = createProbeActivationForProjectInOrganization.mock.calls[0]?.[0];
+    expect(activationInput).toBeDefined();
+    expect(activationInput?.trigger_expires_at).toBe(activationInput?.expires_at);
+  });
+
   it("should return not found when probe management is missing or project is out-of-scope", async (): Promise<void> => {
     const withoutProbeDeps = createApiServer({
       ingestionPersistence: {
@@ -643,7 +684,8 @@ describe("api probe routes", () => {
       url: "/v1/projects/00000000-0000-4000-8000-000000000001/probes/activate",
       headers: { authorization: "Bearer dbundle_mem_test" },
       payload: {
-        label_pattern: "checkout.*"
+        label_pattern: "checkout.*",
+        ttl_seconds: 300
       }
     });
 
@@ -785,7 +827,8 @@ describe("api probe routes", () => {
       payload: {
         label_pattern: "checkout.*",
         service: "*",
-        environment: "*"
+        environment: "*",
+        ttl_seconds: 300
       }
     });
     const listed = await app.inject({
@@ -870,7 +913,7 @@ describe("api probe routes", () => {
       method: "POST",
       url: "/v1/projects/00000000-0000-4000-8000-000000000001/probes/activate",
       headers: { authorization: "Bearer dbundle_mem_test" },
-      payload: { label_pattern: "payment.*" }
+      payload: { label_pattern: "payment.*", ttl_seconds: 300 }
     });
     expect(created.statusCode).toBe(201);
 
@@ -996,7 +1039,7 @@ describe("api probe routes", () => {
       method: "POST",
       url: `/v1/projects/${projectId}/probes/activate`,
       headers: { authorization: "Bearer dbundle_mem_test" },
-      payload: { label_pattern: "checkout.*" }
+      payload: { label_pattern: "checkout.*", ttl_seconds: 300 }
     });
     expect(cdnPurge).toHaveBeenCalledWith(projectId);
 
@@ -1029,7 +1072,7 @@ describe("api probe routes", () => {
       method: "POST",
       url: "/v1/projects/00000000-0000-4000-8000-000000000001/probes/activate",
       headers: { authorization: "Bearer dbundle_mem_test" },
-      payload: { label_pattern: "checkout.*" }
+      payload: { label_pattern: "checkout.*", ttl_seconds: 300 }
     });
 
     expect(response.statusCode).toBe(409);

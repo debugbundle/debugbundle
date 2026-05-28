@@ -223,6 +223,7 @@ function buildLlmsTxt(): string {
       `- Java SDK: ${toAbsoluteUrl('/docs/sdks/java/')}`,
       `- Go SDK: ${toAbsoluteUrl('/docs/sdks/go/')}`,
       `- Ruby SDK: ${toAbsoluteUrl('/docs/sdks/ruby/')}`,
+      `- Android SDK: ${toAbsoluteUrl('/docs/sdks/android/')}`,
       `- Universal SDK interface: ${toAbsoluteUrl('/docs/sdks/universal-interface/')}`,
       `- WordPress integration: ${toAbsoluteUrl('/docs/integrations/wordpress/')}`,
       `- Log ingestion: ${toAbsoluteUrl('/docs/cli/log-ingestion/')}`,

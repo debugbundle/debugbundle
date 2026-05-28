@@ -759,14 +759,15 @@ Free-tier mobile SDKs skip remote probe activation checks unless the config resp
   "remote_probes_enabled": true,
   "active_probes": [
     {
-      "id": "uuid",
+      "activation_id": "uuid",
       "label_pattern": "checkout.*",
       "service": "checkout-api | *",
       "environment": "production | *",
       "expires_at": "ISO8601"
     }
   ],
-  "poll_interval_ms": 60000
+  "poll_interval_ms": 60000,
+  "trigger_token_key": "project-scoped signing key for trigger-token validation"
 }
 ```
 
@@ -782,7 +783,7 @@ When active probes exist for a paid-tier project, the `POST /v1/events` response
   "probe_directives": {
     "active_probes": [
       {
-        "id": "uuid",
+        "activation_id": "uuid",
         "label_pattern": "checkout.ui.*",
         "service": "*",
         "environment": "production",
@@ -822,7 +823,7 @@ Trigger tokens have their own independent TTL (up to 24 hours), which can be lon
 **SDK validation (local, no API call):**
 
 1. Extract trigger token from query param or header (header takes precedence if both present).
-2. Verify HMAC-SHA256 signature using the project's signing key (derived from project token during `init()`).
+2. Verify HMAC-SHA256 signature using the project-scoped `trigger_token_key` delivered by `GET /v1/sdk/config`.
 3. Check `trigger_expires_at` embedded in the token payload — reject if expired. Note: this is the trigger token's own expiry, independent of the activation's `expires_at`.
 4. Check label/service/environment scope — only activate matching probes.
 5. If valid: activate matching probes for **this single request/session only**.

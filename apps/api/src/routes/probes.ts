@@ -80,6 +80,7 @@ export function registerProbeRoutes(app: FastifyInstance, dependencies: ApiDepen
     }
 
     const nowMs = now.getTime();
+    const triggerTtlSeconds = parsedBody.data.trigger_ttl_seconds ?? parsedBody.data.ttl_seconds;
     const created = await dependencies.probeManagement.createProbeActivationForProjectInOrganization({
       organization_id: member.organization_id,
       project_id: parsedParams.data.id,
@@ -88,7 +89,7 @@ export function registerProbeRoutes(app: FastifyInstance, dependencies: ApiDepen
       service: parsedBody.data.service,
       environment: parsedBody.data.environment,
       expires_at: new Date(nowMs + parsedBody.data.ttl_seconds * 1000).toISOString(),
-      trigger_expires_at: new Date(nowMs + parsedBody.data.trigger_ttl_seconds * 1000).toISOString()
+      trigger_expires_at: new Date(nowMs + triggerTtlSeconds * 1000).toISOString()
     });
 
     if (created === null) {

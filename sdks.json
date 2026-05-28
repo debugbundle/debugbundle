@@ -34,6 +34,11 @@
       "path": "sdks/debugbundle-ruby",
       "cloneUrl": "https://github.com/debugbundle/debugbundle-ruby.git",
       "branch": "main"
+    },
+    {
+      "path": "sdks/debugbundle-android",
+      "cloneUrl": "https://github.com/debugbundle/debugbundle-android.git",
+      "branch": "main"
     }
   ]
 }
