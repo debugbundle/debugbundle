@@ -1,7 +1,7 @@
 # SDK Language Targets — DebugBundle
 
 Version: v1
-Last updated: 2026-03-27
+Last updated: 2026-05-28
 
 ---
 
@@ -100,9 +100,11 @@ Current cross-repo release sequencing for the JS family is intentional: publish 
 
 TypeScript and JavaScript are delivered as one shared npm SDK surface, exactly as this document recommends.
 
-**Pre-release SDK expansion:**
+**Pre-release SDK expansion and prepared plans:**
 - `github.com/debugbundle/debugbundle-go` — Go SDK. Detailed implementation plan: `spec/sdks/go-sdk.md`.
 - `debugbundle` (RubyGems) — Ruby SDK. Detailed implementation plan: `spec/sdks/ruby-sdk.md`.
+- `github.com/debugbundle/debugbundle-android` — Kotlin Android SDK plan prepared in `spec/sdks/kotlin-sdk.md`.
+- `github.com/debugbundle/debugbundle-swift` — Swift iOS SDK plan prepared in `spec/sdks/swift-sdk.md`.
 
 ---
 
@@ -442,7 +444,9 @@ This makes Kotlin strategically valuable because it can participate in both serv
 
 ### Implementation notes
 
-- Kotlin server and Kotlin Android are separate SDK surfaces (`sdk-kotlin` and `sdk-android`).
+- Kotlin server and Kotlin Android are separate SDK surfaces (`debugbundle-kotlin` and `debugbundle-android`).
+- The detailed Kotlin Android implementation plan lives in `spec/sdks/kotlin-sdk.md`.
+- The Ktor/server SDK still needs a separate server-focused plan before implementation.
 - KMP is strategically interesting later, but should not block native-first support.
 
 ---
@@ -475,6 +479,7 @@ It matters because many real incidents start on-device and only make sense once 
 - Swift should be treated as a native mobile/client SDK with backend correlation support.
 - Focus on crash capture, handled exceptions/errors where possible, network breadcrumbs, and release-aware bundles.
 - Trace ID injection via `URLSession` delegate or `URLProtocol` subclass for cross-boundary correlation.
+- The detailed Swift iOS implementation plan lives in `spec/sdks/swift-sdk.md`.
 
 ---
 
@@ -595,13 +600,13 @@ This wave expands the product from backend debugging into **cross-boundary debug
 
 ### Prerequisite
 
-Before Wave 3 implementation begins, a **Mobile Correlation Contract** must be designed (during Wave 2) that defines:
+Before Wave 3 implementation begins, the **Mobile Correlation Contract** must be kept current. It defines:
 - How mobile SDKs inject `X-DebugBundle-Trace-Id` into outgoing requests (OkHttp interceptor for Kotlin, URLSession delegate for Swift, fetch wrapper for React Native)
 - How offline-captured events timestamp and eventually correlate with backend events
 - Whether mobile-specific device context extends the browser SDK's `device` schema or introduces new event types
 - The offline queueing and deferred delivery contract
 
-This contract has been drafted in `contracts/sdk-interface.md` Section 10.1 and will be refined before Wave 3 starts.
+This contract has been drafted in `contracts/sdk-interface.md` Section 10.1 and is now expanded into native implementation plans for Kotlin Android (`spec/sdks/kotlin-sdk.md`) and Swift iOS (`spec/sdks/swift-sdk.md`). React Native and Dart/Flutter must align to the same contract when their plans are prepared.
 
 ---
 
@@ -750,7 +755,7 @@ The SDK should support:
 
 ### First implementation targets
 
-1. **Kotlin / Android** — `com.debugbundle:sdk-android` on Maven Central
+1. **Kotlin / Android** — `com.debugbundle:debugbundle-android` on Maven Central
 2. **Swift / iOS** — `DebugBundle` via Swift Package Manager
 
 ### Second implementation targets
@@ -814,7 +819,7 @@ For the next phase of SDK implementation, DebugBundle should prioritize these tw
 - **Immediate implementation focus (Wave 1):** TS/JS, Python, PHP, WordPress plugin, Java core + Spring Boot + servlet/JAX-RS app-server support, Ruby, Go
 - **Pre-release expansion:** Ruby and Go publication handoff
 - **Next depth layer (Wave 2):** C#, Kotlin server, Rust
-- **Strategic product expansion (Wave 3):** Kotlin Android, Swift iOS, React Native, Dart/Flutter
+- **Strategic product expansion (Wave 3):** Kotlin Android and Swift iOS plans prepared; React Native and Dart/Flutter remain future plans.
 
 ### V1 framework scope per SDK
 
@@ -858,7 +863,9 @@ That is where the bundle model becomes much more valuable than a narrow error SD
 | Document | Relationship |
 |---|---|
 | `contracts/sdk-interface.md` | Universal SDK interface contract — naming conventions, framework matrix, mobile correlation contract (Section 10.1) |
-| `spec/requirements.md` | Functional requirements FR-SDK-01 through FR-SDK-35 |
+| `spec/requirements.md` | Functional requirements FR-SDK-01 through FR-SDK-37 |
+| `spec/sdks/kotlin-sdk.md` | Detailed Kotlin Android SDK implementation plan |
+| `spec/sdks/swift-sdk.md` | Detailed Swift iOS SDK implementation plan |
 | `spec/implementation-roadmap.md` | Phase 18 (Python), 18a (PHP), 18b (Go), 18c (Ruby), Wave 2/3 placeholders |
 | `SYSTEM_OVERVIEW.md` | SDK surface count and tech stack references |
 | `ARCHITECTURE_MAP.md` | Package entries for all SDK repositories |

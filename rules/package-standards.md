@@ -1,7 +1,7 @@
 # Package Standards — DebugBundle
 
 Version: v1
-Last updated: 2026-03-10
+Last updated: 2026-05-28
 
 ---
 
@@ -60,6 +60,8 @@ All npm packages use the `@debugbundle/` scope.
 |----------|----------|-------------|
 | Go | Go modules | `github.com/debugbundle/debugbundle-go` |
 | Ruby | RubyGems | `debugbundle` |
+| Kotlin Android | Maven Central | `com.debugbundle:debugbundle-android` package family |
+| Swift iOS | Swift Package Manager | `DebugBundle` package products from `github.com/debugbundle/debugbundle-swift` |
 | Rust | crates.io | `debugbundle` |
 
 ---

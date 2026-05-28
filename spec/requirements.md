@@ -1,7 +1,7 @@
 # Requirements — DebugBundle
 
 Version: v1
-Last updated: 2026-03-27
+Last updated: 2026-05-28
 
 ---
 
@@ -80,13 +80,17 @@ Last updated: 2026-03-27
 
 **FR-SDK-31:** Provide a Ruby backend SDK (`debugbundle` on RubyGems) supporting Rails (Railtie + middleware), Rack middleware, and Sidekiq server middleware. Must implement the universal SDK interface with Ruby-idiomatic naming (`init`, `capture_exception`, `capture_error`, `capture_log`, `capture_request`, `capture_message`, `set_context`, `flush`, `probe`). Must support background job context capture alongside web request capture and follow the detailed implementation plan in `spec/sdks/ruby-sdk.md`.
 
-**FR-SDK-32:** Mobile SDKs (Kotlin Android, Swift iOS, React Native) must inject `X-DebugBundle-Trace-Id` into outgoing HTTP requests using platform-native mechanisms: OkHttp interceptor for Kotlin, `URLSession` delegate or `URLProtocol` subclass for Swift, fetch wrapper for React Native. Trace IDs must correlate mobile client events with backend events captured by backend SDKs.
+**FR-SDK-32:** Mobile SDKs (Kotlin Android, Swift iOS, React Native) must inject `X-DebugBundle-Trace-Id` into configured first-party outgoing HTTP requests using platform-native mechanisms: OkHttp interceptor for Kotlin, `URLSession` delegate or `URLProtocol` subclass for Swift, fetch wrapper for React Native. Trace IDs must correlate mobile client events with backend events captured by backend SDKs. SDKs must not inject DebugBundle trace headers into arbitrary third-party requests by default.
 
 **FR-SDK-33:** Mobile SDKs must support offline event queueing with deferred delivery. Events captured while the device is offline must be persisted to local storage, timestamped at capture time, and delivered with retry and backoff when connectivity resumes. Offline-captured events must correlate correctly with backend events via shared trace IDs where applicable.
 
 **FR-SDK-34:** Mobile SDKs must collect extended device context on `init()` and attach it to all outgoing event payloads. Collected data must include: app version, build number, release channel, OS name/version, device model, device manufacturer, screen resolution, locale, timezone, network connection type, battery level (where available), and available storage (where available). Collection extends the browser SDK's `device` schema with mobile-specific fields rather than introducing new event types.
 
 **FR-SDK-35:** Wave 2 backend SDKs (Java, C#, Kotlin server, Rust) must implement the universal SDK interface with language-idiomatic naming conventions and at minimum one first-class framework integration each: Spring Boot (Java), ASP.NET Core (C#), Ktor (Kotlin server), Axum + Actix Web (Rust). See `spec/sdk-language-targets.md` for per-language guidance and `contracts/sdk-interface.md` for the full interface contract.
+
+**FR-SDK-36:** Provide a Kotlin Android SDK (`com.debugbundle:debugbundle-android`) supporting Android application/activity/process lifecycle capture, Jetpack Navigation and Navigation Compose breadcrumbs, OkHttp trace injection, offline queueing, WorkManager deferred delivery, Timber log capture, mobile device context, capture policy, probes, and the universal SDK interface with Kotlin-idiomatic naming. The SDK must follow the detailed implementation plan in `spec/sdks/kotlin-sdk.md`.
+
+**FR-SDK-37:** Provide a Swift iOS SDK (`DebugBundle` via Swift Package Manager) supporting UIKit and SwiftUI lifecycle capture, navigation breadcrumbs, URLSession trace injection, offline queueing, SwiftLog capture, mobile device context, capture policy, probes, and the universal SDK interface with Swift-idiomatic naming. The SDK must follow the detailed implementation plan in `spec/sdks/swift-sdk.md`.
 
 ### 1.1a Probes (Always-On Diagnostic Context + Remote Investigation)
 

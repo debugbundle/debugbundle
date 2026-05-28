@@ -1,7 +1,7 @@
 # SDK Interface Contract — DebugBundle
 
 Version: v1
-Last updated: 2026-05-25
+Last updated: 2026-05-28
 
 This contract defines the standard interface that ALL DebugBundle SDKs must implement, regardless of language. It ensures behavioral consistency across Node.js, browser, Python, PHP, Go, Ruby, and all future language SDKs.
 
@@ -586,14 +586,14 @@ Framework integrations must auto-register log capture alongside error/request ca
 | Language | Package | Registry | Status |
 |----------|---------|----------|--------|
 | C# | `DebugBundle.Sdk` | NuGet | Planned |
-| Kotlin (server) | `com.debugbundle:sdk-kotlin` | Maven Central | Planned |
+| Kotlin (server) | `com.debugbundle:debugbundle-kotlin` | Maven Central | Planned |
 | Rust | `debugbundle` | crates.io | Planned |
 
 ### V1 SDK Targets (Wave 3 — Client & Mobile Expansion)
 
 | Language | Package | Registry | Status |
 |----------|---------|----------|--------|
-| Kotlin (Android) | `com.debugbundle:sdk-android` | Maven Central | Planned |
+| Kotlin (Android) | `com.debugbundle:debugbundle-android` | Maven Central | Planned |
 | Swift (iOS) | `DebugBundle` | Swift Package Manager | Planned |
 | React Native | `@debugbundle/sdk-react-native` | npm | Planned |
 | Dart / Flutter | `debugbundle` | pub.dev | Planned |
@@ -641,6 +641,8 @@ Mobile SDKs (Kotlin Android, Swift iOS, React Native, Dart/Flutter) must impleme
 | React Native | fetch (JS bridge) | Same as browser SDK — fetch wrapper |
 | Dart / Flutter | `http` / `dio` | `Interceptor` that adds header |
 
+Mobile trace injection must be scoped to explicit first-party propagation targets or explicitly instrumented first-party clients. SDKs must not add `X-DebugBundle-Trace-Id` to arbitrary third-party requests.
+
 **Mobile-specific event types:**
 
 Mobile SDKs reuse the existing `frontend_exception` and `frontend_breadcrumb` event types. No new mobile-only event types are introduced. Mobile-specific context (app version, build number, OS version, device model, network state) is captured as device context fields extending the browser SDK's `device` schema.
@@ -652,7 +654,7 @@ Mobile SDKs reuse the existing `frontend_exception` and `frontend_breadcrumb` ev
 | `app_version` | App manifest / Info.plist | Semantic version string |
 | `build_number` | App manifest / Info.plist | Build identifier |
 | `release_channel` | SDK config | e.g., `production`, `beta`, `testflight` |
-| `jailbroken` | Runtime detection | `true`, `false`, or `null` if undetectable |
+| `jailbroken` | Root/jailbreak detection | `true`, `false`, or `null` if unavailable, disabled, or undetectable. Android uses this field for rooted-device status; Apple platforms use it for jailbreak status. |
 | `battery_level` | System API | 0.0–1.0 or `null` if unavailable |
 | `battery_charging` | System API | boolean or `null` |
 | `free_disk_bytes` | System API | Available disk space or `null` |
@@ -686,7 +688,7 @@ Mobile breadcrumbs capture screen transitions and user actions into the same bre
 Probes operate in two modes:
 
 - **Always-on (all tiers):** `probe()` buffers data in per-label ring buffers. On error, all ring buffers flush alongside the error event. Zero network cost during normal operation.
-- **Remote-activated (paid tiers only):** Agents can activate probes for independent shipping (without waiting for errors) via API/CLI/MCP. Backend SDKs poll for directives; browser SDKs use piggybacking.
+- **Remote-activated (paid tiers only):** Agents can activate probes for independent shipping (without waiting for errors) via API/CLI/MCP. Backend SDKs poll for directives; browser and mobile SDKs use session-start checks plus ingestion-response piggybacking.
 
 Free-tier SDKs get always-on probes (buffer + error-flush) but no remote activation: no config polling, no trigger tokens, activation API returns 403.
 
@@ -727,6 +729,28 @@ Free-tier browser SDKs skip the session-start config check and ignore `probe_dir
 | TTL enforcement | Same as backend — local `expires_at` check, no network needed. |
 | `probesPollInterval` config | **Not applicable** for browser SDK (ignored if set). |
 
+### Mobile SDK: Bounded Refresh (Piggyback + Lifecycle Check, Paid Tiers Only)
+
+Mobile SDKs must not run aggressive background polling. Android and iOS apps may be suspended, offline, on metered networks, or killed by the OS, so config/probe refresh must be opportunistic and bounded.
+
+Mobile SDKs receive remote probe directives through (paid tiers only):
+
+1. **App/session-start check:** On `init()`, one `GET /v1/sdk/config` request when the SDK has a project token and endpoint.
+2. **Foreground lifecycle check:** On foreground resume, the SDK may refresh config only if a bounded minimum interval has elapsed since the last check.
+3. **Ingestion-response piggybacking:** Every `POST /v1/events` response may include `probe_directives`; the SDK reads this field and updates local remote probe state.
+
+Free-tier mobile SDKs skip remote probe activation checks unless the config response is already needed for capture policy. Always-on probes still buffer locally and flush with errors.
+
+| Rule | Detail |
+|------|--------|
+| Periodic polling | Disabled by default. No fixed background poll loop. |
+| App/session start | Single `GET /v1/sdk/config` on `init()` when configured. |
+| Foreground resume | Optional bounded refresh after a minimum interval; no refresh storm on rapid lifecycle changes. |
+| Event response | Read `probe_directives` from `POST /v1/events` response body when present. |
+| Offline behavior | Cached config stands while offline; queued events keep original capture timestamps. |
+| TTL enforcement | Same as backend: local `expires_at` check, no network needed. |
+| `probesPollInterval` config | Not applicable by default for mobile SDKs; a mobile-specific bounded refresh interval may be exposed instead. |
+
 ### Config Response Shape
 
 ```json
@@ -746,7 +770,7 @@ Free-tier browser SDKs skip the session-start config check and ignore `probe_dir
 }
 ```
 
-### Ingestion Response Shape (Browser Piggybacking)
+### Ingestion Response Shape (Browser And Mobile Piggybacking)
 
 When active probes exist for a paid-tier project, the `POST /v1/events` response includes:
 
@@ -817,7 +841,7 @@ Trigger tokens have their own independent TTL (up to 24 hours), which can be lon
 - A request/session may have probes active from both polling AND a trigger token simultaneously.
 - The passive activation may expire while the trigger token remains valid — this is by design.
 
-All SDKs must implement sections 1–8, section 11, section 12, and section 13 (server SDKs only) of this contract before release.
+All SDKs must implement sections 1-8, section 11, and section 12 of this contract before release. Mobile SDKs must also implement section 10.1. Server SDKs with backend framework integrations must also implement section 13.
 
 ---
 

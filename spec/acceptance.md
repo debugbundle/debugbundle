@@ -1,7 +1,7 @@
 # Acceptance Criteria — DebugBundle
 
 Version: v1
-Last updated: 2026-03-13
+Last updated: 2026-05-28
 
 ---
 
@@ -103,6 +103,53 @@ Last updated: 2026-03-13
 - **And** `context.device.browser` agrees with `frontend_exception.browser` on the same event
 - **And** unavailable fields (e.g. `connection_type` on browsers without Network Information API) are set to `null`
 - **And** no fine-grained hardware identifiers (GPU model, serial numbers) are collected
+
+### AC-SDK-15: Mobile Trace Injection
+- **Given** a Kotlin Android app with the DebugBundle OkHttp interceptor or a Swift iOS app with DebugBundle URLSession instrumentation
+- **When** the app sends a first-party request to a configured trace propagation target
+- **Then** the SDK injects `X-DebugBundle-Trace-Id` (UUID v4) into the outgoing request
+- **And** the mobile event envelope includes the same trace ID in `correlation.trace_id`
+- **And** backend SDK events captured during the request can be linked to the mobile event through that trace ID
+- **And** the SDK does not inject the trace header into unrelated third-party URLs by default
+
+### AC-SDK-16: Mobile Offline Queue
+- **Given** a Kotlin Android or Swift iOS app initialized while the device is offline
+- **When** the SDK captures a frontend exception, log, breadcrumb, request event, or probe event allowed by capture policy
+- **Then** the event is redacted and persisted to a bounded app-private offline queue with its original `occurred_at` timestamp
+- **And** the queue survives app restart
+- **And** queued events are delivered with retry and backoff when connectivity resumes
+- **And** events older than the configured queue TTL are discarded on delivery attempt
+
+### AC-SDK-17: Mobile Device Context Capture
+- **Given** a Kotlin Android or Swift iOS app with the SDK initialized
+- **When** a mobile client event is captured
+- **Then** the event payload includes mobile device context containing app version, build number, release channel, OS name/version, device model/manufacturer where available, screen resolution, locale, timezone, network connection type, battery level where available, charging state where available, and available storage where available
+- **And** unavailable fields are set to `null`
+- **And** mobile context extends the existing device schema without introducing mobile-only event types
+- **And** no fine-grained hardware identifiers, advertising identifiers, contacts, clipboard, photos, precise location, screenshots, or keychain/keystore values are collected by default
+
+### AC-SDK-18: Android Lifecycle And Crash Capture
+- **Given** a Kotlin Android app with the DebugBundle SDK initialized in `Application.onCreate`
+- **When** the user navigates between activities, Jetpack Navigation destinations, or Navigation Compose screens
+- **Then** the SDK records sanitized screen breadcrumbs without view text or form values
+- **When** a handled `Throwable` or uncaught JVM/Kotlin exception is captured
+- **Then** the SDK emits a `frontend_exception` event with breadcrumbs, device context, app version, release channel, and probe buffers when enabled
+- **And** fatal exception handling preserves Android's normal crash behavior and uploads bounded crash evidence on next launch
+
+### AC-SDK-19: iOS Lifecycle And Crash Capture
+- **Given** a Swift iOS app with the DebugBundle SDK initialized through SwiftUI or UIKit setup
+- **When** the user navigates between SwiftUI screens or UIKit view controllers
+- **Then** the SDK records sanitized screen breadcrumbs without view text or form values
+- **When** a handled `Error`, `NSError`, Objective-C `NSException`, or supported fatal crash evidence is captured
+- **Then** the SDK emits a `frontend_exception` event with breadcrumbs, device context, app version, release channel, and probe buffers when enabled
+- **And** fatal crash handling, if enabled, persists only bounded crash evidence and uploads it on next launch without attempting network work in the crashing process
+
+### AC-SDK-20: Mobile Privacy Defaults
+- **Given** a Kotlin Android or Swift iOS app using default SDK configuration
+- **When** the SDK captures lifecycle, action, network, log, error, or probe data
+- **Then** request bodies, response bodies, screenshots, raw view hierarchy, text content, form values, precise coordinates, precise location, advertising identifiers, contacts, clipboard, photos, and keychain/keystore values are not captured
+- **And** sensitive fields are redacted before queue persistence and network transport
+- **And** project tokens are used only for write-only ingestion and never for retrieval or management APIs
 
 ---
 

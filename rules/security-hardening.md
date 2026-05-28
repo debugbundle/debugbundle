@@ -1,7 +1,7 @@
 # Security Hardening Rules — DebugBundle
 
 Version: v1
-Last updated: 2026-04-05
+Last updated: 2026-05-28
 
 These rules are ongoing enforcement requirements derived from the Phase 20 hardening audit.
 They apply to **every future change** — not just the initial hardening pass.
@@ -78,7 +78,7 @@ SDK clients must cap `Retry-After` header values at a maximum (currently 5 minut
 Click breadcrumbs must not capture `textContent` (may contain prices, account info). Form breadcrumbs must capture only `field_count`, not field names (which may leak schema info like `credit_card_number`). Only structural/selector context is permitted.
 
 ### SEC-19: Trace Header Scoping
-Browser trace-header injection (`X-DebugBundle-Trace-Id`) must be restricted to same-origin requests by default. Cross-origin injection only when the URL matches an explicit `tracePropagationTargets` allowlist. Never inject into arbitrary third-party requests.
+Browser trace-header injection (`X-DebugBundle-Trace-Id`) must be restricted to same-origin requests by default. Cross-origin injection only when the URL matches an explicit `tracePropagationTargets` allowlist. Mobile SDK trace-header injection must happen only through explicit native HTTP instrumentation and configured first-party propagation targets. Never inject into arbitrary third-party requests.
 
 ### SEC-20: No User-Provided Regex Execution
 SDK configuration that accepts URL patterns (network filters, deny patterns) must use string matching only. Never compile and execute user-provided `RegExp` objects against request data (ReDoS risk).

@@ -1,7 +1,7 @@
 # SDK Testing Strategy — DebugBundle
 
 Version: v1
-Last updated: 2026-05-25
+Last updated: 2026-05-28
 
 ---
 
@@ -32,8 +32,10 @@ Every SDK must unit-test the following behaviors by **mocking the HTTP transport
 | Log capture | Logger integration captures at configured level; auto-detection works |
 | Framework integrations | Middleware/handlers capture request metadata, unhandled errors, response status |
 | Browser relay handlers | Server SDK relay handlers validate origin, content type, body size, event type, trust fields, rate limits, local-only file writes, connected durable spool, connected cloud forwarding, and credential isolation per `contracts/sdk-interface.md` §13 |
+| Mobile lifecycle and trace | Android/iOS SDKs capture lifecycle breadcrumbs, inject `X-DebugBundle-Trace-Id` only through explicit native HTTP instrumentation, and preserve trace IDs in event envelopes per `contracts/sdk-interface.md` §10.1 |
+| Mobile offline queue | Android/iOS SDKs redact before queue persistence, preserve original capture timestamps, enforce queue size/TTL bounds, survive app restart, and retry on connectivity restoration |
 | Probes | Always-on probe buffers in ring buffer, flushes with errors; heavy probe dormant until remote activation |
-| Config polling (paid tiers) | Polls `/v1/sdk/config` at configured interval; caches with ETag/304; deactivates expired remote probes |
+| Config refresh (paid tiers) | Backend SDKs poll `/v1/sdk/config`; browser/mobile SDKs use session-start checks plus ingestion-response piggybacking; all cache with ETag/304 where applicable and deactivate expired remote probes |
 | Capture policy | Respects `GET /v1/sdk/config` capture-policy directives (mode, overrides) per `contracts/sdk-interface.md` §12 |
 
 **Transport mock pattern:** Each SDK should provide a test utility that intercepts outbound HTTP calls and captures the payloads for assertion. Examples:
@@ -42,6 +44,8 @@ Every SDK must unit-test the following behaviors by **mocking the HTTP transport
 - **PHP:** Guzzle mock handler stack
 - **Go:** `httptest.NewServer` with a recording handler
 - **Ruby:** WebMock or VCR
+- **Kotlin Android:** MockWebServer or fake transport plus Robolectric/instrumented storage fixtures
+- **Swift iOS:** Custom `URLProtocol` fake transport or local mock server plus simulator storage fixtures
 
 ### Tier 2 — Contract Compliance Tests (mandatory)
 
@@ -93,6 +97,8 @@ Every SDK release must include at least one minimal application-level smoke test
 | PHP | PHPUnit | Xdebug / PCOV |
 | Go | `go test` | `go test -cover` |
 | Ruby | RSpec | SimpleCov |
+| Kotlin Android | JUnit, Robolectric, Android instrumented tests | JaCoCo / Gradle coverage |
+| Swift iOS | XCTest or Swift Testing plus simulator tests | Xcode coverage / SwiftPM coverage where available |
 
 ---
 
