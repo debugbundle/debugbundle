@@ -307,7 +307,7 @@ export function buildSchedulePhasesForReduction(input: {
         hasExtraCapacityItem = true;
         if (targetAdditionalPurchased > 0) {
           items.push({
-            price: extraCapacityPriceId,
+            price: priceId,
             quantity: targetAdditionalPurchased
           });
         }

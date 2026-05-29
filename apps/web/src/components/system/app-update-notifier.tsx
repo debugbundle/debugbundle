@@ -59,8 +59,7 @@ export function AppUpdateNotifier(): null {
           action: {
             label: "Reload",
             onClick: () => window.location.reload()
-          },
-          duration: 15000
+          }
         });
       } catch {
         // Network failures here are expected during flaky sessions and should stay silent.
