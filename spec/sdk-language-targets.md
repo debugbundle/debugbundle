@@ -103,7 +103,7 @@ TypeScript and JavaScript are delivered as one shared npm SDK surface, exactly a
 **Pre-release SDK expansion and prepared plans:**
 - `github.com/debugbundle/debugbundle-go` — Go SDK. Detailed implementation plan: `spec/sdks/go-sdk.md`.
 - `debugbundle` (RubyGems) — Ruby SDK. Detailed implementation plan: `spec/sdks/ruby-sdk.md`.
-- `github.com/debugbundle/debugbundle-android` — Kotlin Android SDK local standalone repo now includes the implemented core/runtime module family (`debugbundle-android-core`, `debugbundle-android`, OkHttp/Ktor, Navigation/Compose, Timber, testkit, BOM), offline queueing, crash/ANR replay, native trace propagation, capture-policy enforcement, and remote probe directive/trigger-token support; the detailed plan lives in `spec/sdks/kotlin-sdk.md`.
+- `github.com/debugbundle/debugbundle-android` — Kotlin Android SDK now lives in a public standalone repo with the implemented core/runtime module family (`debugbundle-android-core`, `debugbundle-android`, OkHttp/Ktor, Navigation/Compose, Timber, testkit, BOM), offline queueing, crash/ANR replay, native trace propagation, capture-policy enforcement, and remote probe directive/trigger-token support. The initial pre-release package family is published on Maven Central at `0.1.0`; the detailed plan lives in `spec/sdks/kotlin-sdk.md`.
 - `github.com/debugbundle/debugbundle-swift` — Swift iOS SDK plan prepared in `spec/sdks/swift-sdk.md`.
 
 ---

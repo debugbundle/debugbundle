@@ -593,7 +593,7 @@ Framework integrations must auto-register log capture alongside error/request ca
 
 | Language | Package | Registry | Status |
 |----------|---------|----------|--------|
-| Kotlin (Android) | `com.debugbundle:debugbundle-android` | Maven Central | Planned |
+| Kotlin (Android) | `com.debugbundle:debugbundle-android` | Maven Central | Pre-release |
 | Swift (iOS) | `DebugBundle` | Swift Package Manager | Planned |
 | React Native | `@debugbundle/sdk-react-native` | npm | Planned |
 | Dart / Flutter | `debugbundle` | pub.dev | Planned |
