@@ -1,7 +1,7 @@
 # SDK Language Targets — DebugBundle
 
 Version: v1
-Last updated: 2026-05-28
+Last updated: 2026-05-29
 
 ---
 
@@ -104,7 +104,8 @@ TypeScript and JavaScript are delivered as one shared npm SDK surface, exactly a
 - `github.com/debugbundle/debugbundle-go` — Go SDK. Detailed implementation plan: `spec/sdks/go-sdk.md`.
 - `debugbundle` (RubyGems) — Ruby SDK. Detailed implementation plan: `spec/sdks/ruby-sdk.md`.
 - `github.com/debugbundle/debugbundle-android` — Kotlin Android SDK now lives in a public standalone repo with the implemented core/runtime module family (`debugbundle-android-core`, `debugbundle-android`, OkHttp/Ktor, Navigation/Compose, Timber, testkit, BOM), offline queueing, crash/ANR replay, native trace propagation, capture-policy enforcement, and remote probe directive/trigger-token support. The initial pre-release package family is published on Maven Central at `0.1.0`; the detailed plan lives in `spec/sdks/kotlin-sdk.md`.
-- `github.com/debugbundle/debugbundle-swift` — Swift iOS SDK plan prepared in `spec/sdks/swift-sdk.md`.
+- `github.com/debugbundle/debugbundle-swift` — Swift iOS SDK now lives in a public standalone repo with the implemented package product family (`DebugBundle`, URLSession, Alamofire, UIKit, SwiftUI, SwiftLog, crash reporter, test support), offline queueing, native trace propagation, capture-policy enforcement, remote probe directive/trigger-token support, CI lanes for host SwiftPM and iOS simulator tests, and the initial Swift Package Manager release tag `v0.1.0`. The detailed plan lives in `spec/sdks/swift-sdk.md`.
+- `github.com/debugbundle/debugbundle-react-native` — React Native SDK plan prepared in `spec/sdks/react-native-sdk.md`, targeting iOS and Android through an npm package, TypeScript API, Turbo Native Module, React Navigation helpers, Expo development-build support, and reuse of the Android/Swift native SDK foundations.
 
 ---
 
@@ -607,7 +608,7 @@ Before Wave 3 implementation begins, the **Mobile Correlation Contract** must be
 - Whether mobile-specific device context extends the browser SDK's `device` schema or introduces new event types
 - The offline queueing and deferred delivery contract
 
-This contract has been drafted in `contracts/sdk-interface.md` Section 10.1 and is now expanded into native implementation plans for Kotlin Android (`spec/sdks/kotlin-sdk.md`) and Swift iOS (`spec/sdks/swift-sdk.md`). React Native and Dart/Flutter must align to the same contract when their plans are prepared.
+This contract has been drafted in `contracts/sdk-interface.md` Section 10.1 and is now expanded into native implementation plans for Kotlin Android (`spec/sdks/kotlin-sdk.md`), Swift iOS (`spec/sdks/swift-sdk.md`), and React Native (`spec/sdks/react-native-sdk.md`). Dart/Flutter must align to the same contract when its plan is prepared.
 
 ---
 
@@ -761,7 +762,7 @@ The SDK should support:
 
 ### Second implementation targets
 
-3. **React Native** — `@debugbundle/sdk-react-native` on npm (wraps browser SDK patterns with native bridge for crash capture)
+3. **React Native** — `@debugbundle/sdk-react-native` on npm (TypeScript API with Turbo Native Module, React Navigation helpers, Expo development-build support, and Android/Swift native SDK reuse)
 
 ### Later expansion
 
@@ -820,7 +821,7 @@ For the next phase of SDK implementation, DebugBundle should prioritize these tw
 - **Immediate implementation focus (Wave 1):** TS/JS, Python, PHP, WordPress plugin, Java core + Spring Boot + servlet/JAX-RS app-server support, Ruby, Go
 - **Pre-release expansion:** Ruby and Go publication handoff
 - **Next depth layer (Wave 2):** C#, Kotlin server, Rust
-- **Strategic product expansion (Wave 3):** Kotlin Android and Swift iOS plans prepared; React Native and Dart/Flutter remain future plans.
+- **Strategic product expansion (Wave 3):** Kotlin Android and Swift iOS SDKs are implemented, with Swift published as `v0.1.0`; React Native and Dart/Flutter remain future plans.
 
 ### V1 framework scope per SDK
 

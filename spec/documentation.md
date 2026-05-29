@@ -59,8 +59,10 @@ The complete docs page tree for `/docs`. Every entry below is a page that must e
 | 3 | `/docs/sdks/browser` | Browser SDK | Guide | Full guide: install, init, config options table, breadcrumb capture, error capture, network filtering, session controls, device context, trace correlation, relay transport vs static transport, unload-safe flushing, probes. |
 | 4 | `/docs/sdks/python` | Python SDK | Guide | Full guide: install, init, vanilla hooks (sys.excepthook, logging, asyncio), framework integrations (Django, Flask, FastAPI), logger integrations (structlog, loguru), config options. |
 | 5 | `/docs/sdks/php` | PHP SDK | Guide | Full guide: install, init, vanilla hooks (set_error_handler, set_exception_handler, register_shutdown_function), framework integrations (Laravel middleware, Symfony event subscriber), Monolog handler, config options. |
-| 6 | `/docs/sdks/universal-interface` | Universal SDK Interface | Reference | The complete interface contract: every method, every config field, every behavior guarantee. Language comparison table. Volume control (suppression, loop protection, backoff). |
-| 7 | `/docs/sdks/browser-relay` | Browser Relay Setup | Guide | How browser events reach DebugBundle: relay handler architecture, Express/Fastify/Next.js relay setup, origin validation, credential isolation, static-only fallback for no-backend apps. |
+| 6 | `/docs/sdks/android` | Android SDK | Guide | Full guide: install, init, crash/ANR replay, lifecycle and navigation breadcrumbs, OkHttp/Ktor, offline queueing, WorkManager flushing, Timber, capture policy, probes, and privacy defaults. |
+| 7 | `/docs/sdks/swift` | Swift SDK | Guide | Full guide: install through Swift Package Manager, SwiftUI and UIKit init, URLSession/Alamofire, offline queueing, SwiftLog, crash replay, capture policy, probes, and privacy defaults. |
+| 8 | `/docs/sdks/universal-interface` | Universal SDK Interface | Reference | The complete interface contract: every method, every config field, every behavior guarantee. Language comparison table. Volume control (suppression, loop protection, backoff). |
+| 9 | `/docs/sdks/browser-relay` | Browser Relay Setup | Guide | How browser events reach DebugBundle: relay handler architecture, Express/Fastify/Next.js relay setup, origin validation, credential isolation, static-only fallback for no-backend apps. |
 
 ### 1.3 CLI
 

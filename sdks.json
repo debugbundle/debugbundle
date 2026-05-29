@@ -39,6 +39,11 @@
       "path": "sdks/debugbundle-android",
       "cloneUrl": "https://github.com/debugbundle/debugbundle-android.git",
       "branch": "main"
+    },
+    {
+      "path": "sdks/debugbundle-swift",
+      "cloneUrl": "https://github.com/debugbundle/debugbundle-swift.git",
+      "branch": "main"
     }
   ]
 }

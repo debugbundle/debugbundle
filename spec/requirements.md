@@ -1,7 +1,7 @@
 # Requirements — DebugBundle
 
 Version: v1
-Last updated: 2026-05-28
+Last updated: 2026-05-29
 
 ---
 
@@ -91,6 +91,8 @@ Last updated: 2026-05-28
 **FR-SDK-36:** Provide a Kotlin Android SDK (`com.debugbundle:debugbundle-android`) supporting Android application/activity/process lifecycle capture, Jetpack Navigation and Navigation Compose breadcrumbs, OkHttp trace injection, offline queueing, WorkManager deferred delivery, Timber log capture, mobile device context, capture policy, probes, and the universal SDK interface with Kotlin-idiomatic naming. The SDK must follow the detailed implementation plan in `spec/sdks/kotlin-sdk.md`.
 
 **FR-SDK-37:** Provide a Swift iOS SDK (`DebugBundle` via Swift Package Manager) supporting UIKit and SwiftUI lifecycle capture, navigation breadcrumbs, URLSession trace injection, offline queueing, SwiftLog capture, mobile device context, capture policy, probes, and the universal SDK interface with Swift-idiomatic naming. The SDK must follow the detailed implementation plan in `spec/sdks/swift-sdk.md`.
+
+**FR-SDK-38:** Provide a React Native SDK (`@debugbundle/sdk-react-native`) targeting iOS and Android with a TypeScript/JavaScript API, Turbo Native Module plus legacy bridge compatibility where needed, React error-boundary capture, React Navigation breadcrumbs, fetch/XMLHttpRequest trace injection, native offline queueing, mobile device context, capture policy, probes, and the universal SDK interface with camelCase naming. The SDK must reuse the native Android and Swift SDK foundations where practical and follow the detailed implementation plan in `spec/sdks/react-native-sdk.md`.
 
 ### 1.1a Probes (Always-On Diagnostic Context + Remote Investigation)
 

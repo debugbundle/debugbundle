@@ -1,7 +1,7 @@
 # Acceptance Criteria — DebugBundle
 
 Version: v1
-Last updated: 2026-05-28
+Last updated: 2026-05-29
 
 ---
 
@@ -150,6 +150,15 @@ Last updated: 2026-05-28
 - **Then** request bodies, response bodies, screenshots, raw view hierarchy, text content, form values, precise coordinates, precise location, advertising identifiers, contacts, clipboard, photos, and keychain/keystore values are not captured
 - **And** sensitive fields are redacted before queue persistence and network transport
 - **And** project tokens are used only for write-only ingestion and never for retrieval or management APIs
+
+### AC-SDK-21: React Native iOS And Android Parity
+- **Given** a React Native app with `@debugbundle/sdk-react-native` initialized on iOS and Android through the supported native module path
+- **When** the app records a React error-boundary exception, a React Navigation screen transition, a first-party `fetch`/`XMLHttpRequest` failure, a log, or a probe
+- **Then** the SDK emits canonical mobile client events with `sdk_name: "@debugbundle/sdk-react-native"`, mobile device context, app version/build/release channel, and sanitized React Native runtime metadata
+- **And** trace IDs are injected only into configured first-party requests and are preserved in `correlation.trace_id`
+- **And** events are redacted before native queue persistence, survive app restart while offline, and flush with retry/backoff when connectivity returns
+- **And** the SDK reuses the native Android and Swift SDK foundations for queueing, transport, capture policy, probes, and native crash evidence where practical
+- **And** Expo Go reports degraded status rather than claiming full native parity
 
 ---
 

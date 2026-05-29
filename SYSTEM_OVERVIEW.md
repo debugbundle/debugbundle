@@ -36,8 +36,16 @@ DebugBundle supports two runtime modes: **local-only** (no cloud account require
 │    offline queueing, crash/ANR replay, and remote probes)       │
 │  Wave 2 (post-launch; C# plan prepared): C#, Kotlin server,    │
 │    Rust                                                        │
-│  Wave 3 (post-launch; Kotlin Android + Swift iOS plans         │
-│    prepared): React Native, Dart/Flutter follow later          │
+│  Wave 3 (post-launch; mobile expansion in progress):           │
+│    Swift iOS now has a local standalone repo with core         │
+│    capture, bundle/runtime config resolution, offline          │
+│    queueing, HTTP transport, lifecycle breadcrumbs, explicit   │
+│    URLSession instrumentation (wrapper +                       │
+│    URLProtocol/configuration paths), SwiftLog integration,     │
+│    capture-policy enforcement, remote probes, Objective-C      │
+│    exception bridging, and bounded next-launch crash replay;   │
+│    React Native now has a detailed iOS/Android plan;           │
+│    Dart/Flutter follows later                                  │
 │  See spec/sdk-language-targets.md for full rollout plan         │
 │  Universal interface: init, captureException, captureError,     │
 │  captureLog, captureRequest, captureMessage, setContext, flush,  │
@@ -214,7 +222,7 @@ packages/
   — debugbundle-ruby   → github.com/debugbundle/debugbundle-ruby (Ruby SDK: Rails + Rack + Sidekiq; release-ready local standalone repo)
   — debugbundle-go     → github.com/debugbundle/debugbundle-go (Go SDK: pre-release local standalone repo with core, secure transports, relay, net/http, Gin, Echo, slog, zap, zerolog, remote config, probes, examples, CI, and release workflow)
   — site               → github.com/debugbundle/site (public docs/blog/marketing site)
-  — Wave 2/3 SDKs (C#, Kotlin, Swift, Rust, Dart, React Native) → separate repos per spec/sdk-language-targets.md; `sdks/debugbundle-android/` is now the local standalone Kotlin Android repo with implemented core/runtime modules (`debugbundle-android-core`, `debugbundle-android`, `debugbundle-android-okhttp`, `debugbundle-android-ktor-client`, `debugbundle-android-navigation`, `debugbundle-android-compose`, `debugbundle-android-timber`, `debugbundle-android-testkit`, `debugbundle-android-bom`), and detailed plans currently live in spec/sdks/csharp-sdk.md, spec/sdks/kotlin-sdk.md (Kotlin Android), and spec/sdks/swift-sdk.md (Swift iOS)
+  — Wave 2/3 SDKs (C#, Kotlin, Swift, Rust, Dart, React Native) → separate repos per spec/sdk-language-targets.md; `sdks/debugbundle-android/` is now the local standalone Kotlin Android repo with implemented core/runtime modules (`debugbundle-android-core`, `debugbundle-android`, `debugbundle-android-okhttp`, `debugbundle-android-ktor-client`, `debugbundle-android-navigation`, `debugbundle-android-compose`, `debugbundle-android-timber`, `debugbundle-android-testkit`, `debugbundle-android-bom`), while `sdks/debugbundle-swift/` now ships the standalone Swift package with bundle/runtime config resolution, configurable queue file protection, connectivity-aware deferred delivery, automatic batch/interval/background flushing, bounded UIKit background-flush execution windows, capped per-send batch sizing, bounded retry windows, bounded remote-config refresh, internal diagnostics for terminal `4xx` queue drops, explicit async operation and task capture helpers, core capture, durable queueing, explicit URLSession instrumentation, optional Alamofire request capture, URLProtocol/configuration-based request capture, UIKit app/scene/view-controller/navigation helpers, SwiftUI scene/navigation/action helpers, SwiftLog integration, capture-policy enforcement, remote-probe activation, Objective-C exception bridging, next-launch crash replay helpers, and queue/mock-ingestion/fixture test support; detailed plans currently live in spec/sdks/csharp-sdk.md, spec/sdks/kotlin-sdk.md (Kotlin Android), spec/sdks/swift-sdk.md (Swift iOS), and spec/sdks/react-native-sdk.md (React Native iOS/Android)
 
 sdks/                    — Local standalone SDK clone roots managed by `sdks.json` and `scripts/bootstrap-sdks.sh`
   debugbundle-js/        — github.com/debugbundle/debugbundle-js (public standalone repo; cloned on demand for single-workspace development)
