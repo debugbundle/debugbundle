@@ -41,7 +41,7 @@ Without those additions, the Spring Boot starter alone would not cover a WildFly
 
 ### Browser Frontends
 
-Java SDKs do not instrument React or browser-side JS incidents. Browser coverage for React, Vite, Material UI, or JSF-rendered pages requires the DebugBundle browser SDK. Java server adapters provide the same-origin browser relay endpoint so browser events can be delivered without browser-side cloud credentials.
+Java SDKs do not instrument React or browser-side JS incidents. Browser coverage for React, Vite, Material UI, or JSF-rendered pages requires the DebugBundle browser SDK. Java server adapters provide the browser relay endpoint so same-origin and explicitly allowed split frontend/backend browser events can be delivered without browser-side cloud credentials.
 
 ---
 
@@ -720,7 +720,7 @@ The SDK must not assign `event_class`; classification remains worker-owned.
 13. Browser relay
    - Spring relay route.
    - Servlet relay servlet for `jakarta` and `javax` deployments.
-   - Origin/content-type/size/schema/rate-limit controls.
+   - Origin/preflight/content-type/size/schema/rate-limit controls.
    - Local-only writes, durable spool, and connected forwarding.
    - Shared relay compliance fixture coverage.
 
@@ -764,7 +764,7 @@ Required test groups:
 - Multi-deployment tests proving separate service names, buffers, probe state, and suppression state in one JVM.
 - Javaagent startup injection tests in Docker.
 - WildFly/JBoss smoke test with multiple deployables copied into one server process.
-- Relay compliance fixtures for valid, invalid, credential-smuggling, wrong-origin, oversized, rate-limited, local-only, durable-spool, and connected-forwarding cases.
+- Relay compliance fixtures for valid, invalid, credential-smuggling, wrong-origin, allowed preflight, disallowed preflight, allowed POST CORS headers, oversized, rate-limited, local-only, durable-spool, and connected-forwarding cases.
 
 CI matrix:
 

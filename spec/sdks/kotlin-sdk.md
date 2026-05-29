@@ -1,7 +1,7 @@
 # Kotlin Android SDK Implementation Plan
 
 Version: v1
-Last updated: 2026-05-28
+Last updated: 2026-05-29
 
 ---
 
@@ -44,7 +44,7 @@ Android events must use the same DebugBundle event pipeline as browser/client ev
 
 ### Server Kotlin
 
-Ktor, JVM server logging, browser relay handlers, local file transport, and server-side probe polling belong to the Kotlin server SDK, not this Android plan. Android may share schema, redaction, and transport design ideas with that future SDK, but the Android artifact must remain mobile-native.
+Ktor, JVM server logging, browser relay handlers, browser relay CORS preflight, local file transport, and server-side probe polling belong to the Kotlin server SDK, not this Android plan. Android may share schema, redaction, and transport design ideas with that future SDK, but the Android artifact must remain mobile-native.
 
 ---
 
@@ -75,7 +75,7 @@ Ktor, JVM server logging, browser relay handlers, local file transport, and serv
 
 ### V1 Out of Scope
 
-- Ktor server SDK and browser relay handler parity.
+- Ktor server SDK and browser relay handler parity, including `/debugbundle/browser` CORS preflight support.
 - Kotlin Multiplatform shared Android/iOS SDK.
 - React Native, Flutter, Unity, Xamarin, or MAUI wrappers.
 - NDK/native crash unwinding and minidump capture.

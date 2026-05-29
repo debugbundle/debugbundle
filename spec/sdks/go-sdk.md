@@ -469,7 +469,7 @@ Runtime facts may include `go_version`, `goos`, `goarch`, `pid`, `cwd`, `hostnam
    - Config fetch and polling, ETag handling, capture-policy enforcement, always-on probe buffers, remote activations, trigger tokens.
 
 10. Browser relay
-    - Framework-neutral `http.Handler`, origin/content-type/size/schema/rate-limit controls, local-only writes, durable spool, connected forwarding, shared relay compliance fixtures.
+   - Framework-neutral `http.Handler`, origin/preflight/content-type/size/schema/rate-limit controls, local-only writes, durable spool, connected forwarding, shared relay compliance fixtures.
 
 11. Documentation and examples
     - `net/http`, Gin, Echo, slog, zap, zerolog, local-only, connected, browser relay, privacy guidance, and release docs.
@@ -493,7 +493,7 @@ Required test groups:
 - `net/http` middleware tests with `httptest`.
 - Gin and Echo integration tests.
 - slog, zap, and zerolog integration tests.
-- Relay compliance fixtures for valid, invalid, credential-smuggling, wrong-origin, oversized, rate-limited, local-only, durable-spool, and connected-forwarding cases.
+- Relay compliance fixtures for valid, invalid, credential-smuggling, wrong-origin, allowed preflight, disallowed preflight, allowed POST CORS headers, oversized, rate-limited, local-only, durable-spool, and connected-forwarding cases.
 - Race tests for concurrent capture and flush paths with `go test -race` in CI.
 
 CI matrix:
@@ -533,7 +533,7 @@ Quality gates:
 - [ ] Duplicate suppression and loop protection match the universal contract.
 - [ ] Capture policy is fetched, cached, polled, and enforced locally with ingestion as a backstop.
 - [ ] Always-on probes, remote probes, heavy probes, and trigger tokens are implemented.
-- [ ] Browser relay covers the shared relay contract: origin validation, content type, body size, schema, credential stripping, local-only writes, durable spool, connected forwarding, and rate limiting.
+- [ ] Browser relay covers the shared relay contract: origin validation, CORS preflight, POST CORS headers, content type, body size, schema, credential stripping, local-only writes, durable spool, connected forwarding, and rate limiting.
 - [ ] SDK failures never panic into host application code.
 - [ ] Request and response bodies are off by default.
 - [ ] Header capture is allowlist-based by default.

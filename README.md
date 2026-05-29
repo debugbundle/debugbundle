@@ -120,13 +120,14 @@ import { createDebugBundleBrowserSdk } from '@debugbundle/sdk-browser';
 const debugbundle = createDebugBundleBrowserSdk();
 
 debugbundle.init({
+  transportMode: 'relay',
   endpoint: '/debugbundle/browser',
   environment: 'production',
   service: 'web',
 });
 ```
 
-For full-stack apps, prefer the same-origin browser relay so project tokens stay server-side. Frontend-only deployments can send directly to DebugBundle Cloud with a dedicated public write-only token and an allowed-origin restriction. See [Browser Relay Setup](https://debugbundle.com/docs/sdks/browser-relay).
+For full-stack apps, prefer a backend browser relay so project tokens stay server-side. Same-origin relay paths are simplest; split frontend/backend deployments can use explicit browser relay mode with an absolute backend relay URL and backend origin allowlisting. Frontend-only deployments can send directly to DebugBundle Cloud with a dedicated public write-only token and an allowed-origin restriction. See [Browser Relay Setup](https://debugbundle.com/docs/sdks/browser-relay).
 
 ### Python
 

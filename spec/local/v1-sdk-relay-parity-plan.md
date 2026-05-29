@@ -22,7 +22,7 @@ Completed in this workspace so far:
 
 Remaining maintenance:
 
-- No V1 relay parity implementation or release-surface gaps remain in this workspace. Future work is limited to expanding fixture reuse when duplicated relay-path tests are touched and applying the same contract to deferred Go/Ruby SDKs when those SDKs resume.
+- No V1 relay parity implementation or release-surface gaps remain in this workspace. Future work is limited to expanding fixture reuse when duplicated relay-path tests are touched and applying the same contract to future server SDKs such as C#/.NET and Kotlin server.
 
 ## Goal
 
@@ -37,7 +37,7 @@ All V1-required server SDK and integration surfaces in this workspace now meet t
 This plan implements and audits these existing rules:
 
 - `FR-REL-01` through `FR-REL-14` in `spec/requirements.md`.
-- `AC-REL-01` through `AC-REL-10` in `spec/acceptance.md`.
+- `AC-REL-01` through `AC-REL-11` in `spec/acceptance.md`.
 - `INV-17`, `INV-18`, and `INV-19` in `rules/domain-invariants.md`.
 - Section 13 of `contracts/sdk-interface.md`.
 - SDK test tiers in `rules/sdk-testing-strategy.md`.
@@ -57,7 +57,7 @@ Full relay parity applies to these V1 shipped server SDK or integration surfaces
 
 The Browser SDK remains the relay client. It must never be counted as a backend relay handler.
 
-Go and Ruby are deferred until their SDK work resumes. When they resume, they must implement the same relay contract before being marked full relay-compatible.
+Go and Ruby have since implemented the same relay contract locally. Future server SDKs, including C#/.NET and Kotlin server, must implement the same relay contract before being marked full relay-compatible.
 
 ## Current State Snapshot
 
@@ -136,16 +136,18 @@ A server SDK relay surface is full relay-compatible only when all items below ar
 
 - Exposes a core language-idiomatic relay handler.
 - Exposes adapters for every V1 framework listed for that SDK.
-- Mounts at `POST /debugbundle/browser` by default.
+- Mounts at `POST /debugbundle/browser` and answers `OPTIONS /debugbundle/browser` preflight by default.
 - Accepts the canonical browser relay body shape: JSON object with `batch` array of browser-origin event envelopes.
 - Returns the canonical response shape: `{ "accepted": number, "rejected": number, "errors": string[] }` for 202 and 400 responses.
 
 ### Security Behavior
 
-- Rejects non-POST requests with `405`.
+- Rejects unsupported methods with `405`, while allowing `POST` event batches and allowed `OPTIONS` CORS preflights.
 - Validates `Origin`, with `Referer` fallback, before parsing or processing event data.
 - Defaults to same-origin validation from the request host.
 - Supports an explicit allowed-origin list.
+- Answers allowed CORS preflight requests with `204`, `Access-Control-Allow-Origin`, `Access-Control-Allow-Methods: POST, OPTIONS`, `Access-Control-Allow-Headers: content-type`, `Access-Control-Max-Age: 600`, and `Vary: Origin`.
+- Adds matching CORS headers to allowed `POST` relay responses when the request is cross-origin.
 - Requires `Content-Type: application/json` unless the source-of-truth contract is deliberately expanded for every SDK.
 - Rejects request bodies larger than 256 KB with `413`.
 - Applies per-IP rate limiting with default `60` requests per minute.

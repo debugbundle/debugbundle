@@ -2293,7 +2293,8 @@ Current implementation scope (Phase 8 complete): the Node SDK now covers the ful
 import { debugbundle } from '@debugbundle/sdk-browser';
 
 debugbundle.init({
-  projectToken: 'dbundle_proj_...',
+  transportMode: 'relay',
+  endpoint: '/debugbundle/browser',
   // captureConsole: false (opt-in),
   // captureNetwork: true (default),
   // maskFormValues: true (default),
@@ -2304,6 +2305,8 @@ debugbundle.init({
 debugbundle.captureException(err);
 debugbundle.captureMessage('User clicked broken link', 'warning');
 ```
+
+For split frontend/backend deployments, keep relay mode explicit and point `endpoint` at the backend relay URL. For frontend-only deployments without a backend, use direct mode with a dedicated public write-only `projectToken` and allowed browser origins.
 
 ### 4.3 Python SDK (`debugbundle-python`)
 

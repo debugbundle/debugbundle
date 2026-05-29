@@ -9,7 +9,7 @@ Last updated: 2026-05-29
 
 This plan defines the React Native SDK surface for DebugBundle. The goal is a production-ready npm package for iOS and Android React Native applications that satisfies the same universal SDK, capture-policy, probe, redaction, safety, event-shape, release, and testing contracts as the major SDKs while respecting React Native's JavaScript runtime, native module architectures, app lifecycle, mobile offline behavior, and native build constraints.
 
-React Native is a client/mobile SDK, not a server SDK and not a browser relay handler. It must correlate React Native client failures with backend SDK events through `X-DebugBundle-Trace-Id`, preserve mobile privacy defaults, and use native persistence/background mechanisms for reliable delivery on both iOS and Android.
+React Native is a client/mobile SDK, not a server SDK and not a browser relay handler. It must correlate React Native client failures with backend SDK events through `X-DebugBundle-Trace-Id`, preserve mobile privacy defaults, and use native persistence/background mechanisms for reliable delivery on both iOS and Android. Browser relay features such as `transportMode`, `allowedOrigins`, CORS preflight, and `/debugbundle/browser` route handling belong to browser plus server SDK surfaces, not React Native.
 
 The React Native SDK must satisfy `contracts/sdk-interface.md`, especially sections 1 through 12 and the mobile correlation contract in section 10.1, plus `spec/sdk-language-targets.md`, `rules/sdk-testing-strategy.md`, `rules/security-hardening.md`, and the relevant requirements and acceptance criteria in `spec/requirements.md` and `spec/acceptance.md`.
 
@@ -75,6 +75,7 @@ React Native-specific code owns the JS API, React integration, bridge lifecycle,
 - Console/log capture as opt-in, plus manual `captureLog`.
 - Durable native offline queue across app restarts.
 - Direct connected transport to DebugBundle cloud or self-hosted ingestion.
+- No browser relay transport mode. React Native sends mobile events through direct connected ingestion using the write-only project token model; platform networking is not subject to browser CORS preflight.
 - Mobile-safe config refresh, capture-policy enforcement, always-on probes, remote probe directives, and trigger-token support.
 - Native crash evidence on Android through the Android SDK path and on iOS through the Swift SDK path when safe.
 - Conservative mobile privacy defaults.
@@ -86,7 +87,7 @@ React Native-specific code owns the JS API, React integration, bridge lifecycle,
 - React Native Web.
 - Windows, macOS, tvOS, visionOS, watchOS, Quest, and other non-iOS/non-Android RN targets.
 - Expo Go full parity, because Expo Go cannot load arbitrary custom native modules. The SDK may expose a degraded JS-only no-op/test mode, but release docs must state that production parity requires a development build or prebuilt native project.
-- Browser relay handlers and `.debugbundle/local/events` file transport.
+- Browser relay handlers, browser relay CORS/preflight options, `transportMode`, `allowedOrigins`, and `.debugbundle/local/events` file transport.
 - Arbitrary interception of every native HTTP client used by third-party native SDKs.
 - Native UI component/Fabric components. The SDK has no UI surface.
 - JSI/C++ custom runtime unless a measured performance or lifecycle need appears.
@@ -338,6 +339,7 @@ Important optional options:
 | `environment` | auto-detect | Runtime environment name. |
 | `service` | app bundle/package name | Service name. Prefer one shared RN service or per-platform names by product convention. |
 | `endpoint` | `https://api.debugbundle.com/v1/events` | Cloud or self-host ingestion endpoint. |
+| `transportMode` | — | Not supported. React Native is a mobile direct-ingestion SDK; browser relay mode belongs to `@debugbundle/sdk-browser` plus a backend relay handler. |
 | `releaseChannel` | platform channel | Mobile release channel, e.g. internal, testflight, app-store, play, production. |
 | `appVersion` | native app version | App version override. |
 | `buildNumber` | native build number | Build number override. |
@@ -379,6 +381,8 @@ Capture policy fields must not be accepted in local config. The SDK must fetch a
 Service naming guidance: React Native apps may use one cross-platform service name such as `checkout-mobile` when product owners want a combined mobile incident surface, or platform-specific service names (`checkout-ios`, `checkout-android`) when they want platform separation. Do not reuse the backend service name. Trace IDs still correlate mobile events with backend events across services.
 
 Safe startup behavior: when `enabled` is true but no usable native module, project token, or endpoint is configured, the SDK must become a no-op or degraded client, expose that state through `status`, emit at most bounded internal diagnostics, and never report healthy connected capture.
+
+Relay/CORS guidance: do not add `allowedOrigins`, CORS preflight handlers, or `/debugbundle/browser` route helpers to the React Native SDK. Split mobile/frontend/backend deployments should configure `tracePropagationTargets` for first-party API correlation and use the mobile direct ingestion endpoint. If a future React Native Web package is considered, it must compose the Browser SDK relay contract instead of extending this mobile SDK with browser relay behavior.
 
 ---
 
@@ -876,6 +880,7 @@ Quality gates:
 - React Native V1 targets iOS and Android only.
 - The SDK is distributed as `@debugbundle/sdk-react-native` on npm.
 - React Native V1 is a mobile/client SDK and does not provide browser relay handlers.
+- React Native V1 does not implement browser relay CORS preflight, `allowedOrigins`, or `transportMode`; those are server/browser SDK responsibilities.
 - TurboModule is the primary native module architecture; legacy bridge support is compatibility glue.
 - The package should reuse `debugbundle-android` and `debugbundle-swift` for native queue, transport, device context, lifecycle/crash, capture policy, and probes.
 - React Navigation is the required V1 navigation integration.

@@ -1,7 +1,7 @@
 # Swift iOS SDK Implementation Plan
 
 Version: v1
-Last updated: 2026-05-28
+Last updated: 2026-05-29
 
 ---
 
@@ -57,6 +57,8 @@ iOS is not a server process. The SDK must account for:
 - URLSession limitations around global interception,
 - crash-capture safety constraints.
 
+Swift iOS is a mobile/client SDK and must not host browser relay routes. Browser relay CORS preflight, `allowedOrigins`, `transportMode`, and `/debugbundle/browser` route handling belong to browser plus server SDK surfaces. If server-side Swift support is added later, that separate server SDK plan must implement the full relay contract.
+
 ---
 
 ## Scope
@@ -86,6 +88,7 @@ iOS is not a server process. The SDK must account for:
 ### V1 Out of Scope
 
 - Server-side Swift frameworks such as Vapor or Hummingbird.
+- Browser relay handlers, browser relay CORS/preflight options, and `.debugbundle/local/events` file transport.
 - macOS, watchOS, tvOS, visionOS, extensions, widgets, and App Clips as first-class targets.
 - React Native, Flutter, Unity, Xamarin, or MAUI wrappers.
 - Arbitrary global interception of every `URLSession` in the process.

@@ -1,7 +1,7 @@
 # C#/.NET SDK Implementation Plan
 
 Version: v1
-Last updated: 2026-05-25
+Last updated: 2026-05-29
 
 ---
 
@@ -33,7 +33,7 @@ C# production issues often happen outside request handlers. V1 should include .N
 
 ### Browser Frontends
 
-The .NET SDK does not instrument browser-side JavaScript or Blazor WebAssembly runtime failures. Browser coverage requires the DebugBundle browser SDK. The .NET server adapter provides the same-origin browser relay endpoint so browser events can be delivered without browser-side cloud credentials.
+The .NET SDK does not instrument browser-side JavaScript or Blazor WebAssembly runtime failures. Browser coverage requires the DebugBundle browser SDK. The .NET server adapter provides the browser relay endpoint so same-origin and explicitly allowed split frontend/backend browser events can be delivered without browser-side cloud credentials.
 
 ---
 
@@ -43,7 +43,7 @@ The .NET SDK does not instrument browser-side JavaScript or Blazor WebAssembly r
 
 - .NET core SDK for manual capture and shared runtime behavior.
 - ASP.NET Core middleware for request, response, exception, trace, and route capture.
-- ASP.NET Core endpoint route for `POST /debugbundle/browser` relay parity.
+- ASP.NET Core endpoint route for `POST /debugbundle/browser` relay parity plus `OPTIONS /debugbundle/browser` CORS preflight handling for split frontend/backend deployments.
 - Minimal APIs, MVC/Web API, Razor Pages, and standard endpoint-routing metadata capture.
 - Blazor Server coverage through ASP.NET Core request/log capture plus optional circuit exception capture.
 - ASP.NET Core gRPC server interceptor for service/method/status/exception metadata.
@@ -300,6 +300,7 @@ Important optional options:
 | `LogLevel` | `Warning` | Minimum captured log level. |
 | `RequestTimeout` | `5 seconds` | HTTP transport timeout. |
 | `Relay.Enabled` | `true` for ASP.NET Core | Enable `/debugbundle/browser` route when mapped. |
+| `Relay.AllowedOrigins` | same-origin derived from request host | Browser origins allowed to submit relay requests. Required for split frontend/backend relay URLs. |
 | `Relay.RateLimitPerMinute` | `60` | Per-IP relay rate limit. |
 | `Relay.DurableWrite` | `true` | Connected relay writes spool before forwarding. |
 | `MaxProbeLabels` | `50` | Distinct probe labels retained. |
@@ -417,7 +418,7 @@ ASP.NET Core integration must include:
 - `X-DebugBundle-Trace-Id` correlation.
 - `System.Diagnostics.Activity.Current` capture for trace/span alignment without becoming an OpenTelemetry exporter.
 - `ILogger` scope capture and MDC-like context from logging scopes.
-- Relay route mapping at `POST /debugbundle/browser`.
+- Relay route mapping at `POST /debugbundle/browser` and `OPTIONS /debugbundle/browser`.
 - Bounded flush on host shutdown.
 
 The integration must not reorder application exception handlers, require authentication changes, or force response headers unless explicitly configured.
@@ -505,6 +506,7 @@ The .NET SDK must provide a full relay handler at:
 
 ```text
 POST /debugbundle/browser
+OPTIONS /debugbundle/browser
 ```
 
 Minimum exported surfaces:
@@ -525,13 +527,14 @@ It must implement `contracts/sdk-interface.md` section 13:
 - Credential isolation: browser-supplied `project_token`, `organization_id`, and auth headers are stripped or rejected.
 - Preserve browser-owned `correlation.trace_id`, `correlation.request_id`, `correlation.session_id`, and `correlation.user_id_hash`.
 - Per-IP rate limiting with an in-memory default and store interfaces for `IMemoryCache`, `IDistributedCache`, or Redis-backed implementations.
+- CORS preflight support for allowed split frontend/backend origins: `OPTIONS` responses must return `204` with `Access-Control-Allow-Origin`, `Access-Control-Allow-Methods: POST, OPTIONS`, `Access-Control-Allow-Headers: content-type`, `Access-Control-Max-Age: 600`, and `Vary: Origin`. Allowed `POST` responses must include matching `Access-Control-Allow-Origin` and `Vary: Origin`; disallowed origins must not receive successful CORS headers.
 - Local-only event file writes.
 - Connected durable spool writes.
 - Connected low-latency forwarding when durable writes are disabled.
 
 ASP.NET Core applications commonly run behind IIS, Azure App Service, nginx, YARP, Kubernetes ingress, and other proxies. The relay must only trust forwarded host/proto headers when ASP.NET Core forwarded headers middleware has been configured correctly or when the user explicitly enables trusted forwarded-host behavior.
 
-The relay endpoint must be easy to exempt from app authentication while still enforcing origin, content type, size, schema, rate limit, and credential isolation. Documentation must include examples for ASP.NET Core authentication/authorization and endpoint routing.
+The relay endpoint must be easy to exempt from app authentication while still enforcing origin, preflight, content type, size, schema, rate limit, and credential isolation. Documentation must include examples for ASP.NET Core authentication/authorization, endpoint routing, and CORS middleware ordering for split frontend/backend deployments. The SDK-owned relay handler must be capable of answering preflight itself so correctness does not depend on a separate application CORS policy.
 
 ---
 
@@ -660,7 +663,7 @@ The SDK must not assign `event_class`; classification remains worker-owned.
    - Middleware, endpoint metadata capture, request ID/trace ID handling, route/controller/action capture, response status/duration, exception capture preserving behavior.
 
 7. ASP.NET Core relay
-   - Endpoint mapping, origin/content-type/size/schema/rate-limit controls, local-only writes, durable spool, connected forwarding, shared relay compliance fixtures.
+    - Endpoint mapping, origin/preflight/content-type/size/schema/rate-limit controls, local-only writes, durable spool, connected forwarding, shared relay compliance fixtures.
 
 8. Logging integrations
    - `Microsoft.Extensions.Logging` provider first, then optional Serilog, NLog, and log4net integrations, recursion guard, scope capture, level filtering.
@@ -709,7 +712,7 @@ Required test groups:
 - Azure Functions isolated worker middleware tests.
 - `Microsoft.Extensions.Logging` provider tests.
 - Serilog, NLog, and log4net integration tests.
-- Relay compliance fixtures for valid, invalid, credential-smuggling, wrong-origin, oversized, rate-limited, local-only, durable-spool, and connected-forwarding cases.
+- Relay compliance fixtures for valid, invalid, credential-smuggling, wrong-origin, allowed preflight, disallowed preflight, allowed POST CORS headers, oversized, rate-limited, local-only, durable-spool, and connected-forwarding cases.
 - Concurrency tests for parallel request/log/probe capture and flush paths.
 - Trimming and NativeAOT smoke tests for supported package paths.
 
@@ -757,7 +760,7 @@ Quality gates:
 - [ ] Instance client and static facade implemented.
 - [ ] ASP.NET Core middleware captures requests, exceptions, trace IDs, request IDs, endpoint metadata, status, duration, and probe buffers.
 - [ ] Minimal APIs, MVC/Web API, and Razor Pages are covered by tests.
-- [ ] ASP.NET Core relay handler covers the shared relay contract: origin validation, content type, body size, schema, credential stripping, local-only writes, durable spool, connected forwarding, and rate limiting.
+- [ ] ASP.NET Core relay handler covers the shared relay contract: origin validation, CORS preflight, POST CORS headers, content type, body size, schema, credential stripping, local-only writes, durable spool, connected forwarding, and rate limiting.
 - [ ] `Microsoft.Extensions.Logging`, Serilog, NLog, and log4net integrations capture structured logs without recursion.
 - [ ] gRPC interceptor captures service/method/status/exception metadata without message bodies.
 - [ ] Worker Service and Hangfire integrations capture background failures and preserve retry/failure behavior.

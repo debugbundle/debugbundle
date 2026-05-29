@@ -1340,7 +1340,7 @@ If CLI says something is healthy and MCP says something different, that is a pro
 ## 24. Browser Relay Acceptance
 
 ### AC-REL-01: Local-Only Relay End-to-End
-- **Given** a full-stack app with `@debugbundle/sdk-browser` configured with `endpoint: '/debugbundle/browser'` and any V1 full relay handler mounted at `POST /debugbundle/browser` in local-only mode
+- **Given** a full-stack app with `@debugbundle/sdk-browser` configured in relay mode with `endpoint: '/debugbundle/browser'` and any V1 full relay handler mounted at `POST /debugbundle/browser` in local-only mode
 - **When** a `frontend_exception` occurs in the browser
 - **Then** the browser SDK sends the event to the same-origin relay endpoint
 - **And** the relay writes a valid event file to `.debugbundle/local/events/`
@@ -1373,10 +1373,17 @@ If CLI says something is healthy and MCP says something different, that is a pro
 - **And** `sdk_name` is forced to `@debugbundle/sdk-browser`
 
 ### AC-REL-06: Credential Isolation
-- **Given** a browser SDK in relay mode (`endpoint: '/debugbundle/browser'`)
+- **Given** a browser SDK in relay mode (`transportMode: 'relay'` with a relative relay path or absolute backend relay URL)
 - **When** the browser SDK sends an event
 - **Then** no `Authorization` header or `projectToken` is included in the request
 - **And** the relay attaches credentials server-side when forwarding to cloud
+
+### AC-REL-11: Split Frontend/Backend Relay Preflight
+- **Given** a browser SDK in explicit relay mode pointing at an absolute backend relay URL
+- **And** the backend relay allowlist includes the frontend origin
+- **When** the browser sends `OPTIONS /debugbundle/browser` for CORS preflight
+- **Then** the relay responds successfully with `Access-Control-Allow-Origin`, `Access-Control-Allow-Methods`, and `Access-Control-Allow-Headers`
+- **And** the following allowed POST response includes matching CORS headers while still containing no browser-side DebugBundle credentials
 
 ### AC-REL-07: Connected Durable Delivery
 - **Given** a relay in connected durable mode (default)

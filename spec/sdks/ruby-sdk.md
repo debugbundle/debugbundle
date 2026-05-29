@@ -457,7 +457,7 @@ Runtime facts may include Ruby version, platform, engine, engine version, pid, c
    - Config fetch and polling, ETag handling, capture-policy enforcement, always-on probe buffers, remote activations, trigger tokens.
 
 10. Browser relay
-    - Framework-neutral relay handler, Rack middleware, Rails mounted route, origin/content-type/size/schema/rate-limit controls, local-only writes, durable spool, connected forwarding, shared relay compliance fixtures.
+   - Framework-neutral relay handler, Rack middleware, Rails mounted route, origin/preflight/content-type/size/schema/rate-limit controls, local-only writes, durable spool, connected forwarding, shared relay compliance fixtures.
 
 11. Documentation and examples
     - Rails, Rack, Sidekiq, Logger, Semantic Logger, browser relay, local-only, connected, probes, and privacy guidance.
@@ -482,7 +482,7 @@ Required test groups:
 - Rails integration tests with a minimal Rails app.
 - Sidekiq server middleware tests.
 - Ruby Logger, Rails logger, and Semantic Logger integration tests.
-- Relay compliance fixtures for valid, invalid, credential-smuggling, wrong-origin, oversized, rate-limited, local-only, durable-spool, and connected-forwarding cases.
+- Relay compliance fixtures for valid, invalid, credential-smuggling, wrong-origin, allowed preflight, disallowed preflight, allowed POST CORS headers, oversized, rate-limited, local-only, durable-spool, and connected-forwarding cases.
 - Thread-safety tests for concurrent request/log capture and flush paths.
 
 CI matrix:
@@ -527,7 +527,7 @@ Quality gates:
 - [x] Duplicate suppression and loop protection match the universal contract.
 - [x] Capture policy is fetched, cached, polled, and enforced locally with ingestion as a backstop.
 - [x] Always-on probes, remote probes, heavy probes, and trigger tokens are implemented.
-- [x] Browser relay covers the shared relay contract: origin validation, content type, body size, schema, credential stripping, local-only writes, durable spool, connected forwarding, and rate limiting.
+- [x] Browser relay covers the shared relay contract: origin validation, CORS preflight, POST CORS headers, content type, body size, schema, credential stripping, local-only writes, durable spool, connected forwarding, and rate limiting.
 - [x] SDK failures never raise into host application code.
 - [x] Request and response bodies are off by default.
 - [x] Header capture is allowlist-based by default.

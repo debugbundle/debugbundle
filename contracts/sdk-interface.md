@@ -919,10 +919,10 @@ SDKs do not assign `event_class` — that is the responsibility of the event-nor
 
 ## 13. Browser Relay Handler Parity (Server-SDK Responsibility)
 
-Server-side SDKs that support backend frameworks must provide relay handler adapters for receiving browser SDK events via a same-origin endpoint. This enables CSP-compatible, ad-blocker-resistant, privacy-preserving browser event capture without requiring the browser SDK to communicate directly with DebugBundle cloud.
+Server-side SDKs that support backend frameworks must provide relay handler adapters for receiving browser SDK events via a backend endpoint. Same-origin relay paths are the default recommendation because they minimize CORS and CSP setup. Split frontend/backend deployments may use an absolute backend relay URL when the browser SDK is explicitly configured for relay mode and the relay route is allowed to receive both `OPTIONS` preflight and `POST` batch requests.
 
 **Requirement references:** `FR-REL-01` through `FR-REL-14` in `/spec/requirements.md`
-**Acceptance criteria:** `AC-REL-01` through `AC-REL-10` in `/spec/acceptance.md`
+**Acceptance criteria:** `AC-REL-01` through `AC-REL-11` in `/spec/acceptance.md`
 **Phase:** 13a (Browser SDK Relay & Durable Delivery) in `/spec/implementation-roadmap.md`
 
 ### 13.1 Compatibility Terms
@@ -933,7 +933,7 @@ Use these terms consistently in contracts, docs, release notes, and parity matri
 |------|---------|
 | Full relay handler | Server SDK implements request validation, sanitization, framework adapters, local-only file writes, connected durable spool writes, connected cloud forwarding, credential isolation, and relay diagnostics using this contract. |
 | Relay foundation | Server SDK validates and sanitizes relay requests but leaves delivery to caller-owned callbacks or custom code. This is not full relay parity. |
-| Relay client path | Browser SDK sends events to a same-origin relay endpoint. The Browser SDK is not a backend relay handler. |
+| Relay client path | Browser SDK sends events to a relay endpoint. Same-origin paths are inferred as relay; absolute backend relay URLs require explicit `transportMode: "relay"`. The Browser SDK is not a backend relay handler. |
 | Integration relay | Platform integration, such as WordPress, composes a server SDK relay path into a concrete framework or CMS route. |
 
 Only a full relay handler may be marked as relay-handler compatible for V1. Foundation-only SDKs may be documented as manual relay integration helpers, but must not be presented as complete relay parity.
@@ -944,21 +944,23 @@ The relay handler runs on the user's backend and bridges browser events into the
 
 ### 13.3 Transport Selection (Browser SDK Side)
 
-The browser SDK determines its transport from the `endpoint` config value:
+The browser SDK supports explicit `transportMode: "relay" | "direct"`. When omitted, it preserves endpoint-based inference for compatibility:
 
-| `endpoint` value | Transport behavior |
+| Config shape | Transport behavior |
 |---|---|
-| Relative path (e.g., `/debugbundle/browser`) | Relay mode: POST to same-origin endpoint, no `Authorization` header |
-| Absolute URL to cloud (e.g., `https://api.debugbundle.com/v1/events`) | Direct-to-cloud: include `projectToken` |
-| Absolute URL to self-hosted instance | Direct-to-self-hosted: include `projectToken` |
+| `transportMode: "relay"` + relative path (e.g., `/debugbundle/browser`) | Relay mode: POST to same-origin endpoint, no `Authorization` header, no `project_token` field |
+| `transportMode: "relay"` + absolute backend URL (e.g., `https://api.example.com/debugbundle/browser`) | Relay mode for split frontend/backend deployments. Requires relay CORS preflight support and `allowedOrigins`. No browser-side DebugBundle credentials. |
+| Relative path with no `transportMode` | Compatibility inference: relay mode |
+| `transportMode: "direct"` + absolute ingestion URL + `projectToken` | Direct-to-cloud or direct-to-self-hosted: include `projectToken` |
+| Absolute URL with no `transportMode` + `projectToken` | Compatibility inference: direct mode |
 | Not set + `projectToken` present | Default direct-to-cloud |
 | Not set + no `projectToken` | SDK disabled (no-op) |
 
-The browser SDK wire format is identical regardless of transport mode. Only the target URL and auth header presence differ.
+The browser SDK uses the relay wire shape (`{"batch": [...]}`) in relay mode and the ingestion wire shape (`{"events": [...]}`) in direct mode. Relay mode must remain credential-free even when the relay endpoint is an absolute URL.
 
 ### 13.4 Relay Handler Contract
 
-**Route:** `POST /debugbundle/browser`
+**Routes:** `POST /debugbundle/browser` for event batches; `OPTIONS /debugbundle/browser` for allowed CORS preflight.
 
 **Accepted event types:** `frontend_exception`, `error_suppressed`, `frontend_breadcrumb`, `request_event`, `probe_event`
 
@@ -989,6 +991,7 @@ The browser SDK wire format is identical regardless of transport mode. Only the 
 | Status | Body | Meaning |
 |--------|------|---------|
 | 202 | `{ "accepted": N, "rejected": 0, "errors": [] }` | Events processed |
+| 204 | — | Allowed CORS preflight for split frontend/backend relay |
 | 400 | `{ "accepted": N, "rejected": M, "errors": ["..."] }` | Validation failure; valid events in the same batch may already be accepted |
 | 413 | — | Request body exceeds 256 KB limit |
 | 403 | — | Origin validation failed |
@@ -1000,18 +1003,19 @@ All relay implementations must enforce these security controls:
 
 1. **Origin validation:** Validate `Origin` header (fallback: `Referer`) against a configured allowlist. Default: same-origin derived from `Host` header. Framework adapters may use a trusted forwarded host only when the host framework already treats that forwarded host as trusted. Reject `403` on mismatch.
 2. **Content-Type enforcement:** Reject requests without `Content-Type: application/json`. This ensures browsers trigger CORS preflight, preventing simple cross-origin form submissions.
-3. **Payload size limit:** Hard limit 256 KB per request body. Reject `413` on overflow.
-4. **Schema validation:** Only known event types accepted. Unknown fields stripped.
-5. **Field override policy:** The relay must strip or override trust-sensitive fields:
+3. **CORS preflight:** Full relay handlers and framework adapters must answer allowed `OPTIONS /debugbundle/browser` requests with `Access-Control-Allow-Origin`, `Access-Control-Allow-Methods: POST, OPTIONS`, and `Access-Control-Allow-Headers: content-type`. Allowed POST responses must include `Access-Control-Allow-Origin` and `Vary: Origin`. Disallowed origins must not receive successful CORS headers.
+4. **Payload size limit:** Hard limit 256 KB per request body. Reject `413` on overflow.
+5. **Schema validation:** Only known event types accepted. Unknown fields stripped.
+6. **Field override policy:** The relay must strip or override trust-sensitive fields:
    - `project_token` — never trust from browser; relay attaches server-side.
    - `sdk_name` — forced to `@debugbundle/sdk-browser`.
    - `organization_id` — never accept from browser.
-6. **Field passthrough policy:** Preserve these browser-owned fields:
+7. **Field passthrough policy:** Preserve these browser-owned fields:
   - `correlation.request_id`, `correlation.trace_id`, `correlation.session_id`, `correlation.user_id_hash` when supplied as strings or `null`.
    - `service`, `environment` — accepted unless relay has explicit overrides.
    - `occurred_at` — browser timestamp (relay may annotate `received_at`).
-7. **Rate limiting:** Default 60 requests per minute per IP. Configurable via `rateLimitPerMinute`.
-8. **Credential isolation:** Browser never sends DebugBundle cloud credentials. Relay attaches credentials server-side when forwarding to cloud.
+8. **Rate limiting:** Default 60 requests per minute per IP. Configurable via `rateLimitPerMinute`.
+9. **Credential isolation:** Browser never sends DebugBundle cloud credentials. Relay attaches credentials server-side when forwarding to cloud.
 
 ### 13.6 Delivery Requirements (Mandatory for Full Relay Handlers)
 
