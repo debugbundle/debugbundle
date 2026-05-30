@@ -1611,7 +1611,7 @@ function createClaimTrackingWorkerQueue(queue: RedisQueueClient): ClaimTrackingW
         return null;
       }
 
-      pendingAcks.push(claimed.ack);
+      pendingAcks.push(() => claimed.ack());
       return claimed.payload;
     }) as WorkerQueue["dequeue"],
     async ackClaimedJobs(): Promise<void> {

@@ -254,7 +254,7 @@ export async function startApiServerFromEnv(envInput: Record<string, string | un
   const app = createApiServer(dependencies, {
     ...serverOptions,
     logger,
-    readinessCheck: readinessState.readinessCheck
+    readinessCheck: () => readinessState.readinessCheck()
   });
 
   let shutdownStarted = false;

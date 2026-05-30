@@ -2,9 +2,10 @@ import { describe, expect, it } from "vitest";
 
 import { buildSchedulePhasesForReduction } from "../../../apps/api/src/billing-slot-management.js";
 import type { StripePriceMapping } from "../../../apps/api/src/stripe-config.js";
+import type { BillingSummaryRecord } from "../../../packages/storage/src/index.js";
 import type Stripe from "stripe";
 
-function buildSummary(additionalPurchased: number) {
+function buildSummary(additionalPurchased: number): BillingSummaryRecord {
   return {
     plan: "solo",
     stripe_customer_id: "cus_123",
@@ -59,7 +60,7 @@ describe("buildSchedulePhasesForReduction", () => {
         items: {
           data: [buildSubscriptionItem("price_solo", 1), buildSubscriptionItem("price_solo_capacity_legacy", 2)]
         }
-      } as Stripe.Subscription,
+      } as unknown as Stripe.Subscription,
       schedule: null,
       stripeConfig: {
         priceMap: buildPriceMap(),
@@ -87,7 +88,7 @@ describe("buildSchedulePhasesForReduction", () => {
         items: {
           data: [buildSubscriptionItem("price_solo", 1), buildSubscriptionItem("price_solo_capacity_legacy", 2)]
         }
-      } as Stripe.Subscription,
+      } as unknown as Stripe.Subscription,
       schedule: null,
       stripeConfig: {
         priceMap: buildPriceMap(),
@@ -114,7 +115,7 @@ describe("buildSchedulePhasesForReduction", () => {
         items: {
           data: [buildSubscriptionItem("price_solo", 1), buildSubscriptionItem("price_solo_capacity_current", 2)]
         }
-      } as Stripe.Subscription,
+      } as unknown as Stripe.Subscription,
       schedule: {
         current_phase: {
           start_date: 1_711_184_800,

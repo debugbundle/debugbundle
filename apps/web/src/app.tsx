@@ -18,7 +18,6 @@ import { AppSidebar } from "./components/system/app-sidebar.js";
 import { AppUpdateNotifier } from "./components/system/app-update-notifier.js";
 import { BrandLockup } from "./components/system/brand-lockup.js";
 import { CalloutCard } from "./components/system/callout-card.js";
-import { PageHeader } from "./components/system/page-header.js";
 import { RecentProjectsTable } from "./components/system/recent-projects-table.js";
 import { GitHubMark } from "./components/system/github-mark.js";
 import { ProjectRouteProvider } from "./components/system/project-route-context.js";
@@ -26,14 +25,6 @@ import { SectionCards } from "./components/system/section-cards.js";
 import { SiteHeader } from "./components/system/site-header.js";
 import { Button } from "./components/ui/button.js";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./components/ui/card.js";
-import {
-  Empty,
-  EmptyContent,
-  EmptyDescription,
-  EmptyHeader,
-  EmptyMedia,
-  EmptyTitle
-} from "./components/ui/empty.js";
 import { Field, FieldDescription, FieldGroup, FieldLabel } from "./components/ui/field.js";
 import { Input } from "./components/ui/input.js";
 import { Notice } from "./components/ui/notice.js";

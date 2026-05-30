@@ -49,6 +49,14 @@ function getRecurringInterval(item: Stripe.SubscriptionItem): {
   };
 }
 
+function readSubscriptionPeriodTimestamp(
+  subscription: Stripe.Subscription,
+  field: "current_period_start" | "current_period_end"
+): number | null {
+  const value = (subscription as unknown as Record<string, unknown>)[field];
+  return typeof value === "number" && Number.isFinite(value) ? value : null;
+}
+
 function createPendingReduction(input: {
   plan: TierName;
   additionalPurchased: number;
@@ -304,7 +312,7 @@ export function buildSchedulePhasesForReduction(input: {
       const priceId = getPriceId(item.price);
       const mapping = priceId === null ? undefined : input.stripeConfig.priceMap.get(priceId);
 
-      if (mapping?.type === "extra_capacity") {
+      if (priceId !== null && mapping?.type === "extra_capacity") {
         hasExtraCapacityItem = true;
         if (targetAdditionalPurchased > 0) {
           items.push({
@@ -335,11 +343,11 @@ export function buildSchedulePhasesForReduction(input: {
 
   const currentPhaseStartDate =
     input.schedule?.current_phase?.start_date ??
-    input.subscription.current_period_start ??
+    readSubscriptionPeriodTimestamp(input.subscription, "current_period_start") ??
     Math.floor(new Date(input.summary.usage_window.starts_at).getTime() / 1000);
   const currentPhaseEndDate =
     input.schedule?.current_phase?.end_date ??
-    input.subscription.current_period_end ??
+    readSubscriptionPeriodTimestamp(input.subscription, "current_period_end") ??
     Math.floor(new Date(input.summary.usage_window.ends_at).getTime() / 1000);
 
   return [
