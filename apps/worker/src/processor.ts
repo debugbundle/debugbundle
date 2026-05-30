@@ -469,6 +469,45 @@ function getWorkerErrorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
+function humanizeEventType(eventType: GroupIncidentJob["event_type"]): string {
+  return eventType
+    .split("_")
+    .map((segment) => segment.charAt(0).toUpperCase() + segment.slice(1))
+    .join(" ");
+}
+
+function isMachineGeneratedIncidentTitle(job: Pick<GroupIncidentJob, "event_type" | "normalized_message">): boolean {
+  const normalizedMessage = job.normalized_message.trim();
+  if (normalizedMessage.length === 0) {
+    return true;
+  }
+
+  if (normalizedMessage.startsWith("[") || normalizedMessage.startsWith("{")) {
+    return true;
+  }
+
+  return normalizedMessage === job.event_type;
+}
+
+function deriveIncidentTitle(job: Pick<GroupIncidentJob, "event_type" | "normalized_message">): string {
+  if (!isMachineGeneratedIncidentTitle(job)) {
+    return job.normalized_message;
+  }
+
+  switch (job.event_type) {
+    case "backend_exception":
+      return "Backend exception";
+    case "frontend_exception":
+      return "Frontend exception";
+    case "request_event":
+      return "Request failure";
+    case "log_event":
+      return "Application log error";
+    default:
+      return humanizeEventType(job.event_type);
+  }
+}
+
 function isAllowanceMeter(value: string): value is Parameters<typeof getAllowanceMeterLabel>[0] {
   return (
     value === "monthly_bundle_requests" ||
@@ -652,6 +691,8 @@ export async function processNextGroupIncidentJob(
     return { processed: true, reason: "non_incident_signal" };
   }
 
+  const incidentTitle = deriveIncidentTitle(job);
+
   const incident = await dependencies.incidentStore.upsertIncident({
     event_id: job.event_id,
     event_type: job.event_type,
@@ -661,7 +702,7 @@ export async function processNextGroupIncidentJob(
     fingerprint: job.fingerprint,
     fingerprint_version: job.fingerprint_version ?? FINGERPRINT_VERSION,
     ...(job.matched_fields !== undefined ? { matched_fields: job.matched_fields } : {}),
-    title: job.normalized_message,
+    title: incidentTitle,
     severity: job.severity,
     occurred_at: job.occurred_at,
     ...(job.deploy_metadata !== undefined ? { deploy_metadata: job.deploy_metadata } : {})
@@ -740,7 +781,7 @@ export async function processNextGroupIncidentJob(
       event_type: job.event_type,
       service_name: job.service_name,
       environment: job.environment,
-      incident_title: job.normalized_message,
+      incident_title: incidentTitle,
       incident_severity: job.severity,
       incident_occurrence_count: incident.occurrence_count,
       occurred_at: job.occurred_at,
@@ -793,7 +834,7 @@ export async function processNextGroupIncidentJob(
         severity: job.severity,
         bundle_type: "failure",
         is_verification: false,
-        title: job.normalized_message
+        title: incidentTitle
       });
       await publishGitHubDispatchIfConfigured(dependencies.githubDispatchPublisher, {
         event_type: "bundle.created",
@@ -804,7 +845,7 @@ export async function processNextGroupIncidentJob(
         environment: job.environment,
         severity: job.severity,
         bundle_type: "failure",
-        title: job.normalized_message,
+        title: incidentTitle,
         occurrence_count: incident.occurrence_count,
         first_seen_at: job.occurred_at,
         bundle_version: incident.occurrence_count
@@ -821,7 +862,7 @@ export async function processNextGroupIncidentJob(
         severity: job.severity,
         bundle_type: "failure",
         is_verification: false,
-        title: job.normalized_message
+        title: incidentTitle
       });
       await publishGitHubDispatchIfConfigured(dependencies.githubDispatchPublisher, {
         event_type: "bundle.updated",
@@ -832,7 +873,7 @@ export async function processNextGroupIncidentJob(
         environment: job.environment,
         severity: job.severity,
         bundle_type: "failure",
-        title: job.normalized_message,
+        title: incidentTitle,
         occurrence_count: incident.occurrence_count,
         first_seen_at: job.occurred_at,
         bundle_version: incident.occurrence_count
@@ -848,7 +889,7 @@ export async function processNextGroupIncidentJob(
         condition_type: "new_incident",
         dedupe_key: "new_incident",
         occurred_at: job.occurred_at,
-        summary: job.normalized_message,
+        summary: incidentTitle,
         service_name: job.service_name,
         environment: job.environment,
         severity: job.severity
@@ -861,7 +902,7 @@ export async function processNextGroupIncidentJob(
       condition_type: "severity_threshold",
       dedupe_key: `severity_threshold:${job.severity}`,
       occurred_at: job.occurred_at,
-      summary: job.normalized_message,
+      summary: incidentTitle,
       service_name: job.service_name,
       environment: job.environment,
       severity: job.severity
@@ -874,7 +915,7 @@ export async function processNextGroupIncidentJob(
         condition_type: "incident_regressed",
         dedupe_key: "incident_regressed",
         occurred_at: job.occurred_at,
-        summary: job.normalized_message,
+        summary: incidentTitle,
         service_name: job.service_name,
         environment: job.environment,
         severity: job.severity,
@@ -888,7 +929,7 @@ export async function processNextGroupIncidentJob(
           condition_type: "regression_after_deploy",
           dedupe_key: "regression_after_deploy",
           occurred_at: job.occurred_at,
-          summary: job.normalized_message,
+          summary: incidentTitle,
           service_name: job.service_name,
           environment: job.environment,
           severity: job.severity,
@@ -909,7 +950,7 @@ export async function processNextGroupIncidentJob(
       severity: job.severity,
       bundle_type: "failure",
       is_verification: false,
-      title: job.normalized_message,
+      title: incidentTitle,
       regression_deploy: incident.regression_deploy ?? null
     });
     await publishGitHubDispatchIfConfigured(dependencies.githubDispatchPublisher, {
@@ -921,7 +962,7 @@ export async function processNextGroupIncidentJob(
       environment: job.environment,
       severity: job.severity,
       bundle_type: "failure",
-      title: job.normalized_message,
+      title: incidentTitle,
       occurrence_count: incident.occurrence_count,
       first_seen_at: job.occurred_at,
       bundle_version: incident.occurrence_count
@@ -948,7 +989,7 @@ export async function processNextGroupIncidentJob(
           condition_type: "error_spike",
           dedupe_key: "error_spike",
           occurred_at: job.occurred_at,
-          summary: job.normalized_message,
+          summary: incidentTitle,
           service_name: job.service_name,
           environment: job.environment,
           severity: job.severity
@@ -964,7 +1005,7 @@ export async function processNextGroupIncidentJob(
           severity: job.severity,
           bundle_type: "failure",
           is_verification: false,
-          title: job.normalized_message
+          title: incidentTitle
         });
         await publishGitHubDispatchIfConfigured(dependencies.githubDispatchPublisher, {
           event_type: "incident.spike_detected",
@@ -975,7 +1016,7 @@ export async function processNextGroupIncidentJob(
           environment: job.environment,
           severity: job.severity,
           bundle_type: "failure",
-          title: job.normalized_message,
+          title: incidentTitle,
           occurrence_count: incident.occurrence_count,
           first_seen_at: job.occurred_at,
           bundle_version: incident.occurrence_count

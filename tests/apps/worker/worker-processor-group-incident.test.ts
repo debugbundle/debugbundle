@@ -1131,6 +1131,147 @@ describe("worker processor \u2013 group-incident", () => {
     expect(incidentStore.markIncidentSpiking).toHaveBeenCalledTimes(0);
   });
 
+  it("should replace JSON-shaped backend exception titles with a human fallback", async (): Promise<void> => {
+    const queue = {
+      enqueue: vi.fn().mockResolvedValue(undefined),
+      dequeue: vi.fn().mockResolvedValue({
+        project_id: "proj_123",
+        event_id: "evt_machine_title",
+        event_type: "backend_exception",
+        service_name: "checkout-api",
+        environment: "production",
+        fingerprint: "fp_machine_title",
+        normalized_message: '[{"code":"invalid_type","message":"Expected number, received string"}]',
+        occurred_at: "2026-03-11T00:00:00.000Z",
+        severity: "high"
+      })
+    };
+
+    const alertEvaluationQueue = {
+      enqueue: vi.fn().mockResolvedValue(undefined)
+    };
+
+    const incidentStore = {
+      upsertIncident: vi.fn().mockResolvedValue({
+        incident_id: "inc_123",
+        matched_fields: ["normalized_message"],
+        status: "open",
+        regressed_now: false,
+        occurrence_count: 1,
+        duplicate_event: false
+      }),
+      insertIncidentEvent: vi.fn().mockResolvedValue(undefined),
+      markIncidentSpiking: vi.fn().mockResolvedValue(false)
+    };
+
+    const frequencyCounter = {
+      recordOccurrence: vi.fn().mockResolvedValue({
+        occurrences_1m: 1,
+        occurrences_5m: 1,
+        occurrences_1h: 1,
+        occurrences_24h: 1,
+        baseline_1h_per_5m: 1,
+        spike_ratio_5m_to_1h: 1,
+        has_sufficient_baseline: true,
+        is_spiking: false
+      })
+    };
+
+    const lifecycleWebhookPublisher = {
+      publish: vi.fn().mockResolvedValue(undefined)
+    };
+
+    const githubDispatchPublisher = {
+      publish: vi.fn().mockResolvedValue(undefined)
+    };
+
+    const result = await processNextGroupIncidentJob({
+      queue,
+      alertEvaluationQueue,
+      incidentStore,
+      frequencyCounter,
+      lifecycleWebhookPublisher,
+      githubDispatchPublisher
+    });
+
+    expect(result).toEqual({ processed: true });
+    expect(incidentStore.upsertIncident).toHaveBeenCalledWith(
+      expect.objectContaining({ title: "Backend exception" })
+    );
+    expect(alertEvaluationQueue.enqueue).toHaveBeenCalledWith(
+      "evaluate-alerts",
+      expect.objectContaining({ summary: "Backend exception" })
+    );
+    expect(lifecycleWebhookPublisher.publish).toHaveBeenCalledWith(
+      expect.objectContaining({ event_type: "bundle.created", title: "Backend exception" })
+    );
+    expect(githubDispatchPublisher.publish).toHaveBeenCalledWith(
+      expect.objectContaining({ event_type: "bundle.created", title: "Backend exception" })
+    );
+  });
+
+  it("should replace bare frontend event-type titles with a human fallback", async (): Promise<void> => {
+    const queue = {
+      enqueue: vi.fn().mockResolvedValue(undefined),
+      dequeue: vi.fn().mockResolvedValue({
+        project_id: "proj_123",
+        event_id: "evt_frontend_title",
+        event_type: "frontend_exception",
+        service_name: "checkout-web",
+        environment: "production",
+        fingerprint: "fp_frontend_title",
+        normalized_message: "frontend_exception",
+        occurred_at: "2026-03-11T00:00:00.000Z",
+        severity: "high"
+      })
+    };
+
+    const incidentStore = {
+      upsertIncident: vi.fn().mockResolvedValue({
+        incident_id: "inc_123",
+        matched_fields: ["normalized_message"],
+        status: "open",
+        regressed_now: false,
+        occurrence_count: 1,
+        duplicate_event: false
+      }),
+      insertIncidentEvent: vi.fn().mockResolvedValue(undefined),
+      markIncidentSpiking: vi.fn().mockResolvedValue(false)
+    };
+
+    const frequencyCounter = {
+      recordOccurrence: vi.fn().mockResolvedValue({
+        occurrences_1m: 1,
+        occurrences_5m: 1,
+        occurrences_1h: 1,
+        occurrences_24h: 1,
+        baseline_1h_per_5m: 1,
+        spike_ratio_5m_to_1h: 1,
+        has_sufficient_baseline: true,
+        is_spiking: false
+      })
+    };
+
+    const lifecycleWebhookPublisher = {
+      publish: vi.fn().mockResolvedValue(undefined)
+    };
+
+    const result = await processNextGroupIncidentJob({
+      queue,
+      incidentStore,
+      frequencyCounter,
+      lifecycleWebhookPublisher
+    });
+
+    expect(result).toEqual({ processed: true });
+    expect(incidentStore.upsertIncident).toHaveBeenCalledWith(
+      expect.objectContaining({ title: "Frontend exception" })
+    );
+    expect(lifecycleWebhookPublisher.publish).toHaveBeenCalledWith(
+      expect.objectContaining({ event_type: "bundle.created", title: "Frontend exception" })
+    );
+  });
+
 });
 
 describe("worker processor – group-incident lifecycle publish", () => {

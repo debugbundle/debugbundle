@@ -36,6 +36,63 @@ describe("capture rule store", () => {
       expect(result).toEqual([row]);
       expect(query.mock.calls[0]?.[1]).toEqual(["proj_123"]);
     });
+
+    it("normalizes Postgres numeric and timestamp values to the capture rule contract", async () => {
+      const query = vi.fn().mockResolvedValue({
+        rows: [
+          {
+            id: "00000000-0000-4000-8000-000000000101",
+            project_id: "proj_123",
+            name: "Sample blocked slideshow requests",
+            description: null,
+            enabled: true,
+            action: "sample",
+            matcher: {
+              event_types: ["request_event"],
+              first_party: true,
+              status_codes: [403]
+            },
+            sample_rate: "0.25",
+            sample_event_class: "preserve",
+            created_by_user_id: null,
+            created_from_incident_id: null,
+            created_from_event_id: null,
+            expires_at: new Date("2026-05-28T10:00:00.000Z"),
+            hit_count: "12",
+            last_matched_at: new Date("2026-05-27T10:00:00.000Z"),
+            created_at: new Date("2026-05-26T10:00:00.000Z"),
+            updated_at: new Date("2026-05-26T11:00:00.000Z")
+          }
+        ]
+      });
+
+      const store = createPostgresCaptureRuleStore({ query });
+      const [result] = await store.listCaptureRulesByProjectId("proj_123");
+
+      expect(result).toEqual({
+        id: "00000000-0000-4000-8000-000000000101",
+        project_id: "proj_123",
+        name: "Sample blocked slideshow requests",
+        description: null,
+        enabled: true,
+        action: "sample",
+        matcher: {
+          event_types: ["request_event"],
+          first_party: true,
+          status_codes: [403]
+        },
+        sample_rate: 0.25,
+        sample_event_class: "preserve",
+        created_by_user_id: null,
+        created_from_incident_id: null,
+        created_from_event_id: null,
+        expires_at: "2026-05-28T10:00:00.000Z",
+        hit_count: 12,
+        last_matched_at: "2026-05-27T10:00:00.000Z",
+        created_at: "2026-05-26T10:00:00.000Z",
+        updated_at: "2026-05-26T11:00:00.000Z"
+      });
+    });
   });
 
   describe("createCaptureRule", () => {

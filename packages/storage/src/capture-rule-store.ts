@@ -1,6 +1,18 @@
 import type { CaptureRule, CaptureRuleAction, CaptureRuleMatcher, CaptureRuleSampleEventClass } from "../../shared-types/src/index.js";
 import type { Queryable } from "./types.js";
 
+type CaptureRuleRow = Omit<
+  CaptureRule,
+  "sample_rate" | "hit_count" | "expires_at" | "last_matched_at" | "created_at" | "updated_at"
+> & {
+  sample_rate: number | string | null;
+  hit_count: number | string;
+  expires_at: string | Date | null;
+  last_matched_at: string | Date | null;
+  created_at: string | Date;
+  updated_at: string | Date;
+};
+
 export interface CaptureRuleStore {
   getCaptureRuleById(input: { id: string; project_id: string }): Promise<CaptureRule | null>;
   listCaptureRulesByProjectId(projectId: string): Promise<CaptureRule[]>;
@@ -58,10 +70,30 @@ function selectColumns(): string {
   `;
 }
 
+function toIsoString(value: string | Date | null): string | null {
+  if (value === null) {
+    return null;
+  }
+
+  return new Date(value).toISOString();
+}
+
+function normalizeCaptureRuleRow(row: CaptureRuleRow): CaptureRule {
+  return {
+    ...row,
+    sample_rate: row.sample_rate === null ? null : Number(row.sample_rate),
+    hit_count: Number(row.hit_count),
+    expires_at: toIsoString(row.expires_at),
+    last_matched_at: toIsoString(row.last_matched_at),
+    created_at: toIsoString(row.created_at) ?? new Date(row.created_at).toISOString(),
+    updated_at: toIsoString(row.updated_at) ?? new Date(row.updated_at).toISOString()
+  };
+}
+
 export function createPostgresCaptureRuleStore(db: Queryable): CaptureRuleStore {
   return {
     async getCaptureRuleById(input) {
-      const result = await db.query<CaptureRule>(
+      const result = await db.query<CaptureRuleRow>(
         `
           SELECT ${selectColumns()}
           FROM capture_rules
@@ -71,11 +103,11 @@ export function createPostgresCaptureRuleStore(db: Queryable): CaptureRuleStore 
         [input.id, input.project_id]
       );
 
-      return result.rows[0] ?? null;
+      return result.rows[0] === undefined ? null : normalizeCaptureRuleRow(result.rows[0]);
     },
 
     async listCaptureRulesByProjectId(projectId) {
-      const result = await db.query<CaptureRule>(
+      const result = await db.query<CaptureRuleRow>(
         `
           SELECT ${selectColumns()}
           FROM capture_rules
@@ -85,11 +117,11 @@ export function createPostgresCaptureRuleStore(db: Queryable): CaptureRuleStore 
         [projectId]
       );
 
-      return result.rows;
+      return result.rows.map(normalizeCaptureRuleRow);
     },
 
     async listActiveCaptureRulesByProjectId(input) {
-      const result = await db.query<CaptureRule>(
+      const result = await db.query<CaptureRuleRow>(
         `
           SELECT ${selectColumns()}
           FROM capture_rules
@@ -101,11 +133,11 @@ export function createPostgresCaptureRuleStore(db: Queryable): CaptureRuleStore 
         [input.project_id, input.now]
       );
 
-      return result.rows;
+      return result.rows.map(normalizeCaptureRuleRow);
     },
 
     async createCaptureRule(input) {
-      const result = await db.query<CaptureRule>(
+      const result = await db.query<CaptureRuleRow>(
         `
           INSERT INTO capture_rules (
             id,
@@ -146,7 +178,7 @@ export function createPostgresCaptureRuleStore(db: Queryable): CaptureRuleStore 
         ]
       );
 
-      return result.rows[0]!;
+      return normalizeCaptureRuleRow(result.rows[0]!);
     },
 
     async updateCaptureRule(input) {
@@ -209,7 +241,7 @@ export function createPostgresCaptureRuleStore(db: Queryable): CaptureRuleStore 
       updates.push("updated_at = NOW()");
       params.push(input.id, input.project_id);
 
-      const result = await db.query<CaptureRule>(
+      const result = await db.query<CaptureRuleRow>(
         `
           UPDATE capture_rules
           SET ${updates.join(", ")}
@@ -219,7 +251,7 @@ export function createPostgresCaptureRuleStore(db: Queryable): CaptureRuleStore 
         params
       );
 
-      return result.rows[0] ?? null;
+      return result.rows[0] === undefined ? null : normalizeCaptureRuleRow(result.rows[0]);
     },
 
     async deleteCaptureRule(input) {
