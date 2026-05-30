@@ -1,7 +1,7 @@
 # Package Standards — DebugBundle
 
 Version: v1
-Last updated: 2026-05-28
+Last updated: 2026-05-31
 
 ---
 
@@ -54,14 +54,15 @@ All npm packages use the `@debugbundle/` scope.
 - Framework integrations ship as separate service providers / bundles within the same package
 - Dependencies kept minimal: `guzzlehttp/guzzle` or PSR-18 HTTP client
 
-### Future registries
+### Additional registries and standalone SDKs
 
 | Language | Registry | Package Name |
 |----------|----------|-------------|
 | Go | Go modules | `github.com/debugbundle/debugbundle-go` |
 | Ruby | RubyGems | `debugbundle` |
 | Kotlin Android | Maven Central | `com.debugbundle:debugbundle-android` package family |
-| Swift iOS | Swift Package Manager | `DebugBundle` package products from `github.com/debugbundle/debugbundle-swift` |
+| Swift iOS | Swift Package Manager and CocoaPods | `DebugBundle` package products from `github.com/debugbundle/debugbundle-swift`; core CocoaPod `DebugBundle` |
+| React Native | npm | `@debugbundle/sdk-react-native` |
 | Rust | crates.io | `debugbundle` |
 
 ---

@@ -109,7 +109,7 @@ The Swift SDK should live in a dedicated repository:
 github.com/debugbundle/debugbundle-swift
 ```
 
-Publish through Swift Package Manager. The package should expose focused products:
+Publish through Swift Package Manager and CocoaPods. Swift Package Manager remains the primary install path for the full native product family, while the CocoaPods package must at least publish the core `DebugBundle` native client required by React Native and brownfield iOS consumers that expect pod-based native dependency resolution. The package should expose focused products:
 
 | Product | Purpose |
 | --- | --- |
@@ -133,7 +133,7 @@ Suggested module roots:
 | `DebugBundleSwiftLog` | SwiftLog integration. |
 | `DebugBundleCrashReporter` | Next-launch crash evidence and crash-path persistence. |
 
-Repository tooling should use Swift Package Manager, Xcode project generation only when needed for examples, SwiftFormat or SwiftLint, Swift Testing and/or XCTest, iOS simulator test lanes, package documentation generation, DocC, semantic versioning, signed GitHub releases, and CI release validation.
+Repository tooling should use Swift Package Manager, CocoaPods podspec validation, Xcode project generation only when needed for examples, SwiftFormat or SwiftLint, Swift Testing and/or XCTest, iOS simulator test lanes, package documentation generation, DocC, semantic versioning, signed GitHub releases, and CI release validation.
 
 Current toolchain snapshot for implementation planning only:
 
@@ -704,7 +704,7 @@ Quality gates:
 - SwiftLog is the first logging integration; OSLog/unified-log scraping is explicitly forbidden.
 - Fatal crash capture must be next-launch and async-signal-safe. If that cannot be implemented safely, it must not be claimed for V1.
 - macOS, watchOS, tvOS, visionOS, App Clips, and extensions are post-V1.
-- Swift Package Manager is the primary distribution path. CocoaPods can be reconsidered later if customer demand justifies the maintenance burden.
+- Swift Package Manager is the primary full-product distribution path. CocoaPods is also supported for the core native `DebugBundle` pod used by React Native and brownfield iOS consumers, with trunk publishing gated by `DebugBundle.podspec` validation and an authenticated CocoaPods trunk session.
 
 ---
 

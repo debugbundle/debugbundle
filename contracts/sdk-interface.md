@@ -593,9 +593,9 @@ Framework integrations must auto-register log capture alongside error/request ca
 
 | Language | Package | Registry | Status |
 |----------|---------|----------|--------|
-| Kotlin (Android) | `com.debugbundle:debugbundle-android` | Maven Central | Pre-release |
-| Swift (iOS) | `DebugBundle` | Swift Package Manager and CocoaPods | Released v0.1.0; CocoaPods publish setup prepared |
-| React Native | `@debugbundle/sdk-react-native` | npm | Local release candidate |
+| Kotlin (Android) | `com.debugbundle:debugbundle-android` | Maven Central | Released v0.1.2 |
+| Swift (iOS) | `DebugBundle` | Swift Package Manager and CocoaPods | Released v0.1.1; CocoaPods `DebugBundle@0.1.1` published |
+| React Native | `@debugbundle/sdk-react-native` | npm | Released v0.1.1 |
 | Dart / Flutter | `debugbundle` | pub.dev | Planned |
 
 ### V1 Framework Support Matrix

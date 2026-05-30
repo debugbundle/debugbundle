@@ -46,6 +46,9 @@ describe('public site content source', () => {
     expect(existsSync(join(publicSiteRoot, 'content/docs/sdks/browser-relay.mdx'))).toBe(true);
     expect(existsSync(join(publicSiteRoot, 'content/docs/sdks/python.mdx'))).toBe(true);
     expect(existsSync(join(publicSiteRoot, 'content/docs/sdks/php.mdx'))).toBe(true);
+    expect(existsSync(join(publicSiteRoot, 'content/docs/sdks/android.mdx'))).toBe(true);
+    expect(existsSync(join(publicSiteRoot, 'content/docs/sdks/swift.mdx'))).toBe(true);
+    expect(existsSync(join(publicSiteRoot, 'content/docs/sdks/react-native.mdx'))).toBe(true);
     expect(existsSync(join(publicSiteRoot, 'content/docs/sdks/universal-interface.mdx'))).toBe(true);
     expect(existsSync(join(publicSiteRoot, 'content/docs/cli/index.mdx'))).toBe(true);
     expect(existsSync(join(publicSiteRoot, 'content/docs/cli/setup.mdx'))).toBe(true);

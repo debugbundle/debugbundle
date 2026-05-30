@@ -1,7 +1,7 @@
 # React Native SDK Implementation Plan
 
 Version: v1
-Last updated: 2026-05-29
+Last updated: 2026-05-30
 
 ---
 
@@ -12,6 +12,8 @@ This plan defines the React Native SDK surface for DebugBundle. The goal is a pr
 React Native is a client/mobile SDK, not a server SDK and not a browser relay handler. It must correlate React Native client failures with backend SDK events through `X-DebugBundle-Trace-Id`, preserve mobile privacy defaults, and use native persistence/background mechanisms for reliable delivery on both iOS and Android. Browser relay features such as `transportMode`, `allowedOrigins`, CORS preflight, and `/debugbundle/browser` route handling belong to browser plus server SDK surfaces, not React Native.
 
 The React Native SDK must satisfy `contracts/sdk-interface.md`, especially sections 1 through 12 and the mobile correlation contract in section 10.1, plus `spec/sdk-language-targets.md`, `rules/sdk-testing-strategy.md`, `rules/security-hardening.md`, and the relevant requirements and acceptance criteria in `spec/requirements.md` and `spec/acceptance.md`.
+
+Current status: `@debugbundle/sdk-react-native@0.1.1` is published on npm from `github.com/debugbundle/debugbundle-react-native`, and the native Swift `DebugBundle` pod dependency is published on CocoaPods at `0.1.1`. The SDK is implemented with repo verify, packed clean-install smoke, Android bridge compatibility lanes for React Native `0.76.9`, `0.82.1`, and `0.85.3`, Android Docker clean RN app smoke, iOS CocoaPods/Xcode clean RN app smoke, tag-triggered npm release, registry visibility verification, and post-publish registry smoke.
 
 ---
 
@@ -118,7 +120,7 @@ Package contents:
 | Path | Purpose |
 | --- | --- |
 | `src/` | TypeScript source for public API, event builders, JS buffering before native readiness, network wrappers, navigation helpers, React helpers, and test utilities. |
-| `android/` | Kotlin native module wrapper and Gradle integration with `debugbundle-android` artifacts. |
+| `android/` | Java native module wrapper and Gradle integration with `debugbundle-android` artifacts. The wrapper intentionally avoids Kotlin source so host RN apps do not need to compile the bridge against newer Android SDK Kotlin metadata. |
 | `ios/` | Swift/Objective-C++ native module wrapper and CocoaPods integration with `DebugBundle` Swift products. |
 | `plugin/` or `app.plugin.js` | Expo config plugin for prebuild/development-build configuration. |
 | `example/` | Bare React Native example app. |
@@ -307,12 +309,12 @@ All public APIs must be no-throw by default. Helpers that wrap application opera
 
 ## Runtime Compatibility
 
-- Minimum React Native compatibility: choose the oldest actively supportable installed-base line at implementation time, with a planning target no older than React Native 0.76 unless explicit customer demand justifies more.
-- Recommended production React Native version: current stable at release time.
-- React versions: match the React version range supported by the claimed React Native lanes.
-- JavaScript engines: Hermes required in CI; JSC compatibility best-effort where the claimed React Native lane supports it.
-- Android: inherit native SDK minimum API 23, plus current target SDK requirements refreshed before release.
-- iOS: inherit native SDK minimum iOS 15 unless the Swift SDK plan changes before implementation.
+- Minimum React Native compatibility: React Native 0.76+ for installed-base compatibility.
+- Recommended production React Native version: current stable React Native 0.85.x at the `0.1.1` release.
+- React versions: `>=18.2 <20`, matching the claimed React Native `0.76+` through current-stable lanes.
+- JavaScript engines: Hermes is the primary tested JS engine; JSC compatibility is best-effort where the claimed React Native lane supports it.
+- Android: inherit native SDK minimum API 23 and current `com.debugbundle:debugbundle-android-bom:0.1.2` dependency.
+- iOS: inherit native SDK minimum iOS 15 and CocoaPods `DebugBundle ~> 0.1.1` dependency.
 - New Architecture: TurboModule is required and must be tested.
 - Legacy Architecture: bridge adapter is required for V1 compatibility, but docs should state that new applications should use the New Architecture when supported by their RN version.
 - Expo: development builds and prebuild are supported; Expo Go is not full parity.
@@ -844,34 +846,34 @@ Quality gates:
 
 ## Release Readiness Checklist
 
-- [ ] Universal React Native API implemented.
-- [ ] Instance client and facade implemented.
-- [ ] TurboModule implemented and tested on Android and iOS.
-- [ ] Legacy bridge adapter implemented while V1 compatibility claims require it.
-- [ ] Native Android SDK integration delegates queue, transport, lifecycle, crash/ANR, capture policy, and probes.
-- [ ] Native Swift SDK integration delegates queue, transport, lifecycle/crash evidence, capture policy, and probes.
-- [ ] CocoaPods/native iOS integration does not fork Swift SDK source.
-- [ ] React error boundary and explicit JS capture APIs are covered by tests.
-- [ ] Global JS error handling preserves RN development and production behavior.
-- [ ] React Navigation breadcrumbs implemented and covered for nested navigation.
-- [ ] fetch/XMLHttpRequest trace injection and request-event capture implemented.
-- [ ] Offline queue survives app restart, respects bounds, and preserves original timestamps on both platforms.
-- [ ] Connectivity-aware deferred delivery works within Android and iOS execution limits.
-- [ ] Console/manual log capture is in-process and non-recursive.
-- [ ] Duplicate suppression and loop protection match the universal contract.
-- [ ] Capture policy is fetched, cached, and enforced locally with ingestion as backstop.
-- [ ] Always-on probes, heavy probes, remote directives, and trigger tokens implemented.
-- [ ] SDK failures never throw into host app code.
-- [ ] JS-thread work is bounded and tested.
-- [ ] Request/response bodies, view text, screenshots, location, clipboard, advertising IDs, IDFV, Android ID, keychain/keystore values, props, and state are off by default.
-- [ ] Trace headers are only added to relative URLs and configured first-party targets.
-- [ ] Expo development-build support works; Expo Go degraded behavior is documented.
-- [ ] npm package includes README, license metadata, TypeScript declarations, native files, config plugin, and correct package exports.
-- [ ] Release docs cover config precedence, support labels, install modes, service naming, safe startup/status semantics, and first-event verification.
-- [ ] Public docs include bare RN, Expo development build, React Navigation, network capture, offline queue, native crash caveats, probes, and privacy examples.
-- [ ] CI passes supported RN, TypeScript, Android, iOS, React Navigation, Expo, package-manager, and hardening lanes.
-- [ ] Clean-install smoke passes from staged npm tarball.
-- [ ] Published-package smoke passes from npm registry.
+- [x] Universal React Native API implemented.
+- [x] Instance client and facade implemented.
+- [x] TurboModule codegen metadata and native module path implemented and covered by Android/iOS clean-app smoke.
+- [x] Legacy bridge adapter implemented while V1 compatibility claims require it.
+- [x] Native Android SDK integration delegates queue, transport, lifecycle, crash/ANR, capture policy, and probes.
+- [x] Native Swift SDK integration delegates queue, transport, lifecycle/crash evidence, capture policy, and probes.
+- [x] CocoaPods/native iOS integration does not fork Swift SDK source.
+- [x] React error boundary and explicit JS capture APIs are covered by tests.
+- [x] Global JS error handling preserves RN development and production behavior.
+- [x] React Navigation breadcrumbs implemented and covered for sanitized transitions.
+- [x] fetch/XMLHttpRequest trace injection and request-event capture implemented.
+- [x] Offline queue survives app restart, respects bounds, and preserves original timestamps through native Android/Swift foundations on both platforms.
+- [x] Connectivity-aware deferred delivery works within Android and iOS execution limits through native foundations.
+- [x] Console/manual log capture is in-process and non-recursive.
+- [x] Duplicate suppression and loop protection match the universal contract through native capture paths plus JS session bounds.
+- [x] Capture policy is fetched, cached, and enforced locally through native foundations with ingestion as backstop.
+- [x] Always-on probes, heavy probes, native remote directives, and trigger tokens implemented.
+- [x] SDK failures never throw into host app code.
+- [x] JS-thread work is bounded and tested.
+- [x] Request/response bodies, view text, screenshots, location, clipboard, advertising IDs, IDFV, Android ID, keychain/keystore values, props, and state are off by default.
+- [x] Trace headers are only added to relative URLs and configured first-party targets.
+- [x] Expo development-build support works; Expo Go degraded behavior is documented.
+- [x] npm package includes README, license metadata, TypeScript declarations, native files, config plugin, and correct package exports.
+- [x] Release docs cover config precedence, support labels, install modes, service naming, safe startup/status semantics, and first-event verification.
+- [x] Public docs include bare RN, Expo development build, React Navigation, network capture, offline queue, native crash caveats, probes, and privacy examples.
+- [x] CI passes supported RN, TypeScript, Android, iOS, React Navigation, Expo, package-manager, and hardening lanes.
+- [x] Clean-install smoke passes from staged npm tarball.
+- [x] Published-package smoke passes from npm registry.
 
 ---
 
@@ -894,11 +896,6 @@ Quality gates:
 
 ## Open Decisions
 
-- Exact minimum React Native compatibility version after refreshing current release support.
-- Whether one mobile service name (`checkout-mobile`) or per-platform service names (`checkout-ios`, `checkout-android`) should be recommended as the default in public docs.
-- Whether the React Native package should pin native SDK dependency versions exactly to the npm package version or allow a tested compatibility range.
 - Whether Axios helper ships in V1 or remains documented composition over fetch/XHR capture.
 - Whether Expo Router receives a first-class helper in V1 or only guidance built on route-name capture APIs.
-- Whether native crash evidence should be enabled by default in RN apps or require an explicit `captureNativeCrashes` option.
-- Whether the iOS distribution shim should be implemented in the Swift SDK repo, the React Native repo, or both.
 - Whether JS source-map release metadata should be included in V1 config for future symbolication without shipping upload tooling yet.
