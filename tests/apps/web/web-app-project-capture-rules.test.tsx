@@ -202,7 +202,7 @@ describe("web app — project capture rules", () => {
 
     expect(await screen.findByRole("heading", { name: /capture rules/i, level: 3 })).toBeInTheDocument();
     expect(screen.getByText(/members can review project capture rules here/i)).toBeInTheDocument();
-    expect(screen.getByText(/demote analytics resource errors/i)).toBeInTheDocument();
+    expect(await screen.findByText(/demote analytics resource errors/i)).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /^pause$/i })).toBeNull();
     expect(screen.queryByRole("button", { name: /^edit$/i })).toBeNull();
     expect(screen.queryByRole("button", { name: /^delete$/i })).toBeNull();
