@@ -153,6 +153,26 @@ describe('public core repository export', () => {
         cloneUrl: 'https://github.com/debugbundle/debugbundle-ruby.git',
         branch: 'main',
       },
+      {
+        path: 'sdks/debugbundle-android',
+        cloneUrl: 'https://github.com/debugbundle/debugbundle-android.git',
+        branch: 'main',
+      },
+      {
+        path: 'sdks/debugbundle-swift',
+        cloneUrl: 'https://github.com/debugbundle/debugbundle-swift.git',
+        branch: 'main',
+      },
+      {
+        path: 'sdks/debugbundle-react-native',
+        cloneUrl: 'https://github.com/debugbundle/debugbundle-react-native.git',
+        branch: 'main',
+      },
+      {
+        path: 'sdks/debugbundle-dotnet',
+        cloneUrl: 'https://github.com/debugbundle/debugbundle-dotnet.git',
+        branch: 'main',
+      },
     ]);
 
     expect(sdkBootstrapScript).toContain('sdks.json');

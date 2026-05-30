@@ -1,7 +1,7 @@
 # SDK Language Targets — DebugBundle
 
 Version: v1
-Last updated: 2026-05-29
+Last updated: 2026-05-30
 
 ---
 
@@ -104,8 +104,9 @@ TypeScript and JavaScript are delivered as one shared npm SDK surface, exactly a
 - `github.com/debugbundle/debugbundle-go` — Go SDK. Detailed implementation plan: `spec/sdks/go-sdk.md`.
 - `debugbundle` (RubyGems) — Ruby SDK. Detailed implementation plan: `spec/sdks/ruby-sdk.md`.
 - `github.com/debugbundle/debugbundle-android` — Kotlin Android SDK now lives in a public standalone repo with the implemented core/runtime module family (`debugbundle-android-core`, `debugbundle-android`, OkHttp/Ktor, Navigation/Compose, Timber, testkit, BOM), offline queueing, crash/ANR replay, native trace propagation, capture-policy enforcement, and remote probe directive/trigger-token support. The initial pre-release package family is published on Maven Central at `0.1.0`; the detailed plan lives in `spec/sdks/kotlin-sdk.md`.
-- `github.com/debugbundle/debugbundle-swift` — Swift iOS SDK now lives in a public standalone repo with the implemented package product family (`DebugBundle`, URLSession, Alamofire, UIKit, SwiftUI, SwiftLog, crash reporter, test support), offline queueing, native trace propagation, capture-policy enforcement, remote probe directive/trigger-token support, CI lanes for host SwiftPM and iOS simulator tests, and the initial Swift Package Manager release tag `v0.1.0`. The detailed plan lives in `spec/sdks/swift-sdk.md`.
-- `github.com/debugbundle/debugbundle-react-native` — React Native SDK plan prepared in `spec/sdks/react-native-sdk.md`, targeting iOS and Android through an npm package, TypeScript API, Turbo Native Module, React Navigation helpers, Expo development-build support, and reuse of the Android/Swift native SDK foundations.
+- `github.com/debugbundle/debugbundle-swift` — Swift iOS SDK now lives in a public standalone repo with the implemented package product family (`DebugBundle`, URLSession, Alamofire, UIKit, SwiftUI, SwiftLog, crash reporter, test support), offline queueing, native trace propagation, capture-policy enforcement, remote probe directive/trigger-token support, CI lanes for host SwiftPM and iOS simulator tests, the initial Swift Package Manager release tag `v0.1.0`, and CocoaPods publishing setup for the native `DebugBundle` pod. The detailed plan lives in `spec/sdks/swift-sdk.md`.
+- `github.com/debugbundle/debugbundle-react-native` — React Native SDK is locally release-gated in `sdks/debugbundle-react-native` with TypeScript facade, safe degraded native-module behavior, target-scoped fetch/XHR trace instrumentation, React Navigation helpers, React error boundary support, Expo config plugin, Android/iOS wrapper glue that delegates to the Android/Swift native SDK foundations, packed clean-install smoke, Android Docker clean RN app smoke, and iOS CocoaPods/Xcode clean RN app smoke. Public npm publication still depends on completing the native Swift `DebugBundle` CocoaPods trunk publish.
+- `github.com/debugbundle/debugbundle-dotnet` — C#/.NET SDK is published on NuGet at `0.1.1` with the planned package family (`DebugBundle.Sdk`, ASP.NET Core, Microsoft.Extensions.Logging, Serilog, NLog, log4net, gRPC, Worker, Hangfire, and Azure Functions isolated worker), remote config/capture policy/probes, secure local transports, browser relay parity, CI, staged package artifacts, trusted publishing, and published-package clean-install smoke across .NET 8 and .NET 10 consumer lanes. The detailed plan lives in `spec/sdks/csharp-sdk.md`.
 
 ---
 
@@ -758,7 +759,7 @@ The SDK should support:
 ### First implementation targets
 
 1. **Kotlin / Android** — `com.debugbundle:debugbundle-android` on Maven Central
-2. **Swift / iOS** — `DebugBundle` via Swift Package Manager
+2. **Swift / iOS** — `DebugBundle` via Swift Package Manager and CocoaPods
 
 ### Second implementation targets
 
@@ -820,8 +821,8 @@ For the next phase of SDK implementation, DebugBundle should prioritize these tw
 
 - **Immediate implementation focus (Wave 1):** TS/JS, Python, PHP, WordPress plugin, Java core + Spring Boot + servlet/JAX-RS app-server support, Ruby, Go
 - **Pre-release expansion:** Ruby and Go publication handoff
-- **Next depth layer (Wave 2):** C#, Kotlin server, Rust
-- **Strategic product expansion (Wave 3):** Kotlin Android and Swift iOS SDKs are implemented, with Swift published as `v0.1.0`; React Native and Dart/Flutter remain future plans.
+- **Next depth layer (Wave 2):** C#/.NET is published at `0.1.1`; Kotlin server and Rust remain future Wave 2 work.
+- **Strategic product expansion (Wave 3):** Kotlin Android and Swift iOS SDKs are implemented, with Swift published as `v0.1.0` through Swift Package Manager and CocoaPods publishing setup prepared; React Native is locally release-gated pending native Swift pod trunk publication for public npm publication; Dart/Flutter remains a future plan.
 
 ### V1 framework scope per SDK
 

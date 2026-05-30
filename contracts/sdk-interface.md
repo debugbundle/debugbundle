@@ -1,7 +1,7 @@
 # SDK Interface Contract — DebugBundle
 
 Version: v1
-Last updated: 2026-05-28
+Last updated: 2026-05-30
 
 This contract defines the standard interface that ALL DebugBundle SDKs must implement, regardless of language. It ensures behavioral consistency across Node.js, browser, Python, PHP, Go, Ruby, and all future language SDKs.
 
@@ -585,7 +585,7 @@ Framework integrations must auto-register log capture alongside error/request ca
 
 | Language | Package | Registry | Status |
 |----------|---------|----------|--------|
-| C# | `DebugBundle.Sdk` | NuGet | Planned |
+| C# | `DebugBundle.Sdk` plus `DebugBundle.*` integrations | NuGet | Released v0.1.1 |
 | Kotlin (server) | `com.debugbundle:debugbundle-kotlin` | Maven Central | Planned |
 | Rust | `debugbundle` | crates.io | Planned |
 
@@ -594,8 +594,8 @@ Framework integrations must auto-register log capture alongside error/request ca
 | Language | Package | Registry | Status |
 |----------|---------|----------|--------|
 | Kotlin (Android) | `com.debugbundle:debugbundle-android` | Maven Central | Pre-release |
-| Swift (iOS) | `DebugBundle` | Swift Package Manager | Released v0.1.0 |
-| React Native | `@debugbundle/sdk-react-native` | npm | Planned |
+| Swift (iOS) | `DebugBundle` | Swift Package Manager and CocoaPods | Released v0.1.0; CocoaPods publish setup prepared |
+| React Native | `@debugbundle/sdk-react-native` | npm | Local release candidate |
 | Dart / Flutter | `debugbundle` | pub.dev | Planned |
 
 ### V1 Framework Support Matrix
@@ -619,7 +619,11 @@ Framework integrations must auto-register log capture alongside error/request ca
 | Ruby | Ruby on Rails | Middleware + Railtie |
 | Ruby | Rack | Middleware |
 | Ruby | Sidekiq | Server middleware |
-| C# | ASP.NET Core | Middleware |
+| C# | ASP.NET Core | Middleware + browser relay endpoint |
+| C# | ASP.NET Core gRPC | Server interceptor |
+| C# | .NET Generic Host / Worker Service | Hosted-service helpers |
+| C# | Hangfire | Server filter |
+| C# | Azure Functions isolated worker | Worker middleware |
 | Kotlin (server) | Ktor | Plugin |
 | Kotlin (Android) | Android | Application lifecycle hooks |
 | Swift (iOS) | UIKit / SwiftUI | App lifecycle hooks |
@@ -1110,7 +1114,7 @@ Future server SDKs must implement the same full relay handler contract before th
 |-----|---------------|
 | Go | `net/http` handler |
 | Ruby | Rack middleware, Rails engine |
-| C# | ASP.NET Core middleware |
+| C# | ASP.NET Core endpoint mapping and middleware |
 | Kotlin (server) | Ktor plugin |
 
 All server SDKs must implement sections 1–8, section 11, section 12, and section 13 of this contract before release.

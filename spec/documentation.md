@@ -61,8 +61,9 @@ The complete docs page tree for `/docs`. Every entry below is a page that must e
 | 5 | `/docs/sdks/php` | PHP SDK | Guide | Full guide: install, init, vanilla hooks (set_error_handler, set_exception_handler, register_shutdown_function), framework integrations (Laravel middleware, Symfony event subscriber), Monolog handler, config options. |
 | 6 | `/docs/sdks/android` | Android SDK | Guide | Full guide: install, init, crash/ANR replay, lifecycle and navigation breadcrumbs, OkHttp/Ktor, offline queueing, WorkManager flushing, Timber, capture policy, probes, and privacy defaults. |
 | 7 | `/docs/sdks/swift` | Swift SDK | Guide | Full guide: install through Swift Package Manager, SwiftUI and UIKit init, URLSession/Alamofire, offline queueing, SwiftLog, crash replay, capture policy, probes, and privacy defaults. |
-| 8 | `/docs/sdks/universal-interface` | Universal SDK Interface | Reference | The complete interface contract: every method, every config field, every behavior guarantee. Language comparison table. Volume control (suppression, loop protection, backoff). |
-| 9 | `/docs/sdks/browser-relay` | Browser Relay Setup | Guide | How browser events reach DebugBundle: relay handler architecture, Express/Fastify/Next.js relay setup, origin validation, credential isolation, static-only fallback for no-backend apps. |
+| 8 | `/docs/sdks/dotnet` | .NET SDK | Guide | Full guide: install through NuGet, ASP.NET Core, Minimal APIs/MVC/Razor Pages, Blazor Server caveats, Microsoft.Extensions.Logging, Serilog, NLog, log4net, gRPC, Worker Service, Hangfire, Azure Functions isolated worker, browser relay, runtime support, probes, and privacy defaults. |
+| 9 | `/docs/sdks/universal-interface` | Universal SDK Interface | Reference | The complete interface contract: every method, every config field, every behavior guarantee. Language comparison table. Volume control (suppression, loop protection, backoff). |
+| 10 | `/docs/sdks/browser-relay` | Browser Relay Setup | Guide | How browser events reach DebugBundle: relay handler architecture, Express/Fastify/Next.js/ASP.NET Core relay setup, origin validation, credential isolation, static-only fallback for no-backend apps. |
 
 ### 1.3 CLI
 

@@ -1,7 +1,9 @@
 # C#/.NET SDK Implementation Plan
 
 Version: v1
-Last updated: 2026-05-29
+Last updated: 2026-05-30
+
+Implementation status: `github.com/debugbundle/debugbundle-dotnet` is public, tagged `v0.1.1`, and published to NuGet as the V1 `DebugBundle.*` package family. The release gate passes restore, build, test, format, pack, staged-package clean-install smoke, NuGet trusted publishing, package publish, and published-package clean-install smoke across .NET 8 and .NET 10 consumer lanes. The `v0.1.1` patch also pins the Hangfire integration's transitive `Newtonsoft.Json` floor to a non-vulnerable version so warning-as-error .NET 10 consumers restore cleanly.
 
 ---
 
@@ -756,31 +758,31 @@ Quality gates:
 
 ## Release Readiness Checklist
 
-- [ ] Universal C# API implemented.
-- [ ] Instance client and static facade implemented.
-- [ ] ASP.NET Core middleware captures requests, exceptions, trace IDs, request IDs, endpoint metadata, status, duration, and probe buffers.
-- [ ] Minimal APIs, MVC/Web API, and Razor Pages are covered by tests.
-- [ ] ASP.NET Core relay handler covers the shared relay contract: origin validation, CORS preflight, POST CORS headers, content type, body size, schema, credential stripping, local-only writes, durable spool, connected forwarding, and rate limiting.
-- [ ] `Microsoft.Extensions.Logging`, Serilog, NLog, and log4net integrations capture structured logs without recursion.
-- [ ] gRPC interceptor captures service/method/status/exception metadata without message bodies.
-- [ ] Worker Service and Hangfire integrations capture background failures and preserve retry/failure behavior.
-- [ ] Azure Functions isolated worker middleware captures invocation context and preserves host behavior.
-- [ ] Local-only and connected transports are implemented.
-- [ ] Secure local file writes enforce owner-only permissions/ACLs, path validation, symlink/reparse-point protection, and unpredictable temp names.
-- [ ] Duplicate suppression and loop protection match the universal contract.
-- [ ] Capture policy is fetched, cached, polled, and enforced locally with ingestion as a backstop.
-- [ ] Always-on probes, remote probes, heavy probes, and trigger tokens are implemented.
-- [ ] SDK failures never throw into host application code.
-- [ ] Request and response bodies are off by default.
-- [ ] Header capture is allowlist-based by default.
-- [ ] Existing request IDs and `Activity` trace context are preserved.
-- [ ] `X-DebugBundle-Trace-Id` links browser and backend events.
-- [ ] NuGet packages build with SourceLink, symbols, README, license metadata, and deterministic build settings.
-- [ ] Release docs cover config precedence, support labels, install modes, service naming, safe startup semantics, and first-event verification.
-- [ ] Public docs include install, ASP.NET Core, Minimal APIs, MVC, Razor Pages, gRPC, Worker Service, Hangfire, Azure Functions, browser relay, local-only, connected, logging, probes, and privacy examples.
-- [ ] CI passes all supported .NET, ASP.NET Core, framework, logging, OS, and hardening lanes.
-- [ ] Clean-install smoke passes for ASP.NET Core and Worker Service fixtures.
-- [ ] Published-package smoke passes against the target NuGet feed.
+- [x] Universal C# API implemented.
+- [x] Instance client and static facade implemented.
+- [x] ASP.NET Core middleware captures requests, exceptions, trace IDs, request IDs, endpoint metadata, status, duration, and probe buffers.
+- [x] Minimal APIs, MVC/Web API, and Razor Pages share the endpoint-routing middleware path; focused tests cover the shared route metadata behavior.
+- [x] ASP.NET Core relay handler covers the shared relay contract: origin validation, CORS preflight, POST CORS headers, content type, body size, schema, credential stripping, local-only writes, durable spool, connected forwarding, and rate limiting.
+- [x] `Microsoft.Extensions.Logging`, Serilog, NLog, and log4net integrations capture structured logs without recursion.
+- [x] gRPC interceptor captures service/method/status/exception metadata without message bodies.
+- [x] Worker Service and Hangfire integrations capture background failures and preserve retry/failure behavior.
+- [x] Azure Functions isolated worker middleware captures invocation context and preserves host behavior.
+- [x] Local-only and connected transports are implemented.
+- [x] Secure local file writes enforce owner-only permissions where supported, path validation, symlink/reparse-point protection, and unpredictable temp names.
+- [x] Duplicate suppression and loop protection match the universal contract.
+- [x] Capture policy is fetched, cached, polled, and enforced locally with ingestion as a backstop.
+- [x] Always-on probes, remote probes, heavy probes, and trigger tokens are implemented.
+- [x] SDK failures never throw into host application code.
+- [x] Request and response bodies are off by default.
+- [x] Header capture is allowlist-based by default.
+- [x] Existing request IDs and `Activity` trace context are preserved.
+- [x] `X-DebugBundle-Trace-Id` links browser and backend events.
+- [x] NuGet packages build with SourceLink, symbols, README, license metadata, and deterministic build settings.
+- [x] Release docs cover config precedence, support labels, install modes, service naming, safe startup semantics, and first-event verification.
+- [x] Public docs include install, ASP.NET Core, Minimal APIs, MVC/Razor shared middleware guidance, gRPC, Worker Service, Hangfire, Azure Functions, browser relay, local-only, connected, logging, probes, runtime support, and privacy examples.
+- [x] CI is configured for .NET 8/.NET 10 SDK lanes, Linux/Windows, test, format, pack, and staged clean-install smoke.
+- [x] Clean-install smoke passes against staged packages.
+- [x] Published-package smoke passes against the target NuGet feed.
 
 ---
 

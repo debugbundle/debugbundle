@@ -34,8 +34,8 @@ DebugBundle supports two runtime modes: **local-only** (no cloud account require
 │    github.com/debugbundle/debugbundle-android (local repo with  │
 │    core/runtime, OkHttp/Ktor, Navigation, Compose, Timber,      │
 │    offline queueing, crash/ANR replay, and remote probes)       │
-│  Wave 2 (post-launch; C# plan prepared): C#, Kotlin server,    │
-│    Rust                                                        │
+│  Wave 2 (post-launch; C# published): C#, Kotlin                │
+│    server, Rust                                                │
 │  Wave 3 (post-launch; mobile expansion in progress):           │
 │    Swift iOS now has a local standalone repo with core         │
 │    capture, bundle/runtime config resolution, offline          │
@@ -43,8 +43,12 @@ DebugBundle supports two runtime modes: **local-only** (no cloud account require
 │    URLSession instrumentation (wrapper +                       │
 │    URLProtocol/configuration paths), SwiftLog integration,     │
 │    capture-policy enforcement, remote probes, Objective-C      │
-│    exception bridging, and bounded next-launch crash replay;   │
-│    React Native now has a detailed iOS/Android plan;           │
+│    exception bridging, bounded next-launch crash replay, and   │
+│    CocoaPods publishing setup;                                │
+│    React Native now has a local release-candidate SDK with     │
+│    TypeScript facade, network/navigation/React helpers, Expo   │
+│    plugin, Android + iOS native wrapper glue, and clean RN     │
+│    app smoke coverage;                                        │
 │    Dart/Flutter follows later                                  │
 │  See spec/sdk-language-targets.md for full rollout plan         │
 │  Universal interface: init, captureException, captureError,     │
@@ -222,7 +226,7 @@ packages/
   — debugbundle-ruby   → github.com/debugbundle/debugbundle-ruby (Ruby SDK: Rails + Rack + Sidekiq; release-ready local standalone repo)
   — debugbundle-go     → github.com/debugbundle/debugbundle-go (Go SDK: pre-release local standalone repo with core, secure transports, relay, net/http, Gin, Echo, slog, zap, zerolog, remote config, probes, examples, CI, and release workflow)
   — site               → github.com/debugbundle/site (public docs/blog/marketing site)
-  — Wave 2/3 SDKs (C#, Kotlin, Swift, Rust, Dart, React Native) → separate repos per spec/sdk-language-targets.md; `sdks/debugbundle-android/` is now the local standalone Kotlin Android repo with implemented core/runtime modules (`debugbundle-android-core`, `debugbundle-android`, `debugbundle-android-okhttp`, `debugbundle-android-ktor-client`, `debugbundle-android-navigation`, `debugbundle-android-compose`, `debugbundle-android-timber`, `debugbundle-android-testkit`, `debugbundle-android-bom`), while `sdks/debugbundle-swift/` now ships the standalone Swift package with bundle/runtime config resolution, configurable queue file protection, connectivity-aware deferred delivery, automatic batch/interval/background flushing, bounded UIKit background-flush execution windows, capped per-send batch sizing, bounded retry windows, bounded remote-config refresh, internal diagnostics for terminal `4xx` queue drops, explicit async operation and task capture helpers, core capture, durable queueing, explicit URLSession instrumentation, optional Alamofire request capture, URLProtocol/configuration-based request capture, UIKit app/scene/view-controller/navigation helpers, SwiftUI scene/navigation/action helpers, SwiftLog integration, capture-policy enforcement, remote-probe activation, Objective-C exception bridging, next-launch crash replay helpers, and queue/mock-ingestion/fixture test support; detailed plans currently live in spec/sdks/csharp-sdk.md, spec/sdks/kotlin-sdk.md (Kotlin Android), spec/sdks/swift-sdk.md (Swift iOS), and spec/sdks/react-native-sdk.md (React Native iOS/Android)
+  — Wave 2/3 SDKs (C#, Kotlin, Swift, Rust, Dart, React Native) → separate repos per spec/sdk-language-targets.md; `sdks/debugbundle-dotnet/` is the local C#/.NET SDK repo published on NuGet at `0.1.1` with the NuGet package family implemented and release-gated (`DebugBundle.Sdk`, ASP.NET Core middleware/browser relay/Blazor Server, Microsoft.Extensions.Logging, Serilog, NLog, log4net, gRPC, Worker, Hangfire, and Azure Functions isolated worker) across .NET 8 and .NET 10 consumer lanes, `sdks/debugbundle-android/` is now the local standalone Kotlin Android repo with implemented core/runtime modules (`debugbundle-android-core`, `debugbundle-android`, `debugbundle-android-okhttp`, `debugbundle-android-ktor-client`, `debugbundle-android-navigation`, `debugbundle-android-compose`, `debugbundle-android-timber`, `debugbundle-android-testkit`, `debugbundle-android-bom`), `sdks/debugbundle-swift/` now ships the standalone Swift package with bundle/runtime config resolution, configurable queue file protection, connectivity-aware deferred delivery, automatic batch/interval/background flushing, bounded UIKit background-flush execution windows, capped per-send batch sizing, bounded retry windows, bounded remote-config refresh, internal diagnostics for terminal `4xx` queue drops, explicit async operation and task capture helpers, core capture, durable queueing, explicit URLSession instrumentation, optional Alamofire request capture, URLProtocol/configuration-based request capture, UIKit app/scene/view-controller/navigation helpers, SwiftUI scene/navigation/action helpers, SwiftLog integration, capture-policy enforcement, remote-probe activation, Objective-C exception bridging, next-launch crash replay helpers, queue/mock-ingestion/fixture test support, and CocoaPods publishing setup, and `sdks/debugbundle-react-native/` is the local React Native release-candidate SDK with TypeScript facade, safe degraded native-module behavior, target-scoped fetch/XHR trace instrumentation, React Navigation breadcrumbs, React error boundary support, Expo config plugin, Android/iOS wrapper glue that delegates to the native SDK foundations, packed clean-install smoke, Android Docker clean RN app smoke, and iOS CocoaPods/Xcode clean RN app smoke; detailed plans currently live in spec/sdks/csharp-sdk.md, spec/sdks/kotlin-sdk.md (Kotlin Android), spec/sdks/swift-sdk.md (Swift iOS), and spec/sdks/react-native-sdk.md (React Native iOS/Android)
 
 sdks/                    — Local standalone SDK clone roots managed by `sdks.json` and `scripts/bootstrap-sdks.sh`
   debugbundle-js/        — github.com/debugbundle/debugbundle-js (public standalone repo; cloned on demand for single-workspace development)
@@ -233,6 +237,8 @@ sdks/                    — Local standalone SDK clone roots managed by `sdks.j
   debugbundle-go/        — github.com/debugbundle/debugbundle-go (local standalone repo; net/http, Gin, Echo, logging integrations, relay, probes, and Go release prep)
   debugbundle-ruby/      — github.com/debugbundle/debugbundle-ruby (local standalone repo; Rails, Rack, Sidekiq, Logger, relay, probes, and RubyGems release prep)
   debugbundle-android/   — github.com/debugbundle/debugbundle-android (local standalone repo; Android runtime/module slice implemented and green under Docker-backed `make test`)
+  debugbundle-swift/     — github.com/debugbundle/debugbundle-swift (local standalone repo; Swift iOS SDK foundation, SwiftPM package products, and CocoaPods podspec publishing)
+  debugbundle-react-native/ — github.com/debugbundle/debugbundle-react-native (local release-candidate SDK; RN TypeScript facade plus Android/iOS native wrapper glue and clean RN app smoke lanes)
   (older local checkouts may still carry pre-cutover `sdks/` directories on disk until they are manually removed and re-bootstrapped)
 
 .local-repos/            — Ignored companion clones for less-frequent non-core repos when working from the core root

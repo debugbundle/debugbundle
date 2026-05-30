@@ -221,6 +221,7 @@ function buildLlmsTxt(): string {
       `- Python SDK: ${toAbsoluteUrl('/docs/sdks/python/')}`,
       `- PHP SDK: ${toAbsoluteUrl('/docs/sdks/php/')}`,
       `- Java SDK: ${toAbsoluteUrl('/docs/sdks/java/')}`,
+      `- .NET SDK: ${toAbsoluteUrl('/docs/sdks/dotnet/')}`,
       `- Go SDK: ${toAbsoluteUrl('/docs/sdks/go/')}`,
       `- Ruby SDK: ${toAbsoluteUrl('/docs/sdks/ruby/')}`,
       `- Android SDK: ${toAbsoluteUrl('/docs/sdks/android/')}`,
