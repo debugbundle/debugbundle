@@ -283,6 +283,7 @@ export function buildSubscriptionItemsForQuantity(input: {
 
 export function buildSchedulePhasesForReduction(input: {
   subscription: Stripe.Subscription;
+  schedule: Stripe.SubscriptionSchedule | null;
   stripeConfig: StripeConfig;
   summary: BillingSummaryRecord;
   targetAdditionalPurchased: number;
@@ -332,15 +333,24 @@ export function buildSchedulePhasesForReduction(input: {
     return items;
   };
 
+  const currentPhaseStartDate =
+    input.schedule?.current_phase?.start_date ??
+    input.subscription.current_period_start ??
+    Math.floor(new Date(input.summary.usage_window.starts_at).getTime() / 1000);
+  const currentPhaseEndDate =
+    input.schedule?.current_phase?.end_date ??
+    input.subscription.current_period_end ??
+    Math.floor(new Date(input.summary.usage_window.ends_at).getTime() / 1000);
+
   return [
     {
-      start_date: Math.floor(new Date(input.summary.usage_window.starts_at).getTime() / 1000),
-      end_date: Math.floor(new Date(input.summary.usage_window.ends_at).getTime() / 1000),
+      start_date: currentPhaseStartDate,
+      end_date: currentPhaseEndDate,
       items: buildPhaseItems(input.summary.capacity_units.additional_purchased),
       proration_behavior: "none"
     },
     {
-      start_date: Math.floor(new Date(input.summary.usage_window.ends_at).getTime() / 1000),
+      start_date: currentPhaseEndDate,
       duration: baseInterval,
       items: buildPhaseItems(input.targetAdditionalPurchased),
       proration_behavior: "none"

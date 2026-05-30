@@ -87,6 +87,7 @@ describe("email package", () => {
     expect(rendered.text).toContain("Project: Checkout <API>");
     expect(rendered.text).toContain("Top spiking incidents:\nNone");
     expect(rendered.html).toContain("Checkout &lt;API&gt;");
+    expect(rendered.html).toContain(">Project<");
     expect(rendered.html).toContain("DebugBundle weekly report");
     expect(rendered.html).toContain("March 9, 2026 to March 16, 2026");
     expect(rendered.html).toContain(">None</p>");
@@ -119,6 +120,7 @@ describe("email package", () => {
     const rendered = renderAlertEmail({
       conditionType: "new_incident",
       incidentId: "inc_<123>",
+      projectName: "Checkout <API>",
       occurredAt: "2026-05-13T08:33:56.774Z",
       serviceName: "checkout-<api>",
       environment: "production",
@@ -128,9 +130,12 @@ describe("email package", () => {
     });
 
     expect(rendered.subject).toBe("[DebugBundle Alert] A new incident was detected");
+    expect(rendered.text).toContain("Project: Checkout <API>");
     expect(rendered.text).toContain("Service: checkout-<api>");
     expect(rendered.text).toContain("Detected at: May 13, 2026, 8:33 AM UTC");
     expect(rendered.text).toContain("Open incident: https://app.debugbundle.com/incidents/inc_<123>");
+    expect(rendered.html).toContain(">Project<");
+    expect(rendered.html).toContain("Checkout &lt;API&gt;");
     expect(rendered.html).toContain("checkout-&lt;api&gt;");
     expect(rendered.html).toContain("May 13, 2026, 8:33 AM UTC");
     expect(rendered.html).toContain("&lt;123&gt;");
@@ -143,6 +148,7 @@ describe("email package", () => {
         {
           conditionType: "new_incident",
           incidentId: "inc_1",
+          projectName: "Checkout <API>",
           occurredAt: "2026-05-17T10:00:00.000Z",
           serviceName: "checkout-<api>",
           environment: "production",
@@ -154,6 +160,7 @@ describe("email package", () => {
         {
           conditionType: "severity_threshold",
           incidentId: "inc_1",
+          projectName: "Checkout <API>",
           occurredAt: "2026-05-17T10:00:01.000Z",
           serviceName: "checkout-<api>",
           environment: "production",
@@ -166,9 +173,12 @@ describe("email package", () => {
     });
 
     expect(rendered.subject).toBe("[DebugBundle Alerts] 1 incident matched your alerts");
+    expect(rendered.text).toContain("Project: Checkout <API>");
     expect(rendered.text).toContain("Alerts: New incident, Severity threshold reached");
     expect(rendered.text).toContain("Detected at: May 17, 2026, 10:00 AM UTC");
     expect(rendered.html).toContain("Checkout crash");
+    expect(rendered.html).toContain(">Project<");
+    expect(rendered.html).toContain("Checkout &lt;API&gt;");
     expect(rendered.html).toContain("checkout-&lt;api&gt;");
     expect(rendered.html).toContain("May 17, 2026, 10:00 AM UTC");
     expect(rendered.html.match(/background-color:#fafaf9;/g)?.length ?? 0).toBe(2);

@@ -60,6 +60,7 @@ describe("buildSchedulePhasesForReduction", () => {
           data: [buildSubscriptionItem("price_solo", 1), buildSubscriptionItem("price_solo_capacity_legacy", 2)]
         }
       } as Stripe.Subscription,
+      schedule: null,
       stripeConfig: {
         priceMap: buildPriceMap(),
         soloExtraCapacityPriceId: "price_solo_capacity_current",
@@ -87,6 +88,7 @@ describe("buildSchedulePhasesForReduction", () => {
           data: [buildSubscriptionItem("price_solo", 1), buildSubscriptionItem("price_solo_capacity_legacy", 2)]
         }
       } as Stripe.Subscription,
+      schedule: null,
       stripeConfig: {
         priceMap: buildPriceMap(),
         soloExtraCapacityPriceId: "price_solo_capacity_current",
@@ -102,5 +104,35 @@ describe("buildSchedulePhasesForReduction", () => {
       { price: "price_solo_capacity_legacy", quantity: 2 }
     ]);
     expect(phases[1]?.items).toEqual([{ price: "price_solo", quantity: 1 }]);
+  });
+
+  it("prefers the live Stripe phase window over the projected billing summary window", () => {
+    const phases = buildSchedulePhasesForReduction({
+      subscription: {
+        current_period_start: 1_711_184_800,
+        current_period_end: 1_713_863_200,
+        items: {
+          data: [buildSubscriptionItem("price_solo", 1), buildSubscriptionItem("price_solo_capacity_current", 2)]
+        }
+      } as Stripe.Subscription,
+      schedule: {
+        current_phase: {
+          start_date: 1_711_184_800,
+          end_date: 1_713_863_200
+        }
+      } as Stripe.SubscriptionSchedule,
+      stripeConfig: {
+        priceMap: buildPriceMap(),
+        soloExtraCapacityPriceId: "price_solo_capacity_current",
+        teamExtraCapacityPriceId: "price_team_capacity_current"
+      } as never,
+      summary: buildSummary(2),
+      targetAdditionalPurchased: 0,
+      plan: "solo"
+    });
+
+    expect(phases[0]?.start_date).toBe(1_711_184_800);
+    expect(phases[0]?.end_date).toBe(1_713_863_200);
+    expect(phases[1]?.start_date).toBe(1_713_863_200);
   });
 });

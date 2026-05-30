@@ -7,7 +7,7 @@ import {
   processNextEvaluateAlertsJob,
   processNextGroupIncidentJob
 } from "../../../apps/worker/src/processor.js";
-import { createAlertTransport } from "../../../apps/worker/src/runtime.js";
+import { createAlertEmailDigestTransport, createAlertTransport } from "../../../apps/worker/src/runtime.js";
 
 const SlackAlertBodySchema = z
   .object({
@@ -480,6 +480,7 @@ describe("alert delivery transport – multi-channel", () => {
     await createAlertTransport({
       timeoutMs: 5000,
       emailTransport: { send: sendMock },
+      resolveProjectName: vi.fn().mockResolvedValue("Checkout API"),
       appBaseUrl: "https://app.debugbundle.com",
       apiBaseUrl: "https://api.debugbundle.com"
     }).deliver({
@@ -502,6 +503,7 @@ describe("alert delivery transport – multi-channel", () => {
     const emailDelivery = sendMock.mock.calls[0]?.[0];
     expect(emailDelivery?.to).toEqual(["team@example.com"]);
     expect(emailDelivery?.subject).toBe("[DebugBundle Alert] A new incident was detected");
+    expect(emailDelivery?.text).toContain("Project: Checkout API");
     expect(emailDelivery?.text).toContain("Service: checkout-api");
     expect(emailDelivery?.text).toContain("Open incident: https://app.debugbundle.com/incidents/inc_1");
     expect(emailDelivery?.html).toContain("View bundle JSON");
@@ -548,6 +550,7 @@ describe("alert delivery transport – multi-channel", () => {
     await createAlertTransport({
       timeoutMs: 5000,
       emailTransport: null,
+      resolveProjectName: vi.fn().mockResolvedValue("Checkout API"),
       appBaseUrl: "https://app.debugbundle.com",
       apiBaseUrl: "https://api.debugbundle.com"
     }).deliver({
@@ -582,10 +585,46 @@ describe("alert delivery transport – multi-channel", () => {
 
     const body = SlackAlertBodySchema.parse(getJsonRequestBody(fetchSpy));
     expect(body.text).toContain("A new incident was detected");
+    expect(body.text).toContain("Project: Checkout API");
     expect(body.text).toContain("Open incident: https://app.debugbundle.com/incidents/inc_1");
     expect(body.text).not.toContain("Alert triggered");
     expect(body.text).not.toContain("new_incident");
     expect(body.blocks[0]?.type).toBe("section");
+  });
+
+  it("adds the project name to alert digest emails", async (): Promise<void> => {
+    const send = vi.fn().mockResolvedValue(undefined);
+
+    await createAlertEmailDigestTransport({
+      emailTransport: { send },
+      resolveProjectName: vi.fn().mockResolvedValue("Checkout API"),
+      appBaseUrl: "https://app.debugbundle.com",
+      apiBaseUrl: "https://api.debugbundle.com"
+    }).deliver({
+      digest_id: "dig_123",
+      project_id: "proj_123",
+      recipient: "alerts@example.com",
+      items: [
+        {
+          incident_id: "inc_123",
+          condition_type: "new_incident",
+          payload: {
+            condition_type: "new_incident",
+            incident_id: "inc_123",
+            occurred_at: "2026-05-17T10:00:00.000Z",
+            service_name: "checkout-api",
+            environment: "production",
+            severity: "high",
+            summary: "Checkout crash"
+          }
+        }
+      ]
+    });
+
+    const email = send.mock.calls[0]?.[0];
+    expect(email?.to).toEqual(["alerts@example.com"]);
+    expect(email?.text).toContain("Project: Checkout API");
+    expect(email?.html).toContain("Checkout API");
   });
 
   it("should resolve connected slack destinations before delivery", async (): Promise<void> => {
@@ -633,7 +672,8 @@ describe("alert delivery transport – multi-channel", () => {
 
     await createAlertTransport({
       timeoutMs: 5000,
-      emailTransport: null
+      emailTransport: null,
+      resolveProjectName: vi.fn().mockResolvedValue("Checkout API")
     }).deliver({
       delivery_id: "adel_5",
       alert_id: "alert_5",
@@ -658,7 +698,11 @@ describe("alert delivery transport – multi-channel", () => {
 
     const body = DiscordAlertBodySchema.parse(getJsonRequestBody(fetchSpy));
     expect(body.content).toContain("severity_threshold");
+    expect(body.content).toContain("Project: Checkout API");
     expect(body.embeds[0]?.title).toBe("severity_threshold");
+    expect(body.embeds[0]?.["fields"]).toEqual(
+      expect.arrayContaining([expect.objectContaining({ name: "Project", value: "Checkout API" })])
+    );
   });
 
   it("should deliver webhook alerts via POST to target_url with raw payload", async (): Promise<void> => {
@@ -667,7 +711,8 @@ describe("alert delivery transport – multi-channel", () => {
 
     await createAlertTransport({
       timeoutMs: 5000,
-      emailTransport: null
+      emailTransport: null,
+      resolveProjectName: vi.fn().mockResolvedValue("Checkout API")
     }).deliver({
       delivery_id: "adel_6",
       alert_id: "alert_6",
@@ -684,7 +729,8 @@ describe("alert delivery transport – multi-channel", () => {
         method: "POST",
         body: JSON.stringify({
           event_type: "new_incident",
-          incident_id: "inc_1"
+          incident_id: "inc_1",
+          project_name: "Checkout API"
         })
       })
     );

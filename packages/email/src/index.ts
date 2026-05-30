@@ -114,6 +114,7 @@ export interface LegacyWeeklyReportEmailInput {
 export interface AlertEmailInput {
   conditionType: string;
   incidentId: string;
+  projectName?: string | null;
   occurredAt: string;
   serviceName: string;
   environment: string;
@@ -390,6 +391,7 @@ export function renderWeeklyReportEmail(input: WeeklyReportEmailInput | LegacyWe
           renderEmailSubheading(project.projectName),
           renderEmailParagraph(escapeHtml(formatIncidentOutcome(project))),
           renderEmailKeyValueList([
+            { label: "Project", valueHtml: escapeHtml(project.projectName) },
             { label: "Failure bundles", valueHtml: project.bundleCounts.failure.toString() },
             { label: "Improvement bundles", valueHtml: project.bundleCounts.improvement.toString() },
             { label: "New incidents", valueHtml: project.newIncidents.toString() },
@@ -430,6 +432,7 @@ export function renderAlertSlackMessage(input: AlertEmailInput): { text: string;
   const text = [
     `[DebugBundle Alert] ${headline}`,
     `Alert: ${conditionLabel}`,
+    ...(input.projectName === undefined || input.projectName === null ? [] : [`Project: ${input.projectName}`]),
     `Service: ${input.serviceName}`,
     `Environment: ${input.environment}`,
     `Severity: ${severityLabel}`,
@@ -454,6 +457,14 @@ export function renderAlertSlackMessage(input: AlertEmailInput): { text: string;
           type: "mrkdwn",
           text: `*Alert*\n${escapeSlackMrkdwn(conditionLabel)}`
         },
+        ...(input.projectName === undefined || input.projectName === null
+          ? []
+          : [
+              {
+                type: "mrkdwn",
+                text: `*Project*\n${escapeSlackMrkdwn(input.projectName)}`
+              }
+            ]),
         {
           type: "mrkdwn",
           text: `*Severity*\n${escapeSlackMrkdwn(severityLabel)}`
@@ -504,6 +515,7 @@ export function renderAlertEmail(input: AlertEmailInput): { subject: string; tex
     formatAlertIntro(input.conditionType),
     "",
     `Alert: ${conditionLabel}`,
+    ...(input.projectName === undefined || input.projectName === null ? [] : [`Project: ${input.projectName}`]),
     `Service: ${input.serviceName}`,
     `Environment: ${input.environment}`,
     `Severity: ${severityLabel}`,
@@ -519,6 +531,9 @@ export function renderAlertEmail(input: AlertEmailInput): { subject: string; tex
     bodyHtml: [
       renderEmailKeyValueList([
         { label: "Alert", valueHtml: escapeHtml(conditionLabel) },
+        ...(input.projectName === undefined || input.projectName === null
+          ? []
+          : [{ label: "Project", valueHtml: escapeHtml(input.projectName) }]),
         { label: "Service", valueHtml: escapeHtml(input.serviceName) },
         { label: "Environment", valueHtml: escapeHtml(input.environment) },
         { label: "Severity", valueHtml: escapeHtml(severityLabel) },
@@ -584,6 +599,7 @@ export function renderAlertDigestEmail(input: {
     ...alerts.flatMap((alert, index) => [
       `${index + 1}. ${alert.summary ?? "Alert triggered"}`,
       `   Incident ID: ${alert.incidentId}`,
+      ...(alert.projectName === undefined || alert.projectName === null ? [] : [`   Project: ${alert.projectName}`]),
       `   Alerts: ${alert.conditionLabels.join(", ")}`,
       `   Service: ${alert.serviceName}`,
       `   Environment: ${alert.environment}`,
@@ -609,6 +625,9 @@ export function renderAlertDigestEmail(input: {
             `<p style="margin:0 0 14px;color:#1c1917;font-size:16px;line-height:24px;font-weight:600;">${index + 1}. ${escapeHtml(alert.summary ?? "Alert triggered")}</p>`,
             renderEmailKeyValueList([
               { label: "Incident ID", valueHtml: escapeHtml(alert.incidentId) },
+              ...(alert.projectName === undefined || alert.projectName === null
+                ? []
+                : [{ label: "Project", valueHtml: escapeHtml(alert.projectName) }]),
               { label: "Alerts", valueHtml: escapeHtml(alert.conditionLabels.join(", ")) },
               { label: "Service", valueHtml: escapeHtml(alert.serviceName) },
               { label: "Environment", valueHtml: escapeHtml(alert.environment) },

@@ -187,6 +187,20 @@ interface WebhookOwnerNotificationRecipient {
   recipientEmail: string;
 }
 
+async function getProjectName(queryable: Queryable, projectId: string): Promise<string | null> {
+  const result = await queryable.query<{ name: string }>(
+    `
+      SELECT name
+      FROM projects
+      WHERE id = $1::uuid
+      LIMIT 1
+    `,
+    [projectId]
+  );
+
+  return result.rows[0]?.name ?? null;
+}
+
 async function getWebhookOwnerNotificationRecipient(
   queryable: Queryable,
   webhookId: string
@@ -892,6 +906,7 @@ interface CreateAlertTransportInput {
   integrationSecretEncryptionKey?: string;
   appBaseUrl?: string | null;
   apiBaseUrl?: string | null;
+  resolveProjectName?: (projectId: string) => Promise<string | null>;
 }
 
 function buildAlertNotificationInput(
@@ -899,6 +914,7 @@ function buildAlertNotificationInput(
   event: {
     incident_id?: string | null;
     payload: Record<string, unknown>;
+    project_name?: string | null;
   }
 ): AlertEmailInput {
   const incidentId =
@@ -911,6 +927,11 @@ function buildAlertNotificationInput(
   return {
     conditionType: typeof event.payload["condition_type"] === "string" ? event.payload["condition_type"] : "alert",
     incidentId,
+    ...(typeof event.payload["project_name"] === "string"
+      ? { projectName: event.payload["project_name"] }
+      : event.project_name === undefined || event.project_name === null
+        ? {}
+        : { projectName: event.project_name }),
     occurredAt: typeof event.payload["occurred_at"] === "string" ? event.payload["occurred_at"] : "unknown",
     serviceName: typeof event.payload["service_name"] === "string" ? event.payload["service_name"] : "unknown",
     environment: typeof event.payload["environment"] === "string" ? event.payload["environment"] : "unknown",
@@ -935,12 +956,14 @@ function buildAlertDigestEntryInput(
   item: {
     incident_id: string;
     payload: Record<string, unknown>;
+    project_name?: string | null;
   }
 ): AlertEmailInput & { summary: string | null } {
   return {
     ...buildAlertNotificationInput(input, {
       incident_id: item.incident_id,
-      payload: item.payload
+      payload: item.payload,
+      ...(item.project_name === undefined ? {} : { project_name: item.project_name })
     }),
     summary: typeof item.payload["summary"] === "string" ? item.payload["summary"] : null
   };
@@ -982,6 +1005,8 @@ export function createAlertTransport(input: CreateAlertTransportInput): AlertDel
 
   return {
     async deliver(event): Promise<void> {
+      const projectName = await input.resolveProjectName?.(event.project_id);
+
       if (event.channel === "email") {
         if (input.emailTransport === null) {
           throw new AlertDeliveryError("alert_email_not_configured");
@@ -993,7 +1018,10 @@ export function createAlertTransport(input: CreateAlertTransportInput): AlertDel
         if (recipient.length === 0) {
           throw new AlertDeliveryError("alert_email_recipients_missing");
         }
-        const rendered = renderAlertEmail(buildAlertNotificationInput(input, event));
+        const rendered = renderAlertEmail(buildAlertNotificationInput(input, {
+          ...event,
+          project_name: projectName ?? null
+        }));
 
         try {
           await input.emailTransport.send({
@@ -1043,7 +1071,10 @@ export function createAlertTransport(input: CreateAlertTransportInput): AlertDel
           throw new AlertDeliveryError("alert_slack_webhook_url_missing");
         }
 
-        const slackPayload = renderAlertSlackMessage(buildAlertNotificationInput(input, event));
+        const slackPayload = renderAlertSlackMessage(buildAlertNotificationInput(input, {
+          ...event,
+          project_name: projectName ?? null
+        }));
 
         await deliverViaWebhook(webhookUrl, slackPayload);
         return;
@@ -1058,11 +1089,25 @@ export function createAlertTransport(input: CreateAlertTransportInput): AlertDel
         const summary = typeof event.payload["summary"] === "string" ? event.payload["summary"] : "Alert triggered";
         const eventType = typeof event.payload["event_type"] === "string" ? event.payload["event_type"] : "alert";
         const discordPayload = {
-          content: `**[DebugBundle]** ${eventType}: ${summary}`,
+          content:
+            projectName === undefined || projectName === null
+              ? `**[DebugBundle]** ${eventType}: ${summary}`
+              : `**[DebugBundle]** ${eventType}: ${summary}\nProject: ${projectName}`,
           embeds: [
             {
               title: eventType,
               description: summary,
+              ...(projectName === undefined || projectName === null
+                ? {}
+                : {
+                    fields: [
+                      {
+                        name: "Project",
+                        value: projectName,
+                        inline: true
+                      }
+                    ]
+                  }),
               color: 0xff4444
             }
           ]
@@ -1078,7 +1123,12 @@ export function createAlertTransport(input: CreateAlertTransportInput): AlertDel
           throw new AlertDeliveryError("alert_target_url_missing");
         }
 
-        await deliverViaWebhook(targetUrlValue, event.payload);
+        await deliverViaWebhook(targetUrlValue, {
+          ...event.payload,
+          ...(typeof event.payload["project_name"] === "string" || projectName === undefined || projectName === null
+            ? {}
+            : { project_name: projectName })
+        });
         return;
       }
 
@@ -1088,7 +1138,7 @@ export function createAlertTransport(input: CreateAlertTransportInput): AlertDel
 }
 
 export function createAlertEmailDigestTransport(
-  input: Pick<CreateAlertTransportInput, "emailTransport" | "appBaseUrl" | "apiBaseUrl">
+  input: Pick<CreateAlertTransportInput, "emailTransport" | "appBaseUrl" | "apiBaseUrl" | "resolveProjectName">
 ): AlertEmailDigestTransport {
   return {
     async deliver(event): Promise<void> {
@@ -1096,8 +1146,13 @@ export function createAlertEmailDigestTransport(
         throw new AlertDeliveryError("alert_email_not_configured");
       }
 
+      const projectName = await input.resolveProjectName?.(event.project_id);
+
       const rendered = renderAlertDigestEmail({
-        alerts: event.items.map((item) => buildAlertDigestEntryInput(input, item))
+        alerts: event.items.map((item) => buildAlertDigestEntryInput(input, {
+          ...item,
+          project_name: projectName ?? null
+        }))
       });
 
       try {
@@ -1709,11 +1764,13 @@ export async function runWorkerFromEnv(envInput: Record<string, string | undefin
     ...(env.INTEGRATION_SECRET_ENCRYPTION_KEY === undefined
       ? {}
       : { integrationSecretEncryptionKey: env.INTEGRATION_SECRET_ENCRYPTION_KEY }),
+    resolveProjectName: (projectId) => getProjectName(queryable, projectId),
     appBaseUrl: normalizeWorkerBaseUrl(envInput["APP_BASE_URL"]),
     apiBaseUrl: normalizeWorkerBaseUrl(envInput["DEBUGBUNDLE_API_URL"] ?? envInput["API_BASE_URL"] ?? envInput["VITE_API_URL"])
   });
   const alertEmailDigestTransport = createAlertEmailDigestTransport({
     emailTransport,
+    resolveProjectName: (projectId) => getProjectName(queryable, projectId),
     appBaseUrl: normalizeWorkerBaseUrl(envInput["APP_BASE_URL"]),
     apiBaseUrl: normalizeWorkerBaseUrl(envInput["DEBUGBUNDLE_API_URL"] ?? envInput["API_BASE_URL"] ?? envInput["VITE_API_URL"])
   });

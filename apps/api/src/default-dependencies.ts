@@ -1418,6 +1418,7 @@ export function createApiDependencies(input: CreateApiDependenciesInput): {
             proration_behavior: "none",
             phases: buildSchedulePhasesForReduction({
               subscription: context.stripeState.subscription,
+              schedule: context.stripeState.schedule,
               stripeConfig: input.stripeConfig!,
               summary: context.summary,
               targetAdditionalPurchased: capacityInput.target_additional_capacity_units,
