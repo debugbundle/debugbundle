@@ -332,7 +332,7 @@ describe("improvement routes", () => {
       url: "/v1/improvements/imp_missing/snooze",
       headers: { authorization: "Bearer dbundle_mem_test_token" },
       payload: {
-        snoozed_until: "2026-05-25T13:00:00.000Z"
+        snoozed_until: "2099-05-25T13:00:00.000Z"
       }
     });
 
@@ -345,7 +345,7 @@ describe("improvement routes", () => {
     expect(snoozeImprovementForOrganization).toHaveBeenCalledWith({
       organization_id: "org_123",
       improvement_id: "imp_missing",
-      snoozed_until: "2026-05-25T13:00:00.000Z"
+      snoozed_until: "2099-05-25T13:00:00.000Z"
     });
   });
 
@@ -403,7 +403,7 @@ describe("improvement routes", () => {
   it("snoozes an improvement", async () => {
     const snoozed = createImprovementRecord({
       status: "snoozed",
-      snoozed_until: "2026-05-25T13:00:00.000Z"
+      snoozed_until: "2099-05-25T13:00:00.000Z"
     });
     const snoozeImprovementForOrganization = vi.fn().mockResolvedValue(snoozed);
     const app = createDependencies({
@@ -421,7 +421,7 @@ describe("improvement routes", () => {
       url: "/v1/improvements/imp_123/snooze",
       headers: { authorization: "Bearer dbundle_mem_test_token" },
       payload: {
-        snoozed_until: "2026-05-25T13:00:00.000Z"
+        snoozed_until: "2099-05-25T13:00:00.000Z"
       }
     });
 
@@ -429,7 +429,7 @@ describe("improvement routes", () => {
     expect(snoozeImprovementForOrganization).toHaveBeenCalledWith({
       organization_id: "org_123",
       improvement_id: "imp_123",
-      snoozed_until: "2026-05-25T13:00:00.000Z"
+      snoozed_until: "2099-05-25T13:00:00.000Z"
     });
     expect(response.json()).toEqual({ improvement: snoozed });
   });
