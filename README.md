@@ -82,9 +82,13 @@ All SDKs follow the same universal interface: `init`, `captureException`, `captu
 | Browser | `@debugbundle/sdk-browser` | `npm install @debugbundle/sdk-browser` | [Browser SDK](https://debugbundle.com/docs/sdks/browser) |
 | Python | `debugbundle-python` | `pip install debugbundle-python` | [Python SDK](https://debugbundle.com/docs/sdks/python) |
 | PHP | `debugbundle/sdk-php` | `composer require debugbundle/sdk-php` | [PHP SDK](https://debugbundle.com/docs/sdks/php) |
-| Ruby | `debugbundle` | `gem install debugbundle` | [Ruby SDK](https://debugbundle.com/docs/sdks/ruby) |
 | Java | `com.debugbundle:debugbundle-spring-boot-starter` | Maven or Gradle dependency | [Java SDK](https://debugbundle.com/docs/sdks/java) |
+| .NET | `DebugBundle.AspNetCore` / `DebugBundle.Sdk` | `dotnet add package DebugBundle.AspNetCore` | [.NET SDK](https://debugbundle.com/docs/sdks/dotnet) |
 | Go | `github.com/debugbundle/debugbundle-go` | `go get github.com/debugbundle/debugbundle-go` | [Go SDK](https://debugbundle.com/docs/sdks/go) |
+| Ruby | `debugbundle` | `gem install debugbundle` | [Ruby SDK](https://debugbundle.com/docs/sdks/ruby) |
+| Android | `com.debugbundle:debugbundle-android` | Maven or Gradle dependency | [Android SDK](https://debugbundle.com/docs/sdks/android) |
+| Swift | `DebugBundle` | Swift Package Manager or CocoaPods | [Swift SDK](https://debugbundle.com/docs/sdks/swift) |
+| React Native | `@debugbundle/sdk-react-native` | `npm install @debugbundle/sdk-react-native` | [React Native SDK](https://debugbundle.com/docs/sdks/react-native) |
 | WordPress | `debugbundle-wordpress` | GitHub Release ZIP | [WordPress plugin](https://debugbundle.com/docs/integrations/wordpress) |
 
 ### Node.js
