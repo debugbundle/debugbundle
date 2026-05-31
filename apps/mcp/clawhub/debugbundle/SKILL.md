@@ -1,7 +1,7 @@
 ---
 name: debugbundle
 description: Use DebugBundle MCP and CLI workflows to investigate incidents, fetch bundles, run verification, and guide fixes.
-version: 0.1.0
+version: 1.0.0
 metadata:
   openclaw:
     requires:
