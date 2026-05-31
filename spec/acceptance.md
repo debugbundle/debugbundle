@@ -835,7 +835,9 @@ If CLI says something is healthy and MCP says something different, that is a pro
 - **Given** a Free-tier user running local analysis
 - **Then** analysis uses only local bundles and the user’s own agent/LLM
 - **And** Solo and Team projects with automated improvements enabled receive deterministic cloud-generated improvement bundles only when bundle-producing telemetry crosses configured thresholds and dedupe gates
+- **And** below-threshold request/log candidates remain internal counting state and do not appear in default hosted improvement lists
 - **And** incident-derived improvement opportunities link to related incident bundles instead of creating duplicate improvement bundle artifacts
+- **And** resolving all incidents linked by an incident-derived opportunity automatically resolves that opportunity
 
 ---
 

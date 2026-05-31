@@ -113,9 +113,19 @@ export async function recordImprovementOpportunityOccurrence(
     opportunity_id: string;
     occurrence_count: number;
     bundle_generation_number: number;
+    event_recorded: boolean;
   } & Record<string, unknown>>(
     `
-      WITH upserted AS (
+      WITH existing_event AS (
+        SELECT 1
+        FROM improvement_opportunity_events ioe
+        JOIN improvement_opportunities existing ON existing.id = ioe.improvement_opportunity_id
+        WHERE existing.project_id = $2::uuid
+          AND existing.fingerprint = $8
+          AND ioe.event_id = $13::uuid
+        LIMIT 1
+      ),
+      upserted AS (
         INSERT INTO improvement_opportunities (
           id,
           project_id,
@@ -170,41 +180,103 @@ export async function recordImprovementOpportunityOccurrence(
         )
         ON CONFLICT (project_id, fingerprint)
         DO UPDATE SET
-          service_id = COALESCE(
-            improvement_opportunities.service_id,
-            (
-              SELECT s.id
-              FROM services s
-              WHERE s.project_id = EXCLUDED.project_id
-                AND s.name = EXCLUDED.service_name
-                AND s.environment = EXCLUDED.environment
-              ORDER BY s.created_at DESC, s.id DESC
-              LIMIT 1
+          service_id = CASE
+            WHEN EXISTS (SELECT 1 FROM existing_event) THEN improvement_opportunities.service_id
+            ELSE COALESCE(
+              improvement_opportunities.service_id,
+              (
+                SELECT s.id
+                FROM services s
+                WHERE s.project_id = EXCLUDED.project_id
+                  AND s.name = EXCLUDED.service_name
+                  AND s.environment = EXCLUDED.environment
+                ORDER BY s.created_at DESC, s.id DESC
+                LIMIT 1
+              )
             )
-          ),
-          service_name = EXCLUDED.service_name,
-          environment = EXCLUDED.environment,
-          status = 'open',
-          severity = EXCLUDED.severity,
-          confidence = GREATEST(improvement_opportunities.confidence, EXCLUDED.confidence),
-          title = EXCLUDED.title,
-          summary = EXCLUDED.summary,
-          occurrence_count = improvement_opportunities.occurrence_count + 1,
-          evidence = EXCLUDED.evidence,
-          last_detected_at = EXCLUDED.last_detected_at,
-          last_source_event_id = EXCLUDED.last_source_event_id,
-          related_incident_ids = COALESCE((
-            SELECT array_agg(DISTINCT related_incident_id)
-            FROM unnest(improvement_opportunities.related_incident_ids || EXCLUDED.related_incident_ids) AS related_incident_id
-          ), '{}'::uuid[]),
-          resolved_at = NULL,
-          resolved_by_user_id = NULL,
-          snoozed_until = NULL,
-          updated_at = now()
+          END,
+          service_name = CASE
+            WHEN EXISTS (SELECT 1 FROM existing_event) THEN improvement_opportunities.service_name
+            ELSE EXCLUDED.service_name
+          END,
+          environment = CASE
+            WHEN EXISTS (SELECT 1 FROM existing_event) THEN improvement_opportunities.environment
+            ELSE EXCLUDED.environment
+          END,
+          status = CASE
+            WHEN EXISTS (SELECT 1 FROM existing_event) THEN improvement_opportunities.status
+            ELSE 'open'
+          END,
+          severity = CASE
+            WHEN EXISTS (SELECT 1 FROM existing_event) THEN improvement_opportunities.severity
+            WHEN EXCLUDED.kind = 'warning_hotspot'
+              THEN CASE WHEN improvement_opportunities.occurrence_count + 1 >= 10 THEN 'high' ELSE 'medium' END
+            WHEN EXCLUDED.kind = 'slow_request'
+              THEN CASE WHEN ($19::int IS NOT NULL AND COALESCE($18::int, 0) >= $19::int * 2) OR improvement_opportunities.occurrence_count + 1 >= 10 THEN 'high' ELSE 'medium' END
+            WHEN EXCLUDED.kind = 'request_failure_pattern'
+              THEN CASE WHEN COALESCE($17::int, 0) >= 500 OR improvement_opportunities.occurrence_count + 1 >= 10 THEN 'high' ELSE 'medium' END
+            ELSE EXCLUDED.severity
+          END,
+          confidence = CASE
+            WHEN EXISTS (SELECT 1 FROM existing_event) THEN improvement_opportunities.confidence
+            WHEN EXCLUDED.kind IN ('warning_hotspot', 'slow_request', 'request_failure_pattern')
+              THEN ROUND((0.55 + LEAST(1, (improvement_opportunities.occurrence_count + 1)::numeric / GREATEST(($16::numeric * 2), 1)) * 0.35) * 100) / 100
+            ELSE GREATEST(improvement_opportunities.confidence, EXCLUDED.confidence)
+          END,
+          title = CASE
+            WHEN EXISTS (SELECT 1 FROM existing_event) THEN improvement_opportunities.title
+            ELSE EXCLUDED.title
+          END,
+          summary = CASE
+            WHEN EXISTS (SELECT 1 FROM existing_event) THEN improvement_opportunities.summary
+            ELSE EXCLUDED.summary
+          END,
+          occurrence_count = improvement_opportunities.occurrence_count + CASE
+            WHEN EXISTS (SELECT 1 FROM existing_event) THEN 0
+            ELSE 1
+          END,
+          evidence = CASE
+            WHEN EXISTS (SELECT 1 FROM existing_event) THEN improvement_opportunities.evidence
+            ELSE EXCLUDED.evidence
+          END,
+          last_detected_at = CASE
+            WHEN EXISTS (SELECT 1 FROM existing_event) THEN improvement_opportunities.last_detected_at
+            ELSE EXCLUDED.last_detected_at
+          END,
+          last_source_event_id = CASE
+            WHEN EXISTS (SELECT 1 FROM existing_event) THEN improvement_opportunities.last_source_event_id
+            ELSE EXCLUDED.last_source_event_id
+          END,
+          related_incident_ids = CASE
+            WHEN EXISTS (SELECT 1 FROM existing_event) THEN improvement_opportunities.related_incident_ids
+            ELSE COALESCE((
+              SELECT array_agg(DISTINCT related_incident_id)
+              FROM unnest(improvement_opportunities.related_incident_ids || EXCLUDED.related_incident_ids) AS related_incident_id
+            ), '{}'::uuid[])
+          END,
+          resolved_at = CASE
+            WHEN EXISTS (SELECT 1 FROM existing_event) THEN improvement_opportunities.resolved_at
+            ELSE NULL
+          END,
+          resolved_by_user_id = CASE
+            WHEN EXISTS (SELECT 1 FROM existing_event) THEN improvement_opportunities.resolved_by_user_id
+            ELSE NULL
+          END,
+          snoozed_until = CASE
+            WHEN EXISTS (SELECT 1 FROM existing_event) THEN improvement_opportunities.snoozed_until
+            ELSE NULL
+          END,
+          updated_at = CASE
+            WHEN EXISTS (SELECT 1 FROM existing_event) THEN improvement_opportunities.updated_at
+            ELSE now()
+          END
         RETURNING
+          id AS opportunity_uuid,
           id::text AS opportunity_id,
+          kind,
           occurrence_count,
-          bundle_generation_number
+          bundle_generation_number,
+          NOT EXISTS (SELECT 1 FROM existing_event) AS event_recorded
       ),
       inserted_event AS (
         INSERT INTO improvement_opportunity_events (
@@ -219,14 +291,16 @@ export async function recordImprovementOpportunityOccurrence(
           $14,
           $12::timestamptz
         FROM upserted
+        WHERE upserted.event_recorded
         ON CONFLICT (improvement_opportunity_id, event_id)
         DO NOTHING
         RETURNING 1
       )
       SELECT
-        opportunity_id,
-        occurrence_count,
-        bundle_generation_number
+        upserted.opportunity_id,
+        upserted.occurrence_count,
+        upserted.bundle_generation_number,
+        upserted.event_recorded AND EXISTS (SELECT 1 FROM inserted_event) AS event_recorded
       FROM upserted
     `,
     [
@@ -244,7 +318,11 @@ export async function recordImprovementOpportunityOccurrence(
       input.occurred_at,
       input.source_event_id,
       input.source_event_type,
-      input.related_incident_id ?? null
+      input.related_incident_id ?? null,
+      input.threshold,
+      typeof input.evidence["response_status"] === "number" ? input.evidence["response_status"] : null,
+      typeof input.evidence["duration_ms"] === "number" ? input.evidence["duration_ms"] : null,
+      typeof input.evidence["slow_request_duration_threshold_ms"] === "number" ? input.evidence["slow_request_duration_threshold_ms"] : null
     ]
   );
 
@@ -257,6 +335,6 @@ export async function recordImprovementOpportunityOccurrence(
     opportunity_id: row.opportunity_id,
     occurrence_count: row.occurrence_count,
     bundle_generation_number: row.bundle_generation_number,
-    should_generate_bundle: row.bundle_generation_number === 0 && row.occurrence_count >= input.threshold
+    should_generate_bundle: row.event_recorded && row.bundle_generation_number === 0 && row.occurrence_count >= input.threshold
   };
 }

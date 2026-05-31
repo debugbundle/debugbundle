@@ -650,7 +650,15 @@ describe("web app — improvements", () => {
     });
     const unavailableImprovement = createImprovement({
       improvement_id: "imp_failed_bundle",
-      kind: "request_failure_pattern"
+      kind: "request_failure_pattern",
+      occurrence_count: 2,
+      evidence: {
+        kind: "request_failure_pattern",
+        threshold: 10
+      },
+      bundle_generation_number: 0,
+      bundle_created_at: null,
+      bundle_updated_at: null
     });
     const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
       const url = requestUrl(input);
@@ -673,7 +681,7 @@ describe("web app — improvements", () => {
         return jsonResponse(200, { improvement: unavailableImprovement });
       }
       if (url.endsWith(`/v1/projects/${unavailableImprovement.project_id}/improvements/${unavailableImprovement.improvement_id}/bundle`)) {
-        return jsonResponse(200, { status: "failed", reason: "bundle_generation_failed" });
+        return jsonResponse(200, { status: "failed", reason: "bundle_not_generated_yet" });
       }
 
       return jsonResponse(404, { error: "not_found" });
@@ -695,7 +703,8 @@ describe("web app — improvements", () => {
     render(<App initialEntries={[`/projects/${unavailableImprovement.project_id}/improvements/${unavailableImprovement.improvement_id}`]} />);
 
     expect(await screen.findByText(/request failure/i)).toBeInTheDocument();
-    expect(await screen.findByText(/bundle not available/i)).toBeInTheDocument();
+    expect(await screen.findByText(/bundle not generated yet/i)).toBeInTheDocument();
+    expect(await screen.findByText(/2 of 10 required signals/i)).toBeInTheDocument();
   });
 
   it("points incident-derived improvements at their related incident bundle", async () => {

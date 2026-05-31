@@ -199,6 +199,8 @@ export function ImprovementDetailPage(): JSX.Element {
             projectId={improvement.project_id}
             improvementId={improvement.improvement_id}
             relatedIncidentIds={improvement.related_incident_ids}
+            occurrenceCount={improvement.occurrence_count}
+            evidence={improvement.evidence}
           />
         </>
       )}
@@ -206,7 +208,13 @@ export function ImprovementDetailPage(): JSX.Element {
   );
 }
 
-function ImprovementBundleCard(input: { projectId: string; improvementId: string; relatedIncidentIds: string[] }): JSX.Element {
+function ImprovementBundleCard(input: {
+  projectId: string;
+  improvementId: string;
+  relatedIncidentIds: string[];
+  occurrenceCount: number;
+  evidence: Record<string, unknown>;
+}): JSX.Element {
   const [bundleState, setBundleState] = useState<
     | { status: "loading" }
     | { status: "ready"; bundle: BundleRecord }
@@ -276,6 +284,22 @@ function ImprovementBundleCard(input: { projectId: string; improvementId: string
   }
 
   if (bundleState.status !== "ready") {
+    if (bundleState.status === "failed" && bundleState.reason === "bundle_not_generated_yet") {
+      const threshold = getEvidenceThreshold(input.evidence);
+      const progressDescription =
+        threshold === null
+          ? "This opportunity has not crossed the configured generation threshold yet."
+          : `${input.occurrenceCount} of ${threshold} required signals have been observed.`;
+      return (
+        <CalloutCard
+          eyebrow="Not generated"
+          title="Bundle not generated yet"
+          description={`DebugBundle is tracking this opportunity, but it is below the hosted bundle threshold. ${progressDescription}`}
+          tone="neutral"
+        />
+      );
+    }
+
     return (
       <CalloutCard
         eyebrow="Unavailable"
@@ -311,6 +335,10 @@ function ImprovementBundleCard(input: { projectId: string; improvementId: string
       </CardContent>
     </Card>
   );
+}
+
+function getEvidenceThreshold(evidence: Record<string, unknown>): number | null {
+  return typeof evidence["threshold"] === "number" ? evidence["threshold"] : null;
 }
 
 function MetricCard({ label, value }: { label: string; value: string }): JSX.Element {

@@ -167,4 +167,67 @@ describe("incident lifecycle service", () => {
       })
     });
   });
+
+  it("auto-resolves incident-derived improvements after resolving the related incident", async (): Promise<void> => {
+    const incident = createResolvedIncident();
+    const resolveIncidentDerivedImprovementsForIncident = vi.fn().mockResolvedValue(1);
+
+    const service = createIncidentLifecycleService({
+      incidentStore: {
+        resolveIncidentForOrganization: vi.fn().mockResolvedValue(incident),
+        reopenIncidentForOrganization: vi.fn()
+      },
+      improvementStore: {
+        resolveIncidentDerivedImprovementsForIncident
+      },
+      webhookDeliveryStore: {
+        listMatchingWebhooks: vi.fn().mockResolvedValue([]),
+        createDeliveryIntent: vi.fn()
+      },
+      fallbackTargetUrl: null,
+      fallbackSigningSecret: null
+    });
+
+    await service.resolveIncidentForOrganization({
+      organization_id: "org_123",
+      incident_id: incident.incident_id,
+      resolved_by_member_id: "mem_123",
+      resolved_at: incident.resolved_at!
+    });
+
+    expect(resolveIncidentDerivedImprovementsForIncident).toHaveBeenCalledWith({
+      organization_id: "org_123",
+      incident_id: incident.incident_id,
+      resolved_by_member_id: "mem_123",
+      resolved_at: incident.resolved_at
+    });
+  });
+
+  it("keeps incident resolution successful when derived improvement cleanup fails", async (): Promise<void> => {
+    const incident = createResolvedIncident();
+    const service = createIncidentLifecycleService({
+      incidentStore: {
+        resolveIncidentForOrganization: vi.fn().mockResolvedValue(incident),
+        reopenIncidentForOrganization: vi.fn()
+      },
+      improvementStore: {
+        resolveIncidentDerivedImprovementsForIncident: vi.fn().mockRejectedValue(new Error("cleanup_failed"))
+      },
+      webhookDeliveryStore: {
+        listMatchingWebhooks: vi.fn().mockResolvedValue([]),
+        createDeliveryIntent: vi.fn()
+      },
+      fallbackTargetUrl: null,
+      fallbackSigningSecret: null
+    });
+
+    await expect(
+      service.resolveIncidentForOrganization({
+        organization_id: "org_123",
+        incident_id: incident.incident_id,
+        resolved_by_member_id: "mem_123",
+        resolved_at: incident.resolved_at!
+      })
+    ).resolves.toEqual(incident);
+  });
 });

@@ -925,6 +925,7 @@ export function createApiDependencies(input: CreateApiDependenciesInput): {
   const webhookDelivery = createPostgresWebhookDeliveryStore(input.db);
   const incidentLifecycle = createIncidentLifecycleService({
     incidentStore: metadataStore,
+    improvementStore: improvementOpportunityStore,
     webhookDeliveryStore: webhookDelivery,
     fallbackTargetUrl: input.lifecycleWebhookFallbackTargetUrl ?? null,
     fallbackSigningSecret: input.lifecycleWebhookFallbackSigningSecret ?? null,

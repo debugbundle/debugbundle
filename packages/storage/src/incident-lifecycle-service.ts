@@ -20,6 +20,10 @@ type IncidentResolutionStore = {
   reopenIncidentForOrganization(input: IncidentReopenInput): Promise<IncidentRetrievalRecord | null>;
 };
 
+type IncidentDerivedImprovementStore = {
+  resolveIncidentDerivedImprovementsForIncident?(input: IncidentResolutionInput): Promise<number>;
+};
+
 type IncidentLifecycleWebhookStore = {
   listMatchingWebhooks(input: {
     project_id: string;
@@ -44,6 +48,7 @@ type IncidentLifecycleWebhookStore = {
 
 interface CreateIncidentLifecycleServiceInput {
   incidentStore: IncidentResolutionStore;
+  improvementStore?: IncidentDerivedImprovementStore;
   webhookDeliveryStore: IncidentLifecycleWebhookStore;
   fallbackTargetUrl: string | null;
   fallbackSigningSecret: string | null;
@@ -193,6 +198,14 @@ export function createIncidentLifecycleService(input: CreateIncidentLifecycleSer
 
       if (resolvedAt === requestedResolvedAt) {
         await publishResolvedWebhook(input, resolvedIncident);
+      }
+
+      if (resolvedIncident.status === "resolved") {
+        try {
+          await input.improvementStore?.resolveIncidentDerivedImprovementsForIncident?.(resolveInput);
+        } catch {
+          // Incident resolution is the authoritative lifecycle action; improvement sync is a derived cleanup.
+        }
       }
 
       return resolvedIncident;

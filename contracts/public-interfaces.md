@@ -390,13 +390,15 @@ When hosted bundle generation is blocked by the shared `monthly_bundle_requests`
 
 **Query params (list improvements):** `project_id`, `environment`, `service`, `status` (open/resolved/snoozed), `severity`, `kind`, `limit`, `cursor`
 
+Open request/log candidates below the configured generation threshold are internal counting state and are excluded from list responses. Common external-probe `GET`/`404` request paths are excluded from hosted improvement lists. Recurring-incident opportunities are listed after their recurrence threshold is met; post-deploy regression opportunities may be listed immediately.
+
 Current API implementation scope:
 - `GET /v1/improvements` response body: `{ improvements: ImprovementRetrievalRecord[], next_cursor: string | null }`
 - `GET /v1/improvements/{id}` response body: `{ improvement: ImprovementRetrievalRecord }`
 - `POST /v1/improvements/{id}/resolve` response body: `{ improvement: ImprovementRetrievalRecord }`
 - `POST /v1/improvements/{id}/reopen` response body: `{ improvement: ImprovementRetrievalRecord }`
 - `POST /v1/improvements/{id}/snooze` request body: `{ snoozed_until: string }`; response body: `{ improvement: ImprovementRetrievalRecord }`
-- `GET /v1/projects/{id}/improvements/{improvementId}/bundle` response body: hosted improvement artifact JSON when present; `{ "status": "pending" }` while an artifact is still expected; `{ "status": "failed", "reason": "..." }` when no artifact is currently available. Incident-derived opportunities (`recurring_incident`, `post_deploy_regression`) may return `{ "status": "failed", "reason": "covered_by_incident_bundle", "related_incident_ids": string[] }` because agents should fetch the related incident bundle instead of a duplicate improvement artifact.
+- `GET /v1/projects/{id}/improvements/{improvementId}/bundle` response body: hosted improvement artifact JSON when present; `{ "status": "pending" }` while an artifact is still expected; `{ "status": "failed", "reason": "bundle_not_generated_yet" }` when a directly fetched opportunity is still below the hosted generation threshold; `{ "status": "failed", "reason": "..." }` when no artifact is currently available. Incident-derived opportunities (`recurring_incident`, `post_deploy_regression`) may return `{ "status": "failed", "reason": "covered_by_incident_bundle", "related_incident_ids": string[] }` because agents should fetch the related incident bundle instead of a duplicate improvement artifact.
 - `ImprovementRetrievalRecord` fields: `improvement_id`, `project_id`, `project_name`, `project_slug`, `service_id`, `service_name`, `service_runtime`, `service_framework`, `environment`, `kind`, `status`, `severity`, `confidence`, `fingerprint`, `title`, `summary`, `occurrence_count`, `evidence`, `related_incident_ids`, `first_detected_at`, `last_detected_at`, `resolved_at`, `snoozed_until`, `bundle_generation_number`, `bundle_created_at`, `bundle_updated_at`, `bundle_failure_reason`
 
 ### 1.3 Services

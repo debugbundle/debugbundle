@@ -333,6 +333,30 @@ describe("retrieval api client", () => {
     expect(pending).toEqual({ status: "pending" });
   });
 
+  it("accepts incident-covered improvement bundle failure payloads", async () => {
+    const request = vi.fn<HttpClient["request"]>().mockResolvedValue({
+      status: 200,
+      body: {
+        status: "failed",
+        reason: "covered_by_incident_bundle",
+        related_incident_ids: ["inc_123"]
+      }
+    });
+
+    const api = createRetrievalApi({ request });
+    const result = await api.getImprovementBundle({
+      bearerToken: "dbundle_mem_x",
+      projectId: "proj_123",
+      improvementId: "imp_123"
+    });
+
+    expect(result).toEqual({
+      status: "failed",
+      reason: "covered_by_incident_bundle",
+      related_incident_ids: ["inc_123"]
+    });
+  });
+
   it("calls reproduction route and accepts reproduction payload", async () => {
     const request = vi.fn<HttpClient["request"]>().mockResolvedValue({
       status: 200,

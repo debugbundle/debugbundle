@@ -621,7 +621,8 @@ export function createRetrievalApi(client: HttpClient): {
           BundleSchema,
           z.object({
             status: z.literal("failed"),
-            reason: z.string()
+            reason: z.string(),
+            related_incident_ids: z.array(z.string()).optional()
           }).strict()
         ])
       );

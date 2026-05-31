@@ -21,6 +21,15 @@ import {
 import { BundleV1Schema, getTierCapabilities, type EventClass, type EventEnvelope } from "../../../packages/shared-types/src/index.js";
 import type { NormalizedEvent } from "../../../packages/event-normalizer/src/index.js";
 import { validateEvent } from "../../../packages/event-normalizer/src/index.js";
+import {
+  createHostedImprovementConfidence,
+  createHostedImprovementSeverity,
+  createHostedRequestFailureSeverity,
+  createHostedSlowRequestSeverity,
+  getImprovementRuleThresholds,
+  isLowValueRequestFailure404,
+  type ImprovementRuleThresholds
+} from "./improvement-rules.js";
 import type { IncidentLifecycleGitHubDispatchPublisher } from "./processor.js";
 
 type ImprovementWebhookStore = Pick<WebhookDeliveryStore, "listMatchingWebhooks" | "createDeliveryIntent">;
@@ -68,37 +77,12 @@ function isRequestEvent(event: EventEnvelope): event is Extract<EventEnvelope, {
   return event.event_type === "request_event";
 }
 
-interface ImprovementRuleThresholds {
-  occurrence_threshold: number;
-  slow_request_duration_threshold_ms: number;
-}
-
 type RecordedImprovementCandidate = {
   opportunity_id: string;
   occurrence_count: number;
   bundle_generation_number: number;
   should_generate_bundle: boolean;
 };
-
-function getImprovementRuleThresholds(value: "high_confidence" | "balanced" | "verbose"): ImprovementRuleThresholds {
-  switch (value) {
-    case "high_confidence":
-      return {
-        occurrence_threshold: 10,
-        slow_request_duration_threshold_ms: 2_500
-      };
-    case "verbose":
-      return {
-        occurrence_threshold: 3,
-        slow_request_duration_threshold_ms: 1_000
-      };
-    default:
-      return {
-        occurrence_threshold: 5,
-        slow_request_duration_threshold_ms: 1_500
-      };
-  }
-}
 
 function normalizeBaseUrl(value: string | null | undefined): string | null {
   if (value === undefined || value === null) {
@@ -107,23 +91,6 @@ function normalizeBaseUrl(value: string | null | undefined): string | null {
 
   const trimmed = value.trim();
   return trimmed.length === 0 ? null : trimmed.replace(/\/+$/, "");
-}
-
-function createHostedImprovementConfidence(occurrenceCount: number, threshold: number): number {
-  const progress = Math.min(1, occurrenceCount / Math.max(threshold * 2, 1));
-  return Math.round((0.55 + progress * 0.35) * 100) / 100;
-}
-
-function createHostedImprovementSeverity(occurrenceCount: number): "medium" | "high" {
-  return occurrenceCount >= 10 ? "high" : "medium";
-}
-
-function createHostedRequestFailureSeverity(responseStatus: number, occurrenceCount: number): "medium" | "high" {
-  return responseStatus >= 500 || occurrenceCount >= 10 ? "high" : "medium";
-}
-
-function createHostedSlowRequestSeverity(durationMs: number, thresholdMs: number, occurrenceCount: number): "medium" | "high" {
-  return durationMs >= thresholdMs * 2 || occurrenceCount >= 10 ? "high" : "medium";
 }
 
 function parseEventEnvelopeFromRaw(rawBody: Buffer): EventEnvelope | null {
@@ -689,8 +656,8 @@ export async function maybeGenerateHostedImprovementBundle(input: {
       normalized_message: input.normalized.normalized_message,
       source_event_id: input.event.event_id,
       occurred_at: input.event.occurred_at,
-      severity: "medium",
-      confidence: createHostedImprovementConfidence(thresholds.occurrence_threshold, thresholds.occurrence_threshold),
+      severity: createHostedImprovementSeverity(1),
+      confidence: createHostedImprovementConfidence(1, thresholds.occurrence_threshold),
       threshold: thresholds.occurrence_threshold
     });
   } else if (isRequestEvent(input.event)) {
@@ -714,9 +681,9 @@ export async function maybeGenerateHostedImprovementBundle(input: {
         severity: createHostedSlowRequestSeverity(
           input.event.payload.duration_ms,
           thresholds.slow_request_duration_threshold_ms,
-          thresholds.occurrence_threshold
+          1
         ),
-        confidence: createHostedImprovementConfidence(thresholds.occurrence_threshold, thresholds.occurrence_threshold),
+        confidence: createHostedImprovementConfidence(1, thresholds.occurrence_threshold),
         threshold: thresholds.occurrence_threshold,
         slow_request_duration_threshold_ms: thresholds.slow_request_duration_threshold_ms
       });
@@ -727,21 +694,29 @@ export async function maybeGenerateHostedImprovementBundle(input: {
       input.normalized.http_status !== null &&
       input.normalized.http_status >= 400
     ) {
-      recorded = await input.dependencies.improvementOpportunityStore.recordRequestPattern({
-        project_id: input.project_id,
-        kind: "request_failure_pattern",
-        service_name: input.event.service.name,
-        environment: input.event.service.environment,
-        route_template: input.normalized.route_template,
-        http_method: input.normalized.http_method,
-        response_status: input.normalized.http_status,
-        duration_ms: input.event.payload.duration_ms,
-        source_event_id: input.event.event_id,
-        occurred_at: input.event.occurred_at,
-        severity: createHostedRequestFailureSeverity(input.normalized.http_status, thresholds.occurrence_threshold),
-        confidence: createHostedImprovementConfidence(thresholds.occurrence_threshold, thresholds.occurrence_threshold),
-        threshold: thresholds.occurrence_threshold
-      });
+      if (
+        !isLowValueRequestFailure404({
+          httpMethod: input.normalized.http_method,
+          routeTemplate: input.normalized.route_template,
+          responseStatus: input.normalized.http_status
+        })
+      ) {
+        recorded = await input.dependencies.improvementOpportunityStore.recordRequestPattern({
+          project_id: input.project_id,
+          kind: "request_failure_pattern",
+          service_name: input.event.service.name,
+          environment: input.event.service.environment,
+          route_template: input.normalized.route_template,
+          http_method: input.normalized.http_method,
+          response_status: input.normalized.http_status,
+          duration_ms: input.event.payload.duration_ms,
+          source_event_id: input.event.event_id,
+          occurred_at: input.event.occurred_at,
+          severity: createHostedRequestFailureSeverity(input.normalized.http_status, 1),
+          confidence: createHostedImprovementConfidence(1, thresholds.occurrence_threshold),
+          threshold: thresholds.occurrence_threshold
+        });
+      }
     }
   }
 

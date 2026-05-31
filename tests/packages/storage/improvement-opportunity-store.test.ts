@@ -81,7 +81,8 @@ describe("improvement opportunity store", () => {
         {
           opportunity_id: "imp_123",
           occurrence_count: 5,
-          bundle_generation_number: 0
+          bundle_generation_number: 0,
+          event_recorded: true
         }
       ]
     });
@@ -111,13 +112,51 @@ describe("improvement opportunity store", () => {
     expect(sql).toContain("INSERT INTO improvement_opportunity_events");
   });
 
+  it("does not trigger generation when the source event was already counted", async () => {
+    const query = vi.fn().mockResolvedValue({
+      rows: [
+        {
+          opportunity_id: "imp_123",
+          occurrence_count: 5,
+          bundle_generation_number: 0,
+          event_recorded: false
+        }
+      ]
+    });
+
+    const store = createPostgresImprovementOpportunityStore({ query });
+    const result = await store.recordWarningHotspot({
+      project_id: "proj_123",
+      service_name: "checkout-api",
+      environment: "production",
+      normalized_message: "Payment provider warning",
+      source_event_id: "evt_123",
+      occurred_at: "2026-05-18T12:00:00.000Z",
+      severity: "medium",
+      confidence: 0.7,
+      threshold: 5
+    });
+
+    expect(result).toEqual({
+      opportunity_id: "imp_123",
+      occurrence_count: 5,
+      bundle_generation_number: 0,
+      should_generate_bundle: false
+    });
+    const sql = String(query.mock.calls[0]?.[0] ?? "");
+    expect(sql).toContain("existing_event AS");
+    expect(sql).toContain("NOT EXISTS (SELECT 1 FROM existing_event) AS event_recorded");
+    expect(sql).toContain("EXISTS (SELECT 1 FROM inserted_event)");
+  });
+
   it("records request patterns and persists request-event evidence", async () => {
     const query = vi.fn().mockResolvedValue({
       rows: [
         {
           opportunity_id: "imp_request",
           occurrence_count: 5,
-          bundle_generation_number: 0
+          bundle_generation_number: 0,
+          event_recorded: true
         }
       ]
     });
@@ -157,7 +196,8 @@ describe("improvement opportunity store", () => {
         {
           opportunity_id: "imp_request_failure",
           occurrence_count: 3,
-          bundle_generation_number: 0
+          bundle_generation_number: 0,
+          event_recorded: true
         }
       ]
     });
@@ -194,7 +234,8 @@ describe("improvement opportunity store", () => {
         {
           opportunity_id: "imp_regression",
           occurrence_count: 4,
-          bundle_generation_number: 0
+          bundle_generation_number: 0,
+          event_recorded: true
         }
       ]
     });
@@ -282,6 +323,11 @@ describe("improvement opportunity store", () => {
     });
 
     expect(result).toEqual([row]);
+    expect(String(query.mock.calls[0]?.[0] ?? "")).toContain("io.bundle_generation_number > 0");
+    expect(String(query.mock.calls[0]?.[0] ?? "")).toContain("io.kind = 'post_deploy_regression'");
+    expect(String(query.mock.calls[0]?.[0] ?? "")).toContain("incident_occurrence_count");
+    expect(String(query.mock.calls[0]?.[0] ?? "")).toContain("~ '^[0-9]+$'");
+    expect(String(query.mock.calls[0]?.[0] ?? "")).toContain("'/wp-admin'");
     expect(query.mock.calls[0]?.[1]).toEqual([
       "org_123",
       "proj_123",
@@ -306,6 +352,7 @@ describe("improvement opportunity store", () => {
     });
 
     expect(result).toEqual([]);
+    expect(String(query.mock.calls[0]?.[0] ?? "")).toContain("io.status <> 'open'");
     expect(query.mock.calls[0]?.[1]).toEqual(["org_123", 10]);
   });
 
@@ -413,6 +460,33 @@ describe("improvement opportunity store", () => {
     expect(resolvedResult).toEqual(resolved);
     expect(reopenedResult).toEqual(reopened);
     expect(snoozedResult).toEqual(snoozed);
+  });
+
+  it("resolves incident-derived improvements only after every related incident is resolved", async () => {
+    const query = vi.fn().mockResolvedValue({
+      rows: [
+        {
+          resolved_count: 2
+        }
+      ]
+    });
+
+    const store = createPostgresImprovementOpportunityStore({ query });
+    const result = await store.resolveIncidentDerivedImprovementsForIncident?.({
+      organization_id: "org_123",
+      incident_id: "inc_123",
+      resolved_by_member_id: "usr_owner",
+      resolved_at: "2026-05-18T13:00:00.000Z"
+    });
+
+    const sql = String(query.mock.calls[0]?.[0] ?? "");
+    expect(result).toBe(2);
+    expect(sql).toContain("$2::uuid = ANY(io.related_incident_ids)");
+    expect(sql).toContain("io.kind IN ('recurring_incident', 'post_deploy_regression')");
+    expect(sql).toContain("LEFT JOIN incidents i ON i.id = related_incident_id");
+    expect(sql).toContain("i.id IS NULL");
+    expect(sql).toContain("i.status <> 'resolved'");
+    expect(query.mock.calls[0]?.[1]).toEqual(["org_123", "inc_123", "usr_owner", "2026-05-18T13:00:00.000Z"]);
   });
 
   it("returns bundle build context and chronological event references", async () => {
@@ -593,7 +667,8 @@ describe("improvement opportunity store", () => {
         {
           opportunity_id: "imp_recurring",
           occurrence_count: 3,
-          bundle_generation_number: 0
+          bundle_generation_number: 0,
+          event_recorded: true
         }
       ]
     });

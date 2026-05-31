@@ -165,6 +165,12 @@ export interface ImprovementOpportunityStore {
     improvement_id: string;
   }): Promise<ImprovementRetrievalRecord | null>;
   resolveImprovementForOrganization(input: ResolveImprovementForOrganizationInput): Promise<ImprovementRetrievalRecord | null>;
+  resolveIncidentDerivedImprovementsForIncident?(input: {
+    organization_id: string;
+    incident_id: string;
+    resolved_by_member_id: string;
+    resolved_at: string;
+  }): Promise<number>;
   reopenImprovementForOrganization(input: ReopenImprovementForOrganizationInput): Promise<ImprovementRetrievalRecord | null>;
   snoozeImprovementForOrganization?(input: SnoozeImprovementForOrganizationInput): Promise<ImprovementRetrievalRecord | null>;
   getImprovementBundleBuildContext(input: { project_id: string; opportunity_id: string }): Promise<ImprovementOpportunityRecord | null>;
@@ -408,7 +414,66 @@ export function createPostgresImprovementOpportunityStore(db: Queryable): Improv
 
     async listImprovementsForOrganization(input) {
       const parameters: Array<string | number> = [input.organization_id];
-      const predicates = ["p.organization_id = $1::uuid"];
+      const predicates = [
+        "p.organization_id = $1::uuid",
+        `(
+          io.status <> 'open'
+          OR io.kind = 'post_deploy_regression'
+          OR (
+            io.kind = 'recurring_incident'
+            AND COALESCE(
+              CASE
+                WHEN COALESCE(io.evidence->>'incident_occurrence_count', '') ~ '^[0-9]+$'
+                  THEN (io.evidence->>'incident_occurrence_count')::int
+              END,
+              io.occurrence_count
+            )
+              >= COALESCE(
+                CASE
+                  WHEN COALESCE(io.evidence->>'threshold', '') ~ '^[0-9]+$'
+                    THEN (io.evidence->>'threshold')::int
+                END,
+                1
+              )
+          )
+          OR io.bundle_generation_number > 0
+          OR io.bundle_failure_reason IS NOT NULL
+        )`,
+        `NOT (
+          io.kind = 'request_failure_pattern'
+          AND COALESCE(io.evidence->>'response_status', '') ~ '^[0-9]+$'
+          AND (io.evidence->>'response_status')::int = 404
+          AND upper(COALESCE(io.evidence->>'http_method', '')) = 'GET'
+          AND (
+            lower(regexp_replace(COALESCE(io.evidence->>'route_template', ''), '/+$', '')) IN (
+              '/.env',
+              '/__debug__/render_panel',
+              '/actuator',
+              '/autodiscover/autodiscover.json',
+              '/cpanel',
+              '/favicon.ico',
+              '/geoserver/web',
+              '/logon/logonpoint/index.html',
+              '/owa/auth/logon.aspx',
+              '/robots.txt',
+              '/rdweb/pages',
+              '/web',
+              '/webclient/login.xhtml',
+              '/webconsole',
+              '/webui',
+              '/whm',
+              '/wp-admin',
+              '/wp-login.php',
+              '/wsman',
+              '/xmlrpc.php'
+            )
+            OR lower(COALESCE(io.evidence->>'route_template', '')) LIKE '/owa/%'
+            OR lower(COALESCE(io.evidence->>'route_template', '')) LIKE '/rdweb/%'
+            OR lower(COALESCE(io.evidence->>'route_template', '')) LIKE '/vpn/%'
+            OR lower(COALESCE(io.evidence->>'route_template', '')) LIKE '/wp-%'
+          )
+        )`
+      ];
 
       if (input.project_id !== undefined) {
         parameters.push(input.project_id);
@@ -529,6 +594,47 @@ export function createPostgresImprovementOpportunityStore(db: Queryable): Improv
       );
 
       return result.rows[0] ?? null;
+    },
+
+    async resolveIncidentDerivedImprovementsForIncident(input) {
+      const result = await db.query<{ resolved_count: number } & Record<string, unknown>>(
+        `
+          WITH candidates AS (
+            SELECT io.id
+            FROM improvement_opportunities io
+            JOIN projects p ON p.id = io.project_id
+            WHERE p.organization_id = $1::uuid
+              AND $2::uuid = ANY(io.related_incident_ids)
+              AND io.kind IN ('recurring_incident', 'post_deploy_regression')
+              AND io.status <> 'resolved'
+              AND NOT EXISTS (
+                SELECT 1
+                FROM unnest(io.related_incident_ids) AS related_incident_id
+                LEFT JOIN incidents i ON i.id = related_incident_id
+                  AND i.project_id = io.project_id
+                WHERE i.id IS NULL
+                  OR i.status <> 'resolved'
+              )
+          ),
+          updated AS (
+            UPDATE improvement_opportunities io
+            SET
+              status = 'resolved',
+              resolved_at = COALESCE(io.resolved_at, $4::timestamptz),
+              resolved_by_user_id = COALESCE(io.resolved_by_user_id, $3::uuid),
+              snoozed_until = NULL,
+              updated_at = now()
+            FROM candidates
+            WHERE io.id = candidates.id
+            RETURNING 1
+          )
+          SELECT COUNT(*)::int AS resolved_count
+          FROM updated
+        `,
+        [input.organization_id, input.incident_id, input.resolved_by_member_id, input.resolved_at]
+      );
+
+      return result.rows[0]?.resolved_count ?? 0;
     },
 
     async reopenImprovementForOrganization(input) {

@@ -447,7 +447,7 @@ An improvement bundle uses the same top-level structure as failure bundles, with
 
 This structural similarity is intentional — agents treat both bundle classes consistently.
 
-Not every improvement opportunity has a standalone improvement bundle artifact. Incident-derived opportunities such as `recurring_incident` and `post_deploy_regression` carry `related_incident_ids` and should route agents to the existing failure bundles for those incidents instead of duplicating the same debugging context.
+Not every improvement opportunity has a standalone improvement bundle artifact. Incident-derived opportunities such as `recurring_incident` and `post_deploy_regression` carry `related_incident_ids` and should route agents to the existing failure bundles for those incidents instead of duplicating the same debugging context. When every related incident is resolved, the incident-derived opportunity is resolved automatically.
 
 ### Schema Evolution Rules
 

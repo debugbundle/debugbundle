@@ -209,11 +209,11 @@ Last updated: 2026-05-29
 
 **FR-RET-06:** `GET /v1/services` — list services for a project.
 
-**FR-RET-07:** `GET /v1/improvements` — list/filter hosted improvement opportunities (project_id, environment, service, status [open/resolved/snoozed], severity, kind, limit, cursor).
+**FR-RET-07:** `GET /v1/improvements` — list/filter hosted improvement opportunities (project_id, environment, service, status [open/resolved/snoozed], severity, kind, limit, cursor). Open request/log candidates that have not crossed their configured generation threshold remain internal counting state and must not appear in default retrieval lists. Common external-probe `GET`/`404` request paths must be excluded from hosted improvement lists. Recurring-incident opportunities appear after their configured incident recurrence threshold is met, while post-deploy regression opportunities may appear immediately.
 
 **FR-RET-08:** `GET /v1/improvements/{id}` plus `POST /v1/improvements/{id}/resolve|reopen` — hosted improvement metadata and lifecycle mutations.
 
-**FR-RET-09:** `GET /v1/projects/{projectId}/improvements/{improvementId}/bundle` — hosted improvement bundle artifact. Return `{"status": "pending"}` if still processing and `{"status": "failed", "reason": "..."}` if generation failed or no artifact is available. Incident-derived improvement opportunities that are covered by existing failure bundles must return `{"status": "failed", "reason": "covered_by_incident_bundle", "related_incident_ids": [...]}` when no standalone improvement artifact exists.
+**FR-RET-09:** `GET /v1/projects/{projectId}/improvements/{improvementId}/bundle` — hosted improvement bundle artifact. Return `{"status": "pending"}` if still processing and `{"status": "failed", "reason": "bundle_not_generated_yet"}` when a directly fetched opportunity exists only as below-threshold counting state. Return `{"status": "failed", "reason": "..."}` if generation failed or no artifact is available. Incident-derived improvement opportunities that are covered by existing failure bundles must return `{"status": "failed", "reason": "covered_by_incident_bundle", "related_incident_ids": [...]}` when no standalone improvement artifact exists.
 
 **FR-RET-10:** Incident and improvement retrieval responses must include denormalized `project_name` and `service_name` values so API/CLI/MCP/web clients do not need follow-up lookups to render list or detail views.
 
