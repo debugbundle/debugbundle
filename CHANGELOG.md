@@ -9,6 +9,7 @@ The format is based on Keep a Changelog and this project follows Semantic Versio
 ### Added
 
 - Prepared `@debugbundle/mcp` for public MCP Registry and ClawHub distribution with `mcpName` ownership metadata, `server.json`, env-token auth support, and a portable ClawHub skill.
+- Documented the v1 package release order so shared packages, SDKs, dependent wrappers, dogfooding manifests, and the canonical core release are published in dependency-safe sequence.
 
 ## [0.1.3] - 2026-05-22
 

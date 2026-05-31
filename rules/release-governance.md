@@ -1,7 +1,7 @@
 # Release & Open-Source Governance — DebugBundle
 
 Version: v1
-Last updated: 2026-03-10
+Last updated: 2026-05-31
 
 ---
 
@@ -80,13 +80,17 @@ Every standalone SDK repository must adopt the same release-hardening pattern be
 3. Any package family that is documented as version-aligned must publish as one coherent family and must avoid mixed-version public snippets.
 4. New SDK plans in `spec/sdks/*.md` must describe their release workflow, clean-install smoke path, and publish-time compatibility matrix before implementation starts.
 
-### Current Pre-Launch Release Order
+### V1 Release Train Order
 
-The current pre-launch package sequence for the JavaScript and CMS surfaces is:
+The V1 release train must publish dependency roots before dependent wrappers. Do not publish a package that embeds, pins, wraps, or documents another DebugBundle package until that prerequisite version is visible from the target registry and its published-artifact smoke has passed.
 
-1. Publish core-owned shared packages from `debugbundle/debugbundle`: `@debugbundle/shared-types` and `@debugbundle/redaction`.
+1. Publish core-owned shared JS packages from `debugbundle/debugbundle`: `@debugbundle/shared-types` and `@debugbundle/redaction`.
 2. Publish the JS SDK family from `debugbundle/debugbundle-js`: `@debugbundle/sdk-node` and `@debugbundle/sdk-browser` at the same version, after the matching shared-package version is already on npm.
-3. Publish dependent wrappers after their prerequisites are live and verified. Today that means the WordPress plugin follows the SDK releases it bundles or documents, rather than shipping ahead of them.
+3. Publish independent backend SDKs and package families whose public artifacts do not bundle another DebugBundle SDK: Python, PHP, Java, Go, Ruby, Android, Swift, .NET, CLI, and MCP. Version-aligned package families must publish coherently as one family.
+4. Publish React Native only after the Android Maven package family and Swift/CocoaPods package it delegates to are published and smoke-tested.
+5. Publish WordPress only after the PHP SDK and browser SDK versions it requires are published and smoke-tested; rebuild the bundled browser asset from those exact published versions before assembling the plugin ZIP.
+6. Bump internal dogfooding manifests only after their referenced registry versions exist, then run hosted/source-deploy validation.
+7. Create the canonical core GitHub release after package-specific release workflows and registry smoke checks are green.
 
 ### Internal Dogfooding Version Touchpoints
 

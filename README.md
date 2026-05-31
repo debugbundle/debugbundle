@@ -371,11 +371,15 @@ Standalone SDK repositories publish and version their own release surfaces indep
 - `debugbundle-go` for Go modules
 - `debugbundle-wordpress` for the WordPress plugin
 
-Current pre-launch sequencing for the JS family is intentional:
+The v1 release train publishes dependency roots before dependent wrappers:
 
 1. Publish `@debugbundle/shared-types` and `@debugbundle/redaction` from the core repo first.
 2. Publish `@debugbundle/sdk-node` and `@debugbundle/sdk-browser` from `debugbundle-js` after the matching shared-package version exists on npm.
-3. Publish dependent wrappers such as the WordPress plugin after the prerequisite SDK releases are live and verified.
+3. Publish independent SDK and package families whose artifacts do not bundle another DebugBundle SDK.
+4. Publish React Native after the Android and Swift versions it delegates to are live and smoke-tested.
+5. Publish WordPress after the PHP SDK and browser SDK versions it requires are live and smoke-tested, then rebuild the bundled browser asset.
+6. Bump hosted dogfooding manifests only after the referenced registry versions exist.
+7. Create the canonical core GitHub Release after package-specific release workflows pass.
 
 Our own hosted/source-deployed dogfooding surfaces intentionally consume published packages rather than implicit workspace links. After a successful registry publish, bump the pinned versions in the root `package.json`, hosted app `apps/web/package.json`, and public-site `site/package.json` before running hosted validation or deployment.
 
