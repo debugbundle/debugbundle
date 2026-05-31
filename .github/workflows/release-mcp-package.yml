@@ -106,7 +106,7 @@ jobs:
           RELEASE_VERSION: ${{ steps.release_version.outputs.value }}
 
       - name: Run focused MCP package tests
-        run: pnpm vitest run tests/apps/mcp/mcp-workspace-package.test.ts tests/apps/mcp/mcp-stdio-server.test.ts
+        run: pnpm vitest run tests/apps/mcp/mcp-workspace-package.test.ts tests/apps/mcp/mcp-stdio-server.test.ts tests/apps/mcp/mcp-default-tools.test.ts tests/apps/mcp/mcp-clawhub-skill.test.ts
 
       - name: Pack MCP artifact
         run: |
@@ -259,7 +259,7 @@ jobs:
           RELEASE_VERSION: ${{ steps.release_version.outputs.value }}
 
       - name: Run focused MCP package tests
-        run: pnpm vitest run tests/apps/mcp/mcp-workspace-package.test.ts tests/apps/mcp/mcp-stdio-server.test.ts
+        run: pnpm vitest run tests/apps/mcp/mcp-workspace-package.test.ts tests/apps/mcp/mcp-stdio-server.test.ts tests/apps/mcp/mcp-default-tools.test.ts tests/apps/mcp/mcp-clawhub-skill.test.ts
 
       - name: Pack MCP artifact
         if: steps.published_state.outputs.state == 'none'

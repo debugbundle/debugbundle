@@ -261,6 +261,8 @@ Automation can use the HTTP API directly or the MCP server for agent workflows:
 - MCP docs: <https://debugbundle.com/docs/mcp>
 - Bundle schema: <https://debugbundle.com/docs/bundles/schema>
 
+Marketplace-managed MCP clients can run `npx @debugbundle/mcp` and provide `DEBUGBUNDLE_MEMBER_TOKEN` in the MCP server environment.
+
 ## Repository Layout
 
 ```text

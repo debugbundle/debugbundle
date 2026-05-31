@@ -42,6 +42,17 @@ type ToolHandler = (input: Record<string, unknown>) => Promise<unknown>;
 type ToolRegistry = Record<string, ToolHandler>;
 
 const DEFAULT_API_BASE_URL = "https://api.debugbundle.com";
+const MEMBER_TOKEN_ENV_VAR = "DEBUGBUNDLE_MEMBER_TOKEN";
+
+function readEnvMemberToken(): string | null {
+  const rawToken = process.env[MEMBER_TOKEN_ENV_VAR];
+  if (typeof rawToken !== "string") {
+    return null;
+  }
+
+  const token = rawToken.trim();
+  return token.length > 0 ? token : null;
+}
 
 async function readLocalAuthState(): Promise<{ bearer_token: string; base_url: string } | null> {
   try {
@@ -66,8 +77,8 @@ function withDefaultBearerToken(tools: ToolRegistry, bearerToken: string | null)
 
 export async function createDefaultMcpTools(input: { apiBaseUrl?: string } = {}): Promise<ToolRegistry> {
   const authState = await readLocalAuthState();
-  const baseUrl = input.apiBaseUrl ?? authState?.base_url ?? process.env["DEBUGBUNDLE_API_URL"] ?? DEFAULT_API_BASE_URL;
-  const defaultBearerToken = authState?.bearer_token ?? null;
+  const baseUrl = input.apiBaseUrl ?? process.env["DEBUGBUNDLE_API_URL"] ?? authState?.base_url ?? DEFAULT_API_BASE_URL;
+  const defaultBearerToken = readEnvMemberToken() ?? authState?.bearer_token ?? null;
   const httpClient = createCliHttpClient({ baseUrl });
   const retrievalApi = createRetrievalApi(httpClient);
 

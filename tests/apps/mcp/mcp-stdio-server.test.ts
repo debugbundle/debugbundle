@@ -1,10 +1,33 @@
 import { PassThrough } from "node:stream";
+import { readFileSync } from "node:fs";
 
 import { describe, expect, it, vi } from "vitest";
 
-import { createMcpServer, runMcpStdioServer } from "../../../apps/mcp/src/server.js";
+import { MCP_SERVER_VERSION, createMcpServer, runMcpStdioServer } from "../../../apps/mcp/src/server.js";
+
+const mcpPackageJson = JSON.parse(readFileSync(new URL("../../../apps/mcp/package.json", import.meta.url), "utf8")) as {
+  version: string;
+};
 
 describe("mcp stdio server", () => {
+  it("reports the published package version during initialize", async () => {
+    const server = createMcpServer({
+      tools: {}
+    });
+
+    await expect(server.handleRequest({ jsonrpc: "2.0", id: 1, method: "initialize" })).resolves.toMatchObject({
+      jsonrpc: "2.0",
+      id: 1,
+      result: {
+        serverInfo: {
+          name: "@debugbundle/mcp",
+          version: mcpPackageJson.version
+        }
+      }
+    });
+    expect(MCP_SERVER_VERSION).toBe(mcpPackageJson.version);
+  });
+
   it("lists implemented tools with JSON schemas", async () => {
     const server = createMcpServer({
       tools: {

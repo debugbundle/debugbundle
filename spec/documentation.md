@@ -96,7 +96,7 @@ The complete docs page tree for `/docs`. Every entry below is a page that must e
 
 | # | Path | Title | Type | Purpose |
 |---|------|-------|------|---------|
-| 1 | `/docs/mcp` | MCP Overview | Landing | What MCP is, who it's for (AI agents in IDEs), how to configure the MCP server, auth model (reuses CLI auth state). |
+| 1 | `/docs/mcp` | MCP Overview | Landing | What MCP is, who it's for (AI agents in IDEs), how to configure the MCP server, auth model (CLI auth state, `DEBUGBUNDLE_MEMBER_TOKEN`, or per-call `bearerToken`). |
 | 2 | `/docs/mcp/tools` | MCP Tools | Reference | Complete tool inventory with parameters, return types, and example invocations. Organized by domain: incidents, bundles, webhooks, alerts, tokens, diagnostics. |
 | 3 | `/docs/mcp/workflows` | MCP Agent Workflows | Guide | Practical agent workflow patterns: "investigate incident", "activate probe and share trigger link", "set up webhook pipeline", "run doctor checks". |
 

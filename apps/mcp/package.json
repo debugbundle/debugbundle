@@ -1,6 +1,7 @@
 {
   "name": "@debugbundle/mcp",
-  "version": "0.1.9",
+  "mcpName": "com.debugbundle/mcp",
+  "version": "0.1.10",
   "private": false,
   "description": "Model Context Protocol server for DebugBundle",
   "license": "AGPL-3.0-only",
@@ -26,7 +27,7 @@
   "bin": {
     "debugbundle-mcp": "bin/debugbundle-mcp.js"
   },
-  "files": ["bin", "dist", "README.md", "LICENSE"],
+  "files": ["bin", "dist", "README.md", "LICENSE", "server.json"],
   "dependencies": {
     "@node-rs/argon2": "^2.0.2"
   },

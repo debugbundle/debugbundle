@@ -36,7 +36,7 @@ The server uses stdio transport and exposes the same DebugBundle incident, incid
 
 ## Authentication
 
-Local use reuses CLI auth state from `~/.debugbundle/auth.json` when available. Headless clients can pass `bearerToken` in tool arguments.
+Local use reuses CLI auth state from `~/.debugbundle/auth.json` when available. Headless or marketplace-managed clients can set `DEBUGBUNDLE_MEMBER_TOKEN` in the MCP server environment. Individual tool calls can still pass `bearerToken` explicitly when needed.
 
 ## License
 

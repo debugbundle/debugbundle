@@ -1,0 +1,39 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "com.debugbundle/mcp",
+  "title": "DebugBundle",
+  "description": "Investigate DebugBundle incidents, bundles, reproductions, probes, alerts, webhooks, projects, members, billing, GitHub automation, and local setup from MCP clients.",
+  "repository": {
+    "url": "https://github.com/debugbundle/debugbundle",
+    "source": "github",
+    "subfolder": "apps/mcp"
+  },
+  "version": "0.1.10",
+  "packages": [
+    {
+      "registryType": "npm",
+      "registryBaseUrl": "https://registry.npmjs.org",
+      "identifier": "@debugbundle/mcp",
+      "version": "0.1.10",
+      "transport": {
+        "type": "stdio"
+      },
+      "environmentVariables": [
+        {
+          "name": "DEBUGBUNDLE_MEMBER_TOKEN",
+          "description": "Optional DebugBundle member token used by hosted API and MCP management tools when CLI auth state is unavailable.",
+          "format": "string",
+          "isRequired": false,
+          "isSecret": true
+        },
+        {
+          "name": "DEBUGBUNDLE_API_URL",
+          "description": "Optional DebugBundle API base URL for self-hosted, staging, or other non-default API environments.",
+          "format": "string",
+          "isRequired": false,
+          "isSecret": false
+        }
+      ]
+    }
+  ]
+}

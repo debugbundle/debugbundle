@@ -3,8 +3,11 @@ import type { Readable, Writable } from "node:stream";
 
 import { zodToJsonSchema } from "zod-to-json-schema";
 
+import packageJson from "../package.json" with { type: "json" };
 import { MCP_TOOL_CATALOG } from "./tool-catalog.js";
 import type { ToolRegistry } from "./default-tools.js";
+
+export const MCP_SERVER_VERSION = packageJson.version;
 
 type JsonRpcId = string | number | null;
 
@@ -117,7 +120,7 @@ export function createMcpServer(input: { tools: ToolRegistry }): {
             },
             serverInfo: {
               name: "@debugbundle/mcp",
-              version: "0.1.2"
+              version: MCP_SERVER_VERSION
             }
           }
         };

@@ -48,6 +48,8 @@ Before public release, the repository must contain these root-level files:
 4. Publish `@debugbundle/mcp` to npm
 5. Smoke-test a clean install from the registry
 
+The MCP package release manifest must include package-level MCP Registry metadata (`server.json`) alongside `package.json`, `README.md`, `LICENSE`, and the executable bin wrapper so public registry and marketplace submissions can be validated from the same release artifact.
+
 **release-shared-js-packages.yml** — Runs on `shared-js-v*` tags or manual dispatch:
 1. Validate the shared package versions
 2. Run focused shared-package tests

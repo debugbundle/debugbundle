@@ -10,6 +10,7 @@
     "package.json",
     "README.md",
     "LICENSE",
+    "server.json",
     "bin/debugbundle-mcp.js"
   ]
 }

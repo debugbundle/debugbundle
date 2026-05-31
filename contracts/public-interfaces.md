@@ -2097,7 +2097,7 @@ debugbundle github deliveries retry <delivery-id> [--project-id <id>] [--auth-fi
 
 Package: `apps/mcp/`
 
-Install surface: `@debugbundle/mcp` publishes a standalone stdio MCP server with the `debugbundle-mcp` bin. External MCP clients should invoke it with `npx @debugbundle/mcp` or a global `debugbundle-mcp` install. The server reuses CLI auth state from `~/.debugbundle/auth.json` when present and still accepts explicit `bearerToken` tool arguments for headless automation.
+Install surface: `@debugbundle/mcp` publishes a standalone stdio MCP server with the `debugbundle-mcp` bin. External MCP clients should invoke it with `npx @debugbundle/mcp` or a global `debugbundle-mcp` install. The package ships MCP Registry metadata in `apps/mcp/server.json`, and npm ownership verification uses `mcpName: "com.debugbundle/mcp"` in `apps/mcp/package.json`. The server resolves hosted auth in this order: explicit per-tool `bearerToken`, `DEBUGBUNDLE_MEMBER_TOKEN` from the MCP server environment, then CLI auth state from `~/.debugbundle/auth.json`. `DEBUGBUNDLE_API_URL` may override the default `https://api.debugbundle.com` endpoint for self-hosted or non-production environments.
 
 ### 3.1 Core Tools
 ```

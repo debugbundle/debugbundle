@@ -5,6 +5,8 @@ import { describe, expect, it } from "vitest";
 
 type PackageJsonLike = {
   name?: string;
+  mcpName?: string;
+  version?: string;
   private?: boolean;
   description?: string;
   license?: string;
@@ -21,6 +23,19 @@ type PackageJsonLike = {
   files?: string[];
 };
 
+type McpServerJsonLike = {
+  name?: string;
+  version?: string;
+  packages?: Array<{
+    registryType?: string;
+    registryBaseUrl?: string;
+    identifier?: string;
+    version?: string;
+    transport?: { type?: string };
+    environmentVariables?: Array<{ name?: string; isRequired?: boolean; isSecret?: boolean }>;
+  }>;
+};
+
 function readPackageJson(relativePath: string): PackageJsonLike {
   return JSON.parse(readFileSync(new URL(relativePath, import.meta.url), "utf8")) as PackageJsonLike;
 }
@@ -32,6 +47,7 @@ describe("mcp workspace package", () => {
     const packageJson = readPackageJson("../../../apps/mcp/package.json");
 
     expect(packageJson.name).toBe("@debugbundle/mcp");
+    expect(packageJson.mcpName).toBe("com.debugbundle/mcp");
     expect(packageJson.private).toBe(false);
     expect(packageJson.description).toBe("Model Context Protocol server for DebugBundle");
     expect(packageJson.license).toBe("AGPL-3.0-only");
@@ -60,7 +76,38 @@ describe("mcp workspace package", () => {
       esbuild: "^0.27.3",
       tsx: "^4.20.5"
     });
-    expect(packageJson.files).toEqual(["bin", "dist", "README.md", "LICENSE"]);
+    expect(packageJson.files).toEqual(["bin", "dist", "README.md", "LICENSE", "server.json"]);
+  });
+
+  it("ships MCP registry metadata aligned with package ownership", () => {
+    const packageJson = readPackageJson("../../../apps/mcp/package.json");
+    const serverJson = JSON.parse(readFileSync(new URL("../../../apps/mcp/server.json", import.meta.url), "utf8")) as McpServerJsonLike;
+
+    expect(serverJson.name).toBe(packageJson.mcpName);
+    expect(serverJson.version).toBe(packageJson.version);
+    expect(serverJson.packages).toEqual([
+      expect.objectContaining({
+        registryType: "npm",
+        registryBaseUrl: "https://registry.npmjs.org",
+        identifier: packageJson.name,
+        version: packageJson.version,
+        transport: {
+          type: "stdio"
+        },
+        environmentVariables: expect.arrayContaining([
+          expect.objectContaining({
+            name: "DEBUGBUNDLE_MEMBER_TOKEN",
+            isRequired: false,
+            isSecret: true
+          }),
+          expect.objectContaining({
+            name: "DEBUGBUNDLE_API_URL",
+            isRequired: false,
+            isSecret: false
+          })
+        ])
+      })
+    ]);
   });
 
   it("keeps the published mcp bin wrapper portable outside the monorepo", () => {
@@ -80,6 +127,7 @@ describe("mcp workspace package", () => {
 
     expect(readme).toContain("# @debugbundle/mcp");
     expect(readme).toContain("npx @debugbundle/mcp");
+    expect(readme).toContain("DEBUGBUNDLE_MEMBER_TOKEN");
     expect(readme).toContain("https://debugbundle.com/docs/mcp");
     expect(license).toContain("GNU AFFERO GENERAL PUBLIC LICENSE");
     expect(license).toContain("Version 3, 19 November 2007");
@@ -115,7 +163,7 @@ describe("mcp workspace package", () => {
       npmTag: "latest",
       distributionCommand: "npx @debugbundle/mcp",
       bin: "debugbundle-mcp",
-      requiredReleaseFiles: ["package.json", "README.md", "LICENSE", "bin/debugbundle-mcp.js"]
+      requiredReleaseFiles: ["package.json", "README.md", "LICENSE", "server.json", "bin/debugbundle-mcp.js"]
     });
 
     expect(workflow).toContain("apps/mcp/release-manifest.json");
@@ -127,6 +175,8 @@ describe("mcp workspace package", () => {
     expect(workflow).toContain('unexpected_prerelease_version');
     expect(workflow).toContain('tests/apps/mcp/mcp-workspace-package.test.ts');
     expect(workflow).toContain('tests/apps/mcp/mcp-stdio-server.test.ts');
+    expect(workflow).toContain('tests/apps/mcp/mcp-default-tools.test.ts');
+    expect(workflow).toContain('tests/apps/mcp/mcp-clawhub-skill.test.ts');
     expect(workflow).toContain("npm pack ./apps/mcp");
     expect(workflow).toContain("npm publish ./apps/mcp --tag latest --access public");
     expect(workflow).toContain('npm view "@debugbundle/mcp@${RELEASE_VERSION}" version');
