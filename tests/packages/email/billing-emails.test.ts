@@ -26,6 +26,8 @@ describe("billing email templates", () => {
       expect(result.text).toContain("team");
       expect(result.text).toContain("3 extra capacity unit(s)");
       expect(result.text).toContain("https://billing.stripe.com/session/abc");
+      expect(result.html).toContain("Your team plan is active for Acme Corp + 3 extra capacity unit(s).");
+      expect(result.html.indexOf("Your team plan is active")).toBeLessThan(result.html.indexOf("<style>"));
       expect(result.html).toContain("Acme Corp");
       expect(result.html).toContain("team");
     });
@@ -56,6 +58,7 @@ describe("billing email templates", () => {
       expect(result.text).toContain("Acme Corp");
       expect(result.text).toContain("2026-05-01");
       expect(result.text).toContain("2 extra capacity unit(s)");
+      expect(result.html).toContain("Your team plan renewed; next renewal is 2026-05-01.");
     });
   });
 
@@ -68,6 +71,7 @@ describe("billing email templates", () => {
       });
 
       expect(result.subject).toContain("payment failed");
+      expect(result.html).toContain("Payment failed for Acme Corp; paid features remain active while Stripe retries.");
       expect(result.text).toContain("remain active");
       expect(result.text).toContain("free tier");
       expect(result.text).toContain("https://billing.stripe.com/session/fail");
@@ -84,6 +88,7 @@ describe("billing email templates", () => {
       });
 
       expect(result.subject).toContain("unresolved");
+      expect(result.html).toContain("Resolve payment within 5 day(s) to avoid a downgrade.");
       expect(result.text).toContain("5 day(s)");
       expect(result.text).toContain("free tier");
     });
@@ -100,6 +105,7 @@ describe("billing email templates", () => {
       });
 
       expect(result.subject).toContain("downgrade pending");
+      expect(result.html).toContain("Acme Corp will move from team to the free tier on 2026-04-15.");
       expect(result.text).toContain("team");
       expect(result.text).toContain("5 capacity unit(s)");
       expect(result.text).toContain("2026-04-15");
@@ -118,6 +124,7 @@ describe("billing email templates", () => {
       });
 
       expect(result.subject).toContain("reduced");
+      expect(result.html).toContain("Acme Corp moved from team to the free tier with 1 capacity unit(s).");
       expect(result.text).toContain("team");
       expect(result.text).toContain("5 capacity unit(s)");
       expect(result.text).toContain("1 capacity unit(s)");
@@ -136,6 +143,7 @@ describe("billing email templates", () => {
       });
 
       expect(result.subject).toContain("team");
+      expect(result.html).toContain("Acme Corp changed from solo to team with 2 extra capacity unit(s).");
       expect(result.text).toContain("solo");
       expect(result.text).toContain("team");
       expect(result.text).toContain("2 extra capacity unit(s)");
@@ -164,6 +172,7 @@ describe("billing email templates", () => {
       });
 
       expect(result.subject).toContain("capacity quantity");
+      expect(result.html).toContain("Extra capacity changed from 2 to 5; total capacity is 8.");
       expect(result.text).toContain("2");
       expect(result.text).toContain("5");
       expect(result.text).toContain("8");

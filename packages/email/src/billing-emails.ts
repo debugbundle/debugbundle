@@ -35,6 +35,7 @@ export function renderPurchaseConfirmationEmail(input: PurchaseConfirmationInput
       eyebrow: "Billing",
       title: "Subscription confirmed",
       intro: `Your account "${escapeHtml(input.organizationName)}" is now on the ${escapeHtml(input.plan)} plan${escapeHtml(capacity)}.`,
+      preheader: `Your ${input.plan} plan is active for ${input.organizationName}${capacity}.`,
       bodyHtml: [
         renderEmailKeyValueList([
           { label: "Account", valueHtml: escapeHtml(input.organizationName) },
@@ -71,6 +72,7 @@ export function renderRenewalSuccessEmail(input: RenewalSuccessInput): BillingEm
       eyebrow: "Billing",
       title: "Subscription renewed",
       intro: `Your ${escapeHtml(input.plan)} plan${escapeHtml(capacity)} for account "${escapeHtml(input.organizationName)}" has been renewed.`,
+      preheader: `Your ${input.plan} plan renewed; next renewal is ${input.nextRenewalDate}.`,
       bodyHtml: renderEmailKeyValueList([
         { label: "Account", valueHtml: escapeHtml(input.organizationName) },
         { label: "Plan", valueHtml: escapeHtml(input.plan) },
@@ -103,6 +105,7 @@ export function renderPaymentFailureEmail(input: PaymentFailureInput): BillingEm
       eyebrow: "Billing",
       title: "Payment failed",
       intro: `A payment for your ${escapeHtml(input.plan)} plan on account "${escapeHtml(input.organizationName)}" could not be processed.`,
+      preheader: `Payment failed for ${input.organizationName}; paid features remain active while Stripe retries.`,
       bodyHtml: [
         renderEmailParagraph(
           "Your paid features remain active while Stripe retries the charge. If payment continues to fail, your entitlements may be reduced to the free tier."
@@ -139,6 +142,7 @@ export function renderPaymentFailureReminderEmail(input: PaymentFailureReminderI
       eyebrow: "Billing",
       title: "Payment still unresolved",
       intro: `Payment for your ${escapeHtml(input.plan)} plan on account "${escapeHtml(input.organizationName)}" remains unresolved.`,
+      preheader: `Resolve payment within ${input.daysUntilDowngrade} day(s) to avoid a downgrade.`,
       bodyHtml: [
         renderEmailParagraph(
           `If not resolved within <strong>${input.daysUntilDowngrade} day(s)</strong>, your account will be downgraded to the free tier.`
@@ -176,6 +180,7 @@ export function renderEntitlementDowngradeWarningEmail(input: EntitlementDowngra
       eyebrow: "Billing",
       title: "Entitlement downgrade pending",
       intro: `Due to unresolved billing, your account "${escapeHtml(input.organizationName)}" (currently ${escapeHtml(input.currentPlan)} with ${input.currentCapacityUnits} capacity unit(s)) will be downgraded to the free tier on ${escapeHtml(input.effectiveDate)}.`,
+      preheader: `${input.organizationName} will move from ${input.currentPlan} to the free tier on ${input.effectiveDate}.`,
       bodyHtml: [
         renderEmailKeyValueList([
           { label: "Current plan", valueHtml: escapeHtml(input.currentPlan) },
@@ -215,6 +220,7 @@ export function renderEntitlementDowngradeConfirmationEmail(input: EntitlementDo
       eyebrow: "Billing",
       title: "Entitlements reduced",
       intro: `Your account "${escapeHtml(input.organizationName)}" has been downgraded from ${escapeHtml(input.previousPlan)} (${input.previousCapacityUnits} capacity unit(s)) to the free tier (${input.newCapacityUnits} capacity unit(s)).`,
+      preheader: `${input.organizationName} moved from ${input.previousPlan} to the free tier with ${input.newCapacityUnits} capacity unit(s).`,
       bodyHtml: [
         renderEmailKeyValueList([
           { label: "Previous plan", valueHtml: escapeHtml(input.previousPlan) },
@@ -251,6 +257,7 @@ export function renderPlanChangeConfirmationEmail(input: PlanChangeConfirmationI
       eyebrow: "Billing",
       title: "Plan changed",
       intro: `Your account "${escapeHtml(input.organizationName)}" plan has been changed from ${escapeHtml(input.previousPlan)} to ${escapeHtml(input.newPlan)}${escapeHtml(capacity)}.`,
+      preheader: `${input.organizationName} changed from ${input.previousPlan} to ${input.newPlan}${capacity}.`,
       bodyHtml: [
         renderEmailKeyValueList([
           { label: "Previous plan", valueHtml: escapeHtml(input.previousPlan) },
@@ -284,6 +291,7 @@ export function renderCapacityQuantityChangeEmail(input: CapacityQuantityChangeI
       eyebrow: "Billing",
       title: "Capacity quantity updated",
       intro: `Extra capacity units for account "${escapeHtml(input.organizationName)}" (${escapeHtml(input.plan)}) changed from ${input.previousCapacity} to ${input.newCapacity}.`,
+      preheader: `Extra capacity changed from ${input.previousCapacity} to ${input.newCapacity}; total capacity is ${input.totalCapacityUnits}.`,
       bodyHtml: renderEmailKeyValueList([
         { label: "Plan", valueHtml: escapeHtml(input.plan) },
         { label: "Previous extra capacity", valueHtml: input.previousCapacity.toString() },

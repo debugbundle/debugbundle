@@ -11,6 +11,12 @@ import {
   renderEmailSubheading,
   renderEmailTextLink
 } from "./email-layout.js";
+import {
+  formatAlertDigestPreheader,
+  formatAlertPreheader,
+  formatWeeklyReportPreheader,
+  titleCase
+} from "./email-preheaders.js";
 
 export {
   renderPurchaseConfirmationEmail,
@@ -209,14 +215,6 @@ function formatWeeklyReportLead(projects: WeeklyReportProjectInput[]): string {
   return `Across ${projects.length} projects, you closed ${openedResolved} of the ${opened} incidents opened this week.`;
 }
 
-function titleCase(value: string): string {
-  if (value.length === 0) {
-    return value;
-  }
-
-  return value.charAt(0).toUpperCase() + value.slice(1);
-}
-
 function formatAlertConditionLabel(conditionType: string): string {
   switch (conditionType) {
     case "new_incident":
@@ -303,6 +301,7 @@ export function renderEmailAuthCodeEmail(input: {
       eyebrow: "Sign-in",
       title: "Your DebugBundle sign-in code",
       intro: "Use this code to continue with DebugBundle.",
+      preheader: `Your sign-in code expires in ${input.expiresInMinutes} minutes.`,
       bodyHtml: [
         renderEmailPanel(
           [
@@ -339,6 +338,7 @@ export function renderProjectInviteEmail(input: {
       eyebrow: "Project invite",
       title: "A DebugBundle project was shared with you",
       intro: `${escapeHtml(input.inviterName)} shared a DebugBundle project with you. Open the invite link to accept access to the shared project.`,
+      preheader: `${input.inviterName} invited you to a shared project.`,
       bodyHtml: [
         renderEmailButton({
           label: "Open invite",
@@ -360,6 +360,7 @@ export function renderWeeklyReportEmail(input: WeeklyReportEmailInput | LegacyWe
       : `DebugBundle weekly report for ${projectCount} projects`;
   const formattedWindow = `${formatEmailDate(normalized.windowStart)} to ${formatEmailDate(normalized.windowEnd)}`;
   const lead = formatWeeklyReportLead(normalized.projects);
+  const preheader = formatWeeklyReportPreheader(normalized.projects, formattedWindow);
   const text = [
     lead,
     `Window: ${formattedWindow}`,
@@ -381,6 +382,7 @@ export function renderWeeklyReportEmail(input: WeeklyReportEmailInput | LegacyWe
     eyebrow: "Weekly report",
     title: "DebugBundle weekly report",
     intro: `${escapeHtml(lead)} ${escapeHtml(formattedWindow)}.`,
+    preheader,
     bodyHtml: [
       renderEmailKeyValueList([
         { label: "Window", valueHtml: escapeHtml(formattedWindow) },
@@ -528,6 +530,14 @@ export function renderAlertEmail(input: AlertEmailInput): { subject: string; tex
     eyebrow: "Alert",
     title: formatAlertHeadline(input.conditionType),
     intro: formatAlertIntro(input.conditionType),
+    preheader: formatAlertPreheader({
+      conditionLabel,
+      environment: input.environment,
+      occurredAt: input.occurredAt,
+      projectName: input.projectName,
+      serviceName: input.serviceName,
+      severity: input.severity
+    }),
     bodyHtml: [
       renderEmailKeyValueList([
         { label: "Alert", valueHtml: escapeHtml(conditionLabel) },
@@ -618,6 +628,7 @@ export function renderAlertDigestEmail(input: {
       incidentCount === 1
         ? "DebugBundle batched 1 incident into this alert digest."
         : `DebugBundle batched ${incidentCount} incidents into this alert digest.`,
+    preheader: formatAlertDigestPreheader(alerts),
     bodyHtml: alerts
       .map((alert, index) =>
         renderEmailPanel(

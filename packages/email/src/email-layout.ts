@@ -114,11 +114,21 @@ export function renderEmailKeyValueList(
   return options.framed === false ? contentHtml : renderEmailPanel(contentHtml);
 }
 
+function renderEmailPreheader(preheader: string | undefined): string {
+  if (preheader === undefined || preheader.trim().length === 0) {
+    return "";
+  }
+
+  const spacer = "&zwnj;&nbsp;".repeat(32);
+  return `<div class="db-email-preheader" style="display:none!important;visibility:hidden;opacity:0;color:transparent;height:0;width:0;max-height:0;max-width:0;overflow:hidden;mso-hide:all;">${escapeHtml(preheader.trim())}${spacer}</div>`;
+}
+
 export function renderEmailLayout(input: {
   title: string;
   bodyHtml: string;
   eyebrow?: string;
   intro?: string;
+  preheader?: string;
   footerHtml?: string;
 }): string {
   const introHtml = input.intro === undefined ? "" : renderEmailParagraph(input.intro);
@@ -127,6 +137,7 @@ export function renderEmailLayout(input: {
     `<p style="margin:0;color:${EMAIL_TEXT_QUIET};font-size:13px;line-height:20px;">This is an automated email from DebugBundle.</p>`;
 
   return [
+    renderEmailPreheader(input.preheader),
     "<style>",
     "@media only screen and (min-width: 641px) {",
     "  .db-email-shell { padding: 32px 16px !important; }",

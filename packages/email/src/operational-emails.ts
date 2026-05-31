@@ -59,6 +59,7 @@ export function renderWebhookAutoDisabledEmail(input: WebhookAutoDisabledEmailIn
       eyebrow: "Operational",
       title: "Webhook auto-disabled",
       intro: `DebugBundle automatically disabled a webhook in account "${escapeHtml(input.organizationName)}" after repeated delivery failures.`,
+      preheader: `Webhook ${input.webhookId} for ${input.projectName} was disabled after 50 delivery failures.`,
       bodyHtml: [
         renderEmailKeyValueList([
           { label: "Project", valueHtml: escapeHtml(input.projectName) },
@@ -104,6 +105,7 @@ export function renderAllowanceWarning80Email(input: AllowanceThresholdEmailInpu
       eyebrow: "Operational",
       title: `${input.meterLabel} allowance at 80%`,
       intro: `DebugBundle reached 80% of the ${escapeHtml(input.meterLabel.toLowerCase())} allowance for account "${escapeHtml(input.organizationName)}".`,
+      preheader: `${input.projectName} used ${input.used} of ${input.limit} ${input.meterLabel.toLowerCase()} allowance.`,
       bodyHtml: [
         renderEmailKeyValueList([
           { label: "Project", valueHtml: escapeHtml(input.projectName) },
@@ -151,6 +153,7 @@ export function renderAllowanceLimitReachedEmail(input: AllowanceThresholdEmailI
       eyebrow: "Operational",
       title: `${input.meterLabel} allowance limit reached`,
       intro: `DebugBundle reached the ${escapeHtml(input.meterLabel.toLowerCase())} allowance limit for account "${escapeHtml(input.organizationName)}".`,
+      preheader: `${input.projectName} reached ${input.used} of ${input.limit} ${input.meterLabel.toLowerCase()} allowance.`,
       bodyHtml: [
         renderEmailKeyValueList([
           { label: "Project", valueHtml: escapeHtml(input.projectName) },
@@ -197,6 +200,7 @@ export function renderRetentionRotationNoticeEmail(
       eyebrow: "Operational",
       title: "Retained bundles rotated out",
       intro: `DebugBundle rotated out the oldest retained bundles in account "${escapeHtml(input.organizationName)}" after the retained bundle cap was reached.`,
+      preheader: `${input.rotatedOwnerCount} retained bundle owners rotated out for ${input.projectName}; cap is ${input.retainedBundleLimit}.`,
       bodyHtml: [
         renderEmailKeyValueList([
           { label: "Project", valueHtml: escapeHtml(input.projectName) },

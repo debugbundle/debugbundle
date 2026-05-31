@@ -86,6 +86,10 @@ describe("email package", () => {
     expect(rendered.text).toContain("Across 2 projects, you closed 2 of the 3 incidents opened this week.");
     expect(rendered.text).toContain("Project: Checkout <API>");
     expect(rendered.text).toContain("Top spiking incidents:\nNone");
+    expect(rendered.html).toContain(
+      "2 projects: 3 new incidents, 3 resolved incidents, 3 failure bundles, 1 improvement bundle, 1 regression for March 9, 2026 to March 16, 2026."
+    );
+    expect(rendered.html.indexOf("2 projects: 3 new incidents")).toBeLessThan(rendered.html.indexOf("<style>"));
     expect(rendered.html).toContain("Checkout &lt;API&gt;");
     expect(rendered.html).toContain(">Project<");
     expect(rendered.html).toContain("DebugBundle weekly report");
@@ -107,11 +111,14 @@ describe("email package", () => {
     expect(emailCode.subject).toContain("sign-in code");
     expect(emailCode.text).toContain("12<3456>");
     expect(emailCode.text).toContain("https://debugbundle.test/login?next=<dashboard>");
+    expect(emailCode.html).toContain("Your sign-in code expires in 10 minutes.");
+    expect(emailCode.html.indexOf("Your sign-in code expires")).toBeLessThan(emailCode.html.indexOf("<style>"));
     expect(emailCode.html).toContain("12&lt;3456&gt;");
     expect(emailCode.html).toContain("&lt;dashboard&gt;");
     expect(invite.subject).toContain("project was shared");
     expect(invite.text).toContain("Owen Example shared a DebugBundle project with you.");
     expect(invite.text).toContain("https://debugbundle.test/accept?token=<secret>");
+    expect(invite.html).toContain("Owen Example invited you to a shared project.");
     expect(invite.html).toContain("Owen Example");
     expect(invite.html).toContain("&lt;secret&gt;");
   });
@@ -130,6 +137,10 @@ describe("email package", () => {
     });
 
     expect(rendered.subject).toBe("[DebugBundle Alert] A new incident was detected");
+    expect(rendered.html).toContain(
+      "Checkout &lt;API&gt;: High new incident for checkout-&lt;api&gt; in production at May 13, 2026, 8:33 AM UTC."
+    );
+    expect(rendered.html.indexOf("High new incident")).toBeLessThan(rendered.html.indexOf("<style>"));
     expect(rendered.text).toContain("Project: Checkout <API>");
     expect(rendered.text).toContain("Service: checkout-<api>");
     expect(rendered.text).toContain("Detected at: May 13, 2026, 8:33 AM UTC");
@@ -173,6 +184,10 @@ describe("email package", () => {
     });
 
     expect(rendered.subject).toBe("[DebugBundle Alerts] 1 incident matched your alerts");
+    expect(rendered.html).toContain(
+      "Checkout &lt;API&gt;: 1 incident matched alerts. First: High Checkout crash on checkout-&lt;api&gt; in production."
+    );
+    expect(rendered.html.indexOf("1 incident matched alerts")).toBeLessThan(rendered.html.indexOf("<style>"));
     expect(rendered.text).toContain("Project: Checkout <API>");
     expect(rendered.text).toContain("Alerts: New incident, Severity threshold reached");
     expect(rendered.text).toContain("Detected at: May 17, 2026, 10:00 AM UTC");
@@ -194,6 +209,9 @@ describe("email package", () => {
     });
 
     expect(rendered.subject).toContain("webhook auto-disabled");
+    expect(rendered.html).toContain(
+      "Webhook wh_&lt;123&gt; for checkout-&lt;api&gt; was disabled after 50 delivery failures."
+    );
     expect(rendered.text).toContain('Acme <Prod>');
     expect(rendered.text).toContain("Project: checkout-<api>");
     expect(rendered.text).toContain("Webhook ID: wh_<123>");
