@@ -2763,21 +2763,27 @@ export function createPostgresMetadataStore(db: Queryable): PostgresMetadataStor
     },
 
     async listIncidentsForOrganization(input): Promise<IncidentRetrievalRecord[]> {
-      const params: unknown[] = [input.organization_id];
-      const conditions = ["p.organization_id = $1::uuid"];
-
-      if (input.user_id !== undefined) {
-        params.push(input.user_id);
-        conditions.push(`(
-          p.owner_user_id = $2::uuid
-          OR EXISTS (
-            SELECT 1
-            FROM project_members pm
-            WHERE pm.project_id = p.id
-              AND pm.user_id = $2::uuid
+      const params: unknown[] = [input.organization_id, input.user_id ?? null];
+      const conditions = [
+        `(
+          (
+            $2::uuid IS NULL
+            AND p.organization_id = $1::uuid
           )
-        )`);
-      }
+          OR (
+            $2::uuid IS NOT NULL
+            AND (
+              p.owner_user_id = $2::uuid
+              OR EXISTS (
+                SELECT 1
+                FROM project_members pm
+                WHERE pm.project_id = p.id
+                  AND pm.user_id = $2::uuid
+              )
+            )
+          )
+        )`
+      ];
 
       if (input.project_id !== undefined) {
         params.push(input.project_id);

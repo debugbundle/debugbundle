@@ -20,7 +20,8 @@ describe("improvement opportunity store", () => {
     });
 
     const listSql = String(query.mock.calls[0]?.[0] ?? "");
-    expect(listSql).toContain("p.organization_id = $1::uuid");
+    expect(listSql).toContain("$2::uuid IS NULL");
+    expect(listSql).toContain("$2::uuid IS NOT NULL");
     expect(listSql).toContain("FROM project_members pm");
 
     expect(query).toHaveBeenNthCalledWith(
@@ -362,6 +363,7 @@ describe("improvement opportunity store", () => {
     expect(String(query.mock.calls[0]?.[0] ?? "")).toContain("'/wp-admin'");
     expect(query.mock.calls[0]?.[1]).toEqual([
       "org_123",
+      null,
       "proj_123",
       "production",
       "checkout-api",
@@ -385,7 +387,7 @@ describe("improvement opportunity store", () => {
 
     expect(result).toEqual([]);
     expect(String(query.mock.calls[0]?.[0] ?? "")).toContain("io.status <> 'open'");
-    expect(query.mock.calls[0]?.[1]).toEqual(["org_123", 10]);
+    expect(query.mock.calls[0]?.[1]).toEqual(["org_123", null, 10]);
   });
 
   it("returns improvement retrieval records or null for organization lookups", async () => {

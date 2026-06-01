@@ -273,7 +273,8 @@ describe("postgres metadata store project collaboration", () => {
     });
 
     const incidentListSql = String(query.mock.calls[0]?.[0] ?? "");
-    expect(incidentListSql).toContain("p.organization_id = $1::uuid");
+    expect(incidentListSql).toContain("$2::uuid IS NULL");
+    expect(incidentListSql).toContain("$2::uuid IS NOT NULL");
     expect(incidentListSql).toContain("FROM project_members pm");
 
     expect(query).toHaveBeenNthCalledWith(

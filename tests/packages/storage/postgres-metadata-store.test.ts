@@ -1806,7 +1806,7 @@ describe("postgres metadata store", () => {
         }
       })
     ]);
-    expect(query).toHaveBeenCalledWith(expect.stringContaining("FROM incident_events ie"), ["org_123", 20]);
+    expect(query).toHaveBeenCalledWith(expect.stringContaining("FROM incident_events ie"), ["org_123", null, 20]);
   });
 
   it("should derive incident_reason for request anomaly incidents from matched_fields when no primary incident-signal row exists", async (): Promise<void> => {
@@ -2004,8 +2004,9 @@ describe("postgres metadata store", () => {
     });
 
     expect(listed).toHaveLength(1);
-    expect(query).toHaveBeenCalledWith(expect.stringContaining("AND i.project_id = $2"), [
+    expect(query).toHaveBeenCalledWith(expect.stringContaining("AND i.project_id = $3"), [
       "org_123",
+      null,
       "proj_123",
       "production",
       "checkout-api",
