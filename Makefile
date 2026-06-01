@@ -227,11 +227,11 @@ dev: ensure-probe-trigger-secret install
 
 .PHONY: dev-public
 dev-public:
-	docker run --rm -it \
+	docker run --rm \
 		-v "$(PWD):$(WORKDIR)" \
 		-w "$(WORKDIR)" \
 		-p $(PUBLIC_SITE_PORT):$(PUBLIC_SITE_PORT) \
-		$(NODE_IMAGE) sh -lc "corepack enable && $(PNPM_INSTALL_RELAXED) && cd site && corepack pnpm exec next dev --hostname 0.0.0.0 --port $(PUBLIC_SITE_PORT)"
+		$(NODE_IMAGE) sh -lc "corepack enable && $(PNPM_INSTALL_RELAXED) && corepack pnpm public-site:artifacts && corepack pnpm --dir ./site install --force --frozen-lockfile=false && corepack pnpm --dir ./site dev --hostname 0.0.0.0 --port $(PUBLIC_SITE_PORT)"
 
 .PHONY: backend-restart
 backend-restart: ensure-probe-trigger-secret install

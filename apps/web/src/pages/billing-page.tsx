@@ -606,6 +606,8 @@ export function BillingPage(): JSX.Element {
   }
 
   const canChangeBilling = billing !== null;
+  const isBillingManagedInternally = billing !== null && billing.plan !== "free" && billing.stripe_customer_id === null;
+  const canManageStripeBilling = canChangeBilling && !isBillingManagedInternally;
   const pendingReduction = billing?.capacity_units.pending_reduction ?? null;
 
   return (
@@ -662,18 +664,18 @@ export function BillingPage(): JSX.Element {
                           Upgrade to Team
                         </Button>
                       </>
-                    ) : billing.plan === "solo" ? (
+                    ) : isBillingManagedInternally ? null : billing.plan === "solo" ? (
                       <>
-                        <Button type="button" disabled={!canChangeBilling || isOpeningPortal} onClick={() => void handlePortal()}>
+                        <Button type="button" disabled={!canManageStripeBilling || isOpeningPortal} onClick={() => void handlePortal()}>
                           <CreditCardIcon data-icon="inline-start" />
                           {isOpeningPortal ? "Opening portal..." : "Manage subscription"}
                         </Button>
-                        <Button type="button" variant="outline" disabled={!canChangeBilling || activeCheckoutPlan !== null} onClick={() => void handleCheckout("team")}>
+                        <Button type="button" variant="outline" disabled={!canManageStripeBilling || activeCheckoutPlan !== null} onClick={() => void handleCheckout("team")}>
                           Upgrade to Team
                         </Button>
                       </>
                     ) : (
-                      <Button type="button" disabled={!canChangeBilling || isOpeningPortal} onClick={() => void handlePortal()}>
+                      <Button type="button" disabled={!canManageStripeBilling || isOpeningPortal} onClick={() => void handlePortal()}>
                         <CreditCardIcon data-icon="inline-start" />
                         {isOpeningPortal ? "Opening portal..." : "Manage subscription"}
                       </Button>
@@ -704,6 +706,14 @@ export function BillingPage(): JSX.Element {
                     tone="neutral"
                   />
                 )}
+                {isBillingManagedInternally ? (
+                  <CalloutCard
+                    eyebrow="Internal plan"
+                    title="Billing is managed internally"
+                    description="This account has an internal plan override, so Stripe checkout and subscription management are not used."
+                    tone="neutral"
+                  />
+                ) : null}
               </CardContent>
             </Card>
 
@@ -713,10 +723,10 @@ export function BillingPage(): JSX.Element {
                   <CardTitle>Allowance capacity</CardTitle>
                   <CardDescription>Included and purchased units set the size of the hosted allowance.</CardDescription>
                 </div>
-                {billing.plan === "free" ? null : (
+                {billing.plan === "free" || isBillingManagedInternally ? null : (
                   <CapacityDialog
                     billing={billing}
-                    canChangeBilling={canChangeBilling}
+                    canChangeBilling={canManageStripeBilling}
                     open={isCapacityDialogOpen}
                     onOpenChange={setIsCapacityDialogOpen}
                     onBillingChange={setBilling}

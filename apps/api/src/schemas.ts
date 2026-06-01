@@ -676,6 +676,15 @@ export const BillingCapacityChangeBodySchema = z
   })
   .strict();
 
+export const AdminBillingOverrideBodySchema = z
+  .object({
+    organization_id: z.string().uuid().optional(),
+    plan: z.enum(["free", "solo", "team"]),
+    additional_capacity_units: z.coerce.number().int().min(0).max(MAX_BILLING_ADDITIONAL_CAPACITY_UNITS),
+    reason: z.string().min(3).max(500)
+  })
+  .strict();
+
 export const CreateProjectBodySchema = z
   .object({
     name: z.string().min(1).max(120),

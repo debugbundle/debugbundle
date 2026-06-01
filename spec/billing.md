@@ -409,6 +409,14 @@ Requirements:
 
 For V1, this can be a CLI command or internal API endpoint. It does not need a UI.
 
+Implementation:
+- Configure runtime operator emails with `BILLING_ADMIN_OVERRIDE_EMAILS` as a comma-separated list.
+- In the hosted deploy workflow, the private `HOSTED_BILLING_ADMIN_OVERRIDE_EMAILS` secret should render into runtime `BILLING_ADMIN_OVERRIDE_EMAILS`.
+- `POST /v1/admin/billing/override` accepts optional `organization_id` (defaults to the operator's own organization), absolute `plan`, absolute `additional_capacity_units`, and `reason`.
+- The route requires an authenticated operator whose email is present in `BILLING_ADMIN_OVERRIDE_EMAILS`.
+- The route writes the effective organization entitlement snapshot directly, clears Stripe customer/subscription linkage, marks paid overrides with `billing_state = 'admin_override'`, and audit-logs the operator, target organization, absolute entitlement, and reason.
+- The Billing page treats paid plans with no `stripe_customer_id` as internally managed and does not offer Stripe checkout, portal, or capacity-management actions.
+
 ---
 
 ## 9. Failure Handling

@@ -134,6 +134,7 @@ import {
   createApiDependenciesFromEnv,
   getBooleanField,
   getStringField,
+  normalizeEmailForConfig,
   normalizeBillingPlan,
   readCsvEnv,
   readSubscriptionInvoiceLinePeriod,
@@ -324,6 +325,7 @@ describe("api default dependencies", () => {
     ]);
     expect(readCsvEnv({ CORS_ORIGINS: " , , " }, "CORS_ORIGINS")).toBeUndefined();
 
+    expect(normalizeEmailForConfig(" Owen@Example.COM ")).toBe("owen@example.com");
     expect(normalizeBillingPlan("solo")).toBe("solo");
     expect(normalizeBillingPlan("team")).toBe("team");
     expect(normalizeBillingPlan("anything-else")).toBe("free");
@@ -894,6 +896,12 @@ describe("api default dependencies", () => {
         client_reference_id: "org_123",
         customer_email: "owner@example.com",
         line_items: [{ price: "price_solo", quantity: 1 }],
+        automatic_tax: { enabled: true },
+        billing_address_collection: "auto",
+        tax_id_collection: { enabled: true },
+        subscription_data: {
+          metadata: { organization_id: "org_123" }
+        },
         success_url: expect.stringContaining("session_id={CHECKOUT_SESSION_ID}")
       })
     );
@@ -901,6 +909,69 @@ describe("api default dependencies", () => {
       "SELECT stripe_customer_id FROM organizations WHERE id = $1 LIMIT 1",
       ["org_123"]
     );
+  });
+
+  it("should update saved Stripe customer billing details during checkout", async (): Promise<void> => {
+    const checkoutCreate = vi.fn().mockResolvedValue({ url: "https://checkout.stripe.test/session_456" });
+    const db = {
+      query: vi.fn().mockResolvedValue({ rows: [{ stripe_customer_id: "cus_existing" }] })
+    };
+    const deps = createApiDependencies({
+      objectStore: {
+        putObject: vi.fn(),
+        getObject: vi.fn(),
+        deleteObjectsByPrefix: vi.fn()
+      },
+      queue: {
+        enqueue: vi.fn()
+      },
+      db,
+      stripeConfig: {
+        client: {
+          checkout: {
+            sessions: {
+              create: checkoutCreate
+            }
+          },
+          billingPortal: {
+            sessions: {
+              create: vi.fn()
+            }
+          }
+        },
+        webhookSecret: "whsec_test",
+        priceMap: new Map([
+          ["price_solo", { plan: "solo", type: "plan" }],
+          ["price_team", { plan: "team", type: "plan" }],
+          ["price_solo_capacity", { plan: "solo", type: "extra_capacity" }],
+          ["price_team_capacity", { plan: "team", type: "extra_capacity" }]
+        ]),
+        soloPriceId: "price_solo",
+        teamPriceId: "price_team",
+        soloExtraCapacityPriceId: "price_solo_capacity",
+        teamExtraCapacityPriceId: "price_team_capacity"
+      } as never
+    });
+
+    const checkout = await deps.billingManagement.createCheckoutLink({
+      organization_id: "org_123",
+      billing_email: "owner@example.com",
+      current_plan: "solo",
+      target_plan: "team"
+    });
+
+    expect(checkout).toEqual({ url: "https://checkout.stripe.test/session_456" });
+    expect(checkoutCreate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        customer: "cus_existing",
+        customer_update: { address: "auto", name: "auto" },
+        line_items: [{ price: "price_team", quantity: 1 }],
+        automatic_tax: { enabled: true },
+        billing_address_collection: "auto",
+        tax_id_collection: { enabled: true }
+      })
+    );
+    expect(checkoutCreate.mock.calls[0]?.[0]).not.toHaveProperty("customer_email");
   });
 
   it("should increase allowance capacity immediately through the Stripe subscription", async (): Promise<void> => {
@@ -1253,6 +1324,18 @@ describe("api default dependencies", () => {
       "brother@example.com",
       "owen@example.com"
     ]);
+  });
+
+  it("should configure billing admin override emails from runtime env", (): void => {
+    const dependencies = createApiDependenciesFromEnv({
+      BILLING_ADMIN_OVERRIDE_EMAILS: " Owen@Example.com, admin@example.com ,owen@example.com"
+    });
+    const billingAdmin = dependencies.billingAdmin;
+
+    expect(billingAdmin).toBeDefined();
+    expect(billingAdmin?.isOperatorAllowed({ email: "owen@example.com" })).toBe(true);
+    expect(billingAdmin?.isOperatorAllowed({ email: "ADMIN@example.com" })).toBe(true);
+    expect(billingAdmin?.isOperatorAllowed({ email: "regular@example.com" })).toBe(false);
   });
 
   it("should compose dev-only mock github oauth support when enabled without real github credentials", async (): Promise<void> => {

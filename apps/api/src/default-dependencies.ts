@@ -13,6 +13,7 @@ import {
   type WebSessionAuthService
 } from "../../../packages/auth/src/index.js";
 import {
+  MAX_BILLING_ADDITIONAL_CAPACITY_UNITS,
   getDefaultPreset,
   type CaptureRuleCreate,
   type CaptureRuleUpdate,
@@ -96,6 +97,7 @@ export interface CreateApiDependenciesInput {
   ingestionRateLimiter?: IngestionRateLimiter;
   authRateLimiter?: AuthRateLimiter;
   signupEmailAllowlist?: string[];
+  billingAdminEmails?: string[];
   authEmails?: AuthEmailSender;
   billingEmails?: BillingEmailService;
   githubOAuth?: GitHubOAuthConfig;
@@ -465,6 +467,20 @@ function readSignupEmailAllowlistFromEnv(env: Record<string, string | undefined>
   return readCsvEnv(env, "AUTH_SIGNUP_ALLOWED_EMAILS");
 }
 
+export function normalizeEmailForConfig(email: string): string {
+  return email.trim().toLowerCase();
+}
+
+function readBillingAdminEmailsFromEnv(env: Record<string, string | undefined>): string[] | undefined {
+  const emails = readCsvEnv(env, "BILLING_ADMIN_OVERRIDE_EMAILS");
+  if (emails === undefined) {
+    return undefined;
+  }
+
+  const normalized = [...new Set(emails.map(normalizeEmailForConfig).filter((email) => email.length > 0))];
+  return normalized.length > 0 ? normalized : undefined;
+}
+
 function createAuthEmailSender(input: { emailTransport: EmailTransport; appBaseUrl: string }): AuthEmailSender {
   const baseUrl = stripTrailingSlash(input.appBaseUrl);
 
@@ -622,6 +638,15 @@ export function createApiDependencies(input: CreateApiDependenciesInput): {
       organization_id: string;
       now: string;
     }): Promise<BillingSummaryRecord | "billing_not_configured" | "billing_not_found" | "no_active_subscription" | "capacity_reduction_not_found">;
+  };
+  billingAdmin?: {
+    isOperatorAllowed(input: { email: string }): boolean;
+    overrideOrganizationBilling(input: {
+      organization_id: string;
+      plan: "free" | "solo" | "team";
+      additional_capacity_units: number;
+      now: string;
+    }): Promise<BillingSummaryRecord | "billing_not_found">;
   };
   projectCollaboration: Pick<
     ReturnType<typeof createPostgresMetadataStore>,
@@ -959,6 +984,10 @@ export function createApiDependencies(input: CreateApiDependenciesInput): {
       ? createIngestionMetadataService(metadataStore)
       : createIngestionMetadataService(metadataStore, { frequencyCounter: input.frequencyCounter });
   const authEmails = input.authEmails;
+  const billingAdminEmails =
+    input.billingAdminEmails === undefined
+      ? null
+      : new Set(input.billingAdminEmails.map(normalizeEmailForConfig).filter((email) => email.length > 0));
   const inviteEmails =
     authEmails === undefined
       ? undefined
@@ -1089,6 +1118,52 @@ export function createApiDependencies(input: CreateApiDependenciesInput): {
     };
   }
 
+  async function overrideOrganizationBilling(inputValue: {
+    organization_id: string;
+    plan: "free" | "solo" | "team";
+    additional_capacity_units: number;
+    now: string;
+  }): Promise<BillingSummaryRecord | "billing_not_found"> {
+    const additionalCapacityUnits =
+      inputValue.plan === "free" ? 0 : Math.min(inputValue.additional_capacity_units, MAX_BILLING_ADDITIONAL_CAPACITY_UNITS);
+    const result = await input.db.query<{ id: string }>(
+      `
+        UPDATE organizations
+        SET
+          plan = $2,
+          additional_capacity_units = $3,
+          stripe_customer_id = NULL,
+          stripe_subscription_id = NULL,
+          billing_state = CASE WHEN $2 = 'free' THEN NULL ELSE 'admin_override' END,
+          billing_period_starts_at = NULL,
+          billing_period_ends_at = NULL,
+          last_billing_sync_at = $4::timestamptz,
+          last_billing_event_id = $5,
+          updated_at = $4::timestamptz
+        WHERE id = $1
+        RETURNING id::text AS id
+      `,
+      [
+        inputValue.organization_id,
+        inputValue.plan,
+        additionalCapacityUnits,
+        inputValue.now,
+        `admin_override:${inputValue.now}`
+      ]
+    );
+
+    if (result.rows[0] === undefined) {
+      return "billing_not_found";
+    }
+
+    return (
+      await billingStore.getBillingSummaryForOrganization({
+        organization_id: inputValue.organization_id,
+        now: inputValue.now
+      })
+    ) ?? "billing_not_found";
+  }
+
   return {
     ingestionPersistence,
     ingestionMetadata,
@@ -1191,13 +1266,16 @@ export function createApiDependencies(input: CreateApiDependenciesInput): {
           );
           const existingCustomerId = orgResult.rows[0]?.stripe_customer_id ?? null;
 
-          const sessionParams: Record<string, unknown> = {
+          const sessionParams: NonNullable<Parameters<typeof stripe.client.checkout.sessions.create>[0]> = {
             mode: "subscription",
             client_reference_id: checkoutInput.organization_id,
             metadata: { organization_id: checkoutInput.organization_id },
             line_items: [{ price: priceId, quantity: 1 }],
             success_url: `${process.env["APP_BASE_URL"] ?? "http://localhost:3000"}/billing?checkout=success&session_id={CHECKOUT_SESSION_ID}`,
             cancel_url: `${process.env["APP_BASE_URL"] ?? "http://localhost:3000"}/billing?checkout=canceled`,
+            automatic_tax: { enabled: true },
+            billing_address_collection: "auto",
+            tax_id_collection: { enabled: true },
             allow_promotion_codes: true,
             subscription_data: {
               metadata: { organization_id: checkoutInput.organization_id }
@@ -1205,13 +1283,14 @@ export function createApiDependencies(input: CreateApiDependenciesInput): {
           };
 
           if (existingCustomerId !== null) {
-            sessionParams["customer"] = existingCustomerId;
+            sessionParams.customer = existingCustomerId;
+            sessionParams.customer_update = { address: "auto", name: "auto" };
           } else {
-            sessionParams["customer_email"] = checkoutInput.billing_email;
+            sessionParams.customer_email = checkoutInput.billing_email;
           }
 
           try {
-            const session = await stripe.client.checkout.sessions.create(sessionParams as Parameters<typeof stripe.client.checkout.sessions.create>[0]);
+            const session = await stripe.client.checkout.sessions.create(sessionParams);
             return session.url ? { url: session.url } : null;
           } catch {
             return null;
@@ -1468,6 +1547,14 @@ export function createApiDependencies(input: CreateApiDependenciesInput): {
         });
       }
     },
+    ...(billingAdminEmails === null
+      ? {}
+      : {
+          billingAdmin: {
+            isOperatorAllowed: ({ email }: { email: string }) => billingAdminEmails.has(normalizeEmailForConfig(email)),
+            overrideOrganizationBilling
+          }
+        }),
     projectCollaboration: {
       listMembersForProject: (input) => metadataStore.listMembersForProject!(input),
       listPendingInvitesForProject: (input) => metadataStore.listPendingInvitesForProject!(input),
@@ -2090,6 +2177,15 @@ export function createApiDependenciesFromEnv(env: Record<string, string | undefi
       now: string;
     }): Promise<BillingSummaryRecord | "billing_not_configured" | "billing_not_found" | "no_active_subscription" | "capacity_reduction_not_found">;
   };
+  billingAdmin?: {
+    isOperatorAllowed(input: { email: string }): boolean;
+    overrideOrganizationBilling(input: {
+      organization_id: string;
+      plan: "free" | "solo" | "team";
+      additional_capacity_units: number;
+      now: string;
+    }): Promise<BillingSummaryRecord | "billing_not_found">;
+  };
   probeManagement: Pick<
     ReturnType<typeof createPostgresMetadataStore>,
     | "listActiveProbesForProject"
@@ -2213,6 +2309,7 @@ export function createApiDependenciesFromEnv(env: Record<string, string | undefi
   const lifecycleWebhookFallbackTargetUrl = readNonEmptyEnv(env, "LIFECYCLE_WEBHOOK_TARGET_URL");
   const lifecycleWebhookFallbackSigningSecret = readNonEmptyEnv(env, "LIFECYCLE_WEBHOOK_SECRET");
   const signupEmailAllowlist = readSignupEmailAllowlistFromEnv(env);
+  const billingAdminEmails = readBillingAdminEmailsFromEnv(env);
 
   const authRateLimiter = createRedisAuthRateLimiter({
     redisUrl: env["REDIS_URL"] ?? "redis://localhost:6379"
@@ -2233,6 +2330,7 @@ export function createApiDependenciesFromEnv(env: Record<string, string | undefi
     ...(githubOAuth === undefined ? {} : { githubOAuth }),
     ...(githubAppClient === undefined ? {} : { githubAppClient }),
     ...(signupEmailAllowlist === undefined ? {} : { signupEmailAllowlist }),
+    ...(billingAdminEmails === undefined ? {} : { billingAdminEmails }),
     ...(stripeConfig === undefined ? {} : { stripeConfig }),
     ...(lifecycleWebhookFallbackTargetUrl === undefined ? {} : { lifecycleWebhookFallbackTargetUrl }),
     ...(lifecycleWebhookFallbackSigningSecret === undefined ? {} : { lifecycleWebhookFallbackSigningSecret }),

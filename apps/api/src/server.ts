@@ -10,6 +10,7 @@ import { SMALL_REQUEST_BODY_LIMIT_BYTES } from "./http-limits.ts";
 import { registerAuthRoutes } from "./routes/auth.js";
 import { registerAlertRoutes } from "./routes/alerts.js";
 import { registerAccountRoutes } from "./routes/account.js";
+import { registerAdminBillingRoutes } from "./routes/admin-billing.js";
 import { registerBillingRoutes } from "./routes/billing.js";
 import { registerCapturePolicyRoutes } from "./routes/capture-policy.js";
 import { registerCaptureRuleRoutes } from "./routes/capture-rules.js";
@@ -267,6 +268,7 @@ export function createApiServer(dependencies: ApiDependencies, options: ApiServe
   registerApiDogfooding(app, dogfoodingEnv, dependencies, options.dogfoodingSdk, app.log);
 
   registerAccountRoutes(app, dependencies);
+  registerAdminBillingRoutes(app, dependencies);
   registerAuthRoutes(app, dependencies);
   registerBillingRoutes(app, dependencies);
   registerGitHubRoutes(app, dependencies);

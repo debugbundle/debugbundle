@@ -237,6 +237,15 @@ export interface ApiDependencies {
       now: string;
     }): Promise<BillingSummaryRecord | "billing_not_configured" | "billing_not_found" | "no_active_subscription" | "capacity_reduction_not_found">;
   } | undefined;
+  billingAdmin?: {
+    isOperatorAllowed(input: { email: string }): boolean;
+    overrideOrganizationBilling(input: {
+      organization_id: string;
+      plan: "free" | "solo" | "team";
+      additional_capacity_units: number;
+      now: string;
+    }): Promise<BillingSummaryRecord | "billing_not_found">;
+  } | undefined;
   projectCollaboration?: {
     listMembersForProject?(input: {
       project_id: string;

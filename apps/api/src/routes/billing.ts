@@ -344,6 +344,24 @@ export function registerBillingRoutes(app: FastifyInstance, dependencies: ApiDep
 
       return reply.status(409).send({ error: "no_active_subscription" });
     }
+    if (billing.stripe_customer_id === null) {
+      await recordAuditLog(dependencies.auditLogging, {
+        organization_id: session.organization_id,
+        actor_user_id: session.user_id,
+        actor_type: "browser_session",
+        action: "billing.portal",
+        target_type: "billing_portal",
+        target_id: session.organization_id,
+        status: "failure",
+        ip_address: request.ip,
+        metadata: {
+          current_plan: billing.plan,
+          reason: "billing_managed_internally"
+        }
+      });
+
+      return reply.status(409).send({ error: "billing_managed_internally" });
+    }
 
     const portal = await dependencies.billingManagement.createPortalLink({
       organization_id: session.organization_id,
