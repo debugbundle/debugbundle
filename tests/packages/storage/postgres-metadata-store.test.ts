@@ -1314,7 +1314,8 @@ describe("postgres metadata store", () => {
       "error",
       "2026-03-11T00:10:00.000Z",
       "550e8400-e29b-41d4-a716-446655440001",
-      10
+      10,
+      null
     ]);
   });
 
@@ -1330,7 +1331,7 @@ describe("postgres metadata store", () => {
     });
 
     expect(logs).toEqual([]);
-    expect(query).toHaveBeenCalledWith(expect.any(String), ["inc_123", "org_123", null, null, null, 5]);
+    expect(query).toHaveBeenCalledWith(expect.any(String), ["inc_123", "org_123", null, null, null, 5, null]);
   });
 
   it("should throw when service creation does not return id", async (): Promise<void> => {
@@ -2079,7 +2080,8 @@ describe("postgres metadata store", () => {
       "org_123",
       "inc_123",
       "usr_123",
-      "2026-03-10T00:12:00.000Z"
+      "2026-03-10T00:12:00.000Z",
+      null
     ]);
   });
 
@@ -2142,7 +2144,8 @@ describe("postgres metadata store", () => {
     expect(query).toHaveBeenCalledOnce();
     expect(query).toHaveBeenCalledWith(expect.stringContaining("UPDATE incidents"), [
       "org_123",
-      "inc_123"
+      "inc_123",
+      null
     ]);
   });
 

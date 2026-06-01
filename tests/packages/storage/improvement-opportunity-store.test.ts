@@ -19,6 +19,10 @@ describe("improvement opportunity store", () => {
       improvement_id: "imp_shared"
     });
 
+    const listSql = String(query.mock.calls[0]?.[0] ?? "");
+    expect(listSql).toContain("p.organization_id = $1::uuid");
+    expect(listSql).toContain("FROM project_members pm");
+
     expect(query).toHaveBeenNthCalledWith(
       1,
       expect.stringContaining("FROM project_members pm"),

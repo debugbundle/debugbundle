@@ -417,17 +417,7 @@ export function createPostgresImprovementOpportunityStore(db: Queryable): Improv
     async listImprovementsForOrganization(input) {
       const parameters: Array<string | number> = [input.organization_id];
       const predicates = [
-        input.user_id === undefined
-          ? "p.organization_id = $1::uuid"
-          : `(
-              p.owner_user_id = $2::uuid
-              OR EXISTS (
-                SELECT 1
-                FROM project_members pm
-                WHERE pm.project_id = p.id
-                  AND pm.user_id = $2::uuid
-              )
-            )`,
+        "p.organization_id = $1::uuid",
         `(
           io.status <> 'open'
           OR io.kind = 'post_deploy_regression'
@@ -489,6 +479,15 @@ export function createPostgresImprovementOpportunityStore(db: Queryable): Improv
 
       if (input.user_id !== undefined) {
         parameters.push(input.user_id);
+        predicates.push(`(
+          p.owner_user_id = $2::uuid
+          OR EXISTS (
+            SELECT 1
+            FROM project_members pm
+            WHERE pm.project_id = p.id
+              AND pm.user_id = $2::uuid
+          )
+        )`);
       }
 
       if (input.project_id !== undefined) {
