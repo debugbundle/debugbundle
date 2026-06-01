@@ -250,6 +250,45 @@ describe("postgres metadata store project collaboration", () => {
     ).toBeNull();
   });
 
+  it("scopes incident retrieval to projects visible to a collaborator", async (): Promise<void> => {
+    const query = vi.fn().mockResolvedValue({ rows: [] });
+    const store = createPostgresMetadataStore({ query });
+
+    await store.listIncidentsForOrganization({
+      organization_id: "org_collaborator",
+      user_id: "usr_collaborator",
+      project_id: "proj_shared",
+      limit: 20
+    });
+    await store.getIncidentForOrganization({
+      organization_id: "org_collaborator",
+      user_id: "usr_collaborator",
+      incident_id: "inc_shared"
+    });
+    await store.listServicesForOrganization?.({
+      organization_id: "org_collaborator",
+      user_id: "usr_collaborator",
+      project_id: "proj_shared",
+      limit: 20
+    });
+
+    expect(query).toHaveBeenNthCalledWith(
+      1,
+      expect.stringContaining("FROM project_members pm"),
+      ["org_collaborator", "usr_collaborator", "proj_shared", 20]
+    );
+    expect(query).toHaveBeenNthCalledWith(
+      2,
+      expect.stringContaining("FROM project_members pm"),
+      ["org_collaborator", "inc_shared", "usr_collaborator"]
+    );
+    expect(query).toHaveBeenNthCalledWith(
+      3,
+      expect.stringContaining("FROM project_members pm"),
+      ["proj_shared", "org_collaborator", "usr_collaborator"]
+    );
+  });
+
   it("covers invite creation outcomes", async (): Promise<void> => {
     const unauthorizedStore = createPostgresMetadataStore({
       query: vi.fn().mockResolvedValue({ rows: [] })

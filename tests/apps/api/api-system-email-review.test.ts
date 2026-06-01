@@ -103,6 +103,13 @@ describe("api system email review route", () => {
         subject: "DebugBundle: payment failed"
       })
     );
+    const sentMessage = send.mock.calls[0]?.[0];
+    expect(sentMessage.html).toContain("@media only screen and (max-width: 480px)");
+    expect(sentMessage.html).toContain(
+      'class="db-email-card-content" style="padding-left:28px;padding-right:28px;vertical-align:top;">'
+    );
+    expect(sentMessage.html).toContain('src="https://app.debugbundle.local/email/debugbundle-mark.png"');
+    expect(sentMessage.html).not.toContain("@media only screen and (min-width:");
   });
 
   it("rejects non-owner callers", async () => {

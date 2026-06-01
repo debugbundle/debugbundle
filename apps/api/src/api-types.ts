@@ -26,6 +26,7 @@ import type {
   ProjectInviteRecord,
   ProjectMemberRecord,
   ProjectTokenRecord,
+  LeaveProjectMembershipResult,
   SlackDestinationRecord,
   IncidentRetrievalRecord,
   ImprovementRetrievalRecord,
@@ -281,6 +282,10 @@ export interface ApiDependencies {
       actor_user_id: string;
       user_id: string;
     }): Promise<RemoveProjectMemberResult | null>;
+    leaveProjectMembership?(input: {
+      project_id: string;
+      user_id: string;
+    }): Promise<LeaveProjectMembershipResult | null>;
   } | undefined;
   improvementSettingsManagement?: {
     getImprovementSettingsForProject(input: {
@@ -296,6 +301,7 @@ export interface ApiDependencies {
   improvementManagement?: {
     listImprovementsForOrganization(input: {
       organization_id: string;
+      user_id?: string;
       project_id?: string;
       environment?: string;
       service?: string;
@@ -308,20 +314,24 @@ export interface ApiDependencies {
     getImprovementForOrganization(input: {
       organization_id: string;
       improvement_id: string;
+      user_id?: string;
     }): Promise<ImprovementRetrievalRecord | null>;
     resolveImprovementForOrganization?(input: {
       organization_id: string;
       improvement_id: string;
+      user_id?: string;
       resolved_by_member_id: string;
       resolved_at: string;
     }): Promise<ImprovementRetrievalRecord | null>;
     reopenImprovementForOrganization?(input: {
       organization_id: string;
       improvement_id: string;
+      user_id?: string;
     }): Promise<ImprovementRetrievalRecord | null>;
     snoozeImprovementForOrganization?(input: {
       organization_id: string;
       improvement_id: string;
+      user_id?: string;
       snoozed_until: string;
     }): Promise<ImprovementRetrievalRecord | null>;
   } | undefined;
@@ -448,6 +458,7 @@ export interface ApiDependencies {
   incidentRetrieval: {
     listIncidentsForOrganization(input: {
       organization_id: string;
+      user_id?: string;
       project_id?: string;
       environment?: string;
       service?: string;
@@ -456,16 +467,22 @@ export interface ApiDependencies {
       cursor?: { last_seen_at: string; incident_id: string };
       limit: number;
     }): Promise<IncidentRetrievalRecord[]>;
-    getIncidentForOrganization(input: { organization_id: string; incident_id: string }): Promise<IncidentRetrievalRecord | null>;
+    getIncidentForOrganization(input: {
+      organization_id: string;
+      incident_id: string;
+      user_id?: string;
+    }): Promise<IncidentRetrievalRecord | null>;
     resolveIncidentForOrganization?(input: {
       organization_id: string;
       incident_id: string;
+      user_id?: string;
       resolved_by_member_id: string;
       resolved_at: string;
     }): Promise<IncidentRetrievalRecord | null>;
     reopenIncidentForOrganization?(input: {
       organization_id: string;
       incident_id: string;
+      user_id?: string;
     }): Promise<IncidentRetrievalRecord | null>;
     getBundleFailureReasonForOrganization?(input: { organization_id: string; incident_id: string }): Promise<string | null>;
     getBundleSourceForOrganization?(input: { organization_id: string; incident_id: string }): Promise<{
@@ -476,11 +493,13 @@ export interface ApiDependencies {
     } | null>;
     listServicesForOrganization?(input: {
       organization_id: string;
+      user_id?: string;
       project_id: string;
       limit: number;
     }): Promise<ServiceRetrievalRecord[] | null>;
     listIncidentLogsForOrganization(input: {
       organization_id: string;
+      user_id?: string;
       incident_id: string;
       level?: string;
       cursor?: { occurred_at: string; event_id: string };

@@ -28,7 +28,8 @@ describe("mcp member tools", () => {
       "invite_project_member",
       "cancel_project_member_invite",
       "update_project_member_role",
-      "remove_project_member"
+      "remove_project_member",
+      "leave_project"
     ]);
   });
 
@@ -39,7 +40,8 @@ describe("mcp member tools", () => {
       inviteMember: vi.fn().mockResolvedValue({ invite: inviteFixture }),
       cancelInvite: vi.fn().mockResolvedValue({ invite: inviteFixture }),
       updateMemberRole: vi.fn().mockResolvedValue({ member: { ...memberFixture, role: "member" } }),
-      removeMember: vi.fn().mockResolvedValue({ member: memberFixture })
+      removeMember: vi.fn().mockResolvedValue({ member: memberFixture }),
+      leaveProject: vi.fn().mockResolvedValue({ member: { ...memberFixture, role: "member", membership_type: "collaborator" } })
     });
 
     await expect(
@@ -86,6 +88,13 @@ describe("mcp member tools", () => {
         userId: "usr_abc"
       })
     ).resolves.toEqual({ member: memberFixture });
+
+    await expect(
+      tools.leave_project({
+        bearerToken: "dbundle_mem_x",
+        projectId: "550e8400-e29b-41d4-a716-446655440000"
+      })
+    ).resolves.toEqual({ member: { ...memberFixture, role: "member", membership_type: "collaborator" } });
   });
 
   it("maps member api and unknown errors to mcp tool errors", async () => {
@@ -95,7 +104,8 @@ describe("mcp member tools", () => {
       inviteMember: vi.fn().mockRejectedValue(new MemberApiError(409, "member_already_exists")),
       cancelInvite: vi.fn().mockRejectedValue(new Error("boom")),
       updateMemberRole: vi.fn(),
-      removeMember: vi.fn()
+      removeMember: vi.fn(),
+      leaveProject: vi.fn()
     });
 
     await expect(

@@ -70,7 +70,8 @@ import {
   inviteMemberWithAuthCommand as defaultInviteMemberCommand,
   cancelInviteWithAuthCommand as defaultCancelInviteCommand,
   updateMemberRoleWithAuthCommand as defaultUpdateMemberRoleCommand,
-  removeMemberWithAuthCommand as defaultRemoveMemberCommand
+  removeMemberWithAuthCommand as defaultRemoveMemberCommand,
+  leaveProjectWithAuthCommand as defaultLeaveProjectCommand
 } from "./member-commands.js";
 import {
   activateProbeWithAuthCommand as defaultActivateProbeCommand,
@@ -164,6 +165,7 @@ export type ManagementCommandDependencies = {
   cancelInviteCommand?: typeof defaultCancelInviteCommand;
   updateMemberRoleCommand?: typeof defaultUpdateMemberRoleCommand;
   removeMemberCommand?: typeof defaultRemoveMemberCommand;
+  leaveProjectCommand?: typeof defaultLeaveProjectCommand;
   getGitHubStatusCommand?: typeof defaultGetGitHubStatusCommand;
   listGitHubRepositoriesCommand?: typeof defaultListGitHubRepositoriesCommand;
   listProjectGitHubRulesCommand?: typeof defaultListProjectGitHubRulesCommand;
@@ -722,6 +724,16 @@ export async function handleProjectCommand(parsedArgv: ParsedArgv, dependencies:
         appendCommonAuthOptions(parsedArgv, {
           projectId,
           userId: requirePositional(parsedArgv, 3, "user-id")
+        })
+      );
+    }
+
+    if (membersAction === "leave") {
+      expectNoUnknownOptions(parsedArgv, ["auth-file", "json", "project-id"]);
+      ensureNoExtraPositionals(parsedArgv, 3);
+      return await (dependencies.leaveProjectCommand ?? defaultLeaveProjectCommand)(
+        appendCommonAuthOptions(parsedArgv, {
+          projectId
         })
       );
     }

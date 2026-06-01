@@ -9,6 +9,7 @@ import { createRuntimeLoggerFromEnv, getErrorMessage, type RuntimeLogger } from 
 import { buildPostgresSslConfig, parsePostgresSslMode, type PostgresSslMode } from "../../../packages/storage/src/postgres-ssl.js";
 import { assertStorageSchemaMigrationsApplied } from "../../../packages/storage/src/schema-migrations.js";
 import {
+  buildEmailBrandMarkUrl,
   createSesEmailTransport,
   formatProductFromEmail,
   renderAlertDigestEmail,
@@ -178,6 +179,10 @@ function normalizeWorkerBaseUrl(value: string | undefined): string | null {
   }
 
   return trimmed.replace(/\/+$/, "");
+}
+
+function resolveWorkerEmailAssetBaseUrl(env: Record<string, string | undefined>): string | null {
+  return normalizeWorkerBaseUrl(env["EMAIL_ASSET_BASE_URL"] ?? env["PUBLIC_SITE_URL"] ?? env["APP_BASE_URL"]);
 }
 
 interface WebhookOwnerNotificationRecipient {
@@ -905,12 +910,13 @@ interface CreateAlertTransportInput {
   slackDestinationStore?: Pick<SlackDestinationStore, "getSlackDestinationSecretForDelivery">;
   integrationSecretEncryptionKey?: string;
   appBaseUrl?: string | null;
+  emailAssetBaseUrl?: string | null;
   apiBaseUrl?: string | null;
   resolveProjectName?: (projectId: string) => Promise<string | null>;
 }
 
 function buildAlertNotificationInput(
-  input: Pick<CreateAlertTransportInput, "appBaseUrl" | "apiBaseUrl">,
+  input: Pick<CreateAlertTransportInput, "appBaseUrl" | "emailAssetBaseUrl" | "apiBaseUrl">,
   event: {
     incident_id?: string | null;
     payload: Record<string, unknown>;
@@ -923,6 +929,7 @@ function buildAlertNotificationInput(
       : typeof event.incident_id === "string"
         ? event.incident_id
         : "unknown";
+  const brandMarkUrl = buildEmailBrandMarkUrl(input.emailAssetBaseUrl ?? input.appBaseUrl);
 
   return {
     conditionType: typeof event.payload["condition_type"] === "string" ? event.payload["condition_type"] : "alert",
@@ -947,7 +954,8 @@ function buildAlertNotificationInput(
       : { incidentUrl: `${input.appBaseUrl}/incidents/${incidentId}` }),
     ...(input.apiBaseUrl === undefined || input.apiBaseUrl === null
       ? {}
-      : { bundleUrl: `${input.apiBaseUrl}/v1/incidents/${incidentId}/bundle` })
+      : { bundleUrl: `${input.apiBaseUrl}/v1/incidents/${incidentId}/bundle` }),
+    ...(brandMarkUrl === undefined ? {} : { brandMarkUrl })
   };
 }
 
@@ -1138,7 +1146,7 @@ export function createAlertTransport(input: CreateAlertTransportInput): AlertDel
 }
 
 export function createAlertEmailDigestTransport(
-  input: Pick<CreateAlertTransportInput, "emailTransport" | "appBaseUrl" | "apiBaseUrl" | "resolveProjectName">
+  input: Pick<CreateAlertTransportInput, "emailTransport" | "appBaseUrl" | "emailAssetBaseUrl" | "apiBaseUrl" | "resolveProjectName">
 ): AlertEmailDigestTransport {
   return {
     async deliver(event): Promise<void> {
@@ -1149,6 +1157,7 @@ export function createAlertEmailDigestTransport(
       const projectName = await input.resolveProjectName?.(event.project_id);
 
       const rendered = renderAlertDigestEmail({
+        brandMarkUrl: buildEmailBrandMarkUrl(input.emailAssetBaseUrl ?? input.appBaseUrl),
         alerts: event.items.map((item) => buildAlertDigestEntryInput(input, {
           ...item,
           project_name: projectName ?? null
@@ -1448,6 +1457,8 @@ export function createWeeklyReportTransport(input: {
   emailTransport: EmailTransport | null;
   slackDestinationStore?: Pick<SlackDestinationStore, "getSlackDestinationSecretForDelivery">;
   integrationSecretEncryptionKey?: string;
+  appBaseUrl?: string | null;
+  emailAssetBaseUrl?: string | null;
 }): WeeklyReportTransport {
   return {
     async deliver(event): Promise<void> {
@@ -1459,6 +1470,7 @@ export function createWeeklyReportTransport(input: {
         }
       ];
       const rendered = renderWeeklyReportEmail({
+        brandMarkUrl: buildEmailBrandMarkUrl(input.emailAssetBaseUrl ?? input.appBaseUrl),
         windowStart: event.report.window_start,
         windowEnd: event.report.window_end,
         projects: deliveries.map((delivery) => ({
@@ -1766,22 +1778,27 @@ export async function runWorkerFromEnv(envInput: Record<string, string | undefin
       : { integrationSecretEncryptionKey: env.INTEGRATION_SECRET_ENCRYPTION_KEY }),
     resolveProjectName: (projectId) => getProjectName(queryable, projectId),
     appBaseUrl: normalizeWorkerBaseUrl(envInput["APP_BASE_URL"]),
+    emailAssetBaseUrl: resolveWorkerEmailAssetBaseUrl(envInput),
     apiBaseUrl: normalizeWorkerBaseUrl(envInput["DEBUGBUNDLE_API_URL"] ?? envInput["API_BASE_URL"] ?? envInput["VITE_API_URL"])
   });
   const alertEmailDigestTransport = createAlertEmailDigestTransport({
     emailTransport,
     resolveProjectName: (projectId) => getProjectName(queryable, projectId),
     appBaseUrl: normalizeWorkerBaseUrl(envInput["APP_BASE_URL"]),
+    emailAssetBaseUrl: resolveWorkerEmailAssetBaseUrl(envInput),
     apiBaseUrl: normalizeWorkerBaseUrl(envInput["DEBUGBUNDLE_API_URL"] ?? envInput["API_BASE_URL"] ?? envInput["VITE_API_URL"])
   });
   const weeklyReportTransport = createWeeklyReportTransport({
     emailTransport,
     slackDestinationStore,
+    appBaseUrl: normalizeWorkerBaseUrl(envInput["APP_BASE_URL"]),
+    emailAssetBaseUrl: resolveWorkerEmailAssetBaseUrl(envInput),
     ...(env.INTEGRATION_SECRET_ENCRYPTION_KEY === undefined
       ? {}
       : { integrationSecretEncryptionKey: env.INTEGRATION_SECRET_ENCRYPTION_KEY })
   });
   const appBaseUrl = normalizeWorkerBaseUrl(envInput["APP_BASE_URL"]);
+  const emailAssetBaseUrl = resolveWorkerEmailAssetBaseUrl(envInput);
   const retentionCleanupRunner = createRetentionCleanupService({
     retentionStore,
     objectStore
@@ -1965,6 +1982,7 @@ export async function runWorkerFromEnv(envInput: Record<string, string | undefin
                     await processNextDeliverOperationalEmailJob({
                       logger,
                       appBaseUrl,
+                      emailAssetBaseUrl,
                       operationalEmailDeliveryStore,
                       emailTransport
                     });

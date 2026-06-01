@@ -98,6 +98,20 @@ async function readReproductionArtifactForIncident(input: {
   }
 }
 
+async function resolveProjectOrganizationId(input: {
+  dependencies: ApiDependencies;
+  memberId: string;
+  fallbackOrganizationId: string;
+  projectId: string;
+}): Promise<string> {
+  const access = await input.dependencies.projectManagement?.resolveProjectAccessForUser?.({
+    user_id: input.memberId,
+    project_id: input.projectId
+  });
+
+  return access?.organization_id ?? input.fallbackOrganizationId;
+}
+
 export function registerIncidentRoutes(app: FastifyInstance, dependencies: ApiDependencies): void {
   app.get("/v1/incidents", async (request, reply) => {
     const member = await requireRateLimitedMemberAuth(request, reply, dependencies, "retrieval-read");
@@ -121,6 +135,7 @@ export function registerIncidentRoutes(app: FastifyInstance, dependencies: ApiDe
 
     const incidentsRequest: {
       organization_id: string;
+      user_id?: string;
       project_id?: string;
       environment?: string;
       service?: string;
@@ -130,6 +145,7 @@ export function registerIncidentRoutes(app: FastifyInstance, dependencies: ApiDe
       limit: number;
     } = {
       organization_id: member.organization_id,
+      user_id: member.member_id,
       limit: parsedQuery.data.limit
     };
 
@@ -179,7 +195,8 @@ export function registerIncidentRoutes(app: FastifyInstance, dependencies: ApiDe
 
     const incident = await dependencies.incidentRetrieval.getIncidentForOrganization({
       organization_id: member.organization_id,
-      incident_id: parsedParams.data.id
+      incident_id: parsedParams.data.id,
+      user_id: member.member_id
     });
 
     if (incident === null) {
@@ -208,7 +225,8 @@ export function registerIncidentRoutes(app: FastifyInstance, dependencies: ApiDe
 
     const incident = await dependencies.incidentRetrieval.getIncidentForOrganization({
       organization_id: member.organization_id,
-      incident_id: parsedParams.data.id
+      incident_id: parsedParams.data.id,
+      user_id: member.member_id
     });
 
     if (incident === null) {
@@ -217,10 +235,17 @@ export function registerIncidentRoutes(app: FastifyInstance, dependencies: ApiDe
       });
     }
 
+    const projectOrganizationId = await resolveProjectOrganizationId({
+      dependencies,
+      memberId: member.member_id,
+      fallbackOrganizationId: member.organization_id,
+      projectId: incident.project_id
+    });
+
     const [bundle, reproduction, logs] = await Promise.all([
       readBundleArtifactForIncident({
         dependencies,
-        organizationId: member.organization_id,
+        organizationId: projectOrganizationId,
         incidentId: incident.incident_id,
         projectId: incident.project_id
       }),
@@ -231,6 +256,7 @@ export function registerIncidentRoutes(app: FastifyInstance, dependencies: ApiDe
       }),
       dependencies.incidentRetrieval.listIncidentLogsForOrganization({
         organization_id: member.organization_id,
+        user_id: member.member_id,
         incident_id: incident.incident_id,
         limit: 20
       })
@@ -268,9 +294,29 @@ export function registerIncidentRoutes(app: FastifyInstance, dependencies: ApiDe
       });
     }
 
-    const incident = await dependencies.incidentRetrieval.resolveIncidentForOrganization({
+    const existingIncident = await dependencies.incidentRetrieval.getIncidentForOrganization({
       organization_id: member.organization_id,
       incident_id: parsedParams.data.id,
+      user_id: member.member_id
+    });
+
+    if (existingIncident === null) {
+      return reply.status(404).send({
+        error: "incident_not_found"
+      });
+    }
+
+    const projectOrganizationId = await resolveProjectOrganizationId({
+      dependencies,
+      memberId: member.member_id,
+      fallbackOrganizationId: member.organization_id,
+      projectId: existingIncident.project_id
+    });
+
+    const incident = await dependencies.incidentRetrieval.resolveIncidentForOrganization({
+      organization_id: projectOrganizationId,
+      incident_id: parsedParams.data.id,
+      user_id: member.member_id,
       resolved_by_member_id: member.member_id,
       resolved_at: new Date().toISOString()
     });
@@ -305,9 +351,29 @@ export function registerIncidentRoutes(app: FastifyInstance, dependencies: ApiDe
       });
     }
 
-    const incident = await dependencies.incidentRetrieval.reopenIncidentForOrganization({
+    const existingIncident = await dependencies.incidentRetrieval.getIncidentForOrganization({
       organization_id: member.organization_id,
-      incident_id: parsedParams.data.id
+      incident_id: parsedParams.data.id,
+      user_id: member.member_id
+    });
+
+    if (existingIncident === null) {
+      return reply.status(404).send({
+        error: "incident_not_found"
+      });
+    }
+
+    const projectOrganizationId = await resolveProjectOrganizationId({
+      dependencies,
+      memberId: member.member_id,
+      fallbackOrganizationId: member.organization_id,
+      projectId: existingIncident.project_id
+    });
+
+    const incident = await dependencies.incidentRetrieval.reopenIncidentForOrganization({
+      organization_id: projectOrganizationId,
+      incident_id: parsedParams.data.id,
+      user_id: member.member_id
     });
 
     if (incident === null) {
@@ -336,7 +402,8 @@ export function registerIncidentRoutes(app: FastifyInstance, dependencies: ApiDe
 
     const incident = await dependencies.incidentRetrieval.getIncidentForOrganization({
       organization_id: member.organization_id,
-      incident_id: parsedParams.data.id
+      incident_id: parsedParams.data.id,
+      user_id: member.member_id
     });
 
     if (incident === null) {
@@ -344,6 +411,13 @@ export function registerIncidentRoutes(app: FastifyInstance, dependencies: ApiDe
         error: "incident_not_found"
       });
     }
+
+    const projectOrganizationId = await resolveProjectOrganizationId({
+      dependencies,
+      memberId: member.member_id,
+      fallbackOrganizationId: member.organization_id,
+      projectId: incident.project_id
+    });
 
     const key = buildBundleObjectKey(incident.project_id, incident.incident_id);
 
@@ -353,7 +427,7 @@ export function registerIncidentRoutes(app: FastifyInstance, dependencies: ApiDe
     } catch (error) {
       if (isObjectNotFoundError(error)) {
         const failureReason = await dependencies.incidentRetrieval.getBundleFailureReasonForOrganization?.({
-          organization_id: member.organization_id,
+          organization_id: projectOrganizationId,
           incident_id: parsedParams.data.id
         });
 
@@ -368,7 +442,7 @@ export function registerIncidentRoutes(app: FastifyInstance, dependencies: ApiDe
         // Attempt auto-regeneration: the events still exist, so re-enqueue a build.
         if (dependencies.bundleRegeneration !== undefined) {
           const regenerationQueued = await dependencies.bundleRegeneration.requestRegeneration({
-            organization_id: member.organization_id,
+            organization_id: projectOrganizationId,
             project_id: incident.project_id,
             incident_id: incident.incident_id
           });
@@ -418,7 +492,8 @@ export function registerIncidentRoutes(app: FastifyInstance, dependencies: ApiDe
 
     const incident = await dependencies.incidentRetrieval.getIncidentForOrganization({
       organization_id: member.organization_id,
-      incident_id: parsedParams.data.id
+      incident_id: parsedParams.data.id,
+      user_id: member.member_id
     });
 
     if (incident === null) {
@@ -468,12 +543,14 @@ export function registerIncidentRoutes(app: FastifyInstance, dependencies: ApiDe
 
     const logsRequest: {
       organization_id: string;
+      user_id?: string;
       incident_id: string;
       limit: number;
       level?: string;
       cursor?: { occurred_at: string; event_id: string };
     } = {
       organization_id: member.organization_id,
+      user_id: member.member_id,
       incident_id: parsedQuery.data.incident_id,
       limit: parsedQuery.data.limit
     };

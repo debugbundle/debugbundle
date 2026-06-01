@@ -5,6 +5,7 @@ import type { RuntimeLogger } from "../../../../packages/runtime-logger/src/inde
 import { getTierCapabilities, type TierName } from "../../../../packages/shared-types/src/index.js";
 import type { AuditLogStore, BillingSyncStore } from "../../../../packages/storage/src/index.js";
 import {
+  buildEmailBrandMarkUrl,
   renderCapacityQuantityChangeEmail,
   renderEntitlementDowngradeConfirmationEmail,
   renderEntitlementDowngradeWarningEmail,
@@ -293,7 +294,8 @@ async function handleCheckoutSessionCompleted(
         organizationName: contact.organizationName,
         plan: entitlements.effectivePlan,
         extraCapacity: entitlements.extraCapacityQuantity,
-        portalUrl: dependencies.billingEmails?.managementUrl ?? fallbackManagementUrl()
+        portalUrl: dependencies.billingEmails?.managementUrl ?? fallbackManagementUrl(),
+        brandMarkUrl: resolveBillingEmailBrandMarkUrl()
       })
     , dependencies.logger);
   }
@@ -334,7 +336,8 @@ async function handleSubscriptionChange(
             organizationName: contact.organizationName,
             previousPlan: previous.plan,
             newPlan: entitlements.effectivePlan,
-            extraCapacity: entitlements.extraCapacityQuantity
+            extraCapacity: entitlements.extraCapacityQuantity,
+            brandMarkUrl: resolveBillingEmailBrandMarkUrl()
           })
         , dependencies.logger);
       }
@@ -346,7 +349,8 @@ async function handleSubscriptionChange(
             plan: entitlements.effectivePlan,
             previousCapacity: previous.additionalCapacityUnits,
             newCapacity: entitlements.extraCapacityQuantity,
-            totalCapacityUnits: entitlements.totalCapacityUnits
+            totalCapacityUnits: entitlements.totalCapacityUnits,
+            brandMarkUrl: resolveBillingEmailBrandMarkUrl()
           })
         , dependencies.logger);
       }
@@ -424,7 +428,8 @@ async function handleInvoicePaid(
         organizationName: contact.organizationName,
         plan: entitlements.effectivePlan,
         extraCapacity: entitlements.extraCapacityQuantity,
-        nextRenewalDate: entitlements.billingPeriodEndsAt ?? new Date().toISOString()
+        nextRenewalDate: entitlements.billingPeriodEndsAt ?? new Date().toISOString(),
+        brandMarkUrl: resolveBillingEmailBrandMarkUrl()
       })
     , dependencies.logger);
   }
@@ -467,7 +472,8 @@ async function handleInvoicePaymentFailed(
         renderPaymentFailureEmail({
           organizationName: contact.organizationName,
           plan: previous.plan,
-          portalUrl: dependencies.billingEmails?.managementUrl ?? fallbackManagementUrl()
+          portalUrl: dependencies.billingEmails?.managementUrl ?? fallbackManagementUrl(),
+          brandMarkUrl: resolveBillingEmailBrandMarkUrl()
         })
       , dependencies.logger);
     } else if (nextAttemptAt !== null) {
@@ -476,7 +482,8 @@ async function handleInvoicePaymentFailed(
           organizationName: contact.organizationName,
           plan: previous.plan,
           portalUrl: dependencies.billingEmails?.managementUrl ?? fallbackManagementUrl(),
-          daysUntilDowngrade: daysUntilIsoTimestamp(effectiveDate)
+          daysUntilDowngrade: daysUntilIsoTimestamp(effectiveDate),
+          brandMarkUrl: resolveBillingEmailBrandMarkUrl()
         })
       , dependencies.logger);
     }
@@ -488,7 +495,8 @@ async function handleInvoicePaymentFailed(
           currentPlan: previous.plan,
           currentCapacityUnits: previous.totalCapacityUnits,
           effectiveDate,
-          portalUrl: dependencies.billingEmails?.managementUrl ?? fallbackManagementUrl()
+          portalUrl: dependencies.billingEmails?.managementUrl ?? fallbackManagementUrl(),
+          brandMarkUrl: resolveBillingEmailBrandMarkUrl()
         })
       );
     }
@@ -690,7 +698,8 @@ async function sendEntitlementDowngradeConfirmation(
       organizationName: contact.organizationName,
       previousPlan: previous.plan,
       previousCapacityUnits: previous.totalCapacityUnits,
-      newCapacityUnits: getTierCapabilities("free").included_capacity_units
+      newCapacityUnits: getTierCapabilities("free").included_capacity_units,
+      brandMarkUrl: resolveBillingEmailBrandMarkUrl()
     })
   , logger);
 }
@@ -710,6 +719,16 @@ function resolveDowngradeEffectiveDate(invoice: Stripe.Invoice, nextAttemptAt: s
 function daysUntilIsoTimestamp(value: string): number {
   const diffMs = new Date(value).getTime() - Date.now();
   return Math.max(1, Math.ceil(diffMs / (24 * 60 * 60 * 1000)));
+}
+
+function resolveBillingEmailBrandMarkUrl(): string | undefined {
+  const baseUrl =
+    process.env["EMAIL_ASSET_BASE_URL"]
+    ?? process.env["PUBLIC_SITE_URL"]
+    ?? process.env["APP_BASE_URL"]
+    ?? "http://localhost:3000";
+
+  return buildEmailBrandMarkUrl(baseUrl);
 }
 
 function fallbackManagementUrl(): string {

@@ -45,13 +45,14 @@ Every capability must be available through all applicable interfaces. Operations
 | Reopen improvement | `POST /v1/improvements/{id}/reopen` | `improvements reopen` | `reopen_improvement` | Explicit user action |
 | Snooze improvement | `POST /v1/improvements/{id}/snooze` | `improvements snooze` | `snooze_improvement` | Explicit user action |
 | Get improvement bundle | `GET /v1/projects/{id}/improvements/{improvementId}/bundle` | `improvements bundle` | `get_improvement_bundle` | Hosted improvement artifact for a project-scoped opportunity |
-| List project members | `GET /v1/projects/{id}/members` | `project members list` | `list_project_members` | Browser Session or Member Token, owner/admin only |
+| List project members | `GET /v1/projects/{id}/members` | `project members list` | `list_project_members` | Browser Session or Member Token, any authorized project member |
 | Get project member avatar | `GET /v1/projects/{id}/members/{userId}/avatar` | — | — | Browser session or member token, authorized project viewers only |
 | List pending project invites | `GET /v1/projects/{id}/invites` | `project members invites` | `list_project_member_invites` | Browser Session or Member Token, owner/admin only |
 | Invite project member | `POST /v1/projects/{id}/invite` | `project members invite` | `invite_project_member` | Browser Session or Member Token, owner/admin only, Team tier |
 | Cancel project invite | `DELETE /v1/projects/{id}/invites/{inviteId}` | `project members cancel-invite` | `cancel_project_member_invite` | Browser Session or Member Token, owner/admin only |
 | Update project member role | `PATCH /v1/projects/{id}/members/{userId}` | `project members update-role` | `update_project_member_role` | Browser Session or Member Token, owner/admin only |
 | Remove project member | `DELETE /v1/projects/{id}/members/{userId}` | `project members remove` | `remove_project_member` | Browser Session or Member Token, owner/admin only |
+| Leave project membership | `DELETE /v1/projects/{id}/membership` | `project members leave` | `leave_project` | Browser Session or Member Token, any collaborator on that project |
 | List projects | `GET /v1/projects` | `project list` | `list_projects` | Browser Session or Member Token, scoped to owned and shared projects |
 | Create project | `POST /v1/projects` | `project create` | `create_project` | Browser Session or Member Token, owner only |
 | Update project | `PATCH /v1/projects/{id}` | `project update` | `update_project` | Browser Session or Member Token, owner only |
@@ -420,13 +421,14 @@ Current API implementation scope (Phase 7 kickoff slice):
 
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
-| GET | `/v1/projects/{id}/members` | Browser Session or Member Token (owner/admin only) | List project members including the owner and collaborators |
+| GET | `/v1/projects/{id}/members` | Browser Session or Member Token (any authorized project member) | List project members including the owner and collaborators |
 | GET | `/v1/projects/{id}/members/{userId}/avatar` | Browser Session or Member Token | Return a cached project member avatar for authorized project viewers |
 | GET | `/v1/projects/{id}/invites` | Browser Session or Member Token (owner/admin only) | List pending, non-expired project invites |
 | POST | `/v1/projects/{id}/invite` | Browser Session or Member Token (owner/admin only) | Create a pending project collaborator invite |
 | DELETE | `/v1/projects/{id}/invites/{inviteId}` | Browser Session or Member Token (owner/admin only) | Cancel a pending project invite |
 | PATCH | `/v1/projects/{id}/members/{userId}` | Browser Session or Member Token (owner/admin only) | Update a collaborator role between `admin` and `member` |
 | DELETE | `/v1/projects/{id}/members/{userId}` | Browser Session or Member Token (owner/admin only) | Remove a collaborator from the project |
+| DELETE | `/v1/projects/{id}/membership` | Browser Session or Member Token (collaborator only) | Leave a shared project as the authenticated collaborator |
 
 **Member list response shape:**
 ```json
@@ -2062,9 +2064,10 @@ debugbundle project members invite --project-id <id> --email <email> --role <adm
 debugbundle project members cancel-invite <invite-id> --project-id <id> [--auth-file <path>] [--json]
 debugbundle project members update-role <user-id> --project-id <id> --role <admin|member> [--auth-file <path>] [--json]
 debugbundle project members remove <user-id> --project-id <id> [--auth-file <path>] [--json]
+debugbundle project members leave --project-id <id> [--auth-file <path>] [--json]
 ```
 
-`project members list` lists the owner and collaborators for one project. `project members invites` lists pending invitations for that project. `project members invite` sends a collaborator invitation to the specified email (Team tier). `project members cancel-invite` cancels a pending invitation. `project members update-role` changes a collaborator's role. `project members remove` removes a collaborator from the project. Listing and invite visibility require owner/admin access; plain members do not receive these surfaces.
+`project members list` lists the owner and collaborators for one project. `project members invites` lists pending invitations for that project. `project members invite` sends a collaborator invitation to the specified email (Team tier). `project members cancel-invite` cancels a pending invitation. `project members update-role` changes a collaborator's role. `project members remove` removes another collaborator from the project. `project members leave` removes the authenticated collaborator's own membership from that project. Listing is available to any authorized project member, while invite visibility and management remain owner/admin-only.
 
 ### 2.16 GitHub Commands
 ```
@@ -2233,9 +2236,10 @@ invite_project_member        → same result as POST /v1/projects/{id}/invite
 cancel_project_member_invite → same result as DELETE /v1/projects/{id}/invites/{inviteId}
 update_project_member_role   → same result as PATCH /v1/projects/{id}/members/{userId}
 remove_project_member        → same result as DELETE /v1/projects/{id}/members/{userId}
+leave_project                → same result as DELETE /v1/projects/{id}/membership
 ```
 
-These tools manage project collaboration lifecycle. Listing requires owner/admin authorization, not mere project access. Invite, cancel, role update, and removal require owner/admin authorization. `invite_project_member` requires Team tier.
+These tools manage project collaboration lifecycle. Listing is available to any authorized project member. Invite, cancel, role update, and removal require owner/admin authorization. `leave_project` is for collaborators leaving their own membership. `invite_project_member` requires Team tier.
 
 ### 3.9 GitHub Tools
 ```

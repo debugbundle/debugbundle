@@ -15,8 +15,9 @@ import {
   requestUrl
 } from "./web-test-helpers.js";
 
-afterEach(() => {
+afterEach(async () => {
   resetBrowserSessionClientState();
+  await new Promise((resolve) => setTimeout(resolve, 0));
   vi.unstubAllGlobals();
 });
 
@@ -77,9 +78,55 @@ describe("web app — project sharing", () => {
     render(<App initialEntries={["/projects/proj_shared"]} />);
 
     expect(await screen.findByText(/project details/i)).toBeInTheDocument();
-    expect(screen.queryByRole("tab", { name: /members/i })).not.toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: /members/i })).toBeInTheDocument();
     await waitFor(() => {
       expect(document.querySelectorAll('[aria-label="Shared project"]')).toHaveLength(1);
+    });
+  });
+
+  it("renders shared-by-you project icons in project breadcrumbs for owners", async () => {
+    const ownedSharedProject = createProject({
+      project_id: "proj_owner_shared",
+      name: "Owner Shared App",
+      slug: "owner-shared-app",
+      organization_plan: "team",
+      relationship: "owned",
+      sharing_state: "shared_by_you",
+      effective_role: "owner",
+      owner_email: "owner@example.com"
+    });
+    const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = requestUrl(input);
+
+      if (url.endsWith("/v1/auth/session")) {
+        return jsonResponse(200, {
+          session: createSession({ organization_plan: "team" })
+        });
+      }
+
+      if (url.endsWith("/v1/projects") && init?.method === undefined) {
+        return jsonResponse(200, {
+          projects: [ownedSharedProject]
+        });
+      }
+
+      if (url.includes("/v1/incidents?") && url.includes("project_id=proj_owner_shared")) {
+        return jsonResponse(200, {
+          incidents: [],
+          next_cursor: null
+        });
+      }
+
+      return jsonResponse(404, { error: "not_found" });
+    });
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<App initialEntries={["/projects/proj_owner_shared/incidents"]} />);
+
+    expect(await screen.findByText(/project incidents/i)).toBeInTheDocument();
+    await waitFor(() => {
+      expect(document.querySelector('[aria-label="Shared by you"]')).toBeInTheDocument();
     });
   });
 
@@ -258,6 +305,98 @@ describe("web app — project sharing", () => {
     }
   });
 
+  it("lets shared collaborators review access and leave from their own row", async () => {
+    const user = userEvent.setup();
+    const project = createProject({
+      project_id: "proj_shared",
+      name: "Shared App",
+      organization_plan: "team",
+      relationship: "shared",
+      sharing_state: "shared_with_you",
+      effective_role: "member",
+      owner_email: "owner@example.com"
+    });
+    const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = requestUrl(input);
+
+      if (url.endsWith("/v1/auth/session")) {
+        return jsonResponse(200, {
+          session: createSession({
+            user_id: "usr_member",
+            email: "member@example.com",
+            organization_plan: "team",
+            role: "member"
+          })
+        });
+      }
+
+      if (url.endsWith("/v1/projects") && init?.method === undefined) {
+        return jsonResponse(200, {
+          projects: [project]
+        });
+      }
+
+      if (url.endsWith("/v1/projects/proj_shared/members") && init?.method === undefined) {
+        return jsonResponse(200, {
+          members: [
+            createProjectMember({
+              user_id: "usr_owner",
+              email: "owner@example.com",
+              role: "owner",
+              membership_type: "owner"
+            }),
+            createProjectMember({
+              user_id: "usr_member",
+              email: "member@example.com",
+              role: "member",
+              membership_type: "collaborator"
+            })
+          ]
+        });
+      }
+
+      if (url.endsWith("/v1/projects/proj_shared/membership") && init?.method === "DELETE") {
+        return jsonResponse(200, {
+          member: createProjectMember({
+            user_id: "usr_member",
+            email: "member@example.com",
+            role: "member",
+            membership_type: "collaborator"
+          })
+        });
+      }
+
+      return jsonResponse(404, { error: "not_found" });
+    });
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    const view = render(<App initialEntries={["/projects/proj_shared/members"]} />);
+
+    const ownerEmail = await screen.findByText(/^owner@example\.com$/i);
+    expect(ownerEmail).toBeInTheDocument();
+    const ownerRow = ownerEmail.closest("tr");
+    expect(ownerRow).not.toBeNull();
+    expect(screen.queryByRole("heading", { name: /pending invites/i })).not.toBeInTheDocument();
+    expect(within(ownerRow as HTMLTableRowElement).queryByRole("button")).not.toBeInTheDocument();
+
+    const memberRow = screen.getAllByText(/^member@example\.com$/i).find((element) => element.closest("tr"))?.closest("tr") ?? null;
+    expect(memberRow).not.toBeNull();
+    await user.click(within(memberRow as HTMLTableRowElement).getByRole("button", { name: /leave project/i }));
+    await user.click(await screen.findByRole("button", { name: /^leave project$/i }));
+
+    await waitFor(() => {
+      expect(
+        fetchMock.mock.calls.some(
+          ([input, init]) => requestUrl(input).endsWith("/v1/projects/proj_shared/membership") && init?.method === "DELETE"
+        )
+      ).toBe(true);
+    });
+
+    expect(await screen.findByRole("heading", { name: /projects/i, level: 1 })).toBeInTheDocument();
+    view.unmount();
+  });
+
   it("returns email sign-in flows to the invite page and accepts the invite", async () => {
     const user = userEvent.setup();
     const project = createProject({
@@ -304,12 +443,25 @@ describe("web app — project sharing", () => {
         });
       }
 
+      if (url.includes("/v1/projects/") && url.endsWith("/members") && init?.method === undefined) {
+        return jsonResponse(200, {
+          members: [
+            createProjectMember({
+              user_id: "usr_123",
+              email: "invited@example.com",
+              role: "member",
+              membership_type: "collaborator"
+            })
+          ]
+        });
+      }
+
       return jsonResponse(404, { error: "not_found" });
     });
 
     vi.stubGlobal("fetch", fetchMock);
 
-    render(<App initialEntries={["/login?next=%2Finvite%3Ftoken%3Dtok_123"]} />);
+    const view = render(<App initialEntries={["/login?next=%2Finvite%3Ftoken%3Dtok_123"]} />);
 
     expect(await screen.findByLabelText(/email address/i)).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /sign up here/i })).toHaveAttribute("href", "/signup?next=%2Finvite%3Ftoken%3Dtok_123");
@@ -328,5 +480,6 @@ describe("web app — project sharing", () => {
 
     expect(await screen.findByText(/shared with you/i)).toBeInTheDocument();
     expect(screen.getByText(/owner@example.com/i)).toBeInTheDocument();
+    view.unmount();
   });
 });

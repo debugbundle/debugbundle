@@ -6,7 +6,8 @@ export const MEMBER_MCP_TOOL_NAMES = [
   "invite_project_member",
   "cancel_project_member_invite",
   "update_project_member_role",
-  "remove_project_member"
+  "remove_project_member",
+  "leave_project"
 ] as const;
 
 function mapMcpError(error: unknown): never {
@@ -87,6 +88,17 @@ export function createMemberMcpTools(api: MemberApi): Record<(typeof MEMBER_MCP_
           bearerToken: String(input["bearerToken"]),
           projectId: String(input["projectId"]),
           userId: String(input["userId"])
+        });
+      } catch (error) {
+        mapMcpError(error);
+      }
+    },
+
+    async leave_project(input) {
+      try {
+        return await api.leaveProject({
+          bearerToken: String(input["bearerToken"]),
+          projectId: String(input["projectId"])
         });
       } catch (error) {
         mapMcpError(error);

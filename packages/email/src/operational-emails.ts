@@ -1,4 +1,5 @@
 import {
+  buildEmailBrandMarkUrl,
   escapeHtml,
   formatEmailDate,
   renderEmailButton,
@@ -20,6 +21,7 @@ export interface WebhookAutoDisabledEmailInput {
   webhookId: string;
   targetUrl: string;
   webhooksUrl?: string;
+  brandMarkUrl?: string | undefined;
 }
 
 export interface AllowanceThresholdEmailInput {
@@ -31,6 +33,7 @@ export interface AllowanceThresholdEmailInput {
   currentBehavior: string;
   usageWindowEndsAt?: string | null;
   billingUrl?: string;
+  brandMarkUrl?: string | undefined;
 }
 
 export interface RetentionRotationNoticeEmailInput {
@@ -39,6 +42,7 @@ export interface RetentionRotationNoticeEmailInput {
   rotatedOwnerCount: number;
   retainedBundleLimit: number;
   billingUrl?: string;
+  brandMarkUrl?: string | undefined;
 }
 
 export function renderWebhookAutoDisabledEmail(input: WebhookAutoDisabledEmailInput): OperationalEmailRendered {
@@ -56,6 +60,7 @@ export function renderWebhookAutoDisabledEmail(input: WebhookAutoDisabledEmailIn
       ...(input.webhooksUrl === undefined ? [] : ["", `Manage project webhooks: ${input.webhooksUrl}`])
     ].join("\n"),
     html: renderEmailLayout({
+      brandMarkUrl: input.brandMarkUrl ?? buildEmailBrandMarkUrl(input.webhooksUrl),
       eyebrow: "Operational",
       title: "Webhook auto-disabled",
       intro: `DebugBundle automatically disabled a webhook in account "${escapeHtml(input.organizationName)}" after repeated delivery failures.`,
@@ -102,6 +107,7 @@ export function renderAllowanceWarning80Email(input: AllowanceThresholdEmailInpu
       ...(input.billingUrl === undefined ? [] : ["", `Open billing to increase capacity units: ${input.billingUrl}`])
     ].join("\n"),
     html: renderEmailLayout({
+      brandMarkUrl: input.brandMarkUrl ?? buildEmailBrandMarkUrl(input.billingUrl),
       eyebrow: "Operational",
       title: `${input.meterLabel} allowance at 80%`,
       intro: `DebugBundle reached 80% of the ${escapeHtml(input.meterLabel.toLowerCase())} allowance for account "${escapeHtml(input.organizationName)}".`,
@@ -150,6 +156,7 @@ export function renderAllowanceLimitReachedEmail(input: AllowanceThresholdEmailI
       ...(input.billingUrl === undefined ? [] : ["", `Open billing to increase capacity units: ${input.billingUrl}`])
     ].join("\n"),
     html: renderEmailLayout({
+      brandMarkUrl: input.brandMarkUrl ?? buildEmailBrandMarkUrl(input.billingUrl),
       eyebrow: "Operational",
       title: `${input.meterLabel} allowance limit reached`,
       intro: `DebugBundle reached the ${escapeHtml(input.meterLabel.toLowerCase())} allowance limit for account "${escapeHtml(input.organizationName)}".`,
@@ -197,6 +204,7 @@ export function renderRetentionRotationNoticeEmail(
       ...(input.billingUrl === undefined ? [] : ["", `Open billing to increase capacity units: ${input.billingUrl}`])
     ].join("\n"),
     html: renderEmailLayout({
+      brandMarkUrl: input.brandMarkUrl ?? buildEmailBrandMarkUrl(input.billingUrl),
       eyebrow: "Operational",
       title: "Retained bundles rotated out",
       intro: `DebugBundle rotated out the oldest retained bundles in account "${escapeHtml(input.organizationName)}" after the retained bundle cap was reached.`,

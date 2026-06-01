@@ -8,6 +8,7 @@ import {
   cancelInviteCommand,
   updateMemberRoleCommand,
   removeMemberCommand,
+  leaveProjectCommand,
   MemberApiError
 } from "../../../apps/cli/src/member-commands.js";
 
@@ -35,7 +36,8 @@ function stubApi(): ReturnType<typeof createMemberApi> {
     inviteMember: vi.fn().mockResolvedValue({ invite: inviteFixture }),
     cancelInvite: vi.fn().mockResolvedValue({ invite: inviteFixture }),
     updateMemberRole: vi.fn().mockResolvedValue({ member: { ...memberFixture, role: "member" } }),
-    removeMember: vi.fn().mockResolvedValue({ member: memberFixture })
+    removeMember: vi.fn().mockResolvedValue({ member: memberFixture }),
+    leaveProject: vi.fn().mockResolvedValue({ member: { ...memberFixture, role: "member", membership_type: "collaborator" } })
   };
 }
 
@@ -137,6 +139,19 @@ describe("member CLI commands", () => {
     expect(JSON.parse(result.output)).toEqual({ member: memberFixture });
   });
 
+  it("leave project returns the removed self membership", async () => {
+    const api = stubApi();
+    const result = await leaveProjectCommand(
+      { bearerToken: "dbundle_mem_x", projectId: "550e8400-e29b-41d4-a716-446655440000", json: true },
+      api
+    );
+
+    expect(result.exitCode).toBe(0);
+    expect(JSON.parse(result.output)).toEqual({
+      member: { ...memberFixture, role: "member", membership_type: "collaborator" }
+    });
+  });
+
   it("maps auth errors correctly", async () => {
     const api = stubApi();
     vi.mocked(api.listMembers).mockRejectedValue(new MemberApiError(401, "invalid_member_token"));
@@ -186,6 +201,7 @@ describe("member inline API client", () => {
       .mockResolvedValueOnce({ status: 200, body: { invites: [inviteFixture] } })
       .mockResolvedValueOnce({ status: 201, body: { invite: inviteFixture } })
       .mockResolvedValueOnce({ status: 200, body: { invite: inviteFixture } })
+      .mockResolvedValueOnce({ status: 200, body: { member: memberFixture } })
       .mockResolvedValueOnce({ status: 200, body: { member: memberFixture } })
       .mockResolvedValueOnce({ status: 200, body: { member: memberFixture } });
 
@@ -246,6 +262,13 @@ describe("member inline API client", () => {
     expect(mockRequest).toHaveBeenCalledWith({
       method: "DELETE",
       path: "/v1/projects/550e8400-e29b-41d4-a716-446655440000/members/usr_abc",
+      bearerToken: "dbundle_mem_x"
+    });
+
+    await api.leaveProject({ bearerToken: "dbundle_mem_x", projectId: "550e8400-e29b-41d4-a716-446655440000" });
+    expect(mockRequest).toHaveBeenCalledWith({
+      method: "DELETE",
+      path: "/v1/projects/550e8400-e29b-41d4-a716-446655440000/membership",
       bearerToken: "dbundle_mem_x"
     });
   });

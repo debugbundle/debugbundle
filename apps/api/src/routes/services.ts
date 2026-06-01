@@ -26,6 +26,7 @@ export function registerServicesRoutes(app: FastifyInstance, dependencies: ApiDe
 
     const services = await dependencies.incidentRetrieval.listServicesForOrganization({
       organization_id: member.organization_id,
+      user_id: member.member_id,
       project_id: parsedQuery.data.project_id,
       limit: parsedQuery.data.limit
     });

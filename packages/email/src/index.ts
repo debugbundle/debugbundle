@@ -1,5 +1,6 @@
 import { SESv2Client, SendEmailCommand } from "@aws-sdk/client-sesv2";
 import {
+  buildEmailBrandMarkUrl,
   escapeHtml,
   formatEmailDate,
   renderEmailButton,
@@ -91,6 +92,7 @@ export interface WeeklyReportProjectInput {
 
 export interface WeeklyReportEmailInput {
   organizationName?: string;
+  brandMarkUrl?: string | undefined;
   windowStart: string;
   windowEnd: string;
   projects: WeeklyReportProjectInput[];
@@ -99,6 +101,7 @@ export interface WeeklyReportEmailInput {
 export interface LegacyWeeklyReportEmailInput {
   projectId: string;
   projectName?: string;
+  brandMarkUrl?: string | undefined;
   windowStart: string;
   windowEnd: string;
   bundleCounts: {
@@ -127,6 +130,7 @@ export interface AlertEmailInput {
   severity: "low" | "medium" | "high" | "critical";
   incidentUrl?: string | null;
   bundleUrl?: string | null;
+  brandMarkUrl?: string | undefined;
 }
 
 export interface AlertDigestEmailEntryInput extends AlertEmailInput {
@@ -156,6 +160,7 @@ function normalizeWeeklyReportInput(input: WeeklyReportEmailInput | LegacyWeekly
   }
 
   return {
+    brandMarkUrl: input.brandMarkUrl,
     windowStart: input.windowStart,
     windowEnd: input.windowEnd,
     projects: [
@@ -285,6 +290,7 @@ export function renderEmailAuthCodeEmail(input: {
   code: string;
   appUrl?: string;
   expiresInMinutes: number;
+  brandMarkUrl?: string | undefined;
 }): { subject: string; text: string; html: string } {
   return {
     subject: "Your DebugBundle sign-in code",
@@ -298,6 +304,7 @@ export function renderEmailAuthCodeEmail(input: {
       ...(input.appUrl === undefined ? [] : [`Return to ${input.appUrl} to enter the code.`])
     ].join("\n"),
     html: renderEmailLayout({
+      brandMarkUrl: input.brandMarkUrl ?? buildEmailBrandMarkUrl(input.appUrl),
       eyebrow: "Sign-in",
       title: "Your DebugBundle sign-in code",
       intro: "Use this code to continue with DebugBundle.",
@@ -326,6 +333,7 @@ export function renderEmailAuthCodeEmail(input: {
 export function renderProjectInviteEmail(input: {
   acceptUrl: string;
   inviterName: string;
+  brandMarkUrl?: string | undefined;
 }): { subject: string; text: string; html: string } {
   return {
     subject: "A DebugBundle project was shared with you",
@@ -335,6 +343,7 @@ export function renderProjectInviteEmail(input: {
       input.acceptUrl
     ].join("\n"),
     html: renderEmailLayout({
+      brandMarkUrl: input.brandMarkUrl ?? buildEmailBrandMarkUrl(input.acceptUrl),
       eyebrow: "Project invite",
       title: "A DebugBundle project was shared with you",
       intro: `${escapeHtml(input.inviterName)} shared a DebugBundle project with you. Open the invite link to accept access to the shared project.`,
@@ -379,6 +388,7 @@ export function renderWeeklyReportEmail(input: WeeklyReportEmailInput | LegacyWe
     ])
   ].join("\n").trimEnd();
   const html = renderEmailLayout({
+    brandMarkUrl: normalized.brandMarkUrl,
     eyebrow: "Weekly report",
     title: "DebugBundle weekly report",
     intro: `${escapeHtml(lead)} ${escapeHtml(formattedWindow)}.`,
@@ -527,6 +537,7 @@ export function renderAlertEmail(input: AlertEmailInput): { subject: string; tex
     ...(input.bundleUrl === undefined || input.bundleUrl === null ? [``, "Use the incident ID above to inspect the bundle in DebugBundle."] : ["", `View bundle: ${input.bundleUrl}`])
   ].join("\n");
   const html = renderEmailLayout({
+    brandMarkUrl: input.brandMarkUrl ?? buildEmailBrandMarkUrl(input.incidentUrl ?? input.bundleUrl),
     eyebrow: "Alert",
     title: formatAlertHeadline(input.conditionType),
     intro: formatAlertIntro(input.conditionType),
@@ -569,6 +580,7 @@ export function renderAlertEmail(input: AlertEmailInput): { subject: string; tex
 
 export function renderAlertDigestEmail(input: {
   alerts: AlertDigestEmailEntryInput[];
+  brandMarkUrl?: string | undefined;
 }): { subject: string; text: string; html: string } {
   const groupedAlerts = new Map<
     string,
@@ -622,6 +634,9 @@ export function renderAlertDigestEmail(input: {
   ].join("\n").trimEnd();
 
   const html = renderEmailLayout({
+    brandMarkUrl:
+      input.brandMarkUrl ??
+      buildEmailBrandMarkUrl(alerts[0]?.incidentUrl ?? alerts[0]?.bundleUrl),
     eyebrow: "Alert digest",
     title: "DebugBundle alert digest",
     intro:
@@ -748,3 +763,5 @@ export function createSesEmailTransport(input: {
     }
   };
 }
+
+export { buildEmailBrandMarkUrl } from "./email-layout.js";

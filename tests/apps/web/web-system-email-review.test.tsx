@@ -57,7 +57,13 @@ describe("web app — system email review", () => {
 
     expect(screen.getByRole("tab", { name: /html preview/i })).toBeInTheDocument();
     expect(screen.getByRole("tab", { name: /mobile view/i })).toBeInTheDocument();
-    expect(screen.getByTitle(/html desktop preview/i)).toBeInTheDocument();
+    const desktopPreview = screen.getByTitle(/html desktop preview/i);
+    expect(desktopPreview).toBeInTheDocument();
+    expect(desktopPreview).toHaveAttribute("srcdoc", expect.stringContaining("<!DOCTYPE html>"));
+    expect(desktopPreview).toHaveAttribute("srcdoc", expect.stringContaining("<html lang=\"en\">"));
+    expect(desktopPreview).toHaveAttribute("srcdoc", expect.stringContaining("/email/debugbundle-mark.png"));
+    expect(desktopPreview).toHaveAttribute("srcdoc", expect.not.stringContaining("app.debugbundle.local/email/debugbundle-mark.png"));
+    expect(desktopPreview).toHaveAttribute("srcdoc", expect.not.stringContaining("font-family: Inter, ui-sans-serif"));
     expect(screen.getByRole("button", { name: /send preview email/i })).toBeInTheDocument();
 
     await user.click(screen.getByRole("tab", { name: /mobile view/i }));

@@ -72,6 +72,7 @@ export function registerImprovementRoutes(app: FastifyInstance, dependencies: Ap
 
     const improvements = await dependencies.improvementManagement.listImprovementsForOrganization({
       organization_id: member.organization_id,
+      user_id: member.member_id,
       ...(parsedQuery.data.project_id === undefined ? {} : { project_id: parsedQuery.data.project_id }),
       ...(parsedQuery.data.environment === undefined ? {} : { environment: parsedQuery.data.environment }),
       ...(parsedQuery.data.service === undefined ? {} : { service: parsedQuery.data.service }),
@@ -109,7 +110,8 @@ export function registerImprovementRoutes(app: FastifyInstance, dependencies: Ap
 
     const improvement = await dependencies.improvementManagement.getImprovementForOrganization({
       organization_id: member.organization_id,
-      improvement_id: parsedParams.data.id
+      improvement_id: parsedParams.data.id,
+      user_id: member.member_id
     });
 
     if (improvement === null) {
@@ -137,6 +139,7 @@ export function registerImprovementRoutes(app: FastifyInstance, dependencies: Ap
     const improvement = await dependencies.improvementManagement.resolveImprovementForOrganization({
       organization_id: member.organization_id,
       improvement_id: parsedParams.data.id,
+      user_id: member.member_id,
       resolved_by_member_id: member.member_id,
       resolved_at: new Date().toISOString()
     });
@@ -165,7 +168,8 @@ export function registerImprovementRoutes(app: FastifyInstance, dependencies: Ap
 
     const improvement = await dependencies.improvementManagement.reopenImprovementForOrganization({
       organization_id: member.organization_id,
-      improvement_id: parsedParams.data.id
+      improvement_id: parsedParams.data.id,
+      user_id: member.member_id
     });
 
     if (improvement === null) {
@@ -202,6 +206,7 @@ export function registerImprovementRoutes(app: FastifyInstance, dependencies: Ap
     const improvement = await dependencies.improvementManagement.snoozeImprovementForOrganization({
       organization_id: member.organization_id,
       improvement_id: parsedParams.data.id,
+      user_id: member.member_id,
       snoozed_until: parsedBody.data.snoozed_until
     });
 
@@ -232,7 +237,8 @@ export function registerImprovementRoutes(app: FastifyInstance, dependencies: Ap
 
     const improvement = await dependencies.improvementManagement.getImprovementForOrganization({
       organization_id: auth.access.organization_id,
-      improvement_id: parsedParams.data.improvementId
+      improvement_id: parsedParams.data.improvementId,
+      user_id: auth.member.member_id
     });
     if (improvement === null || improvement.project_id !== parsedParams.data.id) {
       return reply.status(404).send({ error: "improvement_not_found" });

@@ -232,7 +232,7 @@ describe("retrieval parity mapping contract", () => {
     const contract = await readFile(CONTRACT_PATH, "utf8");
 
     expect(contract).toContain(
-      "| List project members | `GET /v1/projects/{id}/members` | `project members list` | `list_project_members` | Browser Session or Member Token, owner/admin only |"
+      "| List project members | `GET /v1/projects/{id}/members` | `project members list` | `list_project_members` | Browser Session or Member Token, any authorized project member |"
     );
     expect(contract).toContain(
       "| List pending project invites | `GET /v1/projects/{id}/invites` | `project members invites` | `list_project_member_invites` | Browser Session or Member Token, owner/admin only |"
@@ -248,6 +248,9 @@ describe("retrieval parity mapping contract", () => {
     );
     expect(contract).toContain(
       "| Remove project member | `DELETE /v1/projects/{id}/members/{userId}` | `project members remove` | `remove_project_member` | Browser Session or Member Token, owner/admin only |"
+    );
+    expect(contract).toContain(
+      "| Leave project membership | `DELETE /v1/projects/{id}/membership` | `project members leave` | `leave_project` | Browser Session or Member Token, any collaborator on that project |"
     );
   });
 });

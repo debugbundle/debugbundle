@@ -385,6 +385,16 @@ export type RemoveProjectMemberResult =
       member: ProjectMemberRecord;
     };
 
+export type LeaveProjectMembershipResult =
+  | {
+      kind: "left";
+      member: ProjectMemberRecord;
+    }
+  | {
+      kind: "owner_leave_forbidden";
+      member: ProjectMemberRecord;
+    };
+
 export type UpdateProjectMemberRoleResult =
   | {
       kind: "updated";
@@ -800,6 +810,7 @@ export interface ImprovementRetrievalRecord extends Record<string, unknown> {
 export interface ResolveIncidentForOrganizationInput {
   organization_id: string;
   incident_id: string;
+  user_id?: string;
   resolved_by_member_id: string;
   resolved_at: string;
 }
@@ -807,11 +818,13 @@ export interface ResolveIncidentForOrganizationInput {
 export interface ReopenIncidentForOrganizationInput {
   organization_id: string;
   incident_id: string;
+  user_id?: string;
 }
 
 export interface ResolveImprovementForOrganizationInput {
   organization_id: string;
   improvement_id: string;
+  user_id?: string;
   resolved_by_member_id: string;
   resolved_at: string;
 }
@@ -819,11 +832,13 @@ export interface ResolveImprovementForOrganizationInput {
 export interface ReopenImprovementForOrganizationInput {
   organization_id: string;
   improvement_id: string;
+  user_id?: string;
 }
 
 export interface SnoozeImprovementForOrganizationInput {
   organization_id: string;
   improvement_id: string;
+  user_id?: string;
   snoozed_until: string;
 }
 
@@ -883,6 +898,7 @@ export interface MetadataStore {
   }): Promise<ProjectAccessRecord | null>;
   listIncidentsForOrganization(input: {
     organization_id: string;
+    user_id?: string;
     project_id?: string;
     environment?: string;
     service?: string;
@@ -891,16 +907,22 @@ export interface MetadataStore {
     cursor?: IncidentsCursor;
     limit: number;
   }): Promise<IncidentRetrievalRecord[]>;
-  getIncidentForOrganization(input: { organization_id: string; incident_id: string }): Promise<IncidentRetrievalRecord | null>;
+  getIncidentForOrganization(input: {
+    organization_id: string;
+    incident_id: string;
+    user_id?: string;
+  }): Promise<IncidentRetrievalRecord | null>;
   resolveIncidentForOrganization(input: ResolveIncidentForOrganizationInput): Promise<IncidentRetrievalRecord | null>;
   reopenIncidentForOrganization(input: ReopenIncidentForOrganizationInput): Promise<IncidentRetrievalRecord | null>;
   listServicesForOrganization?(input: {
     organization_id: string;
+    user_id?: string;
     project_id: string;
     limit: number;
   }): Promise<ServiceRetrievalRecord[] | null>;
   listIncidentLogsForOrganization(input: {
     organization_id: string;
+    user_id?: string;
     incident_id: string;
     limit: number;
     level?: string;
@@ -922,6 +944,7 @@ export interface MetadataStore {
 export interface ImprovementRetrievalStore {
   listImprovementsForOrganization(input: {
     organization_id: string;
+    user_id?: string;
     project_id?: string;
     environment?: string;
     service?: string;
@@ -934,6 +957,7 @@ export interface ImprovementRetrievalStore {
   getImprovementForOrganization(input: {
     organization_id: string;
     improvement_id: string;
+    user_id?: string;
   }): Promise<ImprovementRetrievalRecord | null>;
   resolveImprovementForOrganization(input: ResolveImprovementForOrganizationInput): Promise<ImprovementRetrievalRecord | null>;
   reopenImprovementForOrganization(input: ReopenImprovementForOrganizationInput): Promise<ImprovementRetrievalRecord | null>;
@@ -1628,6 +1652,10 @@ export interface ProjectCollaborationStore {
     actor_user_id: string;
     user_id: string;
   }): Promise<RemoveProjectMemberResult | null>;
+  leaveProjectMembership?(input: {
+    project_id: string;
+    user_id: string;
+  }): Promise<LeaveProjectMembershipResult | null>;
 }
 
 export interface CreateWebhookDeliveryIntentInput {

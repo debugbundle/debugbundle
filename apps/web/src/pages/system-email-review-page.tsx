@@ -28,6 +28,17 @@ function formatCategory(category: SystemEmailReviewEntry["category"]): string {
 }
 
 function renderPreviewDocument(html: string): string {
+  const previewAssetBaseUrl =
+    typeof window === "undefined" ? "http://localhost" : window.location.origin;
+  const previewHtml = html.replaceAll(
+    /https?:\/\/[^"'\\s]+\/email\/debugbundle-mark\.png/gi,
+    `${previewAssetBaseUrl}/email/debugbundle-mark.png`
+  );
+
+  if (/<html[\s>]/i.test(previewHtml) || /<!doctype/i.test(previewHtml)) {
+    return previewHtml;
+  }
+
   return [
     "<!doctype html>",
     "<html>",
@@ -43,7 +54,7 @@ function renderPreviewDocument(html: string): string {
     "strong { font-weight: 600; }",
     "</style>",
     "</head>",
-    `<body>${html}</body>`,
+    `<body>${previewHtml}</body>`,
     "</html>"
   ].join("");
 }

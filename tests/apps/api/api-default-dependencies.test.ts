@@ -123,6 +123,10 @@ vi.mock("../../../packages/auth/src/index.js", () => ({
 }));
 
 vi.mock("../../../packages/email/src/index.js", () => ({
+  buildEmailBrandMarkUrl: (baseUrl: string | null | undefined) =>
+    baseUrl === undefined || baseUrl === null || baseUrl.trim().length === 0
+      ? undefined
+      : `${baseUrl.replace(/\/+$/, "")}/email/debugbundle-mark.png`,
   createSesEmailTransport: createSesEmailTransportMock,
   formatProductFromEmail: (fromEmail: string) => `DebugBundle <${fromEmail}>`,
   renderEmailAuthCodeEmail: renderEmailAuthCodeEmailMock,
@@ -1258,11 +1262,13 @@ describe("api default dependencies", () => {
     expect(renderEmailAuthCodeEmailMock).toHaveBeenCalledWith({
       code: "123456",
       appUrl: "https://app.debugbundle.test/login",
-      expiresInMinutes: 10
+      expiresInMinutes: 10,
+      brandMarkUrl: "https://app.debugbundle.test/email/debugbundle-mark.png"
     });
     expect(renderProjectInviteEmailMock).toHaveBeenCalledWith({
       acceptUrl: "https://app.debugbundle.test/invite?token=invite-token",
-      inviterName: "Owen Example"
+      inviterName: "Owen Example",
+      brandMarkUrl: "https://app.debugbundle.test/email/debugbundle-mark.png"
     });
     expect(emailTransportSendMock).toHaveBeenCalledTimes(2);
   });

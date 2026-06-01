@@ -929,6 +929,15 @@ export const MCP_TOOL_CATALOG = [
     }),
   },
   {
+    name: 'leave_project',
+    group: 'members',
+    description: 'Leave a shared project as the authenticated collaborator.',
+    inputSchema: z.object({
+      bearerToken: z.string(),
+      projectId: z.string(),
+    }),
+  },
+  {
     name: 'list_services',
     group: 'services',
     description: 'List services for a project.',

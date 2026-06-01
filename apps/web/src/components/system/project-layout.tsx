@@ -7,7 +7,7 @@ import { Button } from "../ui/button.js";
 import { Skeleton } from "../ui/skeleton.js";
 import { Tabs, TabsList, TabsTrigger } from "../ui/tabs.js";
 import { listProjects, type ProjectRecord } from "../../lib/api.js";
-import { getProjectEffectiveRole, getProjectRelationship } from "../../lib/project-access.js";
+import { getProjectEffectiveRole, getProjectRelationship, getProjectSharingState } from "../../lib/project-access.js";
 
 const PROJECT_TABS = [
   { value: "overview", label: "Overview", suffix: "" },
@@ -25,7 +25,7 @@ const PROJECT_TABS = [
 
 function canViewProjectMembers(project: ProjectRecord): boolean {
   const effectiveRole = getProjectEffectiveRole(project);
-  return effectiveRole === "owner" || effectiveRole === "admin";
+  return effectiveRole === "owner" || effectiveRole === "admin" || effectiveRole === "member";
 }
 
 export type ProjectTab = (typeof PROJECT_TABS)[number]["value"];
@@ -78,7 +78,8 @@ export function ProjectLayout(): JSX.Element {
     setActiveProject({
       projectId,
       projectName: project.name,
-      relationship: getProjectRelationship(project)
+      relationship: getProjectRelationship(project),
+      sharingState: getProjectSharingState(project)
     });
 
     return () => {
@@ -97,7 +98,8 @@ export function ProjectLayout(): JSX.Element {
     setActiveProject({
       projectId: nextProject.project_id,
       projectName: nextProject.name,
-      relationship: getProjectRelationship(nextProject)
+      relationship: getProjectRelationship(nextProject),
+      sharingState: getProjectSharingState(nextProject)
     });
   }
 

@@ -59,6 +59,7 @@ export function createMemberApi(httpClient: {
   cancelInvite(input: { bearerToken: string; projectId: string; inviteId: string }): Promise<{ invite: InviteLike }>;
   updateMemberRole(input: { bearerToken: string; projectId: string; userId: string; role: string }): Promise<{ member: MemberLike }>;
   removeMember(input: { bearerToken: string; projectId: string; userId: string }): Promise<{ member: MemberLike }>;
+  leaveProject(input: { bearerToken: string; projectId: string }): Promise<{ member: MemberLike }>;
 } {
   return {
     async listMembers(input) {
@@ -137,6 +138,20 @@ export function createMemberApi(httpClient: {
       const response = await httpClient.request({
         method: "DELETE",
         path: `/v1/projects/${input.projectId}/members/${input.userId}`,
+        bearerToken: input.bearerToken
+      });
+
+      if (response.status !== 200) {
+        throw toApiError(response.status, response.body);
+      }
+
+      return response.body as { member: MemberLike };
+    },
+
+    async leaveProject(input) {
+      const response = await httpClient.request({
+        method: "DELETE",
+        path: `/v1/projects/${input.projectId}/membership`,
         bearerToken: input.bearerToken
       });
 
@@ -304,6 +319,24 @@ export async function removeMemberCommand(
   }
 }
 
+export async function leaveProjectCommand(
+  input: { bearerToken: string; projectId: string; json?: boolean },
+  api: ReturnType<typeof createMemberApi>
+): Promise<CliCommandResult> {
+  try {
+    const result = await api.leaveProject({ bearerToken: input.bearerToken, projectId: input.projectId });
+    return {
+      exitCode: 0,
+      output: input.json ? JSON.stringify(result) : `Left project: ${input.projectId}`
+    };
+  } catch (error) {
+    return {
+      exitCode: mapErrorToExitCode(error),
+      output: error instanceof MemberApiError ? error.code : String(error)
+    };
+  }
+}
+
 async function createAuthenticatedMemberApi(
   input: { authFilePath?: string },
   dependencies?: {
@@ -431,6 +464,25 @@ export async function removeMemberWithAuthCommand(
           bearerToken: authState.bearer_token,
           projectId: input.projectId,
           userId: input.userId,
+          ...(input.json === undefined ? {} : { json: input.json })
+        },
+        api
+      )
+  });
+}
+
+export async function leaveProjectWithAuthCommand(
+  input: { projectId: string; json?: boolean; authFilePath?: string },
+  dependencies?: Parameters<typeof createAuthenticatedMemberApi>[1]
+): Promise<CliCommandResult> {
+  return runAuthenticatedCliCommand(input, {
+    createApi: createAuthenticatedMemberApi,
+    dependencies,
+    runCommand: (authState, api) =>
+      leaveProjectCommand(
+        {
+          bearerToken: authState.bearer_token,
+          projectId: input.projectId,
           ...(input.json === undefined ? {} : { json: input.json })
         },
         api

@@ -3,6 +3,34 @@ import { describe, expect, it, vi } from "vitest";
 import { createPostgresImprovementOpportunityStore } from "../../../packages/storage/src/improvement-opportunity-store.js";
 
 describe("improvement opportunity store", () => {
+  it("scopes improvement retrieval to projects visible to a collaborator", async () => {
+    const query = vi.fn().mockResolvedValue({ rows: [] });
+    const store = createPostgresImprovementOpportunityStore({ query });
+
+    await store.listImprovementsForOrganization({
+      organization_id: "org_collaborator",
+      user_id: "usr_collaborator",
+      project_id: "proj_shared",
+      limit: 20
+    });
+    await store.getImprovementForOrganization({
+      organization_id: "org_collaborator",
+      user_id: "usr_collaborator",
+      improvement_id: "imp_shared"
+    });
+
+    expect(query).toHaveBeenNthCalledWith(
+      1,
+      expect.stringContaining("FROM project_members pm"),
+      ["org_collaborator", "usr_collaborator", "proj_shared", 20]
+    );
+    expect(query).toHaveBeenNthCalledWith(
+      2,
+      expect.stringContaining("FROM project_members pm"),
+      ["org_collaborator", "imp_shared", "usr_collaborator"]
+    );
+  });
+
   it("returns null when improvement execution settings are missing", async () => {
     const query = vi.fn().mockResolvedValue({ rows: [] });
 

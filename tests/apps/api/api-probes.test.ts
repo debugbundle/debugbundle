@@ -8,6 +8,7 @@ type IngestionMetadataDependency = MockedMethods<ApiServerDependencies["ingestio
 type CapturePolicyManagementDependency = MockedMethods<NonNullable<ApiServerDependencies["capturePolicyManagement"]>>;
 type BillingManagementDependency = MockedMethods<NonNullable<ApiServerDependencies["billingManagement"]>>;
 type ProbeManagementDependency = MockedMethods<NonNullable<ApiServerDependencies["probeManagement"]>>;
+type ProjectManagementDependency = MockedMethods<NonNullable<ApiServerDependencies["projectManagement"]>>;
 type MemberAuthDependency = MockedMethods<ApiServerDependencies["memberAuth"]>;
 
 const originalProbeTriggerSecret = process.env["DEBUGBUNDLE_PROBE_TRIGGER_SECRET"];
@@ -17,6 +18,7 @@ function createServer(overrides: {
   capturePolicyManagement?: CapturePolicyManagementDependency;
   billingManagement?: Partial<BillingManagementDependency>;
   probeManagement?: ProbeManagementDependency;
+  projectManagement?: Partial<ProjectManagementDependency>;
   operationalEmailDelivery?: ApiServerDependencies["operationalEmailDelivery"];
   memberAuth?: MemberAuthDependency;
   authRateLimiter?: ApiServerDependencies["authRateLimiter"];
@@ -58,6 +60,24 @@ function createServer(overrides: {
       createMemberTokenForOrganization: vi.fn().mockResolvedValue(null),
       revokeMemberTokenForOrganization: vi.fn().mockResolvedValue(null)
     }),
+    projectManagement: {
+      resolveProjectAccessForUser:
+        overrides.projectManagement?.resolveProjectAccessForUser ??
+        vi.fn().mockResolvedValue({
+          project_id: "00000000-0000-4000-8000-000000000001",
+          organization_id: "org_owner",
+          owner_user_id: "usr_owner",
+          owner_email: "owner@example.com",
+          relationship: "shared",
+          sharing_state: "shared_with_you",
+          effective_role: "member",
+          organization_plan: "solo"
+        }),
+      listProjectsForOrganization: vi.fn().mockResolvedValue([]),
+      createProjectForOrganization: vi.fn().mockResolvedValue(null),
+      updateProjectForOrganization: vi.fn().mockResolvedValue(null),
+      deleteProjectForOrganization: vi.fn().mockResolvedValue(null)
+    },
     probeManagement:
       overrides.probeManagement ??
       mockedObject<NonNullable<ApiServerDependencies["probeManagement"]>>({
@@ -249,6 +269,22 @@ describe("api probe routes", () => {
         listMemberTokensForOrganization: vi.fn().mockResolvedValue([]),
         createMemberTokenForOrganization: vi.fn().mockResolvedValue(null),
         revokeMemberTokenForOrganization: vi.fn().mockResolvedValue(null)
+      },
+      projectManagement: {
+        resolveProjectAccessForUser: vi.fn().mockResolvedValue({
+          project_id: "00000000-0000-4000-8000-000000000001",
+          organization_id: "org_owner",
+          owner_user_id: "usr_owner",
+          owner_email: "owner@example.com",
+          relationship: "shared",
+          sharing_state: "shared_with_you",
+          effective_role: "member",
+          organization_plan: "solo"
+        }),
+        listProjectsForOrganization: vi.fn().mockResolvedValue([]),
+        createProjectForOrganization: vi.fn().mockResolvedValue(null),
+        updateProjectForOrganization: vi.fn().mockResolvedValue(null),
+        deleteProjectForOrganization: vi.fn().mockResolvedValue(null)
       },
       incidentRetrieval: {
         listIncidentsForOrganization: vi.fn().mockResolvedValue([]),
@@ -651,6 +687,22 @@ describe("api probe routes", () => {
         createMemberTokenForOrganization: vi.fn().mockResolvedValue(null),
         revokeMemberTokenForOrganization: vi.fn().mockResolvedValue(null)
       },
+      projectManagement: {
+        resolveProjectAccessForUser: vi.fn().mockResolvedValue({
+          project_id: "00000000-0000-4000-8000-000000000001",
+          organization_id: "org_owner",
+          owner_user_id: "usr_owner",
+          owner_email: "owner@example.com",
+          relationship: "shared",
+          sharing_state: "shared_with_you",
+          effective_role: "member",
+          organization_plan: "solo"
+        }),
+        listProjectsForOrganization: vi.fn().mockResolvedValue([]),
+        createProjectForOrganization: vi.fn().mockResolvedValue(null),
+        updateProjectForOrganization: vi.fn().mockResolvedValue(null),
+        deleteProjectForOrganization: vi.fn().mockResolvedValue(null)
+      },
       incidentRetrieval: {
         listIncidentsForOrganization: vi.fn().mockResolvedValue([]),
         getIncidentForOrganization: vi.fn().mockResolvedValue(null),
@@ -925,6 +977,121 @@ describe("api probe routes", () => {
     expect(listed.statusCode).toBe(200);
   });
 
+  it("should scope collaborator probe access to the project owner organization", async (): Promise<void> => {
+    const projectManagement = {
+      resolveProjectAccessForUser: vi.fn().mockResolvedValue({
+        project_id: "00000000-0000-4000-8000-000000000001",
+        organization_id: "org_owner",
+        owner_user_id: "usr_owner",
+        owner_email: "owner@example.com",
+        relationship: "shared",
+        sharing_state: "shared_with_you",
+        effective_role: "member",
+        organization_plan: "solo"
+      })
+    };
+    const billingManagement = {
+      getBillingSummaryForOrganization: vi.fn().mockResolvedValue({
+        organization_id: "org_owner",
+        plan: "solo",
+        stripe_customer_id: null,
+        usage_window: {
+          starts_at: "2026-03-01T00:00:00.000Z",
+          ends_at: "2026-03-31T23:59:59.000Z"
+        },
+        active_projects: 1,
+        capacities: {
+          active_projects: 1,
+          retention_days: 7,
+          team_members: 1
+        },
+        allowances: {
+          monthly_bundle_requests: { used: 0, limit: 100 },
+          retained_bundles: { used: 0, limit: 100 },
+          monthly_raw_ingested_events: { used: 0, limit: 1000 },
+          monthly_alert_deliveries: { used: 0, limit: 1000 },
+          monthly_remote_activations: { used: 0, limit: 10 }
+        }
+      })
+    };
+    const probeManagement = {
+      listActiveProbesForProject: vi.fn().mockResolvedValue([]),
+      listActiveProbesForProjectInOrganization: vi.fn().mockResolvedValue({ organization_plan: "solo", activations: [] }),
+      createProbeActivationForProjectInOrganization: vi.fn().mockResolvedValue({
+        organization_plan: "solo",
+        activation: {
+          activation_id: "11111111-1111-4111-8111-111111111111",
+          label_pattern: "checkout.*",
+          service: "*",
+          environment: "*",
+          expires_at: "2026-03-11T01:00:00.000Z",
+          trigger_expires_at: "2026-03-12T01:00:00.000Z"
+        },
+        trigger_token: "dbundle_probe_test"
+      }),
+      deactivateProbeActivationForProjectInOrganization: vi.fn().mockResolvedValue({
+        organization_plan: "solo",
+        deactivated: {
+          activation_id: "11111111-1111-4111-8111-111111111111",
+          deactivated_at: "2026-03-11T00:10:00.000Z"
+        }
+      })
+    };
+    const app = createServer({
+      memberAuth: mockedObject<ApiServerDependencies["memberAuth"]>({
+        resolveMemberByTokenHash: vi.fn().mockResolvedValue({ member_id: "usr_member", organization_id: "org_member" })
+      }),
+      projectManagement,
+      billingManagement,
+      probeManagement
+    });
+
+    await app.inject({
+      method: "GET",
+      url: "/v1/projects/00000000-0000-4000-8000-000000000001/probes",
+      headers: { authorization: "Bearer dbundle_mem_test" }
+    });
+    await app.inject({
+      method: "POST",
+      url: "/v1/projects/00000000-0000-4000-8000-000000000001/probes/activate",
+      headers: { authorization: "Bearer dbundle_mem_test" },
+      payload: { label_pattern: "checkout.*", ttl_seconds: 300 }
+    });
+    await app.inject({
+      method: "POST",
+      url: "/v1/projects/00000000-0000-4000-8000-000000000001/probes/deactivate",
+      headers: { authorization: "Bearer dbundle_mem_test" },
+      payload: { activation_id: "11111111-1111-4111-8111-111111111111" }
+    });
+
+    expect(projectManagement.resolveProjectAccessForUser).toHaveBeenCalledWith({
+      user_id: "usr_member",
+      project_id: "00000000-0000-4000-8000-000000000001"
+    });
+    expect(billingManagement.getBillingSummaryForOrganization).toHaveBeenCalledWith({
+      organization_id: "org_owner",
+      now: expect.any(String)
+    });
+    expect(probeManagement.listActiveProbesForProjectInOrganization).toHaveBeenCalledWith({
+      organization_id: "org_owner",
+      project_id: "00000000-0000-4000-8000-000000000001",
+      now: expect.any(String)
+    });
+    expect(probeManagement.createProbeActivationForProjectInOrganization).toHaveBeenCalledWith(
+      expect.objectContaining({
+        organization_id: "org_owner",
+        project_id: "00000000-0000-4000-8000-000000000001",
+        created_by_member_id: "usr_member"
+      })
+    );
+    expect(probeManagement.deactivateProbeActivationForProjectInOrganization).toHaveBeenCalledWith({
+      organization_id: "org_owner",
+      project_id: "00000000-0000-4000-8000-000000000001",
+      activation_id: "11111111-1111-4111-8111-111111111111",
+      deactivated_at: expect.any(String)
+    });
+  });
+
   it("should return ETag header on sdk config and 304 on If-None-Match hit", async (): Promise<void> => {
     const probeManagement = {
       listActiveProbesForProject: vi.fn().mockResolvedValue([
@@ -982,6 +1149,7 @@ describe("api probe routes", () => {
 
   it("should call cdnPurge on probe activation and deactivation", async (): Promise<void> => {
     const cdnPurge = vi.fn();
+    const projectId = "00000000-0000-4000-8000-000000000001";
     const probeManagement = {
       listActiveProbesForProject: vi.fn().mockResolvedValue([]),
       listActiveProbesForProjectInOrganization: vi.fn().mockResolvedValue({ organization_plan: "solo", activations: [] }),
@@ -1020,6 +1188,22 @@ describe("api probe routes", () => {
         createMemberTokenForOrganization: vi.fn().mockResolvedValue(null),
         revokeMemberTokenForOrganization: vi.fn().mockResolvedValue(null)
       },
+      projectManagement: {
+        resolveProjectAccessForUser: vi.fn().mockResolvedValue({
+          project_id: projectId,
+          organization_id: "org_owner",
+          owner_user_id: "usr_owner",
+          owner_email: "owner@example.com",
+          relationship: "shared",
+          sharing_state: "shared_with_you",
+          effective_role: "member",
+          organization_plan: "solo"
+        }),
+        listProjectsForOrganization: vi.fn().mockResolvedValue([]),
+        createProjectForOrganization: vi.fn().mockResolvedValue(null),
+        updateProjectForOrganization: vi.fn().mockResolvedValue(null),
+        deleteProjectForOrganization: vi.fn().mockResolvedValue(null)
+      },
       incidentRetrieval: {
         listIncidentsForOrganization: vi.fn().mockResolvedValue([]),
         getIncidentForOrganization: vi.fn().mockResolvedValue(null),
@@ -1032,8 +1216,6 @@ describe("api probe routes", () => {
       probeManagement,
       cdnPurge
     });
-
-    const projectId = "00000000-0000-4000-8000-000000000001";
 
     await app.inject({
       method: "POST",

@@ -1,6 +1,6 @@
 import { MailCheckIcon, PlusIcon } from "lucide-react";
 import { useEffect, useState } from "react";
-import { useOutletContext } from "react-router-dom";
+import { useNavigate, useOutletContext } from "react-router-dom";
 
 import { CalloutCard } from "../components/system/callout-card.js";
 import { DialogFormContent } from "../components/system/dialog-form-content.js";
@@ -33,6 +33,7 @@ import { getProjectEffectiveRole } from "../lib/project-access.js";
 import {
   cancelProjectInvite,
   inviteProjectMember,
+  leaveProjectMembership,
   listProjectInvites,
   listProjectMembers,
   removeProjectMember,
@@ -45,6 +46,7 @@ import { useSession } from "../lib/session.js";
 export function ProjectMembersPage(): JSX.Element {
   const { project, projectId } = useOutletContext<ProjectContext>();
   const { session, setSession } = useSession();
+  const navigate = useNavigate();
   const [members, setMembers] = useState<ProjectMemberRecord[] | null>(null);
   const [invites, setInvites] = useState<ProjectInviteRecord[] | null>(null);
   const [isInviteOpen, setIsInviteOpen] = useState(false);
@@ -60,7 +62,10 @@ export function ProjectMembersPage(): JSX.Element {
 
     void (async () => {
       try {
-        const [nextMembers, nextInvites] = await Promise.all([listProjectMembers(projectId), listProjectInvites(projectId)]);
+        const [nextMembers, nextInvites] = await Promise.all([
+          listProjectMembers(projectId),
+          canManage ? listProjectInvites(projectId) : Promise.resolve([])
+        ]);
         if (!isCancelled) {
           setMembers(nextMembers);
           setInvites(nextInvites);
@@ -78,7 +83,7 @@ export function ProjectMembersPage(): JSX.Element {
     return () => {
       isCancelled = true;
     };
-  }, [projectId, setSession]);
+  }, [canManage, projectId, setSession]);
 
   async function handleInvite(event: React.FormEvent<HTMLFormElement>): Promise<void> {
     event.preventDefault();
@@ -140,6 +145,21 @@ export function ProjectMembersPage(): JSX.Element {
     }
   }
 
+  async function handleLeaveProject(): Promise<void> {
+    try {
+      await leaveProjectMembership(projectId);
+      showSuccessToast("You left the project.");
+      void navigate("/projects");
+    } catch (error) {
+      if (error instanceof Error && error.message === "owner_leave_not_allowed") {
+        showErrorToast("Owners cannot leave their own project.");
+        return;
+      }
+
+      showErrorToast("Could not leave the project.");
+    }
+  }
+
   return (
     <div className="space-y-8">
       <PageHeader
@@ -196,8 +216,8 @@ export function ProjectMembersPage(): JSX.Element {
       {!canManage ? (
         <CalloutCard
           eyebrow="Read-only"
-          title="You can view project access"
-          description="Only project owners and admins can change sharing settings."
+          title="You can review project access"
+          description="Owners and admins manage sharing. Collaborators can still leave a project from their own row."
           tone="warning"
         />
       ) : null}
@@ -239,6 +259,7 @@ export function ProjectMembersPage(): JSX.Element {
                     const isSelf = member.user_id === session?.user_id;
                     const canEditRole = canManage && !isOwner && !isSelf;
                     const canRemove = canManage && !isOwner && !isSelf;
+                    const canLeave = isSelf && !isOwner;
 
                     return (
                       <TableRow key={member.user_id}>
@@ -270,27 +291,53 @@ export function ProjectMembersPage(): JSX.Element {
                         </TableCell>
                         <TableCell>{formatDate(member.created_at)}</TableCell>
                         <TableCell className="text-right">
-                          <AlertDialog>
-                            <AlertDialogTrigger asChild>
-                              <Button type="button" variant="ghost" size="sm" disabled={!canRemove}>
-                                Remove
-                              </Button>
-                            </AlertDialogTrigger>
-                            <AlertDialogContent>
-                              <AlertDialogHeader>
-                                <AlertDialogTitle>Remove access</AlertDialogTitle>
-                                <AlertDialogDescription>
-                                  This removes {member.email} from this project immediately.
-                                </AlertDialogDescription>
-                              </AlertDialogHeader>
-                              <AlertDialogFooter>
-                                <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                <AlertDialogAction onClick={() => void handleRemoveMember(member.user_id)}>
-                                  Remove access
-                                </AlertDialogAction>
-                              </AlertDialogFooter>
-                            </AlertDialogContent>
-                          </AlertDialog>
+                          {canRemove ? (
+                            <AlertDialog>
+                              <AlertDialogTrigger asChild>
+                                <Button type="button" variant="ghost" size="sm">
+                                  Remove
+                                </Button>
+                              </AlertDialogTrigger>
+                              <AlertDialogContent>
+                                <AlertDialogHeader>
+                                  <AlertDialogTitle>Remove access</AlertDialogTitle>
+                                  <AlertDialogDescription>
+                                    This removes {member.email} from this project immediately.
+                                  </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                  <AlertDialogAction onClick={() => void handleRemoveMember(member.user_id)}>
+                                    Remove access
+                                  </AlertDialogAction>
+                                </AlertDialogFooter>
+                              </AlertDialogContent>
+                            </AlertDialog>
+                          ) : canLeave ? (
+                            <AlertDialog>
+                              <AlertDialogTrigger asChild>
+                                <Button type="button" variant="ghost" size="sm">
+                                  Leave project
+                                </Button>
+                              </AlertDialogTrigger>
+                              <AlertDialogContent>
+                                <AlertDialogHeader>
+                                  <AlertDialogTitle>Leave project</AlertDialogTitle>
+                                  <AlertDialogDescription>
+                                    You will lose access to {project.name} immediately.
+                                  </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                  <AlertDialogCancel>Stay on project</AlertDialogCancel>
+                                  <AlertDialogAction onClick={() => void handleLeaveProject()}>
+                                    Leave project
+                                  </AlertDialogAction>
+                                </AlertDialogFooter>
+                              </AlertDialogContent>
+                            </AlertDialog>
+                          ) : (
+                            <span className="text-muted-foreground" aria-label="No action available">—</span>
+                          )}
                         </TableCell>
                       </TableRow>
                     );
@@ -301,73 +348,75 @@ export function ProjectMembersPage(): JSX.Element {
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Pending invites</CardTitle>
-            <CardDescription>Invitations waiting to be accepted.</CardDescription>
-          </CardHeader>
-          <CardContent>
-            {invites === null ? (
-              <div className="space-y-3">
-                <Skeleton className="h-12 w-full" />
-                <Skeleton className="h-12 w-full" />
-              </div>
-            ) : invites.length === 0 ? (
-              <Empty className="min-h-[9rem] justify-center border border-dashed border-border/80 bg-background/50">
-                <EmptyHeader>
-                  <EmptyMedia variant="icon">
-                    <MailCheckIcon />
-                  </EmptyMedia>
-                  <EmptyTitle>No pending invites right now</EmptyTitle>
-                  <EmptyDescription>Outstanding invitations will appear here until they are accepted or cancelled.</EmptyDescription>
-                </EmptyHeader>
-              </Empty>
-            ) : (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Email</TableHead>
-                    <TableHead>Role</TableHead>
-                    <TableHead>Expires</TableHead>
-                    <TableHead className="text-right">Action</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {invites.map((invite) => (
-                    <TableRow key={invite.invite_id}>
-                      <TableCell className="font-medium">{invite.email}</TableCell>
-                      <TableCell>{invite.role}</TableCell>
-                      <TableCell>{formatDate(invite.expires_at)}</TableCell>
-                      <TableCell className="text-right">
-                        <AlertDialog>
-                          <AlertDialogTrigger asChild>
-                            <Button type="button" variant="ghost" size="sm" disabled={!canManage}>
-                              Cancel
-                            </Button>
-                          </AlertDialogTrigger>
-                          <AlertDialogContent>
-                            <AlertDialogHeader>
-                              <AlertDialogTitle>Cancel invite</AlertDialogTitle>
-                              <AlertDialogDescription>
-                                This will revoke the pending invitation for {invite.email}.
-                              </AlertDialogDescription>
-                            </AlertDialogHeader>
-                            <AlertDialogFooter>
-                              <AlertDialogCancel>Keep invite</AlertDialogCancel>
-                              <AlertDialogAction onClick={() => void handleCancelInvite(invite.invite_id)}>
-                                Cancel invite
-                              </AlertDialogAction>
-                            </AlertDialogFooter>
-                          </AlertDialogContent>
-                        </AlertDialog>
-                      </TableCell>
+        {canManage ? (
+          <Card>
+            <CardHeader>
+              <CardTitle>Pending invites</CardTitle>
+              <CardDescription>Invitations waiting to be accepted.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {invites === null ? (
+                <div className="space-y-3">
+                  <Skeleton className="h-12 w-full" />
+                  <Skeleton className="h-12 w-full" />
+                </div>
+              ) : invites.length === 0 ? (
+                <Empty className="min-h-[9rem] justify-center border border-dashed border-border/80 bg-background/50">
+                  <EmptyHeader>
+                    <EmptyMedia variant="icon">
+                      <MailCheckIcon />
+                    </EmptyMedia>
+                    <EmptyTitle>No pending invites right now</EmptyTitle>
+                    <EmptyDescription>Outstanding invitations will appear here until they are accepted or cancelled.</EmptyDescription>
+                  </EmptyHeader>
+                </Empty>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Email</TableHead>
+                      <TableHead>Role</TableHead>
+                      <TableHead>Expires</TableHead>
+                      <TableHead className="text-right">Action</TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            )}
-          </CardContent>
-        </Card>
+                  </TableHeader>
+                  <TableBody>
+                    {invites.map((invite) => (
+                      <TableRow key={invite.invite_id}>
+                        <TableCell className="font-medium">{invite.email}</TableCell>
+                        <TableCell>{invite.role}</TableCell>
+                        <TableCell>{formatDate(invite.expires_at)}</TableCell>
+                        <TableCell className="text-right">
+                          <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                              <Button type="button" variant="ghost" size="sm">
+                                Cancel
+                              </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                              <AlertDialogHeader>
+                                <AlertDialogTitle>Cancel invite</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                  This will revoke the pending invitation for {invite.email}.
+                                </AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                                <AlertDialogCancel>Keep invite</AlertDialogCancel>
+                                <AlertDialogAction onClick={() => void handleCancelInvite(invite.invite_id)}>
+                                  Cancel invite
+                                </AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
+            </CardContent>
+          </Card>
+        ) : null}
       </div>
     </div>
   );

@@ -20,6 +20,7 @@ export interface PurchaseConfirmationInput {
   plan: TierName;
   extraCapacity: number;
   portalUrl: string;
+  brandMarkUrl?: string | undefined;
 }
 
 export function renderPurchaseConfirmationEmail(input: PurchaseConfirmationInput): BillingEmailRendered {
@@ -32,6 +33,7 @@ export function renderPurchaseConfirmationEmail(input: PurchaseConfirmationInput
       `Manage your subscription: ${input.portalUrl}`
     ].join("\n"),
     html: renderEmailLayout({
+      brandMarkUrl: input.brandMarkUrl,
       eyebrow: "Billing",
       title: "Subscription confirmed",
       intro: `Your account "${escapeHtml(input.organizationName)}" is now on the ${escapeHtml(input.plan)} plan${escapeHtml(capacity)}.`,
@@ -58,6 +60,7 @@ export interface RenewalSuccessInput {
   plan: TierName;
   extraCapacity: number;
   nextRenewalDate: string;
+  brandMarkUrl?: string | undefined;
 }
 
 export function renderRenewalSuccessEmail(input: RenewalSuccessInput): BillingEmailRendered {
@@ -69,6 +72,7 @@ export function renderRenewalSuccessEmail(input: RenewalSuccessInput): BillingEm
       `Next renewal: ${input.nextRenewalDate}.`
     ].join("\n"),
     html: renderEmailLayout({
+      brandMarkUrl: input.brandMarkUrl,
       eyebrow: "Billing",
       title: "Subscription renewed",
       intro: `Your ${escapeHtml(input.plan)} plan${escapeHtml(capacity)} for account "${escapeHtml(input.organizationName)}" has been renewed.`,
@@ -88,6 +92,7 @@ export interface PaymentFailureInput {
   organizationName: string;
   plan: TierName;
   portalUrl: string;
+  brandMarkUrl?: string | undefined;
 }
 
 export function renderPaymentFailureEmail(input: PaymentFailureInput): BillingEmailRendered {
@@ -102,6 +107,7 @@ export function renderPaymentFailureEmail(input: PaymentFailureInput): BillingEm
       `Update your payment method: ${input.portalUrl}`
     ].join("\n"),
     html: renderEmailLayout({
+      brandMarkUrl: input.brandMarkUrl,
       eyebrow: "Billing",
       title: "Payment failed",
       intro: `A payment for your ${escapeHtml(input.plan)} plan on account "${escapeHtml(input.organizationName)}" could not be processed.`,
@@ -126,6 +132,7 @@ export interface PaymentFailureReminderInput {
   plan: TierName;
   portalUrl: string;
   daysUntilDowngrade: number;
+  brandMarkUrl?: string | undefined;
 }
 
 export function renderPaymentFailureReminderEmail(input: PaymentFailureReminderInput): BillingEmailRendered {
@@ -139,6 +146,7 @@ export function renderPaymentFailureReminderEmail(input: PaymentFailureReminderI
       `Update your payment method: ${input.portalUrl}`
     ].join("\n"),
     html: renderEmailLayout({
+      brandMarkUrl: input.brandMarkUrl,
       eyebrow: "Billing",
       title: "Payment still unresolved",
       intro: `Payment for your ${escapeHtml(input.plan)} plan on account "${escapeHtml(input.organizationName)}" remains unresolved.`,
@@ -164,6 +172,7 @@ export interface EntitlementDowngradeWarningInput {
   currentCapacityUnits: number;
   effectiveDate: string;
   portalUrl: string;
+  brandMarkUrl?: string | undefined;
 }
 
 export function renderEntitlementDowngradeWarningEmail(input: EntitlementDowngradeWarningInput): BillingEmailRendered {
@@ -177,6 +186,7 @@ export function renderEntitlementDowngradeWarningEmail(input: EntitlementDowngra
       `Resolve payment to keep your plan: ${input.portalUrl}`
     ].join("\n"),
     html: renderEmailLayout({
+      brandMarkUrl: input.brandMarkUrl,
       eyebrow: "Billing",
       title: "Entitlement downgrade pending",
       intro: `Due to unresolved billing, your account "${escapeHtml(input.organizationName)}" (currently ${escapeHtml(input.currentPlan)} with ${input.currentCapacityUnits} capacity unit(s)) will be downgraded to the free tier on ${escapeHtml(input.effectiveDate)}.`,
@@ -206,6 +216,7 @@ export interface EntitlementDowngradeConfirmationInput {
   previousPlan: TierName;
   previousCapacityUnits: number;
   newCapacityUnits: number;
+  brandMarkUrl?: string | undefined;
 }
 
 export function renderEntitlementDowngradeConfirmationEmail(input: EntitlementDowngradeConfirmationInput): BillingEmailRendered {
@@ -217,6 +228,7 @@ export function renderEntitlementDowngradeConfirmationEmail(input: EntitlementDo
       "Your shared allowance capacity has been reduced. Existing projects remain available, and you can re-subscribe at any time to expand capacity again."
     ].join("\n"),
     html: renderEmailLayout({
+      brandMarkUrl: input.brandMarkUrl,
       eyebrow: "Billing",
       title: "Entitlements reduced",
       intro: `Your account "${escapeHtml(input.organizationName)}" has been downgraded from ${escapeHtml(input.previousPlan)} (${input.previousCapacityUnits} capacity unit(s)) to the free tier (${input.newCapacityUnits} capacity unit(s)).`,
@@ -242,6 +254,7 @@ export interface PlanChangeConfirmationInput {
   previousPlan: TierName;
   newPlan: TierName;
   extraCapacity: number;
+  brandMarkUrl?: string | undefined;
 }
 
 export function renderPlanChangeConfirmationEmail(input: PlanChangeConfirmationInput): BillingEmailRendered {
@@ -254,6 +267,7 @@ export function renderPlanChangeConfirmationEmail(input: PlanChangeConfirmationI
       "Your entitlements have been updated to reflect the new plan."
     ].join("\n"),
     html: renderEmailLayout({
+      brandMarkUrl: input.brandMarkUrl,
       eyebrow: "Billing",
       title: "Plan changed",
       intro: `Your account "${escapeHtml(input.organizationName)}" plan has been changed from ${escapeHtml(input.previousPlan)} to ${escapeHtml(input.newPlan)}${escapeHtml(capacity)}.`,
@@ -278,6 +292,7 @@ export interface CapacityQuantityChangeInput {
   previousCapacity: number;
   newCapacity: number;
   totalCapacityUnits: number;
+  brandMarkUrl?: string | undefined;
 }
 
 export function renderCapacityQuantityChangeEmail(input: CapacityQuantityChangeInput): BillingEmailRendered {
@@ -288,6 +303,7 @@ export function renderCapacityQuantityChangeEmail(input: CapacityQuantityChangeI
       `Total allowance capacity is now ${input.totalCapacityUnits}.`
     ].join("\n"),
     html: renderEmailLayout({
+      brandMarkUrl: input.brandMarkUrl,
       eyebrow: "Billing",
       title: "Capacity quantity updated",
       intro: `Extra capacity units for account "${escapeHtml(input.organizationName)}" (${escapeHtml(input.plan)}) changed from ${input.previousCapacity} to ${input.newCapacity}.`,

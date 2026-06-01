@@ -37,6 +37,7 @@ import {
   renderWebhookAutoDisabledEmail,
   renderWeeklyReportEmail
 } from "../../../packages/email/src/index.js";
+import { getSystemEmailReviewEntry } from "../../../packages/email/src/system-email-review.js";
 
 describe("email package", () => {
   afterEach(() => {
@@ -89,7 +90,7 @@ describe("email package", () => {
     expect(rendered.html).toContain(
       "2 projects: 3 new incidents, 3 resolved incidents, 3 failure bundles, 1 improvement bundle, 1 regression for March 9, 2026 to March 16, 2026."
     );
-    expect(rendered.html.indexOf("2 projects: 3 new incidents")).toBeLessThan(rendered.html.indexOf("<style>"));
+    expect(rendered.html.indexOf("2 projects: 3 new incidents")).toBeLessThan(rendered.html.indexOf('class="db-email-frame"'));
     expect(rendered.html).toContain("Checkout &lt;API&gt;");
     expect(rendered.html).toContain(">Project<");
     expect(rendered.html).toContain("DebugBundle weekly report");
@@ -112,15 +113,17 @@ describe("email package", () => {
     expect(emailCode.text).toContain("12<3456>");
     expect(emailCode.text).toContain("https://debugbundle.test/login?next=<dashboard>");
     expect(emailCode.html).toContain("Your sign-in code expires in 10 minutes.");
-    expect(emailCode.html.indexOf("Your sign-in code expires")).toBeLessThan(emailCode.html.indexOf("<style>"));
+    expect(emailCode.html.indexOf("Your sign-in code expires")).toBeLessThan(emailCode.html.indexOf('class="db-email-frame"'));
     expect(emailCode.html).toContain("12&lt;3456&gt;");
     expect(emailCode.html).toContain("&lt;dashboard&gt;");
+    expect(emailCode.html).toContain('src="https://debugbundle.test/email/debugbundle-mark.png"');
     expect(invite.subject).toContain("project was shared");
     expect(invite.text).toContain("Owen Example shared a DebugBundle project with you.");
     expect(invite.text).toContain("https://debugbundle.test/accept?token=<secret>");
     expect(invite.html).toContain("Owen Example invited you to a shared project.");
     expect(invite.html).toContain("Owen Example");
     expect(invite.html).toContain("&lt;secret&gt;");
+    expect(invite.html).toContain('src="https://debugbundle.test/email/debugbundle-mark.png"');
   });
 
   it("renders alert emails with human copy and links", () => {
@@ -140,7 +143,7 @@ describe("email package", () => {
     expect(rendered.html).toContain(
       "Checkout &lt;API&gt;: High new incident for checkout-&lt;api&gt; in production at May 13, 2026, 8:33 AM UTC."
     );
-    expect(rendered.html.indexOf("High new incident")).toBeLessThan(rendered.html.indexOf("<style>"));
+    expect(rendered.html.indexOf("High new incident")).toBeLessThan(rendered.html.indexOf('class="db-email-frame"'));
     expect(rendered.text).toContain("Project: Checkout <API>");
     expect(rendered.text).toContain("Service: checkout-<api>");
     expect(rendered.text).toContain("Detected at: May 13, 2026, 8:33 AM UTC");
@@ -151,6 +154,7 @@ describe("email package", () => {
     expect(rendered.html).toContain("May 13, 2026, 8:33 AM UTC");
     expect(rendered.html).toContain("&lt;123&gt;");
     expect(rendered.html).toContain("Open incident in DebugBundle");
+    expect(rendered.html).toContain('src="https://app.debugbundle.com/email/debugbundle-mark.png"');
   });
 
   it("renders alert digest emails with grouped incidents", () => {
@@ -187,7 +191,7 @@ describe("email package", () => {
     expect(rendered.html).toContain(
       "Checkout &lt;API&gt;: 1 incident matched alerts. First: High Checkout crash on checkout-&lt;api&gt; in production."
     );
-    expect(rendered.html.indexOf("1 incident matched alerts")).toBeLessThan(rendered.html.indexOf("<style>"));
+    expect(rendered.html.indexOf("1 incident matched alerts")).toBeLessThan(rendered.html.indexOf('class="db-email-frame"'));
     expect(rendered.text).toContain("Project: Checkout <API>");
     expect(rendered.text).toContain("Alerts: New incident, Severity threshold reached");
     expect(rendered.text).toContain("Detected at: May 17, 2026, 10:00 AM UTC");
@@ -197,6 +201,7 @@ describe("email package", () => {
     expect(rendered.html).toContain("checkout-&lt;api&gt;");
     expect(rendered.html).toContain("May 17, 2026, 10:00 AM UTC");
     expect(rendered.html.match(/background-color:#fafaf9;/g)?.length ?? 0).toBe(2);
+    expect(rendered.html).toContain('src="https://app.debugbundle.com/email/debugbundle-mark.png"');
   });
 
   it("renders webhook auto-disabled emails with escaped content and management links", () => {
@@ -225,7 +230,7 @@ describe("email package", () => {
     expect(rendered.html).toContain("DebugBundle");
   });
 
-  it("renders mobile-safe email layout styles for narrow clients", () => {
+  it("renders Gmail-safe card markup with narrow-client adjustments", () => {
     const rendered = renderWebhookAutoDisabledEmail({
       organizationName: "Acme Production",
       projectName: "Checkout API",
@@ -235,19 +240,57 @@ describe("email package", () => {
       webhooksUrl: "https://app.debugbundle.test/projects/proj_123/webhooks"
     });
 
-    expect(rendered.html).toContain('class="db-email-root" style="margin:0;padding:0;background-color:#f5f5f4;"');
-    expect(rendered.html).toContain('class="db-email-frame" role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="width:100%;border-collapse:collapse;background-color:#f5f5f4;"');
-    expect(rendered.html).toContain('class="db-email-shell" style="padding:20px 0;"');
-    expect(rendered.html).toContain('class="db-email-card" style="background-color:#ffffff;border-radius:0;padding:0;"');
-    expect(rendered.html).toContain("@media only screen and (min-width: 641px)");
-    expect(rendered.html).toContain(".db-email-shell { padding: 32px 16px !important; }");
-    expect(rendered.html).toContain(".db-email-card { padding: 32px 28px !important; border-radius: 16px !important; }");
-    expect(rendered.html).toContain('style="display:block;width:100%;padding:0 0 8px 0;');
-    expect(rendered.html).toContain(".db-email-kv-value {");
-    expect(rendered.html).toContain(".db-email-kv-label, .db-email-kv-value { display: table-cell !important; width: auto !important; }");
+    expect(rendered.html).toContain("<!DOCTYPE html>");
+    expect(rendered.html).toContain("<head>");
+    expect(rendered.html).toContain('<meta name="viewport" content="width=device-width, initial-scale=1.0" />');
+    expect(rendered.html).toContain("<style>");
+    expect(rendered.html).toContain("@media only screen and (max-width: 480px)");
+    expect(rendered.html).toContain(".db-email-shell { padding-top:20px !important; padding-right:12px !important; padding-bottom:20px !important; padding-left:12px !important; }");
+    expect(rendered.html).toContain(".db-email-title { font-size:24px !important; line-height:30px !important; }");
+    expect(rendered.html).toContain(".db-email-kv-label, .db-email-kv-value { display:block !important; width:100% !important; text-align:left !important; }");
+    expect(rendered.html).not.toContain("@media only screen and (min-width:");
+    expect(rendered.html).not.toContain(".db-email-card {");
+    expect(rendered.html).not.toContain(".db-email-card-shell {");
+    expect(rendered.html).not.toContain(".db-email-card-content {");
+    expect(rendered.html).not.toContain("max-width: 640px");
+    expect(rendered.html).toContain('<body bgcolor="#f5f5f4" style="margin:0;padding:0;background-color:#f5f5f4;font-family:Arial,Helvetica,sans-serif;">');
+    expect(rendered.html).toContain('class="db-email-root" style="margin:0;padding:0;background-color:#f5f5f4;font-family:Arial,Helvetica,sans-serif;"');
+    expect(rendered.html).toContain('class="db-email-frame" role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#f5f5f4" style="width:100%;border-collapse:collapse;background-color:#f5f5f4;"');
+    expect(rendered.html).toContain('class="db-email-shell" style="padding-top:32px;padding-right:16px;padding-bottom:32px;padding-left:16px;"');
+    expect(rendered.html).toContain('class="db-email-card-shell" role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#ffffff" style="width:100%;border-collapse:separate;background-color:#ffffff;border:1px solid #e7e5e4;border-radius:16px;');
+    expect(rendered.html).toContain(
+      'class="db-email-card-top-space" height="32" style="height:32px;line-height:32px;font-size:1px;mso-line-height-rule:exactly;">&nbsp;</td>'
+    );
+    expect(rendered.html).toContain(
+      'class="db-email-card-content" style="padding-left:28px;padding-right:28px;vertical-align:top;">'
+    );
+    expect(rendered.html).toContain(
+      'class="db-email-card-bottom-space" height="32" style="height:32px;line-height:32px;font-size:1px;mso-line-height-rule:exactly;">&nbsp;</td>'
+    );
+    expect(rendered.html).not.toContain('class="db-email-card-shell" bgcolor="#ffffff" style="background-color:#ffffff;border:1px solid #e7e5e4;border-radius:16px;overflow:hidden;"');
+    expect(rendered.html).not.toContain('class="db-email-card" bgcolor="#ffffff"');
+    expect(rendered.html).not.toContain("db-email-card-side-space");
+    expect(rendered.html).not.toContain("<svg");
+    expect(rendered.html).toContain('src="https://app.debugbundle.test/email/debugbundle-mark.png"');
+    expect(rendered.html).toContain('style="display:table-cell;width:34%;padding:0 12px 0 0;');
+    expect(rendered.html).toContain('style="display:table-cell;width:66%;padding:0;vertical-align:top;color:#1c1917;font-size:15px;line-height:22px;text-align:right;"');
     expect(rendered.html).toContain("word-break:break-word;overflow-wrap:anywhere;");
-    expect(rendered.html).toContain("text-align:left;");
-    expect(rendered.html).toContain(".db-email-kv-value { text-align: right !important; }");
+    expect(rendered.html).toContain("text-align:right;");
+  });
+
+  it("renders system email review previews lazily from the current templates", () => {
+    const entry = getSystemEmailReviewEntry("email-sign-in-code");
+
+    expect(entry).not.toBeNull();
+    const firstPreview = entry?.preview;
+    const secondPreview = entry?.preview;
+
+    expect(firstPreview).toBeDefined();
+    expect(secondPreview).toBeDefined();
+    expect(firstPreview).not.toBe(secondPreview);
+    expect(firstPreview?.html).toContain("@media only screen and (max-width: 480px)");
+    expect(firstPreview?.html).toContain('class="db-email-card-content" style="padding-left:28px;padding-right:28px;vertical-align:top;">');
+    expect(firstPreview?.html).toContain('src="https://app.debugbundle.local/email/debugbundle-mark.png"');
   });
 
   it("renders allowance and retention operational emails with scoped usage copy", () => {

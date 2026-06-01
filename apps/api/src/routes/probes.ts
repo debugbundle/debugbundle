@@ -6,7 +6,7 @@ import {
 } from "../../../../packages/storage/src/index.js";
 import { getTierCapabilities } from "../../../../packages/shared-types/src/index.js";
 import type { ApiDependencies } from "../api-types.js";
-import { requireRateLimitedMemberAuth } from "../api-helpers.js";
+import { requireRateLimitedProjectAccess } from "../api-helpers.js";
 import { ProjectParamsSchema, ProbeActivateBodySchema, ProbeDeactivateBodySchema } from "../schemas.js";
 
 function toRetryAfterSeconds(retryAfterMs: number): string {
@@ -19,17 +19,19 @@ function getQuotaRetryAfterMs(resetAt: string, now: Date): number {
 
 export function registerProbeRoutes(app: FastifyInstance, dependencies: ApiDependencies): void {
   app.post("/v1/projects/:id/probes/activate", async (request, reply) => {
-    const member = await requireRateLimitedMemberAuth(request, reply, dependencies, "management-write");
-    if (member === null) {
+    const parsedParams = ProjectParamsSchema.safeParse(request.params);
+    if (!parsedParams.success) {
+      return reply.status(400).send({ error: "invalid_project_id" });
+    }
+    const auth = await requireRateLimitedProjectAccess(request, reply, dependencies, {
+      bucket: "management-write",
+      projectId: parsedParams.data.id
+    });
+    if (auth === null) {
       return;
     }
     if (dependencies.probeManagement === undefined) {
       return reply.status(404).send({ error: "project_not_found" });
-    }
-
-    const parsedParams = ProjectParamsSchema.safeParse(request.params);
-    if (!parsedParams.success) {
-      return reply.status(400).send({ error: "invalid_project_id" });
     }
     const parsedBody = ProbeActivateBodySchema.safeParse(request.body);
     if (!parsedBody.success) {
@@ -43,7 +45,7 @@ export function registerProbeRoutes(app: FastifyInstance, dependencies: ApiDepen
     let usageWindowEndsAt: string | null = null;
     if (dependencies.billingManagement !== undefined) {
       const billingSummary = await dependencies.billingManagement.getBillingSummaryForOrganization({
-        organization_id: member.organization_id,
+        organization_id: auth.access.organization_id,
         now: now.toISOString()
       });
 
@@ -82,9 +84,9 @@ export function registerProbeRoutes(app: FastifyInstance, dependencies: ApiDepen
     const nowMs = now.getTime();
     const triggerTtlSeconds = parsedBody.data.trigger_ttl_seconds ?? parsedBody.data.ttl_seconds;
     const created = await dependencies.probeManagement.createProbeActivationForProjectInOrganization({
-      organization_id: member.organization_id,
+      organization_id: auth.access.organization_id,
       project_id: parsedParams.data.id,
-      created_by_member_id: member.member_id,
+      created_by_member_id: auth.member.member_id,
       label_pattern: parsedBody.data.label_pattern,
       service: parsedBody.data.service,
       environment: parsedBody.data.environment,
@@ -127,21 +129,23 @@ export function registerProbeRoutes(app: FastifyInstance, dependencies: ApiDepen
   });
 
   app.get("/v1/projects/:id/probes", async (request, reply) => {
-    const member = await requireRateLimitedMemberAuth(request, reply, dependencies, "management-read");
-    if (member === null) {
+    const parsedParams = ProjectParamsSchema.safeParse(request.params);
+    if (!parsedParams.success) {
+      return reply.status(400).send({ error: "invalid_project_id" });
+    }
+    const auth = await requireRateLimitedProjectAccess(request, reply, dependencies, {
+      bucket: "management-read",
+      projectId: parsedParams.data.id
+    });
+    if (auth === null) {
       return;
     }
     if (dependencies.probeManagement === undefined) {
       return reply.status(404).send({ error: "project_not_found" });
     }
 
-    const parsedParams = ProjectParamsSchema.safeParse(request.params);
-    if (!parsedParams.success) {
-      return reply.status(400).send({ error: "invalid_project_id" });
-    }
-
     const listed = await dependencies.probeManagement.listActiveProbesForProjectInOrganization({
-      organization_id: member.organization_id,
+      organization_id: auth.access.organization_id,
       project_id: parsedParams.data.id,
       now: new Date().toISOString()
     });
@@ -157,17 +161,19 @@ export function registerProbeRoutes(app: FastifyInstance, dependencies: ApiDepen
   });
 
   app.post("/v1/projects/:id/probes/deactivate", async (request, reply) => {
-    const member = await requireRateLimitedMemberAuth(request, reply, dependencies, "management-write");
-    if (member === null) {
+    const parsedParams = ProjectParamsSchema.safeParse(request.params);
+    if (!parsedParams.success) {
+      return reply.status(400).send({ error: "invalid_project_id" });
+    }
+    const auth = await requireRateLimitedProjectAccess(request, reply, dependencies, {
+      bucket: "management-write",
+      projectId: parsedParams.data.id
+    });
+    if (auth === null) {
       return;
     }
     if (dependencies.probeManagement === undefined) {
       return reply.status(404).send({ error: "project_not_found" });
-    }
-
-    const parsedParams = ProjectParamsSchema.safeParse(request.params);
-    if (!parsedParams.success) {
-      return reply.status(400).send({ error: "invalid_project_id" });
     }
     const parsedBody = ProbeDeactivateBodySchema.safeParse(request.body);
     if (!parsedBody.success) {
@@ -175,7 +181,7 @@ export function registerProbeRoutes(app: FastifyInstance, dependencies: ApiDepen
     }
 
     const deactivated = await dependencies.probeManagement.deactivateProbeActivationForProjectInOrganization({
-      organization_id: member.organization_id,
+      organization_id: auth.access.organization_id,
       project_id: parsedParams.data.id,
       activation_id: parsedBody.data.activation_id,
       deactivated_at: new Date().toISOString()

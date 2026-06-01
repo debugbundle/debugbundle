@@ -104,9 +104,6 @@ export function registerProjectMemberRoutes(app: FastifyInstance, dependencies: 
     if (auth === null) {
       return;
     }
-    if (auth.access.effective_role !== "owner" && auth.access.effective_role !== "admin") {
-      return reply.status(403).send({ error: "forbidden" });
-    }
     const projectCollaboration = dependencies.projectCollaboration;
     if (projectCollaboration === undefined || projectCollaboration.listMembersForProject === undefined) {
       return reply.status(404).send({ error: "member_management_not_available" });
@@ -139,9 +136,6 @@ export function registerProjectMemberRoutes(app: FastifyInstance, dependencies: 
     });
     if (auth === null) {
       return;
-    }
-    if (auth.access.effective_role !== "owner" && auth.access.effective_role !== "admin") {
-      return reply.status(403).send({ error: "forbidden" });
     }
 
     const projectCollaboration = dependencies.projectCollaboration;
@@ -416,5 +410,39 @@ export function registerProjectMemberRoutes(app: FastifyInstance, dependencies: 
     }
 
     return reply.status(200).send({ member: toPublicProjectMember(parsedParams.data.id, removed.member) });
+  });
+
+  app.delete("/v1/projects/:id/membership", async (request, reply) => {
+    const parsedParams = ProjectParamsSchema.safeParse(request.params);
+    if (!parsedParams.success) {
+      return reply.status(400).send({ error: "invalid_project_id" });
+    }
+
+    const auth = await requireProjectAccess({
+      request,
+      reply,
+      projectId: parsedParams.data.id,
+      bucket: "management-write"
+    });
+    if (auth === null) {
+      return;
+    }
+    const projectCollaboration = dependencies.projectCollaboration;
+    if (projectCollaboration === undefined || projectCollaboration.leaveProjectMembership === undefined) {
+      return reply.status(404).send({ error: "member_management_not_available" });
+    }
+
+    const left = await projectCollaboration.leaveProjectMembership({
+      project_id: parsedParams.data.id,
+      user_id: auth.member.member_id
+    });
+    if (left === null) {
+      return reply.status(404).send({ error: "member_not_found" });
+    }
+    if (left.kind === "owner_leave_forbidden") {
+      return reply.status(409).send({ error: "owner_leave_not_allowed" });
+    }
+
+    return reply.status(200).send({ member: toPublicProjectMember(parsedParams.data.id, left.member) });
   });
 }

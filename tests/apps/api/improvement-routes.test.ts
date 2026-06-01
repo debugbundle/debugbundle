@@ -147,6 +147,7 @@ describe("improvement routes", () => {
     expect(response.statusCode).toBe(200);
     expect(listImprovementsForOrganization).toHaveBeenCalledWith({
       organization_id: "org_123",
+      user_id: "usr_owner",
       project_id: "00000000-0000-0000-0000-000000000001",
       environment: "production",
       service: "checkout-api",
@@ -345,6 +346,7 @@ describe("improvement routes", () => {
     expect(snoozeImprovementForOrganization).toHaveBeenCalledWith({
       organization_id: "org_123",
       improvement_id: "imp_missing",
+      user_id: "usr_owner",
       snoozed_until: "2099-05-25T13:00:00.000Z"
     });
   });
@@ -429,6 +431,7 @@ describe("improvement routes", () => {
     expect(snoozeImprovementForOrganization).toHaveBeenCalledWith({
       organization_id: "org_123",
       improvement_id: "imp_123",
+      user_id: "usr_owner",
       snoozed_until: "2099-05-25T13:00:00.000Z"
     });
     expect(response.json()).toEqual({ improvement: snoozed });

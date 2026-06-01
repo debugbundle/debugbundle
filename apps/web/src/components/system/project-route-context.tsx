@@ -4,6 +4,7 @@ export interface ActiveProjectRoute {
   projectId: string;
   projectName: string;
   relationship: "owned" | "shared";
+  sharingState: "private" | "shared_by_you" | "shared_with_you";
 }
 
 export interface ProjectRouteContextValue {

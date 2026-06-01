@@ -151,6 +151,7 @@ export interface ImprovementOpportunityStore {
   recordIncidentPattern?(input: RecordIncidentPatternInput): Promise<RecordIncidentPatternResult | null>;
   listImprovementsForOrganization(input: {
     organization_id: string;
+    user_id?: string;
     project_id?: string;
     environment?: string;
     service?: string;
@@ -163,6 +164,7 @@ export interface ImprovementOpportunityStore {
   getImprovementForOrganization(input: {
     organization_id: string;
     improvement_id: string;
+    user_id?: string;
   }): Promise<ImprovementRetrievalRecord | null>;
   resolveImprovementForOrganization(input: ResolveImprovementForOrganizationInput): Promise<ImprovementRetrievalRecord | null>;
   resolveIncidentDerivedImprovementsForIncident?(input: {
@@ -415,7 +417,17 @@ export function createPostgresImprovementOpportunityStore(db: Queryable): Improv
     async listImprovementsForOrganization(input) {
       const parameters: Array<string | number> = [input.organization_id];
       const predicates = [
-        "p.organization_id = $1::uuid",
+        input.user_id === undefined
+          ? "p.organization_id = $1::uuid"
+          : `(
+              p.owner_user_id = $2::uuid
+              OR EXISTS (
+                SELECT 1
+                FROM project_members pm
+                WHERE pm.project_id = p.id
+                  AND pm.user_id = $2::uuid
+              )
+            )`,
         `(
           io.status <> 'open'
           OR io.kind = 'post_deploy_regression'
@@ -475,6 +487,10 @@ export function createPostgresImprovementOpportunityStore(db: Queryable): Improv
         )`
       ];
 
+      if (input.user_id !== undefined) {
+        parameters.push(input.user_id);
+      }
+
       if (input.project_id !== undefined) {
         parameters.push(input.project_id);
         predicates.push(`io.project_id = $${parameters.length}::uuid`);
@@ -531,11 +547,28 @@ export function createPostgresImprovementOpportunityStore(db: Queryable): Improv
           FROM improvement_opportunities io
           JOIN projects p ON p.id = io.project_id
           LEFT JOIN services s ON s.id = io.service_id
-          WHERE p.organization_id = $1::uuid
-            AND io.id = $2::uuid
+          WHERE io.id = $2::uuid
+            AND (
+              (
+                $3::uuid IS NULL
+                AND p.organization_id = $1::uuid
+              )
+              OR (
+                $3::uuid IS NOT NULL
+                AND (
+                  p.owner_user_id = $3::uuid
+                  OR EXISTS (
+                    SELECT 1
+                    FROM project_members pm
+                    WHERE pm.project_id = p.id
+                      AND pm.user_id = $3::uuid
+                  )
+                )
+              )
+            )
           LIMIT 1
         `,
-        [input.organization_id, input.improvement_id]
+        [input.organization_id, input.improvement_id, input.user_id ?? null]
       );
 
       return result.rows[0] ?? null;
@@ -554,7 +587,24 @@ export function createPostgresImprovementOpportunityStore(db: Queryable): Improv
               updated_at = now()
             FROM projects p
             WHERE io.project_id = p.id
-              AND p.organization_id = $1::uuid
+              AND (
+                (
+                  $5::uuid IS NULL
+                  AND p.organization_id = $1::uuid
+                )
+                OR (
+                  $5::uuid IS NOT NULL
+                  AND (
+                    p.owner_user_id = $5::uuid
+                    OR EXISTS (
+                      SELECT 1
+                      FROM project_members pm
+                      WHERE pm.project_id = p.id
+                        AND pm.user_id = $5::uuid
+                    )
+                  )
+                )
+              )
               AND io.id = $2::uuid
             RETURNING io.*
           )
@@ -590,7 +640,7 @@ export function createPostgresImprovementOpportunityStore(db: Queryable): Improv
           JOIN projects p ON p.id = updated.project_id
           LEFT JOIN services s ON s.id = updated.service_id
         `,
-        [input.organization_id, input.improvement_id, input.resolved_at, input.resolved_by_member_id]
+        [input.organization_id, input.improvement_id, input.resolved_at, input.resolved_by_member_id, input.user_id ?? null]
       );
 
       return result.rows[0] ?? null;
@@ -650,7 +700,24 @@ export function createPostgresImprovementOpportunityStore(db: Queryable): Improv
               updated_at = now()
             FROM projects p
             WHERE io.project_id = p.id
-              AND p.organization_id = $1::uuid
+              AND (
+                (
+                  $3::uuid IS NULL
+                  AND p.organization_id = $1::uuid
+                )
+                OR (
+                  $3::uuid IS NOT NULL
+                  AND (
+                    p.owner_user_id = $3::uuid
+                    OR EXISTS (
+                      SELECT 1
+                      FROM project_members pm
+                      WHERE pm.project_id = p.id
+                        AND pm.user_id = $3::uuid
+                    )
+                  )
+                )
+              )
               AND io.id = $2::uuid
             RETURNING io.*
           )
@@ -686,7 +753,7 @@ export function createPostgresImprovementOpportunityStore(db: Queryable): Improv
           JOIN projects p ON p.id = updated.project_id
           LEFT JOIN services s ON s.id = updated.service_id
         `,
-        [input.organization_id, input.improvement_id]
+        [input.organization_id, input.improvement_id, input.user_id ?? null]
       );
 
       return result.rows[0] ?? null;
@@ -705,7 +772,24 @@ export function createPostgresImprovementOpportunityStore(db: Queryable): Improv
               updated_at = now()
             FROM projects p
             WHERE io.project_id = p.id
-              AND p.organization_id = $1::uuid
+              AND (
+                (
+                  $4::uuid IS NULL
+                  AND p.organization_id = $1::uuid
+                )
+                OR (
+                  $4::uuid IS NOT NULL
+                  AND (
+                    p.owner_user_id = $4::uuid
+                    OR EXISTS (
+                      SELECT 1
+                      FROM project_members pm
+                      WHERE pm.project_id = p.id
+                        AND pm.user_id = $4::uuid
+                    )
+                  )
+                )
+              )
               AND io.id = $2::uuid
             RETURNING io.*
           )
@@ -741,7 +825,7 @@ export function createPostgresImprovementOpportunityStore(db: Queryable): Improv
           JOIN projects p ON p.id = updated.project_id
           LEFT JOIN services s ON s.id = updated.service_id
         `,
-        [input.organization_id, input.improvement_id, input.snoozed_until]
+        [input.organization_id, input.improvement_id, input.snoozed_until, input.user_id ?? null]
       );
 
       return result.rows[0] ?? null;

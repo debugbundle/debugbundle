@@ -632,6 +632,7 @@ describe("api retrieval routes", () => {
 
     expect(listIncidentsForOrganization).toHaveBeenCalledWith({
       organization_id: "org_123",
+      user_id: "mem_123",
       project_id: "550e8400-e29b-41d4-a716-446655440000",
       environment: "production",
       service: "checkout-api",
@@ -837,7 +838,27 @@ describe("api retrieval routes", () => {
       tokenManagement: createTokenManagementDependency(),
       incidentRetrieval: {
         listIncidentsForOrganization: vi.fn().mockResolvedValue([]),
-        getIncidentForOrganization: vi.fn().mockResolvedValue(null),
+        getIncidentForOrganization: vi.fn().mockResolvedValue({
+          incident_id: "inc_123",
+          project_id: "550e8400-e29b-41d4-a716-446655440000",
+          project_name: "Main App",
+          service_id: "svc_123",
+          service_name: "checkout-api",
+          latest_deployment_id: null,
+          environment: "production",
+          fingerprint: "fp_123",
+          fingerprint_version: "v1",
+          title: "TypeError",
+          severity: "high",
+          status: "open",
+          first_seen_at: "2026-03-11T00:00:00.000Z",
+          last_seen_at: "2026-03-11T00:10:00.000Z",
+          occurrence_count: 3,
+          spike_detected_at: null,
+          resolved_at: null,
+          regressed_at: null,
+          matched_fields: ["fingerprint"]
+        }),
         resolveIncidentForOrganization,
         listServicesForOrganization: vi.fn().mockResolvedValue([]),
         listIncidentLogsForOrganization: vi.fn().mockResolvedValue([])
@@ -863,6 +884,7 @@ describe("api retrieval routes", () => {
     expect(resolveIncidentForOrganization).toHaveBeenCalledWith({
       organization_id: "org_123",
       incident_id: "inc_123",
+      user_id: "usr_123",
       resolved_by_member_id: "usr_123",
       resolved_at: expect.any(String)
     });
@@ -927,7 +949,27 @@ describe("api retrieval routes", () => {
       tokenManagement: createTokenManagementDependency(),
       incidentRetrieval: {
         listIncidentsForOrganization: vi.fn().mockResolvedValue([]),
-        getIncidentForOrganization: vi.fn().mockResolvedValue(null),
+        getIncidentForOrganization: vi.fn().mockResolvedValue({
+          incident_id: "inc_123",
+          project_id: "550e8400-e29b-41d4-a716-446655440000",
+          project_name: "Main App",
+          service_id: "svc_123",
+          service_name: "checkout-api",
+          latest_deployment_id: null,
+          environment: "production",
+          fingerprint: "fp_123",
+          fingerprint_version: "v1",
+          title: "TypeError",
+          severity: "high",
+          status: "resolved",
+          first_seen_at: "2026-03-11T00:00:00.000Z",
+          last_seen_at: "2026-03-11T00:10:00.000Z",
+          occurrence_count: 3,
+          spike_detected_at: null,
+          resolved_at: "2026-03-11T00:12:00.000Z",
+          regressed_at: null,
+          matched_fields: ["fingerprint"]
+        }),
         resolveIncidentForOrganization: vi.fn(),
         reopenIncidentForOrganization,
         listServicesForOrganization: vi.fn().mockResolvedValue([]),
@@ -953,7 +995,8 @@ describe("api retrieval routes", () => {
     expect(response.statusCode).toBe(200);
     expect(reopenIncidentForOrganization).toHaveBeenCalledWith({
       organization_id: "org_123",
-      incident_id: "inc_123"
+      incident_id: "inc_123",
+      user_id: "usr_123"
     });
     expect(response.json()).toEqual({
       incident: {
@@ -1056,6 +1099,99 @@ describe("api retrieval routes", () => {
       organization_id: "org_123",
       project_id: "proj_123",
       incident_id: "inc_123"
+    });
+  });
+
+  it("uses the owning project organization when a collaborator fetches a shared incident bundle", async (): Promise<void> => {
+    const requestRegeneration = vi.fn().mockResolvedValue(true);
+    const getBundleFailureReasonForOrganization = vi.fn().mockResolvedValue(null);
+    const app = createApiServer({
+      ingestionPersistence: {
+        persistAndEnqueue: vi.fn()
+      },
+      ingestionMetadata: {
+        resolveProjectByTokenHash: vi.fn()
+      },
+      memberAuth: {
+        resolveMemberByTokenHash: vi.fn().mockResolvedValue({
+          member_id: "usr_collaborator",
+          organization_id: "org_collaborator"
+        })
+      },
+      tokenManagement: createTokenManagementDependency(),
+      projectManagement: {
+        resolveProjectAccessForUser: vi.fn().mockResolvedValue({
+          project_id: "proj_shared",
+          organization_id: "org_owner",
+          owner_user_id: "usr_owner",
+          owner_email: "owner@example.com",
+          relationship: "shared",
+          sharing_state: "shared_with_you",
+          effective_role: "member",
+          organization_plan: "team"
+        }),
+        listProjectsForOrganization: vi.fn().mockResolvedValue([]),
+        createProjectForOrganization: vi.fn(),
+        updateProjectForOrganization: vi.fn(),
+        deleteProjectForOrganization: vi.fn()
+      },
+      incidentRetrieval: {
+        listIncidentsForOrganization: vi.fn().mockResolvedValue([]),
+        getIncidentForOrganization: vi.fn().mockResolvedValue({
+          incident_id: "inc_shared",
+          project_id: "proj_shared",
+          project_name: "Shared App",
+          service_id: null,
+          service_name: null,
+          latest_deployment_id: null,
+          environment: "production",
+          fingerprint: "fp_shared",
+          fingerprint_version: "v1",
+          title: "Shared incident",
+          severity: "high",
+          status: "open",
+          first_seen_at: "2026-03-11T00:00:00.000Z",
+          last_seen_at: "2026-03-11T00:10:00.000Z",
+          occurrence_count: 3,
+          spike_detected_at: null,
+          resolved_at: null,
+          regressed_at: null,
+          matched_fields: []
+        }),
+        getBundleFailureReasonForOrganization,
+        listServicesForOrganization: vi.fn().mockResolvedValue([]),
+        listIncidentLogsForOrganization: vi.fn().mockResolvedValue([])
+      },
+      objectStoreReader: {
+        getObject: vi.fn().mockRejectedValue(new Error("s3_object_not_found"))
+      },
+      bundleRegeneration: {
+        requestRegeneration
+      },
+      webhookDelivery: {
+        listDeliveriesForWebhookInOrganization: vi.fn().mockResolvedValue({ deliveries: [] }),
+        retryDeliveryForOrganization: vi.fn().mockResolvedValue(null)
+      }
+    });
+
+    const response = await app.inject({
+      method: "GET",
+      url: "/v1/incidents/inc_shared/bundle",
+      headers: {
+        authorization: "Bearer dbundle_mem_test"
+      }
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toEqual({ status: "pending" });
+    expect(getBundleFailureReasonForOrganization).toHaveBeenCalledWith({
+      organization_id: "org_owner",
+      incident_id: "inc_shared"
+    });
+    expect(requestRegeneration).toHaveBeenCalledWith({
+      organization_id: "org_owner",
+      project_id: "proj_shared",
+      incident_id: "inc_shared"
     });
   });
 
@@ -1677,6 +1813,7 @@ describe("api retrieval routes", () => {
     expect(response.statusCode).toBe(200);
     expect(listIncidentLogsForOrganization).toHaveBeenCalledWith({
       organization_id: "org_123",
+      user_id: "mem_123",
       incident_id: "inc_123",
       level: "error",
       cursor: {

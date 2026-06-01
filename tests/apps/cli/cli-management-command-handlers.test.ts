@@ -123,6 +123,7 @@ describe("cli management command handlers", () => {
     const cancelInviteCommand = vi.fn().mockResolvedValue({ exitCode: 0, output: "cancel" });
     const updateMemberRoleCommand = vi.fn().mockResolvedValue({ exitCode: 0, output: "update-role" });
     const removeMemberCommand = vi.fn().mockResolvedValue({ exitCode: 0, output: "remove" });
+    const leaveProjectCommand = vi.fn().mockResolvedValue({ exitCode: 0, output: "leave" });
 
     await handleProjectCommand(parseArgv(["projects", "members", "list", "--project-id", "proj_1", "--json"]), { listMembersCommand });
     await handleProjectCommand(parseArgv(["projects", "members", "invites", "--project-id", "proj_1"]), { listInvitesCommand });
@@ -138,6 +139,9 @@ describe("cli management command handlers", () => {
     });
     await handleProjectCommand(parseArgv(["projects", "members", "remove", "usr_3", "--project-id", "proj_1", "--json"]), {
       removeMemberCommand
+    });
+    await handleProjectCommand(parseArgv(["projects", "members", "leave", "--project-id", "proj_1"]), {
+      leaveProjectCommand
     });
 
     expect(listMembersCommand).toHaveBeenCalledWith({ authFilePath: undefined, json: true, projectId: "proj_1" });
@@ -167,6 +171,11 @@ describe("cli management command handlers", () => {
       json: true,
       projectId: "proj_1",
       userId: "usr_3"
+    });
+    expect(leaveProjectCommand).toHaveBeenCalledWith({
+      authFilePath: undefined,
+      json: undefined,
+      projectId: "proj_1"
     });
   });
 

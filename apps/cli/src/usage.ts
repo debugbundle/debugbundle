@@ -100,6 +100,7 @@ export const CLI_USAGE_LINES = [
   '  debugbundle project members cancel-invite <invite-id> --project-id <id> [--auth-file <path>] [--json]',
   '  debugbundle project members update-role <user-id> --project-id <id> --role <admin|member> [--auth-file <path>] [--json]',
   '  debugbundle project members remove <user-id> --project-id <id> [--auth-file <path>] [--json]',
+  '  debugbundle project members leave --project-id <id> [--auth-file <path>] [--json]',
 ];
 
 export function formatUsage(): string {

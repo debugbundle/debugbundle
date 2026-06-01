@@ -14,6 +14,7 @@ import type {
   DeleteAlertResult,
   IncidentEventReference,
   LogEventCandidateReference,
+  LeaveProjectMembershipResult,
   IncidentLogRecord,
   IncidentRetrievalRecord,
   InsertIncidentEventInput,
@@ -659,7 +660,7 @@ export function createPostgresMetadataStore(db: Queryable): PostgresMetadataStor
           WHERE p.id = $1::uuid
             AND (
               p.owner_user_id = $2::uuid
-              OR actor_membership.role = 'admin'
+              OR actor_membership.user_id IS NOT NULL
             )
           LIMIT 1
         `,
@@ -1251,6 +1252,74 @@ export function createPostgresMetadataStore(db: Queryable): PostgresMetadataStor
 
       return {
         kind: "removed",
+        member: mapProjectMemberRow(member)
+      };
+    },
+
+    async leaveProjectMembership(input: {
+      project_id: string;
+      user_id: string;
+    }): Promise<LeaveProjectMembershipResult | null> {
+      const ownerResult = await db.query<{ owner_user_id: string; owner_email: string; created_at: string }>(
+        `
+          SELECT
+            p.owner_user_id,
+            owner_user.email AS owner_email,
+            p.created_at::text AS created_at
+          FROM projects p
+          JOIN users owner_user ON owner_user.id = p.owner_user_id
+          LEFT JOIN project_members actor_membership
+            ON actor_membership.project_id = p.id
+           AND actor_membership.user_id = $2::uuid
+          WHERE p.id = $1::uuid
+            AND (p.owner_user_id = $2::uuid OR actor_membership.user_id IS NOT NULL)
+          LIMIT 1
+        `,
+        [input.project_id, input.user_id]
+      );
+
+      const owner = ownerResult.rows[0];
+      if (owner === undefined) {
+        return null;
+      }
+
+      if (owner.owner_user_id === input.user_id) {
+        return {
+          kind: "owner_leave_forbidden",
+          member: {
+            user_id: owner.owner_user_id,
+            email: owner.owner_email,
+            role: "owner",
+            membership_type: "owner",
+            created_at: owner.created_at
+          }
+        };
+      }
+
+      const deletedMemberResult = await db.query<ProjectMemberRecord & Record<string, unknown>>(
+        `
+          DELETE FROM project_members pm
+          USING users member_user
+          WHERE pm.project_id = $1::uuid
+            AND pm.user_id = $2::uuid
+            AND member_user.id = pm.user_id
+          RETURNING
+            pm.user_id,
+            member_user.email,
+            pm.role,
+            'collaborator' AS membership_type,
+            pm.created_at::text AS created_at
+        `,
+        [input.project_id, input.user_id]
+      );
+
+      const member = deletedMemberResult.rows[0];
+      if (member === undefined) {
+        return null;
+      }
+
+      return {
+        kind: "left",
         member: mapProjectMemberRow(member)
       };
     },
@@ -2694,8 +2763,25 @@ export function createPostgresMetadataStore(db: Queryable): PostgresMetadataStor
     },
 
     async listIncidentsForOrganization(input): Promise<IncidentRetrievalRecord[]> {
-      const conditions = ["p.organization_id = $1"];
       const params: unknown[] = [input.organization_id];
+      const conditions =
+        input.user_id === undefined
+          ? ["p.organization_id = $1"]
+          : [
+              `(
+                p.owner_user_id = $2::uuid
+                OR EXISTS (
+                  SELECT 1
+                  FROM project_members pm
+                  WHERE pm.project_id = p.id
+                    AND pm.user_id = $2::uuid
+                )
+              )`
+            ];
+
+      if (input.user_id !== undefined) {
+        params.push(input.user_id);
+      }
 
       if (input.project_id !== undefined) {
         params.push(input.project_id);
@@ -2818,11 +2904,28 @@ export function createPostgresMetadataStore(db: Queryable): PostgresMetadataStor
             ORDER BY ie.occurred_at ASC, ie.event_id ASC
             LIMIT 1
           ) primary_signal ON TRUE
-          WHERE p.organization_id = $1
-            AND i.id = $2
+          WHERE i.id = $2
+            AND (
+              (
+                $3::uuid IS NULL
+                AND p.organization_id = $1
+              )
+              OR (
+                $3::uuid IS NOT NULL
+                AND (
+                  p.owner_user_id = $3::uuid
+                  OR EXISTS (
+                    SELECT 1
+                    FROM project_members pm
+                    WHERE pm.project_id = p.id
+                      AND pm.user_id = $3::uuid
+                  )
+                )
+              )
+            )
           LIMIT 1
         `,
-        [input.organization_id, input.incident_id]
+        [input.organization_id, input.incident_id, input.user_id ?? null]
       );
 
       return mapOptionalRow(result.rows[0], mapIncidentRetrievalRow);
@@ -2839,7 +2942,24 @@ export function createPostgresMetadataStore(db: Queryable): PostgresMetadataStor
                 updated_at = now()
             FROM projects p
             WHERE i.project_id = p.id
-              AND p.organization_id = $1
+              AND (
+                (
+                  $5::uuid IS NULL
+                  AND p.organization_id = $1
+                )
+                OR (
+                  $5::uuid IS NOT NULL
+                  AND (
+                    p.owner_user_id = $5::uuid
+                    OR EXISTS (
+                      SELECT 1
+                      FROM project_members pm
+                      WHERE pm.project_id = p.id
+                        AND pm.user_id = $5::uuid
+                    )
+                  )
+                )
+              )
               AND i.id = $2
             RETURNING
               i.id AS incident_id,
@@ -2895,7 +3015,7 @@ export function createPostgresMetadataStore(db: Queryable): PostgresMetadataStor
             LIMIT 1
           ) primary_signal ON TRUE
         `,
-        [input.organization_id, input.incident_id, input.resolved_by_member_id, input.resolved_at]
+        [input.organization_id, input.incident_id, input.resolved_by_member_id, input.resolved_at, input.user_id ?? null]
       );
 
       return mapOptionalRow(result.rows[0], mapIncidentRetrievalRow);
@@ -2913,7 +3033,24 @@ export function createPostgresMetadataStore(db: Queryable): PostgresMetadataStor
                 updated_at = now()
             FROM projects p
             WHERE i.project_id = p.id
-              AND p.organization_id = $1
+              AND (
+                (
+                  $3::uuid IS NULL
+                  AND p.organization_id = $1
+                )
+                OR (
+                  $3::uuid IS NOT NULL
+                  AND (
+                    p.owner_user_id = $3::uuid
+                    OR EXISTS (
+                      SELECT 1
+                      FROM project_members pm
+                      WHERE pm.project_id = p.id
+                        AND pm.user_id = $3::uuid
+                    )
+                  )
+                )
+              )
               AND i.id = $2
             RETURNING
               i.id AS incident_id,
@@ -2969,7 +3106,7 @@ export function createPostgresMetadataStore(db: Queryable): PostgresMetadataStor
             LIMIT 1
           ) primary_signal ON TRUE
         `,
-        [input.organization_id, input.incident_id]
+        [input.organization_id, input.incident_id, input.user_id ?? null]
       );
 
       return mapOptionalRow(result.rows[0], mapIncidentRetrievalRow);
@@ -2981,10 +3118,27 @@ export function createPostgresMetadataStore(db: Queryable): PostgresMetadataStor
           SELECT id
           FROM projects
           WHERE id = $1
-            AND organization_id = $2
+            AND (
+              (
+                $3::uuid IS NULL
+                AND organization_id = $2
+              )
+              OR (
+                $3::uuid IS NOT NULL
+                AND (
+                  owner_user_id = $3::uuid
+                  OR EXISTS (
+                    SELECT 1
+                    FROM project_members pm
+                    WHERE pm.project_id = projects.id
+                      AND pm.user_id = $3::uuid
+                  )
+                )
+              )
+            )
           LIMIT 1
         `,
-        [input.project_id, input.organization_id]
+        [input.project_id, input.organization_id, input.user_id ?? null]
       );
 
       if (scopedProject.rows[0] === undefined) {
@@ -3028,7 +3182,24 @@ export function createPostgresMetadataStore(db: Queryable): PostgresMetadataStor
           JOIN incidents i ON i.id = ie.incident_id
           JOIN projects p ON p.id = i.project_id
           WHERE i.id = $1
-            AND p.organization_id = $2
+            AND (
+              (
+                $7::uuid IS NULL
+                AND p.organization_id = $2
+              )
+              OR (
+                $7::uuid IS NOT NULL
+                AND (
+                  p.owner_user_id = $7::uuid
+                  OR EXISTS (
+                    SELECT 1
+                    FROM project_members pm
+                    WHERE pm.project_id = p.id
+                      AND pm.user_id = $7::uuid
+                  )
+                )
+              )
+            )
             AND ($3::text IS NULL OR ie.level = $3)
             AND (
               $4::timestamptz IS NULL
@@ -3037,7 +3208,7 @@ export function createPostgresMetadataStore(db: Queryable): PostgresMetadataStor
           ORDER BY ie.occurred_at DESC
           LIMIT $6
         `,
-        [input.incident_id, input.organization_id, level, cursorOccurredAt, cursorEventId, input.limit]
+        [input.incident_id, input.organization_id, level, cursorOccurredAt, cursorEventId, input.limit, input.user_id ?? null]
       );
 
       return result.rows;

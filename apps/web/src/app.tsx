@@ -20,7 +20,7 @@ import { BrandLockup } from "./components/system/brand-lockup.js";
 import { CalloutCard } from "./components/system/callout-card.js";
 import { RecentProjectsTable } from "./components/system/recent-projects-table.js";
 import { GitHubMark } from "./components/system/github-mark.js";
-import { ProjectRouteProvider } from "./components/system/project-route-context.js";
+import { ProjectRouteProvider, type ActiveProjectRoute } from "./components/system/project-route-context.js";
 import { SectionCards } from "./components/system/section-cards.js";
 import { SiteHeader } from "./components/system/site-header.js";
 import { Button } from "./components/ui/button.js";
@@ -279,11 +279,7 @@ function RootRedirect(): JSX.Element {
 function ProtectedLayout(): JSX.Element {
   const { session, setSession } = useSession();
   const navigate = useNavigate();
-  const [activeProject, setActiveProject] = useState<{
-    projectId: string;
-    projectName: string;
-    relationship: "owned" | "shared";
-  } | null>(null);
+  const [activeProject, setActiveProject] = useState<ActiveProjectRoute | null>(null);
 
   if (session === null) {
     return <Navigate replace to="/login" />;

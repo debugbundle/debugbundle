@@ -105,6 +105,16 @@ export async function removeProjectMember(projectId: string, userId: string): Pr
   );
 }
 
+export async function leaveProjectMembership(projectId: string): Promise<void> {
+  await readProjectSharingJson(
+    await fetch(buildApiUrl(`/v1/projects/${projectId}/membership`), {
+      method: "DELETE",
+      credentials: "include",
+      headers: buildBrowserSessionHeaders()
+    })
+  );
+}
+
 export async function cancelProjectInvite(projectId: string, inviteId: string): Promise<void> {
   await readProjectSharingJson(
     await fetch(buildApiUrl(`/v1/projects/${projectId}/invites/${inviteId}`), {

@@ -97,7 +97,8 @@ export function SiteHeader(): JSX.Element {
                         },
                         created_at: "",
                         updated_at: "",
-                        relationship: activeProject.relationship
+                        relationship: activeProject.relationship,
+                        sharing_state: activeProject.sharingState
                       }}
                     />
                   )}

@@ -27,9 +27,11 @@ describe("billing email templates", () => {
       expect(result.text).toContain("3 extra capacity unit(s)");
       expect(result.text).toContain("https://billing.stripe.com/session/abc");
       expect(result.html).toContain("Your team plan is active for Acme Corp + 3 extra capacity unit(s).");
-      expect(result.html.indexOf("Your team plan is active")).toBeLessThan(result.html.indexOf("<style>"));
+      expect(result.html.indexOf("Your team plan is active")).toBeLessThan(result.html.indexOf('class="db-email-frame"'));
       expect(result.html).toContain("Acme Corp");
       expect(result.html).toContain("team");
+      expect(result.html).toContain("<svg");
+      expect(result.html).not.toContain("billing.stripe.com/email/debugbundle-mark.png");
     });
 
     it("should omit capacity text when no extra capacity is purchased", () => {
@@ -59,6 +61,7 @@ describe("billing email templates", () => {
       expect(result.text).toContain("2026-05-01");
       expect(result.text).toContain("2 extra capacity unit(s)");
       expect(result.html).toContain("Your team plan renewed; next renewal is 2026-05-01.");
+      expect(result.html).toContain("<svg");
     });
   });
 
@@ -120,7 +123,8 @@ describe("billing email templates", () => {
         organizationName: "Acme Corp",
         previousPlan: "team",
         previousCapacityUnits: 5,
-        newCapacityUnits: 1
+        newCapacityUnits: 1,
+        brandMarkUrl: "https://app.debugbundle.test/email/debugbundle-mark.png"
       });
 
       expect(result.subject).toContain("reduced");
@@ -130,6 +134,7 @@ describe("billing email templates", () => {
       expect(result.text).toContain("1 capacity unit(s)");
       expect(result.text).toContain("allowance capacity");
       expect(result.text).not.toContain("archived");
+      expect(result.html).toContain('src="https://app.debugbundle.test/email/debugbundle-mark.png"');
     });
   });
 
@@ -139,7 +144,8 @@ describe("billing email templates", () => {
         organizationName: "Acme Corp",
         previousPlan: "solo",
         newPlan: "team",
-        extraCapacity: 2
+        extraCapacity: 2,
+        brandMarkUrl: "https://app.debugbundle.test/email/debugbundle-mark.png"
       });
 
       expect(result.subject).toContain("team");
@@ -147,6 +153,7 @@ describe("billing email templates", () => {
       expect(result.text).toContain("solo");
       expect(result.text).toContain("team");
       expect(result.text).toContain("2 extra capacity unit(s)");
+      expect(result.html).toContain('src="https://app.debugbundle.test/email/debugbundle-mark.png"');
     });
 
     it("should render plan change without extra slots", () => {

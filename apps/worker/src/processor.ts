@@ -1,6 +1,7 @@
 import { gunzipSync, gzipSync } from "node:zlib";
 
 import {
+  buildEmailBrandMarkUrl,
   renderAllowanceLimitReachedEmail,
   renderAllowanceWarning80Email,
   renderRetentionRotationNoticeEmail,
@@ -407,6 +408,7 @@ export interface DeliverAlertEmailDigestWorkerDependencies {
 export interface DeliverOperationalEmailWorkerDependencies {
   logger?: Pick<RuntimeLogger, "warn">;
   appBaseUrl?: string | null;
+  emailAssetBaseUrl?: string | null;
   operationalEmailDeliveryStore: Pick<
     OperationalEmailDeliveryStore,
     | "claimDueOperationalEmailDeliveries"
@@ -1312,6 +1314,7 @@ export async function processNextDeliverOperationalEmailJob(
     const webhooksUrl = dependencies.appBaseUrl === null || dependencies.appBaseUrl === undefined
       ? undefined
       : `${dependencies.appBaseUrl}/projects/${delivery.project_id}/webhooks`;
+    const brandMarkUrl = buildEmailBrandMarkUrl(dependencies.emailAssetBaseUrl ?? dependencies.appBaseUrl);
 
     let rendered: ReturnType<typeof renderWebhookAutoDisabledEmail>;
     switch (delivery.kind) {
@@ -1325,6 +1328,7 @@ export async function processNextDeliverOperationalEmailJob(
           projectName: recipientContext.project_name,
           webhookId: payload.webhook_id,
           targetUrl: payload.target_url,
+          ...(brandMarkUrl === undefined ? {} : { brandMarkUrl }),
           ...(webhooksUrl === undefined ? {} : { webhooksUrl })
         });
         break;
@@ -1355,6 +1359,7 @@ export async function processNextDeliverOperationalEmailJob(
             : undefined;
         const allowanceInput = {
           ...input,
+          ...(brandMarkUrl === undefined ? {} : { brandMarkUrl }),
           ...(usageWindowEndsAt === undefined ? {} : { usageWindowEndsAt }),
           ...(billingUrl === undefined ? {} : { billingUrl })
         };
@@ -1378,6 +1383,7 @@ export async function processNextDeliverOperationalEmailJob(
           projectName: recipientContext.project_name,
           rotatedOwnerCount: payload.rotated_owner_count,
           retainedBundleLimit: payload.retained_bundle_limit,
+          ...(brandMarkUrl === undefined ? {} : { brandMarkUrl }),
           ...(billingUrl === undefined ? {} : { billingUrl })
         });
         break;

@@ -21,6 +21,7 @@ import {
   type ImprovementSettingsUpdate
 } from "../../../packages/shared-types/src/index.js";
 import {
+  buildEmailBrandMarkUrl,
   createSesEmailTransport,
   formatProductFromEmail,
   renderEmailAuthCodeEmail,
@@ -132,6 +133,12 @@ export function readNonEmptyEnv(env: Record<string, string | undefined>, key: st
 
   const trimmed = value.trim();
   return trimmed.length > 0 ? trimmed : undefined;
+}
+
+function resolveEmailAssetBaseUrl(env: Record<string, string | undefined>): string | undefined {
+  return readNonEmptyEnv(env, "EMAIL_ASSET_BASE_URL")
+    ?? readNonEmptyEnv(env, "PUBLIC_SITE_URL")
+    ?? readNonEmptyEnv(env, "APP_BASE_URL");
 }
 
 export function readCsvEnv(env: Record<string, string | undefined>, key: string): string[] | undefined {
@@ -481,15 +488,21 @@ function readBillingAdminEmailsFromEnv(env: Record<string, string | undefined>):
   return normalized.length > 0 ? normalized : undefined;
 }
 
-function createAuthEmailSender(input: { emailTransport: EmailTransport; appBaseUrl: string }): AuthEmailSender {
+function createAuthEmailSender(input: {
+  emailTransport: EmailTransport;
+  appBaseUrl: string;
+  emailAssetBaseUrl?: string;
+}): AuthEmailSender {
   const baseUrl = stripTrailingSlash(input.appBaseUrl);
+  const brandMarkUrl = buildEmailBrandMarkUrl(input.emailAssetBaseUrl ?? baseUrl);
 
   return {
     async sendEmailAuthCode({ email, code, expires_in_minutes }): Promise<void> {
       const rendered = renderEmailAuthCodeEmail({
         code,
         expiresInMinutes: expires_in_minutes,
-        appUrl: `${baseUrl}/login`
+        appUrl: `${baseUrl}/login`,
+        brandMarkUrl
       });
       await input.emailTransport.send({
         to: [email],
@@ -502,7 +515,8 @@ function createAuthEmailSender(input: { emailTransport: EmailTransport; appBaseU
     async sendProjectInviteEmail({ email, token, inviter_name }): Promise<void> {
       const rendered = renderProjectInviteEmail({
         acceptUrl: `${baseUrl}/invite?token=${encodeURIComponent(token)}`,
-        inviterName: inviter_name
+        inviterName: inviter_name,
+        brandMarkUrl
       });
       await input.emailTransport.send({
         to: [email],
@@ -656,6 +670,7 @@ export function createApiDependencies(input: CreateApiDependenciesInput): {
     | "cancelInviteForProject"
     | "updateProjectMemberRole"
     | "removeProjectMember"
+    | "leaveProjectMembership"
   >;
   githubManagement?: {
     getInstallUrl(): Promise<string>;
@@ -1561,7 +1576,8 @@ export function createApiDependencies(input: CreateApiDependenciesInput): {
       createInviteForProject: (input) => metadataStore.createInviteForProject!(input),
       cancelInviteForProject: (input) => metadataStore.cancelInviteForProject!(input),
       updateProjectMemberRole: (input) => metadataStore.updateProjectMemberRole!(input),
-      removeProjectMember: (input) => metadataStore.removeProjectMember!(input)
+      removeProjectMember: (input) => metadataStore.removeProjectMember!(input),
+      leaveProjectMembership: (input) => metadataStore.leaveProjectMembership!(input)
     },
     ...(githubAppClient === undefined
       ? {}
@@ -2286,12 +2302,14 @@ export function createApiDependenciesFromEnv(env: Record<string, string | undefi
       : undefined;
 
   const appBaseUrl = env["APP_BASE_URL"] ?? "http://localhost:3000";
+  const emailAssetBaseUrl = resolveEmailAssetBaseUrl(env);
   const authEmailSender =
     authEmails === undefined
       ? undefined
       : createAuthEmailSender({
           emailTransport: authEmails,
-          appBaseUrl
+          appBaseUrl,
+          ...(emailAssetBaseUrl === undefined ? {} : { emailAssetBaseUrl })
         });
   const billingEmails =
     authEmails === undefined

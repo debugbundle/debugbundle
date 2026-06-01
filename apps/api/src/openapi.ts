@@ -1143,6 +1143,22 @@ function buildPublicApiOperations(): OperationSpec[] {
       },
     },
     {
+      method: "delete",
+      path: "/v1/projects/{id}/membership",
+      operationId: "leaveProject",
+      summary: "Leave a shared project",
+      tags: ["Projects"],
+      security: anyMemberAuth,
+      params: ProjectParamsSchema,
+      responses: {
+        "200": { description: "Left project membership.", schema: memberResponse },
+        "400": { description: "Invalid project id.", schema: apiError },
+        "401": { description: "Authentication is invalid.", schema: apiError },
+        "404": { description: "Project membership was not found.", schema: apiError },
+        "409": { description: "Owners cannot leave their own project.", schema: apiError },
+      },
+    },
+    {
       method: "get",
       path: "/v1/projects",
       operationId: "listProjects",
