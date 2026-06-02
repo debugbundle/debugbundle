@@ -88,7 +88,7 @@ The checked-in `.env.example` includes the baseline configuration needed to boot
 - `POSTGRES_*`, `REDIS_PORT`, `LOCALSTACK_PORT`, `S3_REGION`, and `S3_BUCKET` define the stateful services
 - `DEBUGBUNDLE_PROBE_TRIGGER_SECRET` is mandatory
 - `AUTH_COOKIE_SECURE=false` is the local default; set it to `true` behind HTTPS
-- GitHub OAuth and GitHub App variables remain optional until those features are enabled
+- GitHub OAuth, GitHub App, and GitHub Marketplace webhook variables remain optional until those features are enabled
 
 Default local endpoints after `docker compose up -d`:
 - Web SPA: `http://localhost:5291`
@@ -199,9 +199,12 @@ GITHUB_APP_PRIVATE_KEY=<contents-of-the-pem-file>
 GITHUB_APP_WEBHOOK_SECRET=<the-webhook-secret-you-chose>
 GITHUB_APP_CLIENT_ID=<your-client-id>
 GITHUB_APP_CLIENT_SECRET=<your-client-secret>
+GITHUB_MARKETPLACE_WEBHOOK_SECRET=<your-github-marketplace-listing-webhook-secret>
 ```
 
 For `GITHUB_APP_PRIVATE_KEY`, paste the full PEM contents including `-----BEGIN RSA PRIVATE KEY-----` and `-----END RSA PRIVATE KEY-----` lines. In Docker, use a multi-line environment variable or mount the key file and reference it.
+
+`GITHUB_MARKETPLACE_WEBHOOK_SECRET` is only needed when publishing the app through GitHub Marketplace. It signs the separate Marketplace listing webhook at `/v1/github/marketplace/webhook`; do not reuse `GITHUB_APP_WEBHOOK_SECRET`.
 
 ### 6. Install the App
 

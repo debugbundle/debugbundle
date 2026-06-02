@@ -47,6 +47,7 @@ import {
   createPostgresCaptureRuleStore,
   createPostgresImprovementOpportunityStore,
   createPostgresImprovementSettingsStore,
+  createPostgresGitHubMarketplaceStore,
   createPostgresGitHubStore,
   createPostgresOperationalEmailDeliveryStore,
   createIncidentLifecycleService,
@@ -929,6 +930,7 @@ export function createApiDependencies(input: CreateApiDependenciesInput): {
   const improvementSettingsStore = createPostgresImprovementSettingsStore(input.db);
   const metadataStore = createPostgresMetadataStore(input.db);
   const githubStore = createPostgresGitHubStore(input.db);
+  const githubMarketplaceStore = createPostgresGitHubMarketplaceStore(input.db);
   const slackDestinationStore = createPostgresSlackDestinationStore(input.db);
   const weeklyReportChannelStore = createPostgresWeeklyReportChannelStore(input.db);
   const billingLinks = createEnvBillingLinkProvider();
@@ -1776,13 +1778,20 @@ export function createApiDependencies(input: CreateApiDependenciesInput): {
             async completeGithubInstallationForOrganization(requestInput) {
               const installation = await githubAppClient.getInstallation({ installationId: requestInput.installation_id });
 
-              return githubStore.upsertGitHubInstallationForOrganization({
+              const storedInstallation = await githubStore.upsertGitHubInstallationForOrganization({
                 organization_id: requestInput.organization_id,
                 installation_id: installation.installation_id,
                 account_login: installation.account_login,
                 account_type: installation.account_type,
                 status: "active"
               });
+
+              await githubMarketplaceStore.linkOrganizationToMarketplaceAccountByInstallationId({
+                organization_id: requestInput.organization_id,
+                installation_id: installation.installation_id
+              });
+
+              return storedInstallation;
             },
             verifyWebhookSignature: (input) => githubAppClient.verifyWebhookSignature(input),
             async processWebhook(input) {

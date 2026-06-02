@@ -76,7 +76,9 @@ runIntegration("storage bootstrap integration", () => {
     expect(actualIndexes.has("alert_deliveries_project_status_idx")).toBe(true);
     expect(actualIndexes.has("org_usage_counters_pkey")).toBe(true);
     expect(actualIndexes.has("processed_billing_events_pkey")).toBe(true);
+    expect(actualIndexes.has("processed_github_marketplace_events_pkey")).toBe(true);
     expect(actualIndexes.has("organizations_stripe_customer_id_key")).toBe(true);
+    expect(actualIndexes.has("github_marketplace_accounts_installation_idx")).toBe(true);
 
     const webhookIncidentColumnResult = await db.query<{ is_nullable: "YES" | "NO" }>(
       `

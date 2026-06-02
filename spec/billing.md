@@ -21,6 +21,8 @@ If this file conflicts with a weaker summary elsewhere, this file wins for billi
 
 Pricing amounts and tier definitions live in `/spec/tiers.md` (source of truth for pricing numbers). This file focuses on how those tiers are implemented through Stripe and enforced in the product.
 
+GitHub Marketplace listing support is related but distinct. In the current model, GitHub Marketplace webhook events are tracked for listing-originated purchase/subscription state and install attribution, while Stripe remains the authoritative source of truth for paid DebugBundle entitlements.
+
 ---
 
 ## 2. Stripe Product Catalog

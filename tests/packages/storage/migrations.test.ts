@@ -133,6 +133,8 @@ describe("storage bootstrap schema", () => {
     expect(REQUIRED_API_TABLES).toContain("email_auth_challenges");
     expect(REQUIRED_API_TABLES).toContain("oauth_identities");
     expect(REQUIRED_API_TABLES).toContain("processed_billing_events");
+    expect(REQUIRED_API_TABLES).toContain("processed_github_marketplace_events");
+    expect(REQUIRED_API_TABLES).toContain("github_marketplace_accounts");
     expect(REQUIRED_API_TABLES).toContain("github_dispatch_deliveries");
     expect(REQUIRED_API_TABLES).toContain("slack_destinations");
     expect(REQUIRED_WORKER_TABLES).toContain("alert_deliveries");
@@ -190,5 +192,6 @@ describe("storage bootstrap schema", () => {
     expect(STORAGE_BOOTSTRAP_SQL.includes("alert_deliveries_project_status_idx")).toBe(true);
     expect(STORAGE_BOOTSTRAP_SQL.includes("organizations_stripe_customer_id_key")).toBe(true);
     expect(STORAGE_BOOTSTRAP_SQL.includes("slack_destinations_org_active_idx")).toBe(true);
+    expect(STORAGE_BOOTSTRAP_SQL.includes("github_marketplace_accounts_installation_idx")).toBe(true);
   });
 });

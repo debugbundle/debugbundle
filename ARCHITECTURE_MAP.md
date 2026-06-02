@@ -252,6 +252,7 @@ The public documentation/marketing/blog site lives in the standalone public repo
   - `routes/webhooks.ts` — webhook CRUD, synthetic test delivery, delivery history retrieval, and manual delivery retry
   - `routes/weekly-report-channels.ts` — per-project weekly report channel CRUD
   - `routes/github.ts` — GitHub App installation listing, project-scoped repo connection/disconnection, dispatch rule CRUD, dispatch delivery history/retry, installation callback handling, and GitHub App webhook ingestion endpoint
+  - `routes/github-marketplace-webhook.ts` — GitHub Marketplace listing webhook ingestion for purchase/subscription tracking keyed by GitHub delivery IDs
   - `api-types.ts` — shared type definitions
   - `api-helpers.ts` — auth guards, response builders, browser-session/member-token convergence, owner-role principal checks
   - `schemas.ts` — Zod request/response schemas
@@ -338,7 +339,8 @@ The public documentation/marketing/blog site lives in the standalone public repo
   - `s3-client.ts` — S3-compatible object store adapter
   - `redis-queue.ts` — Redis queue client (enqueue/dequeue typed jobs)
   - `billing-sync-store.ts` — Postgres billing sync for Stripe webhooks (idempotent event dedup, entitlement updates, Stripe customer linking, entitlement revocation)
-  - `github-store.ts` — Postgres GitHub automation persistence for installations, project repo connections, dispatch-rule CRUD, worker-side dispatch matching/cooldown/rate-limit counters, and project-scoped dispatch-delivery claim/history/retry state
+- `github-store.ts` — Postgres GitHub automation persistence for installations, project repo connections, dispatch-rule CRUD, worker-side dispatch matching/cooldown/rate-limit counters, and project-scoped dispatch-delivery claim/history/retry state
+- `github-marketplace-store.ts` — Postgres GitHub Marketplace purchase snapshot persistence and webhook idempotency ledger, bridged to organizations by GitHub installation ID when available
   - `audit-log-store.ts` — Postgres audit log persistence (create, query by organization/action/time range)
   - `retention-store.ts` — Postgres tier-aware retention cleanup service (sampled event expiry by organization tier)
   - `migrations.ts` — authoritative bootstrap schema and required-table manifests (not re-exported from barrel)

@@ -16,6 +16,7 @@ import { registerCapturePolicyRoutes } from "./routes/capture-policy.js";
 import { registerCaptureRuleRoutes } from "./routes/capture-rules.js";
 import { registerGitHubRoutes } from "./routes/github.js";
 import { registerHealthRoutes } from "./routes/health.js";
+import { registerGitHubMarketplaceWebhookRoute, type GitHubMarketplaceWebhookDependencies } from "./routes/github-marketplace-webhook.js";
 import { registerImprovementRoutes } from "./routes/improvements.js";
 import { registerImprovementSettingsRoutes } from "./routes/improvement-settings.js";
 import { registerProjectMemberRoutes } from "./routes/project-members.js";
@@ -40,6 +41,7 @@ export interface ApiServerOptions {
   requestTimeoutMs?: number;
   relayFetchImpl?: typeof fetch;
   stripeWebhook?: StripeWebhookDependencies;
+  githubMarketplaceWebhook?: GitHubMarketplaceWebhookDependencies;
   readinessCheck?: () => Promise<void>;
 }
 
@@ -292,6 +294,9 @@ export function createApiServer(dependencies: ApiDependencies, options: ApiServe
 
   if (options.stripeWebhook !== undefined) {
     registerStripeWebhookRoute(app, options.stripeWebhook);
+  }
+  if (options.githubMarketplaceWebhook !== undefined) {
+    registerGitHubMarketplaceWebhookRoute(app, options.githubMarketplaceWebhook);
   }
 
   return app;

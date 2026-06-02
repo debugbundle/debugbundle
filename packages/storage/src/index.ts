@@ -51,6 +51,7 @@ export type {
 } from "./improvement-opportunity-store.js";
 export { createPostgresImprovementOpportunityStore } from "./improvement-opportunity-store.js";
 export { createPostgresGitHubStore } from "./github-store.js";
+export { createPostgresGitHubMarketplaceStore } from "./github-marketplace-store.js";
 export { createIncidentLifecycleService } from "./incident-lifecycle-service.js";
 export { createPostgresMetadataStore } from "./metadata-store.js";
 export { createPostgresOperationalEmailDeliveryStore } from "./operational-email-delivery-store.js";

@@ -159,7 +159,8 @@ apps/
         projects.ts          — Project list/create/update/delete and owner-only destructive operations
         probes.ts            — Probe activation/deactivation/listing
         capture-policy.ts    — GET/PATCH /v1/projects/{id}/capture-policy
-        github.ts            — GitHub App callback, webhook intake, installation status, project repo assignment, dispatch-rule CRUD, and dispatch-delivery history/retry routes
+        github.ts            — GitHub App callback, installation webhook intake, installation status, project repo assignment, dispatch-rule CRUD, and dispatch-delivery history/retry routes
+        github-marketplace-webhook.ts — GitHub Marketplace webhook intake for listing purchase/subscription tracking and install attribution
         tokens.ts            — Token lifecycle CRUD (project + member)
         webhooks.ts          — Webhook CRUD, synthetic test delivery, and delivery history retrieval
         weekly-report-channels.ts — Weekly report channel CRUD

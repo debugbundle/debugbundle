@@ -26,6 +26,7 @@ export const REQUIRED_API_TABLES = [
   "bundle_generations",
   "weekly_report_channels",
   "github_installations",
+  "github_marketplace_accounts",
   "project_github_repos",
   "github_dispatch_rules",
   "github_dispatch_deliveries",
@@ -36,7 +37,8 @@ export const REQUIRED_API_TABLES = [
   "operational_email_deliveries",
   "agent_webhooks",
   "webhook_deliveries",
-  "processed_billing_events"
+  "processed_billing_events",
+  "processed_github_marketplace_events"
 ] as const;
 
 export const REQUIRED_WORKER_TABLES = [
@@ -803,6 +805,19 @@ const STORAGE_BOOTSTRAP_STATEMENTS = [
     )
   `,
   `
+    CREATE TABLE processed_github_marketplace_events (
+      delivery_id text PRIMARY KEY,
+      event_name text NOT NULL,
+      marketplace_account_id bigint,
+      action text,
+      processed_at timestamptz NOT NULL DEFAULT now()
+    )
+  `,
+  `
+    CREATE INDEX processed_github_marketplace_events_account_idx
+    ON processed_github_marketplace_events (marketplace_account_id, processed_at DESC)
+  `,
+  `
     CREATE TABLE github_installations (
       id uuid PRIMARY KEY,
       organization_id uuid NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
@@ -818,6 +833,41 @@ const STORAGE_BOOTSTRAP_STATEMENTS = [
   `
     CREATE INDEX github_installations_status_idx
     ON github_installations (status)
+  `,
+  `
+    CREATE TABLE github_marketplace_accounts (
+      id uuid PRIMARY KEY,
+      organization_id uuid REFERENCES organizations(id) ON DELETE SET NULL,
+      marketplace_account_id bigint NOT NULL UNIQUE,
+      marketplace_account_login text NOT NULL,
+      marketplace_account_type text NOT NULL CHECK (marketplace_account_type IN ('Organization', 'User')),
+      marketplace_account_node_id text,
+      marketplace_listing_plan_id bigint NOT NULL,
+      marketplace_listing_plan_name text NOT NULL,
+      marketplace_plan_price_model text,
+      billing_cycle text CHECK (billing_cycle IN ('monthly', 'yearly')),
+      unit_count integer,
+      on_free_trial boolean NOT NULL DEFAULT false,
+      free_trial_ends_on timestamptz,
+      next_billing_date timestamptz,
+      effective_date timestamptz NOT NULL,
+      installation_id bigint,
+      marketplace_purchase_status text NOT NULL
+        CHECK (marketplace_purchase_status IN ('purchased', 'cancelled', 'pending_change', 'pending_change_cancelled', 'changed')),
+      last_event_id text NOT NULL,
+      last_event_action text NOT NULL,
+      created_at timestamptz NOT NULL DEFAULT now(),
+      updated_at timestamptz NOT NULL DEFAULT now()
+    )
+  `,
+  `
+    CREATE INDEX github_marketplace_accounts_org_idx
+    ON github_marketplace_accounts (organization_id, updated_at DESC)
+  `,
+  `
+    CREATE UNIQUE INDEX github_marketplace_accounts_installation_idx
+    ON github_marketplace_accounts (installation_id)
+    WHERE installation_id IS NOT NULL
   `,
   `
     CREATE TABLE project_github_repos (

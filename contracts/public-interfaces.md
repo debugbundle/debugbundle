@@ -125,6 +125,7 @@ Every capability must be available through all applicable interfaces. Operations
 | Retry dispatch delivery | `POST /v1/projects/{id}/github/deliveries/{id}/retry` | `github deliveries retry` | `retry_github_delivery` | Browser Session or Member Token, owner/admin or creator-owned-rule member on eligible Solo+ project |
 | GitHub App callback | `GET /v1/github/app/callback` | — | — | GitHub App setup URL / post-install redirect handler |
 | GitHub App webhook | `POST /v1/github/app/webhook` | — | — | Installation lifecycle events (HMAC-verified) |
+| GitHub Marketplace webhook | `POST /v1/github/marketplace/webhook` | — | — | GitHub Marketplace listing webhook for purchase/subscription lifecycle tracking (HMAC-verified) |
 
 ---
 
@@ -1561,7 +1562,7 @@ SDKs must respect the server-side capture policy. Events that violate the policy
 | GET | `/v1/github/app/callback` | None | GitHub App setup URL / post-install redirect handler |
 | POST | `/v1/github/app/webhook` | GitHub App webhook secret (HMAC-SHA256) | Installation lifecycle events |
 
-The setup callback endpoint completes the App installation flow: validates the `installation_id`, accepts GitHub's optional `setup_action`, records the installation in `github_installations`, validates a signed install `state` when present, and redirects the user back into the DebugBundle web app so they can continue setup from the originating project GitHub tab.
+The setup callback endpoint completes the App installation flow for trusted in-app installs: it requires the signed install `state` to match the transient install cookie, validates the `installation_id` through the GitHub App client before recording it in `github_installations`, accepts GitHub's optional `setup_action`, and redirects the user back into the originating DebugBundle project GitHub tab. If GitHub reaches the setup URL without DebugBundle's install state, such as a direct Marketplace install, the endpoint clears any stale install cookie and redirects to the web app without trusting or persisting the unauthenticated `installation_id`.
 
 The webhook endpoint handles `installation.created`, `installation.deleted`, `installation.suspend`, and `installation.unsuspend` events. All payloads are verified with HMAC-SHA256 using `GITHUB_APP_WEBHOOK_SECRET`.
 
@@ -1647,6 +1648,8 @@ When no repository is assigned to the project yet, the route returns:
 ```
 
 GitHub automation eligibility is determined from the target project's owner plan, not from the acting collaborator's personal account plan.
+
+`POST /v1/github/marketplace/webhook` is separate from the GitHub App installation webhook. It exists for GitHub Marketplace listing events such as `ping` and `marketplace_purchase`, verifies `X-Hub-Signature-256`, persists the latest Marketplace purchase snapshot keyed by the GitHub Marketplace account, and records processed delivery IDs for idempotency. In the current billing model, this route does **not** mutate DebugBundle organization billing tiers or Stripe-derived entitlements; it tracks Marketplace-originated listing state and can later be linked to a DebugBundle organization through the shared GitHub App installation ID.
 
 **Dispatch rule management:**
 

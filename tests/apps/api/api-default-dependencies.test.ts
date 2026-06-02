@@ -30,6 +30,7 @@ const {
   createPostgresWeeklyReportChannelStoreMock,
   createPostgresWebhookDeliveryStoreMock,
   createPostgresGitHubStoreMock,
+  createPostgresGitHubMarketplaceStoreMock,
   createIngestionMetadataServiceMock,
   createIncidentLifecycleServiceMock,
   createSesEmailTransportMock,
@@ -64,6 +65,7 @@ const {
   createPostgresWeeklyReportChannelStoreMock: vi.fn(),
   createPostgresWebhookDeliveryStoreMock: vi.fn(),
   createPostgresGitHubStoreMock: vi.fn(),
+  createPostgresGitHubMarketplaceStoreMock: vi.fn(),
   createIngestionMetadataServiceMock: vi.fn(),
   createIncidentLifecycleServiceMock: vi.fn(),
   createSesEmailTransportMock: vi.fn(),
@@ -108,6 +110,7 @@ vi.mock("../../../packages/storage/src/index.js", () => ({
   createPostgresWeeklyReportChannelStore: createPostgresWeeklyReportChannelStoreMock,
   createPostgresWebhookDeliveryStore: createPostgresWebhookDeliveryStoreMock,
   createPostgresGitHubStore: createPostgresGitHubStoreMock,
+  createPostgresGitHubMarketplaceStore: createPostgresGitHubMarketplaceStoreMock,
   createIngestionMetadataService: createIngestionMetadataServiceMock,
   createIncidentLifecycleService: createIncidentLifecycleServiceMock,
   createPostgresBillingSyncStore: createPostgresBillingSyncStoreMock,
@@ -173,6 +176,7 @@ describe("api default dependencies", () => {
     createPostgresOperationalEmailDeliveryStoreMock.mockReset();
     createPostgresWeeklyReportChannelStoreMock.mockReset();
     createPostgresWebhookDeliveryStoreMock.mockReset();
+    createPostgresGitHubMarketplaceStoreMock.mockReset();
     createIngestionMetadataServiceMock.mockReset();
     createIncidentLifecycleServiceMock.mockReset();
     createSesEmailTransportMock.mockReset();
@@ -314,6 +318,12 @@ describe("api default dependencies", () => {
         delivery_id: "del_123",
         event_type: "verification.passed"
       })
+    });
+    createPostgresGitHubMarketplaceStoreMock.mockReturnValue({
+      isEventProcessed: vi.fn(),
+      markEventProcessed: vi.fn(),
+      upsertMarketplaceAccount: vi.fn(),
+      linkOrganizationToMarketplaceAccountByInstallationId: vi.fn()
     });
     createIngestionMetadataServiceMock.mockReturnValue({
       resolveProjectByTokenHash: vi.fn(),
@@ -3058,7 +3068,14 @@ describe("api default dependencies", () => {
       retryProjectGitHubDeliveryForOrganization: vi.fn(),
       upsertProjectGitHubRepoForOrganization: vi.fn()
     };
+    const linkOrganizationToMarketplaceAccountByInstallationId = vi.fn().mockResolvedValue(null);
     createPostgresGitHubStoreMock.mockReturnValueOnce(githubStore);
+    createPostgresGitHubMarketplaceStoreMock.mockReturnValueOnce({
+      isEventProcessed: vi.fn(),
+      markEventProcessed: vi.fn(),
+      upsertMarketplaceAccount: vi.fn(),
+      linkOrganizationToMarketplaceAccountByInstallationId
+    });
     createPostgresMetadataStoreMock.mockReturnValueOnce({
       ...createPostgresMetadataStoreMock.getMockImplementation?.()?.(),
       listProjectsForOrganization: vi
@@ -3160,6 +3177,10 @@ describe("api default dependencies", () => {
         status: "active"
       })
     );
+    expect(linkOrganizationToMarketplaceAccountByInstallationId).toHaveBeenCalledWith({
+      organization_id: "org_1",
+      installation_id: 42
+    });
 
     expect(
       deps.githubManagement?.verifyWebhookSignature({

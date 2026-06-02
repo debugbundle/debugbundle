@@ -410,6 +410,20 @@ export function createPostgresAccountStore(db: Queryable): AccountLifecycleStore
         [input.organization_id],
       );
 
+      const githubMarketplaceAccounts = await queryJsonRows(
+        db,
+        `
+          SELECT to_jsonb(t) AS data
+          FROM (
+            SELECT github_marketplace_accounts.*
+            FROM github_marketplace_accounts
+            WHERE organization_id = $1
+            ORDER BY updated_at ASC, created_at ASC, id ASC
+          ) t
+        `,
+        [input.organization_id],
+      );
+
       const orgUsageCounters = await queryJsonRows(
         db,
         `
@@ -433,6 +447,22 @@ export function createPostgresAccountStore(db: Queryable): AccountLifecycleStore
             FROM processed_billing_events
             WHERE organization_id = $1
             ORDER BY processed_at ASC, event_id ASC
+          ) t
+        `,
+        [input.organization_id],
+      );
+
+      const processedGitHubMarketplaceEvents = await queryJsonRows(
+        db,
+        `
+          SELECT to_jsonb(t) AS data
+          FROM (
+            SELECT pgme.*
+            FROM processed_github_marketplace_events pgme
+            JOIN github_marketplace_accounts gma
+              ON gma.marketplace_account_id = pgme.marketplace_account_id
+            WHERE gma.organization_id = $1
+            ORDER BY pgme.processed_at ASC, pgme.delivery_id ASC
           ) t
         `,
         [input.organization_id],
@@ -491,11 +521,13 @@ export function createPostgresAccountStore(db: Queryable): AccountLifecycleStore
         agent_webhooks: agentWebhooks,
         webhook_deliveries: webhookDeliveries,
         github_installations: githubInstallations,
+        github_marketplace_accounts: githubMarketplaceAccounts,
         project_github_repos: projectGitHubRepos,
         github_dispatch_rules: githubDispatchRules,
         github_dispatch_deliveries: githubDispatchDeliveries,
         org_usage_counters: orgUsageCounters,
         processed_billing_events: processedBillingEvents,
+        processed_github_marketplace_events: processedGitHubMarketplaceEvents,
         operational_email_deliveries: operationalEmailDeliveries,
         audit_logs: auditLogs,
         artifacts: {

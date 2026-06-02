@@ -7,7 +7,7 @@ import { createRuntimeLoggerFromEnv } from "../../../packages/runtime-logger/src
 import { buildPostgresSslConfig, parsePostgresSslMode, type PostgresSslMode } from "../../../packages/storage/src/postgres-ssl.js";
 import { REQUIRED_API_TABLES } from "../../../packages/storage/src/migrations.js";
 import { assertStorageSchemaMigrationsApplied } from "../../../packages/storage/src/schema-migrations.js";
-import { createPostgresBillingSyncStore } from "../../../packages/storage/src/index.js";
+import { createPostgresBillingSyncStore, createPostgresGitHubMarketplaceStore } from "../../../packages/storage/src/index.js";
 import { createApiDependenciesFromEnv } from "./default-dependencies.ts";
 import { createApiServer, type ApiServerOptions } from "./server.js";
 import { createStripeConfig } from "./stripe-config.js";
@@ -161,6 +161,16 @@ function createApiPool(env: ApiRuntimeEnv): Pool {
   });
 }
 
+function readNonEmptyEnv(env: Record<string, string | undefined>, key: string): string | undefined {
+  const value = env[key];
+  if (value === undefined) {
+    return undefined;
+  }
+
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : undefined;
+}
+
 export function buildApiReadinessCheck(env: ApiRuntimeEnv): () => Promise<void> {
   return async () => {
     const pool = createApiPool(env);
@@ -229,9 +239,11 @@ export async function startApiServerFromEnv(envInput: Record<string, string | un
   });
 
   const serverOptions: ApiServerOptions = {};
+  const webhookPools: Pool[] = [];
   const stripeConfig = createStripeConfig(envInput);
   if (stripeConfig) {
     const syncPool = createApiPool(env);
+    webhookPools.push(syncPool);
     const billingSyncStore = createPostgresBillingSyncStore({
       query: async <Row extends Record<string, unknown>>(sql: string, params: unknown[]) =>
         syncPool.query<Row>(sql, params)
@@ -248,6 +260,22 @@ export async function startApiServerFromEnv(envInput: Record<string, string | un
       ...(dependencies.billingEmails === undefined
         ? {}
         : { billingEmails: dependencies.billingEmails })
+    };
+  }
+
+  const githubMarketplaceWebhookSecret = readNonEmptyEnv(envInput, "GITHUB_MARKETPLACE_WEBHOOK_SECRET");
+  if (githubMarketplaceWebhookSecret !== undefined) {
+    const marketplacePool = createApiPool(env);
+    webhookPools.push(marketplacePool);
+    serverOptions.githubMarketplaceWebhook = {
+      webhookSecret: githubMarketplaceWebhookSecret,
+      githubMarketplaceStore: createPostgresGitHubMarketplaceStore({
+        query: async <Row extends Record<string, unknown>>(sql: string, params: unknown[]) =>
+          marketplacePool.query<Row>(sql, params)
+      }),
+      ...(dependencies.auditLogging === undefined
+        ? {}
+        : { auditLogging: dependencies.auditLogging })
     };
   }
 
@@ -283,6 +311,7 @@ export async function startApiServerFromEnv(envInput: Record<string, string | un
       if (closeDependencies !== undefined) {
         await closeDependencies();
       }
+      await Promise.all(webhookPools.map(async (pool) => pool.end()));
       clearTimeout(forceExitTimer);
       logger.info({ signal }, "api_server_shutdown_complete");
     } catch (error) {

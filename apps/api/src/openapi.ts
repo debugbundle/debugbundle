@@ -260,11 +260,13 @@ const AccountExportResponseSchema = z
     agent_webhooks: z.array(z.record(z.string(), z.unknown())),
     webhook_deliveries: z.array(z.record(z.string(), z.unknown())),
     github_installations: z.array(z.record(z.string(), z.unknown())),
+    github_marketplace_accounts: z.array(z.record(z.string(), z.unknown())),
     project_github_repos: z.array(z.record(z.string(), z.unknown())),
     github_dispatch_rules: z.array(z.record(z.string(), z.unknown())),
     github_dispatch_deliveries: z.array(z.record(z.string(), z.unknown())),
     org_usage_counters: z.array(z.record(z.string(), z.unknown())),
     processed_billing_events: z.array(z.record(z.string(), z.unknown())),
+    processed_github_marketplace_events: z.array(z.record(z.string(), z.unknown())),
     operational_email_deliveries: z.array(z.record(z.string(), z.unknown())),
     audit_logs: z.array(z.record(z.string(), z.unknown())),
     artifacts: z

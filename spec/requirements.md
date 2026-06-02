@@ -610,6 +610,14 @@ This ensures Free behaves as **failure-first, not telemetry-first**.
 
 **FR-GHA-19:** Self-hosted deployments must support custom GitHub App configuration via environment variables (`GITHUB_APP_ID`, `GITHUB_APP_PRIVATE_KEY`, `GITHUB_APP_WEBHOOK_SECRET`, `GITHUB_APP_CLIENT_ID`, `GITHUB_APP_CLIENT_SECRET`).
 
+**FR-GHM-01:** Support a dedicated GitHub Marketplace webhook at `POST /v1/github/marketplace/webhook`, verified by HMAC-SHA256 using a separate Marketplace webhook secret and keyed idempotently by the GitHub delivery ID.
+
+**FR-GHM-02:** Persist the latest GitHub Marketplace purchase snapshot per GitHub Marketplace account, including account identity, plan identity, current purchase status/action, effective date, optional installation ID, and the last processed delivery ID.
+
+**FR-GHM-03:** Marketplace purchase tracking must remain separate from GitHub App installation tracking and from Stripe billing entitlements. In the current billing model, Marketplace webhook processing must not directly mutate `organizations.plan`, `stripe_customer_id`, or other Stripe-derived entitlement fields.
+
+**FR-GHM-04:** When a GitHub App installation is later linked to a DebugBundle organization, any stored Marketplace purchase snapshot with the same GitHub installation ID must be linked to that organization for attribution and account export.
+
 ---
 
 ## 2. Non-Functional Requirements

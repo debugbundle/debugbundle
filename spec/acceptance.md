@@ -1544,3 +1544,21 @@ If CLI says something is healthy and MCP says something different, that is a pro
 - **When** the operator completes GitHub App setup
 - **Then** dispatch rule evaluation, delivery, and retry logic is identical to cloud
 - **And** no code paths differ between cloud and self-host
+
+### AC-GHM-01: Marketplace Purchase Tracking
+- **Given** a configured GitHub Marketplace webhook
+- **When** GitHub sends a `marketplace_purchase` webhook with action `purchased`
+- **Then** DebugBundle verifies the webhook signature
+- **And** persists the Marketplace account, plan, action/status, effective date, and installation ID when present
+- **And** records the GitHub delivery ID so the webhook is idempotent
+
+### AC-GHM-02: Marketplace Cancellation Does Not Mutate Stripe Entitlements
+- **Given** a DebugBundle organization with normal Stripe-backed billing fields
+- **When** GitHub sends a `marketplace_purchase` webhook with action `cancelled`
+- **Then** the Marketplace purchase snapshot is updated to `cancelled`
+- **And** the organization's Stripe-derived billing tier and entitlement fields are not changed by Marketplace webhook processing
+
+### AC-GHM-03: Marketplace Record Links On Installation Connection
+- **Given** a stored GitHub Marketplace purchase snapshot with `installation_id = 42`
+- **When** that GitHub App installation is later linked to a DebugBundle organization through the normal installation completion flow
+- **Then** the stored Marketplace purchase snapshot is linked to that organization for attribution and export

@@ -404,6 +404,24 @@ describe("api github routes", () => {
     expect(githubManagement.completeGithubInstallationForOrganization).not.toHaveBeenCalled();
   });
 
+  it("redirects external github installation callbacks without trusting the installation id", async () => {
+    vi.stubEnv("APP_BASE_URL", "https://app.debugbundle.com");
+    const githubManagement = {
+      completeGithubInstallationForOrganization: vi.fn()
+    };
+    const app = createServer({ githubManagement });
+
+    const response = await app.inject({
+      method: "GET",
+      url: "/v1/github/app/callback?installation_id=123&setup_action=install"
+    });
+
+    expect(response.statusCode).toBe(302);
+    expect(response.headers.location).toBe("https://app.debugbundle.com/projects?github_app_setup=external");
+    expect(String(response.headers["set-cookie"])).toContain(`${GITHUB_APP_INSTALL_STATE_COOKIE_NAME}=;`);
+    expect(githubManagement.completeGithubInstallationForOrganization).not.toHaveBeenCalled();
+  });
+
   it("blocks non-owner members from github mutation routes", async () => {
     const projectId = "00000000-0000-4000-8000-000000000001";
     const githubManagement = {

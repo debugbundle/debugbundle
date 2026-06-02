@@ -321,11 +321,13 @@ export interface AccountDataExportRecord extends Record<string, unknown> {
   agent_webhooks: Record<string, unknown>[];
   webhook_deliveries: Record<string, unknown>[];
   github_installations: Record<string, unknown>[];
+  github_marketplace_accounts: Record<string, unknown>[];
   project_github_repos: Record<string, unknown>[];
   github_dispatch_rules: Record<string, unknown>[];
   github_dispatch_deliveries: Record<string, unknown>[];
   org_usage_counters: Record<string, unknown>[];
   processed_billing_events: Record<string, unknown>[];
+  processed_github_marketplace_events: Record<string, unknown>[];
   operational_email_deliveries: Record<string, unknown>[];
   audit_logs: Record<string, unknown>[];
   artifacts: {
@@ -1363,6 +1365,30 @@ export interface GitHubInstallationRecord extends Record<string, unknown> {
   updated_at: string;
 }
 
+export interface GitHubMarketplaceAccountRecord extends Record<string, unknown> {
+  id: string;
+  organization_id: string | null;
+  marketplace_account_id: number;
+  marketplace_account_login: string;
+  marketplace_account_type: "Organization" | "User";
+  marketplace_account_node_id: string | null;
+  marketplace_listing_plan_id: number;
+  marketplace_listing_plan_name: string;
+  marketplace_plan_price_model: string | null;
+  billing_cycle: "monthly" | "yearly" | null;
+  unit_count: number | null;
+  on_free_trial: boolean;
+  free_trial_ends_on: string | null;
+  next_billing_date: string | null;
+  effective_date: string;
+  installation_id: number | null;
+  marketplace_purchase_status: "purchased" | "cancelled" | "pending_change" | "pending_change_cancelled" | "changed";
+  last_event_id: string;
+  last_event_action: string;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface GitHubRepositoryRecord extends Record<string, unknown> {
   id: number;
   owner: string;
@@ -1601,6 +1627,42 @@ export interface GitHubStore {
   claimDueGitHubDispatchDeliveries(limit: number): Promise<DeliverGitHubDispatchJob[]>;
   getGitHubDispatchDeliveryIntent(deliveryId: string): Promise<GitHubDispatchDeliveryIntent | null>;
   markGitHubDispatchDeliveryAttempt(input: MarkGitHubDispatchDeliveryAttemptInput): Promise<MarkGitHubDispatchDeliveryAttemptResult>;
+}
+
+export interface GitHubMarketplaceAccountUpsertInput {
+  organization_id: string | null;
+  marketplace_account_id: number;
+  marketplace_account_login: string;
+  marketplace_account_type: "Organization" | "User";
+  marketplace_account_node_id: string | null;
+  marketplace_listing_plan_id: number;
+  marketplace_listing_plan_name: string;
+  marketplace_plan_price_model: string | null;
+  billing_cycle: "monthly" | "yearly" | null;
+  unit_count: number | null;
+  on_free_trial: boolean;
+  free_trial_ends_on: string | null;
+  next_billing_date: string | null;
+  effective_date: string;
+  installation_id: number | null;
+  marketplace_purchase_status: "purchased" | "cancelled" | "pending_change" | "pending_change_cancelled" | "changed";
+  last_event_id: string;
+  last_event_action: string;
+}
+
+export interface GitHubMarketplaceStore {
+  isEventProcessed(delivery_id: string): Promise<boolean>;
+  markEventProcessed(input: {
+    delivery_id: string;
+    event_name: string;
+    marketplace_account_id: number | null;
+    action: string | null;
+  }): Promise<void>;
+  upsertMarketplaceAccount(input: GitHubMarketplaceAccountUpsertInput): Promise<GitHubMarketplaceAccountRecord>;
+  linkOrganizationToMarketplaceAccountByInstallationId(input: {
+    organization_id: string;
+    installation_id: number;
+  }): Promise<GitHubMarketplaceAccountRecord | null>;
 }
 
 export interface ProjectCollaborationStore {

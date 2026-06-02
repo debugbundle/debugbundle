@@ -10,7 +10,8 @@ const {
   s3SendMock,
   createApiDependenciesFromEnvMock,
   createApiServerMock,
-  createStripeConfigMock
+  createStripeConfigMock,
+  createPostgresGitHubMarketplaceStoreMock
 } = vi.hoisted(() => ({
   listenMock: vi.fn().mockResolvedValue(undefined),
   queryMock: vi.fn(),
@@ -20,7 +21,13 @@ const {
   s3SendMock: vi.fn().mockResolvedValue({}),
   createApiDependenciesFromEnvMock: vi.fn(),
   createApiServerMock: vi.fn(),
-  createStripeConfigMock: vi.fn().mockReturnValue(null)
+  createStripeConfigMock: vi.fn().mockReturnValue(null),
+  createPostgresGitHubMarketplaceStoreMock: vi.fn().mockReturnValue({
+    isEventProcessed: vi.fn(),
+    markEventProcessed: vi.fn(),
+    upsertMarketplaceAccount: vi.fn(),
+    linkOrganizationToMarketplaceAccountByInstallationId: vi.fn()
+  })
 }));
 
 vi.mock("pg", () => ({
@@ -68,6 +75,14 @@ vi.mock("../../../apps/api/src/stripe-config.js", () => ({
   createStripeConfig: createStripeConfigMock
 }));
 
+vi.mock("../../../packages/storage/src/index.js", async () => {
+  const actual = await vi.importActual<Record<string, unknown>>("../../../packages/storage/src/index.js");
+  return {
+    ...actual,
+    createPostgresGitHubMarketplaceStore: createPostgresGitHubMarketplaceStoreMock
+  };
+});
+
 import { createDrainingReadinessState, startApiServerFromEnv } from "../../../apps/api/src/runtime.js";
 
 function buildMigratedRuntimeSchemaRows(sql: string): { rows: Record<string, unknown>[] } {
@@ -107,7 +122,9 @@ function buildMigratedRuntimeSchemaRows(sql: string): { rows: Record<string, unk
         { table_name: "capture_rules" },
         { table_name: "audit_logs" },
         { table_name: "processed_billing_events" },
+        { table_name: "processed_github_marketplace_events" },
         { table_name: "github_installations" },
+        { table_name: "github_marketplace_accounts" },
         { table_name: "project_github_repos" },
         { table_name: "github_dispatch_rules" },
         { table_name: "github_dispatch_deliveries" }
@@ -140,6 +157,7 @@ describe("api runtime start", () => {
     s3SendMock.mockClear();
     createStripeConfigMock.mockReset();
     createStripeConfigMock.mockReturnValue(null);
+    createPostgresGitHubMarketplaceStoreMock.mockClear();
     createApiDependenciesFromEnvMock.mockReset();
     createApiDependenciesFromEnvMock.mockReturnValue({
       ingestionPersistence: { persistAndEnqueue: vi.fn() },

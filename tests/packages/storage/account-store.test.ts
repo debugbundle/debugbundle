@@ -116,11 +116,17 @@ describe("postgres account store", () => {
       if (sqlText.includes("FROM github_installations")) {
         return rowsResult([{ data: { github_installation_id: "ghi_123", organization_id: "org_123" } }]);
       }
+      if (sqlText.includes("FROM github_marketplace_accounts")) {
+        return rowsResult([{ data: { marketplace_account_id: 42, organization_id: "org_123" } }]);
+      }
       if (sqlText.includes("FROM org_usage_counters")) {
         return rowsResult([{ data: { organization_id: "org_123", month: "2026-04" } }]);
       }
       if (sqlText.includes("FROM processed_billing_events")) {
         return rowsResult([{ data: { organization_id: "org_123", event_id: "bill_123" } }]);
+      }
+      if (sqlText.includes("FROM processed_github_marketplace_events")) {
+        return rowsResult([{ data: { delivery_id: "ghm_123", marketplace_account_id: 42 } }]);
       }
       if (sqlText.includes("FROM operational_email_deliveries")) {
         return rowsResult([{ data: { delivery_id: "op_email_123", organization_id: "org_123", project_id: "proj_123" } }]);
@@ -155,6 +161,8 @@ describe("postgres account store", () => {
         incident_events: [expect.objectContaining({ event_id: "evt_123" })],
         alert_email_digests: [expect.objectContaining({ digest_id: "aed_123" })],
         alert_email_digest_items: [expect.objectContaining({ digest_item_id: "aedi_123" })],
+        github_marketplace_accounts: [expect.objectContaining({ marketplace_account_id: 42 })],
+        processed_github_marketplace_events: [expect.objectContaining({ delivery_id: "ghm_123" })],
         operational_email_deliveries: [expect.objectContaining({ delivery_id: "op_email_123" })],
         artifacts: {
           raw_events: [],

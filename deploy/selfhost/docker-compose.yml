@@ -160,6 +160,7 @@ services:
       GITHUB_APP_WEBHOOK_SECRET: ${GITHUB_APP_WEBHOOK_SECRET:-}
       GITHUB_APP_CLIENT_ID: ${GITHUB_APP_CLIENT_ID:-}
       GITHUB_APP_CLIENT_SECRET: ${GITHUB_APP_CLIENT_SECRET:-}
+      GITHUB_MARKETPLACE_WEBHOOK_SECRET: ${GITHUB_MARKETPLACE_WEBHOOK_SECRET:-}
     command: sh -lc "corepack enable && corepack pnpm api:start"
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:3000/ready >/dev/null"]

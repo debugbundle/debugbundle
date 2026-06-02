@@ -33,6 +33,12 @@ function resolveAppRedirectBaseUrl(): string {
   return (process.env["APP_BASE_URL"] ?? "http://localhost:5291").replace(/\/+$/, "");
 }
 
+function buildExternalGitHubAppSetupRedirectUrl(): string {
+  const url = new URL(`${resolveAppRedirectBaseUrl()}/projects`);
+  url.searchParams.set("github_app_setup", "external");
+  return url.toString();
+}
+
 function shouldUseSecureCookies(): boolean {
   return process.env["AUTH_COOKIE_SECURE"] !== "false";
 }
@@ -835,6 +841,9 @@ export function registerGitHubRoutes(app: FastifyInstance, dependencies: ApiDepe
       !isTimingSafeEqualUtf8(stateCookie, queryState)
     ) {
       reply.header("Set-Cookie", buildClearedGitHubAppInstallStateCookie({ secure: shouldUseSecureCookies() }));
+      if (queryState === undefined && stateCookie === null) {
+        return reply.redirect(buildExternalGitHubAppSetupRedirectUrl());
+      }
       return reply.status(400).send({ error: "invalid_state" });
     }
 
