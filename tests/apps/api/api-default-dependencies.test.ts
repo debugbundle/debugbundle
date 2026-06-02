@@ -1273,6 +1273,38 @@ describe("api default dependencies", () => {
     expect(emailTransportSendMock).toHaveBeenCalledTimes(2);
   });
 
+  it("should prefer the app origin over the public site for email brand assets when no explicit override is set", async (): Promise<void> => {
+    createApiDependenciesFromEnv({
+      SES_REGION: "eu-west-1",
+      SES_FROM_EMAIL: "noreply@debugbundle.test",
+      AWS_ACCESS_KEY_ID: "aws-key",
+      AWS_SECRET_ACCESS_KEY: "aws-secret",
+      APP_BASE_URL: "https://app.debugbundle.test",
+      PUBLIC_SITE_URL: "https://debugbundle.test"
+    });
+
+    const serviceOptions = createWebSessionAuthServiceMock.mock.calls.at(-1)?.[1] as
+        | {
+          authEmails?: {
+            sendEmailAuthCode(input: { email: string; code: string; expires_in_minutes: number }): Promise<void>;
+          };
+        }
+      | undefined;
+
+    await serviceOptions?.authEmails?.sendEmailAuthCode({
+      email: "owen@example.com",
+      code: "123456",
+      expires_in_minutes: 10
+    });
+
+    expect(renderEmailAuthCodeEmailMock).toHaveBeenLastCalledWith({
+      code: "123456",
+      appUrl: "https://app.debugbundle.test/login",
+      expiresInMinutes: 10,
+      brandMarkUrl: "https://app.debugbundle.test/email/debugbundle-mark.png"
+    });
+  });
+
   it("should compose github oauth support when github env settings are present", (): void => {
     createApiDependenciesFromEnv({
       GITHUB_CLIENT_ID: "gh-client-id",

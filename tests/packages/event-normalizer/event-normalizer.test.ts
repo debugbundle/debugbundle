@@ -159,6 +159,116 @@ describe("event-normalizer", () => {
     );
   });
 
+  it("should collapse equivalent PostgreSQL connection refused log messages to one normalized title and fingerprint", (): void => {
+    const makeEvent = (sessionId: string) =>
+      createEventEnvelope({
+        event_type: "log_event",
+        service: {
+          name: "saycheese-backend",
+          environment: "production",
+          runtime: "php",
+          framework: "laravel"
+        },
+        payload: {
+          level: "error",
+          message:
+            `SQLSTATE[08006] [7] connection to server at "ls-f4e27e598f75398e5dff8de15f8c745a6c59858a.c502662kgtwo.eu-central-1.rds.amazonaws.com" ` +
+            `(172.26.14.174), port 5432 failed: Connection refused\n\tIs the server running on that host and accepting TCP/IP connections? ` +
+            `(Connection: pgsql, SQL: select * from "sessions" where "id" = ${sessionId} limit 1)`,
+          attributes: {}
+        }
+      });
+
+    const normalizedA = normalizeEvent(makeEvent("XHv1IAC3DlFeuX0ZqxktsTK04Y44Qz7YDQ2tEd2k"));
+    const normalizedB = normalizeEvent(makeEvent("OZOp4tUMTCJY7xPfdyR2sVjU32fJMgqAyv1YLgG1"));
+
+    expect(normalizedA.normalized_message).toBe("PostgreSQL connection refused");
+    expect(normalizedB.normalized_message).toBe("PostgreSQL connection refused");
+    expect(fingerprint(normalizedA)).toBe(fingerprint(normalizedB));
+  });
+
+  it("should collapse PostgreSQL pg_hba access errors despite SSL and query noise", (): void => {
+    const event = createEventEnvelope({
+      event_type: "log_event",
+      service: {
+        name: "saycheese-backend",
+        environment: "production",
+        runtime: "php",
+        framework: "laravel"
+      },
+      payload: {
+        level: "error",
+        message:
+          "SQLSTATE[08006] [7] connection to server at " +
+          "\"ls-f4e27e598f75398e5dff8de15f8c745a6c59858a.c502662kgtwo.eu-central-1.rds.amazonaws.com\" " +
+          "(172.26.14.174), port 5432 failed: FATAL:  no pg_hba.conf entry for host \"172.26.14.174\", " +
+          "user \"saycheese_admin\", database \"say_cheese\", SSL encryption\nconnection to server at " +
+          "\"ls-f4e27e598f75398e5dff8de15f8c745a6c59858a.c502662kgtwo.eu-central-1.rds.amazonaws.com\" " +
+          "(172.26.14.174), port 5432 failed: FATAL:  no pg_hba.conf entry for host \"172.26.14.174\", " +
+          "user \"saycheese_admin\", database \"say_cheese\", no encryption " +
+          "(Connection: pgsql, SQL: select * from \"sessions\" where \"id\" = dL1FUsfsgOzi1g6dQL98CY0riaCwPLgSpQomOdOk limit 1)",
+        attributes: {}
+      }
+    });
+
+    const normalized = normalizeEvent(event);
+
+    expect(normalized.normalized_message).toBe("PostgreSQL access rejected by pg_hba.conf");
+  });
+
+  it("should collapse MySQL access denied messages across driver-specific noise", (): void => {
+    const event = createEventEnvelope({
+      event_type: "log_event",
+      service: {
+        name: "worker",
+        environment: "production",
+        runtime: "node",
+        framework: null
+      },
+      payload: {
+        level: "error",
+        message:
+          "SQLSTATE[HY000] [1045] Access denied for user 'app'@'10.12.0.5' (using password: YES) " +
+          "(Connection: mysql, SQL: select * from users where email = 'jane@example.com')",
+        attributes: {}
+      }
+    });
+
+    const normalized = normalizeEvent(event);
+
+    expect(normalized.normalized_message).toBe("MySQL authentication failed");
+  });
+
+  it("should scrub dynamic SQL wrapper values while preserving the core database error", (): void => {
+    const event = createEventEnvelope({
+      event_type: "log_event",
+      service: {
+        name: "worker",
+        environment: "production",
+        runtime: "php",
+        framework: "laravel"
+      },
+      payload: {
+        level: "error",
+        message:
+          "SQLSTATE[23505]: Unique violation: 7 ERROR: duplicate key value violates unique constraint " +
+          "\"users_email_unique\" (Connection: pgsql, SQL: insert into \"users\" " +
+          "(\"email\", \"external_id\", \"created_at\") values ('jane@example.com', " +
+          "'usr_29QkY4P8PzK4q8v7mJ2JfL1j', '2026-03-10T10:10:10.000Z'))",
+        attributes: {}
+      }
+    });
+
+    const normalized = normalizeEvent(event);
+
+    expect(normalized.normalized_message).toContain("duplicate key value violates unique constraint");
+    expect(normalized.normalized_message).toContain("(Connection: pgsql, SQL: insert into \"users\"");
+    expect(normalized.normalized_message).not.toContain("jane@example.com");
+    expect(normalized.normalized_message).not.toContain("usr_29QkY4P8PzK4q8v7mJ2JfL1j");
+    expect(normalized.normalized_message).not.toContain("2026-03-10T10:10:10.000Z");
+    expect(normalized.normalized_message).toContain("{dynamic}");
+  });
+
   it("should select application stack frames from escaped-newline stacks and drop vendor frames", (): void => {
     const event = createEventEnvelope({
       event_type: "backend_exception",

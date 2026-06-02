@@ -4,20 +4,76 @@ import {
   getSystemEmailReviewEntry,
   type SystemEmailReviewEntry
 } from "../../../../packages/email/src/system-email-review.js";
+import { buildEmailBrandMarkUrl } from "../../../../packages/email/src/index.js";
 import type { ApiDependencies } from "../api-types.js";
 import { requireRateLimitedOwnerMemberAuth } from "../api-helpers.js";
 import { SendSystemEmailPreviewBodySchema } from "../schemas.js";
 
 const SYSTEM_EMAIL_PREVIEW_MIRROR_RECIPIENTS = ["owenfar1@gmail.com"] as const;
+const SYSTEM_EMAIL_PREVIEW_SAMPLE_APP_BASE_URL = "https://app.debugbundle.local";
+const SYSTEM_EMAIL_PREVIEW_SAMPLE_BRAND_MARK_URL = `${SYSTEM_EMAIL_PREVIEW_SAMPLE_APP_BASE_URL}/email/debugbundle-mark.png`;
 
 function isSystemEmailReviewEnabled(env: Record<string, string | undefined>): boolean {
   return env["NODE_ENV"] !== "production";
 }
 
+function readNonEmptyEnv(env: Record<string, string | undefined>, key: string): string | undefined {
+  const value = env[key]?.trim();
+  return value === undefined || value.length === 0 ? undefined : value;
+}
+
+function stripTrailingSlash(value: string): string {
+  return value.replace(/\/+$/, "");
+}
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function resolvePreviewAppBaseUrl(env: Record<string, string | undefined>): string | undefined {
+  const value = readNonEmptyEnv(env, "APP_BASE_URL");
+  return value === undefined ? undefined : stripTrailingSlash(value);
+}
+
+function resolvePreviewEmailAssetBaseUrl(env: Record<string, string | undefined>): string | undefined {
+  const value =
+    readNonEmptyEnv(env, "EMAIL_ASSET_BASE_URL")
+    ?? readNonEmptyEnv(env, "APP_BASE_URL")
+    ?? readNonEmptyEnv(env, "PUBLIC_SITE_URL");
+  return value === undefined ? undefined : stripTrailingSlash(value);
+}
+
 function resolvePreviewMessage(
-  entry: SystemEmailReviewEntry
+  entry: SystemEmailReviewEntry,
+  env: Record<string, string | undefined>
 ): { subject: string; text: string; html: string } | null {
-  return entry.preview === undefined ? null : entry.preview;
+  if (entry.preview === undefined) {
+    return null;
+  }
+
+  const appBaseUrl = resolvePreviewAppBaseUrl(env);
+  const assetBaseUrl = resolvePreviewEmailAssetBaseUrl(env);
+  const brandMarkUrl = buildEmailBrandMarkUrl(assetBaseUrl);
+
+  const html = entry.preview.html
+    .replace(
+      new RegExp(escapeRegExp(SYSTEM_EMAIL_PREVIEW_SAMPLE_BRAND_MARK_URL), "g"),
+      brandMarkUrl ?? SYSTEM_EMAIL_PREVIEW_SAMPLE_BRAND_MARK_URL
+    )
+    .replace(
+      new RegExp(escapeRegExp(SYSTEM_EMAIL_PREVIEW_SAMPLE_APP_BASE_URL), "g"),
+      appBaseUrl ?? SYSTEM_EMAIL_PREVIEW_SAMPLE_APP_BASE_URL
+    );
+  const text = entry.preview.text.replace(
+    new RegExp(escapeRegExp(SYSTEM_EMAIL_PREVIEW_SAMPLE_APP_BASE_URL), "g"),
+    appBaseUrl ?? SYSTEM_EMAIL_PREVIEW_SAMPLE_APP_BASE_URL
+  );
+
+  return {
+    subject: entry.preview.subject,
+    text,
+    html
+  };
 }
 
 function resolvePreviewRecipients(ownerEmail: string): string[] {
@@ -67,7 +123,7 @@ export function registerSystemEmailReviewRoutes(
       return reply.status(404).send({ error: "system_email_preview_not_found" });
     }
 
-    const message = resolvePreviewMessage(entry);
+    const message = resolvePreviewMessage(entry, env);
     if (message === null) {
       return reply.status(404).send({ error: "system_email_preview_unavailable" });
     }

@@ -70,13 +70,145 @@ const ISO_TIMESTAMP_PATTERN = /\b\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z\
 const IPV4_PATTERN = /\b(?:\d{1,3}\.){3}\d{1,3}\b/g;
 const HEX_PATTERN = /\b0x[0-9a-f]+\b/gi;
 const BARE_HEX_PATTERN = /\b(?=[0-9a-f]{8,}\b)(?=[0-9a-f]*[a-f])[0-9a-f]+\b/gi;
+const LONG_ALPHANUMERIC_TOKEN_PATTERN = /\b(?=[A-Za-z0-9_-]{16,}\b)(?=[A-Za-z0-9_-]*[A-Za-z])(?=[A-Za-z0-9_-]*\d)[A-Za-z0-9_-]+\b/g;
 const LARGE_NUMBER_PATTERN = /\b\d{2,}\b/g;
 
 const DYNAMIC_SEGMENT_PATTERN = /^(?:\d+|[0-9a-f]{8}-[0-9a-f-]{27}|[A-Za-z0-9_-]{24,})$/;
 
 const FRAME_NOISE_PATTERNS = ["node_modules/", "vendor/", "site-packages/", ".venv/"];
 
-function normalizeMessage(message: string): string {
+type KnownDatabaseMessageFamily = {
+  summary: string;
+  when: (lowerMessage: string) => boolean;
+};
+
+const KNOWN_DATABASE_MESSAGE_FAMILIES: KnownDatabaseMessageFamily[] = [
+  {
+    summary: "PostgreSQL access rejected by pg_hba.conf",
+    when: (message) => looksLikePostgresMessage(message) && message.includes("pg_hba.conf")
+  },
+  {
+    summary: "PostgreSQL authentication failed",
+    when: (message) =>
+      looksLikePostgresMessage(message) &&
+      (message.includes("password authentication failed") || message.includes("authentication failed for user"))
+  },
+  {
+    summary: "PostgreSQL host resolution failed",
+    when: (message) =>
+      looksLikePostgresMessage(message) &&
+      (message.includes("could not translate host name") || message.includes("getaddrinfo enotfound"))
+  },
+  {
+    summary: "PostgreSQL connection timed out",
+    when: (message) =>
+      looksLikePostgresMessage(message) &&
+      (message.includes("connection timed out") || message.includes("timeout expired") || message.includes("etimedout"))
+  },
+  {
+    summary: "PostgreSQL connection limit reached",
+    when: (message) =>
+      looksLikePostgresMessage(message) &&
+      (message.includes("too many connections") || message.includes("remaining connection slots are reserved"))
+  },
+  {
+    summary: "PostgreSQL database does not exist",
+    when: (message) => looksLikePostgresMessage(message) && message.includes("does not exist")
+  },
+  {
+    summary: "PostgreSQL connection refused",
+    when: (message) => looksLikePostgresMessage(message) && message.includes("connection refused")
+  },
+  {
+    summary: "MySQL authentication failed",
+    when: (message) =>
+      looksLikeMySqlMessage(message) &&
+      (message.includes("access denied for user") || message.includes("authentication failed"))
+  },
+  {
+    summary: "MySQL connection refused",
+    when: (message) =>
+      looksLikeMySqlMessage(message) &&
+      (message.includes("connection refused") || message.includes("can't connect to mysql server"))
+  },
+  {
+    summary: "MySQL connection dropped",
+    when: (message) => looksLikeMySqlMessage(message) && message.includes("server has gone away")
+  },
+  {
+    summary: "MySQL connection limit reached",
+    when: (message) => looksLikeMySqlMessage(message) && message.includes("too many connections")
+  },
+  {
+    summary: "MySQL database does not exist",
+    when: (message) => looksLikeMySqlMessage(message) && message.includes("unknown database")
+  },
+  {
+    summary: "MongoDB authentication failed",
+    when: (message) => looksLikeMongoMessage(message) && message.includes("authentication failed")
+  },
+  {
+    summary: "MongoDB host resolution failed",
+    when: (message) =>
+      looksLikeMongoMessage(message) && (message.includes("getaddrinfo enotfound") || message.includes("ename not found"))
+  },
+  {
+    summary: "MongoDB connection timed out",
+    when: (message) =>
+      looksLikeMongoMessage(message) &&
+      (message.includes("connection timed out") || message.includes("etimedout") || message.includes("server selection timed out"))
+  },
+  {
+    summary: "MongoDB connection refused",
+    when: (message) => looksLikeMongoMessage(message) && message.includes("connection refused")
+  },
+  {
+    summary: "Redis authentication failed",
+    when: (message) => looksLikeRedisMessage(message) && message.includes("wrongpass")
+  },
+  {
+    summary: "Redis replica is read-only",
+    when: (message) => looksLikeRedisMessage(message) && message.includes("readonly")
+  },
+  {
+    summary: "Redis host resolution failed",
+    when: (message) =>
+      looksLikeRedisMessage(message) && (message.includes("getaddrinfo enotfound") || message.includes("ename not found"))
+  },
+  {
+    summary: "Redis connection timed out",
+    when: (message) =>
+      looksLikeRedisMessage(message) &&
+      (message.includes("connection timed out") || message.includes("etimedout") || message.includes("timeout"))
+  },
+  {
+    summary: "Redis connection refused",
+    when: (message) => looksLikeRedisMessage(message) && message.includes("connection refused")
+  }
+];
+
+function looksLikePostgresMessage(message: string): boolean {
+  return (
+    message.includes("postgres") ||
+    message.includes("pgsql") ||
+    message.includes("pg_hba.conf") ||
+    message.includes("connection to server at")
+  );
+}
+
+function looksLikeMySqlMessage(message: string): boolean {
+  return message.includes("mysql") || message.includes("mariadb");
+}
+
+function looksLikeMongoMessage(message: string): boolean {
+  return message.includes("mongodb") || message.includes("mongoserver") || message.includes("mongo");
+}
+
+function looksLikeRedisMessage(message: string): boolean {
+  return message.includes("redis");
+}
+
+function normalizeScalarTokens(message: string): string {
   return message
     .replace(UUID_PATTERN, "{dynamic}")
     .replace(EMAIL_PATTERN, "{dynamic}")
@@ -84,7 +216,33 @@ function normalizeMessage(message: string): string {
     .replace(IPV4_PATTERN, "{dynamic}")
     .replace(HEX_PATTERN, "{dynamic}")
     .replace(BARE_HEX_PATTERN, "{dynamic}")
+    .replace(LONG_ALPHANUMERIC_TOKEN_PATTERN, "{dynamic}")
     .replace(LARGE_NUMBER_PATTERN, "{dynamic}");
+}
+
+function collapseWhitespace(message: string): string {
+  return message.replace(/\s+/g, " ").trim();
+}
+
+function normalizeKnownDatabaseMessage(message: string): string | null {
+  const lowerMessage = message.toLowerCase();
+
+  for (const family of KNOWN_DATABASE_MESSAGE_FAMILIES) {
+    if (family.when(lowerMessage)) {
+      return family.summary;
+    }
+  }
+
+  return null;
+}
+
+function normalizeMessage(message: string): string {
+  const knownDatabaseMessage = normalizeKnownDatabaseMessage(message);
+  if (knownDatabaseMessage !== null) {
+    return knownDatabaseMessage;
+  }
+
+  return collapseWhitespace(normalizeScalarTokens(message));
 }
 
 function normalizeRoute(path: string | null): string | null {

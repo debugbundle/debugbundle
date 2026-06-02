@@ -73,7 +73,9 @@ describe("api system email review route", () => {
       },
       {
         dogfoodingEnv: {
-          NODE_ENV: "development"
+          NODE_ENV: "development",
+          APP_BASE_URL: "https://app.debugbundle.test",
+          PUBLIC_SITE_URL: "https://debugbundle.test"
         }
       }
     );
@@ -108,7 +110,9 @@ describe("api system email review route", () => {
     expect(sentMessage.html).toContain(
       'class="db-email-card-content" style="padding-left:28px;padding-right:28px;vertical-align:top;">'
     );
-    expect(sentMessage.html).toContain('src="https://app.debugbundle.local/email/debugbundle-mark.png"');
+    expect(sentMessage.html).toContain('src="https://app.debugbundle.test/email/debugbundle-mark.png"');
+    expect(sentMessage.html).toContain("https://app.debugbundle.test/billing");
+    expect(sentMessage.html).not.toContain("https://app.debugbundle.local/");
     expect(sentMessage.html).not.toContain("@media only screen and (min-width:");
   });
 

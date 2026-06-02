@@ -137,8 +137,8 @@ export function readNonEmptyEnv(env: Record<string, string | undefined>, key: st
 
 function resolveEmailAssetBaseUrl(env: Record<string, string | undefined>): string | undefined {
   return readNonEmptyEnv(env, "EMAIL_ASSET_BASE_URL")
-    ?? readNonEmptyEnv(env, "PUBLIC_SITE_URL")
-    ?? readNonEmptyEnv(env, "APP_BASE_URL");
+    ?? readNonEmptyEnv(env, "APP_BASE_URL")
+    ?? readNonEmptyEnv(env, "PUBLIC_SITE_URL");
 }
 
 export function readCsvEnv(env: Record<string, string | undefined>, key: string): string[] | undefined {
