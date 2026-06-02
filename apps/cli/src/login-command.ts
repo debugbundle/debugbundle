@@ -253,8 +253,6 @@ function mapApiErrorToMessage(error: LoginApiError): string {
       return "GitHub device authorization was rejected.";
     case "github_email_unavailable":
       return "GitHub did not provide a verified primary email address.";
-    case "account_signup_disabled":
-      return "This DebugBundle workspace does not allow new account signups for this GitHub identity.";
     case "account_suspended":
       return "This DebugBundle account is suspended.";
     case "rate_limited":

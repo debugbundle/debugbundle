@@ -403,8 +403,8 @@ describe("cli login command", () => {
       "GitHub device authorization expired."
     ],
     [
-      { status: "rejected", reason: "account_signup_disabled", expires_at: "2026-03-16T00:15:00.000Z" },
-      "GitHub device authorization was rejected: account_signup_disabled"
+      { status: "rejected", reason: "provider_error", expires_at: "2026-03-16T00:15:00.000Z" },
+      "GitHub device authorization was rejected: provider_error"
     ]
   ])("handles device flow terminal status %j", async (pollBody, expectedOutput) => {
     const fetchImpl = vi
@@ -443,7 +443,6 @@ describe("cli login command", () => {
   it.each([
     [503, "auth_not_configured", "GitHub login is not configured on this DebugBundle API.", "githubCli", 1],
     [400, "github_email_unavailable", "GitHub did not provide a verified primary email address.", "githubCli", 1],
-    [403, "account_signup_disabled", "This DebugBundle workspace does not allow new account signups for this GitHub identity.", "githubCli", 4],
     [403, "account_suspended", "This DebugBundle account is suspended.", "githubCli", 4],
     [429, "rate_limited", "GitHub login was rate limited. Please wait and try again.", "githubCli", 1],
     [404, "github_device_request_not_found", "GitHub device authorization request was not found.", "githubDevice", 1],

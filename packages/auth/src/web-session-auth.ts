@@ -131,7 +131,6 @@ export type CompleteGitHubAuthResult =
         | "provider_not_configured"
         | "invalid_oauth_state"
         | "oauth_exchange_failed"
-        | "account_signup_disabled"
         | "account_suspended";
       redirect_url?: string;
     };
@@ -139,7 +138,6 @@ export type CompleteGitHubAuthResult =
 export interface WebSessionAuthServiceOptions {
   sessionLifetimeMs?: number;
   emailAuthCodeLifetimeMs?: number;
-  signupEmailAllowlist?: readonly string[];
   authEmails?: AuthEmailSender;
   githubOAuth?: GitHubOAuthConfig;
 }
@@ -256,23 +254,10 @@ export function createWebSessionAuthService(
 ): WebSessionAuthService {
   const sessionLifetimeMs = options.sessionLifetimeMs ?? DEFAULT_SESSION_LIFETIME_MS;
   const emailAuthCodeLifetimeMs = options.emailAuthCodeLifetimeMs ?? DEFAULT_EMAIL_AUTH_CODE_LIFETIME_MS;
-  const signupEmailAllowlist =
-    options.signupEmailAllowlist === undefined
-      ? null
-      : new Set(options.signupEmailAllowlist.map((email) => normalizeEmail(email)).filter((email) => email.length > 0));
-
-  function isNewAccountSignupAllowed(email: string): boolean {
-    return signupEmailAllowlist === null || signupEmailAllowlist.has(email);
-  }
 
   return {
     async requestEmailCode(input): Promise<RequestEmailCodeResult> {
       const normalizedEmail = normalizeEmail(input.email);
-      const existingAccount = await store.findUserAccountByEmail(normalizedEmail);
-      if (existingAccount === null && !isNewAccountSignupAllowed(normalizedEmail)) {
-        return { ok: true, code_sent: false };
-      }
-
       const now = input.now ?? new Date();
       const authCode = generateEmailAuthCode();
       await store.replaceEmailAuthChallenge({
@@ -310,7 +295,7 @@ export function createWebSessionAuthService(
       let createdUser = false;
 
       if (account === null) {
-        if (consumed.accepted_terms_at === null || !isNewAccountSignupAllowed(normalizedEmail)) {
+        if (consumed.accepted_terms_at === null) {
           return {
             ok: false,
             error: "invalid_code"
@@ -445,21 +430,13 @@ export function createWebSessionAuthService(
         store,
         identity,
         verified_at: now.toISOString(),
-        ...(statePayload.accepted_terms_at === undefined ? {} : { accepted_terms_at: statePayload.accepted_terms_at }),
-        isNewAccountSignupAllowed
+        ...(statePayload.accepted_terms_at === undefined ? {} : { accepted_terms_at: statePayload.accepted_terms_at })
       });
-      if (!resolvedAccount.ok) {
-        return {
-          ok: false,
-          error: "account_signup_disabled",
-          redirect_url: buildGithubAppRedirectUrl(githubOAuth.appRedirectUrl, "signup_disabled")
-        };
-      }
 
       const sessionToken = generateSessionToken();
       const session = await store.createSession({
-        user_id: resolvedAccount.account.user_id,
-        organization_id: resolvedAccount.account.organization_id,
+        user_id: resolvedAccount.user_id,
+        organization_id: resolvedAccount.organization_id,
         session_token_hash: hashToken(sessionToken),
         expires_at: new Date(now.getTime() + sessionLifetimeMs).toISOString()
       });
@@ -476,7 +453,7 @@ export function createWebSessionAuthService(
         session_token: sessionToken,
         session,
         redirect_url: githubOAuth.appRedirectUrl,
-        created_user: resolvedAccount.account.created_user,
+        created_user: resolvedAccount.created_user,
         accepted_terms_at: statePayload.accepted_terms_at ?? null,
         ...(typeof identity.avatar_url === "string" && identity.avatar_url.length > 0
           ? { avatar_url: identity.avatar_url }

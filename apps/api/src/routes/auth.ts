@@ -698,7 +698,7 @@ export function registerAuthRoutes(app: FastifyInstance, dependencies: ApiDepend
           ? 503
           : exchanged.error === "oauth_exchange_failed"
             ? 401
-            : exchanged.error === "account_signup_disabled" || exchanged.error === "account_suspended"
+            : exchanged.error === "account_suspended"
               ? 403
               : 400;
 

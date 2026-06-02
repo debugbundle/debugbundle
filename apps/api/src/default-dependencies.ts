@@ -97,7 +97,6 @@ export interface CreateApiDependenciesInput {
   frequencyCounter?: IncidentFrequencyCounter;
   ingestionRateLimiter?: IngestionRateLimiter;
   authRateLimiter?: AuthRateLimiter;
-  signupEmailAllowlist?: string[];
   billingAdminEmails?: string[];
   authEmails?: AuthEmailSender;
   billingEmails?: BillingEmailService;
@@ -468,10 +467,6 @@ function createGithubOAuthConfigFromEnv(env: Record<string, string | undefined>)
       }
     }
   };
-}
-
-function readSignupEmailAllowlistFromEnv(env: Record<string, string | undefined>): string[] | undefined {
-  return readCsvEnv(env, "AUTH_SIGNUP_ALLOWED_EMAILS");
 }
 
 export function normalizeEmailForConfig(email: string): string {
@@ -948,17 +943,14 @@ export function createApiDependencies(input: CreateApiDependenciesInput): {
       accepted_at: string;
     }) => metadataStore.acceptProjectInviteForUser!(request)
   };
-  const signupEmailAllowlist = input.signupEmailAllowlist;
   const webAuth = createWebSessionAuthService(
     webAuthStore,
     {
-      ...(signupEmailAllowlist === undefined ? {} : { signupEmailAllowlist }),
       ...(input.authEmails === undefined ? {} : { authEmails: input.authEmails }),
       ...(input.githubOAuth === undefined ? {} : { githubOAuth: input.githubOAuth })
     }
   );
   const githubCliAuth = createGitHubCliAuthService(authStore, {
-    ...(signupEmailAllowlist === undefined ? {} : { signupEmailAllowlist }),
     ...(input.githubOAuth === undefined ? {} : { githubOAuth: input.githubOAuth })
   });
   const operationalEmailDelivery = createPostgresOperationalEmailDeliveryStore(input.db);
@@ -2326,7 +2318,6 @@ export function createApiDependenciesFromEnv(env: Record<string, string | undefi
   const githubAppClient = createGitHubAppClientFromEnv(env);
   const lifecycleWebhookFallbackTargetUrl = readNonEmptyEnv(env, "LIFECYCLE_WEBHOOK_TARGET_URL");
   const lifecycleWebhookFallbackSigningSecret = readNonEmptyEnv(env, "LIFECYCLE_WEBHOOK_SECRET");
-  const signupEmailAllowlist = readSignupEmailAllowlistFromEnv(env);
   const billingAdminEmails = readBillingAdminEmailsFromEnv(env);
 
   const authRateLimiter = createRedisAuthRateLimiter({
@@ -2347,7 +2338,6 @@ export function createApiDependenciesFromEnv(env: Record<string, string | undefi
     ...(billingEmails === undefined ? {} : { billingEmails }),
     ...(githubOAuth === undefined ? {} : { githubOAuth }),
     ...(githubAppClient === undefined ? {} : { githubAppClient }),
-    ...(signupEmailAllowlist === undefined ? {} : { signupEmailAllowlist }),
     ...(billingAdminEmails === undefined ? {} : { billingAdminEmails }),
     ...(stripeConfig === undefined ? {} : { stripeConfig }),
     ...(lifecycleWebhookFallbackTargetUrl === undefined ? {} : { lifecycleWebhookFallbackTargetUrl }),

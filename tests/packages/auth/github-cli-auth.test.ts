@@ -383,35 +383,16 @@ describe("github cli auth service", () => {
       error: "github_email_unavailable",
     });
 
-    const signupDisabledService = createGitHubCliAuthService(
-      createStore({
-        upsertGitHubUserAccount: vi.fn(),
-      }),
-      {
-        signupEmailAllowlist: ["allowlisted@example.com"],
-        githubOAuth: createGithubOAuth({
-          resolveIdentityFromAccessToken: vi.fn().mockResolvedValue({
-            ok: true,
-            identity: {
-              github_user_id: "ghu_123",
-              email: "outsider@example.com",
-            },
-          }),
-        }),
-      }
-    );
-    await expect(
-      signupDisabledService.exchangeGitHubAccessToken({
-        github_access_token: "gho_123",
-        label: "GitHub bootstrap",
-        accepted_terms_at: "2026-03-17T00:00:00.000Z",
-      })
-    ).resolves.toEqual({
-      ok: false,
-      error: "account_signup_disabled",
-    });
-
     const successStore = createStore({
+      findUserAccountByEmail: vi.fn().mockResolvedValue(null),
+      upsertGitHubUserAccount: vi.fn().mockResolvedValue({
+        user_id: "usr_123",
+        email: "outsider@example.com",
+        email_verified_at: "2026-03-17T00:00:00.000Z",
+        organization_id: "org_123",
+        role: "owner",
+        created_user: true,
+      }),
       issueMemberTokenForUser: vi.fn().mockResolvedValue({
         token_id: "tok_123",
         user_id: "usr_123",
@@ -424,7 +405,15 @@ describe("github cli auth service", () => {
       }),
     });
     const successService = createGitHubCliAuthService(successStore, {
-      githubOAuth: createGithubOAuth(),
+      githubOAuth: createGithubOAuth({
+        resolveIdentityFromAccessToken: vi.fn().mockResolvedValue({
+          ok: true,
+          identity: {
+            github_user_id: "ghu_123",
+            email: "outsider@example.com",
+          },
+        }),
+      }),
     });
     const exchanged = await successService.exchangeGitHubAccessToken({
       github_access_token: "gho_123",
@@ -436,7 +425,7 @@ describe("github cli auth service", () => {
     expect(exchanged.ok).toBe(true);
     if (exchanged.ok) {
       expect(exchanged.token.plaintext.startsWith("dbundle_mem_")).toBe(true);
-      expect(exchanged.created_user).toBe(false);
+      expect(exchanged.created_user).toBe(true);
     }
   });
 });

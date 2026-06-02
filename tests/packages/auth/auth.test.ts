@@ -197,7 +197,7 @@ describe("auth email-code and session primitives", () => {
     expect(readCookieValue("theme=light; broken-entry", SESSION_COOKIE_NAME)).toBeNull();
   });
 
-  it("requests an email code for allowlisted addresses and sends the OTP email", async (): Promise<void> => {
+  it("requests an email code for new accounts and sends the OTP email", async (): Promise<void> => {
     const now = new Date("2026-03-16T00:00:00.000Z");
     const replaceEmailAuthChallenge = vi.fn().mockResolvedValue({
       challenge_id: "challenge_123",
@@ -222,7 +222,6 @@ describe("auth email-code and session primitives", () => {
         acceptProjectInvite: vi.fn()
       },
       {
-        signupEmailAllowlist: ["owen@example.com"],
         authEmails: {
           sendEmailAuthCode,
           sendProjectInviteEmail: vi.fn().mockResolvedValue(undefined)
@@ -252,43 +251,7 @@ describe("auth email-code and session primitives", () => {
     });
   });
 
-  it("does not send a code for non-allowlisted new accounts", async (): Promise<void> => {
-    const replaceEmailAuthChallenge = vi.fn();
-    const sendEmailAuthCode = vi.fn();
-    const service = createWebSessionAuthService(
-      {
-        findUserAccountByEmail: vi.fn().mockResolvedValue(null),
-        createUserAccount: vi.fn(),
-        createSession: vi.fn(),
-        resolveSessionByTokenHash: vi.fn(),
-        revokeSessionByTokenHash: vi.fn(),
-        revokeOtherSessionsForUser: vi.fn().mockResolvedValue(0),
-        markUserEmailVerified: vi.fn(),
-        replaceEmailAuthChallenge,
-        consumeEmailAuthChallenge: vi.fn(),
-        upsertGitHubUserAccount: vi.fn(),
-        acceptProjectInvite: vi.fn()
-      },
-      {
-        signupEmailAllowlist: ["allowlisted@example.com"],
-        authEmails: {
-          sendEmailAuthCode,
-          sendProjectInviteEmail: vi.fn().mockResolvedValue(undefined)
-        }
-      }
-    );
-
-    const result = await service.requestEmailCode({
-      email: "outsider@example.com",
-      accepted_terms_at: "2026-03-16T00:00:00.000Z"
-    });
-
-    expect(result).toEqual({ ok: true, code_sent: false });
-    expect(replaceEmailAuthChallenge).not.toHaveBeenCalled();
-    expect(sendEmailAuthCode).not.toHaveBeenCalled();
-  });
-
-  it("verifies a code, creates an allowlisted account, and issues a verified session", async (): Promise<void> => {
+  it("verifies a code, creates a new account, and issues a verified session", async (): Promise<void> => {
     const now = new Date("2026-03-16T00:00:00.000Z");
     const findUserAccountByEmail = vi.fn().mockResolvedValueOnce(null);
     const createUserAccount = vi.fn().mockResolvedValue({
@@ -329,9 +292,6 @@ describe("auth email-code and session primitives", () => {
         consumeEmailAuthChallenge,
         upsertGitHubUserAccount: vi.fn(),
         acceptProjectInvite: vi.fn()
-      },
-      {
-        signupEmailAllowlist: ["owen@example.com"]
       }
     );
 
@@ -402,9 +362,6 @@ describe("auth email-code and session primitives", () => {
         }),
         upsertGitHubUserAccount: vi.fn(),
         acceptProjectInvite: vi.fn()
-      },
-      {
-        signupEmailAllowlist: ["owen@example.com"]
       }
     );
 
@@ -632,28 +589,47 @@ describe("auth email-code and session primitives", () => {
     expect(buildClearedSessionCookie()).toContain("Max-Age=0");
   });
 
-  it("rejects GitHub signup for non-allowlisted new accounts", async (): Promise<void> => {
+  it("creates a GitHub-backed account for a new user", async (): Promise<void> => {
     const exchangeCodeForIdentity = vi.fn().mockResolvedValue({
       github_user_id: "ghu_999",
       email: "outsider@example.com"
+    });
+    const upsertGitHubUserAccount = vi.fn().mockResolvedValue({
+      user_id: "usr_999",
+      email: "outsider@example.com",
+      email_verified_at: "2026-03-17T00:00:00.000Z",
+      organization_id: "org_999",
+      role: "owner",
+      created_user: true
     });
     const service = createWebSessionAuthService(
       {
         findUserAccountByEmail: vi.fn().mockResolvedValue(null),
         findGitHubUserAccountByProviderUserId: vi.fn().mockResolvedValue(null),
         createUserAccount: vi.fn(),
-        createSession: vi.fn(),
+        createSession: vi.fn().mockResolvedValue({
+          session_id: "ses_999",
+          user_id: "usr_999",
+          email: "outsider@example.com",
+          email_verified_at: "2026-03-17T00:00:00.000Z",
+          organization_id: "org_999",
+          role: "owner",
+          created_at: "2026-03-17T00:00:00.000Z",
+          expires_at: "2026-03-24T00:00:00.000Z",
+          revoked_at: null,
+          has_email_auth: false,
+          has_github_oauth: true
+        }),
         resolveSessionByTokenHash: vi.fn(),
         revokeSessionByTokenHash: vi.fn(),
         revokeOtherSessionsForUser: vi.fn().mockResolvedValue(0),
         markUserEmailVerified: vi.fn(),
         replaceEmailAuthChallenge: vi.fn(),
         consumeEmailAuthChallenge: vi.fn(),
-        upsertGitHubUserAccount: vi.fn(),
+        upsertGitHubUserAccount,
         acceptProjectInvite: vi.fn()
       },
       {
-        signupEmailAllowlist: ["owen@example.com"],
         githubOAuth: {
           clientId: "debugbundle-dev-mock-github",
           callbackUrl: "http://localhost:5291/v1/auth/github/callback",
@@ -670,17 +646,98 @@ describe("auth email-code and session primitives", () => {
       return;
     }
 
-    await expect(
-      service.completeGithubAuth({
-        code: "oauth-code",
-        state: started.state,
-        stateCookieValue: started.state,
-        now
-      })
-    ).resolves.toEqual({
-      ok: false,
-      error: "account_signup_disabled",
-      redirect_url: "http://localhost:5291/auth/github/callback?error=signup_disabled"
+    const completed = await service.completeGithubAuth({
+      code: "oauth-code",
+      state: started.state,
+      stateCookieValue: started.state,
+      now
+    });
+
+    expect(completed.ok).toBe(true);
+    if (!completed.ok) {
+      return;
+    }
+    expect(completed.created_user).toBe(true);
+    expect(upsertGitHubUserAccount).toHaveBeenCalledWith({
+      github_user_id: "ghu_999",
+      email: "outsider@example.com",
+      verified_at: now.toISOString(),
+      accepted_terms_at: now.toISOString()
+    });
+  });
+
+  it("completes GitHub auth without forwarding absent accepted terms state", async (): Promise<void> => {
+    const exchangeCodeForIdentity = vi.fn().mockResolvedValue({
+      github_user_id: "ghu_124",
+      email: "owen@example.com"
+    });
+    const upsertGitHubUserAccount = vi.fn().mockResolvedValue({
+      user_id: "usr_124",
+      email: "owen@example.com",
+      email_verified_at: "2026-03-17T00:00:00.000Z",
+      organization_id: "org_124",
+      role: "owner",
+      created_user: false
+    });
+    const service = createWebSessionAuthService(
+      {
+        findUserAccountByEmail: vi.fn(),
+        findGitHubUserAccountByProviderUserId: vi.fn(),
+        createUserAccount: vi.fn(),
+        createSession: vi.fn().mockResolvedValue({
+          session_id: "ses_124",
+          user_id: "usr_124",
+          email: "owen@example.com",
+          email_verified_at: "2026-03-17T00:00:00.000Z",
+          organization_id: "org_124",
+          role: "owner",
+          created_at: "2026-03-17T00:00:00.000Z",
+          expires_at: "2026-03-24T00:00:00.000Z",
+          revoked_at: null,
+          has_email_auth: false,
+          has_github_oauth: true
+        }),
+        resolveSessionByTokenHash: vi.fn(),
+        revokeSessionByTokenHash: vi.fn(),
+        revokeOtherSessionsForUser: vi.fn().mockResolvedValue(0),
+        markUserEmailVerified: vi.fn(),
+        replaceEmailAuthChallenge: vi.fn(),
+        consumeEmailAuthChallenge: vi.fn(),
+        upsertGitHubUserAccount,
+        acceptProjectInvite: vi.fn()
+      },
+      {
+        githubOAuth: {
+          clientId: "debugbundle-dev-mock-github",
+          callbackUrl: "http://localhost:5291/v1/auth/github/callback",
+          appRedirectUrl: "http://localhost:5291/auth/github/callback",
+          stateSecret: "github-oauth-secret",
+          client: createGitHubOAuthClientMock({ exchangeCodeForIdentity })
+        }
+      }
+    );
+    const now = new Date("2026-03-17T00:00:00.000Z");
+    const started = await service.beginGithubAuth({ now });
+    expect(started.ok).toBe(true);
+    if (!started.ok) {
+      return;
+    }
+
+    const completed = await service.completeGithubAuth({
+      code: "oauth-code",
+      state: started.state,
+      stateCookieValue: started.state,
+      now
+    });
+
+    expect(completed).toMatchObject({
+      ok: true,
+      accepted_terms_at: null
+    });
+    expect(upsertGitHubUserAccount).toHaveBeenCalledWith({
+      github_user_id: "ghu_124",
+      email: "owen@example.com",
+      verified_at: now.toISOString()
     });
   });
 

@@ -989,7 +989,7 @@ describe("api auth routes", () => {
         exchangeGitHubAccessToken: vi
           .fn()
           .mockResolvedValueOnce({ ok: false, error: "provider_not_configured" })
-          .mockResolvedValueOnce({ ok: false, error: "account_signup_disabled" })
+          .mockResolvedValueOnce({ ok: false, error: "account_suspended" })
       }
     });
     const exchangeNotConfigured = await exchangeApp.inject({
@@ -1001,7 +1001,7 @@ describe("api auth routes", () => {
         accepted_terms: true
       }
     });
-    const exchangeSignupDisabled = await exchangeApp.inject({
+    const exchangeSuspended = await exchangeApp.inject({
       method: "POST",
       url: "/v1/auth/github/token/exchange",
       payload: {
@@ -1027,8 +1027,8 @@ describe("api auth routes", () => {
     expect(claimRejected.json()).toEqual({ error: "github_device_auth_rejected" });
     expect(exchangeNotConfigured.statusCode).toBe(503);
     expect(exchangeNotConfigured.json()).toEqual({ error: "auth_not_configured" });
-    expect(exchangeSignupDisabled.statusCode).toBe(403);
-    expect(exchangeSignupDisabled.json()).toEqual({ error: "account_signup_disabled" });
+    expect(exchangeSuspended.statusCode).toBe(403);
+    expect(exchangeSuspended.json()).toEqual({ error: "account_suspended" });
   });
 
   it("returns terminal device poll states without collapsing their reasons", async (): Promise<void> => {
@@ -1056,7 +1056,7 @@ describe("api auth routes", () => {
           .mockResolvedValueOnce({
             ok: true,
             status: "rejected",
-            reason: "account_signup_disabled",
+            reason: "provider_error",
             expires_at: "2026-03-16T00:15:00.000Z"
           })
       }
@@ -1086,7 +1086,7 @@ describe("api auth routes", () => {
     expect(claimed.json()).toEqual({ status: "claimed", expires_at: "2026-03-16T00:15:00.000Z" });
     expect(denied.json()).toEqual({ status: "denied", reason: "access_denied", expires_at: "2026-03-16T00:15:00.000Z" });
     expect(expired.json()).toEqual({ status: "expired", reason: "expired_token", expires_at: "2026-03-16T00:15:00.000Z" });
-    expect(rejected.json()).toEqual({ status: "rejected", reason: "account_signup_disabled", expires_at: "2026-03-16T00:15:00.000Z" });
+    expect(rejected.json()).toEqual({ status: "rejected", reason: "provider_error", expires_at: "2026-03-16T00:15:00.000Z" });
   });
 
   it("records bootstrap audit metadata when github token exchange creates a new user", async (): Promise<void> => {

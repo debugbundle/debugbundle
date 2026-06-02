@@ -8,7 +8,8 @@ const targetPaths = [
   path.join(repoRoot, "sdks", "debugbundle-js", "tests", "fixtures", "relay-compliance.json"),
   path.join(repoRoot, "sdks", "debugbundle-python", "tests", "fixtures", "relay-compliance.json"),
   path.join(repoRoot, "sdks", "debugbundle-php", "tests", "fixtures", "relay-compliance.json"),
-  path.join(repoRoot, "sdks", "debugbundle-wordpress", "tests", "fixtures", "relay-compliance.json")
+  path.join(repoRoot, "sdks", "debugbundle-wordpress", "tests", "fixtures", "relay-compliance.json"),
+  path.join(repoRoot, "sdks", "debugbundle-java", "tests", "fixtures", "relay-compliance.json")
 ];
 
 const sourceContents = await readFile(sourcePath, "utf8");

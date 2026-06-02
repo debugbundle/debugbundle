@@ -9,8 +9,7 @@ import {
   type GitHubUserAccountResult,
   type IssuedMemberTokenRecord,
   type WebUserAccount,
-  generateMemberToken,
-  normalizeEmail
+  generateMemberToken
 } from "./primitives.js";
 
 const DEFAULT_GITHUB_DEVICE_SCOPE = "read:user user:email";
@@ -120,7 +119,7 @@ export type PollGitHubDeviceAuthResult =
   | {
       ok: true;
       status: "rejected";
-      reason: "github_email_unavailable" | "account_signup_disabled" | "account_suspended" | "provider_error";
+      reason: "github_email_unavailable" | "account_suspended" | "provider_error";
       expires_at: string;
     }
   | {
@@ -150,7 +149,6 @@ export type ExchangeGitHubAccessTokenResult =
         | "provider_not_configured"
         | "oauth_exchange_failed"
         | "github_email_unavailable"
-        | "account_signup_disabled"
         | "account_suspended";
     };
 
@@ -169,39 +167,19 @@ export interface GitHubCliAuthService {
 export function createGitHubCliAuthService(
   store: GitHubCliAuthStore,
   options: {
-    signupEmailAllowlist?: readonly string[];
     githubOAuth?: GitHubOAuthConfig;
   } = {}
 ): GitHubCliAuthService {
-  const signupEmailAllowlist =
-    options.signupEmailAllowlist === undefined
-      ? null
-      : new Set(options.signupEmailAllowlist.map((email) => normalizeEmail(email)).filter((email) => email.length > 0));
-
-  function isNewAccountSignupAllowed(email: string): boolean {
-    return signupEmailAllowlist === null || signupEmailAllowlist.has(email);
-  }
-
   async function resolveGitHubAccount(input: {
     identity: GitHubOAuthIdentity;
     accepted_terms_at: string;
     now: Date;
-  }): Promise<
-    | {
-        ok: true;
-        account: GitHubUserAccountResult;
-      }
-    | {
-        ok: false;
-        error: "account_signup_disabled";
-      }
-  > {
+  }): Promise<GitHubUserAccountResult> {
     return resolveGitHubAccountForIdentity({
       store,
       identity: input.identity,
       verified_at: input.now.toISOString(),
-      accepted_terms_at: input.accepted_terms_at,
-      isNewAccountSignupAllowed
+      accepted_terms_at: input.accepted_terms_at
     });
   }
 
@@ -299,7 +277,6 @@ export function createGitHubCliAuthService(
       }
       if (
         request.terminal_error === "github_email_unavailable"
-        || request.terminal_error === "account_signup_disabled"
         || request.terminal_error === "account_suspended"
         || request.terminal_error === "provider_error"
       ) {
@@ -403,23 +380,11 @@ export function createGitHubCliAuthService(
         accepted_terms_at: request.accepted_terms_at ?? now.toISOString(),
         now
       });
-      if (!resolvedAccount.ok) {
-        await store.setGitHubDeviceAuthorizationTerminalError({
-          request_id: request.request_id,
-          terminal_error: "account_signup_disabled"
-        });
-        return {
-          ok: true,
-          status: "rejected",
-          reason: "account_signup_disabled",
-          expires_at: request.expires_at
-        };
-      }
 
       const completed = await store.completeGitHubDeviceAuthorization({
         request_id: request.request_id,
-        user_id: resolvedAccount.account.user_id,
-        organization_id: resolvedAccount.account.organization_id,
+        user_id: resolvedAccount.user_id,
+        organization_id: resolvedAccount.organization_id,
         completed_at: now.toISOString()
       });
 
@@ -525,18 +490,12 @@ export function createGitHubCliAuthService(
         accepted_terms_at: input.accepted_terms_at,
         now
       });
-      if (!resolvedAccount.ok) {
-        return {
-          ok: false,
-          error: "account_signup_disabled"
-        };
-      }
 
-      const generated = generateMemberToken(resolvedAccount.account.user_id);
+      const generated = generateMemberToken(resolvedAccount.user_id);
       const issued = await store.issueMemberTokenForUser({
         token_id: randomUUID(),
-        user_id: resolvedAccount.account.user_id,
-        organization_id: resolvedAccount.account.organization_id,
+        user_id: resolvedAccount.user_id,
+        organization_id: resolvedAccount.organization_id,
         token_hash: generated.hash,
         label: input.label,
         created_at: now.toISOString()
@@ -548,7 +507,7 @@ export function createGitHubCliAuthService(
           ...issued,
           plaintext: generated.plaintext
         },
-        created_user: resolvedAccount.account.created_user
+        created_user: resolvedAccount.created_user
       };
     }
   };

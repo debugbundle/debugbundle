@@ -1348,20 +1348,14 @@ describe("api default dependencies", () => {
     });
   });
 
-  it("should pass signup allowlist emails into the web auth service when configured", (): void => {
+  it("should ignore the removed signup allowlist runtime env", (): void => {
     createApiDependenciesFromEnv({
       AUTH_SIGNUP_ALLOWED_EMAILS: "owen@example.com, brother@example.com ,owen@example.com"
     });
 
-    const serviceOptions = createWebSessionAuthServiceMock.mock.calls.at(-1)?.[1] as {
-      signupEmailAllowlist?: string[];
-    };
+    const serviceOptions = (createWebSessionAuthServiceMock.mock.calls.at(-1)?.[1] ?? {}) as Record<string, unknown>;
 
-    expect(serviceOptions.signupEmailAllowlist).toEqual([
-      "owen@example.com",
-      "brother@example.com",
-      "owen@example.com"
-    ]);
+    expect(serviceOptions).not.toHaveProperty("signupEmailAllowlist");
   });
 
   it("should configure billing admin override emails from runtime env", (): void => {
