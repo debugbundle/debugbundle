@@ -1,7 +1,7 @@
 {
   "name": "@debugbundle/mcp",
   "mcpName": "com.debugbundle/mcp",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "private": false,
   "description": "Model Context Protocol server for DebugBundle",
   "license": "AGPL-3.0-only",
