@@ -190,6 +190,7 @@ The billing page must expose explicit allowance-capacity controls for paid plans
 - Billing summaries must surface any pending reduction with the target purchased-capacity count, effective timestamp, and resulting shared allowance capacity.
 - Cancelling a scheduled reduction releases the Stripe subscription schedule and keeps the current quantity in place.
 - Active projects remain active when capacity is reduced; the resulting change is to the shared allowance pool, not project existence.
+- For internally managed admin-override accounts (`stripe_customer_id = null` on a paid plan), the same billing page controls remain available, but both increases and reductions apply immediately by writing the absolute purchased-capacity quantity directly instead of using Stripe subscription updates or schedules.
 
 ---
 
@@ -415,7 +416,8 @@ Implementation:
 - `POST /v1/admin/billing/override` accepts optional `organization_id` (defaults to the operator's own organization), absolute `plan`, absolute `additional_capacity_units`, and `reason`.
 - The route requires an authenticated operator whose email is present in `BILLING_ADMIN_OVERRIDE_EMAILS`.
 - The route writes the effective organization entitlement snapshot directly, clears Stripe customer/subscription linkage, marks paid overrides with `billing_state = 'admin_override'`, and audit-logs the operator, target organization, absolute entitlement, and reason.
-- The Billing page treats paid plans with no `stripe_customer_id` as internally managed and does not offer Stripe checkout, portal, or capacity-management actions.
+- When an allowlisted operator signs into their own free organization, DebugBundle should automatically seed that organization to an internally managed Team plan with zero additional capacity units so operator accounts do not need a manual bootstrap override.
+- The Billing page treats paid plans with no `stripe_customer_id` as internally managed, suppresses Stripe checkout/portal actions, and keeps the existing capacity-management controls available with immediate internal updates.
 
 ---
 

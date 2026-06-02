@@ -10,11 +10,12 @@ import {
   buildSessionCookie,
   readCookieValue
 } from "../../../../packages/auth/src/index.js";
-import { importUserAvatarFromUrl } from "../../../../packages/storage/src/index.js";
+import { importUserAvatarFromUrl, type AuditLogActorType } from "../../../../packages/storage/src/index.js";
 import { isSelfHostMode } from "../../../../packages/shared-types/src/index.js";
 import type { ApiDependencies } from "../api-types.js";
 import { buildAccountAvatarUrl } from "../avatar-urls.js";
 import { hashAuditIdentifier, recordAuditLog } from "../audit-logging.js";
+import { ensureBillingAdminDefaultPlan } from "../billing-admin-helpers.js";
 import { SMALL_REQUEST_BODY_LIMIT_BYTES } from "../http-limits.js";
 import {
   AcceptInviteBodySchema,
@@ -192,20 +193,57 @@ function buildSessionResponse(
 }
 
 async function resolveOrganizationPlan(
-  organizationId: string,
-  dependencies: Pick<ApiDependencies, "billingManagement" | "projectManagement">
+  input: {
+    organization_id: string;
+    user_id: string;
+    email: string;
+    role: "owner" | "member";
+    actor_type: AuditLogActorType;
+    ip_address: string;
+  },
+  dependencies: Pick<ApiDependencies, "auditLogging" | "billingAdmin" | "billingManagement" | "projectManagement">
 ): Promise<"free" | "solo" | "team"> {
-  const billingSummary = await dependencies.billingManagement?.getBillingSummaryForOrganization({
-    organization_id: organizationId,
-    now: new Date().toISOString()
-  });
+  const now = new Date().toISOString();
+  const adminDefault =
+    input.role === "owner"
+      ? await ensureBillingAdminDefaultPlan({
+          organization_id: input.organization_id,
+          email: input.email,
+          now,
+          dependencies
+        })
+      : undefined;
+  if (adminDefault?.default_applied === true) {
+    await recordAuditLog(dependencies.auditLogging, {
+      organization_id: input.organization_id,
+      actor_user_id: input.user_id,
+      actor_type: input.actor_type,
+      action: "billing.admin_override",
+      target_type: "organization",
+      target_id: input.organization_id,
+      status: "success",
+      ip_address: input.ip_address,
+      metadata: {
+        plan: "team",
+        additional_capacity_units: 0,
+        reason: "billing_admin_auto_default_team"
+      }
+    });
+  }
+
+  const billingSummary =
+    adminDefault?.billing ??
+    (await dependencies.billingManagement?.getBillingSummaryForOrganization({
+      organization_id: input.organization_id,
+      now
+    }));
 
   if (billingSummary !== null && billingSummary !== undefined) {
     return billingSummary.plan;
   }
 
   const projects = await dependencies.projectManagement?.listProjectsForOrganization({
-    organization_id: organizationId,
+    organization_id: input.organization_id,
     now: new Date().toISOString(),
     limit: 1
   });
@@ -378,7 +416,17 @@ export function registerAuthRoutes(app: FastifyInstance, dependencies: ApiDepend
     return reply.status(200).send(
       buildSessionResponse(login.session_token, {
         ...login.session,
-        organization_plan: await resolveOrganizationPlan(login.session.organization_id, dependencies)
+        organization_plan: await resolveOrganizationPlan(
+          {
+            organization_id: login.session.organization_id,
+            user_id: login.session.user_id,
+            email: login.session.email,
+            role: login.session.role,
+            actor_type: "browser_session",
+            ip_address: request.ip
+          },
+          dependencies
+        )
       })
     );
   });
@@ -790,7 +838,17 @@ export function registerAuthRoutes(app: FastifyInstance, dependencies: ApiDepend
     return reply.status(200).send({
       ...buildSessionResponse(sessionToken, {
         ...session,
-        organization_plan: await resolveOrganizationPlan(session.organization_id, dependencies)
+        organization_plan: await resolveOrganizationPlan(
+          {
+            organization_id: session.organization_id,
+            user_id: session.user_id,
+            email: session.email,
+            role: session.role,
+            actor_type: "browser_session",
+            ip_address: request.ip
+          },
+          dependencies
+        )
       })
     });
   });

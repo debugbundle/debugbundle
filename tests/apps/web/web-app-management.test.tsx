@@ -3610,6 +3610,74 @@ describe("web app — management routes", () => {
     ).toBeInTheDocument();
   });
 
+  it("lets internal admin-managed plans reduce capacity immediately from the billing page", async () => {
+    const user = userEvent.setup();
+    const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = requestUrl(input);
+
+      if (url.endsWith("/v1/auth/session")) {
+        return jsonResponse(200, {
+          session: createSession({ organization_plan: "team" })
+        });
+      }
+
+      if (url.endsWith("/v1/billing") && init?.method === undefined) {
+        return jsonResponse(200, {
+          billing: createBillingSummary({
+            plan: "team",
+            stripe_customer_id: null,
+            active_projects: 3,
+            capacity_units: {
+              total: 17,
+              included: 15,
+              additional_purchased: 2,
+              pending_reduction: null
+            }
+          })
+        });
+      }
+
+      if (url.endsWith("/v1/billing/capacity/scheduled-reduction") && init?.method === "POST") {
+        expect(init.credentials).toBe("include");
+        expect(init.body).toBe(JSON.stringify({ target_additional_capacity_units: 1 }));
+
+        return jsonResponse(200, {
+          billing: createBillingSummary({
+            plan: "team",
+            stripe_customer_id: null,
+            active_projects: 3,
+            capacity_units: {
+              total: 16,
+              included: 15,
+              additional_purchased: 1,
+              pending_reduction: null
+            }
+          })
+        });
+      }
+
+      return jsonResponse(404, { error: "not_found" });
+    });
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<App initialEntries={["/billing"]} />);
+
+    expect(await screen.findByRole("heading", { name: /billing/i, level: 1 })).toBeInTheDocument();
+    expect(screen.getByText(/billing is managed internally/i)).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: /manage capacity/i }));
+    expect(screen.getByText(/internal admin-managed accounts update purchased allowance units immediately/i)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /keep current units/i })).not.toBeInTheDocument();
+
+    const reductionInput = screen.getByLabelText(/purchased extra units after update/i);
+    await user.clear(reductionInput);
+    await user.type(reductionInput, "1");
+    await user.click(screen.getByRole("button", { name: /reduce capacity now/i }));
+
+    expect(await screen.findByText(/^1$/i, { selector: "p.font-medium" })).toBeInTheDocument();
+  });
+
   it("lets owners schedule a capacity reduction from the billing page", async () => {
     const user = userEvent.setup();
     const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {

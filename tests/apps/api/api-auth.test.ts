@@ -10,6 +10,8 @@ type AuditLoggingDependency = MockedMethods<NonNullable<ApiServerDependencies["a
 type WebAuthDependency = MockedMethods<NonNullable<ApiServerDependencies["webAuth"]>>;
 type GitHubCliAuthDependency = MockedMethods<NonNullable<ApiServerDependencies["githubCliAuth"]>>;
 type AccountManagementDependency = MockedMethods<NonNullable<ApiServerDependencies["accountManagement"]>>;
+type BillingManagementDependency = MockedMethods<NonNullable<ApiServerDependencies["billingManagement"]>>;
+type BillingAdminDependency = MockedMethods<NonNullable<ApiServerDependencies["billingAdmin"]>>;
 
 function createServer(overrides: {
   authRateLimiter?: Partial<AuthRateLimiterDependency>;
@@ -17,11 +19,15 @@ function createServer(overrides: {
   webAuth?: Partial<WebAuthDependency> | undefined;
   githubCliAuth?: Partial<GitHubCliAuthDependency> | undefined;
   accountManagement?: Partial<AccountManagementDependency>;
+  billingManagement?: BillingManagementDependency | undefined;
+  billingAdmin?: Partial<BillingAdminDependency>;
   objectStoreWriter?: ApiServerDependencies["objectStoreWriter"];
   objectStoreReader?: ApiServerDependencies["objectStoreReader"];
 } = {}): ReturnType<typeof createApiServer> {
   const hasWebAuthOverride = Object.prototype.hasOwnProperty.call(overrides, "webAuth");
   const hasGitHubCliAuthOverride = Object.prototype.hasOwnProperty.call(overrides, "githubCliAuth");
+  const hasBillingManagementOverride = Object.prototype.hasOwnProperty.call(overrides, "billingManagement");
+  const hasBillingAdminOverride = Object.prototype.hasOwnProperty.call(overrides, "billingAdmin");
   const defaultWebAuth = mockedObject<NonNullable<ApiServerDependencies["webAuth"]>>({
     requestEmailCode: vi.fn().mockResolvedValue({ ok: true, code_sent: true }),
     verifyEmailCode: vi.fn().mockResolvedValue({
@@ -204,6 +210,18 @@ function createServer(overrides: {
       listDeliveriesForWebhookInOrganization: vi.fn().mockResolvedValue({ deliveries: [] }),
       retryDeliveryForOrganization: vi.fn().mockResolvedValue(null)
     },
+    ...(hasBillingManagementOverride ? { billingManagement: overrides.billingManagement } : {}),
+    ...(hasBillingAdminOverride
+      ? {
+          billingAdmin:
+            overrides.billingAdmin === undefined
+              ? undefined
+              : {
+                  isOperatorAllowed: overrides.billingAdmin.isOperatorAllowed ?? vi.fn().mockReturnValue(false),
+                  overrideOrganizationBilling: overrides.billingAdmin.overrideOrganizationBilling ?? vi.fn()
+                }
+        }
+      : {}),
     ...(overrides.auditLogging === undefined
       ? {}
       : {
@@ -1253,6 +1271,206 @@ describe("api auth routes", () => {
         csrf_token: buildCsrfToken("session-secret")
       }
     });
+  });
+
+  it("auto-promotes allowlisted operator sessions to the team plan", async (): Promise<void> => {
+    const createAuditLog = vi.fn().mockResolvedValue(undefined);
+    const overrideOrganizationBilling = vi.fn().mockResolvedValue({
+      plan: "team",
+      stripe_customer_id: null,
+      active_projects: 1,
+      capacity_units: {
+        total: 15,
+        included: 15,
+        additional_purchased: 0,
+        pending_reduction: null
+      },
+      usage_window: {
+        starts_at: "2026-03-01T00:00:00.000Z",
+        ends_at: "2026-04-01T00:00:00.000Z"
+      },
+      allowances: {
+        monthly_bundle_requests: { used: 0, limit: 11250 },
+        monthly_raw_ingested_events: { used: 0, limit: 157500 },
+        retained_bundle_cap: { used: 0, limit: 6750 },
+        monthly_remote_activations: { used: 0, limit: 1125 },
+        monthly_alert_deliveries: { used: 0, limit: 3375 },
+        monthly_webhook_deliveries: { used: 0, limit: 11250 }
+      }
+    });
+    const app = createServer({
+      webAuth: {
+        resolveSessionByToken: vi.fn().mockResolvedValue({
+          session_id: "ses_123",
+          user_id: "usr_123",
+          email: "arnold.farrugia@gmail.com",
+          email_verified_at: "2026-03-16T00:00:00.000Z",
+          organization_id: "org_123",
+          role: "owner",
+          created_at: "2026-03-16T00:00:00.000Z",
+          expires_at: "2026-03-16T04:00:00.000Z",
+          revoked_at: null,
+          has_email_auth: true,
+          has_github_oauth: false
+        })
+      },
+      billingManagement: mockedObject<NonNullable<ApiServerDependencies["billingManagement"]>>({
+        getBillingSummaryForOrganization: vi.fn().mockResolvedValue({
+          plan: "free",
+          stripe_customer_id: null,
+          active_projects: 1,
+          capacity_units: {
+            total: 1,
+            included: 1,
+            additional_purchased: 0,
+            pending_reduction: null
+          },
+          usage_window: {
+            starts_at: "2026-03-01T00:00:00.000Z",
+            ends_at: "2026-04-01T00:00:00.000Z"
+          },
+          allowances: {
+            monthly_bundle_requests: { used: 0, limit: 750 },
+            monthly_raw_ingested_events: { used: 0, limit: 750 },
+            retained_bundle_cap: { used: 0, limit: 50 },
+            monthly_remote_activations: { used: 0, limit: 0 },
+            monthly_alert_deliveries: { used: 0, limit: 75 },
+            monthly_webhook_deliveries: { used: 0, limit: 750 }
+          }
+        }),
+        createCheckoutLink: vi.fn().mockResolvedValue(null),
+        createPortalLink: vi.fn().mockResolvedValue(null)
+      }),
+      billingAdmin: {
+        isOperatorAllowed: vi.fn().mockReturnValue(true),
+        overrideOrganizationBilling
+      },
+      auditLogging: {
+        createAuditLog
+      }
+    });
+
+    const response = await app.inject({
+      method: "GET",
+      url: "/v1/auth/session",
+      headers: {
+        cookie: `${SESSION_COOKIE_NAME}=session-secret`
+      }
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toEqual({
+      session: expect.objectContaining({
+        email: "arnold.farrugia@gmail.com",
+        organization_plan: "team"
+      })
+    });
+    expect(overrideOrganizationBilling).toHaveBeenCalledWith({
+      organization_id: "org_123",
+      plan: "team",
+      additional_capacity_units: 0,
+      now: expect.any(String)
+    });
+    expect(createAuditLog).toHaveBeenCalledWith(
+      expect.objectContaining({
+        organization_id: "org_123",
+        actor_user_id: "usr_123",
+        actor_type: "browser_session",
+        action: "billing.admin_override",
+        target_type: "organization",
+        target_id: "org_123",
+        status: "success",
+        metadata: {
+          plan: "team",
+          additional_capacity_units: 0,
+          reason: "billing_admin_auto_default_team"
+        }
+      })
+    );
+  });
+
+  it("does not auto-promote allowlisted operator sessions for non-owner memberships", async (): Promise<void> => {
+    const overrideOrganizationBilling = vi.fn();
+    const createAuditLog = vi.fn().mockResolvedValue(undefined);
+    const getBillingSummaryForOrganization = vi.fn().mockResolvedValue({
+      plan: "free",
+      stripe_customer_id: null,
+      active_projects: 1,
+      capacity_units: {
+        total: 1,
+        included: 1,
+        additional_purchased: 0,
+        pending_reduction: null
+      },
+      usage_window: {
+        starts_at: "2026-03-01T00:00:00.000Z",
+        ends_at: "2026-04-01T00:00:00.000Z"
+      },
+      allowances: {
+        monthly_bundle_requests: { used: 0, limit: 750 },
+        monthly_raw_ingested_events: { used: 0, limit: 750 },
+        retained_bundle_cap: { used: 0, limit: 50 },
+        monthly_remote_activations: { used: 0, limit: 0 },
+        monthly_alert_deliveries: { used: 0, limit: 75 },
+        monthly_webhook_deliveries: { used: 0, limit: 750 }
+      }
+    });
+    const app = createServer({
+      webAuth: {
+        resolveSessionByToken: vi.fn().mockResolvedValue({
+          session_id: "ses_123",
+          user_id: "usr_123",
+          email: "arnold.farrugia@gmail.com",
+          email_verified_at: "2026-03-16T00:00:00.000Z",
+          organization_id: "org_customer",
+          role: "member",
+          created_at: "2026-03-16T00:00:00.000Z",
+          expires_at: "2026-03-16T04:00:00.000Z",
+          revoked_at: null,
+          has_email_auth: true,
+          has_github_oauth: false
+        })
+      },
+      billingManagement: mockedObject<NonNullable<ApiServerDependencies["billingManagement"]>>({
+        getBillingSummaryForOrganization,
+        createCheckoutLink: vi.fn().mockResolvedValue(null),
+        createPortalLink: vi.fn().mockResolvedValue(null)
+      }),
+      billingAdmin: {
+        isOperatorAllowed: vi.fn().mockReturnValue(true),
+        overrideOrganizationBilling
+      },
+      auditLogging: {
+        createAuditLog
+      }
+    });
+
+    const response = await app.inject({
+      method: "GET",
+      url: "/v1/auth/session",
+      headers: {
+        cookie: `${SESSION_COOKIE_NAME}=session-secret`
+      }
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toEqual({
+      session: expect.objectContaining({
+        organization_id: "org_customer",
+        organization_plan: "free",
+        role: "member"
+      })
+    });
+    expect(getBillingSummaryForOrganization).toHaveBeenCalledWith({
+      organization_id: "org_customer",
+      now: expect.any(String)
+    });
+    expect(overrideOrganizationBilling).not.toHaveBeenCalled();
+    expect(createAuditLog).not.toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: "billing.admin_override"
+      })
+    );
   });
 
   it("logs out active sessions and clears the cookie", async (): Promise<void> => {

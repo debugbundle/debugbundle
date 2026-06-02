@@ -617,6 +617,8 @@ All update fields are optional, but at least one field must be present.
 
 Billing summary and allowance-capacity management routes accept both browser session and owner-scoped member tokens. Checkout, checkout confirmation, and portal routes are browser-session-only interactive surfaces. Stripe checkout sessions are created dynamically with `client_reference_id` = `organization_id`; the success URL includes Stripe's `{CHECKOUT_SESSION_ID}` placeholder so the web app can ask the API to verify the returned Checkout Session and sync the account immediately.
 
+For paid internally managed accounts (`stripe_customer_id = null`), the same capacity routes remain available. In that mode, increases and reductions both apply immediately to the stored purchased-capacity quantity and `pending_reduction` remains `null`.
+
 **Billing summary response shape:**
 ```json
 {
@@ -718,7 +720,7 @@ Checkout confirmation returns the standard billing summary response after the AP
 }
 ```
 
-`target_additional_capacity_units` must be less than the current `additional_purchased` count and no greater than 99 (0 to remove all extra capacity units). A Stripe subscription schedule is created (or updated) with two phases: current phase maintains current capacity until billing period end, next phase applies the reduced quantity. Response is the updated billing summary with `pending_reduction` populated.
+`target_additional_capacity_units` must be less than the current `additional_purchased` count and no greater than 99 (0 to remove all extra capacity units). For Stripe-managed paid accounts, a Stripe subscription schedule is created (or updated) with two phases: current phase maintains current capacity until billing period end, next phase applies the reduced quantity. Response is the updated billing summary with `pending_reduction` populated. For internally managed paid accounts, the reduction is applied immediately and `pending_reduction` stays `null`.
 
 **Cancel capacity reduction:** No request body. Releases the Stripe subscription schedule and keeps the current capacity quantity. Response is the updated billing summary with `pending_reduction: null`.
 

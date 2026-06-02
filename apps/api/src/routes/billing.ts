@@ -1,7 +1,8 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 
 import type { ApiDependencies } from "../api-types.js";
-import { recordAuditLog } from "../audit-logging.js";
+import { recordAuditLog, resolveAuditActorType } from "../audit-logging.js";
+import { ensureBillingAdminDefaultPlan, isBillingAdminOperator } from "../billing-admin-helpers.js";
 import { enforceRequestRateLimit, requireOwnerMemberAuth, resolveBrowserSession } from "../api-helpers.js";
 import { BillingCheckoutBodySchema, BillingCheckoutConfirmBodySchema, BillingCapacityChangeBodySchema } from "../schemas.js";
 
@@ -14,6 +15,8 @@ async function requireOwnerBillingPrincipal(
   | {
       organization_id: string;
       subject: string;
+      user_id: string;
+      email: string | undefined;
     }
   | null
 > {
@@ -40,7 +43,9 @@ async function requireOwnerBillingPrincipal(
 
     return {
       organization_id: session.organization_id,
-      subject: `member:${session.user_id}`
+      subject: `member:${session.user_id}`,
+      user_id: session.user_id,
+      email: session.email
     };
   }
 
@@ -65,7 +70,9 @@ async function requireOwnerBillingPrincipal(
 
   return {
     organization_id: member.organization_id,
-    subject: `member:${member.member_id}`
+    subject: `member:${member.member_id}`,
+    user_id: member.member_id,
+    email: member.email
   };
 }
 
@@ -81,6 +88,37 @@ function canUpgrade(currentPlan: "free" | "solo" | "team", targetPlan: "solo" | 
   return false;
 }
 
+async function recordBillingAdminOverrideAudit(
+  dependencies: Pick<ApiDependencies, "auditLogging">,
+  request: FastifyRequest,
+  input: {
+    organization_id: string;
+    user_id: string;
+    plan: "free" | "solo" | "team";
+    additional_capacity_units: number;
+    reason: string;
+    status: "success" | "failure";
+    error?: string;
+  }
+): Promise<void> {
+  await recordAuditLog(dependencies.auditLogging, {
+    organization_id: input.organization_id,
+    actor_user_id: input.user_id,
+    actor_type: resolveAuditActorType(request.headers),
+    action: "billing.admin_override",
+    target_type: "organization",
+    target_id: input.organization_id,
+    status: input.status,
+    ip_address: request.ip,
+    metadata: {
+      plan: input.plan,
+      additional_capacity_units: input.additional_capacity_units,
+      reason: input.reason,
+      ...(input.error === undefined ? {} : { error: input.error })
+    }
+  });
+}
+
 export function registerBillingRoutes(app: FastifyInstance, dependencies: ApiDependencies): void {
   app.get("/v1/billing", async (request, reply) => {
     const principal = await requireOwnerBillingPrincipal(request, reply, dependencies, "management-read");
@@ -91,10 +129,30 @@ export function registerBillingRoutes(app: FastifyInstance, dependencies: ApiDep
       return reply.status(404).send({ error: "billing_not_available" });
     }
 
-    const billing = await dependencies.billingManagement.getBillingSummaryForOrganization({
+    const now = new Date().toISOString();
+    const adminDefault = await ensureBillingAdminDefaultPlan({
       organization_id: principal.organization_id,
-      now: new Date().toISOString()
+      email: principal.email,
+      now,
+      dependencies
     });
+    if (adminDefault?.default_applied === true) {
+      await recordBillingAdminOverrideAudit(dependencies, request, {
+        organization_id: principal.organization_id,
+        user_id: principal.user_id,
+        plan: "team",
+        additional_capacity_units: 0,
+        reason: "billing_admin_auto_default_team",
+        status: "success"
+      });
+    }
+
+    const billing =
+      adminDefault?.billing ??
+      (await dependencies.billingManagement.getBillingSummaryForOrganization({
+        organization_id: principal.organization_id,
+        now
+      }));
     if (billing === null) {
       return reply.status(404).send({ error: "billing_not_found" });
     }
@@ -417,11 +475,68 @@ export function registerBillingRoutes(app: FastifyInstance, dependencies: ApiDep
       return reply.status(400).send({ error: "invalid_payload" });
     }
 
-    const result = await dependencies.billingManagement.increaseCapacity({
-      organization_id: principal.organization_id,
-      target_additional_capacity_units: parsedBody.data.target_additional_capacity_units,
-      now: new Date().toISOString()
-    });
+    const now = new Date().toISOString();
+    const adminDefault = isBillingAdminOperator(dependencies, principal.email)
+      ? await ensureBillingAdminDefaultPlan({
+          organization_id: principal.organization_id,
+          email: principal.email,
+          now,
+          dependencies
+        })
+      : undefined;
+    if (adminDefault?.default_applied === true) {
+      await recordBillingAdminOverrideAudit(dependencies, request, {
+        organization_id: principal.organization_id,
+        user_id: principal.user_id,
+        plan: "team",
+        additional_capacity_units: 0,
+        reason: "billing_admin_auto_default_team",
+        status: "success"
+      });
+    }
+
+    const currentBilling = isBillingAdminOperator(dependencies, principal.email)
+      ? (adminDefault?.billing ??
+        (await dependencies.billingManagement.getBillingSummaryForOrganization({
+          organization_id: principal.organization_id,
+          now
+        })))
+      : undefined;
+    if (currentBilling === null) {
+      return reply.status(404).send({ error: "billing_not_found" });
+    }
+
+    const isInternalOperatorBilling =
+      currentBilling !== undefined &&
+      currentBilling.plan !== "free" &&
+      currentBilling.stripe_customer_id === null;
+
+    const result = isInternalOperatorBilling
+      ? parsedBody.data.target_additional_capacity_units <= currentBilling.capacity_units.additional_purchased
+        ? "invalid_target_quantity"
+        : await dependencies.billingAdmin!.overrideOrganizationBilling({
+            organization_id: principal.organization_id,
+            plan: currentBilling.plan,
+            additional_capacity_units: parsedBody.data.target_additional_capacity_units,
+            now
+          })
+      : await dependencies.billingManagement.increaseCapacity({
+          organization_id: principal.organization_id,
+          target_additional_capacity_units: parsedBody.data.target_additional_capacity_units,
+          now
+        });
+
+    if (isInternalOperatorBilling && result !== "invalid_target_quantity") {
+      await recordBillingAdminOverrideAudit(dependencies, request, {
+        organization_id: principal.organization_id,
+        user_id: principal.user_id,
+        plan: currentBilling.plan,
+        additional_capacity_units: parsedBody.data.target_additional_capacity_units,
+        reason: "billing_admin_capacity_increase",
+        status: typeof result === "string" ? "failure" : "success",
+        ...(typeof result === "string" ? { error: result } : {})
+      });
+    }
 
     if (typeof result === "string") {
       const statusCode =
@@ -451,11 +566,69 @@ export function registerBillingRoutes(app: FastifyInstance, dependencies: ApiDep
       return reply.status(400).send({ error: "invalid_payload" });
     }
 
-    const result = await dependencies.billingManagement.scheduleCapacityReduction({
-      organization_id: principal.organization_id,
-      target_additional_capacity_units: parsedBody.data.target_additional_capacity_units,
-      now: new Date().toISOString()
-    });
+    const now = new Date().toISOString();
+    const adminDefault = isBillingAdminOperator(dependencies, principal.email)
+      ? await ensureBillingAdminDefaultPlan({
+          organization_id: principal.organization_id,
+          email: principal.email,
+          now,
+          dependencies
+        })
+      : undefined;
+    if (adminDefault?.default_applied === true) {
+      await recordBillingAdminOverrideAudit(dependencies, request, {
+        organization_id: principal.organization_id,
+        user_id: principal.user_id,
+        plan: "team",
+        additional_capacity_units: 0,
+        reason: "billing_admin_auto_default_team",
+        status: "success"
+      });
+    }
+
+    const currentBilling = isBillingAdminOperator(dependencies, principal.email)
+      ? (adminDefault?.billing ??
+        (await dependencies.billingManagement.getBillingSummaryForOrganization({
+          organization_id: principal.organization_id,
+          now
+        })))
+      : undefined;
+    if (currentBilling === null) {
+      return reply.status(404).send({ error: "billing_not_found" });
+    }
+
+    const isInternalOperatorBilling =
+      currentBilling !== undefined &&
+      currentBilling.plan !== "free" &&
+      currentBilling.stripe_customer_id === null;
+
+    const result = isInternalOperatorBilling
+      ? parsedBody.data.target_additional_capacity_units < 0 ||
+        parsedBody.data.target_additional_capacity_units >= currentBilling.capacity_units.additional_purchased
+        ? "invalid_target_quantity"
+        : await dependencies.billingAdmin!.overrideOrganizationBilling({
+            organization_id: principal.organization_id,
+            plan: currentBilling.plan,
+            additional_capacity_units: parsedBody.data.target_additional_capacity_units,
+            now
+          })
+      : await dependencies.billingManagement.scheduleCapacityReduction({
+          organization_id: principal.organization_id,
+          target_additional_capacity_units: parsedBody.data.target_additional_capacity_units,
+          now
+        });
+
+    if (isInternalOperatorBilling && result !== "invalid_target_quantity") {
+      await recordBillingAdminOverrideAudit(dependencies, request, {
+        organization_id: principal.organization_id,
+        user_id: principal.user_id,
+        plan: currentBilling.plan,
+        additional_capacity_units: parsedBody.data.target_additional_capacity_units,
+        reason: "billing_admin_capacity_reduction",
+        status: typeof result === "string" ? "failure" : "success",
+        ...(typeof result === "string" ? { error: result } : {})
+      });
+    }
 
     if (typeof result === "string") {
       const statusCode =

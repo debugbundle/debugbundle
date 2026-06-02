@@ -453,7 +453,14 @@ describe("web page helper coverage", () => {
     );
 
     const { rerender } = render(
-      <CapacityDialog billing={billing} canChangeBilling={true} open={true} onOpenChange={() => {}} onBillingChange={onBillingChange} />
+      <CapacityDialog
+        billing={billing}
+        canChangeBilling={true}
+        managementMode="stripe"
+        open={true}
+        onOpenChange={() => {}}
+        onBillingChange={onBillingChange}
+      />
     );
 
     await user.click(screen.getByRole("button", { name: /increase capacity now/i }));
@@ -489,6 +496,7 @@ describe("web page helper coverage", () => {
           }
         })}
         canChangeBilling={true}
+        managementMode="stripe"
         open={true}
         onOpenChange={() => {}}
         onBillingChange={onBillingChange}
@@ -534,6 +542,7 @@ describe("web page helper coverage", () => {
           }
         })}
         canChangeBilling={true}
+        managementMode="stripe"
         open={true}
         onOpenChange={() => {}}
         onBillingChange={onBillingChange}
@@ -545,6 +554,56 @@ describe("web page helper coverage", () => {
     await waitFor(() => {
       expect(onBillingChange).toHaveBeenCalledWith(nextBilling);
       expect(showSuccessToast).toHaveBeenCalledWith("Allowance capacity increased successfully.");
+    });
+  });
+
+  it("applies immediate internal capacity reductions", async () => {
+    const user = userEvent.setup();
+    const nextBilling = createBillingSummary({
+      plan: "team",
+      stripe_customer_id: null,
+      active_projects: 3,
+      capacity_units: {
+        total: 16,
+        included: 15,
+        additional_purchased: 1,
+        pending_reduction: null
+      }
+    });
+    const onBillingChange = vi.fn();
+    const showSuccessToast = vi.spyOn(notify, "showSuccessToast").mockImplementation(() => undefined);
+
+    vi.spyOn(api, "scheduleBillingCapacityReduction").mockResolvedValue(nextBilling);
+
+    render(
+      <CapacityDialog
+        billing={createBillingSummary({
+          plan: "team",
+          stripe_customer_id: null,
+          active_projects: 3,
+          capacity_units: {
+            total: 17,
+            included: 15,
+            additional_purchased: 2,
+            pending_reduction: null
+          }
+        })}
+        canChangeBilling={true}
+        managementMode="internal"
+        open={true}
+        onOpenChange={() => {}}
+        onBillingChange={onBillingChange}
+      />
+    );
+
+    expect(screen.getByText(/internal admin-managed accounts update purchased allowance units immediately/i)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /reduce capacity now/i })).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: /reduce capacity now/i }));
+
+    await waitFor(() => {
+      expect(onBillingChange).toHaveBeenCalledWith(nextBilling);
+      expect(showSuccessToast).toHaveBeenCalledWith("Allowance capacity reduced successfully.");
     });
   });
 

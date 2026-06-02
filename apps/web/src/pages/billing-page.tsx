@@ -32,6 +32,8 @@ interface PendingBillingCheckout {
   targetPlan: "solo" | "team";
 }
 
+type CapacityManagementMode = "stripe" | "internal";
+
 const BILLING_CHECKOUT_STORAGE_KEY = "debugbundle.billing.checkout";
 const BILLING_CHECKOUT_POLL_INTERVAL_MS = 250;
 const BILLING_CHECKOUT_MAX_POLL_ATTEMPTS = 6;
@@ -117,6 +119,7 @@ export function formatPlanName(plan: BillingSummaryRecord["plan"]): string {
 interface CapacityDialogProps {
   billing: BillingSummaryRecord;
   canChangeBilling: boolean;
+  managementMode: CapacityManagementMode;
   open: boolean;
   onOpenChange(nextOpen: boolean): void;
   onBillingChange(nextBilling: BillingSummaryRecord): void;
@@ -142,6 +145,7 @@ export function CapacityDialog(props: CapacityDialogProps): JSX.Element {
 
   const currentAdditionalCapacityUnits = props.billing.capacity_units.additional_purchased;
   const pendingReduction = props.billing.capacity_units.pending_reduction ?? null;
+  const isInternalManagement = props.managementMode === "internal";
   const parsedIncreaseTarget = Number.parseInt(increaseTarget, 10);
   const parsedReductionTarget = Number.parseInt(reductionTarget, 10);
 
@@ -179,7 +183,7 @@ export function CapacityDialog(props: CapacityDialogProps): JSX.Element {
     try {
       const nextBilling = await scheduleBillingCapacityReduction(parsedReductionTarget);
       props.onBillingChange(nextBilling);
-      showSuccessToast("Capacity reduction scheduled successfully.");
+      showSuccessToast(isInternalManagement ? "Allowance capacity reduced successfully." : "Capacity reduction scheduled successfully.");
     } catch (error) {
       if (error instanceof Error && error.message === "invalid_target_quantity") {
         showErrorToast("Choose a unit count below your current purchased quantity.");
@@ -216,7 +220,9 @@ export function CapacityDialog(props: CapacityDialogProps): JSX.Element {
         <DialogHeader>
           <DialogTitle>Manage allowance capacity</DialogTitle>
           <DialogDescription>
-            Extra units expand shared allowance capacity immediately. Reductions stay active until the current paid window ends.
+            {isInternalManagement
+              ? "Internal admin-managed accounts update purchased allowance units immediately."
+              : "Extra units expand shared allowance capacity immediately. Reductions stay active until the current paid window ends."}
           </DialogDescription>
         </DialogHeader>
 
@@ -242,7 +248,7 @@ export function CapacityDialog(props: CapacityDialogProps): JSX.Element {
           </Card>
         </div>
 
-        {pendingReduction === null ? null : (
+        {isInternalManagement || pendingReduction === null ? null : (
           <CalloutCard
             eyebrow="Scheduled reduction"
             title={`Dropping to ${pendingReduction.total} total units on ${formatDate(pendingReduction.effective_at)}`}
@@ -255,7 +261,11 @@ export function CapacityDialog(props: CapacityDialogProps): JSX.Element {
           <Card>
             <CardHeader>
               <CardTitle>Add capacity now</CardTitle>
-              <CardDescription>Charge the prorated difference now and expand allowance capacity immediately.</CardDescription>
+              <CardDescription>
+                {isInternalManagement
+                  ? "Increase the purchased extra-unit count immediately for this internally managed account."
+                  : "Charge the prorated difference now and expand allowance capacity immediately."}
+              </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <FieldGroup>
@@ -290,7 +300,7 @@ export function CapacityDialog(props: CapacityDialogProps): JSX.Element {
               >
                 {activeAction === "increase" ? "Updating units..." : "Increase capacity now"}
               </Button>
-              {pendingReduction === null ? null : (
+              {isInternalManagement || pendingReduction === null ? null : (
                 <p className="text-sm text-muted-foreground">
                   Cancel the scheduled reduction first if you want to add more capacity immediately.
                 </p>
@@ -300,13 +310,19 @@ export function CapacityDialog(props: CapacityDialogProps): JSX.Element {
 
           <Card>
             <CardHeader>
-              <CardTitle>Reduce on renewal</CardTitle>
-              <CardDescription>Keep your current allowance until {formatDate(props.billing.usage_window.ends_at)}, then lower it at renewal.</CardDescription>
+              <CardTitle>{isInternalManagement ? "Reduce capacity now" : "Reduce on renewal"}</CardTitle>
+              <CardDescription>
+                {isInternalManagement
+                  ? "Lower the purchased extra-unit count immediately for this internally managed account."
+                  : `Keep your current allowance until ${formatDate(props.billing.usage_window.ends_at)}, then lower it at renewal.`}
+              </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <FieldGroup>
                 <Field>
-                  <FieldLabel htmlFor="billing-slot-reduction">Purchased extra units after renewal</FieldLabel>
+                  <FieldLabel htmlFor="billing-slot-reduction">
+                    {isInternalManagement ? "Purchased extra units after update" : "Purchased extra units after renewal"}
+                  </FieldLabel>
                   <Input
                     id="billing-slot-reduction"
                     type="number"
@@ -318,7 +334,9 @@ export function CapacityDialog(props: CapacityDialogProps): JSX.Element {
                     disabled={currentAdditionalCapacityUnits === 0}
                   />
                   <FieldDescription>
-                    The current subscription stays unchanged until the next paid period begins.
+                    {isInternalManagement
+                      ? "The total purchased extra-unit count updates as soon as you save it."
+                      : "The current subscription stays unchanged until the next paid period begins."}
                   </FieldDescription>
                 </Field>
               </FieldGroup>
@@ -336,9 +354,17 @@ export function CapacityDialog(props: CapacityDialogProps): JSX.Element {
                   }
                   onClick={() => void handleScheduleReduction()}
                 >
-                  {activeAction === "reduce" ? "Saving schedule..." : pendingReduction === null ? "Schedule reduction" : "Update scheduled reduction"}
+                  {activeAction === "reduce"
+                    ? isInternalManagement
+                      ? "Updating units..."
+                      : "Saving schedule..."
+                    : isInternalManagement
+                      ? "Reduce capacity now"
+                      : pendingReduction === null
+                        ? "Schedule reduction"
+                        : "Update scheduled reduction"}
                 </Button>
-                {pendingReduction === null ? null : (
+                {isInternalManagement || pendingReduction === null ? null : (
                   <Button type="button" variant="outline" disabled={activeAction !== null} onClick={() => void handleCancelReduction()}>
                     {activeAction === "cancel" ? "Cancelling..." : "Keep current units"}
                   </Button>
@@ -608,6 +634,7 @@ export function BillingPage(): JSX.Element {
   const canChangeBilling = billing !== null;
   const isBillingManagedInternally = billing !== null && billing.plan !== "free" && billing.stripe_customer_id === null;
   const canManageStripeBilling = canChangeBilling && !isBillingManagedInternally;
+  const canManageCapacity = billing !== null && billing.plan !== "free";
   const pendingReduction = billing?.capacity_units.pending_reduction ?? null;
 
   return (
@@ -710,7 +737,7 @@ export function BillingPage(): JSX.Element {
                   <CalloutCard
                     eyebrow="Internal plan"
                     title="Billing is managed internally"
-                    description="This account has an internal plan override, so Stripe checkout and subscription management are not used."
+                    description="This account has an internal plan override, so Stripe checkout and subscription management are not used. Allowance capacity is still managed here."
                     tone="neutral"
                   />
                 ) : null}
@@ -723,10 +750,11 @@ export function BillingPage(): JSX.Element {
                   <CardTitle>Allowance capacity</CardTitle>
                   <CardDescription>Included and purchased units set the size of the hosted allowance.</CardDescription>
                 </div>
-                {billing.plan === "free" || isBillingManagedInternally ? null : (
+                {billing.plan === "free" ? null : (
                   <CapacityDialog
                     billing={billing}
-                    canChangeBilling={canManageStripeBilling}
+                    canChangeBilling={canManageCapacity}
+                    managementMode={isBillingManagedInternally ? "internal" : "stripe"}
                     open={isCapacityDialogOpen}
                     onOpenChange={setIsCapacityDialogOpen}
                     onBillingChange={setBilling}
