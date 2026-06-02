@@ -58,7 +58,7 @@ The compose file now brings up the full authenticated product surface:
 - `localstack` bootstraps the raw-event bucket automatically via `localstack-init/01-create-bucket.sh`
 - `web` serves the built SPA on the configured host port
 
-This keeps self-host close to the hosted production shape while still using the checked-out repo as the deployment artifact during pre-production.
+This keeps self-host close to the hosted production shape while still allowing operators to deploy from a checked-out repo artifact.
 
 ## Self-Host Mode
 

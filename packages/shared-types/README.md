@@ -37,4 +37,4 @@ EventEnvelopeSchema.parse(event);
 ## Notes
 
 - Published from the core-owned shared-package release workflow in `debugbundle/debugbundle`.
-- Source lives in the DebugBundle workspace during pre-production.
+- Source remains core-owned in the DebugBundle workspace and is published through the shared-package release workflow.

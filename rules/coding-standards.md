@@ -77,17 +77,17 @@ Last updated: 2026-03-09
 
 ---
 
-## 8. Pre-Production Rules
+## 8. Production Compatibility Rules
 
-This project is NOT in production. Therefore:
+DebugBundle is live and has installed projects. Therefore:
 
-1. **NO backwards compatibility** — break things freely when improving
-2. **NO legacy code** — remove old implementations entirely
-3. **NO migration paths** — users can clear data if needed
-4. **NO workarounds for old patterns** — clean implementations only
-5. **NO deprecated code comments** — delete, don't comment out
+1. Preserve backwards compatibility for public APIs, SDK init/config behavior, CLI JSON output, MCP tool schemas, bundle schemas, webhook payloads, and persisted data.
+2. Breaking changes require a major version or an explicitly documented migration path, plus changelog and public documentation updates.
+3. Keep compatibility paths small, explicit, tested, and time-bounded. Do not introduce opaque shims or hidden fallback behavior.
+4. Use deprecation markers and documentation only for supported public interfaces that are intentionally being phased out; remove stale internal comments and dead code.
+5. Installed projects must continue to ingest, retrieve, and process existing data across normal patch and minor releases.
 
-These rules apply until first public release. After production: backwards compatibility becomes mandatory.
+Clean implementation still matters: prefer direct, well-tested code over accumulating legacy branches, but do not remove public behavior without the required production release process.
 
 ---
 
@@ -149,15 +149,17 @@ SDKs and CLI must auto-detect project runtime and framework using file heuristic
 
 ---
 
-## 12. Storage Bootstrap Conventions
+## 12. Storage Bootstrap And Migration Conventions
 
 - The authoritative storage schema lives in `packages/storage/src/migrations.ts` as the clean-slate bootstrap contract.
 - The bootstrap SQL must describe the final database shape directly for a fresh database.
 - Do not use schema-evolution SQL in the bootstrap contract: no `ALTER TABLE`, no `ADD COLUMN`, no `DROP CONSTRAINT`, no `IF NOT EXISTS`, and no backfill/update steps for historical rows.
-- Do not reintroduce `schema_migrations` or append-only migration IDs while the project remains pre-production.
 - Do not include `BEGIN`, `COMMIT`, or `ROLLBACK` statements inside bootstrap SQL. Transactions are managed by the bootstrap runner.
-- Bootstrap behavior may detect three states only: empty database, already-bootstrapped clean schema, or unsupported legacy/partial schema that must be recreated.
+- Bootstrap behavior may detect three states only: empty database, already-bootstrapped clean schema, or unsupported partial schema that must be recreated before bootstrap.
 - Bootstrap failures must fail fast with explicit error messages that distinguish legacy-schema detection, partial-schema detection, bootstrap failure, and rollback failure.
+- Existing databases must be upgraded only through ordered forward migrations in `packages/storage/src/schema-migrations.ts`.
+- Migration readiness checks must fail closed when required migrations are missing or checksums do not match.
+- Destructive schema cleanup must follow expand/contract discipline and ship only after compatible code has already been live.
 
 ---
 

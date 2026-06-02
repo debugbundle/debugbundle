@@ -12,7 +12,7 @@ Include a clear description, impact assessment, affected version or commit, repr
 
 ## Supported Versions
 
-DebugBundle is pre-production. Security fixes are applied against the current main branch and the latest unreleased code in this repository.
+DebugBundle is live. Security fixes are applied against supported released versions and the current main branch. When a vulnerability affects installed projects, maintainers will prioritize a patch release or mitigation path over incompatible cleanup.
 
 ## Response Expectations
 

@@ -16,4 +16,4 @@
 
 - Follow `AGENTS.md` and all files in `rules/`.
 - Keep apps/package boundaries strict (`apps` may import `packages`; reverse is forbidden).
-- Do not add backwards-compatibility shims during pre-production.
+- Preserve compatibility for installed projects and public interfaces. Breaking changes require the production policy in `AGENTS.md` and `rules/release-governance.md`: versioning, migration guidance, tests, changelog coverage, and documentation.

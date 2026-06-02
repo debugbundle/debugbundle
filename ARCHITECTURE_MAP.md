@@ -151,7 +151,7 @@ The TypeScript/JavaScript SDKs live in a separate JS SDK repo: `github.com/debug
 
 The `debugbundle-js` repo now consumes published `@debugbundle/shared-types` and `@debugbundle/redaction` packages from npm. The core monorepo (`debugbundle/debugbundle`) continues to own the maintained source for those two packages and now owns only their shared-package release workflow, while the dedicated `debugbundle/debugbundle-js` repo owns release automation for `@debugbundle/sdk-node` and `@debugbundle/sdk-browser`.
 
-**Migration note:** The public `debugbundle/debugbundle-js` repo is live, its dedicated release workflow now stages and publishes the SDK packages from that repository, and core dogfooding in `apps/api` and `apps/web` continues to resolve published npm artifacts by disabling implicit pnpm workspace linking for non-`workspace:` ranges. Shared-package publication remains a core responsibility because `shared-types` and `redaction` still have direct source coupling in the main product repo. The intended pre-launch release order is shared packages first, then the JS SDK family, then dependent wrappers such as WordPress; after registry publish, bump the pinned versions in the root app, hosted SPA, and public-site manifests before hosted validation or deploy.
+**Migration note:** The public `debugbundle/debugbundle-js` repo is live, its dedicated release workflow now stages and publishes the SDK packages from that repository, and core dogfooding in `apps/api` and `apps/web` continues to resolve published npm artifacts by disabling implicit pnpm workspace linking for non-`workspace:` ranges. Shared-package publication remains a core responsibility because `shared-types` and `redaction` still have direct source coupling in the main product repo. The production release train publishes dependency roots before dependent packages: shared packages first, then the JS SDK family, then dependent wrappers such as WordPress. After registry publish, bump the pinned versions in the root app, hosted SPA, and public-site manifests before hosted validation or deploy.
 
 **Current ownership note:** `@debugbundle/sdk-node` and `@debugbundle/sdk-browser` are the packages intended to move cleanly with `debugbundle-js`. By contrast, `@debugbundle/shared-types` and `@debugbundle/redaction` remain core-owned source in the current workspace even though they are published as standalone npm packages and consumed by the JS SDK. Core still has meaningful direct source-path coupling to both packages, especially `shared-types`, across product code, tests, and build-time artifact generation. Treat them as externally distributed core libraries for the current Phase 22 repo split; moving their maintained source into `debugbundle-js` would be a later deliberate extraction slice rather than an already-complete ownership transfer.
 
@@ -166,7 +166,7 @@ All non-TypeScript SDKs live in separate repositories under `github.com/debugbun
 **Local workspace convention:** Separate SDK repos live as independent clones or active scaffolds under `sdks/` for single-workspace development. The core repo now ships `sdks.json` plus `scripts/bootstrap-sdks.sh`, root workspace/test/typecheck wiring no longer hardcodes the staged JS SDK tree, and the legacy tracked SDK snapshot directories have been removed from the core repo index. The public site repo lives as a real local clone at the root `site/` path for day-to-day work, while lower-touch companion repos such as `debugbundle/action` live under ignored `.local-repos/` clones. Temporary operator notes and local execution checklists live under ignored `.local-notes/`. On an older long-lived checkout, remove any pre-cutover `sdks/debugbundle-js`, `sdks/debugbundle-python`, or `sdks/debugbundle-php` directories from disk before the first bootstrap run so those paths can be recloned cleanly.
 The current local SDK repo set includes `debugbundle-js`, `debugbundle-python`, `debugbundle-php`, `debugbundle-wordpress`, `debugbundle-java`, `debugbundle-go`, `debugbundle-ruby`, `debugbundle-android`, `debugbundle-swift`, the published `debugbundle-react-native` SDK repo, and the published `debugbundle-dotnet` SDK repo.
 
-**Wave 1 (active pre-launch scope):**
+**Published V1 backend SDK scope:**
 
 | SDK       | Repository                                     | Package Registry                       | Frameworks                                                |
 | --------- | ---------------------------------------------- | -------------------------------------- | --------------------------------------------------------- |
@@ -179,7 +179,7 @@ The current local SDK repo set includes `debugbundle-js`, `debugbundle-python`, 
 
 Detailed implementation plans live in `spec/sdks/java-sdk.md`, `spec/sdks/go-sdk.md`, `spec/sdks/ruby-sdk.md`, `spec/sdks/csharp-sdk.md`, `spec/sdks/kotlin-sdk.md`, `spec/sdks/swift-sdk.md`, and `spec/sdks/react-native-sdk.md`; Java, Ruby, and Go now follow their plans in local standalone repos, the Kotlin Android repo now has its core/runtime, offline queue, crash/ANR replay, native HTTP instrumentation, UI/logging adapters, and probe-directive slice implemented locally against its plan, the Swift iOS repo now has bundle/runtime config resolution, configurable queue file protection, connectivity-aware deferred delivery, automatic batch/interval/background flushing, bounded UIKit background-flush execution windows, capped per-send batch sizing, bounded retry windows, bounded remote-config refresh, internal diagnostics for terminal `4xx` queue drops, explicit async operation and task capture helpers, its core client, durable queue, HTTP transport, UIKit app/scene/view-controller/navigation helpers, SwiftUI scene/navigation/action helpers, explicit URLSession request capture (wrapper plus URLProtocol/configuration paths), optional Alamofire adapter, SwiftLog adapter, capture-policy enforcement, remote probes, Objective-C exception bridging, next-launch crash replay helpers, queue/mock-ingestion/fixture test support, and CocoaPods `DebugBundle@0.1.1` published, React Native now has a published npm SDK with TypeScript public API, safe degraded native-module behavior, JS redaction, fetch/XHR trace propagation, React/React Navigation helpers, Expo plugin, Android/iOS wrapper glue that delegates to native SDK foundations, packed clean-install smoke, Android Docker clean RN app smoke, iOS CocoaPods/Xcode clean RN app smoke, and tag-triggered npm release, and C#/.NET now has the planned NuGet package family published at `0.1.1` with core capture/redaction/suppression/probes/transports/vanilla hooks, ASP.NET Core middleware/browser relay/Blazor Server, Microsoft.Extensions.Logging, Serilog, NLog, log4net, gRPC, Worker, Hangfire, Azure Functions isolated worker, CI, pack, staged-package clean-install smoke, and published-package clean-install smoke across .NET 8 and .NET 10 consumer lanes.
 
-**Wave 2 (post-launch):**
+**Future backend expansion:**
 
 | SDK             | Repository                                  | Package Registry          | Frameworks      |
 | --------------- | ------------------------------------------- | ------------------------- | --------------- |
@@ -187,7 +187,7 @@ Detailed implementation plans live in `spec/sdks/java-sdk.md`, `spec/sdks/go-sdk
 | Kotlin (server) | `github.com/debugbundle/debugbundle-kotlin` | Maven Central             | Ktor            |
 | Rust            | `github.com/debugbundle/debugbundle-rust`   | crates.io (`debugbundle`) | Axum, Actix Web |
 
-**Wave 3 (post-launch, follows Mobile Correlation Contract):**
+**Future mobile expansion, follows Mobile Correlation Contract:**
 
 | SDK              | Repository                                        | Package Registry        | Frameworks        |
 | ---------------- | ------------------------------------------------- | ----------------------- | ----------------- |
@@ -345,7 +345,7 @@ The public documentation/marketing/blog site lives in the standalone public repo
   - `schema-migrations.ts` — ordered forward migrations, migration ledger/checksum enforcement, and runtime readiness assertions for existing databases
 - **Key constraint:** All external consumers import only from `index.ts` barrel
 
-**Production DB rule:** After first public release, schema changes must never rely on bootstrap SQL or restart ordering alone. Use forward migrations, run them before API/worker consume the schema, and ship destructive cleanup only after compatible code has already been live.
+**Production DB rule:** Schema changes must never rely on bootstrap SQL or restart ordering alone. Use forward migrations, run them before API/worker consume the schema, and ship destructive cleanup only after compatible code has already been live.
 
 ### `packages/retrieval-client`
 

@@ -213,12 +213,13 @@ Error code categories: `AUTH`, `SDK`, `CLI`, `ING` (ingestion), `BND` (bundle), 
 
 ---
 
-## 9. Pre-Production Removal Policy
+## 9. Deprecation And Breaking Change Policy
 
-- Before first public release, remove obsolete features outright instead of adding deprecation scaffolding.
-- Do not add `@deprecated` markers, compatibility shims, or warning-only fallback paths for internal cleanups unless a source-of-truth spec explicitly requires a temporary public bridge.
-- If a pre-release public surface is intentionally retained, document the reason in the relevant spec or contract rather than relying on ad hoc deprecation comments.
-- After first public release, adopt an explicit deprecation policy before removing supported public interfaces.
+- Public package APIs, SDK init signatures, event schemas, CLI JSON output, MCP tool schemas, and webhook payloads are production interfaces.
+- Breaking changes require a major version bump, changelog entry under `### Breaking`, migration guidance, and matching documentation updates.
+- Supported public interfaces must be deprecated before removal unless a security or abuse-control source of truth requires immediate disablement.
+- Deprecation markers are allowed only for supported public interfaces with a documented replacement and removal timeline.
+- Internal-only cleanup should still delete obsolete code directly when no installed project or public interface depends on it.
 
 ---
 

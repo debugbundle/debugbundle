@@ -7,7 +7,7 @@ Last updated: 2026-05-31
 
 ## 1. Required Repository Files
 
-Before public release, the repository must contain these root-level files:
+The public repository must contain these root-level files:
 
 | File | Purpose | Status |
 |------|---------|--------|
@@ -110,18 +110,13 @@ Handles production deployment, container publishing to private registries, and i
 
 ## 3. Breaking Change Policy
 
-### Pre-v1 (current)
-- Breaking changes allowed in any release.
-- No migration guides required (users can reset).
-- See AGENTS.md section 0 — Pre-Production rules.
-
-### Post-v1
+### Production
 - Breaking changes require a major version bump.
 - Migration guide must be published: what changed, why, how to update.
 - Deprecated features retained for at least one major version before removal.
 - Breaking changes must be announced in CHANGELOG under `### Breaking`.
 
-### Post-v1 Database Schema Evolution Policy
+### Production Database Schema Evolution Policy
 
 - Production database changes must use ordered forward migrations. Clean-schema bootstrap files are not a supported upgrade mechanism.
 - Hosted and self-hosted deploy procedures must run migrations before new application code is started against the target database.
@@ -185,6 +180,6 @@ Each example must include:
 
 ## 8. Status Page
 
-- Cloud service health exposed at `status.debugbundle.com` (post-launch).
+- Cloud service health should be exposed at `status.debugbundle.com`.
 - Health check endpoints: `GET /healthz` (API), `GET /readyz` (Worker).
 - Downtime notifications via status page and optional webhook.

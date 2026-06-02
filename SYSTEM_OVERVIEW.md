@@ -26,7 +26,7 @@ DebugBundle supports two runtime modes: **local-only** (no cloud account require
 │    @debugbundle/sdk-node, @debugbundle/sdk-browser              │
 │  JS packages still published from core today:                   │
 │    @debugbundle/shared-types, @debugbundle/redaction            │
-│  Completed non-TS/integration pre-launch scope:                 │
+│  Completed non-TS/integration launch scope:                     │
 │    debugbundle-python, debugbundle/sdk-php,                     │
 │    debugbundle-wordpress, com.debugbundle Java SDK,             │
 │    debugbundle Ruby SDK, github.com/debugbundle/debugbundle-go  │
@@ -35,9 +35,9 @@ DebugBundle supports two runtime modes: **local-only** (no cloud account require
 │    Central at 0.1.2 with core/runtime, OkHttp/Ktor, Navigation, │
 │    Compose, Timber, offline queueing, crash/ANR replay, and     │
 │    remote probes;                                               │
-│  Wave 2 (post-launch; C# published): C#, Kotlin                │
+│  Future backend expansion (C# published): C#, Kotlin           │
 │    server, Rust                                                │
-│  Wave 3 (post-launch; remaining mobile expansion):             │
+│  Future mobile expansion:                                      │
 │    Swift iOS now has a local standalone repo with core         │
 │    capture, bundle/runtime config resolution, offline          │
 │    queueing, HTTP transport, lifecycle breadcrumbs, explicit   │
@@ -328,7 +328,7 @@ scripts/         — Dev/CI utility scripts
 
 See `/spec/local-first-onboarding.md` for the full artifact layout rationale.
 
-**Repo strategy:** This workspace is now the public `debugbundle/debugbundle` core checkout. The public `debugbundle-js`, `debugbundle-python`, and `debugbundle-php` repos exist as separate org repos and are pulled into `sdks/` only as real local clones when needed. The public site repo now lives as a real local clone at the root `site/` path, while lower-touch companion repos such as `debugbundle/action` stay under ignored `.local-repos/` clones. `shared-types` and `redaction` remain core-owned published libraries because product code still has meaningful direct source coupling to them here, and core now owns only their stable release workflow. `@debugbundle/sdk-node` and `@debugbundle/sdk-browser` now publish from the dedicated `debugbundle/debugbundle-js` repo workflow instead of the core workspace, while the core workspace continues to dogfood published npm artifacts by disabling implicit pnpm workspace linking for non-`workspace:` ranges. The intended pre-launch release order is shared packages first, JS SDK family second, then dependent wrappers such as WordPress; after registry publish, bump the dogfooding manifests in the root app, hosted SPA, and public site before hosted validation or deploy. Environment-specific deployment and operations details are intentionally outside this public overview. Older long-lived local checkouts may still need one manual cleanup of pre-cutover `sdks/` directories before first bootstrap.
+**Repo strategy:** This workspace is now the public `debugbundle/debugbundle` core checkout. The public `debugbundle-js`, `debugbundle-python`, and `debugbundle-php` repos exist as separate org repos and are pulled into `sdks/` only as real local clones when needed. The public site repo now lives as a real local clone at the root `site/` path, while lower-touch companion repos such as `debugbundle/action` stay under ignored `.local-repos/` clones. `shared-types` and `redaction` remain core-owned published libraries because product code still has meaningful direct source coupling to them here, and core now owns only their stable release workflow. `@debugbundle/sdk-node` and `@debugbundle/sdk-browser` now publish from the dedicated `debugbundle/debugbundle-js` repo workflow instead of the core workspace, while the core workspace continues to dogfood published npm artifacts by disabling implicit pnpm workspace linking for non-`workspace:` ranges. The production release train publishes dependency roots before dependent packages: shared packages first, JS SDK family second, then dependent wrappers such as WordPress. After registry publish, bump the dogfooding manifests in the root app, hosted SPA, and public site before hosted validation or deploy. Environment-specific deployment and operations details are intentionally outside this public overview. Older long-lived local checkouts may still need one manual cleanup of pre-cutover `sdks/` directories before first bootstrap.
 
 ---
 
@@ -386,4 +386,4 @@ This working tree is now the public core repo checkout. Local multi-repo conveni
 
 ## Status
 
-**Pre-production.** No backwards compatibility required. Break freely when improving.
+**Production.** DebugBundle is live with installed projects. Backwards compatibility, forward migrations, deprecation discipline, and documented major-version upgrade paths are mandatory for public interfaces and persisted data.

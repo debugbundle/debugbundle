@@ -120,9 +120,9 @@ Organizations on the `free` plan have:
 
 ## 4. Checkout Flow
 
-### 4.1 Current State (Pre-Production)
+### 4.1 Production Checkout State
 
-The current implementation creates Stripe Checkout and portal sessions dynamically whenever the Stripe SDK is fully configured with secret and price-id env vars.
+The production implementation creates Stripe Checkout and portal sessions dynamically whenever the Stripe SDK is fully configured with secret and price-id env vars.
 
 Static fallback URLs still exist as a development scaffold when Stripe credentials are intentionally absent:
 - `STRIPE_SOLO_CHECKOUT_URL` → static Payment Link or Checkout URL for Solo
@@ -131,9 +131,9 @@ Static fallback URLs still exist as a development scaffold when Stripe credentia
 
 Those fallback URLs cannot carry the `organization_id` to Stripe, so hosted production must use dynamic session creation instead of relying on static links.
 
-### 4.2 Production Target: Dynamic Checkout Sessions
+### 4.2 Dynamic Checkout Sessions
 
-For production, the checkout route must create a Stripe Checkout Session dynamically using the Stripe SDK.
+The checkout route must create a Stripe Checkout Session dynamically using the Stripe SDK.
 
 **Required Checkout Session parameters:**
 

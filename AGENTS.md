@@ -6,28 +6,23 @@ This file is the mandatory execution contract for AI agents working on DebugBund
 
 ## 0) Critical Rules
 
-### Development Phase Status: PRE-PRODUCTION
+### Development Phase Status: PRODUCTION
 
-**This project is NOT in production. Therefore:**
+**This project is live and has installed projects. Therefore:**
 
-1. **NO backwards compatibility** — Break things freely when improving
-2. **NO legacy code** — Remove old implementations entirely, don't keep both
-3. **NO migration paths** — Users can clear browser data if needed
-4. **NO workarounds for old patterns** — Clean implementations only
-5. **NO deprecated code comments** — Delete, don't comment out
+1. **Backwards compatibility matters** — Public APIs, SDK behavior, CLI output, MCP tools, bundle schemas, webhook payloads, and persisted data must not be broken casually.
+2. **No silent breaking changes** — Breaking changes require an explicit major-version path, migration guidance, changelog coverage, and user-facing documentation.
+3. **Installed projects must keep working** — Avoid changes that strand existing SDK installs, project tokens, browser relay routes, profiles, bundles, or self-hosted databases.
+4. **Deprecate deliberately** — Public interfaces must be retained through the documented deprecation window before removal unless a source-of-truth security rule requires immediate disablement.
+5. **Clean implementations still matter** — Do not add fragile shims or stale comments; when compatibility is required, make the compatibility path explicit, tested, and documented.
 
-### When This Changes
-- These rules apply until first public release
-- Before going to production: revisit this document
-- After production: backwards compatibility becomes mandatory
-
-### Post-Production Database Change Standard
-- After first public release, treat every database schema change as a production migration task.
+### Production Database Change Standard
+- Treat every database schema change as a production migration task.
 - `db-bootstrap` is for clean empty-schema creation only. It must never be used as a schema-upgrade path for existing environments.
 - All schema evolution must ship through ordered forward migrations with ledger/checksum validation.
 - Deploys must run required migrations before new API or worker code is allowed to consume the changed schema.
 - Database changes must follow expand/contract discipline: additive change first, application code compatible with both shapes when needed, backfill separately when needed, destructive cleanup only in a later deploy.
-- Do not merge or ship a post-production schema change unless tests cover the migration path and the deploy/runtime path fails closed when required migrations are missing.
+- Do not merge or ship a schema change unless tests cover the migration path and the deploy/runtime path fails closed when required migrations are missing.
 
 ---
 
