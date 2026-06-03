@@ -35,9 +35,11 @@ const API_TABLE_ROWS = [
   { table_name: "audit_logs" },
   { table_name: "processed_billing_events" },
   { table_name: "github_installations" },
+  { table_name: "github_marketplace_accounts" },
   { table_name: "project_github_repos" },
   { table_name: "github_dispatch_rules" },
-  { table_name: "github_dispatch_deliveries" }
+  { table_name: "github_dispatch_deliveries" },
+  { table_name: "processed_github_marketplace_events" }
 ];
 
 function buildMigratedApiSchemaDb(): Queryable {

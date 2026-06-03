@@ -832,6 +832,7 @@ describe("api default dependencies", () => {
       channel: "email",
       condition_type: "new_incident",
       config: { to: "owner@example.com" },
+      cooldown_seconds: 0,
       is_enabled: true
     });
     expect(metadataStore.updateAlertForOrganization).toHaveBeenCalledWith({
