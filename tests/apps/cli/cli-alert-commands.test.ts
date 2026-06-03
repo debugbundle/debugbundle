@@ -36,6 +36,7 @@ describe("cli alert commands", () => {
             channel: "email",
             condition_type: "severity_threshold",
             severity_min: "high",
+            cooldown_seconds: 0,
             config: { to: "owner@example.com" },
             is_enabled: true,
             created_at: "2026-03-15T00:00:00.000Z",
@@ -46,7 +47,7 @@ describe("cli alert commands", () => {
     );
 
     expect(result.exitCode).toBe(0);
-    expect(result.output).toContain("al_1 | enabled | severity_threshold | email | project=proj_1");
+    expect(result.output).toContain("al_1 | enabled | severity_threshold | email | cooldown=0s | project=proj_1");
   });
 
   it("loads stored auth state and forwards it into alert creation", async () => {
