@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { gunzipSync, gzipSync } from "node:zlib";
 
 import {
@@ -67,12 +68,12 @@ import {
 import {
   applyCaptureRuleEventClass,
   BundleV1Schema,
-  classifyRequestStatus,
   getRequestAnomalyThreshold,
   type BundleV1,
   type EventEnvelope
 } from "../../../packages/shared-types/src/index.js";
 import { evaluateRequestAnomalyCandidate } from "./request-anomaly.js";
+import { inferSeverity } from "./severity.js";
 import {
   maybeGenerateHostedImprovementBundle,
   maybeGenerateHostedIncidentImprovementBundle,
@@ -235,6 +236,56 @@ function normalizeWorkerBaseUrl(value: string | undefined): string | null {
 
 function appendUrlPath(baseUrl: string, path: string): string {
   return baseUrl.endsWith(path) ? baseUrl : `${baseUrl}${path}`;
+}
+
+function stableJson(value: unknown): string {
+  if (value === null || typeof value !== "object") {
+    return JSON.stringify(value);
+  }
+
+  if (Array.isArray(value)) {
+    return `[${value.map((entry) => stableJson(entry)).join(",")}]`;
+  }
+
+  const record = value as Record<string, unknown>;
+  const keys = Object.keys(record).sort();
+  return `{${keys.map((key) => `${JSON.stringify(key)}:${stableJson(record[key])}`).join(",")}}`;
+}
+
+function buildAlertNotificationKey(input: {
+  event: EventEnvelope;
+  normalized: {
+    error_type: string | null;
+    normalized_message: string;
+    route_template: string | null;
+    browser_event_kind?: "window_error" | "resource_error" | null;
+    resource_host?: string | null;
+    resource_path?: string | null;
+  };
+  fingerprint: string;
+}): string {
+  if (
+    input.event.event_type === "frontend_exception" &&
+    input.event.payload.browser_event?.opaque === true
+  ) {
+    return createHash("sha256")
+      .update(
+        stableJson({
+          kind: "opaque_browser_alert",
+          event_type: input.event.event_type,
+          service_name: input.event.service.name,
+          environment: input.event.service.environment,
+          error_type: input.normalized.error_type,
+          normalized_message: input.normalized.normalized_message,
+          browser_event_kind: input.normalized.browser_event_kind ?? null,
+          resource_host: input.normalized.resource_host ?? null,
+          resource_path: input.normalized.resource_path ?? null
+        })
+      )
+      .digest("hex");
+  }
+
+  return input.fingerprint;
 }
 
 function buildWorkerBundleLinkBaseUrls(env: Record<string, string | undefined>): BundleLinkBaseUrls {
@@ -528,6 +579,7 @@ async function enqueueAlertEvaluation(
     incident_id: string;
     condition_type: AlertConditionType;
     dedupe_key: string;
+    notification_key?: string;
     occurred_at: string;
     summary?: string;
     service_name: string;
@@ -539,33 +591,6 @@ async function enqueueAlertEvaluation(
   if (queue !== undefined) {
     await queue.enqueue("evaluate-alerts", input);
   }
-}
-
-function inferSeverity(
-  event: EventEnvelope,
-  capturePreset: "minimal" | "balanced" | "investigative" = "minimal",
-  immediateClientErrorStatuses: readonly number[] = []
-): "low" | "medium" | "high" | "critical" {
-  if (
-    event.event_type === "request_event"
-    && classifyRequestStatus({
-      responseStatus: event.payload.response_status,
-      capturePreset,
-      immediateClientErrorStatuses
-    }) === "incident_signal"
-  ) {
-    return "high";
-  }
-
-  if (event.event_type === "backend_exception" || event.event_type === "frontend_exception") {
-    return "high";
-  }
-
-  if (event.event_type === "error_suppressed") {
-    return "medium";
-  }
-
-  return "low";
 }
 
 export async function processNextNormalizeEventsJob(
@@ -639,6 +664,11 @@ export async function processNextNormalizeEventsJob(
     service_name: validated.data.service.name,
     environment: validated.data.service.environment,
     fingerprint: computedFingerprint,
+    alert_notification_key: buildAlertNotificationKey({
+      event: validated.data,
+      normalized,
+      fingerprint: computedFingerprint
+    }),
     fingerprint_version: FINGERPRINT_VERSION,
     normalized_message: normalized.normalized_message,
     matched_fields: matchedFields,
@@ -890,6 +920,7 @@ export async function processNextGroupIncidentJob(
         incident_id: incident.incident_id,
         condition_type: "new_incident",
         dedupe_key: "new_incident",
+        notification_key: job.alert_notification_key ?? job.fingerprint,
         occurred_at: job.occurred_at,
         summary: incidentTitle,
         service_name: job.service_name,
@@ -903,6 +934,7 @@ export async function processNextGroupIncidentJob(
       incident_id: incident.incident_id,
       condition_type: "severity_threshold",
       dedupe_key: `severity_threshold:${job.severity}`,
+      notification_key: job.alert_notification_key ?? job.fingerprint,
       occurred_at: job.occurred_at,
       summary: incidentTitle,
       service_name: job.service_name,
@@ -916,6 +948,7 @@ export async function processNextGroupIncidentJob(
         incident_id: incident.incident_id,
         condition_type: "incident_regressed",
         dedupe_key: "incident_regressed",
+        notification_key: job.alert_notification_key ?? job.fingerprint,
         occurred_at: job.occurred_at,
         summary: incidentTitle,
         service_name: job.service_name,
@@ -930,6 +963,7 @@ export async function processNextGroupIncidentJob(
           incident_id: incident.incident_id,
           condition_type: "regression_after_deploy",
           dedupe_key: "regression_after_deploy",
+          notification_key: job.alert_notification_key ?? job.fingerprint,
           occurred_at: job.occurred_at,
           summary: incidentTitle,
           service_name: job.service_name,
@@ -990,6 +1024,7 @@ export async function processNextGroupIncidentJob(
           incident_id: incident.incident_id,
           condition_type: "error_spike",
           dedupe_key: "error_spike",
+          notification_key: job.alert_notification_key ?? job.fingerprint,
           occurred_at: job.occurred_at,
           summary: incidentTitle,
           service_name: job.service_name,
@@ -1051,6 +1086,7 @@ export async function processNextEvaluateAlertsJob(
   let alertAllowanceLimit: number | null = null;
   let alertUsageWindowStartsAt: string | null = null;
   let alertUsageWindowEndsAt: string | null = null;
+  const notificationKey = job.notification_key ?? job.dedupe_key;
   if (dependencies.billingStore !== undefined) {
     const billingSummary = await dependencies.billingStore.getBillingSummaryForProject({
       project_id: job.project_id,
@@ -1098,6 +1134,8 @@ export async function processNextEvaluateAlertsJob(
         incident_id: job.incident_id,
         condition_type: job.condition_type,
         dedupe_key: job.dedupe_key,
+        notification_key: notificationKey,
+        cooldown_seconds: alert.cooldown_seconds,
         recipient,
         payload,
         aggregation_window_seconds: ALERT_EMAIL_DIGEST_WINDOW_SECONDS,
@@ -1168,6 +1206,8 @@ export async function processNextEvaluateAlertsJob(
       incident_id: job.incident_id,
       condition_type: job.condition_type,
       dedupe_key: job.dedupe_key,
+      notification_key: notificationKey,
+      cooldown_seconds: alert.cooldown_seconds,
       channel: alert.channel,
       payload
     });

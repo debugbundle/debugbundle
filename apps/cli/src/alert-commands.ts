@@ -29,7 +29,7 @@ function formatAlertTable(alerts: AlertRecord[]): string {
   return alerts
     .map(
       (alert) =>
-        `${alert.alert_id} | ${alert.is_enabled ? "enabled" : "disabled"} | ${alert.condition_type} | ${alert.channel} | project=${alert.project_id}`
+        `${alert.alert_id} | ${alert.is_enabled ? "enabled" : "disabled"} | ${alert.condition_type} | ${alert.channel} | cooldown=${alert.cooldown_seconds}s | project=${alert.project_id}`
     )
     .join("\n");
 }
@@ -98,6 +98,7 @@ export async function createAlertCommand(
     channel: AlertChannel;
     conditionType: AlertConditionType;
     severityMin?: "low" | "medium" | "high" | "critical";
+    cooldownSeconds?: number;
     config: Record<string, unknown>;
     isEnabled?: boolean;
     json?: boolean;
@@ -110,6 +111,7 @@ export async function createAlertCommand(
       channel: AlertChannel;
       conditionType: AlertConditionType;
       severityMin?: "low" | "medium" | "high" | "critical";
+      cooldownSeconds?: number;
       config: Record<string, unknown>;
       isEnabled?: boolean;
     }): Promise<AlertRecord>;
@@ -123,6 +125,7 @@ export async function createAlertCommand(
       channel: AlertChannel;
       conditionType: AlertConditionType;
       severityMin?: "low" | "medium" | "high" | "critical";
+      cooldownSeconds?: number;
       config: Record<string, unknown>;
       isEnabled?: boolean;
     } = {
@@ -137,6 +140,9 @@ export async function createAlertCommand(
     }
     if (input.severityMin !== undefined) {
       requestInput.severityMin = input.severityMin;
+    }
+    if (input.cooldownSeconds !== undefined) {
+      requestInput.cooldownSeconds = input.cooldownSeconds;
     }
     if (input.isEnabled !== undefined) {
       requestInput.isEnabled = input.isEnabled;
@@ -160,6 +166,7 @@ export async function createAlertWithAuthCommand(
     channel: AlertChannel;
     conditionType: AlertConditionType;
     severityMin?: "low" | "medium" | "high" | "critical";
+    cooldownSeconds?: number;
     config: Record<string, unknown>;
     isEnabled?: boolean;
     json?: boolean;
@@ -177,6 +184,7 @@ export async function createAlertWithAuthCommand(
         channel: AlertChannel;
         conditionType: AlertConditionType;
         severityMin?: "low" | "medium" | "high" | "critical";
+        cooldownSeconds?: number;
         config: Record<string, unknown>;
         isEnabled?: boolean;
         json?: boolean;
@@ -192,6 +200,9 @@ export async function createAlertWithAuthCommand(
       }
       if (input.severityMin !== undefined) {
         commandInput.severityMin = input.severityMin;
+      }
+      if (input.cooldownSeconds !== undefined) {
+        commandInput.cooldownSeconds = input.cooldownSeconds;
       }
       if (input.isEnabled !== undefined) {
         commandInput.isEnabled = input.isEnabled;
@@ -216,6 +227,7 @@ export async function updateAlertCommand(
     channel?: AlertChannel;
     conditionType?: AlertConditionType;
     severityMin?: "low" | "medium" | "high" | "critical" | null;
+    cooldownSeconds?: number;
     config?: Record<string, unknown> | null;
     isEnabled?: boolean;
     json?: boolean;
@@ -229,6 +241,7 @@ export async function updateAlertCommand(
       channel?: AlertChannel;
       conditionType?: AlertConditionType;
       severityMin?: "low" | "medium" | "high" | "critical" | null;
+      cooldownSeconds?: number;
       config?: Record<string, unknown> | null;
       isEnabled?: boolean;
     }): Promise<AlertRecord>;
@@ -243,6 +256,7 @@ export async function updateAlertCommand(
       channel?: AlertChannel;
       conditionType?: AlertConditionType;
       severityMin?: "low" | "medium" | "high" | "critical" | null;
+      cooldownSeconds?: number;
       config?: Record<string, unknown> | null;
       isEnabled?: boolean;
     } = {
@@ -261,6 +275,9 @@ export async function updateAlertCommand(
     }
     if (input.severityMin !== undefined) {
       requestInput.severityMin = input.severityMin;
+    }
+    if (input.cooldownSeconds !== undefined) {
+      requestInput.cooldownSeconds = input.cooldownSeconds;
     }
     if (input.config !== undefined) {
       requestInput.config = input.config;
@@ -288,6 +305,7 @@ export async function updateAlertWithAuthCommand(
     channel?: AlertChannel;
     conditionType?: AlertConditionType;
     severityMin?: "low" | "medium" | "high" | "critical" | null;
+    cooldownSeconds?: number;
     config?: Record<string, unknown> | null;
     isEnabled?: boolean;
     json?: boolean;
@@ -306,6 +324,7 @@ export async function updateAlertWithAuthCommand(
         channel?: AlertChannel;
         conditionType?: AlertConditionType;
         severityMin?: "low" | "medium" | "high" | "critical" | null;
+        cooldownSeconds?: number;
         config?: Record<string, unknown> | null;
         isEnabled?: boolean;
         json?: boolean;
@@ -325,6 +344,9 @@ export async function updateAlertWithAuthCommand(
       }
       if (input.severityMin !== undefined) {
         commandInput.severityMin = input.severityMin;
+      }
+      if (input.cooldownSeconds !== undefined) {
+        commandInput.cooldownSeconds = input.cooldownSeconds;
       }
       if (input.config !== undefined) {
         commandInput.config = input.config;

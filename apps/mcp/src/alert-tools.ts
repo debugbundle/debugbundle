@@ -19,6 +19,7 @@ export function createAlertMcpTools(api: {
     channel: string;
     conditionType: string;
     severityMin?: string;
+    cooldownSeconds?: number;
     config: Record<string, unknown>;
     isEnabled?: boolean;
   }): Promise<unknown>;
@@ -30,6 +31,7 @@ export function createAlertMcpTools(api: {
     channel?: string;
     conditionType?: string;
     severityMin?: string | null;
+    cooldownSeconds?: number;
     config?: Record<string, unknown> | null;
     isEnabled?: boolean;
   }): Promise<unknown>;
@@ -61,6 +63,7 @@ export function createAlertMcpTools(api: {
           channel: string;
           conditionType: string;
           severityMin?: string;
+          cooldownSeconds?: number;
           config: Record<string, unknown>;
           isEnabled?: boolean;
         } = {
@@ -75,6 +78,9 @@ export function createAlertMcpTools(api: {
         }
         if (typeof input["severityMin"] === "string") {
           requestInput.severityMin = input["severityMin"];
+        }
+        if (typeof input["cooldownSeconds"] === "number") {
+          requestInput.cooldownSeconds = input["cooldownSeconds"];
         }
         if (typeof input["isEnabled"] === "boolean") {
           requestInput.isEnabled = input["isEnabled"];
@@ -96,6 +102,7 @@ export function createAlertMcpTools(api: {
           channel?: string;
           conditionType?: string;
           severityMin?: string | null;
+          cooldownSeconds?: number;
           config?: Record<string, unknown> | null;
           isEnabled?: boolean;
         } = {
@@ -118,6 +125,9 @@ export function createAlertMcpTools(api: {
           requestInput.severityMin = input["severityMin"];
         } else if (input["severityMin"] === null) {
           requestInput.severityMin = null;
+        }
+        if (typeof input["cooldownSeconds"] === "number") {
+          requestInput.cooldownSeconds = input["cooldownSeconds"];
         }
         if (typeof input["config"] === "object") {
           requestInput.config = input["config"] as Record<string, unknown> | null;

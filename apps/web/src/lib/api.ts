@@ -293,6 +293,7 @@ export interface AlertRecord {
   channel: AlertChannel;
   condition_type: AlertConditionType;
   severity_min: "low" | "medium" | "high" | "critical" | null;
+  cooldown_seconds: number;
   config: Record<string, unknown>;
   is_enabled: boolean;
   created_at: string;
@@ -1202,6 +1203,7 @@ export async function createProjectAlert(payload: {
   channel: AlertChannel;
   condition_type: AlertConditionType;
   severity_min?: "low" | "medium" | "high" | "critical";
+  cooldown_seconds?: number;
   config: Record<string, unknown>;
   is_enabled?: boolean;
 }): Promise<AlertRecord> {
@@ -1216,6 +1218,7 @@ export async function createProjectAlert(payload: {
         channel: payload.channel,
         condition_type: payload.condition_type,
         severity_min: payload.severity_min,
+        cooldown_seconds: payload.cooldown_seconds ?? 0,
         config: payload.config,
         is_enabled: payload.is_enabled ?? true
       })

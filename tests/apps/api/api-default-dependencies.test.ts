@@ -627,6 +627,7 @@ describe("api default dependencies", () => {
       created_by_user_id: "usr_123",
       channel: "email",
       condition_type: "new_incident",
+      cooldown_seconds: 0,
       config: { to: "owner@example.com" },
       is_enabled: true
     });

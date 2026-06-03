@@ -157,6 +157,7 @@ export interface AlertRecord {
   channel: AlertChannel;
   condition_type: AlertConditionType;
   severity_min: "low" | "medium" | "high" | "critical" | null;
+  cooldown_seconds: number;
   config: Record<string, unknown>;
   is_enabled: boolean;
   created_at: string;
@@ -450,6 +451,7 @@ export function createAlert(overrides: Partial<AlertRecord> = {}): AlertRecord {
     channel: "email",
     condition_type: "new_incident",
     severity_min: null,
+    cooldown_seconds: 0,
     config: { to: "owen@example.com" },
     is_enabled: true,
     created_at: "2026-03-17T00:00:00.000Z",

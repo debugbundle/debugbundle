@@ -1661,6 +1661,7 @@ export async function handleAlertCommand(parsedArgv: ParsedArgv, dependencies: M
       "channel",
       "condition",
       "severity-min",
+      "cooldown",
       "config-json",
       "is-enabled"
     ]);
@@ -1689,6 +1690,7 @@ export async function handleAlertCommand(parsedArgv: ParsedArgv, dependencies: M
       channel: string;
       conditionType: string;
       severityMin?: string;
+      cooldownSeconds?: number;
       config?: Record<string, unknown>;
       isEnabled?: boolean;
       authFilePath?: string;
@@ -1702,6 +1704,10 @@ export async function handleAlertCommand(parsedArgv: ParsedArgv, dependencies: M
     const severityMin = readStringOption(parsedArgv, "severity-min");
     if (severityMin !== undefined) {
       input.severityMin = severityMin;
+    }
+    const cooldownSeconds = readIntegerOption(parsedArgv, "cooldown");
+    if (cooldownSeconds !== undefined) {
+      input.cooldownSeconds = cooldownSeconds;
     }
     const config = readJsonOption(parsedArgv, "config-json");
     if (config === undefined || typeof config !== "object" || config === null) {
@@ -1725,6 +1731,7 @@ export async function handleAlertCommand(parsedArgv: ParsedArgv, dependencies: M
       "channel",
       "condition",
       "severity-min",
+      "cooldown",
       "config-json",
       "is-enabled"
     ]);
@@ -1744,6 +1751,7 @@ export async function handleAlertCommand(parsedArgv: ParsedArgv, dependencies: M
       channel?: string;
       conditionType?: string;
       severityMin?: string | null;
+      cooldownSeconds?: number;
       config?: Record<string, unknown> | null;
       isEnabled?: boolean;
       authFilePath?: string;
@@ -1766,6 +1774,10 @@ export async function handleAlertCommand(parsedArgv: ParsedArgv, dependencies: M
     if (severityMin !== undefined) {
       input.severityMin = severityMin === "null" ? null : severityMin;
     }
+    const cooldownSeconds = readIntegerOption(parsedArgv, "cooldown");
+    if (cooldownSeconds !== undefined) {
+      input.cooldownSeconds = cooldownSeconds;
+    }
     const config = readJsonOption(parsedArgv, "config-json");
     if (config !== undefined) {
       input.config = config as Record<string, unknown> | null;
@@ -1780,6 +1792,7 @@ export async function handleAlertCommand(parsedArgv: ParsedArgv, dependencies: M
       input.channel === undefined &&
       input.conditionType === undefined &&
       input.severityMin === undefined &&
+      input.cooldownSeconds === undefined &&
       input.config === undefined &&
       input.isEnabled === undefined
     ) {

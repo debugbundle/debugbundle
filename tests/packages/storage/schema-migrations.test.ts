@@ -92,6 +92,7 @@ describe("storage schema migrations", () => {
     const currentSchemaColumns = [
       { table_name: "agent_webhooks", column_name: "created_by_user_id" },
       { table_name: "alert_rules", column_name: "created_by_user_id" },
+      { table_name: "alert_rules", column_name: "cooldown_seconds" },
       { table_name: "capture_policies", column_name: "immediate_client_error_statuses" },
       { table_name: "github_dispatch_rules", column_name: "created_by_user_id" },
       { table_name: "github_dispatch_deliveries", column_name: "target_fingerprint" },

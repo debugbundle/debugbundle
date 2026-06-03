@@ -526,10 +526,12 @@ export interface ApiDependencies {
       Array<{
         alert_id: string;
         project_id: string;
+        created_by_user_id: string;
         service_id: string | null;
         channel: AlertChannel;
         condition_type: AlertConditionType;
         severity_min: "low" | "medium" | "high" | "critical" | null;
+        cooldown_seconds: number;
         config: Record<string, unknown>;
         is_enabled: boolean;
         created_at: string;
@@ -544,6 +546,7 @@ export interface ApiDependencies {
       channel: AlertChannel;
       condition_type: AlertConditionType;
       severity_min?: "low" | "medium" | "high" | "critical";
+      cooldown_seconds: number;
       config: Record<string, unknown>;
       is_enabled: boolean;
     }): Promise<{
@@ -554,6 +557,7 @@ export interface ApiDependencies {
       channel: AlertChannel;
       condition_type: AlertConditionType;
       severity_min: "low" | "medium" | "high" | "critical" | null;
+      cooldown_seconds: number;
       config: Record<string, unknown>;
       is_enabled: boolean;
       created_at: string;
@@ -569,6 +573,7 @@ export interface ApiDependencies {
       channel?: AlertChannel;
       condition_type?: AlertConditionType;
       severity_min?: "low" | "medium" | "high" | "critical" | null;
+      cooldown_seconds?: number;
       config?: Record<string, unknown> | null;
       is_enabled?: boolean;
     }): Promise<{
@@ -579,6 +584,7 @@ export interface ApiDependencies {
       channel: AlertChannel;
       condition_type: AlertConditionType;
       severity_min: "low" | "medium" | "high" | "critical" | null;
+      cooldown_seconds: number;
       config: Record<string, unknown>;
       is_enabled: boolean;
       created_at: string;

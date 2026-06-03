@@ -432,6 +432,7 @@ const BaseCreateAlertBodySchema = {
   service_id: z.string().uuid().optional(),
   condition_type: AlertConditionTypeSchema,
   severity_min: z.enum(["low", "medium", "high", "critical"]).optional(),
+  cooldown_seconds: z.coerce.number().int().min(0).max(604800).default(0),
   is_enabled: z.boolean().default(true)
 } as const;
 
@@ -470,6 +471,7 @@ const BaseUpdateAlertBodySchema = {
   service_id: z.string().uuid().nullable().optional(),
   condition_type: AlertConditionTypeSchema.optional(),
   severity_min: z.enum(["low", "medium", "high", "critical"]).nullable().optional(),
+  cooldown_seconds: z.coerce.number().int().min(0).max(604800).optional(),
   is_enabled: z.boolean().optional()
 } as const;
 

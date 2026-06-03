@@ -87,6 +87,9 @@ const SEVERITY_OPTIONS: Array<{ value: "" | "low" | "medium" | "high" | "critica
 ];
 
 const ALERT_SEVERITY_ANY_VALUE = "__any_severity__";
+const ALERT_COOLDOWN_DEFAULT_DAYS = "1";
+const ALERT_COOLDOWN_MAX_DAYS = 7;
+const SECONDS_PER_DAY = 86_400;
 
 export function ProjectAlertsPage(): JSX.Element {
   const { project, projectId } = useOutletContext<ProjectContext>();
@@ -103,6 +106,7 @@ export function ProjectAlertsPage(): JSX.Element {
   const [channel, setChannel] = useState<AlertChannel>("email");
   const [conditionType, setConditionType] = useState<AlertConditionType>("new_incident");
   const [severityMin, setSeverityMin] = useState<"" | "low" | "medium" | "high" | "critical">("");
+  const [cooldownDays, setCooldownDays] = useState(ALERT_COOLDOWN_DEFAULT_DAYS);
   const [emailRecipient, setEmailRecipient] = useState("");
   const [destinationUrl, setDestinationUrl] = useState("");
   const [selectedSlackDestinationId, setSelectedSlackDestinationId] = useState("");
@@ -161,6 +165,7 @@ export function ProjectAlertsPage(): JSX.Element {
     setChannel(nextChannel);
     setConditionType("new_incident");
     setSeverityMin("");
+    setCooldownDays(ALERT_COOLDOWN_DEFAULT_DAYS);
     setEmailRecipient(session?.email ?? "");
     setDestinationUrl("");
     setSelectedSlackDestinationId(resolveSlackDestinationSelection(slackDestinations, preferredSlackDestinationId) ?? "");
@@ -259,6 +264,13 @@ export function ProjectAlertsPage(): JSX.Element {
 
   async function handleCreateAlert(event: React.FormEvent<HTMLFormElement>): Promise<void> {
     event.preventDefault();
+    const cooldownValidationError = validateAlertCooldownDays(cooldownDays);
+    if (cooldownValidationError !== undefined) {
+      showErrorToast(cooldownValidationError);
+      return;
+    }
+
+    const cooldownSeconds = Number.parseInt(cooldownDays, 10) * SECONDS_PER_DAY;
 
     const config = buildAlertConfig({
       channel,
@@ -283,12 +295,14 @@ export function ProjectAlertsPage(): JSX.Element {
       channel: AlertChannel;
       condition_type: AlertConditionType;
       severity_min?: "low" | "medium" | "high" | "critical";
+      cooldown_seconds: number;
       config: Record<string, unknown>;
       is_enabled: boolean;
     } = {
       project_id: resolvedProjectId,
       channel,
       condition_type: conditionType,
+      cooldown_seconds: cooldownSeconds,
       config,
       is_enabled: true
     };
@@ -541,6 +555,23 @@ export function ProjectAlertsPage(): JSX.Element {
                       </SelectContent>
                     </Select>
                   </Field>
+                  <Field>
+                    <FieldLabel htmlFor="project-alert-cooldown-days">Cooldown (days)</FieldLabel>
+                    <FieldDescription>
+                      Suppress repeated notifications for similar matches for this many days. Use 0 to disable the cooldown.
+                    </FieldDescription>
+                    <Input
+                      id="project-alert-cooldown-days"
+                      type="number"
+                      inputMode="numeric"
+                      min="0"
+                      max={String(ALERT_COOLDOWN_MAX_DAYS)}
+                      step="1"
+                      value={cooldownDays}
+                      onChange={(event) => setCooldownDays(event.currentTarget.value)}
+                      required
+                    />
+                  </Field>
                 </FieldGroup>
             </DialogFormContent>
           </Dialog>
@@ -575,6 +606,7 @@ export function ProjectAlertsPage(): JSX.Element {
                     <TableHead>Channel</TableHead>
                     <TableHead>Condition</TableHead>
                     <TableHead>Minimum severity</TableHead>
+                    <TableHead>Cooldown</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead className="text-right">Action</TableHead>
                   </TableRow>
@@ -587,6 +619,7 @@ export function ProjectAlertsPage(): JSX.Element {
                       </TableCell>
                       <TableCell>{formatAlertCondition(alert.condition_type)}</TableCell>
                       <TableCell>{alert.severity_min === null ? "Any" : formatSeverity(alert.severity_min)}</TableCell>
+                      <TableCell>{formatAlertCooldown(alert.cooldown_seconds)}</TableCell>
                       <TableCell>
                         <Badge variant={alert.is_enabled ? "success" : "secondary"}>{alert.is_enabled ? "enabled" : "disabled"}</Badge>
                       </TableCell>
@@ -595,7 +628,7 @@ export function ProjectAlertsPage(): JSX.Element {
                           <AlertDialog>
                             <AlertDialogTrigger asChild>
                               <Button type="button" variant="ghost" size="sm">
-                                <Trash2Icon className="size-4" />
+                                <Trash2Icon data-icon="inline-start" />
                                 Delete
                               </Button>
                             </AlertDialogTrigger>
@@ -702,6 +735,29 @@ export function formatSeverity(severity: "low" | "medium" | "high" | "critical")
   return SEVERITY_OPTIONS.find((option) => option.value === severity)?.label ?? severity;
 }
 
+export function formatAlertCooldown(cooldownSeconds: number): string {
+  if (cooldownSeconds <= 0) {
+    return "Off";
+  }
+
+  if (cooldownSeconds % SECONDS_PER_DAY === 0) {
+    const days = cooldownSeconds / SECONDS_PER_DAY;
+    return days === 1 ? "1 day" : `${days} days`;
+  }
+
+  if (cooldownSeconds % 3_600 === 0) {
+    const hours = cooldownSeconds / 3_600;
+    return hours === 1 ? "1 hour" : `${hours} hours`;
+  }
+
+  if (cooldownSeconds % 60 === 0) {
+    const minutes = cooldownSeconds / 60;
+    return minutes === 1 ? "1 minute" : `${minutes} minutes`;
+  }
+
+  return cooldownSeconds === 1 ? "1 second" : `${cooldownSeconds} seconds`;
+}
+
 export function buildAlertConfig(input: {
   channel: AlertChannel;
   emailRecipient: string;
@@ -782,6 +838,19 @@ export function validateAlertRecipientEmail(value: string): string | undefined {
 
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) {
     return "Enter a valid email address for this alert.";
+  }
+
+  return undefined;
+}
+
+export function validateAlertCooldownDays(value: string): string | undefined {
+  if (!/^\d+$/.test(value)) {
+    return "Cooldown days must be a whole number between 0 and 7.";
+  }
+
+  const parsed = Number.parseInt(value, 10);
+  if (parsed < 0 || parsed > ALERT_COOLDOWN_MAX_DAYS) {
+    return "Cooldown days must be a whole number between 0 and 7.";
   }
 
   return undefined;

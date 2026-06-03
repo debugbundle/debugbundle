@@ -660,6 +660,7 @@ const STORAGE_BOOTSTRAP_STATEMENTS = [
       channel text NOT NULL,
       condition_type text NOT NULL,
       severity_min text,
+      cooldown_seconds integer NOT NULL DEFAULT 0,
       config jsonb NOT NULL DEFAULT '{}'::jsonb,
       is_enabled boolean NOT NULL DEFAULT true,
       created_at timestamptz NOT NULL DEFAULT now(),
@@ -698,6 +699,7 @@ const STORAGE_BOOTSTRAP_STATEMENTS = [
       incident_id uuid NOT NULL REFERENCES incidents(id) ON DELETE CASCADE,
       condition_type text NOT NULL,
       dedupe_key text NOT NULL,
+      notification_key text NOT NULL DEFAULT '',
       channel text NOT NULL,
       status text NOT NULL,
       payload jsonb NOT NULL,
@@ -711,6 +713,10 @@ const STORAGE_BOOTSTRAP_STATEMENTS = [
   `
     CREATE INDEX alert_deliveries_project_status_idx
     ON alert_deliveries (project_id, status, created_at DESC)
+  `,
+  `
+    CREATE INDEX alert_deliveries_alert_notification_idx
+    ON alert_deliveries (alert_id, notification_key, created_at DESC)
   `,
   `
     CREATE TABLE alert_email_digests (
@@ -744,6 +750,7 @@ const STORAGE_BOOTSTRAP_STATEMENTS = [
       incident_id uuid NOT NULL REFERENCES incidents(id) ON DELETE CASCADE,
       condition_type text NOT NULL,
       dedupe_key text NOT NULL,
+      notification_key text NOT NULL DEFAULT '',
       payload jsonb NOT NULL,
       created_at timestamptz NOT NULL DEFAULT now(),
       UNIQUE (alert_id, incident_id, dedupe_key)
@@ -752,6 +759,10 @@ const STORAGE_BOOTSTRAP_STATEMENTS = [
   `
     CREATE INDEX alert_email_digest_items_digest_created_idx
     ON alert_email_digest_items (digest_id, created_at ASC)
+  `,
+  `
+    CREATE INDEX alert_email_digest_items_alert_notification_idx
+    ON alert_email_digest_items (alert_id, notification_key, created_at DESC)
   `,
   `
     CREATE TABLE agent_webhooks (

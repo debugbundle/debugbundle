@@ -2590,6 +2590,7 @@ describe("web app — management routes", () => {
             channel: "slack",
             condition_type: "error_spike",
             severity_min: "critical",
+            cooldown_seconds: 86400,
             config: {
               slack_destination_id: "sd_123"
             },
@@ -2602,7 +2603,8 @@ describe("web app — management routes", () => {
             alert_id: "alert_789",
             channel: "slack",
             condition_type: "error_spike",
-            severity_min: "critical"
+            severity_min: "critical",
+            cooldown_seconds: 86400
           })
         });
       }
@@ -2750,6 +2752,7 @@ describe("web app — management routes", () => {
             project_id: "proj_123",
             channel: "email",
             condition_type: "new_incident",
+            cooldown_seconds: 86400,
             config: {
               to: "alerts@example.com"
             },
@@ -2760,6 +2763,7 @@ describe("web app — management routes", () => {
         return jsonResponse(201, {
           alert: createAlert({
             alert_id: "alert_email_789",
+            cooldown_seconds: 86400,
             config: { to: "alerts@example.com" }
           })
         });
@@ -2776,6 +2780,7 @@ describe("web app — management routes", () => {
 
     const recipientInput = await screen.findByLabelText(/recipient email/i);
     expect(recipientInput).toHaveValue("owner@example.com");
+    expect(screen.getByLabelText(/cooldown \(days\)/i)).toHaveValue(1);
 
     await user.clear(recipientInput);
     await user.type(recipientInput, "alerts@example.com");
@@ -2784,6 +2789,7 @@ describe("web app — management routes", () => {
     await waitFor(() => {
       expect(screen.getByText(/email/i)).toBeInTheDocument();
     });
+    expect(screen.getByText(/^1 day$/i)).toBeInTheDocument();
   });
 
   it("validates missing alert webhook urls and creates webhook alert rules", async () => {
@@ -2815,6 +2821,7 @@ describe("web app — management routes", () => {
             project_id: "proj_123",
             channel: "webhook",
             condition_type: "new_incident",
+            cooldown_seconds: 86400,
             config: {
               target_url: "https://alerts.example.test/project-webhook"
             },
@@ -2826,6 +2833,7 @@ describe("web app — management routes", () => {
           alert: createAlert({
             alert_id: "alert_webhook_789",
             channel: "webhook",
+            cooldown_seconds: 86400,
             config: { target_url: "https://alerts.example.test/project-webhook" }
           })
         });

@@ -23,6 +23,7 @@ function mapAlertRuleRow(row: {
   channel: AlertChannel;
   condition_type: AlertConditionType;
   severity_min: AlertRuleRecord["severity_min"];
+  cooldown_seconds: number;
   config: Record<string, unknown>;
   is_enabled: boolean;
   created_at: string;
@@ -36,6 +37,7 @@ function mapAlertRuleRow(row: {
     channel: row.channel,
     condition_type: row.condition_type,
     severity_min: row.severity_min,
+    cooldown_seconds: Number(row.cooldown_seconds),
     config: row.config,
     is_enabled: row.is_enabled,
     created_at: row.created_at,
@@ -60,6 +62,7 @@ export function createPostgresAlertDeliveryStore(db: Queryable): AlertDeliverySt
         channel: AlertChannel;
         condition_type: AlertConditionType;
         severity_min: AlertRuleRecord["severity_min"];
+        cooldown_seconds: number;
         config: Record<string, unknown>;
         is_enabled: boolean;
         created_at: string;
@@ -74,6 +77,7 @@ export function createPostgresAlertDeliveryStore(db: Queryable): AlertDeliverySt
             ar.channel,
             ar.condition_type,
             ar.severity_min,
+            ar.cooldown_seconds,
             ar.config,
             ar.is_enabled,
             ar.created_at::text AS created_at,
@@ -103,6 +107,8 @@ export function createPostgresAlertDeliveryStore(db: Queryable): AlertDeliverySt
       incident_id: string;
       condition_type: AlertConditionType;
       dedupe_key: string;
+      notification_key: string;
+      cooldown_seconds: number;
       channel: AlertChannel;
       payload: Record<string, unknown>;
     }): Promise<{ delivery_id: string | null; created: boolean }> {
@@ -115,6 +121,7 @@ export function createPostgresAlertDeliveryStore(db: Queryable): AlertDeliverySt
             incident_id,
             condition_type,
             dedupe_key,
+            notification_key,
             channel,
             status,
             payload,
@@ -123,7 +130,49 @@ export function createPostgresAlertDeliveryStore(db: Queryable): AlertDeliverySt
             created_at,
             updated_at
           )
-          VALUES ($1, $2, $3, $4, $5, $6, $7, 'pending', $8::jsonb, NULL, NULL, now(), now())
+          SELECT
+            $1,
+            $2,
+            $3,
+            $4,
+            $5,
+            $6,
+            $7,
+            $8,
+            'pending',
+            $9::jsonb,
+            NULL,
+            NULL,
+            now(),
+            now()
+          FROM (
+            SELECT pg_advisory_xact_lock(hashtext($2::text), hashtext($7))
+          ) lock_row
+          WHERE $10 <= 0
+            OR NOT EXISTS (
+              SELECT 1
+              FROM (
+                SELECT COALESCE(delivered_at, created_at) AS notified_at
+                FROM alert_deliveries
+                WHERE alert_id = $2
+                  AND notification_key = $7
+                  AND status IN ('pending', 'delivered')
+                UNION ALL
+                SELECT
+                  CASE
+                    WHEN digests.status = 'delivered'
+                      THEN COALESCE(digests.delivered_at, items.created_at)
+                    ELSE items.created_at
+                  END AS notified_at
+                FROM alert_email_digest_items items
+                INNER JOIN alert_email_digests digests
+                  ON digests.id = items.digest_id
+                WHERE items.alert_id = $2
+                  AND items.notification_key = $7
+                  AND digests.status IN ('pending', 'delivered')
+              ) recent_notifications
+              WHERE recent_notifications.notified_at >= now() - make_interval(secs => $10)
+            )
           ON CONFLICT (alert_id, incident_id, dedupe_key) DO NOTHING
           RETURNING id AS delivery_id
         `,
@@ -134,8 +183,10 @@ export function createPostgresAlertDeliveryStore(db: Queryable): AlertDeliverySt
           input.incident_id,
           input.condition_type,
           input.dedupe_key,
+          input.notification_key,
           input.channel,
-          JSON.stringify(input.payload)
+          JSON.stringify(input.payload),
+          input.cooldown_seconds
         ]
       );
 
@@ -179,7 +230,10 @@ export function createPostgresAlertDeliveryStore(db: Queryable): AlertDeliverySt
         created_digest: boolean;
       }>(
         `
-          WITH upserted_digest AS (
+          WITH cooldown_lock AS (
+            SELECT pg_advisory_xact_lock(hashtext($5::text), hashtext($9))
+          ),
+          upserted_digest AS (
             INSERT INTO alert_email_digests (
               id,
               project_id,
@@ -203,7 +257,8 @@ export function createPostgresAlertDeliveryStore(db: Queryable): AlertDeliverySt
               NULL,
               now(),
               now()
-            WHERE $10::boolean = true
+            FROM cooldown_lock
+            WHERE $12::boolean = true
             ON CONFLICT (project_id, recipient) WHERE status = 'pending' AND claimed_at IS NULL
             DO UPDATE SET
               updated_at = now()
@@ -231,11 +286,37 @@ export function createPostgresAlertDeliveryStore(db: Queryable): AlertDeliverySt
               incident_id,
               condition_type,
               dedupe_key,
+              notification_key,
               payload,
               created_at
             )
-            SELECT $11, selected_digest.id, $5, $2, $6, $7, $8, $9::jsonb, now()
+            SELECT $13, selected_digest.id, $5, $2, $6, $7, $8, $9, $10::jsonb, now()
             FROM selected_digest
+            WHERE $11 <= 0
+              OR NOT EXISTS (
+                SELECT 1
+                FROM (
+                  SELECT COALESCE(delivered_at, created_at) AS notified_at
+                  FROM alert_deliveries
+                  WHERE alert_id = $5
+                    AND notification_key = $9
+                    AND status IN ('pending', 'delivered')
+                  UNION ALL
+                  SELECT
+                    CASE
+                      WHEN digests.status = 'delivered'
+                        THEN COALESCE(digests.delivered_at, items.created_at)
+                      ELSE items.created_at
+                    END AS notified_at
+                  FROM alert_email_digest_items items
+                  INNER JOIN alert_email_digests digests
+                    ON digests.id = items.digest_id
+                  WHERE items.alert_id = $5
+                    AND items.notification_key = $9
+                    AND digests.status IN ('pending', 'delivered')
+                ) recent_notifications
+                WHERE recent_notifications.notified_at >= now() - make_interval(secs => $11)
+              )
             ON CONFLICT (alert_id, incident_id, dedupe_key) DO NOTHING
             RETURNING id, digest_id
           ),
@@ -273,7 +354,9 @@ export function createPostgresAlertDeliveryStore(db: Queryable): AlertDeliverySt
           input.incident_id,
           input.condition_type,
           input.dedupe_key,
+          input.notification_key,
           JSON.stringify(input.payload),
+          input.cooldown_seconds,
           input.allow_new_digest,
           randomUUID()
         ]
@@ -332,6 +415,7 @@ export function createPostgresAlertDeliveryStore(db: Queryable): AlertDeliverySt
         incident_id: string;
         condition_type: AlertConditionType;
         dedupe_key: string;
+        notification_key: string;
         payload: Record<string, unknown>;
         created_at: string;
       }>;
@@ -380,6 +464,7 @@ export function createPostgresAlertDeliveryStore(db: Queryable): AlertDeliverySt
         incident_id: string;
         condition_type: AlertConditionType;
         dedupe_key: string;
+        notification_key: string;
         payload: Record<string, unknown>;
         created_at: string;
       }>(
@@ -392,6 +477,7 @@ export function createPostgresAlertDeliveryStore(db: Queryable): AlertDeliverySt
             incident_id::text AS incident_id,
             condition_type,
             dedupe_key,
+            notification_key,
             payload,
             created_at::text AS created_at
           FROM alert_email_digest_items

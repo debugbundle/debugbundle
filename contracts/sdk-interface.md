@@ -106,7 +106,7 @@ fetch("/v1/auth/session", {
 
 When present, the browser SDK must copy this metadata into the captured `network_request` breadcrumb payload and must not forward the `debugbundle` field to the actual HTTP request.
 
-Browser `window` `error` captures must preserve browser-native event metadata when available. If the browser does not expose a usable `Error` object, the SDK may synthesize a fallback error message, but it must also attach `payload.browser_event` with `kind`, `message`, `file_name`, `line_number`, `column_number`, `target`, and `opaque` fields so bundles can explain the signal without attributing it to the SDK listener frame. Resource-load errors should use `kind: "resource_error"` and include `target.source_url` when the browser exposes a failing script, stylesheet, image, or similar target.
+Browser `window` `error` captures must preserve browser-native event metadata when available. If the browser does not expose a usable `Error` object, the SDK may synthesize a fallback error message, but it must also attach `payload.browser_event` with `kind`, `message`, `file_name`, `line_number`, `column_number`, `target`, and `opaque` fields so bundles can explain the signal without attributing it to the SDK listener frame. Resource-load errors should use `kind: "resource_error"` and include `target.source_url` when the browser exposes a failing script, stylesheet, image, or similar target. Bundle generation must treat opaque browser-native signals as low-confidence source data and must not infer an application frame from known SDK listener assets alone.
 
 ---
 
@@ -368,7 +368,11 @@ Non-exception browser captures (clicks, route changes, network summaries, consol
 2. The combined payload (exception + breadcrumbs) is shipped as a single batch.
 3. The ring buffer is cleared after flush.
 
+The attached `frontend_exception.payload.breadcrumbs[]` payload is the canonical error-context path. Bundle generation must consume those inline breadcrumbs even when standalone `frontend_breadcrumb` events were not emitted, and may merge both sources deterministically when both are present.
+
 When `breadcrumbsOnErrorOnly` is `true` (default), breadcrumbs are **never** shipped independently — they only appear as context for errors. When set to `false`, breadcrumbs are batched and shipped on their own schedule (standard batching rules apply).
+
+Browser-native `window_error` and `resource_error` captures may include an optional `browser_event` object on the `frontend_exception` payload. Existing fields (`kind`, `message`, `file_name`, `line_number`, `column_number`, `target`, `opaque`) are stable. SDKs may add optional sanitized resource-target attributes and page lifecycle state to improve opaque browser-error diagnosis without changing the event envelope or requiring consumers to understand those fields.
 
 ### Session Sampling and Event Caps
 

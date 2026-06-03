@@ -95,6 +95,7 @@ export interface GroupIncidentJob {
   service_name: string;
   environment: string;
   fingerprint: string;
+  alert_notification_key?: string;
   fingerprint_version?: string;
   normalized_message: string;
   matched_fields?: string[];
@@ -136,6 +137,7 @@ export interface EvaluateAlertsJob {
   incident_id: string;
   condition_type: AlertConditionType;
   dedupe_key: string;
+  notification_key?: string;
   occurred_at: string;
   summary?: string;
   service_name: string;
@@ -449,6 +451,7 @@ export interface AlertRuleRecord extends Record<string, unknown> {
   channel: AlertChannel;
   condition_type: AlertConditionType;
   severity_min: "low" | "medium" | "high" | "critical" | null;
+  cooldown_seconds: number;
   config: Record<string, unknown>;
   is_enabled: boolean;
   created_at: string;
@@ -473,6 +476,7 @@ export interface AlertManagementStore {
     channel: AlertChannel;
     condition_type: AlertConditionType;
     severity_min?: "low" | "medium" | "high" | "critical" | null;
+    cooldown_seconds: number;
     config: Record<string, unknown>;
     is_enabled: boolean;
   }): Promise<AlertRuleRecord | null>;
@@ -486,6 +490,7 @@ export interface AlertManagementStore {
     channel?: AlertChannel;
     condition_type?: AlertConditionType;
     severity_min?: "low" | "medium" | "high" | "critical" | null;
+    cooldown_seconds?: number;
     config?: Record<string, unknown>;
     is_enabled?: boolean;
   }): Promise<AlertRuleRecord | null>;
@@ -526,6 +531,7 @@ export interface AlertDeliveryRecord extends Record<string, unknown> {
   incident_id: string;
   condition_type: AlertConditionType;
   dedupe_key: string;
+  notification_key: string;
   channel: AlertChannel;
   status: "pending" | "delivered" | "failed";
   payload: Record<string, unknown>;
@@ -556,6 +562,7 @@ export interface AlertEmailDigestItemRecord extends Record<string, unknown> {
   incident_id: string;
   condition_type: AlertConditionType;
   dedupe_key: string;
+  notification_key: string;
   payload: Record<string, unknown>;
   created_at: string;
 }
@@ -566,6 +573,8 @@ export interface CreateAlertDeliveryIntentInput {
   incident_id: string;
   condition_type: AlertConditionType;
   dedupe_key: string;
+  notification_key: string;
+  cooldown_seconds: number;
   channel: AlertChannel;
   payload: Record<string, unknown>;
 }
@@ -582,6 +591,8 @@ export interface QueueAlertEmailDigestItemInput {
   incident_id: string;
   condition_type: AlertConditionType;
   dedupe_key: string;
+  notification_key: string;
+  cooldown_seconds: number;
   recipient: string;
   payload: Record<string, unknown>;
   aggregation_window_seconds: number;

@@ -449,6 +449,116 @@ describe("bundle-engine", () => {
     expect(bundle.context.device?.browser.name).toBe("Chrome");
   });
 
+  it("should include inline frontend exception breadcrumbs without requiring standalone breadcrumb envelopes", (): void => {
+    const bundle = buildBundle({
+      job: {
+        trigger: "occurrence_threshold"
+      },
+      incident: {
+        incident_id: "inc_inline_breadcrumbs",
+        project_id: "proj_inline_breadcrumbs",
+        service_id: "svc_inline_breadcrumbs",
+        service_name: "checkout-web",
+        service_runtime: "browser",
+        service_framework: "react",
+        environment: "production",
+        fingerprint: "fp_inline_breadcrumbs",
+        title: "Frontend checkout failure",
+        severity: "high",
+        first_seen_at: "2026-03-12T00:00:00.000Z",
+        last_seen_at: "2026-03-12T00:01:00.000Z",
+        occurrence_count: 1,
+        source_event_types: ["frontend_exception"]
+      },
+      bundleMetadata: {
+        generation_number: 1,
+        created_at: "2026-03-12T00:01:00.000Z",
+        updated_at: "2026-03-12T00:01:00.000Z",
+        source_event_id: "00000000-0000-4000-8000-000000000401",
+        source_occurred_at: "2026-03-12T00:00:20.000Z"
+      },
+      sourceEnvelopes: [
+        createEventEnvelope({
+          event_id: "00000000-0000-4000-8000-000000000401",
+          event_type: "frontend_exception",
+          occurred_at: "2026-03-12T00:00:20.000Z",
+          service: {
+            name: "checkout-web",
+            environment: "production",
+            runtime: "browser",
+            framework: "react"
+          },
+          payload: {
+            name: "TypeError",
+            message: "Cannot read properties of undefined",
+            stack: "TypeError: Cannot read properties of undefined\n    at CheckoutPage (src/Checkout.tsx:12:3)",
+            route: "/checkout",
+            browser: {
+              name: "Chrome",
+              version: "122.0"
+            },
+            breadcrumbs: [
+              {
+                breadcrumb_type: "route_change",
+                route: "/checkout",
+                data: {
+                  from: "/cart",
+                  to: "/checkout"
+                },
+                ts: "2026-03-12T00:00:10.000Z"
+              },
+              {
+                breadcrumb_type: "click",
+                route: "/checkout",
+                data: {
+                  selector: "button.pay",
+                  label: "Pay now"
+                },
+                ts: "2026-03-12T00:00:11.000Z"
+              },
+              {
+                breadcrumb_type: "network_request",
+                route: "/checkout",
+                data: {
+                  method: "POST",
+                  url: "/api/pay",
+                  status_code: 500,
+                  duration_ms: 320
+                },
+                ts: "2026-03-12T00:00:12.000Z"
+              }
+            ]
+          }
+        })
+      ],
+      probeDataItems: []
+    });
+
+    expect(bundle.context.frontend?.route_changes).toEqual([
+      {
+        from: "/cart",
+        to: "/checkout",
+        ts: "2026-03-12T00:00:10.000Z"
+      }
+    ]);
+    expect(bundle.context.frontend?.clicks).toEqual([
+      {
+        selector: "button.pay",
+        label: "Pay now",
+        ts: "2026-03-12T00:00:11.000Z"
+      }
+    ]);
+    expect(bundle.context.frontend?.network_requests).toEqual([
+      {
+        method: "POST",
+        url: "/api/pay",
+        status: 500,
+        ts: "2026-03-12T00:00:12.000Z",
+        duration_ms: 320
+      }
+    ]);
+  });
+
   it("should describe opaque browser window errors without using the SDK fallback frame as app code", (): void => {
     const bundle = buildBundle({
       job: {
@@ -493,7 +603,7 @@ describe("bundle-engine", () => {
             message: "Window error",
             stack:
               "Error: Window error\n" +
-              "    at onError (https://app.example/debugbundle-browser-sdk.js:6208:81)",
+              "    at onError (https://app.example/wp-content/plugins/debugbundle/assets/dist/debugbundle-browser.js:6208:81)",
             route: "/collaborate/index.xhtml",
             browser: {
               name: "Chrome",
@@ -505,7 +615,21 @@ describe("bundle-engine", () => {
               file_name: "https://app.example/assets/app.js",
               line_number: 12,
               column_number: 4,
-              target: null,
+              target: {
+                tag_name: "script",
+                source_url: "https://app.example/assets/app.js",
+                attributes: {
+                  cross_origin: "anonymous",
+                  async: true,
+                  integrity_present: true
+                }
+              },
+              page: {
+                url: "https://app.example/collaborate/index.xhtml",
+                referrer: "https://app.example/home",
+                ready_state: "interactive",
+                visibility_state: "visible"
+              },
               opaque: true
             }
           }
@@ -536,7 +660,21 @@ describe("bundle-engine", () => {
         file_name: "https://app.example/assets/app.js",
         line_number: 12,
         column_number: 4,
-        target: null,
+        target: {
+          tag_name: "script",
+          source_url: "https://app.example/assets/app.js",
+          attributes: {
+            cross_origin: "anonymous",
+            async: true,
+            integrity_present: true
+          }
+        },
+        page: {
+          url: "https://app.example/collaborate/index.xhtml",
+          referrer: "https://app.example/home",
+          ready_state: "interactive",
+          visibility_state: "visible"
+        },
         opaque: true
       }
     });

@@ -120,6 +120,7 @@ export function registerAlertRoutes(app: FastifyInstance, dependencies: ApiDepen
         | "severity_threshold"
         | "regression_after_deploy";
       severity_min?: "low" | "medium" | "high" | "critical";
+      cooldown_seconds: number;
       config: Record<string, unknown>;
       is_enabled: boolean;
     } = {
@@ -128,6 +129,7 @@ export function registerAlertRoutes(app: FastifyInstance, dependencies: ApiDepen
       created_by_user_id: auth.member.member_id,
       channel: parsedBody.data.channel,
       condition_type: parsedBody.data.condition_type,
+      cooldown_seconds: parsedBody.data.cooldown_seconds,
       config: parsedBody.data.config,
       is_enabled: parsedBody.data.is_enabled
     };
@@ -238,6 +240,7 @@ export function registerAlertRoutes(app: FastifyInstance, dependencies: ApiDepen
         | "severity_threshold"
         | "regression_after_deploy";
       severity_min?: "low" | "medium" | "high" | "critical" | null;
+      cooldown_seconds?: number;
       config?: Record<string, unknown> | null;
       is_enabled?: boolean;
     } = {
@@ -265,6 +268,9 @@ export function registerAlertRoutes(app: FastifyInstance, dependencies: ApiDepen
       if (severityMin !== undefined) {
         updateInput.severity_min = severityMin;
       }
+    }
+    if (parsedBody.data.cooldown_seconds !== undefined) {
+      updateInput.cooldown_seconds = parsedBody.data.cooldown_seconds;
     }
     if ("config" in parsedBody.data) {
       const { config } = parsedBody.data;

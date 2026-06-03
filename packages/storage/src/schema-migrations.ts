@@ -582,6 +582,32 @@ export const STORAGE_SCHEMA_MIGRATIONS = [
         WHERE installation_id IS NOT NULL
       `
     ]
+  }),
+  defineStorageSchemaMigration({
+    id: "202606030001_add_alert_notification_cooldowns_and_rule_window",
+    description: "Add configurable alert cooldown windows and notification keys for cross-incident suppression.",
+    statements: [
+      "ALTER TABLE alert_rules ADD COLUMN IF NOT EXISTS cooldown_seconds integer",
+      "UPDATE alert_rules SET cooldown_seconds = 0 WHERE cooldown_seconds IS NULL",
+      "ALTER TABLE alert_rules ALTER COLUMN cooldown_seconds SET DEFAULT 0",
+      "ALTER TABLE alert_rules ALTER COLUMN cooldown_seconds SET NOT NULL",
+      "ALTER TABLE alert_deliveries ADD COLUMN IF NOT EXISTS notification_key text",
+      "UPDATE alert_deliveries SET notification_key = dedupe_key WHERE notification_key IS NULL",
+      "ALTER TABLE alert_deliveries ALTER COLUMN notification_key SET DEFAULT ''",
+      "ALTER TABLE alert_deliveries ALTER COLUMN notification_key SET NOT NULL",
+      `
+        CREATE INDEX IF NOT EXISTS alert_deliveries_alert_notification_idx
+        ON alert_deliveries (alert_id, notification_key, created_at DESC)
+      `,
+      "ALTER TABLE alert_email_digest_items ADD COLUMN IF NOT EXISTS notification_key text",
+      "UPDATE alert_email_digest_items SET notification_key = dedupe_key WHERE notification_key IS NULL",
+      "ALTER TABLE alert_email_digest_items ALTER COLUMN notification_key SET DEFAULT ''",
+      "ALTER TABLE alert_email_digest_items ALTER COLUMN notification_key SET NOT NULL",
+      `
+        CREATE INDEX IF NOT EXISTS alert_email_digest_items_alert_notification_idx
+        ON alert_email_digest_items (alert_id, notification_key, created_at DESC)
+      `
+    ]
   })
 ] as const;
 
@@ -620,6 +646,7 @@ function validateStorageSchemaMigrations(migrations: readonly StorageSchemaMigra
 const CURRENT_SCHEMA_SENTINEL_COLUMNS = [
   { table_name: "agent_webhooks", column_name: "created_by_user_id" },
   { table_name: "alert_rules", column_name: "created_by_user_id" },
+  { table_name: "alert_rules", column_name: "cooldown_seconds" },
   { table_name: "capture_policies", column_name: "immediate_client_error_statuses" },
   { table_name: "github_dispatch_rules", column_name: "created_by_user_id" },
   { table_name: "github_dispatch_deliveries", column_name: "target_fingerprint" },

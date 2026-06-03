@@ -18,6 +18,7 @@ export const AlertSchema = z
     channel: AlertChannelSchema,
     condition_type: AlertConditionTypeSchema,
     severity_min: z.enum(["low", "medium", "high", "critical"]).nullable(),
+    cooldown_seconds: z.number().int().min(0),
     config: z.record(z.string(), z.unknown()),
     is_enabled: z.boolean(),
     created_at: z.string(),
@@ -133,6 +134,7 @@ export function createAlertApi(client: HttpClient): {
     channel: AlertChannel;
     conditionType: AlertConditionType;
     severityMin?: "low" | "medium" | "high" | "critical";
+    cooldownSeconds?: number;
     config: Record<string, unknown>;
     isEnabled?: boolean;
   }): Promise<AlertRecord>;
@@ -144,6 +146,7 @@ export function createAlertApi(client: HttpClient): {
     channel?: AlertChannel;
     conditionType?: AlertConditionType;
     severityMin?: "low" | "medium" | "high" | "critical" | null;
+    cooldownSeconds?: number;
     config?: Record<string, unknown> | null;
     isEnabled?: boolean;
   }): Promise<AlertRecord>;
@@ -167,6 +170,7 @@ export function createAlertApi(client: HttpClient): {
         channel: AlertChannel;
         condition_type: AlertConditionType;
         severity_min?: "low" | "medium" | "high" | "critical";
+        cooldown_seconds?: number;
         config: Record<string, unknown>;
         is_enabled?: boolean;
       } = {
@@ -181,6 +185,9 @@ export function createAlertApi(client: HttpClient): {
       }
       if (input.severityMin !== undefined) {
         body.severity_min = input.severityMin;
+      }
+      if (input.cooldownSeconds !== undefined) {
+        body.cooldown_seconds = input.cooldownSeconds;
       }
       if (input.isEnabled !== undefined) {
         body.is_enabled = input.isEnabled;
@@ -202,6 +209,7 @@ export function createAlertApi(client: HttpClient): {
         channel?: AlertChannel;
         condition_type?: AlertConditionType;
         severity_min?: "low" | "medium" | "high" | "critical" | null;
+        cooldown_seconds?: number;
         config?: Record<string, unknown> | null;
         is_enabled?: boolean;
       } = {};
@@ -217,6 +225,9 @@ export function createAlertApi(client: HttpClient): {
       }
       if (input.severityMin !== undefined) {
         body.severity_min = input.severityMin;
+      }
+      if (input.cooldownSeconds !== undefined) {
+        body.cooldown_seconds = input.cooldownSeconds;
       }
       if (input.config !== undefined) {
         body.config = input.config;

@@ -600,7 +600,23 @@ Note: `data` fields shown above are for `network_request` breadcrumbs. Other bre
     "column_number": "number | null",
     "target": {
       "tag_name": "string | null",
-      "source_url": "string | null"
+      "source_url": "string | null",
+      "attributes": {
+        "rel": "string",
+        "as": "string",
+        "type": "string",
+        "media": "string",
+        "cross_origin": "string",
+        "async": true,
+        "defer": false,
+        "integrity_present": true
+      }
+    },
+    "page": {
+      "url": "string | null",
+      "referrer": "string | null",
+      "ready_state": "loading | interactive | complete | null",
+      "visibility_state": "visible | hidden | prerender | unloaded | null"
     },
     "opaque": true
   },
@@ -620,7 +636,7 @@ Note: `data` fields shown above are for `network_request` breadcrumbs. Other bre
 }
 ```
 
-`browser_event` is present when the Browser SDK captured the exception through a browser-native global hook such as `window` `error`. When `opaque` is `true`, the browser did not provide a usable JavaScript `Error` object; inspect `file_name`, `line_number`, `column_number`, or `target.source_url` for the best available source clue.
+`browser_event` is present when the Browser SDK captured the exception through a browser-native global hook such as `window` `error`. When `opaque` is `true`, the browser did not provide a usable JavaScript `Error` object; inspect `file_name`, `line_number`, `column_number`, `target.source_url`, optional technical `target.attributes`, or optional `page` lifecycle state for the best available source clue.
 
 ### 3.6 `deploy_metadata`
 ```json
@@ -858,10 +874,12 @@ Emitted by SDKs when duplicate suppression is active:
 |--------|------|-------------|
 | id | uuid | PK |
 | project_id | uuid | FK → projects, CASCADE |
+| created_by_user_id | uuid | NOT NULL, FK → users |
 | service_id | uuid | FK → services, CASCADE |
 | channel | text | NOT NULL |
 | condition_type | text | NOT NULL |
 | severity_min | text | |
+| cooldown_seconds | integer | NOT NULL DEFAULT 0 |
 | config | jsonb | NOT NULL DEFAULT '{}' |
 | is_enabled | boolean | NOT NULL DEFAULT true |
 | created_at | timestamptz | NOT NULL DEFAULT now() |
@@ -876,6 +894,7 @@ Emitted by SDKs when duplicate suppression is active:
 | incident_id | uuid | NOT NULL, FK → incidents, CASCADE |
 | condition_type | text | NOT NULL |
 | dedupe_key | text | NOT NULL |
+| notification_key | text | NOT NULL DEFAULT '' |
 | channel | text | NOT NULL |
 | status | text | NOT NULL |
 | payload | jsonb | NOT NULL |
@@ -886,6 +905,7 @@ Emitted by SDKs when duplicate suppression is active:
 | UNIQUE | (alert_id, incident_id, dedupe_key) | |
 
 These rows represent immediate non-email alert sends. Email alerts use the digest queue below so bursty incidents can be aggregated before transport delivery.
+Exact replay idempotency still keys on `(alert_id, incident_id, dedupe_key)`. Optional cooldown suppression uses `(alert_id, notification_key)` plus recent delivery history and does not merge incidents.
 
 ### 5.10b alert_email_digests
 | Column | Type | Constraints |
@@ -913,9 +933,12 @@ Pending email digests aggregate for a fixed 10-second window per `(project_id, r
 | incident_id | uuid | NOT NULL, FK → incidents, CASCADE |
 | condition_type | text | NOT NULL |
 | dedupe_key | text | NOT NULL |
+| notification_key | text | NOT NULL DEFAULT '' |
 | payload | jsonb | NOT NULL |
 | created_at | timestamptz | NOT NULL DEFAULT now() |
 | UNIQUE | (alert_id, incident_id, dedupe_key) | |
+
+Digest-item notification keys follow the same cooldown semantics as immediate deliveries so repeated email notifications can be suppressed without changing per-incident digest dedupe.
 
 ### 5.11 agent_webhooks
 | Column | Type | Constraints |

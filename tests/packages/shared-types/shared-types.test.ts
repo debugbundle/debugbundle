@@ -303,6 +303,56 @@ describe("shared-types event envelope", () => {
     }
   });
 
+  it("should parse enriched browser-native exception metadata", (): void => {
+    const envelope: EventEnvelope = createEventEnvelope({
+      event_type: "frontend_exception",
+      service: {
+        name: "checkout-spa",
+        environment: "production",
+        runtime: "browser-js",
+        framework: "react"
+      },
+      payload: {
+        name: "Error",
+        message: "Browser resource load error",
+        stack: "Error: Browser resource load error",
+        route: "/checkout",
+        browser: { name: "Chrome", version: "122.0" },
+        browser_event: {
+          kind: "resource_error",
+          message: null,
+          file_name: null,
+          line_number: null,
+          column_number: null,
+          target: {
+            tag_name: "script",
+            source_url: "https://cdn.example/app.js",
+            attributes: {
+              cross_origin: "anonymous",
+              async: true,
+              integrity_present: true
+            }
+          },
+          page: {
+            url: "https://example.com/checkout",
+            referrer: "https://example.com/cart",
+            ready_state: "interactive",
+            visibility_state: "visible"
+          },
+          opaque: true
+        }
+      }
+    });
+
+    const parsed = EventEnvelopeSchema.parse(envelope);
+
+    expect(parsed.event_type).toBe("frontend_exception");
+    if (parsed.event_type === "frontend_exception") {
+      expect(parsed.payload.browser_event?.target?.attributes?.integrity_present).toBe(true);
+      expect(parsed.payload.browser_event?.page?.ready_state).toBe("interactive");
+    }
+  });
+
   it("should use crypto.randomUUID when createEventEnvelope generates an event id", (): void => {
     vi.stubGlobal("crypto", {
       randomUUID: () => "11111111-2222-4333-8444-555555555555"

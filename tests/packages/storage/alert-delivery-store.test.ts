@@ -9,10 +9,12 @@ describe("alert delivery store", () => {
         {
           alert_id: "alt_1",
           project_id: "proj_123",
+          created_by_user_id: "usr_123",
           service_id: null,
           channel: "webhook",
           condition_type: "severity_threshold",
           severity_min: "medium",
+          cooldown_seconds: 0,
           config: { target_url: "https://hooks.example.test/alerts" },
           is_enabled: true,
           created_at: "2026-03-15T00:00:00.000Z",
@@ -34,10 +36,12 @@ describe("alert delivery store", () => {
       {
         alert_id: "alt_1",
         project_id: "proj_123",
+        created_by_user_id: "usr_123",
         service_id: null,
         channel: "webhook",
         condition_type: "severity_threshold",
         severity_min: "medium",
+        cooldown_seconds: 0,
         config: { target_url: "https://hooks.example.test/alerts" },
         is_enabled: true,
         created_at: "2026-03-15T00:00:00.000Z",
@@ -61,6 +65,8 @@ describe("alert delivery store", () => {
       incident_id: "inc_123",
       condition_type: "new_incident",
       dedupe_key: "new_incident",
+      notification_key: "new_incident",
+      cooldown_seconds: 0,
       channel: "webhook",
       payload: { incident_id: "inc_123" }
     });
@@ -70,6 +76,8 @@ describe("alert delivery store", () => {
       incident_id: "inc_123",
       condition_type: "new_incident",
       dedupe_key: "new_incident",
+      notification_key: "new_incident",
+      cooldown_seconds: 0,
       channel: "webhook",
       payload: { incident_id: "inc_123" }
     });
@@ -91,6 +99,8 @@ describe("alert delivery store", () => {
       incident_id: "inc_123",
       condition_type: "new_incident",
       dedupe_key: "new_incident",
+      notification_key: "new_incident",
+      cooldown_seconds: 0,
       recipient: "team@example.com",
       payload: { incident_id: "inc_123" },
       aggregation_window_seconds: 10,
@@ -103,9 +113,12 @@ describe("alert delivery store", () => {
       created_digest: true
     });
     expect(query).toHaveBeenCalledOnce();
-    expect(query.mock.calls[0]?.[0]).toContain("WITH upserted_digest AS");
+    expect(query.mock.calls[0]?.[0]).toContain("WITH cooldown_lock AS");
+    expect(query.mock.calls[0]?.[0]).toContain("WHERE $12::boolean = true");
     expect(query.mock.calls[0]?.[0]).toContain("DO UPDATE SET\n              updated_at = now()");
     expect(query.mock.calls[0]?.[0]).not.toContain("BEGIN");
+    expect(query.mock.calls[0]?.[1]?.[9]).toBe(JSON.stringify({ incident_id: "inc_123" }));
+    expect(query.mock.calls[0]?.[1]?.[11]).toBe(true);
   });
 
   it("does not create a new digest when quota is exhausted and no pending digest exists", async (): Promise<void> => {
@@ -121,6 +134,8 @@ describe("alert delivery store", () => {
       incident_id: "inc_123",
       condition_type: "new_incident",
       dedupe_key: "new_incident",
+      notification_key: "new_incident",
+      cooldown_seconds: 0,
       recipient: "team@example.com",
       payload: { incident_id: "inc_123" },
       aggregation_window_seconds: 10,
@@ -164,6 +179,7 @@ describe("alert delivery store", () => {
             incident_id: "inc_1",
             condition_type: "new_incident",
             dedupe_key: "new_incident",
+            notification_key: "new_incident",
             payload: { incident_id: "inc_1" },
             created_at: "2026-05-17T10:00:00.000Z"
           }
@@ -195,6 +211,7 @@ describe("alert delivery store", () => {
           incident_id: "inc_1",
           condition_type: "new_incident",
           dedupe_key: "new_incident",
+          notification_key: "new_incident",
           payload: { incident_id: "inc_1" },
           created_at: "2026-05-17T10:00:00.000Z"
         }

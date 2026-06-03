@@ -18,6 +18,7 @@ site/
 .tmp/
 /STATUS.md
 /TODO.md
+bundle-analysis/
 spec/local/*
 !spec/local/v1-sdk-relay-parity-plan.md
 debugbundle-multirepo.code-workspace

@@ -51,6 +51,7 @@ function mapAlertRuleRow(row: {
   channel: AlertRuleRecord["channel"];
   condition_type: AlertRuleRecord["condition_type"];
   severity_min: AlertRuleRecord["severity_min"];
+  cooldown_seconds: number;
   config: Record<string, unknown>;
   is_enabled: boolean;
   created_at: string;
@@ -64,6 +65,7 @@ function mapAlertRuleRow(row: {
     channel: row.channel,
     condition_type: row.condition_type,
     severity_min: row.severity_min,
+    cooldown_seconds: Number(row.cooldown_seconds),
     config: row.config,
     is_enabled: row.is_enabled,
     created_at: row.created_at,
@@ -2342,6 +2344,7 @@ export function createPostgresMetadataStore(db: Queryable): PostgresMetadataStor
         channel: AlertRuleRecord["channel"];
         condition_type: AlertRuleRecord["condition_type"];
         severity_min: AlertRuleRecord["severity_min"];
+        cooldown_seconds: number;
         config: Record<string, unknown>;
         is_enabled: boolean;
         created_at: string;
@@ -2356,6 +2359,7 @@ export function createPostgresMetadataStore(db: Queryable): PostgresMetadataStor
             channel,
             condition_type,
             severity_min,
+            cooldown_seconds,
             config,
             is_enabled,
             created_at::text AS created_at,
@@ -2397,6 +2401,7 @@ export function createPostgresMetadataStore(db: Queryable): PostgresMetadataStor
         channel: AlertRuleRecord["channel"];
         condition_type: AlertRuleRecord["condition_type"];
         severity_min: AlertRuleRecord["severity_min"];
+        cooldown_seconds: number;
         config: Record<string, unknown>;
         is_enabled: boolean;
         created_at: string;
@@ -2411,12 +2416,13 @@ export function createPostgresMetadataStore(db: Queryable): PostgresMetadataStor
             channel,
             condition_type,
             severity_min,
+            cooldown_seconds,
             config,
             is_enabled,
             created_at,
             updated_at
           )
-          VALUES ($1, $2, $3::uuid, $4::uuid, $5, $6, $7, $8::jsonb, $9, now(), now())
+          VALUES ($1, $2, $3::uuid, $4::uuid, $5, $6, $7, $8, $9::jsonb, $10, now(), now())
           RETURNING
             id AS alert_id,
             project_id,
@@ -2425,6 +2431,7 @@ export function createPostgresMetadataStore(db: Queryable): PostgresMetadataStor
             channel,
             condition_type,
             severity_min,
+            cooldown_seconds,
             config,
             is_enabled,
             created_at::text AS created_at,
@@ -2438,6 +2445,7 @@ export function createPostgresMetadataStore(db: Queryable): PostgresMetadataStor
           input.channel,
           input.condition_type,
           input.severity_min ?? null,
+          input.cooldown_seconds,
           JSON.stringify(input.config),
           input.is_enabled
         ]
@@ -2449,6 +2457,7 @@ export function createPostgresMetadataStore(db: Queryable): PostgresMetadataStor
     async updateAlertForOrganization(input): Promise<AlertRuleRecord | null> {
       const hasServiceId = Object.prototype.hasOwnProperty.call(input, "service_id");
       const hasSeverityMin = Object.prototype.hasOwnProperty.call(input, "severity_min");
+      const hasCooldownSeconds = Object.prototype.hasOwnProperty.call(input, "cooldown_seconds");
       const hasConfig = Object.prototype.hasOwnProperty.call(input, "config");
 
       const result = await db.query<{
@@ -2459,6 +2468,7 @@ export function createPostgresMetadataStore(db: Queryable): PostgresMetadataStor
         channel: AlertRuleRecord["channel"];
         condition_type: AlertRuleRecord["condition_type"];
         severity_min: AlertRuleRecord["severity_min"];
+        cooldown_seconds: number;
         config: Record<string, unknown>;
         is_enabled: boolean;
         created_at: string;
@@ -2471,19 +2481,20 @@ export function createPostgresMetadataStore(db: Queryable): PostgresMetadataStor
             channel = COALESCE($5, ar.channel),
             condition_type = COALESCE($6, ar.condition_type),
             severity_min = CASE WHEN $7::boolean THEN $8 ELSE ar.severity_min END,
-            config = CASE WHEN $9::boolean THEN COALESCE($10::jsonb, '{}'::jsonb) ELSE ar.config END,
-            is_enabled = COALESCE($11::boolean, ar.is_enabled),
+            cooldown_seconds = CASE WHEN $9::boolean THEN $10 ELSE ar.cooldown_seconds END,
+            config = CASE WHEN $11::boolean THEN COALESCE($12::jsonb, '{}'::jsonb) ELSE ar.config END,
+            is_enabled = COALESCE($13::boolean, ar.is_enabled),
             updated_at = now()
           FROM projects p
           LEFT JOIN services s ON s.id = $4::uuid
           WHERE ar.id = $1
             AND p.id = ar.project_id
             AND p.organization_id = $2
-            AND ($12::uuid IS NULL OR ar.project_id = $12::uuid)
+            AND ($14::uuid IS NULL OR ar.project_id = $14::uuid)
             AND (
-              $13::uuid IS NULL
-              OR $14::text IN ('owner', 'admin')
-              OR ar.created_by_user_id = $13::uuid
+              $15::uuid IS NULL
+              OR $16::text IN ('owner', 'admin')
+              OR ar.created_by_user_id = $15::uuid
             )
             AND ($4::uuid IS NULL OR $3::boolean = false OR s.project_id = ar.project_id)
           RETURNING
@@ -2494,6 +2505,7 @@ export function createPostgresMetadataStore(db: Queryable): PostgresMetadataStor
             ar.channel,
             ar.condition_type,
             ar.severity_min,
+            ar.cooldown_seconds,
             ar.config,
             ar.is_enabled,
             ar.created_at::text AS created_at,
@@ -2508,6 +2520,8 @@ export function createPostgresMetadataStore(db: Queryable): PostgresMetadataStor
           input.condition_type ?? null,
           hasSeverityMin,
           optionalFieldValue(hasSeverityMin, input.severity_min),
+          hasCooldownSeconds,
+          input.cooldown_seconds ?? 0,
           hasConfig,
           optionalJsonFieldValue(hasConfig, input.config),
           input.is_enabled ?? null,

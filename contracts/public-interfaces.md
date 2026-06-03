@@ -357,7 +357,7 @@ Current API implementation scope (Phase 1 continuation):
 - `IncidentRetrievalRecord` fields: `incident_id`, `project_id`, `project_name`, `service_id`, `service_name`, `latest_deployment_id`, `environment`, `fingerprint`, `fingerprint_version`, `title`, `severity`, `status`, `first_seen_at`, `last_seen_at`, `occurrence_count`, `spike_detected_at`, `resolved_at`, `regressed_at`, `matched_fields`, `incident_reason`
 - `IncidentContextRecord` fields: `incident`, `incident_reason`, `primary_signal`, `bundle`, `reproduction`, `logs`, `deploy`, `grouping`, `visibility`, `redaction`, `suggested_next_checks`
 - `primary_signal` summarizes the current incident's primary failing signal without requiring an LLM call. `logs.source` is one of `retrieval`, `bundle_context`, or `none`. `bundle` and `reproduction` use deterministic artifact states: `ready`, `pending`, or `failed`.
-- `visibility` explains four operator-facing behaviors directly in retrieval output: how repeated failures group into the current fingerprint, when bundle regeneration occurs (including current precedence), how spike detection differs from incident creation, and how webhook/GitHub cooldown windows suppress repeated lifecycle notifications.
+- `visibility` explains four operator-facing behaviors directly in retrieval output: how repeated failures group into the current fingerprint, when bundle regeneration occurs (including current precedence), how spike detection differs from incident creation, and how alert/webhook/GitHub cooldown windows suppress repeated lifecycle notifications.
 - `incident_reason` is deterministically derived from the incident's primary `incident_signal` metadata. Current kinds: `backend_exception`, `frontend_exception`, `request_failure`, `error_log`. Example:
 
 ```json
@@ -811,6 +811,7 @@ Checkout confirmation returns the standard billing summary response after the AP
   "channel": "email",
   "condition_type": "severity_threshold",
   "severity_min": "high",
+  "cooldown_seconds": 604800,
   "config": {
     "to": "oncall@example.com"
   },
@@ -819,6 +820,7 @@ Checkout confirmation returns the standard billing summary response after the AP
 ```
 
 `service_id` and `severity_min` are optional on create, and `is_enabled` defaults to `true`.
+`cooldown_seconds` is optional, defaults to `0`, and may be set between `0` and `604800` seconds (7 days).
 For `channel: "email"`, `config.to` is required and must be a single recipient email address. Create additional alert rules if multiple people should receive email notifications.
 For `channel: "slack"`, prefer `config.slack_destination_id` when the workspace/channel was connected through the Slack OAuth flow. Direct `config.webhook_url` remains valid for callers that intentionally want a raw webhook configuration.
 
@@ -828,6 +830,7 @@ For `channel: "slack"`, prefer `config.slack_destination_id` when the workspace/
   "channel": "webhook",
   "service_id": null,
   "severity_min": null,
+  "cooldown_seconds": 3600,
   "config": {
     "target_url": "https://hooks.example.test/alerts"
   },
@@ -836,6 +839,7 @@ For `channel: "slack"`, prefer `config.slack_destination_id` when the workspace/
 ```
 
 Update requests must include at least one field. `service_id`, `severity_min`, and `config` accept `null` to clear the stored value.
+`cooldown_seconds` accepts `0` to disable suppression and positive values up to `604800` to suppress repeated notifications for the same notification key.
 When updating channel-specific `config`, include the `channel` in the same request so validation can apply the correct config schema.
 
 **Alert response:**
@@ -849,6 +853,7 @@ When updating channel-specific `config`, include the `channel` in the same reque
     "channel": "email",
     "condition_type": "severity_threshold",
     "severity_min": "high",
+    "cooldown_seconds": 604800,
     "config": {
       "to": "oncall@example.com"
     },
@@ -871,6 +876,7 @@ When updating channel-specific `config`, include the `channel` in the same reque
       "channel": "slack",
       "condition_type": "error_spike",
       "severity_min": null,
+      "cooldown_seconds": 0,
       "config": {
         "slack_destination_id": "uuid"
       },
@@ -889,6 +895,9 @@ Current API implementation scope (Phase 10 alert CRUD slice):
 - `DELETE /v1/alerts/{id}` returns `204` on success for owner/admin or the rule creator.
 - Worker-side alert evaluation now enqueues internal `evaluate-alerts` jobs from real incident transitions for `new_incident`, `severity_threshold`, `incident_regressed`, `regression_after_deploy`, and `error_spike` conditions.
 - Matching non-email alerts persist one internal `alert_deliveries` row per `alert_id + incident_id + dedupe_key` before delivery so duplicate worker replays stay idempotent. Email alerts aggregate into a 10-second per-project/per-recipient digest queue backed by `alert_email_digests` plus `alert_email_digest_items`, so bursts send one email while preserving per-incident dedupe.
+- Each alert rule may additionally define a delivery cooldown window via `cooldown_seconds`. This suppresses repeated notifications for the same computed notification key without changing incident grouping. Default `0` preserves existing behavior.
+- Severity is inferred from signal confidence before alert filters run. Backend exceptions, non-opaque frontend exceptions, and immediate request-failure incident signals infer `high`; opaque browser-native `window_error` signals infer `low`; opaque browser-native `resource_error` signals infer `medium`; `error_suppressed` infers `medium`; other events infer `low`.
+- Opaque browser `frontend_exception` alerts may reuse a broader notification key than the incident fingerprint so repeated low-information browser-native `window_error` signals can be suppressed across otherwise separate incidents.
 - Delivery transport is implemented for `channel: "email"`, `channel: "slack"`, `channel: "discord"`, and `channel: "webhook"`. Email requires `config.to` as a single recipient address; Slack accepts either `config.slack_destination_id` (resolved to an encrypted stored webhook URL at delivery time) or `config.webhook_url`; Discord requires `config.webhook_url`; webhook requires `config.target_url`.
 - Authorization failure: `401 { "error": "invalid_member_token" }`
 - Invalid list query: `400 { "error": "invalid_query" }`
@@ -1933,12 +1942,12 @@ Current local CLI retrieval limitation: `debugbundle logs` still requires the au
 ### 2.5 Alert Commands
 ```
 debugbundle alert list --project-id <id> [--limit <n>] [--auth-file <path>] [--json]
-debugbundle alert create --project-id <id> --channel <channel> --condition <condition> [--service-id <id>] [--severity-min <level>] --config-json <json> [--is-enabled <true|false>] [--auth-file <path>] [--json]
-debugbundle alert update <id> --project-id <id> [--service-id <id|null>] [--channel <channel>] [--condition <condition>] [--severity-min <level|null>] [--config-json <json|null>] [--is-enabled <true|false>] [--auth-file <path>] [--json]
+debugbundle alert create --project-id <id> --channel <channel> --condition <condition> [--service-id <id>] [--severity-min <level>] [--cooldown <seconds>] --config-json <json> [--is-enabled <true|false>] [--auth-file <path>] [--json]
+debugbundle alert update <id> --project-id <id> [--service-id <id|null>] [--channel <channel>] [--condition <condition>] [--severity-min <level|null>] [--cooldown <seconds>] [--config-json <json|null>] [--is-enabled <true|false>] [--auth-file <path>] [--json]
 debugbundle alert delete <id> --project-id <id> [--auth-file <path>] [--json]
 ```
 
-Current alert CLI behavior is a thin adapter over the alert HTTP client in `packages/alert-client`, reusing stored member auth after `debugbundle login` and forwarding JSON output without duplicating transport logic. `alert create` requires `--config-json` with a channel-specific object, and `alert update` accepts `null` clears for `service_id`, `severity_min`, or `config`. Slack alert configs can use either `{"webhook_url":"..."}` or `{"slack_destination_id":"uuid"}`.
+Current alert CLI behavior is a thin adapter over the alert HTTP client in `packages/alert-client`, reusing stored member auth after `debugbundle login` and forwarding JSON output without duplicating transport logic. `alert create` requires `--config-json` with a channel-specific object, and `alert update` accepts `null` clears for `service_id`, `severity_min`, or `config`. `--cooldown` maps to API `cooldown_seconds`, uses seconds, accepts `0` to disable notification suppression, and accepts positive values up to `604800` (7 days). Slack alert configs can use either `{"webhook_url":"..."}` or `{"slack_destination_id":"uuid"}`.
 
 ### 2.6 Webhook Commands
 ```
@@ -2139,6 +2148,8 @@ debugbundle_delete_webhook         → same result as `DELETE /v1/webhooks/{id}`
 debugbundle_test_webhook           → same result as `POST /v1/webhooks/{id}/test`
 debugbundle_list_webhook_deliveries → same result as `GET /v1/webhooks/{id}/deliveries`
 ```
+
+Alert MCP tools use camelCase request fields (`projectId`, `serviceId`, `conditionType`, `severityMin`, `cooldownSeconds`, `isEnabled`) over the same HTTP alert API. `cooldownSeconds` is optional on `create_alert` and `update_alert`, uses seconds, defaults to API `0` on create when omitted, accepts `0` to disable suppression, and is capped at `604800`.
 
 Current MCP alert, Slack-destination, weekly-report, and webhook behavior is a thin adapter over the same shared HTTP clients used by CLI, returning the same machine-readable payloads for lifecycle operations without adding business logic.
 

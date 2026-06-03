@@ -95,6 +95,7 @@ describe("web api client", () => {
             channel: "webhook",
             condition_type: "severity_threshold",
             severity_min: "high",
+            cooldown_seconds: 0,
             config: { target_url: "https://hooks.example.test/alerts" },
             is_enabled: true,
             created_at: "2026-03-15T00:00:00.000Z",
@@ -125,6 +126,7 @@ describe("web api client", () => {
           channel: "webhook",
           condition_type: "severity_threshold",
           severity_min: "high",
+          cooldown_seconds: 0,
           config: { target_url: "https://hooks.example.test/alerts" },
           is_enabled: true
         })

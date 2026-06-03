@@ -15,6 +15,7 @@ describe("alert api client", () => {
             channel: "email",
             condition_type: "severity_threshold",
             severity_min: "high",
+            cooldown_seconds: 0,
             config: {
               to: "oncall@example.com"
             },
@@ -53,6 +54,7 @@ describe("alert api client", () => {
           channel: "email",
           condition_type: "severity_threshold",
           severity_min: "high",
+          cooldown_seconds: 3600,
           config: {
             to: "oncall@example.com"
           },
@@ -72,6 +74,7 @@ describe("alert api client", () => {
       channel: "email",
       conditionType: "severity_threshold",
       severityMin: "high",
+      cooldownSeconds: 3600,
       config: {
         to: "oncall@example.com"
       },
@@ -89,6 +92,7 @@ describe("alert api client", () => {
         channel: "email",
         condition_type: "severity_threshold",
         severity_min: "high",
+        cooldown_seconds: 3600,
         config: {
           to: "oncall@example.com"
         },
@@ -110,6 +114,7 @@ describe("alert api client", () => {
             channel: "slack",
             condition_type: "error_spike",
             severity_min: null,
+            cooldown_seconds: 86400,
             config: {
               channel: "eng-alerts"
             },
@@ -134,6 +139,7 @@ describe("alert api client", () => {
       channel: "slack",
       conditionType: "error_spike",
       severityMin: null,
+      cooldownSeconds: 86400,
       config: {
         channel: "eng-alerts"
       },
@@ -156,6 +162,7 @@ describe("alert api client", () => {
         channel: "slack",
         condition_type: "error_spike",
         severity_min: null,
+        cooldown_seconds: 86400,
         config: {
           channel: "eng-alerts"
         },
@@ -229,6 +236,7 @@ describe("alert api client", () => {
             channel: "email",
             condition_type: "new_incident",
             severity_min: null,
+            cooldown_seconds: 0,
             config: {
               to: "owner@example.com"
             },
@@ -249,6 +257,7 @@ describe("alert api client", () => {
             channel: "email",
             condition_type: "new_incident",
             severity_min: null,
+            cooldown_seconds: 0,
             config: {
               to: "owner@example.com"
             },

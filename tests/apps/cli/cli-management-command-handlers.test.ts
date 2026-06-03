@@ -41,6 +41,8 @@ describe("cli management command handlers", () => {
         "severity_threshold",
         "--severity-min",
         "high",
+        "--cooldown",
+        "86400",
         "--config-json",
         '{"target_url":"https://hooks.example.test/alerts"}',
         "--is-enabled",
@@ -63,6 +65,7 @@ describe("cli management command handlers", () => {
       channel: "webhook",
       conditionType: "severity_threshold",
       severityMin: "high",
+      cooldownSeconds: 86400,
       json: true,
       config: {
         target_url: "https://hooks.example.test/alerts"
@@ -754,6 +757,18 @@ describe("cli management command handlers", () => {
       "At least one alert field must be provided."
     );
     await expect(handleAlertCommand(parseArgv(["alerts", "unknown"]), {})).rejects.toThrow("Unknown alert command.");
+
+    const updateAlertCommand = vi.fn(async () => ({ exitCode: 0, output: "updated" }));
+    await handleAlertCommand(
+      parseArgv(["alerts", "update", "al_1", "--project-id", "proj_1", "--cooldown", "0"]),
+      { updateAlertCommand }
+    );
+    expect(updateAlertCommand).toHaveBeenCalledWith({
+      alertId: "al_1",
+      authFilePath: undefined,
+      cooldownSeconds: 0,
+      projectId: "proj_1"
+    });
 
     await expect(handleWebhookCommand(parseArgv(["webhooks", "update", "wh_1", "--project-id", "proj_1"]), {})).rejects.toThrow(
       "At least one webhook field must be provided."

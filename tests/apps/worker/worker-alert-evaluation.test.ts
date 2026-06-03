@@ -98,6 +98,7 @@ describe("worker alert evaluation", () => {
       incident_id: "inc_123",
       condition_type: "new_incident",
       dedupe_key: "new_incident",
+      notification_key: "fp_123",
       occurred_at: "2026-03-15T12:00:00.000Z",
       summary: "boom",
       service_name: "checkout-api",
@@ -109,6 +110,7 @@ describe("worker alert evaluation", () => {
       incident_id: "inc_123",
       condition_type: "severity_threshold",
       dedupe_key: "severity_threshold:high",
+      notification_key: "fp_123",
       occurred_at: "2026-03-15T12:00:00.000Z",
       summary: "boom",
       service_name: "checkout-api",
@@ -178,19 +180,22 @@ describe("worker alert evaluation", () => {
 
     expect(result).toEqual({ processed: true });
     expect(alertEnqueue).toHaveBeenCalledWith("evaluate-alerts", expect.objectContaining({
-      incident_id: "inc_456",
-      condition_type: "incident_regressed",
-      dedupe_key: "incident_regressed"
-    }));
+        incident_id: "inc_456",
+        condition_type: "incident_regressed",
+        dedupe_key: "incident_regressed",
+        notification_key: "fp_456"
+      }));
     expect(alertEnqueue).toHaveBeenCalledWith("evaluate-alerts", expect.objectContaining({
       incident_id: "inc_456",
       condition_type: "regression_after_deploy",
-      dedupe_key: "regression_after_deploy"
+      dedupe_key: "regression_after_deploy",
+      notification_key: "fp_456"
     }));
     expect(alertEnqueue).toHaveBeenCalledWith("evaluate-alerts", expect.objectContaining({
       incident_id: "inc_456",
       condition_type: "error_spike",
-      dedupe_key: "error_spike"
+      dedupe_key: "error_spike",
+      notification_key: "fp_456"
     }));
     expect(publish).toHaveBeenCalledWith(expect.objectContaining({ event_type: "bundle.reopened" }));
     expect(publish).toHaveBeenCalledWith(expect.objectContaining({ event_type: "incident.spike_detected" }));
@@ -205,6 +210,7 @@ describe("worker alert evaluation", () => {
         channel: "webhook",
         condition_type: "new_incident",
         severity_min: null,
+        cooldown_seconds: 0,
         config: { target_url: "https://hooks.example.test/alerts" },
         is_enabled: true,
         created_at: "2026-03-15T00:00:00.000Z",
@@ -217,6 +223,7 @@ describe("worker alert evaluation", () => {
         channel: "webhook",
         condition_type: "new_incident",
         severity_min: null,
+        cooldown_seconds: 0,
         config: { target_url: "https://hooks.example.test/alerts-2" },
         is_enabled: true,
         created_at: "2026-03-15T00:00:00.000Z",
@@ -238,6 +245,7 @@ describe("worker alert evaluation", () => {
           incident_id: "inc_123",
           condition_type: "new_incident",
           dedupe_key: "new_incident",
+          notification_key: "fp_123",
           occurred_at: "2026-03-15T12:00:00.000Z",
           service_name: "checkout-api",
           environment: "production",
@@ -310,6 +318,7 @@ describe("worker alert evaluation", () => {
             channel: "email",
             condition_type: "error_spike",
             severity_min: "high",
+            cooldown_seconds: 0,
             config: { to: "alerts@example.com" },
             is_enabled: true,
             created_at: "2026-03-15T00:00:00.000Z",
@@ -335,6 +344,8 @@ describe("worker alert evaluation", () => {
       incident_id: "inc_123",
       condition_type: "error_spike",
       dedupe_key: "error_spike",
+      notification_key: "error_spike",
+      cooldown_seconds: 0,
       recipient: "alerts@example.com",
       payload: expect.objectContaining({
         incident_id: "inc_123",
@@ -375,6 +386,7 @@ describe("worker alert evaluation", () => {
             channel: "webhook",
             condition_type: "new_incident",
             severity_min: null,
+            cooldown_seconds: 0,
             config: { target_url: "https://hooks.example.test/alerts" },
             is_enabled: true,
             created_at: "2026-03-15T00:00:00.000Z",

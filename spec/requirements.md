@@ -173,6 +173,8 @@ Last updated: 2026-05-29
 
 **FR-GRP-09:** Fingerprint versioning: every incident must carry a `fingerprint_version` field indicating which algorithm version produced the fingerprint. When the algorithm changes, new incidents use the new version; existing incidents retain their version until explicitly re-fingerprinted.
 
+**FR-GRP-10:** Severity inference must preserve high severity for backend exceptions, non-opaque frontend exceptions, and immediate request-failure incident signals. Low-confidence opaque browser-native `frontend_exception` captures must not be stamped high by default: opaque `window_error` signals infer `low`, and opaque `resource_error` signals infer `medium`. `error_suppressed` events infer `medium`; other events infer `low` unless explicitly escalated by a later operator-controlled path.
+
 ### 1.5 Bundle System
 
 **FR-BND-01:** Bundles must follow the bundle schema (see `/contracts/data-schemas.md`).

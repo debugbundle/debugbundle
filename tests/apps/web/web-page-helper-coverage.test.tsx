@@ -31,12 +31,14 @@ import {
   buildAlertConfig,
   describeAlertChannel,
   formatAlertChannel,
+  formatAlertCooldown,
   formatAlertChannelWithDestination,
   formatAlertCondition,
   formatSeverity,
   getDestinationDescription,
   getDestinationLabel,
   getSlackDestinationErrorMessage,
+  validateAlertCooldownDays,
   validateAlertRecipientEmail
 } from "../../../apps/web/src/pages/project-alerts-page.tsx";
 import * as api from "../../../apps/web/src/lib/api.ts";
@@ -636,6 +638,7 @@ describe("web page helper coverage", () => {
           channel: "slack",
           condition_type: "error_spike",
           severity_min: null,
+          cooldown_seconds: 0,
           config: {
             slack_destination_id: "sd_123"
           },
@@ -669,6 +672,7 @@ describe("web page helper coverage", () => {
           channel: "slack",
           condition_type: "error_spike",
           severity_min: null,
+          cooldown_seconds: 0,
           config: {
             slack_destination_id: "sd_missing"
           },
@@ -679,6 +683,10 @@ describe("web page helper coverage", () => {
         []
       )
     ).toBe("Slack (channel unavailable)");
+    expect(formatAlertCooldown(0)).toBe("Off");
+    expect(formatAlertCooldown(86_400)).toBe("1 day");
+    expect(formatAlertCooldown(172_800)).toBe("2 days");
+    expect(formatAlertCooldown(900)).toBe("15 minutes");
     expect(getSlackDestinationErrorMessage(new Error("slack_destination_in_use"), "delete")).toMatch(/weekly reports/i);
     expect(getSlackDestinationErrorMessage(new Error("slack_rate_limited"), "test")).toMatch(/slow down/i);
     expect(getSlackDestinationErrorMessage(new Error("forbidden"), "delete")).toMatch(/owners/i);
@@ -687,6 +695,11 @@ describe("web page helper coverage", () => {
     expect(validateAlertRecipientEmail("")).toBe("Enter the email address that should receive this alert.");
     expect(validateAlertRecipientEmail("broken")).toBe("Enter a valid email address for this alert.");
     expect(validateAlertRecipientEmail("alerts@example.com")).toBeUndefined();
+    expect(validateAlertCooldownDays("")).toBe("Cooldown days must be a whole number between 0 and 7.");
+    expect(validateAlertCooldownDays("1.5")).toBe("Cooldown days must be a whole number between 0 and 7.");
+    expect(validateAlertCooldownDays("8")).toBe("Cooldown days must be a whole number between 0 and 7.");
+    expect(validateAlertCooldownDays("0")).toBeUndefined();
+    expect(validateAlertCooldownDays("7")).toBeUndefined();
 
     expect(
       buildAlertConfig({

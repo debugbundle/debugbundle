@@ -108,6 +108,7 @@ describe("mcp alert tools", () => {
       channel: "webhook",
       conditionType: "severity_threshold",
       severityMin: "high",
+      cooldownSeconds: 86400,
       config: { target_url: "https://hooks.example.test/alerts" },
       isEnabled: false
     });
@@ -119,6 +120,7 @@ describe("mcp alert tools", () => {
       channel: "slack",
       conditionType: "error_spike",
       severityMin: null,
+      cooldownSeconds: 0,
       config: null,
       isEnabled: true
     });
@@ -130,6 +132,7 @@ describe("mcp alert tools", () => {
       channel: "webhook",
       conditionType: "severity_threshold",
       severityMin: "high",
+      cooldownSeconds: 86400,
       config: { target_url: "https://hooks.example.test/alerts" },
       isEnabled: false
     });
@@ -141,6 +144,7 @@ describe("mcp alert tools", () => {
       channel: "slack",
       conditionType: "error_spike",
       severityMin: null,
+      cooldownSeconds: 0,
       config: null,
       isEnabled: true
     });
