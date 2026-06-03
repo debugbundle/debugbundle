@@ -1,6 +1,6 @@
 {
   "name": "@debugbundle/web",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "private": true,
   "type": "module",
   "scripts": {
@@ -10,7 +10,7 @@
     "typecheck": "tsc --noEmit -p tsconfig.json"
   },
   "dependencies": {
-    "@debugbundle/sdk-browser": "1.0.0",
+    "@debugbundle/sdk-browser": "1.0.1",
     "@fontsource-variable/geist": "^5.2.8",
     "@fontsource/instrument-sans": "^5.2.8",
     "@fontsource/jetbrains-mono": "^5.2.8",

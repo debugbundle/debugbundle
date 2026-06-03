@@ -11,6 +11,19 @@ The format is based on Keep a Changelog and this project follows Semantic Versio
 - Prepared `@debugbundle/mcp` for public MCP Registry and ClawHub distribution with `mcpName` ownership metadata, `server.json`, env-token auth support, and a portable ClawHub skill.
 - Documented the v1 package release order so shared packages, SDKs, dependent wrappers, dogfooding manifests, and the canonical core release are published in dependency-safe sequence.
 
+## [1.0.1] - 2026-06-03
+
+### Added
+
+- Alert rules now support notification cooldown suppression across API, CLI, MCP, and the web app without changing incident grouping, including broader notification keys for low-information opaque browser-native `window_error` alerts.
+- Browser bundle assembly now consumes inline exception breadcrumbs and preserves additional browser-native opaque error metadata for better failure context.
+
+### Changed
+
+- Worker severity inference now treats opaque browser-native `window_error` captures as `low` and opaque `resource_error` captures as `medium`, while preserving `high` for backend exceptions, non-opaque frontend exceptions, and immediate request-failure incident signals.
+- Promoted the core monorepo and hosted web app dogfooding manifests to `@debugbundle/shared-types@1.0.1`, `@debugbundle/redaction@1.0.1`, `@debugbundle/sdk-node@1.0.1`, and `@debugbundle/sdk-browser@1.0.1`.
+- Bumped `@debugbundle/cli` to `1.0.3` and `@debugbundle/mcp` to `1.0.2` for the alert cooldown, severity, and MCP registry metadata sync changes in this release train.
+
 ## [0.1.3] - 2026-05-22
 
 ### Added
