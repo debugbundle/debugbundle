@@ -1,3 +1,4 @@
+import { useState } from "react";
 import {
   BookMarkedIcon,
   ChevronsUpDownIcon,
@@ -36,7 +37,8 @@ interface NavUserProps {
 }
 
 export function NavUser({ email, role, avatarUrl = null, onSignOut }: NavUserProps): JSX.Element {
-  const { isMobile } = useSidebar();
+  const [open, setOpen] = useState(false);
+  const { isMobile, setOpenMobile } = useSidebar();
   const navigate = useNavigate();
   const { resolvedTheme, setTheme } = useTheme();
   const documentationUrl = resolveDocumentationUrl();
@@ -45,10 +47,23 @@ export function NavUser({ email, role, avatarUrl = null, onSignOut }: NavUserPro
     setTheme(resolvedTheme === "dark" ? "light" : "dark");
   }
 
+  function closeNavigationOverlays(): void {
+    setOpen(false);
+
+    if (isMobile) {
+      setOpenMobile(false);
+    }
+  }
+
+  function runAfterOverlayClose(action: () => void): void {
+    closeNavigationOverlays();
+    window.setTimeout(action, 0);
+  }
+
   return (
     <SidebarMenu>
       <SidebarMenuItem>
-        <DropdownMenu>
+        <DropdownMenu open={open} onOpenChange={setOpen}>
           <DropdownMenuTrigger asChild>
             <SidebarMenuButton
               size="lg"
@@ -79,7 +94,14 @@ export function NavUser({ email, role, avatarUrl = null, onSignOut }: NavUserPro
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
             <DropdownMenuGroup>
-              <DropdownMenuItem className="py-2" onSelect={() => { void navigate("/settings"); }}>
+              <DropdownMenuItem
+                className="py-2"
+                onSelect={() => {
+                  runAfterOverlayClose(() => {
+                    void navigate("/settings");
+                  });
+                }}
+              >
                 <UserIcon />
                 Account
               </DropdownMenuItem>
@@ -89,18 +111,38 @@ export function NavUser({ email, role, avatarUrl = null, onSignOut }: NavUserPro
                   Documentation
                 </a>
               </DropdownMenuItem>
-              <DropdownMenuItem className="py-2" onSelect={() => { void navigate("/billing"); }}>
+              <DropdownMenuItem
+                className="py-2"
+                onSelect={() => {
+                  runAfterOverlayClose(() => {
+                    void navigate("/billing");
+                  });
+                }}
+              >
                 <CreditCardIcon />
                 Billing
               </DropdownMenuItem>
             </DropdownMenuGroup>
             <DropdownMenuSeparator />
-            <DropdownMenuItem className="py-2" onSelect={handleToggleTheme}>
+            <DropdownMenuItem
+              className="py-2"
+              onSelect={() => {
+                closeNavigationOverlays();
+                handleToggleTheme();
+              }}
+            >
               {resolvedTheme === "dark" ? <SunIcon /> : <MoonIcon />}
               {resolvedTheme === "dark" ? "Light mode" : "Dark mode"}
             </DropdownMenuItem>
             <DropdownMenuSeparator />
-            <DropdownMenuItem className="py-2" onSelect={() => void onSignOut()}>
+            <DropdownMenuItem
+              className="py-2"
+              onSelect={() => {
+                runAfterOverlayClose(() => {
+                  void onSignOut();
+                });
+              }}
+            >
               <LogOutIcon />
               Log out
             </DropdownMenuItem>

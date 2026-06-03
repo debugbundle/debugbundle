@@ -442,6 +442,14 @@ function EmailAuthPage({
   const isVerifyStep = step === "verify";
 
   useEffect(() => {
+    if (document.body.style.pointerEvents === "none") {
+      document.body.style.pointerEvents = "";
+    }
+
+    document.body.removeAttribute("data-scroll-locked");
+  }, []);
+
+  useEffect(() => {
     if (isVerifyStep) {
       codeInputRef.current?.focus();
       return;

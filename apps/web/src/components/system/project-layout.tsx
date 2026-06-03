@@ -150,13 +150,15 @@ export function ProjectLayout(): JSX.Element {
   return (
     <div className="min-w-0 space-y-6">
       <Tabs value={activeTab} onValueChange={handleTabChange}>
-        <TabsList>
-          {visibleTabs.map((tab) => (
-            <TabsTrigger key={tab.value} value={tab.value}>
-              {tab.label}
-            </TabsTrigger>
-          ))}
-        </TabsList>
+        <div className="overflow-x-auto overscroll-x-contain pb-1">
+          <TabsList className="min-w-max justify-start">
+            {visibleTabs.map((tab) => (
+              <TabsTrigger key={tab.value} value={tab.value} className="shrink-0 flex-none px-3">
+                {tab.label}
+              </TabsTrigger>
+            ))}
+          </TabsList>
+        </div>
       </Tabs>
 
       <Outlet
