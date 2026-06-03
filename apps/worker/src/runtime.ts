@@ -181,8 +181,8 @@ function normalizeWorkerBaseUrl(value: string | undefined): string | null {
   return trimmed.replace(/\/+$/, "");
 }
 
-function resolveWorkerEmailAssetBaseUrl(env: Record<string, string | undefined>): string | null {
-  return normalizeWorkerBaseUrl(env["EMAIL_ASSET_BASE_URL"] ?? env["PUBLIC_SITE_URL"] ?? env["APP_BASE_URL"]);
+export function resolveWorkerEmailAssetBaseUrl(env: Record<string, string | undefined>): string | null {
+  return normalizeWorkerBaseUrl(env["EMAIL_ASSET_BASE_URL"] ?? env["APP_BASE_URL"] ?? env["PUBLIC_SITE_URL"]);
 }
 
 interface WebhookOwnerNotificationRecipient {

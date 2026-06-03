@@ -325,6 +325,7 @@ import {
   scheduleWeeklyReports,
   createProcessedEventStore,
   parseWorkerEnv,
+  resolveWorkerEmailAssetBaseUrl,
   runWorkerFromEnv
 } from "../../../apps/worker/src/runtime.js";
 import { STORAGE_SCHEMA_MIGRATIONS } from "../../../packages/storage/src/schema-migrations.js";
@@ -446,6 +447,15 @@ describe("worker runtime", () => {
     const env = parseWorkerEnv({ DB_SSL_MODE: "require" });
 
     expect(env.DB_SSL_MODE).toBe("require");
+  });
+
+  it("should prefer the app origin over the public site for worker email brand assets when no explicit override is set", (): void => {
+    const assetBaseUrl = resolveWorkerEmailAssetBaseUrl({
+      APP_BASE_URL: "https://app.debugbundle.test",
+      PUBLIC_SITE_URL: "https://debugbundle.test"
+    });
+
+    expect(assetBaseUrl).toBe("https://app.debugbundle.test");
   });
 
   it("should throw clear error for invalid poll interval", (): void => {
