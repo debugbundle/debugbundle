@@ -420,6 +420,7 @@ Implementation:
 - The route writes the effective organization entitlement snapshot directly, clears Stripe customer/subscription linkage, marks paid overrides with `billing_state = 'admin_override'`, and audit-logs the operator, target organization, absolute entitlement, and reason.
 - When an allowlisted operator signs into their own free organization, DebugBundle should automatically seed that organization to an internally managed Team plan with zero additional capacity units so operator accounts do not need a manual bootstrap override.
 - The Billing page treats paid plans with no `stripe_customer_id` as internally managed, suppresses Stripe checkout/portal actions, and keeps the existing capacity-management controls available with immediate internal updates.
+- Review access may additionally bootstrap a reviewer-owned free organization to an internally managed Team plan through a secret-gated browser bootstrap route. The route must only mint a short-lived review cookie, the actual plan upgrade must still happen server-side through the same admin override primitive, and the cookie must be cleared after session resolution.
 
 ---
 

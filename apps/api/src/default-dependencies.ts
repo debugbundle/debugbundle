@@ -2328,6 +2328,7 @@ export function createApiDependenciesFromEnv(env: Record<string, string | undefi
   const lifecycleWebhookFallbackTargetUrl = readNonEmptyEnv(env, "LIFECYCLE_WEBHOOK_TARGET_URL");
   const lifecycleWebhookFallbackSigningSecret = readNonEmptyEnv(env, "LIFECYCLE_WEBHOOK_SECRET");
   const billingAdminEmails = readBillingAdminEmailsFromEnv(env);
+  const reviewAccessSecret = readNonEmptyEnv(env, "REVIEW_ACCESS_SECRET");
 
   const authRateLimiter = createRedisAuthRateLimiter({
     redisUrl: env["REDIS_URL"] ?? "redis://localhost:6379"
@@ -2347,7 +2348,9 @@ export function createApiDependenciesFromEnv(env: Record<string, string | undefi
     ...(billingEmails === undefined ? {} : { billingEmails }),
     ...(githubOAuth === undefined ? {} : { githubOAuth }),
     ...(githubAppClient === undefined ? {} : { githubAppClient }),
-    ...(billingAdminEmails === undefined ? {} : { billingAdminEmails }),
+    ...(billingAdminEmails === undefined && reviewAccessSecret === undefined
+      ? {}
+      : { billingAdminEmails: billingAdminEmails ?? [] }),
     ...(stripeConfig === undefined ? {} : { stripeConfig }),
     ...(lifecycleWebhookFallbackTargetUrl === undefined ? {} : { lifecycleWebhookFallbackTargetUrl }),
     ...(lifecycleWebhookFallbackSigningSecret === undefined ? {} : { lifecycleWebhookFallbackSigningSecret }),

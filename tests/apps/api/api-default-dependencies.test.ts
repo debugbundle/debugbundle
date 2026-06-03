@@ -1360,7 +1360,7 @@ describe("api default dependencies", () => {
 
   it("should ignore the removed signup allowlist runtime env", (): void => {
     createApiDependenciesFromEnv({
-      AUTH_SIGNUP_ALLOWED_EMAILS: "owen@example.com, brother@example.com ,owen@example.com"
+      AUTH_SIGNUP_ALLOWED_EMAILS: "owen@example.com, jason@example.com"
     });
 
     const serviceOptions = (createWebSessionAuthServiceMock.mock.calls.at(-1)?.[1] ?? {}) as Record<string, unknown>;
@@ -1377,6 +1377,16 @@ describe("api default dependencies", () => {
     expect(billingAdmin).toBeDefined();
     expect(billingAdmin?.isOperatorAllowed({ email: "owen@example.com" })).toBe(true);
     expect(billingAdmin?.isOperatorAllowed({ email: "ADMIN@example.com" })).toBe(true);
+    expect(billingAdmin?.isOperatorAllowed({ email: "regular@example.com" })).toBe(false);
+  });
+
+  it("should compose billing admin override support for review access without operator emails", (): void => {
+    const dependencies = createApiDependenciesFromEnv({
+      REVIEW_ACCESS_SECRET: "review-secret"
+    });
+    const billingAdmin = dependencies.billingAdmin;
+
+    expect(billingAdmin).toBeDefined();
     expect(billingAdmin?.isOperatorAllowed({ email: "regular@example.com" })).toBe(false);
   });
 

@@ -21,6 +21,13 @@ export const VerifyEmailCodeBodySchema = z
   })
   .strict();
 
+export const ReviewAccessQuerySchema = z
+  .object({
+    token: z.string().min(1),
+    next: z.string().min(1).optional()
+  })
+  .strict();
+
 export const SendSystemEmailPreviewBodySchema = z
   .object({
     id: z.string().min(1)

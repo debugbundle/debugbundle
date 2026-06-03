@@ -233,6 +233,48 @@ function createServer(overrides: {
 }
 
 describe("api auth routes", () => {
+  it("hides the review access bootstrap route unless the matching secret is configured", async (): Promise<void> => {
+    const previousSecret = process.env["REVIEW_ACCESS_SECRET"];
+    delete process.env["REVIEW_ACCESS_SECRET"];
+
+    try {
+      const withoutSecret = createServer();
+      const missing = await withoutSecret.inject({
+        method: "GET",
+        url: "/review/access?token=review-secret"
+      });
+
+      expect(missing.statusCode).toBe(404);
+      expect(missing.json()).toEqual({ error: "not_found" });
+
+      process.env["REVIEW_ACCESS_SECRET"] = "review-secret";
+      const withSecret = createServer({
+        billingManagement: mockedObject<NonNullable<ApiServerDependencies["billingManagement"]>>({
+          getBillingSummaryForOrganization: vi.fn().mockResolvedValue(null),
+          createCheckoutLink: vi.fn().mockResolvedValue(null),
+          createPortalLink: vi.fn().mockResolvedValue(null)
+        }),
+        billingAdmin: {
+          isOperatorAllowed: vi.fn().mockReturnValue(false),
+          overrideOrganizationBilling: vi.fn()
+        }
+      });
+      const invalid = await withSecret.inject({
+        method: "GET",
+        url: "/review/access?token=wrong-secret"
+      });
+
+      expect(invalid.statusCode).toBe(404);
+      expect(invalid.json()).toEqual({ error: "not_found" });
+    } finally {
+      if (previousSecret === undefined) {
+        delete process.env["REVIEW_ACCESS_SECRET"];
+      } else {
+        process.env["REVIEW_ACCESS_SECRET"] = previousSecret;
+      }
+    }
+  });
+
   it("validates request-code and verify-code payloads", async (): Promise<void> => {
     const app = createServer();
 
@@ -279,6 +321,8 @@ describe("api auth routes", () => {
   });
 
   it("rate limits request-code and verify-code requests per IP", async (): Promise<void> => {
+    const previousSecret = process.env["REVIEW_ACCESS_SECRET"];
+    process.env["REVIEW_ACCESS_SECRET"] = "review-secret";
     const claimRequest = vi.fn().mockResolvedValue({
       allowed: false,
       limit: 10,
@@ -297,26 +341,38 @@ describe("api auth routes", () => {
       }
     });
 
-    const requestCode = await app.inject({
-      method: "POST",
-      url: "/v1/auth/request-code",
-      payload: { email: "owen@example.com", accepted_terms: true }
-    });
-    const verifyCode = await app.inject({
-      method: "POST",
-      url: "/v1/auth/verify-code",
-      payload: { email: "owen@example.com", code: "123456" }
-    });
+    try {
+      const requestCode = await app.inject({
+        method: "POST",
+        url: "/v1/auth/request-code",
+        payload: { email: "owen@example.com", accepted_terms: true }
+      });
+      const verifyCode = await app.inject({
+        method: "POST",
+        url: "/v1/auth/verify-code",
+        payload: { email: "owen@example.com", code: "123456" }
+      });
+      const reviewAccess = await app.inject({
+        method: "GET",
+        url: "/review/access?token=review-secret"
+      });
 
-    for (const response of [requestCode, verifyCode]) {
-      expect(response.statusCode).toBe(429);
-      expect(response.json()).toEqual({ error: "rate_limited" });
-      expect(response.headers["retry-after"]).toBe("12");
+      for (const response of [requestCode, verifyCode, reviewAccess]) {
+        expect(response.statusCode).toBe(429);
+        expect(response.json()).toEqual({ error: "rate_limited" });
+        expect(response.headers["retry-after"]).toBe("12");
+      }
+
+      expect(claimRequest).toHaveBeenCalledTimes(3);
+      expect(requestEmailCode).not.toHaveBeenCalled();
+      expect(verifyEmailCode).not.toHaveBeenCalled();
+    } finally {
+      if (previousSecret === undefined) {
+        delete process.env["REVIEW_ACCESS_SECRET"];
+      } else {
+        process.env["REVIEW_ACCESS_SECRET"] = previousSecret;
+      }
     }
-
-    expect(claimRequest).toHaveBeenCalledTimes(2);
-    expect(requestEmailCode).not.toHaveBeenCalled();
-    expect(verifyEmailCode).not.toHaveBeenCalled();
   });
 
   it("forwards request-code calls with clickwrap acceptance semantics", async (): Promise<void> => {
@@ -402,6 +458,127 @@ describe("api auth routes", () => {
       }
     });
     expect(String(response.headers["set-cookie"])).toContain(`${SESSION_COOKIE_NAME}=session-secret`);
+  });
+
+  it("applies the review access grant during email-code login and clears the bootstrap cookie", async (): Promise<void> => {
+    const previousSecret = process.env["REVIEW_ACCESS_SECRET"];
+    process.env["REVIEW_ACCESS_SECRET"] = "review-secret";
+
+    try {
+      const overrideOrganizationBilling = vi.fn().mockResolvedValue({
+        plan: "team",
+        stripe_customer_id: null,
+        active_projects: 1,
+        capacity_units: {
+          total: 15,
+          included: 15,
+          additional_purchased: 0,
+          pending_reduction: null
+        },
+        usage_window: {
+          starts_at: "2026-03-01T00:00:00.000Z",
+          ends_at: "2026-04-01T00:00:00.000Z"
+        },
+        allowances: {
+          monthly_bundle_requests: { used: 0, limit: 11250 },
+          monthly_raw_ingested_events: { used: 0, limit: 157500 },
+          retained_bundle_cap: { used: 0, limit: 6750 },
+          monthly_remote_activations: { used: 0, limit: 1125 },
+          monthly_alert_deliveries: { used: 0, limit: 3375 },
+          monthly_webhook_deliveries: { used: 0, limit: 11250 }
+        }
+      });
+      const createAuditLog = vi.fn().mockResolvedValue(undefined);
+      const app = createServer({
+        billingManagement: mockedObject<NonNullable<ApiServerDependencies["billingManagement"]>>({
+          getBillingSummaryForOrganization: vi.fn().mockResolvedValue({
+            plan: "free",
+            stripe_customer_id: null,
+            active_projects: 1,
+            capacity_units: {
+              total: 1,
+              included: 1,
+              additional_purchased: 0,
+              pending_reduction: null
+            },
+            usage_window: {
+              starts_at: "2026-03-01T00:00:00.000Z",
+              ends_at: "2026-04-01T00:00:00.000Z"
+            },
+            allowances: {
+              monthly_bundle_requests: { used: 0, limit: 750 },
+              monthly_raw_ingested_events: { used: 0, limit: 750 },
+              retained_bundle_cap: { used: 0, limit: 50 },
+              monthly_remote_activations: { used: 0, limit: 0 },
+              monthly_alert_deliveries: { used: 0, limit: 75 },
+              monthly_webhook_deliveries: { used: 0, limit: 750 }
+            }
+          }),
+          createCheckoutLink: vi.fn().mockResolvedValue(null),
+          createPortalLink: vi.fn().mockResolvedValue(null)
+        }),
+        billingAdmin: {
+          isOperatorAllowed: vi.fn().mockReturnValue(false),
+          overrideOrganizationBilling
+        },
+        auditLogging: {
+          createAuditLog
+        }
+      });
+
+      const grant = await app.inject({
+        method: "GET",
+        url: "/review/access?token=review-secret&next=/login"
+      });
+      const grantCookie = Array.isArray(grant.headers["set-cookie"])
+        ? (grant.headers["set-cookie"][0] ?? "")
+        : String(grant.headers["set-cookie"] ?? "");
+      const grantCookiePair = grantCookie.split(";").at(0) ?? "";
+
+      const response = await app.inject({
+        method: "POST",
+        url: "/v1/auth/verify-code",
+        headers: {
+          cookie: grantCookiePair
+        },
+        payload: { email: "owen@example.com", code: "123456" }
+      });
+
+      expect(response.statusCode).toBe(200);
+      expect(response.json()).toEqual({
+        session: expect.objectContaining({
+          email: "owen@example.com",
+          organization_plan: "team"
+        })
+      });
+      expect(String(response.headers["set-cookie"])).toContain(`${SESSION_COOKIE_NAME}=session-secret`);
+      expect(String(response.headers["set-cookie"])).toContain("dbundle_review_grant=;");
+      expect(overrideOrganizationBilling).toHaveBeenCalledWith({
+        organization_id: "org_123",
+        plan: "team",
+        additional_capacity_units: 0,
+        now: expect.any(String)
+      });
+      expect(createAuditLog).toHaveBeenCalledWith(
+        expect.objectContaining({
+          organization_id: "org_123",
+          actor_user_id: "usr_123",
+          action: "billing.admin_override",
+          status: "success",
+          metadata: {
+            plan: "team",
+            additional_capacity_units: 0,
+            reason: "review_access"
+          }
+        })
+      );
+    } finally {
+      if (previousSecret === undefined) {
+        delete process.env["REVIEW_ACCESS_SECRET"];
+      } else {
+        process.env["REVIEW_ACCESS_SECRET"] = previousSecret;
+      }
+    }
   });
 
   it("maps invalid email codes to a 400 response", async (): Promise<void> => {
@@ -1271,6 +1448,143 @@ describe("api auth routes", () => {
         csrf_token: buildCsrfToken("session-secret")
       }
     });
+  });
+
+  it("applies the review access grant when resolving an existing browser session", async (): Promise<void> => {
+    const previousSecret = process.env["REVIEW_ACCESS_SECRET"];
+    process.env["REVIEW_ACCESS_SECRET"] = "review-secret";
+
+    try {
+      const overrideOrganizationBilling = vi.fn().mockResolvedValue({
+        plan: "team",
+        stripe_customer_id: null,
+        active_projects: 1,
+        capacity_units: {
+          total: 15,
+          included: 15,
+          additional_purchased: 0,
+          pending_reduction: null
+        },
+        usage_window: {
+          starts_at: "2026-03-01T00:00:00.000Z",
+          ends_at: "2026-04-01T00:00:00.000Z"
+        },
+        allowances: {
+          monthly_bundle_requests: { used: 0, limit: 11250 },
+          monthly_raw_ingested_events: { used: 0, limit: 157500 },
+          retained_bundle_cap: { used: 0, limit: 6750 },
+          monthly_remote_activations: { used: 0, limit: 1125 },
+          monthly_alert_deliveries: { used: 0, limit: 3375 },
+          monthly_webhook_deliveries: { used: 0, limit: 11250 }
+        }
+      });
+      const createAuditLog = vi.fn().mockResolvedValue(undefined);
+      const app = createServer({
+        webAuth: {
+          resolveSessionByToken: vi.fn().mockResolvedValue({
+            session_id: "ses_123",
+            user_id: "usr_123",
+            email: "owen@example.com",
+            email_verified_at: "2026-03-16T00:00:00.000Z",
+            organization_id: "org_123",
+            role: "owner",
+            created_at: "2026-03-16T00:00:00.000Z",
+            expires_at: "2026-03-16T04:00:00.000Z",
+            revoked_at: null,
+            has_email_auth: true,
+            has_github_oauth: true
+          })
+        },
+        billingManagement: mockedObject<NonNullable<ApiServerDependencies["billingManagement"]>>({
+          getBillingSummaryForOrganization: vi.fn().mockResolvedValue({
+            plan: "free",
+            stripe_customer_id: null,
+            active_projects: 1,
+            capacity_units: {
+              total: 1,
+              included: 1,
+              additional_purchased: 0,
+              pending_reduction: null
+            },
+            usage_window: {
+              starts_at: "2026-03-01T00:00:00.000Z",
+              ends_at: "2026-04-01T00:00:00.000Z"
+            },
+            allowances: {
+              monthly_bundle_requests: { used: 0, limit: 750 },
+              monthly_raw_ingested_events: { used: 0, limit: 750 },
+              retained_bundle_cap: { used: 0, limit: 50 },
+              monthly_remote_activations: { used: 0, limit: 0 },
+              monthly_alert_deliveries: { used: 0, limit: 75 },
+              monthly_webhook_deliveries: { used: 0, limit: 750 }
+            }
+          }),
+          createCheckoutLink: vi.fn().mockResolvedValue(null),
+          createPortalLink: vi.fn().mockResolvedValue(null)
+        }),
+        billingAdmin: {
+          isOperatorAllowed: vi.fn().mockReturnValue(false),
+          overrideOrganizationBilling
+        },
+        auditLogging: {
+          createAuditLog
+        }
+      });
+
+      const grant = await app.inject({
+        method: "GET",
+        url: "/review/access?token=review-secret&next=/projects"
+      });
+      const grantCookie = Array.isArray(grant.headers["set-cookie"])
+        ? (grant.headers["set-cookie"][0] ?? "")
+        : String(grant.headers["set-cookie"] ?? "");
+      const grantCookiePair = grantCookie.split(";").at(0) ?? "";
+
+      const response = await app.inject({
+        method: "GET",
+        url: "/v1/auth/session",
+        headers: {
+          cookie: `${SESSION_COOKIE_NAME}=session-secret; ${grantCookiePair}`
+        }
+      });
+
+      expect(grant.statusCode).toBe(302);
+      expect(grant.headers.location).toBe("http://localhost:5291/projects");
+      expect(String(grant.headers["set-cookie"])).toContain("dbundle_review_grant=");
+      expect(response.statusCode).toBe(200);
+      expect(response.json()).toEqual({
+        session: expect.objectContaining({
+          email: "owen@example.com",
+          organization_plan: "team"
+        })
+      });
+      expect(String(response.headers["set-cookie"])).toContain("dbundle_review_grant=;");
+      expect(overrideOrganizationBilling).toHaveBeenCalledWith({
+        organization_id: "org_123",
+        plan: "team",
+        additional_capacity_units: 0,
+        now: expect.any(String)
+      });
+      expect(createAuditLog).toHaveBeenCalledWith(
+        expect.objectContaining({
+          organization_id: "org_123",
+          actor_user_id: "usr_123",
+          action: "billing.admin_override",
+          status: "success",
+          metadata: {
+            plan: "team",
+            additional_capacity_units: 0,
+            reason: "review_access"
+          }
+        })
+      );
+    } finally {
+      if (previousSecret === undefined) {
+        delete process.env["REVIEW_ACCESS_SECRET"];
+      } else {
+        process.env["REVIEW_ACCESS_SECRET"] = previousSecret;
+      }
+    }
   });
 
   it("auto-promotes allowlisted operator sessions to the team plan", async (): Promise<void> => {

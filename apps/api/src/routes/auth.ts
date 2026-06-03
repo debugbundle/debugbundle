@@ -1,3 +1,5 @@
+import { createHmac, timingSafeEqual } from "node:crypto";
+
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 
 import {
@@ -24,6 +26,7 @@ import {
   GithubDevicePollBodySchema,
   GithubDeviceStartBodySchema,
   GithubMockAuthorizeQuerySchema,
+  ReviewAccessQuerySchema,
   GithubTokenExchangeBodySchema,
   RequestEmailCodeBodySchema,
   VerifyEmailCodeBodySchema
@@ -32,6 +35,9 @@ import {
 const DEV_GITHUB_MOCK_CODE = "debugbundle-dev-mock-code";
 const AUTH_RATE_LIMIT_PER_MINUTE = 10;
 const DEFAULT_GITHUB_BOOTSTRAP_LABEL = "GitHub bootstrap";
+const REVIEW_GRANT_COOKIE_NAME = "dbundle_review_grant";
+const REVIEW_GRANT_SCOPE = "review_access";
+const REVIEW_GRANT_TTL_MS = 1000 * 60 * 60 * 24 * 14;
 
 function toRetryAfterSeconds(retryAfterMs: number): string {
   return String(Math.max(1, Math.ceil(retryAfterMs / 1_000)));
@@ -39,6 +45,68 @@ function toRetryAfterSeconds(retryAfterMs: number): string {
 
 function shouldUseSecureCookies(): boolean {
   return process.env["AUTH_COOKIE_SECURE"] !== "false";
+}
+
+function buildStrictHttpOnlyCookieAttributes(options: { secure: boolean | undefined }): string {
+  return `Path=/; HttpOnly; ${options.secure === false ? "" : "Secure; "}SameSite=Strict`;
+}
+
+function buildReviewGrantCookie(secret: string, expiresAt: string, options: { secure: boolean | undefined }): string {
+  const value = createHmac("sha256", secret).update(REVIEW_GRANT_SCOPE, "utf8").digest("base64url");
+  return `${REVIEW_GRANT_COOKIE_NAME}=${encodeURIComponent(value)}; ${buildStrictHttpOnlyCookieAttributes(options)}; Expires=${new Date(expiresAt).toUTCString()}`;
+}
+
+function buildClearedReviewGrantCookie(options: { secure: boolean | undefined }): string {
+  return `${REVIEW_GRANT_COOKIE_NAME}=; ${buildStrictHttpOnlyCookieAttributes(options)}; Expires=${new Date(0).toUTCString()}; Max-Age=0`;
+}
+
+function readReviewAccessSecret(): string | null {
+  const secret = process.env["REVIEW_ACCESS_SECRET"]?.trim();
+  return secret === undefined || secret.length === 0 ? null : secret;
+}
+
+function timingSafeStringEquals(left: string, right: string): boolean {
+  const leftBuffer = Buffer.from(left, "utf8");
+  const rightBuffer = Buffer.from(right, "utf8");
+  return leftBuffer.length === rightBuffer.length && timingSafeEqual(leftBuffer, rightBuffer);
+}
+
+function hasValidReviewGrantCookie(cookieHeader: string | undefined, secret: string): boolean {
+  const cookieValue = readCookieValue(cookieHeader, REVIEW_GRANT_COOKIE_NAME);
+  if (cookieValue === null) {
+    return false;
+  }
+
+  const expected = createHmac("sha256", secret).update(REVIEW_GRANT_SCOPE, "utf8").digest("base64url");
+  return timingSafeStringEquals(cookieValue, expected);
+}
+
+function normalizeReviewGrantRedirectPath(path: string | undefined): string {
+  if (typeof path !== "string" || path.length === 0 || !path.startsWith("/") || path.startsWith("//")) {
+    return "/login";
+  }
+
+  return path;
+}
+
+function resolveAppRedirectUrl(path: string | undefined): string {
+  const appBaseUrl = process.env["APP_BASE_URL"]?.trim() || "http://localhost:5291";
+  return new URL(normalizeReviewGrantRedirectPath(path), appBaseUrl).toString();
+}
+
+function appendSetCookieHeader(reply: FastifyReply, value: string): void {
+  const existing = reply.getHeader("Set-Cookie");
+  if (existing === undefined) {
+    reply.header("Set-Cookie", value);
+    return;
+  }
+
+  if (Array.isArray(existing)) {
+    reply.header("Set-Cookie", [...existing.map((entry) => String(entry)), value]);
+    return;
+  }
+
+  reply.header("Set-Cookie", [String(existing), value]);
 }
 
 function isDevGithubMockEnabled(): boolean {
@@ -255,6 +323,164 @@ async function resolveOrganizationPlan(
   return "free";
 }
 
+async function applyReviewAccessGrant(
+  request: FastifyRequest,
+  input: {
+    organization_id: string;
+    user_id: string;
+    email: string;
+    role: "owner" | "member";
+  },
+  dependencies: Pick<ApiDependencies, "auditLogging" | "billingAdmin" | "billingManagement">
+): Promise<{ plan?: "free" | "solo" | "team"; clear_cookie: boolean }> {
+  const secret = readReviewAccessSecret();
+  if (secret === null || !hasValidReviewGrantCookie(request.headers.cookie, secret)) {
+    return { clear_cookie: false };
+  }
+
+  const clear_cookie = true;
+  if (input.role !== "owner") {
+    await recordAuditLog(dependencies.auditLogging, {
+      organization_id: input.organization_id,
+      actor_user_id: input.user_id,
+      actor_type: "browser_session",
+      action: "billing.admin_override",
+      target_type: "organization",
+      target_id: input.organization_id,
+      status: "failure",
+      ip_address: request.ip,
+      metadata: {
+        plan: "team",
+        additional_capacity_units: 0,
+        reason: "review_access_not_owner"
+      }
+    });
+    return { clear_cookie };
+  }
+
+  if (dependencies.billingManagement === undefined || dependencies.billingAdmin === undefined) {
+    await recordAuditLog(dependencies.auditLogging, {
+      organization_id: input.organization_id,
+      actor_user_id: input.user_id,
+      actor_type: "browser_session",
+      action: "billing.admin_override",
+      target_type: "organization",
+      target_id: input.organization_id,
+      status: "failure",
+      ip_address: request.ip,
+      metadata: {
+        plan: "team",
+        additional_capacity_units: 0,
+        reason: "review_access_not_available"
+      }
+    });
+    return { clear_cookie };
+  }
+
+  const billing = await dependencies.billingManagement.getBillingSummaryForOrganization({
+    organization_id: input.organization_id,
+    now: new Date().toISOString()
+  });
+  if (billing === null) {
+    await recordAuditLog(dependencies.auditLogging, {
+      organization_id: input.organization_id,
+      actor_user_id: input.user_id,
+      actor_type: "browser_session",
+      action: "billing.admin_override",
+      target_type: "organization",
+      target_id: input.organization_id,
+      status: "failure",
+      ip_address: request.ip,
+      metadata: {
+        plan: "team",
+        additional_capacity_units: 0,
+        reason: "review_access_billing_not_found"
+      }
+    });
+    return { clear_cookie };
+  }
+
+  if (billing.plan !== "free") {
+    return {
+      plan: billing.plan,
+      clear_cookie
+    };
+  }
+
+  const overridden = await dependencies.billingAdmin.overrideOrganizationBilling({
+    organization_id: input.organization_id,
+    plan: "team",
+    additional_capacity_units: 0,
+    now: new Date().toISOString()
+  });
+
+  if (overridden === "billing_not_found") {
+    await recordAuditLog(dependencies.auditLogging, {
+      organization_id: input.organization_id,
+      actor_user_id: input.user_id,
+      actor_type: "browser_session",
+      action: "billing.admin_override",
+      target_type: "organization",
+      target_id: input.organization_id,
+      status: "failure",
+      ip_address: request.ip,
+      metadata: {
+        plan: "team",
+        additional_capacity_units: 0,
+        reason: "review_access_billing_not_found"
+      }
+    });
+    return { clear_cookie };
+  }
+
+  await recordAuditLog(dependencies.auditLogging, {
+    organization_id: input.organization_id,
+    actor_user_id: input.user_id,
+    actor_type: "browser_session",
+    action: "billing.admin_override",
+    target_type: "organization",
+    target_id: input.organization_id,
+    status: "success",
+    ip_address: request.ip,
+    metadata: {
+      plan: "team",
+      additional_capacity_units: 0,
+      reason: "review_access"
+    }
+  });
+
+  return {
+    plan: overridden.plan,
+    clear_cookie
+  };
+}
+
+async function resolveOrganizationPlanForRequest(
+  request: FastifyRequest,
+  input: {
+    organization_id: string;
+    user_id: string;
+    email: string;
+    role: "owner" | "member";
+    actor_type: AuditLogActorType;
+    ip_address: string;
+  },
+  dependencies: Pick<ApiDependencies, "auditLogging" | "billingAdmin" | "billingManagement" | "projectManagement">
+): Promise<{ organization_plan: "free" | "solo" | "team"; clear_review_cookie: boolean }> {
+  const reviewGrant = await applyReviewAccessGrant(request, input, dependencies);
+  if (reviewGrant.plan !== undefined) {
+    return {
+      organization_plan: reviewGrant.plan,
+      clear_review_cookie: reviewGrant.clear_cookie
+    };
+  }
+
+  return {
+    organization_plan: await resolveOrganizationPlan(input, dependencies),
+    clear_review_cookie: reviewGrant.clear_cookie
+  };
+}
+
 async function enforceAuthRateLimit(
   request: FastifyRequest,
   reply: FastifyReply,
@@ -283,6 +509,38 @@ async function enforceAuthRateLimit(
 
 export function registerAuthRoutes(app: FastifyInstance, dependencies: ApiDependencies): void {
   assertDevGithubMockNotEnabledInProduction();
+
+  const handleReviewAccess = async (request: FastifyRequest, reply: FastifyReply): Promise<void> => {
+    const secret = readReviewAccessSecret();
+    if (secret === null) {
+      await reply.status(404).send({ error: "not_found" });
+      return;
+    }
+    if (!(await enforceAuthRateLimit(request, reply, dependencies))) {
+      return;
+    }
+    if (dependencies.billingManagement === undefined || dependencies.billingAdmin === undefined) {
+      await reply.status(503).send({ error: "review_access_not_available" });
+      return;
+    }
+
+    const parsedQuery = ReviewAccessQuerySchema.safeParse(request.query);
+    if (!parsedQuery.success) {
+      await reply.status(400).send({ error: "invalid_query" });
+      return;
+    }
+    if (!timingSafeStringEquals(parsedQuery.data.token, secret)) {
+      await reply.status(404).send({ error: "not_found" });
+      return;
+    }
+
+    const expiresAt = new Date(Date.now() + REVIEW_GRANT_TTL_MS).toISOString();
+    reply.header("Set-Cookie", buildReviewGrantCookie(secret, expiresAt, { secure: shouldUseSecureCookies() }));
+    await reply.redirect(resolveAppRedirectUrl(parsedQuery.data.next));
+  };
+
+  app.get("/review/access", handleReviewAccess);
+  app.get("/v1/auth/review/access", handleReviewAccess);
 
   app.post("/v1/auth/request-code", { bodyLimit: SMALL_REQUEST_BODY_LIMIT_BYTES }, async (request, reply) => {
     if (!(await enforceAuthRateLimit(request, reply, dependencies))) {
@@ -409,24 +667,27 @@ export function registerAuthRoutes(app: FastifyInstance, dependencies: ApiDepend
       }
     });
 
-    reply.header(
-      "Set-Cookie",
-      buildSessionCookie(login.session_token, login.session.expires_at, { secure: shouldUseSecureCookies() })
+    const plan = await resolveOrganizationPlanForRequest(
+      request,
+      {
+        organization_id: login.session.organization_id,
+        user_id: login.session.user_id,
+        email: login.session.email,
+        role: login.session.role,
+        actor_type: "browser_session",
+        ip_address: request.ip
+      },
+      dependencies
     );
+
+    reply.header("Set-Cookie", buildSessionCookie(login.session_token, login.session.expires_at, { secure: shouldUseSecureCookies() }));
+    if (plan.clear_review_cookie) {
+      appendSetCookieHeader(reply, buildClearedReviewGrantCookie({ secure: shouldUseSecureCookies() }));
+    }
     return reply.status(200).send(
       buildSessionResponse(login.session_token, {
         ...login.session,
-        organization_plan: await resolveOrganizationPlan(
-          {
-            organization_id: login.session.organization_id,
-            user_id: login.session.user_id,
-            email: login.session.email,
-            role: login.session.role,
-            actor_type: "browser_session",
-            ip_address: request.ip
-          },
-          dependencies
-        )
+        organization_plan: plan.organization_plan
       })
     );
   });
@@ -835,20 +1096,26 @@ export function registerAuthRoutes(app: FastifyInstance, dependencies: ApiDepend
       });
     }
 
+    const plan = await resolveOrganizationPlanForRequest(
+      request,
+      {
+        organization_id: session.organization_id,
+        user_id: session.user_id,
+        email: session.email,
+        role: session.role,
+        actor_type: "browser_session",
+        ip_address: request.ip
+      },
+      dependencies
+    );
+    if (plan.clear_review_cookie) {
+      appendSetCookieHeader(reply, buildClearedReviewGrantCookie({ secure: shouldUseSecureCookies() }));
+    }
+
     return reply.status(200).send({
       ...buildSessionResponse(sessionToken, {
         ...session,
-        organization_plan: await resolveOrganizationPlan(
-          {
-            organization_id: session.organization_id,
-            user_id: session.user_id,
-            email: session.email,
-            role: session.role,
-            actor_type: "browser_session",
-            ip_address: request.ip
-          },
-          dependencies
-        )
+        organization_plan: plan.organization_plan
       })
     });
   });
@@ -902,7 +1169,10 @@ export function registerAuthRoutes(app: FastifyInstance, dependencies: ApiDepend
       metadata: {}
     });
 
-    reply.header("Set-Cookie", buildClearedSessionCookie({ secure: shouldUseSecureCookies() }));
+    reply.header("Set-Cookie", [
+      buildClearedSessionCookie({ secure: shouldUseSecureCookies() }),
+      buildClearedReviewGrantCookie({ secure: shouldUseSecureCookies() })
+    ]);
     return reply.status(200).send({ success: true });
   });
 }

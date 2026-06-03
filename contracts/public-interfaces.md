@@ -152,6 +152,7 @@ Stripe checkout and customer-portal billing routes remain browser-session-only i
 | POST | `/v1/auth/verify-code` | None | Verify a one-time email code and create a browser session |
 | POST | `/v1/auth/logout` | Browser Session | Revoke current browser session |
 | GET | `/v1/auth/session` | Browser Session | Return current session state or `session: null` when signed out |
+| GET | `/review/access` | None | Secret-gated reviewer bootstrap that sets a short-lived review grant cookie and redirects to the app |
 | GET | `/v1/account/avatar` | Browser Session | Return the signed-in user's cached avatar bytes when one has been imported |
 | POST | `/v1/account/avatar/import-gravatar` | Browser Session | Import and cache a Gravatar avatar server-side after explicit user action |
 | GET | `/v1/account/export` | Browser Session | Export retained organization-account data as a JSON attachment (owner only) |
@@ -165,6 +166,8 @@ Stripe checkout and customer-portal billing routes remain browser-session-only i
 | POST | `/v1/auth/github/token/exchange` | None | Exchange an existing GitHub access token for a DebugBundle member token |
 
 Browser-session bootstrap endpoints exist for the SPA flow only. The separate GitHub CLI bootstrap endpoints are API-backed helpers used by `debugbundle login --github*`, while MCP still reuses the member-token auth state established by the CLI.
+
+`GET /review/access?token=<secret>&next=/login` is an internal reviewer bootstrap surface enabled only when `REVIEW_ACCESS_SECRET` is configured. It validates the token with a constant-time comparison, rate-limits like other auth-adjacent endpoints, sets only a short-lived HttpOnly review grant cookie, and redirects to the app. The reviewer still signs in normally; when their owner session resolves, the server applies the existing internally managed Team override path and clears the review grant cookie. The API also accepts `/v1/auth/review/access` as a versioned alias for the same handler.
 
 `GET /v1/auth/session` returns either `session: null` or a session object with `auth_methods.email`, `auth_methods.github`, `avatar_url`, and `csrf_token`. Browser-session mutations continue to use `csrf_token` from the same session payload.
 
