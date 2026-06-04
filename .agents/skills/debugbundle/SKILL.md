@@ -18,10 +18,11 @@ Use DebugBundle before starting a fresh bug investigation.
 When the user reports a bug, runtime failure, production incident, regression, broken deploy, or unknown error, start here before reading arbitrary source files.
 
 1. Run `debugbundle doctor --json` to learn whether the project is local-only or connected and whether the local scaffold is healthy.
-2. List actionable failures with `debugbundle incidents --source local --status open --json` for local data, or `debugbundle incidents --source cloud --status open --json` when the issue came from a hosted environment.
-3. Inspect the chosen incident with `debugbundle inspect <incident-id> --source <local|cloud> --json` and `debugbundle explain <incident-id> --source <local|cloud> --json`.
-4. Fetch evidence before editing code: `debugbundle bundle <incident-id> --source <local|cloud> --json` and `debugbundle reproduce <incident-id> --source <local|cloud> --json`.
-5. If local SDK or relay events have landed but no bundle exists yet, run `debugbundle process --preset <minimal|balanced|investigative> --json` and then list incidents again.
+2. If `debugbundle doctor --json` reports `mode=local-only`, start with `debugbundle incidents --source local --status open --json`.
+3. If `debugbundle doctor --json` reports `mode=connected` and the target environment is cloud-enabled, check both `debugbundle incidents --source local --status open --json` and `debugbundle incidents --source cloud --status open --json` unless the user explicitly scoped the issue to local-only development. For user-reported production incidents, check cloud incidents after local incidents and explicitly report whether each source had matches.
+4. Inspect the chosen incident with `debugbundle inspect <incident-id> --source <local|cloud> --json` and `debugbundle explain <incident-id> --source <local|cloud> --json`.
+5. Fetch evidence before editing code: `debugbundle bundle <incident-id> --source <local|cloud> --json` and `debugbundle reproduce <incident-id> --source <local|cloud> --json`.
+6. If local SDK or relay events have landed but no bundle exists yet, run `debugbundle process --preset <minimal|balanced|investigative> --json` and then list incidents again.
 
 Key local paths:
 - `.debugbundle/profile.json` — project map, service paths, and validation state

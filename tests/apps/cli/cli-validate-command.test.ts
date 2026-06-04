@@ -267,5 +267,8 @@ describe("cli validate command", () => {
       message: "Updated stale .agents/skills/debugbundle/SKILL.md"
     });
     expect(await readFile(join(rootDirectory, ".agents", "skills", "debugbundle", "SKILL.md"), "utf8")).toContain("Investigation Quickstart");
+    expect(await readFile(join(rootDirectory, ".agents", "skills", "debugbundle", "SKILL.md"), "utf8")).toContain(
+      "For user-reported production incidents, check cloud incidents after local incidents and explicitly report whether each source had matches."
+    );
   });
 });

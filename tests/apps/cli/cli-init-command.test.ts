@@ -189,6 +189,8 @@ describe("cli setup command", () => {
     const skillContents = await readFile(join(rootDirectory, ".agents", "skills", "debugbundle", "SKILL.md"), "utf8");
     expect(skillContents).toContain("name: debugbundle");
     expect(skillContents).toContain("resolve it with `debugbundle resolve <incident-id>` or MCP `resolve_incident`");
+    expect(skillContents).toContain("If `debugbundle doctor --json` reports `mode=connected` and the target environment is cloud-enabled, check both");
+    expect(skillContents).toContain("For user-reported production incidents, check cloud incidents after local incidents and explicitly report whether each source had matches.");
     expect(skillContents).toContain("## Browser Capture and Relay Setup");
     expect(skillContents).toContain("Add `@debugbundle/sdk-browser` to each browser app");
     expect(skillContents).toContain("For split frontend/backend hosts, configure the browser endpoint to the API host relay URL");
@@ -213,6 +215,8 @@ describe("cli setup command", () => {
     const skillEvalsContents = await readFile(join(rootDirectory, ".agents", "skills", "debugbundle", "evals", "evals.json"), "utf8");
     expect(skillEvalsContents).toContain("incident_first_workflow");
     expect(skillEvalsContents).toContain("incident_resolution_hygiene");
+    expect(skillEvalsContents).toContain("Check both local and cloud incident sources when the project is connected and the environment is cloud-enabled.");
+    expect(skillEvalsContents).toContain("Explicitly report whether the local source, the cloud source, or both had matches.");
     expect(await readFile(join(rootDirectory, ".gitignore"), "utf8")).toContain("# DebugBundle (managed by debugbundle setup)");
     expect(await readFile(join(rootDirectory, ".gitignore"), "utf8")).toContain(".debugbundle/local/*");
     expect(await readFile(join(rootDirectory, ".gitignore"), "utf8")).toContain("!.debugbundle/local/connection.json");
