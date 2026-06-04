@@ -13,6 +13,174 @@ export interface BillingEmailRendered {
   html: string;
 }
 
+export interface TrialStartedEmailInput {
+  organizationName: string;
+  trialPlan: TierName;
+  trialEndsAt: string;
+  billingUrl: string;
+  brandMarkUrl?: string | undefined;
+}
+
+export interface TrialEndingSoonEmailInput {
+  organizationName: string;
+  trialPlan: TierName;
+  trialEndsAt: string;
+  daysRemaining: number;
+  billingUrl: string;
+  brandMarkUrl?: string | undefined;
+}
+
+export interface TrialExpiredEmailInput {
+  organizationName: string;
+  trialPlan: TierName;
+  trialEndedAt: string;
+  billingUrl: string;
+  brandMarkUrl?: string | undefined;
+}
+
+export interface TrialConvertedEmailInput {
+  organizationName: string;
+  trialPlan: TierName;
+  paidPlan: TierName;
+  billingUrl: string;
+  brandMarkUrl?: string | undefined;
+}
+
+export function renderTrialStartedEmail(input: TrialStartedEmailInput): BillingEmailRendered {
+  return {
+    subject: `DebugBundle: your ${input.trialPlan} trial has started`,
+    text: [
+      `Your 30-day ${input.trialPlan} trial for "${input.organizationName}" is active now.`,
+      `Trial end: ${input.trialEndsAt}.`,
+      "",
+      "No credit card is required during the trial.",
+      "Extra purchased capacity requires paid conversion.",
+      "",
+      `Manage billing: ${input.billingUrl}`
+    ].join("\n"),
+    html: renderEmailLayout({
+      brandMarkUrl: input.brandMarkUrl,
+      eyebrow: "Billing",
+      title: "Trial started",
+      intro: `Your 30-day ${escapeHtml(input.trialPlan)} trial for "${escapeHtml(input.organizationName)}" is active now.`,
+      preheader: `${input.organizationName} started a ${input.trialPlan} trial ending on ${input.trialEndsAt}.`,
+      bodyHtml: [
+        renderEmailKeyValueList([
+          { label: "Account", valueHtml: escapeHtml(input.organizationName) },
+          { label: "Trial plan", valueHtml: escapeHtml(input.trialPlan) },
+          { label: "Trial end", valueHtml: escapeHtml(input.trialEndsAt) }
+        ]),
+        renderEmailParagraph(
+          "No credit card is required during the trial. Extra purchased capacity remains unavailable until you convert to a paid subscription."
+        ),
+        renderEmailButton({
+          label: "View billing",
+          url: input.billingUrl
+        })
+      ].join("")
+    })
+  };
+}
+
+export function renderTrialEndingSoonEmail(input: TrialEndingSoonEmailInput): BillingEmailRendered {
+  return {
+    subject: `DebugBundle: ${input.daysRemaining} day(s) left in your trial`,
+    text: [
+      `Your ${input.trialPlan} trial for "${input.organizationName}" ends in ${input.daysRemaining} day(s).`,
+      `Trial end: ${input.trialEndsAt}.`,
+      "",
+      "Convert to a paid plan to keep paid features and unlock extra capacity purchases.",
+      "",
+      `Manage billing: ${input.billingUrl}`
+    ].join("\n"),
+    html: renderEmailLayout({
+      brandMarkUrl: input.brandMarkUrl,
+      eyebrow: "Billing",
+      title: "Trial ending soon",
+      intro: `Your ${escapeHtml(input.trialPlan)} trial for "${escapeHtml(input.organizationName)}" ends in ${input.daysRemaining} day(s).`,
+      preheader: `${input.organizationName} has ${input.daysRemaining} day(s) left in its trial.`,
+      bodyHtml: [
+        renderEmailKeyValueList([
+          { label: "Account", valueHtml: escapeHtml(input.organizationName) },
+          { label: "Trial plan", valueHtml: escapeHtml(input.trialPlan) },
+          { label: "Days remaining", valueHtml: `${input.daysRemaining}` },
+          { label: "Trial end", valueHtml: escapeHtml(input.trialEndsAt) }
+        ]),
+        renderEmailParagraph(
+          "Convert to a paid plan to keep paid features active and unlock extra purchased capacity."
+        ),
+        renderEmailButton({
+          label: "Convert to paid",
+          url: input.billingUrl
+        })
+      ].join("")
+    })
+  };
+}
+
+export function renderTrialExpiredEmail(input: TrialExpiredEmailInput): BillingEmailRendered {
+  return {
+    subject: "DebugBundle: your trial has ended",
+    text: [
+      `Your ${input.trialPlan} trial for "${input.organizationName}" ended on ${input.trialEndedAt}.`,
+      "",
+      "The account is now back on the free tier. Existing projects remain available, and you can convert to a paid plan at any time.",
+      "",
+      `Manage billing: ${input.billingUrl}`
+    ].join("\n"),
+    html: renderEmailLayout({
+      brandMarkUrl: input.brandMarkUrl,
+      eyebrow: "Billing",
+      title: "Trial ended",
+      intro: `Your ${escapeHtml(input.trialPlan)} trial for "${escapeHtml(input.organizationName)}" ended on ${escapeHtml(input.trialEndedAt)}.`,
+      preheader: `${input.organizationName} moved back to the free tier after trial expiry.`,
+      bodyHtml: [
+        renderEmailKeyValueList([
+          { label: "Account", valueHtml: escapeHtml(input.organizationName) },
+          { label: "Expired trial", valueHtml: escapeHtml(input.trialPlan) },
+          { label: "Ended at", valueHtml: escapeHtml(input.trialEndedAt) }
+        ]),
+        renderEmailParagraph(
+          "The account is now back on the free tier. Existing projects remain available, and you can convert to a paid plan at any time."
+        ),
+        renderEmailButton({
+          label: "View billing",
+          url: input.billingUrl
+        })
+      ].join("")
+    })
+  };
+}
+
+export function renderTrialConvertedEmail(input: TrialConvertedEmailInput): BillingEmailRendered {
+  return {
+    subject: `DebugBundle: ${input.paidPlan} plan activated`,
+    text: [
+      `Your "${input.organizationName}" account has converted from a ${input.trialPlan} trial to the paid ${input.paidPlan} plan.`,
+      "",
+      `Manage billing: ${input.billingUrl}`
+    ].join("\n"),
+    html: renderEmailLayout({
+      brandMarkUrl: input.brandMarkUrl,
+      eyebrow: "Billing",
+      title: "Trial converted",
+      intro: `Your account "${escapeHtml(input.organizationName)}" has converted from a ${escapeHtml(input.trialPlan)} trial to the paid ${escapeHtml(input.paidPlan)} plan.`,
+      preheader: `${input.organizationName} converted from trial to the paid ${input.paidPlan} plan.`,
+      bodyHtml: [
+        renderEmailKeyValueList([
+          { label: "Account", valueHtml: escapeHtml(input.organizationName) },
+          { label: "Trial plan", valueHtml: escapeHtml(input.trialPlan) },
+          { label: "Paid plan", valueHtml: escapeHtml(input.paidPlan) }
+        ]),
+        renderEmailButton({
+          label: "Manage billing",
+          url: input.billingUrl
+        })
+      ].join("")
+    })
+  };
+}
+
 // --- 4.4 Purchase Confirmation ---
 
 export interface PurchaseConfirmationInput {

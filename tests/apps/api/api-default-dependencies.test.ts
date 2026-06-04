@@ -148,6 +148,7 @@ import {
   readUnixTimestampField,
   resolveStripeSubscriptionBillingPeriod
 } from "../../../apps/api/src/default-dependencies.ts";
+import { createBillingManagement } from "../../../apps/api/src/billing-management.ts";
 
 describe("api default dependencies", () => {
   beforeEach(() => {
@@ -422,6 +423,137 @@ describe("api default dependencies", () => {
         latest_invoice: "in_123"
       } as never)
     ).toEqual({ starts_at: null, ends_at: null });
+  });
+
+  it("overrides organization billing through the billing management service", async () => {
+    const summary = {
+      organization_id: "org_123",
+      plan: "solo",
+      billing_state: "admin_override",
+      stripe_customer_id: null,
+      active_projects: 1,
+      capacity_units: {
+        total: 3,
+        included: 3,
+        additional_purchased: 0,
+        pending_reduction: null
+      },
+      usage_window: {
+        starts_at: "2026-06-01T00:00:00.000Z",
+        ends_at: "2026-07-01T00:00:00.000Z"
+      },
+      allowances: {
+        monthly_bundle_requests: { used: 0, limit: 1000 },
+        monthly_raw_ingested_events: { used: 0, limit: 10000 },
+        retained_bundle_cap: { used: 0, limit: 100 },
+        monthly_remote_activations: { used: 0, limit: 10 },
+        monthly_alert_deliveries: { used: 0, limit: 100 },
+        monthly_webhook_deliveries: { used: 0, limit: 100 }
+      },
+      trial: {
+        available: false,
+        active: false,
+        plan: null,
+        started_at: null,
+        ends_at: null,
+        used_at: null,
+        converted_at: null,
+        expired_at: null,
+        days_remaining: null
+      }
+    };
+    const db = {
+      query: vi.fn().mockResolvedValue({ rows: [{ id: "org_123" }] })
+    };
+    const billingStore = {
+      getBillingSummaryForOrganization: vi.fn().mockResolvedValue(summary)
+    };
+    const service = createBillingManagement({
+      db,
+      billingStore: billingStore as never,
+      billingSyncStore: {} as never,
+      billingLinks: {
+        createCheckoutUrl: vi.fn().mockReturnValue(null),
+        createPortalUrl: vi.fn().mockReturnValue(null)
+      }
+    });
+
+    await expect(
+      service.overrideOrganizationBilling({
+        organization_id: "org_123",
+        plan: "solo",
+        additional_capacity_units: 999,
+        now: "2026-06-04T12:00:00.000Z"
+      })
+    ).resolves.toBe(summary);
+    await expect(
+      service.overrideOrganizationBilling({
+        organization_id: "org_123",
+        plan: "free",
+        additional_capacity_units: 5,
+        now: "2026-06-04T12:00:01.000Z"
+      })
+    ).resolves.toBe(summary);
+
+    expect(db.query).toHaveBeenNthCalledWith(
+      1,
+      expect.stringContaining("UPDATE organizations"),
+      [
+        "org_123",
+        "solo",
+        99,
+        "2026-06-04T12:00:00.000Z",
+        "admin_override:2026-06-04T12:00:00.000Z"
+      ]
+    );
+    expect(db.query).toHaveBeenNthCalledWith(
+      2,
+      expect.stringContaining("UPDATE organizations"),
+      [
+        "org_123",
+        "free",
+        0,
+        "2026-06-04T12:00:01.000Z",
+        "admin_override:2026-06-04T12:00:01.000Z"
+      ]
+    );
+  });
+
+  it("returns billing_not_found when admin billing override cannot update or reload", async () => {
+    const db = {
+      query: vi.fn()
+        .mockResolvedValueOnce({ rows: [] })
+        .mockResolvedValueOnce({ rows: [{ id: "org_123" }] })
+    };
+    const billingStore = {
+      getBillingSummaryForOrganization: vi.fn().mockResolvedValue(null)
+    };
+    const service = createBillingManagement({
+      db,
+      billingStore: billingStore as never,
+      billingSyncStore: {} as never,
+      billingLinks: {
+        createCheckoutUrl: vi.fn().mockReturnValue(null),
+        createPortalUrl: vi.fn().mockReturnValue(null)
+      }
+    });
+
+    await expect(
+      service.overrideOrganizationBilling({
+        organization_id: "missing",
+        plan: "team",
+        additional_capacity_units: 1,
+        now: "2026-06-04T12:00:00.000Z"
+      })
+    ).resolves.toBe("billing_not_found");
+    await expect(
+      service.overrideOrganizationBilling({
+        organization_id: "org_123",
+        plan: "team",
+        additional_capacity_units: 1,
+        now: "2026-06-04T12:00:01.000Z"
+      })
+    ).resolves.toBe("billing_not_found");
   });
 
   it("should compose ingestion services from object store, queue, and db", async (): Promise<void> => {
@@ -3122,6 +3254,7 @@ describe("api default dependencies", () => {
       deps.githubManagement?.createProjectRuleForOrganization({
         organization_id: "org_1",
         project_id: "proj_repo_missing",
+        created_by_user_id: "user_1",
         name: "Rule",
         enabled: true,
         event_types: ["bundle.created"],
@@ -3137,6 +3270,7 @@ describe("api default dependencies", () => {
       deps.githubManagement?.createProjectRuleForOrganization({
         organization_id: "org_1",
         project_id: "proj_missing",
+        created_by_user_id: "user_1",
         name: "Rule",
         enabled: true,
         event_types: ["bundle.created"],
@@ -3152,6 +3286,7 @@ describe("api default dependencies", () => {
       deps.githubManagement?.createProjectRuleForOrganization({
         organization_id: "org_1",
         project_id: "proj_limit",
+        created_by_user_id: "user_1",
         name: "Rule",
         enabled: true,
         event_types: ["bundle.created"],
@@ -3167,6 +3302,7 @@ describe("api default dependencies", () => {
       deps.githubManagement?.createProjectRuleForOrganization({
         organization_id: "org_1",
         project_id: "proj_created",
+        created_by_user_id: "user_1",
         name: "Rule",
         enabled: true,
         event_types: ["bundle.created"],

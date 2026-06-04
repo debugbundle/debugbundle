@@ -395,6 +395,7 @@ describe("cli management command handlers", () => {
 
   it("forwards billing, project, token, capture policy, webhook, and weekly report inputs", async () => {
     const getBillingSummaryCommand = vi.fn().mockResolvedValue({ exitCode: 0, output: "billing" });
+    const startBillingTrialCommand = vi.fn().mockResolvedValue({ exitCode: 0, output: "trial" });
     const increaseBillingCapacityCommand = vi.fn().mockResolvedValue({ exitCode: 0, output: "inc" });
     const scheduleBillingCapacityReductionCommand = vi.fn().mockResolvedValue({ exitCode: 0, output: "schedule" });
     const cancelBillingCapacityReductionCommand = vi.fn().mockResolvedValue({ exitCode: 0, output: "cancel" });
@@ -423,6 +424,7 @@ describe("cli management command handlers", () => {
     const deleteWeeklyReportChannelCommand = vi.fn().mockResolvedValue({ exitCode: 0, output: "weekly-delete" });
 
     await handleBillingCommand(parseArgv(["billing", "get", "--json"]), { getBillingSummaryCommand });
+    await handleBillingCommand(parseArgv(["billing", "trial", "start", "--plan", "team"]), { startBillingTrialCommand });
     await handleBillingCommand(parseArgv(["billing", "capacity", "increase", "--target-additional-capacity-units", "2"]), {
       increaseBillingCapacityCommand
     });
@@ -590,6 +592,7 @@ describe("cli management command handlers", () => {
     );
 
     expect(getBillingSummaryCommand).toHaveBeenCalledWith({ authFilePath: undefined, json: true });
+    expect(startBillingTrialCommand).toHaveBeenCalledWith({ authFilePath: undefined, json: undefined, targetPlan: "team" });
     expect(increaseBillingCapacityCommand).toHaveBeenCalledWith({ authFilePath: undefined, json: undefined, targetAdditionalCapacityUnits: 2 });
     expect(scheduleBillingCapacityReductionCommand).toHaveBeenCalledWith({ authFilePath: undefined, json: undefined, targetAdditionalCapacityUnits: 1 });
     expect(cancelBillingCapacityReductionCommand).toHaveBeenCalledWith({ authFilePath: undefined, json: undefined });
@@ -704,6 +707,9 @@ describe("cli management command handlers", () => {
 
     await expect(handleBillingCommand(parseArgv(["billing", "capacity", "increase"]), {})).rejects.toThrow(
       "Missing required option --target-additional-capacity-units."
+    );
+    await expect(handleBillingCommand(parseArgv(["billing", "trial", "start"]), {})).rejects.toThrow(
+      "Missing required option --plan."
     );
     await expect(handleBillingCommand(parseArgv(["billing", "unknown"]), {})).rejects.toThrow("Unknown billing command.");
 

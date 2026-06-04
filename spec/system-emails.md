@@ -1,7 +1,7 @@
 # System Emails
 
 Version: v1
-Last updated: 2026-05-18
+Last updated: 2026-06-04
 
 ---
 
@@ -40,6 +40,10 @@ Mandatory v1 emails:
 ### 3.2 Billing Emails
 
 Mandatory v1 emails:
+- no-card trial started
+- no-card trial ending soon
+- no-card trial expired
+- no-card trial converted to paid
 - checkout / purchase confirmation
 - subscription renewal success
 - payment failure
@@ -159,7 +163,39 @@ Recommended v1 or shortly after:
 - Required in v1: yes
 - Notes: should state previous quantity, new quantity, and effective shared allowance-capacity impact
 
-### 4.12 Webhook Auto-Disabled
+### 4.12 No-Card Trial Started
+
+- Category: billing
+- Trigger: a free organization successfully starts a 30-day no-card Solo or Team trial
+- Recipient: organization owner billing contact
+- Required in v1: yes
+- Notes: must confirm selected trial plan, exact trial end, and that extra purchased capacity still requires paid conversion
+
+### 4.13 No-Card Trial Ending Soon
+
+- Category: billing
+- Trigger: worker-owned lifecycle scheduling reaches the 7-day or 1-day reminder window before trial expiry
+- Recipient: organization owner billing contact
+- Required in v1: yes
+- Notes: must state remaining days, exact trial end, and the paid-conversion CTA
+
+### 4.14 No-Card Trial Expired
+
+- Category: billing
+- Trigger: worker-owned lifecycle expiry downgrades an unconverted no-card trial back to Free
+- Recipient: organization owner billing contact
+- Required in v1: yes
+- Notes: must explain that the account moved back to Free while keeping projects accessible
+
+### 4.15 No-Card Trial Converted
+
+- Category: billing
+- Trigger: a prior no-card trial receives paid Stripe-backed entitlements
+- Recipient: organization owner billing contact
+- Required in v1: yes
+- Notes: must confirm the paid plan now active after trial conversion
+
+### 4.16 Webhook Auto-Disabled
 
 - Category: operational
 - Trigger: webhook auto-disabled after repeated delivery failures
@@ -167,7 +203,7 @@ Recommended v1 or shortly after:
 - Required in v1: yes
 - Current implementation status: exists
 
-### 4.13 Allowance Warning 80%
+### 4.17 Allowance Warning 80%
 
 - Category: operational / billing-aware
 - Trigger: allowance usage reaches 80% for a meter
@@ -176,7 +212,7 @@ Recommended v1 or shortly after:
 - Notes: applies to every allowance meter defined in `/spec/local/tiers.md`
 - Current implementation status: exists
 
-### 4.14 Allowance Limit Reached 100%
+### 4.18 Allowance Limit Reached 100%
 
 - Category: operational / billing-aware
 - Trigger: allowance usage reaches 100% for a meter
@@ -185,7 +221,7 @@ Recommended v1 or shortly after:
 - Notes: must explain resulting behavior such as rejection, pause, or block
 - Current implementation status: exists
 
-### 4.15 Retention Rotation Notice
+### 4.19 Retention Rotation Notice
 
 - Category: operational
 - Trigger: oldest retained bundles are rotated out because retention cap is exceeded
@@ -194,7 +230,7 @@ Recommended v1 or shortly after:
 - Notes: should explain that this is expected policy behavior, not corruption
 - Current implementation status: exists
 
-### 4.16 Weekly Report
+### 4.20 Weekly Report
 
 - Category: operational
 - Trigger: scheduled weekly-report delivery
@@ -235,6 +271,7 @@ Billing emails should additionally include when relevant:
 - Auth and billing emails are transactional and must be treated as high priority.
 - Failure to send critical billing emails must be observable.
 - Retries and failure logging for critical emails must be implemented.
+- Trial lifecycle emails now use the same durable queued-delivery pattern as operational owner notifications, with dedupe through `trial_lifecycle_events` and retry state in `operational_email_deliveries`.
 - Email templates should remain explicit and testable, not inline string assembly in route logic.
 
 ---

@@ -117,9 +117,44 @@ describe("web page helper coverage", () => {
   it("detects when billing state reflects a checkout and formats billing labels", () => {
     const baseline = createBillingSummary({ plan: "free", stripe_customer_id: null });
     const updated = createBillingSummary({ plan: "solo", stripe_customer_id: "cus_123" });
+    const trialBaseline = createBillingSummary({
+      plan: "team",
+      billing_state: "trialing",
+      stripe_customer_id: null,
+      trial: {
+        available: false,
+        active: true,
+        plan: "team",
+        started_at: "2026-06-04T00:00:00.000Z",
+        ends_at: "2026-07-04T00:00:00.000Z",
+        used_at: "2026-06-04T00:00:00.000Z",
+        converted_at: null,
+        expired_at: null,
+        days_remaining: 30
+      }
+    });
+    const convertedTrial = createBillingSummary({
+      plan: "team",
+      billing_state: "active",
+      stripe_customer_id: "cus_123",
+      trial: {
+        available: false,
+        active: false,
+        plan: "team",
+        started_at: "2026-06-04T00:00:00.000Z",
+        ends_at: "2026-07-04T00:00:00.000Z",
+        used_at: "2026-06-04T00:00:00.000Z",
+        converted_at: "2026-06-10T00:00:00.000Z",
+        expired_at: null,
+        days_remaining: null
+      }
+    });
 
     expect(
       billingReflectsCheckout(updated, { previousPlan: "free", targetPlan: "solo" }, baseline)
+    ).toBe(true);
+    expect(
+      billingReflectsCheckout(convertedTrial, { previousPlan: "team", targetPlan: "team" }, trialBaseline)
     ).toBe(true);
     expect(billingReflectsCheckout(baseline, null, null)).toBe(false);
     expect(billingReflectsCheckout(updated, null, baseline)).toBe(true);

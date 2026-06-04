@@ -1,6 +1,6 @@
 {
   "name": "debugbundle",
-  "version": "1.0.1",
+  "version": "1.1.0",
   "private": true,
   "type": "module",
   "description": "DebugBundle monorepo",

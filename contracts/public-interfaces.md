@@ -1,7 +1,7 @@
 # Public Interfaces — DebugBundle
 
 Version: v1
-Last updated: 2026-05-15
+Last updated: 2026-06-04
 
 ---
 
@@ -58,6 +58,7 @@ Every capability must be available through all applicable interfaces. Operations
 | Update project | `PATCH /v1/projects/{id}` | `project update` | `update_project` | Browser Session or Member Token, owner only |
 | Delete project | `DELETE /v1/projects/{id}` | `project delete` | `delete_project` | Browser Session or Member Token, owner only |
 | Get billing summary | `GET /v1/billing` | `billing get` | `get_billing_summary` | Browser Session or Member Token, owner only |
+| Start no-card trial | `POST /v1/billing/trial/start` | `billing trial start` | `start_trial` | Browser Session or Member Token, owner only |
 | Start billing checkout | `POST /v1/billing/checkout` | — | — | Browser Session only, owner only |
 | Open billing portal | `POST /v1/billing/portal` | — | — | Browser Session only, owner only |
 | Increase capacity now | `POST /v1/billing/capacity/increase` | `billing capacity increase` | `increase_capacity` | Browser Session or Member Token, owner only |
@@ -142,7 +143,7 @@ The full auth model is defined in `/spec/auth-architecture.md`.
 
 Member-authorized routes accept either a valid browser session or a valid member token. After principal resolution, both paths must enforce the same authorization rules and execute the same domain behavior.
 
-Stripe checkout and customer-portal billing routes remain browser-session-only interactive surfaces. Billing summary and allowance-capacity management routes now accept owner-scoped member tokens so CLI and future MCP tools can reuse the same domain behavior.
+Stripe checkout and customer-portal billing routes remain browser-session-only interactive surfaces. Billing summary, no-card trial start, and allowance-capacity management routes now accept owner-scoped member tokens so CLI and MCP can reuse the same domain behavior.
 
 ### 1.0a Browser Auth
 
@@ -612,6 +613,7 @@ All update fields are optional, but at least one field must be present.
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
 | GET | `/v1/billing` | Browser Session or Member Token (owner only) | Return billing summary, plan state, and allowance usage for the current organization |
+| POST | `/v1/billing/trial/start` | Browser Session or Member Token (owner only) | Start an eligible 30-day no-card Solo or Team trial for the current organization |
 | POST | `/v1/billing/checkout` | Browser Session (owner only) | Create a Stripe-hosted checkout session URL for an allowed upgrade target |
 | POST | `/v1/billing/checkout/confirm` | Browser Session (owner only) | Verify a returned Stripe Checkout Session and sync the organization billing snapshot from Stripe |
 | POST | `/v1/billing/portal` | Browser Session (owner only) | Create a Stripe-hosted customer-portal session URL for an active paid plan |
@@ -619,7 +621,7 @@ All update fields are optional, but at least one field must be present.
 | POST | `/v1/billing/capacity/scheduled-reduction` | Browser Session or Member Token (owner only) | Schedule an allowance-capacity reduction to take effect at the next billing-period boundary via Stripe subscription schedule |
 | DELETE | `/v1/billing/capacity/scheduled-reduction` | Browser Session or Member Token (owner only) | Cancel a pending scheduled allowance-capacity reduction, releasing the Stripe subscription schedule |
 
-Billing summary and allowance-capacity management routes accept both browser session and owner-scoped member tokens. Checkout, checkout confirmation, and portal routes are browser-session-only interactive surfaces. Stripe checkout sessions are created dynamically with `client_reference_id` = `organization_id`; the success URL includes Stripe's `{CHECKOUT_SESSION_ID}` placeholder so the web app can ask the API to verify the returned Checkout Session and sync the account immediately.
+Billing summary, no-card trial start, and allowance-capacity management routes accept both browser session and owner-scoped member tokens. Checkout, checkout confirmation, and portal routes are browser-session-only interactive surfaces. Stripe checkout sessions are created dynamically with `client_reference_id` = `organization_id`; the success URL includes Stripe's `{CHECKOUT_SESSION_ID}` placeholder so the web app can ask the API to verify the returned Checkout Session and sync the account immediately.
 
 For paid internally managed accounts (`stripe_customer_id = null`), the same capacity routes remain available. In that mode, increases and reductions both apply immediately to the stored purchased-capacity quantity and `pending_reduction` remains `null`.
 
@@ -628,7 +630,8 @@ For paid internally managed accounts (`stripe_customer_id = null`), the same cap
 {
   "billing": {
     "plan": "solo",
-    "stripe_customer_id": "cus_123",
+    "billing_state": "trialing",
+    "stripe_customer_id": null,
     "active_projects": 1,
     "capacity_units": {
       "total": 3,
@@ -665,12 +668,25 @@ For paid internally managed accounts (`stripe_customer_id = null`), the same cap
         "used": 20,
         "limit": 750
       }
+    },
+    "trial": {
+      "available": false,
+      "active": true,
+      "plan": "solo",
+      "started_at": "2026-03-01T00:00:00.000Z",
+      "ends_at": "2026-03-31T00:00:00.000Z",
+      "used_at": "2026-03-01T00:00:00.000Z",
+      "converted_at": null,
+      "expired_at": null,
+      "days_remaining": 14
     }
   }
 }
 ```
 
 `active_projects` is the current count of active projects. Project creation is not gated by `capacity_units.total`.
+
+`billing_state` reflects the organization's current billing lifecycle state. It is `null` for baseline Free organizations with no paid or trial lifecycle state yet.
 
 `capacity_units.additional_purchased` is the persisted count of purchased extra capacity units for the organization. Billing allowance capacity is computed from `included + additional_purchased`, not inferred from the current number of projects.
 
@@ -684,6 +700,17 @@ For paid internally managed accounts (`stripe_customer_id = null`), the same cap
   }
 }
 ```
+
+`trial` is always present. It records whether the organization is currently eligible for a no-card trial, whether a trial is active, the selected trial plan when one was used, lifecycle timestamps (`started_at`, `used_at`, `converted_at`, `expired_at`), and `days_remaining` during an active trial.
+
+**Trial start request:**
+```json
+{
+  "target_plan": "team"
+}
+```
+
+`target_plan` must be `solo` or `team`. The route starts a 30-day no-card trial only when the organization is still eligible. Response is the updated billing summary.
 
 **Checkout request:**
 ```json
@@ -733,11 +760,12 @@ Checkout confirmation returns the standard billing summary response after the AP
 - Missing billing dependency/surface: `404 { "error": "billing_not_available" }`
 - Missing billing record for organization: `404 { "error": "billing_not_found" }`
 - Invalid checkout payload: `400 { "error": "invalid_payload" }`
+- Trial already used, active, or otherwise unavailable: `409 { "error": "trial_unavailable" }`
 - Invalid upgrade target for current plan: `409 { "error": "invalid_plan_change" }`
 - Checkout confirmation could not find or use the returned session: `404 { "error": "checkout_session_not_found" }` or `409 { "error": "checkout_not_complete" }`
 - Portal requested for free plan: `409 { "error": "no_active_subscription" }`
 - Stripe not configured or temporarily unavailable: `503 { "error": "billing_not_configured" }` or `503 { "error": "billing_service_error" }`
-- Capacity-management error (free plan, invalid target, pending reduction conflict): `409` with descriptive error code
+- Capacity-management error (free plan, invalid target, pending reduction conflict, or active trial conversion required): `409` with descriptive error code such as `trial_conversion_required`
 
 ### 1.3d Token Management
 
@@ -2046,12 +2074,15 @@ debugbundle improvements settings set --project <id> [--enabled <true|false>] [-
 ### 2.14 Billing Commands
 ```
 debugbundle billing get [--json]
+debugbundle billing trial start --plan <solo|team> [--json]
 debugbundle billing capacity increase --target-additional-capacity-units <n> [--json]
 debugbundle billing capacity schedule-reduction --target-additional-capacity-units <n> [--json]
 debugbundle billing capacity cancel-reduction [--json]
 ```
 
-`billing get` retrieves the organization's billing summary, plan state, active-project counts, capacity units, and allowance metrics. Requires owner-scoped member token authentication.
+`billing get` retrieves the organization's billing summary, plan state, trial state, active-project counts, capacity units, and allowance metrics. Requires owner-scoped member token authentication.
+
+`billing trial start --plan <solo|team>` starts an eligible 30-day no-card trial and returns the updated billing summary. During an active trial, Stripe checkout remains browser-only; the CLI reports `trial_conversion_required` and directs the operator to the billing page when capacity changes require paid conversion first.
 
 `billing capacity increase --target-additional-capacity-units <n>` immediately increases the additional capacity-unit count to `<n>` via Stripe subscription update with proration. Target must be greater than current additional purchased units. Fails if a pending scheduled reduction exists.
 
@@ -2230,12 +2261,13 @@ These tools manage hosted improvement opportunities plus hosted improvement auto
 ### 3.7 Billing Tools
 ```
 debugbundle_get_billing_summary          → same result as GET /v1/billing
+start_trial                              → same result as POST /v1/billing/trial/start
 increase_capacity                        → same result as POST /v1/billing/capacity/increase
 schedule_capacity_reduction              → same result as POST /v1/billing/capacity/scheduled-reduction
 cancel_capacity_reduction                → same result as DELETE /v1/billing/capacity/scheduled-reduction
 ```
 
-These tools manage organization billing summary and capacity lifecycle. All require owner-scoped member token authentication.
+These tools manage organization billing summary, no-card trial start, and capacity lifecycle. All require owner-scoped member token authentication. `get_billing_summary` includes the `billing_state` field plus the normalized `trial` object. `start_trial` accepts `targetPlan: "solo" | "team"`. Capacity tools return `trial_conversion_required` while an active no-card trial still requires paid conversion.
 
 ### 3.7 Project Tools
 ```

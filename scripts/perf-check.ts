@@ -37,7 +37,10 @@ function summarize(samples: number[]): SampleStats {
   };
 }
 
-async function measureAsyncSamples(iterations: number, run: () => Promise<void>): Promise<number[]> {
+async function measureAsyncSamples(
+  iterations: number,
+  run: () => Promise<void>
+): Promise<number[]> {
   const samples: number[] = [];
 
   for (let index = 0; index < iterations; index += 1) {
@@ -132,7 +135,11 @@ function createBundleInput(): BuildBundleInput {
     first_seen_at: "2026-04-04T00:00:00.000Z",
     last_seen_at: "2026-04-04T00:10:00.000Z",
     occurrence_count: 12,
-    source_event_types: ["request_event", "backend_exception", "log_event"] as EventEnvelope["event_type"][]
+    source_event_types: [
+      "request_event",
+      "backend_exception",
+      "log_event"
+    ] as EventEnvelope["event_type"][]
   };
 
   const sourceEnvelopes = Array.from({ length: 12 }, (_, index) => {
@@ -151,7 +158,8 @@ function createBundleInput(): BuildBundleInput {
         payload: {
           name: "TypeError",
           message: "Cannot read properties of undefined",
-          stack: "TypeError: Cannot read properties of undefined\n    at checkout.ts:10:5\n    at processPayment.ts:42:9",
+          stack:
+            "TypeError: Cannot read properties of undefined\n    at checkout.ts:10:5\n    at processPayment.ts:42:9",
           handled: false,
           request: {
             method: "POST",
@@ -190,7 +198,7 @@ function createBundleInput(): BuildBundleInput {
           headers: { "content-type": "application/json" },
           body: { amount: 1999, currency: "USD" },
           response_status: 500,
-          duration_ms: 187,
+          duration_ms: 187
         }
       });
     }
@@ -238,7 +246,8 @@ function createBundleInput(): BuildBundleInput {
         queue_depth: index * 2
       },
       timestamp: `2026-04-04T00:${String(index).padStart(2, "0")}:45.000Z`,
-      activation_id: index % 2 === 0 ? null : `30000000-0000-4000-8000-${String(index + 1).padStart(12, "0")}`
+      activation_id:
+        index % 2 === 0 ? null : `30000000-0000-4000-8000-${String(index + 1).padStart(12, "0")}`
     }))
   };
 }
@@ -303,6 +312,7 @@ function createIngestionBenchmarkApp() {
     billingManagement: {
       getBillingSummaryForOrganization: async () => ({
         plan: "solo" as const,
+        billing_state: "active" as const,
         stripe_customer_id: null,
         active_projects: 1,
         capacity_units: {
@@ -340,6 +350,17 @@ function createIngestionBenchmarkApp() {
             used: 0,
             limit: 250
           }
+        },
+        trial: {
+          available: false,
+          active: false,
+          plan: null,
+          started_at: null,
+          ends_at: null,
+          used_at: null,
+          converted_at: null,
+          expired_at: null,
+          days_remaining: null
         }
       }),
       createCheckoutLink: async () => null,

@@ -7,9 +7,30 @@ export const BillingUsageMetricSchema = z
   })
   .strict();
 
+export const BillingStateSchema = z
+  .enum(["active", "past_due", "canceled", "unpaid", "incomplete", "admin_override", "trialing", "trial_expired"])
+  .nullable();
+
+export const BillingTrialPlanSchema = z.enum(["solo", "team"]);
+
+export const BillingTrialSummarySchema = z
+  .object({
+    available: z.boolean(),
+    active: z.boolean(),
+    plan: BillingTrialPlanSchema.nullable(),
+    started_at: z.string().nullable(),
+    ends_at: z.string().nullable(),
+    used_at: z.string().nullable(),
+    converted_at: z.string().nullable(),
+    expired_at: z.string().nullable(),
+    days_remaining: z.number().int().nullable()
+  })
+  .strict();
+
 export const BillingSummarySchema = z
   .object({
     plan: z.enum(["free", "solo", "team"]),
+    billing_state: BillingStateSchema,
     stripe_customer_id: z.string().nullable(),
     active_projects: z.number().int().nonnegative(),
     capacity_units: z
@@ -41,7 +62,8 @@ export const BillingSummarySchema = z
         monthly_alert_deliveries: BillingUsageMetricSchema,
         monthly_webhook_deliveries: BillingUsageMetricSchema
       })
-      .strict()
+      .strict(),
+    trial: BillingTrialSummarySchema
   })
   .strict();
 
@@ -109,6 +131,7 @@ async function expectBilling(responsePromise: Promise<HttpResponse>): Promise<z.
 
 export function createBillingApi(client: HttpClient): {
   getBillingSummary(input: { bearerToken: string }): Promise<z.infer<typeof BillingSummarySchema>>;
+  startTrial(input: { bearerToken: string; targetPlan: z.infer<typeof BillingTrialPlanSchema> }): Promise<z.infer<typeof BillingSummarySchema>>;
   increaseCapacity(input: { bearerToken: string; targetAdditionalCapacityUnits: number }): Promise<z.infer<typeof BillingSummarySchema>>;
   scheduleCapacityReduction(input: { bearerToken: string; targetAdditionalCapacityUnits: number }): Promise<z.infer<typeof BillingSummarySchema>>;
   cancelCapacityReduction(input: { bearerToken: string }): Promise<z.infer<typeof BillingSummarySchema>>;
@@ -120,6 +143,19 @@ export function createBillingApi(client: HttpClient): {
           method: "GET",
           path: "/v1/billing",
           bearerToken: input.bearerToken
+        })
+      );
+    },
+
+    async startTrial(input) {
+      return expectBilling(
+        client.request({
+          method: "POST",
+          path: "/v1/billing/trial/start",
+          bearerToken: input.bearerToken,
+          body: {
+            target_plan: input.targetPlan
+          }
         })
       );
     },

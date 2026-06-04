@@ -60,7 +60,6 @@ import {
   processNextCleanupRetentionJob,
   processNextDeliverAlertEmailDigestJob,
   processNextDeliverGitHubDispatchJob,
-  processNextDeliverOperationalEmailJob,
   processNextDeliverWebhookJob,
   processNextGenerateWeeklyReportJob,
   AlertDeliveryError,
@@ -77,6 +76,8 @@ import {
   type WorkerQueue,
   type WeeklyReportTransport
 } from "./processor.js";
+import { processNextDeliverOperationalEmailJob } from "./operational-email-processor.js";
+import { scheduleTrialLifecycleEmails } from "./trial-lifecycle-scheduler.js";
 import { captureWorkerDogfoodingStepFailure, registerWorkerDogfooding } from "./dogfooding.js";
 
 const RETENTION_CLEANUP_LEASE_KEY = "leases:cleanup-retention:schedule";
@@ -1966,6 +1967,13 @@ export async function runWorkerFromEnv(envInput: Record<string, string | undefin
                   await scheduleRetentionCleanup({
                     queue,
                     intervalMs: env.RETENTION_CLEANUP_INTERVAL_MS
+                  });
+                });
+                await runWorkerStep(logger, "schedule-trial-lifecycle-emails", async () => {
+                  await scheduleTrialLifecycleEmails({
+                    batchSize: env.WEEKLY_REPORT_SCHEDULER_BATCH_SIZE,
+                    billingStore,
+                    operationalEmailDeliveryStore
                   });
                 });
 

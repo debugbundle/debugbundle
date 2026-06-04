@@ -20,6 +20,10 @@ import {
 } from "./email-preheaders.js";
 
 export {
+  renderTrialStartedEmail,
+  renderTrialEndingSoonEmail,
+  renderTrialExpiredEmail,
+  renderTrialConvertedEmail,
   renderPurchaseConfirmationEmail,
   renderRenewalSuccessEmail,
   renderPaymentFailureEmail,
@@ -31,6 +35,10 @@ export {
 } from "./billing-emails.js";
 export type {
   BillingEmailRendered,
+  TrialStartedEmailInput,
+  TrialEndingSoonEmailInput,
+  TrialExpiredEmailInput,
+  TrialConvertedEmailInput,
   PurchaseConfirmationInput,
   RenewalSuccessInput,
   PaymentFailureInput,

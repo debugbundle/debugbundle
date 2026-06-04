@@ -12,21 +12,59 @@ import type {
 
 const OPERATIONAL_EMAIL_RETRY_DELAYS_SECONDS = [1, 5, 30, 120, 600] as const;
 
+export type PostgresOperationalEmailDeliveryKind =
+  | OperationalEmailDeliveryKind
+  | "trial_started"
+  | "trial_ending_soon"
+  | "trial_expired"
+  | "trial_converted";
+
+export interface PostgresOperationalEmailDeliveryRecord
+  extends Omit<OperationalEmailDeliveryRecord, "project_id" | "kind"> {
+  project_id: string | null;
+  kind: PostgresOperationalEmailDeliveryKind;
+}
+
+export interface PostgresOperationalEmailRecipientContext
+  extends Omit<OperationalEmailRecipientContext, "project_name"> {
+  project_name: string | null;
+}
+
+export interface PostgresOperationalEmailDeliveryStore
+  extends Omit<
+    OperationalEmailDeliveryStore,
+    "getOperationalEmailDelivery" | "resolveOperationalEmailRecipientContext"
+  > {
+  queueOrganizationOperationalEmailDelivery(input: {
+    organization_id: string;
+    kind: PostgresOperationalEmailDeliveryKind;
+    dedupe_key: string;
+    payload: Record<string, unknown>;
+  }): Promise<{ delivery_id: string | null; created: boolean }>;
+  getOperationalEmailDelivery(input: {
+    delivery_id: string;
+  }): Promise<PostgresOperationalEmailDeliveryRecord | null>;
+  resolveOperationalEmailRecipientContext(input: {
+    organization_id: string;
+    project_id: string | null;
+  }): Promise<PostgresOperationalEmailRecipientContext | null>;
+}
+
 function mapOperationalEmailDeliveryRow(row: {
   delivery_id: string;
   organization_id: string;
-  project_id: string;
-  kind: OperationalEmailDeliveryKind;
+  project_id: string | null;
+  kind: PostgresOperationalEmailDeliveryKind;
   dedupe_key: string;
   payload: Record<string, unknown>;
-  status: OperationalEmailDeliveryRecord["status"];
+  status: PostgresOperationalEmailDeliveryRecord["status"];
   attempt_count: number;
   next_attempt_at: string | null;
   last_error: string | null;
   delivered_at: string | null;
   created_at: string;
   updated_at: string;
-}): OperationalEmailDeliveryRecord {
+}): PostgresOperationalEmailDeliveryRecord {
   return {
     delivery_id: row.delivery_id,
     organization_id: row.organization_id,
@@ -44,7 +82,91 @@ function mapOperationalEmailDeliveryRow(row: {
   };
 }
 
-export function createPostgresOperationalEmailDeliveryStore(db: Queryable): OperationalEmailDeliveryStore {
+async function queueOperationalEmailDelivery(input: {
+  db: Queryable;
+  organization_id: string;
+  project_id: string | null;
+  kind: PostgresOperationalEmailDeliveryKind;
+  dedupe_key: string;
+  payload: Record<string, unknown>;
+}): Promise<{ delivery_id: string | null; created: boolean }> {
+  const result = await input.db.query<{ delivery_id: string | null; created: boolean }>(
+    `
+      WITH queued AS (
+        INSERT INTO operational_email_deliveries (
+          id,
+          organization_id,
+          project_id,
+          kind,
+          dedupe_key,
+          payload,
+          status,
+          attempt_count,
+          next_attempt_at,
+          last_error,
+          delivered_at,
+          created_at,
+          updated_at
+        )
+        VALUES (
+          $1::uuid,
+          $2::uuid,
+          $3::uuid,
+          $4,
+          $5,
+          $6::jsonb,
+          'pending',
+          0,
+          now(),
+          NULL,
+          NULL,
+          now(),
+          now()
+        )
+        ON CONFLICT (organization_id, kind, dedupe_key)
+        DO UPDATE
+        SET
+          project_id = EXCLUDED.project_id,
+          payload = EXCLUDED.payload,
+          status = 'pending',
+          attempt_count = 0,
+          next_attempt_at = now(),
+          last_error = NULL,
+          delivered_at = NULL,
+          updated_at = now()
+        WHERE operational_email_deliveries.status = 'failed'
+        RETURNING id::text AS delivery_id, true AS created
+      )
+      SELECT delivery_id, created
+      FROM queued
+
+      UNION ALL
+
+      SELECT oed.id::text AS delivery_id, false AS created
+      FROM operational_email_deliveries oed
+      WHERE oed.organization_id = $2::uuid
+        AND oed.kind = $4
+        AND oed.dedupe_key = $5
+        AND NOT EXISTS (SELECT 1 FROM queued)
+      LIMIT 1
+    `,
+    [
+      randomUUID(),
+      input.organization_id,
+      input.project_id,
+      input.kind,
+      input.dedupe_key,
+      JSON.stringify(input.payload)
+    ]
+  );
+
+  const row = result.rows[0];
+  return row ?? { delivery_id: null, created: false };
+}
+
+export function createPostgresOperationalEmailDeliveryStore(
+  db: Queryable
+): PostgresOperationalEmailDeliveryStore {
   return {
     async queueProjectOperationalEmailDelivery(input): Promise<{ delivery_id: string | null; created: boolean }> {
       const result = await db.query<{ delivery_id: string | null; created: boolean }>(
@@ -120,6 +242,17 @@ export function createPostgresOperationalEmailDeliveryStore(db: Queryable): Oper
       return row ?? { delivery_id: null, created: false };
     },
 
+    async queueOrganizationOperationalEmailDelivery(input): Promise<{ delivery_id: string | null; created: boolean }> {
+      return queueOperationalEmailDelivery({
+        db,
+        organization_id: input.organization_id,
+        project_id: null,
+        kind: input.kind,
+        dedupe_key: input.dedupe_key,
+        payload: input.payload
+      });
+    },
+
     async claimDueOperationalEmailDeliveries(limit): Promise<Array<{ delivery_id: string; attempt: number }>> {
       const result = await db.query<{ delivery_id: string; attempt: number }>(
         `
@@ -148,15 +281,15 @@ export function createPostgresOperationalEmailDeliveryStore(db: Queryable): Oper
       return result.rows;
     },
 
-    async getOperationalEmailDelivery(input): Promise<OperationalEmailDeliveryRecord | null> {
+    async getOperationalEmailDelivery(input): Promise<PostgresOperationalEmailDeliveryRecord | null> {
       const result = await db.query<{
         delivery_id: string;
         organization_id: string;
-        project_id: string;
-        kind: OperationalEmailDeliveryKind;
+        project_id: string | null;
+        kind: PostgresOperationalEmailDeliveryKind;
         dedupe_key: string;
         payload: Record<string, unknown>;
-        status: OperationalEmailDeliveryRecord["status"];
+        status: PostgresOperationalEmailDeliveryRecord["status"];
         attempt_count: number;
         next_attempt_at: string | null;
         last_error: string | null;
@@ -168,7 +301,7 @@ export function createPostgresOperationalEmailDeliveryStore(db: Queryable): Oper
           SELECT
             id::text AS delivery_id,
             organization_id::text AS organization_id,
-            project_id::text AS project_id,
+            CASE WHEN project_id IS NULL THEN NULL ELSE project_id::text END AS project_id,
             kind,
             dedupe_key,
             payload,
@@ -190,23 +323,26 @@ export function createPostgresOperationalEmailDeliveryStore(db: Queryable): Oper
       return row === undefined ? null : mapOperationalEmailDeliveryRow(row);
     },
 
-    async resolveOperationalEmailRecipientContext(input): Promise<OperationalEmailRecipientContext | null> {
-      const result = await db.query<OperationalEmailRecipientContext & Record<string, unknown>>(
+    async resolveOperationalEmailRecipientContext(
+      input
+    ): Promise<PostgresOperationalEmailRecipientContext | null> {
+      const result = await db.query<PostgresOperationalEmailRecipientContext & Record<string, unknown>>(
         `
           SELECT
             o.name AS organization_name,
             p.name AS project_name,
             u.email AS recipient_email
-          FROM projects p
-          JOIN organizations o
-            ON o.id = p.organization_id
+          FROM organizations o
+          LEFT JOIN projects p
+            ON p.organization_id = o.id
+           AND p.id = $2::uuid
           JOIN organization_members om
             ON om.organization_id = o.id
            AND om.role = 'owner'
           JOIN users u
             ON u.id = om.user_id
-          WHERE p.organization_id = $1::uuid
-            AND p.id = $2::uuid
+          WHERE o.id = $1::uuid
+            AND ($2::uuid IS NULL OR p.id IS NOT NULL)
           ORDER BY om.created_at ASC, om.user_id ASC
           LIMIT 1
         `,

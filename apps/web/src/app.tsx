@@ -66,6 +66,7 @@ import { TooltipProvider } from "./components/ui/tooltip.js";
 import { SystemEmailReviewPage } from "./pages/system-email-review-page.js";
 
 const GITHUB_START_HREF = buildApiUrl("/v1/auth/github/start");
+const SIGNUP_TRIAL_STORAGE_KEY = "debugbundle.auth.signup_trial";
 const TERMS_OF_SERVICE_URL = "https://debugbundle.com/terms";
 const PRIVACY_POLICY_URL = "https://debugbundle.com/privacy";
 
@@ -74,6 +75,7 @@ interface AppProps {
 }
 
 type AuthStep = "request" | "verify";
+type RequestedTrialPlan = "solo" | "team";
 
 interface AuthFieldErrors {
   email?: string;
@@ -83,6 +85,35 @@ interface AuthFieldErrors {
 interface AuthRequestError {
   title: string;
   description: string;
+}
+
+function parseRequestedTrialPlan(value: string | null): RequestedTrialPlan | null {
+  return value === "solo" || value === "team" ? value : null;
+}
+
+function readStoredSignupTrialPlan(): RequestedTrialPlan | null {
+  if (typeof window === "undefined") {
+    return null;
+  }
+
+  return parseRequestedTrialPlan(window.sessionStorage.getItem(SIGNUP_TRIAL_STORAGE_KEY));
+}
+
+function writeStoredSignupTrialPlan(plan: RequestedTrialPlan | null): void {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  if (plan === null) {
+    window.sessionStorage.removeItem(SIGNUP_TRIAL_STORAGE_KEY);
+    return;
+  }
+
+  window.sessionStorage.setItem(SIGNUP_TRIAL_STORAGE_KEY, plan);
+}
+
+function formatRequestedTrialPlanName(plan: RequestedTrialPlan): string {
+  return plan === "solo" ? "Solo" : "Team";
 }
 
 function validateEmailAddress(value: string): string | undefined {
@@ -371,10 +402,12 @@ function AuthLayout({
   );
 }
 
-function GithubLink(): JSX.Element {
+function GithubLink({ trialPlan }: { trialPlan?: RequestedTrialPlan | null } = {}): JSX.Element {
+  const href = trialPlan === undefined || trialPlan === null ? GITHUB_START_HREF : `${GITHUB_START_HREF}?trial=${trialPlan}`;
+
   return (
     <Button asChild variant="outline" className="w-full justify-center">
-      <a href={GITHUB_START_HREF}>
+      <a href={href}>
         <GitHubMark data-icon="inline-start" />
         Continue with GitHub
       </a>
@@ -403,12 +436,24 @@ function resolvePostAuthPath(nextPath: string | null): string {
   return nextPath;
 }
 
-function appendNextPath(pathname: string, nextPath: string): string {
-  if (nextPath === "/dashboard") {
-    return pathname;
+function appendAuthPath(
+  pathname: string,
+  options: {
+    nextPath: string;
+    trialPlan?: RequestedTrialPlan | null;
+  }
+): string {
+  const searchParams = new URLSearchParams();
+
+  if (options.nextPath !== "/dashboard") {
+    searchParams.set("next", options.nextPath);
+  }
+  if (options.trialPlan === "solo" || options.trialPlan === "team") {
+    searchParams.set("trial", options.trialPlan);
   }
 
-  return `${pathname}?next=${encodeURIComponent(nextPath)}`;
+  const queryString = searchParams.toString();
+  return queryString.length === 0 ? pathname : `${pathname}?${queryString}`;
 }
 
 function EmailAuthPage({
@@ -417,7 +462,8 @@ function EmailAuthPage({
   description,
   alternateLinkHref,
   alternateLinkLabel,
-  alternatePrompt
+  alternatePrompt,
+  showTrialIntentPanel = false
 }: {
   title: string;
   heading: string;
@@ -425,10 +471,10 @@ function EmailAuthPage({
   alternateLinkHref: string;
   alternateLinkLabel: string;
   alternatePrompt: string;
+  showTrialIntentPanel?: boolean;
 }): JSX.Element {
   const { session, setSession } = useSession();
-  const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const emailInputRef = useRef<HTMLInputElement>(null);
   const codeInputRef = useRef<HTMLInputElement>(null);
   const [email, setEmail] = useState("");
@@ -437,8 +483,23 @@ function EmailAuthPage({
   const [fieldErrors, setFieldErrors] = useState<AuthFieldErrors>({});
   const [requestError, setRequestError] = useState<AuthRequestError | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [postVerifyRedirectPath, setPostVerifyRedirectPath] = useState<string | null>(null);
   const postAuthPath = resolvePostAuthPath(searchParams.get("next"));
-  const alternateHref = appendNextPath(alternateLinkHref, postAuthPath);
+  const hasTrialQuery = searchParams.has("trial");
+  const requestedTrialPlan =
+    parseRequestedTrialPlan(searchParams.get("trial")) ??
+    (hasTrialQuery ? null : readStoredSignupTrialPlan());
+  const alternateHref = appendAuthPath(alternateLinkHref, {
+    nextPath: postAuthPath,
+    trialPlan: requestedTrialPlan
+  });
+  const trialIntentRedirectPath =
+    requestedTrialPlan === null
+      ? postAuthPath
+      : appendAuthPath("/billing", {
+          nextPath: postAuthPath,
+          trialPlan: requestedTrialPlan
+        });
   const isVerifyStep = step === "verify";
 
   useEffect(() => {
@@ -458,8 +519,12 @@ function EmailAuthPage({
     emailInputRef.current?.focus();
   }, [isVerifyStep]);
 
+  useEffect(() => {
+    writeStoredSignupTrialPlan(requestedTrialPlan);
+  }, [requestedTrialPlan]);
+
   if (session !== null) {
-    return <Navigate replace to={postAuthPath} />;
+    return <Navigate replace to={postVerifyRedirectPath ?? trialIntentRedirectPath} />;
   }
 
   function focusFirstInvalidField(errors: AuthFieldErrors): void {
@@ -477,6 +542,18 @@ function EmailAuthPage({
     setFieldErrors((current) =>
       current[field] === undefined ? current : omitAuthFieldError(current, field)
     );
+  }
+
+  function setRequestedTrialPlan(nextPlan: RequestedTrialPlan | null): void {
+    setSearchParams((current) => {
+      const nextParams = new URLSearchParams(current);
+      if (nextPlan === null) {
+        nextParams.delete("trial");
+      } else {
+        nextParams.set("trial", nextPlan);
+      }
+      return nextParams;
+    }, { replace: true });
   }
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>): Promise<void> {
@@ -499,15 +576,25 @@ function EmailAuthPage({
 
     try {
       if (step === "request") {
-        await requestEmailCode({ email: normalizedEmail, accepted_terms: true });
+        await requestEmailCode({
+          email: normalizedEmail,
+          accepted_terms: true,
+          ...(requestedTrialPlan === null ? {} : { requested_trial_plan: requestedTrialPlan })
+        });
         setStep("verify");
         setCode("");
         showSuccessToast("Sign-in code sent successfully.");
       } else {
-        const nextSession = await verifyEmailCode({ email: normalizedEmail, code: normalizedCode });
+        const nextPath = trialIntentRedirectPath;
+        const nextSession = await verifyEmailCode({
+          email: normalizedEmail,
+          code: normalizedCode,
+          ...(requestedTrialPlan === null ? {} : { requested_trial_plan: requestedTrialPlan })
+        });
+        setPostVerifyRedirectPath(nextPath);
         setSession(nextSession);
+        writeStoredSignupTrialPlan(null);
         showSuccessToast("Signed in successfully.");
-        void navigate(postAuthPath, { replace: true });
       }
     } catch {
       setRequestError(
@@ -543,7 +630,11 @@ function EmailAuthPage({
     setIsSubmitting(true);
 
     try {
-      await requestEmailCode({ email: normalizedEmail, accepted_terms: true });
+      await requestEmailCode({
+        email: normalizedEmail,
+        accepted_terms: true,
+        ...(requestedTrialPlan === null ? {} : { requested_trial_plan: requestedTrialPlan })
+      });
       setCode("");
       showSuccessToast("New sign-in code sent successfully.");
     } catch {
@@ -577,6 +668,47 @@ function EmailAuthPage({
     <AuthLayout title={layoutTitle} heading={layoutHeading} description={layoutDescription}>
       <form className="flex flex-col gap-6" onSubmit={(event) => void handleSubmit(event)}>
         <FieldGroup>
+          {!showTrialIntentPanel || requestedTrialPlan === null ? null : (
+            <CalloutCard
+              eyebrow="30-day no-card trial"
+              title={`${formatRequestedTrialPlanName(requestedTrialPlan)} trial selected`}
+              description={
+                isVerifyStep
+                  ? `Verify your code to continue into billing. If this is a new account, your ${formatRequestedTrialPlanName(requestedTrialPlan)} trial will start automatically.`
+                  : `${formatRequestedTrialPlanName(requestedTrialPlan)} includes its paid allowance for 30 days. No credit card is required, and extra capacity stays locked until paid conversion.`
+              }
+              tone="neutral"
+            >
+              {isVerifyStep ? null : (
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    type="button"
+                    variant={requestedTrialPlan === "solo" ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => setRequestedTrialPlan("solo")}
+                  >
+                    Solo trial
+                  </Button>
+                  <Button
+                    type="button"
+                    variant={requestedTrialPlan === "team" ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => setRequestedTrialPlan("team")}
+                  >
+                    Team trial
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setRequestedTrialPlan(null)}
+                  >
+                    Continue without trial
+                  </Button>
+                </div>
+              )}
+            </CalloutCard>
+          )}
           {isVerifyStep ? (
             <Field data-invalid={fieldErrors.code !== undefined || undefined}>
               <FieldLabel htmlFor="email-auth-code">Six-digit code</FieldLabel>
@@ -606,7 +738,7 @@ function EmailAuthPage({
           ) : (
             <>
               <Field>
-                <GithubLink />
+                <GithubLink trialPlan={requestedTrialPlan} />
               </Field>
               <AuthMethodDivider />
               <div className="space-y-1">
@@ -717,6 +849,7 @@ function SignupPage(): JSX.Element {
       alternatePrompt="Already have an account?"
       alternateLinkHref="/login"
       alternateLinkLabel="Login here"
+      showTrialIntentPanel
     />
   );
 }

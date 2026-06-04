@@ -8,13 +8,13 @@
     "source": "github",
     "subfolder": "apps/mcp"
   },
-  "version": "1.0.2",
+  "version": "1.1.0",
   "packages": [
     {
       "registryType": "npm",
       "registryBaseUrl": "https://registry.npmjs.org",
       "identifier": "@debugbundle/mcp",
-      "version": "1.0.2",
+      "version": "1.1.0",
       "transport": {
         "type": "stdio"
       },

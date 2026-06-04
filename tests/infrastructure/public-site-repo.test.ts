@@ -126,4 +126,16 @@ describePublicSiteRepo('public site repository export', () => {
       rmSync(rehearsalRoot, { recursive: true, force: true });
     }
   }, 20_000);
+
+  it('keeps the pricing page trial CTAs and no-card capacity messaging aligned with the hosted app flow', () => {
+    const pricing = readFileSync(join(siteRoot, 'app', '(site)', 'pricing', 'page.tsx'), 'utf8');
+
+    expect(pricing).toContain('https://app.debugbundle.com/signup');
+    expect(pricing).toContain('https://app.debugbundle.com/signup?trial=solo');
+    expect(pricing).toContain('https://app.debugbundle.com/signup?trial=team');
+    expect(pricing).toContain('Start Solo trial');
+    expect(pricing).toContain('Start Team trial');
+    expect(pricing).toContain('30-day trial, no credit card required. Extra capacity requires paid conversion.');
+    expect(pricing).toContain('capacity after paid conversion');
+  });
 });

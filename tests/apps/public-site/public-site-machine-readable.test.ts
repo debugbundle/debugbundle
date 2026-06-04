@@ -75,6 +75,7 @@ describe('public site machine-readable artifacts', () => {
     expect(document.$defs?.['get_bundleArguments']?.required).toEqual(['incidentId']);
     expect(document.$defs?.['get_bundleArguments']?.properties?.['incidentId']?.type).toBe('string');
     expect(document.$defs?.['list_project_tokensArguments']?.required).toEqual(['bearerToken', 'projectId']);
+    expect(document.$defs?.['start_trialArguments']?.required).toEqual(['bearerToken', 'targetPlan']);
     expect(document.$defs?.['set_project_github_repoArguments']?.required).toEqual(['bearerToken', 'projectId', 'owner', 'repo']);
     expect(document.$defs?.['test_webhookArguments']?.properties?.['eventType']?.enum).toEqual([
       'verification.passed',

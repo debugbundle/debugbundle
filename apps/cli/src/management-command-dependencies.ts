@@ -1,0 +1,170 @@
+import type {
+  createAlertWithAuthCommand as defaultCreateAlertCommand,
+  deleteAlertWithAuthCommand as defaultDeleteAlertCommand,
+  listAlertsWithAuthCommand as defaultListAlertsCommand,
+  updateAlertWithAuthCommand as defaultUpdateAlertCommand
+} from "./alert-commands.js";
+import type {
+  getCapturePolicyWithAuthCommand as defaultGetCapturePolicyCommand,
+  setCapturePolicyWithAuthCommand as defaultSetCapturePolicyCommand
+} from "./capture-policy-commands.js";
+import type {
+  createCaptureRuleWithAuthCommand as defaultCreateCaptureRuleCommand,
+  deleteCaptureRuleWithAuthCommand as defaultDeleteCaptureRuleCommand,
+  listCaptureRulesWithAuthCommand as defaultListCaptureRulesCommand,
+  updateCaptureRuleWithAuthCommand as defaultUpdateCaptureRuleCommand
+} from "./capture-rule-commands.js";
+import type {
+  cancelBillingCapacityReductionWithAuthCommand as defaultCancelBillingCapacityReductionCommand,
+  getBillingSummaryWithAuthCommand as defaultGetBillingSummaryCommand,
+  increaseBillingCapacityWithAuthCommand as defaultIncreaseBillingCapacityCommand,
+  scheduleBillingCapacityReductionWithAuthCommand as defaultScheduleBillingCapacityReductionCommand,
+  startBillingTrialWithAuthCommand as defaultStartBillingTrialCommand
+} from "./billing-commands.js";
+import type {
+  createProjectGitHubRuleWithAuthCommand as defaultCreateProjectGitHubRuleCommand,
+  deleteProjectGitHubRuleWithAuthCommand as defaultDeleteProjectGitHubRuleCommand,
+  getGitHubStatusWithAuthCommand as defaultGetGitHubStatusCommand,
+  listGitHubRepositoriesWithAuthCommand as defaultListGitHubRepositoriesCommand,
+  listProjectGitHubDeliveriesWithAuthCommand as defaultListProjectGitHubDeliveriesCommand,
+  listProjectGitHubRulesWithAuthCommand as defaultListProjectGitHubRulesCommand,
+  removeProjectGitHubRepoWithAuthCommand as defaultRemoveProjectGitHubRepoCommand,
+  retryProjectGitHubDeliveryWithAuthCommand as defaultRetryProjectGitHubDeliveryCommand,
+  setProjectGitHubRepoWithAuthCommand as defaultSetProjectGitHubRepoCommand,
+  updateProjectGitHubRuleWithAuthCommand as defaultUpdateProjectGitHubRuleCommand
+} from "./github-commands.js";
+import type {
+  getImprovementBundleWithAuthCommand as defaultGetImprovementBundleCommand,
+  getImprovementWithAuthCommand as defaultGetImprovementCommand,
+  listImprovementsWithAuthCommand as defaultListImprovementsCommand,
+  reopenImprovementWithAuthCommand as defaultReopenImprovementCommand,
+  resolveImprovementWithAuthCommand as defaultResolveImprovementCommand,
+  snoozeImprovementWithAuthCommand as defaultSnoozeImprovementCommand
+} from "./improvement-commands.js";
+import type {
+  getImprovementSettingsWithAuthCommand as defaultGetImprovementSettingsCommand,
+  setImprovementSettingsWithAuthCommand as defaultSetImprovementSettingsCommand
+} from "./improvement-settings-commands.js";
+import type {
+  cancelInviteWithAuthCommand as defaultCancelInviteCommand,
+  inviteMemberWithAuthCommand as defaultInviteMemberCommand,
+  leaveProjectWithAuthCommand as defaultLeaveProjectCommand,
+  listInvitesWithAuthCommand as defaultListInvitesCommand,
+  listMembersWithAuthCommand as defaultListMembersCommand,
+  removeMemberWithAuthCommand as defaultRemoveMemberCommand,
+  updateMemberRoleWithAuthCommand as defaultUpdateMemberRoleCommand
+} from "./member-commands.js";
+import type {
+  activateProbeWithAuthCommand as defaultActivateProbeCommand,
+  deactivateProbeWithAuthCommand as defaultDeactivateProbeCommand,
+  listActiveProbesWithAuthCommand as defaultListActiveProbesCommand
+} from "./probe-commands.js";
+import type {
+  createProjectWithAuthCommand as defaultCreateProjectCommand,
+  deleteProjectWithAuthCommand as defaultDeleteProjectCommand,
+  listProjectsWithAuthCommand as defaultListProjectsCommand,
+  updateProjectWithAuthCommand as defaultUpdateProjectCommand
+} from "./project-commands.js";
+import type {
+  deleteSlackDestinationWithAuthCommand as defaultDeleteSlackDestinationCommand,
+  getSlackConnectUrlWithAuthCommand as defaultGetSlackConnectUrlCommand,
+  listSlackDestinationsWithAuthCommand as defaultListSlackDestinationsCommand,
+  testSlackDestinationWithAuthCommand as defaultTestSlackDestinationCommand
+} from "./slack-commands.js";
+import type { CliCommandResult } from "./token-commands.js";
+import type {
+  createMemberTokenWithAuthCommand as defaultCreateMemberTokenCommand,
+  createProjectTokenWithAuthCommand as defaultCreateProjectTokenCommand,
+  listMemberTokensWithAuthCommand as defaultListMemberTokensCommand,
+  listProjectTokensWithAuthCommand as defaultListProjectTokensCommand,
+  revokeMemberTokenWithAuthCommand as defaultRevokeMemberTokenCommand,
+  revokeProjectTokenWithAuthCommand as defaultRevokeProjectTokenCommand
+} from "./token-commands.js";
+import type {
+  createWebhookWithAuthCommand as defaultCreateWebhookCommand,
+  deleteWebhookWithAuthCommand as defaultDeleteWebhookCommand,
+  listWebhookDeliveriesWithAuthCommand as defaultListWebhookDeliveriesCommand,
+  listWebhooksWithAuthCommand as defaultListWebhooksCommand,
+  retryWebhookDeliveryWithAuthCommand as defaultRetryWebhookDeliveryCommand,
+  testWebhookWithAuthCommand as defaultTestWebhookCommand,
+  updateWebhookWithAuthCommand as defaultUpdateWebhookCommand
+} from "./webhook-commands.js";
+import type {
+  createWeeklyReportChannelWithAuthCommand as defaultCreateWeeklyReportChannelCommand,
+  deleteWeeklyReportChannelWithAuthCommand as defaultDeleteWeeklyReportChannelCommand,
+  listWeeklyReportChannelsWithAuthCommand as defaultListWeeklyReportChannelsCommand,
+  updateWeeklyReportChannelWithAuthCommand as defaultUpdateWeeklyReportChannelCommand
+} from "./weekly-report-commands.js";
+
+export type ManagementCommandDependencies = {
+  getBillingSummaryCommand?: typeof defaultGetBillingSummaryCommand;
+  startBillingTrialCommand?: typeof defaultStartBillingTrialCommand;
+  increaseBillingCapacityCommand?: typeof defaultIncreaseBillingCapacityCommand;
+  scheduleBillingCapacityReductionCommand?: typeof defaultScheduleBillingCapacityReductionCommand;
+  cancelBillingCapacityReductionCommand?: typeof defaultCancelBillingCapacityReductionCommand;
+  deleteProjectCommand?: typeof defaultDeleteProjectCommand;
+  listProjectsCommand?: typeof defaultListProjectsCommand;
+  createProjectCommand?: typeof defaultCreateProjectCommand;
+  updateProjectCommand?: typeof defaultUpdateProjectCommand;
+  listProjectTokensCommand?: typeof defaultListProjectTokensCommand;
+  createProjectTokenCommand?: typeof defaultCreateProjectTokenCommand;
+  revokeProjectTokenCommand?: typeof defaultRevokeProjectTokenCommand;
+  listMemberTokensCommand?: typeof defaultListMemberTokensCommand;
+  createMemberTokenCommand?: typeof defaultCreateMemberTokenCommand;
+  revokeMemberTokenCommand?: typeof defaultRevokeMemberTokenCommand;
+  listAlertsCommand?: typeof defaultListAlertsCommand;
+  createAlertCommand?: typeof defaultCreateAlertCommand;
+  updateAlertCommand?: typeof defaultUpdateAlertCommand;
+  deleteAlertCommand?: typeof defaultDeleteAlertCommand;
+  listWebhooksCommand?: typeof defaultListWebhooksCommand;
+  createWebhookCommand?: typeof defaultCreateWebhookCommand;
+  updateWebhookCommand?: typeof defaultUpdateWebhookCommand;
+  deleteWebhookCommand?: typeof defaultDeleteWebhookCommand;
+  testWebhookCommand?: typeof defaultTestWebhookCommand;
+  listWebhookDeliveriesCommand?: typeof defaultListWebhookDeliveriesCommand;
+  retryWebhookDeliveryCommand?: typeof defaultRetryWebhookDeliveryCommand;
+  listWeeklyReportChannelsCommand?: typeof defaultListWeeklyReportChannelsCommand;
+  createWeeklyReportChannelCommand?: typeof defaultCreateWeeklyReportChannelCommand;
+  updateWeeklyReportChannelCommand?: typeof defaultUpdateWeeklyReportChannelCommand;
+  deleteWeeklyReportChannelCommand?: typeof defaultDeleteWeeklyReportChannelCommand;
+  listSlackDestinationsCommand?: typeof defaultListSlackDestinationsCommand;
+  getSlackConnectUrlCommand?: typeof defaultGetSlackConnectUrlCommand;
+  testSlackDestinationCommand?: typeof defaultTestSlackDestinationCommand;
+  deleteSlackDestinationCommand?: typeof defaultDeleteSlackDestinationCommand;
+  getCapturePolicyCommand?: typeof defaultGetCapturePolicyCommand;
+  setCapturePolicyCommand?: typeof defaultSetCapturePolicyCommand;
+  listCaptureRulesCommand?: typeof defaultListCaptureRulesCommand;
+  createCaptureRuleCommand?: typeof defaultCreateCaptureRuleCommand;
+  updateCaptureRuleCommand?: typeof defaultUpdateCaptureRuleCommand;
+  deleteCaptureRuleCommand?: typeof defaultDeleteCaptureRuleCommand;
+  listImprovementsCommand?: typeof defaultListImprovementsCommand;
+  getImprovementCommand?: typeof defaultGetImprovementCommand;
+  getImprovementBundleCommand?: typeof defaultGetImprovementBundleCommand;
+  resolveImprovementCommand?: typeof defaultResolveImprovementCommand;
+  reopenImprovementCommand?: typeof defaultReopenImprovementCommand;
+  snoozeImprovementCommand?: typeof defaultSnoozeImprovementCommand;
+  getImprovementSettingsCommand?: typeof defaultGetImprovementSettingsCommand;
+  setImprovementSettingsCommand?: typeof defaultSetImprovementSettingsCommand;
+  activateProbeCommand?: typeof defaultActivateProbeCommand;
+  listActiveProbesCommand?: typeof defaultListActiveProbesCommand;
+  deactivateProbeCommand?: typeof defaultDeactivateProbeCommand;
+  listMembersCommand?: typeof defaultListMembersCommand;
+  listInvitesCommand?: typeof defaultListInvitesCommand;
+  inviteMemberCommand?: typeof defaultInviteMemberCommand;
+  cancelInviteCommand?: typeof defaultCancelInviteCommand;
+  updateMemberRoleCommand?: typeof defaultUpdateMemberRoleCommand;
+  removeMemberCommand?: typeof defaultRemoveMemberCommand;
+  leaveProjectCommand?: typeof defaultLeaveProjectCommand;
+  getGitHubStatusCommand?: typeof defaultGetGitHubStatusCommand;
+  listGitHubRepositoriesCommand?: typeof defaultListGitHubRepositoriesCommand;
+  listProjectGitHubRulesCommand?: typeof defaultListProjectGitHubRulesCommand;
+  createProjectGitHubRuleCommand?: typeof defaultCreateProjectGitHubRuleCommand;
+  updateProjectGitHubRuleCommand?: typeof defaultUpdateProjectGitHubRuleCommand;
+  deleteProjectGitHubRuleCommand?: typeof defaultDeleteProjectGitHubRuleCommand;
+  listProjectGitHubDeliveriesCommand?: typeof defaultListProjectGitHubDeliveriesCommand;
+  retryProjectGitHubDeliveryCommand?: typeof defaultRetryProjectGitHubDeliveryCommand;
+  setProjectGitHubRepoCommand?: typeof defaultSetProjectGitHubRepoCommand;
+  removeProjectGitHubRepoCommand?: typeof defaultRemoveProjectGitHubRepoCommand;
+};
+
+export type { CliCommandResult };

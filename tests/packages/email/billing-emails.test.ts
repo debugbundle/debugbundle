@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  renderTrialStartedEmail,
+  renderTrialEndingSoonEmail,
+  renderTrialExpiredEmail,
+  renderTrialConvertedEmail,
   renderPurchaseConfirmationEmail,
   renderRenewalSuccessEmail,
   renderPaymentFailureEmail,
@@ -12,6 +16,62 @@ import {
 } from "../../../packages/email/src/billing-emails.js";
 
 describe("billing email templates", () => {
+  describe("trial lifecycle emails", () => {
+    it("renders trial started email", () => {
+      const result = renderTrialStartedEmail({
+        organizationName: "Acme Corp",
+        trialPlan: "team",
+        trialEndsAt: "2026-07-01T00:00:00.000Z",
+        billingUrl: "https://app.debugbundle.test/billing"
+      });
+
+      expect(result.subject).toContain("trial has started");
+      expect(result.text).toContain("30-day team trial");
+      expect(result.text).toContain("2026-07-01T00:00:00.000Z");
+      expect(result.html).toContain("Trial started");
+    });
+
+    it("renders trial ending soon email", () => {
+      const result = renderTrialEndingSoonEmail({
+        organizationName: "Acme Corp",
+        trialPlan: "solo",
+        trialEndsAt: "2026-07-01T00:00:00.000Z",
+        daysRemaining: 7,
+        billingUrl: "https://app.debugbundle.test/billing"
+      });
+
+      expect(result.subject).toContain("7 day(s) left");
+      expect(result.text).toContain("ends in 7 day(s)");
+      expect(result.html).toContain("Convert to paid");
+    });
+
+    it("renders trial expired email", () => {
+      const result = renderTrialExpiredEmail({
+        organizationName: "Acme Corp",
+        trialPlan: "solo",
+        trialEndedAt: "2026-07-01T00:00:00.000Z",
+        billingUrl: "https://app.debugbundle.test/billing"
+      });
+
+      expect(result.subject).toContain("trial has ended");
+      expect(result.text).toContain("free tier");
+      expect(result.html).toContain("Trial ended");
+    });
+
+    it("renders trial converted email", () => {
+      const result = renderTrialConvertedEmail({
+        organizationName: "Acme Corp",
+        trialPlan: "team",
+        paidPlan: "team",
+        billingUrl: "https://app.debugbundle.test/billing"
+      });
+
+      expect(result.subject).toContain("plan activated");
+      expect(result.text).toContain("converted from a team trial");
+      expect(result.html).toContain("Trial converted");
+    });
+  });
+
   describe("renderPurchaseConfirmationEmail", () => {
     it("should render purchase confirmation with plan and extra capacity", () => {
       const result = renderPurchaseConfirmationEmail({

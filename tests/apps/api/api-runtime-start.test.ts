@@ -122,6 +122,7 @@ function buildMigratedRuntimeSchemaRows(sql: string): { rows: Record<string, unk
         { table_name: "capture_rules" },
         { table_name: "audit_logs" },
         { table_name: "processed_billing_events" },
+        { table_name: "trial_lifecycle_events" },
         { table_name: "processed_github_marketplace_events" },
         { table_name: "github_installations" },
         { table_name: "github_marketplace_accounts" },

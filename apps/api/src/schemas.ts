@@ -1,6 +1,8 @@
 import { MAX_BILLING_ADDITIONAL_CAPACITY_UNITS } from "../../../packages/shared-types/src/index.js";
 import { z } from "zod";
 
+export const RequestedTrialPlanSchema = z.enum(["solo", "team"]);
+
 export const IngestionRequestSchema = z
   .object({
     events: z.array(z.unknown())
@@ -10,14 +12,16 @@ export const IngestionRequestSchema = z
 export const RequestEmailCodeBodySchema = z
   .object({
     email: z.string().email(),
-    accepted_terms: z.literal(true)
+    accepted_terms: z.literal(true),
+    requested_trial_plan: RequestedTrialPlanSchema.optional()
   })
   .strict();
 
 export const VerifyEmailCodeBodySchema = z
   .object({
     email: z.string().email(),
-    code: z.string().regex(/^\d{6}$/, "otp_code_invalid")
+    code: z.string().regex(/^\d{6}$/, "otp_code_invalid"),
+    requested_trial_plan: RequestedTrialPlanSchema.optional()
   })
   .strict();
 
@@ -59,6 +63,12 @@ export const GithubMockAuthorizeQuerySchema = z
     redirect_uri: z.string().url(),
     scope: z.string().min(1).optional(),
     state: z.string().min(1)
+  })
+  .strict();
+
+export const GithubSignupStartQuerySchema = z
+  .object({
+    trial: RequestedTrialPlanSchema.optional()
   })
   .strict();
 
@@ -669,7 +679,13 @@ export const ProjectsQuerySchema = TokenListQuerySchema;
 
 export const BillingCheckoutBodySchema = z
   .object({
-    target_plan: z.enum(["solo", "team"])
+    target_plan: RequestedTrialPlanSchema
+  })
+  .strict();
+
+export const BillingTrialStartBodySchema = z
+  .object({
+    target_plan: RequestedTrialPlanSchema
   })
   .strict();
 

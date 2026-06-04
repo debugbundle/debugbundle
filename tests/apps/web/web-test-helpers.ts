@@ -114,6 +114,16 @@ export interface BillingUsageMetric {
 
 export interface BillingSummaryRecord {
   plan: "free" | "solo" | "team";
+  billing_state:
+    | "active"
+    | "past_due"
+    | "canceled"
+    | "unpaid"
+    | "incomplete"
+    | "admin_override"
+    | "trialing"
+    | "trial_expired"
+    | null;
   stripe_customer_id: string | null;
   active_projects: number;
   capacity_units: {
@@ -137,6 +147,17 @@ export interface BillingSummaryRecord {
     monthly_remote_activations: BillingUsageMetric;
     monthly_alert_deliveries: BillingUsageMetric;
     monthly_webhook_deliveries: BillingUsageMetric;
+  };
+  trial: {
+    available: boolean;
+    active: boolean;
+    plan: "solo" | "team" | null;
+    started_at: string | null;
+    ends_at: string | null;
+    used_at: string | null;
+    converted_at: string | null;
+    expired_at: string | null;
+    days_remaining: number | null;
   };
 }
 
@@ -405,6 +426,7 @@ export function createBillingSummary(overrides: Partial<BillingSummaryRecord> = 
 
   return {
     plan,
+    billing_state: null,
     stripe_customer_id: null,
     active_projects: 1,
     capacity_units: capacityUnits,
@@ -437,6 +459,17 @@ export function createBillingSummary(overrides: Partial<BillingSummaryRecord> = 
         used: 8,
         limit: capabilities.monthly_webhook_deliveries * capacityUnits.total
       }
+    },
+    trial: {
+      available: true,
+      active: false,
+      plan: null,
+      started_at: null,
+      ends_at: null,
+      used_at: null,
+      converted_at: null,
+      expired_at: null,
+      days_remaining: null
     },
     ...overrides
   };

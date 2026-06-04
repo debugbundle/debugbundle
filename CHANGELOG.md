@@ -6,10 +6,18 @@ The format is based on Keep a Changelog and this project follows Semantic Versio
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-06-04
+
 ### Added
 
-- Prepared `@debugbundle/mcp` for public MCP Registry and ClawHub distribution with `mcpName` ownership metadata, `server.json`, env-token auth support, and a portable ClawHub skill.
-- Documented the v1 package release order so shared packages, SDKs, dependent wrappers, dogfooding manifests, and the canonical core release are published in dependency-safe sequence.
+- Added no-card 30-day Solo and Team trial onboarding across signup, billing, CLI, MCP, worker lifecycle scheduling, operational email delivery, and public documentation.
+- Added trial state visibility to billing interfaces, including remaining-trial-day messaging in the hosted billing UI and normalized trial metadata in the API, CLI, and MCP surfaces.
+
+### Changed
+
+- Strengthened the production migration path for no-card trials with ordered forward migrations, clean-install bootstrap parity, API/worker readiness guards, and self-host deploy guidance that requires migrations before runtime startup.
+- Split oversized API, CLI, web, and storage modules as part of the trial slice so the new billing and signup behavior ships without violating repo file-size limits.
+- Bumped `@debugbundle/cli` to `1.1.0` and `@debugbundle/mcp` to `1.1.0` for the new trial-management commands, trial-aware billing output, and MCP billing tool additions.
 
 ## [1.0.1] - 2026-06-03
 

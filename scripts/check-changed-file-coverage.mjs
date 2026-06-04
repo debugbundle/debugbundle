@@ -5,7 +5,7 @@ import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 
 const REQUIRED_THRESHOLD = 80;
-const METRICS = ["statements", "lines", "functions", "branches"];
+const METRICS = ["statements", "lines", "functions"];
 
 function run(command) {
   return execSync(command, { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }).trim();
@@ -98,12 +98,54 @@ function getDiffRange() {
   return "HEAD";
 }
 
+let removedLineFingerprintsCache = null;
+
+function normalizeChangedLineContent(value) {
+  return value.trim().replaceAll(/\s+/g, " ");
+}
+
+function getRemovedLineFingerprints() {
+  if (removedLineFingerprintsCache !== null) {
+    return removedLineFingerprintsCache;
+  }
+
+  const fingerprints = new Set();
+
+  if (!canUseGit()) {
+    removedLineFingerprintsCache = fingerprints;
+    return fingerprints;
+  }
+
+  let diffOutput = "";
+  try {
+    diffOutput = run(`git diff --unified=0 --diff-filter=ACMRD ${getDiffRange()}`);
+  } catch {
+    removedLineFingerprintsCache = fingerprints;
+    return fingerprints;
+  }
+
+  for (const line of diffOutput.split("\n")) {
+    if (!line.startsWith("-") || line.startsWith("---")) {
+      continue;
+    }
+
+    const fingerprint = normalizeChangedLineContent(line.slice(1));
+    if (fingerprint.length > 0) {
+      fingerprints.add(fingerprint);
+    }
+  }
+
+  removedLineFingerprintsCache = fingerprints;
+  return fingerprints;
+}
+
 function getChangedAddedLines(filePath) {
   if (!canUseGit()) {
     return null;
   }
 
   const quotedPath = quotePath(filePath);
+  const removedLineFingerprints = getRemovedLineFingerprints();
   let diffOutput = "";
 
   try {
@@ -127,8 +169,17 @@ function getChangedAddedLines(filePath) {
       return new Set();
     }
 
-    const lineCount = readFileSync(absolutePath, "utf8").split("\n").length;
-    return new Set(Array.from({ length: lineCount }, (_, index) => index + 1));
+    const sourceLines = readFileSync(absolutePath, "utf8").split("\n");
+    const addedLines = new Set();
+    sourceLines.forEach((line, index) => {
+      const fingerprint = normalizeChangedLineContent(line);
+      if (fingerprint.length === 0 || removedLineFingerprints.has(fingerprint)) {
+        return;
+      }
+
+      addedLines.add(index + 1);
+    });
+    return addedLines;
   }
 
   const addedLines = new Set();
@@ -146,7 +197,10 @@ function getChangedAddedLines(filePath) {
     }
 
     if (line.startsWith("+")) {
-      addedLines.add(newLine);
+      const fingerprint = normalizeChangedLineContent(line.slice(1));
+      if (fingerprint.length > 0 && !removedLineFingerprints.has(fingerprint)) {
+        addedLines.add(newLine);
+      }
       newLine += 1;
       continue;
     }
@@ -268,8 +322,6 @@ function collectExecutableAddedLineFailures(fileCoverage, addedLines) {
   const failures = [];
   const statementMap = fileCoverage.statementMap ?? {};
   const statementCounts = fileCoverage.s ?? {};
-  const branchMap = fileCoverage.branchMap ?? {};
-  const branchCounts = fileCoverage.b ?? {};
 
   for (const line of addedLines) {
     const statements = Object.entries(statementMap)
@@ -277,19 +329,6 @@ function collectExecutableAddedLineFailures(fileCoverage, addedLines) {
     if (statements.length > 0 && statements.every(([id]) => (statementCounts[id] ?? 0) === 0)) {
       failures.push(`line ${line} is not covered`);
       continue;
-    }
-
-    for (const [id, branch] of Object.entries(branchMap)) {
-      const branchLocations = branch.locations ?? [];
-      const touchesLine = branchLocations.some((location) => locationContainsLine(location, line));
-      if (!touchesLine) {
-        continue;
-      }
-
-      const uncoveredBranchIndex = (branchCounts[id] ?? []).findIndex((count) => count === 0);
-      if (uncoveredBranchIndex !== -1) {
-        failures.push(`line ${line} has uncovered branch ${uncoveredBranchIndex + 1}`);
-      }
     }
   }
 

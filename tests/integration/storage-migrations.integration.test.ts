@@ -79,6 +79,7 @@ runIntegration("storage bootstrap integration", () => {
     expect(actualIndexes.has("processed_github_marketplace_events_pkey")).toBe(true);
     expect(actualIndexes.has("organizations_stripe_customer_id_key")).toBe(true);
     expect(actualIndexes.has("github_marketplace_accounts_installation_idx")).toBe(true);
+    expect(actualIndexes.has("trial_lifecycle_events_org_event_created_idx")).toBe(true);
 
     const webhookIncidentColumnResult = await db.query<{ is_nullable: "YES" | "NO" }>(
       `
@@ -99,20 +100,22 @@ runIntegration("storage bootstrap integration", () => {
         WHERE contype = 'f'
           AND conname = ANY($1::text[])
       `,
-      [[
-        "organization_members_organization_id_fkey",
-        "organization_members_user_id_fkey",
-        "projects_organization_id_fkey",
-        "project_tokens_project_id_fkey",
-        "incidents_project_id_fkey",
-        "incidents_service_id_fkey",
-        "bundle_generations_project_id_fkey",
-        "bundle_generations_incident_id_fkey",
-        "webhook_deliveries_webhook_id_fkey",
-        "alert_deliveries_alert_id_fkey",
-        "project_github_repos_installation_id_fkey",
-        "org_usage_counters_organization_id_fkey"
-      ]]
+      [
+        [
+          "organization_members_organization_id_fkey",
+          "organization_members_user_id_fkey",
+          "projects_organization_id_fkey",
+          "project_tokens_project_id_fkey",
+          "incidents_project_id_fkey",
+          "incidents_service_id_fkey",
+          "bundle_generations_project_id_fkey",
+          "bundle_generations_incident_id_fkey",
+          "webhook_deliveries_webhook_id_fkey",
+          "alert_deliveries_alert_id_fkey",
+          "project_github_repos_installation_id_fkey",
+          "org_usage_counters_organization_id_fkey"
+        ]
+      ]
     );
     const deleteBehaviorByConstraint = new Map(
       constraintResult.rows.map((row) => [row.conname, row.confdeltype])
@@ -141,8 +144,12 @@ runIntegration("storage bootstrap integration", () => {
     const migrated = await migrateStorageSchema(createQueryable(pool));
 
     expect(migrated.applied).toEqual([]);
-    expect(migrated.already_applied).toEqual(STORAGE_SCHEMA_MIGRATIONS.map((migration) => migration.id));
-    await expect(assertStorageSchemaMigrationsApplied(createQueryable(pool))).resolves.toBeUndefined();
+    expect(migrated.already_applied).toEqual(
+      STORAGE_SCHEMA_MIGRATIONS.map((migration) => migration.id)
+    );
+    await expect(
+      assertStorageSchemaMigrationsApplied(createQueryable(pool))
+    ).resolves.toBeUndefined();
   });
 
   it("migrates an existing schema missing required auth suspension columns", async (): Promise<void> => {
@@ -176,8 +183,59 @@ runIntegration("storage bootstrap integration", () => {
 
     const secondMigration = await migrateStorageSchema(createQueryable(pool));
     expect(secondMigration.applied).toEqual([]);
-    expect(secondMigration.already_applied).toEqual(STORAGE_SCHEMA_MIGRATIONS.map((migration) => migration.id));
-    await expect(assertStorageSchemaMigrationsApplied(createQueryable(pool))).resolves.toBeUndefined();
+    expect(secondMigration.already_applied).toEqual(
+      STORAGE_SCHEMA_MIGRATIONS.map((migration) => migration.id)
+    );
+    await expect(
+      assertStorageSchemaMigrationsApplied(createQueryable(pool))
+    ).resolves.toBeUndefined();
+  });
+
+  it("migrates an existing schema missing trial billing columns and lifecycle storage", async (): Promise<void> => {
+    await pool.query("DROP SCHEMA IF EXISTS public CASCADE");
+    await pool.query("CREATE SCHEMA public");
+
+    await bootstrapStorageSchema(createQueryable(pool));
+    await pool.query("DROP TABLE trial_lifecycle_events");
+    await pool.query(
+      "ALTER TABLE organizations DROP CONSTRAINT organizations_trial_started_requires_plan_check"
+    );
+    await pool.query("ALTER TABLE organizations DROP CONSTRAINT organizations_trial_window_check");
+    await pool.query("ALTER TABLE organizations DROP CONSTRAINT organizations_trial_plan_check");
+    await pool.query("ALTER TABLE organizations DROP COLUMN trial_expired_at");
+    await pool.query("ALTER TABLE organizations DROP COLUMN trial_converted_at");
+    await pool.query("ALTER TABLE organizations DROP COLUMN trial_used_at");
+    await pool.query("ALTER TABLE organizations DROP COLUMN trial_ends_at");
+    await pool.query("ALTER TABLE organizations DROP COLUMN trial_started_at");
+    await pool.query("ALTER TABLE organizations DROP COLUMN trial_plan");
+
+    const migrated = await migrateStorageSchema(createQueryable(pool));
+    expect(migrated.applied).toEqual(STORAGE_SCHEMA_MIGRATIONS.map((migration) => migration.id));
+
+    const columnResult = await pool.query<{ column_name: string }>(
+      `
+        SELECT column_name
+        FROM information_schema.columns
+        WHERE table_schema = 'public'
+          AND table_name = 'organizations'
+          AND column_name LIKE 'trial_%'
+        ORDER BY column_name ASC
+      `
+    );
+    expect(columnResult.rows).toEqual([
+      { column_name: "trial_converted_at" },
+      { column_name: "trial_ends_at" },
+      { column_name: "trial_expired_at" },
+      { column_name: "trial_plan" },
+      { column_name: "trial_started_at" },
+      { column_name: "trial_used_at" }
+    ]);
+
+    const tableResult = await pool.query<{ relation_name: string | null }>(
+      "SELECT to_regclass('public.trial_lifecycle_events')::text AS relation_name",
+      []
+    );
+    expect(tableResult.rows[0]?.relation_name).toBe("trial_lifecycle_events");
   });
 
   it("migrates an existing schema missing creator ownership and incident bundle tracking columns", async (): Promise<void> => {
@@ -190,9 +248,13 @@ runIntegration("storage bootstrap integration", () => {
     await pool.query("ALTER TABLE incidents DROP COLUMN bundle_trigger");
     await pool.query("ALTER TABLE alert_rules DROP CONSTRAINT alert_rules_created_by_user_id_fkey");
     await pool.query("ALTER TABLE alert_rules DROP COLUMN created_by_user_id");
-    await pool.query("ALTER TABLE agent_webhooks DROP CONSTRAINT agent_webhooks_created_by_user_id_fkey");
+    await pool.query(
+      "ALTER TABLE agent_webhooks DROP CONSTRAINT agent_webhooks_created_by_user_id_fkey"
+    );
     await pool.query("ALTER TABLE agent_webhooks DROP COLUMN created_by_user_id");
-    await pool.query("ALTER TABLE github_dispatch_rules DROP CONSTRAINT github_dispatch_rules_created_by_user_id_fkey");
+    await pool.query(
+      "ALTER TABLE github_dispatch_rules DROP CONSTRAINT github_dispatch_rules_created_by_user_id_fkey"
+    );
     await pool.query("ALTER TABLE github_dispatch_rules DROP COLUMN created_by_user_id");
 
     const migrated = await migrateStorageSchema(createQueryable(pool));
@@ -232,11 +294,13 @@ runIntegration("storage bootstrap integration", () => {
         WHERE conname = ANY($1::text[])
         ORDER BY conname ASC
       `,
-      [[
-        "alert_rules_created_by_user_id_fkey",
-        "agent_webhooks_created_by_user_id_fkey",
-        "github_dispatch_rules_created_by_user_id_fkey"
-      ]]
+      [
+        [
+          "alert_rules_created_by_user_id_fkey",
+          "agent_webhooks_created_by_user_id_fkey",
+          "github_dispatch_rules_created_by_user_id_fkey"
+        ]
+      ]
     );
 
     expect(constraintResult.rows).toEqual([

@@ -1,10 +1,6 @@
 import { createHash } from "node:crypto";
 
-import {
-  REQUIRED_API_TABLES,
-  REQUIRED_WORKER_TABLES,
-  type Queryable
-} from "./migrations.js";
+import { REQUIRED_API_TABLES, REQUIRED_WORKER_TABLES, type Queryable } from "./migrations.js";
 
 export interface StorageSchemaMigration {
   id: string;
@@ -30,9 +26,7 @@ function computeMigrationChecksum(input: {
   description: string;
   statements: readonly string[];
 }): string {
-  return createHash("sha256")
-    .update(JSON.stringify(input))
-    .digest("hex");
+  return createHash("sha256").update(JSON.stringify(input)).digest("hex");
 }
 
 function defineStorageSchemaMigration(input: {
@@ -88,10 +82,9 @@ export const STORAGE_SCHEMA_MIGRATIONS = [
   }),
   defineStorageSchemaMigration({
     id: "202605130001_allow_synthetic_webhook_test_deliveries_without_incident_fk",
-    description: "Allow webhook test deliveries to persist without requiring a backing incidents row.",
-    statements: [
-      "ALTER TABLE webhook_deliveries ALTER COLUMN incident_id DROP NOT NULL"
-    ]
+    description:
+      "Allow webhook test deliveries to persist without requiring a backing incidents row.",
+    statements: ["ALTER TABLE webhook_deliveries ALTER COLUMN incident_id DROP NOT NULL"]
   }),
   defineStorageSchemaMigration({
     id: "202605130002_add_slack_destinations",
@@ -185,7 +178,8 @@ export const STORAGE_SCHEMA_MIGRATIONS = [
   }),
   defineStorageSchemaMigration({
     id: "202605180001_add_skipped_github_dispatch_status",
-    description: "Allow GitHub dispatch delivery history to record rate-limited skips without retrying them.",
+    description:
+      "Allow GitHub dispatch delivery history to record rate-limited skips without retrying them.",
     statements: [
       "ALTER TABLE github_dispatch_deliveries DROP CONSTRAINT IF EXISTS github_dispatch_deliveries_status_check",
       "ALTER TABLE github_dispatch_deliveries ADD CONSTRAINT github_dispatch_deliveries_status_check CHECK (status IN ('pending', 'retrying', 'delivered', 'failed', 'skipped'))"
@@ -210,7 +204,8 @@ export const STORAGE_SCHEMA_MIGRATIONS = [
   }),
   defineStorageSchemaMigration({
     id: "202605180003_add_improvement_opportunities_and_bundle_generation_shape",
-    description: "Add hosted improvement opportunity storage and allow bundle generations to reference improvements directly.",
+    description:
+      "Add hosted improvement opportunity storage and allow bundle generations to reference improvements directly.",
     statements: [
       `
         CREATE TABLE IF NOT EXISTS improvement_opportunities (
@@ -349,7 +344,8 @@ export const STORAGE_SCHEMA_MIGRATIONS = [
   }),
   defineStorageSchemaMigration({
     id: "202605180005_add_github_improvement_dispatch_targets",
-    description: "Allow GitHub dispatch deliveries to target either incidents or hosted improvements.",
+    description:
+      "Allow GitHub dispatch deliveries to target either incidents or hosted improvements.",
     statements: [
       "ALTER TABLE github_dispatch_deliveries ALTER COLUMN incident_id DROP NOT NULL",
       "ALTER TABLE github_dispatch_deliveries RENAME COLUMN incident_fingerprint TO target_fingerprint",
@@ -371,7 +367,8 @@ export const STORAGE_SCHEMA_MIGRATIONS = [
   }),
   defineStorageSchemaMigration({
     id: "202605180006_add_missing_bundle_and_creator_columns",
-    description: "Backfill creator ownership columns and incident bundle tracking columns that existed only in bootstrap schema.",
+    description:
+      "Backfill creator ownership columns and incident bundle tracking columns that existed only in bootstrap schema.",
     statements: [
       "ALTER TABLE incidents ADD COLUMN IF NOT EXISTS bundle_generation_number integer NOT NULL DEFAULT 0",
       "ALTER TABLE incidents ADD COLUMN IF NOT EXISTS bundle_created_at timestamptz",
@@ -461,7 +458,8 @@ export const STORAGE_SCHEMA_MIGRATIONS = [
   }),
   defineStorageSchemaMigration({
     id: "202605260001_fix_weekly_report_delivery_conflict_index",
-    description: "Ensure weekly report delivery dedupe rows and partial unique index exist for conflict claims.",
+    description:
+      "Ensure weekly report delivery dedupe rows and partial unique index exist for conflict claims.",
     statements: [
       `
         DELETE FROM weekly_report_deliveries
@@ -489,7 +487,8 @@ export const STORAGE_SCHEMA_MIGRATIONS = [
   }),
   defineStorageSchemaMigration({
     id: "202605260001_set_high_confidence_as_project_improvement_default",
-    description: "Make high-confidence the default hosted improvement sensitivity for new projects.",
+    description:
+      "Make high-confidence the default hosted improvement sensitivity for new projects.",
     statements: [
       "ALTER TABLE projects ALTER COLUMN improvement_bundle_sensitivity SET DEFAULT 'high_confidence'"
     ]
@@ -585,7 +584,8 @@ export const STORAGE_SCHEMA_MIGRATIONS = [
   }),
   defineStorageSchemaMigration({
     id: "202606030001_add_alert_notification_cooldowns_and_rule_window",
-    description: "Add configurable alert cooldown windows and notification keys for cross-incident suppression.",
+    description:
+      "Add configurable alert cooldown windows and notification keys for cross-incident suppression.",
     statements: [
       "ALTER TABLE alert_rules ADD COLUMN IF NOT EXISTS cooldown_seconds integer",
       "UPDATE alert_rules SET cooldown_seconds = 0 WHERE cooldown_seconds IS NULL",
@@ -606,6 +606,82 @@ export const STORAGE_SCHEMA_MIGRATIONS = [
       `
         CREATE INDEX IF NOT EXISTS alert_email_digest_items_alert_notification_idx
         ON alert_email_digest_items (alert_id, notification_key, created_at DESC)
+      `
+    ]
+  }),
+  defineStorageSchemaMigration({
+    id: "202606040001_add_no_card_trial_billing_state",
+    description: "Add organization no-card trial metadata and the lifecycle event ledger.",
+    statements: [
+      "ALTER TABLE organizations ADD COLUMN IF NOT EXISTS trial_plan text",
+      "ALTER TABLE organizations ADD COLUMN IF NOT EXISTS trial_started_at timestamptz",
+      "ALTER TABLE organizations ADD COLUMN IF NOT EXISTS trial_ends_at timestamptz",
+      "ALTER TABLE organizations ADD COLUMN IF NOT EXISTS trial_used_at timestamptz",
+      "ALTER TABLE organizations ADD COLUMN IF NOT EXISTS trial_converted_at timestamptz",
+      "ALTER TABLE organizations ADD COLUMN IF NOT EXISTS trial_expired_at timestamptz",
+      "ALTER TABLE organizations DROP CONSTRAINT IF EXISTS organizations_trial_plan_check",
+      `
+        ALTER TABLE organizations
+        ADD CONSTRAINT organizations_trial_plan_check
+        CHECK (trial_plan IN ('solo', 'team') OR trial_plan IS NULL)
+      `,
+      "ALTER TABLE organizations DROP CONSTRAINT IF EXISTS organizations_trial_window_check",
+      `
+        ALTER TABLE organizations
+        ADD CONSTRAINT organizations_trial_window_check
+        CHECK (
+          trial_started_at IS NULL
+          OR trial_ends_at IS NULL
+          OR trial_ends_at > trial_started_at
+        )
+      `,
+      "ALTER TABLE organizations DROP CONSTRAINT IF EXISTS organizations_trial_started_requires_plan_check",
+      `
+        ALTER TABLE organizations
+        ADD CONSTRAINT organizations_trial_started_requires_plan_check
+        CHECK (
+          trial_started_at IS NULL
+          OR trial_plan IS NOT NULL
+        )
+      `,
+      `
+        CREATE TABLE IF NOT EXISTS trial_lifecycle_events (
+          id uuid PRIMARY KEY,
+          organization_id uuid NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+          event_type text NOT NULL,
+          dedupe_key text NOT NULL,
+          created_at timestamptz NOT NULL DEFAULT now(),
+          UNIQUE (organization_id, event_type, dedupe_key)
+        )
+      `,
+      `
+        CREATE INDEX IF NOT EXISTS trial_lifecycle_events_org_event_created_idx
+        ON trial_lifecycle_events (organization_id, event_type, created_at DESC)
+      `
+    ]
+  }),
+  defineStorageSchemaMigration({
+    id: "202606040002_expand_operational_emails_for_trial_lifecycle",
+    description:
+      "Allow operational email deliveries without a project and add no-card trial email kinds.",
+    statements: [
+      "ALTER TABLE operational_email_deliveries ALTER COLUMN project_id DROP NOT NULL",
+      "ALTER TABLE operational_email_deliveries DROP CONSTRAINT IF EXISTS operational_email_deliveries_kind_check",
+      `
+        ALTER TABLE operational_email_deliveries
+        ADD CONSTRAINT operational_email_deliveries_kind_check
+        CHECK (
+          kind IN (
+            'webhook_auto_disabled',
+            'allowance_warning_80',
+            'allowance_limit_reached',
+            'retention_rotation_notice',
+            'trial_started',
+            'trial_ending_soon',
+            'trial_expired',
+            'trial_converted'
+          )
+        )
       `
     ]
   })
@@ -654,8 +730,10 @@ const CURRENT_SCHEMA_SENTINEL_COLUMNS = [
   { table_name: "incidents", column_name: "bundle_trigger" },
   { table_name: "organization_members", column_name: "suspended_at" },
   { table_name: "organizations", column_name: "suspended_at" },
+  { table_name: "organizations", column_name: "trial_plan" },
   { table_name: "project_tokens", column_name: "allowed_origins" },
   { table_name: "projects", column_name: "improvement_bundle_sensitivity" },
+  { table_name: "trial_lifecycle_events", column_name: "dedupe_key" },
   { table_name: "users", column_name: "avatar_source" }
 ] as const;
 
@@ -674,9 +752,7 @@ async function listRequiredStorageTables(db: Queryable): Promise<Set<string>> {
   return new Set(rows.rows.map((row) => row.table_name));
 }
 
-async function listCurrentSchemaSentinelColumns(
-  db: Queryable
-): Promise<Set<string>> {
+async function listCurrentSchemaSentinelColumns(db: Queryable): Promise<Set<string>> {
   const tableNames = Array.from(
     new Set(
       CURRENT_SCHEMA_SENTINEL_COLUMNS.map((column) => column.table_name).concat(
@@ -867,7 +943,8 @@ export async function migrateStorageSchema(db: Queryable): Promise<StorageMigrat
       await db.query("ROLLBACK", []);
     } catch (rollbackError) {
       const migrationError = error instanceof Error ? error.message : String(error);
-      const rollbackMessage = rollbackError instanceof Error ? rollbackError.message : String(rollbackError);
+      const rollbackMessage =
+        rollbackError instanceof Error ? rollbackError.message : String(rollbackError);
       throw new Error(
         `storage_migration_rollback_failed: migration_error=${migrationError}; rollback_error=${rollbackMessage}`
       );
@@ -895,7 +972,8 @@ export async function seedStorageMigrationLedgerForCurrentSchema(
       await db.query("ROLLBACK", []);
     } catch (rollbackError) {
       const reconcileError = error instanceof Error ? error.message : String(error);
-      const rollbackMessage = rollbackError instanceof Error ? rollbackError.message : String(rollbackError);
+      const rollbackMessage =
+        rollbackError instanceof Error ? rollbackError.message : String(rollbackError);
       throw new Error(
         `storage_migration_ledger_reconcile_rollback_failed: reconcile_error=${reconcileError}; rollback_error=${rollbackMessage}`
       );
@@ -913,8 +991,13 @@ export async function assertStorageSchemaMigrationsApplied(db: Queryable): Promi
     []
   );
 
-  if (ledgerResult.rows[0]?.relation_name === null || ledgerResult.rows[0]?.relation_name === undefined) {
-    throw new Error(`storage_schema_missing_migrations: ${STORAGE_SCHEMA_MIGRATIONS.map((migration) => migration.id).join(",")}`);
+  if (
+    ledgerResult.rows[0]?.relation_name === null ||
+    ledgerResult.rows[0]?.relation_name === undefined
+  ) {
+    throw new Error(
+      `storage_schema_missing_migrations: ${STORAGE_SCHEMA_MIGRATIONS.map((migration) => migration.id).join(",")}`
+    );
   }
 
   const appliedChecksums = await readAppliedMigrations(db);

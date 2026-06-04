@@ -24,13 +24,11 @@ describe("billing store – event_class filter", () => {
     const store = createPostgresBillingStore({ query });
     await store.getBillingSummaryForOrganization({
       organization_id: "org_123",
-      now: "2026-03-15T12:00:00.000Z",
+      now: "2026-03-15T12:00:00.000Z"
     });
 
     // Find the incident_events count query
-    const incidentEventsCall = calls.find(
-      (c) => c.sql.includes("FROM incident_events")
-    );
+    const incidentEventsCall = calls.find((c) => c.sql.includes("FROM incident_events"));
     expect(incidentEventsCall).toBeDefined();
     expect(incidentEventsCall!.sql).toContain("ie.event_class = 'incident_signal'");
   });
@@ -154,8 +152,12 @@ describe("billing store – event_class filter", () => {
     const organizationCall = calls.find((call) => call.sql.includes("FROM organizations"));
 
     expect(organizationCall).toBeDefined();
-    expect(organizationCall!.sql).toContain("to_jsonb(organizations) ->> 'additional_capacity_units'");
-    expect(organizationCall!.sql).toContain("to_jsonb(organizations) ->> 'billing_period_starts_at'");
+    expect(organizationCall!.sql).toContain(
+      "to_jsonb(organizations) ->> 'additional_capacity_units'"
+    );
+    expect(organizationCall!.sql).toContain(
+      "to_jsonb(organizations) ->> 'billing_period_starts_at'"
+    );
     expect(organizationCall!.sql).toContain("to_jsonb(organizations) ->> 'billing_period_ends_at'");
     expect(summary).toMatchObject({
       plan: "free",
@@ -174,13 +176,15 @@ describe("billing store – event_class filter", () => {
     const query = vi.fn().mockImplementation((sql: string) => {
       if (sql.includes("FROM organizations")) {
         return {
-          rows: [{
-            plan: "solo",
-            stripe_customer_id: "cus_123",
-            additional_capacity_units: 0,
-            billing_period_starts_at: "2026-03-23T00:00:00.000Z",
-            billing_period_ends_at: "2026-04-23T00:00:00.000Z"
-          }]
+          rows: [
+            {
+              plan: "solo",
+              stripe_customer_id: "cus_123",
+              additional_capacity_units: 0,
+              billing_period_starts_at: "2026-03-23T00:00:00.000Z",
+              billing_period_ends_at: "2026-04-23T00:00:00.000Z"
+            }
+          ]
         };
       }
 
@@ -207,13 +211,15 @@ describe("billing store – event_class filter", () => {
     const query = vi.fn().mockImplementation((sql: string) => {
       if (sql.includes("FROM organizations")) {
         return {
-          rows: [{
-            plan: "solo",
-            stripe_customer_id: "cus_123",
-            additional_capacity_units: 0,
-            billing_period_starts_at: null,
-            billing_period_ends_at: null
-          }]
+          rows: [
+            {
+              plan: "solo",
+              stripe_customer_id: "cus_123",
+              additional_capacity_units: 0,
+              billing_period_starts_at: null,
+              billing_period_ends_at: null
+            }
+          ]
         };
       }
 
@@ -333,6 +339,60 @@ describe("billing store – event_class filter", () => {
 
     expect(summary?.allowances.monthly_raw_ingested_events.used).toBe(300);
   });
+
+  it("surfaces trial metadata and remaining days for active no-card trials", async () => {
+    const query = vi.fn().mockImplementation((sql: string) => {
+      if (sql.includes("FROM organizations")) {
+        return {
+          rows: [
+            {
+              plan: "team",
+              billing_state: "trialing",
+              stripe_customer_id: null,
+              stripe_subscription_id: null,
+              additional_capacity_units: 0,
+              billing_period_starts_at: "2026-03-15T00:00:00.000Z",
+              billing_period_ends_at: "2026-04-14T00:00:00.000Z",
+              trial_plan: "team",
+              trial_started_at: "2026-03-15T00:00:00.000Z",
+              trial_ends_at: "2026-04-14T00:00:00.000Z",
+              trial_used_at: "2026-03-15T00:00:00.000Z",
+              trial_converted_at: null,
+              trial_expired_at: null
+            }
+          ]
+        };
+      }
+
+      if (sql.includes("to_regclass")) {
+        return { rows: [{ exists: false }] };
+      }
+
+      return { rows: [{ count: 0 }] };
+    });
+
+    const store = createPostgresBillingStore({ query });
+    const summary = await store.getBillingSummaryForOrganization({
+      organization_id: "org_trial",
+      now: "2026-03-20T12:00:00.000Z"
+    });
+
+    expect(summary).toMatchObject({
+      plan: "team",
+      billing_state: "trialing",
+      trial: {
+        available: false,
+        active: true,
+        plan: "team",
+        started_at: "2026-03-15T00:00:00.000Z",
+        ends_at: "2026-04-14T00:00:00.000Z",
+        used_at: "2026-03-15T00:00:00.000Z",
+        converted_at: null,
+        expired_at: null,
+        days_remaining: 25
+      }
+    });
+  });
 });
 
 describe("billing store – incrementOrgUsageCounter", () => {
@@ -356,5 +416,208 @@ describe("billing store – incrementOrgUsageCounter", () => {
     expect(call.sql).toContain("ON CONFLICT");
     expect(call.sql).toContain("raw_ingested_events + EXCLUDED.raw_ingested_events");
     expect(call.params).toEqual(["org_abc", "2026-03-01T00:00:00.000Z", 5]);
+  });
+});
+
+describe("billing store – trial lifecycle", () => {
+  it("starts an eligible trial and returns the updated summary", async () => {
+    const query = vi.fn().mockImplementation((sql: string) => {
+      if (sql.includes("UPDATE organizations") && sql.includes("billing_state = 'trialing'")) {
+        return { rows: [{ id: "org_trial" }] };
+      }
+
+      if (sql.includes("FROM organizations")) {
+        return {
+          rows: [
+            {
+              plan: "solo",
+              billing_state: "trialing",
+              stripe_customer_id: null,
+              stripe_subscription_id: null,
+              additional_capacity_units: 0,
+              billing_period_starts_at: "2026-03-01T00:00:00.000Z",
+              billing_period_ends_at: "2026-03-31T00:00:00.000Z",
+              trial_plan: "solo",
+              trial_started_at: "2026-03-01T00:00:00.000Z",
+              trial_ends_at: "2026-03-31T00:00:00.000Z",
+              trial_used_at: "2026-03-01T00:00:00.000Z",
+              trial_converted_at: null,
+              trial_expired_at: null
+            }
+          ]
+        };
+      }
+
+      if (sql.includes("to_regclass")) {
+        return { rows: [{ exists: false }] };
+      }
+
+      return { rows: [{ count: 0 }] };
+    });
+
+    const store = createPostgresBillingStore({ query });
+    const summary = await store.startTrialForOrganization({
+      organization_id: "org_trial",
+      target_plan: "solo",
+      started_at: "2026-03-01T00:00:00.000Z",
+      ends_at: "2026-03-31T00:00:00.000Z"
+    });
+
+    expect(typeof summary).not.toBe("string");
+    expect(summary).toMatchObject({
+      plan: "solo",
+      billing_state: "trialing",
+      trial: {
+        active: true,
+        plan: "solo",
+        available: false
+      }
+    });
+  });
+
+  it("rejects starting a second trial after one has been used", async () => {
+    const query = vi.fn().mockImplementation((sql: string) => {
+      if (sql.includes("UPDATE organizations") && sql.includes("billing_state = 'trialing'")) {
+        return { rows: [] };
+      }
+
+      if (sql.includes("SELECT id::text AS id")) {
+        return { rows: [{ id: "org_trial" }] };
+      }
+
+      return { rows: [] };
+    });
+
+    const store = createPostgresBillingStore({ query });
+    const result = await store.startTrialForOrganization({
+      organization_id: "org_trial",
+      target_plan: "team",
+      started_at: "2026-03-01T00:00:00.000Z",
+      ends_at: "2026-03-31T00:00:00.000Z"
+    });
+
+    expect(result).toBe("trial_unavailable");
+  });
+
+  it("expires an overdue unconverted trial idempotently", async () => {
+    const query = vi.fn().mockImplementation((sql: string) => {
+      if (sql.includes("UPDATE organizations") && sql.includes("billing_state = 'trial_expired'")) {
+        return { rows: [{ id: "org_trial" }] };
+      }
+
+      if (sql.includes("FROM organizations")) {
+        return {
+          rows: [
+            {
+              plan: "free",
+              billing_state: "trial_expired",
+              stripe_customer_id: null,
+              stripe_subscription_id: null,
+              additional_capacity_units: 0,
+              billing_period_starts_at: null,
+              billing_period_ends_at: null,
+              trial_plan: "solo",
+              trial_started_at: "2026-03-01T00:00:00.000Z",
+              trial_ends_at: "2026-03-31T00:00:00.000Z",
+              trial_used_at: "2026-03-01T00:00:00.000Z",
+              trial_converted_at: null,
+              trial_expired_at: "2026-04-01T00:00:00.000Z"
+            }
+          ]
+        };
+      }
+
+      if (sql.includes("to_regclass")) {
+        return { rows: [{ exists: false }] };
+      }
+
+      return { rows: [{ count: 0 }] };
+    });
+
+    const store = createPostgresBillingStore({ query });
+    const summary = await store.expireTrialForOrganization({
+      organization_id: "org_trial",
+      now: "2026-04-01T00:00:00.000Z"
+    });
+
+    expect(typeof summary).not.toBe("string");
+    expect(summary).toMatchObject({
+      plan: "free",
+      billing_state: "trial_expired",
+      trial: {
+        active: false,
+        expired_at: "2026-04-01T00:00:00.000Z"
+      }
+    });
+  });
+
+  it("returns unrecorded trial lifecycle candidates and records the ledger after side effects", async () => {
+    const query = vi.fn().mockImplementation((sql: string) => {
+      if (sql.includes("FROM organizations") && sql.includes("trial_started_at")) {
+        return {
+          rows: [
+            {
+              organization_id: "org_trial",
+              current_plan: "team",
+              trial_plan: "team",
+              trial_started_at: "2026-06-01T00:00:00.000Z",
+              trial_ends_at: "2026-07-01T00:00:00.000Z",
+              trial_converted_at: null,
+              trial_expired_at: null
+            }
+          ]
+        };
+      }
+
+      if (sql.includes("SELECT EXISTS") && sql.includes("trial_lifecycle_events")) {
+        return { rows: [{ exists: false }] };
+      }
+
+      if (sql.includes("INSERT INTO trial_lifecycle_events")) {
+        return { rows: [{ id: "tle_123" }] };
+      }
+
+      return { rows: [] };
+    });
+
+    const store = createPostgresBillingStore({ query });
+    const claimed = await store.claimTrialStartedNotificationCandidates({ limit: 5 });
+
+    expect(claimed).toEqual([
+      {
+        organization_id: "org_trial",
+        current_plan: "team",
+        trial_plan: "team",
+        trial_started_at: "2026-06-01T00:00:00.000Z",
+        trial_ends_at: "2026-07-01T00:00:00.000Z",
+        trial_converted_at: null,
+        trial_expired_at: null
+      }
+    ]);
+    expect(query).toHaveBeenCalledWith(
+      expect.stringContaining("SELECT EXISTS"),
+      [
+        "org_trial",
+        "trial_started_email",
+        "2026-06-01T00:00:00.000Z"
+      ]
+    );
+
+    await expect(
+      store.recordTrialLifecycleEvent({
+        organization_id: "org_trial",
+        event_type: "trial_started_email",
+        dedupe_key: "2026-06-01T00:00:00.000Z"
+      })
+    ).resolves.toBe(true);
+    expect(query).toHaveBeenCalledWith(
+      expect.stringContaining("INSERT INTO trial_lifecycle_events"),
+      expect.arrayContaining([
+        expect.any(String),
+        "org_trial",
+        "trial_started_email",
+        "2026-06-01T00:00:00.000Z"
+      ])
+    );
   });
 });

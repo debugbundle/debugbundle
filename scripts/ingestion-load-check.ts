@@ -31,7 +31,12 @@ function roundMs(value: number): number {
   return Number(value.toFixed(2));
 }
 
-function summarize(samples: number[]): { p50Ms: number; p95Ms: number; avgMs: number; maxMs: number } {
+function summarize(samples: number[]): {
+  p50Ms: number;
+  p95Ms: number;
+  avgMs: number;
+  maxMs: number;
+} {
   const sorted = [...samples].sort((left, right) => left - right);
   const percentile = (ratio: number): number => {
     const index = Math.min(sorted.length - 1, Math.max(0, Math.ceil(sorted.length * ratio) - 1));
@@ -120,7 +125,10 @@ function buildPlan(totalRequests: number): RequestPlan[] {
     { kind: "valid" }
   ];
 
-  return Array.from({ length: totalRequests }, (_, index) => pattern[index % pattern.length] ?? { kind: "valid" });
+  return Array.from(
+    { length: totalRequests },
+    (_, index) => pattern[index % pattern.length] ?? { kind: "valid" }
+  );
 }
 
 async function main(): Promise<void> {
@@ -183,6 +191,7 @@ async function main(): Promise<void> {
     billingManagement: {
       getBillingSummaryForOrganization: async () => ({
         plan: "solo" as const,
+        billing_state: "active" as const,
         stripe_customer_id: null,
         active_projects: 1,
         capacity_units: {
@@ -202,6 +211,17 @@ async function main(): Promise<void> {
           monthly_remote_activations: { used: 0, limit: 25 },
           monthly_alert_deliveries: { used: 0, limit: 100 },
           monthly_webhook_deliveries: { used: 0, limit: 250 }
+        },
+        trial: {
+          available: false,
+          active: false,
+          plan: null,
+          started_at: null,
+          ends_at: null,
+          used_at: null,
+          converted_at: null,
+          expired_at: null,
+          days_remaining: null
         }
       }),
       createCheckoutLink: async () => null,
@@ -350,11 +370,33 @@ async function main(): Promise<void> {
     );
 
     const groupedCounts = {
-      validAccepted: results.filter((result) => result.kind === "valid" && result.statusCode === 202 && result.reason === null).length,
-      malformed400: results.filter((result) => result.kind === "malformed" && result.statusCode === 400 && result.reason === "malformed_payload").length,
-      invalid401: results.filter((result) => result.kind === "invalid-token" && result.statusCode === 401 && result.reason === "invalid_project_token").length,
-      rateLimited429: results.filter((result) => result.kind === "rate-limited" && result.statusCode === 429 && result.reason === "rate_limited").length,
-      capturePolicyRejected: results.filter((result) => result.kind === "capture-policy" && result.statusCode === 202 && result.reason === "capture_policy_rejected").length,
+      validAccepted: results.filter(
+        (result) => result.kind === "valid" && result.statusCode === 202 && result.reason === null
+      ).length,
+      malformed400: results.filter(
+        (result) =>
+          result.kind === "malformed" &&
+          result.statusCode === 400 &&
+          result.reason === "malformed_payload"
+      ).length,
+      invalid401: results.filter(
+        (result) =>
+          result.kind === "invalid-token" &&
+          result.statusCode === 401 &&
+          result.reason === "invalid_project_token"
+      ).length,
+      rateLimited429: results.filter(
+        (result) =>
+          result.kind === "rate-limited" &&
+          result.statusCode === 429 &&
+          result.reason === "rate_limited"
+      ).length,
+      capturePolicyRejected: results.filter(
+        (result) =>
+          result.kind === "capture-policy" &&
+          result.statusCode === 202 &&
+          result.reason === "capture_policy_rejected"
+      ).length,
       unexpected: results.filter((result) => {
         if (result.kind === "valid") {
           return !(result.statusCode === 202 && result.reason === null);
@@ -373,7 +415,9 @@ async function main(): Promise<void> {
       }).length
     };
 
-    const validLatencies = results.filter((result) => result.kind === "valid").map((result) => result.latencyMs);
+    const validLatencies = results
+      .filter((result) => result.kind === "valid")
+      .map((result) => result.latencyMs);
     const overallLatencies = results.map((result) => result.latencyMs);
 
     const summary = {

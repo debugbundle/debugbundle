@@ -4,7 +4,12 @@ import type { ApiDependencies } from "../api-types.js";
 import { recordAuditLog, resolveAuditActorType } from "../audit-logging.js";
 import { ensureBillingAdminDefaultPlan, isBillingAdminOperator } from "../billing-admin-helpers.js";
 import { enforceRequestRateLimit, requireOwnerMemberAuth, resolveBrowserSession } from "../api-helpers.js";
-import { BillingCheckoutBodySchema, BillingCheckoutConfirmBodySchema, BillingCapacityChangeBodySchema } from "../schemas.js";
+import {
+  BillingCheckoutBodySchema,
+  BillingCheckoutConfirmBodySchema,
+  BillingCapacityChangeBodySchema,
+  BillingTrialStartBodySchema
+} from "../schemas.js";
 
 async function requireOwnerBillingPrincipal(
   request: FastifyRequest,
@@ -88,6 +93,46 @@ function canUpgrade(currentPlan: "free" | "solo" | "team", targetPlan: "solo" | 
   return false;
 }
 
+function getTrialPlan(billing: {
+  trial?: {
+    plan?: "solo" | "team" | null;
+  };
+}): "solo" | "team" | null {
+  return billing.trial?.plan === "solo" || billing.trial?.plan === "team"
+    ? billing.trial.plan
+    : null;
+}
+
+function hasActiveTrial(billing: {
+  trial?: {
+    active?: boolean;
+  };
+}): boolean {
+  return billing.trial?.active === true;
+}
+
+function canCheckoutToTargetPlan(
+  billing: {
+    plan: "free" | "solo" | "team";
+    trial?: {
+      active?: boolean;
+      plan?: "solo" | "team" | null;
+    };
+  },
+  targetPlan: "solo" | "team"
+): boolean {
+  if (hasActiveTrial(billing)) {
+    const trialPlan = getTrialPlan(billing);
+    if (trialPlan === "solo") {
+      return targetPlan === "solo" || targetPlan === "team";
+    }
+
+    return trialPlan === "team" && targetPlan === "team";
+  }
+
+  return canUpgrade(billing.plan, targetPlan);
+}
+
 async function recordBillingAdminOverrideAudit(
   dependencies: Pick<ApiDependencies, "auditLogging">,
   request: FastifyRequest,
@@ -160,6 +205,64 @@ export function registerBillingRoutes(app: FastifyInstance, dependencies: ApiDep
     return reply.status(200).send({ billing });
   });
 
+  app.post("/v1/billing/trial/start", async (request, reply) => {
+    const principal = await requireOwnerBillingPrincipal(request, reply, dependencies, "management-write");
+    if (principal === null) {
+      return;
+    }
+    if (dependencies.billingManagement?.startTrial === undefined) {
+      return reply.status(404).send({ error: "billing_not_available" });
+    }
+
+    const parsedBody = BillingTrialStartBodySchema.safeParse(request.body);
+    if (!parsedBody.success) {
+      return reply.status(400).send({ error: "invalid_payload" });
+    }
+
+    const started = await dependencies.billingManagement.startTrial({
+      organization_id: principal.organization_id,
+      target_plan: parsedBody.data.target_plan,
+      now: new Date().toISOString()
+    });
+
+    if (typeof started === "string") {
+      await recordAuditLog(dependencies.auditLogging, {
+        organization_id: principal.organization_id,
+        actor_user_id: principal.user_id,
+        actor_type: resolveAuditActorType(request.headers),
+        action: "billing.trial.start",
+        target_type: "organization",
+        target_id: principal.organization_id,
+        status: "failure",
+        ip_address: request.ip,
+        metadata: {
+          target_plan: parsedBody.data.target_plan,
+          reason: started
+        }
+      });
+
+      const statusCode = started === "billing_not_found" ? 404 : 409;
+      return reply.status(statusCode).send({ error: started });
+    }
+
+    await recordAuditLog(dependencies.auditLogging, {
+      organization_id: principal.organization_id,
+      actor_user_id: principal.user_id,
+      actor_type: resolveAuditActorType(request.headers),
+      action: "billing.trial.start",
+      target_type: "organization",
+      target_id: principal.organization_id,
+      status: "success",
+      ip_address: request.ip,
+      metadata: {
+        target_plan: parsedBody.data.target_plan,
+        ends_at: started.trial.ends_at
+      }
+    });
+
+    return reply.status(200).send({ billing: started });
+  });
+
   app.post("/v1/billing/checkout", async (request, reply) => {
     const session = await resolveBrowserSession(request.headers.cookie, dependencies);
     if (session === null) {
@@ -207,7 +310,7 @@ export function registerBillingRoutes(app: FastifyInstance, dependencies: ApiDep
 
       return reply.status(404).send({ error: "billing_not_found" });
     }
-    if (!canUpgrade(billing.plan, parsedBody.data.target_plan)) {
+    if (!canCheckoutToTargetPlan(billing, parsedBody.data.target_plan)) {
       await recordAuditLog(dependencies.auditLogging, {
         organization_id: session.organization_id,
         actor_user_id: session.user_id,
@@ -496,27 +599,36 @@ export function registerBillingRoutes(app: FastifyInstance, dependencies: ApiDep
     }
 
     const currentBilling = isBillingAdminOperator(dependencies, principal.email)
-      ? (adminDefault?.billing ??
-        (await dependencies.billingManagement.getBillingSummaryForOrganization({
-          organization_id: principal.organization_id,
-          now
-        })))
+      ? adminDefault?.billing
       : undefined;
-    if (currentBilling === null) {
-      return reply.status(404).send({ error: "billing_not_found" });
+    const billing =
+      currentBilling ??
+      (await dependencies.billingManagement.getBillingSummaryForOrganization({
+        organization_id: principal.organization_id,
+        now
+      }));
+    if (billing !== null && hasActiveTrial(billing)) {
+      return reply.status(409).send({ error: "trial_conversion_required" });
     }
 
     const isInternalOperatorBilling =
-      currentBilling !== undefined &&
-      currentBilling.plan !== "free" &&
-      currentBilling.stripe_customer_id === null;
+      isBillingAdminOperator(dependencies, principal.email) &&
+      billing !== null &&
+      billing.plan !== "free" &&
+      !hasActiveTrial(billing) &&
+      (
+        billing.billing_state === "admin_override" ||
+        billing.billing_state === null ||
+        billing.billing_state === undefined
+      ) &&
+      billing.stripe_customer_id === null;
 
     const result = isInternalOperatorBilling
-      ? parsedBody.data.target_additional_capacity_units <= currentBilling.capacity_units.additional_purchased
+      ? parsedBody.data.target_additional_capacity_units <= billing.capacity_units.additional_purchased
         ? "invalid_target_quantity"
         : await dependencies.billingAdmin!.overrideOrganizationBilling({
             organization_id: principal.organization_id,
-            plan: currentBilling.plan,
+            plan: billing.plan,
             additional_capacity_units: parsedBody.data.target_additional_capacity_units,
             now
           })
@@ -530,7 +642,7 @@ export function registerBillingRoutes(app: FastifyInstance, dependencies: ApiDep
       await recordBillingAdminOverrideAudit(dependencies, request, {
         organization_id: principal.organization_id,
         user_id: principal.user_id,
-        plan: currentBilling.plan,
+        plan: billing.plan,
         additional_capacity_units: parsedBody.data.target_additional_capacity_units,
         reason: "billing_admin_capacity_increase",
         status: typeof result === "string" ? "failure" : "success",
@@ -587,28 +699,37 @@ export function registerBillingRoutes(app: FastifyInstance, dependencies: ApiDep
     }
 
     const currentBilling = isBillingAdminOperator(dependencies, principal.email)
-      ? (adminDefault?.billing ??
-        (await dependencies.billingManagement.getBillingSummaryForOrganization({
-          organization_id: principal.organization_id,
-          now
-        })))
+      ? adminDefault?.billing
       : undefined;
-    if (currentBilling === null) {
-      return reply.status(404).send({ error: "billing_not_found" });
+    const billing =
+      currentBilling ??
+      (await dependencies.billingManagement.getBillingSummaryForOrganization({
+        organization_id: principal.organization_id,
+        now
+      }));
+    if (billing !== null && hasActiveTrial(billing)) {
+      return reply.status(409).send({ error: "trial_conversion_required" });
     }
 
     const isInternalOperatorBilling =
-      currentBilling !== undefined &&
-      currentBilling.plan !== "free" &&
-      currentBilling.stripe_customer_id === null;
+      isBillingAdminOperator(dependencies, principal.email) &&
+      billing !== null &&
+      billing.plan !== "free" &&
+      !hasActiveTrial(billing) &&
+      (
+        billing.billing_state === "admin_override" ||
+        billing.billing_state === null ||
+        billing.billing_state === undefined
+      ) &&
+      billing.stripe_customer_id === null;
 
     const result = isInternalOperatorBilling
       ? parsedBody.data.target_additional_capacity_units < 0 ||
-        parsedBody.data.target_additional_capacity_units >= currentBilling.capacity_units.additional_purchased
+        parsedBody.data.target_additional_capacity_units >= billing.capacity_units.additional_purchased
         ? "invalid_target_quantity"
         : await dependencies.billingAdmin!.overrideOrganizationBilling({
             organization_id: principal.organization_id,
-            plan: currentBilling.plan,
+            plan: billing.plan,
             additional_capacity_units: parsedBody.data.target_additional_capacity_units,
             now
           })
@@ -622,7 +743,7 @@ export function registerBillingRoutes(app: FastifyInstance, dependencies: ApiDep
       await recordBillingAdminOverrideAudit(dependencies, request, {
         organization_id: principal.organization_id,
         user_id: principal.user_id,
-        plan: currentBilling.plan,
+        plan: billing.plan,
         additional_capacity_units: parsedBody.data.target_additional_capacity_units,
         reason: "billing_admin_capacity_reduction",
         status: typeof result === "string" ? "failure" : "success",
@@ -651,6 +772,14 @@ export function registerBillingRoutes(app: FastifyInstance, dependencies: ApiDep
     }
     if (dependencies.billingManagement?.cancelCapacityReduction === undefined) {
       return reply.status(404).send({ error: "billing_not_available" });
+    }
+
+    const billing = await dependencies.billingManagement.getBillingSummaryForOrganization({
+      organization_id: principal.organization_id,
+      now: new Date().toISOString()
+    });
+    if (billing !== null && hasActiveTrial(billing)) {
+      return reply.status(409).send({ error: "trial_conversion_required" });
     }
 
     const result = await dependencies.billingManagement.cancelCapacityReduction({

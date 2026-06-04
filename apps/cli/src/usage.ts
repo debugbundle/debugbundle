@@ -32,6 +32,7 @@ export const CLI_USAGE_LINES = [
   '  debugbundle logs <incident-id> [--level <level>] [--cursor <cursor>] [--limit <n>] [--auth-file <path>] [--json]',
   '  debugbundle services --project-id <id> [--limit <n>] [--auth-file <path>] [--json]',
   '  debugbundle billing get [--auth-file <path>] [--json]',
+  '  debugbundle billing trial start --plan <solo|team> [--auth-file <path>] [--json]',
   '  debugbundle billing capacity increase --target-additional-capacity-units <n> [--auth-file <path>] [--json]',
   '  debugbundle billing capacity schedule-reduction --target-additional-capacity-units <n> [--auth-file <path>] [--json]',
   '  debugbundle billing capacity cancel-reduction [--auth-file <path>] [--json]',

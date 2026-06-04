@@ -8,6 +8,7 @@ import type Stripe from "stripe";
 function buildSummary(additionalPurchased: number): BillingSummaryRecord {
   return {
     plan: "solo",
+    billing_state: "active",
     stripe_customer_id: "cus_123",
     active_projects: 2,
     capacity_units: {
@@ -27,6 +28,17 @@ function buildSummary(additionalPurchased: number): BillingSummaryRecord {
       monthly_remote_activations: { used: 1, limit: 125 },
       monthly_alert_deliveries: { used: 3, limit: 375 },
       monthly_webhook_deliveries: { used: 6, limit: 1250 }
+    },
+    trial: {
+      available: false,
+      active: false,
+      plan: null,
+      started_at: null,
+      ends_at: null,
+      used_at: null,
+      converted_at: null,
+      expired_at: null,
+      days_remaining: null
     }
   };
 }
@@ -58,7 +70,10 @@ describe("buildSchedulePhasesForReduction", () => {
     const phases = buildSchedulePhasesForReduction({
       subscription: {
         items: {
-          data: [buildSubscriptionItem("price_solo", 1), buildSubscriptionItem("price_solo_capacity_legacy", 2)]
+          data: [
+            buildSubscriptionItem("price_solo", 1),
+            buildSubscriptionItem("price_solo_capacity_legacy", 2)
+          ]
         }
       } as unknown as Stripe.Subscription,
       schedule: null,
@@ -86,7 +101,10 @@ describe("buildSchedulePhasesForReduction", () => {
     const phases = buildSchedulePhasesForReduction({
       subscription: {
         items: {
-          data: [buildSubscriptionItem("price_solo", 1), buildSubscriptionItem("price_solo_capacity_legacy", 2)]
+          data: [
+            buildSubscriptionItem("price_solo", 1),
+            buildSubscriptionItem("price_solo_capacity_legacy", 2)
+          ]
         }
       } as unknown as Stripe.Subscription,
       schedule: null,
@@ -113,7 +131,10 @@ describe("buildSchedulePhasesForReduction", () => {
         current_period_start: 1_711_184_800,
         current_period_end: 1_713_863_200,
         items: {
-          data: [buildSubscriptionItem("price_solo", 1), buildSubscriptionItem("price_solo_capacity_current", 2)]
+          data: [
+            buildSubscriptionItem("price_solo", 1),
+            buildSubscriptionItem("price_solo_capacity_current", 2)
+          ]
         }
       } as unknown as Stripe.Subscription,
       schedule: {

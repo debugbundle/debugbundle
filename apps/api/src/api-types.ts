@@ -208,6 +208,11 @@ export interface ApiDependencies {
       period_starts_at: string;
       count: number;
     }): Promise<void>;
+    startTrial?(input: {
+      organization_id: string;
+      target_plan: "solo" | "team";
+      now: string;
+    }): Promise<BillingSummaryRecord | "billing_not_found" | "trial_unavailable">;
     createCheckoutLink(input: {
       organization_id: string;
       billing_email: string;

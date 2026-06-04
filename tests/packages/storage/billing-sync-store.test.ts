@@ -19,10 +19,9 @@ describe("createPostgresBillingSyncStore", () => {
       const result = await store.isEventProcessed("evt_123");
 
       expect(result).toBe(true);
-      expect(query).toHaveBeenCalledWith(
-        expect.stringContaining("processed_billing_events"),
-        ["evt_123"]
-      );
+      expect(query).toHaveBeenCalledWith(expect.stringContaining("processed_billing_events"), [
+        "evt_123"
+      ]);
     });
 
     it("should return false when event does not exist", async () => {
@@ -75,10 +74,7 @@ describe("createPostgresBillingSyncStore", () => {
 
       await store.markEventProcessed("evt_789", "invoice.paid", "org_xyz");
 
-      expect(query).toHaveBeenCalledWith(
-        expect.stringContaining("ON CONFLICT"),
-        expect.any(Array)
-      );
+      expect(query).toHaveBeenCalledWith(expect.stringContaining("ON CONFLICT"), expect.any(Array));
     });
   });
 
@@ -110,6 +106,7 @@ describe("createPostgresBillingSyncStore", () => {
       expect(sql).toContain("stripe_subscription_id = $6");
       expect(sql).toContain("billing_period_starts_at = $7::timestamptz");
       expect(sql).toContain("billing_period_ends_at = $8::timestamptz");
+      expect(sql).toContain("trial_converted_at = CASE");
       expect(params).toEqual([
         "org_abc",
         "team",
@@ -145,6 +142,32 @@ describe("createPostgresBillingSyncStore", () => {
       expect(params[6]).toBeNull();
       expect(params[6]).toBeNull();
     });
+
+    it("marks trial_converted_at when syncing a paid entitlement for a prior trial", async () => {
+      const { query, store } = createMockDb();
+      query.mockResolvedValue({ rows: [] });
+
+      await store.updateEntitlements({
+        organization_id: "org_trial",
+        plan: "solo",
+        additional_capacity_units: 0,
+        billing_state: "active",
+        stripe_customer_id: "cus_trial",
+        stripe_subscription_id: "sub_trial",
+        billing_period_starts_at: "2026-03-01T00:00:00.000Z",
+        billing_period_ends_at: "2026-04-01T00:00:00.000Z",
+        last_billing_sync_at: "2026-03-02T00:00:00.000Z",
+        last_billing_event_id: "evt_trial_convert"
+      });
+
+      const sql = query.mock.calls[0]?.[0] as string;
+      expect(sql).toContain(
+        "WHEN $2 <> 'free' AND (to_jsonb(organizations) ->> 'trial_used_at') IS NOT NULL"
+      );
+      expect(sql).toContain(
+        "COALESCE((to_jsonb(organizations) ->> 'trial_converted_at')::timestamptz, $9::timestamptz)"
+      );
+    });
   });
 
   describe("resolveOrganizationByStripeCustomerId", () => {
@@ -155,10 +178,9 @@ describe("createPostgresBillingSyncStore", () => {
       const result = await store.resolveOrganizationByStripeCustomerId("cus_123");
 
       expect(result).toBe("org_found");
-      expect(query).toHaveBeenCalledWith(
-        expect.stringContaining("stripe_customer_id"),
-        ["cus_123"]
-      );
+      expect(query).toHaveBeenCalledWith(expect.stringContaining("stripe_customer_id"), [
+        "cus_123"
+      ]);
     });
 
     it("should return null when not found", async () => {

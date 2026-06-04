@@ -845,6 +845,15 @@ export const MCP_TOOL_CATALOG = [
     }),
   },
   {
+    name: 'start_trial',
+    group: 'billing',
+    description: 'Start an eligible no-card trial for the organization.',
+    inputSchema: z.object({
+      bearerToken: z.string(),
+      targetPlan: z.enum(['solo', 'team']),
+    }),
+  },
+  {
     name: 'increase_capacity',
     group: 'billing',
     description: 'Increase additional capacity units.',

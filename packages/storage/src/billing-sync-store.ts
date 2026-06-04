@@ -17,10 +17,18 @@ export interface BillingEntitlementUpdate {
 
 export interface BillingSyncStore {
   isEventProcessed(eventId: string): Promise<boolean>;
-  markEventProcessed(eventId: string, eventType: string, organizationId: string | null): Promise<void>;
+  markEventProcessed(
+    eventId: string,
+    eventType: string,
+    organizationId: string | null
+  ): Promise<void>;
   updateEntitlements(update: BillingEntitlementUpdate): Promise<void>;
   resolveOrganizationByStripeCustomerId(customerId: string): Promise<string | null>;
-  linkStripeCustomer(organizationId: string, customerId: string, subscriptionId: string): Promise<void>;
+  linkStripeCustomer(
+    organizationId: string,
+    customerId: string,
+    subscriptionId: string
+  ): Promise<void>;
   revokeEntitlements(organizationId: string, eventId: string): Promise<void>;
   updateBillingState(organizationId: string, billingState: string, eventId: string): Promise<void>;
 }
@@ -35,7 +43,11 @@ export function createPostgresBillingSyncStore(db: Queryable): BillingSyncStore 
       return result.rows[0]?.exists ?? false;
     },
 
-    async markEventProcessed(eventId: string, eventType: string, organizationId: string | null): Promise<void> {
+    async markEventProcessed(
+      eventId: string,
+      eventType: string,
+      organizationId: string | null
+    ): Promise<void> {
       await db.query(
         `
           INSERT INTO processed_billing_events (event_id, event_type, organization_id, processed_at)
@@ -58,6 +70,11 @@ export function createPostgresBillingSyncStore(db: Queryable): BillingSyncStore 
             stripe_subscription_id = $6,
             billing_period_starts_at = $7::timestamptz,
             billing_period_ends_at = $8::timestamptz,
+            trial_converted_at = CASE
+              WHEN $2 <> 'free' AND (to_jsonb(organizations) ->> 'trial_used_at') IS NOT NULL
+                THEN COALESCE((to_jsonb(organizations) ->> 'trial_converted_at')::timestamptz, $9::timestamptz)
+              ELSE (to_jsonb(organizations) ->> 'trial_converted_at')::timestamptz
+            END,
             last_billing_sync_at = $9::timestamptz,
             last_billing_event_id = $10
           WHERE id = $1
@@ -85,7 +102,11 @@ export function createPostgresBillingSyncStore(db: Queryable): BillingSyncStore 
       return result.rows[0]?.id ?? null;
     },
 
-    async linkStripeCustomer(organizationId: string, customerId: string, subscriptionId: string): Promise<void> {
+    async linkStripeCustomer(
+      organizationId: string,
+      customerId: string,
+      subscriptionId: string
+    ): Promise<void> {
       await db.query(
         `
           UPDATE organizations
@@ -114,7 +135,11 @@ export function createPostgresBillingSyncStore(db: Queryable): BillingSyncStore 
       );
     },
 
-    async updateBillingState(organizationId: string, billingState: string, eventId: string): Promise<void> {
+    async updateBillingState(
+      organizationId: string,
+      billingState: string,
+      eventId: string
+    ): Promise<void> {
       await db.query(
         `
           UPDATE organizations

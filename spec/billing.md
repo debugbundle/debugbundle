@@ -1,7 +1,7 @@
 # Billing
 
 Version: v1
-Last updated: 2026-03-19
+Last updated: 2026-06-04
 
 ---
 
@@ -11,6 +11,7 @@ This file is the source-of-truth design for the complete DebugBundle billing sys
 
 It covers:
 - Stripe product catalog and what must be configured in the Stripe Dashboard
+- how no-card Solo and Team trials behave before Stripe checkout begins
 - how organizations become paying customers (checkout flow)
 - how customers manage their subscriptions (customer portal)
 - how Stripe billing state syncs back to DebugBundle (webhook sync)
@@ -103,11 +104,17 @@ The `organizations` table stores the effective entitlement snapshot:
 | `stripe_customer_id` | Stripe Customer ID (set after first checkout) |
 | `stripe_subscription_id` | Stripe Subscription ID (set after first checkout, updated on changes) |
 | `additional_capacity_units` | Currently valid purchased extra capacity count (set-based, not incremental) |
-| `billing_state` | Derived billing health: `active`, `past_due`, `canceled`, `unpaid` |
+| `billing_state` | Effective billing lifecycle state: `active`, `past_due`, `canceled`, `unpaid`, `incomplete`, `admin_override`, `trialing`, `trial_expired` |
 | `billing_period_starts_at` | Current billing period start (for usage-window display and metering alignment) |
 | `billing_period_ends_at` | Current billing period end (for UI display and renewal timing) |
 | `last_billing_sync_at` | Timestamp of last successful webhook-driven entitlement sync |
 | `last_billing_event_id` | Stripe event ID from last processed webhook (idempotency reference) |
+| `trial_plan` | Selected no-card trial plan: `solo`, `team`, or `null` |
+| `trial_started_at` | Timestamp when the no-card trial began |
+| `trial_ends_at` | Timestamp when the no-card trial ends |
+| `trial_used_at` | One-time eligibility ledger timestamp; set on first trial start and never cleared |
+| `trial_converted_at` | Timestamp when a prior no-card trial converted to paid entitlements |
+| `trial_expired_at` | Timestamp when an unconverted no-card trial was downgraded back to Free |
 
 ### 3.3 Free Organizations
 
@@ -118,9 +125,34 @@ Organizations on the `free` plan have:
 - `billing_state`: null
 - All billing-period fields: null
 
+If a no-card trial already expired, the organization still returns to `plan = "free"` but keeps its trial history and uses `billing_state = "trial_expired"`.
+
+### 3.4 No-Card Trial State
+
+DebugBundle supports one 30-day no-card trial per organization account for `solo` or `team`.
+
+Effective no-card trial entitlement:
+- `plan` = selected trial plan
+- `billing_state` = `trialing`
+- `stripe_customer_id` = null
+- `stripe_subscription_id` = null
+- `additional_capacity_units` = 0
+- `billing_period_starts_at` = `trial_started_at`
+- `billing_period_ends_at` = `trial_ends_at`
+
+Eligibility and lifecycle rules:
+- Every new organization starts from the Free baseline.
+- `trial_used_at IS NULL` means the organization is still eligible.
+- Expiry and conversion never clear `trial_used_at`.
+- Solo trial can convert to paid Solo or Team.
+- Team trial can convert to paid Team only.
+- Active no-card trials cannot buy extra capacity; capacity routes must reject them with `409 trial_conversion_required`.
+
 ---
 
 ## 4. Checkout Flow
+
+Before Stripe checkout begins, eligible Free organizations may start a 30-day no-card Solo or Team trial from pricing, billing, API, CLI, or MCP. Checkout remains available during an active trial so the organization can convert to paid before expiry.
 
 ### 4.1 Production Checkout State
 
@@ -152,6 +184,11 @@ The checkout route must create a Stripe Checkout Session dynamically using the S
 | `allow_promotion_codes` | `true` (enable promo codes from day one) |
 
 **Extra capacity add-on:** Extra capacity units are managed directly inside the DebugBundle billing page after subscription creation. Increasing capacity updates the Stripe subscription immediately. Reducing capacity creates or updates a Stripe subscription schedule so the lower quantity only takes effect at the next renewal boundary. Paid organizations can hold up to 99 purchased extra capacity units. These units expand shared allowance capacity only; they do not gate project creation.
+
+Checkout validation must also enforce trial conversion rules:
+- Active Solo trial: allow paid Solo or Team checkout.
+- Active Team trial: allow paid Team checkout only.
+- Active no-card trials are not required to expire first.
 
 ### 4.3 Checkout Route Changes
 
@@ -337,6 +374,8 @@ If a subscription falls out of an entitlement-eligible state, paid capacity unit
 - `active`
 - `trialing`
 
+Stripe `trialing` here refers to Stripe-managed subscription state, not DebugBundle's internal no-card trial. Internal no-card trials are represented by `billing_state = 'trialing'` together with `stripe_customer_id = null`.
+
 **Non-eligible subscription states** (remove paid entitlements):
 - `canceled`
 - `incomplete_expired`
@@ -375,6 +414,7 @@ Write to the organization record:
 - `billing_period_ends_at` — from subscription current period end
 - `last_billing_sync_at` — current timestamp
 - `last_billing_event_id` — Stripe event ID
+- `trial_converted_at` — first paid-entitlement sync timestamp when `trial_used_at` was already set and the resulting paid plan is not `free`
 
 ### 7.3 Write Rules
 
@@ -418,6 +458,7 @@ Implementation:
 - `POST /v1/admin/billing/override` accepts optional `organization_id` (defaults to the operator's own organization), absolute `plan`, absolute `additional_capacity_units`, and `reason`.
 - The route requires an authenticated operator whose email is present in `BILLING_ADMIN_OVERRIDE_EMAILS`.
 - The route writes the effective organization entitlement snapshot directly, clears Stripe customer/subscription linkage, marks paid overrides with `billing_state = 'admin_override'`, and audit-logs the operator, target organization, absolute entitlement, and reason.
+- Admin overrides do not reset no-card trial eligibility and must not clear `trial_used_at`.
 - When an allowlisted operator signs into their own free organization, DebugBundle should automatically seed that organization to an internally managed Team plan with zero additional capacity units so operator accounts do not need a manual bootstrap override.
 - The Billing page treats paid plans with no `stripe_customer_id` as internally managed, suppresses Stripe checkout/portal actions, and keeps the existing capacity-management controls available with immediate internal updates.
 - Review access may additionally bootstrap a reviewer-owned free organization to an internally managed Team plan through a secret-gated browser bootstrap route. The route must only mint a short-lived review cookie, the actual plan upgrade must still happen server-side through the same admin override primitive, and the cookie must be cleared after session resolution.
@@ -449,9 +490,10 @@ If a webhook event cannot be mapped to an organization:
 
 ### 9.5 Observability
 
-Billing sync must be observable with:
+Billing sync and no-card trial lifecycle must be observable with:
 - Structured logs for every processed event (event type, organization ID, resulting state)
 - Structured logs for failures (resolution misses, Stripe API errors)
+- Structured logs for trial lifecycle actions (start, reminder queued, expired, converted, skipped)
 - Metrics for webhook processing latency and error rates (deferred to operational monitoring phase)
 
 ---
@@ -463,6 +505,11 @@ The billing system must emit customer-facing emails for important transitions.
 See `/spec/system-emails.md` for the canonical email inventory, templates, and trigger rules.
 
 At minimum, billing webhook processing must trigger:
+- No-card trial started
+- No-card trial ending soon (7 days)
+- No-card trial ending soon (1 day)
+- No-card trial expired
+- No-card trial converted
 - Purchase confirmation (on `checkout.session.completed`)
 - Renewal success (on `invoice.paid` for recurring invoices)
 - Payment failure (on `invoice.payment_failed`)
@@ -493,6 +540,23 @@ A migration must add the new billing columns to organizations:
 - `billing_period_ends_at` (timestamptz, nullable)
 - `last_billing_sync_at` (timestamptz, nullable)
 - `last_billing_event_id` (text, nullable)
+- `trial_plan` (text, nullable)
+- `trial_started_at` (timestamptz, nullable)
+- `trial_ends_at` (timestamptz, nullable)
+- `trial_used_at` (timestamptz, nullable)
+- `trial_converted_at` (timestamptz, nullable)
+- `trial_expired_at` (timestamptz, nullable)
+
+A `trial_lifecycle_events` table must exist for worker-side reminder/expiry/conversion dedupe:
+- `id` (uuid, primary key)
+- `organization_id` (uuid, not null)
+- `event_type` (text, not null)
+- `dedupe_key` (text, not null)
+- `created_at` (timestamptz, not null, default now())
+
+`operational_email_deliveries` must support organization-scoped lifecycle mail:
+- `project_id` nullable for trial lifecycle emails
+- `kind` includes `trial_started`, `trial_ending_soon`, `trial_expired`, and `trial_converted`
 
 A `processed_billing_events` table must be created:
 - `event_id` (text, primary key) — Stripe event ID
@@ -502,13 +566,17 @@ A `processed_billing_events` table must be created:
 
 Note: `stripe_customer_id` and `additional_capacity_units` already exist on organizations.
 
+Deploy/runtime rule:
+- ordered forward migrations must run before API or worker code that reads trial fields or schedules trial lifecycle work
+- readiness/startup checks must fail closed when required trial migrations are missing
+
 ---
 
 ## 12. Implementation Sequence
 
 ### Phase A: Foundation (must be done first)
 1. Add `stripe` npm dependency to `apps/api`
-2. Database migration for new organization columns + `processed_billing_events` table
+2. Database migration for new organization columns + `processed_billing_events` table + no-card trial metadata + `trial_lifecycle_events`
 3. Price-to-plan mapping configuration module
 4. Stripe client factory (reads `STRIPE_SECRET_KEY`, creates typed Stripe client)
 
@@ -526,9 +594,10 @@ Note: `stripe_customer_id` and `additional_capacity_units` already exist on orga
 5. Set-based organization update
 
 ### Phase D: Emails & Notifications
-1. Billing email templates (purchase confirmation, renewal, failure, etc.)
-2. Email trigger integration in webhook event handlers
-3. Dunning flow (payment failure → reminder timing)
+1. Billing email templates (purchase confirmation, renewal, failure, no-card trial lifecycle, etc.)
+2. Durable worker scheduling for no-card trial reminders, expiry, and conversion email queueing
+3. Email trigger integration in webhook event handlers
+4. Dunning flow (payment failure → reminder timing)
 
 ### Phase E: Testing & Hardening
 1. Unit tests for entitlement recompute logic
