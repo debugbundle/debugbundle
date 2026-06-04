@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react";
 
+import { showErrorToast } from "./notify.js";
+
 export interface CursorPageResult<TItem> {
   items: TItem[];
   nextCursor: string | null;
@@ -9,6 +11,11 @@ interface CachedCursorPage<TItem> {
   items: TItem[];
   nextCursor: string | null;
 }
+
+const EMPTY_PAGE: CachedCursorPage<never> = {
+  items: [],
+  nextCursor: null
+};
 
 export function useCursorPagination<TItem>(
   loadPage: (cursor: string | null) => Promise<CursorPageResult<TItem>>,
@@ -35,12 +42,22 @@ export function useCursorPagination<TItem>(
     setIsLoading(true);
 
     void (async () => {
-      const firstPage = await loadPage(null);
+      try {
+        const firstPage = await loadPage(null);
 
-      if (!isCancelled) {
-        setPages([firstPage]);
-        setPageIndex(0);
-        setIsLoading(false);
+        if (!isCancelled) {
+          setPages([firstPage]);
+          setPageIndex(0);
+        }
+      } catch {
+        if (!isCancelled) {
+          setPages([EMPTY_PAGE as CachedCursorPage<TItem>]);
+          showErrorToast("Could not load the current page.");
+        }
+      } finally {
+        if (!isCancelled) {
+          setIsLoading(false);
+        }
       }
     })();
 
@@ -67,6 +84,8 @@ export function useCursorPagination<TItem>(
       const nextPage = await loadPage(currentPage.nextCursor);
       setPages((current) => [...current, nextPage]);
       setPageIndex((current) => current + 1);
+    } catch {
+      showErrorToast("Could not load the next page.");
     } finally {
       setIsLoading(false);
     }
@@ -88,6 +107,8 @@ export function useCursorPagination<TItem>(
     try {
       const refreshedPage = await loadPage(cursor);
       setPages((current) => [...current.slice(0, pageIndex), refreshedPage]);
+    } catch {
+      showErrorToast("Could not refresh the current page.");
     } finally {
       setIsLoading(false);
     }

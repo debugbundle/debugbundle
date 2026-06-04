@@ -84,6 +84,9 @@ describe("alert delivery store", () => {
 
     expect(created).toEqual({ delivery_id: "ad_123", created: true });
     expect(duplicate).toEqual({ delivery_id: null, created: false });
+    expect(query.mock.calls[0]?.[0]).toContain("hashtext(($2::uuid)::text)");
+    expect(query.mock.calls[0]?.[0]).toContain("WHERE alert_id = $2::uuid");
+    expect(query.mock.calls[0]?.[0]).toContain("WHERE items.alert_id = $2::uuid");
   });
 
   it("queues email digest items and reports whether a new digest was created", async (): Promise<void> => {
@@ -114,6 +117,9 @@ describe("alert delivery store", () => {
     });
     expect(query).toHaveBeenCalledOnce();
     expect(query.mock.calls[0]?.[0]).toContain("WITH cooldown_lock AS");
+    expect(query.mock.calls[0]?.[0]).toContain("hashtext(($5::uuid)::text)");
+    expect(query.mock.calls[0]?.[0]).toContain("WHERE alert_id = $5::uuid");
+    expect(query.mock.calls[0]?.[0]).toContain("WHERE items.alert_id = $5::uuid");
     expect(query.mock.calls[0]?.[0]).toContain("WHERE $12::boolean = true");
     expect(query.mock.calls[0]?.[0]).toContain("DO UPDATE SET\n              updated_at = now()");
     expect(query.mock.calls[0]?.[0]).not.toContain("BEGIN");

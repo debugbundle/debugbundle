@@ -6,6 +6,7 @@ import { redact } from "../../../packages/redaction/src/index.js";
 import { isSelfHostMode } from "../../../packages/shared-types/src/index.js";
 import type { EventEnvelope } from "../../../packages/shared-types/src/index.js";
 import type { ProjectAccessRecord, ResolveMemberResult } from "../../../packages/storage/src/index.js";
+import { z } from "zod";
 import type { ApiDependencies } from "./api-types.js";
 import { ImprovementsCursorSchema, IncidentsCursorSchema, LogsCursorSchema } from "./schemas.js";
 
@@ -40,6 +41,25 @@ export function isObjectNotFoundError(error: unknown): boolean {
   return error instanceof Error && error.message === "s3_object_not_found";
 }
 
+function normalizeCursorTimestamp(rawValue: string): string | null {
+  const strictIso = z.string().datetime().safeParse(rawValue);
+  if (strictIso.success) {
+    return strictIso.data;
+  }
+
+  const parsedMillis = Date.parse(rawValue);
+  if (Number.isNaN(parsedMillis)) {
+    return null;
+  }
+
+  return new Date(parsedMillis).toISOString();
+}
+
+export function serializeCursorTimestamp(rawValue: string): string {
+  const normalized = normalizeCursorTimestamp(rawValue);
+  return normalized ?? rawValue;
+}
+
 export function parseLogsCursor(rawCursor: string | undefined): { occurred_at: string; event_id: string } | null {
   if (rawCursor === undefined) {
     return null;
@@ -52,7 +72,12 @@ export function parseLogsCursor(rawCursor: string | undefined): { occurred_at: s
 
   const occurredAt = rawCursor.slice(0, separatorIndex);
   const eventId = rawCursor.slice(separatorIndex + 1);
-  const parsed = LogsCursorSchema.safeParse({ occurred_at: occurredAt, event_id: eventId });
+  const normalizedOccurredAt = normalizeCursorTimestamp(occurredAt);
+  if (normalizedOccurredAt === null) {
+    return null;
+  }
+
+  const parsed = LogsCursorSchema.safeParse({ occurred_at: normalizedOccurredAt, event_id: eventId });
   if (!parsed.success) {
     return null;
   }
@@ -72,7 +97,12 @@ export function parseIncidentsCursor(rawCursor: string | undefined): { last_seen
 
   const lastSeenAt = rawCursor.slice(0, separatorIndex);
   const incidentId = rawCursor.slice(separatorIndex + 1);
-  const parsed = IncidentsCursorSchema.safeParse({ last_seen_at: lastSeenAt, incident_id: incidentId });
+  const normalizedLastSeenAt = normalizeCursorTimestamp(lastSeenAt);
+  if (normalizedLastSeenAt === null) {
+    return null;
+  }
+
+  const parsed = IncidentsCursorSchema.safeParse({ last_seen_at: normalizedLastSeenAt, incident_id: incidentId });
   if (!parsed.success) {
     return null;
   }
@@ -92,7 +122,12 @@ export function parseImprovementsCursor(rawCursor: string | undefined): { last_d
 
   const lastDetectedAt = rawCursor.slice(0, separatorIndex);
   const improvementId = rawCursor.slice(separatorIndex + 1);
-  const parsed = ImprovementsCursorSchema.safeParse({ last_detected_at: lastDetectedAt, improvement_id: improvementId });
+  const normalizedLastDetectedAt = normalizeCursorTimestamp(lastDetectedAt);
+  if (normalizedLastDetectedAt === null) {
+    return null;
+  }
+
+  const parsed = ImprovementsCursorSchema.safeParse({ last_detected_at: normalizedLastDetectedAt, improvement_id: improvementId });
   if (!parsed.success) {
     return null;
   }

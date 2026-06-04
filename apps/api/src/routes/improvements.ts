@@ -6,6 +6,7 @@ import type { ApiDependencies } from "../api-types.js";
 import {
   isObjectNotFoundError,
   parseImprovementsCursor,
+  serializeCursorTimestamp,
   requireRateLimitedMemberAuth,
   requireRateLimitedProjectAccess
 } from "../api-helpers.js";
@@ -85,7 +86,7 @@ export function registerImprovementRoutes(app: FastifyInstance, dependencies: Ap
 
     const nextCursorRecord = improvements.length >= parsedQuery.data.limit ? improvements.at(-1) : undefined;
     const nextCursor =
-      nextCursorRecord === undefined ? null : `${nextCursorRecord.last_detected_at}|${nextCursorRecord.improvement_id}`;
+      nextCursorRecord === undefined ? null : `${serializeCursorTimestamp(nextCursorRecord.last_detected_at)}|${nextCursorRecord.improvement_id}`;
 
     return reply.status(200).send({
       improvements,

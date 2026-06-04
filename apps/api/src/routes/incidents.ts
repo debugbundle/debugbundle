@@ -12,7 +12,8 @@ import {
   isObjectNotFoundError,
   parseIncidentsCursor,
   parseLogsCursor,
-  requireRateLimitedMemberAuth
+  requireRateLimitedMemberAuth,
+  serializeCursorTimestamp
 } from "../api-helpers.js";
 import { IncidentParamsSchema, IncidentsQuerySchema, LogsQuerySchema } from "../schemas.js";
 
@@ -172,7 +173,7 @@ export function registerIncidentRoutes(app: FastifyInstance, dependencies: ApiDe
 
     const nextCursorRecord = incidents.length >= parsedQuery.data.limit ? incidents.at(-1) : undefined;
     const nextCursor =
-      nextCursorRecord === undefined ? null : `${nextCursorRecord.last_seen_at}|${nextCursorRecord.incident_id}`;
+      nextCursorRecord === undefined ? null : `${serializeCursorTimestamp(nextCursorRecord.last_seen_at)}|${nextCursorRecord.incident_id}`;
 
     return reply.status(200).send({
       incidents,
@@ -566,7 +567,7 @@ export function registerIncidentRoutes(app: FastifyInstance, dependencies: ApiDe
 
     const nextCursorRecord = logs.length >= parsedQuery.data.limit ? logs.at(-1) : undefined;
     const nextCursor =
-      nextCursorRecord === undefined ? null : `${nextCursorRecord.occurred_at}|${nextCursorRecord.event_id}`;
+      nextCursorRecord === undefined ? null : `${serializeCursorTimestamp(nextCursorRecord.occurred_at)}|${nextCursorRecord.event_id}`;
 
     return reply.status(200).send({
       logs,

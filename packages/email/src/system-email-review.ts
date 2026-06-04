@@ -13,6 +13,10 @@ import {
   renderWebhookAutoDisabledEmail
 } from "./operational-emails.js";
 import {
+  renderTrialConvertedEmail,
+  renderTrialEndingSoonEmail,
+  renderTrialExpiredEmail,
+  renderTrialStartedEmail,
   renderEntitlementDowngradeConfirmationEmail,
   renderEntitlementDowngradeWarningEmail,
   renderPaymentFailureEmail,
@@ -75,6 +79,98 @@ export const SYSTEM_EMAIL_REVIEW_ENTRIES: readonly SystemEmailReviewEntry[] = [
       return renderProjectInviteEmail({
         acceptUrl: "https://app.debugbundle.local/invite?token=dbundle_invite_preview_123",
         inviterName: "Owen Example",
+        brandMarkUrl: SAMPLE_EMAIL_BRAND_MARK_URL
+      });
+    }
+  },
+  {
+    id: "trial-started",
+    title: "No-card trial started",
+    category: "billing",
+    recipient: "Organization owner billing contact",
+    trigger: "A free organization successfully starts a 30-day no-card Solo or Team trial",
+    requiredInV1: true,
+    implementationStatus: "implemented",
+    get preview() {
+      return renderTrialStartedEmail({
+        organizationName: "Acme Production",
+        trialPlan: "team",
+        trialEndsAt: "2026-06-30",
+        billingUrl: SAMPLE_PORTAL_URL,
+        brandMarkUrl: SAMPLE_EMAIL_BRAND_MARK_URL
+      });
+    }
+  },
+  {
+    id: "trial-ending-soon-7-day",
+    title: "No-card trial ending soon (7-day reminder)",
+    category: "billing",
+    recipient: "Organization owner billing contact",
+    trigger: "Worker-owned lifecycle scheduling reaches the 7-day reminder window before trial expiry",
+    requiredInV1: true,
+    implementationStatus: "implemented",
+    get preview() {
+      return renderTrialEndingSoonEmail({
+        organizationName: "Acme Production",
+        trialPlan: "team",
+        trialEndsAt: "2026-06-30",
+        daysRemaining: 7,
+        billingUrl: SAMPLE_PORTAL_URL,
+        brandMarkUrl: SAMPLE_EMAIL_BRAND_MARK_URL
+      });
+    }
+  },
+  {
+    id: "trial-ending-soon-1-day",
+    title: "No-card trial ending soon (1-day reminder)",
+    category: "billing",
+    recipient: "Organization owner billing contact",
+    trigger: "Worker-owned lifecycle scheduling reaches the 1-day reminder window before trial expiry",
+    requiredInV1: true,
+    implementationStatus: "implemented",
+    get preview() {
+      return renderTrialEndingSoonEmail({
+        organizationName: "Acme Production",
+        trialPlan: "team",
+        trialEndsAt: "2026-06-30",
+        daysRemaining: 1,
+        billingUrl: SAMPLE_PORTAL_URL,
+        brandMarkUrl: SAMPLE_EMAIL_BRAND_MARK_URL
+      });
+    }
+  },
+  {
+    id: "trial-expired",
+    title: "No-card trial expired",
+    category: "billing",
+    recipient: "Organization owner billing contact",
+    trigger: "Worker-owned lifecycle expiry downgrades an unconverted no-card trial back to Free",
+    requiredInV1: true,
+    implementationStatus: "implemented",
+    get preview() {
+      return renderTrialExpiredEmail({
+        organizationName: "Acme Production",
+        trialPlan: "team",
+        trialEndedAt: "2026-06-30",
+        billingUrl: SAMPLE_PORTAL_URL,
+        brandMarkUrl: SAMPLE_EMAIL_BRAND_MARK_URL
+      });
+    }
+  },
+  {
+    id: "trial-converted",
+    title: "No-card trial converted",
+    category: "billing",
+    recipient: "Organization owner billing contact",
+    trigger: "A prior no-card trial receives paid Stripe-backed entitlements",
+    requiredInV1: true,
+    implementationStatus: "implemented",
+    get preview() {
+      return renderTrialConvertedEmail({
+        organizationName: "Acme Production",
+        trialPlan: "team",
+        paidPlan: "team",
+        billingUrl: SAMPLE_PORTAL_URL,
         brandMarkUrl: SAMPLE_EMAIL_BRAND_MARK_URL
       });
     }

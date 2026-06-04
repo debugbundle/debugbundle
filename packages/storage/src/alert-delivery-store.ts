@@ -131,10 +131,10 @@ export function createPostgresAlertDeliveryStore(db: Queryable): AlertDeliverySt
             updated_at
           )
           SELECT
-            $1,
-            $2,
-            $3,
-            $4,
+            $1::uuid,
+            $2::uuid,
+            $3::uuid,
+            $4::uuid,
             $5,
             $6,
             $7,
@@ -146,7 +146,7 @@ export function createPostgresAlertDeliveryStore(db: Queryable): AlertDeliverySt
             now(),
             now()
           FROM (
-            SELECT pg_advisory_xact_lock(hashtext($2::text), hashtext($7))
+            SELECT pg_advisory_xact_lock(hashtext(($2::uuid)::text), hashtext($7))
           ) lock_row
           WHERE $10 <= 0
             OR NOT EXISTS (
@@ -154,7 +154,7 @@ export function createPostgresAlertDeliveryStore(db: Queryable): AlertDeliverySt
               FROM (
                 SELECT COALESCE(delivered_at, created_at) AS notified_at
                 FROM alert_deliveries
-                WHERE alert_id = $2
+                WHERE alert_id = $2::uuid
                   AND notification_key = $7
                   AND status IN ('pending', 'delivered')
                 UNION ALL
@@ -167,7 +167,7 @@ export function createPostgresAlertDeliveryStore(db: Queryable): AlertDeliverySt
                 FROM alert_email_digest_items items
                 INNER JOIN alert_email_digests digests
                   ON digests.id = items.digest_id
-                WHERE items.alert_id = $2
+                WHERE items.alert_id = $2::uuid
                   AND items.notification_key = $7
                   AND digests.status IN ('pending', 'delivered')
               ) recent_notifications
@@ -231,7 +231,7 @@ export function createPostgresAlertDeliveryStore(db: Queryable): AlertDeliverySt
       }>(
         `
           WITH cooldown_lock AS (
-            SELECT pg_advisory_xact_lock(hashtext($5::text), hashtext($9))
+            SELECT pg_advisory_xact_lock(hashtext(($5::uuid)::text), hashtext($9))
           ),
           upserted_digest AS (
             INSERT INTO alert_email_digests (
@@ -247,8 +247,8 @@ export function createPostgresAlertDeliveryStore(db: Queryable): AlertDeliverySt
               updated_at
             )
             SELECT
-              $1,
-              $2,
+              $1::uuid,
+              $2::uuid,
               $3,
               'pending',
               now() + make_interval(secs => $4),
@@ -270,7 +270,7 @@ export function createPostgresAlertDeliveryStore(db: Queryable): AlertDeliverySt
             UNION ALL
             SELECT id, false AS created_digest
             FROM alert_email_digests
-            WHERE project_id = $2
+            WHERE project_id = $2::uuid
               AND recipient = $3
               AND status = 'pending'
               AND claimed_at IS NULL
@@ -290,7 +290,7 @@ export function createPostgresAlertDeliveryStore(db: Queryable): AlertDeliverySt
               payload,
               created_at
             )
-            SELECT $13, selected_digest.id, $5, $2, $6, $7, $8, $9, $10::jsonb, now()
+            SELECT $13::uuid, selected_digest.id, $5::uuid, $2::uuid, $6::uuid, $7, $8, $9, $10::jsonb, now()
             FROM selected_digest
             WHERE $11 <= 0
               OR NOT EXISTS (
@@ -298,7 +298,7 @@ export function createPostgresAlertDeliveryStore(db: Queryable): AlertDeliverySt
                 FROM (
                   SELECT COALESCE(delivered_at, created_at) AS notified_at
                   FROM alert_deliveries
-                  WHERE alert_id = $5
+                  WHERE alert_id = $5::uuid
                     AND notification_key = $9
                     AND status IN ('pending', 'delivered')
                   UNION ALL
@@ -311,7 +311,7 @@ export function createPostgresAlertDeliveryStore(db: Queryable): AlertDeliverySt
                   FROM alert_email_digest_items items
                   INNER JOIN alert_email_digests digests
                     ON digests.id = items.digest_id
-                  WHERE items.alert_id = $5
+                  WHERE items.alert_id = $5::uuid
                     AND items.notification_key = $9
                     AND digests.status IN ('pending', 'delivered')
                 ) recent_notifications

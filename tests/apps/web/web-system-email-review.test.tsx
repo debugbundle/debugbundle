@@ -43,16 +43,18 @@ describe("web app — system email review", () => {
     expect(await screen.findByRole("heading", { name: /system emails/i })).toBeInTheDocument();
     expect(screen.getByText(/local-only review surface for every email debugbundle currently sends/i)).toBeInTheDocument();
     expect(screen.getAllByText(/email sign-in code/i).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/no-card trial ending soon \(7-day reminder\)/i).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/no-card trial ending soon \(1-day reminder\)/i).length).toBeGreaterThan(0);
     expect(screen.getAllByText(/webhook auto-disabled/i).length).toBeGreaterThan(0);
     expect(screen.getByText(/your debugbundle sign-in code/i)).toBeInTheDocument();
 
-    const retentionRow = screen.getAllByText(/retention rotation notice/i)[0]?.closest("tr");
-    expect(retentionRow).not.toBeNull();
+    const reminderRow = screen.getAllByText(/no-card trial ending soon \(7-day reminder\)/i)[0]?.closest("tr");
+    expect(reminderRow).not.toBeNull();
 
-    await user.click(within(retentionRow as HTMLTableRowElement).getByRole("button", { name: /^view$/i }));
+    await user.click(within(reminderRow as HTMLTableRowElement).getByRole("button", { name: /^view$/i }));
 
     await waitFor(() => {
-      expect(screen.getByText(/retained bundles rotated out/i)).toBeInTheDocument();
+      expect(screen.getByText(/debugbundle: 7 day\(s\) left in your trial/i)).toBeInTheDocument();
     });
 
     expect(screen.getByRole("tab", { name: /html preview/i })).toBeInTheDocument();

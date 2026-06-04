@@ -33,11 +33,18 @@ import {
   renderAllowanceWarning80Email,
   renderEmailAuthCodeEmail,
   renderProjectInviteEmail,
+  renderTrialConvertedEmail,
+  renderTrialEndingSoonEmail,
+  renderTrialExpiredEmail,
+  renderTrialStartedEmail,
   renderRetentionRotationNoticeEmail,
   renderWebhookAutoDisabledEmail,
   renderWeeklyReportEmail
 } from "../../../packages/email/src/index.js";
-import { getSystemEmailReviewEntry } from "../../../packages/email/src/system-email-review.js";
+import {
+  getSystemEmailReviewEntry,
+  SYSTEM_EMAIL_REVIEW_ENTRIES
+} from "../../../packages/email/src/system-email-review.js";
 
 describe("email package", () => {
   afterEach(() => {
@@ -291,6 +298,64 @@ describe("email package", () => {
     expect(firstPreview?.html).toContain("@media only screen and (max-width: 480px)");
     expect(firstPreview?.html).toContain('class="db-email-card-content" style="padding-left:28px;padding-right:28px;vertical-align:top;">');
     expect(firstPreview?.html).toContain('src="https://app.debugbundle.local/email/debugbundle-mark.png"');
+  });
+
+  it("includes no-card trial lifecycle entries in the shared system email review inventory", () => {
+    const entryIds = new Set(SYSTEM_EMAIL_REVIEW_ENTRIES.map((entry) => entry.id));
+
+    expect(entryIds.has("trial-started")).toBe(true);
+    expect(entryIds.has("trial-ending-soon-7-day")).toBe(true);
+    expect(entryIds.has("trial-ending-soon-1-day")).toBe(true);
+    expect(entryIds.has("trial-expired")).toBe(true);
+    expect(entryIds.has("trial-converted")).toBe(true);
+  });
+
+  it("renders no-card trial lifecycle billing emails with billing ctas", () => {
+    const started = renderTrialStartedEmail({
+      organizationName: "Acme <Prod>",
+      trialPlan: "team",
+      trialEndsAt: "2026-06-30",
+      billingUrl: "https://app.debugbundle.test/billing?view=<trial>"
+    });
+    const reminder = renderTrialEndingSoonEmail({
+      organizationName: "Acme <Prod>",
+      trialPlan: "team",
+      trialEndsAt: "2026-06-30",
+      daysRemaining: 7,
+      billingUrl: "https://app.debugbundle.test/billing?view=<trial>"
+    });
+    const expired = renderTrialExpiredEmail({
+      organizationName: "Acme <Prod>",
+      trialPlan: "team",
+      trialEndedAt: "2026-06-30",
+      billingUrl: "https://app.debugbundle.test/billing?view=<trial>"
+    });
+    const converted = renderTrialConvertedEmail({
+      organizationName: "Acme <Prod>",
+      trialPlan: "team",
+      paidPlan: "team",
+      billingUrl: "https://app.debugbundle.test/billing?view=<trial>"
+    });
+
+    expect(started.subject).toContain("trial has started");
+    expect(started.text).toContain('Your 30-day team trial for "Acme <Prod>" is active now.');
+    expect(started.text).toContain("Extra purchased capacity requires paid conversion.");
+    expect(started.html).toContain("Acme &lt;Prod&gt;");
+    expect(started.html).toContain("View billing");
+
+    expect(reminder.subject).toContain("7 day(s) left");
+    expect(reminder.text).toContain("ends in 7 day(s)");
+    expect(reminder.html).toContain("Days remaining");
+    expect(reminder.html).toContain("Convert to paid");
+
+    expect(expired.subject).toContain("trial has ended");
+    expect(expired.text).toContain("The account is now back on the free tier.");
+    expect(expired.html).toContain("Ended at");
+    expect(expired.html).toContain("View billing");
+
+    expect(converted.subject).toContain("team plan activated");
+    expect(converted.text).toContain("converted from a team trial to the paid team plan");
+    expect(converted.html).toContain("Manage billing");
   });
 
   it("renders allowance and retention operational emails with scoped usage copy", () => {

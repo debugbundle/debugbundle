@@ -356,7 +356,7 @@ export function BillingPage(): JSX.Element {
               <CardContent className="space-y-6">
                 <div className="flex flex-wrap items-center justify-between gap-4">
                   <div className="space-y-2">
-                    <p className="text-sm text-muted-foreground">Current plan</p>
+                    {/* <p className="text-sm text-muted-foreground">Current plan</p> */}
                     <div className="flex items-center gap-3">
                       <PlanBadge plan={billing.plan} />
                       <span className="text-sm text-muted-foreground">

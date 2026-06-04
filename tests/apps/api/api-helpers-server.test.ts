@@ -2,7 +2,15 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { ApiDependencies } from "../../../apps/api/src/server.ts";
 import { createApiServer } from "../../../apps/api/src/server.ts";
-import { isObjectNotFoundError, parseLogsCursor, redactEvent, requireMemberAuth } from "../../../apps/api/src/api-helpers.ts";
+import {
+  isObjectNotFoundError,
+  parseImprovementsCursor,
+  parseIncidentsCursor,
+  parseLogsCursor,
+  redactEvent,
+  requireMemberAuth,
+  serializeCursorTimestamp
+} from "../../../apps/api/src/api-helpers.ts";
 import { createEventEnvelope } from "../../../packages/shared-types/src/index.js";
 
 function createDependencies(): ApiDependencies {
@@ -51,6 +59,37 @@ describe("api helpers", () => {
       occurred_at: "2026-03-11T00:10:00.000Z",
       event_id: "550e8400-e29b-41d4-a716-446655440001"
     });
+
+    const parsedPostgresTimestamp = parseLogsCursor("2026-03-11 00:10:00.000+00|550e8400-e29b-41d4-a716-446655440001");
+    expect(parsedPostgresTimestamp).toEqual({
+      occurred_at: "2026-03-11T00:10:00.000Z",
+      event_id: "550e8400-e29b-41d4-a716-446655440001"
+    });
+  });
+
+  it("should parse incident and improvement cursors from ISO and Postgres timestamp formats", (): void => {
+    expect(parseIncidentsCursor("2026-03-11T00:09:00.000Z|inc_122")).toEqual({
+      last_seen_at: "2026-03-11T00:09:00.000Z",
+      incident_id: "inc_122"
+    });
+    expect(parseIncidentsCursor("2026-03-11 00:09:00.000+00|inc_122")).toEqual({
+      last_seen_at: "2026-03-11T00:09:00.000Z",
+      incident_id: "inc_122"
+    });
+
+    expect(parseImprovementsCursor("2026-05-18T12:45:00.000Z|imp_cursor")).toEqual({
+      last_detected_at: "2026-05-18T12:45:00.000Z",
+      improvement_id: "imp_cursor"
+    });
+    expect(parseImprovementsCursor("2026-05-18 12:45:00.000+00|imp_cursor")).toEqual({
+      last_detected_at: "2026-05-18T12:45:00.000Z",
+      improvement_id: "imp_cursor"
+    });
+  });
+
+  it("should serialize cursor timestamps to ISO", (): void => {
+    expect(serializeCursorTimestamp("2026-03-11T00:10:00.000Z")).toBe("2026-03-11T00:10:00.000Z");
+    expect(serializeCursorTimestamp("2026-03-11 00:10:00.000+00")).toBe("2026-03-11T00:10:00.000Z");
   });
 
   it("should classify not-found object errors", (): void => {
