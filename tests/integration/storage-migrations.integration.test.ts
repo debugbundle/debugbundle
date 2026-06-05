@@ -10,6 +10,7 @@ import {
   migrateStorageSchema,
   STORAGE_SCHEMA_MIGRATIONS
 } from "../../packages/storage/src/schema-migrations.js";
+import { LEGACY_PLAN_CLEANUP_TASKS_MIGRATION_CHECKSUM } from "../../packages/storage/src/schema-migration-compatibility.js";
 import {
   createIntegrationPool,
   createQueryable,
@@ -189,6 +190,46 @@ runIntegration("storage bootstrap integration", () => {
     await expect(
       assertStorageSchemaMigrationsApplied(createQueryable(pool))
     ).resolves.toBeUndefined();
+  });
+
+  it("repairs the known compatible legacy checksum for plan cleanup tasks", async (): Promise<void> => {
+    await pool.query("DROP SCHEMA IF EXISTS public CASCADE");
+    await pool.query("CREATE SCHEMA public");
+
+    await bootstrapStorageSchema(createQueryable(pool));
+    await migrateStorageSchema(createQueryable(pool));
+
+    await pool.query(
+      `
+        UPDATE storage_migration_ledger
+        SET checksum = $2
+        WHERE id = $1
+      `,
+      [
+        "202606050002_add_durable_plan_cleanup_tasks",
+        LEGACY_PLAN_CLEANUP_TASKS_MIGRATION_CHECKSUM
+      ]
+    );
+
+    const repaired = await migrateStorageSchema(createQueryable(pool));
+    expect(repaired.applied).toEqual([]);
+    expect(repaired.already_applied).toEqual(
+      STORAGE_SCHEMA_MIGRATIONS.map((migration) => migration.id)
+    );
+
+    const ledgerResult = await pool.query<{ checksum: string }>(
+      `
+        SELECT checksum
+        FROM storage_migration_ledger
+        WHERE id = $1
+      `,
+      ["202606050002_add_durable_plan_cleanup_tasks"]
+    );
+    expect(ledgerResult.rows[0]?.checksum).toBe(
+      STORAGE_SCHEMA_MIGRATIONS.find(
+        (migration) => migration.id === "202606050002_add_durable_plan_cleanup_tasks"
+      )?.checksum
+    );
   });
 
   it("migrates an existing schema missing trial billing columns and lifecycle storage", async (): Promise<void> => {

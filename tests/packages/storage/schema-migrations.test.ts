@@ -10,6 +10,7 @@ import {
   seedStorageMigrationLedgerForCurrentSchema,
   STORAGE_SCHEMA_MIGRATIONS
 } from "../../../packages/storage/src/schema-migrations.js";
+import { LEGACY_PLAN_CLEANUP_TASKS_MIGRATION_CHECKSUM } from "../../../packages/storage/src/schema-migration-compatibility.js";
 import type { Queryable } from "../../../packages/storage/src/migrations.js";
 
 const ALL_REQUIRED_TABLES = Array.from(
@@ -82,6 +83,80 @@ describe("storage schema migrations", () => {
       "storage_migration_checksum_mismatch"
     );
     expect(query).toHaveBeenCalledWith("ROLLBACK", []);
+  });
+
+  it("should repair the known compatible legacy checksum for plan cleanup tasks", async (): Promise<void> => {
+    const migration = STORAGE_SCHEMA_MIGRATIONS.find(
+      (entry) => entry.id === "202606050002_add_durable_plan_cleanup_tasks"
+    );
+    expect(migration).toBeDefined();
+
+    const query = vi.fn(
+      async (sql: string): Promise<{ rows: Record<string, unknown>[]; rowCount?: number }> => {
+        const sqlText = String(sql);
+
+        if (sqlText.includes("SELECT id, checksum")) {
+          return {
+            rows: STORAGE_SCHEMA_MIGRATIONS.map((entry) => ({
+              id: entry.id,
+              checksum:
+                entry.id === migration?.id
+                  ? LEGACY_PLAN_CLEANUP_TASKS_MIGRATION_CHECKSUM
+                  : entry.checksum
+            }))
+          };
+        }
+
+        if (
+          sqlText.includes("FROM information_schema.columns") &&
+          sqlText.includes("table_name = 'plan_cleanup_tasks'")
+        ) {
+          return {
+            rows: [
+              { column_name: "id", is_nullable: "NO", column_default: null },
+              { column_name: "organization_id", is_nullable: "NO", column_default: null },
+              { column_name: "project_id", is_nullable: "NO", column_default: null },
+              { column_name: "cleanup_type", is_nullable: "NO", column_default: null },
+              { column_name: "attempt_count", is_nullable: "NO", column_default: "0" },
+              { column_name: "last_error", is_nullable: "YES", column_default: null },
+              { column_name: "next_attempt_at", is_nullable: "NO", column_default: "now()" },
+              { column_name: "completed_at", is_nullable: "YES", column_default: null },
+              { column_name: "created_at", is_nullable: "NO", column_default: "now()" },
+              { column_name: "updated_at", is_nullable: "NO", column_default: "now()" }
+            ]
+          };
+        }
+
+        if (sqlText.includes("FROM pg_indexes")) {
+          return {
+            rows: [
+              {
+                index_name: "plan_cleanup_tasks_pending_idx",
+                index_definition:
+                  "CREATE INDEX plan_cleanup_tasks_pending_idx ON public.plan_cleanup_tasks USING btree (completed_at, next_attempt_at, created_at)"
+              },
+              {
+                index_name: "plan_cleanup_tasks_project_id_cleanup_type_key",
+                index_definition:
+                  "CREATE UNIQUE INDEX plan_cleanup_tasks_project_id_cleanup_type_key ON public.plan_cleanup_tasks USING btree (project_id, cleanup_type)"
+              }
+            ]
+          };
+        }
+
+        return { rows: [] };
+      }
+    );
+
+    const result = await migrateStorageSchema({ query } as Queryable);
+
+    expect(result.applied).toEqual([]);
+    expect(result.already_applied).toEqual(
+      STORAGE_SCHEMA_MIGRATIONS.map((entry) => entry.id)
+    );
+    expect(query.mock.calls.map((call) => String(call[0]))).toContainEqual(
+      expect.stringContaining("UPDATE storage_migration_ledger")
+    );
   });
 
   it("should assert all required migrations are applied before runtimes start", async (): Promise<void> => {

@@ -1,9 +1,10 @@
-import { BellRingIcon, LinkIcon, PlusIcon, Trash2Icon } from "lucide-react";
+import { BellRingIcon, PlusIcon, Trash2Icon } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useOutletContext, useSearchParams } from "react-router-dom";
 import { getTierCapabilities } from "../../../../packages/shared-types/src/index.js";
 import { DialogFormContent } from "../components/system/dialog-form-content.js";
 import { CalloutCard } from "../components/system/callout-card.js";
+import { ConnectedSlackDestinationField } from "../components/system/connected-slack-destination-field.js";
 import { ProjectResourceEmptyState } from "../components/system/project-resource-empty-state.js";
 import type { ProjectContext } from "../components/system/project-layout.js";
 import {
@@ -44,6 +45,11 @@ import {
   testProjectSlackDestination,
   type SlackDestinationRecord
 } from "../lib/slack-api.js";
+import {
+  formatSlackDestinationLabel,
+  getSlackDestinationErrorMessage,
+  resolveSlackDestinationSelection
+} from "../lib/slack-destinations.js";
 import { useDelayedVisibility } from "../lib/use-delayed-visibility.js";
 
 type AlertChannelOption = {
@@ -116,10 +122,6 @@ export function ProjectAlertsPage(): JSX.Element {
   const effectiveRole = getProjectEffectiveRole(project);
   const canManageIntegrations = effectiveRole === "owner" || effectiveRole === "admin";
   const channelOptions = slackEnabled ? TEAM_ALERT_CHANNEL_OPTIONS : STANDARD_ALERT_CHANNEL_OPTIONS;
-  const selectedSlackDestination = slackDestinations.find(
-    (destination) => destination.slack_destination_id === selectedSlackDestinationId
-  ) ?? null;
-
   useEffect(() => {
     void (async () => {
       const nextAlerts = await listProjectAlerts(projectId);
@@ -390,102 +392,23 @@ export function ProjectAlertsPage(): JSX.Element {
                       />
                     </Field>
                   ) : channel === "slack" ? (
-                    <Field>
-                      <FieldLabel id="project-alert-slack-channel-label" htmlFor="project-alert-slack-channel">{getDestinationLabel(channel)}</FieldLabel>
-                      <FieldDescription>{getDestinationDescription(channel)}</FieldDescription>
-                      {!slackDestinationsLoaded ? (
-                        <Skeleton className="h-10 w-full" />
-                      ) : slackDestinations.length > 0 ? (
-                        <div className="space-y-3">
-                          <Select
-                            value={selectedSlackDestinationId}
-                            onValueChange={setSelectedSlackDestinationId}
-                          >
-                            <SelectTrigger
-                              id="project-alert-slack-channel"
-                              aria-labelledby="project-alert-slack-channel-label project-alert-slack-channel"
-                              className="w-full"
-                            >
-                              <SelectValue placeholder="Choose a Slack channel" />
-                            </SelectTrigger>
-                            <SelectContent position="popper">
-                              <SelectGroup>
-                                {slackDestinations.map((destination) => (
-                                  <SelectItem key={destination.slack_destination_id} value={destination.slack_destination_id}>
-                                    {formatSlackDestinationLabel(destination)}
-                                  </SelectItem>
-                                ))}
-                              </SelectGroup>
-                            </SelectContent>
-                          </Select>
-                          {selectedSlackDestination !== null ? (
-                            <div className="rounded-md border border-border bg-muted/30 px-3 py-2 text-sm text-muted-foreground">
-                              Selected: {formatSlackDestinationLabel(selectedSlackDestination)}
-                            </div>
-                          ) : null}
-                          {canManageIntegrations ? (
-                            <div className="flex flex-wrap gap-2">
-                              <Button
-                                type="button"
-                                variant="secondary"
-                                size="sm"
-                                onClick={() => void handleConnectSlack()}
-                                disabled={isConnectingSlack}
-                              >
-                                <LinkIcon data-icon="inline-start" />
-                                {isConnectingSlack ? "Connecting Slack..." : "Connect Slack"}
-                              </Button>
-                              <Button
-                                type="button"
-                                variant="outline"
-                                size="sm"
-                                onClick={() => void handleTestSlackDestination(selectedSlackDestinationId)}
-                                disabled={
-                                  selectedSlackDestinationId.length === 0 ||
-                                  slackTestDestinationId === selectedSlackDestinationId ||
-                                  slackDeleteDestinationId === selectedSlackDestinationId
-                                }
-                              >
-                                {slackTestDestinationId === selectedSlackDestinationId ? "Sending test..." : "Send test message"}
-                              </Button>
-                              <Button
-                                type="button"
-                                variant="outline"
-                                size="sm"
-                                onClick={() => void handleDeleteSlackDestination(selectedSlackDestinationId)}
-                                disabled={
-                                  selectedSlackDestinationId.length === 0 ||
-                                  slackDeleteDestinationId === selectedSlackDestinationId ||
-                                  slackTestDestinationId === selectedSlackDestinationId
-                                }
-                              >
-                                {slackDeleteDestinationId === selectedSlackDestinationId ? "Disconnecting..." : "Disconnect channel"}
-                              </Button>
-                            </div>
-                          ) : null}
-                        </div>
-                      ) : (
-                        <div className="space-y-3 rounded-lg border border-dashed border-border bg-muted/30 p-3 text-sm text-muted-foreground">
-                          <p>
-                            {canManageIntegrations
-                              ? "Connect Slack once, choose a channel in Slack, and it will become available for alert rules here."
-                              : "A project admin needs to connect Slack before this project can send Slack alerts."}
-                          </p>
-                          {canManageIntegrations ? (
-                            <Button
-                              type="button"
-                              variant="secondary"
-                              size="sm"
-                              onClick={() => void handleConnectSlack()}
-                              disabled={isConnectingSlack}
-                            >
-                              <LinkIcon data-icon="inline-start" />
-                              {isConnectingSlack ? "Connecting Slack..." : "Connect Slack"}
-                            </Button>
-                          ) : null}
-                        </div>
-                      )}
-                    </Field>
+                    <ConnectedSlackDestinationField
+                      label={getDestinationLabel(channel)}
+                      description={getDestinationDescription(channel)}
+                      slackDestinations={slackDestinations}
+                      slackDestinationsLoaded={slackDestinationsLoaded}
+                      selectedSlackDestinationId={selectedSlackDestinationId}
+                      canManageIntegrations={canManageIntegrations}
+                      isConnectingSlack={isConnectingSlack}
+                      slackTestDestinationId={slackTestDestinationId}
+                      slackDeleteDestinationId={slackDeleteDestinationId}
+                      onSelectedSlackDestinationIdChange={setSelectedSlackDestinationId}
+                      onConnectSlack={() => void handleConnectSlack()}
+                      onTestSlackDestination={(destinationId) => void handleTestSlackDestination(destinationId)}
+                      onDeleteSlackDestination={(destinationId) => void handleDeleteSlackDestination(destinationId)}
+                      emptyManageText="Connect Slack once, choose a channel in Slack, and it will become available for alert rules here."
+                      emptyReadOnlyText="A project admin needs to connect Slack before this project can send Slack alerts."
+                    />
                   ) : (
                     <Field>
                       <FieldLabel htmlFor="project-alert-destination">{getDestinationLabel(channel)}</FieldLabel>
@@ -885,56 +808,4 @@ export function validateAlertCooldownDays(value: string): string | undefined {
   }
 
   return undefined;
-}
-
-export function getSlackDestinationErrorMessage(error: unknown, action: "test" | "delete"): string {
-  const code = error instanceof Error ? error.message : String(error);
-
-  if (code === "slack_destination_in_use") {
-    return "Disconnect any alert rules or weekly reports using this Slack channel before removing it.";
-  }
-  if (code === "slack_destination_unavailable" || code === "slack_destination_forbidden") {
-    return action === "test"
-      ? "This Slack channel looks unavailable. Reconnect Slack or choose a different channel."
-      : "This Slack channel looks unavailable. Remove any rules using it first, then reconnect or choose a different channel.";
-  }
-  if (code === "slack_rate_limited") {
-    return "Slack asked us to slow down. Wait a moment and try again.";
-  }
-  if (code === "upgrade_required") {
-    return "Slack connected destinations are available on the Team plan.";
-  }
-  if (code === "forbidden") {
-    return "Only organization owners can manage connected Slack channels.";
-  }
-  if (code === "slack_not_configured") {
-    return "Slack is not configured yet for this environment.";
-  }
-  if (code === "slack_delivery_failed") {
-    return "We could not deliver the Slack test message. Please try again.";
-  }
-
-  return action === "test"
-    ? "We could not send the Slack test message."
-    : "We could not disconnect this Slack channel.";
-}
-
-function resolveSlackDestinationSelection(
-  destinations: SlackDestinationRecord[],
-  preferredDestinationId: string | null
-): string | null {
-  if (typeof preferredDestinationId === "string") {
-    const matchingDestination = destinations.find((destination) => destination.slack_destination_id === preferredDestinationId);
-    if (matchingDestination !== undefined) {
-      return matchingDestination.slack_destination_id;
-    }
-  }
-
-  return destinations[0]?.slack_destination_id ?? null;
-}
-
-function formatSlackDestinationLabel(destination: SlackDestinationRecord): string {
-  const teamLabel = destination.slack_team_name ?? destination.slack_team_id;
-  const channelLabel = destination.slack_channel_name ?? destination.slack_channel_id;
-  return `${teamLabel} - ${channelLabel}`;
 }

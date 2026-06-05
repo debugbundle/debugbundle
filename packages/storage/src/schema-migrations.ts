@@ -1,6 +1,11 @@
 import { createHash } from "node:crypto";
 
 import { REQUIRED_API_TABLES, REQUIRED_WORKER_TABLES, type Queryable } from "./migrations.js";
+import {
+  ensureLegacyGitHubDispatchFingerprintCompatibility,
+  isCurrentStorageSchemaBaseline,
+  repairKnownCompatibleMigrationChecksums
+} from "./schema-migration-compatibility.js";
 
 export interface StorageSchemaMigration {
   id: string;
@@ -765,86 +770,6 @@ function validateStorageSchemaMigrations(migrations: readonly StorageSchemaMigra
   }
 }
 
-const CURRENT_SCHEMA_SENTINEL_COLUMNS = [
-  { table_name: "agent_webhooks", column_name: "created_by_user_id" },
-  { table_name: "alert_rules", column_name: "created_by_user_id" },
-  { table_name: "alert_rules", column_name: "cooldown_seconds" },
-  { table_name: "capture_policies", column_name: "immediate_client_error_statuses" },
-  { table_name: "github_dispatch_rules", column_name: "created_by_user_id" },
-  { table_name: "github_dispatch_deliveries", column_name: "rule_name" },
-  { table_name: "github_dispatch_deliveries", column_name: "target_fingerprint" },
-  { table_name: "incidents", column_name: "bundle_source_occurred_at" },
-  { table_name: "incidents", column_name: "bundle_trigger" },
-  { table_name: "organization_members", column_name: "suspended_at" },
-  { table_name: "organizations", column_name: "suspended_at" },
-  { table_name: "organizations", column_name: "trial_plan" },
-  { table_name: "project_tokens", column_name: "allowed_origins" },
-  { table_name: "projects", column_name: "improvement_bundle_sensitivity" },
-  { table_name: "plan_cleanup_tasks", column_name: "cleanup_type" },
-  { table_name: "trial_lifecycle_events", column_name: "dedupe_key" },
-  { table_name: "users", column_name: "avatar_source" }
-] as const;
-
-async function listRequiredStorageTables(db: Queryable): Promise<Set<string>> {
-  const requiredTables = Array.from(new Set([...REQUIRED_API_TABLES, ...REQUIRED_WORKER_TABLES]));
-  const rows = await db.query<{ table_name: string }>(
-    `
-      SELECT table_name
-      FROM information_schema.tables
-      WHERE table_schema = 'public'
-        AND table_name = ANY($1::text[])
-    `,
-    [requiredTables]
-  );
-
-  return new Set(rows.rows.map((row) => row.table_name));
-}
-
-async function listCurrentSchemaSentinelColumns(db: Queryable): Promise<Set<string>> {
-  const tableNames = Array.from(
-    new Set(
-      CURRENT_SCHEMA_SENTINEL_COLUMNS.map((column) => column.table_name).concat(
-        "github_dispatch_deliveries"
-      )
-    )
-  );
-  const rows = await db.query<{ table_name: string; column_name: string }>(
-    `
-      SELECT table_name, column_name
-      FROM information_schema.columns
-      WHERE table_schema = 'public'
-        AND table_name = ANY($1::text[])
-    `,
-    [tableNames]
-  );
-
-  return new Set(rows.rows.map((row) => `${row.table_name}.${row.column_name}`));
-}
-
-async function isCurrentStorageSchemaBaseline(db: Queryable): Promise<boolean> {
-  const requiredTables = await listRequiredStorageTables(db);
-  const expectedRequiredTables = new Set([...REQUIRED_API_TABLES, ...REQUIRED_WORKER_TABLES]);
-
-  for (const tableName of expectedRequiredTables) {
-    if (!requiredTables.has(tableName)) {
-      return false;
-    }
-  }
-
-  const sentinelColumns = await listCurrentSchemaSentinelColumns(db);
-  for (const sentinel of CURRENT_SCHEMA_SENTINEL_COLUMNS) {
-    if (!sentinelColumns.has(`${sentinel.table_name}.${sentinel.column_name}`)) {
-      return false;
-    }
-  }
-
-  if (sentinelColumns.has("github_dispatch_deliveries.incident_fingerprint")) {
-    return false;
-  }
-
-  return true;
-}
-
 async function recordAppliedMigrations(
   db: Queryable,
   migrations: readonly StorageSchemaMigration[]
@@ -878,36 +803,6 @@ async function reconcileMigrationLedgerInTransaction(
     appliedChecksums.set(migration.id, migration.checksum);
   }
   return "seeded_current_schema";
-}
-
-async function ensureLegacyGitHubDispatchFingerprintCompatibility(
-  db: Queryable,
-  appliedChecksums: Map<string, string>
-): Promise<void> {
-  if (appliedChecksums.size > 0) {
-    return;
-  }
-
-  const rows = await db.query<{ column_name: string }>(
-    `
-      SELECT column_name
-      FROM information_schema.columns
-      WHERE table_schema = 'public'
-        AND table_name = 'github_dispatch_deliveries'
-        AND column_name IN ('incident_fingerprint', 'target_fingerprint')
-    `,
-    []
-  );
-
-  const columns = new Set(rows.rows.map((row) => row.column_name));
-  if (!columns.has("target_fingerprint") || columns.has("incident_fingerprint")) {
-    return;
-  }
-
-  await db.query(
-    "ALTER TABLE github_dispatch_deliveries RENAME COLUMN target_fingerprint TO incident_fingerprint",
-    []
-  );
 }
 
 async function ensureMigrationLedger(db: Queryable): Promise<void> {
@@ -960,6 +855,12 @@ export async function migrateStorageSchema(db: Queryable): Promise<StorageMigrat
     }
 
     await ensureLegacyGitHubDispatchFingerprintCompatibility(db, appliedChecksums);
+    await repairKnownCompatibleMigrationChecksums({
+      db,
+      ledgerTableName: STORAGE_MIGRATION_LEDGER_TABLE,
+      appliedChecksums,
+      migrations: STORAGE_SCHEMA_MIGRATIONS
+    });
 
     for (const migration of STORAGE_SCHEMA_MIGRATIONS) {
       const appliedChecksum = appliedChecksums.get(migration.id);

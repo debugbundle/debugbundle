@@ -417,8 +417,8 @@ export async function listProjectWeeklyReportChannels(
 
 export async function createProjectWeeklyReportChannel(payload: {
   project_id: string;
-  channel: "email";
-  config: { to: string[] };
+  channel: "email" | "slack";
+  config: { to: string[] } | { slack_destination_id: string };
   schedule: WeeklyReportChannelRecord["schedule"];
   is_enabled?: boolean;
 }): Promise<WeeklyReportChannelRecord> {
@@ -443,7 +443,7 @@ export async function createProjectWeeklyReportChannel(payload: {
 export async function updateProjectWeeklyReportChannel(
   channelId: string,
   payload: {
-    config?: { to: string[] };
+    config?: { to: string[] } | { slack_destination_id: string };
     schedule?: WeeklyReportChannelRecord["schedule"];
     is_enabled?: boolean;
   }
@@ -458,6 +458,19 @@ export async function updateProjectWeeklyReportChannel(
   );
 
   return body.channel;
+}
+
+export async function deleteProjectWeeklyReportChannel(channelId: string): Promise<void> {
+  const response = await fetch(`${API_BASE}/v1/weekly-report-channels/${channelId}`, {
+    method: "DELETE",
+    credentials: "include",
+    headers: buildBrowserSessionHeaders(true)
+  });
+
+  if (!response.ok) {
+    const body = (await response.json().catch(() => null)) as { error?: string } | null;
+    throw new Error(body?.error ?? `request_failed_${response.status}`);
+  }
 }
 
 export async function createProjectAlert(payload: {

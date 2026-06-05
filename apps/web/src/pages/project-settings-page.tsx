@@ -164,7 +164,11 @@ export function ProjectSettingsPage(): JSX.Element {
               </div>
             </CardContent>
           </Card>
-          <ProjectWeeklyReportSettingsCard projectId={project.project_id} canEdit={canManageProject} />
+          <ProjectWeeklyReportSettingsCard
+            projectId={project.project_id}
+            organizationPlan={project.organization_plan}
+            canEdit={canManageProject}
+          />
         </div>
 
         <div className="space-y-4">

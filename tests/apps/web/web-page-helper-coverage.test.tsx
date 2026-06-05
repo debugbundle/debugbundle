@@ -37,10 +37,10 @@ import {
   formatSeverity,
   getDestinationDescription,
   getDestinationLabel,
-  getSlackDestinationErrorMessage,
   validateAlertCooldownDays,
   validateAlertRecipientEmail
 } from "../../../apps/web/src/pages/project-alerts-page.tsx";
+import { getSlackDestinationErrorMessage } from "../../../apps/web/src/lib/slack-destinations.ts";
 import * as api from "../../../apps/web/src/lib/api.ts";
 import * as notify from "../../../apps/web/src/lib/notify.tsx";
 import * as projectSharingApi from "../../../apps/web/src/lib/project-sharing-api.ts";
