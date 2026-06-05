@@ -42,6 +42,7 @@ export interface ProjectRecord {
   relationship?: "owned" | "shared";
   sharing_state?: "private" | "shared_by_you" | "shared_with_you";
   effective_role?: "owner" | "admin" | "member";
+  shared_access_suspended?: boolean;
   metrics: {
     monthly_bundle_requests: number;
     monthly_raw_ingested_events: number;

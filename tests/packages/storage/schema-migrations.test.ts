@@ -38,6 +38,12 @@ describe("storage schema migrations", () => {
     expect(query.mock.calls.map((call) => String(call[0]))).toContainEqual(
       expect.stringContaining("CREATE TABLE IF NOT EXISTS slack_destinations")
     );
+    expect(query.mock.calls.map((call) => String(call[0]))).toContainEqual(
+      expect.stringContaining("ALTER TABLE github_dispatch_deliveries ADD COLUMN IF NOT EXISTS rule_name text")
+    );
+    expect(query.mock.calls.map((call) => String(call[0]))).toContainEqual(
+      expect.stringContaining("CREATE TABLE IF NOT EXISTS plan_cleanup_tasks")
+    );
   });
 
   it("should skip already-applied migrations with matching checksums", async (): Promise<void> => {
@@ -113,12 +119,14 @@ describe("storage schema migrations", () => {
       { table_name: "alert_rules", column_name: "cooldown_seconds" },
       { table_name: "capture_policies", column_name: "immediate_client_error_statuses" },
       { table_name: "github_dispatch_rules", column_name: "created_by_user_id" },
+      { table_name: "github_dispatch_deliveries", column_name: "rule_name" },
       { table_name: "github_dispatch_deliveries", column_name: "target_fingerprint" },
       { table_name: "incidents", column_name: "bundle_source_occurred_at" },
       { table_name: "incidents", column_name: "bundle_trigger" },
       { table_name: "organization_members", column_name: "suspended_at" },
       { table_name: "organizations", column_name: "suspended_at" },
       { table_name: "organizations", column_name: "trial_plan" },
+      { table_name: "plan_cleanup_tasks", column_name: "cleanup_type" },
       { table_name: "project_tokens", column_name: "allowed_origins" },
       { table_name: "projects", column_name: "improvement_bundle_sensitivity" },
       { table_name: "trial_lifecycle_events", column_name: "dedupe_key" },

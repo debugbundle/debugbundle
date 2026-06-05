@@ -1,5 +1,7 @@
 import { randomUUID } from "node:crypto";
 
+import { getTierCapabilities } from "../../shared-types/src/index.js";
+
 import type {
   Queryable,
   WeeklyReportChannelRecord,
@@ -10,6 +12,7 @@ import type {
 type WeeklyReportChannelRow = {
   channel_id: string;
   project_id: string;
+  organization_plan?: string;
   channel: "email" | "slack";
   config: Record<string, unknown>;
   schedule_day_of_week: WeeklyReportScheduleDayOfWeek;
@@ -38,6 +41,10 @@ function mapWeeklyReportChannel(row: WeeklyReportChannelRow): WeeklyReportChanne
 }
 
 export function createPostgresWeeklyReportChannelStore(db: Queryable): WeeklyReportChannelStore {
+  function isChannelAllowed(row: WeeklyReportChannelRow): boolean {
+    return row.channel !== "slack" || getTierCapabilities(row.organization_plan).slack_integration;
+  }
+
   return {
     async listWeeklyReportChannelsForOrganization(input) {
       const result = await db.query<WeeklyReportChannelRow>(
@@ -45,6 +52,7 @@ export function createPostgresWeeklyReportChannelStore(db: Queryable): WeeklyRep
           SELECT
             wrc.id AS channel_id,
             wrc.project_id,
+            COALESCE(o.plan, 'free') AS organization_plan,
             wrc.channel,
             wrc.config,
             wrc.schedule_day_of_week,
@@ -55,6 +63,7 @@ export function createPostgresWeeklyReportChannelStore(db: Queryable): WeeklyRep
             wrc.updated_at::text AS updated_at
           FROM weekly_report_channels wrc
           JOIN projects p ON p.id = wrc.project_id
+          JOIN organizations o ON o.id = p.organization_id
           WHERE wrc.project_id = $2
             AND p.organization_id = $1
           ORDER BY wrc.created_at ASC
@@ -232,6 +241,7 @@ export function createPostgresWeeklyReportChannelStore(db: Queryable): WeeklyRep
           SELECT
             wrc.id AS channel_id,
             wrc.project_id,
+            COALESCE(o.plan, 'free') AS organization_plan,
             wrc.channel,
             wrc.config,
             wrc.schedule_day_of_week,
@@ -241,6 +251,8 @@ export function createPostgresWeeklyReportChannelStore(db: Queryable): WeeklyRep
             wrc.created_at::text AS created_at,
             wrc.updated_at::text AS updated_at
           FROM weekly_report_channels wrc
+          JOIN projects p ON p.id = wrc.project_id
+          JOIN organizations o ON o.id = p.organization_id
           WHERE wrc.is_enabled = true
           ORDER BY wrc.created_at ASC
           LIMIT $1
@@ -248,7 +260,7 @@ export function createPostgresWeeklyReportChannelStore(db: Queryable): WeeklyRep
         [input.limit]
       );
 
-      return result.rows.map(mapWeeklyReportChannel);
+      return result.rows.filter(isChannelAllowed).map(mapWeeklyReportChannel);
     },
 
     async getWeeklyReportChannelById(input) {
@@ -257,6 +269,7 @@ export function createPostgresWeeklyReportChannelStore(db: Queryable): WeeklyRep
           SELECT
             wrc.id AS channel_id,
             wrc.project_id,
+            COALESCE(o.plan, 'free') AS organization_plan,
             wrc.channel,
             wrc.config,
             wrc.schedule_day_of_week,
@@ -266,6 +279,8 @@ export function createPostgresWeeklyReportChannelStore(db: Queryable): WeeklyRep
             wrc.created_at::text AS created_at,
             wrc.updated_at::text AS updated_at
           FROM weekly_report_channels wrc
+          JOIN projects p ON p.id = wrc.project_id
+          JOIN organizations o ON o.id = p.organization_id
           WHERE wrc.id = $1
           LIMIT 1
         `,

@@ -7,6 +7,13 @@ import type {
   BillingSyncStore,
   Queryable
 } from "../../../packages/storage/src/index.js";
+import {
+  createOrganizationPlanCleanupService,
+  isPlanDowngrade,
+  normalizePlanForDowngradeAudit,
+  recordPlanDowngradeCleanupAudit,
+  runInTransaction
+} from "../../../packages/storage/src/index.js";
 
 import {
   buildSchedulePhasesForReduction,
@@ -116,6 +123,7 @@ interface CreateBillingManagementInput {
   billingStore: BillingStore;
   billingSyncStore: BillingSyncStore;
   billingLinks: BillingLinkProvider;
+  appBaseUrl?: string;
 }
 
 async function getOrganizationBillingState(
@@ -238,6 +246,8 @@ export function createBillingManagement(input: CreateBillingManagementInput): {
     now: string;
   }): Promise<BillingSummaryRecord | "billing_not_found">;
 } {
+  const appBaseUrl = input.appBaseUrl ?? "http://localhost:3000";
+
   async function getProjectedBillingSummary(inputValue: {
     organization_id: string;
     now: string;
@@ -344,33 +354,71 @@ export function createBillingManagement(input: CreateBillingManagementInput): {
             inputValue.additional_capacity_units,
             MAX_BILLING_ADDITIONAL_CAPACITY_UNITS
           );
-    const result = await input.db.query<{ id: string }>(
-      `
-        UPDATE organizations
-        SET
-          plan = $2,
-          additional_capacity_units = $3,
-          stripe_customer_id = NULL,
-          stripe_subscription_id = NULL,
-          billing_state = CASE WHEN $2 = 'free' THEN NULL ELSE 'admin_override' END,
-          billing_period_starts_at = NULL,
-          billing_period_ends_at = NULL,
-          last_billing_sync_at = $4::timestamptz,
-          last_billing_event_id = $5,
-          updated_at = $4::timestamptz
-        WHERE id = $1
-        RETURNING id::text AS id
-      `,
-      [
-        inputValue.organization_id,
-        inputValue.plan,
-        additionalCapacityUnits,
-        inputValue.now,
-        `admin_override:${inputValue.now}`
-      ]
-    );
+    const updated = await runInTransaction(input.db, async (tx) => {
+      const previousResult = await tx.query<{ plan: string }>(
+        `
+          SELECT COALESCE(plan, 'free') AS plan
+          FROM organizations
+          WHERE id = $1
+          FOR UPDATE
+        `,
+        [inputValue.organization_id]
+      );
+      const previousPlan = normalizePlanForDowngradeAudit(previousResult.rows[0]?.plan);
+      const targetPlan = normalizePlanForDowngradeAudit(inputValue.plan);
 
-    if (result.rows[0] === undefined) {
+      const result = await tx.query<{ id: string }>(
+        `
+          UPDATE organizations
+          SET
+            plan = $2,
+            additional_capacity_units = $3,
+            stripe_customer_id = NULL,
+            stripe_subscription_id = NULL,
+            billing_state = CASE WHEN $2 = 'free' THEN NULL ELSE 'admin_override' END,
+            billing_period_starts_at = NULL,
+            billing_period_ends_at = NULL,
+            last_billing_sync_at = $4::timestamptz,
+            last_billing_event_id = $5,
+            updated_at = $4::timestamptz
+          WHERE id = $1
+          RETURNING id::text AS id
+        `,
+        [
+          inputValue.organization_id,
+          inputValue.plan,
+          additionalCapacityUnits,
+          inputValue.now,
+          `admin_override:${inputValue.now}`
+        ]
+      );
+
+      if (result.rows[0] === undefined) {
+        return false;
+      }
+
+      const cleanupSummary = await createOrganizationPlanCleanupService(tx).cleanupOrganizationForPlan({
+        organization_id: inputValue.organization_id,
+        plan: targetPlan,
+        now: inputValue.now
+      });
+
+      if (isPlanDowngrade(previousPlan, targetPlan)) {
+        await recordPlanDowngradeCleanupAudit({
+          db: tx,
+          organization_id: inputValue.organization_id,
+          previous_plan: previousPlan,
+          target_plan: targetPlan,
+          trigger_source: "admin_override",
+          cleanup_summary: cleanupSummary,
+          occurred_at: inputValue.now
+        });
+      }
+
+      return true;
+    });
+
+    if (!updated) {
       return "billing_not_found";
     }
 
@@ -416,12 +464,8 @@ export function createBillingManagement(input: CreateBillingManagementInput): {
             client_reference_id: checkoutInput.organization_id,
             metadata: { organization_id: checkoutInput.organization_id },
             line_items: [{ price: priceId, quantity: 1 }],
-            success_url: `${
-              process.env["APP_BASE_URL"] ?? "http://localhost:3000"
-            }/billing?checkout=success&session_id={CHECKOUT_SESSION_ID}`,
-            cancel_url: `${
-              process.env["APP_BASE_URL"] ?? "http://localhost:3000"
-            }/billing?checkout=canceled`,
+            success_url: `${appBaseUrl}/billing?checkout=success&session_id={CHECKOUT_SESSION_ID}`,
+            cancel_url: `${appBaseUrl}/billing?checkout=canceled`,
             automatic_tax: { enabled: true },
             billing_address_collection: "auto",
             tax_id_collection: { enabled: true },
@@ -570,7 +614,7 @@ export function createBillingManagement(input: CreateBillingManagementInput): {
           try {
             const session = await input.stripeConfig.client.billingPortal.sessions.create({
               customer: customerId,
-              return_url: `${process.env["APP_BASE_URL"] ?? "http://localhost:3000"}/billing`
+              return_url: `${appBaseUrl}/billing`
             });
             return { url: session.url };
           } catch {

@@ -260,6 +260,7 @@ export interface ProjectRecord {
   relationship: "owned" | "shared";
   sharing_state: "private" | "shared_by_you" | "shared_with_you";
   effective_role: "owner" | "admin" | "member";
+  shared_access_suspended?: boolean;
   name: string;
   slug: string;
   environment_default: string;
@@ -284,6 +285,7 @@ export interface ProjectAccessRecord {
   relationship: "owned" | "shared";
   sharing_state: "private" | "shared_by_you" | "shared_with_you";
   effective_role: "owner" | "admin" | "member";
+  shared_access_suspended: boolean;
   organization_plan: TierName;
 }
 
@@ -330,6 +332,7 @@ export interface AccountDataExportRecord extends Record<string, unknown> {
   org_usage_counters: Record<string, unknown>[];
   processed_billing_events: Record<string, unknown>[];
   processed_github_marketplace_events: Record<string, unknown>[];
+  plan_cleanup_tasks: Record<string, unknown>[];
   operational_email_deliveries: Record<string, unknown>[];
   audit_logs: Record<string, unknown>[];
   artifacts: {
@@ -1454,6 +1457,7 @@ export interface GitHubDispatchDeliveryRecord extends Record<string, unknown> {
 
 export interface MatchingGitHubDispatchRule {
   rule_id: string;
+  rule_name: string;
   installation_id: number;
   repo_owner: string;
   repo_name: string;
@@ -1612,6 +1616,7 @@ export interface GitHubStore {
   }): Promise<number>;
   createGitHubDispatchDeliveryIntent(input: {
     rule_id: string;
+    rule_name: string;
     project_id: string;
     incident_id: string | null;
     improvement_id: string | null;
@@ -1624,6 +1629,7 @@ export interface GitHubStore {
   }): Promise<{ delivery_id: string; created: boolean }>;
   createSkippedGitHubDispatchDelivery(input: {
     rule_id: string;
+    rule_name: string;
     project_id: string;
     incident_id: string | null;
     improvement_id: string | null;
@@ -1711,7 +1717,7 @@ export interface ProjectCollaborationStore {
         membership: ProjectMemberRecord & { project_id: string };
       }
     | {
-        kind: "invalid_token" | "email_mismatch";
+        kind: "invalid_token" | "email_mismatch" | "shared_access_suspended";
       }
   >;
   updateProjectMemberRole?(input: {
@@ -1932,6 +1938,7 @@ export interface QueryResult<Row> {
 
 export interface Queryable {
   query<Row extends Record<string, unknown>>(sql: string, params: unknown[]): Promise<QueryResult<Row>>;
+  transaction?<Result>(callback: (db: Queryable) => Promise<Result>): Promise<Result>;
 }
 
 export interface PersistEventMetadataInput {

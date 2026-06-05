@@ -226,7 +226,8 @@ vi.mock("../../../packages/storage/src/index.js", async (importOriginal) => {
   createS3ObjectStoreClient: vi.fn().mockImplementation((input: unknown) => {
     s3FactoryMock(input);
     return {
-      getObject: vi.fn()
+      getObject: vi.fn(),
+      deleteObjectsByPrefix: vi.fn()
     };
   }),
   createRedisIncidentFrequencyCounter: vi.fn().mockReturnValue({
@@ -1362,6 +1363,7 @@ describe("worker runtime", () => {
     const listMatchingGitHubDispatchRules = vi.fn().mockResolvedValue([
       {
         rule_id: "ghr_123",
+        rule_name: "High severity incidents",
         installation_id: 99,
         repo_owner: "debugbundle",
         repo_name: "app",
@@ -1413,6 +1415,7 @@ describe("worker runtime", () => {
     expect(createGitHubDispatchDeliveryIntent).toHaveBeenCalledWith(
       expect.objectContaining({
         rule_id: "ghr_123",
+        rule_name: "High severity incidents",
         project_id: "proj_123",
         incident_id: "inc_123",
         improvement_id: null,
@@ -1454,6 +1457,7 @@ describe("worker runtime", () => {
 
     const baseRule = {
       rule_id: "ghr_123",
+      rule_name: "High severity incidents",
       installation_id: 99,
       repo_owner: "debugbundle",
       repo_name: "app",
@@ -1546,6 +1550,7 @@ describe("worker runtime", () => {
     const listMatchingGitHubDispatchRules = vi.fn().mockResolvedValue([
       {
         rule_id: "ghr_123",
+        rule_name: "Hosted improvements",
         installation_id: 99,
         repo_owner: "debugbundle",
         repo_name: "app",
@@ -1596,6 +1601,7 @@ describe("worker runtime", () => {
     });
     expect(createGitHubDispatchDeliveryIntent).toHaveBeenCalledWith({
       rule_id: "ghr_123",
+      rule_name: "Hosted improvements",
       project_id: "proj_123",
       incident_id: null,
       improvement_id: "imp_123",
@@ -1632,6 +1638,7 @@ describe("worker runtime", () => {
     const listMatchingGitHubDispatchRules = vi.fn().mockResolvedValue([
       {
         rule_id: "ghr_123",
+        rule_name: "Spike detector",
         installation_id: 99,
         repo_owner: "debugbundle",
         repo_name: "app",
@@ -1668,6 +1675,7 @@ describe("worker runtime", () => {
 
     expect(createGitHubDispatchDeliveryIntent).toHaveBeenCalledWith(
       expect.objectContaining({
+        rule_name: "Spike detector",
         dedupe_key: "incident.spike_detected:2026-03-11T00:00:00.000Z"
       })
     );

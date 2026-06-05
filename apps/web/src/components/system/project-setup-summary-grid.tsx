@@ -32,8 +32,7 @@ type SummaryLoadState<T> =
 type GitHubSummaryLoadState =
   | { status: "loading" }
   | { status: "ready"; data: GitHubOverviewSummary }
-  | { status: "error" }
-  | { status: "unsupported" };
+  | { status: "error" };
 
 interface GitHubOverviewSummary {
   installation: GitHubInstallationRecord | null;
@@ -72,9 +71,7 @@ export function ProjectSetupSummaryGrid({ project }: { project: ProjectRecord })
         getProjectCapturePolicy(project.project_id),
         getProjectImprovementSettings(project.project_id),
         listProjectWeeklyReportChannels(project.project_id, PROJECT_SETUP_SUMMARY_LIST_LIMIT),
-        project.organization_plan === "free"
-          ? Promise.resolve<GitHubOverviewSummary>({ installation: null, repo: null, rules: [] })
-          : loadGitHubOverviewSummary(project.project_id)
+        loadGitHubOverviewSummary(project.project_id)
       ]);
 
       if (!isActive) {
@@ -87,7 +84,7 @@ export function ProjectSetupSummaryGrid({ project }: { project: ProjectRecord })
         capturePolicy: toSummaryLoadState(capturePolicyResult),
         improvementSettings: toSummaryLoadState(improvementSettingsResult),
         weeklyReports: toSummaryLoadState(weeklyReportsResult),
-        github: project.organization_plan === "free" ? { status: "unsupported" } : toSummaryLoadState(githubResult)
+        github: toSummaryLoadState(githubResult)
       });
     })();
 
@@ -104,7 +101,7 @@ export function ProjectSetupSummaryGrid({ project }: { project: ProjectRecord })
     <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
       {renderAlertsSummaryBlock(summary.alerts)}
       {renderWebhooksSummaryBlock(summary.webhooks)}
-      {renderGitHubSummaryBlock(summary.github)}
+      {renderGitHubSummaryBlock(summary.github, project.organization_plan)}
       {renderWeeklyReportsSummaryBlock(summary.weeklyReports)}
       {renderCapturePolicySummaryBlock(summary.capturePolicy)}
       {renderImprovementSummaryBlock(summary.improvementSettings)}
@@ -118,7 +115,7 @@ function buildLoadingProjectSetupSummary(
   return {
     alerts: { status: "loading" },
     webhooks: { status: "loading" },
-    github: organizationPlan === "free" ? { status: "unsupported" } : { status: "loading" },
+    github: { status: "loading" },
     weeklyReports: { status: "loading" },
     capturePolicy: { status: "loading" },
     improvementSettings: { status: "loading" }
@@ -250,20 +247,12 @@ function renderWebhooksSummaryBlock(summary: SummaryLoadState<WebhookRecord[]>):
   );
 }
 
-function renderGitHubSummaryBlock(summary: GitHubSummaryLoadState): JSX.Element {
+function renderGitHubSummaryBlock(
+  summary: GitHubSummaryLoadState,
+  organizationPlan: ProjectRecord["organization_plan"]
+): JSX.Element {
   if (summary.status === "loading") {
     return <SetupSummaryBlock label="GitHub automation" value="Loading..." badge={{ label: "Loading", variant: "outline" }} description="Loading GitHub automation status." />;
-  }
-
-  if (summary.status === "unsupported") {
-    return (
-      <SetupSummaryBlock
-        label="GitHub automation"
-        value="Solo+ only"
-        badge={{ label: "Unavailable", variant: "outline" }}
-        description="Repository dispatch automation is not available on the Free plan."
-      />
-    );
   }
 
   if (summary.status === "error") {
@@ -278,14 +267,37 @@ function renderGitHubSummaryBlock(summary: GitHubSummaryLoadState): JSX.Element 
   }
 
   const { installation, repo, rules } = summary.data;
+  const automationEnabled = organizationPlan !== "free";
 
   if (installation === null) {
     return (
       <SetupSummaryBlock
         label="GitHub automation"
-        value="Not configured"
-        badge={{ label: "Setup required", variant: "secondary" }}
-        description="No GitHub App installation is connected to this workspace yet."
+        value={automationEnabled ? "Not configured" : "Solo+ only"}
+        badge={{
+          label: automationEnabled ? "Setup required" : "Unavailable",
+          variant: automationEnabled ? "secondary" : "outline"
+        }}
+        description={
+          automationEnabled
+            ? "No GitHub App installation is connected to this workspace yet."
+            : "Repository dispatch automation is not available on the Free plan."
+        }
+      />
+    );
+  }
+
+  if (!automationEnabled) {
+    return (
+      <SetupSummaryBlock
+        label="GitHub automation"
+        value="Paused"
+        badge={{ label: "Upgrade required", variant: "warning" }}
+        description={
+          repo === null
+            ? "The GitHub App installation is preserved and will resume after the project returns to Solo or Team."
+            : `${repo.repo_owner}/${repo.repo_name} and its dispatch rules are preserved and will resume after the project returns to Solo or Team.`
+        }
       />
     );
   }

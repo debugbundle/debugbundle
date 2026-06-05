@@ -147,6 +147,10 @@ Eligibility and lifecycle rules:
 - Solo trial can convert to paid Solo or Team.
 - Team trial can convert to paid Team only.
 - Active no-card trials cannot buy extra capacity; capacity routes must reject them with `409 trial_conversion_required`.
+- Any downgrade to a lower-capability tier must suspend setup for features that no longer belong to that tier; route-level `upgrade_required` checks are not enough.
+- Team to Solo pauses Team-only collaboration and Slack setup while preserving the saved setup for later reactivation.
+- Solo or Team to Free pauses remote probes, GitHub automation setup, Slack setup, collaborators/invites, and hosted improvement opportunities/settings while preserving the saved setup for later reactivation.
+- Free downgrades must not delete hosted improvement bundle objects solely because of the downgrade. Existing hosted improvement artifacts remain subject to normal retained-bundle caps and retention, and retrieval/generation paths must enforce the current tier.
 
 ---
 
@@ -494,6 +498,7 @@ Billing sync and no-card trial lifecycle must be observable with:
 - Structured logs for every processed event (event type, organization ID, resulting state)
 - Structured logs for failures (resolution misses, Stripe API errors)
 - Structured logs for trial lifecycle actions (start, reminder queued, expired, converted, skipped)
+- A `billing.plan_downgrade_cleanup` system audit record whenever a lower-plan write suspends, terminalizes, or invalidates paid-tier setup. The audit metadata includes `previous_plan`, `target_plan`, `trigger_source`, and `cleanup_summary` counts by feature category.
 - Metrics for webhook processing latency and error rates (deferred to operational monitoring phase)
 
 ---
@@ -557,6 +562,18 @@ A `trial_lifecycle_events` table must exist for worker-side reminder/expiry/conv
 `operational_email_deliveries` must support organization-scoped lifecycle mail:
 - `project_id` nullable for trial lifecycle emails
 - `kind` includes `trial_started`, `trial_ending_soon`, `trial_expired`, and `trial_converted`
+
+A `plan_cleanup_tasks` table exists as a reserved compatibility surface for external cleanup side effects that cannot be completed transactionally. The current preserve-and-suspend downgrade flow does not emit or process hosted-improvement object deletion tasks:
+- `id` (uuid, primary key)
+- `organization_id` (uuid, not null)
+- `project_id` (uuid, not null)
+- `cleanup_type` (text, not null) — currently `delete_improvement_bundle_objects`
+- `attempt_count` (integer, not null, default 0)
+- `last_error` (text, nullable)
+- `next_attempt_at` (timestamptz, not null, default now())
+- `completed_at` (timestamptz, nullable)
+- `created_at` (timestamptz, not null, default now())
+- `updated_at` (timestamptz, not null, default now())
 
 A `processed_billing_events` table must be created:
 - `event_id` (text, primary key) — Stripe event ID

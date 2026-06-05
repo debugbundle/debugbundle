@@ -58,6 +58,15 @@ export { createPostgresGitHubMarketplaceStore } from "./github-marketplace-store
 export { createIncidentLifecycleService } from "./incident-lifecycle-service.js";
 export { createPostgresMetadataStore } from "./metadata-store.js";
 export { createPostgresOperationalEmailDeliveryStore } from "./operational-email-delivery-store.js";
+export type { OrganizationPlanCleanupService } from "./plan-downgrade-cleanup.js";
+export { createOrganizationPlanCleanupService } from "./plan-downgrade-cleanup.js";
+export {
+  isPlanDowngrade,
+  normalizePlanForDowngradeAudit,
+  recordPlanDowngradeCleanupAudit
+} from "./plan-downgrade-audit.js";
+export type { PlanDowngradeTriggerSource } from "./plan-downgrade-audit.js";
+export { runInTransaction } from "./transaction.js";
 export {
   getAllowanceLimitBehavior,
   getAllowanceMeterLabel,

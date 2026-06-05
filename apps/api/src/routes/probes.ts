@@ -153,9 +153,6 @@ export function registerProbeRoutes(app: FastifyInstance, dependencies: ApiDepen
     if (listed === null) {
       return reply.status(404).send({ error: "project_not_found" });
     }
-    if (!getTierCapabilities(listed.organization_plan).remote_probes) {
-      return reply.status(403).send({ error: "upgrade_required" });
-    }
 
     return reply.status(200).send({ activations: listed.activations });
   });
@@ -190,10 +187,6 @@ export function registerProbeRoutes(app: FastifyInstance, dependencies: ApiDepen
     if (deactivated === null) {
       return reply.status(404).send({ error: "activation_not_found" });
     }
-    if (!getTierCapabilities(deactivated.organization_plan).remote_probes) {
-      return reply.status(403).send({ error: "upgrade_required" });
-    }
-
     if (dependencies.cdnPurge !== undefined) {
       await dependencies.cdnPurge(parsedParams.data.id);
     }

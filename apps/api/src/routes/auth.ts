@@ -785,6 +785,9 @@ export function registerAuthRoutes(app: FastifyInstance, dependencies: ApiDepend
       if (accepted.error === "invite_email_mismatch") {
         return reply.status(403).send({ error: "invite_email_mismatch" });
       }
+      if (accepted.error === "shared_access_suspended") {
+        return reply.status(403).send({ error: "shared_access_suspended" });
+      }
 
       return reply.status(400).send({ error: "invalid_token" });
     }

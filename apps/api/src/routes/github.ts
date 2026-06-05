@@ -289,17 +289,7 @@ export function registerGitHubRoutes(app: FastifyInstance, dependencies: ApiDepe
       if (auth === null) {
         return;
       }
-      if (
-        !(await ensureGitHubAutomationEnabledForProject(dependencies, {
-          project_id: parsedQuery.data.project_id,
-          organization_id: auth.access.organization_id
-        }))
-      ) {
-        return reply.status(403).send({ error: "upgrade_required" });
-      }
       organizationId = auth.access.organization_id;
-    } else if (!(await ensureGitHubAutomationEnabled(dependencies, member.organization_id))) {
-      return reply.status(403).send({ error: "upgrade_required" });
     }
 
     const installation = await dependencies.githubManagement.getInstallationForOrganization({
@@ -319,10 +309,6 @@ export function registerGitHubRoutes(app: FastifyInstance, dependencies: ApiDepe
     if (dependencies.githubManagement === undefined) {
       return reply.status(503).send({ error: "github_not_configured" });
     }
-    if (!(await ensureGitHubAutomationEnabled(dependencies, member.organization_id))) {
-      return reply.status(403).send({ error: "upgrade_required" });
-    }
-
     const deleted = await dependencies.githubManagement.disconnectInstallationForOrganization({
       organization_id: member.organization_id
     });
@@ -397,14 +383,6 @@ export function registerGitHubRoutes(app: FastifyInstance, dependencies: ApiDepe
     if (dependencies.githubManagement === undefined) {
       return reply.status(503).send({ error: "github_not_configured" });
     }
-    if (
-      !(await ensureGitHubAutomationEnabledForProject(dependencies, {
-        project_id: parsedParams.data.id,
-        organization_id: auth.access.organization_id
-      }))
-    ) {
-      return reply.status(403).send({ error: "upgrade_required" });
-    }
 
     const repo = await dependencies.githubManagement.getProjectRepoForOrganization({
       organization_id: auth.access.organization_id,
@@ -478,15 +456,6 @@ export function registerGitHubRoutes(app: FastifyInstance, dependencies: ApiDepe
     if (dependencies.githubManagement === undefined) {
       return reply.status(503).send({ error: "github_not_configured" });
     }
-    if (
-      !(await ensureGitHubAutomationEnabledForProject(dependencies, {
-        project_id: parsedParams.data.id,
-        organization_id: auth.access.organization_id
-      }))
-    ) {
-      return reply.status(403).send({ error: "upgrade_required" });
-    }
-
     const removed = await dependencies.githubManagement.removeProjectRepoForOrganization({
       organization_id: auth.access.organization_id,
       project_id: parsedParams.data.id
@@ -512,14 +481,6 @@ export function registerGitHubRoutes(app: FastifyInstance, dependencies: ApiDepe
     }
     if (dependencies.githubManagement === undefined) {
       return reply.status(503).send({ error: "github_not_configured" });
-    }
-    if (
-      !(await ensureGitHubAutomationEnabledForProject(dependencies, {
-        project_id: parsedParams.data.id,
-        organization_id: auth.access.organization_id
-      }))
-    ) {
-      return reply.status(403).send({ error: "upgrade_required" });
     }
 
     const rules = await dependencies.githubManagement.listProjectRulesForOrganization({
@@ -547,14 +508,6 @@ export function registerGitHubRoutes(app: FastifyInstance, dependencies: ApiDepe
     }
     if (dependencies.githubManagement === undefined) {
       return reply.status(503).send({ error: "github_not_configured" });
-    }
-    if (
-      !(await ensureGitHubAutomationEnabledForProject(dependencies, {
-        project_id: parsedParams.data.id,
-        organization_id: auth.access.organization_id
-      }))
-    ) {
-      return reply.status(403).send({ error: "upgrade_required" });
     }
     const parsedQuery = GitHubDispatchDeliveriesQuerySchema.safeParse(request.query);
     if (!parsedQuery.success) {
@@ -624,14 +577,6 @@ export function registerGitHubRoutes(app: FastifyInstance, dependencies: ApiDepe
     }
     if (dependencies.githubManagement === undefined) {
       return reply.status(503).send({ error: "github_not_configured" });
-    }
-    if (
-      !(await ensureGitHubAutomationEnabledForProject(dependencies, {
-        project_id: parsedParams.data.id,
-        organization_id: auth.access.organization_id
-      }))
-    ) {
-      return reply.status(403).send({ error: "upgrade_required" });
     }
 
     const rule = await dependencies.githubManagement.getProjectRuleForOrganization({
@@ -799,15 +744,6 @@ export function registerGitHubRoutes(app: FastifyInstance, dependencies: ApiDepe
     if (dependencies.githubManagement === undefined) {
       return reply.status(503).send({ error: "github_not_configured" });
     }
-    if (
-      !(await ensureGitHubAutomationEnabledForProject(dependencies, {
-        project_id: parsedParams.data.id,
-        organization_id: auth.access.organization_id
-      }))
-    ) {
-      return reply.status(403).send({ error: "upgrade_required" });
-    }
-
     const deleted = await dependencies.githubManagement.deleteProjectRuleForOrganization({
       organization_id: auth.access.organization_id,
       project_id: parsedParams.data.id,

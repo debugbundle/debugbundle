@@ -165,6 +165,32 @@ export function createWorkerShutdownState(): WorkerShutdownState {
   };
 }
 
+function createPoolQueryable(pool: Pool): Queryable {
+  return {
+    query: async <Row extends Record<string, unknown>>(sql: string, params: unknown[]) =>
+      pool.query<Row>(sql, params),
+    transaction: async <Result>(callback: (db: Queryable) => Promise<Result>) => {
+      const client = await pool.connect();
+      const tx: Queryable = {
+        query: async <Row extends Record<string, unknown>>(sql: string, params: unknown[]) =>
+          client.query<Row>(sql, params)
+      };
+
+      try {
+        await client.query("BEGIN", []);
+        const result = await callback(tx);
+        await client.query("COMMIT", []);
+        return result;
+      } catch (error) {
+        await client.query("ROLLBACK", []).catch(() => undefined);
+        throw error;
+      } finally {
+        client.release();
+      }
+    }
+  };
+}
+
 async function delayUntilNextPollOrShutdown(ms: number, shutdownState: WorkerShutdownState): Promise<void> {
   if (shutdownState.isShuttingDown()) {
     return;
@@ -523,6 +549,7 @@ export function createGitHubDispatchPublisher(input: CreateGitHubDispatchPublish
         if (projectCount >= 100) {
           await input.githubStore.createSkippedGitHubDispatchDelivery({
             rule_id: rule.rule_id,
+            rule_name: rule.rule_name,
             project_id: event.project_id,
             incident_id: incidentId,
             improvement_id: improvementId,
@@ -544,6 +571,7 @@ export function createGitHubDispatchPublisher(input: CreateGitHubDispatchPublish
         if (installationCount >= 4000) {
           await input.githubStore.createSkippedGitHubDispatchDelivery({
             rule_id: rule.rule_id,
+            rule_name: rule.rule_name,
             project_id: event.project_id,
             incident_id: incidentId,
             improvement_id: improvementId,
@@ -560,6 +588,7 @@ export function createGitHubDispatchPublisher(input: CreateGitHubDispatchPublish
 
         await input.githubStore.createGitHubDispatchDeliveryIntent({
           rule_id: rule.rule_id,
+          rule_name: rule.rule_name,
           project_id: event.project_id,
           incident_id: incidentId,
           improvement_id: improvementId,
@@ -1680,9 +1709,7 @@ export async function runWorkerFromEnv(envInput: Record<string, string | undefin
     ...(dbSsl === undefined ? {} : { ssl: dbSsl })
   });
 
-  const queryable: Queryable = {
-    query: async <Row extends Record<string, unknown>>(sql: string, params: unknown[]) => pool.query<Row>(sql, params)
-  };
+  const queryable = createPoolQueryable(pool);
   const shutdownState = createWorkerShutdownState();
   const readinessCheck = buildWorkerReadinessCheck({ env, queryable });
   const drainingReadinessCheck = async (): Promise<void> => {

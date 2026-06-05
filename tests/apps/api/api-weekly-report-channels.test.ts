@@ -175,6 +175,80 @@ describe("api weekly report channel routes", () => {
     });
   });
 
+  it("keeps preserved Slack weekly report channels readable and deletable after downgrade", async (): Promise<void> => {
+    const weeklyReportManagement = {
+      listWeeklyReportChannelsForOrganization: vi.fn().mockResolvedValue([
+        {
+          channel_id: "11111111-1111-4111-8111-111111111111",
+          project_id: "00000000-0000-4000-8000-000000000001",
+          channel: "slack",
+          config: { slack_destination_id: "22222222-2222-4222-8222-222222222222" },
+          schedule: { day_of_week: "monday", hour_of_day: 9, timezone: "UTC" },
+          is_enabled: true,
+          created_at: "2026-03-15T00:00:00.000Z",
+          updated_at: "2026-03-15T00:00:00.000Z"
+        }
+      ]),
+      createWeeklyReportChannelForOrganization: vi.fn().mockResolvedValue(null),
+      updateWeeklyReportChannelForOrganization: vi.fn().mockResolvedValue(null),
+      deleteWeeklyReportChannelForOrganization: vi.fn().mockResolvedValue({
+        channel_id: "11111111-1111-4111-8111-111111111111"
+      }),
+      getWeeklyReportChannelById: vi.fn().mockResolvedValue({
+        channel_id: "11111111-1111-4111-8111-111111111111",
+        project_id: "00000000-0000-4000-8000-000000000001",
+        channel: "slack",
+        config: { slack_destination_id: "22222222-2222-4222-8222-222222222222" },
+        schedule: { day_of_week: "monday", hour_of_day: 9, timezone: "UTC" },
+        is_enabled: true,
+        created_at: "2026-03-15T00:00:00.000Z",
+        updated_at: "2026-03-15T00:00:00.000Z"
+      })
+    };
+    const app = createServer({
+      weeklyReportManagement,
+      projectManagement: {
+        resolveProjectAccessForUser: vi.fn().mockResolvedValue({
+          project_id: "00000000-0000-4000-8000-000000000001",
+          organization_id: "org_123",
+          owner_user_id: "usr_123",
+          owner_email: "owner@example.com",
+          relationship: "owned",
+          sharing_state: "shared_by_you",
+          effective_role: "owner",
+          organization_plan: "free"
+        })
+      }
+    });
+
+    const listed = await app.inject({
+      method: "GET",
+      url: "/v1/weekly-report-channels?project_id=00000000-0000-4000-8000-000000000001",
+      headers: { authorization: "Bearer dbundle_mem_test" }
+    });
+    const deleted = await app.inject({
+      method: "DELETE",
+      url: "/v1/weekly-report-channels/11111111-1111-4111-8111-111111111111",
+      headers: { authorization: "Bearer dbundle_mem_test" }
+    });
+
+    expect(listed.statusCode).toBe(200);
+    expect(listed.json()).toEqual({
+      channels: [
+        expect.objectContaining({
+          channel_id: "11111111-1111-4111-8111-111111111111",
+          channel: "slack",
+          config: { slack_destination_id: "22222222-2222-4222-8222-222222222222" }
+        })
+      ]
+    });
+    expect(deleted.statusCode).toBe(204);
+    expect(weeklyReportManagement.deleteWeeklyReportChannelForOrganization).toHaveBeenCalledWith({
+      organization_id: "org_123",
+      channel_id: "11111111-1111-4111-8111-111111111111"
+    });
+  });
+
   it("allows project members to list weekly reports but rejects weekly report writes", async (): Promise<void> => {
     const weeklyReportManagement = {
       listWeeklyReportChannelsForOrganization: vi.fn().mockResolvedValue([]),

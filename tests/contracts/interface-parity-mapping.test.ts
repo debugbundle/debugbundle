@@ -113,7 +113,7 @@ describe("retrieval parity mapping contract", () => {
     const contract = await readFile(CONTRACT_PATH, "utf8");
 
     expect(contract).toContain(
-      "| Weekly report channel CRUD | `POST/GET/PATCH/DELETE /v1/weekly-report-channels` | `weekly-report list/create/update/delete` | `list_weekly_report_channels/create_weekly_report_channel/update_weekly_report_channel/delete_weekly_report_channel` | Browser Session or Member Token, scoped to organization/project |"
+      "| Weekly report channel CRUD | `POST/GET/PATCH/DELETE /v1/weekly-report-channels` | `weekly-report list/create/update/delete` | `list_weekly_report_channels/create_weekly_report_channel/update_weekly_report_channel/delete_weekly_report_channel` | Browser Session or Member Token, scoped to organization/project; preserved Slack channels remain readable while paused |"
     );
     expect(contract).toContain("debugbundle_list_weekly_report_channels   → same result as `GET /v1/weekly-report-channels`");
     expect(contract).toContain("debugbundle_create_weekly_report_channel  → same result as `POST /v1/weekly-report-channels`");
@@ -128,10 +128,10 @@ describe("retrieval parity mapping contract", () => {
       "| Activate probes (remote) | `POST /v1/projects/{id}/probes/activate` | `probe activate` | `activate_probe` | Browser Session or Member Token, Solo+ only |"
     );
     expect(contract).toContain(
-      "| List active probes (remote) | `GET /v1/projects/{id}/probes` | `probe list` | `list_active_probes` | Solo+ only |"
+      "| List active probes (remote) | `GET /v1/projects/{id}/probes` | `probe list` | `list_active_probes` | Browser Session or Member Token, preserved activations remain readable while paused on Free |"
     );
     expect(contract).toContain(
-      "| Deactivate probes (remote) | `POST /v1/projects/{id}/probes/deactivate` | `probe deactivate` | `deactivate_probe` | Solo+ only |"
+      "| Deactivate probes (remote) | `POST /v1/projects/{id}/probes/deactivate` | `probe deactivate` | `deactivate_probe` | Browser Session or Member Token cleanup action; allowed after downgrade |"
     );
     expect(contract).toContain(
       "| SDK config | `GET /v1/sdk/config` | — | — | SDK-only (project token, includes resolved capture policy) |"
@@ -159,7 +159,7 @@ describe("retrieval parity mapping contract", () => {
     const contract = await readFile(CONTRACT_PATH, "utf8");
 
     expect(contract).toContain(
-      "| Get GitHub installation | `GET /v1/github/installation` | `github status` | `get_github_status` | Browser Session or Member Token, available to authorized members on eligible Solo+ project |"
+      "| Get GitHub installation | `GET /v1/github/installation` | `github status` | `get_github_status` | Browser Session or Member Token; read remains available when preserved GitHub setup is paused on Free |"
     );
     expect(contract).toContain(
       "| List GitHub repositories | `GET /v1/github/repositories` | `github repos` | `list_github_repositories` | Browser Session or Member Token, owner/admin only on eligible Solo+ project |"
@@ -168,7 +168,7 @@ describe("retrieval parity mapping contract", () => {
       "| Set project GitHub repo | `PUT /v1/projects/{id}/github/repo` | `github repo set` | `set_project_github_repo` | Browser Session or Member Token, owner/admin only, Solo+ only |"
     );
     expect(contract).toContain(
-      "| Remove project GitHub repo | `DELETE /v1/projects/{id}/github/repo` | `github repo remove` | `remove_project_github_repo` | Browser Session or Member Token, owner/admin only, Solo+ only |"
+      "| Remove project GitHub repo | `DELETE /v1/projects/{id}/github/repo` | `github repo remove` | `remove_project_github_repo` | Browser Session or Member Token, owner/admin cleanup action; allowed after downgrade |"
     );
     expect(contract).toContain("debugbundle_get_github_status           → same result as GET /v1/github/installation");
     expect(contract).toContain("debugbundle_list_github_repositories    → same result as GET /v1/github/repositories");
@@ -180,7 +180,7 @@ describe("retrieval parity mapping contract", () => {
     const contract = await readFile(CONTRACT_PATH, "utf8");
 
     expect(contract).toContain(
-      "| List dispatch rules | `GET /v1/projects/{id}/github/rules` | `github rules` | `list_github_dispatch_rules` | Browser Session or Member Token, available to authorized members on eligible Solo+ project |"
+      "| List dispatch rules | `GET /v1/projects/{id}/github/rules` | `github rules` | `list_github_dispatch_rules` | Browser Session or Member Token; read remains available when preserved GitHub setup is paused on Free |"
     );
     expect(contract).toContain(
       "| Create dispatch rule | `POST /v1/projects/{id}/github/rules` | `github rules create` | `create_github_dispatch_rule` | Browser Session or Member Token, any authorized project member on eligible Solo+ project |"
@@ -189,7 +189,7 @@ describe("retrieval parity mapping contract", () => {
       "| Update dispatch rule | `PATCH /v1/projects/{id}/github/rules/{ruleId}` | `github rules update` | `update_github_dispatch_rule` | Browser Session or Member Token, owner/admin may update any rule; member may update only self-created rules |"
     );
     expect(contract).toContain(
-      "| Delete dispatch rule | `DELETE /v1/projects/{id}/github/rules/{ruleId}` | `github rules delete` | `delete_github_dispatch_rule` | Browser Session or Member Token, owner/admin may delete any rule; member may delete only self-created rules |"
+      "| Delete dispatch rule | `DELETE /v1/projects/{id}/github/rules/{ruleId}` | `github rules delete` | `delete_github_dispatch_rule` | Browser Session or Member Token cleanup action; owner/admin may delete any rule and member may delete only self-created rules, allowed after downgrade |"
     );
     expect(contract).toContain("debugbundle_list_github_dispatch_rules  → same result as GET /v1/projects/{id}/github/rules");
     expect(contract).toContain("debugbundle_create_github_dispatch_rule → same result as POST /v1/projects/{id}/github/rules");
@@ -201,7 +201,7 @@ describe("retrieval parity mapping contract", () => {
     const contract = await readFile(CONTRACT_PATH, "utf8");
 
     expect(contract).toContain(
-      "| List dispatch deliveries | `GET /v1/projects/{id}/github/deliveries` | `github deliveries` | `list_github_deliveries` | Browser Session or Member Token, available to authorized members on eligible Solo+ project |"
+      "| List dispatch deliveries | `GET /v1/projects/{id}/github/deliveries` | `github deliveries` | `list_github_deliveries` | Browser Session or Member Token; read remains available when preserved GitHub setup is paused on Free |"
     );
     expect(contract).toContain(
       "| Retry dispatch delivery | `POST /v1/projects/{id}/github/deliveries/{id}/retry` | `github deliveries retry` | `retry_github_delivery` | Browser Session or Member Token, owner/admin or creator-owned-rule member on eligible Solo+ project |"

@@ -1,7 +1,7 @@
 import type { FastifyInstance } from "fastify";
 
 import type { ApiDependencies } from "../api-types.js";
-import { requireRateLimitedMemberAuth } from "../api-helpers.js";
+import { isSharedProjectAccessSuspended, requireRateLimitedMemberAuth } from "../api-helpers.js";
 import { CreateProjectBodySchema, ProjectParamsSchema, ProjectsQuerySchema, UpdateProjectBodySchema } from "../schemas.js";
 
 export function registerProjectRoutes(app: FastifyInstance, dependencies: ApiDependencies): void {
@@ -94,6 +94,9 @@ export function registerProjectRoutes(app: FastifyInstance, dependencies: ApiDep
     if (access === null) {
       return reply.status(404).send({ error: "project_not_found" });
     }
+    if (isSharedProjectAccessSuspended(access)) {
+      return reply.status(403).send({ error: "shared_access_suspended" });
+    }
     if (access.effective_role !== "owner" && access.effective_role !== "admin") {
       return reply.status(403).send({ error: "forbidden" });
     }
@@ -144,6 +147,9 @@ export function registerProjectRoutes(app: FastifyInstance, dependencies: ApiDep
     });
     if (access === null) {
       return reply.status(404).send({ error: "project_not_found" });
+    }
+    if (isSharedProjectAccessSuspended(access)) {
+      return reply.status(403).send({ error: "shared_access_suspended" });
     }
     if (access.effective_role !== "owner") {
       return reply.status(403).send({ error: "forbidden" });

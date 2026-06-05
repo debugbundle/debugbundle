@@ -684,6 +684,52 @@ export const STORAGE_SCHEMA_MIGRATIONS = [
         )
       `
     ]
+  }),
+  defineStorageSchemaMigration({
+    id: "202606050001_preserve_github_dispatch_history_when_rules_are_deleted",
+    description:
+      "Snapshot GitHub rule names onto deliveries and decouple delivery history from live rule rows.",
+    statements: [
+      "ALTER TABLE github_dispatch_deliveries ADD COLUMN IF NOT EXISTS rule_name text",
+      `
+        UPDATE github_dispatch_deliveries deliveries
+        SET rule_name = rules.name
+        FROM github_dispatch_rules rules
+        WHERE deliveries.rule_id = rules.id
+          AND deliveries.rule_name IS NULL
+      `,
+      "ALTER TABLE github_dispatch_deliveries ALTER COLUMN rule_name SET DEFAULT ''",
+      "UPDATE github_dispatch_deliveries SET rule_name = '' WHERE rule_name IS NULL",
+      "ALTER TABLE github_dispatch_deliveries ALTER COLUMN rule_name SET NOT NULL",
+      "ALTER TABLE github_dispatch_deliveries DROP CONSTRAINT IF EXISTS github_dispatch_deliveries_rule_id_fkey"
+    ]
+  }),
+  defineStorageSchemaMigration({
+    id: "202606050002_add_durable_plan_cleanup_tasks",
+    description:
+      "Persist retryable external cleanup tasks for side effects that cannot be completed transactionally.",
+    statements: [
+      `
+        CREATE TABLE IF NOT EXISTS plan_cleanup_tasks (
+          id uuid PRIMARY KEY,
+          organization_id uuid NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+          project_id uuid NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+          cleanup_type text NOT NULL
+            CHECK (cleanup_type IN ('delete_improvement_bundle_objects')),
+          attempt_count integer NOT NULL DEFAULT 0,
+          last_error text,
+          next_attempt_at timestamptz NOT NULL DEFAULT now(),
+          completed_at timestamptz,
+          created_at timestamptz NOT NULL DEFAULT now(),
+          updated_at timestamptz NOT NULL DEFAULT now(),
+          UNIQUE (project_id, cleanup_type)
+        )
+      `,
+      `
+        CREATE INDEX IF NOT EXISTS plan_cleanup_tasks_pending_idx
+        ON plan_cleanup_tasks (completed_at, next_attempt_at, created_at)
+      `
+    ]
   })
 ] as const;
 
@@ -725,6 +771,7 @@ const CURRENT_SCHEMA_SENTINEL_COLUMNS = [
   { table_name: "alert_rules", column_name: "cooldown_seconds" },
   { table_name: "capture_policies", column_name: "immediate_client_error_statuses" },
   { table_name: "github_dispatch_rules", column_name: "created_by_user_id" },
+  { table_name: "github_dispatch_deliveries", column_name: "rule_name" },
   { table_name: "github_dispatch_deliveries", column_name: "target_fingerprint" },
   { table_name: "incidents", column_name: "bundle_source_occurred_at" },
   { table_name: "incidents", column_name: "bundle_trigger" },
@@ -733,6 +780,7 @@ const CURRENT_SCHEMA_SENTINEL_COLUMNS = [
   { table_name: "organizations", column_name: "trial_plan" },
   { table_name: "project_tokens", column_name: "allowed_origins" },
   { table_name: "projects", column_name: "improvement_bundle_sensitivity" },
+  { table_name: "plan_cleanup_tasks", column_name: "cleanup_type" },
   { table_name: "trial_lifecycle_events", column_name: "dedupe_key" },
   { table_name: "users", column_name: "avatar_source" }
 ] as const;

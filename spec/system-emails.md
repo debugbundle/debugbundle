@@ -177,7 +177,7 @@ Recommended v1 or shortly after:
 - Trigger: worker-owned lifecycle scheduling reaches the 7-day or 1-day reminder window before trial expiry
 - Recipient: organization owner billing contact
 - Required in v1: yes
-- Notes: must state remaining days, exact trial end, and the paid-conversion CTA
+- Notes: must state remaining days, exact trial end, paid-conversion CTA, and which paid functionality will pause if the trial expires
 
 ### 4.14 No-Card Trial Expired
 
@@ -185,7 +185,7 @@ Recommended v1 or shortly after:
 - Trigger: worker-owned lifecycle expiry downgrades an unconverted no-card trial back to Free
 - Recipient: organization owner billing contact
 - Required in v1: yes
-- Notes: must explain that the account moved back to Free while keeping projects accessible
+- Notes: must explain that the account moved back to Free, projects remain accessible to the owner, paid functionality is paused, and saved paid-feature setup is preserved for later reactivation
 
 ### 4.15 No-Card Trial Converted
 

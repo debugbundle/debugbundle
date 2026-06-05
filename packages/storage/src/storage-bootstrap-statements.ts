@@ -862,7 +862,8 @@ export const STORAGE_BOOTSTRAP_STATEMENTS = [
   `
     CREATE TABLE github_dispatch_deliveries (
       id uuid PRIMARY KEY,
-      rule_id uuid NOT NULL REFERENCES github_dispatch_rules(id) ON DELETE CASCADE,
+      rule_id uuid NOT NULL,
+      rule_name text NOT NULL,
       project_id uuid NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
       incident_id uuid REFERENCES incidents(id) ON DELETE CASCADE,
       improvement_opportunity_id uuid REFERENCES improvement_opportunities(id) ON DELETE CASCADE,
@@ -950,5 +951,25 @@ export const STORAGE_BOOTSTRAP_STATEMENTS = [
   `
     CREATE INDEX trial_lifecycle_events_org_event_created_idx
     ON trial_lifecycle_events (organization_id, event_type, created_at DESC)
+  `,
+  `
+    CREATE TABLE plan_cleanup_tasks (
+      id uuid PRIMARY KEY,
+      organization_id uuid NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+      project_id uuid NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+      cleanup_type text NOT NULL
+        CHECK (cleanup_type IN ('delete_improvement_bundle_objects')),
+      attempt_count integer NOT NULL DEFAULT 0,
+      last_error text,
+      next_attempt_at timestamptz NOT NULL DEFAULT now(),
+      completed_at timestamptz,
+      created_at timestamptz NOT NULL DEFAULT now(),
+      updated_at timestamptz NOT NULL DEFAULT now(),
+      UNIQUE (project_id, cleanup_type)
+    )
+  `,
+  `
+    CREATE INDEX plan_cleanup_tasks_pending_idx
+    ON plan_cleanup_tasks (completed_at, next_attempt_at, created_at)
   `
 ] as const;

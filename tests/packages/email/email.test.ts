@@ -345,12 +345,18 @@ describe("email package", () => {
 
     expect(reminder.subject).toContain("7 day(s) left");
     expect(reminder.text).toContain("ends in 7 day(s)");
+    expect(reminder.text).toContain("DebugBundle will pause:");
+    expect(reminder.text).toContain("Slack destinations plus Slack alert and weekly report channels");
     expect(reminder.html).toContain("Days remaining");
+    expect(reminder.html).toContain("Project collaborators and pending invites");
     expect(reminder.html).toContain("Convert to paid");
 
     expect(expired.subject).toContain("trial has ended");
-    expect(expired.text).toContain("The account is now back on the free tier.");
+    expect(expired.text).toContain("paid-feature setup remain saved");
+    expect(expired.text).toContain("DebugBundle paused:");
+    expect(expired.text).toContain("GitHub automation setup and dispatch rules");
     expect(expired.html).toContain("Ended at");
+    expect(expired.html).toContain("generated hosted improvement bundle artifacts");
     expect(expired.html).toContain("View billing");
 
     expect(converted.subject).toContain("team plan activated");

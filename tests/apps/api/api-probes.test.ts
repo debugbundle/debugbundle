@@ -747,11 +747,23 @@ describe("api probe routes", () => {
     expect(activationNotFound.json()).toEqual({ error: "project_not_found" });
   });
 
-  it("should enforce paid tier and missing activation branches on list/deactivate", async (): Promise<void> => {
+  it("should keep preserved probe activations readable on free and still handle missing deactivations", async (): Promise<void> => {
     const app = createServer({
       probeManagement: {
         listActiveProbesForProject: vi.fn().mockResolvedValue([]),
-        listActiveProbesForProjectInOrganization: vi.fn().mockResolvedValue({ organization_plan: "free", activations: [] }),
+        listActiveProbesForProjectInOrganization: vi.fn().mockResolvedValue({
+          organization_plan: "free",
+          activations: [
+            {
+              activation_id: "11111111-1111-4111-8111-111111111111",
+              label_pattern: "checkout.*",
+              service: "*",
+              environment: "*",
+              expires_at: "2026-03-11T01:00:00.000Z",
+              trigger_expires_at: "2026-03-12T01:00:00.000Z"
+            }
+          ]
+        }),
         createProbeActivationForProjectInOrganization: vi.fn().mockResolvedValue(null),
         deactivateProbeActivationForProjectInOrganization: vi.fn().mockResolvedValue(null)
       }
@@ -771,8 +783,19 @@ describe("api probe routes", () => {
       }
     });
 
-    expect(freeList.statusCode).toBe(403);
-    expect(freeList.json()).toEqual({ error: "upgrade_required" });
+    expect(freeList.statusCode).toBe(200);
+    expect(freeList.json()).toEqual({
+      activations: [
+        {
+          activation_id: "11111111-1111-4111-8111-111111111111",
+          label_pattern: "checkout.*",
+          service: "*",
+          environment: "*",
+          expires_at: "2026-03-11T01:00:00.000Z",
+          trigger_expires_at: "2026-03-12T01:00:00.000Z"
+        }
+      ]
+    });
     expect(deactivateMissing.statusCode).toBe(404);
     expect(deactivateMissing.json()).toEqual({ error: "activation_not_found" });
   });
@@ -806,7 +829,7 @@ describe("api probe routes", () => {
     expect(deactivateBadPayload.json()).toEqual({ error: "invalid_payload" });
   });
 
-  it("should enforce paid tier on deactivate route", async (): Promise<void> => {
+  it("should allow deactivating preserved remote probes after a downgrade", async (): Promise<void> => {
     const app = createServer({
       probeManagement: {
         listActiveProbesForProject: vi.fn().mockResolvedValue([]),
@@ -831,8 +854,13 @@ describe("api probe routes", () => {
       }
     });
 
-    expect(response.statusCode).toBe(403);
-    expect(response.json()).toEqual({ error: "upgrade_required" });
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toEqual({
+      deactivated: {
+        activation_id: "11111111-1111-4111-8111-111111111111",
+        deactivated_at: "2026-03-11T00:10:00.000Z"
+      }
+    });
   });
 
   it("should create, list, and deactivate remote probe activations for paid projects", async (): Promise<void> => {

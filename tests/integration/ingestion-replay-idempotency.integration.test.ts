@@ -16,7 +16,8 @@ import {
   createIntegrationPool,
   createS3AdminClient,
   redisUrl,
-  bootstrapStorageAndCreateBucket
+  bootstrapStorageAndCreateBucket,
+  seedOwnedProject
 } from "../helpers/integration-setup.ts";
 
 runIntegration("ingestion integration \u2013 replay idempotency", () => {
@@ -46,21 +47,15 @@ runIntegration("ingestion integration \u2013 replay idempotency", () => {
     await pool.query("DELETE FROM projects");
     await pool.query("DELETE FROM organizations");
 
-    await pool.query(
-      `
-        INSERT INTO organizations (id, name, slug)
-        VALUES ($1, $2, $3)
-      `,
-      [organizationId, "Bundle New Context Replay Org", `bundle-new-context-replay-org-${organizationId.slice(0, 8)}`]
-    );
-
-    await pool.query(
-      `
-        INSERT INTO projects (id, organization_id, name, slug, environment_default)
-        VALUES ($1, $2, $3, $4, $5)
-      `,
-      [projectId, organizationId, "Bundle New Context Replay Project", "bundle-new-context-replay-project", "production"]
-    );
+    await seedOwnedProject({
+      pool,
+      organizationId,
+      projectId,
+      organizationName: "Bundle New Context Replay Org",
+      organizationSlug: `bundle-new-context-replay-org-${organizationId.slice(0, 8)}`,
+      projectName: "Bundle New Context Replay Project",
+      projectSlug: "bundle-new-context-replay-project"
+    });
 
     await pool.query(
       `
@@ -203,21 +198,15 @@ runIntegration("ingestion integration \u2013 replay idempotency", () => {
     await pool.query("DELETE FROM projects");
     await pool.query("DELETE FROM organizations");
 
-    await pool.query(
-      `
-        INSERT INTO organizations (id, name, slug)
-        VALUES ($1, $2, $3)
-      `,
-      [organizationId, "Bundle Deploy Replay Org", `bundle-deploy-replay-org-${organizationId.slice(0, 8)}`]
-    );
-
-    await pool.query(
-      `
-        INSERT INTO projects (id, organization_id, name, slug, environment_default)
-        VALUES ($1, $2, $3, $4, $5)
-      `,
-      [projectId, organizationId, "Bundle Deploy Replay Project", "bundle-deploy-replay-project", "production"]
-    );
+    await seedOwnedProject({
+      pool,
+      organizationId,
+      projectId,
+      organizationName: "Bundle Deploy Replay Org",
+      organizationSlug: `bundle-deploy-replay-org-${organizationId.slice(0, 8)}`,
+      projectName: "Bundle Deploy Replay Project",
+      projectSlug: "bundle-deploy-replay-project"
+    });
 
     await pool.query(
       `
@@ -363,21 +352,15 @@ runIntegration("ingestion integration \u2013 replay idempotency", () => {
     await pool.query("DELETE FROM projects");
     await pool.query("DELETE FROM organizations");
 
-    await pool.query(
-      `
-        INSERT INTO organizations (id, name, slug)
-        VALUES ($1, $2, $3)
-      `,
-      [organizationId, "Bundle Threshold Replay Org", `bundle-threshold-replay-org-${organizationId.slice(0, 8)}`]
-    );
-
-    await pool.query(
-      `
-        INSERT INTO projects (id, organization_id, name, slug, environment_default)
-        VALUES ($1, $2, $3, $4, $5)
-      `,
-      [projectId, organizationId, "Bundle Threshold Replay Project", "bundle-threshold-replay-project", "production"]
-    );
+    await seedOwnedProject({
+      pool,
+      organizationId,
+      projectId,
+      organizationName: "Bundle Threshold Replay Org",
+      organizationSlug: `bundle-threshold-replay-org-${organizationId.slice(0, 8)}`,
+      projectName: "Bundle Threshold Replay Project",
+      projectSlug: "bundle-threshold-replay-project"
+    });
 
     const queue = createRedisQueueClient({ redisUrl });
     await queue.clearJobQueue("group-incident");
@@ -453,21 +436,15 @@ runIntegration("ingestion integration \u2013 replay idempotency", () => {
     await pool.query("DELETE FROM projects");
     await pool.query("DELETE FROM organizations");
 
-    await pool.query(
-      `
-        INSERT INTO organizations (id, name, slug)
-        VALUES ($1, $2, $3)
-      `,
-      [organizationId, "Bundle Regression Replay Org", `bundle-regression-replay-org-${organizationId.slice(0, 8)}`]
-    );
-
-    await pool.query(
-      `
-        INSERT INTO projects (id, organization_id, name, slug, environment_default)
-        VALUES ($1, $2, $3, $4, $5)
-      `,
-      [projectId, organizationId, "Bundle Regression Replay Project", "bundle-regression-replay-project", "production"]
-    );
+    await seedOwnedProject({
+      pool,
+      organizationId,
+      projectId,
+      organizationName: "Bundle Regression Replay Org",
+      organizationSlug: `bundle-regression-replay-org-${organizationId.slice(0, 8)}`,
+      projectName: "Bundle Regression Replay Project",
+      projectSlug: "bundle-regression-replay-project"
+    });
 
     await pool.query(
       `
@@ -610,25 +587,15 @@ runIntegration("ingestion integration \u2013 replay idempotency", () => {
     await pool.query("DELETE FROM projects");
     await pool.query("DELETE FROM organizations");
 
-    await pool.query(
-      `
-        INSERT INTO organizations (id, name, slug)
-        VALUES ($1, $2, $3)
-      `,
-      [
-        organizationId,
-        "Bundle Repro Confidence Replay Org",
-        `bundle-repro-conf-replay-org-${organizationId.slice(0, 8)}`
-      ]
-    );
-
-    await pool.query(
-      `
-        INSERT INTO projects (id, organization_id, name, slug, environment_default)
-        VALUES ($1, $2, $3, $4, $5)
-      `,
-      [projectId, organizationId, "Bundle Repro Confidence Replay Project", "bundle-repro-conf-replay-project", "production"]
-    );
+    await seedOwnedProject({
+      pool,
+      organizationId,
+      projectId,
+      organizationName: "Bundle Repro Confidence Replay Org",
+      organizationSlug: `bundle-repro-conf-replay-org-${organizationId.slice(0, 8)}`,
+      projectName: "Bundle Repro Confidence Replay Project",
+      projectSlug: "bundle-repro-conf-replay-project"
+    });
 
     await pool.query(
       `
@@ -768,21 +735,15 @@ runIntegration("ingestion integration \u2013 replay idempotency", () => {
     await pool.query("DELETE FROM organizations");
     await pool.query("DELETE FROM processed_events");
 
-    await pool.query(
-      `
-        INSERT INTO organizations (id, name, slug)
-        VALUES ($1, $2, $3)
-      `,
-      [organizationId, "Sampling Integration Org", `sampling-org-${organizationId.slice(0, 8)}`]
-    );
-
-    await pool.query(
-      `
-        INSERT INTO projects (id, organization_id, name, slug, environment_default)
-        VALUES ($1, $2, $3, $4, $5)
-      `,
-      [projectId, organizationId, "Sampling Integration Project", "sampling-integration-project", "production"]
-    );
+    await seedOwnedProject({
+      pool,
+      organizationId,
+      projectId,
+      organizationName: "Sampling Integration Org",
+      organizationSlug: `sampling-org-${organizationId.slice(0, 8)}`,
+      projectName: "Sampling Integration Project",
+      projectSlug: "sampling-integration-project"
+    });
 
     const queue = createRedisQueueClient({ redisUrl });
     const objectStore = createTestObjectStore();

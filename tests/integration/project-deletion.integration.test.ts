@@ -13,7 +13,8 @@ import {
   createTestObjectStore,
   runIntegration,
   bootstrapStorageAndCreateBucket,
-  s3Bucket
+  s3Bucket,
+  seedOwnedProject
 } from "../helpers/integration-setup.ts";
 
 runIntegration("project deletion integration", () => {
@@ -48,21 +49,15 @@ runIntegration("project deletion integration", () => {
 
     await resetProjectDeletionTables();
 
-    await pool.query(
-      `
-        INSERT INTO organizations (id, name, slug)
-        VALUES ($1, $2, $3)
-      `,
-      [organizationId, "Project Deletion Org", `project-deletion-org-${organizationId.slice(0, 8)}`]
-    );
-
-    await pool.query(
-      `
-        INSERT INTO projects (id, organization_id, name, slug, environment_default)
-        VALUES ($1, $2, $3, $4, $5)
-      `,
-      [projectId, organizationId, "Main App", "main-app", "production"]
-    );
+    const { ownerUserId } = await seedOwnedProject({
+      pool,
+      organizationId,
+      projectId,
+      organizationName: "Project Deletion Org",
+      organizationSlug: `project-deletion-org-${organizationId.slice(0, 8)}`,
+      projectName: "Main App",
+      projectSlug: "main-app"
+    });
 
     await pool.query(
       `
@@ -246,6 +241,7 @@ runIntegration("project deletion integration", () => {
         INSERT INTO alert_rules (
           id,
           project_id,
+          created_by_user_id,
           service_id,
           channel,
           condition_type,
@@ -253,9 +249,9 @@ runIntegration("project deletion integration", () => {
           config,
           is_enabled
         )
-        VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, $8)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8::jsonb, $9)
       `,
-      [alertRuleId, projectId, serviceId, "email", "new_incident", "high", "{}", true]
+      [alertRuleId, projectId, ownerUserId, serviceId, "email", "new_incident", "high", "{}", true]
     );
 
     await pool.query(
@@ -281,15 +277,16 @@ runIntegration("project deletion integration", () => {
         INSERT INTO agent_webhooks (
           id,
           project_id,
+          created_by_user_id,
           url,
           secret_hash,
           events,
           filters,
           is_enabled
         )
-        VALUES ($1, $2, $3, $4, $5::text[], $6::jsonb, $7)
+        VALUES ($1, $2, $3, $4, $5, $6::text[], $7::jsonb, $8)
       `,
-      [webhookId, projectId, "https://hooks.example.test/debugbundle", "secret_hash_123", ["bundle.created"], "{}", true]
+      [webhookId, projectId, ownerUserId, "https://hooks.example.test/debugbundle", "secret_hash_123", ["bundle.created"], "{}", true]
     );
 
     await pool.query(
@@ -428,21 +425,16 @@ runIntegration("project deletion integration", () => {
 
     await resetProjectDeletionTables();
 
-    await pool.query(
-      `
-        INSERT INTO organizations (id, name, slug, plan)
-        VALUES ($1, $2, $3, $4)
-      `,
-      [organizationId, "Usage Counter Org", `usage-counter-org-${organizationId.slice(0, 8)}`, "solo"]
-    );
-
-    await pool.query(
-      `
-        INSERT INTO projects (id, organization_id, name, slug, environment_default)
-        VALUES ($1, $2, $3, $4, $5)
-      `,
-      [deletedProjectId, organizationId, "Deleted Project", "deleted-project", "production"]
-    );
+    const { ownerUserId } = await seedOwnedProject({
+      pool,
+      organizationId,
+      projectId: deletedProjectId,
+      organizationName: "Usage Counter Org",
+      organizationSlug: `usage-counter-org-${organizationId.slice(0, 8)}`,
+      projectName: "Deleted Project",
+      projectSlug: "deleted-project",
+      organizationPlan: "solo"
+    });
 
     await pool.query(
       `
@@ -464,10 +456,10 @@ runIntegration("project deletion integration", () => {
 
     await pool.query(
       `
-        INSERT INTO projects (id, organization_id, name, slug, environment_default)
-        VALUES ($1, $2, $3, $4, $5)
+        INSERT INTO projects (id, organization_id, owner_user_id, name, slug, environment_default)
+        VALUES ($1, $2, $3, $4, $5, $6)
       `,
-      [recreatedProjectId, organizationId, "Recreated Project", "recreated-project", "production"]
+      [recreatedProjectId, organizationId, ownerUserId, "Recreated Project", "recreated-project", "production"]
     );
 
     const summary = await billingStore.getBillingSummaryForOrganization({

@@ -149,6 +149,10 @@ describe("web app — project probes", () => {
         });
       }
 
+      if (url.endsWith("/v1/projects/proj_123/probes") && init?.method === undefined) {
+        return jsonResponse(200, { activations: [] });
+      }
+
       return jsonResponse(404, { error: "not_found" });
     });
 
@@ -165,6 +169,47 @@ describe("web app — project probes", () => {
       fetchMock.mock.calls.some(([input]) =>
         requestUrl(input).endsWith("/v1/projects/proj_123/probes")
       )
-    ).toBe(false);
+    ).toBe(true);
+  });
+
+  it("shows preserved probe activations as paused on free projects", async () => {
+    const preservedActivation = createProbeActivation({
+      activation_id: "00000000-0000-4000-8000-000000000789",
+      label_pattern: "auth.*"
+    });
+
+    const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = requestUrl(input);
+
+      if (url.endsWith("/v1/auth/session")) {
+        return jsonResponse(200, {
+          session: createSession({ organization_plan: "free" })
+        });
+      }
+
+      if (url.endsWith("/v1/projects") && init?.method === undefined) {
+        return jsonResponse(200, {
+          projects: [createProject({ organization_plan: "free" })]
+        });
+      }
+
+      if (url.endsWith("/v1/projects/proj_123/probes") && init?.method === undefined) {
+        return jsonResponse(200, { activations: [preservedActivation] });
+      }
+
+      return jsonResponse(404, { error: "not_found" });
+    });
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<App initialEntries={["/projects/proj_123/probes"]} />);
+
+    expect(
+      await screen.findByText(/saved remote probes will resume after an upgrade/i)
+    ).toBeInTheDocument();
+    expect(screen.getByText(/^auth\.\*$/i)).toBeInTheDocument();
+    expect(screen.getByText(/upgrade required/i)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /activate probe/i })).toBeNull();
+    expect(screen.queryByRole("button", { name: /deactivate/i })).toBeNull();
   });
 });

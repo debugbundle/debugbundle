@@ -1,6 +1,7 @@
 import type { TierName } from "../../../packages/shared-types/src/index.js";
 import {
   escapeHtml,
+  renderEmailBulletList,
   renderEmailButton,
   renderEmailKeyValueList,
   renderEmailLayout,
@@ -46,6 +47,28 @@ export interface TrialConvertedEmailInput {
   brandMarkUrl?: string | undefined;
 }
 
+function getTrialSuspensionItems(trialPlan: TierName): string[] {
+  if (trialPlan === "team") {
+    return [
+      "Remote probe activations",
+      "GitHub automation setup and dispatch rules",
+      "Slack destinations plus Slack alert and weekly report channels",
+      "Project collaborators and pending invites",
+      "Automated improvement bundle settings, open opportunities, and generated hosted improvement bundle artifacts"
+    ];
+  }
+
+  if (trialPlan === "solo") {
+    return [
+      "Remote probe activations",
+      "GitHub automation setup and dispatch rules",
+      "Automated improvement bundle settings, open opportunities, and generated hosted improvement bundle artifacts"
+    ];
+  }
+
+  return [];
+}
+
 export function renderTrialStartedEmail(input: TrialStartedEmailInput): BillingEmailRendered {
   return {
     subject: `DebugBundle: your ${input.trialPlan} trial has started`,
@@ -83,6 +106,8 @@ export function renderTrialStartedEmail(input: TrialStartedEmailInput): BillingE
 }
 
 export function renderTrialEndingSoonEmail(input: TrialEndingSoonEmailInput): BillingEmailRendered {
+  const suspensionItems = getTrialSuspensionItems(input.trialPlan);
+
   return {
     subject: `DebugBundle: ${input.daysRemaining} day(s) left in your trial`,
     text: [
@@ -90,6 +115,12 @@ export function renderTrialEndingSoonEmail(input: TrialEndingSoonEmailInput): Bi
       `Trial end: ${input.trialEndsAt}.`,
       "",
       "Convert to a paid plan to keep paid features and unlock extra capacity purchases.",
+      ...(suspensionItems.length === 0
+        ? []
+        : [
+            "If you do not convert before the trial ends, DebugBundle will pause:",
+            ...suspensionItems.map((item) => `- ${item}`)
+          ]),
       "",
       `Manage billing: ${input.billingUrl}`
     ].join("\n"),
@@ -109,6 +140,12 @@ export function renderTrialEndingSoonEmail(input: TrialEndingSoonEmailInput): Bi
         renderEmailParagraph(
           "Convert to a paid plan to keep paid features active and unlock extra purchased capacity."
         ),
+        ...(suspensionItems.length === 0
+          ? []
+          : [
+              renderEmailParagraph("If you do not convert before the trial ends, DebugBundle will pause:"),
+              renderEmailBulletList(suspensionItems.map((item) => escapeHtml(item)))
+            ]),
         renderEmailButton({
           label: "Convert to paid",
           url: input.billingUrl
@@ -119,12 +156,20 @@ export function renderTrialEndingSoonEmail(input: TrialEndingSoonEmailInput): Bi
 }
 
 export function renderTrialExpiredEmail(input: TrialExpiredEmailInput): BillingEmailRendered {
+  const suspensionItems = getTrialSuspensionItems(input.trialPlan);
+
   return {
     subject: "DebugBundle: your trial has ended",
     text: [
       `Your ${input.trialPlan} trial for "${input.organizationName}" ended on ${input.trialEndedAt}.`,
       "",
-      "The account is now back on the free tier. Existing projects remain available, and you can convert to a paid plan at any time.",
+      "The account is now back on the free tier. Existing projects and paid-feature setup remain saved, and you can convert to a paid plan at any time to reactivate paid features.",
+      ...(suspensionItems.length === 0
+        ? []
+        : [
+            "DebugBundle paused:",
+            ...suspensionItems.map((item) => `- ${item}`)
+          ]),
       "",
       `Manage billing: ${input.billingUrl}`
     ].join("\n"),
@@ -141,8 +186,14 @@ export function renderTrialExpiredEmail(input: TrialExpiredEmailInput): BillingE
           { label: "Ended at", valueHtml: escapeHtml(input.trialEndedAt) }
         ]),
         renderEmailParagraph(
-          "The account is now back on the free tier. Existing projects remain available, and you can convert to a paid plan at any time."
+          "The account is now back on the free tier. Existing projects and paid-feature setup remain saved, and you can convert to a paid plan at any time to reactivate paid features."
         ),
+        ...(suspensionItems.length === 0
+          ? []
+          : [
+              renderEmailParagraph("DebugBundle paused the following trial-only functionality:"),
+              renderEmailBulletList(suspensionItems.map((item) => escapeHtml(item)))
+            ]),
         renderEmailButton({
           label: "View billing",
           url: input.billingUrl

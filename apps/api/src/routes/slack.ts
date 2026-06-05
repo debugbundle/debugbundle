@@ -290,9 +290,6 @@ export function registerSlackRoutes(app: FastifyInstance, dependencies: ApiDepen
     if (dependencies.slackManagement === undefined) {
       return reply.status(503).send({ error: "slack_not_configured" });
     }
-    if (!(await ensureSlackIntegrationEnabled(dependencies, auth.access.organization_id))) {
-      return reply.status(403).send({ error: "upgrade_required" });
-    }
 
     const destinations = await dependencies.slackManagement.listSlackDestinationsForProjectInOrganization({
       organization_id: auth.access.organization_id,
@@ -317,10 +314,6 @@ export function registerSlackRoutes(app: FastifyInstance, dependencies: ApiDepen
     if (dependencies.slackManagement === undefined) {
       return reply.status(503).send({ error: "slack_not_configured" });
     }
-    if (!(await ensureSlackIntegrationEnabled(dependencies, member.organization_id))) {
-      return reply.status(403).send({ error: "upgrade_required" });
-    }
-
     const parsedParams = ProjectSlackDestinationDeleteParamsSchema.safeParse(request.params);
     if (!parsedParams.success) {
       return reply.status(400).send({ error: "invalid_slack_destination_id" });

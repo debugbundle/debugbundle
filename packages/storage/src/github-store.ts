@@ -1,5 +1,7 @@
 import { randomUUID } from "node:crypto";
 
+import { getTierCapabilities } from "../../shared-types/src/index.js";
+
 import type {
   DeliverGitHubDispatchJob,
   GitHubDispatchDeliveryIntent,
@@ -88,6 +90,7 @@ function mapGitHubDispatchDeliveryRow(
 function mapMatchingGitHubDispatchRule(row: MatchingGitHubDispatchRule & Record<string, unknown>): MatchingGitHubDispatchRule {
   return {
     rule_id: row.rule_id,
+    rule_name: row.rule_name,
     installation_id: Number(row.installation_id),
     repo_owner: row.repo_owner,
     repo_name: row.repo_name,
@@ -620,7 +623,7 @@ export function createPostgresGitHubStore(db: Queryable): GitHubStore {
           SELECT
             gdd.id AS delivery_id,
             gdd.rule_id,
-            gdr.name AS rule_name,
+            gdd.rule_name,
             gdd.incident_id,
             gdd.improvement_opportunity_id AS improvement_id,
             COALESCE(i.title, io.title) AS target_title,
@@ -631,7 +634,6 @@ export function createPostgresGitHubStore(db: Queryable): GitHubStore {
             gdd.github_status_code,
             gdd.created_at::text AS created_at
           FROM github_dispatch_deliveries gdd
-          JOIN github_dispatch_rules gdr ON gdr.id = gdd.rule_id
           JOIN projects p ON p.id = gdd.project_id
           LEFT JOIN incidents i ON i.id = gdd.incident_id
           LEFT JOIN improvement_opportunities io ON io.id = gdd.improvement_opportunity_id
@@ -673,7 +675,7 @@ export function createPostgresGitHubStore(db: Queryable): GitHubStore {
           RETURNING
             gdd.id AS delivery_id,
             gdd.rule_id,
-            gdr.name AS rule_name,
+            gdd.rule_name,
             gdd.incident_id,
             gdd.improvement_opportunity_id AS improvement_id,
             COALESCE(
@@ -702,6 +704,7 @@ export function createPostgresGitHubStore(db: Queryable): GitHubStore {
 
     async listMatchingGitHubDispatchRules(input) {
       const result = await db.query<MatchingGitHubDispatchRule & Record<string, unknown> & {
+        organization_plan: string;
         environments: string[] | null;
         services: string[] | null;
         severity_min: GitHubDispatchRuleRecord["severity_min"];
@@ -711,6 +714,8 @@ export function createPostgresGitHubStore(db: Queryable): GitHubStore {
         `
           SELECT
             gdr.id AS rule_id,
+            gdr.name AS rule_name,
+            COALESCE(o.plan, 'free') AS organization_plan,
             gi.installation_id,
             pgr.repo_owner,
             pgr.repo_name,
@@ -722,6 +727,8 @@ export function createPostgresGitHubStore(db: Queryable): GitHubStore {
             gdr.bundle_type,
             gdr.incident_status
           FROM github_dispatch_rules gdr
+          JOIN projects p ON p.id = gdr.project_id
+          JOIN organizations o ON o.id = p.organization_id
           JOIN project_github_repos pgr ON pgr.project_id = gdr.project_id
           JOIN github_installations gi ON gi.id = pgr.installation_id
           WHERE gdr.project_id = $1
@@ -735,6 +742,10 @@ export function createPostgresGitHubStore(db: Queryable): GitHubStore {
 
       return result.rows
         .filter((row) => {
+          if (!getTierCapabilities(row.organization_plan).github_automation) {
+            return false;
+          }
+
           if (Array.isArray(row.environments) && row.environments.length > 0 && !row.environments.includes(input.environment)) {
             return false;
           }
@@ -817,6 +828,7 @@ export function createPostgresGitHubStore(db: Queryable): GitHubStore {
           INSERT INTO github_dispatch_deliveries (
             id,
             rule_id,
+            rule_name,
             project_id,
             incident_id,
             improvement_opportunity_id,
@@ -831,13 +843,14 @@ export function createPostgresGitHubStore(db: Queryable): GitHubStore {
             created_at,
             updated_at
           )
-          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'pending', 0, $11::jsonb, now(), now())
+          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, 'pending', 0, $12::jsonb, now(), now())
           ON CONFLICT (rule_id, target_fingerprint, dedupe_key) DO NOTHING
           RETURNING id
         `,
         [
           deliveryId,
           input.rule_id,
+          input.rule_name,
           input.project_id,
           input.incident_id,
           input.improvement_id,
@@ -860,6 +873,7 @@ export function createPostgresGitHubStore(db: Queryable): GitHubStore {
           INSERT INTO github_dispatch_deliveries (
             id,
             rule_id,
+            rule_name,
             project_id,
             incident_id,
             improvement_opportunity_id,
@@ -875,13 +889,14 @@ export function createPostgresGitHubStore(db: Queryable): GitHubStore {
             created_at,
             updated_at
           )
-          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'skipped', 0, $11, $12::jsonb, now(), now())
+          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, 'skipped', 0, $12, $13::jsonb, now(), now())
           ON CONFLICT (rule_id, target_fingerprint, dedupe_key) DO NOTHING
           RETURNING id
         `,
         [
           deliveryId,
           input.rule_id,
+          input.rule_name,
           input.project_id,
           input.incident_id,
           input.improvement_id,
@@ -926,33 +941,40 @@ export function createPostgresGitHubStore(db: Queryable): GitHubStore {
     },
 
     async getGitHubDispatchDeliveryIntent(deliveryId) {
-      const result = await db.query<GitHubDispatchDeliveryIntent & Record<string, unknown>>(
+      const result = await db.query<GitHubDispatchDeliveryIntent & Record<string, unknown> & { organization_plan: string }>(
         `
           SELECT
-            id AS delivery_id,
-            rule_id,
-            project_id,
-            incident_id,
-            improvement_opportunity_id AS improvement_id,
-            installation_id,
-            repo_owner,
-            repo_name,
-            status,
-            attempt_count,
-            next_attempt_at::text AS next_attempt_at,
-            last_attempt_at::text AS last_attempt_at,
-            last_error,
-            github_status_code,
-            dispatch_payload
-          FROM github_dispatch_deliveries
-          WHERE id = $1
+            gdd.id AS delivery_id,
+            gdd.rule_id,
+            gdd.project_id,
+            gdd.incident_id,
+            gdd.improvement_opportunity_id AS improvement_id,
+            gdd.installation_id,
+            gdd.repo_owner,
+            gdd.repo_name,
+            gdd.status,
+            gdd.attempt_count,
+            gdd.next_attempt_at::text AS next_attempt_at,
+            gdd.last_attempt_at::text AS last_attempt_at,
+            gdd.last_error,
+            gdd.github_status_code,
+            gdd.dispatch_payload,
+            COALESCE(o.plan, 'free') AS organization_plan
+          FROM github_dispatch_deliveries gdd
+          JOIN projects p ON p.id = gdd.project_id
+          JOIN organizations o ON o.id = p.organization_id
+          WHERE gdd.id = $1
           LIMIT 1
         `,
         [deliveryId]
       );
 
       const row = result.rows[0];
-      return row === undefined ? null : mapGitHubDispatchDeliveryIntent(row);
+      if (row === undefined || !getTierCapabilities(row.organization_plan).github_automation) {
+        return null;
+      }
+
+      return mapGitHubDispatchDeliveryIntent(row);
     },
 
     async markGitHubDispatchDeliveryAttempt(input) {

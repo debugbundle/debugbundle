@@ -165,6 +165,9 @@ describe("storage bootstrap schema", () => {
     expect(STORAGE_BOOTSTRAP_SQL.includes("UNIQUE (organization_id, user_id)")).toBe(true);
     expect(STORAGE_BOOTSTRAP_SQL.includes("email text NOT NULL UNIQUE")).toBe(true);
     expect(STORAGE_BOOTSTRAP_SQL.includes("project_id uuid NOT NULL UNIQUE REFERENCES projects(id) ON DELETE CASCADE")).toBe(true);
+    expect(STORAGE_BOOTSTRAP_SQL.includes("rule_name text NOT NULL")).toBe(true);
+    expect(STORAGE_BOOTSTRAP_SQL.includes("rule_id uuid NOT NULL REFERENCES github_dispatch_rules(id) ON DELETE CASCADE")).toBe(false);
+    expect(STORAGE_BOOTSTRAP_SQL.includes("CREATE INDEX plan_cleanup_tasks_pending_idx")).toBe(true);
     expect(STORAGE_BOOTSTRAP_SQL.includes("CREATE UNIQUE INDEX github_dispatch_deliveries_rule_dedupe_key_idx")).toBe(true);
     expect(STORAGE_BOOTSTRAP_SQL.includes("CREATE UNIQUE INDEX alert_email_digests_project_recipient_pending_idx")).toBe(true);
     expect(STORAGE_BOOTSTRAP_SQL.includes("UNIQUE (organization_id, slack_team_id, slack_channel_id)")).toBe(true);

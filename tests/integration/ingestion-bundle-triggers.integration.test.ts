@@ -30,7 +30,8 @@ import {
   s3Region,
   s3Bucket,
   redisUrl,
-  bootstrapStorageAndCreateBucket
+  bootstrapStorageAndCreateBucket,
+  seedOwnedProject
 } from "../helpers/integration-setup.ts";
 
 runIntegration("ingestion integration \u2013 bundle triggers", () => {
@@ -61,21 +62,16 @@ runIntegration("ingestion integration \u2013 bundle triggers", () => {
     await pool.query("DELETE FROM projects");
     await pool.query("DELETE FROM organizations");
 
-    await pool.query(
-      `
-        INSERT INTO organizations (id, name, slug)
-        VALUES ($1, $2, $3)
-      `,
-      [organizationId, "Bundle Threshold Org", `bundle-threshold-org-${organizationId.slice(0, 8)}`]
-    );
-
-    await pool.query(
-      `
-        INSERT INTO projects (id, organization_id, name, slug, environment_default)
-        VALUES ($1, $2, $3, $4, $5)
-      `,
-      [projectId, organizationId, "Bundle Threshold Project", "bundle-threshold-project", "production"]
-    );
+    await seedOwnedProject({
+      pool,
+      organizationId,
+      projectId,
+      organizationName: "Bundle Threshold Org",
+      organizationSlug: `bundle-threshold-org-${organizationId.slice(0, 8)}`,
+      projectName: "Bundle Threshold Project",
+      projectSlug: "bundle-threshold-project",
+      ownerUserId: memberId
+    });
 
     await pool.query(
       `
@@ -170,9 +166,11 @@ runIntegration("ingestion integration \u2013 bundle triggers", () => {
     expect(pendingResponse.json()).toEqual({ status: "pending" });
 
     const queuedBuildJobs = await queue.readJobQueue("build-bundle");
-    expect(queuedBuildJobs).toHaveLength(1);
+    expect(queuedBuildJobs).toHaveLength(2);
     const buildJob = JSON.parse(queuedBuildJobs[0] ?? "{}") as { trigger: string };
+    const regenerationJob = JSON.parse(queuedBuildJobs[1] ?? "{}") as { trigger: string };
     expect(buildJob.trigger).toBe("occurrence_threshold");
+    expect(regenerationJob.trigger).toBe("regeneration");
 
     expect(
       await processNextBuildBundleJob({
@@ -227,6 +225,7 @@ runIntegration("ingestion integration \u2013 bundle triggers", () => {
     expect(firstBundle.context.dependencies).toBeNull();
     expect(firstBundle.context.device).toBeNull();
 
+    await queue.clearJobQueue("build-bundle");
     await queue.enqueue("build-bundle", JSON.parse(queuedBuildJobs[0] ?? "{}") as BuildBundleJob);
     expect(
       await processNextBuildBundleJob({
@@ -265,21 +264,16 @@ runIntegration("ingestion integration \u2013 bundle triggers", () => {
     await pool.query("DELETE FROM projects");
     await pool.query("DELETE FROM organizations");
 
-    await pool.query(
-      `
-        INSERT INTO organizations (id, name, slug)
-        VALUES ($1, $2, $3)
-      `,
-      [organizationId, "Bundle Regression Org", `bundle-regression-org-${organizationId.slice(0, 8)}`]
-    );
-
-    await pool.query(
-      `
-        INSERT INTO projects (id, organization_id, name, slug, environment_default)
-        VALUES ($1, $2, $3, $4, $5)
-      `,
-      [projectId, organizationId, "Bundle Regression Project", "bundle-regression-project", "production"]
-    );
+    await seedOwnedProject({
+      pool,
+      organizationId,
+      projectId,
+      organizationName: "Bundle Regression Org",
+      organizationSlug: `bundle-regression-org-${organizationId.slice(0, 8)}`,
+      projectName: "Bundle Regression Project",
+      projectSlug: "bundle-regression-project",
+      ownerUserId: memberId
+    });
 
     await pool.query(
       `
@@ -421,10 +415,12 @@ runIntegration("ingestion integration \u2013 bundle triggers", () => {
     expect(pendingResponse.json()).toEqual({ status: "pending" });
 
     const queuedBuildJobs = await queue.readJobQueue("build-bundle");
-    expect(queuedBuildJobs).toHaveLength(1);
+    expect(queuedBuildJobs).toHaveLength(2);
     const buildJob = JSON.parse(queuedBuildJobs[0] ?? "{}") as { trigger: string; occurrence_count: number };
+    const regenerationJob = JSON.parse(queuedBuildJobs[1] ?? "{}") as { trigger: string };
     expect(buildJob.trigger).toBe("regression_reopen");
     expect(buildJob.occurrence_count).toBe(2);
+    expect(regenerationJob.trigger).toBe("regeneration");
 
     expect(
       await processNextBuildBundleJob({
@@ -478,21 +474,16 @@ runIntegration("ingestion integration \u2013 bundle triggers", () => {
     await pool.query("DELETE FROM projects");
     await pool.query("DELETE FROM organizations");
 
-    await pool.query(
-      `
-        INSERT INTO organizations (id, name, slug)
-        VALUES ($1, $2, $3)
-      `,
-      [organizationId, "Bundle Deploy Org", `bundle-deploy-org-${organizationId.slice(0, 8)}`]
-    );
-
-    await pool.query(
-      `
-        INSERT INTO projects (id, organization_id, name, slug, environment_default)
-        VALUES ($1, $2, $3, $4, $5)
-      `,
-      [projectId, organizationId, "Bundle Deploy Project", "bundle-deploy-project", "production"]
-    );
+    await seedOwnedProject({
+      pool,
+      organizationId,
+      projectId,
+      organizationName: "Bundle Deploy Org",
+      organizationSlug: `bundle-deploy-org-${organizationId.slice(0, 8)}`,
+      projectName: "Bundle Deploy Project",
+      projectSlug: "bundle-deploy-project",
+      ownerUserId: memberId
+    });
 
     await pool.query(
       `
@@ -648,10 +639,12 @@ runIntegration("ingestion integration \u2013 bundle triggers", () => {
     expect(pendingResponse.json()).toEqual({ status: "pending" });
 
     const queuedBuildJobs = await queue.readJobQueue("build-bundle");
-    expect(queuedBuildJobs).toHaveLength(1);
+    expect(queuedBuildJobs).toHaveLength(2);
     const buildJob = JSON.parse(queuedBuildJobs[0] ?? "{}") as { trigger: string; occurrence_count: number };
+    const regenerationJob = JSON.parse(queuedBuildJobs[1] ?? "{}") as { trigger: string };
     expect(buildJob.trigger).toBe("deploy_metadata");
     expect(buildJob.occurrence_count).toBe(2);
+    expect(regenerationJob.trigger).toBe("regeneration");
 
     expect(
       await processNextBuildBundleJob({
@@ -680,6 +673,7 @@ runIntegration("ingestion integration \u2013 bundle triggers", () => {
     expect(firstBundle.summary.signals.new_deploy).toBe(true);
     expect(firstBundle.summary.signals.regression_suspected).toBe(false);
 
+    await queue.clearJobQueue("build-bundle");
     await queue.enqueue("build-bundle", JSON.parse(queuedBuildJobs[0] ?? "{}") as BuildBundleJob);
     expect(
       await processNextBuildBundleJob({
@@ -719,21 +713,16 @@ runIntegration("ingestion integration \u2013 bundle triggers", () => {
     await pool.query("DELETE FROM projects");
     await pool.query("DELETE FROM organizations");
 
-    await pool.query(
-      `
-        INSERT INTO organizations (id, name, slug)
-        VALUES ($1, $2, $3)
-      `,
-      [organizationId, "Bundle New Context Org", `bundle-new-context-org-${organizationId.slice(0, 8)}`]
-    );
-
-    await pool.query(
-      `
-        INSERT INTO projects (id, organization_id, name, slug, environment_default)
-        VALUES ($1, $2, $3, $4, $5)
-      `,
-      [projectId, organizationId, "Bundle New Context Project", "bundle-new-context-project", "production"]
-    );
+    await seedOwnedProject({
+      pool,
+      organizationId,
+      projectId,
+      organizationName: "Bundle New Context Org",
+      organizationSlug: `bundle-new-context-org-${organizationId.slice(0, 8)}`,
+      projectName: "Bundle New Context Project",
+      projectSlug: "bundle-new-context-project",
+      ownerUserId: memberId
+    });
 
     await pool.query(
       `
@@ -883,10 +872,12 @@ runIntegration("ingestion integration \u2013 bundle triggers", () => {
     expect(pendingResponse.json()).toEqual({ status: "pending" });
 
     const queuedBuildJobs = await queue.readJobQueue("build-bundle");
-    expect(queuedBuildJobs).toHaveLength(1);
+    expect(queuedBuildJobs).toHaveLength(2);
     const buildJob = JSON.parse(queuedBuildJobs[0] ?? "{}") as { trigger: string; occurrence_count: number };
+    const regenerationJob = JSON.parse(queuedBuildJobs[1] ?? "{}") as { trigger: string };
     expect(buildJob.trigger).toBe("new_context_type");
     expect(buildJob.occurrence_count).toBe(2);
+    expect(regenerationJob.trigger).toBe("regeneration");
 
     expect(
       await processNextBuildBundleJob({
@@ -912,6 +903,7 @@ runIntegration("ingestion integration \u2013 bundle triggers", () => {
     expect(firstBundle.signal.occurrence_count).toBe(2);
     expect(firstBundle.signal.source_event_types).toEqual(["backend_exception", "frontend_exception"]);
 
+    await queue.clearJobQueue("build-bundle");
     await queue.enqueue("build-bundle", JSON.parse(queuedBuildJobs[0] ?? "{}") as BuildBundleJob);
     expect(
       await processNextBuildBundleJob({
@@ -951,21 +943,16 @@ runIntegration("ingestion integration \u2013 bundle triggers", () => {
     await pool.query("DELETE FROM projects");
     await pool.query("DELETE FROM organizations");
 
-    await pool.query(
-      `
-        INSERT INTO organizations (id, name, slug)
-        VALUES ($1, $2, $3)
-      `,
-      [organizationId, "Bundle Repro Confidence Org", `bundle-repro-conf-org-${organizationId.slice(0, 8)}`]
-    );
-
-    await pool.query(
-      `
-        INSERT INTO projects (id, organization_id, name, slug, environment_default)
-        VALUES ($1, $2, $3, $4, $5)
-      `,
-      [projectId, organizationId, "Bundle Repro Confidence Project", "bundle-repro-conf-project", "production"]
-    );
+    await seedOwnedProject({
+      pool,
+      organizationId,
+      projectId,
+      organizationName: "Bundle Repro Confidence Org",
+      organizationSlug: `bundle-repro-conf-org-${organizationId.slice(0, 8)}`,
+      projectName: "Bundle Repro Confidence Project",
+      projectSlug: "bundle-repro-conf-project",
+      ownerUserId: memberId
+    });
 
     await pool.query(
       `
@@ -1115,10 +1102,12 @@ runIntegration("ingestion integration \u2013 bundle triggers", () => {
     expect(pendingResponse.json()).toEqual({ status: "pending" });
 
     const queuedBuildJobs = await queue.readJobQueue("build-bundle");
-    expect(queuedBuildJobs).toHaveLength(1);
+    expect(queuedBuildJobs).toHaveLength(2);
     const buildJob = JSON.parse(queuedBuildJobs[0] ?? "{}") as { trigger: string; occurrence_count: number };
+    const regenerationJob = JSON.parse(queuedBuildJobs[1] ?? "{}") as { trigger: string };
     expect(buildJob.trigger).toBe("reproduction_confidence_change");
     expect(buildJob.occurrence_count).toBe(2);
+    expect(regenerationJob.trigger).toBe("regeneration");
 
     expect(
       await processNextBuildBundleJob({
@@ -1144,6 +1133,7 @@ runIntegration("ingestion integration \u2013 bundle triggers", () => {
     expect(firstBundle.signal.occurrence_count).toBe(2);
     expect(firstBundle.signal.source_event_types).toEqual(["backend_exception", "request_event"]);
 
+    await queue.clearJobQueue("build-bundle");
     await queue.enqueue("build-bundle", JSON.parse(queuedBuildJobs[0] ?? "{}") as BuildBundleJob);
     expect(
       await processNextBuildBundleJob({
@@ -1181,21 +1171,16 @@ runIntegration("ingestion integration \u2013 bundle triggers", () => {
     await pool.query("DELETE FROM projects");
     await pool.query("DELETE FROM organizations");
 
-    await pool.query(
-      `
-        INSERT INTO organizations (id, name, slug)
-        VALUES ($1, $2, $3)
-      `,
-      [organizationId, "Bundle Rich Org", `bundle-rich-org-${organizationId.slice(0, 8)}`]
-    );
-
-    await pool.query(
-      `
-        INSERT INTO projects (id, organization_id, name, slug, environment_default)
-        VALUES ($1, $2, $3, $4, $5)
-      `,
-      [projectId, organizationId, "Bundle Rich Project", "bundle-rich-project", "production"]
-    );
+    await seedOwnedProject({
+      pool,
+      organizationId,
+      projectId,
+      organizationName: "Bundle Rich Org",
+      organizationSlug: `bundle-rich-org-${organizationId.slice(0, 8)}`,
+      projectName: "Bundle Rich Project",
+      projectSlug: "bundle-rich-project",
+      ownerUserId: memberId
+    });
 
     await pool.query(
       `
@@ -1610,21 +1595,16 @@ runIntegration("ingestion integration \u2013 bundle triggers", () => {
     await pool.query("DELETE FROM projects");
     await pool.query("DELETE FROM organizations");
 
-    await pool.query(
-      `
-        INSERT INTO organizations (id, name, slug)
-        VALUES ($1, $2, $3)
-      `,
-      [organizationId, "Bundle Probe Merge Org", `bundle-probe-merge-org-${organizationId.slice(0, 8)}`]
-    );
-
-    await pool.query(
-      `
-        INSERT INTO projects (id, organization_id, name, slug, environment_default)
-        VALUES ($1, $2, $3, $4, $5)
-      `,
-      [projectId, organizationId, "Bundle Probe Merge Project", "bundle-probe-merge-project", "production"]
-    );
+    await seedOwnedProject({
+      pool,
+      organizationId,
+      projectId,
+      organizationName: "Bundle Probe Merge Org",
+      organizationSlug: `bundle-probe-merge-org-${organizationId.slice(0, 8)}`,
+      projectName: "Bundle Probe Merge Project",
+      projectSlug: "bundle-probe-merge-project",
+      ownerUserId: memberId
+    });
 
     await pool.query(
       `
@@ -2062,21 +2042,15 @@ runIntegration("ingestion integration \u2013 bundle triggers", () => {
       await pool.query("DELETE FROM projects");
       await pool.query("DELETE FROM organizations");
 
-      await pool.query(
-        `
-          INSERT INTO organizations (id, name, slug)
-          VALUES ($1, $2, $3)
-        `,
-        [organizationId, "Bundle Precedence Org", `bundle-precedence-org-${organizationId.slice(0, 8)}`]
-      );
-
-      await pool.query(
-        `
-          INSERT INTO projects (id, organization_id, name, slug, environment_default)
-          VALUES ($1, $2, $3, $4, $5)
-        `,
-        [projectId, organizationId, "Bundle Precedence Project", `bundle-precedence-project-${projectId.slice(0, 8)}`, "production"]
-      );
+      await seedOwnedProject({
+        pool,
+        organizationId,
+        projectId,
+        organizationName: "Bundle Precedence Org",
+        organizationSlug: `bundle-precedence-org-${organizationId.slice(0, 8)}`,
+        projectName: "Bundle Precedence Project",
+        projectSlug: `bundle-precedence-project-${projectId.slice(0, 8)}`
+      });
 
       await pool.query(
         `
@@ -2276,21 +2250,16 @@ runIntegration("ingestion integration \u2013 bundle triggers", () => {
     await pool.query("DELETE FROM projects");
     await pool.query("DELETE FROM organizations");
 
-    await pool.query(
-      `
-        INSERT INTO organizations (id, name, slug)
-        VALUES ($1, $2, $3)
-      `,
-      [organizationId, "Reproduction Org", `reproduction-org-${organizationId.slice(0, 8)}`]
-    );
-
-    await pool.query(
-      `
-        INSERT INTO projects (id, organization_id, name, slug, environment_default)
-        VALUES ($1, $2, $3, $4, $5)
-      `,
-      [projectId, organizationId, "Reproduction Project", "reproduction-project", "production"]
-    );
+    await seedOwnedProject({
+      pool,
+      organizationId,
+      projectId,
+      organizationName: "Reproduction Org",
+      organizationSlug: `reproduction-org-${organizationId.slice(0, 8)}`,
+      projectName: "Reproduction Project",
+      projectSlug: "reproduction-project",
+      ownerUserId: memberId
+    });
 
     await pool.query(
       `
@@ -2521,21 +2490,16 @@ runIntegration("ingestion integration \u2013 bundle triggers", () => {
     await pool.query("DELETE FROM projects");
     await pool.query("DELETE FROM organizations");
 
-    await pool.query(
-      `
-        INSERT INTO organizations (id, name, slug)
-        VALUES ($1, $2, $3)
-      `,
-      [organizationId, "Reproduction Upgrade Org", `reproduction-upgrade-org-${organizationId.slice(0, 8)}`]
-    );
-
-    await pool.query(
-      `
-        INSERT INTO projects (id, organization_id, name, slug, environment_default)
-        VALUES ($1, $2, $3, $4, $5)
-      `,
-      [projectId, organizationId, "Reproduction Upgrade Project", "reproduction-upgrade-project", "production"]
-    );
+    await seedOwnedProject({
+      pool,
+      organizationId,
+      projectId,
+      organizationName: "Reproduction Upgrade Org",
+      organizationSlug: `reproduction-upgrade-org-${organizationId.slice(0, 8)}`,
+      projectName: "Reproduction Upgrade Project",
+      projectSlug: "reproduction-upgrade-project",
+      ownerUserId: memberId
+    });
 
     await pool.query(
       `

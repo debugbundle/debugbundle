@@ -1,5 +1,12 @@
 import type { TierName } from "../../../packages/shared-types/src/index.js";
 
+import {
+  isPlanDowngrade,
+  normalizePlanForDowngradeAudit,
+  recordPlanDowngradeCleanupAudit
+} from "./plan-downgrade-audit.js";
+import { createOrganizationPlanCleanupService } from "./plan-downgrade-cleanup.js";
+import { runInTransaction } from "./transaction.js";
 import type { Queryable } from "./types.js";
 
 export interface BillingEntitlementUpdate {
@@ -59,39 +66,71 @@ export function createPostgresBillingSyncStore(db: Queryable): BillingSyncStore 
     },
 
     async updateEntitlements(update: BillingEntitlementUpdate): Promise<void> {
-      await db.query(
-        `
-          UPDATE organizations
-          SET
-            plan = $2,
-            additional_capacity_units = $3,
-            billing_state = $4,
-            stripe_customer_id = $5,
-            stripe_subscription_id = $6,
-            billing_period_starts_at = $7::timestamptz,
-            billing_period_ends_at = $8::timestamptz,
-            trial_converted_at = CASE
-              WHEN $2 <> 'free' AND (to_jsonb(organizations) ->> 'trial_used_at') IS NOT NULL
-                THEN COALESCE((to_jsonb(organizations) ->> 'trial_converted_at')::timestamptz, $9::timestamptz)
-              ELSE (to_jsonb(organizations) ->> 'trial_converted_at')::timestamptz
-            END,
-            last_billing_sync_at = $9::timestamptz,
-            last_billing_event_id = $10
-          WHERE id = $1
-        `,
-        [
-          update.organization_id,
-          update.plan,
-          update.additional_capacity_units,
-          update.billing_state,
-          update.stripe_customer_id,
-          update.stripe_subscription_id,
-          update.billing_period_starts_at,
-          update.billing_period_ends_at,
-          update.last_billing_sync_at,
-          update.last_billing_event_id
-        ]
-      );
+      await runInTransaction(db, async (tx) => {
+        const previousResult = await tx.query<{ plan: string }>(
+          `
+            SELECT COALESCE(plan, 'free') AS plan
+            FROM organizations
+            WHERE id = $1
+            FOR UPDATE
+          `,
+          [update.organization_id]
+        );
+        const previousPlan = normalizePlanForDowngradeAudit(previousResult.rows[0]?.plan);
+        const targetPlan = normalizePlanForDowngradeAudit(update.plan);
+
+        await tx.query(
+          `
+            UPDATE organizations
+            SET
+              plan = $2,
+              additional_capacity_units = $3,
+              billing_state = $4,
+              stripe_customer_id = $5,
+              stripe_subscription_id = $6,
+              billing_period_starts_at = $7::timestamptz,
+              billing_period_ends_at = $8::timestamptz,
+              trial_converted_at = CASE
+                WHEN $2 <> 'free' AND (to_jsonb(organizations) ->> 'trial_used_at') IS NOT NULL
+                  THEN COALESCE((to_jsonb(organizations) ->> 'trial_converted_at')::timestamptz, $9::timestamptz)
+                ELSE (to_jsonb(organizations) ->> 'trial_converted_at')::timestamptz
+              END,
+              last_billing_sync_at = $9::timestamptz,
+              last_billing_event_id = $10
+            WHERE id = $1
+          `,
+          [
+            update.organization_id,
+            update.plan,
+            update.additional_capacity_units,
+            update.billing_state,
+            update.stripe_customer_id,
+            update.stripe_subscription_id,
+            update.billing_period_starts_at,
+            update.billing_period_ends_at,
+            update.last_billing_sync_at,
+            update.last_billing_event_id
+          ]
+        );
+
+        const cleanupSummary = await createOrganizationPlanCleanupService(tx).cleanupOrganizationForPlan({
+          organization_id: update.organization_id,
+          plan: targetPlan,
+          now: update.last_billing_sync_at
+        });
+
+        if (isPlanDowngrade(previousPlan, targetPlan)) {
+          await recordPlanDowngradeCleanupAudit({
+            db: tx,
+            organization_id: update.organization_id,
+            previous_plan: previousPlan,
+            target_plan: targetPlan,
+            trigger_source: "stripe_sync",
+            cleanup_summary: cleanupSummary,
+            occurred_at: update.last_billing_sync_at
+          });
+        }
+      });
     },
 
     async resolveOrganizationByStripeCustomerId(customerId: string): Promise<string | null> {
@@ -118,21 +157,51 @@ export function createPostgresBillingSyncStore(db: Queryable): BillingSyncStore 
     },
 
     async revokeEntitlements(organizationId: string, eventId: string): Promise<void> {
-      await db.query(
-        `
-          UPDATE organizations
-          SET
-            plan = 'free',
-            additional_capacity_units = 0,
-            billing_state = 'canceled',
-            billing_period_starts_at = NULL,
-            billing_period_ends_at = NULL,
-            last_billing_sync_at = NOW(),
-            last_billing_event_id = $2
-          WHERE id = $1
-        `,
-        [organizationId, eventId]
-      );
+      await runInTransaction(db, async (tx) => {
+        const previousResult = await tx.query<{ plan: string }>(
+          `
+            SELECT COALESCE(plan, 'free') AS plan
+            FROM organizations
+            WHERE id = $1
+            FOR UPDATE
+          `,
+          [organizationId]
+        );
+        const previousPlan = normalizePlanForDowngradeAudit(previousResult.rows[0]?.plan);
+
+        await tx.query(
+          `
+            UPDATE organizations
+            SET
+              plan = 'free',
+              additional_capacity_units = 0,
+              billing_state = 'canceled',
+              billing_period_starts_at = NULL,
+              billing_period_ends_at = NULL,
+              last_billing_sync_at = NOW(),
+              last_billing_event_id = $2
+            WHERE id = $1
+          `,
+          [organizationId, eventId]
+        );
+
+        const cleanupSummary = await createOrganizationPlanCleanupService(tx).cleanupOrganizationForPlan({
+          organization_id: organizationId,
+          plan: "free"
+        });
+
+        if (isPlanDowngrade(previousPlan, "free")) {
+          await recordPlanDowngradeCleanupAudit({
+            db: tx,
+            organization_id: organizationId,
+            previous_plan: previousPlan,
+            target_plan: "free",
+            trigger_source: "stripe_sync",
+            cleanup_summary: cleanupSummary,
+            occurred_at: new Date().toISOString()
+          });
+        }
+      });
     },
 
     async updateBillingState(

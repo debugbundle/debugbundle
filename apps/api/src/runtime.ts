@@ -36,6 +36,7 @@ export type ApiRuntimeEnv = Omit<z.infer<typeof ApiRuntimeEnvSchema>, "DB_SSL_MO
 
 export interface Queryable {
   query<Row extends Record<string, unknown>>(sql: string, params: unknown[]): Promise<{ rows: Row[] }>;
+  transaction?<Result>(callback: (db: Queryable) => Promise<Result>): Promise<Result>;
 }
 
 export interface DrainingReadinessState {
@@ -207,6 +208,32 @@ export function buildApiReadinessCheck(env: ApiRuntimeEnv): () => Promise<void> 
   };
 }
 
+function createPoolQueryable(pool: Pool): Queryable {
+  return {
+    query: async <Row extends Record<string, unknown>>(sql: string, params: unknown[]) =>
+      pool.query<Row>(sql, params),
+    transaction: async <Result>(callback: (db: Queryable) => Promise<Result>) => {
+      const client = await pool.connect();
+      const tx: Queryable = {
+        query: async <Row extends Record<string, unknown>>(sql: string, params: unknown[]) =>
+          client.query<Row>(sql, params)
+      };
+
+      try {
+        await client.query("BEGIN", []);
+        const result = await callback(tx);
+        await client.query("COMMIT", []);
+        return result;
+      } catch (error) {
+        await client.query("ROLLBACK", []).catch(() => undefined);
+        throw error;
+      } finally {
+        client.release();
+      }
+    }
+  };
+}
+
 export async function startApiServerFromEnv(envInput: Record<string, string | undefined>): Promise<void> {
   const env = parseApiRuntimeEnv(envInput);
   const logger = createRuntimeLoggerFromEnv({
@@ -244,10 +271,7 @@ export async function startApiServerFromEnv(envInput: Record<string, string | un
   if (stripeConfig) {
     const syncPool = createApiPool(env);
     webhookPools.push(syncPool);
-    const billingSyncStore = createPostgresBillingSyncStore({
-      query: async <Row extends Record<string, unknown>>(sql: string, params: unknown[]) =>
-        syncPool.query<Row>(sql, params)
-    });
+    const billingSyncStore = createPostgresBillingSyncStore(createPoolQueryable(syncPool));
     serverOptions.stripeWebhook = {
       stripeConfig,
       billingSyncStore,

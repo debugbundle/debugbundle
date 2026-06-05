@@ -7,7 +7,13 @@ import { Button } from "../ui/button.js";
 import { Skeleton } from "../ui/skeleton.js";
 import { Tabs, TabsList, TabsTrigger } from "../ui/tabs.js";
 import { listProjects, type ProjectRecord } from "../../lib/api.js";
-import { getProjectEffectiveRole, getProjectRelationship, getProjectSharingState } from "../../lib/project-access.js";
+import {
+  getProjectEffectiveRole,
+  getProjectOwnerEmail,
+  getProjectRelationship,
+  getProjectSharingState,
+  isSharedProjectAccessSuspended
+} from "../../lib/project-access.js";
 
 const PROJECT_TABS = [
   { value: "overview", label: "Overview", suffix: "" },
@@ -145,6 +151,27 @@ export function ProjectLayout(): JSX.Element {
 
   if (activeTab === "members" && !canViewProjectMembers(project)) {
     return <Navigate replace to={`/projects/${projectId}`} />;
+  }
+
+  if (isSharedProjectAccessSuspended(project)) {
+    const ownerEmail = getProjectOwnerEmail(project);
+
+    return (
+      <CalloutCard
+        eyebrow="Shared access paused"
+        title="This shared project is paused until the owner upgrades again"
+        description={
+          ownerEmail === null
+            ? "Your saved access is still on file, but the owner's current plan no longer includes project sharing."
+            : `Your saved access is still on file, but ${ownerEmail}'s current plan no longer includes project sharing.`
+        }
+        tone="warning"
+      >
+        <Button asChild type="button" variant="outline">
+          <Link to="/projects">Back to projects</Link>
+        </Button>
+      </CalloutCard>
+    );
   }
 
   return (

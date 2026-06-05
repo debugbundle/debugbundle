@@ -47,6 +47,7 @@ import {
   createS3ObjectStoreClient,
   deleteProjectObjects,
   type ObjectStoreClient,
+  type Queryable,
   type QueueClient,
   type RedisQueueClient,
   type WebhookEventType
@@ -85,6 +86,32 @@ export {
 export type { BillingEmailContact, BillingEmailService } from "./default-dependency-helpers.js";
 
 const BUNDLE_REGENERATION_LEASE_TTL_SECONDS = 30;
+
+function createPoolQueryable(pool: Pool): Queryable {
+  return {
+    query: async <Row extends Record<string, unknown>>(sql: string, params: unknown[]) =>
+      pool.query<Row>(sql, params),
+    transaction: async <Result>(callback: (db: Queryable) => Promise<Result>) => {
+      const client = await pool.connect();
+      const tx: Queryable = {
+        query: async <Row extends Record<string, unknown>>(sql: string, params: unknown[]) =>
+          client.query<Row>(sql, params)
+      };
+
+      try {
+        await client.query("BEGIN", []);
+        const result = await callback(tx);
+        await client.query("COMMIT", []);
+        return result;
+      } catch (error) {
+        await client.query("ROLLBACK", []).catch(() => undefined);
+        throw error;
+      } finally {
+        client.release();
+      }
+    }
+  };
+}
 
 export function createApiDependencies(input: CreateApiDependenciesInput): DefaultApiDependencies {
   const ingestionPersistence = createIngestionPersistenceService({
@@ -175,7 +202,8 @@ export function createApiDependencies(input: CreateApiDependenciesInput): Defaul
     ...(input.stripeConfig === undefined ? {} : { stripeConfig: input.stripeConfig }),
     billingStore,
     billingSyncStore,
-    billingLinks
+    billingLinks,
+    ...(input.appBaseUrl === undefined ? {} : { appBaseUrl: input.appBaseUrl })
   });
   const { billingManagement } = billingManagementServices;
   const inviteEmails =
@@ -855,6 +883,7 @@ export function createApiDependenciesFromEnv(
     database: env["DB_NAME"] ?? "debugbundle",
     ...(dbSsl === undefined ? {} : { ssl: dbSsl })
   });
+  const db = createPoolQueryable(dbPool);
 
   const queue = createRedisQueueClient({
     redisUrl: env["REDIS_URL"] ?? "redis://localhost:6379"
@@ -926,12 +955,11 @@ export function createApiDependenciesFromEnv(
   });
 
   const dependencies = createApiDependencies({
-    db: {
-      query: async <Row extends Record<string, unknown>>(sql: string, params: unknown[]) => dbPool.query<Row>(sql, params)
-    },
+    db,
     queue,
     objectStore,
     frequencyCounter,
+    appBaseUrl,
     ...(authEmailSender === undefined ? {} : { authEmails: authEmailSender }),
     ...(billingEmails === undefined ? {} : { billingEmails }),
     ...(githubOAuth === undefined ? {} : { githubOAuth }),

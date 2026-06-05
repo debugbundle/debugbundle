@@ -65,6 +65,7 @@ describe("github store", () => {
 
     const created = await store.createSkippedGitHubDispatchDelivery({
       rule_id: "11111111-1111-4111-8111-111111111111",
+      rule_name: "High severity incidents",
       project_id: "22222222-2222-4222-8222-222222222222",
       incident_id: "33333333-3333-4333-8333-333333333333",
       improvement_id: null,
@@ -352,6 +353,8 @@ describe("github store", () => {
         rows: [
           {
             rule_id: "11111111-1111-4111-8111-111111111111",
+            rule_name: "High severity incidents",
+            organization_plan: "team",
             installation_id: 99,
             repo_owner: "debugbundle",
             repo_name: "app",
@@ -381,8 +384,12 @@ describe("github store", () => {
       bundle_type: "failure",
       incident_status: "new_or_reopened"
     });
+    expect(String(query.mock.calls[0]?.[0] ?? "")).toContain(
+      "COALESCE(o.plan, 'free') AS organization_plan"
+    );
     const created = await store.createGitHubDispatchDeliveryIntent({
       rule_id: "11111111-1111-4111-8111-111111111111",
+      rule_name: "High severity incidents",
       project_id: "proj_123",
       incident_id: "inc_123",
       improvement_id: null,
@@ -410,6 +417,7 @@ describe("github store", () => {
     expect(matches).toEqual([
       {
         rule_id: "11111111-1111-4111-8111-111111111111",
+        rule_name: "High severity incidents",
         installation_id: 99,
         repo_owner: "debugbundle",
         repo_name: "app",
@@ -427,6 +435,8 @@ describe("github store", () => {
       rows: [
         {
           rule_id: "rule_env",
+          rule_name: "Wrong environment",
+          organization_plan: "team",
           installation_id: "91",
           repo_owner: "debugbundle",
           repo_name: "app",
@@ -440,6 +450,8 @@ describe("github store", () => {
         },
         {
           rule_id: "rule_service",
+          rule_name: "Wrong service",
+          organization_plan: "team",
           installation_id: "92",
           repo_owner: "debugbundle",
           repo_name: "app",
@@ -453,6 +465,8 @@ describe("github store", () => {
         },
         {
           rule_id: "rule_severity",
+          rule_name: "Too strict",
+          organization_plan: "team",
           installation_id: "93",
           repo_owner: "debugbundle",
           repo_name: "app",
@@ -466,6 +480,8 @@ describe("github store", () => {
         },
         {
           rule_id: "rule_bundle",
+          rule_name: "Improvement only",
+          organization_plan: "team",
           installation_id: "94",
           repo_owner: "debugbundle",
           repo_name: "app",
@@ -479,6 +495,8 @@ describe("github store", () => {
         },
         {
           rule_id: "rule_created_only",
+          rule_name: "Reopened only",
+          organization_plan: "team",
           installation_id: "95",
           repo_owner: "debugbundle",
           repo_name: "app",
@@ -492,6 +510,8 @@ describe("github store", () => {
         },
         {
           rule_id: "rule_match",
+          rule_name: "Match",
+          organization_plan: "team",
           installation_id: "96",
           repo_owner: "debugbundle",
           repo_name: "app",
@@ -521,6 +541,7 @@ describe("github store", () => {
     ).resolves.toEqual([
       {
         rule_id: "rule_match",
+        rule_name: "Match",
         installation_id: 96,
         repo_owner: "debugbundle",
         repo_name: "app",
@@ -537,6 +558,7 @@ describe("github store", () => {
           delivery_id: "44444444-4444-4444-8444-444444444444",
           rule_id: "11111111-1111-4111-8111-111111111111",
           project_id: "proj_123",
+          organization_plan: "team",
           incident_id: "inc_123",
           improvement_id: null,
           installation_id: "99",
@@ -574,6 +596,67 @@ describe("github store", () => {
     });
   });
 
+  it("suppresses github dispatch matches and queued deliveries when the current plan is free", async () => {
+    const query = vi
+      .fn()
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            rule_id: "rule_old",
+            rule_name: "Stale rule",
+            organization_plan: "free",
+            installation_id: 96,
+            repo_owner: "debugbundle",
+            repo_name: "app",
+            default_branch: "main",
+            cooldown_seconds: 360,
+            environments: [],
+            services: [],
+            severity_min: null,
+            bundle_type: "failure",
+            incident_status: "new_or_reopened"
+          }
+        ]
+      })
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            delivery_id: "44444444-4444-4444-8444-444444444444",
+            rule_id: "11111111-1111-4111-8111-111111111111",
+            project_id: "proj_123",
+            organization_plan: "free",
+            incident_id: "inc_123",
+            improvement_id: null,
+            installation_id: "99",
+            repo_owner: "debugbundle",
+            repo_name: "app",
+            status: "retrying",
+            attempt_count: "2",
+            next_attempt_at: "2026-03-26T00:05:00.000Z",
+            last_attempt_at: "2026-03-26T00:01:00.000Z",
+            last_error: "github_dispatch_http_error_429",
+            github_status_code: null,
+            dispatch_payload: {}
+          }
+        ]
+      });
+
+    const store = createPostgresGitHubStore({ query });
+
+    await expect(
+      store.listMatchingGitHubDispatchRules({
+        project_id: "proj_123",
+        event_type: "bundle.created",
+        environment: "production",
+        service_name: "checkout-api",
+        severity: "high",
+        bundle_type: "failure",
+        incident_status: "new_or_reopened"
+      })
+    ).resolves.toEqual([]);
+    await expect(store.getGitHubDispatchDeliveryIntent("44444444-4444-4444-8444-444444444444")).resolves.toBeNull();
+  });
+
   it("suppresses duplicate github dispatch intents for the same rule and dedupe key", async () => {
     const query = vi
       .fn()
@@ -584,6 +667,7 @@ describe("github store", () => {
 
     const duplicate = await store.createGitHubDispatchDeliveryIntent({
       rule_id: "11111111-1111-4111-8111-111111111111",
+      rule_name: "High severity incidents",
       project_id: "proj_123",
       incident_id: "inc_123",
       improvement_id: null,
@@ -604,6 +688,7 @@ describe("github store", () => {
 
     const created = await store.createGitHubDispatchDeliveryIntent({
       rule_id: "11111111-1111-4111-8111-111111111111",
+      rule_name: "High severity incidents",
       project_id: "proj_123",
       incident_id: "inc_123",
       improvement_id: null,
@@ -851,6 +936,7 @@ describe("github store", () => {
             delivery_id: "delivery_123",
             rule_id: "rule_123",
             project_id: "proj_1",
+            organization_plan: "team",
             incident_id: "inc_1",
             installation_id: "123",
             repo_owner: "debugbundle",

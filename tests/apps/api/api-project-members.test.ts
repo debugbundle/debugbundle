@@ -281,6 +281,43 @@ describe("api project member routes", () => {
     });
   });
 
+  it("returns shared_access_suspended instead of project_not_found for downgraded shared collaborators", async (): Promise<void> => {
+    const app = createServer({
+      memberAuth: {
+        resolveMemberByTokenHash: vi.fn().mockResolvedValue({
+          member_id: "usr_collaborator",
+          organization_id: "org_123",
+          email: "collaborator@example.com",
+          role: "member"
+        })
+      },
+      projectManagement: {
+        resolveProjectAccessForUser: vi.fn().mockResolvedValue({
+          project_id: PROJECT_ID,
+          organization_id: "org_owner",
+          owner_user_id: "usr_owner",
+          owner_email: "owner@example.com",
+          relationship: "shared",
+          sharing_state: "shared_with_you",
+          effective_role: "member",
+          shared_access_suspended: true,
+          organization_plan: "free"
+        })
+      }
+    });
+
+    const response = await app.inject({
+      method: "GET",
+      url: `/v1/projects/${PROJECT_ID}/members`,
+      headers: {
+        authorization: "Bearer dbundle_mem_test"
+      }
+    });
+
+    expect(response.statusCode).toBe(403);
+    expect(response.json()).toEqual({ error: "shared_access_suspended" });
+  });
+
   it("creates a project invite for owner or admin callers and sends the invite email", async (): Promise<void> => {
     const inviteEmails = {
       sendProjectInviteEmail: vi.fn().mockResolvedValue(undefined)

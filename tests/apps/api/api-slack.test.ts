@@ -282,15 +282,58 @@ describe("api slack routes", () => {
     });
 
     expect(response.statusCode).toBe(200);
-    expect(billingManagement.getBillingSummaryForOrganization).toHaveBeenCalledWith({
-      organization_id: "org_shared",
-      now: expect.any(String)
-    });
+    expect(billingManagement.getBillingSummaryForOrganization).not.toHaveBeenCalled();
     expect(slackManagement.listSlackDestinationsForProjectInOrganization).toHaveBeenCalledWith({
       organization_id: "org_shared",
       project_id: "00000000-0000-4000-8000-000000000001",
       limit: 100
     });
+  });
+
+  it("keeps preserved Slack destinations readable on free-tier projects", async () => {
+    const billingManagement = mockedObject<NonNullable<ApiServerDependencies["billingManagement"]>>({
+      getBillingSummaryForOrganization: vi.fn().mockResolvedValue({ plan: "free" })
+    });
+    const slackManagement = mockedObject<NonNullable<ApiServerDependencies["slackManagement"]>>({
+      listSlackDestinationsForProjectInOrganization: vi.fn().mockResolvedValue([
+        {
+          slack_destination_id: slackDestinationId,
+          organization_id: "org_123",
+          slack_team_id: "T123",
+          slack_team_name: "Acme",
+          slack_channel_id: "C123",
+          slack_channel_name: "#alerts",
+          installed_by_member_id: "usr_123",
+          is_active: true,
+          created_at: "2026-05-13T10:00:00.000Z",
+          updated_at: "2026-05-13T10:00:00.000Z"
+        }
+      ]),
+      getSlackDestinationForOrganization: vi.fn().mockResolvedValue(null),
+      getSlackDestinationSecretForOrganization: vi.fn().mockResolvedValue(null),
+      upsertSlackDestinationForOrganization: vi.fn().mockResolvedValue({ slack_destination_id: slackDestinationId }),
+      deleteSlackDestinationForProjectInOrganization: vi.fn().mockResolvedValue(null)
+    });
+    const app = createServer({ billingManagement, slackManagement });
+
+    const response = await app.inject({
+      method: "GET",
+      url: "/v1/projects/00000000-0000-4000-8000-000000000001/slack/destinations",
+      headers: {
+        authorization: "Bearer dbundle_mem_test"
+      }
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toEqual({
+      destinations: [
+        expect.objectContaining({
+          slack_destination_id: slackDestinationId,
+          slack_channel_name: "#alerts"
+        })
+      ]
+    });
+    expect(billingManagement.getBillingSummaryForOrganization).not.toHaveBeenCalled();
   });
 
   it("tests and protects connected Slack destinations through the project route family", async () => {
@@ -352,6 +395,48 @@ describe("api slack routes", () => {
     expect(testResponse.statusCode).toBe(200);
     expect(testResponse.json()).toEqual({ delivered: true });
     expect(deleted.statusCode).toBe(204);
+  });
+
+  it("allows deleting preserved Slack destinations after downgrade", async (): Promise<void> => {
+    const deleteSlackDestinationForProjectInOrganization = vi.fn().mockResolvedValue({
+      slack_destination_id: slackDestinationId
+    });
+    const app = createServer({
+      billingManagement: mockedObject<NonNullable<ApiServerDependencies["billingManagement"]>>({
+        getBillingSummaryForOrganization: vi.fn().mockResolvedValue({ plan: "solo" })
+      }),
+      slackManagement: mockedObject<NonNullable<ApiServerDependencies["slackManagement"]>>({
+        listSlackDestinationsForProjectInOrganization: vi.fn().mockResolvedValue([]),
+        getSlackDestinationForOrganization: vi.fn().mockResolvedValue(null),
+        getSlackDestinationSecretForOrganization: vi.fn().mockResolvedValue(null),
+        upsertSlackDestinationForOrganization: vi.fn().mockResolvedValue({ slack_destination_id: slackDestinationId }),
+        deleteSlackDestinationForProjectInOrganization
+      })
+    });
+
+    const deleted = await app.inject({
+      method: "DELETE",
+      url: `/v1/projects/00000000-0000-4000-8000-000000000001/slack/destinations/${slackDestinationId}`,
+      headers: {
+        authorization: "Bearer dbundle_mem_test"
+      }
+    });
+    const testResponse = await app.inject({
+      method: "POST",
+      url: `/v1/projects/00000000-0000-4000-8000-000000000001/slack/destinations/${slackDestinationId}/test`,
+      headers: {
+        authorization: "Bearer dbundle_mem_test"
+      }
+    });
+
+    expect(deleted.statusCode).toBe(204);
+    expect(testResponse.statusCode).toBe(403);
+    expect(testResponse.json()).toEqual({ error: "upgrade_required" });
+    expect(deleteSlackDestinationForProjectInOrganization).toHaveBeenCalledWith({
+      organization_id: "org_123",
+      project_id: "00000000-0000-4000-8000-000000000001",
+      slack_destination_id: slackDestinationId
+    });
   });
 
   it("surfaces Slack delivery failures from the test route", async () => {

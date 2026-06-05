@@ -1,5 +1,7 @@
 import { randomUUID } from "node:crypto";
 
+import { getTierCapabilities } from "../../shared-types/src/index.js";
+
 import type { Queryable } from "./types.js";
 
 export interface SlackDestinationRecord extends Record<string, unknown> {
@@ -59,6 +61,7 @@ export interface SlackDestinationStore {
 type SlackDestinationRow = {
   slack_destination_id: string;
   organization_id: string;
+  organization_plan?: string;
   slack_team_id: string;
   slack_team_name: string | null;
   slack_channel_id: string;
@@ -270,6 +273,7 @@ export function createPostgresSlackDestinationStore(db: Queryable): SlackDestina
           SELECT
             sd.id AS slack_destination_id,
             sd.organization_id,
+            COALESCE(o.plan, 'free') AS organization_plan,
             sd.slack_team_id,
             sd.slack_team_name,
             sd.slack_channel_id,
@@ -280,6 +284,7 @@ export function createPostgresSlackDestinationStore(db: Queryable): SlackDestina
             sd.created_at::text AS created_at,
             sd.updated_at::text AS updated_at
           FROM slack_destinations sd
+          JOIN organizations o ON o.id = sd.organization_id
           WHERE sd.id = $1
             AND sd.is_active = true
           LIMIT 1
@@ -288,7 +293,9 @@ export function createPostgresSlackDestinationStore(db: Queryable): SlackDestina
       );
 
       const row = result.rows[0];
-      return row === undefined ? null : mapSlackDestinationSecret(row);
+      return row === undefined || !getTierCapabilities(row.organization_plan).slack_integration
+        ? null
+        : mapSlackDestinationSecret(row);
     },
 
     async getSlackDestinationSecretForOrganization(input) {

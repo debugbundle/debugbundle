@@ -233,7 +233,7 @@ describe("api github routes", () => {
     expect(String(response.headers["set-cookie"])).toContain(`${GITHUB_APP_INSTALL_STATE_COOKIE_NAME}=`);
   });
 
-  it("rejects github installation routes when the organization tier lacks access", async () => {
+  it("allows installation reads but still rejects install flows when the organization tier lacks access", async () => {
     const app = createServer({
       billingManagement: {
         getBillingSummaryForOrganization: vi.fn().mockResolvedValue({ plan: "free" }),
@@ -242,16 +242,147 @@ describe("api github routes", () => {
       }
     });
 
-    const response = await app.inject({
+    const installationResponse = await app.inject({
       method: "GET",
       url: "/v1/github/installation",
       headers: {
         authorization: "Bearer dbundle_mem_test"
       }
     });
+    const installUrlResponse = await app.inject({
+      method: "GET",
+      url: "/v1/github/app/install-url",
+      headers: {
+        authorization: "Bearer dbundle_mem_test"
+      }
+    });
 
-    expect(response.statusCode).toBe(403);
-    expect(response.json()).toEqual({ error: "upgrade_required" });
+    expect(installationResponse.statusCode).toBe(200);
+    expect(installationResponse.json()).toEqual({
+      installation: expect.objectContaining({
+        account_login: "debugbundle"
+      })
+    });
+    expect(installUrlResponse.statusCode).toBe(403);
+    expect(installUrlResponse.json()).toEqual({ error: "upgrade_required" });
+  });
+
+  it("keeps project github setup readable on free tiers while paid mutations remain blocked", async () => {
+    const projectId = "00000000-0000-4000-8000-000000000001";
+    const removeProjectRepoForOrganization = vi.fn().mockResolvedValue(true);
+    const deleteProjectRuleForOrganization = vi.fn().mockResolvedValue(true);
+    const app = createServer({
+      billingManagement: {
+        getBillingSummaryForOrganization: vi.fn().mockResolvedValue({ plan: "free" }),
+        getBillingSummaryForProject: vi.fn().mockResolvedValue({ plan: "free" }),
+        createCheckoutLink: vi.fn(),
+        createPortalLink: vi.fn(),
+        increaseCapacity: vi.fn(),
+        scheduleCapacityReduction: vi.fn(),
+        cancelCapacityReduction: vi.fn()
+      },
+      githubManagement: {
+        getProjectRepoForOrganization: vi.fn().mockResolvedValue({
+          id: "pgr_1",
+          project_id: projectId,
+          installation_id: "ghi_1",
+          repo_owner: "debugbundle",
+          repo_name: "app",
+          default_branch: "main",
+          created_at: "2026-03-26T00:00:00.000Z",
+          updated_at: "2026-03-26T00:00:00.000Z"
+        }),
+        listProjectRulesForOrganization: vi.fn().mockResolvedValue([
+          {
+            rule_id: "ghr_1",
+            project_id: projectId,
+            created_by_user_id: "usr_123",
+            name: "Bundle created",
+            enabled: true,
+            event_types: ["bundle.created"],
+            environments: ["production"],
+            services: [],
+            severity_min: "high",
+            bundle_type: "failure",
+            incident_status: "new_or_reopened",
+            cooldown_seconds: 300,
+            created_at: "2026-03-26T00:00:00.000Z",
+            updated_at: "2026-03-26T00:00:00.000Z"
+          }
+        ]),
+        listProjectDeliveriesForOrganization: vi.fn().mockResolvedValue([]),
+        setProjectRepoForOrganization: vi.fn(),
+        removeProjectRepoForOrganization,
+        deleteProjectRuleForOrganization
+      }
+    });
+
+    const repoResponse = await app.inject({
+      method: "GET",
+      url: `/v1/projects/${projectId}/github/repo`,
+      headers: {
+        authorization: "Bearer dbundle_mem_test"
+      }
+    });
+    const rulesResponse = await app.inject({
+      method: "GET",
+      url: `/v1/projects/${projectId}/github/rules`,
+      headers: {
+        authorization: "Bearer dbundle_mem_test"
+      }
+    });
+    const mutateResponse = await app.inject({
+      method: "PUT",
+      url: `/v1/projects/${projectId}/github/repo`,
+      headers: {
+        authorization: "Bearer dbundle_mem_test"
+      },
+      payload: {
+        owner: "debugbundle",
+        repo: "api"
+      }
+    });
+    const removeRepoResponse = await app.inject({
+      method: "DELETE",
+      url: `/v1/projects/${projectId}/github/repo`,
+      headers: {
+        authorization: "Bearer dbundle_mem_test"
+      }
+    });
+    const deleteRuleResponse = await app.inject({
+      method: "DELETE",
+      url: `/v1/projects/${projectId}/github/rules/11111111-1111-4111-8111-111111111111`,
+      headers: {
+        authorization: "Bearer dbundle_mem_test"
+      }
+    });
+
+    expect(repoResponse.statusCode).toBe(200);
+    expect(repoResponse.json()).toEqual({
+      repo: expect.objectContaining({
+        repo_owner: "debugbundle",
+        repo_name: "app"
+      })
+    });
+    expect(rulesResponse.statusCode).toBe(200);
+    expect(rulesResponse.json()).toEqual({
+      rules: [expect.objectContaining({ rule_id: "ghr_1" })]
+    });
+    expect(mutateResponse.statusCode).toBe(403);
+    expect(mutateResponse.json()).toEqual({ error: "upgrade_required" });
+    expect(removeRepoResponse.statusCode).toBe(204);
+    expect(deleteRuleResponse.statusCode).toBe(204);
+    expect(removeProjectRepoForOrganization).toHaveBeenCalledWith({
+      organization_id: "org_123",
+      project_id: projectId
+    });
+    expect(deleteProjectRuleForOrganization).toHaveBeenCalledWith({
+      organization_id: "org_123",
+      project_id: projectId,
+      rule_id: "11111111-1111-4111-8111-111111111111",
+      actor_user_id: "usr_123",
+      actor_role: "owner"
+    });
   });
 
   it("sets project repo assignments and completes installation callbacks", async () => {

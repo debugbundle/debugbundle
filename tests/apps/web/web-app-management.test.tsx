@@ -263,7 +263,7 @@ describe("web app — management routes", () => {
     expect(fetchMock.mock.calls.some(([input]) => requestUrl(input).includes("/github/"))).toBe(true);
   });
 
-  it("keeps github automation unavailable on free projects without probing github endpoints", async () => {
+  it("shows github automation as unavailable on free projects when no preserved setup exists", async () => {
     const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
       const url = requestUrl(input);
 
@@ -323,6 +323,10 @@ describe("web app — management routes", () => {
         });
       }
 
+      if (url.endsWith("/v1/github/installation?project_id=proj_123")) {
+        return jsonResponse(200, { installation: null });
+      }
+
       return jsonResponse(404, { error: "not_found" });
     });
 
@@ -338,7 +342,7 @@ describe("web app — management routes", () => {
         requestUrl(input).endsWith("/v1/alerts?project_id=proj_123&limit=100")
       )
     ).toBe(true);
-    expect(fetchMock.mock.calls.some(([input]) => requestUrl(input).includes("/github/"))).toBe(false);
+    expect(fetchMock.mock.calls.some(([input]) => requestUrl(input).includes("/github/"))).toBe(true);
   });
 
   it("shows incident inventory from the signed-in incidents route and exposes the sidebar entry", async () => {
@@ -1457,6 +1461,13 @@ describe("web app — management routes", () => {
         });
       }
 
+      if (
+        url.endsWith("/v1/github/installation?project_id=proj_123") &&
+        init?.method === undefined
+      ) {
+        return jsonResponse(200, { installation: null });
+      }
+
       return jsonResponse(404, { error: "not_found" });
     });
 
@@ -1468,6 +1479,67 @@ describe("web app — management routes", () => {
       await screen.findByText(/upgrade to solo or team to connect github automation/i)
     ).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /open billing/i })).toHaveAttribute("href", "/billing");
+  });
+
+  it("shows preserved github setup as paused on free projects", async () => {
+    const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = requestUrl(input);
+
+      if (url.endsWith("/v1/auth/session")) {
+        return jsonResponse(200, {
+          session: createSession({ organization_plan: "free" })
+        });
+      }
+
+      if (url.endsWith("/v1/projects") && init?.method === undefined) {
+        return jsonResponse(200, {
+          projects: [createProject({ organization_plan: "free" })]
+        });
+      }
+
+      if (
+        url.endsWith("/v1/github/installation?project_id=proj_123") &&
+        init?.method === undefined
+      ) {
+        return jsonResponse(200, {
+          installation: createGitHubInstallation()
+        });
+      }
+
+      if (url.endsWith("/v1/projects/proj_123/github/repo") && init?.method === undefined) {
+        return jsonResponse(200, {
+          repo: createProjectGitHubRepo()
+        });
+      }
+
+      if (url.endsWith("/v1/projects/proj_123/github/rules") && init?.method === undefined) {
+        return jsonResponse(200, {
+          rules: [createGitHubDispatchRule()]
+        });
+      }
+
+      if (
+        url.endsWith("/v1/projects/proj_123/github/deliveries?limit=20") &&
+        init?.method === undefined
+      ) {
+        return jsonResponse(200, { deliveries: [] });
+      }
+
+      return jsonResponse(404, { error: "not_found" });
+    });
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<App initialEntries={["/projects/proj_123/github"]} />);
+
+    expect(
+      await screen.findByText(/github automation is paused while this project is on free/i)
+    ).toBeInTheDocument();
+    expect(screen.getByText(/repository connected to this project/i)).toBeInTheDocument();
+    expect(screen.getByText(/debugbundle\/app/i)).toBeInTheDocument();
+    expect(screen.getByText(/high severity incidents/i)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /create rule/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /retry delivery/i })).not.toBeInTheDocument();
   });
 
   it("lets owners connect and remove a github repository from the project github page", async () => {
@@ -2721,6 +2793,61 @@ describe("web app — management routes", () => {
         )
       ).toBe(true);
     });
+  });
+
+  it("shows preserved Slack destinations as paused on free projects", async () => {
+    const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = requestUrl(input);
+
+      if (url.endsWith("/v1/auth/session")) {
+        return jsonResponse(200, {
+          session: createSession({ organization_plan: "free" })
+        });
+      }
+
+      if (url.endsWith("/v1/projects") && init?.method === undefined) {
+        return jsonResponse(200, {
+          projects: [createProject({ organization_plan: "free" })]
+        });
+      }
+
+      if (url.endsWith("/v1/alerts?project_id=proj_123&limit=20") && init?.method === undefined) {
+        return jsonResponse(200, {
+          alerts: []
+        });
+      }
+
+      if (url.endsWith("/v1/projects/proj_123/slack/destinations") && init?.method === undefined) {
+        return jsonResponse(200, {
+          destinations: [
+            {
+              slack_destination_id: "sd_123",
+              organization_id: "org_123",
+              slack_team_id: "T123",
+              slack_team_name: "Acme",
+              slack_channel_id: "C123",
+              slack_channel_name: "#alerts",
+              installed_by_member_id: "usr_123",
+              is_active: true,
+              created_at: "2026-05-13T10:00:00.000Z",
+              updated_at: "2026-05-13T10:00:00.000Z"
+            }
+          ]
+        });
+      }
+
+      return jsonResponse(404, { error: "not_found" });
+    });
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<App initialEntries={["/projects/proj_123/alerts"]} />);
+
+    expect(
+      await screen.findByText(/saved slack channels will resume after an upgrade/i)
+    ).toBeInTheDocument();
+    expect(screen.getByText(/slack alert delivery and channel management are paused/i)).toBeInTheDocument();
+    expect(screen.getByText(/acme - #alerts/i)).toBeInTheDocument();
   });
 
   it("prefills and requires a single recipient email for email alert rules", async () => {

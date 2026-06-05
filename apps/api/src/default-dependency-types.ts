@@ -42,6 +42,7 @@ export interface CreateApiDependenciesInput {
   githubOAuth?: GitHubOAuthConfig;
   githubAppClient?: GitHubAppClient;
   stripeConfig?: StripeConfig;
+  appBaseUrl?: string;
   lifecycleWebhookFallbackTargetUrl?: string;
   lifecycleWebhookFallbackSigningSecret?: string;
 }

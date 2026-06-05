@@ -1,3 +1,5 @@
+import { randomUUID } from "node:crypto";
+
 import { CreateBucketCommand, S3Client } from "@aws-sdk/client-s3";
 import { Pool } from "pg";
 import { describe } from "vitest";
@@ -94,6 +96,77 @@ export function createNonSpikingFrequencyCounter(): IncidentFrequencyCounter {
 
 export function createNoopWebhookPublisher(): { publish: () => Promise<void> } {
   return { publish: () => Promise.resolve(undefined) };
+}
+
+export async function seedOwnedProject(input: {
+  pool: Pool;
+  organizationId: string;
+  projectId: string;
+  organizationName: string;
+  organizationSlug: string;
+  projectName: string;
+  projectSlug: string;
+  organizationPlan?: string;
+  ownerUserId?: string;
+  ownerEmail?: string;
+  environmentDefault?: string;
+  createOwnerMembership?: boolean;
+}): Promise<{ ownerUserId: string }> {
+  const ownerUserId = input.ownerUserId ?? randomUUID();
+  const ownerEmail = input.ownerEmail ?? `owner-${ownerUserId.slice(0, 8)}@example.com`;
+
+  if (input.organizationPlan === undefined) {
+    await input.pool.query(
+      `
+        INSERT INTO organizations (id, name, slug)
+        VALUES ($1, $2, $3)
+      `,
+      [input.organizationId, input.organizationName, input.organizationSlug]
+    );
+  } else {
+    await input.pool.query(
+      `
+        INSERT INTO organizations (id, name, slug, plan)
+        VALUES ($1, $2, $3, $4)
+      `,
+      [input.organizationId, input.organizationName, input.organizationSlug, input.organizationPlan]
+    );
+  }
+
+  await input.pool.query(
+    `
+      INSERT INTO users (id, email)
+      VALUES ($1, $2)
+    `,
+    [ownerUserId, ownerEmail]
+  );
+
+  if (input.createOwnerMembership ?? true) {
+    await input.pool.query(
+      `
+        INSERT INTO organization_members (id, organization_id, user_id, role)
+        VALUES ($1, $2, $3, 'owner')
+      `,
+      [randomUUID(), input.organizationId, ownerUserId]
+    );
+  }
+
+  await input.pool.query(
+    `
+      INSERT INTO projects (id, organization_id, owner_user_id, name, slug, environment_default)
+      VALUES ($1, $2, $3, $4, $5, $6)
+    `,
+    [
+      input.projectId,
+      input.organizationId,
+      ownerUserId,
+      input.projectName,
+      input.projectSlug,
+      input.environmentDefault ?? "production"
+    ]
+  );
+
+  return { ownerUserId };
 }
 
 /* ── Suite lifecycle ───────────────────────────────────────── */

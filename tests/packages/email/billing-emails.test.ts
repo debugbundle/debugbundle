@@ -42,6 +42,8 @@ describe("billing email templates", () => {
 
       expect(result.subject).toContain("7 day(s) left");
       expect(result.text).toContain("ends in 7 day(s)");
+      expect(result.text).toContain("DebugBundle will pause:");
+      expect(result.text).toContain("generated hosted improvement bundle artifacts");
       expect(result.html).toContain("Convert to paid");
     });
 
@@ -55,6 +57,9 @@ describe("billing email templates", () => {
 
       expect(result.subject).toContain("trial has ended");
       expect(result.text).toContain("free tier");
+      expect(result.text).toContain("paid-feature setup remain saved");
+      expect(result.text).toContain("DebugBundle paused:");
+      expect(result.text).toContain("generated hosted improvement bundle artifacts");
       expect(result.html).toContain("Trial ended");
     });
 

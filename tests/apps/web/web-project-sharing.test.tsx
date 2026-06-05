@@ -130,6 +130,45 @@ describe("web app — project sharing", () => {
     });
   });
 
+  it("shows a paused access warning for preserved shared projects on a lower owner tier", async () => {
+    const pausedSharedProject = createProject({
+      project_id: "proj_paused",
+      name: "Paused Shared App",
+      slug: "paused-shared-app",
+      organization_plan: "free",
+      relationship: "shared",
+      sharing_state: "shared_with_you",
+      effective_role: "member",
+      shared_access_suspended: true,
+      owner_email: "owner@example.com"
+    });
+    const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = requestUrl(input);
+
+      if (url.endsWith("/v1/auth/session")) {
+        return jsonResponse(200, {
+          session: createSession({ organization_plan: "team" })
+        });
+      }
+
+      if (url.endsWith("/v1/projects") && init?.method === undefined) {
+        return jsonResponse(200, {
+          projects: [pausedSharedProject]
+        });
+      }
+
+      return jsonResponse(404, { error: "not_found" });
+    });
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<App initialEntries={["/projects/proj_paused"]} />);
+
+    expect(await screen.findByText(/shared access paused/i)).toBeInTheDocument();
+    expect(screen.getByText(/owner@example.com's current plan no longer includes project sharing/i)).toBeInTheDocument();
+    expect(screen.queryByRole("tab", { name: /members/i })).not.toBeInTheDocument();
+  });
+
   it("invites collaborators, updates roles, removes access, and cancels invites from the members tab", async () => {
     const user = userEvent.setup();
     const project = createProject({

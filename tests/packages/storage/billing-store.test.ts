@@ -549,6 +549,127 @@ describe("billing store – trial lifecycle", () => {
         expired_at: "2026-04-01T00:00:00.000Z"
       }
     });
+    expect(
+      query.mock.calls.some((call) => String(call[0]).includes("JOIN github_dispatch_rules rules"))
+    ).toBe(true);
+    expect(query).toHaveBeenCalledWith("BEGIN", []);
+    expect(query).toHaveBeenCalledWith("COMMIT", []);
+  });
+
+  it("rolls back trial expiry when downgrade cleanup fails", async () => {
+    const query = vi.fn().mockImplementation((sql: string) => {
+      if (sql.includes("UPDATE organizations") && sql.includes("billing_state = 'trial_expired'")) {
+        return { rows: [{ id: "org_trial" }] };
+      }
+
+      if (sql.includes("JOIN github_dispatch_rules rules")) {
+        throw new Error("cleanup failed");
+      }
+
+      return { rows: [] };
+    });
+
+    const store = createPostgresBillingStore({ query });
+
+    await expect(
+      store.expireTrialForOrganization({
+        organization_id: "org_trial",
+        now: "2026-04-01T00:00:00.000Z"
+      })
+    ).rejects.toThrow("cleanup failed");
+
+    expect(query).toHaveBeenCalledWith("BEGIN", []);
+    expect(query).toHaveBeenCalledWith("ROLLBACK", []);
+    expect(query).not.toHaveBeenCalledWith("COMMIT", []);
+  });
+
+  it("records cleanup-count audit metadata when trial expiry downgrades a paid trial", async () => {
+    const query = vi.fn().mockImplementation((sql: string) => {
+      if (sql.includes("SELECT COALESCE(plan, 'free') AS plan")) {
+        return { rows: [{ plan: "solo" }] };
+      }
+
+      if (sql.includes("UPDATE organizations") && sql.includes("billing_state = 'trial_expired'")) {
+        return { rows: [{ id: "org_trial" }], rowCount: 1 };
+      }
+
+      if (sql.includes("automated_improvement_bundles_enabled = true")) {
+        return { rows: [], rowCount: 2 };
+      }
+
+      if (sql.includes("JOIN improvement_opportunities opportunities")) {
+        return { rows: [], rowCount: 5 };
+      }
+
+      if (sql.includes("INSERT INTO audit_logs")) {
+        return {
+          rows: [
+            {
+              audit_log_id: "audit_123",
+              organization_id: "org_trial",
+              actor_user_id: null,
+              actor_type: "system",
+              action: "billing.plan_downgrade_cleanup",
+              target_type: "organization",
+              target_id: "org_trial",
+              status: "success",
+              ip_address: null,
+              metadata: {},
+              occurred_at: "2026-04-01T00:00:00.000Z",
+              created_at: "2026-04-01T00:00:00.000Z"
+            }
+          ]
+        };
+      }
+
+      if (sql.includes("FROM organizations")) {
+        return {
+          rows: [
+            {
+              plan: "free",
+              billing_state: "trial_expired",
+              stripe_customer_id: null,
+              stripe_subscription_id: null,
+              additional_capacity_units: 0,
+              billing_period_starts_at: null,
+              billing_period_ends_at: null,
+              trial_plan: "solo",
+              trial_started_at: "2026-03-01T00:00:00.000Z",
+              trial_ends_at: "2026-03-31T00:00:00.000Z",
+              trial_used_at: "2026-03-01T00:00:00.000Z",
+              trial_converted_at: null,
+              trial_expired_at: "2026-04-01T00:00:00.000Z"
+            }
+          ]
+        };
+      }
+
+      if (sql.includes("to_regclass")) {
+        return { rows: [{ exists: false }] };
+      }
+
+      return { rows: [], rowCount: 0 };
+    });
+
+    const store = createPostgresBillingStore({ query });
+
+    await store.expireTrialForOrganization({
+      organization_id: "org_trial",
+      now: "2026-04-01T00:00:00.000Z"
+    });
+
+    const auditCall = query.mock.calls.find(([sql]) => String(sql).includes("INSERT INTO audit_logs"));
+    expect(auditCall).toBeDefined();
+    const metadata = JSON.parse(auditCall?.[1]?.[9] as string) as Record<string, unknown>;
+    expect(metadata).toMatchObject({
+      previous_plan: "solo",
+      target_plan: "free",
+      trigger_source: "trial_expiry",
+      cleanup_summary: {
+        suspended_improvement_settings_projects: 2,
+        suspended_improvement_opportunities: 5
+      }
+    });
   });
 
   it("returns unrecorded trial lifecycle candidates and records the ledger after side effects", async () => {

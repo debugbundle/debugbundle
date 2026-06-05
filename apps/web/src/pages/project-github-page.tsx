@@ -98,6 +98,7 @@ export function ProjectGitHubPage(): JSX.Element {
   const effectiveRole = getProjectEffectiveRole(project);
   const canManageConnections = effectiveRole === "owner" || effectiveRole === "admin";
   const githubAutomationEnabled = project.organization_plan !== "free";
+  const canManageGitHubAutomation = canManageConnections && githubAutomationEnabled;
 
   useEffect(() => {
     if (!isCreateRuleOpen) {
@@ -113,12 +114,6 @@ export function ProjectGitHubPage(): JSX.Element {
   }, [isCreateRuleOpen]);
 
   useEffect(() => {
-    if (!githubAutomationEnabled) {
-      setGitHubSettings(null);
-      setGitHubErrorMessage(null);
-      return;
-    }
-
     let cancelled = false;
 
     void (async () => {
@@ -129,7 +124,7 @@ export function ProjectGitHubPage(): JSX.Element {
         const installation = await getGitHubInstallation(project.project_id);
 
         if (installation === null) {
-          const installUrlState = canManageConnections
+          const installUrlState = canManageGitHubAutomation
             ? await loadOptionalGitHubInstallUrl(project.project_id)
             : { installUrl: null, installUrlLoadFailed: false };
 
@@ -148,7 +143,7 @@ export function ProjectGitHubPage(): JSX.Element {
           return;
         }
 
-        const installUrlPromise = canManageConnections
+        const installUrlPromise = canManageGitHubAutomation
           ? loadOptionalGitHubInstallUrl(project.project_id)
           : Promise.resolve({ installUrl: null, installUrlLoadFailed: false });
         const [repo, rules, deliveries] = await Promise.all([
@@ -157,7 +152,9 @@ export function ProjectGitHubPage(): JSX.Element {
           listProjectGitHubDeliveries(project.project_id)
         ]);
         const repositories =
-          canManageConnections && installation.status === "active" ? await listGitHubRepositories(project.project_id) : [];
+          canManageGitHubAutomation && installation.status === "active"
+            ? await listGitHubRepositories(project.project_id)
+            : [];
         const installUrlState = await installUrlPromise;
 
         if (cancelled) {
@@ -177,7 +174,7 @@ export function ProjectGitHubPage(): JSX.Element {
     return () => {
       cancelled = true;
     };
-  }, [canManageConnections, githubAutomationEnabled, githubSettingsReloadKey, project.project_id]);
+  }, [canManageGitHubAutomation, githubSettingsReloadKey, project.project_id]);
 
   useEffect(() => {
     if (githubSettings === null) {
@@ -357,12 +354,7 @@ export function ProjectGitHubPage(): JSX.Element {
           <CardDescription>Connect a repository, manage dispatch rules, and inspect recent GitHub delivery attempts for this project.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          {!githubAutomationEnabled ? (
-            <PlanUpgradeCallout
-              title="Upgrade to Solo or Team to connect GitHub automation"
-              description="GitHub automation is available on paid plans. Upgrade before connecting a repository, creating dispatch rules, or retrying failed deliveries from this project."
-            />
-          ) : githubErrorMessage !== null ? (
+          {githubErrorMessage !== null ? (
             <CalloutCard
               eyebrow="Unavailable"
               title="GitHub automation settings could not be loaded"
@@ -378,29 +370,45 @@ export function ProjectGitHubPage(): JSX.Element {
               </div>
             ) : null
           ) : githubSettings.installation === null ? (
-            <CalloutCard
-              eyebrow="Setup required"
-              title="Connect the GitHub App to start automation"
-              description="No GitHub App installation is connected to this workspace yet. Complete the install flow, then return here to assign a repository and manage dispatch rules."
-              tone="neutral"
-            >
-              {!canManageConnections || githubSettings.installUrl === null ? null : (
-                <div className="flex flex-wrap gap-2">
-                  <Button asChild type="button" variant="outline" size="sm">
-                    <a href={githubSettings.installUrl}>
-                      Install GitHub App
-                    </a>
-                  </Button>
-                </div>
-              )}
-              {githubSettings.installUrlLoadFailed ? (
-                <Notice tone="warning" title="GitHub install link unavailable">
-                  The GitHub App install link could not be loaded. Refresh this tab after the API connection is restored.
-                </Notice>
-              ) : null}
-            </CalloutCard>
+            githubAutomationEnabled ? (
+              <CalloutCard
+                eyebrow="Setup required"
+                title="Connect the GitHub App to start automation"
+                description="No GitHub App installation is connected to this workspace yet. Complete the install flow, then return here to assign a repository and manage dispatch rules."
+                tone="neutral"
+              >
+                {!canManageGitHubAutomation || githubSettings.installUrl === null ? null : (
+                  <div className="flex flex-wrap gap-2">
+                    <Button asChild type="button" variant="outline" size="sm">
+                      <a href={githubSettings.installUrl}>
+                        Install GitHub App
+                      </a>
+                    </Button>
+                  </div>
+                )}
+                {githubSettings.installUrlLoadFailed ? (
+                  <Notice tone="warning" title="GitHub install link unavailable">
+                    The GitHub App install link could not be loaded. Refresh this tab after the API connection is restored.
+                  </Notice>
+                ) : null}
+              </CalloutCard>
+            ) : (
+              <PlanUpgradeCallout
+                title="Upgrade to Solo or Team to connect GitHub automation"
+                description="GitHub automation is available on paid plans. Upgrade before connecting a repository, creating dispatch rules, or retrying failed deliveries from this project."
+              />
+            )
           ) : (
             <>
+              {!githubAutomationEnabled ? (
+                <CalloutCard
+                  eyebrow="Automation paused"
+                  title="GitHub automation is paused while this project is on Free"
+                  description="The connected installation, repository assignment, and dispatch rules are preserved. They will resume after the owner upgrades back to Solo or Team."
+                  tone="warning"
+                />
+              ) : null}
+
               {githubSettings.installation?.status === "suspended" || githubSettings.installation?.status === "removed" ? (
                 <CalloutCard
                   eyebrow="Connection lost"
@@ -408,7 +416,7 @@ export function ProjectGitHubPage(): JSX.Element {
                   description="Dispatches are paused until the installation is active again. Reconnect the GitHub App in the linked account before expecting new automation deliveries."
                   tone="warning"
                 >
-                  {!canManageConnections || githubSettings.installUrl === null ? null : (
+                  {!canManageGitHubAutomation || githubSettings.installUrl === null ? null : (
                     <div className="flex flex-wrap gap-2">
                       <Button asChild type="button" variant="outline" size="sm">
                         <a href={githubSettings.installUrl}>
@@ -441,7 +449,7 @@ export function ProjectGitHubPage(): JSX.Element {
                     <Badge variant="secondary">{githubSettings.repo.default_branch}</Badge>
                   </div>
                 )}
-                {!canManageConnections ? null : (
+                {!canManageGitHubAutomation ? null : (
                   <div className="mt-4 space-y-3">
                     <p className="text-sm text-muted-foreground">
                       Choose one repository from the repos currently granted to this GitHub App installation. To change
@@ -527,7 +535,7 @@ export function ProjectGitHubPage(): JSX.Element {
                   </div>
                   <div className="flex items-center gap-2">
                     <Badge variant="outline">{githubSettings.rules.length}</Badge>
-                    {githubSettings.repo === null ? null : (
+                    {githubSettings.repo === null || !canManageGitHubAutomation ? null : (
                       <Button type="button" size="sm" variant="outline" onClick={() => handleStartCreateRule()}>
                         <PlusIcon data-icon="inline-start" />
                         Create rule
@@ -545,7 +553,7 @@ export function ProjectGitHubPage(): JSX.Element {
                           <p className="text-sm font-medium text-foreground">{rule.name}</p>
                           <div className="flex items-center gap-2">
                             <Badge variant={rule.enabled ? "success" : "secondary"}>{rule.enabled ? "enabled" : "disabled"}</Badge>
-                            {canManageGitHubRule(rule, session?.user_id, effectiveRole) ? (
+                            {canManageGitHubAutomation && canManageGitHubRule(rule, session?.user_id, effectiveRole) ? (
                               <Button
                                 type="button"
                                 variant="ghost"
@@ -557,7 +565,7 @@ export function ProjectGitHubPage(): JSX.Element {
                                 Edit rule
                               </Button>
                             ) : null}
-                            {canManageGitHubRule(rule, session?.user_id, effectiveRole) ? (
+                            {canManageGitHubAutomation && canManageGitHubRule(rule, session?.user_id, effectiveRole) ? (
                               <Button
                                 type="button"
                                 variant="ghost"
@@ -609,7 +617,9 @@ export function ProjectGitHubPage(): JSX.Element {
                             </TableCell>
                             <TableCell>{delivery.last_error ?? "-"}</TableCell>
                             <TableCell className="text-right">
-                              {delivery.status === "failed" && canRetryGitHubDelivery(delivery, githubSettings.rules, session?.user_id, effectiveRole) ? (
+                              {githubAutomationEnabled &&
+                              delivery.status === "failed" &&
+                              canRetryGitHubDelivery(delivery, githubSettings.rules, session?.user_id, effectiveRole) ? (
                                 <Button
                                   type="button"
                                   variant="ghost"

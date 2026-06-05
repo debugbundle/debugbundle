@@ -1339,6 +1339,7 @@ describe("api auth routes", () => {
     const acceptInviteForSession = vi
       .fn()
       .mockResolvedValueOnce({ ok: false, error: "invite_email_mismatch" })
+      .mockResolvedValueOnce({ ok: false, error: "shared_access_suspended" })
       .mockResolvedValueOnce({
         ok: true,
         membership: {
@@ -1368,6 +1369,15 @@ describe("api auth routes", () => {
       },
       payload: { token: "invite-secret" }
     });
+    const suspended = await app.inject({
+      method: "POST",
+      url: "/v1/auth/project-invite/accept",
+      headers: {
+        cookie: `${SESSION_COOKIE_NAME}=session-secret`,
+        "x-csrf-token": csrfToken
+      },
+      payload: { token: "invite-secret" }
+    });
     const success = await app.inject({
       method: "POST",
       url: "/v1/auth/project-invite/accept",
@@ -1380,6 +1390,8 @@ describe("api auth routes", () => {
 
     expect(missingSession.statusCode).toBe(401);
     expect(mismatch.statusCode).toBe(403);
+    expect(suspended.statusCode).toBe(403);
+    expect(suspended.json()).toEqual({ error: "shared_access_suspended" });
     expect(success.statusCode).toBe(200);
     expect(success.json()).toEqual({
       membership: {
@@ -2012,12 +2024,18 @@ describe("account routes backed by browser auth", () => {
       putObject: vi.fn().mockResolvedValue(undefined)
     };
 
-    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(Buffer.from("avatar-image"), {
-      status: 200,
-      headers: {
-        "Content-Type": "image/png"
-      }
-    })));
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockImplementation(
+        async () =>
+          new Response(Buffer.from("avatar-image"), {
+            status: 200,
+            headers: {
+              "Content-Type": "image/png"
+            }
+          })
+      )
+    );
 
     const app = createServer({
       accountManagement,

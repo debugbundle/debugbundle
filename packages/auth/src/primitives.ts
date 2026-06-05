@@ -147,7 +147,7 @@ export type AcceptProjectInviteStoreResult =
       membership: ProjectInviteMembership;
     }
   | {
-      kind: "invalid_token" | "email_mismatch";
+      kind: "invalid_token" | "email_mismatch" | "shared_access_suspended";
     };
 
 export interface AuthEmailSender {

@@ -197,6 +197,86 @@ describe("weekly report channel store", () => {
     expect(missingLoad).toBeNull();
   });
 
+  it("keeps preserved slack weekly report channels visible to management while hiding them from scheduler", async (): Promise<void> => {
+    const query = vi
+      .fn()
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            channel_id: "wr_1",
+            project_id: "proj_123",
+            organization_plan: "free",
+            channel: "slack",
+            config: { slack_destination_id: "sd_123" },
+            schedule_day_of_week: "monday",
+            schedule_hour_of_day: 9,
+            schedule_timezone: "UTC",
+            is_enabled: true,
+            created_at: "2026-03-15T00:00:00.000Z",
+            updated_at: "2026-03-15T00:00:00.000Z"
+          }
+        ]
+      })
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            channel_id: "wr_1",
+            project_id: "proj_123",
+            organization_plan: "free",
+            channel: "slack",
+            config: { slack_destination_id: "sd_123" },
+            schedule_day_of_week: "monday",
+            schedule_hour_of_day: 9,
+            schedule_timezone: "UTC",
+            is_enabled: true,
+            created_at: "2026-03-15T00:00:00.000Z",
+            updated_at: "2026-03-15T00:00:00.000Z"
+          }
+        ]
+      })
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            channel_id: "wr_1",
+            project_id: "proj_123",
+            organization_plan: "free",
+            channel: "slack",
+            config: { slack_destination_id: "sd_123" },
+            schedule_day_of_week: "monday",
+            schedule_hour_of_day: 9,
+            schedule_timezone: "UTC",
+            is_enabled: true,
+            created_at: "2026-03-15T00:00:00.000Z",
+            updated_at: "2026-03-15T00:00:00.000Z"
+          }
+        ]
+      });
+
+    const store = createPostgresWeeklyReportChannelStore({ query });
+
+    await expect(
+      store.listWeeklyReportChannelsForOrganization({
+        organization_id: "org_123",
+        project_id: "proj_123",
+        limit: 20
+      })
+    ).resolves.toEqual([
+      expect.objectContaining({
+        channel_id: "wr_1",
+        channel: "slack",
+        config: { slack_destination_id: "sd_123" }
+      })
+    ]);
+    await expect(store.listEnabledWeeklyReportChannels({ limit: 50 })).resolves.toEqual([]);
+    await expect(store.getWeeklyReportChannelById({ channel_id: "wr_1" })).resolves.toEqual(
+      expect.objectContaining({
+        channel_id: "wr_1",
+        channel: "slack",
+        config: { slack_destination_id: "sd_123" }
+      })
+    );
+  });
+
   it("maps duplicate email weekly report channels to a domain result", async (): Promise<void> => {
     const query = vi.fn().mockRejectedValue({
       code: "23505",

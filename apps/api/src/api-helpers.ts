@@ -267,8 +267,18 @@ export async function requireRateLimitedProjectAccess(
     await reply.status(404).send({ error: "project_not_found" });
     return null;
   }
+  if (isSharedProjectAccessSuspended(access)) {
+    await reply.status(403).send({ error: "shared_access_suspended" });
+    return null;
+  }
 
   return { member, access };
+}
+
+export function isSharedProjectAccessSuspended(
+  access: Pick<ProjectAccessRecord, "relationship" | "shared_access_suspended">
+): boolean {
+  return access.relationship === "shared" && access.shared_access_suspended;
 }
 
 export async function resolveBrowserSession(

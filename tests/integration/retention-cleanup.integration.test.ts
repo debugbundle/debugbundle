@@ -16,7 +16,8 @@ import {
   createS3AdminClient,
   createTestObjectStore,
   runIntegration,
-  bootstrapStorageAndCreateBucket
+  bootstrapStorageAndCreateBucket,
+  seedOwnedProject
 } from "../helpers/integration-setup.ts";
 
 runIntegration("retention cleanup integration", () => {
@@ -267,21 +268,16 @@ async function seedRetentionFixture(input: {
   const expiredEventId = randomUUID();
   const retainedEventId = randomUUID();
 
-  await input.pool.query(
-    `
-      INSERT INTO organizations (id, name, slug, plan)
-      VALUES ($1, $2, $3, $4)
-    `,
-    [organizationId, `${input.plan} retention org`, `${input.plan}-retention-${organizationId.slice(0, 8)}`, input.plan]
-  );
-
-  await input.pool.query(
-    `
-      INSERT INTO projects (id, organization_id, name, slug, environment_default)
-      VALUES ($1, $2, $3, $4, $5)
-    `,
-    [projectId, organizationId, `${input.plan} project`, `${input.plan}-project-${projectId.slice(0, 8)}`, "production"]
-  );
+  await seedOwnedProject({
+    pool: input.pool,
+    organizationId,
+    projectId,
+    organizationName: `${input.plan} retention org`,
+    organizationSlug: `${input.plan}-retention-${organizationId.slice(0, 8)}`,
+    projectName: `${input.plan} project`,
+    projectSlug: `${input.plan}-project-${projectId.slice(0, 8)}`,
+    organizationPlan: input.plan
+  });
 
   await input.pool.query(
     `
@@ -414,21 +410,16 @@ async function seedBundleRetentionFixture(input: {
   const expiredEventId = randomUUID();
   const retainedEventId = randomUUID();
 
-  await input.pool.query(
-    `
-      INSERT INTO organizations (id, name, slug, plan)
-      VALUES ($1, $2, $3, $4)
-    `,
-    [organizationId, `${input.plan} bundle org`, `${input.plan}-bundle-${organizationId.slice(0, 8)}`, input.plan]
-  );
-
-  await input.pool.query(
-    `
-      INSERT INTO projects (id, organization_id, name, slug, environment_default)
-      VALUES ($1, $2, $3, $4, $5)
-    `,
-    [projectId, organizationId, `${input.plan} bundle project`, `${input.plan}-bundle-project-${projectId.slice(0, 8)}`, "production"]
-  );
+  await seedOwnedProject({
+    pool: input.pool,
+    organizationId,
+    projectId,
+    organizationName: `${input.plan} bundle org`,
+    organizationSlug: `${input.plan}-bundle-${organizationId.slice(0, 8)}`,
+    projectName: `${input.plan} bundle project`,
+    projectSlug: `${input.plan}-bundle-project-${projectId.slice(0, 8)}`,
+    organizationPlan: input.plan
+  });
 
   await input.pool.query(
     `

@@ -18,7 +18,8 @@ import {
   createS3AdminClient,
   createTestObjectStore,
   runIntegration,
-  bootstrapStorageAndCreateBucket
+  bootstrapStorageAndCreateBucket,
+  seedOwnedProject
 } from "../helpers/integration-setup.ts";
 
 runIntegration("retention sampling integration", () => {
@@ -56,21 +57,15 @@ runIntegration("retention sampling integration", () => {
       []
     );
 
-    await pool.query(
-      `
-        INSERT INTO organizations (id, name, slug)
-        VALUES ($1, $2, $3)
-      `,
-      [organizationId, "Sampling Org", `sampling-org-${organizationId.slice(0, 8)}`]
-    );
-
-    await pool.query(
-      `
-        INSERT INTO projects (id, organization_id, name, slug, environment_default)
-        VALUES ($1, $2, $3, $4, $5)
-      `,
-      [projectId, organizationId, "Sampling Project", `sampling-project-${projectId.slice(0, 8)}`, "production"]
-    );
+    await seedOwnedProject({
+      pool,
+      organizationId,
+      projectId,
+      organizationName: "Sampling Org",
+      organizationSlug: `sampling-org-${organizationId.slice(0, 8)}`,
+      projectName: "Sampling Project",
+      projectSlug: `sampling-project-${projectId.slice(0, 8)}`
+    });
 
     const objectStore = createTestObjectStore();
     const body = gzipSync(Buffer.from("{}", "utf8"));

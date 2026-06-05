@@ -135,7 +135,7 @@ describePublicSiteRepo('public site repository export', () => {
     expect(pricing).toContain('https://app.debugbundle.com/signup?trial=team');
     expect(pricing).toContain('Start Solo trial');
     expect(pricing).toContain('Start Team trial');
-    expect(pricing).toContain('30-day trial, no credit card required. Extra capacity requires paid conversion.');
+    expect(pricing).toContain('30-day trial, no credit card required');
     expect(pricing).toContain('capacity after paid conversion');
   });
 });

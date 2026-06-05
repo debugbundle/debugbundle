@@ -205,6 +205,75 @@ describe("api project routes", () => {
     expect(badQuery.json()).toEqual({ error: "invalid_query" });
   });
 
+  it("should keep suspended shared projects in the list response", async (): Promise<void> => {
+    const projectManagement = {
+      listProjectsForUser: vi.fn().mockResolvedValue([
+        {
+          project_id: "00000000-0000-4000-8000-000000000002",
+          organization_id: "org_owner",
+          owner_user_id: "usr_owner",
+          owner_email: "owner@example.com",
+          relationship: "shared",
+          sharing_state: "shared_with_you",
+          effective_role: "member",
+          shared_access_suspended: true,
+          name: "Paused Shared App",
+          slug: "paused-shared-app",
+          environment_default: "production",
+          organization_plan: "free",
+          metrics: {
+            monthly_bundle_requests: 1,
+            monthly_raw_ingested_events: 8,
+            retained_bundles: 1,
+            monthly_alert_deliveries: 0
+          },
+          created_at: "2026-03-16T00:00:00.000Z",
+          updated_at: "2026-03-16T00:00:00.000Z"
+        }
+      ]),
+      createProjectForUser: vi.fn().mockResolvedValue(null),
+      updateProjectForUser: vi.fn().mockResolvedValue(null),
+      deleteProjectForUser: vi.fn().mockResolvedValue(null)
+    };
+    const app = createServer({ projectManagement });
+
+    const response = await app.inject({
+      method: "GET",
+      url: "/v1/projects",
+      headers: {
+        authorization: "Bearer dbundle_mem_test"
+      }
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toEqual({
+      projects: [
+        {
+          project_id: "00000000-0000-4000-8000-000000000002",
+          organization_id: "org_owner",
+          owner_user_id: "usr_owner",
+          owner_email: "owner@example.com",
+          relationship: "shared",
+          sharing_state: "shared_with_you",
+          effective_role: "member",
+          shared_access_suspended: true,
+          name: "Paused Shared App",
+          slug: "paused-shared-app",
+          environment_default: "production",
+          organization_plan: "free",
+          metrics: {
+            monthly_bundle_requests: 1,
+            monthly_raw_ingested_events: 8,
+            retained_bundles: 1,
+            monthly_alert_deliveries: 0
+          },
+          created_at: "2026-03-16T00:00:00.000Z",
+          updated_at: "2026-03-16T00:00:00.000Z"
+        }
+      ]
+    });
+  });
+
   it("should create a project for owner-role callers", async (): Promise<void> => {
     const projectManagement = {
       listProjectsForUser: vi.fn().mockResolvedValue([]),
@@ -596,6 +665,51 @@ describe("api project routes", () => {
     expect(invalidProjectId.json()).toEqual({ error: "invalid_project_id" });
     expect(invalidPayload.statusCode).toBe(400);
     expect(invalidPayload.json()).toEqual({ error: "invalid_payload" });
+  });
+
+  it("should return shared_access_suspended for shared collaborators attempting to mutate a paused project", async (): Promise<void> => {
+    const projectManagement = {
+      listProjectsForUser: vi.fn().mockResolvedValue([]),
+      createProjectForUser: vi.fn().mockResolvedValue(null),
+      resolveProjectAccessForUser: vi.fn().mockResolvedValue({
+        project_id: "00000000-0000-4000-8000-000000000003",
+        organization_id: "org_owner",
+        owner_user_id: "usr_owner",
+        owner_email: "owner@example.com",
+        relationship: "shared",
+        sharing_state: "shared_with_you",
+        effective_role: "admin",
+        shared_access_suspended: true,
+        organization_plan: "free"
+      }),
+      updateProjectForUser: vi.fn().mockResolvedValue(null),
+      deleteProjectForUser: vi.fn().mockResolvedValue(null)
+    };
+    const app = createServer({
+      memberAuth: mockedObject<ApiServerDependencies["memberAuth"]>({
+        resolveMemberByTokenHash: vi.fn().mockResolvedValue({
+          member_id: "usr_collaborator",
+          organization_id: "org_collaborator",
+          role: "member"
+        })
+      }),
+      projectManagement
+    });
+
+    const response = await app.inject({
+      method: "PATCH",
+      url: "/v1/projects/00000000-0000-4000-8000-000000000003",
+      headers: {
+        authorization: "Bearer dbundle_mem_test"
+      },
+      payload: {
+        name: "Renamed"
+      }
+    });
+
+    expect(response.statusCode).toBe(403);
+    expect(response.json()).toEqual({ error: "shared_access_suspended" });
+    expect(projectManagement.updateProjectForUser).not.toHaveBeenCalled();
   });
 
   it("should delete a project for owner-role callers and map missing projects", async (): Promise<void> => {

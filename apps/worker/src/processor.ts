@@ -719,7 +719,16 @@ export async function processNextGroupIncidentJob(
     return { processed: false, reason: "no_jobs" };
   }
 
-  if (job.event_class !== undefined && job.event_class !== "incident_signal" && job.incident_trigger !== "request_anomaly") {
+  const allowsContextDrivenIncidentEnrichment =
+    job.event_class === "context_signal" &&
+    (job.event_type === "deploy_metadata" || job.event_type === "request_event");
+
+  if (
+    job.event_class !== undefined &&
+    job.event_class !== "incident_signal" &&
+    job.incident_trigger !== "request_anomaly" &&
+    !allowsContextDrivenIncidentEnrichment
+  ) {
     return { processed: true, reason: "non_incident_signal" };
   }
 

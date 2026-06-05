@@ -36,6 +36,7 @@ const {
   createSesEmailTransportMock,
   renderEmailAuthCodeEmailMock,
   renderProjectInviteEmailMock,
+  recordPlanDowngradeCleanupAuditMock,
   emailTransportSendMock
 } = vi.hoisted(() => ({
   poolQueryMock: vi.fn(),
@@ -71,6 +72,7 @@ const {
   createSesEmailTransportMock: vi.fn(),
   renderEmailAuthCodeEmailMock: vi.fn(),
   renderProjectInviteEmailMock: vi.fn(),
+  recordPlanDowngradeCleanupAuditMock: vi.fn(),
   emailTransportSendMock: vi.fn()
 }));
 
@@ -114,6 +116,30 @@ vi.mock("../../../packages/storage/src/index.js", () => ({
   createIngestionMetadataService: createIngestionMetadataServiceMock,
   createIncidentLifecycleService: createIncidentLifecycleServiceMock,
   createPostgresBillingSyncStore: createPostgresBillingSyncStoreMock,
+  createOrganizationPlanCleanupService: () => ({
+    cleanupOrganizationForPlan: async () => ({})
+  }),
+  isPlanDowngrade: (previousPlan: string, targetPlan: string) => {
+    const rank: Record<string, number> = { free: 0, solo: 1, team: 2 };
+    return (rank[targetPlan] ?? 0) < (rank[previousPlan] ?? 0);
+  },
+  normalizePlanForDowngradeAudit: (plan: string | null | undefined) =>
+    plan === "solo" || plan === "team" ? plan : "free",
+  recordPlanDowngradeCleanupAudit: recordPlanDowngradeCleanupAuditMock,
+  runInTransaction: async <Result>(
+    db: { query(sql: string, params: unknown[]): Promise<unknown> },
+    callback: (tx: { query(sql: string, params: unknown[]): Promise<unknown> }) => Promise<Result>
+  ): Promise<Result> => {
+    await db.query("BEGIN", []);
+    try {
+      const result = await callback(db);
+      await db.query("COMMIT", []);
+      return result;
+    } catch (error) {
+      await db.query("ROLLBACK", []).catch(() => undefined);
+      throw error;
+    }
+  },
   createPostgresImprovementOpportunityStore: createPostgresImprovementOpportunityStoreMock,
   createPostgresImprovementSettingsStore: createPostgresImprovementSettingsStoreMock,
   createPostgresCaptureRuleStore: createPostgresCaptureRuleStoreMock,
@@ -183,7 +209,9 @@ describe("api default dependencies", () => {
     createSesEmailTransportMock.mockReset();
     renderEmailAuthCodeEmailMock.mockReset();
     renderProjectInviteEmailMock.mockReset();
+    recordPlanDowngradeCleanupAuditMock.mockReset();
     emailTransportSendMock.mockReset();
+    recordPlanDowngradeCleanupAuditMock.mockResolvedValue(undefined);
 
     createRedisQueueClientMock.mockReturnValue({ enqueue: vi.fn() });
     createRedisIncidentFrequencyCounterMock.mockReturnValue({ recordOccurrence: vi.fn(), close: vi.fn() });
@@ -462,8 +490,22 @@ describe("api default dependencies", () => {
         days_remaining: null
       }
     };
+    let previousPlanIndex = 0;
+    const previousPlans = ["team", "solo"];
     const db = {
-      query: vi.fn().mockResolvedValue({ rows: [{ id: "org_123" }] })
+      query: vi.fn().mockImplementation((sql: string) => {
+        if (sql.includes("SELECT COALESCE(plan, 'free') AS plan")) {
+          const plan = previousPlans[previousPlanIndex] ?? "free";
+          previousPlanIndex += 1;
+          return { rows: [{ plan }] };
+        }
+
+        if (sql.includes("UPDATE organizations")) {
+          return { rows: [{ id: "org_123" }] };
+        }
+
+        return { rows: [], rowCount: 0 };
+      })
     };
     const billingStore = {
       getBillingSummaryForOrganization: vi.fn().mockResolvedValue(summary)
@@ -495,35 +537,51 @@ describe("api default dependencies", () => {
       })
     ).resolves.toBe(summary);
 
-    expect(db.query).toHaveBeenNthCalledWith(
-      1,
-      expect.stringContaining("UPDATE organizations"),
-      [
-        "org_123",
-        "solo",
-        99,
-        "2026-06-04T12:00:00.000Z",
-        "admin_override:2026-06-04T12:00:00.000Z"
-      ]
+    expect(db.query).toHaveBeenCalledWith("BEGIN", []);
+    expect(db.query).toHaveBeenCalledWith("COMMIT", []);
+    expect(db.query).toHaveBeenCalledWith(expect.stringContaining("UPDATE organizations"), [
+      "org_123",
+      "solo",
+      99,
+      "2026-06-04T12:00:00.000Z",
+      "admin_override:2026-06-04T12:00:00.000Z"
+    ]);
+    expect(db.query).toHaveBeenCalledWith(expect.stringContaining("UPDATE organizations"), [
+      "org_123",
+      "free",
+      0,
+      "2026-06-04T12:00:01.000Z",
+      "admin_override:2026-06-04T12:00:01.000Z"
+    ]);
+    expect(recordPlanDowngradeCleanupAuditMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        organization_id: "org_123",
+        previous_plan: "team",
+        target_plan: "solo",
+        trigger_source: "admin_override",
+        occurred_at: "2026-06-04T12:00:00.000Z"
+      })
     );
-    expect(db.query).toHaveBeenNthCalledWith(
-      2,
-      expect.stringContaining("UPDATE organizations"),
-      [
-        "org_123",
-        "free",
-        0,
-        "2026-06-04T12:00:01.000Z",
-        "admin_override:2026-06-04T12:00:01.000Z"
-      ]
+    expect(recordPlanDowngradeCleanupAuditMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        organization_id: "org_123",
+        previous_plan: "solo",
+        target_plan: "free",
+        trigger_source: "admin_override",
+        occurred_at: "2026-06-04T12:00:01.000Z"
+      })
     );
   });
 
   it("returns billing_not_found when admin billing override cannot update or reload", async () => {
     const db = {
-      query: vi.fn()
-        .mockResolvedValueOnce({ rows: [] })
-        .mockResolvedValueOnce({ rows: [{ id: "org_123" }] })
+      query: vi.fn().mockImplementation((sql: string, params: unknown[]) => {
+        if (sql.includes("UPDATE organizations") && params[0] === "org_123") {
+          return { rows: [{ id: "org_123" }] };
+        }
+
+        return { rows: [] };
+      })
     };
     const billingStore = {
       getBillingSummaryForOrganization: vi.fn().mockResolvedValue(null)

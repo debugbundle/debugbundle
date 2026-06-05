@@ -3,6 +3,13 @@ import { randomUUID } from "node:crypto";
 import { getTierCapabilities, type TierName } from "../../shared-types/src/index.js";
 
 import { buildBillableIncidentEventsPredicateSql } from "./helpers.js";
+import {
+  isPlanDowngrade,
+  normalizePlanForDowngradeAudit,
+  recordPlanDowngradeCleanupAudit
+} from "./plan-downgrade-audit.js";
+import { createOrganizationPlanCleanupService } from "./plan-downgrade-cleanup.js";
+import { runInTransaction } from "./transaction.js";
 import type { Queryable } from "./types.js";
 
 export interface BillingUsageMetric {
@@ -758,26 +765,63 @@ export function createPostgresBillingStore(
     async expireTrialForOrganization(
       input
     ): Promise<BillingSummaryRecord | "billing_not_found" | "trial_not_expired"> {
-      const result = await db.query<{ id: string }>(
-        `
-          UPDATE organizations
-          SET
-            plan = 'free',
-            additional_capacity_units = 0,
-            billing_state = 'trial_expired',
-            billing_period_starts_at = NULL,
-            billing_period_ends_at = NULL,
-            trial_expired_at = COALESCE((to_jsonb(organizations) ->> 'trial_expired_at')::timestamptz, $2::timestamptz)
-          WHERE id = $1
-            AND COALESCE(to_jsonb(organizations) ->> 'billing_state', '') = 'trialing'
-            AND (to_jsonb(organizations) ->> 'trial_ends_at')::timestamptz <= $2::timestamptz
-            AND COALESCE(to_jsonb(organizations) ->> 'stripe_subscription_id', '') = ''
-          RETURNING id::text AS id
-        `,
-        [input.organization_id, input.now]
-      );
+      const expired = await runInTransaction(db, async (tx) => {
+        const previousResult = await tx.query<{ plan: string }>(
+          `
+            SELECT COALESCE(plan, 'free') AS plan
+            FROM organizations
+            WHERE id = $1
+            FOR UPDATE
+          `,
+          [input.organization_id]
+        );
+        const previousPlan = normalizePlanForDowngradeAudit(previousResult.rows[0]?.plan);
 
-      if (result.rows[0]?.id === undefined) {
+        const result = await tx.query<{ id: string }>(
+          `
+            UPDATE organizations
+            SET
+              plan = 'free',
+              additional_capacity_units = 0,
+              billing_state = 'trial_expired',
+              billing_period_starts_at = NULL,
+              billing_period_ends_at = NULL,
+              trial_expired_at = COALESCE((to_jsonb(organizations) ->> 'trial_expired_at')::timestamptz, $2::timestamptz)
+            WHERE id = $1
+              AND COALESCE(to_jsonb(organizations) ->> 'billing_state', '') = 'trialing'
+              AND (to_jsonb(organizations) ->> 'trial_ends_at')::timestamptz <= $2::timestamptz
+              AND COALESCE(to_jsonb(organizations) ->> 'stripe_subscription_id', '') = ''
+            RETURNING id::text AS id
+          `,
+          [input.organization_id, input.now]
+        );
+
+        if (result.rows[0]?.id === undefined) {
+          return false;
+        }
+
+        const cleanupSummary = await createOrganizationPlanCleanupService(tx).cleanupOrganizationForPlan({
+          organization_id: input.organization_id,
+          plan: "free",
+          now: input.now
+        });
+
+        if (isPlanDowngrade(previousPlan, "free")) {
+          await recordPlanDowngradeCleanupAudit({
+            db: tx,
+            organization_id: input.organization_id,
+            previous_plan: previousPlan,
+            target_plan: "free",
+            trigger_source: "trial_expiry",
+            cleanup_summary: cleanupSummary,
+            occurred_at: input.now
+          });
+        }
+
+        return true;
+      });
+
+      if (!expired) {
         const organizationResult = await db.query<{ id: string }>(
           `
             SELECT id::text AS id

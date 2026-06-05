@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useOutletContext } from "react-router-dom";
 
 import { DialogFormContent } from "../components/system/dialog-form-content.js";
+import { CalloutCard } from "../components/system/callout-card.js";
 import { PlaintextTokenReveal } from "../components/system/plaintext-token-reveal.js";
 import { PlanUpgradeCallout } from "../components/system/plan-upgrade-callout.js";
 import { ProjectResourceEmptyState } from "../components/system/project-resource-empty-state.js";
@@ -59,6 +60,7 @@ export function ProjectProbesPage(): JSX.Element {
   const [loadErrorMessage, setLoadErrorMessage] = useState<string | null>(null);
 
   const remoteProbesEnabled = project.organization_plan !== "free";
+  const hasPreservedActivations = (activations?.length ?? 0) > 0;
   const canSubmitActivation =
     labelPattern.trim() !== "" &&
     service.trim() !== "" &&
@@ -67,14 +69,8 @@ export function ProjectProbesPage(): JSX.Element {
     isSecondsWithinRange(triggerTtlSeconds, 60, 86400);
 
   useEffect(() => {
-    if (!remoteProbesEnabled) {
-      setActivations(null);
-      setLoadErrorMessage(null);
-      return;
-    }
-
     void loadActivations(project.project_id, setActivations, setLoadErrorMessage);
-  }, [project.project_id, remoteProbesEnabled]);
+  }, [project.project_id]);
 
   async function handleActivateProbe(event: FormEvent<HTMLFormElement>): Promise<void> {
     event.preventDefault();
@@ -248,7 +244,17 @@ export function ProjectProbesPage(): JSX.Element {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          {!remoteProbesEnabled ? (
+          {!remoteProbesEnabled && hasPreservedActivations ? (
+            <div className="mb-4">
+              <CalloutCard
+                eyebrow="Remote probes paused"
+                title="Saved remote probes will resume after an upgrade"
+                description="This project is currently on Free, so standalone remote probe shipping is paused. The saved activations below are preserved and will start working again after the owner upgrades back to Solo or Team."
+                tone="warning"
+              />
+            </div>
+          ) : null}
+          {!remoteProbesEnabled && activations !== null && activations.length === 0 ? (
             <PlanUpgradeCallout
               title="Upgrade to Solo or Team to activate remote probes"
               description="Always-on probe buffers work on every tier, but remote probe activation and trigger tokens are paid-tier features. Upgrade before activating probes from the web app, API, CLI, or MCP."
@@ -303,17 +309,21 @@ export function ProjectProbesPage(): JSX.Element {
                       <TableCell>{formatDateTime(activation.expires_at)}</TableCell>
                       <TableCell>{formatDateTime(activation.trigger_expires_at)}</TableCell>
                       <TableCell className="text-right">
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          disabled={deactivatingId === activation.activation_id}
-                          onClick={() => void handleDeactivateProbe(activation.activation_id)}
-                        >
-                          {deactivatingId === activation.activation_id
-                            ? "Deactivating..."
-                            : "Deactivate"}
-                        </Button>
+                        {remoteProbesEnabled ? (
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            disabled={deactivatingId === activation.activation_id}
+                            onClick={() => void handleDeactivateProbe(activation.activation_id)}
+                          >
+                            {deactivatingId === activation.activation_id
+                              ? "Deactivating..."
+                              : "Deactivate"}
+                          </Button>
+                        ) : (
+                          <Badge variant="outline">Upgrade required</Badge>
+                        )}
                       </TableCell>
                     </TableRow>
                   ))}

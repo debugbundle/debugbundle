@@ -10,6 +10,7 @@ export type AccessibleProjectRecord = ProjectRecord & {
   relationship?: ProjectRelationship;
   sharing_state?: ProjectSharingState;
   effective_role?: ProjectEffectiveRole;
+  shared_access_suspended?: boolean;
 };
 
 export function asAccessibleProject(project: ProjectRecord): AccessibleProjectRecord {
@@ -40,6 +41,14 @@ export function getProjectEffectiveRole(project: ProjectRecord | null | undefine
   }
 
   return asAccessibleProject(project).effective_role ?? "owner";
+}
+
+export function isSharedProjectAccessSuspended(project: ProjectRecord | null | undefined): boolean {
+  if (project === null || project === undefined) {
+    return false;
+  }
+
+  return getProjectRelationship(project) === "shared" && asAccessibleProject(project).shared_access_suspended === true;
 }
 
 export function getProjectOwnerEmail(project: ProjectRecord): string | null {

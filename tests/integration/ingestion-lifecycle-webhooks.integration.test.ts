@@ -15,7 +15,8 @@ import {
   createIntegrationPool,
   createS3AdminClient,
   redisUrl,
-  bootstrapStorageAndCreateBucket
+  bootstrapStorageAndCreateBucket,
+  seedOwnedProject
 } from "../helpers/integration-setup.ts";
 
 runIntegration("ingestion integration \u2013 lifecycle webhooks", () => {
@@ -47,21 +48,15 @@ runIntegration("ingestion integration \u2013 lifecycle webhooks", () => {
     await pool.query("DELETE FROM projects");
     await pool.query("DELETE FROM organizations");
 
-    await pool.query(
-      `
-        INSERT INTO organizations (id, name, slug)
-        VALUES ($1, $2, $3)
-      `,
-      [organizationId, "Lifecycle Replay Integration Org", `lifecycle-replay-org-${organizationId.slice(0, 8)}`]
-    );
-
-    await pool.query(
-      `
-        INSERT INTO projects (id, organization_id, name, slug, environment_default)
-        VALUES ($1, $2, $3, $4, $5)
-      `,
-      [projectId, organizationId, "Lifecycle Replay Integration Project", "lifecycle-replay-project", "production"]
-    );
+    const { ownerUserId } = await seedOwnedProject({
+      pool,
+      organizationId,
+      projectId,
+      organizationName: "Lifecycle Replay Integration Org",
+      organizationSlug: `lifecycle-replay-org-${organizationId.slice(0, 8)}`,
+      projectName: "Lifecycle Replay Integration Project",
+      projectSlug: "lifecycle-replay-project"
+    });
 
     await pool.query(
       `
@@ -124,12 +119,13 @@ runIntegration("ingestion integration \u2013 lifecycle webhooks", () => {
 
     await pool.query(
       `
-        INSERT INTO agent_webhooks (id, project_id, url, secret_hash, events, filters, is_enabled)
-        VALUES ($1, $2, $3, $4, $5::text[], $6::jsonb, true)
+        INSERT INTO agent_webhooks (id, project_id, created_by_user_id, url, secret_hash, events, filters, is_enabled)
+        VALUES ($1, $2, $3, $4, $5, $6::text[], $7::jsonb, true)
       `,
       [
         webhookId,
         projectId,
+        ownerUserId,
         "https://hooks.example.test/lifecycle",
         "secret_123",
         ["bundle.reopened"],
@@ -243,21 +239,15 @@ runIntegration("ingestion integration \u2013 lifecycle webhooks", () => {
     await pool.query("DELETE FROM projects");
     await pool.query("DELETE FROM organizations");
 
-    await pool.query(
-      `
-        INSERT INTO organizations (id, name, slug)
-        VALUES ($1, $2, $3)
-      `,
-      [organizationId, "Lifecycle Queue Integration Org", `lifecycle-queue-org-${organizationId.slice(0, 8)}`]
-    );
-
-    await pool.query(
-      `
-        INSERT INTO projects (id, organization_id, name, slug, environment_default)
-        VALUES ($1, $2, $3, $4, $5)
-      `,
-      [projectId, organizationId, "Lifecycle Queue Integration Project", "lifecycle-queue-project", "production"]
-    );
+    const { ownerUserId } = await seedOwnedProject({
+      pool,
+      organizationId,
+      projectId,
+      organizationName: "Lifecycle Queue Integration Org",
+      organizationSlug: `lifecycle-queue-org-${organizationId.slice(0, 8)}`,
+      projectName: "Lifecycle Queue Integration Project",
+      projectSlug: "lifecycle-queue-project"
+    });
 
     await pool.query(
       `
@@ -320,12 +310,13 @@ runIntegration("ingestion integration \u2013 lifecycle webhooks", () => {
 
     await pool.query(
       `
-        INSERT INTO agent_webhooks (id, project_id, url, secret_hash, events, filters, is_enabled)
-        VALUES ($1, $2, $3, $4, $5::text[], $6::jsonb, true)
+        INSERT INTO agent_webhooks (id, project_id, created_by_user_id, url, secret_hash, events, filters, is_enabled)
+        VALUES ($1, $2, $3, $4, $5, $6::text[], $7::jsonb, true)
       `,
       [
         webhookId,
         projectId,
+        ownerUserId,
         "https://hooks.example.test/lifecycle-queue",
         "secret_456",
         ["bundle.reopened"],
@@ -421,21 +412,15 @@ runIntegration("ingestion integration \u2013 lifecycle webhooks", () => {
     await pool.query("DELETE FROM projects");
     await pool.query("DELETE FROM organizations");
 
-    await pool.query(
-      `
-        INSERT INTO organizations (id, name, slug)
-        VALUES ($1, $2, $3)
-      `,
-      [organizationId, "Lifecycle Overlap Replay Org", `lifecycle-overlap-org-${organizationId.slice(0, 8)}`]
-    );
-
-    await pool.query(
-      `
-        INSERT INTO projects (id, organization_id, name, slug, environment_default)
-        VALUES ($1, $2, $3, $4, $5)
-      `,
-      [projectId, organizationId, "Lifecycle Overlap Replay Project", "lifecycle-overlap-project", "production"]
-    );
+    const { ownerUserId } = await seedOwnedProject({
+      pool,
+      organizationId,
+      projectId,
+      organizationName: "Lifecycle Overlap Replay Org",
+      organizationSlug: `lifecycle-overlap-org-${organizationId.slice(0, 8)}`,
+      projectName: "Lifecycle Overlap Replay Project",
+      projectSlug: "lifecycle-overlap-project"
+    });
 
     await pool.query(
       `
@@ -498,12 +483,13 @@ runIntegration("ingestion integration \u2013 lifecycle webhooks", () => {
 
     await pool.query(
       `
-        INSERT INTO agent_webhooks (id, project_id, url, secret_hash, events, filters, is_enabled)
-        VALUES ($1, $2, $3, $4, $5::text[], $6::jsonb, true)
+        INSERT INTO agent_webhooks (id, project_id, created_by_user_id, url, secret_hash, events, filters, is_enabled)
+        VALUES ($1, $2, $3, $4, $5, $6::text[], $7::jsonb, true)
       `,
       [
         webhookId,
         projectId,
+        ownerUserId,
         "https://hooks.example.test/lifecycle-overlap",
         "secret_overlap",
         ["bundle.reopened"],
@@ -636,25 +622,15 @@ runIntegration("ingestion integration \u2013 lifecycle webhooks", () => {
     await pool.query("DELETE FROM projects");
     await pool.query("DELETE FROM organizations");
 
-    await pool.query(
-      `
-        INSERT INTO organizations (id, name, slug)
-        VALUES ($1, $2, $3)
-      `,
-      [
-        organizationId,
-        "Non-Regression Overlap Org",
-        `non-regression-overlap-org-${organizationId.slice(0, 8)}`
-      ]
-    );
-
-    await pool.query(
-      `
-        INSERT INTO projects (id, organization_id, name, slug, environment_default)
-        VALUES ($1, $2, $3, $4, $5)
-      `,
-      [projectId, organizationId, "Non-Regression Overlap Project", "non-regression-overlap-project", "production"]
-    );
+    const { ownerUserId } = await seedOwnedProject({
+      pool,
+      organizationId,
+      projectId,
+      organizationName: "Non-Regression Overlap Org",
+      organizationSlug: `non-regression-overlap-org-${organizationId.slice(0, 8)}`,
+      projectName: "Non-Regression Overlap Project",
+      projectSlug: "non-regression-overlap-project"
+    });
 
     await pool.query(
       `
@@ -725,12 +701,13 @@ runIntegration("ingestion integration \u2013 lifecycle webhooks", () => {
 
     await pool.query(
       `
-        INSERT INTO agent_webhooks (id, project_id, url, secret_hash, events, filters, is_enabled)
-        VALUES ($1, $2, $3, $4, $5::text[], $6::jsonb, true)
+        INSERT INTO agent_webhooks (id, project_id, created_by_user_id, url, secret_hash, events, filters, is_enabled)
+        VALUES ($1, $2, $3, $4, $5, $6::text[], $7::jsonb, true)
       `,
       [
         webhookId,
         projectId,
+        ownerUserId,
         "https://hooks.example.test/non-regression-overlap",
         "secret_non_regression_overlap",
         ["bundle.updated"],
@@ -877,21 +854,15 @@ runIntegration("ingestion integration \u2013 lifecycle webhooks", () => {
     await pool.query("DELETE FROM projects");
     await pool.query("DELETE FROM organizations");
 
-    await pool.query(
-      `
-        INSERT INTO organizations (id, name, slug)
-        VALUES ($1, $2, $3)
-      `,
-      [organizationId, "Spike Replay Integration Org", `spike-replay-org-${organizationId.slice(0, 8)}`]
-    );
-
-    await pool.query(
-      `
-        INSERT INTO projects (id, organization_id, name, slug, environment_default)
-        VALUES ($1, $2, $3, $4, $5)
-      `,
-      [projectId, organizationId, "Spike Replay Integration Project", "spike-replay-project", "production"]
-    );
+    const { ownerUserId } = await seedOwnedProject({
+      pool,
+      organizationId,
+      projectId,
+      organizationName: "Spike Replay Integration Org",
+      organizationSlug: `spike-replay-org-${organizationId.slice(0, 8)}`,
+      projectName: "Spike Replay Integration Project",
+      projectSlug: "spike-replay-project"
+    });
 
     await pool.query(
       `
@@ -965,12 +936,13 @@ runIntegration("ingestion integration \u2013 lifecycle webhooks", () => {
 
     await pool.query(
       `
-        INSERT INTO agent_webhooks (id, project_id, url, secret_hash, events, filters, is_enabled)
-        VALUES ($1, $2, $3, $4, $5::text[], $6::jsonb, true)
+        INSERT INTO agent_webhooks (id, project_id, created_by_user_id, url, secret_hash, events, filters, is_enabled)
+        VALUES ($1, $2, $3, $4, $5, $6::text[], $7::jsonb, true)
       `,
       [
         webhookId,
         projectId,
+        ownerUserId,
         "https://hooks.example.test/spike-replay",
         "secret_789",
         ["incident.spike_detected"],
@@ -1071,21 +1043,15 @@ runIntegration("ingestion integration \u2013 lifecycle webhooks", () => {
     await pool.query("DELETE FROM projects");
     await pool.query("DELETE FROM organizations");
 
-    await pool.query(
-      `
-        INSERT INTO organizations (id, name, slug)
-        VALUES ($1, $2, $3)
-      `,
-      [organizationId, "Regression Deploy Integration Org", `reg-deploy-org-${organizationId.slice(0, 8)}`]
-    );
-
-    await pool.query(
-      `
-        INSERT INTO projects (id, organization_id, name, slug, environment_default)
-        VALUES ($1, $2, $3, $4, $5)
-      `,
-      [projectId, organizationId, "Regression Deploy Integration Project", "reg-deploy-project", "production"]
-    );
+    const { ownerUserId } = await seedOwnedProject({
+      pool,
+      organizationId,
+      projectId,
+      organizationName: "Regression Deploy Integration Org",
+      organizationSlug: `reg-deploy-org-${organizationId.slice(0, 8)}`,
+      projectName: "Regression Deploy Integration Project",
+      projectSlug: "reg-deploy-project"
+    });
 
     await pool.query(
       `
@@ -1188,12 +1154,13 @@ runIntegration("ingestion integration \u2013 lifecycle webhooks", () => {
 
     await pool.query(
       `
-        INSERT INTO agent_webhooks (id, project_id, url, secret_hash, events, filters, is_enabled)
-        VALUES ($1, $2, $3, $4, $5::text[], $6::jsonb, true)
+        INSERT INTO agent_webhooks (id, project_id, created_by_user_id, url, secret_hash, events, filters, is_enabled)
+        VALUES ($1, $2, $3, $4, $5, $6::text[], $7::jsonb, true)
       `,
       [
         webhookId,
         projectId,
+        ownerUserId,
         "https://hooks.example.test/regression-after-deploy",
         "secret_regression",
         ["bundle.reopened"],
@@ -1316,21 +1283,15 @@ runIntegration("ingestion integration \u2013 lifecycle webhooks", () => {
     await pool.query("DELETE FROM projects");
     await pool.query("DELETE FROM organizations");
 
-    await pool.query(
-      `
-        INSERT INTO organizations (id, name, slug)
-        VALUES ($1, $2, $3)
-      `,
-      [organizationId, "Regression No-Correlation Org", `reg-nocorr-org-${organizationId.slice(0, 8)}`]
-    );
-
-    await pool.query(
-      `
-        INSERT INTO projects (id, organization_id, name, slug, environment_default)
-        VALUES ($1, $2, $3, $4, $5)
-      `,
-      [projectId, organizationId, "Regression No-Correlation Project", "reg-nocorr-project", "production"]
-    );
+    const { ownerUserId } = await seedOwnedProject({
+      pool,
+      organizationId,
+      projectId,
+      organizationName: "Regression No-Correlation Org",
+      organizationSlug: `reg-nocorr-org-${organizationId.slice(0, 8)}`,
+      projectName: "Regression No-Correlation Project",
+      projectSlug: "reg-nocorr-project"
+    });
 
     await pool.query(
       `
@@ -1433,12 +1394,13 @@ runIntegration("ingestion integration \u2013 lifecycle webhooks", () => {
 
     await pool.query(
       `
-        INSERT INTO agent_webhooks (id, project_id, url, secret_hash, events, filters, is_enabled)
-        VALUES ($1, $2, $3, $4, $5::text[], $6::jsonb, true)
+        INSERT INTO agent_webhooks (id, project_id, created_by_user_id, url, secret_hash, events, filters, is_enabled)
+        VALUES ($1, $2, $3, $4, $5, $6::text[], $7::jsonb, true)
       `,
       [
         webhookId,
         projectId,
+        ownerUserId,
         "https://hooks.example.test/regression-no-correlation",
         "secret_regression",
         ["bundle.reopened"],

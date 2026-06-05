@@ -224,6 +224,7 @@ function mapProjectRow(row: ProjectRecord & Record<string, unknown>): ProjectRec
     relationship: row.relationship,
     sharing_state: row.sharing_state,
     effective_role: row.effective_role,
+    shared_access_suspended: row.shared_access_suspended ?? false,
     name: row.name,
     slug: row.slug,
     environment_default: row.environment_default,
@@ -243,6 +244,7 @@ function mapDeletedProjectRow(row: DeletedProjectRecord & Record<string, unknown
     relationship: row.relationship,
     sharing_state: row.sharing_state,
     effective_role: row.effective_role,
+    shared_access_suspended: row.shared_access_suspended ?? false,
     name: row.name,
     slug: row.slug,
     environment_default: row.environment_default,
@@ -260,6 +262,27 @@ function mapProjectMemberRow(row: ProjectMemberRecord & Record<string, unknown>)
     membership_type: row.membership_type,
     created_at: row.created_at,
     avatar_object_key: row.avatar_object_key ?? null
+  };
+}
+
+function shouldSuspendSharedAccess(input: {
+  relationship: "owned" | "shared";
+  organization_plan: string;
+}): boolean {
+  return input.relationship === "shared" && !getTierCapabilities(input.organization_plan).shared_dashboards;
+}
+
+function applySharedAccessSuspension(project: ProjectRecord): ProjectRecord {
+  return {
+    ...project,
+    shared_access_suspended: shouldSuspendSharedAccess(project)
+  };
+}
+
+function applyProjectAccessSuspension(access: ProjectAccessRecord): ProjectAccessRecord {
+  return {
+    ...access,
+    shared_access_suspended: shouldSuspendSharedAccess(access)
   };
 }
 
@@ -647,7 +670,8 @@ export function createPostgresMetadataStore(db: Queryable): PostgresMetadataStor
         [input.user_id, input.project_id]
       );
 
-      return result.rows[0] ?? null;
+      const access = result.rows[0] ?? null;
+      return access === null ? null : applyProjectAccessSuspension(access);
     },
 
     async listMembersForProject(input: { project_id: string; user_id: string }): Promise<{ owner_plan: TierName; members: ProjectMemberRecord[] } | null> {
@@ -980,6 +1004,7 @@ export function createPostgresMetadataStore(db: Queryable): PostgresMetadataStor
           project_id: string;
           email: string;
           role: "admin" | "member";
+          owner_plan: TierName;
         } & Record<string, unknown>
       >(
         `
@@ -987,8 +1012,11 @@ export function createPostgresMetadataStore(db: Queryable): PostgresMetadataStor
             id AS invite_id,
             project_id,
             email,
-            role
-          FROM project_invites
+            role,
+            COALESCE(o.plan, 'free') AS owner_plan
+          FROM project_invites invites
+          JOIN projects p ON p.id = invites.project_id
+          JOIN organizations o ON o.id = p.organization_id
           WHERE invite_token_hash = $1
             AND accepted_at IS NULL
             AND canceled_at IS NULL
@@ -1005,6 +1033,11 @@ export function createPostgresMetadataStore(db: Queryable): PostgresMetadataStor
 
       if (invite.email.trim().toLowerCase() !== input.email.trim().toLowerCase()) {
         return { kind: "email_mismatch" } as const;
+      }
+
+      const ownerCapabilities = getTierCapabilities(invite.owner_plan);
+      if (!ownerCapabilities.member_invites || !ownerCapabilities.shared_dashboards) {
+        return { kind: "shared_access_suspended" } as const;
       }
 
       const existingMembershipResult = await db.query<ProjectMemberRecord & Record<string, unknown>>(
@@ -1419,7 +1452,7 @@ export function createPostgresMetadataStore(db: Queryable): PostgresMetadataStor
         [input.user_id, usageWindow.starts_at, usageWindow.ends_at, input.limit]
       );
 
-      return result.rows.map(mapProjectRow);
+      return result.rows.map(mapProjectRow).map(applySharedAccessSuspension);
     },
 
     async listProjectsForOrganization(input): Promise<ProjectRecord[]> {

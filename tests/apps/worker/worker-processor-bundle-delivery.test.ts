@@ -325,7 +325,7 @@ describe("worker processor \u2013 bundle, delivery & sampling", () => {
         dequeue: vi.fn().mockResolvedValue({
           project_id: "proj_123",
           event_id: "evt_context",
-          event_type: "request_event",
+          event_type: "frontend_breadcrumb",
           event_class: "context_signal",
           service_name: "checkout-api",
           environment: "production",

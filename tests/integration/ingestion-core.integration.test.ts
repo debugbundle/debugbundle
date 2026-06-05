@@ -23,7 +23,8 @@ import {
   s3Region,
   s3Bucket,
   redisUrl,
-  bootstrapStorageAndCreateBucket
+  bootstrapStorageAndCreateBucket,
+  seedOwnedProject
 } from "../helpers/integration-setup.ts";
 
 runIntegration("ingestion integration \u2013 core pipeline", () => {
@@ -51,21 +52,15 @@ runIntegration("ingestion integration \u2013 core pipeline", () => {
     await pool.query("DELETE FROM projects");
     await pool.query("DELETE FROM processed_events");
 
-    await pool.query(
-      `
-        INSERT INTO organizations (id, name, slug)
-        VALUES ($1, $2, $3)
-      `,
-      [organizationId, "Integration Org", `integration-org-${organizationId.slice(0, 8)}`]
-    );
-
-    await pool.query(
-      `
-        INSERT INTO projects (id, organization_id, name, slug, environment_default)
-        VALUES ($1, $2, $3, $4, $5)
-      `,
-      [projectId, organizationId, "Integration Project", "integration-project", "production"]
-    );
+    await seedOwnedProject({
+      pool,
+      organizationId,
+      projectId,
+      organizationName: "Integration Org",
+      organizationSlug: `integration-org-${organizationId.slice(0, 8)}`,
+      projectName: "Integration Project",
+      projectSlug: "integration-project"
+    });
 
     await pool.query(
       `
@@ -195,21 +190,15 @@ runIntegration("ingestion integration \u2013 core pipeline", () => {
     await pool.query("DELETE FROM projects");
     await pool.query("DELETE FROM processed_events");
 
-    await pool.query(
-      `
-        INSERT INTO organizations (id, name, slug)
-        VALUES ($1, $2, $3)
-      `,
-      [organizationId, "Worker Integration Org", `worker-integration-org-${organizationId.slice(0, 8)}`]
-    );
-
-    await pool.query(
-      `
-        INSERT INTO projects (id, organization_id, name, slug, environment_default)
-        VALUES ($1, $2, $3, $4, $5)
-      `,
-      [projectId, organizationId, "Worker Integration Project", "worker-integration-project", "production"]
-    );
+    await seedOwnedProject({
+      pool,
+      organizationId,
+      projectId,
+      organizationName: "Worker Integration Org",
+      organizationSlug: `worker-integration-org-${organizationId.slice(0, 8)}`,
+      projectName: "Worker Integration Project",
+      projectSlug: "worker-integration-project"
+    });
 
     await pool.query(
       `
@@ -342,21 +331,15 @@ runIntegration("ingestion integration \u2013 core pipeline", () => {
     await pool.query("DELETE FROM projects");
     await pool.query("DELETE FROM processed_events");
 
-    await pool.query(
-      `
-        INSERT INTO organizations (id, name, slug)
-        VALUES ($1, $2, $3)
-      `,
-      [organizationId, "Idempotency Integration Org", `idempotency-org-${organizationId.slice(0, 8)}`]
-    );
-
-    await pool.query(
-      `
-        INSERT INTO projects (id, organization_id, name, slug, environment_default)
-        VALUES ($1, $2, $3, $4, $5)
-      `,
-      [projectId, organizationId, "Idempotency Integration Project", "idempotency-integration-project", "production"]
-    );
+    await seedOwnedProject({
+      pool,
+      organizationId,
+      projectId,
+      organizationName: "Idempotency Integration Org",
+      organizationSlug: `idempotency-org-${organizationId.slice(0, 8)}`,
+      projectName: "Idempotency Integration Project",
+      projectSlug: "idempotency-integration-project"
+    });
 
     await pool.query(
       `

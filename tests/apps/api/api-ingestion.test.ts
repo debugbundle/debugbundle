@@ -751,6 +751,64 @@ describe("api ingestion route", () => {
     expect(listActiveProbesForProject).not.toHaveBeenCalled();
   });
 
+  it("should reject standalone remote probe_event ingestion after downgrade to free", async (): Promise<void> => {
+    const persistAndEnqueue = vi.fn().mockResolvedValue({ object_key: "raw-events/proj_123/path.json.gz" });
+    const resolveProjectByTokenHash = vi
+      .fn()
+      .mockResolvedValue({ project_id: "proj_123", organization_id: "org_123", organization_plan: "free" });
+
+    const app = createApiServer({
+      ingestionPersistence: { persistAndEnqueue },
+      ingestionMetadata: {
+        resolveProjectByTokenHash
+      },
+      memberAuth: createMemberAuthDependency(),
+      tokenManagement: createTokenManagementDependency(),
+      probeManagement: createProbeManagementDependency(),
+      incidentRetrieval: createIncidentRetrievalDependency(),
+      objectStoreReader: createObjectStoreReaderDependency(),
+      webhookDelivery: createWebhookDeliveryDependency()
+    });
+
+    const event = createEventEnvelope({
+      event_type: "probe_event",
+      project_token: "dbundle_proj_test",
+      service: {
+        name: "checkout-api",
+        environment: "production",
+        runtime: "node",
+        framework: "fastify"
+      },
+      payload: {
+        activation_id: "11111111-1111-4111-8111-111111111111",
+        label: "checkout.trace",
+        probe_label_pattern: "checkout.*",
+        data: {
+          state: "after-downgrade"
+        }
+      }
+    });
+
+    const response = await app.inject({
+      method: "POST",
+      url: "/v1/events",
+      headers: {
+        authorization: "Bearer dbundle_proj_test"
+      },
+      payload: {
+        events: [event]
+      }
+    });
+
+    expect(response.statusCode).toBe(202);
+    expect(response.json()).toEqual({
+      accepted: 0,
+      rejected: 1,
+      errors: [{ index: 0, reason: "remote_probes_disabled" }]
+    });
+    expect(persistAndEnqueue).not.toHaveBeenCalled();
+  });
+
   it("should reject invalid project token", async (): Promise<void> => {
     const resolveProjectByTokenHash = vi.fn().mockResolvedValue(null);
 

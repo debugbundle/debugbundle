@@ -2,6 +2,15 @@ import { describe, expect, it, vi } from "vitest";
 
 import { createPostgresBillingSyncStore } from "../../../packages/storage/src/billing-sync-store.js";
 
+function findSqlCall(
+  query: ReturnType<typeof vi.fn>,
+  pattern: string
+): [string, unknown[]] {
+  const call = query.mock.calls.find(([sql]) => String(sql).includes(pattern));
+  expect(call).toBeDefined();
+  return call as [string, unknown[]];
+}
+
 function createMockDb(): {
   query: ReturnType<typeof vi.fn>;
   store: ReturnType<typeof createPostgresBillingSyncStore>;
@@ -96,8 +105,9 @@ describe("createPostgresBillingSyncStore", () => {
         last_billing_event_id: "evt_789"
       });
 
-      const sql = query.mock.calls[0]?.[0] as string;
-      const params = query.mock.calls[0]?.[1] as unknown[];
+      expect(query).toHaveBeenCalledWith("BEGIN", []);
+      expect(query).toHaveBeenCalledWith("COMMIT", []);
+      const [sql, params] = findSqlCall(query, "UPDATE organizations");
       expect(sql).toContain("UPDATE organizations");
       expect(sql).toContain("plan = $2");
       expect(sql).toContain("additional_capacity_units = $3");
@@ -138,9 +148,9 @@ describe("createPostgresBillingSyncStore", () => {
         last_billing_event_id: "evt_789"
       });
 
-      const params = query.mock.calls[0]?.[1] as unknown[];
+      const [, params] = findSqlCall(query, "UPDATE organizations");
       expect(params[6]).toBeNull();
-      expect(params[6]).toBeNull();
+      expect(params[7]).toBeNull();
     });
 
     it("marks trial_converted_at when syncing a paid entitlement for a prior trial", async () => {
@@ -160,13 +170,83 @@ describe("createPostgresBillingSyncStore", () => {
         last_billing_event_id: "evt_trial_convert"
       });
 
-      const sql = query.mock.calls[0]?.[0] as string;
+      const [sql] = findSqlCall(query, "UPDATE organizations");
       expect(sql).toContain(
         "WHEN $2 <> 'free' AND (to_jsonb(organizations) ->> 'trial_used_at') IS NOT NULL"
       );
       expect(sql).toContain(
         "COALESCE((to_jsonb(organizations) ->> 'trial_converted_at')::timestamptz, $9::timestamptz)"
       );
+    });
+
+    it("records cleanup-count audit metadata when Stripe sync lowers the plan", async () => {
+      const { query, store } = createMockDb();
+      query.mockImplementation((sql: string) => {
+        if (sql.includes("SELECT COALESCE(plan, 'free') AS plan")) {
+          return { rows: [{ plan: "team" }] };
+        }
+
+        if (sql.includes("UPDATE organizations")) {
+          return { rows: [], rowCount: 1 };
+        }
+
+        if (sql.includes("JOIN project_members members")) {
+          return { rows: [], rowCount: 2 };
+        }
+
+        if (sql.includes("FROM slack_destinations")) {
+          return { rows: [], rowCount: 1 };
+        }
+
+        if (sql.includes("INSERT INTO audit_logs")) {
+          return {
+            rows: [
+              {
+                audit_log_id: "audit_123",
+                organization_id: "org_abc",
+                actor_user_id: null,
+                actor_type: "system",
+                action: "billing.plan_downgrade_cleanup",
+                target_type: "organization",
+                target_id: "org_abc",
+                status: "success",
+                ip_address: null,
+                metadata: {},
+                occurred_at: "2026-03-01T00:00:00.000Z",
+                created_at: "2026-03-01T00:00:00.000Z"
+              }
+            ]
+          };
+        }
+
+        return { rows: [], rowCount: 0 };
+      });
+
+      await store.updateEntitlements({
+        organization_id: "org_abc",
+        plan: "solo",
+        additional_capacity_units: 0,
+        billing_state: "active",
+        stripe_customer_id: "cus_123",
+        stripe_subscription_id: "sub_456",
+        billing_period_starts_at: "2026-03-01T00:00:00.000Z",
+        billing_period_ends_at: "2026-04-01T00:00:00.000Z",
+        last_billing_sync_at: "2026-03-01T00:00:00.000Z",
+        last_billing_event_id: "evt_789"
+      });
+
+      const auditCall = query.mock.calls.find(([sql]) => String(sql).includes("INSERT INTO audit_logs"));
+      expect(auditCall).toBeDefined();
+      const metadata = JSON.parse(auditCall?.[1]?.[9] as string) as Record<string, unknown>;
+      expect(metadata).toMatchObject({
+        previous_plan: "team",
+        target_plan: "solo",
+        trigger_source: "stripe_sync",
+        cleanup_summary: {
+          suspended_project_members: 2,
+          suspended_slack_destinations: 1
+        }
+      });
     });
   });
 
@@ -216,14 +296,37 @@ describe("createPostgresBillingSyncStore", () => {
 
       await store.revokeEntitlements("org_abc", "evt_cancel");
 
-      const sql = query.mock.calls[0]?.[0] as string;
-      const params = query.mock.calls[0]?.[1] as unknown[];
+      expect(query).toHaveBeenCalledWith("BEGIN", []);
+      expect(query).toHaveBeenCalledWith("COMMIT", []);
+      const [sql, params] = findSqlCall(query, "UPDATE organizations");
       expect(sql).toContain("plan = 'free'");
       expect(sql).toContain("additional_capacity_units = 0");
       expect(sql).toContain("billing_state = 'canceled'");
       expect(sql).toContain("billing_period_starts_at = NULL");
       expect(sql).toContain("billing_period_ends_at = NULL");
       expect(params).toEqual(["org_abc", "evt_cancel"]);
+      expect(
+        query.mock.calls.some((call) => String(call[0]).includes("JOIN github_dispatch_rules rules"))
+      ).toBe(true);
+    });
+
+    it("rolls back when downgrade cleanup fails", async () => {
+      const { query, store } = createMockDb();
+      query.mockImplementation((sql: string) => {
+        if (sql.includes("JOIN github_dispatch_rules rules")) {
+          throw new Error("cleanup failed");
+        }
+
+        return { rows: [] };
+      });
+
+      await expect(store.revokeEntitlements("org_abc", "evt_cancel")).rejects.toThrow(
+        "cleanup failed"
+      );
+
+      expect(query).toHaveBeenCalledWith("BEGIN", []);
+      expect(query).toHaveBeenCalledWith("ROLLBACK", []);
+      expect(query).not.toHaveBeenCalledWith("COMMIT", []);
     });
   });
 

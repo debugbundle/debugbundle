@@ -123,7 +123,7 @@ runIntegration("storage bootstrap integration", () => {
 
     expect(deleteBehaviorByConstraint.get("organization_members_organization_id_fkey")).toBe("c");
     expect(deleteBehaviorByConstraint.get("organization_members_user_id_fkey")).toBe("c");
-    expect(deleteBehaviorByConstraint.get("projects_organization_id_fkey")).toBe("n");
+    expect(deleteBehaviorByConstraint.get("projects_organization_id_fkey")).toBe("c");
     expect(deleteBehaviorByConstraint.get("project_tokens_project_id_fkey")).toBe("c");
     expect(deleteBehaviorByConstraint.get("incidents_project_id_fkey")).toBe("c");
     expect(deleteBehaviorByConstraint.get("incidents_service_id_fkey")).toBe("n");

@@ -21,7 +21,12 @@ import {
 import { buildBundleObjectKey } from "../../../../packages/storage/src/index.js";
 import type { ApiDependencies } from "../api-types.js";
 import { recordAuditLog, resolveAuditActorType } from "../audit-logging.js";
-import { isObjectNotFoundError, requireRateLimitedMemberAuth, requireRateLimitedProjectAccess } from "../api-helpers.js";
+import {
+  isObjectNotFoundError,
+  isSharedProjectAccessSuspended,
+  requireRateLimitedMemberAuth,
+  requireRateLimitedProjectAccess
+} from "../api-helpers.js";
 import { IncidentParamsSchema, ProjectCaptureRuleParamsSchema, ProjectParamsSchema } from "../schemas.js";
 
 function buildCaptureRulesResponse(input: {
@@ -321,6 +326,9 @@ export function registerCaptureRuleRoutes(app: FastifyInstance, dependencies: Ap
     });
     if (access === null) {
       return reply.status(404).send({ error: "project_not_found" });
+    }
+    if (isSharedProjectAccessSuspended(access)) {
+      return reply.status(403).send({ error: "shared_access_suspended" });
     }
     if (access.effective_role !== "owner" && access.effective_role !== "admin") {
       return reply.status(403).send({ error: "forbidden" });

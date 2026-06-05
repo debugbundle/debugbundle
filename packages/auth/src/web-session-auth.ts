@@ -100,7 +100,7 @@ export type AcceptInviteResult =
     }
   | {
       ok: false;
-      error: "invalid_session" | "invalid_token" | "invite_email_mismatch";
+      error: "invalid_session" | "invalid_token" | "invite_email_mismatch" | "shared_access_suspended";
     };
 
 export type BeginGitHubAuthResult =
@@ -494,6 +494,12 @@ export function createWebSessionAuthService(
         return {
           ok: false,
           error: "invite_email_mismatch"
+        };
+      }
+      if (accepted.kind === "shared_access_suspended") {
+        return {
+          ok: false,
+          error: "shared_access_suspended"
         };
       }
       if (accepted.kind !== "accepted") {

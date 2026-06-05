@@ -4,7 +4,11 @@ import { generateProjectInviteToken } from "../../../../packages/auth/src/index.
 import type { ProjectAccessRecord, ResolveMemberResult } from "../../../../packages/storage/src/index.js";
 import type { ApiDependencies } from "../api-types.js";
 import { buildProjectMemberAvatarUrl } from "../avatar-urls.js";
-import { requireRateLimitedMemberAuth, resolveBrowserSession } from "../api-helpers.js";
+import {
+  isSharedProjectAccessSuspended,
+  requireRateLimitedMemberAuth,
+  resolveBrowserSession
+} from "../api-helpers.js";
 import {
   CreateProjectInviteBodySchema,
   ProjectInviteParamsSchema,
@@ -80,6 +84,10 @@ export function registerProjectMemberRoutes(app: FastifyInstance, dependencies: 
     });
     if (access === null) {
       input.reply.status(404).send({ error: "project_not_found" });
+      return null;
+    }
+    if (isSharedProjectAccessSuspended(access)) {
+      input.reply.status(403).send({ error: "shared_access_suspended" });
       return null;
     }
 

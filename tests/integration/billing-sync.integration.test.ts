@@ -180,7 +180,7 @@ runIntegration("billing integration – stripe sync", () => {
           plan: "team",
           stripe_customer_id: "cus_checkout_123",
           capacity_units: {
-            total: 12,
+            total: 17,
             additional_purchased: 2
           }
         }
@@ -276,7 +276,7 @@ runIntegration("billing integration – stripe sync", () => {
         billing: {
           plan: "team",
           capacity_units: {
-            total: 12,
+            total: 17,
             additional_purchased: 2
           }
         }
@@ -465,12 +465,13 @@ async function seedOrganization(
   for (let index = 0; index < input.existingProjectCount; index += 1) {
     await pool.query(
       `
-        INSERT INTO projects (id, organization_id, name, slug, environment_default)
-        VALUES ($1, $2, $3, $4, 'production')
+        INSERT INTO projects (id, organization_id, owner_user_id, name, slug, environment_default)
+        VALUES ($1, $2, $3, $4, $5, 'production')
       `,
       [
         randomUUID(),
         organizationId,
+        userId,
         `Existing Project ${index + 1}`,
         `existing-project-${index + 1}-${organizationId.slice(0, 8)}`
       ]

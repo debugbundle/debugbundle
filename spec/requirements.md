@@ -604,7 +604,7 @@ This ensures Free behaves as **failure-first, not telemetry-first**.
 
 **FR-GHA-16:** If the GitHub installation becomes suspended or removed, show a "GitHub connection lost" banner in the project GitHub tab with a "Reconnect" action.
 
-**FR-GHA-17:** Enforce tier gating from the target project's owner plan: GitHub automation (App connection, repo assignment, dispatch rules, delivery history, manual retry) is available on Solo and Team tiers only. Free-tier projects see an upgrade prompt even when the acting collaborator personally pays for a higher plan, while shared projects owned by Solo/Team accounts remain eligible even when the acting collaborator's own account is Free.
+**FR-GHA-17:** Enforce tier gating from the target project's owner plan: GitHub automation use (App connection, repo assignment, dispatch rule creation/update, dispatch publishing, and manual retry) is available on Solo and Team tiers only. After a downgrade, preserved GitHub setup and delivery history remain readable and delete-only cleanup remains available, but Free-tier projects see an upgrade prompt for new use even when the acting collaborator personally pays for a higher plan. Shared projects owned by Solo/Team accounts remain eligible even when the acting collaborator's own account is Free.
 
 **FR-GHA-18:** All GitHub automation management operations must be available through API, CLI, and MCP (INV-5 interface parity). Member token or browser session required; project tokens rejected.
 

@@ -89,6 +89,39 @@ describe("alert delivery store", () => {
     expect(query.mock.calls[0]?.[0]).toContain("WHERE items.alert_id = $2::uuid");
   });
 
+  it("suppresses slack alerts when the current plan no longer allows Slack", async (): Promise<void> => {
+    const query = vi.fn().mockResolvedValue({
+      rows: [
+        {
+          alert_id: "alt_1",
+          project_id: "proj_123",
+          created_by_user_id: "usr_123",
+          service_id: null,
+          organization_plan: "free",
+          channel: "slack",
+          condition_type: "severity_threshold",
+          severity_min: "medium",
+          cooldown_seconds: 0,
+          config: { slack_destination_id: "sd_123" },
+          is_enabled: true,
+          created_at: "2026-03-15T00:00:00.000Z",
+          updated_at: "2026-03-15T00:00:00.000Z"
+        }
+      ]
+    });
+
+    const store = createPostgresAlertDeliveryStore({ query });
+    const alerts = await store.listMatchingAlerts({
+      project_id: "proj_123",
+      condition_type: "severity_threshold",
+      service_name: "checkout-api",
+      environment: "production",
+      severity: "high"
+    });
+
+    expect(alerts).toEqual([]);
+  });
+
   it("queues email digest items and reports whether a new digest was created", async (): Promise<void> => {
     const query = vi.fn().mockResolvedValueOnce({
       rows: [{ digest_id: "dig_123", created: true, created_digest: true }]

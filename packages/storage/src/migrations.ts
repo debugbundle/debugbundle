@@ -43,6 +43,7 @@ export const REQUIRED_API_TABLES = [
   "agent_webhooks",
   "webhook_deliveries",
   "trial_lifecycle_events",
+  "plan_cleanup_tasks",
   "processed_billing_events",
   "processed_github_marketplace_events"
 ] as const;
@@ -71,7 +72,7 @@ export const REQUIRED_WORKER_TABLES = [
   "weekly_report_deliveries",
   "agent_webhooks",
   "webhook_deliveries",
-  "trial_lifecycle_events"
+  "trial_lifecycle_events",
 ] as const;
 
 const LEGACY_SCHEMA_TABLE = "schema_migrations";

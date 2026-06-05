@@ -1,5 +1,7 @@
 import { randomUUID } from "node:crypto";
 
+import { getTierCapabilities } from "../../shared-types/src/index.js";
+
 import type {
   AlertChannel,
   AlertConditionType,
@@ -59,6 +61,7 @@ export function createPostgresAlertDeliveryStore(db: Queryable): AlertDeliverySt
         project_id: string;
         created_by_user_id: string;
         service_id: string | null;
+        organization_plan: string;
         channel: AlertChannel;
         condition_type: AlertConditionType;
         severity_min: AlertRuleRecord["severity_min"];
@@ -74,6 +77,7 @@ export function createPostgresAlertDeliveryStore(db: Queryable): AlertDeliverySt
             ar.project_id,
             ar.created_by_user_id,
             ar.service_id,
+            COALESCE(o.plan, 'free') AS organization_plan,
             ar.channel,
             ar.condition_type,
             ar.severity_min,
@@ -83,6 +87,8 @@ export function createPostgresAlertDeliveryStore(db: Queryable): AlertDeliverySt
             ar.created_at::text AS created_at,
             ar.updated_at::text AS updated_at
           FROM alert_rules ar
+          JOIN projects p ON p.id = ar.project_id
+          JOIN organizations o ON o.id = p.organization_id
           LEFT JOIN services s ON s.id = ar.service_id
           WHERE ar.project_id = $1
             AND ar.is_enabled = true
@@ -94,6 +100,7 @@ export function createPostgresAlertDeliveryStore(db: Queryable): AlertDeliverySt
       );
 
       return result.rows
+        .filter((row) => row.channel !== "slack" || getTierCapabilities(row.organization_plan).slack_integration)
         .map(mapAlertRuleRow)
         .filter(
           (alert) =>

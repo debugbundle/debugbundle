@@ -58,6 +58,7 @@ export interface ProjectRecord {
   relationship?: "owned" | "shared";
   sharing_state?: "private" | "shared_by_you" | "shared_with_you";
   effective_role?: "owner" | "admin" | "member";
+  shared_access_suspended?: boolean;
   name: string;
   slug: string;
   environment_default: string;
@@ -80,6 +81,7 @@ export interface DeletedProjectRecord {
   relationship?: "owned" | "shared";
   sharing_state?: "private" | "shared_by_you" | "shared_with_you";
   effective_role?: "owner" | "admin" | "member";
+  shared_access_suspended?: boolean;
   name: string;
   slug: string;
   environment_default: string;

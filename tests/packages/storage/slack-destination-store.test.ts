@@ -19,6 +19,7 @@ describe("postgres slack destination store", () => {
           {
             slack_destination_id: "sd_123",
             organization_id: "org_123",
+            organization_plan: "team",
             slack_team_id: "T123",
             slack_team_name: "Acme",
             slack_channel_id: "C123",
@@ -72,6 +73,7 @@ describe("postgres slack destination store", () => {
           {
             slack_destination_id: "sd_123",
             organization_id: "org_123",
+            organization_plan: "team",
             slack_team_id: "T123",
             slack_team_name: "Acme",
             slack_channel_id: "C123",
@@ -89,6 +91,7 @@ describe("postgres slack destination store", () => {
           {
             slack_destination_id: "sd_123",
             organization_id: "org_123",
+            organization_plan: "team",
             slack_team_id: "T123",
             slack_team_name: "Acme",
             slack_channel_id: "C123",
@@ -132,6 +135,35 @@ describe("postgres slack destination store", () => {
         webhook_url_ciphertext: "encv1.iv.tag.payload"
       })
     );
+  });
+
+  it("returns no delivery secret when the current plan no longer allows Slack", async () => {
+    const query = vi.fn().mockResolvedValueOnce(
+      rowsResult([
+        {
+          slack_destination_id: "sd_123",
+          organization_id: "org_123",
+          organization_plan: "free",
+          slack_team_id: "T123",
+          slack_team_name: "Acme",
+          slack_channel_id: "C123",
+          slack_channel_name: "#alerts",
+          installed_by_member_id: "usr_123",
+          webhook_url_ciphertext: "encv1.iv.tag.payload",
+          is_active: true,
+          created_at: "2026-05-13T10:00:00.000Z",
+          updated_at: "2026-05-13T10:00:00.000Z"
+        }
+      ])
+    );
+
+    const store = createPostgresSlackDestinationStore({ query } as Queryable);
+
+    await expect(
+      store.getSlackDestinationSecretForDelivery({
+        slack_destination_id: "sd_123"
+      })
+    ).resolves.toBeNull();
   });
 
   it("deletes only destinations visible from the scoped project", async () => {

@@ -72,10 +72,10 @@ Every capability must be available through all applicable interfaces. Operations
 | Revoke member token | `POST /v1/member/tokens/{tokenId}/revoke` | `token member revoke` | `revoke_member_token` | Browser session or caller-owned member token |
 | List services | `GET /v1/services` | `services` | `list_services` | |
 | Alert CRUD | `POST/GET/PATCH/DELETE /v1/alerts` | `alert list/create/update/delete` | `list_alerts/create_alert/update_alert/delete_alert` | Browser Session or Member Token, scoped to project; member may mutate only self-created rules |
-| Project Slack destinations | `GET /v1/projects/{id}/slack/destinations` | `slack list` | `list_slack_destinations` | Browser Session or Member Token, Team tier, reusable Slack channel list for alert setup |
+| Project Slack destinations | `GET /v1/projects/{id}/slack/destinations` | `slack list` | `list_slack_destinations` | Browser Session or Member Token, reusable Slack channel list for alert setup; preserved destinations remain readable while paused on Free |
 | Test Slack destination | `POST /v1/projects/{id}/slack/destinations/{destinationId}/test` | `slack test` | `test_slack_destination` | Browser Session or Member Token, owner/admin only, Team tier |
-| Delete Slack destination | `DELETE /v1/projects/{id}/slack/destinations/{destinationId}` | `slack delete` | `delete_slack_destination` | Browser Session or Member Token, owner/admin only, Team tier |
-| Weekly report channel CRUD | `POST/GET/PATCH/DELETE /v1/weekly-report-channels` | `weekly-report list/create/update/delete` | `list_weekly_report_channels/create_weekly_report_channel/update_weekly_report_channel/delete_weekly_report_channel` | Browser Session or Member Token, scoped to organization/project |
+| Delete Slack destination | `DELETE /v1/projects/{id}/slack/destinations/{destinationId}` | `slack delete` | `delete_slack_destination` | Browser Session or Member Token, owner/admin cleanup action; allowed after downgrade |
+| Weekly report channel CRUD | `POST/GET/PATCH/DELETE /v1/weekly-report-channels` | `weekly-report list/create/update/delete` | `list_weekly_report_channels/create_weekly_report_channel/update_weekly_report_channel/delete_weekly_report_channel` | Browser Session or Member Token, scoped to organization/project; preserved Slack channels remain readable while paused |
 | List webhooks | `GET /v1/webhooks` | `webhook list` | `list_webhooks` | Browser Session or Member Token, scoped to project |
 | Create webhook | `POST /v1/webhooks` | `webhook create` | `create_webhook` | Signing secret returned once |
 | Update webhook | `PATCH /v1/webhooks/{id}` | `webhook update` | `update_webhook` | Owner/admin may update any webhook; member may update only self-created webhooks |
@@ -99,8 +99,8 @@ Every capability must be available through all applicable interfaces. Operations
 | Profile sync | — | `profile sync` | — | CLI-only (local files) |
 | Analyze (local) | — | `analyze` | `analyze` | CLI/MCP-only (local agent-driven) |
 | Activate probes (remote) | `POST /v1/projects/{id}/probes/activate` | `probe activate` | `activate_probe` | Browser Session or Member Token, Solo+ only |
-| List active probes (remote) | `GET /v1/projects/{id}/probes` | `probe list` | `list_active_probes` | Solo+ only |
-| Deactivate probes (remote) | `POST /v1/projects/{id}/probes/deactivate` | `probe deactivate` | `deactivate_probe` | Solo+ only |
+| List active probes (remote) | `GET /v1/projects/{id}/probes` | `probe list` | `list_active_probes` | Browser Session or Member Token, preserved activations remain readable while paused on Free |
+| Deactivate probes (remote) | `POST /v1/projects/{id}/probes/deactivate` | `probe deactivate` | `deactivate_probe` | Browser Session or Member Token cleanup action; allowed after downgrade |
 | Get capture policy | `GET /v1/projects/{id}/capture-policy` | `capture-policy get` | `get_capture_policy` | Browser Session or Member Token; member receives preview-only payload |
 | Update capture policy | `PATCH /v1/projects/{id}/capture-policy` | `capture-policy set` | `update_capture_policy` | Browser Session or Member Token, owner/admin only |
 | List capture rules | `GET /v1/projects/{id}/capture-rules` | `capture-rule list` | `list_capture_rules` | Browser Session or Member Token; members receive preview-only payload |
@@ -111,18 +111,18 @@ Every capability must be available through all applicable interfaces. Operations
 | Update improvement settings | `PATCH /v1/projects/{id}/improvement-settings` | `improvements settings set` | `update_improvement_settings` | Browser Session or Member Token, owner/admin only, paid Solo+ or self-host |
 | SDK config | `GET /v1/sdk/config` | — | — | SDK-only (project token, includes resolved capture policy) |
 | Get GitHub App install URL | `GET /v1/github/app/install-url` | — | — | Browser Session or Member Token, owner/admin only on eligible Solo+ project; web convenience route for the install/reconnect CTA, optionally signed with a return path |
-| Get GitHub installation | `GET /v1/github/installation` | `github status` | `get_github_status` | Browser Session or Member Token, available to authorized members on eligible Solo+ project |
-| Disconnect GitHub installation | `DELETE /v1/github/installation` | — | — | Web/API only; owner/admin only |
+| Get GitHub installation | `GET /v1/github/installation` | `github status` | `get_github_status` | Browser Session or Member Token; read remains available when preserved GitHub setup is paused on Free |
+| Disconnect GitHub installation | `DELETE /v1/github/installation` | — | — | Web/API cleanup action; owner/admin only and allowed after downgrade |
 | List GitHub repositories | `GET /v1/github/repositories` | `github repos` | `list_github_repositories` | Browser Session or Member Token, owner/admin only on eligible Solo+ project |
-| Get project GitHub repo | `GET /v1/projects/{id}/github/repo` | `github status` | `get_github_status` | Included in status response; Solo+ only |
+| Get project GitHub repo | `GET /v1/projects/{id}/github/repo` | `github status` | `get_github_status` | Included in status response; read remains available when preserved GitHub setup is paused on Free |
 | Set project GitHub repo | `PUT /v1/projects/{id}/github/repo` | `github repo set` | `set_project_github_repo` | Browser Session or Member Token, owner/admin only, Solo+ only |
-| Remove project GitHub repo | `DELETE /v1/projects/{id}/github/repo` | `github repo remove` | `remove_project_github_repo` | Browser Session or Member Token, owner/admin only, Solo+ only |
+| Remove project GitHub repo | `DELETE /v1/projects/{id}/github/repo` | `github repo remove` | `remove_project_github_repo` | Browser Session or Member Token, owner/admin cleanup action; allowed after downgrade |
 | Create dispatch rule | `POST /v1/projects/{id}/github/rules` | `github rules create` | `create_github_dispatch_rule` | Browser Session or Member Token, any authorized project member on eligible Solo+ project |
-| List dispatch rules | `GET /v1/projects/{id}/github/rules` | `github rules` | `list_github_dispatch_rules` | Browser Session or Member Token, available to authorized members on eligible Solo+ project |
+| List dispatch rules | `GET /v1/projects/{id}/github/rules` | `github rules` | `list_github_dispatch_rules` | Browser Session or Member Token; read remains available when preserved GitHub setup is paused on Free |
 | Get dispatch rule | `GET /v1/projects/{id}/github/rules/{ruleId}` | — | — | API convenience; CLI/MCP use list |
 | Update dispatch rule | `PATCH /v1/projects/{id}/github/rules/{ruleId}` | `github rules update` | `update_github_dispatch_rule` | Browser Session or Member Token, owner/admin may update any rule; member may update only self-created rules |
-| Delete dispatch rule | `DELETE /v1/projects/{id}/github/rules/{ruleId}` | `github rules delete` | `delete_github_dispatch_rule` | Browser Session or Member Token, owner/admin may delete any rule; member may delete only self-created rules |
-| List dispatch deliveries | `GET /v1/projects/{id}/github/deliveries` | `github deliveries` | `list_github_deliveries` | Browser Session or Member Token, available to authorized members on eligible Solo+ project |
+| Delete dispatch rule | `DELETE /v1/projects/{id}/github/rules/{ruleId}` | `github rules delete` | `delete_github_dispatch_rule` | Browser Session or Member Token cleanup action; owner/admin may delete any rule and member may delete only self-created rules, allowed after downgrade |
+| List dispatch deliveries | `GET /v1/projects/{id}/github/deliveries` | `github deliveries` | `list_github_deliveries` | Browser Session or Member Token; read remains available when preserved GitHub setup is paused on Free |
 | Retry dispatch delivery | `POST /v1/projects/{id}/github/deliveries/{id}/retry` | `github deliveries retry` | `retry_github_delivery` | Browser Session or Member Token, owner/admin or creator-owned-rule member on eligible Solo+ project |
 | GitHub App callback | `GET /v1/github/app/callback` | — | — | GitHub App setup URL / post-install redirect handler |
 | GitHub App webhook | `POST /v1/github/app/webhook` | — | — | Installation lifecycle events (HMAC-verified) |
@@ -198,7 +198,7 @@ When GitHub sign-in returns a profile image URL, the API may fetch and cache tha
 
 The CLI bootstrap flow is additive and issues the same member-token credential used by normal CLI/MCP auth. `POST /v1/auth/github/device/start` plus `poll`/`claim` implement the official GitHub device flow. `POST /v1/auth/github/token/exchange` accepts an already-authenticated GitHub access token such as the output of `gh auth token`.
 
-`GET /v1/account/export` returns a JSON attachment with top-level `export_version: 1` plus the retained organization-account record set, including organization and project members, projects, tokens, capture policies, probes, hosted improvement opportunities, reusable Slack destinations, alerts, weekly reports, webhooks, GitHub automation, incidents, audit logs, billing-processing rows, operational email rows, and retained raw-event, bundle, improvement-bundle, and reproduction artifacts when present in object storage.
+`GET /v1/account/export` returns a JSON attachment with top-level `export_version: 1` plus the retained organization-account record set, including organization and project members, projects, tokens, capture policies, probes, hosted improvement opportunities, reusable Slack destinations, alerts, weekly reports, webhooks, GitHub automation, incidents, audit logs, billing-processing rows, retryable plan-cleanup rows, operational email rows, and retained raw-event, bundle, improvement-bundle, and reproduction artifacts when present in object storage.
 
 `GET /v1/account/avatar` returns the signed-in user's cached avatar bytes with a first-party URL shape of `/v1/account/avatar`. `POST /v1/account/avatar/import-gravatar` performs a server-side fetch against Gravatar only after explicit user action, stores the resulting avatar in object storage, and returns:
 
@@ -240,6 +240,7 @@ The CLI bootstrap flow is additive and issues the same member-token credential u
 - Invalid accept payload: `400 { "error": "invalid_payload" }`
 - Missing, expired, or already-consumed invite token: `400 { "error": "invalid_token" }`
 - Signed-in user email does not match invite email: `403 { "error": "invite_email_mismatch" }`
+- Owner's current plan no longer allows project sharing, but the pending invite is preserved for later retry before expiry: `403 { "error": "shared_access_suspended" }`
 
 ### 1.1 Ingestion
 
@@ -421,6 +422,7 @@ Current API implementation scope (Phase 7 kickoff slice):
 - Authorization failure: `401 { "error": "invalid_member_token" }`
 - Out-of-scope or missing project: `404 { "error": "project_not_found" }`
 - Invalid query: `400 { "error": "invalid_query" }`
+- Preserved shared access paused by the owner's current tier: `403 { "error": "shared_access_suspended" }`
 
 ### 1.3a Project Members
 
@@ -532,6 +534,7 @@ Invite creation also sends a transactional invite email containing a one-time ac
 
 - Authorization failure: `401 { "error": "invalid_member_token" }`
 - Forbidden for non-admin callers: `403 { "error": "forbidden" }`
+- Preserved shared access paused by the project owner's current tier: `403 { "error": "shared_access_suspended" }`
 - Unverified browser-session owner/admin callers cannot create or cancel invites: `403 { "error": "email_verification_required" }`
 - Team-tier capability on the project owner's plan is required for invites: `403 { "error": "upgrade_required" }`
 - Missing member-management dependency/surface: `404 { "error": "member_management_not_available" }`
@@ -557,6 +560,8 @@ Invite creation also sends a transactional invite email containing a one-time ac
 
 **List projects query:**
 - `limit` default `20`, min `1`, max `100`
+
+When a collaborator keeps saved access to a shared project but the owner's current tier no longer allows sharing, `GET /v1/projects` still returns that project with `shared_access_suspended: true` so the UI can show a paused state instead of dropping the project from view. Project-scoped mutations for that collaborator return `403 { "error": "shared_access_suspended" }` until the owner upgrades again.
 
 **Create project request:**
 ```json
@@ -982,9 +987,9 @@ These routes back the Team-tier `Connect Slack` flow inside the project alerts m
 
 Current implementation behavior:
 - `GET /v1/slack/app/install-url` requires owner/admin access, a Team-tier organization, and a scoped project.
-- `GET /v1/projects/{id}/slack/destinations` requires member auth and Team tier.
+- `GET /v1/projects/{id}/slack/destinations` requires member auth and keeps preserved destinations readable after downgrade so saved Slack setup remains visible while paused on Free.
 - `POST /v1/projects/{id}/slack/destinations/{destinationId}/test` requires owner/admin access, decrypts the stored webhook URL, sends a Slack test message, and returns `502` with a stable Slack-specific error code when delivery fails.
-- `DELETE /v1/projects/{id}/slack/destinations/{destinationId}` requires owner/admin access and returns `409 { "error": "slack_destination_in_use" }` while any alert rule or weekly report still references that destination.
+- `DELETE /v1/projects/{id}/slack/destinations/{destinationId}` requires owner/admin access, remains available as a cleanup action after downgrade, and returns `409 { "error": "slack_destination_in_use" }` while any alert rule or weekly report still references that destination.
 - Slack webhook URLs are never returned by these routes.
 
 ### 1.5 Webhooks
@@ -1251,13 +1256,13 @@ Slack channels accept either `config.webhook_url` or `config.slack_destination_i
 
 ### 1.8 Probes (Remote Activation — Solo+ Only)
 
-Always-on probes (ring buffer + error-flush) require no API endpoints — they are purely SDK-local. The endpoints below manage **remote activation** (Solo+ only).
+Always-on probes (ring buffer + error-flush) require no API endpoints — they are purely SDK-local. The endpoints below manage **remote activation** (Solo+ only). When a project downgrades to Free, saved remote probe activations remain readable through the management list route so owners can see what will resume after an upgrade. Activation still fails with `upgrade_required` while the lower tier is active, while deactivation remains available as a cleanup action.
 
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
 | POST | `/v1/projects/{id}/probes/activate` | Browser Session or Member Token (Solo+) | Remotely activate probes matching a label pattern |
-| GET | `/v1/projects/{id}/probes` | Browser Session or Member Token (Solo+) | List active remote probe activations |
-| POST | `/v1/projects/{id}/probes/deactivate` | Browser Session or Member Token (Solo+) | Deactivate a remote probe activation |
+| GET | `/v1/projects/{id}/probes` | Browser Session or Member Token | List active remote probe activations; preserved activations remain readable while paused on Free |
+| POST | `/v1/projects/{id}/probes/deactivate` | Browser Session or Member Token | Deactivate a remote probe activation; cleanup remains available after downgrade |
 | GET | `/v1/sdk/config` | Project Token | SDK config (remote probes, poll interval). Solo+: includes active_probes. Free: `remote_probes_enabled: false`. |
 
 **Activate request:**
@@ -1611,7 +1616,7 @@ The webhook endpoint handles `installation.created`, `installation.deleted`, `in
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
 | GET | `/v1/github/app/install-url` | Browser Session or Member Token (owner/admin only) | Get the GitHub App installation URL used by the web install/reconnect CTA |
-| GET | `/v1/github/installation` | Browser Session or Member Token | Get current org's GitHub App installation status for an eligible project |
+| GET | `/v1/github/installation` | Browser Session or Member Token | Get current org's GitHub App installation status; preserved setup remains readable while paused on Free |
 | DELETE | `/v1/github/installation` | Browser Session or Member Token (owner/admin only) | Disconnect GitHub installation |
 | GET | `/v1/github/repositories` | Browser Session or Member Token (owner/admin only) | List repositories available to the installation |
 | GET | `/v1/projects/{id}/github/repo` | Browser Session or Member Token | Get project's assigned primary repo |
@@ -1800,6 +1805,8 @@ Exactly one of `incident_id` or `improvement_id` is present. `target_title` is t
 `skipped` delivery records are non-retryable warnings created when DebugBundle suppresses a matching dispatch because the project or GitHub App installation has reached its hourly dispatch limit.
 
 Owner and admin may manage any dispatch rule. Plain members may create dispatch rules on an eligible shared project, but may update, delete, or retry only the rules and deliveries tied to rules they created themselves. Plain members may not mutate the shared GitHub installation or repository assignment.
+
+When a project downgrades to Free, preserved GitHub installation state, repository assignment, dispatch rules, and delivery history remain readable so the owner can see what will resume after an upgrade. GitHub install flows, repository set/update operations, rule create/update operations, and delivery retries still fail with `upgrade_required` while the lower tier is active. Delete-only cleanup actions for the installation, repo assignment, and dispatch rules remain available.
 
 **Error responses:**
 - `401 { "error": "invalid_member_token" }` — missing or invalid auth
@@ -1998,7 +2005,7 @@ debugbundle slack test <destination-id> --project-id <id> [--auth-file <path>] [
 debugbundle slack delete <destination-id> --project-id <id> [--auth-file <path>] [--json]
 ```
 
-Current Slack CLI behavior is a thin adapter over `packages/slack-client`. `slack connect-url` returns the browser OAuth handoff URL, `slack list` exposes reusable connected destinations for a project organization, `slack test` sends a test message to the selected destination, and `slack delete` removes a destination once no alert rules or weekly reports still reference it.
+Current Slack CLI behavior is a thin adapter over `packages/slack-client`. `slack connect-url` returns the browser OAuth handoff URL, `slack list` exposes reusable connected destinations for a project organization, `slack test` sends a test message to the selected destination, and `slack delete` remains available after downgrade to remove a destination once no alert rules or weekly reports still reference it.
 
 ### 2.8 Weekly Report Commands
 ```
@@ -2008,7 +2015,7 @@ debugbundle weekly-report update <channel-id> [--day-of-week <day>] [--hour-of-d
 debugbundle weekly-report delete <channel-id> [--auth-file <path>] [--json]
 ```
 
-Current weekly report CLI behavior is a thin adapter over the weekly report HTTP client in `packages/weekly-report-client`, reusing stored member auth after `debugbundle login` and forwarding JSON output without duplicating transport logic. Slack weekly-report configs accept either `{"webhook_url":"..."}` or `{"slack_destination_id":"uuid"}` in `--config-json`.
+Current weekly report CLI behavior is a thin adapter over the weekly report HTTP client in `packages/weekly-report-client`, reusing stored member auth after `debugbundle login` and forwarding JSON output without duplicating transport logic. Slack weekly-report configs accept either `{"webhook_url":"..."}` or `{"slack_destination_id":"uuid"}` in `--config-json`; preserved Slack weekly-report channels remain listed while paused after downgrade.
 
 ### 2.9 Profile Commands
 ```
@@ -2033,7 +2040,7 @@ debugbundle probe list <project-id> [--auth-file <path>] [--json]
 debugbundle probe deactivate <project-id> <activation-id> [--auth-file <path>] [--json]
 ```
 
-These commands manage **remote probe activations** (Solo+ only). Always-on probes require no CLI commands — they operate automatically in the SDK.
+These commands manage remote probe activations. `probe activate` remains a Solo+ mutation, `probe list` stays readable on Free after downgrade, and `probe deactivate` remains available as cleanup for preserved activations. Always-on probes require no CLI commands — they operate automatically in the SDK.
 
 ### 2.12 Capture Policy Commands
 ```
@@ -2222,7 +2229,7 @@ debugbundle_list_active_probes → same result as GET /v1/projects/{id}/probes
 debugbundle_deactivate_probe  → same result as POST /v1/projects/{id}/probes/deactivate
 ```
 
-These tools manage **remote probe activations** (Solo+ only). Always-on probes require no MCP tools — they operate automatically in the SDK.
+These tools manage remote probe activations. `activate_probe` remains a Solo+ mutation, while `list_active_probes` stays readable on Free after downgrade and `deactivate_probe` remains available as cleanup for preserved activations. Always-on probes require no MCP tools — they operate automatically in the SDK.
 
 ### 3.5 Capture Policy Tools
 ```

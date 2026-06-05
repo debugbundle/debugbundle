@@ -3,7 +3,7 @@ import type { FastifyInstance } from "fastify";
 import { getTierCapabilities } from "../../../../packages/shared-types/src/index.js";
 import type { ProjectAccessRecord, ResolveMemberResult } from "../../../../packages/storage/src/index.js";
 import type { ApiDependencies } from "../api-types.js";
-import { requireRateLimitedMemberAuth } from "../api-helpers.js";
+import { isSharedProjectAccessSuspended, requireRateLimitedMemberAuth } from "../api-helpers.js";
 import {
   CreateWeeklyReportChannelBodySchema,
   UpdateWeeklyReportChannelBodySchema,
@@ -104,6 +104,9 @@ export function registerWeeklyReportChannelRoutes(app: FastifyInstance, dependen
     if (access === null) {
       return reply.status(404).send({ error: "project_not_found" });
     }
+    if (isSharedProjectAccessSuspended(access)) {
+      return reply.status(403).send({ error: "shared_access_suspended" });
+    }
 
     const channels = await dependencies.weeklyReportManagement.listWeeklyReportChannelsForOrganization({
       organization_id: access.organization_id,
@@ -137,6 +140,9 @@ export function registerWeeklyReportChannelRoutes(app: FastifyInstance, dependen
     });
     if (access === null) {
       return reply.status(404).send({ error: "project_not_found" });
+    }
+    if (isSharedProjectAccessSuspended(access)) {
+      return reply.status(403).send({ error: "shared_access_suspended" });
     }
     if (!canManageWeeklyReports(access)) {
       return reply.status(403).send({ error: "forbidden" });
@@ -217,6 +223,9 @@ export function registerWeeklyReportChannelRoutes(app: FastifyInstance, dependen
     if (editableChannel === "forbidden") {
       return reply.status(403).send({ error: "forbidden" });
     }
+    if (isSharedProjectAccessSuspended(editableChannel.access)) {
+      return reply.status(403).send({ error: "shared_access_suspended" });
+    }
 
     if (
       parsedBody.data.config !== undefined &&
@@ -276,6 +285,9 @@ export function registerWeeklyReportChannelRoutes(app: FastifyInstance, dependen
     }
     if (editableChannel === "forbidden") {
       return reply.status(403).send({ error: "forbidden" });
+    }
+    if (isSharedProjectAccessSuspended(editableChannel.access)) {
+      return reply.status(403).send({ error: "shared_access_suspended" });
     }
 
     const deleted = await dependencies.weeklyReportManagement.deleteWeeklyReportChannelForOrganization({

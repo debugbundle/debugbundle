@@ -888,6 +888,7 @@ describe("auth email-code and session primitives", () => {
         acceptProjectInvite: vi
           .fn()
           .mockResolvedValueOnce({ kind: "email_mismatch" })
+          .mockResolvedValueOnce({ kind: "shared_access_suspended" })
           .mockResolvedValueOnce({ kind: "accepted", membership: { user_id: "usr_123", organization_id: "org_123", role: "member" } }),
       },
       {
@@ -916,6 +917,10 @@ describe("auth email-code and session primitives", () => {
     await expect(inviteService.acceptInviteForSession("session-secret", { token: "dbundle_invite_test", now: new Date("2026-03-17T00:00:00.000Z") })).resolves.toEqual({
       ok: false,
       error: "invite_email_mismatch",
+    });
+    await expect(inviteService.acceptInviteForSession("session-secret", { token: "dbundle_invite_test", now: new Date("2026-03-17T00:00:00.000Z") })).resolves.toEqual({
+      ok: false,
+      error: "shared_access_suspended",
     });
     await expect(inviteService.acceptInviteForSession("session-secret", { token: "dbundle_invite_test", now: new Date("2026-03-17T00:00:00.000Z") })).resolves.toEqual({
       ok: true,

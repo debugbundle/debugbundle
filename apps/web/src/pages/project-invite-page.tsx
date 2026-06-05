@@ -107,6 +107,10 @@ export function ProjectInvitePage(): JSX.Element {
           <Button type="button" variant="outline" className="w-full" onClick={() => void handleSwitchAccount()}>
             Switch account
           </Button>
+        ) : errorCode === "shared_access_suspended" ? (
+          <Button asChild type="button" variant="outline" className="w-full">
+            <Link to="/projects">Back to projects</Link>
+          </Button>
         ) : (
           <Button type="button" className="w-full" disabled={isSubmitting || token.length === 0} onClick={() => void handleAcceptInvite()}>
             {isSubmitting ? <LoaderCircleIcon className="animate-spin" /> : null}
@@ -172,6 +176,13 @@ function getInviteErrorState(
       return {
         title: "This invite link is not valid",
         description: "Request a new invite link from the project owner or admin.",
+        tone: "warning"
+      };
+    case "shared_access_suspended":
+      return {
+        title: "Project sharing is paused",
+        description:
+          "This invite is still saved, but the project owner's current plan no longer includes sharing. Ask the owner to upgrade to Team, then try this invite again before it expires.",
         tone: "warning"
       };
     case "invalid_session":

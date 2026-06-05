@@ -154,6 +154,7 @@ export function registerIngestionRoutes(app: FastifyInstance, dependencies: ApiD
     }
 
     const capturedEvents: typeof validEvents = [];
+    const caps = getTierCapabilities(project.organization_plan);
     const activeCaptureRules =
       dependencies.captureRuleManagement === undefined
         ? []
@@ -170,6 +171,18 @@ export function registerIngestionRoutes(app: FastifyInstance, dependencies: ApiD
     }> = [];
 
     for (const entry of validEvents) {
+      if (
+        !caps.remote_probes &&
+        entry.event.event_type === "probe_event" &&
+        typeof entry.event.payload === "object" &&
+        entry.event.payload !== null &&
+        typeof entry.event.payload.activation_id === "string" &&
+        entry.event.payload.activation_id.length > 0
+      ) {
+        errors.push({ index: entry.index, reason: "remote_probes_disabled" });
+        continue;
+      }
+
       if (shouldCaptureEvent(capturePolicy, entry.event.event_type, entry.event.payload as Record<string, unknown>)) {
         const baseEventClass = classifyEvent(
           entry.event.event_type,
@@ -360,7 +373,6 @@ export function registerIngestionRoutes(app: FastifyInstance, dependencies: ApiD
       trigger_expires_at: string;
     }> = [];
 
-    const caps = getTierCapabilities(project.organization_plan);
     if (caps.remote_probes && dependencies.probeManagement !== undefined) {
       activeProbes = await dependencies.probeManagement.listActiveProbesForProject({
         project_id: project.project_id,

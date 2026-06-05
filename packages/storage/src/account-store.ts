@@ -468,6 +468,14 @@ export function createPostgresAccountStore(db: Queryable): AccountLifecycleStore
         [input.organization_id],
       );
 
+      const planCleanupTasks = await queryProjectScopedRows(
+        db,
+        "plan_cleanup_tasks",
+        projectIds,
+        "created_at ASC, id ASC",
+        "plan_cleanup_tasks.*, plan_cleanup_tasks.id AS task_id",
+      );
+
       const operationalEmailDeliveries = await queryProjectScopedRows(
         db,
         "operational_email_deliveries",
@@ -528,6 +536,7 @@ export function createPostgresAccountStore(db: Queryable): AccountLifecycleStore
         org_usage_counters: orgUsageCounters,
         processed_billing_events: processedBillingEvents,
         processed_github_marketplace_events: processedGitHubMarketplaceEvents,
+        plan_cleanup_tasks: planCleanupTasks,
         operational_email_deliveries: operationalEmailDeliveries,
         audit_logs: auditLogs,
         artifacts: {

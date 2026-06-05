@@ -128,6 +128,9 @@ describe("postgres account store", () => {
       if (sqlText.includes("FROM processed_github_marketplace_events")) {
         return rowsResult([{ data: { delivery_id: "ghm_123", marketplace_account_id: 42 } }]);
       }
+      if (sqlText.includes("FROM plan_cleanup_tasks")) {
+        return rowsResult([{ data: { task_id: "pct_123", organization_id: "org_123", project_id: "proj_123" } }]);
+      }
       if (sqlText.includes("FROM operational_email_deliveries")) {
         return rowsResult([{ data: { delivery_id: "op_email_123", organization_id: "org_123", project_id: "proj_123" } }]);
       }
@@ -163,6 +166,7 @@ describe("postgres account store", () => {
         alert_email_digest_items: [expect.objectContaining({ digest_item_id: "aedi_123" })],
         github_marketplace_accounts: [expect.objectContaining({ marketplace_account_id: 42 })],
         processed_github_marketplace_events: [expect.objectContaining({ delivery_id: "ghm_123" })],
+        plan_cleanup_tasks: [expect.objectContaining({ task_id: "pct_123" })],
         operational_email_deliveries: [expect.objectContaining({ delivery_id: "op_email_123" })],
         artifacts: {
           raw_events: [],

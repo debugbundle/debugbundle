@@ -163,6 +163,7 @@ describe("postgres metadata store project collaboration", () => {
       relationship: "shared",
       sharing_state: "shared_with_you",
       effective_role: "admin",
+      shared_access_suspended: false,
       organization_plan: "team"
     });
     expect(members).toEqual({
@@ -208,6 +209,7 @@ describe("postgres metadata store project collaboration", () => {
         relationship: "owned",
         sharing_state: "shared_by_you",
         effective_role: "owner",
+        shared_access_suspended: false,
         name: "Checkout App",
         slug: "checkout-app",
         environment_default: "production",
@@ -223,6 +225,109 @@ describe("postgres metadata store project collaboration", () => {
       }
     ]);
     expect(calls.some((sql) => sql.includes("monthly_alert_deliveries"))).toBe(true);
+  });
+
+  it("preserves shared collaborator access as suspended when the owner's current tier no longer allows sharing", async (): Promise<void> => {
+    const query = vi.fn().mockImplementation((sql: string) => {
+      if (sql.includes("WHERE p.id = $2::uuid")) {
+        return {
+          rows: [
+            {
+              project_id: "proj_shared",
+              organization_id: "org_free",
+              owner_user_id: "usr_owner",
+              owner_email: "owner@example.com",
+              relationship: "shared",
+              sharing_state: "shared_with_you",
+              effective_role: "member",
+              organization_plan: "free"
+            }
+          ]
+        };
+      }
+
+      if (sql.includes("information_schema.tables")) {
+        return { rows: [{ exists: true }] };
+      }
+
+      if (sql.includes("json_build_object") && sql.includes("WHERE p.owner_user_id = $1::uuid")) {
+        return {
+          rows: [
+            {
+              project_id: "proj_shared",
+              organization_id: "org_free",
+              owner_user_id: "usr_owner",
+              owner_email: "owner@example.com",
+              relationship: "shared",
+              sharing_state: "shared_with_you",
+              effective_role: "member",
+              name: "Shared App",
+              slug: "shared-app",
+              environment_default: "production",
+              organization_plan: "free",
+              metrics: {
+                monthly_bundle_requests: 0,
+                monthly_raw_ingested_events: 0,
+                retained_bundles: 1,
+                monthly_alert_deliveries: 0
+              },
+              created_at: "2026-03-16T00:00:00.000Z",
+              updated_at: "2026-03-18T00:00:00.000Z"
+            }
+          ]
+        };
+      }
+
+      return { rows: [] };
+    });
+
+    const store = createPostgresMetadataStore({ query });
+
+    const access = await store.resolveProjectAccessForUser!({
+      user_id: "usr_collaborator",
+      project_id: "proj_shared"
+    });
+    const projects = await store.listProjectsForUser!({
+      user_id: "usr_collaborator",
+      now: "2026-03-20T00:00:00.000Z",
+      limit: 10
+    });
+
+    expect(access).toEqual({
+      project_id: "proj_shared",
+      organization_id: "org_free",
+      owner_user_id: "usr_owner",
+      owner_email: "owner@example.com",
+      relationship: "shared",
+      sharing_state: "shared_with_you",
+      effective_role: "member",
+      shared_access_suspended: true,
+      organization_plan: "free"
+    });
+    expect(projects).toEqual([
+      {
+        project_id: "proj_shared",
+        organization_id: "org_free",
+        owner_user_id: "usr_owner",
+        owner_email: "owner@example.com",
+        relationship: "shared",
+        sharing_state: "shared_with_you",
+        effective_role: "member",
+        shared_access_suspended: true,
+        name: "Shared App",
+        slug: "shared-app",
+        environment_default: "production",
+        organization_plan: "free",
+        metrics: {
+          monthly_bundle_requests: 0,
+          monthly_raw_ingested_events: 0,
+          retained_bundles: 1,
+          monthly_alert_deliveries: 0
+        },
+        created_at: "2026-03-16T00:00:00.000Z",
+        updated_at: "2026-03-18T00:00:00.000Z"
+      }
+    ]);
   });
 
   it("returns null when project collaboration scope checks fail", async (): Promise<void> => {
@@ -506,7 +611,8 @@ describe("postgres metadata store project collaboration", () => {
               invite_id: "inv_123",
               project_id: "proj_123",
               email: "dev@example.com",
-              role: "admin"
+              role: "admin",
+              owner_plan: "team"
             }
           ]
         })
@@ -532,7 +638,8 @@ describe("postgres metadata store project collaboration", () => {
               invite_id: "inv_123",
               project_id: "proj_123",
               email: "dev@example.com",
-              role: "admin"
+              role: "admin",
+              owner_plan: "team"
             }
           ]
         })
@@ -561,7 +668,8 @@ describe("postgres metadata store project collaboration", () => {
               invite_id: "inv_123",
               project_id: "proj_123",
               email: "dev@example.com",
-              role: "admin"
+              role: "admin",
+              owner_plan: "team"
             }
           ]
         })
@@ -612,6 +720,63 @@ describe("postgres metadata store project collaboration", () => {
       }
     });
     expect(await lostInsertStore.acceptProjectInviteForUser!(acceptInput)).toEqual({ kind: "invalid_token" });
+  });
+
+  it("preserves collaborator access as suspended while still blocking invite acceptance when the current plan no longer allows sharing", async (): Promise<void> => {
+    const accessStore = createPostgresMetadataStore({
+      query: vi.fn().mockResolvedValue({
+        rows: [
+          {
+            project_id: "proj_123",
+            organization_id: "org_123",
+            owner_user_id: "usr_owner",
+            owner_email: "owner@example.com",
+            relationship: "shared",
+            sharing_state: "shared_with_you",
+            effective_role: "admin",
+            organization_plan: "free"
+          }
+        ]
+      })
+    });
+    const inviteStore = createPostgresMetadataStore({
+      query: vi.fn().mockResolvedValueOnce({
+        rows: [
+          {
+            invite_id: "inv_123",
+            project_id: "proj_123",
+            email: "dev@example.com",
+            role: "admin",
+            owner_plan: "free"
+          }
+        ]
+      })
+    });
+
+    await expect(
+      accessStore.resolveProjectAccessForUser!({
+        user_id: "usr_member",
+        project_id: "proj_123"
+      })
+    ).resolves.toEqual({
+      project_id: "proj_123",
+      organization_id: "org_123",
+      owner_user_id: "usr_owner",
+      owner_email: "owner@example.com",
+      relationship: "shared",
+      sharing_state: "shared_with_you",
+      effective_role: "admin",
+      shared_access_suspended: true,
+      organization_plan: "free"
+    });
+    await expect(
+      inviteStore.acceptProjectInviteForUser!({
+        invite_token_hash: "hash_invite",
+        user_id: "usr_member",
+        email: "dev@example.com",
+        accepted_at: "2026-03-20T00:00:00.000Z"
+      })
+    ).resolves.toEqual({ kind: "shared_access_suspended" });
   });
 
   it("covers member role updates and removals", async (): Promise<void> => {
