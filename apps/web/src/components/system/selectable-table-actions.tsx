@@ -125,3 +125,80 @@ export function SelectableTableActions(input: {
     </div>
   );
 }
+
+export function StickyMobileTableActions(input: {
+  selectedCount: number;
+  totalCount: number;
+  allSelected: boolean;
+  isBusy?: boolean;
+  primaryActionLabel: string;
+  secondaryActionLabel: string;
+  primaryActionDisabled?: boolean;
+  secondaryActionDisabled?: boolean;
+  onToggleSelectAll: () => void;
+  onClearSelection: () => void;
+  onPrimaryAction: () => void;
+  onSecondaryAction: () => void;
+}): JSX.Element | null {
+  const {
+    selectedCount,
+    totalCount,
+    allSelected,
+    isBusy = false,
+    primaryActionLabel,
+    secondaryActionLabel,
+    primaryActionDisabled = false,
+    secondaryActionDisabled = false,
+    onToggleSelectAll,
+    onClearSelection,
+    onPrimaryAction,
+    onSecondaryAction
+  } = input;
+
+  if (selectedCount === 0) {
+    return null;
+  }
+
+  return (
+    <div
+      className="fixed inset-x-4 z-40 rounded-xl border bg-background/95 p-3 shadow-lg backdrop-blur sm:hidden"
+      style={{ bottom: "calc(env(safe-area-inset-bottom) + 1rem)" }}
+    >
+      <div className="flex items-center justify-between gap-3">
+        <p className="text-sm font-medium text-foreground">{selectedCount} selected</p>
+        <div className="flex items-center gap-2">
+          {!allSelected && totalCount > 0 ? (
+            <Button type="button" variant="ghost" size="sm" disabled={isBusy} onClick={onToggleSelectAll}>
+              Select all
+            </Button>
+          ) : null}
+          <Button type="button" variant="ghost" size="sm" disabled={isBusy} onClick={onClearSelection}>
+            Clear
+          </Button>
+        </div>
+      </div>
+      <div className="mt-3 flex items-center gap-2">
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          className="flex-1"
+          disabled={primaryActionDisabled || isBusy}
+          onClick={onPrimaryAction}
+        >
+          {primaryActionLabel}
+        </Button>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          className="flex-1"
+          disabled={secondaryActionDisabled || isBusy}
+          onClick={onSecondaryAction}
+        >
+          {secondaryActionLabel}
+        </Button>
+      </div>
+    </div>
+  );
+}

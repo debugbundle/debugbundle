@@ -504,6 +504,31 @@ export async function createProjectAlert(payload: {
   return body.alert;
 }
 
+export async function updateProjectAlert(
+  alertId: string,
+  projectId: string,
+  payload: {
+    service_id?: string | null;
+    channel?: AlertChannel;
+    condition_type?: AlertConditionType;
+    severity_min?: "low" | "medium" | "high" | "critical" | null;
+    cooldown_seconds?: number;
+    config?: Record<string, unknown> | null;
+    is_enabled?: boolean;
+  }
+): Promise<AlertRecord> {
+  const body = await readJson<{ alert: AlertRecord }>(
+    await fetch(`${API_BASE}/v1/alerts/${alertId}?project_id=${encodeURIComponent(projectId)}`, {
+      method: "PATCH",
+      credentials: "include",
+      headers: buildBrowserSessionHeaders(true),
+      body: JSON.stringify(payload)
+    })
+  );
+
+  return body.alert;
+}
+
 export async function listProjectWebhooks(projectId: string, limit = 20): Promise<WebhookRecord[]> {
   const searchParams = new URLSearchParams({
     project_id: projectId,

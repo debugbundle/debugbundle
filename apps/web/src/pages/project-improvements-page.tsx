@@ -7,6 +7,7 @@ import { HostedImprovementsUpgradeCallout } from "../components/system/hosted-im
 import { ResourceListState } from "../components/system/resource-list-state.js";
 import {
   SelectableTableActions,
+  StickyMobileTableActions,
   shouldIgnoreTableRowActivation,
   useVisibleRowSelection
 } from "../components/system/selectable-table-actions.js";
@@ -143,20 +144,23 @@ export function ProjectImprovementsPage(): JSX.Element {
       ) : (
         <Card className="min-w-0">
           <CardHeader className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-            <div className="space-y-1.5">
-              <CardTitle>Project improvements</CardTitle>
-              <CardDescription>Deterministic improvement opportunities for this project.</CardDescription>
+            <div className="flex w-full items-start justify-between gap-3 sm:block sm:w-auto">
+              <div className="space-y-1.5">
+                <CardTitle>Project improvements</CardTitle>
+                <CardDescription>Deterministic improvement opportunities for this project.</CardDescription>
+              </div>
+              <TableRefreshButton isLoading={isLoading} onRefresh={() => void refreshPage()} mobileIconOnly className="shrink-0 sm:hidden" />
             </div>
-            <div className="flex items-center gap-2 sm:justify-end">
-              <TableRefreshButton isLoading={isLoading} onRefresh={() => void refreshPage()} />
-              <label id="project-improvements-status-filter-label" htmlFor="project-improvements-status-filter" className="text-sm font-medium text-foreground">
+            <div className="flex w-full items-center gap-2 sm:w-auto sm:justify-end">
+              <TableRefreshButton isLoading={isLoading} onRefresh={() => void refreshPage()} className="hidden sm:inline-flex" />
+              <label id="project-improvements-status-filter-label" htmlFor="project-improvements-status-filter" className="sr-only sm:not-sr-only sm:text-sm sm:font-medium sm:text-foreground">
                 Status
               </label>
               <Select value={statusFilter} onValueChange={(value) => setStatusFilter(value as ImprovementStatusFilter)}>
                 <SelectTrigger
                   id="project-improvements-status-filter"
                   aria-labelledby="project-improvements-status-filter-label project-improvements-status-filter"
-                  className="min-w-40"
+                  className="w-full sm:w-fit sm:min-w-40"
                 >
                   <SelectValue />
                 </SelectTrigger>
@@ -172,7 +176,7 @@ export function ProjectImprovementsPage(): JSX.Element {
               </Select>
             </div>
           </CardHeader>
-          <CardContent>
+          <CardContent className={selection.selectedCount > 0 ? "pb-28 sm:pb-6" : undefined}>
             <ResourceListState
               items={improvements}
               loading={
@@ -195,25 +199,27 @@ export function ProjectImprovementsPage(): JSX.Element {
             >
               {() => (
                 <div className="space-y-4">
-                  <SelectableTableActions
-                    itemLabel="improvement"
-                    totalCount={sortedImprovements.length}
-                    selectedCount={selection.selectedCount}
-                    allSelected={selection.allSelected}
-                    isBusy={bulkAction !== null}
-                    primaryActionLabel={bulkAction === "resolved" ? "Marking resolved..." : "Mark selected resolved"}
-                    secondaryActionLabel={bulkAction === "unresolved" ? "Marking unresolved..." : "Mark selected unresolved"}
-                    primaryActionDisabled={selection.selectedCount === 0 || selectedImprovements.every((improvement) => improvement.status === "resolved")}
-                    secondaryActionDisabled={selection.selectedCount === 0 || selectedImprovements.every((improvement) => improvement.status === "open")}
-                    onToggleSelectAll={selection.toggleSelectAll}
-                    onClearSelection={selection.clearSelection}
-                    onPrimaryAction={() => {
-                      void handleBulkImprovementAction("resolved");
-                    }}
-                    onSecondaryAction={() => {
-                      void handleBulkImprovementAction("unresolved");
-                    }}
-                  />
+                  <div className="hidden sm:block">
+                    <SelectableTableActions
+                      itemLabel="improvement"
+                      totalCount={sortedImprovements.length}
+                      selectedCount={selection.selectedCount}
+                      allSelected={selection.allSelected}
+                      isBusy={bulkAction !== null}
+                      primaryActionLabel={bulkAction === "resolved" ? "Marking resolved..." : "Mark selected resolved"}
+                      secondaryActionLabel={bulkAction === "unresolved" ? "Marking unresolved..." : "Mark selected unresolved"}
+                      primaryActionDisabled={selection.selectedCount === 0 || selectedImprovements.every((improvement) => improvement.status === "resolved")}
+                      secondaryActionDisabled={selection.selectedCount === 0 || selectedImprovements.every((improvement) => improvement.status === "open")}
+                      onToggleSelectAll={selection.toggleSelectAll}
+                      onClearSelection={selection.clearSelection}
+                      onPrimaryAction={() => {
+                        void handleBulkImprovementAction("resolved");
+                      }}
+                      onSecondaryAction={() => {
+                        void handleBulkImprovementAction("unresolved");
+                      }}
+                    />
+                  </div>
                   <ImprovementsTable
                     improvements={sortedImprovements}
                     sort={sort}
@@ -242,6 +248,24 @@ export function ProjectImprovementsPage(): JSX.Element {
           </CardContent>
         </Card>
       )}
+      <StickyMobileTableActions
+        selectedCount={selection.selectedCount}
+        totalCount={sortedImprovements.length}
+        allSelected={selection.allSelected}
+        isBusy={bulkAction !== null}
+        primaryActionLabel={bulkAction === "resolved" ? "Marking resolved..." : "Mark resolved"}
+        secondaryActionLabel={bulkAction === "unresolved" ? "Marking unresolved..." : "Mark unresolved"}
+        primaryActionDisabled={selection.selectedCount === 0 || selectedImprovements.every((improvement) => improvement.status === "resolved")}
+        secondaryActionDisabled={selection.selectedCount === 0 || selectedImprovements.every((improvement) => improvement.status === "open")}
+        onToggleSelectAll={selection.toggleSelectAll}
+        onClearSelection={selection.clearSelection}
+        onPrimaryAction={() => {
+          void handleBulkImprovementAction("resolved");
+        }}
+        onSecondaryAction={() => {
+          void handleBulkImprovementAction("unresolved");
+        }}
+      />
     </div>
   );
 }

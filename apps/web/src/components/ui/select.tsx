@@ -40,7 +40,7 @@ function SelectTrigger({
       data-slot="select-trigger"
       data-size={size}
       className={cn(
-        "flex w-fit items-center justify-between gap-2 whitespace-nowrap rounded-lg border border-input bg-transparent px-2.5 text-sm outline-none transition-[color,box-shadow] disabled:cursor-not-allowed disabled:opacity-50 disabled:pointer-events-none data-[placeholder]:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&>span]:line-clamp-1 [&>span]:flex [&>span]:items-center [&>span]:text-left",
+        "flex w-fit min-w-0 max-w-full items-center justify-between gap-2 overflow-hidden rounded-lg border border-input bg-transparent px-2.5 text-sm outline-none transition-[color,box-shadow] disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50 data-[placeholder]:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&>span]:flex [&>span]:min-w-0 [&>span]:flex-1 [&>span]:items-center [&>span]:truncate [&>span]:text-left",
         size === "default" && "h-8 py-1",
         size === "sm" && "h-7 py-1 text-xs",
         className

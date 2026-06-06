@@ -526,6 +526,7 @@ export function ProjectWeeklyReportSettingsCard({
       No Slack weekly reports configured.
     </div>
   );
+  const showPausedSlackReportLoading = !slackEnabled && slackChannels.length > 0 && !slackDestinationsLoaded;
 
   return (
     <Card>
@@ -708,17 +709,25 @@ export function ProjectWeeklyReportSettingsCard({
 
           {!slackEnabled ? (
             <div className="mt-4 space-y-4">
-              <CalloutCard
-                eyebrow="Team tier only"
-                title="Slack weekly reports are paused on the current plan"
-                description={
-                  slackChannels.length > 0
-                    ? "Saved Slack weekly reports are preserved and will resume after the owner upgrades back to Team."
-                    : "Upgrade to Team to deliver weekly reports into connected Slack channels."
-                }
-                tone="warning"
-              />
-              {readOnlySlackChannels}
+              {showPausedSlackReportLoading ? (
+                <div className="rounded-lg border border-dashed border-border bg-muted/20 px-4 py-3 text-sm text-muted-foreground">
+                  Loading connected Slack channels...
+                </div>
+              ) : (
+                <>
+                  <CalloutCard
+                    eyebrow="Team tier only"
+                    title="Slack weekly reports are paused on the current plan"
+                    description={
+                      slackChannels.length > 0
+                        ? "Saved Slack weekly reports are preserved and will resume after the owner upgrades back to Team."
+                        : "Upgrade to Team to deliver weekly reports into connected Slack channels."
+                    }
+                    tone="warning"
+                  />
+                  {readOnlySlackChannels}
+                </>
+              )}
             </div>
           ) : isLoading ? (
             <div className="mt-4 rounded-lg border border-dashed border-border bg-muted/20 px-4 py-3 text-sm text-muted-foreground">

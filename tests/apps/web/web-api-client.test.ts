@@ -19,6 +19,7 @@ import {
   subscribeToBrowserSessionInvalidation,
   resetBrowserSessionClientState,
   testProjectWebhook,
+  updateProjectAlert,
   verifyEmailCode
 } from "../../../apps/web/src/lib/api.ts";
 import { createSession } from "./web-test-helpers.js";
@@ -131,6 +132,54 @@ describe("web api client", () => {
           cooldown_seconds: 0,
           config: { target_url: "https://hooks.example.test/alerts" },
           is_enabled: true
+        })
+      })
+    );
+  });
+
+  it("sends alert update payloads through the project-scoped patch route", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          alert: {
+            alert_id: "al_1",
+            project_id: "proj_1",
+            created_by_user_id: "usr_123",
+            service_id: null,
+            channel: "email",
+            condition_type: "severity_threshold",
+            severity_min: "critical",
+            cooldown_seconds: 172800,
+            config: { to: "alerts@example.com" },
+            is_enabled: true,
+            created_at: "2026-03-15T00:00:00.000Z",
+            updated_at: "2026-03-16T00:00:00.000Z"
+          }
+        }),
+        { status: 200 }
+      )
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const alert = await updateProjectAlert("al_1", "proj_1", {
+      channel: "email",
+      condition_type: "severity_threshold",
+      severity_min: "critical",
+      cooldown_seconds: 172800,
+      config: { to: "alerts@example.com" }
+    });
+
+    expect(alert.updated_at).toBe("2026-03-16T00:00:00.000Z");
+    expect(fetchMock).toHaveBeenCalledWith(
+      buildApiUrl("/v1/alerts/al_1?project_id=proj_1"),
+      expect.objectContaining({
+        method: "PATCH",
+        body: JSON.stringify({
+          channel: "email",
+          condition_type: "severity_threshold",
+          severity_min: "critical",
+          cooldown_seconds: 172800,
+          config: { to: "alerts@example.com" }
         })
       })
     );

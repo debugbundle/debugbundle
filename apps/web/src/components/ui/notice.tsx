@@ -5,9 +5,11 @@ import { cn } from "../../lib/utils.js";
 
 type NoticeTone = "info" | "success" | "warning" | "destructive";
 
+const neutralToneClasses = "border-border bg-muted/40 text-foreground";
+
 const toneClasses: Record<NoticeTone, string> = {
-  info: "border-info/20 bg-info/8 text-foreground",
-  success: "border-success/20 bg-success/8 text-foreground",
+  info: neutralToneClasses,
+  success: neutralToneClasses,
   warning: "border-warning/30 bg-warning/12 text-foreground",
   destructive: "border-destructive/20 bg-destructive/8 text-foreground"
 };

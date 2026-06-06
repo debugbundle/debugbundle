@@ -669,45 +669,12 @@ function EmailAuthPage({
       <form className="flex flex-col gap-6" onSubmit={(event) => void handleSubmit(event)}>
         <FieldGroup>
           {!showTrialIntentPanel || requestedTrialPlan === null ? null : (
-            <CalloutCard
-              eyebrow="30-day no-card trial"
+            <Notice
               title={`${formatRequestedTrialPlanName(requestedTrialPlan)} trial selected`}
-              description={
-                isVerifyStep
-                  ? `Verify your code to continue into billing. If this is a new account, your ${formatRequestedTrialPlanName(requestedTrialPlan)} trial will start automatically.`
-                  : `${formatRequestedTrialPlanName(requestedTrialPlan)} includes its paid allowance for 30 days. No credit card is required, and extra capacity stays locked until paid conversion.`
-              }
-              tone="neutral"
+              tone="info"
             >
-              {isVerifyStep ? null : (
-                <div className="flex flex-wrap gap-2">
-                  <Button
-                    type="button"
-                    variant={requestedTrialPlan === "solo" ? "default" : "outline"}
-                    size="sm"
-                    onClick={() => setRequestedTrialPlan("solo")}
-                  >
-                    Solo trial
-                  </Button>
-                  <Button
-                    type="button"
-                    variant={requestedTrialPlan === "team" ? "default" : "outline"}
-                    size="sm"
-                    onClick={() => setRequestedTrialPlan("team")}
-                  >
-                    Team trial
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setRequestedTrialPlan(null)}
-                  >
-                    Continue without trial
-                  </Button>
-                </div>
-              )}
-            </CalloutCard>
+              You&apos;re starting with a 30-day no-card trial.
+            </Notice>
           )}
           {isVerifyStep ? (
             <Field data-invalid={fieldErrors.code !== undefined || undefined}>

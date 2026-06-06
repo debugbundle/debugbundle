@@ -1,4 +1,4 @@
-import { BellRingIcon, PlusIcon, Trash2Icon } from "lucide-react";
+import { BellRingIcon, PencilIcon, PlusIcon, Trash2Icon } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useOutletContext, useSearchParams } from "react-router-dom";
 import { getTierCapabilities } from "../../../../packages/shared-types/src/index.js";
@@ -31,6 +31,7 @@ import {
   createProjectAlert,
   deleteAlert,
   listProjectAlerts,
+  updateProjectAlert,
   type AlertChannel,
   type AlertConditionType,
   type AlertRecord
@@ -95,6 +96,7 @@ const SEVERITY_OPTIONS: Array<{ value: "" | "low" | "medium" | "high" | "critica
 
 const ALERT_SEVERITY_ANY_VALUE = "__any_severity__";
 const ALERT_COOLDOWN_DEFAULT_DAYS = "1";
+const ALERT_COOLDOWN_DISABLED_DAYS = "0";
 const ALERT_COOLDOWN_MAX_DAYS = 7;
 const SECONDS_PER_DAY = 86_400;
 
@@ -110,10 +112,12 @@ export function ProjectAlertsPage(): JSX.Element {
   const [isConnectingSlack, setIsConnectingSlack] = useState(false);
   const [slackTestDestinationId, setSlackTestDestinationId] = useState<string | null>(null);
   const [slackDeleteDestinationId, setSlackDeleteDestinationId] = useState<string | null>(null);
+  const [editingAlertId, setEditingAlertId] = useState<string | null>(null);
   const [channel, setChannel] = useState<AlertChannel>("email");
   const [conditionType, setConditionType] = useState<AlertConditionType>("new_incident");
   const [severityMin, setSeverityMin] = useState<"" | "low" | "medium" | "high" | "critical">("");
   const [cooldownDays, setCooldownDays] = useState(ALERT_COOLDOWN_DEFAULT_DAYS);
+  const [isCooldownPristine, setIsCooldownPristine] = useState(true);
   const [emailRecipient, setEmailRecipient] = useState("");
   const [destinationUrl, setDestinationUrl] = useState("");
   const [selectedSlackDestinationId, setSelectedSlackDestinationId] = useState("");
@@ -158,11 +162,12 @@ export function ProjectAlertsPage(): JSX.Element {
     setChannel(channelOptions.find((option) => option.disabled !== true)?.value ?? "email");
   }, [channel, channelOptions]);
 
-  function resetCreateForm(nextChannel: AlertChannel = "email"): void {
+  function resetAlertForm(nextChannel: AlertChannel = "email"): void {
     setChannel(nextChannel);
     setConditionType("new_incident");
     setSeverityMin("");
-    setCooldownDays(ALERT_COOLDOWN_DEFAULT_DAYS);
+    setCooldownDays(getDefaultCooldownDays(nextChannel));
+    setIsCooldownPristine(true);
     setEmailRecipient(session?.email ?? "");
     setDestinationUrl("");
     setSelectedSlackDestinationId(resolveSlackDestinationSelection(slackDestinations, preferredSlackDestinationId) ?? "");
@@ -172,7 +177,11 @@ export function ProjectAlertsPage(): JSX.Element {
     setIsCreateOpen(nextOpen);
 
     if (nextOpen) {
-      resetCreateForm();
+      if (editingAlertId === null) {
+        resetAlertForm();
+      }
+    } else {
+      setEditingAlertId(null);
     }
   }
 
@@ -186,6 +195,14 @@ export function ProjectAlertsPage(): JSX.Element {
       setSelectedSlackDestinationId(resolvedDestinationId);
     }
   }, [channel, preferredSlackDestinationId, selectedSlackDestinationId, slackDestinations, slackEnabled]);
+
+  useEffect(() => {
+    if (!isCooldownPristine) {
+      return;
+    }
+
+    setCooldownDays(getDefaultCooldownDays(channel));
+  }, [channel, isCooldownPristine]);
 
   useEffect(() => {
     const slackConnectStatus = searchParams.get("slack_connect");
@@ -202,7 +219,7 @@ export function ProjectAlertsPage(): JSX.Element {
     setSearchParams(nextSearchParams, { replace: true });
 
     if (slackConnectStatus === "success") {
-      resetCreateForm("slack");
+      resetAlertForm("slack");
       setIsCreateOpen(true);
       showSuccessToast("Slack channel connected successfully.");
       void refreshSlackDestinations(nextPreferredDestinationId);
@@ -259,16 +276,58 @@ export function ProjectAlertsPage(): JSX.Element {
     }
   }
 
-  async function handleCreateAlert(event: React.FormEvent<HTMLFormElement>): Promise<void> {
-    event.preventDefault();
-    const cooldownValidationError = validateAlertCooldownDays(cooldownDays);
-    if (cooldownValidationError !== undefined) {
-      showErrorToast(cooldownValidationError);
+  function populateAlertForm(alert: AlertRecord): void {
+    setChannel(alert.channel);
+    setConditionType(alert.condition_type);
+    setSeverityMin(alert.severity_min ?? "");
+    setCooldownDays(String(alert.cooldown_seconds / SECONDS_PER_DAY));
+    setIsCooldownPristine(false);
+
+    if (alert.channel === "email") {
+      const recipient = alert.config["to"];
+      setEmailRecipient(typeof recipient === "string" ? recipient : "");
+      setDestinationUrl("");
+      setSelectedSlackDestinationId("");
       return;
     }
 
-    const cooldownSeconds = Number.parseInt(cooldownDays, 10) * SECONDS_PER_DAY;
+    if (alert.channel === "slack") {
+      const slackDestinationId = alert.config["slack_destination_id"];
+      setEmailRecipient("");
+      setDestinationUrl("");
+      setSelectedSlackDestinationId(typeof slackDestinationId === "string" ? slackDestinationId : "");
+      return;
+    }
 
+    const destinationKey = alert.channel === "webhook" ? "target_url" : "webhook_url";
+    const configuredDestination = alert.config[destinationKey];
+    setEmailRecipient("");
+    setDestinationUrl(typeof configuredDestination === "string" ? configuredDestination : "");
+    setSelectedSlackDestinationId("");
+  }
+
+  function openEditAlertDialog(alert: AlertRecord): void {
+    setEditingAlertId(alert.alert_id);
+    populateAlertForm(alert);
+    setIsCreateOpen(true);
+  }
+
+  function buildAlertDraft():
+    | {
+        channel: AlertChannel;
+        condition_type: AlertConditionType;
+        severity_min?: "low" | "medium" | "high" | "critical";
+        cooldown_seconds: number;
+        config: Record<string, unknown>;
+      }
+    | null {
+    const cooldownValidationError = validateAlertCooldownDays(cooldownDays);
+    if (cooldownValidationError !== undefined) {
+      showErrorToast(cooldownValidationError);
+      return null;
+    }
+
+    const cooldownSeconds = Number.parseInt(cooldownDays, 10) * SECONDS_PER_DAY;
     const config = buildAlertConfig({
       channel,
       emailRecipient: emailRecipient.trim(),
@@ -284,6 +343,33 @@ export function ProjectAlertsPage(): JSX.Element {
             ? "Connect Slack and choose a channel for this alert."
             : "Add a destination URL for this alert channel."
       );
+      return null;
+    }
+
+    const draft: {
+      channel: AlertChannel;
+      condition_type: AlertConditionType;
+      severity_min?: "low" | "medium" | "high" | "critical";
+      cooldown_seconds: number;
+      config: Record<string, unknown>;
+    } = {
+      channel,
+      condition_type: conditionType,
+      cooldown_seconds: cooldownSeconds,
+      config
+    };
+
+    if (severityMin !== "") {
+      draft.severity_min = severityMin;
+    }
+
+    return draft;
+  }
+
+  async function handleCreateAlert(event: React.FormEvent<HTMLFormElement>): Promise<void> {
+    event.preventDefault();
+    const draft = buildAlertDraft();
+    if (draft === null) {
       return;
     }
 
@@ -297,26 +383,42 @@ export function ProjectAlertsPage(): JSX.Element {
       is_enabled: boolean;
     } = {
       project_id: resolvedProjectId,
-      channel,
-      condition_type: conditionType,
-      cooldown_seconds: cooldownSeconds,
-      config,
+      ...draft,
       is_enabled: true
     };
-
-    if (severityMin !== "") {
-      createPayload.severity_min = severityMin;
-    }
 
     try {
       const created = await createProjectAlert(createPayload);
 
       setAlerts((current) => [...(current ?? []), created]);
-      resetCreateForm();
+      resetAlertForm();
       setIsCreateOpen(false);
       showSuccessToast("Alert rule created successfully.");
     } catch {
       showErrorToast("Could not create alert rule.");
+    }
+  }
+
+  async function handleUpdateAlert(event: React.FormEvent<HTMLFormElement>): Promise<void> {
+    event.preventDefault();
+
+    if (editingAlertId === null) {
+      return;
+    }
+
+    const draft = buildAlertDraft();
+    if (draft === null) {
+      return;
+    }
+
+    try {
+      const updated = await updateProjectAlert(editingAlertId, resolvedProjectId, draft);
+      setAlerts((current) => (current ?? []).map((alert) => (alert.alert_id === updated.alert_id ? updated : alert)));
+      setIsCreateOpen(false);
+      setEditingAlertId(null);
+      showSuccessToast("Alert rule updated successfully.");
+    } catch {
+      showErrorToast("Could not update alert rule.");
     }
   }
 
@@ -330,6 +432,149 @@ export function ProjectAlertsPage(): JSX.Element {
     }
   }
 
+  const alertFormFields = (
+    <FieldGroup>
+      <Field>
+        <FieldLabel id="project-alert-channel-label" htmlFor="project-alert-channel">Channel</FieldLabel>
+        <Select
+          value={channel}
+          onValueChange={(value) => setChannel(value as AlertChannel)}
+        >
+          <SelectTrigger id="project-alert-channel" aria-labelledby="project-alert-channel-label project-alert-channel" className="w-full">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent position="popper">
+            <SelectGroup>
+              {channelOptions.map((option) => (
+                <SelectItem key={option.value} value={option.value} disabled={option.disabled === true}>
+                  {option.label}
+                </SelectItem>
+              ))}
+            </SelectGroup>
+          </SelectContent>
+        </Select>
+        <FieldDescription>{describeAlertChannel(channel)}</FieldDescription>
+      </Field>
+      {channel === "email" ? (
+        <Field>
+          <FieldLabel htmlFor="project-alert-email-recipient">Recipient email</FieldLabel>
+          <FieldDescription>Send this alert to a single email address. Create additional alert rules if multiple people should receive it.</FieldDescription>
+          <Input
+            id="project-alert-email-recipient"
+            type="email"
+            inputMode="email"
+            autoComplete="email"
+            placeholder={session?.email ?? "oncall@example.com"}
+            value={emailRecipient}
+            onChange={(event) => setEmailRecipient(event.currentTarget.value)}
+            required
+          />
+        </Field>
+      ) : channel === "slack" ? (
+        <ConnectedSlackDestinationField
+          label={getDestinationLabel(channel)}
+          description={getDestinationDescription(channel)}
+          slackDestinations={slackDestinations}
+          slackDestinationsLoaded={slackDestinationsLoaded}
+          selectedSlackDestinationId={selectedSlackDestinationId}
+          canManageIntegrations={canManageIntegrations}
+          isConnectingSlack={isConnectingSlack}
+          slackTestDestinationId={slackTestDestinationId}
+          slackDeleteDestinationId={slackDeleteDestinationId}
+          onSelectedSlackDestinationIdChange={setSelectedSlackDestinationId}
+          onConnectSlack={() => void handleConnectSlack()}
+          onTestSlackDestination={(destinationId) => void handleTestSlackDestination(destinationId)}
+          onDeleteSlackDestination={(destinationId) => void handleDeleteSlackDestination(destinationId)}
+          emptyManageText="Connect Slack once, choose a channel in Slack, and it will become available for alert rules here."
+          emptyReadOnlyText="A project admin needs to connect Slack before this project can send Slack alerts."
+        />
+      ) : (
+        <Field>
+          <FieldLabel htmlFor="project-alert-destination">{getDestinationLabel(channel)}</FieldLabel>
+          <FieldDescription>{getDestinationDescription(channel)}</FieldDescription>
+          <Input
+            id="project-alert-destination"
+            type="url"
+            inputMode="url"
+            placeholder="https://example.com/..."
+            value={destinationUrl}
+            onChange={(event) => setDestinationUrl(event.currentTarget.value)}
+            required
+          />
+        </Field>
+      )}
+      <Field>
+        <FieldLabel id="project-alert-condition-label" htmlFor="project-alert-condition">Condition</FieldLabel>
+        <Select
+          value={conditionType}
+          onValueChange={(value) => setConditionType(value as AlertConditionType)}
+        >
+          <SelectTrigger
+            id="project-alert-condition"
+            aria-labelledby="project-alert-condition-label project-alert-condition"
+            className="w-full"
+          >
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent position="popper">
+            <SelectGroup>
+              {ALERT_CONDITION_OPTIONS.map((option) => (
+                <SelectItem key={option.value} value={option.value}>
+                  {option.label}
+                </SelectItem>
+              ))}
+            </SelectGroup>
+          </SelectContent>
+        </Select>
+      </Field>
+      <Field>
+        <FieldLabel id="project-alert-severity-label" htmlFor="project-alert-severity">Minimum severity</FieldLabel>
+        <FieldDescription>Leave unset to deliver for all severities matching the selected condition.</FieldDescription>
+        <Select
+          value={severityMin === "" ? ALERT_SEVERITY_ANY_VALUE : severityMin}
+          onValueChange={(value) => setSeverityMin((value === ALERT_SEVERITY_ANY_VALUE ? "" : value) as typeof severityMin)}
+        >
+          <SelectTrigger
+            id="project-alert-severity"
+            aria-labelledby="project-alert-severity-label project-alert-severity"
+            className="w-full"
+          >
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent position="popper">
+            <SelectGroup>
+              {SEVERITY_OPTIONS.map((option) => (
+                <SelectItem key={option.value || "any"} value={option.value === "" ? ALERT_SEVERITY_ANY_VALUE : option.value}>
+                  {option.label}
+                </SelectItem>
+              ))}
+            </SelectGroup>
+          </SelectContent>
+        </Select>
+      </Field>
+      <Field>
+        <FieldLabel htmlFor="project-alert-cooldown-days">Cooldown (days)</FieldLabel>
+        <FieldDescription>
+          {describeAlertCooldown(channel)}
+        </FieldDescription>
+        <Input
+          id="project-alert-cooldown-days"
+          type="number"
+          inputMode="numeric"
+          min="0"
+          max={String(ALERT_COOLDOWN_MAX_DAYS)}
+          step="1"
+          value={cooldownDays}
+          onChange={(event) => {
+            setCooldownDays(event.currentTarget.value);
+            setIsCooldownPristine(false);
+          }}
+          required
+        />
+      </Field>
+    </FieldGroup>
+  );
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
@@ -341,158 +586,26 @@ export function ProjectAlertsPage(): JSX.Element {
               Create alert rule
             </Button>
           </DialogTrigger>
-            <DialogFormContent
-              title="Create alert rule"
-              description="Add a project-scoped delivery rule for incident lifecycle changes."
-              footer={
-                <Button
-                  type="submit"
-                  disabled={channel === "slack" && (!slackEnabled || selectedSlackDestinationId.length === 0)}
-                >
-                  Create alert rule
-                </Button>
-              }
-              onSubmit={(event) => void handleCreateAlert(event)}
-            >
-                <FieldGroup>
-                  <Field>
-                    <FieldLabel id="project-alert-channel-label" htmlFor="project-alert-channel">Channel</FieldLabel>
-                    <Select
-                      value={channel}
-                      onValueChange={(value) => setChannel(value as AlertChannel)}
-                    >
-                      <SelectTrigger id="project-alert-channel" aria-labelledby="project-alert-channel-label project-alert-channel" className="w-full">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent position="popper">
-                        <SelectGroup>
-                          {channelOptions.map((option) => (
-                            <SelectItem key={option.value} value={option.value} disabled={option.disabled === true}>
-                              {option.label}
-                            </SelectItem>
-                          ))}
-                        </SelectGroup>
-                      </SelectContent>
-                    </Select>
-                    <FieldDescription>{describeAlertChannel(channel)}</FieldDescription>
-                  </Field>
-                  {channel === "email" ? (
-                    <Field>
-                      <FieldLabel htmlFor="project-alert-email-recipient">Recipient email</FieldLabel>
-                      <FieldDescription>Send this alert to a single email address. Create additional alert rules if multiple people should receive it.</FieldDescription>
-                      <Input
-                        id="project-alert-email-recipient"
-                        type="email"
-                        inputMode="email"
-                        autoComplete="email"
-                        placeholder={session?.email ?? "oncall@example.com"}
-                        value={emailRecipient}
-                        onChange={(event) => setEmailRecipient(event.currentTarget.value)}
-                        required
-                      />
-                    </Field>
-                  ) : channel === "slack" ? (
-                    <ConnectedSlackDestinationField
-                      label={getDestinationLabel(channel)}
-                      description={getDestinationDescription(channel)}
-                      slackDestinations={slackDestinations}
-                      slackDestinationsLoaded={slackDestinationsLoaded}
-                      selectedSlackDestinationId={selectedSlackDestinationId}
-                      canManageIntegrations={canManageIntegrations}
-                      isConnectingSlack={isConnectingSlack}
-                      slackTestDestinationId={slackTestDestinationId}
-                      slackDeleteDestinationId={slackDeleteDestinationId}
-                      onSelectedSlackDestinationIdChange={setSelectedSlackDestinationId}
-                      onConnectSlack={() => void handleConnectSlack()}
-                      onTestSlackDestination={(destinationId) => void handleTestSlackDestination(destinationId)}
-                      onDeleteSlackDestination={(destinationId) => void handleDeleteSlackDestination(destinationId)}
-                      emptyManageText="Connect Slack once, choose a channel in Slack, and it will become available for alert rules here."
-                      emptyReadOnlyText="A project admin needs to connect Slack before this project can send Slack alerts."
-                    />
-                  ) : (
-                    <Field>
-                      <FieldLabel htmlFor="project-alert-destination">{getDestinationLabel(channel)}</FieldLabel>
-                      <FieldDescription>{getDestinationDescription(channel)}</FieldDescription>
-                      <Input
-                        id="project-alert-destination"
-                        type="url"
-                        inputMode="url"
-                        placeholder="https://example.com/..."
-                        value={destinationUrl}
-                        onChange={(event) => setDestinationUrl(event.currentTarget.value)}
-                        required
-                      />
-                    </Field>
-                  )}
-                  <Field>
-                    <FieldLabel id="project-alert-condition-label" htmlFor="project-alert-condition">Condition</FieldLabel>
-                    <Select
-                      value={conditionType}
-                      onValueChange={(value) => setConditionType(value as AlertConditionType)}
-                    >
-                      <SelectTrigger
-                        id="project-alert-condition"
-                        aria-labelledby="project-alert-condition-label project-alert-condition"
-                        className="w-full"
-                      >
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent position="popper">
-                        <SelectGroup>
-                          {ALERT_CONDITION_OPTIONS.map((option) => (
-                            <SelectItem key={option.value} value={option.value}>
-                              {option.label}
-                            </SelectItem>
-                          ))}
-                        </SelectGroup>
-                      </SelectContent>
-                    </Select>
-                  </Field>
-                  <Field>
-                    <FieldLabel id="project-alert-severity-label" htmlFor="project-alert-severity">Minimum severity</FieldLabel>
-                    <FieldDescription>Leave unset to deliver for all severities matching the selected condition.</FieldDescription>
-                    <Select
-                      value={severityMin === "" ? ALERT_SEVERITY_ANY_VALUE : severityMin}
-                      onValueChange={(value) => setSeverityMin((value === ALERT_SEVERITY_ANY_VALUE ? "" : value) as typeof severityMin)}
-                    >
-                      <SelectTrigger
-                        id="project-alert-severity"
-                        aria-labelledby="project-alert-severity-label project-alert-severity"
-                        className="w-full"
-                      >
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent position="popper">
-                        <SelectGroup>
-                          {SEVERITY_OPTIONS.map((option) => (
-                            <SelectItem key={option.value || "any"} value={option.value === "" ? ALERT_SEVERITY_ANY_VALUE : option.value}>
-                              {option.label}
-                            </SelectItem>
-                          ))}
-                        </SelectGroup>
-                      </SelectContent>
-                    </Select>
-                  </Field>
-                  <Field>
-                    <FieldLabel htmlFor="project-alert-cooldown-days">Cooldown (days)</FieldLabel>
-                    <FieldDescription>
-                      Suppress repeated notifications for similar matches for this many days. Use 0 to disable the cooldown.
-                    </FieldDescription>
-                    <Input
-                      id="project-alert-cooldown-days"
-                      type="number"
-                      inputMode="numeric"
-                      min="0"
-                      max={String(ALERT_COOLDOWN_MAX_DAYS)}
-                      step="1"
-                      value={cooldownDays}
-                      onChange={(event) => setCooldownDays(event.currentTarget.value)}
-                      required
-                    />
-                  </Field>
-                </FieldGroup>
-            </DialogFormContent>
-          </Dialog>
+          <DialogFormContent
+            title={editingAlertId === null ? "Create alert rule" : "Edit alert rule"}
+            description={
+              editingAlertId === null
+                ? "Add a project-scoped delivery rule for incident lifecycle changes."
+                : "Update this project-scoped delivery rule for incident lifecycle changes."
+            }
+            footer={
+              <Button
+                type="submit"
+                disabled={channel === "slack" && (!slackEnabled || selectedSlackDestinationId.length === 0)}
+              >
+                {editingAlertId === null ? "Create alert rule" : "Save changes"}
+              </Button>
+            }
+            onSubmit={(event) => void (editingAlertId === null ? handleCreateAlert(event) : handleUpdateAlert(event))}
+          >
+            {alertFormFields}
+          </DialogFormContent>
+        </Dialog>
       </div>
 
       <div className="grid gap-4 xl:grid-cols-[1.15fr_0.85fr]">
@@ -526,7 +639,7 @@ export function ProjectAlertsPage(): JSX.Element {
                     <TableHead>Minimum severity</TableHead>
                     <TableHead>Cooldown</TableHead>
                     <TableHead>Status</TableHead>
-                    <TableHead className="text-right">Action</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -543,26 +656,32 @@ export function ProjectAlertsPage(): JSX.Element {
                       </TableCell>
                       <TableCell className="text-right">
                         {canManageAlertRule(alert, session?.user_id, effectiveRole) ? (
-                          <AlertDialog>
-                            <AlertDialogTrigger asChild>
-                              <Button type="button" variant="ghost" size="sm">
-                                <Trash2Icon data-icon="inline-start" />
-                                Delete
-                              </Button>
-                            </AlertDialogTrigger>
-                            <AlertDialogContent>
-                              <AlertDialogHeader>
-                                <AlertDialogTitle>Delete alert rule</AlertDialogTitle>
-                                <AlertDialogDescription>
-                                  This will permanently remove this alert rule. Incident lifecycle events will no longer be delivered through this channel.
-                                </AlertDialogDescription>
-                              </AlertDialogHeader>
-                              <AlertDialogFooter>
-                                <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                <AlertDialogAction onClick={() => void handleDeleteAlert(alert.alert_id)}>Delete alert</AlertDialogAction>
-                              </AlertDialogFooter>
-                            </AlertDialogContent>
-                          </AlertDialog>
+                          <div className="flex items-center justify-end gap-1">
+                            <Button type="button" variant="ghost" size="sm" onClick={() => openEditAlertDialog(alert)}>
+                              <PencilIcon data-icon="inline-start" />
+                              Edit
+                            </Button>
+                            <AlertDialog>
+                              <AlertDialogTrigger asChild>
+                                <Button type="button" variant="ghost" size="sm">
+                                  <Trash2Icon data-icon="inline-start" />
+                                  Delete
+                                </Button>
+                              </AlertDialogTrigger>
+                              <AlertDialogContent>
+                                <AlertDialogHeader>
+                                  <AlertDialogTitle>Delete alert rule</AlertDialogTitle>
+                                  <AlertDialogDescription>
+                                    This will permanently remove this alert rule. Incident lifecycle events will no longer be delivered through this channel.
+                                  </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                  <AlertDialogAction onClick={() => void handleDeleteAlert(alert.alert_id)}>Delete alert</AlertDialogAction>
+                                </AlertDialogFooter>
+                              </AlertDialogContent>
+                            </AlertDialog>
+                          </div>
                         ) : (
                           <span className="text-sm text-muted-foreground">-</span>
                         )}
@@ -759,6 +878,15 @@ export function describeAlertChannel(channel: AlertChannel): string {
   }
 
   return "Send matched alert notifications to a single email recipient. Create additional alert rules if multiple people should receive email.";
+}
+
+export function getDefaultCooldownDays(channel: AlertChannel): string {
+  return channel === "email" ? ALERT_COOLDOWN_DEFAULT_DAYS : ALERT_COOLDOWN_DISABLED_DAYS;
+}
+
+export function describeAlertCooldown(channel: AlertChannel): string {
+  const baseDescription = "Suppress repeated notifications for similar matches for this many days. Use 0 to disable the cooldown.";
+  return channel === "email" ? `${baseDescription} Recommended for email: 1 day.` : baseDescription;
 }
 
 export function getDestinationLabel(channel: AlertChannel): string {

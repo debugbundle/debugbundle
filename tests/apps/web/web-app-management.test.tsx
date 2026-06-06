@@ -2851,7 +2851,7 @@ describe("web app — management routes", () => {
             channel: "slack",
             condition_type: "error_spike",
             severity_min: "critical",
-            cooldown_seconds: 86400,
+            cooldown_seconds: 0,
             config: {
               slack_destination_id: "sd_123"
             },
@@ -2865,7 +2865,7 @@ describe("web app — management routes", () => {
             channel: "slack",
             condition_type: "error_spike",
             severity_min: "critical",
-            cooldown_seconds: 86400
+            cooldown_seconds: 0
           })
         });
       }
@@ -2879,6 +2879,8 @@ describe("web app — management routes", () => {
 
     await user.click(await screen.findByRole("button", { name: /create alert rule/i }));
     await chooseSelectOption(user, /channel/i, /^slack$/i);
+    expect(screen.getByLabelText(/cooldown \(days\)/i)).toHaveValue(0);
+    expect(screen.queryByText(/recommended for email: 1 day/i)).not.toBeInTheDocument();
     await chooseSelectOption(user, /slack channel/i, /^acme - #alerts$/i);
     await chooseSelectOption(user, /condition/i, /^error spike$/i);
     await chooseSelectOption(user, /minimum severity/i, /^critical$/i);
@@ -2888,6 +2890,95 @@ describe("web app — management routes", () => {
       expect(screen.getByText(/slack/i)).toBeInTheDocument();
     });
     expect(screen.getByText(/critical/i)).toBeInTheDocument();
+  });
+
+  it("edits a project alert rule from the web route using the same modal fields as create", async () => {
+    const user = userEvent.setup();
+    const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = requestUrl(input);
+
+      if (url.endsWith("/v1/auth/session")) {
+        return jsonResponse(200, {
+          session: createSession()
+        });
+      }
+
+      if (url.endsWith("/v1/projects") && init?.method === undefined) {
+        return jsonResponse(200, {
+          projects: [createProject({ organization_plan: "team" })]
+        });
+      }
+
+      if (url.endsWith("/v1/alerts?project_id=proj_123&limit=20") && init?.method === undefined) {
+        return jsonResponse(200, {
+          alerts: [
+            createAlert({
+              alert_id: "alert_123",
+              config: { to: "owner@example.com" },
+              cooldown_seconds: 86400
+            })
+          ]
+        });
+      }
+
+      if (url.endsWith("/v1/alerts/alert_123?project_id=proj_123") && init?.method === "PATCH") {
+        expect(init.credentials).toBe("include");
+        expect(JSON.parse(String(init.body))).toEqual({
+          channel: "email",
+          condition_type: "severity_threshold",
+          severity_min: "critical",
+          cooldown_seconds: 172800,
+          config: {
+            to: "alerts@example.com"
+          }
+        });
+
+        return jsonResponse(200, {
+          alert: createAlert({
+            alert_id: "alert_123",
+            condition_type: "severity_threshold",
+            severity_min: "critical",
+            cooldown_seconds: 172800,
+            config: { to: "alerts@example.com" }
+          })
+        });
+      }
+
+      return jsonResponse(404, { error: "not_found" });
+    });
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<App initialEntries={["/projects/proj_123/alerts"]} />);
+
+    expect(await screen.findByText(/email - owner@example.com/i)).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: /^edit$/i }));
+
+    expect(await screen.findByRole("heading", { name: /edit alert rule/i })).toBeInTheDocument();
+    expect(screen.getByLabelText(/recipient email/i)).toHaveValue("owner@example.com");
+    expect(screen.getByLabelText(/cooldown \(days\)/i)).toHaveValue(1);
+    expect(screen.getByText(/recommended for email: 1 day/i)).toBeInTheDocument();
+
+    await user.clear(screen.getByLabelText(/recipient email/i));
+    await user.type(screen.getByLabelText(/recipient email/i), "alerts@example.com");
+    await chooseSelectOption(user, /condition/i, /^severity threshold$/i);
+    await chooseSelectOption(user, /minimum severity/i, /^critical$/i);
+    await user.clear(screen.getByLabelText(/cooldown \(days\)/i));
+    await user.type(screen.getByLabelText(/cooldown \(days\)/i), "2");
+    await user.click(screen.getByRole("button", { name: /save changes/i }));
+
+    await waitFor(() => {
+      expect(
+        fetchMock.mock.calls.some(
+          ([input, init]) =>
+            requestUrl(input).endsWith("/v1/alerts/alert_123?project_id=proj_123") &&
+            init?.method === "PATCH"
+        )
+      ).toBe(true);
+    });
+
+    expect(await screen.findByText(/alert rule updated successfully/i)).toBeInTheDocument();
   });
 
   it("lets owners test and disconnect connected Slack channels from the alert dialog", async () => {
@@ -3097,6 +3188,7 @@ describe("web app — management routes", () => {
     const recipientInput = await screen.findByLabelText(/recipient email/i);
     expect(recipientInput).toHaveValue("owner@example.com");
     expect(screen.getByLabelText(/cooldown \(days\)/i)).toHaveValue(1);
+    expect(screen.getByText(/recommended for email: 1 day/i)).toBeInTheDocument();
 
     await user.clear(recipientInput);
     await user.type(recipientInput, "alerts@example.com");
@@ -3137,7 +3229,7 @@ describe("web app — management routes", () => {
             project_id: "proj_123",
             channel: "webhook",
             condition_type: "new_incident",
-            cooldown_seconds: 86400,
+            cooldown_seconds: 0,
             config: {
               target_url: "https://alerts.example.test/project-webhook"
             },
@@ -3149,7 +3241,7 @@ describe("web app — management routes", () => {
           alert: createAlert({
             alert_id: "alert_webhook_789",
             channel: "webhook",
-            cooldown_seconds: 86400,
+            cooldown_seconds: 0,
             config: { target_url: "https://alerts.example.test/project-webhook" }
           })
         });
@@ -3167,6 +3259,8 @@ describe("web app — management routes", () => {
     await chooseSelectOption(user, /channel/i, /^alert webhook$/i);
     const destinationInput = screen.getByLabelText(/webhook endpoint url/i);
     expect(destinationInput).toBeInTheDocument();
+    expect(screen.getByLabelText(/cooldown \(days\)/i)).toHaveValue(0);
+    expect(screen.queryByText(/recommended for email: 1 day/i)).not.toBeInTheDocument();
 
     const createButton = screen.getByRole("button", { name: /^create alert rule$/i });
     const createForm = createButton.closest("form");

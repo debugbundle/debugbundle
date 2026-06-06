@@ -9,11 +9,15 @@ const MINIMUM_SPIN_DURATION_MS = 1_000;
 export function TableRefreshButton({
   isLoading,
   onRefresh,
-  label = "Refresh"
+  label = "Refresh",
+  className,
+  mobileIconOnly = false
 }: {
   isLoading: boolean;
   onRefresh: () => Promise<void> | void;
   label?: string;
+  className?: string;
+  mobileIconOnly?: boolean;
 }): JSX.Element {
   const [refreshStartedAt, setRefreshStartedAt] = useState<number | null>(null);
   const [isAwaitingRefresh, setIsAwaitingRefresh] = useState(false);
@@ -66,13 +70,14 @@ export function TableRefreshButton({
       type="button"
       variant="outline"
       size="sm"
-      className="gap-1.5"
+      className={cn("gap-1.5", mobileIconOnly && "size-7 px-0 sm:w-auto sm:px-2.5", className)}
       disabled={isLoading || isSpinning}
       aria-busy={isSpinning}
+      aria-label={label}
       onClick={() => void handleRefreshClick()}
     >
       <RefreshCwIcon className={cn("size-4", isSpinning && "animate-spin")} aria-hidden="true" />
-      {label}
+      <span className={mobileIconOnly ? "sr-only sm:not-sr-only" : undefined}>{label}</span>
     </Button>
   );
 }
