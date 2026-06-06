@@ -114,6 +114,18 @@ function formatObjectOutput(payload: unknown): string {
   return JSON.stringify(payload, null, 2);
 }
 
+function readIncidentIdsInput(input: { incidentId?: string; incidentIds?: string[] }): string[] {
+  if (Array.isArray(input.incidentIds) && input.incidentIds.length > 0) {
+    return input.incidentIds;
+  }
+
+  if (typeof input.incidentId === "string" && input.incidentId.length > 0) {
+    return [input.incidentId];
+  }
+
+  return [];
+}
+
 function formatIncidentContextDetail(context: IncidentContextRecord): string {
   const incidentSource = context.incident["source"];
   const visibility = typeof context.visibility === "object" && context.visibility !== null && !Array.isArray(context.visibility)
@@ -742,13 +754,36 @@ export async function getIncidentWithAuthCommand(
 }
 
 export async function resolveIncidentCommand(
-  input: { bearerToken: string; incidentId: string; json?: boolean },
-  api: { resolveIncident(input: { bearerToken: string; incidentId: string }): Promise<IncidentLike> }
+  input: { bearerToken: string; incidentId?: string; incidentIds?: string[]; json?: boolean },
+  api: {
+    resolveIncident(input: { bearerToken: string; incidentId: string }): Promise<IncidentLike>;
+    resolveIncidents?: (input: { bearerToken: string; incidentIds: string[] }) => Promise<IncidentLike[]>;
+  }
 ): Promise<CliCommandResult> {
+  const incidentIds = readIncidentIdsInput(input);
+
   try {
+    if (incidentIds.length > 1 && api.resolveIncidents !== undefined) {
+      const incidents = await api.resolveIncidents({
+        bearerToken: input.bearerToken,
+        incidentIds
+      });
+      if (input.json) {
+        return {
+          exitCode: 0,
+          output: JSON.stringify({ incidents })
+        };
+      }
+
+      return {
+        exitCode: 0,
+        output: formatIncidentTable(incidents)
+      };
+    }
+
     const incident = await api.resolveIncident({
       bearerToken: input.bearerToken,
-      incidentId: input.incidentId
+      incidentId: incidentIds[0]!
     });
     if (input.json) {
       return {
@@ -767,15 +802,24 @@ export async function resolveIncidentCommand(
 }
 
 export async function resolveIncidentWithAuthCommand(
-  input: { authFilePath?: string; incidentId: string; source?: RetrievalSource; json?: boolean },
+  input: { authFilePath?: string; incidentId?: string; incidentIds?: string[]; source?: RetrievalSource; json?: boolean },
   dependencies?: AuthenticatedRetrievalDependencies
 ): Promise<CliCommandResult> {
+  const incidentIds = readIncidentIdsInput(input);
+
   if (await shouldUseLocalRetrieval(input.source, dependencies)) {
     try {
-      const incident = await resolveLocalIncident({ incidentId: input.incidentId }, dependencies);
+      const incidents = await Promise.all(
+        incidentIds.map((incidentId) => resolveLocalIncident({ incidentId }, dependencies))
+      );
       return {
         exitCode: 0,
-        output: input.json ? JSON.stringify({ incident }) : formatIncidentDetail(incident)
+        output:
+          input.json
+            ? JSON.stringify(incidents.length === 1 ? { incident: incidents[0] } : { incidents })
+            : incidents.length === 1
+              ? formatIncidentDetail(incidents[0]!)
+              : formatIncidentTable(incidents)
       };
     } catch (error) {
       return mapErrorToResult(error);
@@ -784,15 +828,88 @@ export async function resolveIncidentWithAuthCommand(
 
   if (await shouldCombineLocalAndCloudRetrieval(input.source, dependencies)) {
     try {
-      const incident = await resolveLocalIncident({ incidentId: input.incidentId }, dependencies);
-      return {
-        exitCode: 0,
-        output: input.json ? JSON.stringify({ incident }) : formatIncidentDetail(incident)
-      };
+      const localIncidents = new Map<string, IncidentLike>();
+      const cloudIncidentIds: string[] = [];
+
+      for (const incidentId of incidentIds) {
+        try {
+          localIncidents.set(incidentId, await resolveLocalIncident({ incidentId }, dependencies));
+        } catch (error) {
+          if (!isNotFoundRetrievalError(error)) {
+            return mapErrorToResult(error);
+          }
+
+          cloudIncidentIds.push(incidentId);
+        }
+      }
+
+      if (cloudIncidentIds.length === 0) {
+        const incidents = incidentIds.map((incidentId) => localIncidents.get(incidentId)!);
+        return {
+          exitCode: 0,
+          output:
+            input.json
+              ? JSON.stringify(incidents.length === 1 ? { incident: incidents[0] } : { incidents })
+              : incidents.length === 1
+                ? formatIncidentDetail(incidents[0]!)
+                : formatIncidentTable(incidents)
+        };
+      }
+
+      return runAuthenticatedCliCommand(input, {
+        createApi: createAuthenticatedRetrievalApi,
+        dependencies,
+        runCommand: async (authState, api) => {
+          const cloudIncidents =
+            cloudIncidentIds.length === 1
+              ? [
+                  attachSourceToRecord(
+                    (await api.resolveIncident({
+                      bearerToken: authState.bearer_token,
+                      incidentId: cloudIncidentIds[0]!
+                    })) as IncidentLike & Record<string, unknown>,
+                    "cloud"
+                  )
+                ]
+              : (await api.resolveIncidents({
+                  bearerToken: authState.bearer_token,
+                  incidentIds: cloudIncidentIds
+                })).map((incident) =>
+                  attachSourceToRecord(incident as IncidentLike & Record<string, unknown>, "cloud")
+                );
+
+          for (const incident of cloudIncidents) {
+            await syncCloudIncidentCacheStatus(
+              {
+                incidentId: incident.incident_id,
+                incident: {
+                  ...(typeof incident.status === "string" ? { status: incident.status } : {}),
+                  resolved_at: incident.resolved_at ?? null
+                }
+              },
+              dependencies
+            );
+            localIncidents.set(incident.incident_id, incident);
+          }
+
+          const incidents = incidentIds.map((incidentId) => localIncidents.get(incidentId)!);
+          return {
+            exitCode: 0,
+            output:
+              input.json
+                ? JSON.stringify(incidents.length === 1 ? { incident: incidents[0] } : { incidents })
+                : incidents.length === 1
+                  ? formatIncidentDetail(incidents[0]!)
+                  : formatIncidentTable(incidents)
+          };
+        }
+      });
     } catch (error) {
-      if (!isNotFoundRetrievalError(error)) {
+      if (!(error instanceof Error)) {
         return mapErrorToResult(error);
       }
+
+      return mapErrorToResult(error);
     }
   }
 
@@ -800,10 +917,16 @@ export async function resolveIncidentWithAuthCommand(
     createApi: createAuthenticatedRetrievalApi,
     dependencies,
     runCommand: (authState, api) => {
-      const commandInput: { bearerToken: string; incidentId: string; json?: boolean } = {
-        bearerToken: authState.bearer_token,
-        incidentId: input.incidentId
-      };
+      const commandInput: { bearerToken: string; incidentId?: string; incidentIds?: string[]; json?: boolean } =
+        incidentIds.length === 1
+          ? {
+              bearerToken: authState.bearer_token,
+              incidentId: incidentIds[0]!
+            }
+          : {
+              bearerToken: authState.bearer_token,
+              incidentIds
+            };
 
       if (input.json !== undefined) {
         commandInput.json = input.json;
@@ -818,7 +941,7 @@ export async function resolveIncidentWithAuthCommand(
 
           await syncCloudIncidentCacheStatus(
             {
-              incidentId: input.incidentId,
+              incidentId: incident.incident_id,
               incident: {
                 ...(typeof incident.status === "string" ? { status: incident.status } : {}),
                 resolved_at: incident.resolved_at ?? null
@@ -828,6 +951,26 @@ export async function resolveIncidentWithAuthCommand(
           );
 
           return incident;
+        },
+        resolveIncidents: async (requestInput) => {
+          const incidents = (await api.resolveIncidents!(requestInput)).map((incident) =>
+            attachSourceToRecord(incident as IncidentLike & Record<string, unknown>, "cloud")
+          );
+
+          for (const incident of incidents) {
+            await syncCloudIncidentCacheStatus(
+              {
+                incidentId: incident.incident_id,
+                incident: {
+                  ...(typeof incident.status === "string" ? { status: incident.status } : {}),
+                  resolved_at: incident.resolved_at ?? null
+                }
+              },
+              dependencies
+            );
+          }
+
+          return incidents;
         }
       });
     }
@@ -835,19 +978,40 @@ export async function resolveIncidentWithAuthCommand(
 }
 
 export async function reopenIncidentCommand(
-  input: { bearerToken: string; incidentId: string; json?: boolean },
+  input: { bearerToken: string; incidentId?: string; incidentIds?: string[]; json?: boolean },
   api: {
     reopenIncident?: (input: { bearerToken: string; incidentId: string }) => Promise<IncidentLike>;
+    reopenIncidents?: (input: { bearerToken: string; incidentIds: string[] }) => Promise<IncidentLike[]>;
   }
 ): Promise<CliCommandResult> {
+  const incidentIds = readIncidentIdsInput(input);
+
   if (api.reopenIncident === undefined) {
     return mapUnsupportedReopenResult();
   }
 
   try {
+    if (incidentIds.length > 1 && api.reopenIncidents !== undefined) {
+      const incidents = await api.reopenIncidents({
+        bearerToken: input.bearerToken,
+        incidentIds
+      });
+      if (input.json) {
+        return {
+          exitCode: 0,
+          output: JSON.stringify({ incidents })
+        };
+      }
+
+      return {
+        exitCode: 0,
+        output: formatIncidentTable(incidents)
+      };
+    }
+
     const incident = await api.reopenIncident({
       bearerToken: input.bearerToken,
-      incidentId: input.incidentId
+      incidentId: incidentIds[0]!
     });
     if (input.json) {
       return {
@@ -866,15 +1030,24 @@ export async function reopenIncidentCommand(
 }
 
 export async function reopenIncidentWithAuthCommand(
-  input: { authFilePath?: string; incidentId: string; source?: RetrievalSource; json?: boolean },
+  input: { authFilePath?: string; incidentId?: string; incidentIds?: string[]; source?: RetrievalSource; json?: boolean },
   dependencies?: AuthenticatedRetrievalDependencies
 ): Promise<CliCommandResult> {
+  const incidentIds = readIncidentIdsInput(input);
+
   if (await shouldUseLocalRetrieval(input.source, dependencies)) {
     try {
-      const incident = await reopenLocalIncident({ incidentId: input.incidentId }, dependencies);
+      const incidents = await Promise.all(
+        incidentIds.map((incidentId) => reopenLocalIncident({ incidentId }, dependencies))
+      );
       return {
         exitCode: 0,
-        output: input.json ? JSON.stringify({ incident }) : formatIncidentDetail(incident)
+        output:
+          input.json
+            ? JSON.stringify(incidents.length === 1 ? { incident: incidents[0] } : { incidents })
+            : incidents.length === 1
+              ? formatIncidentDetail(incidents[0]!)
+              : formatIncidentTable(incidents)
       };
     } catch (error) {
       return mapErrorToResult(error);
@@ -883,15 +1056,88 @@ export async function reopenIncidentWithAuthCommand(
 
   if (await shouldCombineLocalAndCloudRetrieval(input.source, dependencies)) {
     try {
-      const incident = await reopenLocalIncident({ incidentId: input.incidentId }, dependencies);
-      return {
-        exitCode: 0,
-        output: input.json ? JSON.stringify({ incident }) : formatIncidentDetail(incident)
-      };
+      const localIncidents = new Map<string, IncidentLike>();
+      const cloudIncidentIds: string[] = [];
+
+      for (const incidentId of incidentIds) {
+        try {
+          localIncidents.set(incidentId, await reopenLocalIncident({ incidentId }, dependencies));
+        } catch (error) {
+          if (!isNotFoundRetrievalError(error)) {
+            return mapErrorToResult(error);
+          }
+
+          cloudIncidentIds.push(incidentId);
+        }
+      }
+
+      if (cloudIncidentIds.length === 0) {
+        const incidents = incidentIds.map((incidentId) => localIncidents.get(incidentId)!);
+        return {
+          exitCode: 0,
+          output:
+            input.json
+              ? JSON.stringify(incidents.length === 1 ? { incident: incidents[0] } : { incidents })
+              : incidents.length === 1
+                ? formatIncidentDetail(incidents[0]!)
+                : formatIncidentTable(incidents)
+        };
+      }
+
+      return runAuthenticatedCliCommand(input, {
+        createApi: createAuthenticatedRetrievalApi,
+        dependencies,
+        runCommand: async (authState, api) => {
+          const cloudIncidents =
+            cloudIncidentIds.length === 1
+              ? [
+                  attachSourceToRecord(
+                    (await api.reopenIncident({
+                      bearerToken: authState.bearer_token,
+                      incidentId: cloudIncidentIds[0]!
+                    })) as IncidentLike & Record<string, unknown>,
+                    "cloud"
+                  )
+                ]
+              : (await api.reopenIncidents!({
+                  bearerToken: authState.bearer_token,
+                  incidentIds: cloudIncidentIds
+                })).map((incident) =>
+                  attachSourceToRecord(incident as IncidentLike & Record<string, unknown>, "cloud")
+                );
+
+          for (const incident of cloudIncidents) {
+            await syncCloudIncidentCacheStatus(
+              {
+                incidentId: incident.incident_id,
+                incident: {
+                  ...(typeof incident.status === "string" ? { status: incident.status } : {}),
+                  resolved_at: null
+                }
+              },
+              dependencies
+            );
+            localIncidents.set(incident.incident_id, incident);
+          }
+
+          const incidents = incidentIds.map((incidentId) => localIncidents.get(incidentId)!);
+          return {
+            exitCode: 0,
+            output:
+              input.json
+                ? JSON.stringify(incidents.length === 1 ? { incident: incidents[0] } : { incidents })
+                : incidents.length === 1
+                  ? formatIncidentDetail(incidents[0]!)
+                  : formatIncidentTable(incidents)
+          };
+        }
+      });
     } catch (error) {
-      if (!isNotFoundRetrievalError(error)) {
+      if (!(error instanceof Error)) {
         return mapErrorToResult(error);
       }
+
+      return mapErrorToResult(error);
     }
   }
 
@@ -899,10 +1145,16 @@ export async function reopenIncidentWithAuthCommand(
     createApi: createAuthenticatedRetrievalApi,
     dependencies,
     runCommand: (authState, api) => {
-      const commandInput: { bearerToken: string; incidentId: string; json?: boolean } = {
-        bearerToken: authState.bearer_token,
-        incidentId: input.incidentId
-      };
+      const commandInput: { bearerToken: string; incidentId?: string; incidentIds?: string[]; json?: boolean } =
+        incidentIds.length === 1
+          ? {
+              bearerToken: authState.bearer_token,
+              incidentId: incidentIds[0]!
+            }
+          : {
+              bearerToken: authState.bearer_token,
+              incidentIds
+            };
 
       if (input.json !== undefined) {
         commandInput.json = input.json;
@@ -917,7 +1169,7 @@ export async function reopenIncidentWithAuthCommand(
 
           await syncCloudIncidentCacheStatus(
             {
-              incidentId: input.incidentId,
+              incidentId: incident.incident_id,
               incident: {
                 ...(typeof incident.status === "string" ? { status: incident.status } : {}),
                 resolved_at: null
@@ -927,6 +1179,26 @@ export async function reopenIncidentWithAuthCommand(
           );
 
           return incident;
+        },
+        reopenIncidents: async (requestInput) => {
+          const incidents = (await api.reopenIncidents!(requestInput)).map((incident) =>
+            attachSourceToRecord(incident as IncidentLike & Record<string, unknown>, "cloud")
+          );
+
+          for (const incident of incidents) {
+            await syncCloudIncidentCacheStatus(
+              {
+                incidentId: incident.incident_id,
+                incident: {
+                  ...(typeof incident.status === "string" ? { status: incident.status } : {}),
+                  resolved_at: null
+                }
+              },
+              dependencies
+            );
+          }
+
+          return incidents;
         }
       });
     }

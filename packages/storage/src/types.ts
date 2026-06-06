@@ -831,9 +831,23 @@ export interface ResolveIncidentForOrganizationInput {
   resolved_at: string;
 }
 
+export interface ResolveIncidentsForOrganizationInput {
+  organization_id: string;
+  incident_ids: string[];
+  user_id?: string;
+  resolved_by_member_id: string;
+  resolved_at: string;
+}
+
 export interface ReopenIncidentForOrganizationInput {
   organization_id: string;
   incident_id: string;
+  user_id?: string;
+}
+
+export interface ReopenIncidentsForOrganizationInput {
+  organization_id: string;
+  incident_ids: string[];
   user_id?: string;
 }
 
@@ -929,7 +943,9 @@ export interface MetadataStore {
     user_id?: string;
   }): Promise<IncidentRetrievalRecord | null>;
   resolveIncidentForOrganization(input: ResolveIncidentForOrganizationInput): Promise<IncidentRetrievalRecord | null>;
+  resolveIncidentsForOrganization(input: ResolveIncidentsForOrganizationInput): Promise<IncidentRetrievalRecord[]>;
   reopenIncidentForOrganization(input: ReopenIncidentForOrganizationInput): Promise<IncidentRetrievalRecord | null>;
+  reopenIncidentsForOrganization(input: ReopenIncidentsForOrganizationInput): Promise<IncidentRetrievalRecord[]>;
   listServicesForOrganization?(input: {
     organization_id: string;
     user_id?: string;
@@ -1961,7 +1977,9 @@ export interface MemberAuthService {
 
 export interface IncidentLifecycleService {
   resolveIncidentForOrganization(input: ResolveIncidentForOrganizationInput): Promise<IncidentRetrievalRecord | null>;
+  resolveIncidentsForOrganization(input: ResolveIncidentsForOrganizationInput): Promise<IncidentRetrievalRecord[]>;
   reopenIncidentForOrganization(input: ReopenIncidentForOrganizationInput): Promise<IncidentRetrievalRecord | null>;
+  reopenIncidentsForOrganization(input: ReopenIncidentsForOrganizationInput): Promise<IncidentRetrievalRecord[]>;
 }
 
 export interface BuildRawEventObjectKeyInput {

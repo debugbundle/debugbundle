@@ -203,7 +203,9 @@ Last updated: 2026-05-29
 
 **FR-RET-02:** `GET /v1/incidents/{id}` — incident metadata.
 
-**FR-RET-03:** `POST /v1/incidents/{id}/resolve` — explicitly resolve an incident for an authenticated caller with access to that project, persist `resolved_at` and resolver attribution, and return the updated incident record.
+**FR-RET-03:** `POST /v1/incidents/{id}/resolve` and `POST /v1/incidents/{id}/reopen` — explicitly update one incident lifecycle state for an authenticated caller with access to that project, persist resolver attribution on resolve, clear it on reopen, and return the updated incident record.
+
+**FR-RET-03a:** `POST /v1/incidents/resolve` and `POST /v1/incidents/reopen` — explicitly update multiple incident lifecycle states in one hosted API request. The request body accepts `incident_ids`, rejects empty lists, caps the list at 1000 ids, ignores duplicate ids before execution, returns updated incident records in request order, and preserves the same access checks and side effects as the single-incident routes.
 
 **FR-RET-04:** `GET /v1/incidents/{id}/bundle` — full debug bundle. Return `{"status": "pending"}` if still processing, `{"status": "failed", "reason": "..."}` if generation failed.
 
@@ -285,7 +287,7 @@ Last updated: 2026-05-29
 
 ### 1.10 MCP Server
 
-**FR-MCP-01:** Expose tools: `list_incidents`, `get_incident`, `resolve_incident`, `reopen_incident`, `get_bundle`, `get_reproduction`, `get_logs`, `doctor`, `validate`, `verify_local`, `verify_cloud`, `smoke`, `list_webhooks`, `create_webhook`, `update_webhook`, `delete_webhook`, `test_webhook`, `list_webhook_deliveries`, `retry_webhook_delivery`, `list_project_tokens`, `create_project_token`, `revoke_project_token`, `list_member_tokens`, `create_member_token`, `revoke_member_token`, `list_alerts`, `create_alert`, `update_alert`, `delete_alert`, `list_weekly_report_channels`, `create_weekly_report_channel`, `update_weekly_report_channel`, `delete_weekly_report_channel`, `list_services`, `analyze`, `get_capture_policy`, `update_capture_policy`, `get_improvement_settings`, `update_improvement_settings`, `activate_probe`, `list_active_probes`, `deactivate_probe`, `list_projects`, `create_project`, `update_project`, `delete_project`, `get_billing_summary`, `increase_capacity`, `schedule_capacity_reduction`, `cancel_capacity_reduction`, `list_project_members`, `list_project_member_invites`, `invite_project_member`, `cancel_project_member_invite`, `update_project_member_role`, `remove_project_member`.
+**FR-MCP-01:** Expose tools: `list_incidents`, `get_incident`, `resolve_incident`, `resolve_incidents`, `reopen_incident`, `reopen_incidents`, `get_bundle`, `get_reproduction`, `get_logs`, `doctor`, `validate`, `verify_local`, `verify_cloud`, `smoke`, `list_webhooks`, `create_webhook`, `update_webhook`, `delete_webhook`, `test_webhook`, `list_webhook_deliveries`, `retry_webhook_delivery`, `list_project_tokens`, `create_project_token`, `revoke_project_token`, `list_member_tokens`, `create_member_token`, `revoke_member_token`, `list_alerts`, `create_alert`, `update_alert`, `delete_alert`, `list_weekly_report_channels`, `create_weekly_report_channel`, `update_weekly_report_channel`, `delete_weekly_report_channel`, `list_services`, `analyze`, `get_capture_policy`, `update_capture_policy`, `get_improvement_settings`, `update_improvement_settings`, `activate_probe`, `list_active_probes`, `deactivate_probe`, `list_projects`, `create_project`, `update_project`, `delete_project`, `get_billing_summary`, `increase_capacity`, `schedule_capacity_reduction`, `cancel_capacity_reduction`, `list_project_members`, `list_project_member_invites`, `invite_project_member`, `cancel_project_member_invite`, `update_project_member_role`, `remove_project_member`.
 
 **FR-MCP-02:** MCP must be a thin adapter over the same domain services used by CLI/API.
 

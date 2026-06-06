@@ -19,6 +19,7 @@ import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectVa
 import { Skeleton } from "../components/ui/skeleton.js";
 import { listProjectImprovements, reopenImprovement, resolveImprovement } from "../lib/api.js";
 import { showErrorToast, showInfoToast, showSuccessToast } from "../lib/notify.js";
+import { runRateLimitedBulkAction } from "../lib/rate-limited-bulk-actions.js";
 import { useCursorPagination } from "../lib/use-cursor-pagination.js";
 import {
   ImprovementsTable,
@@ -107,13 +108,13 @@ export function ProjectImprovementsPage(): JSX.Element {
     setBulkAction(action);
 
     try {
-      const results = await Promise.allSettled(
-        improvementsToUpdate.map((improvement) =>
+      const results = await runRateLimitedBulkAction({
+        items: improvementsToUpdate,
+        execute: (improvement) =>
           action === "resolved"
             ? resolveImprovement(improvement.improvement_id)
             : reopenImprovement(improvement.improvement_id)
-        )
-      );
+      });
       const successCount = results.filter((result) => result.status === "fulfilled").length;
 
       if (successCount > 0) {

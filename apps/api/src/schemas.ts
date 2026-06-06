@@ -555,6 +555,12 @@ export const ImprovementsQuerySchema = z
   })
   .strict();
 
+export const BulkIncidentMutationBodySchema = z
+  .object({
+    incident_ids: z.array(z.string().uuid()).min(1).max(1000)
+  })
+  .strict();
+
 export const IncidentsCursorSchema = z
   .object({
     last_seen_at: z.string().datetime(),

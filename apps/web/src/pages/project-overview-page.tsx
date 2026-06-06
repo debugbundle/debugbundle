@@ -21,10 +21,10 @@ import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectVa
 import { Skeleton } from "../components/ui/skeleton.js";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../components/ui/table.js";
 import {
+  bulkReopenIncidents,
+  bulkResolveIncidents,
   getIncidentBundle,
   listProjectIncidents,
-  reopenIncident,
-  resolveIncident,
   type IncidentRecord,
   type ProjectRecord
 } from "../lib/api.js";
@@ -176,25 +176,17 @@ export function ProjectIncidentsPage(): JSX.Element {
     setBulkAction(action);
 
     try {
-      const results = await Promise.allSettled(
-        incidentsToUpdate.map((incident) =>
-          action === "resolved" ? resolveIncident(incident.incident_id) : reopenIncident(incident.incident_id)
-        )
-      );
-      const successCount = results.filter((result) => result.status === "fulfilled").length;
+      const updatedIncidents =
+        action === "resolved"
+          ? await bulkResolveIncidents(incidentsToUpdate.map((incident) => incident.incident_id))
+          : await bulkReopenIncidents(incidentsToUpdate.map((incident) => incident.incident_id));
 
-      if (successCount > 0) {
+      if (updatedIncidents.length > 0) {
         selection.clearSelection();
         await refreshPage();
       }
 
-      if (successCount === incidentsToUpdate.length) {
-        showSuccessToast(`Marked ${successCount} incident${successCount === 1 ? "" : "s"} as ${action}.`);
-      } else if (successCount > 0) {
-        showInfoToast(`Marked ${successCount} of ${incidentsToUpdate.length} incidents as ${action}.`);
-      } else {
-        showErrorToast(`Could not mark the selected incidents as ${action}.`);
-      }
+      showSuccessToast(`Marked ${updatedIncidents.length} incident${updatedIncidents.length === 1 ? "" : "s"} as ${action}.`);
     } catch {
       showErrorToast(`Could not mark the selected incidents as ${action}.`);
     } finally {

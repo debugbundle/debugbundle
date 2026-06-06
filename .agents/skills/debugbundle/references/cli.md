@@ -18,8 +18,8 @@
 - `debugbundle explain <incident-id> [--source <local|cloud>] [--json]`
 - `debugbundle bundle <incident-id> [--source <local|cloud>] [--json]`
 - `debugbundle reproduce <incident-id> [--source <local|cloud>] [--json]`
-- `debugbundle resolve <incident-id> [--source <local|cloud>] [--json]`
-- `debugbundle reopen <incident-id> [--source <local|cloud>] [--json]`
+- `debugbundle resolve <incident-id> [incident-id ...] [--source <local|cloud>] [--json]`
+- `debugbundle reopen <incident-id> [incident-id ...] [--source <local|cloud>] [--json]`
 - `debugbundle analyze --type improvement --local`
 
 ## Operational Paths
@@ -43,7 +43,7 @@ Review open incidents and resolve the intentionally generated ones:
 
 ```bash
 debugbundle incidents --status open --json
-debugbundle resolve <incident-id>
+debugbundle resolve <incident-id> [incident-id ...]
 debugbundle incidents --status open --json
 ```
 
@@ -52,5 +52,5 @@ If you want a title-based batch cleanup and have `jq` available:
 ```bash
 debugbundle incidents --status open --json \
   | jq -r '.incidents[] | select(.title | test("smoke test|dogfood|verification|synthetic"; "i")) | .incident_id' \
-  | xargs -n1 debugbundle resolve
+  | xargs debugbundle resolve
 ```

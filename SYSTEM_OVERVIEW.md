@@ -151,7 +151,7 @@ apps/
         account.ts           — Owner-scoped browser-session account export, cached-avatar retrieval/import, and destructive account deletion routes
         auth.ts              — Web-auth signup, login, session, verification, password-reset, auth-method disclosure, and best-effort GitHub avatar import
         ingestion.ts         — POST /v1/events (with capture-policy enforcement)
-        incidents.ts         — GET /v1/incidents, /v1/incidents/{id}, resolve/reopen, bundle, reproduction, logs
+        incidents.ts         — GET /v1/incidents, /v1/incidents/{id}, single + bulk resolve/reopen, bundle, reproduction, logs
         services.ts          — GET /v1/services
         alerts.ts            — Alert rule CRUD
         slack.ts             — Slack OAuth connect flow plus reusable destination list/delete routes for project alerts

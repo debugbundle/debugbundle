@@ -1,7 +1,7 @@
 # Public Interfaces — DebugBundle
 
 Version: v1
-Last updated: 2026-06-04
+Last updated: 2026-06-06
 
 ---
 
@@ -32,8 +32,10 @@ Every capability must be available through all applicable interfaces. Operations
 | List incidents | `GET /v1/incidents` | `incidents` | `list_incidents` | |
 | Get incident | `GET /v1/incidents/{id}` | `inspect` | `get_incident` | |
 | Get incident context | `GET /v1/incidents/{id}/context` | `explain` | `get_incident_context` | Deterministic one-call incident explanation context aggregation |
-| Resolve incident | `POST /v1/incidents/{id}/resolve` | `resolve` | `resolve_incident` | Explicit user action |
-| Reopen incident | `POST /v1/incidents/{id}/reopen` | `reopen` | `reopen_incident` | Cloud incidents use the API route; local incidents still reopen directly from `.debugbundle/local/state.json` |
+| Resolve incident | `POST /v1/incidents/{id}/resolve` | `resolve <incident-id>` | `resolve_incident` | Explicit user action |
+| Resolve incidents (bulk) | `POST /v1/incidents/resolve` | `resolve <incident-id> [incident-id ...]` | `resolve_incidents` | One bulk mutation request for cloud incidents; local mode still resolves per incident against `.debugbundle/local/state.json` |
+| Reopen incident | `POST /v1/incidents/{id}/reopen` | `reopen <incident-id>` | `reopen_incident` | Explicit user action |
+| Reopen incidents (bulk) | `POST /v1/incidents/reopen` | `reopen <incident-id> [incident-id ...]` | `reopen_incidents` | One bulk mutation request for cloud incidents; local mode still reopens per incident against `.debugbundle/local/state.json` |
 | Get bundle | `GET /v1/incidents/{id}/bundle` | `bundle` | `get_bundle` | |
 | Get reproduction | `GET /v1/incidents/{id}/reproduction` | `reproduce` | `get_reproduction` | |
 | Suggest capture rules from incident | `POST /v1/incidents/{id}/capture-rule-suggestion` | `capture-rule suggest` | `suggest_capture_rules_from_incident` | Browser Session or Member Token; deterministic bundle-derived suggestions |
@@ -339,6 +341,9 @@ Rate-limited responses also include `Retry-After: <seconds>` so SDKs can back of
 | GET | `/v1/incidents/{id}` | Browser Session or Member Token | Get incident metadata |
 | GET | `/v1/incidents/{id}/context` | Browser Session or Member Token | Get deterministic one-call incident explanation context |
 | POST | `/v1/incidents/{id}/resolve` | Browser Session or Member Token | Explicitly resolve an incident |
+| POST | `/v1/incidents/resolve` | Browser Session or Member Token | Explicitly resolve incidents in bulk |
+| POST | `/v1/incidents/{id}/reopen` | Browser Session or Member Token | Explicitly reopen an incident |
+| POST | `/v1/incidents/reopen` | Browser Session or Member Token | Explicitly reopen incidents in bulk |
 | GET | `/v1/incidents/{id}/bundle` | Browser Session or Member Token | Get debug bundle |
 | GET | `/v1/incidents/{id}/reproduction` | Browser Session or Member Token | Get reproduction artifact |
 | GET | `/v1/logs` | Browser Session or Member Token | Query logs by incident |
@@ -356,6 +361,11 @@ Current API implementation scope (Phase 1 continuation):
 - `GET /v1/incidents/{id}` response body: `{ incident: IncidentRetrievalRecord }`
 - `GET /v1/incidents/{id}/context` response body: `IncidentContextRecord`
 - `POST /v1/incidents/{id}/resolve` response body: `{ incident: IncidentRetrievalRecord }`
+- `POST /v1/incidents/resolve` request body: `{ incident_ids: string[] }` (1-1000 hosted incident UUID strings, duplicates ignored before execution)
+- `POST /v1/incidents/resolve` response body: `{ incidents: IncidentRetrievalRecord[] }`
+- `POST /v1/incidents/{id}/reopen` response body: `{ incident: IncidentRetrievalRecord }`
+- `POST /v1/incidents/reopen` request body: `{ incident_ids: string[] }` (1-1000 hosted incident UUID strings, duplicates ignored before execution)
+- `POST /v1/incidents/reopen` response body: `{ incidents: IncidentRetrievalRecord[] }`
 - `IncidentRetrievalRecord` fields: `incident_id`, `project_id`, `project_name`, `service_id`, `service_name`, `latest_deployment_id`, `environment`, `fingerprint`, `fingerprint_version`, `title`, `severity`, `status`, `first_seen_at`, `last_seen_at`, `occurrence_count`, `spike_detected_at`, `resolved_at`, `regressed_at`, `matched_fields`, `incident_reason`
 - `IncidentContextRecord` fields: `incident`, `incident_reason`, `primary_signal`, `bundle`, `reproduction`, `logs`, `deploy`, `grouping`, `visibility`, `redaction`, `suggested_next_checks`
 - `primary_signal` summarizes the current incident's primary failing signal without requiring an LLM call. `logs.source` is one of `retrieval`, `bundle_context`, or `none`. `bundle` and `reproduction` use deterministic artifact states: `ready`, `pending`, or `failed`.
@@ -1960,8 +1970,8 @@ All setup and verification commands with `--json` must return:
 ```
 debugbundle incidents [--source <local|cloud>] [--project-id <id>] [--environment <env>] [--service <name>] [--status <open|resolved|regressed>] [--severity <level>] [--cursor <cursor>] [--limit <n>] [--json]
 debugbundle inspect <incident-id> [--source <local|cloud>] [--json]
-debugbundle resolve <incident-id> [--source <local|cloud>] [--json]
-debugbundle reopen <incident-id> [--source <local|cloud>] [--json]
+debugbundle resolve <incident-id> [incident-id ...] [--source <local|cloud>] [--json]
+debugbundle reopen <incident-id> [incident-id ...] [--source <local|cloud>] [--json]
 debugbundle bundle <incident-id> [--source <local|cloud>] [--json]
 debugbundle logs <incident-id> [--level <level>] [--cursor <cursor>] [--limit <n>] [--json]
 debugbundle reproduce <incident-id> [--source <local|cloud>] [--json]
@@ -1970,7 +1980,7 @@ debugbundle services [--json]
 
 Current local CLI retrieval behavior: when `.debugbundle/local/connection.json` is configured with `"mode": "local-only"`, `debugbundle incidents`, `debugbundle inspect`, `debugbundle resolve`, `debugbundle reopen`, `debugbundle bundle`, and `debugbundle reproduce` read `.debugbundle/local/state.json`, `.debugbundle/bundles/local/`, and `.debugbundle/bundles/local/reproductions/` directly without requiring `debugbundle login`. Local incident listing preserves the machine-readable `{ incidents, next_cursor }` shape and applies `project_id`, `environment`, `service`, `status`, `severity`, `cursor`, and `limit` filters against the local incident index.
 
-Current connected-mode retrieval behavior: when `.debugbundle/local/connection.json` is configured as `"connected"`, `debugbundle incidents` now merges matching local and cloud incidents by default, preserves `cursor` / `limit` pagination after the merged sort order is applied, and annotates cloud-backed incident payloads with `source: "cloud"` so origin is explicit in both human and JSON output. `--source local` and `--source cloud` still narrow the same commands to a single store. `debugbundle inspect`, `debugbundle resolve`, `debugbundle reopen`, `debugbundle bundle`, and `debugbundle reproduce` now probe the local store first and then fall back to cloud. When `debugbundle bundle` or `debugbundle reproduce` fetches from cloud, the returned payload is also written to `.debugbundle/bundles/cloud/<incident-id>.bundle.json` or `.debugbundle/bundles/cloud/reproductions/<incident-id>.reproduction.json`, overwriting the cached snapshot on later explicit fetches; cloud resolve and cloud reopen rewrite cached status fields when a cached copy exists, and the same explicit cloud cache activity prunes `.debugbundle/bundles/cloud/` entries older than 30 days since last access.
+Current connected-mode retrieval behavior: when `.debugbundle/local/connection.json` is configured as `"connected"`, `debugbundle incidents` now merges matching local and cloud incidents by default, preserves `cursor` / `limit` pagination after the merged sort order is applied, and annotates cloud-backed incident payloads with `source: "cloud"` so origin is explicit in both human and JSON output. `--source local` and `--source cloud` still narrow the same commands to a single store. `debugbundle inspect`, `debugbundle resolve`, `debugbundle reopen`, `debugbundle bundle`, and `debugbundle reproduce` now probe the local store first and then fall back to cloud. When multiple cloud-backed incident ids are passed to `debugbundle resolve` or `debugbundle reopen`, the CLI collapses them into one hosted bulk mutation request while keeping local incidents on the existing local-state path. When `debugbundle bundle` or `debugbundle reproduce` fetches from cloud, the returned payload is also written to `.debugbundle/bundles/cloud/<incident-id>.bundle.json` or `.debugbundle/bundles/cloud/reproductions/<incident-id>.reproduction.json`, overwriting the cached snapshot on later explicit fetches; cloud resolve and cloud reopen rewrite cached status fields when a cached copy exists, and the same explicit cloud cache activity prunes `.debugbundle/bundles/cloud/` entries older than 30 days since last access.
 
 Current local CLI retrieval limitation: `debugbundle logs` still requires the authenticated cloud path in the current implementation; local log projection is not part of this slice.
 
@@ -2162,7 +2172,9 @@ Install surface: `@debugbundle/mcp` publishes a standalone stdio MCP server with
 debugbundle_list_incidents    → same result as GET /v1/incidents (including `next_cursor`)
 debugbundle_get_incident      → same result as GET /v1/incidents/{id}
 debugbundle_resolve_incident  → same result as POST /v1/incidents/{id}/resolve for cloud incidents; local state mutation for local incidents
+debugbundle_resolve_incidents → same result as POST /v1/incidents/resolve for cloud incidents; local state mutations per incident for local incidents
 debugbundle_reopen_incident   → same result as POST /v1/incidents/{id}/reopen for cloud incidents; local state mutation for local incidents
+debugbundle_reopen_incidents  → same result as POST /v1/incidents/reopen for cloud incidents; local state mutations per incident for local incidents
 debugbundle_get_bundle        → same result as GET /v1/incidents/{id}/bundle
 debugbundle_get_logs          → same result as GET /v1/logs
 debugbundle_get_reproduction  → same result as GET /v1/incidents/{id}/reproduction
@@ -2191,9 +2203,9 @@ Alert MCP tools use camelCase request fields (`projectId`, `serviceId`, `conditi
 
 Current MCP alert, Slack-destination, weekly-report, and webhook behavior is a thin adapter over the same shared HTTP clients used by CLI, returning the same machine-readable payloads for lifecycle operations without adding business logic.
 
-Current MCP local retrieval behavior: when no `bearerToken` is supplied and the project is configured as local-only, `debugbundle_list_incidents`, `debugbundle_get_incident`, `debugbundle_resolve_incident`, `debugbundle_reopen_incident`, `debugbundle_get_bundle`, and `debugbundle_get_reproduction` read the same local store used by the CLI (`.debugbundle/local/state.json`, `.debugbundle/bundles/local/`, `.debugbundle/bundles/local/reproductions/`) and return the same machine-readable payloads without cloud auth.
+Current MCP local retrieval behavior: when no `bearerToken` is supplied and the project is configured as local-only, `debugbundle_list_incidents`, `debugbundle_get_incident`, `debugbundle_resolve_incident`, `debugbundle_resolve_incidents`, `debugbundle_reopen_incident`, `debugbundle_reopen_incidents`, `debugbundle_get_bundle`, and `debugbundle_get_reproduction` read the same local store used by the CLI (`.debugbundle/local/state.json`, `.debugbundle/bundles/local/`, `.debugbundle/bundles/local/reproductions/`) and return the same machine-readable payloads without cloud auth.
 
-Current connected-mode MCP retrieval behavior: when the project is configured as `"connected"`, `debugbundle_list_incidents` now merges matching local and cloud incidents by default, preserves merged `cursor` / `limit` pagination, and annotates cloud-backed incident payloads with `source: "cloud"` so callers can distinguish origin explicitly. `source: "local"` and `source: "cloud"` still narrow the same MCP retrieval/lifecycle tools to a single store. `debugbundle_get_incident`, `debugbundle_resolve_incident`, `debugbundle_reopen_incident`, `debugbundle_get_bundle`, and `debugbundle_get_reproduction` now probe the local store first and fall back to cloud. When MCP fetches a cloud bundle or reproduction, the same payload is written into `.debugbundle/bundles/cloud/` so the local artifact cache matches explicit connected-mode fetches across both agent-facing surfaces; cloud resolve and cloud reopen rewrite cached status fields when a cached copy exists, and explicit cloud cache activity prunes `.debugbundle/bundles/cloud/` entries older than 30 days since last access.
+Current connected-mode MCP retrieval behavior: when the project is configured as `"connected"`, `debugbundle_list_incidents` now merges matching local and cloud incidents by default, preserves merged `cursor` / `limit` pagination, and annotates cloud-backed incident payloads with `source: "cloud"` so callers can distinguish origin explicitly. `source: "local"` and `source: "cloud"` still narrow the same MCP retrieval/lifecycle tools to a single store. `debugbundle_get_incident`, `debugbundle_resolve_incident`, `debugbundle_resolve_incidents`, `debugbundle_reopen_incident`, `debugbundle_reopen_incidents`, `debugbundle_get_bundle`, and `debugbundle_get_reproduction` now probe the local store first and fall back to cloud. When MCP resolves or reopens multiple cloud-backed incidents, it collapses them into one hosted bulk mutation request while keeping local incidents on the existing local-state path. When MCP fetches a cloud bundle or reproduction, the same payload is written into `.debugbundle/bundles/cloud/` so the local artifact cache matches explicit connected-mode fetches across both agent-facing surfaces; cloud resolve and cloud reopen rewrite cached status fields when a cached copy exists, and explicit cloud cache activity prunes `.debugbundle/bundles/cloud/` entries older than 30 days since last access.
 
 Current MCP retrieval limitation: `debugbundle_get_logs` remains cloud-backed in the current implementation and still requires a bearer token.
 

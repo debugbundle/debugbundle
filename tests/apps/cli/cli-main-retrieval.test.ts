@@ -185,13 +185,13 @@ describe("cli main retrieval routing", () => {
       json: true
     });
     expect(resolveIncidentCommand).toHaveBeenCalledWith({
-      incidentId: "inc_123",
+      incidentIds: ["inc_123"],
       source: "local",
       authFilePath: "/tmp/auth.json",
       json: true
     });
     expect(reopenIncidentCommand).toHaveBeenCalledWith({
-      incidentId: "inc_456",
+      incidentIds: ["inc_456"],
       source: "local",
       json: true
     });

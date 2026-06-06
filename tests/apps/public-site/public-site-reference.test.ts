@@ -60,7 +60,12 @@ describe('public site reference documentation', () => {
       expect.arrayContaining([
         expect.objectContaining({ commandPath: 'setup', usage: 'debugbundle setup [--non-interactive] [--json]' }),
         expect.objectContaining({ commandPath: 'incidents', usage: expect.stringContaining('--source <local|cloud>') }),
-        expect.objectContaining({ commandPath: 'webhook retry', usage: 'debugbundle webhook retry <webhook-id> <delivery-id> [--auth-file <path>] [--json]' }),
+        expect.objectContaining({ commandPath: 'resolve', usage: expect.stringContaining('[incident-id ...]') }),
+        expect.objectContaining({ commandPath: 'reopen', usage: expect.stringContaining('[incident-id ...]') }),
+        expect.objectContaining({
+          commandPath: 'webhook retry',
+          usage: 'debugbundle webhook retry <webhook-id> <delivery-id> --project-id <id> [--auth-file <path>] [--json]',
+        }),
       ]),
     );
   });

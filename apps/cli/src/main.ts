@@ -475,10 +475,12 @@ export async function runCli(argv: string[], dependencies: CliDependencies = {})
 
     if (command === "resolve") {
       expectNoUnknownOptions(parsedArgv, ["auth-file", "json", "source"]);
-      ensureNoExtraPositionals(parsedArgv, 2);
+      if (parsedArgv.positionals.length < 2) {
+        throw new CliInputError("Missing required positional argument incident-id.");
+      }
       const input = appendCommonAuthOptions(parsedArgv, {
-        incidentId: requirePositional(parsedArgv, 1, "incident-id")
-      } as { incidentId: string; authFilePath?: string; json?: boolean; source?: "local" | "cloud" });
+        incidentIds: parsedArgv.positionals.slice(1)
+      } as { incidentIds: string[]; authFilePath?: string; json?: boolean; source?: "local" | "cloud" });
       const source = readRetrievalSource(parsedArgv);
       if (source !== undefined) {
         input.source = source;
@@ -488,10 +490,12 @@ export async function runCli(argv: string[], dependencies: CliDependencies = {})
 
     if (command === "reopen") {
       expectNoUnknownOptions(parsedArgv, ["auth-file", "json", "source"]);
-      ensureNoExtraPositionals(parsedArgv, 2);
+      if (parsedArgv.positionals.length < 2) {
+        throw new CliInputError("Missing required positional argument incident-id.");
+      }
       const input = appendCommonAuthOptions(parsedArgv, {
-        incidentId: requirePositional(parsedArgv, 1, "incident-id")
-      } as { incidentId: string; authFilePath?: string; json?: boolean; source?: "local" | "cloud" });
+        incidentIds: parsedArgv.positionals.slice(1)
+      } as { incidentIds: string[]; authFilePath?: string; json?: boolean; source?: "local" | "cloud" });
       const source = readRetrievalSource(parsedArgv);
       if (source !== undefined) {
         input.source = source;

@@ -31,6 +31,7 @@ import {
   ProjectListResponseSchema,
 } from "../../../packages/project-management-client/src/index.js";
 import {
+  BulkIncidentResponseSchema,
   IncidentResponseSchema,
   IncidentsResponseSchema,
   ImprovementResponseSchema,
@@ -62,6 +63,7 @@ import {
   BillingCheckoutBodySchema,
   BillingCheckoutConfirmBodySchema,
   BillingCapacityChangeBodySchema,
+  BulkIncidentMutationBodySchema,
   CreateAlertBodySchema,
   CreateProjectTokenBodySchema,
   CreateProjectInviteBodySchema,
@@ -483,6 +485,7 @@ function buildPublicApiOperations(): OperationSpec[] {
   const ingestionResponse = component("IngestionAcceptedResponse", IngestionAcceptedResponseSchema);
   const incidentListResponse = component("IncidentListResponse", IncidentsResponseSchema);
   const incidentResponse = component("IncidentResponse", IncidentResponseSchema);
+  const bulkIncidentResponse = component("BulkIncidentResponse", BulkIncidentResponseSchema);
   const improvementListResponse = component("ImprovementListResponse", ImprovementsResponseSchema);
   const improvementResponse = component("ImprovementResponse", ImprovementResponseSchema);
   const improvementSnoozeBody = component("ImprovementSnoozeBody", ImprovementSnoozeBodySchema);
@@ -823,6 +826,38 @@ function buildPublicApiOperations(): OperationSpec[] {
         "200": { description: "Incident list.", schema: incidentListResponse },
         "400": { description: "Invalid query parameters.", schema: apiError },
         "401": { description: "Member token is invalid.", schema: apiError },
+      },
+    },
+    {
+      method: "post",
+      path: "/v1/incidents/resolve",
+      operationId: "resolveIncidents",
+      summary: "Resolve incidents in bulk",
+      tags: ["Incidents"],
+      security: anyMemberAuth,
+      requestBody: component("BulkIncidentMutationBody", BulkIncidentMutationBodySchema),
+      responses: {
+        "200": { description: "Resolved incident details in request order.", schema: bulkIncidentResponse },
+        "400": { description: "Invalid request body.", schema: apiError },
+        "401": { description: "Member token is invalid.", schema: apiError },
+        "404": { description: "One or more incidents were not found.", schema: apiError },
+        "500": { description: "Incident resolution is unavailable.", schema: apiError },
+      },
+    },
+    {
+      method: "post",
+      path: "/v1/incidents/reopen",
+      operationId: "reopenIncidents",
+      summary: "Reopen incidents in bulk",
+      tags: ["Incidents"],
+      security: anyMemberAuth,
+      requestBody: component("BulkIncidentMutationBody", BulkIncidentMutationBodySchema),
+      responses: {
+        "200": { description: "Reopened incident details in request order.", schema: bulkIncidentResponse },
+        "400": { description: "Invalid request body.", schema: apiError },
+        "401": { description: "Member token is invalid.", schema: apiError },
+        "404": { description: "One or more incidents were not found.", schema: apiError },
+        "500": { description: "Incident reopen is unavailable.", schema: apiError },
       },
     },
     {

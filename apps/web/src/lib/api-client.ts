@@ -53,6 +53,20 @@ export class InvalidSessionError extends Error {
   }
 }
 
+export class ApiRequestError extends Error {
+  readonly code: string;
+  readonly status: number;
+  readonly retryAfterMs: number | null;
+
+  constructor(code: string, status: number, retryAfterMs: number | null = null) {
+    super(code);
+    this.name = "ApiRequestError";
+    this.code = code;
+    this.status = status;
+    this.retryAfterMs = retryAfterMs;
+  }
+}
+
 export function isInvalidSessionError(error: unknown): error is InvalidSessionError {
   return (
     error instanceof InvalidSessionError ||
@@ -90,6 +104,24 @@ export function resetBrowserSessionClientState(): void {
   clearBrowserSessionState();
   browserSessionInvalidated = false;
   browserSessionInvalidationListeners.clear();
+}
+
+function parseRetryAfterMs(value: string | null): number | null {
+  if (value === null) {
+    return null;
+  }
+
+  const parsedSeconds = Number(value);
+  if (Number.isFinite(parsedSeconds) && parsedSeconds >= 0) {
+    return Math.ceil(parsedSeconds * 1_000);
+  }
+
+  const parsedAt = Date.parse(value);
+  if (!Number.isFinite(parsedAt)) {
+    return null;
+  }
+
+  return Math.max(0, parsedAt - Date.now());
 }
 
 function normalizeBillingUsageMetric(metric?: Partial<BillingUsageMetric>): BillingUsageMetric {
@@ -152,7 +184,11 @@ export async function readJson<T>(response: Response): Promise<T> {
       throw new InvalidSessionError();
     }
 
-    throw new Error(body?.error ?? `request_failed_${response.status}`);
+    throw new ApiRequestError(
+      body?.error ?? `request_failed_${response.status}`,
+      response.status,
+      parseRetryAfterMs(response.headers.get("Retry-After"))
+    );
   }
 
   return (await response.json()) as T;

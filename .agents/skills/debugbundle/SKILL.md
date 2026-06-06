@@ -39,7 +39,7 @@ Key local paths:
 2. Inspect the incident bundle and reproduction artifact before proposing a fix.
 3. Run `debugbundle analyze --type improvement --local` after local processing when you need a deterministic change plan.
 4. Apply the narrowest fix, then validate it with the repository test workflow from `.debugbundle/profile.json`.
-5. When the fix is confirmed, or when the incident was intentionally generated for smoke, verification, or dogfooding, resolve it with `debugbundle resolve <incident-id>` or MCP `resolve_incident` so the open queue stays actionable.
+5. When the fix is confirmed, or when the incident was intentionally generated for smoke, verification, or dogfooding, resolve it with `debugbundle resolve <incident-id> [incident-id ...]` or MCP `resolve_incident` / `resolve_incidents` so the open queue stays actionable.
 
 ## Incident Hygiene
 

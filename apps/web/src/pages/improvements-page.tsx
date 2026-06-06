@@ -22,6 +22,7 @@ import { Skeleton } from "../components/ui/skeleton.js";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../components/ui/table.js";
 import { listImprovements, reopenImprovement, resolveImprovement, type ImprovementRecord } from "../lib/api.js";
 import { showErrorToast, showInfoToast, showSuccessToast } from "../lib/notify.js";
+import { runRateLimitedBulkAction } from "../lib/rate-limited-bulk-actions.js";
 import { useCursorPagination } from "../lib/use-cursor-pagination.js";
 import { useSession } from "../lib/session.js";
 
@@ -77,13 +78,13 @@ export function ImprovementsPage(): JSX.Element {
     setBulkAction(action);
 
     try {
-      const results = await Promise.allSettled(
-        improvementsToUpdate.map((improvement) =>
+      const results = await runRateLimitedBulkAction({
+        items: improvementsToUpdate,
+        execute: (improvement) =>
           action === "resolved"
             ? resolveImprovement(improvement.improvement_id)
             : reopenImprovement(improvement.improvement_id)
-        )
-      );
+      });
       const successCount = results.filter((result) => result.status === "fulfilled").length;
 
       if (successCount > 0) {

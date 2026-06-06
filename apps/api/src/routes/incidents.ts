@@ -5,7 +5,8 @@ import {
   buildBundleObjectKey,
   buildIncidentContextRecord,
   buildReproductionObjectKey,
-  type IncidentContextArtifactRecord
+  type IncidentContextArtifactRecord,
+  type IncidentRetrievalRecord
 } from "../../../../packages/storage/src/index.js";
 import type { ApiDependencies } from "../api-types.js";
 import {
@@ -15,7 +16,7 @@ import {
   requireRateLimitedMemberAuth,
   serializeCursorTimestamp
 } from "../api-helpers.js";
-import { IncidentParamsSchema, IncidentsQuerySchema, LogsQuerySchema } from "../schemas.js";
+import { BulkIncidentMutationBodySchema, IncidentParamsSchema, IncidentsQuerySchema, LogsQuerySchema } from "../schemas.js";
 
 async function readBundleArtifactForIncident(input: {
   dependencies: ApiDependencies;
@@ -113,6 +114,55 @@ async function resolveProjectOrganizationId(input: {
   return access?.organization_id ?? input.fallbackOrganizationId;
 }
 
+function dedupeIncidentIds(incidentIds: string[]): string[] {
+  return [...new Set(incidentIds)];
+}
+
+async function resolveBulkIncidentOrganizationGroups(input: {
+  dependencies: ApiDependencies;
+  member: { member_id: string; organization_id: string };
+  incidentIds: string[];
+}): Promise<{ incidents: IncidentRetrievalRecord[]; groups: Map<string, string[]> } | null> {
+  const incidents = await Promise.all(
+    input.incidentIds.map((incidentId) =>
+      input.dependencies.incidentRetrieval.getIncidentForOrganization({
+        organization_id: input.member.organization_id,
+        incident_id: incidentId,
+        user_id: input.member.member_id
+      })
+    )
+  );
+
+  if (incidents.some((incident) => incident === null)) {
+    return null;
+  }
+
+  const resolvedIncidents = incidents as IncidentRetrievalRecord[];
+  const organizationIds = await Promise.all(
+    resolvedIncidents.map((incident) =>
+      resolveProjectOrganizationId({
+        dependencies: input.dependencies,
+        memberId: input.member.member_id,
+        fallbackOrganizationId: input.member.organization_id,
+        projectId: incident.project_id
+      })
+    )
+  );
+
+  const groups = new Map<string, string[]>();
+  for (const [index, organizationId] of organizationIds.entries()) {
+    const incidentId = resolvedIncidents[index]!.incident_id;
+    const current = groups.get(organizationId);
+    if (current === undefined) {
+      groups.set(organizationId, [incidentId]);
+    } else {
+      current.push(incidentId);
+    }
+  }
+
+  return { incidents: resolvedIncidents, groups };
+}
+
 export function registerIncidentRoutes(app: FastifyInstance, dependencies: ApiDependencies): void {
   app.get("/v1/incidents", async (request, reply) => {
     const member = await requireRateLimitedMemberAuth(request, reply, dependencies, "retrieval-read");
@@ -178,6 +228,117 @@ export function registerIncidentRoutes(app: FastifyInstance, dependencies: ApiDe
     return reply.status(200).send({
       incidents,
       next_cursor: nextCursor
+    });
+  });
+
+  app.post("/v1/incidents/resolve", async (request, reply) => {
+    const member = await requireRateLimitedMemberAuth(request, reply, dependencies, "retrieval-write");
+    if (member === null) {
+      return;
+    }
+
+    if (dependencies.incidentRetrieval.resolveIncidentsForOrganization === undefined) {
+      return reply.status(500).send({
+        error: "incident_resolution_unavailable"
+      });
+    }
+
+    const parsedBody = BulkIncidentMutationBodySchema.safeParse(request.body);
+    if (!parsedBody.success) {
+      return reply.status(400).send({
+        error: "invalid_body"
+      });
+    }
+
+    const incidentIds = dedupeIncidentIds(parsedBody.data.incident_ids);
+    const targets = await resolveBulkIncidentOrganizationGroups({
+      dependencies,
+      member,
+      incidentIds
+    });
+    if (targets === null) {
+      return reply.status(404).send({
+        error: "incident_not_found"
+      });
+    }
+
+    const resolvedAt = new Date().toISOString();
+    const incidentsById = new Map<string, IncidentRetrievalRecord>();
+    for (const [organizationId, groupedIncidentIds] of targets.groups.entries()) {
+      const incidents = await dependencies.incidentRetrieval.resolveIncidentsForOrganization({
+        organization_id: organizationId,
+        incident_ids: groupedIncidentIds,
+        user_id: member.member_id,
+        resolved_by_member_id: member.member_id,
+        resolved_at: resolvedAt
+      });
+      for (const incident of incidents) {
+        incidentsById.set(incident.incident_id, incident);
+      }
+    }
+
+    if (incidentsById.size !== incidentIds.length) {
+      return reply.status(404).send({
+        error: "incident_not_found"
+      });
+    }
+
+    return reply.status(200).send({
+      incidents: incidentIds.map((incidentId) => incidentsById.get(incidentId)!)
+    });
+  });
+
+  app.post("/v1/incidents/reopen", async (request, reply) => {
+    const member = await requireRateLimitedMemberAuth(request, reply, dependencies, "retrieval-write");
+    if (member === null) {
+      return;
+    }
+
+    if (dependencies.incidentRetrieval.reopenIncidentsForOrganization === undefined) {
+      return reply.status(500).send({
+        error: "incident_reopen_unavailable"
+      });
+    }
+
+    const parsedBody = BulkIncidentMutationBodySchema.safeParse(request.body);
+    if (!parsedBody.success) {
+      return reply.status(400).send({
+        error: "invalid_body"
+      });
+    }
+
+    const incidentIds = dedupeIncidentIds(parsedBody.data.incident_ids);
+    const targets = await resolveBulkIncidentOrganizationGroups({
+      dependencies,
+      member,
+      incidentIds
+    });
+    if (targets === null) {
+      return reply.status(404).send({
+        error: "incident_not_found"
+      });
+    }
+
+    const incidentsById = new Map<string, IncidentRetrievalRecord>();
+    for (const [organizationId, groupedIncidentIds] of targets.groups.entries()) {
+      const incidents = await dependencies.incidentRetrieval.reopenIncidentsForOrganization({
+        organization_id: organizationId,
+        incident_ids: groupedIncidentIds,
+        user_id: member.member_id
+      });
+      for (const incident of incidents) {
+        incidentsById.set(incident.incident_id, incident);
+      }
+    }
+
+    if (incidentsById.size !== incidentIds.length) {
+      return reply.status(404).send({
+        error: "incident_not_found"
+      });
+    }
+
+    return reply.status(200).send({
+      incidents: incidentIds.map((incidentId) => incidentsById.get(incidentId)!)
     });
   });
 

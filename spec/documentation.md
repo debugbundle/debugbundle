@@ -85,7 +85,7 @@ The complete docs page tree for `/docs`. Every entry below is a page that must e
 | 1 | `/docs/api` | API Overview | Landing | Base URL, auth model (project tokens vs member tokens vs browser sessions), request/response format, pagination, error format, rate limiting. |
 | 2 | `/docs/api/authentication` | Authentication | Guide | All three auth artifact types. How to create tokens. How to use headers. Cookie sessions for web app. Examples with curl. |
 | 3 | `/docs/api/ingestion` | Event Ingestion | Guide | `POST /v1/events` deep dive: request format, event envelope schema, batch semantics, capture policy enforcement, rate limiting, error responses. |
-| 4 | `/docs/api/incidents` | Incidents API | Guide | List, get, resolve incidents. Bundle and reproduction retrieval. Logs. Services. Query parameters, filtering, pagination. |
+| 4 | `/docs/api/incidents` | Incidents API | Guide | List, get, resolve/reopen single incidents and bulk incident selections. Bundle and reproduction retrieval. Logs. Services. Query parameters, filtering, pagination. |
 | 5 | `/docs/api/webhooks` | Webhooks API | Guide | CRUD operations, test delivery, delivery history, retry. Request/response examples for each endpoint. |
 | 6 | `/docs/api/alerts` | Alerts API | Guide | CRUD operations with channel-specific payload examples. |
 | 7 | `/docs/api/projects` | Projects API | Guide | List, create, update, delete projects. Token management endpoints. Capture policy endpoints. |

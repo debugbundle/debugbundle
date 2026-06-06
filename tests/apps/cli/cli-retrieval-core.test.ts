@@ -16,6 +16,7 @@ import {
   getLogsCommand,
   getReproductionCommand,
   getReproductionWithAuthCommand,
+  reopenIncidentCommand,
   reopenIncidentWithAuthCommand,
   resolveIncidentCommand,
   resolveIncidentWithAuthCommand,
@@ -365,6 +366,108 @@ describe("cli retrieval commands core", () => {
     });
     expect(result.exitCode).toBe(0);
     expect(result.output).toContain("Status: resolved");
+  });
+
+  it("resolves incidents in bulk when multiple ids are provided", async () => {
+    const resolveIncidents = vi.fn().mockResolvedValue([
+      {
+        incident_id: "inc_123",
+        title: "TypeError",
+        severity: "high",
+        status: "resolved"
+      },
+      {
+        incident_id: "inc_456",
+        title: "TimeoutError",
+        severity: "medium",
+        status: "resolved"
+      }
+    ]);
+
+    const result = await resolveIncidentCommand(
+      {
+        bearerToken: "dbundle_mem_x",
+        incidentIds: ["inc_123", "inc_456"],
+        json: true
+      },
+      {
+        resolveIncident: vi.fn(),
+        resolveIncidents
+      }
+    );
+
+    expect(resolveIncidents).toHaveBeenCalledWith({
+      bearerToken: "dbundle_mem_x",
+      incidentIds: ["inc_123", "inc_456"]
+    });
+    expect(result.exitCode).toBe(0);
+    expect(JSON.parse(result.output)).toEqual({
+      incidents: [
+        {
+          incident_id: "inc_123",
+          title: "TypeError",
+          severity: "high",
+          status: "resolved"
+        },
+        {
+          incident_id: "inc_456",
+          title: "TimeoutError",
+          severity: "medium",
+          status: "resolved"
+        }
+      ]
+    });
+  });
+
+  it("reopens incidents in bulk when multiple ids are provided", async () => {
+    const reopenIncidents = vi.fn().mockResolvedValue([
+      {
+        incident_id: "inc_123",
+        title: "TypeError",
+        severity: "high",
+        status: "open"
+      },
+      {
+        incident_id: "inc_456",
+        title: "TimeoutError",
+        severity: "medium",
+        status: "open"
+      }
+    ]);
+
+    const result = await reopenIncidentCommand(
+      {
+        bearerToken: "dbundle_mem_x",
+        incidentIds: ["inc_123", "inc_456"],
+        json: true
+      },
+      {
+        reopenIncident: vi.fn(),
+        reopenIncidents
+      }
+    );
+
+    expect(reopenIncidents).toHaveBeenCalledWith({
+      bearerToken: "dbundle_mem_x",
+      incidentIds: ["inc_123", "inc_456"]
+    });
+    expect(result.exitCode).toBe(0);
+    expect(JSON.parse(result.output)).toEqual({
+      incidents: [
+        {
+          incident_id: "inc_123",
+          title: "TypeError",
+          severity: "high",
+          status: "open"
+        },
+        {
+          incident_id: "inc_456",
+          title: "TimeoutError",
+          severity: "medium",
+          status: "open"
+        }
+      ]
+    });
   });
 
   it("renders human output for bundle and reproduction commands using stable golden formatting", async () => {

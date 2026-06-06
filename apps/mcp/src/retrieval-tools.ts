@@ -27,7 +27,9 @@ export const RETRIEVAL_MCP_TOOL_NAMES = [
   "get_incident",
   "get_incident_context",
   "resolve_incident",
+  "resolve_incidents",
   "reopen_incident",
+  "reopen_incidents",
   "get_bundle",
   "get_reproduction",
   "get_logs"
@@ -234,7 +236,9 @@ export function createRetrievalMcpTools(api: {
   getIncident(input: { bearerToken: string; incidentId: string }): Promise<unknown>;
   getIncidentContext(input: { bearerToken: string; incidentId: string }): Promise<unknown>;
   resolveIncident(input: { bearerToken: string; incidentId: string }): Promise<unknown>;
+  resolveIncidents?(input: { bearerToken: string; incidentIds: string[] }): Promise<unknown[]>;
   reopenIncident(input: { bearerToken: string; incidentId: string }): Promise<unknown>;
+  reopenIncidents?(input: { bearerToken: string; incidentIds: string[] }): Promise<unknown[]>;
   getBundle(input: { bearerToken: string; incidentId: string }): Promise<unknown>;
   getLogs(input: {
     bearerToken: string;
@@ -445,6 +449,79 @@ export function createRetrievalMcpTools(api: {
         mapMcpError(error);
       }
     },
+    async resolve_incidents(input) {
+      try {
+        const incidentIds = Array.from(
+          new Set((Array.isArray(input["incidentIds"]) ? input["incidentIds"] : []).map((value) => String(value)))
+        );
+        const localIncidents = new Map<string, Record<string, unknown>>();
+        const cloudIncidentIds: string[] = [];
+
+        if (await shouldUseLocalSource(input)) {
+          return {
+            incidents: await Promise.all(
+              incidentIds.map((incidentId) => resolveLocalIncident({ incidentId }))
+            )
+          };
+        }
+
+        if (await shouldCombineLocalAndCloudSource(input)) {
+          for (const incidentId of incidentIds) {
+            try {
+              localIncidents.set(incidentId, await resolveLocalIncident({ incidentId }));
+            } catch (error) {
+              if (!isNotFoundRetrievalError(error)) {
+                throw error;
+              }
+
+              cloudIncidentIds.push(incidentId);
+            }
+          }
+        } else {
+          cloudIncidentIds.push(...incidentIds);
+        }
+
+        if (cloudIncidentIds.length > 0) {
+          const cloudIncidents =
+            api.resolveIncidents === undefined
+              ? await Promise.all(
+                  cloudIncidentIds.map(async (incidentId) =>
+                    attachSourceToRecord(
+                      (await api.resolveIncident({
+                        bearerToken: await requireCloudBearerToken(input),
+                        incidentId
+                      })) as Record<string, unknown>,
+                      "cloud"
+                    )
+                  )
+                )
+              : ((await api.resolveIncidents({
+                  bearerToken: await requireCloudBearerToken(input),
+                  incidentIds: cloudIncidentIds
+                })) as Record<string, unknown>[]).map((incident) => attachSourceToRecord(incident, "cloud"));
+
+          for (const incident of cloudIncidents) {
+            await syncCloudIncidentCacheStatus({
+              incidentId: String(incident["incident_id"]),
+              incident: {
+                ...(typeof incident["status"] === "string" ? { status: incident["status"] } : {}),
+                resolved_at:
+                  typeof incident["resolved_at"] === "string" || incident["resolved_at"] === null
+                    ? incident["resolved_at"]
+                    : null
+              }
+            });
+            localIncidents.set(String(incident["incident_id"]), incident);
+          }
+        }
+
+        return {
+          incidents: incidentIds.map((incidentId) => localIncidents.get(incidentId)!)
+        };
+      } catch (error) {
+        mapMcpError(error);
+      }
+    },
     async reopen_incident(input) {
       try {
         if (await shouldUseLocalSource(input)) {
@@ -489,6 +566,76 @@ export function createRetrievalMcpTools(api: {
 
             return incident;
           })()
+        };
+      } catch (error) {
+        mapMcpError(error);
+      }
+    },
+    async reopen_incidents(input) {
+      try {
+        const incidentIds = Array.from(
+          new Set((Array.isArray(input["incidentIds"]) ? input["incidentIds"] : []).map((value) => String(value)))
+        );
+        const localIncidents = new Map<string, Record<string, unknown>>();
+        const cloudIncidentIds: string[] = [];
+
+        if (await shouldUseLocalSource(input)) {
+          return {
+            incidents: await Promise.all(
+              incidentIds.map((incidentId) => reopenLocalIncident({ incidentId }))
+            )
+          };
+        }
+
+        if (await shouldCombineLocalAndCloudSource(input)) {
+          for (const incidentId of incidentIds) {
+            try {
+              localIncidents.set(incidentId, await reopenLocalIncident({ incidentId }));
+            } catch (error) {
+              if (!isNotFoundRetrievalError(error)) {
+                throw error;
+              }
+
+              cloudIncidentIds.push(incidentId);
+            }
+          }
+        } else {
+          cloudIncidentIds.push(...incidentIds);
+        }
+
+        if (cloudIncidentIds.length > 0) {
+          const cloudIncidents =
+            api.reopenIncidents === undefined
+              ? await Promise.all(
+                  cloudIncidentIds.map(async (incidentId) =>
+                    attachSourceToRecord(
+                      (await api.reopenIncident({
+                        bearerToken: await requireCloudBearerToken(input),
+                        incidentId
+                      })) as Record<string, unknown>,
+                      "cloud"
+                    )
+                  )
+                )
+              : ((await api.reopenIncidents({
+                  bearerToken: await requireCloudBearerToken(input),
+                  incidentIds: cloudIncidentIds
+                })) as Record<string, unknown>[]).map((incident) => attachSourceToRecord(incident, "cloud"));
+
+          for (const incident of cloudIncidents) {
+            await syncCloudIncidentCacheStatus({
+              incidentId: String(incident["incident_id"]),
+              incident: {
+                ...(typeof incident["status"] === "string" ? { status: incident["status"] } : {}),
+                resolved_at: null
+              }
+            });
+            localIncidents.set(String(incident["incident_id"]), incident);
+          }
+        }
+
+        return {
+          incidents: incidentIds.map((incidentId) => localIncidents.get(incidentId)!)
         };
       } catch (error) {
         mapMcpError(error);

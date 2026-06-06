@@ -17,12 +17,14 @@ function createMetadataStore(overrides: Partial<MetadataStore>): MetadataStore {
     listIncidentsForOrganization: vi.fn(),
     getIncidentForOrganization: vi.fn(),
     resolveIncidentForOrganization: vi.fn(),
+    resolveIncidentsForOrganization: vi.fn(),
     listIncidentLogsForOrganization: vi.fn(),
     upsertIncident: vi.fn(),
     insertIncidentEvent: vi.fn(),
     markIncidentSpiking: vi.fn(),
     recordIncidentEventRetention: vi.fn(),
     reopenIncidentForOrganization: vi.fn(),
+    reopenIncidentsForOrganization: vi.fn(),
     ...overrides
   };
 }

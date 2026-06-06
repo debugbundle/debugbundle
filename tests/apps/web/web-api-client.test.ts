@@ -2,6 +2,8 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
   buildApiUrl,
+  bulkReopenIncidents,
+  bulkResolveIncidents,
   createProjectAlert,
   createProjectWebhook,
   deleteAlert,
@@ -175,6 +177,47 @@ describe("web api client", () => {
       buildApiUrl("/v1/github/app/install-url?return_to=%2Fprojects%2Fproj_1%2Fgithub&project_id=proj_1"),
       { credentials: "include" }
     );
+  });
+
+  it("calls bulk incident lifecycle endpoints with csrf headers", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({ session: createSession() }), { status: 200 }))
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ incidents: [{ incident_id: "inc_1", status: "resolved" }] }), { status: 200 })
+      )
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ incidents: [{ incident_id: "inc_1", status: "open" }] }), { status: 200 })
+      );
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    await verifyEmailCode({ email: "owen@example.com", code: "123456" });
+    await expect(bulkResolveIncidents(["inc_1", "inc_2"])).resolves.toEqual([
+      { incident_id: "inc_1", status: "resolved" }
+    ]);
+    await expect(bulkReopenIncidents(["inc_1", "inc_2"])).resolves.toEqual([
+      { incident_id: "inc_1", status: "open" }
+    ]);
+
+    expect(fetchMock).toHaveBeenNthCalledWith(2, buildApiUrl("/v1/incidents/resolve"), {
+      method: "POST",
+      credentials: "include",
+      headers: {
+        "Content-Type": "application/json",
+        "X-CSRF-Token": "csrf-token-123"
+      },
+      body: JSON.stringify({ incident_ids: ["inc_1", "inc_2"] })
+    });
+    expect(fetchMock).toHaveBeenNthCalledWith(3, buildApiUrl("/v1/incidents/reopen"), {
+      method: "POST",
+      credentials: "include",
+      headers: {
+        "Content-Type": "application/json",
+        "X-CSRF-Token": "csrf-token-123"
+      },
+      body: JSON.stringify({ incident_ids: ["inc_1", "inc_2"] })
+    });
   });
 
   it("falls back to the default export filename when content disposition is missing", async () => {

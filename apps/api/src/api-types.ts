@@ -484,11 +484,23 @@ export interface ApiDependencies {
       resolved_by_member_id: string;
       resolved_at: string;
     }): Promise<IncidentRetrievalRecord | null>;
+    resolveIncidentsForOrganization?(input: {
+      organization_id: string;
+      incident_ids: string[];
+      user_id?: string;
+      resolved_by_member_id: string;
+      resolved_at: string;
+    }): Promise<IncidentRetrievalRecord[]>;
     reopenIncidentForOrganization?(input: {
       organization_id: string;
       incident_id: string;
       user_id?: string;
     }): Promise<IncidentRetrievalRecord | null>;
+    reopenIncidentsForOrganization?(input: {
+      organization_id: string;
+      incident_ids: string[];
+      user_id?: string;
+    }): Promise<IncidentRetrievalRecord[]>;
     getBundleFailureReasonForOrganization?(input: { organization_id: string; incident_id: string }): Promise<string | null>;
     getBundleSourceForOrganization?(input: { organization_id: string; incident_id: string }): Promise<{
       event_id: string;

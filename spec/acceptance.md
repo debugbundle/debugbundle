@@ -490,7 +490,7 @@ Last updated: 2026-05-29
 ### AC-MCP-02: Granular Parity Tests
 Each MCP tool must produce results that match its API/CLI equivalent:
 - Incident list parity (`debugbundle_list_incidents` = `GET /v1/incidents` = `debugbundle incidents --json`)
-- Incident resolve parity (`resolve_incident` = `POST /v1/incidents/{id}/resolve` = `debugbundle resolve <id> --json`)
+- Incident resolve parity (`resolve_incident` = `POST /v1/incidents/{id}/resolve` = `debugbundle resolve <id> --json`) and bulk resolve parity (`resolve_incidents` = `POST /v1/incidents/resolve` = `debugbundle resolve <id> <id> --json`)
 - Bundle parity (`debugbundle_get_bundle` = `GET /v1/incidents/{id}/bundle` = `debugbundle bundle <id> --json`)
 - Reproduction parity (`debugbundle_get_reproduction` = `GET /v1/incidents/{id}/reproduction` = `debugbundle reproduce <id> --json`)
 - Doctor parity (`debugbundle_doctor` = `debugbundle doctor --json`)

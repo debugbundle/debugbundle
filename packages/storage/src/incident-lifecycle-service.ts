@@ -10,14 +10,28 @@ type IncidentResolutionInput = {
   resolved_at: string;
 };
 
+type IncidentBulkResolutionInput = {
+  organization_id: string;
+  incident_ids: string[];
+  resolved_by_member_id: string;
+  resolved_at: string;
+};
+
 type IncidentReopenInput = {
   organization_id: string;
   incident_id: string;
 };
 
+type IncidentBulkReopenInput = {
+  organization_id: string;
+  incident_ids: string[];
+};
+
 type IncidentResolutionStore = {
   resolveIncidentForOrganization(input: IncidentResolutionInput): Promise<IncidentRetrievalRecord | null>;
+  resolveIncidentsForOrganization(input: IncidentBulkResolutionInput): Promise<IncidentRetrievalRecord[]>;
   reopenIncidentForOrganization(input: IncidentReopenInput): Promise<IncidentRetrievalRecord | null>;
+  reopenIncidentsForOrganization(input: IncidentBulkReopenInput): Promise<IncidentRetrievalRecord[]>;
 };
 
 type IncidentDerivedImprovementStore = {
@@ -211,8 +225,41 @@ export function createIncidentLifecycleService(input: CreateIncidentLifecycleSer
       return resolvedIncident;
     },
 
+    async resolveIncidentsForOrganization(resolveInput: IncidentBulkResolutionInput): Promise<IncidentRetrievalRecord[]> {
+      const incidents = await input.incidentStore.resolveIncidentsForOrganization(resolveInput);
+
+      for (const incident of incidents) {
+        const resolvedIncident: IncidentRetrievalRecord = incident;
+        const resolvedAt = resolvedIncident["resolved_at"];
+        const requestedResolvedAt = resolveInput["resolved_at"];
+
+        if (resolvedAt === requestedResolvedAt) {
+          await publishResolvedWebhook(input, resolvedIncident);
+        }
+
+        if (resolvedIncident.status === "resolved") {
+          try {
+            await input.improvementStore?.resolveIncidentDerivedImprovementsForIncident?.({
+              organization_id: resolveInput.organization_id,
+              incident_id: resolvedIncident.incident_id,
+              resolved_by_member_id: resolveInput.resolved_by_member_id,
+              resolved_at: resolveInput.resolved_at
+            });
+          } catch {
+            // Incident resolution is the authoritative lifecycle action; improvement sync is a derived cleanup.
+          }
+        }
+      }
+
+      return incidents;
+    },
+
     async reopenIncidentForOrganization(reopenInput: IncidentReopenInput): Promise<IncidentRetrievalRecord | null> {
       return input.incidentStore.reopenIncidentForOrganization(reopenInput);
+    },
+
+    async reopenIncidentsForOrganization(reopenInput: IncidentBulkReopenInput): Promise<IncidentRetrievalRecord[]> {
+      return input.incidentStore.reopenIncidentsForOrganization(reopenInput);
     }
   };
 }

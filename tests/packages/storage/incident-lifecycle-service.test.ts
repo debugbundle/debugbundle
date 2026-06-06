@@ -28,6 +28,16 @@ function createResolvedIncident(overrides: Partial<IncidentRetrievalRecord> = {}
   };
 }
 
+function createIncidentResolutionStore(overrides: Partial<Parameters<typeof createIncidentLifecycleService>[0]["incidentStore"]> = {}) {
+  return {
+    resolveIncidentForOrganization: vi.fn(),
+    resolveIncidentsForOrganization: vi.fn(),
+    reopenIncidentForOrganization: vi.fn(),
+    reopenIncidentsForOrganization: vi.fn(),
+    ...overrides
+  };
+}
+
 describe("incident lifecycle service", () => {
   it("does not create bundle.resolved webhook intents when the monthly webhook quota is exhausted", async (): Promise<void> => {
     const incident = createResolvedIncident();
@@ -65,10 +75,9 @@ describe("incident lifecycle service", () => {
     });
 
     const service = createIncidentLifecycleService({
-      incidentStore: {
-        resolveIncidentForOrganization,
-        reopenIncidentForOrganization: vi.fn()
-      },
+      incidentStore: createIncidentResolutionStore({
+        resolveIncidentForOrganization
+      }),
       webhookDeliveryStore: {
         listMatchingWebhooks,
         createDeliveryIntent
@@ -101,10 +110,9 @@ describe("incident lifecycle service", () => {
     const createDeliveryIntent = vi.fn().mockResolvedValue({ delivery_id: "del_123" });
 
     const service = createIncidentLifecycleService({
-      incidentStore: {
+      incidentStore: createIncidentResolutionStore({
         resolveIncidentForOrganization: vi.fn().mockResolvedValue(incident),
-        reopenIncidentForOrganization: vi.fn()
-      },
+      }),
       webhookDeliveryStore: {
         listMatchingWebhooks: vi.fn().mockResolvedValue([
           {
@@ -173,10 +181,9 @@ describe("incident lifecycle service", () => {
     const resolveIncidentDerivedImprovementsForIncident = vi.fn().mockResolvedValue(1);
 
     const service = createIncidentLifecycleService({
-      incidentStore: {
+      incidentStore: createIncidentResolutionStore({
         resolveIncidentForOrganization: vi.fn().mockResolvedValue(incident),
-        reopenIncidentForOrganization: vi.fn()
-      },
+      }),
       improvementStore: {
         resolveIncidentDerivedImprovementsForIncident
       },
@@ -206,10 +213,9 @@ describe("incident lifecycle service", () => {
   it("keeps incident resolution successful when derived improvement cleanup fails", async (): Promise<void> => {
     const incident = createResolvedIncident();
     const service = createIncidentLifecycleService({
-      incidentStore: {
+      incidentStore: createIncidentResolutionStore({
         resolveIncidentForOrganization: vi.fn().mockResolvedValue(incident),
-        reopenIncidentForOrganization: vi.fn()
-      },
+      }),
       improvementStore: {
         resolveIncidentDerivedImprovementsForIncident: vi.fn().mockRejectedValue(new Error("cleanup_failed"))
       },

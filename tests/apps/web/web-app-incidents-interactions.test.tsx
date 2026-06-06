@@ -209,7 +209,7 @@ describe("web app — incident table interactions", () => {
     expect(await screen.findByRole("button", { name: /^create rule$/i })).toBeInTheDocument();
   });
 
-  it("bulk resolves and bulk reopens workspace incidents from the table", async () => {
+  it("bulk resolves workspace incidents from the table with one request", async () => {
     const user = userEvent.setup();
     const project = createProject();
     const incidentState = [
@@ -251,32 +251,17 @@ describe("web app — incident table interactions", () => {
         return jsonResponse(200, { incidents, next_cursor: null });
       }
 
-      if (url.endsWith("/resolve") && init?.method === "POST") {
-        const incidentId = url.split("/").at(-2);
-        const incident = incidentState.find((item) => item.incident_id === incidentId);
-
-        if (incident === undefined) {
-          return jsonResponse(404, { error: "not_found" });
+      if (url.endsWith("/v1/incidents/resolve") && init?.method === "POST") {
+        expect(init.body).toBe(JSON.stringify({ incident_ids: ["inc_workspace_open", "inc_workspace_regressed"] }));
+        const incidents = incidentState.filter(
+          (incident) => incident.incident_id === "inc_workspace_open" || incident.incident_id === "inc_workspace_regressed"
+        );
+        for (const incident of incidents) {
+          incident.status = "resolved";
+          incident.resolved_at = "2026-05-18T13:15:00.000Z";
+          incident.regressed_at = null;
         }
-
-        incident.status = "resolved";
-        incident.resolved_at = "2026-05-18T13:15:00.000Z";
-        incident.regressed_at = null;
-        return jsonResponse(200, { incident });
-      }
-
-      if (url.endsWith("/reopen") && init?.method === "POST") {
-        const incidentId = url.split("/").at(-2);
-        const incident = incidentState.find((item) => item.incident_id === incidentId);
-
-        if (incident === undefined) {
-          return jsonResponse(404, { error: "not_found" });
-        }
-
-        incident.status = "open";
-        incident.resolved_at = null;
-        incident.regressed_at = null;
-        return jsonResponse(200, { incident });
+        return jsonResponse(200, { incidents });
       }
 
       return jsonResponse(404, { error: "not_found" });
@@ -291,26 +276,84 @@ describe("web app — incident table interactions", () => {
     expect(await screen.findByText(/resolved workspace incident/i)).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: /select all visible incidents/i }));
+    await screen.findByText(/3 incidents selected on this page/i);
     await user.click(screen.getByRole("button", { name: /mark selected resolved/i }));
 
     await waitFor(() => {
       expect(
         fetchMock.mock.calls.filter(
-          ([input, init]) => requestUrl(input).includes("/resolve") && init?.method === "POST"
+          ([input, init]) => requestUrl(input).endsWith("/v1/incidents/resolve") && init?.method === "POST"
         )
-      ).toHaveLength(2);
+      ).toHaveLength(1);
+    });
+  });
+
+  it("uses the bulk workspace incident resolve endpoint", async () => {
+    const user = userEvent.setup();
+    const project = createProject();
+    const incidentState = [
+      createIncident({
+        incident_id: "inc_workspace_retry_one",
+        project_id: project.project_id,
+        project_name: project.name,
+        title: "Retry workspace incident one",
+        status: "open"
+      }),
+      createIncident({
+        incident_id: "inc_workspace_retry_two",
+        project_id: project.project_id,
+        project_name: project.name,
+        title: "Retry workspace incident two",
+        status: "open"
+      })
+    ];
+
+    const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = requestUrl(input);
+
+      if (url.endsWith("/v1/auth/session")) {
+        return jsonResponse(200, { session: createSession() });
+      }
+
+      if (url.includes("/v1/incidents?") && init?.method === undefined) {
+        const request = new URL(url, "https://app.debugbundle.test");
+        const status = request.searchParams.get("status");
+        const incidents = status === null ? incidentState : incidentState.filter((incident) => incident.status === status);
+        return jsonResponse(200, { incidents, next_cursor: null });
+      }
+
+      if (url.endsWith("/v1/incidents/resolve") && init?.method === "POST") {
+        expect(init.body).toBe(
+          JSON.stringify({ incident_ids: ["inc_workspace_retry_one", "inc_workspace_retry_two"] })
+        );
+        for (const incident of incidentState) {
+          incident.status = "resolved";
+          incident.resolved_at = "2026-05-18T13:15:00.000Z";
+          incident.regressed_at = null;
+        }
+        return jsonResponse(200, { incidents: incidentState });
+      }
+
+      return jsonResponse(404, { error: "not_found" });
     });
 
-    await user.click(await screen.findByRole("button", { name: /select all visible incidents/i }));
-    await user.click(screen.getByRole("button", { name: /mark selected unresolved/i }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<App initialEntries={["/incidents"]} />);
+
+    await screen.findByText(/retry workspace incident one/i);
+    await user.click(screen.getByRole("button", { name: /select all visible incidents/i }));
+    await screen.findByText(/2 incidents selected on this page/i);
+    await user.click(screen.getByRole("button", { name: /mark selected resolved/i }));
 
     await waitFor(() => {
       expect(
         fetchMock.mock.calls.filter(
-          ([input, init]) => requestUrl(input).includes("/reopen") && init?.method === "POST"
+          ([input, init]) => requestUrl(input).endsWith("/v1/incidents/resolve") && init?.method === "POST"
         )
-      ).toHaveLength(3);
+      ).toHaveLength(1);
     });
+
   });
 
   it("opens the project incident detail route when users click anywhere on the row", async () => {
@@ -368,7 +411,7 @@ describe("web app — incident table interactions", () => {
     );
   });
 
-  it("bulk resolves and bulk reopens project incidents from the table", async () => {
+  it("bulk resolves project incidents from the table with one request", async () => {
     const user = userEvent.setup();
     const project = createProject();
     const incidentState = [
@@ -411,32 +454,17 @@ describe("web app — incident table interactions", () => {
         return jsonResponse(200, { incidents, next_cursor: null });
       }
 
-      if (url.endsWith("/resolve") && init?.method === "POST") {
-        const incidentId = url.split("/").at(-2);
-        const incident = incidentState.find((item) => item.incident_id === incidentId);
-
-        if (incident === undefined) {
-          return jsonResponse(404, { error: "not_found" });
+      if (url.endsWith("/v1/incidents/resolve") && init?.method === "POST") {
+        expect(init.body).toBe(JSON.stringify({ incident_ids: ["inc_project_open", "inc_project_regressed"] }));
+        const incidents = incidentState.filter(
+          (incident) => incident.incident_id === "inc_project_open" || incident.incident_id === "inc_project_regressed"
+        );
+        for (const incident of incidents) {
+          incident.status = "resolved";
+          incident.resolved_at = "2026-05-18T13:20:00.000Z";
+          incident.regressed_at = null;
         }
-
-        incident.status = "resolved";
-        incident.resolved_at = "2026-05-18T13:20:00.000Z";
-        incident.regressed_at = null;
-        return jsonResponse(200, { incident });
-      }
-
-      if (url.endsWith("/reopen") && init?.method === "POST") {
-        const incidentId = url.split("/").at(-2);
-        const incident = incidentState.find((item) => item.incident_id === incidentId);
-
-        if (incident === undefined) {
-          return jsonResponse(404, { error: "not_found" });
-        }
-
-        incident.status = "open";
-        incident.resolved_at = null;
-        incident.regressed_at = null;
-        return jsonResponse(200, { incident });
+        return jsonResponse(200, { incidents });
       }
 
       return jsonResponse(404, { error: "not_found" });
@@ -451,25 +479,15 @@ describe("web app — incident table interactions", () => {
     expect(await screen.findByText(/resolved project incident/i)).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: /select all visible incidents/i }));
+    await screen.findByText(/3 incidents selected on this page/i);
     await user.click(screen.getByRole("button", { name: /mark selected resolved/i }));
 
     await waitFor(() => {
       expect(
         fetchMock.mock.calls.filter(
-          ([input, init]) => requestUrl(input).includes("/resolve") && init?.method === "POST"
+          ([input, init]) => requestUrl(input).endsWith("/v1/incidents/resolve") && init?.method === "POST"
         )
-      ).toHaveLength(2);
-    });
-
-    await user.click(await screen.findByRole("button", { name: /select all visible incidents/i }));
-    await user.click(screen.getByRole("button", { name: /mark selected unresolved/i }));
-
-    await waitFor(() => {
-      expect(
-        fetchMock.mock.calls.filter(
-          ([input, init]) => requestUrl(input).includes("/reopen") && init?.method === "POST"
-        )
-      ).toHaveLength(3);
+      ).toHaveLength(1);
     });
   });
 });

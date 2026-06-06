@@ -9,9 +9,17 @@ describe("retrieval parity mapping contract", () => {
 
     expect(contract).toContain("| List incidents | `GET /v1/incidents` | `incidents` | `list_incidents` | |");
     expect(contract).toContain("| Get incident | `GET /v1/incidents/{id}` | `inspect` | `get_incident` | |");
-    expect(contract).toContain("| Resolve incident | `POST /v1/incidents/{id}/resolve` | `resolve` | `resolve_incident` | Explicit user action |");
     expect(contract).toContain(
-      "| Reopen incident | `POST /v1/incidents/{id}/reopen` | `reopen` | `reopen_incident` | Cloud incidents use the API route; local incidents still reopen directly from `.debugbundle/local/state.json` |"
+      "| Resolve incident | `POST /v1/incidents/{id}/resolve` | `resolve <incident-id>` | `resolve_incident` | Explicit user action |"
+    );
+    expect(contract).toContain(
+      "| Resolve incidents (bulk) | `POST /v1/incidents/resolve` | `resolve <incident-id> [incident-id ...]` | `resolve_incidents` | One bulk mutation request for cloud incidents; local mode still resolves per incident against `.debugbundle/local/state.json` |"
+    );
+    expect(contract).toContain(
+      "| Reopen incident | `POST /v1/incidents/{id}/reopen` | `reopen <incident-id>` | `reopen_incident` | Explicit user action |"
+    );
+    expect(contract).toContain(
+      "| Reopen incidents (bulk) | `POST /v1/incidents/reopen` | `reopen <incident-id> [incident-id ...]` | `reopen_incidents` | One bulk mutation request for cloud incidents; local mode still reopens per incident against `.debugbundle/local/state.json` |"
     );
     expect(contract).toContain("| Get bundle | `GET /v1/incidents/{id}/bundle` | `bundle` | `get_bundle` | |");
     expect(contract).toContain(
@@ -28,7 +36,13 @@ describe("retrieval parity mapping contract", () => {
       "debugbundle_resolve_incident  → same result as POST /v1/incidents/{id}/resolve for cloud incidents; local state mutation for local incidents"
     );
     expect(contract).toContain(
+      "debugbundle_resolve_incidents → same result as POST /v1/incidents/resolve for cloud incidents; local state mutations per incident for local incidents"
+    );
+    expect(contract).toContain(
       "debugbundle_reopen_incident   → same result as POST /v1/incidents/{id}/reopen for cloud incidents; local state mutation for local incidents"
+    );
+    expect(contract).toContain(
+      "debugbundle_reopen_incidents  → same result as POST /v1/incidents/reopen for cloud incidents; local state mutations per incident for local incidents"
     );
   });
 

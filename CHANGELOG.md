@@ -6,6 +6,16 @@ The format is based on Keep a Changelog and this project follows Semantic Versio
 
 ## [Unreleased]
 
+## [1.1.1] - 2026-06-06
+
+### Added
+
+- Added hosted bulk incident lifecycle routes for resolve and reopen so one request can update up to 1000 cloud incident ids at once while preserving request order and duplicate-id deduplication.
+
+### Changed
+
+- Updated the web incident inventory, project overview incident actions, CLI retrieval commands, MCP retrieval tools, shared retrieval client, and public reference artifacts so bulk incident resolve/reopen is documented and available across the supported automation surfaces.
+
 ## [1.1.0] - 2026-06-04
 
 ### Added

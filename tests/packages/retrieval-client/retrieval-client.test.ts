@@ -301,6 +301,80 @@ describe("retrieval api client", () => {
     });
   });
 
+  it("calls bulk incident resolve and reopen routes", async () => {
+    const resolvedIncident = {
+      incident_id: "00000000-0000-0000-0000-000000000101",
+      project_id: "proj_123",
+      project_name: "Main App",
+      service_id: "svc_123",
+      service_name: "checkout-api",
+      latest_deployment_id: null,
+      environment: "production",
+      fingerprint: "fp_123",
+      fingerprint_version: "v1",
+      title: "TypeError",
+      severity: "high",
+      status: "resolved",
+      first_seen_at: "2026-03-11T00:00:00.000Z",
+      last_seen_at: "2026-03-11T00:10:00.000Z",
+      occurrence_count: 3,
+      spike_detected_at: null,
+      resolved_at: "2026-03-11T00:12:00.000Z",
+      regressed_at: null,
+      matched_fields: ["fingerprint"]
+    };
+    const reopenedIncident = {
+      ...resolvedIncident,
+      status: "open",
+      resolved_at: null
+    };
+    const request = vi
+      .fn<HttpClient["request"]>()
+      .mockResolvedValueOnce({
+        status: 200,
+        body: {
+          incidents: [resolvedIncident]
+        }
+      })
+      .mockResolvedValueOnce({
+        status: 200,
+        body: {
+          incidents: [reopenedIncident]
+        }
+      });
+
+    const api = createRetrievalApi({ request });
+    await expect(
+      api.resolveIncidents({
+        bearerToken: "dbundle_mem_x",
+        incidentIds: ["00000000-0000-0000-0000-000000000101"]
+      })
+    ).resolves.toEqual([resolvedIncident]);
+    await expect(
+      api.reopenIncidents({
+        bearerToken: "dbundle_mem_x",
+        incidentIds: ["00000000-0000-0000-0000-000000000101"]
+      })
+    ).resolves.toEqual([reopenedIncident]);
+
+    expect(request).toHaveBeenNthCalledWith(1, {
+      method: "POST",
+      path: "/v1/incidents/resolve",
+      bearerToken: "dbundle_mem_x",
+      body: {
+        incident_ids: ["00000000-0000-0000-0000-000000000101"]
+      }
+    });
+    expect(request).toHaveBeenNthCalledWith(2, {
+      method: "POST",
+      path: "/v1/incidents/reopen",
+      bearerToken: "dbundle_mem_x",
+      body: {
+        incident_ids: ["00000000-0000-0000-0000-000000000101"]
+      }
+    });
+  });
+
   it("calls bundle route and accepts pending payload", async () => {
     const request = vi
       .fn<HttpClient["request"]>()

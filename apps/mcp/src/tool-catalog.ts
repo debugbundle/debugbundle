@@ -94,6 +94,12 @@ const incidentLookupInputSchema = z.object({
   incidentId: z.string(),
 });
 
+const bulkIncidentLookupInputSchema = z.object({
+  bearerToken: optionalBearerTokenSchema,
+  source: sourceSchema,
+  incidentIds: z.array(z.string()).min(1).max(1000),
+});
+
 const improvementLookupInputSchema = z.object({
   bearerToken: z.string(),
   improvementId: z.string(),
@@ -183,10 +189,22 @@ export const MCP_TOOL_CATALOG = [
     inputSchema: incidentLookupInputSchema,
   },
   {
+    name: 'resolve_incidents',
+    group: 'retrieval',
+    description: 'Resolve incidents in bulk by incident id.',
+    inputSchema: bulkIncidentLookupInputSchema,
+  },
+  {
     name: 'reopen_incident',
     group: 'retrieval',
-    description: 'Reopen a locally stored resolved incident.',
+    description: 'Reopen an incident by incident id.',
     inputSchema: incidentLookupInputSchema,
+  },
+  {
+    name: 'reopen_incidents',
+    group: 'retrieval',
+    description: 'Reopen incidents in bulk by incident id.',
+    inputSchema: bulkIncidentLookupInputSchema,
   },
   {
     name: 'get_bundle',

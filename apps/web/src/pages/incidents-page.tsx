@@ -19,9 +19,9 @@ import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTi
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select.js";
 import { Skeleton } from "../components/ui/skeleton.js";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../components/ui/table.js";
-import { listIncidents, reopenIncident, resolveIncident, type IncidentRecord } from "../lib/api.js";
+import { bulkReopenIncidents, bulkResolveIncidents, listIncidents, type IncidentRecord } from "../lib/api.js";
 import { formatIncidentMatchedFields } from "../lib/incident-copy.js";
-import { showErrorToast, showInfoToast, showSuccessToast } from "../lib/notify.js";
+import { showErrorToast, showSuccessToast } from "../lib/notify.js";
 import { useCursorPagination } from "../lib/use-cursor-pagination.js";
 
 export function IncidentsPage(): JSX.Element {
@@ -67,25 +67,17 @@ export function IncidentsPage(): JSX.Element {
     setBulkAction(action);
 
     try {
-      const results = await Promise.allSettled(
-        incidentsToUpdate.map((incident) =>
-          action === "resolved" ? resolveIncident(incident.incident_id) : reopenIncident(incident.incident_id)
-        )
-      );
-      const successCount = results.filter((result) => result.status === "fulfilled").length;
+      const updatedIncidents =
+        action === "resolved"
+          ? await bulkResolveIncidents(incidentsToUpdate.map((incident) => incident.incident_id))
+          : await bulkReopenIncidents(incidentsToUpdate.map((incident) => incident.incident_id));
 
-      if (successCount > 0) {
+      if (updatedIncidents.length > 0) {
         selection.clearSelection();
         await refreshPage();
       }
 
-      if (successCount === incidentsToUpdate.length) {
-        showSuccessToast(`Marked ${successCount} incident${successCount === 1 ? "" : "s"} as ${action}.`);
-      } else if (successCount > 0) {
-        showInfoToast(`Marked ${successCount} of ${incidentsToUpdate.length} incidents as ${action}.`);
-      } else {
-        showErrorToast(`Could not mark the selected incidents as ${action}.`);
-      }
+      showSuccessToast(`Marked ${updatedIncidents.length} incident${updatedIncidents.length === 1 ? "" : "s"} as ${action}.`);
     } catch {
       showErrorToast(`Could not mark the selected incidents as ${action}.`);
     } finally {

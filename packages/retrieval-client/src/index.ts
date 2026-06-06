@@ -101,6 +101,12 @@ export const IncidentResponseSchema = z
   })
   .strict();
 
+export const BulkIncidentResponseSchema = z
+  .object({
+    incidents: z.array(IncidentSchema)
+  })
+  .strict();
+
 export const ImprovementResponseSchema = z
   .object({
     improvement: ImprovementSchema
@@ -332,7 +338,9 @@ export function createRetrievalApi(client: HttpClient): {
   getIncident(input: { bearerToken: string; incidentId: string }): Promise<z.infer<typeof IncidentSchema>>;
   getIncidentContext(input: { bearerToken: string; incidentId: string }): Promise<z.infer<typeof IncidentContextSchema>>;
   resolveIncident(input: { bearerToken: string; incidentId: string }): Promise<z.infer<typeof IncidentSchema>>;
+  resolveIncidents(input: { bearerToken: string; incidentIds: string[] }): Promise<Array<z.infer<typeof IncidentSchema>>>;
   reopenIncident(input: { bearerToken: string; incidentId: string }): Promise<z.infer<typeof IncidentSchema>>;
+  reopenIncidents(input: { bearerToken: string; incidentIds: string[] }): Promise<Array<z.infer<typeof IncidentSchema>>>;
   getBundle(input: { bearerToken: string; incidentId: string }): Promise<z.infer<typeof PendingStatusSchema> | z.infer<typeof BundleSchema>>;
   listLogs(input: {
     bearerToken: string;
@@ -442,6 +450,21 @@ export function createRetrievalApi(client: HttpClient): {
 
       return parsed.incident;
     },
+    async resolveIncidents(input) {
+      const parsed = await expectParsed(
+        client.request({
+          method: "POST",
+          path: "/v1/incidents/resolve",
+          bearerToken: input.bearerToken,
+          body: {
+            incident_ids: input.incidentIds
+          }
+        }),
+        BulkIncidentResponseSchema
+      );
+
+      return parsed.incidents;
+    },
     async reopenIncident(input) {
       const parsed = await expectParsed(
         client.request({
@@ -453,6 +476,21 @@ export function createRetrievalApi(client: HttpClient): {
       );
 
       return parsed.incident;
+    },
+    async reopenIncidents(input) {
+      const parsed = await expectParsed(
+        client.request({
+          method: "POST",
+          path: "/v1/incidents/reopen",
+          bearerToken: input.bearerToken,
+          body: {
+            incident_ids: input.incidentIds
+          }
+        }),
+        BulkIncidentResponseSchema
+      );
+
+      return parsed.incidents;
     },
     async getBundle(input) {
       const bundle = await expectParsed(

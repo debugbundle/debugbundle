@@ -731,6 +731,19 @@ export async function resolveIncident(incidentId: string): Promise<IncidentRecor
   return body.incident;
 }
 
+export async function bulkResolveIncidents(incidentIds: string[]): Promise<IncidentRecord[]> {
+  const body = await readJson<{ incidents: IncidentRecord[] }>(
+    await fetch(`${API_BASE}/v1/incidents/resolve`, {
+      method: "POST",
+      credentials: "include",
+      headers: buildBrowserSessionHeaders(true),
+      body: JSON.stringify({ incident_ids: incidentIds })
+    })
+  );
+
+  return body.incidents;
+}
+
 export async function reopenIncident(incidentId: string): Promise<IncidentRecord> {
   const body = await readJson<{ incident: IncidentRecord }>(
     await fetch(`${API_BASE}/v1/incidents/${incidentId}/reopen`, {
@@ -741,6 +754,19 @@ export async function reopenIncident(incidentId: string): Promise<IncidentRecord
   );
 
   return body.incident;
+}
+
+export async function bulkReopenIncidents(incidentIds: string[]): Promise<IncidentRecord[]> {
+  const body = await readJson<{ incidents: IncidentRecord[] }>(
+    await fetch(`${API_BASE}/v1/incidents/reopen`, {
+      method: "POST",
+      credentials: "include",
+      headers: buildBrowserSessionHeaders(true),
+      body: JSON.stringify({ incident_ids: incidentIds })
+    })
+  );
+
+  return body.incidents;
 }
 
 export async function resolveImprovement(improvementId: string): Promise<ImprovementRecord> {
