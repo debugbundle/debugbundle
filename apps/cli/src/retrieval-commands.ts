@@ -953,7 +953,7 @@ export async function resolveIncidentWithAuthCommand(
           return incident;
         },
         resolveIncidents: async (requestInput) => {
-          const incidents = (await api.resolveIncidents!(requestInput)).map((incident) =>
+          const incidents = (await api.resolveIncidents(requestInput)).map((incident) =>
             attachSourceToRecord(incident as IncidentLike & Record<string, unknown>, "cloud")
           );
 
@@ -1099,7 +1099,7 @@ export async function reopenIncidentWithAuthCommand(
                     "cloud"
                   )
                 ]
-              : (await api.reopenIncidents!({
+              : (await api.reopenIncidents({
                   bearerToken: authState.bearer_token,
                   incidentIds: cloudIncidentIds
                 })).map((incident) =>
@@ -1181,7 +1181,7 @@ export async function reopenIncidentWithAuthCommand(
           return incident;
         },
         reopenIncidents: async (requestInput) => {
-          const incidents = (await api.reopenIncidents!(requestInput)).map((incident) =>
+          const incidents = (await api.reopenIncidents(requestInput)).map((incident) =>
             attachSourceToRecord(incident as IncidentLike & Record<string, unknown>, "cloud")
           );
 

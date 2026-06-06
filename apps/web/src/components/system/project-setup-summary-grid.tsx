@@ -50,12 +50,12 @@ interface ProjectSetupSummaryState {
 }
 
 export function ProjectSetupSummaryGrid({ project }: { project: ProjectRecord }): JSX.Element {
-  const [summary, setSummary] = useState<ProjectSetupSummaryState>(() => buildLoadingProjectSetupSummary(project.organization_plan));
+  const [summary, setSummary] = useState<ProjectSetupSummaryState>(() => buildLoadingProjectSetupSummary());
 
   useEffect(() => {
     let isActive = true;
 
-    setSummary(buildLoadingProjectSetupSummary(project.organization_plan));
+    setSummary(buildLoadingProjectSetupSummary());
 
     void (async () => {
       const [
@@ -109,9 +109,7 @@ export function ProjectSetupSummaryGrid({ project }: { project: ProjectRecord })
   );
 }
 
-function buildLoadingProjectSetupSummary(
-  organizationPlan: ProjectRecord["organization_plan"]
-): ProjectSetupSummaryState {
+function buildLoadingProjectSetupSummary(): ProjectSetupSummaryState {
   return {
     alerts: { status: "loading" },
     webhooks: { status: "loading" },

@@ -49,7 +49,7 @@ describe("organization plan cleanup service", () => {
 
   it("returns suspended and terminalized feature counts by category", async (): Promise<void> => {
     const rowCounts = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13];
-    const query = vi.fn().mockImplementation((sql: string) => {
+    const query = vi.fn().mockImplementation(() => {
       const rowCount = rowCounts.shift() ?? 0;
       return {
         rows: [],

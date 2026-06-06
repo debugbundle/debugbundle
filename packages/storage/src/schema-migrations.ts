@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 
-import { REQUIRED_API_TABLES, REQUIRED_WORKER_TABLES, type Queryable } from "./migrations.js";
+import { type Queryable } from "./migrations.js";
 import {
   ensureLegacyGitHubDispatchFingerprintCompatibility,
   isCurrentStorageSchemaBaseline,
