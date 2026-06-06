@@ -6,8 +6,7 @@ export const ProjectMetricsSchema = z
     monthly_raw_ingested_events: z.number().int().nonnegative(),
     retained_bundles: z.number().int().nonnegative(),
     monthly_alert_deliveries: z.number().int().nonnegative()
-  })
-  .strict();
+  });
 
 export const ProjectRecordSchema = z
   .object({
@@ -26,20 +25,17 @@ export const ProjectRecordSchema = z
     metrics: ProjectMetricsSchema,
     created_at: z.string(),
     updated_at: z.string()
-  })
-  .strict();
+  });
 
 export const ProjectListResponseSchema = z
   .object({
     projects: z.array(ProjectRecordSchema)
-  })
-  .strict();
+  });
 
 export const ProjectCreateResponseSchema = z
   .object({
     project: ProjectRecordSchema
-  })
-  .strict();
+  });
 
 export const DeletedProjectRecordSchema = z
   .object({
@@ -57,14 +53,12 @@ export const DeletedProjectRecordSchema = z
     organization_plan: z.enum(["free", "solo", "team"]),
     created_at: z.string(),
     updated_at: z.string()
-  })
-  .strict();
+  });
 
 export const ProjectDeleteResponseSchema = z
   .object({
     project: DeletedProjectRecordSchema
-  })
-  .strict();
+  });
 
 export const ApiErrorResponseSchema = z
   .object({

@@ -711,6 +711,10 @@ export {
 } from "./capture-policy.js";
 
 export {
+  isLowValueExternalProbeRequestFailure404
+} from "./request-failure-noise.js";
+
+export {
   CaptureRuleActionValues,
   CaptureRuleActionSchema,
   type CaptureRuleAction,

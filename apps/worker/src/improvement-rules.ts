@@ -1,3 +1,5 @@
+import { isLowValueExternalProbeRequestFailure404 } from "../../../packages/shared-types/src/index.js";
+
 export interface ImprovementRuleThresholds {
   occurrence_threshold: number;
   slow_request_duration_threshold_ms: number;
@@ -45,42 +47,5 @@ export function isLowValueRequestFailure404(input: {
   routeTemplate: string;
   responseStatus: number;
 }): boolean {
-  if (input.responseStatus !== 404 || input.httpMethod.toUpperCase() !== "GET") {
-    return false;
-  }
-
-  const normalizedRoute = input.routeTemplate.toLowerCase().replace(/\/+$/, "") || "/";
-  const exactRoutes = new Set([
-    "/.env",
-    "/__debug__/render_panel",
-    "/actuator",
-    "/autodiscover/autodiscover.json",
-    "/cpanel",
-    "/favicon.ico",
-    "/geoserver/web",
-    "/logon/logonpoint/index.html",
-    "/owa/auth/logon.aspx",
-    "/robots.txt",
-    "/rdweb/pages",
-    "/web",
-    "/webclient/login.xhtml",
-    "/webconsole",
-    "/webui",
-    "/whm",
-    "/wp-admin",
-    "/wp-login.php",
-    "/wsman",
-    "/xmlrpc.php"
-  ]);
-
-  if (exactRoutes.has(normalizedRoute)) {
-    return true;
-  }
-
-  return (
-    normalizedRoute.startsWith("/owa/") ||
-    normalizedRoute.startsWith("/rdweb/") ||
-    normalizedRoute.startsWith("/vpn/") ||
-    normalizedRoute.startsWith("/wp-")
-  );
+  return isLowValueExternalProbeRequestFailure404(input);
 }

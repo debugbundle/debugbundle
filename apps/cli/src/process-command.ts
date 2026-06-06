@@ -23,6 +23,7 @@ import {
   EventTypeValues,
   classifyRequestStatus,
   getRequestAnomalyThreshold,
+  isLowValueExternalProbeRequestFailure404,
   type CapturePreset,
   type EventClass,
   type EventEnvelope
@@ -378,6 +379,18 @@ function collectRequestAnomalyAggregates(batches: EventBatch[], capturePreset: C
       const threshold = getRequestAnomalyThreshold({ responseStatus, capturePreset });
 
       if (threshold === null || responseStatus === null || method === null || routeTemplate === null) {
+        continue;
+      }
+
+      if (
+        isLowValueExternalProbeRequestFailure404({
+          httpMethod: method,
+          requestPath: event.payload.path,
+          routeTemplate,
+          responseStatus,
+          headers: event.payload.headers
+        })
+      ) {
         continue;
       }
 

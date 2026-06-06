@@ -160,6 +160,7 @@ function createRequestEvent(input: {
   serviceName: string;
   responseStatus: number;
   environment?: string;
+  headers?: Record<string, unknown>;
   method?: string;
   path?: string;
 }): EventEnvelope {
@@ -184,7 +185,7 @@ function createRequestEvent(input: {
       method: input.method ?? "GET",
       path: input.path ?? "/orders/123",
       query: {},
-      headers: {
+      headers: input.headers ?? {
         host: "checkout.local"
       },
       response_status: input.responseStatus,
@@ -653,6 +654,37 @@ describe("cli process command", () => {
     expect(Object.values(localState.incidents)[0]?.incident_reason).toEqual(expect.objectContaining({
       kind: "request_failure",
       description: "request_event crossed the repeated request anomaly threshold"
+    }));
+  });
+
+  it("does not create local request anomaly incidents for low-value external probe 404s", async () => {
+    const rootDirectory = await createProcessFixtureRepository();
+    const requestEvents = Array.from({ length: 20 }, (_, index) =>
+      createRequestEvent({
+        eventId: `00000000-0000-4000-8000-0000000008${String(index).padStart(2, "0")}`,
+        occurredAt: `2026-03-20T00:0${Math.floor(index / 6)}:${String((index % 6) * 10).padStart(2, "0")}.000Z`,
+        serviceName: "checkout-api",
+        responseStatus: 404,
+        path: "/wp-config.php_old2024",
+        headers: {
+          host: "203.0.113.10"
+        }
+      })
+    );
+
+    await writeEventBatch(rootDirectory, "1700000000000-1-checkout-api.events.json", requestEvents);
+
+    const result = await processCommand(
+      { json: true, preset: "balanced" },
+      {
+        cwd: () => rootDirectory
+      }
+    );
+
+    expect(result.exitCode).toBe(0);
+    expect(JSON.parse(result.output)).toEqual(expect.objectContaining({
+      processed: true,
+      incidents_processed: 0
     }));
   });
 

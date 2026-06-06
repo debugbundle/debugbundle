@@ -53,6 +53,62 @@ describe("project-management api client", () => {
     });
   });
 
+  it("accepts additive fields in successful project payloads", async () => {
+    const request = vi.fn<HttpClient["request"]>()
+      .mockResolvedValueOnce({
+        status: 200,
+        body: {
+          projects: [
+            projectFixture({
+              shared_access_suspended: false,
+              additive_field: "future-compatible"
+            })
+          ],
+          response_metadata: {
+            version: 2
+          }
+        }
+      })
+      .mockResolvedValueOnce({
+        status: 201,
+        body: {
+          project: projectFixture({
+            shared_access_suspended: false,
+            additive_field: "future-compatible"
+          }),
+          response_metadata: {
+            version: 2
+          }
+        }
+      })
+      .mockResolvedValueOnce({
+        status: 200,
+        body: {
+          project: deletedProjectFixture({
+            shared_access_suspended: false,
+            additive_field: "future-compatible"
+          }),
+          response_metadata: {
+            version: 2
+          }
+        }
+      });
+
+    const api = createProjectManagementApi({ request });
+
+    await expect(api.listProjects({ bearerToken: "dbundle_mem_x" })).resolves.toHaveLength(1);
+    await expect(
+      api.createProject({
+        bearerToken: "dbundle_mem_x",
+        name: "Checkout",
+        slug: "checkout"
+      })
+    ).resolves.toMatchObject({ project_id: "proj_1" });
+    await expect(api.deleteProject({ bearerToken: "dbundle_mem_x", projectId: "proj_2" })).resolves.toMatchObject({
+      project_id: "proj_2"
+    });
+  });
+
   it("creates projects through the project route", async () => {
     const request = vi.fn<HttpClient["request"]>().mockResolvedValue({
       status: 201,

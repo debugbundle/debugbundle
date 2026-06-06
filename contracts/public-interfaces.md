@@ -352,6 +352,8 @@ Rate-limited responses also include `Retry-After: <seconds>` so SDKs can back of
 
 Current API implementation scope (Phase 7 continuation): `GET /v1/incidents` supports organization-scoped filtering by `project_id`, `environment`, `service`, `status`, `severity`, plus cursor-based pagination via `cursor` and `limit` (1-100, default 20).
 
+Low-value external-probe `GET`/`404` routes such as common WordPress, OWA, RDWeb, VPN, `/.env`, and autodiscover scanner paths are excluded from anomaly-driven incident creation in the worker. They may still exist as accepted request telemetry when capture policy allows them, but they should not appear as normal incidents solely because repeated scanner traffic crossed the generic request-anomaly threshold.
+
 **Query params (logs):** `incident_id` (required), `level`, `limit`, `cursor`
 
 **Incident response fields include:** `id`, `project_id`, `project_name`, `service_id`, `service_name`, `environment`, `fingerprint`, `fingerprint_version`, `title`, `severity`, `status`, `first_seen_at`, `last_seen_at`, `occurrence_count`, `affected_users_estimate`, `spike_detected_at`, `resolved_at`, `regressed_at`, `matched_fields`, `incident_reason`

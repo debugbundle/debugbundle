@@ -518,6 +518,8 @@ Advanced controls are optional. When unset, the preset's defaults apply. The ini
 
 **FR-EVT-08c:** When a request anomaly threshold fires, the worker must enqueue a deterministic incident-grouping path keyed by project, service, environment, normalized route template, HTTP method, and response status. The resulting incident must surface as `request_failure` through existing retrieval, bundle, CLI, MCP, and web incident flows while preserving the source `request_event` rows as `context_signal` records.
 
+**FR-EVT-08e:** The worker must suppress low-value external-probe `GET`/`404` patterns from request-anomaly incident creation. Common internet scanner routes such as WordPress, OWA, RDWeb, VPN, `/.env`, and autodiscover probes may remain stored as contextual request telemetry when accepted by capture policy, but must not open normal incidents through the repeated-request anomaly path unless an operator overrides that behavior through a narrower capture-rule workflow in a later version.
+
 #### Surfacing Rules
 
 **FR-EVT-09:** Default user-facing surfacing must follow event class:

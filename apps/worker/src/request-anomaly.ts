@@ -2,7 +2,12 @@ import { createHash } from "node:crypto";
 
 import type { NormalizedEvent } from "../../../packages/event-normalizer/src/index.js";
 import type { GroupIncidentJob, IncidentFrequencySnapshot, RequestAnomalyCounter } from "../../../packages/storage/src/index.js";
-import { getRequestAnomalyThreshold, type CapturePreset, type EventEnvelope } from "../../../packages/shared-types/src/index.js";
+import {
+  getRequestAnomalyThreshold,
+  isLowValueExternalProbeRequestFailure404,
+  type CapturePreset,
+  type EventEnvelope
+} from "../../../packages/shared-types/src/index.js";
 
 function stableJson(value: unknown): string {
   if (value === null || typeof value !== "object") {
@@ -93,6 +98,18 @@ export async function evaluateRequestAnomalyCandidate(input: {
   });
 
   if (threshold === null || responseStatus === null || method === null || routeTemplate === null) {
+    return null;
+  }
+
+  if (
+    isLowValueExternalProbeRequestFailure404({
+      httpMethod: method,
+      requestPath: input.event.payload.path,
+      routeTemplate,
+      responseStatus,
+      headers: input.event.payload.headers
+    })
+  ) {
     return null;
   }
 

@@ -1300,6 +1300,11 @@ If CLI says something is healthy and MCP says something different, that is a pro
 - **Given** a project with preset `minimal`
 - **When** the same repeated `404` pattern occurs
 - **Then** no request anomaly incident is created
+- **Given** a project with preset `investigative`
+- **And** repeated scanner-style `GET` `404` request events for low-value external-probe paths such as `/wp-config.php_old2024` or `/autodiscover/autodiscover.json`
+- **When** the same count and ratio thresholds are crossed
+- **Then** the stored `request_event` rows remain contextual telemetry only
+- **And** the worker does not enqueue a request-anomaly incident for those low-value probe paths
 
 ### AC-EVT-09: SDK Local Capture Policy Enforcement
 - **Given** an SDK initialized with a project whose capture policy sets `capture_logs: "error"`

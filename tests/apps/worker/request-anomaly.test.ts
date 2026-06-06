@@ -150,6 +150,123 @@ describe("request anomaly evaluation", () => {
     });
   });
 
+  it("skips low-value external probe 404 routes before anomaly counting", async () => {
+    const recordObservation = vi.fn();
+
+    const result = await evaluateRequestAnomalyCandidate({
+      event: createRequestEventEnvelope({
+        payload: {
+          method: "GET",
+          path: "/wp-config.php_old2024",
+          query: {},
+          headers: {
+            host: "203.0.113.10"
+          },
+          response_status: 404,
+          duration_ms: 42,
+          route_template: "/wp-config.php_old2024"
+        }
+      }),
+      normalized: createNormalizedEvent({
+        normalized_message: "request GET /wp-config.php_old2024",
+        route_template: "/wp-config.php_old2024"
+      }),
+      project_id: "proj_123",
+      capture_preset: "investigative",
+      fingerprint_version: "v1",
+      requestAnomalyCounter: {
+        recordObservation
+      }
+    });
+
+    expect(result).toBeNull();
+    expect(recordObservation).not.toHaveBeenCalled();
+  });
+
+  it("skips generic login probes only when the request targets a direct IP host", async () => {
+    const recordObservation = vi.fn();
+
+    const result = await evaluateRequestAnomalyCandidate({
+      event: createRequestEventEnvelope({
+        payload: {
+          method: "GET",
+          path: "/login",
+          query: {},
+          headers: {
+            host: "203.0.113.10"
+          },
+          response_status: 404,
+          duration_ms: 42,
+          route_template: "/login"
+        }
+      }),
+      normalized: createNormalizedEvent({
+        normalized_message: "request GET /login",
+        route_template: "/login"
+      }),
+      project_id: "proj_123",
+      capture_preset: "investigative",
+      fingerprint_version: "v1",
+      requestAnomalyCounter: {
+        recordObservation
+      }
+    });
+
+    expect(result).toBeNull();
+    expect(recordObservation).not.toHaveBeenCalled();
+  });
+
+  it("keeps normal app login 404s eligible for request anomaly incidents", async () => {
+    const recordObservation = vi.fn().mockResolvedValue({
+      occurrences_1m: 6,
+      occurrences_5m: 24,
+      occurrences_1h: 30,
+      occurrences_24h: 30,
+      baseline_1h_per_5m: 2.5,
+      spike_ratio_5m_to_1h: 4,
+      has_sufficient_baseline: true,
+      is_spiking: true
+    });
+
+    const result = await evaluateRequestAnomalyCandidate({
+      event: createRequestEventEnvelope({
+        payload: {
+          method: "GET",
+          path: "/login",
+          query: {},
+          headers: {
+            host: "app.example.test"
+          },
+          response_status: 404,
+          duration_ms: 42,
+          route_template: "/login"
+        }
+      }),
+      normalized: createNormalizedEvent({
+        normalized_message: "request GET /login",
+        route_template: "/login"
+      }),
+      project_id: "proj_123",
+      capture_preset: "investigative",
+      fingerprint_version: "v1",
+      requestAnomalyCounter: {
+        recordObservation
+      }
+    });
+
+    expect(result).toMatchObject({
+      event_type: "request_event",
+      event_class: "context_signal",
+      incident_trigger: "request_anomaly",
+      normalized_message: "Request anomaly: GET /login returned 404 repeatedly"
+    });
+    expect(recordObservation).toHaveBeenCalledWith({
+      anomaly_key: "proj_123:investigative:checkout-api:production:GET:/login:404",
+      event_id: "00000000-0000-4000-8000-000000000401",
+      occurred_at: "2026-03-20T00:00:00.000Z"
+    });
+  });
+
   it("returns a request anomaly job when the threshold is crossed", async () => {
     const recordObservation = vi.fn().mockResolvedValue({
       occurrences_1m: 6,
