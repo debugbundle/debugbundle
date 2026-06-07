@@ -225,7 +225,7 @@ function buildLlmsTxt(): string {
       `- Go SDK: ${toAbsoluteUrl('/docs/sdks/go/')}`,
       `- Ruby SDK: ${toAbsoluteUrl('/docs/sdks/ruby/')}`,
       `- Android SDK: ${toAbsoluteUrl('/docs/sdks/android/')}`,
-      `- Swift SDK: ${toAbsoluteUrl('/docs/sdks/swift/')}`,
+      `- iOS SDK: ${toAbsoluteUrl('/docs/sdks/swift/')}`,
       `- React Native SDK: ${toAbsoluteUrl('/docs/sdks/react-native/')}`,
       `- Universal SDK interface: ${toAbsoluteUrl('/docs/sdks/universal-interface/')}`,
       `- WordPress integration: ${toAbsoluteUrl('/docs/integrations/wordpress/')}`,

@@ -87,7 +87,7 @@ All SDKs follow the same universal interface: `init`, `captureException`, `captu
 | Go | `github.com/debugbundle/debugbundle-go` | `go get github.com/debugbundle/debugbundle-go` | [Go SDK](https://debugbundle.com/docs/sdks/go) |
 | Ruby | `debugbundle` | `gem install debugbundle` | [Ruby SDK](https://debugbundle.com/docs/sdks/ruby) |
 | Android | `com.debugbundle:debugbundle-android` | Maven or Gradle dependency | [Android SDK](https://debugbundle.com/docs/sdks/android) |
-| Swift | `DebugBundle` | Swift Package Manager or CocoaPods | [Swift SDK](https://debugbundle.com/docs/sdks/swift) |
+| iOS | `DebugBundle` | Swift Package Manager or CocoaPods | [iOS SDK](https://debugbundle.com/docs/sdks/swift) |
 | React Native | `@debugbundle/sdk-react-native` | `npm install @debugbundle/sdk-react-native` | [React Native SDK](https://debugbundle.com/docs/sdks/react-native) |
 | WordPress | `debugbundle-wordpress` | GitHub Release ZIP | [WordPress plugin](https://debugbundle.com/docs/integrations/wordpress) |
 
@@ -376,7 +376,7 @@ The v1 release train publishes dependency roots before dependent wrappers:
 1. Publish `@debugbundle/shared-types` and `@debugbundle/redaction` from the core repo first.
 2. Publish `@debugbundle/sdk-node` and `@debugbundle/sdk-browser` from `debugbundle-js` after the matching shared-package version exists on npm.
 3. Publish independent SDK and package families whose artifacts do not bundle another DebugBundle SDK.
-4. Publish React Native after the Android and Swift versions it delegates to are live and smoke-tested.
+4. Publish React Native after the Android and iOS native SDK versions it delegates to are live and smoke-tested.
 5. Publish WordPress after the PHP SDK and browser SDK versions it requires are live and smoke-tested, then rebuild the bundled browser asset.
 6. Bump hosted dogfooding manifests only after the referenced registry versions exist.
 7. Create the canonical core GitHub Release after package-specific release workflows pass.
