@@ -55,7 +55,7 @@ See the full [Cloud quickstart](https://debugbundle.com/docs/quickstart) and [co
 
 ### Local-only
 
-Use local-only mode when you want all captured data and bundles to stay on your machine.
+Use local-only mode when you want captured data and bundles to stay on the machine or storage volume where the SDK and CLI run.
 
 ```bash
 npm install -g @debugbundle/cli

@@ -35,7 +35,7 @@ Every SDK must expose an init function that accepts a configuration object and r
 **Node.js local-first config fields (`@debugbundle/sdk-node`):**
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
-| `projectMode` | `"connected" \| "local-only"` | `"connected"` | Selects transport behavior. `local-only` keeps local/dev on file transport and warns instead of shipping staging/production remotely. `connected` keeps local/dev on file transport and staging/production on HTTP transport. |
+| `projectMode` | `"connected" \| "local-only"` | `"connected"` | Selects transport behavior. `local-only` uses file transport and requires filesystem plus CLI access on the machine doing capture. `connected` keeps local/dev on file transport and staging/production on HTTP transport. |
 | `localEventsDir` | string | `<cwd>/.debugbundle/local/events` | Filesystem destination for Node file transport batches. |
 
 **Capture policy note:** SDKs do NOT accept capture policy fields in the init config. The capture policy is server-owned and delivered to SDKs via the `capture_policy` field in the `GET /v1/sdk/config` response. SDKs must respect the server-side policy and filter events locally before transmission. See Section 12 (Capture Policy Integration) for details.
@@ -46,8 +46,7 @@ The Node.js SDK resolves its default transport from `projectMode` plus the confi
 
 | `projectMode` | Environment | Transport behavior |
 |---------------|-------------|--------------------|
-| `local-only` | `local`, `development` | File transport to `.debugbundle/local/events/` |
-| `local-only` | `staging`, `production` | No remote capture; emit diagnostic warning instructing the user to run `debugbundle connect` |
+| `local-only` | any environment | File transport to `.debugbundle/local/events/` on the current machine; operators must run `debugbundle process` there or on a mounted copy of that directory |
 | `connected` | `local`, `development` | File transport to `.debugbundle/local/events/` |
 | `connected` | `staging`, `production` | HTTP transport to the configured ingestion endpoint |
 

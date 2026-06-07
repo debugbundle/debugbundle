@@ -17,7 +17,7 @@ The system is built around three primitives: **bundle** (versioned debugging art
 
 ## System Shape
 
-DebugBundle supports two runtime modes: **local-only** (no cloud account required, SDK writes to filesystem, CLI processes locally) and **connected** (cloud ingestion, team features, alerts). Local-only is the default starting point; connected is an upgrade path. See `/spec/local-first-onboarding.md`.
+DebugBundle supports two runtime modes: **local-only** (no cloud account required, SDK writes to filesystem, CLI processes where those files live) and **connected** (cloud ingestion, team features, alerts). Local-only is the default starting point and can run on a developer machine or self-managed server with persistent storage and CLI access; connected is the recommended production path for team visibility, ephemeral infrastructure, alerts, webhooks, and hosted automation. See `/spec/local-first-onboarding.md`.
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
@@ -58,7 +58,8 @@ DebugBundle supports two runtime modes: **local-only** (no cloud account require
 │  Vanilla hooks + stdlib/structlog/loguru logger auto-detection  │
 │  + framework integrations                                       │
 │  Always-on probe ring buffer; config polling (paid tiers, 60s)  │
-│  Transport: file (local/dev) or HTTP (staging/prod connected)   │
+│  Transport: file (local-only/current machine) or HTTP           │
+│  (staging/prod connected)                                       │
 │  Browser relay: POST to user's backend relay handler             │
 └────────────┬───────┬─────────────────┬──────────────────────────┘
              │       │ Browser relay    │ POST /v1/events (batched)
