@@ -1,4 +1,7 @@
-import { RECOMMENDED_IMMEDIATE_CLIENT_ERROR_STATUSES } from "../../../packages/shared-types/src/index.js";
+import {
+  ImmediateClientErrorPathRulesSchema,
+  RECOMMENDED_IMMEDIATE_CLIENT_ERROR_STATUSES
+} from "../../../packages/shared-types/src/index.js";
 import type { CapturePolicyUpdate, CaptureRuleCreate, CaptureRuleUpdate } from "../../../packages/shared-types/src/index.js";
 import {
   getCapturePolicyWithAuthCommand as defaultGetCapturePolicyCommand,
@@ -62,6 +65,41 @@ export async function handleCapturePolicyCommand(
     return normalized;
   }
 
+  function parseClientErrorPathRuleOption(value: string): NonNullable<CapturePolicyUpdate["immediate_client_error_path_rules"]>[number] {
+    const separatorIndex = value.indexOf("=");
+    if (separatorIndex <= 0 || separatorIndex === value.length - 1) {
+      throw new CliInputError("Invalid value for --client-error-path-rule.");
+    }
+
+    const status = Number(value.slice(0, separatorIndex));
+    if (!Number.isInteger(status) || status < 400 || status > 499) {
+      throw new CliInputError("Invalid value for --client-error-path-rule.");
+    }
+
+    const ruleValue = value.slice(separatorIndex + 1);
+    const methodSeparatorIndex = ruleValue.lastIndexOf("@");
+    const pathPattern = methodSeparatorIndex === -1 ? ruleValue : ruleValue.slice(0, methodSeparatorIndex);
+    const methods = methodSeparatorIndex === -1
+      ? []
+      : ruleValue
+          .slice(methodSeparatorIndex + 1)
+          .split(",")
+          .map((method) => method.trim().toUpperCase())
+          .filter((method) => method.length > 0);
+    const parsed = ImmediateClientErrorPathRulesSchema.safeParse([
+      {
+        status_code: status,
+        path_pattern: pathPattern,
+        methods
+      }
+    ]);
+    if (!parsed.success || parsed.data[0] === undefined) {
+      throw new CliInputError("Invalid value for --client-error-path-rule.");
+    }
+
+    return parsed.data[0];
+  }
+
   const action = requirePositional(parsedArgv, 1, "action");
 
   if (action === "get") {
@@ -86,7 +124,9 @@ export async function handleCapturePolicyCommand(
       "preset",
       "override",
       "client-error-incidents",
-      "client-error-statuses"
+      "client-error-statuses",
+      "client-error-path-rule",
+      "client-error-path-rules-json"
     ]);
     ensureNoExtraPositionals(parsedArgv, 2);
 
@@ -124,9 +164,15 @@ export async function handleCapturePolicyCommand(
 
     const clientErrorIncidents = readStringOption(parsedArgv, "client-error-incidents");
     const clientErrorStatuses = readStringOption(parsedArgv, "client-error-statuses");
+    const clientErrorPathRuleOptions = readStringListOption(parsedArgv, "client-error-path-rule") ?? [];
+    const clientErrorPathRulesJson = readJsonOption(parsedArgv, "client-error-path-rules-json");
 
     if (clientErrorStatuses !== undefined && clientErrorIncidents !== "custom") {
       throw new CliInputError("Use --client-error-statuses only with --client-error-incidents custom.");
+    }
+
+    if (clientErrorPathRuleOptions.length > 0 && clientErrorPathRulesJson !== undefined) {
+      throw new CliInputError("Use either --client-error-path-rule or --client-error-path-rules-json, not both.");
     }
 
     if (clientErrorIncidents !== undefined) {
@@ -149,6 +195,24 @@ export async function handleCapturePolicyCommand(
         default:
           throw new CliInputError("Invalid value for --client-error-incidents.");
       }
+    }
+
+    if (clientErrorPathRulesJson !== undefined) {
+      if (clientErrorPathRulesJson === null) {
+        update.immediate_client_error_path_rules = null;
+      } else {
+        const parsed = ImmediateClientErrorPathRulesSchema.safeParse(clientErrorPathRulesJson);
+        if (!parsed.success) {
+          throw new CliInputError("Invalid value for --client-error-path-rules-json.");
+        }
+        update.immediate_client_error_path_rules = parsed.data;
+      }
+    }
+
+    if (clientErrorPathRuleOptions.length > 0) {
+      update.immediate_client_error_path_rules = ImmediateClientErrorPathRulesSchema.parse(
+        clientErrorPathRuleOptions.map(parseClientErrorPathRuleOption)
+      );
     }
 
     if (Object.keys(update).length === 0) {

@@ -796,6 +796,11 @@ export const MCP_TOOL_CATALOG = [
         capture_breadcrumbs: z.string().nullable().optional(),
         capture_probe_events: z.string().nullable().optional(),
         immediate_client_error_statuses: z.array(z.number().int().min(400).max(499)).nullable().optional(),
+        immediate_client_error_path_rules: z.array(z.object({
+          status_code: z.number().int().min(400).max(499),
+          path_pattern: z.string(),
+          methods: z.array(z.enum(['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD', 'OPTIONS'])).optional(),
+        })).nullable().optional(),
       }),
     }),
   },

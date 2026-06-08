@@ -56,8 +56,11 @@ export interface RequestAnomalyThreshold {
 }
 
 export const RECOMMENDED_IMMEDIATE_CLIENT_ERROR_STATUSES = [401, 403, 409, 422] as const;
+export const HTTP_METHOD_VALUES = ["GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"] as const;
+export type HttpMethod = (typeof HTTP_METHOD_VALUES)[number];
 
 const ImmediateClientErrorStatusSchema = z.number().int().min(400).max(499);
+const HttpMethodSchema = z.enum(HTTP_METHOD_VALUES);
 
 export function normalizeImmediateClientErrorStatuses(statuses: readonly number[]): number[] {
   return Array.from(new Set(statuses)).sort((left, right) => left - right);
@@ -67,6 +70,73 @@ export const ImmediateClientErrorStatusesSchema = z
   .array(ImmediateClientErrorStatusSchema)
   .max(12)
   .transform((statuses) => normalizeImmediateClientErrorStatuses(statuses));
+
+export interface ImmediateClientErrorPathRule {
+  status_code: number;
+  path_pattern: string;
+  methods: HttpMethod[];
+}
+
+function normalizePathPattern(value: string): string {
+  return value.trim().replace(/\/{2,}/g, "/");
+}
+
+function isValidPathPattern(value: string): boolean {
+  const normalized = normalizePathPattern(value);
+  if (!normalized.startsWith("/") || normalized.includes("?") || normalized.includes("#")) {
+    return false;
+  }
+
+  const wildcardIndex = normalized.indexOf("*");
+  return wildcardIndex === -1 || wildcardIndex === normalized.length - 1;
+}
+
+function normalizeHttpMethods(methods: readonly string[] | undefined): HttpMethod[] {
+  if (methods === undefined || methods.length === 0) {
+    return [];
+  }
+
+  const normalized = methods.map((method) => method.toUpperCase()).filter((method): method is HttpMethod =>
+    (HTTP_METHOD_VALUES as readonly string[]).includes(method)
+  );
+
+  return Array.from(new Set(normalized)).sort();
+}
+
+export function normalizeImmediateClientErrorPathRules(
+  rules: readonly ImmediateClientErrorPathRule[]
+): ImmediateClientErrorPathRule[] {
+  const normalized = rules.map((rule) => ({
+    status_code: rule.status_code,
+    path_pattern: normalizePathPattern(rule.path_pattern),
+    methods: normalizeHttpMethods(rule.methods)
+  }));
+  const deduped = new Map<string, ImmediateClientErrorPathRule>();
+
+  for (const rule of normalized) {
+    deduped.set(`${rule.status_code}:${rule.path_pattern}:${rule.methods.join(",")}`, rule);
+  }
+
+  return Array.from(deduped.values()).sort((left, right) => {
+    if (left.status_code !== right.status_code) return left.status_code - right.status_code;
+    const pathComparison = left.path_pattern.localeCompare(right.path_pattern);
+    if (pathComparison !== 0) return pathComparison;
+    return left.methods.join(",").localeCompare(right.methods.join(","));
+  });
+}
+
+export const ImmediateClientErrorPathRuleSchema = z.object({
+  status_code: ImmediateClientErrorStatusSchema,
+  path_pattern: z.string().min(1).max(256).transform(normalizePathPattern).refine(isValidPathPattern, {
+    message: "path_pattern must start with / and may only use a terminal * wildcard"
+  }),
+  methods: z.array(HttpMethodSchema).max(7).optional().default([]).transform(normalizeHttpMethods)
+});
+
+export const ImmediateClientErrorPathRulesSchema = z
+  .array(ImmediateClientErrorPathRuleSchema)
+  .max(25)
+  .transform((rules) => normalizeImmediateClientErrorPathRules(rules));
 
 // ---------------------------------------------------------------------------
 // Resolved Capture Policy (all controls have concrete values)
@@ -79,6 +149,7 @@ export interface ResolvedCapturePolicy {
   capture_breadcrumbs: CaptureBreadcrumbs;
   capture_probe_events: CaptureProbeEvents;
   immediate_client_error_statuses: number[];
+  immediate_client_error_path_rules: ImmediateClientErrorPathRule[];
 }
 
 export const ResolvedCapturePolicySchema = z.object({
@@ -87,7 +158,8 @@ export const ResolvedCapturePolicySchema = z.object({
   capture_request_events: CaptureRequestEventsSchema,
   capture_breadcrumbs: CaptureBreadcrumbsSchema,
   capture_probe_events: CaptureProbeEventsSchema,
-  immediate_client_error_statuses: ImmediateClientErrorStatusesSchema
+  immediate_client_error_statuses: ImmediateClientErrorStatusesSchema,
+  immediate_client_error_path_rules: ImmediateClientErrorPathRulesSchema.default([])
 });
 
 export interface CapturePolicyOverrides {
@@ -96,6 +168,7 @@ export interface CapturePolicyOverrides {
   capture_breadcrumbs: CaptureBreadcrumbs | null;
   capture_probe_events: CaptureProbeEvents | null;
   immediate_client_error_statuses: number[] | null;
+  immediate_client_error_path_rules: ImmediateClientErrorPathRule[] | null;
 }
 
 export const CapturePolicyOverridesSchema = z.object({
@@ -103,7 +176,8 @@ export const CapturePolicyOverridesSchema = z.object({
   capture_request_events: CaptureRequestEventsSchema.nullable(),
   capture_breadcrumbs: CaptureBreadcrumbsSchema.nullable(),
   capture_probe_events: CaptureProbeEventsSchema.nullable(),
-  immediate_client_error_statuses: ImmediateClientErrorStatusesSchema.nullable()
+  immediate_client_error_statuses: ImmediateClientErrorStatusesSchema.nullable(),
+  immediate_client_error_path_rules: ImmediateClientErrorPathRulesSchema.nullable().default(null)
 });
 
 export interface CapturePolicyResponse {
@@ -130,6 +204,7 @@ export const CapturePolicySchema = z.object({
   capture_breadcrumbs: CaptureBreadcrumbsSchema.nullable(),
   capture_probe_events: CaptureProbeEventsSchema.nullable(),
   immediate_client_error_statuses: ImmediateClientErrorStatusesSchema.nullable(),
+  immediate_client_error_path_rules: ImmediateClientErrorPathRulesSchema.nullable().default(null),
   updated_at: z.string().datetime(),
 });
 
@@ -146,6 +221,7 @@ export const CapturePolicyUpdateSchema = z.object({
   capture_breadcrumbs: CaptureBreadcrumbsSchema.nullable().optional(),
   capture_probe_events: CaptureProbeEventsSchema.nullable().optional(),
   immediate_client_error_statuses: ImmediateClientErrorStatusesSchema.nullable().optional(),
+  immediate_client_error_path_rules: ImmediateClientErrorPathRulesSchema.nullable().optional(),
 });
 
 export type CapturePolicyUpdate = z.infer<typeof CapturePolicyUpdateSchema>;
@@ -161,6 +237,7 @@ export const PRESET_DEFAULTS: Record<CapturePreset, Omit<ResolvedCapturePolicy, 
     capture_breadcrumbs: "local_only",
     capture_probe_events: "buffer_only",
     immediate_client_error_statuses: [],
+    immediate_client_error_path_rules: [],
   },
   balanced: {
     capture_logs: "warning",
@@ -168,6 +245,7 @@ export const PRESET_DEFAULTS: Record<CapturePreset, Omit<ResolvedCapturePolicy, 
     capture_breadcrumbs: "exception_only",
     capture_probe_events: "buffer_only",
     immediate_client_error_statuses: [],
+    immediate_client_error_path_rules: [],
   },
   investigative: {
     capture_logs: "info",
@@ -175,6 +253,7 @@ export const PRESET_DEFAULTS: Record<CapturePreset, Omit<ResolvedCapturePolicy, 
     capture_breadcrumbs: "standalone",
     capture_probe_events: "standalone_when_activated",
     immediate_client_error_statuses: [...RECOMMENDED_IMMEDIATE_CLIENT_ERROR_STATUSES],
+    immediate_client_error_path_rules: [],
   },
 };
 
@@ -203,6 +282,9 @@ export function resolvePolicy(record: CapturePolicyRecord): ResolvedCapturePolic
     immediate_client_error_statuses: normalizeImmediateClientErrorStatuses(
       record.immediate_client_error_statuses ?? defaults.immediate_client_error_statuses
     ),
+    immediate_client_error_path_rules: normalizeImmediateClientErrorPathRules(
+      record.immediate_client_error_path_rules ?? defaults.immediate_client_error_path_rules
+    ),
   };
 }
 
@@ -215,7 +297,11 @@ export function getCapturePolicyOverrides(record: CapturePolicyRecord): CaptureP
     immediate_client_error_statuses:
       record.immediate_client_error_statuses === null
         ? null
-        : normalizeImmediateClientErrorStatuses(record.immediate_client_error_statuses)
+        : normalizeImmediateClientErrorStatuses(record.immediate_client_error_statuses),
+    immediate_client_error_path_rules:
+      record.immediate_client_error_path_rules === null || record.immediate_client_error_path_rules === undefined
+        ? null
+        : normalizeImmediateClientErrorPathRules(record.immediate_client_error_path_rules)
   };
 }
 
@@ -250,16 +336,74 @@ const CAPTURE_LOGS_THRESHOLD: Record<CaptureLogs, number | null> = {
 
 const BALANCED_IMMEDIATE_REQUEST_STATUSES = new Set([408, 423, 424, 425, 429]);
 const INVESTIGATIVE_IMMEDIATE_REQUEST_STATUSES = new Set([...BALANCED_IMMEDIATE_REQUEST_STATUSES, 409]);
-const BALANCED_STANDARD_ANOMALY_STATUSES = new Set([401, 403, 404, 409, 422]);
-const BALANCED_HIGH_VOLUME_ANOMALY_STATUSES = new Set([400, 410]);
-const INVESTIGATIVE_ANOMALY_STATUSES = new Set([...BALANCED_STANDARD_ANOMALY_STATUSES, ...BALANCED_HIGH_VOLUME_ANOMALY_STATUSES]);
+
+function normalizeRequestPath(value: unknown): string | null {
+  if (typeof value !== "string") {
+    return null;
+  }
+
+  const trimmed = value.trim();
+  if (trimmed.length === 0) {
+    return null;
+  }
+
+  const path = trimmed.startsWith("http://") || trimmed.startsWith("https://")
+    ? (() => {
+        try {
+          return new URL(trimmed).pathname;
+        } catch {
+          return trimmed;
+        }
+      })()
+    : trimmed;
+
+  return (path.split(/[?#]/, 1)[0] ?? path).replace(/\/{2,}/g, "/");
+}
+
+function pathPatternMatches(rulePattern: string, requestPath: string): boolean {
+  const pattern = normalizePathPattern(rulePattern);
+  if (!pattern.endsWith("*")) {
+    return requestPath === pattern;
+  }
+
+  const prefix = pattern.slice(0, -1);
+  return requestPath.startsWith(prefix);
+}
+
+export function matchesImmediateClientErrorPathRule(input: {
+  responseStatus: number | null;
+  requestPath?: unknown;
+  httpMethod?: unknown;
+  immediateClientErrorPathRules?: readonly ImmediateClientErrorPathRule[];
+}): boolean {
+  const { responseStatus, immediateClientErrorPathRules = [] } = input;
+  if (responseStatus === null || !Number.isFinite(responseStatus) || immediateClientErrorPathRules.length === 0) {
+    return false;
+  }
+
+  const requestPath = normalizeRequestPath(input.requestPath);
+  if (requestPath === null) {
+    return false;
+  }
+
+  const httpMethod = typeof input.httpMethod === "string" ? input.httpMethod.toUpperCase() : null;
+
+  return immediateClientErrorPathRules.some((rule) =>
+    rule.status_code === responseStatus &&
+    (rule.methods.length === 0 || (httpMethod !== null && rule.methods.includes(httpMethod as HttpMethod))) &&
+    pathPatternMatches(rule.path_pattern, requestPath)
+  );
+}
 
 export function classifyRequestStatus(input: {
   responseStatus: number | null;
+  requestPath?: unknown;
+  httpMethod?: unknown;
   capturePreset: CapturePreset;
   immediateClientErrorStatuses?: readonly number[];
+  immediateClientErrorPathRules?: readonly ImmediateClientErrorPathRule[];
 }): RequestSignalClassification {
-  const { responseStatus, capturePreset, immediateClientErrorStatuses = [] } = input;
+  const { responseStatus, capturePreset, immediateClientErrorStatuses = [], immediateClientErrorPathRules = [] } = input;
 
   if (responseStatus === null || !Number.isFinite(responseStatus)) {
     return "context_signal";
@@ -270,6 +414,17 @@ export function classifyRequestStatus(input: {
   }
 
   if (immediateClientErrorStatuses.includes(responseStatus)) {
+    return "incident_signal";
+  }
+
+  if (
+    matchesImmediateClientErrorPathRule({
+      responseStatus,
+      requestPath: input.requestPath,
+      httpMethod: input.httpMethod,
+      immediateClientErrorPathRules
+    })
+  ) {
     return "incident_signal";
   }
 
@@ -286,8 +441,11 @@ export function classifyRequestStatus(input: {
 
 export function isImmediateRequestIncident(input: {
   responseStatus: number | null;
+  requestPath?: unknown;
+  httpMethod?: unknown;
   capturePreset: CapturePreset;
   immediateClientErrorStatuses?: readonly number[];
+  immediateClientErrorPathRules?: readonly ImmediateClientErrorPathRule[];
 }): boolean {
   return classifyRequestStatus(input) === "incident_signal";
 }
@@ -296,37 +454,10 @@ export function getRequestAnomalyThreshold(input: {
   responseStatus: number | null;
   capturePreset: CapturePreset;
 }): RequestAnomalyThreshold | null {
-  const { responseStatus, capturePreset } = input;
+  const { responseStatus } = input;
 
   if (responseStatus === null || !Number.isFinite(responseStatus) || responseStatus < 400 || responseStatus >= 500) {
     return null;
-  }
-
-  if (capturePreset === "minimal") {
-    return null;
-  }
-
-  if (capturePreset === "investigative") {
-    return INVESTIGATIVE_ANOMALY_STATUSES.has(responseStatus)
-      ? {
-          minimum_occurrences_5m: 8,
-          minimum_ratio_5m_to_1h: 2.0
-        }
-      : null;
-  }
-
-  if (BALANCED_STANDARD_ANOMALY_STATUSES.has(responseStatus)) {
-    return {
-      minimum_occurrences_5m: 20,
-      minimum_ratio_5m_to_1h: 3.0
-    };
-  }
-
-  if (BALANCED_HIGH_VOLUME_ANOMALY_STATUSES.has(responseStatus)) {
-    return {
-      minimum_occurrences_5m: 50,
-      minimum_ratio_5m_to_1h: 5.0
-    };
   }
 
   return null;
@@ -369,7 +500,10 @@ export function shouldCaptureEvent(
         isImmediateRequestIncident({
           responseStatus: status,
           capturePreset: policy.preset,
-          immediateClientErrorStatuses: policy.immediate_client_error_statuses
+          requestPath: payload["path"],
+          httpMethod: payload["method"],
+          immediateClientErrorStatuses: policy.immediate_client_error_statuses,
+          immediateClientErrorPathRules: policy.immediate_client_error_path_rules
         })
       ) {
         return true;

@@ -2486,7 +2486,7 @@ describe("web app — management routes", () => {
 
     expect(await screen.findByText(/slack weekly reports are paused on the current plan/i)).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /create slack weekly report/i })).not.toBeInTheDocument();
-    expect(screen.getByText(/acme workspace - #weekly-reports/i)).toBeInTheDocument();
+    expect(await screen.findByText(/acme workspace - #weekly-reports/i)).toBeInTheDocument();
     expect(screen.getByText(/friday at 16:00 America\/New_York/i)).toBeInTheDocument();
   });
 

@@ -70,14 +70,16 @@ describe("web app — project capture policy settings", () => {
             capture_request_events: "failures_only",
             capture_breadcrumbs: "exception_only",
             capture_probe_events: "buffer_only",
-            immediate_client_error_statuses: []
+            immediate_client_error_statuses: [],
+            immediate_client_error_path_rules: []
           },
           overrides: {
             capture_logs: null,
             capture_request_events: null,
             capture_breadcrumbs: null,
             capture_probe_events: null,
-            immediate_client_error_statuses: null
+            immediate_client_error_statuses: null,
+            immediate_client_error_path_rules: null
           }
         });
       }
@@ -90,7 +92,11 @@ describe("web app — project capture policy settings", () => {
           capture_request_events: "filtered",
           capture_breadcrumbs: null,
           capture_probe_events: null,
-          immediate_client_error_statuses: [401, 403, 409, 422]
+          immediate_client_error_statuses: [401, 403, 409, 422],
+          immediate_client_error_path_rules: [
+            { status_code: 404, path_pattern: "/checkout/*", methods: ["GET", "POST"] },
+            { status_code: 422, path_pattern: "/signup", methods: [] }
+          ]
         }));
 
         return jsonResponse(200, {
@@ -101,14 +107,22 @@ describe("web app — project capture policy settings", () => {
             capture_request_events: "filtered",
             capture_breadcrumbs: "standalone",
             capture_probe_events: "standalone_when_activated",
-            immediate_client_error_statuses: [401, 403, 409, 422]
+            immediate_client_error_statuses: [401, 403, 409, 422],
+            immediate_client_error_path_rules: [
+              { status_code: 404, path_pattern: "/checkout/*", methods: ["GET", "POST"] },
+              { status_code: 422, path_pattern: "/signup", methods: [] }
+            ]
           },
           overrides: {
             capture_logs: null,
             capture_request_events: "filtered",
             capture_breadcrumbs: null,
             capture_probe_events: null,
-            immediate_client_error_statuses: [401, 403, 409, 422]
+            immediate_client_error_statuses: [401, 403, 409, 422],
+            immediate_client_error_path_rules: [
+              { status_code: 404, path_pattern: "/checkout/*", methods: ["GET", "POST"] },
+              { status_code: 422, path_pattern: "/signup", methods: [] }
+            ]
           }
         });
       }
@@ -145,6 +159,11 @@ describe("web app — project capture policy settings", () => {
     await chooseSelectOption(user, /^preset$/i, /^investigative$/i);
     await chooseSelectOption(user, /^request events$/i, /^filtered request events$/i);
     await chooseSelectOption(user, /^client error incidents$/i, /^recommended for interactive apps$/i);
+    fireEvent.change(screen.getByLabelText(/^path rules$/i), {
+      target: {
+        value: "404=/checkout//*@post,get,post\n422=/signup"
+      }
+    });
 
     await waitFor(() => {
       expect(saveButton).not.toBeDisabled();
@@ -166,6 +185,77 @@ describe("web app — project capture policy settings", () => {
 
     expect(screen.getAllByText(/filtered request events/i).length).toBeGreaterThan(0);
     expect(screen.getAllByText(/^401, 403, 409, 422$/i).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/2 rules/i).length).toBeGreaterThan(0);
+  });
+
+  it("validates capture policy client error path rules before saving", async () => {
+    const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = requestUrl(input);
+
+      if (url.endsWith("/v1/auth/session")) {
+        return jsonResponse(200, {
+          session: createSession()
+        });
+      }
+
+      if (url.endsWith("/v1/projects") && init?.method === undefined) {
+        return jsonResponse(200, {
+          projects: [createProject({ organization_plan: "solo" })]
+        });
+      }
+
+      if (url.endsWith("/v1/projects/proj_123/capture-policy") && init?.method === undefined) {
+        return jsonResponse(200, {
+          access_mode: "manage",
+          policy: {
+            preset: "balanced",
+            capture_logs: "warning",
+            capture_request_events: "failures_only",
+            capture_breadcrumbs: "exception_only",
+            capture_probe_events: "buffer_only",
+            immediate_client_error_statuses: [],
+            immediate_client_error_path_rules: []
+          },
+          overrides: {
+            capture_logs: null,
+            capture_request_events: null,
+            capture_breadcrumbs: null,
+            capture_probe_events: null,
+            immediate_client_error_statuses: null,
+            immediate_client_error_path_rules: null
+          }
+        });
+      }
+
+      return jsonResponse(404, { error: "not_found" });
+    });
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<App initialEntries={["/projects/proj_123/settings"]} />);
+
+    const saveButton = expectButton(await screen.findByRole("button", { name: /save capture policy/i }));
+    const pathRulesInput = await screen.findByLabelText(/^path rules$/i);
+
+    fireEvent.change(pathRulesInput, { target: { value: "404=checkout" } });
+    expect(await screen.findByRole("alert")).toHaveTextContent(/path must start with/i);
+    expect(saveButton).toBeDisabled();
+
+    fireEvent.change(pathRulesInput, { target: { value: "404=/checkout/*/confirm" } });
+    expect(await screen.findByRole("alert")).toHaveTextContent(/wildcard must be at the end/i);
+    expect(saveButton).toBeDisabled();
+
+    fireEvent.change(pathRulesInput, { target: { value: "404=/checkout@TRACE" } });
+    expect(await screen.findByRole("alert")).toHaveTextContent(/valid HTTP methods/i);
+    expect(saveButton).toBeDisabled();
+
+    fireEvent.change(pathRulesInput, {
+      target: {
+        value: Array.from({ length: 26 }, (_, index) => `404=/route-${index}`).join("\n")
+      }
+    });
+    expect(await screen.findByRole("alert")).toHaveTextContent(/no more than 25 path rules/i);
+    expect(saveButton).toBeDisabled();
   });
 
   it("shows capture policy in read-only mode for members", async () => {
@@ -268,7 +358,8 @@ describe("web app — project capture policy settings", () => {
           capture_request_events: "all",
           capture_breadcrumbs: null,
           capture_probe_events: null,
-          immediate_client_error_statuses: null
+          immediate_client_error_statuses: null,
+          immediate_client_error_path_rules: null
         }));
 
         return jsonResponse(200, {
@@ -373,7 +464,8 @@ describe("web app — project capture policy settings", () => {
           capture_request_events: null,
           capture_breadcrumbs: null,
           capture_probe_events: null,
-          immediate_client_error_statuses: []
+          immediate_client_error_statuses: [],
+          immediate_client_error_path_rules: null
         }));
 
         savedImmediateClientErrorStatuses = [];

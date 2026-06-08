@@ -1162,6 +1162,7 @@ If CLI says something is healthy and MCP says something different, that is a pro
 - **And** `request_event` with `response_status: 429` → `incident_signal` for `balanced` and `investigative`, but `context_signal` for `minimal`
 - **And** `request_event` with `response_status: 409` → `incident_signal` for `investigative`, but `context_signal` for `minimal` and `balanced`
 - **And** `request_event` with a `4xx` status listed in `immediate_client_error_statuses` → `incident_signal` for that project regardless of whether the preset would otherwise keep it contextual
+- **And** `request_event` with a `4xx` status, path, and optional method matched by `immediate_client_error_path_rules` → `incident_signal` for that project regardless of whether broader status promotion is disabled
 - **And** `request_event` outside the preset's immediate request-failure set → `context_signal`
 - **And** `frontend_breadcrumb` → `context_signal`
 - **And** `deploy_metadata` → `context_signal`
@@ -1188,6 +1189,7 @@ If CLI says something is healthy and MCP says something different, that is a pro
 - **And** paid-tier projects default to preset `balanced`
 - **And** `policy.immediate_client_error_statuses` resolves to `[]` for `balanced`
 - **And** `policy.immediate_client_error_statuses` resolves to `[401,403,409,422]` for `investigative`
+- **And** `policy.immediate_client_error_path_rules` resolves to `[]` for every preset
 - **And** all override fields are `null` (preset controls apply)
 - **And** a plain member viewer receives only the resolved preview payload, not raw override provenance
 
@@ -1220,6 +1222,10 @@ If CLI says something is healthy and MCP says something different, that is a pro
 - **When** the same route is called with `{ "immediate_client_error_statuses": [] }`
 - **Then** the project uses explicit `none`
 - **And** `GET /v1/projects/{id}/capture-policy` returns `overrides.immediate_client_error_statuses: []` rather than `null`
+- **When** the route is called with `{ "immediate_client_error_path_rules": [{ "status_code": 404, "path_pattern": "/checkout/*", "methods": ["GET", "POST"] }] }`
+- **Then** the override is stored with normalized method names
+- **And** only matching `404` requests under `/checkout/` for those methods are promoted into request incidents
+- **And** unrelated `404` paths remain contextual telemetry
 
 ### AC-EVT-07: SDK Config Includes Capture Policy
 - **Given** a project with a capture policy set
@@ -1288,23 +1294,23 @@ If CLI says something is healthy and MCP says something different, that is a pro
 - **Then** the event is accepted
 - **And** worker normalization classifies it as `incident_signal`
 - **And** the same request would be rejected with `capture_policy_rejected` if the override were `[]` or `null`
+- **Given** the same project instead has `immediate_client_error_path_rules: [{ "status_code": 404, "path_pattern": "/checkout/*", "methods": ["GET"] }]`
+- **When** an SDK sends a `GET` `request_event` for `/checkout/order-missing` with `response_status: 404`
+- **Then** the event is accepted and classified as `incident_signal`
+- **When** an SDK sends a `GET` `request_event` for `/robots.txt` with `response_status: 404`
+- **Then** the event is rejected when `capture_request_events` is `off`, or stored as `context_signal` when request telemetry is otherwise enabled
 
-### AC-EVT-08c: Repeated Contextual Request Failures Can Open Request Anomaly Incidents
+### AC-EVT-08c: Repeated Contextual 4xx Request Failures Do Not Open Incidents
 - **Given** a project with preset `balanced`
 - **And** repeated first-party `request_event` payloads for the same normalized route, method, service, environment, and `response_status: 404`
 - **When** the worker observes at least `20` such events in `5` minutes and the `5m/1h` ratio is at least `3.0`
 - **Then** the stored `request_event` rows remain `context_signal`
-- **And** the worker enqueues a deterministic anomaly-triggered `group-incident` job
-- **And** incident retrieval surfaces the resulting incident as `request_failure`
-- **And** the incident reason explains that repeated contextual request failures crossed the request anomaly threshold
-- **Given** a project with preset `minimal`
-- **When** the same repeated `404` pattern occurs
-- **Then** no request anomaly incident is created
+- **And** the worker does not enqueue a request incident solely from repetition
 - **Given** a project with preset `investigative`
 - **And** repeated scanner-style `GET` `404` request events for low-value external-probe paths such as `/wp-config.php_old2024` or `/autodiscover/autodiscover.json`
 - **When** the same count and ratio thresholds are crossed
 - **Then** the stored `request_event` rows remain contextual telemetry only
-- **And** the worker does not enqueue a request-anomaly incident for those low-value probe paths
+- **And** the worker does not enqueue a request incident for those low-value probe paths unless an explicit status or path rule promotes them
 
 ### AC-EVT-09: SDK Local Capture Policy Enforcement
 - **Given** an SDK initialized with a project whose capture policy sets `capture_logs: "error"`
@@ -1315,9 +1321,10 @@ If CLI says something is healthy and MCP says something different, that is a pro
 - **Given** an SDK that has loaded `capture_policy` from `GET /v1/sdk/config`
 - **When** the effective preset is `balanced` and it observes a first-party request failure with `response_status: 429`
 - **Then** the SDK emits a standalone `request_event`
-- **And** if the effective preset is `balanced`, `capture_request_events` is `failures_only`, and the response status is anomaly-eligible such as `404` or `409`, the SDK emits a standalone `request_event` that the worker stores as `context_signal`
+- **And** if the effective preset is `balanced`, `capture_request_events` is `failures_only`, and the response status is an unpromoted `404`, the SDK does not emit a standalone request incident signal
 - **And** if the effective preset is `investigative` and the response status is `409`, the SDK emits a standalone `request_event`
 - **And** if `immediate_client_error_statuses` includes `403`, the SDK emits a standalone `request_event` for a first-party `403` even when `capture_request_events` is `off`
+- **And** if `immediate_client_error_path_rules` includes `404 /checkout/* GET`, the SDK emits a standalone `request_event` for a matching first-party `GET /checkout/*` `404` even when `capture_request_events` is `off`
 - **And** no network request is made for the suppressed event
 
 ### AC-EVT-10: Capture Policy Interface Parity

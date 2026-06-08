@@ -14,6 +14,7 @@ import {
   getCapturePolicyOverrides,
   classifyRequestStatus,
   normalizeImmediateClientErrorStatuses,
+  normalizeImmediateClientErrorPathRules,
   resolvePolicy,
   getDefaultPreset,
   shouldCaptureEvent,
@@ -66,6 +67,7 @@ describe("preset defaults", () => {
       capture_breadcrumbs: "local_only",
       capture_probe_events: "buffer_only",
       immediate_client_error_statuses: [],
+      immediate_client_error_path_rules: [],
     });
   });
 
@@ -76,6 +78,7 @@ describe("preset defaults", () => {
       capture_breadcrumbs: "exception_only",
       capture_probe_events: "buffer_only",
       immediate_client_error_statuses: [],
+      immediate_client_error_path_rules: [],
     });
   });
 
@@ -86,6 +89,7 @@ describe("preset defaults", () => {
       capture_breadcrumbs: "standalone",
       capture_probe_events: "standalone_when_activated",
       immediate_client_error_statuses: [...RECOMMENDED_IMMEDIATE_CLIENT_ERROR_STATUSES],
+      immediate_client_error_path_rules: [],
     });
   });
 });
@@ -99,6 +103,7 @@ describe("capture policy schema", () => {
     capture_breadcrumbs: null,
     capture_probe_events: null,
     immediate_client_error_statuses: null,
+    immediate_client_error_path_rules: null,
     updated_at: "2026-03-19T00:00:00Z",
   };
 
@@ -148,9 +153,25 @@ describe("capture policy update schema", () => {
     expect(parsed.immediate_client_error_statuses).toEqual([401, 409, 422]);
   });
 
+  it("normalizes client error path rules", () => {
+    const parsed = CapturePolicyUpdateSchema.parse({
+      immediate_client_error_path_rules: [
+        { status_code: 404, path_pattern: "/checkout/*", methods: ["POST", "GET", "GET"] },
+        { status_code: 404, path_pattern: "/checkout/*", methods: ["GET", "POST"] }
+      ]
+    });
+
+    expect(parsed.immediate_client_error_path_rules).toEqual([
+      { status_code: 404, path_pattern: "/checkout/*", methods: ["GET", "POST"] }
+    ]);
+  });
+
   it("rejects invalid values", () => {
     expect(CapturePolicyUpdateSchema.safeParse({ preset: "custom" }).success).toBe(false);
     expect(CapturePolicyUpdateSchema.safeParse({ immediate_client_error_statuses: [399] }).success).toBe(false);
+    expect(CapturePolicyUpdateSchema.safeParse({
+      immediate_client_error_path_rules: [{ status_code: 404, path_pattern: "/checkout/*/bad" }]
+    }).success).toBe(false);
   });
 });
 
@@ -164,6 +185,7 @@ describe("resolvePolicy", () => {
       capture_breadcrumbs: null,
       capture_probe_events: null,
       immediate_client_error_statuses: null,
+      immediate_client_error_path_rules: null,
       updated_at: "2026-03-19T00:00:00Z",
     };
     expect(resolvePolicy(record)).toEqual({
@@ -181,12 +203,16 @@ describe("resolvePolicy", () => {
       capture_breadcrumbs: null,
       capture_probe_events: null,
       immediate_client_error_statuses: [422, 403],
+      immediate_client_error_path_rules: [{ status_code: 404, path_pattern: "/checkout/*", methods: ["GET"] }],
       updated_at: "2026-03-19T00:00:00Z",
     };
     const resolved = resolvePolicy(record);
     expect(resolved.capture_logs).toBe("info");
     expect(resolved.capture_request_events).toBe("all");
     expect(resolved.immediate_client_error_statuses).toEqual([403, 422]);
+    expect(resolved.immediate_client_error_path_rules).toEqual([
+      { status_code: 404, path_pattern: "/checkout/*", methods: ["GET"] }
+    ]);
     // These should still come from preset defaults
     expect(resolved.capture_breadcrumbs).toBe("local_only");
     expect(resolved.capture_probe_events).toBe("buffer_only");
@@ -203,14 +229,16 @@ describe("capture policy response schema", () => {
         capture_request_events: "all",
         capture_breadcrumbs: "standalone",
         capture_probe_events: "standalone_when_activated",
-        immediate_client_error_statuses: [...RECOMMENDED_IMMEDIATE_CLIENT_ERROR_STATUSES]
+        immediate_client_error_statuses: [...RECOMMENDED_IMMEDIATE_CLIENT_ERROR_STATUSES],
+        immediate_client_error_path_rules: []
       },
       overrides: {
         capture_logs: null,
         capture_request_events: null,
         capture_breadcrumbs: null,
         capture_probe_events: null,
-        immediate_client_error_statuses: null
+        immediate_client_error_statuses: null,
+        immediate_client_error_path_rules: null
       }
     }).success).toBe(true);
   });
@@ -230,6 +258,7 @@ describe("client error status helpers", () => {
       capture_breadcrumbs: null,
       capture_probe_events: null,
       immediate_client_error_statuses: [],
+      immediate_client_error_path_rules: null,
       updated_at: "2026-03-19T00:00:00Z",
     };
 
@@ -238,8 +267,20 @@ describe("client error status helpers", () => {
       capture_request_events: null,
       capture_breadcrumbs: null,
       capture_probe_events: null,
-      immediate_client_error_statuses: []
+      immediate_client_error_statuses: [],
+      immediate_client_error_path_rules: null
     });
+  });
+
+  it("normalizes path-scoped client error rules", () => {
+    expect(normalizeImmediateClientErrorPathRules([
+      { status_code: 404, path_pattern: "/checkout//", methods: [] },
+      { status_code: 404, path_pattern: "/checkout/", methods: [] },
+      { status_code: 404, path_pattern: "/checkout/*", methods: ["POST", "GET"] }
+    ])).toEqual([
+      { status_code: 404, path_pattern: "/checkout/", methods: [] },
+      { status_code: 404, path_pattern: "/checkout/*", methods: ["GET", "POST"] }
+    ]);
   });
 });
 
@@ -270,25 +311,10 @@ describe("getRequestAnomalyThreshold", () => {
     expect(getRequestAnomalyThreshold({ responseStatus: 404, capturePreset: "minimal" })).toBeNull();
   });
 
-  it("returns the balanced threshold for repeated 404 request failures", () => {
-    expect(getRequestAnomalyThreshold({ responseStatus: 404, capturePreset: "balanced" })).toEqual({
-      minimum_occurrences_5m: 20,
-      minimum_ratio_5m_to_1h: 3
-    });
-  });
-
-  it("returns the higher balanced threshold for common 400-class volume", () => {
-    expect(getRequestAnomalyThreshold({ responseStatus: 400, capturePreset: "balanced" })).toEqual({
-      minimum_occurrences_5m: 50,
-      minimum_ratio_5m_to_1h: 5
-    });
-  });
-
-  it("returns the investigative threshold for repeated 409 request failures", () => {
-    expect(getRequestAnomalyThreshold({ responseStatus: 409, capturePreset: "investigative" })).toEqual({
-      minimum_occurrences_5m: 8,
-      minimum_ratio_5m_to_1h: 2
-    });
+  it("returns no anomaly threshold for unpromoted 4xx request failures", () => {
+    expect(getRequestAnomalyThreshold({ responseStatus: 404, capturePreset: "balanced" })).toBeNull();
+    expect(getRequestAnomalyThreshold({ responseStatus: 403, capturePreset: "investigative" })).toBeNull();
+    expect(getRequestAnomalyThreshold({ responseStatus: 410, capturePreset: "balanced" })).toBeNull();
   });
 });
 
@@ -301,6 +327,28 @@ describe("classifyRequestStatus", () => {
         immediateClientErrorStatuses: [401, 403, 422]
       })
     ).toBe("incident_signal");
+  });
+
+  it("treats matching path-scoped client error rules as immediate incidents", () => {
+    expect(
+      classifyRequestStatus({
+        responseStatus: 404,
+        requestPath: "/checkout/123",
+        httpMethod: "GET",
+        capturePreset: "balanced",
+        immediateClientErrorPathRules: [{ status_code: 404, path_pattern: "/checkout/*", methods: ["GET"] }]
+      })
+    ).toBe("incident_signal");
+
+    expect(
+      classifyRequestStatus({
+        responseStatus: 404,
+        requestPath: "/pricing",
+        httpMethod: "GET",
+        capturePreset: "balanced",
+        immediateClientErrorPathRules: [{ status_code: 404, path_pattern: "/checkout/*", methods: ["GET"] }]
+      })
+    ).toBe("context_signal");
   });
 });
 
@@ -357,6 +405,17 @@ describe("shouldCaptureEvent", () => {
     expect(shouldCaptureEvent(policy, "request_event", { response_status: 403 })).toBe(true);
   });
 
+  it("accepts path-scoped client error incidents even when request events are otherwise off", () => {
+    const policy: ResolvedCapturePolicy = {
+      ...minimal,
+      capture_request_events: "off",
+      immediate_client_error_path_rules: [{ status_code: 404, path_pattern: "/checkout/*", methods: ["GET"] }]
+    };
+
+    expect(shouldCaptureEvent(policy, "request_event", { method: "GET", path: "/checkout/123", response_status: 404 })).toBe(true);
+    expect(shouldCaptureEvent(policy, "request_event", { method: "GET", path: "/robots.txt", response_status: 404 })).toBe(false);
+  });
+
   it("always accepts immediate request incident statuses on minimal", () => {
     expect(shouldCaptureEvent({ ...minimal, capture_request_events: "off" }, "request_event", { response_status: 500 })).toBe(true);
     expect(shouldCaptureEvent({ ...minimal, capture_request_events: "off" }, "request_event", { response_status: 503 })).toBe(true);
@@ -369,9 +428,9 @@ describe("shouldCaptureEvent", () => {
     expect(shouldCaptureEvent(balanced, "request_event", { response_status: 500 })).toBe(true);
     expect(shouldCaptureEvent(balanced, "request_event", { response_status: 429 })).toBe(true);
     expect(shouldCaptureEvent(balanced, "request_event", { response_status: 408 })).toBe(true);
-    expect(shouldCaptureEvent(balanced, "request_event", { response_status: 404 })).toBe(true);
-    expect(shouldCaptureEvent(balanced, "request_event", { response_status: 409 })).toBe(true);
-    expect(shouldCaptureEvent(balanced, "request_event", { response_status: 400 })).toBe(true);
+    expect(shouldCaptureEvent(balanced, "request_event", { response_status: 404 })).toBe(false);
+    expect(shouldCaptureEvent(balanced, "request_event", { response_status: 409 })).toBe(false);
+    expect(shouldCaptureEvent(balanced, "request_event", { response_status: 400 })).toBe(false);
     expect(shouldCaptureEvent(balanced, "request_event", { response_status: 200 })).toBe(false);
     expect(shouldCaptureEvent(balanced, "request_event", { response_status: 302 })).toBe(false);
   });

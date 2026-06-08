@@ -311,6 +311,7 @@ export const STORAGE_BOOTSTRAP_STATEMENTS = [
       capture_breadcrumbs text,
       capture_probe_events text,
       immediate_client_error_statuses jsonb,
+      immediate_client_error_path_rules jsonb,
       updated_at timestamptz NOT NULL DEFAULT now()
     )
   `,

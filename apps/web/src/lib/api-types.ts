@@ -129,6 +129,12 @@ export type CaptureBreadcrumbs = "local_only" | "exception_only" | "standalone";
 
 export type CaptureProbeEvents = "buffer_only" | "standalone_when_activated";
 
+export interface ImmediateClientErrorPathRule {
+  status_code: number;
+  path_pattern: string;
+  methods: Array<"GET" | "POST" | "PUT" | "PATCH" | "DELETE" | "HEAD" | "OPTIONS">;
+}
+
 export interface ProjectCapturePolicy {
   preset: CapturePreset;
   capture_logs: CaptureLogs;
@@ -136,6 +142,7 @@ export interface ProjectCapturePolicy {
   capture_breadcrumbs: CaptureBreadcrumbs;
   capture_probe_events: CaptureProbeEvents;
   immediate_client_error_statuses: number[];
+  immediate_client_error_path_rules: ImmediateClientErrorPathRule[];
 }
 
 export interface ProjectCapturePolicyOverrides {
@@ -144,6 +151,7 @@ export interface ProjectCapturePolicyOverrides {
   capture_breadcrumbs: CaptureBreadcrumbs | null;
   capture_probe_events: CaptureProbeEvents | null;
   immediate_client_error_statuses: number[] | null;
+  immediate_client_error_path_rules: ImmediateClientErrorPathRule[] | null;
 }
 
 export interface ProjectCapturePolicyResponse {
@@ -159,6 +167,7 @@ export interface ProjectCapturePolicyUpdate {
   capture_breadcrumbs?: CaptureBreadcrumbs | null;
   capture_probe_events?: CaptureProbeEvents | null;
   immediate_client_error_statuses?: number[] | null;
+  immediate_client_error_path_rules?: ImmediateClientErrorPathRule[] | null;
 }
 
 export type ImprovementBundleSensitivity = "high_confidence" | "balanced" | "verbose";

@@ -29,7 +29,8 @@ function buildDefaultOverrides(): CapturePolicyOverrides {
     capture_request_events: null,
     capture_breadcrumbs: null,
     capture_probe_events: null,
-    immediate_client_error_statuses: null
+    immediate_client_error_statuses: null,
+    immediate_client_error_path_rules: null
   };
 }
 

@@ -3,8 +3,10 @@ import { gzipSync } from "node:zlib";
 import { FINGERPRINT_VERSION, inferMatchedFields } from "../../event-normalizer/src/index.js";
 import {
   normalizeImmediateClientErrorStatuses,
+  normalizeImmediateClientErrorPathRules,
   type CapturePreset,
-  type EventEnvelope
+  type EventEnvelope,
+  type ImmediateClientErrorPathRule
 } from "../../shared-types/src/index.js";
 import { buildRawEventObjectKey, hashToken, inferEventLogLevel, inferSeverity } from "./helpers.js";
 import type {
@@ -118,7 +120,12 @@ export function createIngestionPersistenceService(
     async persistAndEnqueue(
       event: EventEnvelope,
       projectId: string,
-      options?: { capturePreset?: CapturePreset; immediateClientErrorStatuses?: number[]; captureRule?: import("../../shared-types/src/index.js").CaptureRuleEvaluationResult }
+      options?: {
+        capturePreset?: CapturePreset;
+        immediateClientErrorStatuses?: number[];
+        immediateClientErrorPathRules?: ImmediateClientErrorPathRule[];
+        captureRule?: import("../../shared-types/src/index.js").CaptureRuleEvaluationResult;
+      }
     ): Promise<{ object_key: string }> {
       const objectKey = buildRawEventObjectKey({
         projectId,
@@ -145,6 +152,13 @@ export function createIngestionPersistenceService(
           : {
               immediate_client_error_statuses: normalizeImmediateClientErrorStatuses(
                 options.immediateClientErrorStatuses
+              )
+            }),
+        ...(options?.immediateClientErrorPathRules === undefined
+          ? {}
+          : {
+              immediate_client_error_path_rules: normalizeImmediateClientErrorPathRules(
+                options.immediateClientErrorPathRules
               )
             }),
         ...(options?.captureRule === undefined ? {} : { capture_rule: options.captureRule })

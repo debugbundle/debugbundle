@@ -236,7 +236,8 @@ describe("api probe routes", () => {
         capture_request_events: "failures_only",
         capture_breadcrumbs: "exception_only",
         capture_probe_events: "buffer_only",
-        immediate_client_error_statuses: []
+        immediate_client_error_statuses: [],
+        immediate_client_error_path_rules: []
       }
     });
   });
@@ -250,7 +251,8 @@ describe("api probe routes", () => {
         capture_request_events: "failures_only",
         capture_breadcrumbs: null,
         capture_probe_events: null,
-        immediate_client_error_statuses: null
+        immediate_client_error_statuses: null,
+        immediate_client_error_path_rules: null
       }),
       upsertCapturePolicyForProject: vi.fn()
     };
@@ -313,7 +315,8 @@ describe("api probe routes", () => {
         capture_request_events: "failures_only",
         capture_breadcrumbs: "standalone",
         capture_probe_events: "standalone_when_activated",
-        immediate_client_error_statuses: [401, 403, 409, 422]
+        immediate_client_error_statuses: [401, 403, 409, 422],
+        immediate_client_error_path_rules: []
       }
     });
     expect(capturePolicyManagement.getCapturePolicyForProject).toHaveBeenCalledWith({
@@ -398,7 +401,8 @@ describe("api probe routes", () => {
         capture_request_events: "failures_only",
         capture_breadcrumbs: "exception_only",
         capture_probe_events: "buffer_only",
-        immediate_client_error_statuses: []
+        immediate_client_error_statuses: [],
+        immediate_client_error_path_rules: []
       }
     });
   });

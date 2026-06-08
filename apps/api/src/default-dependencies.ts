@@ -634,7 +634,11 @@ export function createApiDependencies(input: CreateApiDependenciesInput): Defaul
           immediate_client_error_statuses:
             input.update.immediate_client_error_statuses !== undefined
               ? input.update.immediate_client_error_statuses
-              : (existingRecord?.immediate_client_error_statuses ?? null)
+              : (existingRecord?.immediate_client_error_statuses ?? null),
+          immediate_client_error_path_rules:
+            input.update.immediate_client_error_path_rules !== undefined
+              ? input.update.immediate_client_error_path_rules
+              : (existingRecord?.immediate_client_error_path_rules ?? null)
         });
         return record;
       }

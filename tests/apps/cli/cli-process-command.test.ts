@@ -609,7 +609,7 @@ describe("cli process command", () => {
     ]);
   });
 
-  it("creates a local request anomaly incident for repeated 404s under the balanced preset", async () => {
+  it("does not create a local request incident for repeated unpromoted 404s under the balanced preset", async () => {
     const rootDirectory = await createProcessFixtureRepository();
     const requestEvents = Array.from({ length: 20 }, (_, index) =>
       createRequestEvent({
@@ -633,31 +633,14 @@ describe("cli process command", () => {
     expect(result.exitCode).toBe(0);
     expect(JSON.parse(result.output)).toEqual(expect.objectContaining({
       processed: true,
-      incidents_processed: 1
-    }));
-
-    const state = JSON.parse(
-      await readFile(join(rootDirectory, ".debugbundle", "local", "state.json"), "utf8")
-    ) as {
-      incidents: Record<string, { title: string; severity: string; matched_fields: string[]; source_event_types: string[] }>;
-    };
-    const anomalyIncident = Object.values(state.incidents)[0];
-
-    expect(anomalyIncident).toEqual(expect.objectContaining({
-      title: "Request anomaly: GET /checkout returned 404 repeatedly",
-      severity: "medium",
-      matched_fields: expect.arrayContaining(["request_anomaly", "http_status", "http_method", "route_template"]),
-      source_event_types: ["request_event"]
+      incidents_processed: 0
     }));
 
     const localState = await readLocalState({ cwd: () => rootDirectory });
-    expect(Object.values(localState.incidents)[0]?.incident_reason).toEqual(expect.objectContaining({
-      kind: "request_failure",
-      description: "request_event crossed the repeated request anomaly threshold"
-    }));
+    expect(Object.values(localState.incidents)).toEqual([]);
   });
 
-  it("does not create local request anomaly incidents for low-value external probe 404s", async () => {
+  it("does not create local request incidents for low-value external probe 404s", async () => {
     const rootDirectory = await createProcessFixtureRepository();
     const requestEvents = Array.from({ length: 20 }, (_, index) =>
       createRequestEvent({
@@ -799,18 +782,12 @@ describe("cli process command", () => {
     expect(JSON.parse(reprocessed.output)).toEqual(expect.objectContaining({
       processed: true,
       files_processed: 0,
-      incidents_processed: 1,
+      incidents_processed: 0,
       last_processed_event_file: "1700000000000-1-checkout-api.events.json"
     }));
 
     const localState = await readLocalState({ cwd: () => rootDirectory });
-    expect(Object.values(localState.incidents)).toEqual([
-      expect.objectContaining({
-        title: "Request anomaly: GET /checkout returned 404 repeatedly",
-        severity: "medium",
-        source_event_types: ["request_event"]
-      })
-    ]);
+    expect(Object.values(localState.incidents)).toEqual([]);
   });
 
   it("merges frontend and backend incidents that share a trace id into one local incident", async () => {

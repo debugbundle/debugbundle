@@ -6,6 +6,17 @@ The format is based on Keep a Changelog and this project follows Semantic Versio
 
 ## [Unreleased]
 
+## [1.2.0] - 2026-06-08
+
+### Added
+
+- Added explicit client-error incident promotion controls across capture policy, including path-scoped `immediate_client_error_path_rules` for real application routes that should open incidents on selected `4xx` responses without promoting the status globally.
+
+### Changed
+
+- Prevented unpromoted client-error request telemetry from opening normal incidents through hosted ingestion, worker anomaly thresholds, or local `debugbundle process`, while preserving `5xx` handling and explicitly promoted `4xx` behavior.
+- Bumped `@debugbundle/shared-types` and `@debugbundle/redaction` to `1.1.0`, `@debugbundle/cli` to `1.2.0`, and `@debugbundle/mcp` to `1.2.0` for the synchronized capture-policy and client-error release train.
+
 ## [1.1.1] - 2026-06-06
 
 ### Added

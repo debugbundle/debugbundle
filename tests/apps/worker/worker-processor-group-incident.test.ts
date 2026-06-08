@@ -8,6 +8,48 @@ import { type MockedMethods } from "../../helpers/vitest.ts";
 type GroupIncidentDependencies = Parameters<typeof processNextGroupIncidentJob>[0];
 
 describe("worker processor \u2013 group-incident", () => {
+  it("should not create incidents from contextual request events without an explicit trigger", async (): Promise<void> => {
+    const queue = {
+      enqueue: vi.fn(),
+      dequeue: vi.fn().mockResolvedValue({
+        project_id: "proj_123",
+        event_id: "evt_context_request",
+        event_type: "request_event",
+        event_class: "context_signal",
+        service_name: "checkout-api",
+        environment: "production",
+        fingerprint: "fp_request_context",
+        normalized_message: "request GET /robots.txt",
+        occurred_at: "2026-06-08T00:00:00.000Z",
+        severity: "low"
+      })
+    };
+
+    const incidentStore = {
+      upsertIncident: vi.fn(),
+      insertIncidentEvent: vi.fn(),
+      markIncidentSpiking: vi.fn()
+    };
+    const frequencyCounter = {
+      recordOccurrence: vi.fn()
+    };
+    const lifecycleWebhookPublisher = {
+      publish: vi.fn()
+    };
+
+    const result = await processNextGroupIncidentJob({
+      queue,
+      incidentStore,
+      frequencyCounter,
+      lifecycleWebhookPublisher
+    });
+
+    expect(result).toEqual({ processed: true, reason: "non_incident_signal" });
+    expect(incidentStore.upsertIncident).not.toHaveBeenCalled();
+    expect(frequencyCounter.recordOccurrence).not.toHaveBeenCalled();
+    expect(lifecycleWebhookPublisher.publish).not.toHaveBeenCalled();
+  });
+
   it("should process group-incident job and emit reopened + spike lifecycle events", async (): Promise<void> => {
     const queue = {
       enqueue: vi.fn(),

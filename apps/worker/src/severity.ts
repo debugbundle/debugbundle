@@ -1,4 +1,8 @@
-import { classifyRequestStatus, type EventEnvelope } from "../../../packages/shared-types/src/index.js";
+import {
+  classifyRequestStatus,
+  type EventEnvelope,
+  type ImmediateClientErrorPathRule
+} from "../../../packages/shared-types/src/index.js";
 
 export type InferredSeverity = "low" | "medium" | "high" | "critical";
 
@@ -18,14 +22,18 @@ function inferFrontendExceptionSeverity(
 export function inferSeverity(
   event: EventEnvelope,
   capturePreset: CapturePreset = "minimal",
-  immediateClientErrorStatuses: readonly number[] = []
+  immediateClientErrorStatuses: readonly number[] = [],
+  immediateClientErrorPathRules: readonly ImmediateClientErrorPathRule[] = []
 ): InferredSeverity {
   if (
     event.event_type === "request_event"
     && classifyRequestStatus({
       responseStatus: event.payload.response_status,
       capturePreset,
-      immediateClientErrorStatuses
+      requestPath: event.payload.path,
+      httpMethod: event.payload.method,
+      immediateClientErrorStatuses,
+      immediateClientErrorPathRules
     }) === "incident_signal"
   ) {
     return "high";

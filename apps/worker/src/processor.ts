@@ -613,13 +613,15 @@ export async function processNextNormalizeEventsJob(
   const captureRule = job.capture_rule ?? null;
   const capturePreset = job.capture_preset ?? "minimal";
   const immediateClientErrorStatuses = job.immediate_client_error_statuses ?? [];
+  const immediateClientErrorPathRules = job.immediate_client_error_path_rules ?? [];
   const baseEventClass = classifyEvent(
     validated.data.event_type,
     validated.data.event_type === "log_event" ? validated.data.payload?.level : undefined,
     validated.data.event_type === "probe_event" ? validated.data.payload?.activation_id : undefined,
     validated.data.payload as Record<string, unknown>,
     capturePreset,
-    immediateClientErrorStatuses
+    immediateClientErrorStatuses,
+    immediateClientErrorPathRules
   );
   const eventClass = applyCaptureRuleEventClass({
     event_class: baseEventClass,
@@ -631,7 +633,12 @@ export async function processNextNormalizeEventsJob(
   } else if (captureRule?.action === "sample" && captureRule.sample_event_class === "context") {
     matchedFields.push("capture_rule_sample_context");
   }
-  const severity = inferSeverity(validated.data, capturePreset, immediateClientErrorStatuses);
+  const severity = inferSeverity(
+    validated.data,
+    capturePreset,
+    immediateClientErrorStatuses,
+    immediateClientErrorPathRules
+  );
 
   const processedEvent = await dependencies.processedEventStore.upsertProcessedEvent({
     event_id: validated.data.event_id,
@@ -721,7 +728,7 @@ export async function processNextGroupIncidentJob(
 
   const allowsContextDrivenIncidentEnrichment =
     job.event_class === "context_signal" &&
-    (job.event_type === "deploy_metadata" || job.event_type === "request_event");
+    job.event_type === "deploy_metadata";
 
   if (
     job.event_class !== undefined &&

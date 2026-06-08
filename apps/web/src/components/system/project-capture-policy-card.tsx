@@ -9,6 +9,7 @@ import {
   type CapturePreset,
   type CaptureProbeEvents,
   type CaptureRequestEvents,
+  type ImmediateClientErrorPathRule,
   type ProjectCapturePolicy,
   type ProjectCapturePolicyResponse,
 } from "../../lib/api.js";
@@ -30,6 +31,7 @@ interface CapturePolicyDraft {
   capture_probe_events: OverrideValue<CaptureProbeEvents>;
   client_error_incident_mode: ClientErrorIncidentMode;
   client_error_custom_input: string;
+  client_error_path_rules_input: string;
 }
 
 interface ProjectCapturePolicyCardProps {
@@ -45,6 +47,7 @@ const DEFAULT_PRESET_BY_PLAN: Record<ProjectCapturePolicyCardProps["organization
 };
 
 const RECOMMENDED_IMMEDIATE_CLIENT_ERROR_STATUSES = [401, 403, 409, 422] as const;
+const HTTP_METHOD_VALUES = ["GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"] as const;
 
 const PRESET_DEFAULTS: Record<CapturePreset, Omit<ProjectCapturePolicy, "preset">> = {
   minimal: {
@@ -52,21 +55,24 @@ const PRESET_DEFAULTS: Record<CapturePreset, Omit<ProjectCapturePolicy, "preset"
     capture_request_events: "failures_only",
     capture_breadcrumbs: "local_only",
     capture_probe_events: "buffer_only",
-    immediate_client_error_statuses: []
+    immediate_client_error_statuses: [],
+    immediate_client_error_path_rules: []
   },
   balanced: {
     capture_logs: "warning",
     capture_request_events: "failures_only",
     capture_breadcrumbs: "exception_only",
     capture_probe_events: "buffer_only",
-    immediate_client_error_statuses: []
+    immediate_client_error_statuses: [],
+    immediate_client_error_path_rules: []
   },
   investigative: {
     capture_logs: "info",
     capture_request_events: "all",
     capture_breadcrumbs: "standalone",
     capture_probe_events: "standalone_when_activated",
-    immediate_client_error_statuses: [...RECOMMENDED_IMMEDIATE_CLIENT_ERROR_STATUSES]
+    immediate_client_error_statuses: [...RECOMMENDED_IMMEDIATE_CLIENT_ERROR_STATUSES],
+    immediate_client_error_path_rules: []
   }
 };
 
@@ -110,6 +116,7 @@ const clientErrorIncidentModeOptions: Array<{ value: ClientErrorIncidentMode; la
 
 const OVERRIDE_SELECT_DEFAULT_VALUE = "__use_preset_default__";
 const inputClassName = "flex h-10 w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:cursor-not-allowed disabled:opacity-60";
+const textareaClassName = "flex min-h-24 w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:cursor-not-allowed disabled:opacity-60";
 
 export function ProjectCapturePolicyCard({ projectId, organizationPlan, canEdit }: ProjectCapturePolicyCardProps): JSX.Element {
   const [draft, setDraft] = useState<CapturePolicyDraft | null>(null);
@@ -156,15 +163,16 @@ export function ProjectCapturePolicyCard({ projectId, organizationPlan, canEdit 
 
   const policyDraft = draft ?? buildDraft(buildDefaultPolicyResponse(organizationPlan));
   const customStatusValidationError = getClientErrorCustomValidationError(policyDraft);
+  const pathRulesValidationError = getClientErrorPathRulesValidationError(policyDraft);
   const resolvedPolicy = resolveDraft(policyDraft);
   const showPreviewOnly = policyDraft.access_mode === "preview" || !canEdit;
   const isDirty = baselineDraft !== null && !draftsEqual(policyDraft, baselineDraft);
   const isDisabled = isLoading || isSaving || !canEdit;
-  const isSaveDisabled = isDisabled || !isDirty || customStatusValidationError !== null;
+  const isSaveDisabled = isDisabled || !isDirty || customStatusValidationError !== null || pathRulesValidationError !== null;
 
   async function handleSave(event: React.FormEvent<HTMLFormElement>): Promise<void> {
     event.preventDefault();
-    if (!canEdit || !isDirty || customStatusValidationError !== null) {
+    if (!canEdit || !isDirty || customStatusValidationError !== null || pathRulesValidationError !== null) {
       return;
     }
 
@@ -278,11 +286,15 @@ export function ProjectCapturePolicyCard({ projectId, organizationPlan, canEdit 
               draft={policyDraft}
               disabled={isDisabled}
               validationError={customStatusValidationError}
+              pathRulesValidationError={pathRulesValidationError}
               onModeChange={(value) => {
                 setDraft((current) => ({ ...(current ?? policyDraft), client_error_incident_mode: value }));
               }}
               onCustomInputChange={(value) => {
                 setDraft((current) => ({ ...(current ?? policyDraft), client_error_custom_input: value }));
+              }}
+              onPathRulesInputChange={(value) => {
+                setDraft((current) => ({ ...(current ?? policyDraft), client_error_path_rules_input: value }));
               }}
             />
             <OverrideField
@@ -322,6 +334,10 @@ export function ProjectCapturePolicyCard({ projectId, organizationPlan, canEdit 
               <ResolvedValue
                 label="Client error incidents"
                 value={formatClientErrorIncidentsPreview(policyDraft, customStatusValidationError)}
+              />
+              <ResolvedValue
+                label="Client error paths"
+                value={formatClientErrorPathRulesPreview(policyDraft, pathRulesValidationError)}
               />
               <ResolvedValue label="Breadcrumbs" value={formatBreadcrumbs(resolvedPolicy.capture_breadcrumbs)} />
               <ResolvedValue label="Probes" value={formatProbes(resolvedPolicy.capture_probe_events)} />
@@ -397,21 +413,25 @@ function ClientErrorIncidentsField({
   draft,
   disabled,
   validationError,
+  pathRulesValidationError,
   onModeChange,
   onCustomInputChange,
+  onPathRulesInputChange,
 }: {
   draft: CapturePolicyDraft;
   disabled: boolean;
   validationError: string | null;
+  pathRulesValidationError: string | null;
   onModeChange: (value: ClientErrorIncidentMode) => void;
   onCustomInputChange: (value: string) => void;
+  onPathRulesInputChange: (value: string) => void;
 }): JSX.Element {
   const presetDefaultLabel = formatClientErrorStatusList(PRESET_DEFAULTS[draft.preset].immediate_client_error_statuses);
 
   return (
     <Field>
       <FieldLabel id="project-capture-policy-client-errors-label" htmlFor="project-capture-policy-client-errors">Client error incidents</FieldLabel>
-      <FieldDescription>Choose which 4xx responses should open incidents immediately instead of waiting for repeated-anomaly thresholds.</FieldDescription>
+      <FieldDescription>Choose which 4xx responses are allowed to open incidents. Unpromoted 4xx responses stay request telemetry.</FieldDescription>
       <Select
         value={draft.client_error_incident_mode}
         onValueChange={(value) => onModeChange(value as ClientErrorIncidentMode)}
@@ -452,6 +472,21 @@ function ClientErrorIncidentsField({
           )}
         </div>
       ) : null}
+      <div className="mt-3 space-y-2">
+        <FieldLabel htmlFor="project-capture-policy-client-error-path-rules">Path rules</FieldLabel>
+        <textarea
+          id="project-capture-policy-client-error-path-rules"
+          className={textareaClassName}
+          value={draft.client_error_path_rules_input}
+          onChange={(event) => onPathRulesInputChange(event.currentTarget.value)}
+          disabled={disabled}
+          aria-invalid={pathRulesValidationError !== null}
+        />
+        <FieldDescription>One rule per line, for example 404=/checkout/*@GET,POST. Omit methods to match any method.</FieldDescription>
+        {pathRulesValidationError === null ? null : (
+          <p className="text-sm text-destructive" role="alert">{pathRulesValidationError}</p>
+        )}
+      </div>
       <FieldDescription>Promoted client errors open incidents immediately and can increase incident volume.</FieldDescription>
     </Field>
   );
@@ -483,7 +518,8 @@ function buildDefaultPolicyResponse(plan: ProjectCapturePolicyCardProps["organiz
       capture_request_events: null,
       capture_breadcrumbs: null,
       capture_probe_events: null,
-      immediate_client_error_statuses: null
+      immediate_client_error_statuses: null,
+      immediate_client_error_path_rules: null
     }
   };
 }
@@ -506,13 +542,17 @@ function buildDraft(policyResponse: ProjectCapturePolicyResponse): CapturePolicy
       && clientErrorOverride.length > 0
       && !statusesEqual(clientErrorOverride, RECOMMENDED_IMMEDIATE_CLIENT_ERROR_STATUSES)
         ? clientErrorOverride.join(",")
-        : ""
+        : "",
+    client_error_path_rules_input: formatClientErrorPathRulesInput(
+      overrides.immediate_client_error_path_rules ?? policy.immediate_client_error_path_rules ?? []
+    )
   };
 }
 
 function resolveDraft(draft: CapturePolicyDraft): ProjectCapturePolicy {
   const defaults = PRESET_DEFAULTS[draft.preset];
   const customStatuses = parseClientErrorStatusesInput(draft.client_error_custom_input);
+  const pathRules = parseClientErrorPathRulesInput(draft.client_error_path_rules_input);
 
   return {
     preset: draft.preset,
@@ -527,7 +567,8 @@ function resolveDraft(draft: CapturePolicyDraft): ProjectCapturePolicy {
           ? []
           : draft.client_error_incident_mode === "recommended"
             ? [...RECOMMENDED_IMMEDIATE_CLIENT_ERROR_STATUSES]
-            : (customStatuses.statuses ?? [])
+            : (customStatuses.statuses ?? []),
+    immediate_client_error_path_rules: pathRules.rules ?? []
   };
 }
 
@@ -538,8 +579,10 @@ function buildUpdatePayload(draft: CapturePolicyDraft): {
   capture_breadcrumbs: CaptureBreadcrumbs | null;
   capture_probe_events: CaptureProbeEvents | null;
   immediate_client_error_statuses: number[] | null;
+  immediate_client_error_path_rules: ImmediateClientErrorPathRule[] | null;
 } {
   const customStatuses = parseClientErrorStatusesInput(draft.client_error_custom_input);
+  const pathRules = parseClientErrorPathRulesInput(draft.client_error_path_rules_input);
 
   return {
     preset: draft.preset,
@@ -554,7 +597,10 @@ function buildUpdatePayload(draft: CapturePolicyDraft): {
           ? []
           : draft.client_error_incident_mode === "recommended"
             ? [...RECOMMENDED_IMMEDIATE_CLIENT_ERROR_STATUSES]
-            : customStatuses.statuses ?? []
+            : customStatuses.statuses ?? [],
+    immediate_client_error_path_rules: draft.client_error_path_rules_input.trim().length === 0
+      ? null
+      : pathRules.rules ?? []
   };
 }
 
@@ -614,12 +660,97 @@ function parseClientErrorStatusesInput(value: string): { statuses?: number[]; er
   return { statuses: normalized };
 }
 
+function normalizePathPattern(value: string): string {
+  return value.trim().replace(/\/{2,}/g, "/");
+}
+
+function parseClientErrorPathRulesInput(value: string): { rules?: ImmediateClientErrorPathRule[]; error?: string } {
+  const trimmed = value.trim();
+  if (trimmed.length === 0) {
+    return { rules: [] };
+  }
+
+  const rules: ImmediateClientErrorPathRule[] = [];
+  for (const [index, rawLine] of trimmed.split(/\r?\n/u).entries()) {
+    const line = rawLine.trim();
+    if (line.length === 0) {
+      continue;
+    }
+
+    const separatorIndex = line.indexOf("=");
+    if (separatorIndex <= 0 || separatorIndex === line.length - 1) {
+      return { error: `Line ${index + 1}: use status=/path/*@METHOD format.` };
+    }
+
+    const status = Number(line.slice(0, separatorIndex));
+    if (!Number.isInteger(status) || status < 400 || status > 499) {
+      return { error: `Line ${index + 1}: use an HTTP 4xx status.` };
+    }
+
+    const ruleValue = line.slice(separatorIndex + 1);
+    const methodSeparatorIndex = ruleValue.lastIndexOf("@");
+    const pathPattern = normalizePathPattern(methodSeparatorIndex === -1 ? ruleValue : ruleValue.slice(0, methodSeparatorIndex));
+    if (!pathPattern.startsWith("/") || pathPattern.includes("?") || pathPattern.includes("#")) {
+      return { error: `Line ${index + 1}: path must start with / and exclude query strings.` };
+    }
+    const wildcardIndex = pathPattern.indexOf("*");
+    if (wildcardIndex !== -1 && wildcardIndex !== pathPattern.length - 1) {
+      return { error: `Line ${index + 1}: wildcard must be at the end of the path.` };
+    }
+
+    const methods = methodSeparatorIndex === -1
+      ? []
+      : Array.from(new Set(ruleValue
+          .slice(methodSeparatorIndex + 1)
+          .split(",")
+          .map((method) => method.trim().toUpperCase())
+          .filter((method): method is ImmediateClientErrorPathRule["methods"][number] =>
+            (HTTP_METHOD_VALUES as readonly string[]).includes(method)
+          )))
+          .sort();
+
+    if (methodSeparatorIndex !== -1 && methods.length === 0) {
+      return { error: `Line ${index + 1}: use valid HTTP methods after @.` };
+    }
+
+    rules.push({ status_code: status, path_pattern: pathPattern, methods });
+  }
+
+  if (rules.length > 25) {
+    return { error: "Choose no more than 25 path rules." };
+  }
+
+  return {
+    rules: Array.from(
+      new Map(rules.map((rule) => [`${rule.status_code}:${rule.path_pattern}:${rule.methods.join(",")}`, rule])).values()
+    ).sort((left, right) => {
+      if (left.status_code !== right.status_code) return left.status_code - right.status_code;
+      const pathComparison = left.path_pattern.localeCompare(right.path_pattern);
+      if (pathComparison !== 0) return pathComparison;
+      return left.methods.join(",").localeCompare(right.methods.join(","));
+    })
+  };
+}
+
+function formatClientErrorPathRulesInput(rules: readonly ImmediateClientErrorPathRule[]): string {
+  return rules
+    .map((rule) => {
+      const methods = rule.methods.length === 0 ? "" : `@${rule.methods.join(",")}`;
+      return `${rule.status_code}=${rule.path_pattern}${methods}`;
+    })
+    .join("\n");
+}
+
 function getClientErrorCustomValidationError(draft: CapturePolicyDraft): string | null {
   if (draft.client_error_incident_mode !== "custom") {
     return null;
   }
 
   return parseClientErrorStatusesInput(draft.client_error_custom_input).error ?? null;
+}
+
+function getClientErrorPathRulesValidationError(draft: CapturePolicyDraft): string | null {
+  return parseClientErrorPathRulesInput(draft.client_error_path_rules_input).error ?? null;
 }
 
 function draftsEqual(left: CapturePolicyDraft, right: CapturePolicyDraft): boolean {
@@ -629,7 +760,8 @@ function draftsEqual(left: CapturePolicyDraft, right: CapturePolicyDraft): boole
     && left.capture_breadcrumbs === right.capture_breadcrumbs
     && left.capture_probe_events === right.capture_probe_events
     && left.client_error_incident_mode === right.client_error_incident_mode
-    && left.client_error_custom_input === right.client_error_custom_input;
+    && left.client_error_custom_input === right.client_error_custom_input
+    && left.client_error_path_rules_input === right.client_error_path_rules_input;
 }
 
 function statusesEqual(left: readonly number[], right: readonly number[]): boolean {
@@ -688,6 +820,20 @@ function formatClientErrorIncidentsPreview(draft: CapturePolicyDraft, validation
 
       return formatClientErrorStatusList(parseClientErrorStatusesInput(draft.client_error_custom_input).statuses ?? []);
   }
+}
+
+function formatClientErrorPathRulesPreview(draft: CapturePolicyDraft, validationError: string | null): string {
+  if (validationError !== null) {
+    return "Custom (invalid)";
+  }
+
+  const parsed = parseClientErrorPathRulesInput(draft.client_error_path_rules_input);
+  const rules = parsed.rules ?? [];
+  if (rules.length === 0) {
+    return "None";
+  }
+
+  return rules.length === 1 ? formatClientErrorPathRulesInput(rules) : `${rules.length} rules`;
 }
 
 function formatClientErrorStatusList(statuses: readonly number[]): string {

@@ -25,14 +25,20 @@ describe("cli capture-policy commands", () => {
             capture_request_events: "failures_only",
             capture_breadcrumbs: "exception_only",
             capture_probe_events: "buffer_only",
-            immediate_client_error_statuses: []
+            immediate_client_error_statuses: [],
+            immediate_client_error_path_rules: [
+              { status_code: 404, path_pattern: "/checkout/*", methods: ["GET", "POST"] }
+            ]
           },
           overrides: {
             capture_logs: null,
             capture_request_events: null,
             capture_breadcrumbs: null,
             capture_probe_events: null,
-            immediate_client_error_statuses: null
+            immediate_client_error_statuses: null,
+            immediate_client_error_path_rules: [
+              { status_code: 404, path_pattern: "/checkout/*", methods: ["GET", "POST"] }
+            ]
           }
         })
       }
@@ -42,6 +48,7 @@ describe("cli capture-policy commands", () => {
     expect(result.output).toContain("preset: balanced");
     expect(result.output).toContain("capture_logs: warning");
     expect(result.output).toContain("client_error_incidents: preset default (none)");
+    expect(result.output).toContain("client_error_path_rules: custom (404=/checkout/*@GET,POST)");
   });
 
   it("renders update results in json mode", async () => {

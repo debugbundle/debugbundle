@@ -1,5 +1,12 @@
 import type { NormalizedEvent } from "../../event-normalizer/src/index.js";
-import type { CapturePreset, CaptureRuleEvaluationResult, EventClass, EventEnvelope, TierName } from "../../shared-types/src/index.js";
+import type {
+  CapturePreset,
+  CaptureRuleEvaluationResult,
+  EventClass,
+  EventEnvelope,
+  ImmediateClientErrorPathRule,
+  TierName
+} from "../../shared-types/src/index.js";
 import type { IncidentReason } from "./incident-reason.js";
 
 export interface ObjectStorePutInput {
@@ -83,6 +90,7 @@ export interface NormalizeEventsJob {
   object_key: string;
   capture_preset?: CapturePreset;
   immediate_client_error_statuses?: number[];
+  immediate_client_error_path_rules?: ImmediateClientErrorPathRule[];
   capture_rule?: CaptureRuleEvaluationResult;
 }
 
@@ -190,7 +198,12 @@ export interface IngestionPersistenceService {
   persistAndEnqueue(
     event: EventEnvelope,
     projectId: string,
-    options?: { capturePreset?: CapturePreset; immediateClientErrorStatuses?: number[]; captureRule?: CaptureRuleEvaluationResult }
+    options?: {
+      capturePreset?: CapturePreset;
+      immediateClientErrorStatuses?: number[];
+      immediateClientErrorPathRules?: ImmediateClientErrorPathRule[];
+      captureRule?: CaptureRuleEvaluationResult;
+    }
   ): Promise<{ object_key: string }>;
 }
 

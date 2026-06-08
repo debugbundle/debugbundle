@@ -119,7 +119,7 @@ describe("request anomaly evaluation", () => {
     expect(recordObservation).not.toHaveBeenCalled();
   });
 
-  it("records observations but returns null when the anomaly threshold is not crossed", async () => {
+  it("does not record unpromoted 404 observations for anomaly incidents", async () => {
     const recordObservation = vi.fn().mockResolvedValue({
       occurrences_1m: 2,
       occurrences_5m: 10,
@@ -143,11 +143,7 @@ describe("request anomaly evaluation", () => {
     });
 
     expect(result).toBeNull();
-    expect(recordObservation).toHaveBeenCalledWith({
-      anomaly_key: "proj_123:balanced:checkout-api:production:GET:/checkout/:orderId:404",
-      event_id: "00000000-0000-4000-8000-000000000401",
-      occurred_at: "2026-03-20T00:00:00.000Z"
-    });
+    expect(recordObservation).not.toHaveBeenCalled();
   });
 
   it("skips low-value external probe 404 routes before anomaly counting", async () => {
@@ -216,7 +212,7 @@ describe("request anomaly evaluation", () => {
     expect(recordObservation).not.toHaveBeenCalled();
   });
 
-  it("keeps normal app login 404s eligible for request anomaly incidents", async () => {
+  it("keeps normal app login 404s out of request anomaly incidents unless explicitly promoted upstream", async () => {
     const recordObservation = vi.fn().mockResolvedValue({
       occurrences_1m: 6,
       occurrences_5m: 24,
@@ -254,20 +250,11 @@ describe("request anomaly evaluation", () => {
       }
     });
 
-    expect(result).toMatchObject({
-      event_type: "request_event",
-      event_class: "context_signal",
-      incident_trigger: "request_anomaly",
-      normalized_message: "Request anomaly: GET /login returned 404 repeatedly"
-    });
-    expect(recordObservation).toHaveBeenCalledWith({
-      anomaly_key: "proj_123:investigative:checkout-api:production:GET:/login:404",
-      event_id: "00000000-0000-4000-8000-000000000401",
-      occurred_at: "2026-03-20T00:00:00.000Z"
-    });
+    expect(result).toBeNull();
+    expect(recordObservation).not.toHaveBeenCalled();
   });
 
-  it("returns a request anomaly job when the threshold is crossed", async () => {
+  it("does not return a request anomaly job for repeated unpromoted 404s even when counters would cross the old threshold", async () => {
     const recordObservation = vi.fn().mockResolvedValue({
       occurrences_1m: 6,
       occurrences_5m: 24,
@@ -290,20 +277,7 @@ describe("request anomaly evaluation", () => {
       }
     });
 
-    expect(result).toEqual({
-      project_id: "proj_123",
-      event_id: "00000000-0000-4000-8000-000000000401",
-      event_type: "request_event",
-      event_class: "context_signal",
-      incident_trigger: "request_anomaly",
-      service_name: "checkout-api",
-      environment: "production",
-      fingerprint: expect.any(String),
-      fingerprint_version: "v2",
-      normalized_message: "Request anomaly: GET /checkout/:orderId returned 404 repeatedly",
-      matched_fields: ["request_anomaly", "route_template", "http_method", "http_status", "environment"],
-      occurred_at: "2026-03-20T00:00:00.000Z",
-      severity: "medium"
-    });
+    expect(result).toBeNull();
+    expect(recordObservation).not.toHaveBeenCalled();
   });
 });

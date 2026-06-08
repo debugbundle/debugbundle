@@ -779,6 +779,29 @@ describe("postgres metadata store project collaboration", () => {
     ).resolves.toEqual({ kind: "shared_access_suspended" });
   });
 
+  it("qualifies joined invite columns when resolving an invite acceptance token", async (): Promise<void> => {
+    const query = vi.fn().mockResolvedValue({ rows: [] });
+    const store = createPostgresMetadataStore({ query });
+
+    await expect(
+      store.acceptProjectInviteForUser!({
+        invite_token_hash: "hash_invite",
+        user_id: "usr_member",
+        email: "dev@example.com",
+        accepted_at: "2026-03-20T00:00:00.000Z"
+      })
+    ).resolves.toEqual({ kind: "invalid_token" });
+
+    expect(query).toHaveBeenCalledTimes(1);
+
+    const [sql] = query.mock.calls[0] as [string, unknown[]];
+    expect(sql).toContain("invites.id AS invite_id");
+    expect(sql).toContain("invites.invite_token_hash = $1");
+    expect(sql).toContain("invites.accepted_at IS NULL");
+    expect(sql).toContain("invites.canceled_at IS NULL");
+    expect(sql).toContain("invites.expires_at > $2::timestamptz");
+  });
+
   it("covers member role updates and removals", async (): Promise<void> => {
     const updateUnauthorizedStore = createPostgresMetadataStore({
       query: vi.fn().mockResolvedValue({ rows: [] })

@@ -352,7 +352,7 @@ Rate-limited responses also include `Retry-After: <seconds>` so SDKs can back of
 
 Current API implementation scope (Phase 7 continuation): `GET /v1/incidents` supports organization-scoped filtering by `project_id`, `environment`, `service`, `status`, `severity`, plus cursor-based pagination via `cursor` and `limit` (1-100, default 20).
 
-Low-value external-probe `GET`/`404` routes such as common WordPress, OWA, RDWeb, VPN, `/.env`, and autodiscover scanner paths are excluded from anomaly-driven incident creation in the worker. They may still exist as accepted request telemetry when capture policy allows them, but they should not appear as normal incidents solely because repeated scanner traffic crossed the generic request-anomaly threshold.
+Low-value external-probe `GET`/`404` routes such as common WordPress, OWA, RDWeb, VPN, `/.env`, and autodiscover scanner paths may still exist as accepted request telemetry when capture policy allows them, but they should not appear as normal incidents unless the project explicitly promotes that status or a narrow status+path rule.
 
 **Query params (logs):** `incident_id` (required), `level`, `limit`, `cursor`
 
@@ -1397,14 +1397,18 @@ Response `200`:
     "capture_request_events": "off | failures_only | filtered | all",
     "capture_breadcrumbs": "local_only | exception_only | standalone",
     "capture_probe_events": "buffer_only | standalone_when_activated",
-    "immediate_client_error_statuses": [401, 403, 409, 422]
+    "immediate_client_error_statuses": [401, 403, 409, 422],
+    "immediate_client_error_path_rules": [
+      { "status_code": 404, "path_pattern": "/checkout/*", "methods": ["GET", "POST"] }
+    ]
   },
   "overrides": {
     "capture_logs": "off | warning | error | info | null",
     "capture_request_events": "off | failures_only | filtered | all | null",
     "capture_breadcrumbs": "local_only | exception_only | standalone | null",
     "capture_probe_events": "buffer_only | standalone_when_activated | null",
-    "immediate_client_error_statuses": null
+    "immediate_client_error_statuses": null,
+    "immediate_client_error_path_rules": null
   },
   "access_mode": "editable | preview"
 }
@@ -1428,7 +1432,10 @@ Request body (all fields optional):
   "capture_request_events": "failures_only",
   "capture_breadcrumbs": "exception_only",
   "capture_probe_events": "buffer_only",
-  "immediate_client_error_statuses": [401, 403, 409, 422]
+  "immediate_client_error_statuses": [401, 403, 409, 422],
+  "immediate_client_error_path_rules": [
+    { "status_code": 404, "path_pattern": "/checkout/*", "methods": ["GET", "POST"] }
+  ]
 }
 ```
 
@@ -1440,6 +1447,8 @@ Response `200`: same shape as GET response with updated values.
 - override values must be valid for that control
 - `immediate_client_error_statuses` must contain only integer HTTP statuses in `400..499`, is normalized to deduped ascending order, and is limited to 12 entries
 - `null` for `immediate_client_error_statuses` means `use preset default`; `[]` means explicit `none`
+- `immediate_client_error_path_rules` must contain at most 25 rules; each rule uses a `4xx` `status_code`, a `path_pattern` that starts with `/` and may use only a terminal `*` wildcard, and optional HTTP `methods` normalized to uppercase
+- `null` for `immediate_client_error_path_rules` means `use preset default`; `[]` means explicit `none`
 - Free-tier projects cannot set `capture_probe_events` to `standalone_when_activated` (returns 403)
 - Omitted override fields keep their existing override state; on a project with no saved capture-policy row yet, omitted overrides behave as `null` and resolve from preset defaults
 - Plain members receive `403 { "error": "forbidden" }` on update attempts
@@ -1603,7 +1612,8 @@ Response `200`: same shape as GET response with updated values.
     "capture_request_events": "failures_only",
     "capture_breadcrumbs": "local_only",
     "capture_probe_events": "buffer_only",
-    "immediate_client_error_statuses": []
+    "immediate_client_error_statuses": [],
+    "immediate_client_error_path_rules": []
   }
 }
 ```
@@ -2059,10 +2069,10 @@ These commands manage remote probe activations. `probe activate` remains a Solo+
 debugbundle capture-policy get [--project <id>] [--json]
 debugbundle capture-policy set [--project <id>] --preset <minimal|balanced|investigative> [--json]
 debugbundle capture-policy set [--project <id>] --override capture_logs=warning --override capture_request_events=failures_only [--json]
-debugbundle capture-policy set [--project <id>] --client-error-incidents <preset-default|none|recommended|custom> [--client-error-statuses <401,403,...>] [--json]
+debugbundle capture-policy set [--project <id>] --client-error-incidents <preset-default|none|recommended|custom> [--client-error-statuses <401,403,...>] [--client-error-path-rule <404=/checkout/*@GET,POST>] [--client-error-path-rules-json <json>] [--json]
 ```
 
-`capture-policy get` displays the project's current resolved policy plus raw override semantics for client error incidents. `capture-policy set` updates the preset and/or individual override fields via `--override key=value` (use `null` to clear an override), and also supports the dedicated client-error incident mode flags shown above. Owner-only.
+`capture-policy get` displays the project's current resolved policy plus raw override semantics for client error incidents. `capture-policy set` updates the preset and/or individual override fields via `--override key=value` (use `null` to clear an override), and also supports the dedicated client-error incident mode flags shown above. `--client-error-path-rule` promotes a specific `4xx` status and path pattern without promoting that status globally. Owner-only.
 
 ### 2.12a Capture Rule Commands
 ```
@@ -2251,7 +2261,7 @@ get_capture_policy            → same result as GET /v1/projects/{id}/capture-p
 update_capture_policy         → same result as PATCH /v1/projects/{id}/capture-policy
 ```
 
-These tools manage per-project capture policy (preset selection and advanced overrides). `get_capture_policy` returns a preview-only payload to plain members and an editable payload to owner/admin callers. `update_capture_policy` requires owner/admin authorization.
+These tools manage per-project capture policy (preset selection and advanced overrides, including status-wide and path-scoped client-error incident promotion). `get_capture_policy` returns a preview-only payload to plain members and an editable payload to owner/admin callers. `update_capture_policy` requires owner/admin authorization.
 
 ### 3.5a Capture Rule Tools
 ```

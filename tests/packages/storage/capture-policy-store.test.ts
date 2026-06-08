@@ -110,10 +110,11 @@ describe("capture policy store", () => {
       });
 
       expect(result).toEqual(row);
-      // Verify all 7 params are passed
+      // Verify all 8 params are passed
       const params = query.mock.calls[0]![1] as unknown[];
-      expect(params).toHaveLength(7);
+      expect(params).toHaveLength(8);
       expect(params[6]).toBe(JSON.stringify([]));
+      expect(params[7]).toBeNull();
     });
   });
 

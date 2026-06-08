@@ -849,6 +849,52 @@ describe("cli management command handlers", () => {
     });
 
     await handleCapturePolicyCommand(
+      parseArgv([
+        "capture-policy",
+        "set",
+        "--project",
+        "proj_1",
+        "--client-error-path-rule",
+        "404=/checkout//@post,get,post"
+      ]),
+      { setCapturePolicyCommand }
+    );
+
+    expect(setCapturePolicyCommand).toHaveBeenLastCalledWith({
+      authFilePath: undefined,
+      json: undefined,
+      projectId: "proj_1",
+      update: {
+        immediate_client_error_path_rules: [
+          { status_code: 404, path_pattern: "/checkout/", methods: ["GET", "POST"] }
+        ]
+      }
+    });
+
+    await handleCapturePolicyCommand(
+      parseArgv([
+        "capture-policy",
+        "set",
+        "--project",
+        "proj_1",
+        "--client-error-path-rules-json",
+        '[{"status_code":404,"path_pattern":"/billing/*","methods":["GET"]}]'
+      ]),
+      { setCapturePolicyCommand }
+    );
+
+    expect(setCapturePolicyCommand).toHaveBeenLastCalledWith({
+      authFilePath: undefined,
+      json: undefined,
+      projectId: "proj_1",
+      update: {
+        immediate_client_error_path_rules: [
+          { status_code: 404, path_pattern: "/billing/*", methods: ["GET"] }
+        ]
+      }
+    });
+
+    await handleCapturePolicyCommand(
       parseArgv(["capture-policy", "set", "--project", "proj_1", "--client-error-incidents", "preset-default"]),
       { setCapturePolicyCommand }
     );
@@ -909,6 +955,27 @@ describe("cli management command handlers", () => {
         {}
       )
     ).rejects.toThrow("Invalid value for --client-error-statuses.");
+    await expect(
+      handleCapturePolicyCommand(
+        parseArgv(["capture-policy", "set", "--project", "proj_1", "--client-error-path-rule", "200=/checkout"]),
+        {}
+      )
+    ).rejects.toThrow("Invalid value for --client-error-path-rule.");
+    await expect(
+      handleCapturePolicyCommand(
+        parseArgv([
+          "capture-policy",
+          "set",
+          "--project",
+          "proj_1",
+          "--client-error-path-rule",
+          "404=/checkout",
+          "--client-error-path-rules-json",
+          "[]"
+        ]),
+        {}
+      )
+    ).rejects.toThrow("Use either --client-error-path-rule or --client-error-path-rules-json, not both.");
     await expect(
       handleCapturePolicyCommand(
         parseArgv([

@@ -923,7 +923,7 @@ describe("worker processor \u2013 normalize-events", () => {
     );
   });
 
-  it("should enqueue a second anomaly-triggered group job when contextual request failures cross the threshold", async (): Promise<void> => {
+  it("should not enqueue an anomaly-triggered group job for contextual 404 request failures", async (): Promise<void> => {
     const event = createEventEnvelope({
       event_type: "request_event",
       service: { name: "api", environment: "production", runtime: "node", framework: "fastify" },
@@ -967,21 +967,12 @@ describe("worker processor \u2013 normalize-events", () => {
       requestAnomalyCounter
     });
 
-    expect(queue.enqueue).toHaveBeenNthCalledWith(
-      1,
+    expect(queue.enqueue).toHaveBeenCalledOnce();
+    expect(queue.enqueue).toHaveBeenCalledWith(
       "group-incident",
       expect.objectContaining({ event_class: "context_signal", severity: "low" })
     );
-    expect(queue.enqueue).toHaveBeenNthCalledWith(
-      2,
-      "group-incident",
-      expect.objectContaining({
-        event_class: "context_signal",
-        incident_trigger: "request_anomaly",
-        severity: "medium",
-        matched_fields: expect.arrayContaining(["request_anomaly", "http_status"])
-      })
-    );
+    expect(requestAnomalyCounter.recordObservation).not.toHaveBeenCalled();
   });
 
   it("should classify log_event with info level as context_signal", async (): Promise<void> => {

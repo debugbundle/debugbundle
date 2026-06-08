@@ -500,7 +500,7 @@ Common wrapper for all SDK events:
 | `backend_exception` | `incident_signal` | Always |
 | `frontend_exception` | `incident_signal` | Always |
 | `log_event` | `incident_signal` or `context_signal` | `incident_signal` when `level` is `error`, `fatal`, or `critical`; `context_signal` otherwise |
-| `request_event` | `incident_signal` or `context_signal` | `incident_signal` when `response_status` matches the active capture preset's immediate request-failure statuses (`minimal`: `5xx`; `balanced`: `5xx`, `408`, `423`, `424`, `425`, `429`; `investigative`: balanced plus `409`) or the project's resolved `immediate_client_error_statuses`; `context_signal` otherwise |
+| `request_event` | `incident_signal` or `context_signal` | `incident_signal` when `response_status` matches the active capture preset's immediate request-failure statuses (`minimal`: `5xx`; `balanced`: `5xx`, `408`, `423`, `424`, `425`, `429`; `investigative`: balanced plus `409`), the project's resolved `immediate_client_error_statuses`, or a matching `immediate_client_error_path_rules` rule; `context_signal` otherwise |
 | `frontend_breadcrumb` | `context_signal` | Journey context for exceptions |
 | `deploy_metadata` | `context_signal` | Release correlation |
 | `error_suppressed` | `operational_signal` | Platform operations only |

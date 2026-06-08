@@ -190,7 +190,8 @@ export function registerIngestionRoutes(app: FastifyInstance, dependencies: ApiD
           entry.event.event_type === "probe_event" && "activation_id" in entry.event.payload ? entry.event.payload.activation_id : undefined,
           entry.event.payload as Record<string, unknown>,
           capturePolicy.preset,
-          capturePolicy.immediate_client_error_statuses
+          capturePolicy.immediate_client_error_statuses,
+          capturePolicy.immediate_client_error_path_rules
         );
         const captureRule =
           activeCaptureRules.length === 0
@@ -310,6 +311,7 @@ export function registerIngestionRoutes(app: FastifyInstance, dependencies: ApiD
       await dependencies.ingestionPersistence.persistAndEnqueue(event, project.project_id, {
         capturePreset: capturePolicy.preset,
         immediateClientErrorStatuses: capturePolicy.immediate_client_error_statuses,
+        immediateClientErrorPathRules: capturePolicy.immediate_client_error_path_rules,
         ...(captureRule === null ? {} : { captureRule })
       });
       accepted += 1;

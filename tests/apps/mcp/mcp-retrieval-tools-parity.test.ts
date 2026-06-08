@@ -9,7 +9,9 @@ describe("mcp retrieval tools parity", () => {
       "get_incident",
       "get_incident_context",
       "resolve_incident",
+      "resolve_incidents",
       "reopen_incident",
+      "reopen_incidents",
       "get_bundle",
       "get_reproduction",
       "get_logs"

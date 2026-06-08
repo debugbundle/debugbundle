@@ -1009,18 +1009,18 @@ export function createPostgresMetadataStore(db: Queryable): PostgresMetadataStor
       >(
         `
           SELECT
-            id AS invite_id,
-            project_id,
-            email,
-            role,
+            invites.id AS invite_id,
+            invites.project_id,
+            invites.email,
+            invites.role,
             COALESCE(o.plan, 'free') AS owner_plan
           FROM project_invites invites
           JOIN projects p ON p.id = invites.project_id
           JOIN organizations o ON o.id = p.organization_id
-          WHERE invite_token_hash = $1
-            AND accepted_at IS NULL
-            AND canceled_at IS NULL
-            AND expires_at > $2::timestamptz
+          WHERE invites.invite_token_hash = $1
+            AND invites.accepted_at IS NULL
+            AND invites.canceled_at IS NULL
+            AND invites.expires_at > $2::timestamptz
           LIMIT 1
         `,
         [input.invite_token_hash, input.accepted_at]

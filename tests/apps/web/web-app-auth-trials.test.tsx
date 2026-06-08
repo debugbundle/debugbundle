@@ -82,7 +82,7 @@ describe("web app - auth trial flows", () => {
     render(<App initialEntries={["/signup?trial=team"]} />);
 
     expect(await screen.findByText(/team trial selected/i)).toBeInTheDocument();
-    expect(screen.getByText(/no credit card is required/i)).toBeInTheDocument();
+    expect(screen.getByText(/30-day no-card trial/i)).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /continue with github/i })).toHaveAttribute(
       "href",
       expect.stringContaining("/v1/auth/github/start?trial=team")
@@ -97,7 +97,7 @@ describe("web app - auth trial flows", () => {
     expect(screen.getByText(/trial access stays active through .*2026/i)).toBeInTheDocument();
   });
 
-  it("lets the user clear the signup trial intent before requesting a code", async () => {
+  it("keeps the signup trial intent when requesting a code", async () => {
     const user = userEvent.setup();
     const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
       const url = requestUrl(input);
@@ -110,7 +110,8 @@ describe("web app - auth trial flows", () => {
         expect(init?.body).toBe(
           JSON.stringify({
             email: "owen@example.com",
-            accepted_terms: true
+            accepted_terms: true,
+            requested_trial_plan: "solo"
           })
         );
         return jsonResponse(200, { success: true });
@@ -124,7 +125,7 @@ describe("web app - auth trial flows", () => {
     render(<App initialEntries={["/signup?trial=solo"]} />);
 
     expect(await screen.findByText(/solo trial selected/i)).toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: /continue without trial/i }));
+    expect(screen.queryByRole("button", { name: /continue without trial/i })).toBeNull();
     await user.type(screen.getByLabelText(/email address/i), "owen@example.com");
     await user.click(screen.getByRole("button", { name: /^send code$/i }));
   });

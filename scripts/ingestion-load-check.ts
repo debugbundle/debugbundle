@@ -238,6 +238,7 @@ async function main(): Promise<void> {
             capture_breadcrumbs: null,
             capture_probe_events: null,
             immediate_client_error_statuses: null,
+            immediate_client_error_path_rules: null,
             updated_at: "2026-04-04T00:00:00.000Z"
           };
         }

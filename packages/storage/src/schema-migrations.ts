@@ -735,6 +735,13 @@ export const STORAGE_SCHEMA_MIGRATIONS = [
         ON plan_cleanup_tasks (completed_at, next_attempt_at, created_at)
       `
     ]
+  }),
+  defineStorageSchemaMigration({
+    id: "202606080001_add_capture_policy_client_error_path_rules",
+    description: "Add path-scoped client error incident promotion rules to capture policies.",
+    statements: [
+      "ALTER TABLE capture_policies ADD COLUMN IF NOT EXISTS immediate_client_error_path_rules jsonb"
+    ]
   })
 ] as const;
 

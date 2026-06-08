@@ -33,6 +33,11 @@ async function chooseStatusFilterOption(
   await user.click(await screen.findByRole("option", { name: optionName }));
 }
 
+function getPrimaryRefreshButton(): HTMLElement {
+  const refreshButtons = screen.getAllByRole("button", { name: /^refresh$/i });
+  return refreshButtons[refreshButtons.length - 1] as HTMLElement;
+}
+
 afterEach(() => {
   resetBrowserSessionClientState();
   vi.restoreAllMocks();
@@ -635,7 +640,7 @@ describe("web app — incident and project detail routes", () => {
     expect(await screen.findByText(/initial workspace incident/i)).toBeInTheDocument();
     expect(workspaceIncidentRequests).toBe(1);
 
-    await user.click(screen.getByRole("button", { name: /^refresh$/i }));
+    await user.click(getPrimaryRefreshButton());
 
     expect(await screen.findByText(/refreshed workspace incident/i)).toBeInTheDocument();
     expect(screen.queryByText(/initial workspace incident/i)).toBeNull();
@@ -678,7 +683,7 @@ describe("web app — incident and project detail routes", () => {
 
     expect(await screen.findByText(/initial workspace incident/i)).toBeInTheDocument();
 
-    const refreshButton = screen.getByRole("button", { name: /^refresh$/i });
+    const refreshButton = getPrimaryRefreshButton();
     const refreshIcon = refreshButton.querySelector("svg");
 
     expect(refreshIcon).not.toBeNull();
@@ -826,7 +831,7 @@ describe("web app — incident and project detail routes", () => {
     expect(await screen.findByText(/initial project incident/i)).toBeInTheDocument();
     expect(projectIncidentRequests).toBe(1);
 
-    await user.click(screen.getByRole("button", { name: /^refresh$/i }));
+    await user.click(getPrimaryRefreshButton());
 
     expect(await screen.findByText(/refreshed project incident/i)).toBeInTheDocument();
     expect(screen.queryByText(/initial project incident/i)).toBeNull();
@@ -920,7 +925,7 @@ describe("web app — incident and project detail routes", () => {
     expect(await screen.findByText(/initial bundle incident/i)).toBeInTheDocument();
     expect(projectBundleRequests).toBe(1);
 
-    await user.click(screen.getByRole("button", { name: /^refresh$/i }));
+    await user.click(getPrimaryRefreshButton());
 
     expect(await screen.findByText(/refreshed bundle incident/i)).toBeInTheDocument();
     expect(screen.queryByText(/initial bundle incident/i)).toBeNull();

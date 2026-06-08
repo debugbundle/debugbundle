@@ -65,19 +65,19 @@ function makeLogEvent(level: string): EventEnvelope {
   });
 }
 
-function makeRequestEvent(responseStatus: number): EventEnvelope {
+function makeRequestEvent(responseStatus: number, path = "/users", method = "GET"): EventEnvelope {
   return createEventEnvelope({
     event_type: "request_event",
     project_token: "dbundle_proj_test",
     service: { name: "api", environment: "production", runtime: "node", framework: "fastify" },
     payload: {
-      method: "GET",
-      path: "/users",
+      method,
+      path,
       query: {},
       headers: {},
       response_status: responseStatus,
       duration_ms: 42,
-      route_template: "/users"
+      route_template: path
     }
   });
 }
@@ -389,7 +389,51 @@ describe("ingestion capture policy enforcement", () => {
     );
   });
 
-  it("should accept immediate and anomaly-eligible request_event payloads on balanced policy", async (): Promise<void> => {
+  it("should accept path-scoped client error incidents even when generic request capture is off", async (): Promise<void> => {
+    const persistAndEnqueue = vi.fn().mockResolvedValue({ object_key: "raw-events/p/k.json.gz" });
+    const pathRules = [{ status_code: 404, path_pattern: "/checkout/*", methods: ["GET"] }];
+    const capturePolicyManagement = {
+      getCapturePolicyForProject: vi.fn().mockResolvedValue({
+        project_id: "proj_123",
+        preset: "minimal",
+        capture_logs: null,
+        capture_request_events: "off",
+        capture_breadcrumbs: null,
+        capture_probe_events: null,
+        immediate_client_error_statuses: null,
+        immediate_client_error_path_rules: pathRules,
+        updated_at: "2026-03-01T00:00:00.000Z"
+      }),
+      upsertCapturePolicyForProject: vi.fn()
+    };
+
+    const app = createApiServer(createBaseDependencies({ persistAndEnqueue, capturePolicyManagement }));
+
+    const response = await app.inject({
+      method: "POST",
+      url: "/v1/events",
+      headers: { authorization: "Bearer dbundle_proj_test" },
+      payload: { events: [makeRequestEvent(404, "/checkout/123"), makeRequestEvent(404, "/robots.txt")] }
+    });
+
+    expect(response.statusCode).toBe(202);
+    expect(response.json()).toMatchObject({
+      accepted: 1,
+      rejected: 1,
+      errors: [{ index: 1, reason: "capture_policy_rejected" }]
+    });
+    expect(persistAndEnqueue).toHaveBeenCalledTimes(1);
+    expect(persistAndEnqueue).toHaveBeenCalledWith(
+      expect.any(Object),
+      "proj_123",
+      expect.objectContaining({
+        capturePreset: "minimal",
+        immediateClientErrorPathRules: pathRules
+      })
+    );
+  });
+
+  it("should accept immediate request_event payloads on balanced policy but reject unpromoted 4xx", async (): Promise<void> => {
     const persistAndEnqueue = vi.fn().mockResolvedValue({ object_key: "raw-events/p/k.json.gz" });
     const capturePolicyManagement = {
       getCapturePolicyForProject: vi.fn().mockResolvedValue({
@@ -420,11 +464,11 @@ describe("ingestion capture policy enforcement", () => {
 
     expect(response.statusCode).toBe(202);
     expect(response.json()).toMatchObject({
-      accepted: 2,
-      rejected: 0,
-      errors: []
+      accepted: 1,
+      rejected: 1,
+      errors: [{ index: 1, reason: "capture_policy_rejected" }]
     });
-    expect(persistAndEnqueue).toHaveBeenCalledTimes(2);
+    expect(persistAndEnqueue).toHaveBeenCalledTimes(1);
   });
 
   it("should reject standalone breadcrumb on minimal policy (capture_breadcrumbs=local_only)", async (): Promise<void> => {

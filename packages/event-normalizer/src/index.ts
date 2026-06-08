@@ -6,7 +6,8 @@ import {
   classifyRequestStatus,
   type CapturePreset,
   type EventEnvelope,
-  type EventClass
+  type EventClass,
+  type ImmediateClientErrorPathRule
 } from "../../shared-types/src/index.js";
 
 export interface NormalizedEvent {
@@ -495,6 +496,7 @@ export function classifyEvent(
   payload?: Record<string, unknown>,
   capturePreset: CapturePreset = "minimal",
   immediateClientErrorStatuses: readonly number[] = [],
+  immediateClientErrorPathRules: readonly ImmediateClientErrorPathRule[] = [],
 ): EventClass {
   switch (eventType) {
     case "backend_exception":
@@ -509,7 +511,14 @@ export function classifyEvent(
 
     case "request_event": {
       const responseStatus = getRequestResponseStatus(payload);
-      return classifyRequestStatus({ responseStatus, capturePreset, immediateClientErrorStatuses });
+      return classifyRequestStatus({
+        responseStatus,
+        requestPath: payload?.["path"],
+        httpMethod: payload?.["method"],
+        capturePreset,
+        immediateClientErrorStatuses,
+        immediateClientErrorPathRules
+      });
     }
 
     case "frontend_breadcrumb":

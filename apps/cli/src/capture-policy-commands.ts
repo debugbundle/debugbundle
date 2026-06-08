@@ -118,6 +118,22 @@ function formatStatusList(statuses: readonly number[]): string {
   return statuses.length === 0 ? "none" : statuses.join(", ");
 }
 
+function formatClientErrorPathRules(response: CapturePolicyResponse): string {
+  const rawOverride = response.overrides.immediate_client_error_path_rules ?? null;
+  const rules = rawOverride ?? response.policy.immediate_client_error_path_rules ?? [];
+
+  if (rules.length === 0) {
+    return rawOverride === null ? "preset default (none)" : "none (explicit)";
+  }
+
+  const formatted = rules.map((rule) => {
+    const methods = rule.methods.length === 0 ? "" : `@${rule.methods.join(",")}`;
+    return `${rule.status_code}=${rule.path_pattern}${methods}`;
+  });
+
+  return `${rawOverride === null ? "preset default" : "custom"} (${formatted.join("; ")})`;
+}
+
 function formatClientErrorIncidents(response: CapturePolicyResponse): string {
   const rawOverride = response.overrides.immediate_client_error_statuses;
 
@@ -145,7 +161,8 @@ function formatPolicy(response: CapturePolicyResponse): string {
     `capture_request_events: ${policy.capture_request_events}`,
     `capture_breadcrumbs: ${policy.capture_breadcrumbs}`,
     `capture_probe_events: ${policy.capture_probe_events}`,
-    `client_error_incidents: ${formatClientErrorIncidents(response)}`
+    `client_error_incidents: ${formatClientErrorIncidents(response)}`,
+    `client_error_path_rules: ${formatClientErrorPathRules(response)}`
   ].join("\n");
 }
 

@@ -361,7 +361,7 @@ The browser SDK collects device/browser metadata once on `init()` and attaches i
 
 ### Breadcrumb Ring Buffer Behavior
 
-Non-exception browser captures (clicks, route changes, network summaries, console entries) are **breadcrumbs** by default. They accumulate in a fixed-size ring buffer (`maxBreadcrumbs`, default 10). First-party network responses that match the active preset's immediate request-failure statuses are the exception: the browser SDK must keep the `network_request` breadcrumb for timeline context and also emit a standalone `request_event` so the failure can create a request-failure incident. Immediate request-failure presets are `minimal`: `5xx`; `balanced`: `5xx`, `408`, `423`, `424`, `425`, `429`; `investigative`: balanced plus `409`. When `capture_request_events` is `failures_only`, first-party browser responses in the preset's request-anomaly set also emit standalone `request_event` context signals so repeated failures can cross the worker anomaly threshold without reclassifying the source events. When a `frontend_exception` occurs:
+Non-exception browser captures (clicks, route changes, network summaries, console entries) are **breadcrumbs** by default. They accumulate in a fixed-size ring buffer (`maxBreadcrumbs`, default 10). First-party network responses that match the active preset's immediate request-failure statuses, a resolved status-wide client-error incident override, or a matching path-scoped client-error incident rule are the exception: the browser SDK must keep the `network_request` breadcrumb for timeline context and also emit a standalone `request_event` so the failure can create a request-failure incident. Immediate request-failure presets are `minimal`: `5xx`; `balanced`: `5xx`, `408`, `423`, `424`, `425`, `429`; `investigative`: balanced plus `409`. Unpromoted `4xx` responses such as generic 404s remain non-incident telemetry/context and must not open incidents solely because they repeat. When a `frontend_exception` occurs:
 
 1. The ring buffer contents are attached to the exception event as `breadcrumbs[]`.
 2. The combined payload (exception + breadcrumbs) is shipped as a single batch.
@@ -869,7 +869,8 @@ The `GET /v1/sdk/config` response includes `capture_policy` and `capture_rules` 
     "capture_request_events": "failures_only",
     "capture_breadcrumbs": "local_only",
     "capture_probe_events": "buffer_only",
-    "immediate_client_error_statuses": []
+    "immediate_client_error_statuses": [],
+    "immediate_client_error_path_rules": []
   },
   "capture_rules": []
 }
@@ -885,8 +886,8 @@ SDKs fetch this on `init()` alongside probe config. The policy and active rules 
 | `capture_logs` | `error` | Only buffer/ship `log_event` with level `error` or `critical` |
 | `capture_logs` | `warning` | Buffer/ship `log_event` with level `warning`, `error`, or `critical` |
 | `capture_logs` | `info` | Buffer/ship `log_event` with level `info` and above |
-| `capture_request_events` | `off` | Discard standalone `request_event` unless the response matches the active preset's immediate request-failure statuses or the resolved `immediate_client_error_statuses`; those immediate request failures are still captured as incident signals |
-| `capture_request_events` | `failures_only` | Buffer/ship immediate request-failure `request_event` for the active preset (`minimal`: `5xx`; `balanced`: `5xx`, `408`, `423`, `424`, `425`, `429`; `investigative`: balanced plus `409`) plus any resolved `immediate_client_error_statuses`, and also ship preset-enabled request-anomaly candidate `request_event` context signals (`balanced`: `400`, `401`, `403`, `404`, `409`, `410`, `422`; `investigative`: same set with lower thresholds). Minimal has no request-anomaly candidates. |
+| `capture_request_events` | `off` | Discard standalone `request_event` unless the response matches the active preset's immediate request-failure statuses, the resolved `immediate_client_error_statuses`, or a matching `immediate_client_error_path_rules` rule; those immediate request failures are still captured as incident signals |
+| `capture_request_events` | `failures_only` | Buffer/ship immediate request-failure `request_event` for the active preset (`minimal`: `5xx`; `balanced`: `5xx`, `408`, `423`, `424`, `425`, `429`; `investigative`: balanced plus `409`) plus any resolved status-wide or path-scoped client-error incident promotions. Unpromoted `4xx` responses such as generic `404` remain non-incident telemetry and are not emitted in `failures_only` unless another SDK feature explicitly captures all request telemetry. |
 | `capture_request_events` | `filtered` | Buffer/ship `request_event` matching configured filters; until custom filters are available, SDKs keep only immediate request failures and do not ship additional filtered request context |
 | `capture_request_events` | `all` | Buffer/ship all `request_event` |
 | `capture_breadcrumbs` | `local_only` | Keep breadcrumbs in local ring buffer; flush only with exceptions |
@@ -894,6 +895,7 @@ SDKs fetch this on `init()` alongside probe config. The policy and active rules 
 | `capture_breadcrumbs` | `standalone` | Ship standalone `frontend_breadcrumb` events independently |
 | `capture_probe_events` | `buffer_only` | Probes stay in ring buffer; flush only with errors (always-on mode) |
 | `immediate_client_error_statuses` | `[401,403,409,422]` etc. | Promote those project-selected `4xx` request failures to immediate standalone `request_event` incident signals across browser and backend SDKs |
+| `immediate_client_error_path_rules` | `[{ status_code: 404, path_pattern: "/checkout/*", methods: ["GET"] }]` | Promote only matching status+path+method client errors to immediate request incidents, useful for real application routes that should not 404 |
 | `capture_probe_events` | `standalone_when_activated` | Remote-activated probes ship independently (paid tiers only) |
 
 ### Fallback Behavior
