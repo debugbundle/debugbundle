@@ -2923,7 +2923,11 @@ describe("web app — management routes", () => {
 
       if (url.endsWith("/v1/alerts/alert_123?project_id=proj_123") && init?.method === "PATCH") {
         expect(init.credentials).toBe("include");
-        expect(JSON.parse(String(init.body))).toEqual({
+        const requestBody = init.body;
+        if (typeof requestBody !== "string") {
+          throw new Error("expected alert update request body");
+        }
+        expect(JSON.parse(requestBody)).toEqual({
           channel: "email",
           condition_type: "severity_threshold",
           severity_min: "critical",

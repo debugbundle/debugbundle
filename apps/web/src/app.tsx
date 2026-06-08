@@ -474,7 +474,7 @@ function EmailAuthPage({
   showTrialIntentPanel?: boolean;
 }): JSX.Element {
   const { session, setSession } = useSession();
-  const [searchParams, setSearchParams] = useSearchParams();
+  const [searchParams] = useSearchParams();
   const emailInputRef = useRef<HTMLInputElement>(null);
   const codeInputRef = useRef<HTMLInputElement>(null);
   const [email, setEmail] = useState("");
@@ -542,18 +542,6 @@ function EmailAuthPage({
     setFieldErrors((current) =>
       current[field] === undefined ? current : omitAuthFieldError(current, field)
     );
-  }
-
-  function setRequestedTrialPlan(nextPlan: RequestedTrialPlan | null): void {
-    setSearchParams((current) => {
-      const nextParams = new URLSearchParams(current);
-      if (nextPlan === null) {
-        nextParams.delete("trial");
-      } else {
-        nextParams.set("trial", nextPlan);
-      }
-      return nextParams;
-    }, { replace: true });
   }
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>): Promise<void> {
