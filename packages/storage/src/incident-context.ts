@@ -1,6 +1,7 @@
 import type { IncidentLogRecord } from "./types.js";
 
 import type { IncidentReason } from "./incident-reason.js";
+import { classifyCaptureRuleClientFromUserAgent } from "../../shared-types/src/index.js";
 
 export interface IncidentContextArtifactRecord extends Record<string, unknown> {
   status: "ready" | "pending" | "failed";
@@ -78,6 +79,14 @@ export interface IncidentContextRedactionRecord extends Record<string, unknown> 
   notes: string | null;
 }
 
+export interface IncidentContextBrowserSignalRecord extends Record<string, unknown> {
+  browser_event_kind: string | null;
+  browser_event_opaque: boolean | null;
+  browser_event_message: string | null;
+  client_kind: "human" | "bot" | "unknown";
+  bot_family: string | null;
+}
+
 export interface IncidentContextRecord extends Record<string, unknown> {
   incident: IncidentContextIncidentRecord;
   incident_reason: IncidentReason | null;
@@ -89,6 +98,7 @@ export interface IncidentContextRecord extends Record<string, unknown> {
   grouping: IncidentContextGroupingRecord;
   visibility: IncidentContextVisibilityRecord;
   redaction: IncidentContextRedactionRecord | null;
+  browser_signal?: IncidentContextBrowserSignalRecord | null;
   suggested_next_checks: string[];
 }
 
@@ -211,6 +221,36 @@ function buildRedactionRecord(bundleBody: unknown): IncidentContextRedactionReco
   };
 }
 
+function buildBrowserSignalRecord(bundleBody: unknown): IncidentContextBrowserSignalRecord | null {
+  const bundle = isRecord(bundleBody) ? bundleBody : {};
+  const context = isRecord(bundle["context"]) ? bundle["context"] : {};
+  const frontend = isRecord(context["frontend"]) ? context["frontend"] : {};
+  const exceptions: unknown[] = Array.isArray(frontend["exceptions"]) ? frontend["exceptions"] : [];
+  let exception: unknown;
+  for (let index = exceptions.length - 1; index >= 0; index -= 1) {
+    const candidate = exceptions[index];
+    if (isRecord(candidate) && isRecord(candidate["browser_event"])) {
+      exception = candidate;
+      break;
+    }
+  }
+  const browserEvent = isRecord(exception) && isRecord(exception["browser_event"]) ? exception["browser_event"] : null;
+  const device = isRecord(context["device"]) ? context["device"] : {};
+  const client = classifyCaptureRuleClientFromUserAgent(readString(device["user_agent"]) ?? undefined);
+
+  if (browserEvent === null && client.client_kind === "unknown") {
+    return null;
+  }
+
+  return {
+    browser_event_kind: readString(browserEvent?.["kind"]),
+    browser_event_opaque: readBoolean(browserEvent?.["opaque"]),
+    browser_event_message: readString(browserEvent?.["message"]),
+    client_kind: client.client_kind,
+    bot_family: client.bot_family ?? null
+  };
+}
+
 function buildVisibilityRecord(input: {
   incident: IncidentContextIncidentRecord;
   bundle: IncidentContextArtifactRecord;
@@ -245,6 +285,7 @@ function buildSuggestedNextChecks(input: {
   logs: IncidentContextLogsRecord;
   primarySignal: IncidentContextPrimarySignalRecord;
   deploy: IncidentContextDeployRecord;
+  browserSignal: IncidentContextBrowserSignalRecord | null;
 }): string[] {
   const suggestions: string[] = [];
   const isRequestAnomaly = input.incident.matched_fields.includes("request_anomaly");
@@ -280,6 +321,16 @@ function buildSuggestedNextChecks(input: {
     suggestions.push("Compare this incident against the most recent deploy and recent regressions.");
   }
 
+  if (input.browserSignal?.browser_event_opaque === true) {
+    suggestions.push("Treat the browser event as opaque; inspect CSP, cross-origin scripts, resource loading, and framework error boundaries before changing application code.");
+  }
+
+  if (input.browserSignal?.client_kind === "bot") {
+    suggestions.push(
+      `Review whether ${input.browserSignal.bot_family ?? "bot"} traffic is operational noise before applying a bot-scoped capture rule.`
+    );
+  }
+
   if (input.reproduction.status === "pending") {
     suggestions.push("Recheck reproduction guidance after the reproduction artifact is ready.");
   }
@@ -308,6 +359,7 @@ export function buildIncidentContextRecord(input: {
     primarySignal
   });
   const redaction = buildRedactionRecord(bundleBody);
+  const browserSignal = buildBrowserSignalRecord(bundleBody);
 
   return {
     incident: input.incident,
@@ -324,13 +376,15 @@ export function buildIncidentContextRecord(input: {
     },
     visibility,
     redaction,
+    browser_signal: browserSignal,
     suggested_next_checks: buildSuggestedNextChecks({
       incident: input.incident,
       bundle: input.bundle,
       reproduction: input.reproduction,
       logs,
       primarySignal,
-      deploy
+      deploy,
+      browserSignal
     })
   };
 }

@@ -260,6 +260,7 @@ describe("api retrieval routes", () => {
           function: "handleCheckout"
         }
       },
+      browser_signal: null,
       bundle: {
         status: "ready",
         body: expect.objectContaining({

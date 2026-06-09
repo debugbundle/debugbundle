@@ -270,5 +270,11 @@ describe("cli validate command", () => {
     expect(await readFile(join(rootDirectory, ".agents", "skills", "debugbundle", "SKILL.md"), "utf8")).toContain(
       "For user-reported production incidents, check cloud incidents after local incidents and explicitly report whether each source had matches."
     );
+    expect(await readFile(join(rootDirectory, ".agents", "skills", "debugbundle", "SKILL.md"), "utf8")).toContain(
+      "## Noise Management"
+    );
+    expect(await readFile(join(rootDirectory, ".agents", "skills", "debugbundle", "SKILL.md"), "utf8")).toContain(
+      "debugbundle capture-rule suggest <incident-id> --json"
+    );
   });
 });

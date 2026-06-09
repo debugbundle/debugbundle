@@ -48,6 +48,15 @@ Key local paths:
 - Reopen or leave open if the failure is still present, the validation is incomplete, or the incident represents a live unresolved problem.
 - If a resolved incident regresses, let the platform move it back to `regressed` through normal incident lifecycle behavior.
 
+## Noise Management
+
+When incident evidence shows repeated low-value operational noise rather than a product bug, evaluate whether a scoped capture rule or capture-policy path rule should handle future matches.
+
+- Run `debugbundle capture-rule suggest <incident-id> --json` before creating a manual rule. Apply deterministic suggestions with `debugbundle capture-rule create-from-suggestion <incident-id> --suggestion-id <id>` after confirming the scope is safe.
+- Prefer project capture rules for operational noise because they are centralized, auditable, and enforced by ingestion and processing. Use SDK `beforeSend` only for app-owned local policy such as final redaction or events that must never leave the runtime.
+- Scope frontend noise by structured evidence such as service, environment, `browser_event_kind`, `browser_event_opaque`, `client_kind`, `bot_family`, and message fields. Do not broadly demote generic `Unhandled promise rejection` incidents without bot-scoped or otherwise narrow evidence.
+- For expected or intentionally promoted 4xx responses on known routes, use capture-policy client-error path rules instead of promoting all client errors: `debugbundle capture-policy set --client-error-path-rule <status=/path/*@GET>`.
+
 ## Profile Validation
 
 Use this task after setup or whenever architecture changes make the static profile stale.
@@ -61,6 +70,18 @@ Use this task after setup or whenever architecture changes make the static profi
 - Run `debugbundle doctor` to confirm the profile, connection mode, auth state, and connected API reachability when the project is cloud-enabled.
 - Run `debugbundle validate --fix` to restore missing generated setup files without overwriting the profile.
 - Run `debugbundle process` after local events land in `.debugbundle/local/events/`.
+
+## Browser Capture and Relay Setup
+
+When the repository has a browser frontend, verify capture end to end instead of stopping at backend SDK setup.
+
+1. Add `@debugbundle/sdk-browser` to each browser app that should capture console, error, navigation, or request context.
+2. Initialize the browser SDK from the app entrypoint with the active environment and a browser relay endpoint.
+3. Add a backend relay endpoint at `/debugbundle/browser` using the server SDK relay helper when available.
+4. For same-origin apps, keep the browser endpoint as `/debugbundle/browser`.
+5. For split frontend/backend hosts, configure the browser endpoint to the API host relay URL and require explicit frontend origin allowlisting on the backend.
+6. Ensure auth and CSRF middleware allow the relay path while the relay still enforces origin, content type, body size, schema validation, and rate limits.
+7. Trigger a local browser smoke event, then run `debugbundle process --json` and confirm the incident or context event appears before marking setup complete.
 
 ## References
 

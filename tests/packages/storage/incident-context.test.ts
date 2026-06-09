@@ -94,4 +94,59 @@ describe("incident context", () => {
       "Inspect the GET /checkout/:orderId handler behind this repeated request-anomaly path."
     );
   });
+
+  it("surfaces opaque browser and bot context from ready bundles", () => {
+    const context = buildIncidentContextRecord({
+      incident: {
+        incident_id: "inc_browser",
+        title: "Unhandled promise rejection",
+        severity: "low",
+        status: "open",
+        service_name: "saycheese-frontend",
+        environment: "production",
+        fingerprint: "fp_browser",
+        fingerprint_version: "v1",
+        matched_fields: ["normalized_message"]
+      },
+      bundle: {
+        status: "ready",
+        body: {
+          context: {
+            device: {
+              user_agent:
+                "Mozilla/5.0 (Linux; Android 10) AppleWebKit/537.36 Chrome/148.0.0.0 Mobile Safari/537.36 Googlebot/2.1"
+            },
+            frontend: {
+              exceptions: [
+                {
+                  browser_event: {
+                    kind: "window_error",
+                    message: "Window error",
+                    opaque: true
+                  }
+                }
+              ]
+            }
+          }
+        }
+      },
+      reproduction: {
+        status: "pending"
+      }
+    });
+
+    expect(context.browser_signal).toEqual({
+      browser_event_kind: "window_error",
+      browser_event_opaque: true,
+      browser_event_message: "Window error",
+      client_kind: "bot",
+      bot_family: "Googlebot"
+    });
+    expect(context.suggested_next_checks).toContain(
+      "Treat the browser event as opaque; inspect CSP, cross-origin scripts, resource loading, and framework error boundaries before changing application code."
+    );
+    expect(context.suggested_next_checks).toContain(
+      "Review whether Googlebot traffic is operational noise before applying a bot-scoped capture rule."
+    );
+  });
 });

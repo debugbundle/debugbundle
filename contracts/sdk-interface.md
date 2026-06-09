@@ -31,6 +31,7 @@ Every SDK must expose an init function that accepts a configuration object and r
 | `maxProbeLabels` | number | `50` | Max distinct probe labels tracked in ring buffer. New labels beyond this are silently dropped. |
 | `maxProbeEntriesPerLabel` | number | `10` | Ring buffer capacity per label. Oldest entry discarded when full. |
 | `probeFlushOnError` | boolean | `true` | Whether probe ring buffers flush alongside error events. |
+| `beforeSend` | `(event) → event \| null` | — | Optional synchronous final hook after SDK event construction/redaction and before buffering. Returning `null` drops the event locally. |
 
 **Node.js local-first config fields (`@debugbundle/sdk-node`):**
 | Field | Type | Default | Description |
@@ -39,6 +40,17 @@ Every SDK must expose an init function that accepts a configuration object and r
 | `localEventsDir` | string | `<cwd>/.debugbundle/local/events` | Filesystem destination for Node file transport batches. |
 
 **Capture policy note:** SDKs do NOT accept capture policy fields in the init config. The capture policy is server-owned and delivered to SDKs via the `capture_policy` field in the `GET /v1/sdk/config` response. SDKs must respect the server-side policy and filter events locally before transmission. See Section 12 (Capture Policy Integration) for details.
+
+### 1.1 Local beforeSend hook
+
+SDKs may expose a synchronous `beforeSend` hook as an optional init config field for app-owned local policy such as final redaction, tenant-specific suppression, or dropping events that must never leave the runtime. The hook receives a fully built DebugBundle event after SDK redaction and before buffering, local capture-rule evaluation, sampling, duplicate suppression, and transport.
+
+Rules:
+- Return the event to keep shipping it.
+- Return `null` to drop the event locally.
+- If the hook throws or returns an invalid event, the SDK must keep the original event and must not throw into host code.
+- Hook execution must not block request/response handling beyond normal synchronous JavaScript/runtime execution.
+- Project capture rules remain the preferred operational noise-control surface because they are centralized, auditable, and enforced again by ingestion and worker backstops.
 
 ### 1.2 Node.js local-first transport selection
 
@@ -89,6 +101,7 @@ These behaviors are mandatory across all SDKs. A new language SDK is non-complia
 | `networkFilter` | object | `{}` | Filter network breadcrumbs. Fields: `urlPatterns` (string[]/RegExp[] allow list), `urlDenyPatterns` (string[]/RegExp[] deny list), `statusCodes` (default: `[400-599]` — only 4xx/5xx), `minResponseTime` (ms, omit faster requests). |
 | `sessionSampleRate` | number (0.0–1.0) | `1.0` | Session-level sampling. Decision made once per session — entire journey captured or nothing. Independent of `sampleRate`. |
 | `maxEventsPerSession` | number | `100` | Hard cap on events per session. After cap, only `frontend_exception` events are captured. |
+| `beforeSend` | `(event) → event \| null` | — | Browser-supported synchronous final hook before buffering. Returning `null` drops the event locally. |
 
 Browser `fetch()` calls may include an optional `debugbundle` metadata object in the init bag:
 
@@ -372,6 +385,8 @@ The attached `frontend_exception.payload.breadcrumbs[]` payload is the canonical
 When `breadcrumbsOnErrorOnly` is `true` (default), breadcrumbs are **never** shipped independently — they only appear as context for errors. When set to `false`, breadcrumbs are batched and shipped on their own schedule (standard batching rules apply).
 
 Browser-native `window_error` and `resource_error` captures may include an optional `browser_event` object on the `frontend_exception` payload. Existing fields (`kind`, `message`, `file_name`, `line_number`, `column_number`, `target`, `opaque`) are stable. SDKs may add optional sanitized resource-target attributes and page lifecycle state to improve opaque browser-error diagnosis without changing the event envelope or requiring consumers to understand those fields.
+
+Browser `unhandledrejection` captures may include `frontend_exception.payload.rejection_reason` with a bounded sanitized reason summary. `Error` reasons preserve name and message, string reasons preserve a truncated preview, object reasons may preserve sanitized `name` / `message` fields plus a type preview, and null/undefined reasons are represented explicitly.
 
 ### Session Sampling and Event Caps
 
@@ -915,6 +930,8 @@ SDKs do not assign `event_class` — that is the responsibility of the event-nor
 | `demote` | Browser SDK converts matching incident-eligible browser events into context where possible. Node and other backend SDKs may send the event normally until local context-preservation parity exists. | Worker stores matching events as `context_signal`; they cannot create, reopen, regress, alert, or dispatch automation. |
 | `sample` | SDKs use deterministic sampling keyed by `project_id`, `rule_id`, and `event_id`. Sampled-out events are discarded locally where implemented. | Ingestion rejects sampled-out events with `capture_rule_sampled_out`; sampled-in events can optionally become context when `sample_event_class` is `context`. |
 | `drop` | SDKs discard matching events before buffering where implemented. | Ingestion rejects matching events with `capture_rule_dropped` before raw persistence. |
+
+Capture-rule matchers support structured browser-noise fields including `browser_event_kind`, `browser_event_opaque`, `client_kind`, and `bot_family`. Bot matching is evidence for scoped operational demotion or sampling; it must not be treated as proof that the underlying browser behavior is impossible for human users.
 
 ### Capture Rule Runtime Parity
 

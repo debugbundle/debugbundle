@@ -4,6 +4,7 @@ import {
   CaptureRuleActionSchema,
   CaptureRuleCreateSchema,
   CaptureRuleEventTypeSchema,
+  classifyCaptureRuleClientFromUserAgent,
   type CaptureRuleAction,
   type CaptureRuleCreate,
   type CaptureRuleEventType
@@ -53,6 +54,12 @@ export interface CaptureRuleSuggestionIncident {
 }
 
 export interface CaptureRuleSuggestionBundle {
+  project?: {
+    environment?: string | null;
+  } | null | undefined;
+  service?: {
+    name?: string | null;
+  } | null | undefined;
   signal: {
     signal_type: string;
     source_event_types: string[];
@@ -69,18 +76,28 @@ export interface CaptureRuleSuggestionBundle {
     frontend?: {
       exceptions?: unknown[];
     } | null | undefined;
+    device?: {
+      user_agent?: string | null;
+    } | null | undefined;
   };
 }
 
 interface SuggestionEvidence {
+  serviceName?: string;
+  environment?: string;
   requestHost?: string;
   requestPath?: string;
   responseStatusCode?: number;
   eventType?: CaptureRuleEventType;
+  errorName?: string;
+  message?: string;
   browserEventKind?: "window_error" | "resource_error";
+  browserEventOpaque?: boolean;
   resourceHost?: string;
   resourcePath?: string;
   resourceFirstParty?: boolean;
+  clientKind?: "human" | "bot" | "unknown";
+  botFamily?: string;
 }
 
 function normalizeHostHeader(value: unknown): string | undefined {
@@ -166,6 +183,14 @@ function buildSuggestionEvidence(
   incident: CaptureRuleSuggestionIncident,
   bundle: CaptureRuleSuggestionBundle
 ): SuggestionEvidence {
+  const serviceName =
+    typeof bundle.service?.name === "string" && bundle.service.name.trim().length > 0
+      ? bundle.service.name.trim()
+      : undefined;
+  const environment =
+    typeof bundle.project?.environment === "string" && bundle.project.environment.trim().length > 0
+      ? bundle.project.environment.trim()
+      : undefined;
   const requestHeaders = bundle.context.request?.headers;
   const requestHost =
     normalizeHostHeader(requestHeaders?.["host"]) ?? normalizeHostHeader(requestHeaders?.["x-forwarded-host"]);
@@ -184,6 +209,9 @@ function buildSuggestionEvidence(
     browserEvent?.["kind"] === "window_error" || browserEvent?.["kind"] === "resource_error"
       ? browserEvent["kind"]
       : undefined;
+  const browserEventOpaque = typeof browserEvent?.["opaque"] === "boolean" ? browserEvent["opaque"] : undefined;
+  const errorName = typeof frontendException?.["name"] === "string" ? frontendException["name"].trim() : undefined;
+  const message = typeof frontendException?.["message"] === "string" ? frontendException["message"].trim() : undefined;
   const target =
     typeof browserEvent?.["target"] === "object" && browserEvent["target"] !== null
       ? (browserEvent["target"] as Record<string, unknown>)
@@ -197,16 +225,26 @@ function buildSuggestionEvidence(
   const resourceUrl = normalizeUrl(sourceUrl);
   const resourceFirstParty =
     resourceUrl.firstParty ?? (resourceUrl.host !== undefined && requestHost !== undefined ? resourceUrl.host === requestHost : undefined);
+  const client = classifyCaptureRuleClientFromUserAgent(
+    typeof bundle.context.device?.user_agent === "string" ? bundle.context.device.user_agent : undefined
+  );
 
   return {
+    ...(serviceName === undefined ? {} : { serviceName }),
+    ...(environment === undefined ? {} : { environment }),
     ...(requestHost === undefined ? {} : { requestHost }),
     ...(requestPath === undefined ? {} : { requestPath }),
     ...(responseStatusCode === undefined ? {} : { responseStatusCode }),
     ...(eventType === undefined ? {} : { eventType }),
+    ...(errorName === undefined || errorName.length === 0 ? {} : { errorName }),
+    ...(message === undefined || message.length === 0 ? {} : { message }),
     ...(browserEventKind === undefined ? {} : { browserEventKind }),
+    ...(browserEventOpaque === undefined ? {} : { browserEventOpaque }),
     ...(resourceUrl.host === undefined ? {} : { resourceHost: resourceUrl.host }),
     ...(resourceUrl.path === undefined ? {} : { resourcePath: resourceUrl.path }),
     ...(resourceFirstParty === undefined ? {} : { resourceFirstParty }),
+    clientKind: client.client_kind,
+    ...(client.bot_family === undefined ? {} : { botFamily: client.bot_family }),
   };
 }
 
@@ -365,6 +403,86 @@ export function buildCaptureRuleSuggestions(input: {
             event_types: ["frontend_exception"],
             browser_event_kind: "window_error",
             resource_url: { host: evidence.resourceHost }
+          },
+          sample_rate: null,
+          sample_event_class: null,
+          created_by_user_id: null,
+          created_from_incident_id: input.incident.incident_id,
+          created_from_event_id: null,
+          expires_at: null
+        }
+      })
+    );
+  }
+
+  if (
+    evidence.eventType === "frontend_exception" &&
+    evidence.browserEventKind === "window_error" &&
+    evidence.browserEventOpaque === true &&
+    evidence.message === "Window error"
+  ) {
+    suggestions.push(
+      createSuggestion({
+        suggestion_id: "opaque_window_generic_demote",
+        label: "Demote opaque browser Window errors",
+        recommended_action: "demote",
+        confidence: "medium",
+        reason:
+          "The primary browser exception is an opaque Window error with no usable application stack, scoped to the observed service and environment when available.",
+        requires_confirmation: true,
+        rule: {
+          name: "Demote opaque browser Window errors",
+          description: "Demote generic opaque browser Window error noise after confirming it is not an application exception.",
+          enabled: true,
+          action: "demote",
+          matcher: {
+            event_types: ["frontend_exception"],
+            runtime: ["browser"],
+            ...(evidence.serviceName === undefined ? {} : { services: [evidence.serviceName] }),
+            ...(evidence.environment === undefined ? {} : { environments: [evidence.environment] }),
+            browser_event_kind: "window_error",
+            browser_event_opaque: true,
+            message_equals: "Window error"
+          },
+          sample_rate: null,
+          sample_event_class: null,
+          created_by_user_id: null,
+          created_from_incident_id: input.incident.incident_id,
+          created_from_event_id: null,
+          expires_at: null
+        }
+      })
+    );
+  }
+
+  if (
+    evidence.eventType === "frontend_exception" &&
+    evidence.clientKind === "bot" &&
+    evidence.botFamily !== undefined &&
+    evidence.message === "Unhandled promise rejection"
+  ) {
+    suggestions.push(
+      createSuggestion({
+        suggestion_id: "bot_unhandled_rejection_demote",
+        label: `Demote ${evidence.botFamily} unhandled promise rejections`,
+        recommended_action: "demote",
+        confidence: "medium",
+        reason:
+          "The incident came from a known bot user agent and has only the generic unhandled-rejection message, so bot-scoped demotion is safer than a broad rejection rule.",
+        requires_confirmation: true,
+        rule: {
+          name: `Demote ${evidence.botFamily} unhandled promise rejections`,
+          description: "Demote bot-scoped generic browser unhandled promise rejection noise.",
+          enabled: true,
+          action: "demote",
+          matcher: {
+            event_types: ["frontend_exception"],
+            runtime: ["browser"],
+            ...(evidence.serviceName === undefined ? {} : { services: [evidence.serviceName] }),
+            ...(evidence.environment === undefined ? {} : { environments: [evidence.environment] }),
+            client_kind: "bot",
+            bot_family: evidence.botFamily,
+            message_equals: "Unhandled promise rejection"
           },
           sample_rate: null,
           sample_event_class: null,

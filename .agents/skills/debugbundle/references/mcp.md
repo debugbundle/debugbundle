@@ -18,6 +18,15 @@ Use the same incident-first workflow through MCP when an agent is operating in c
 - Resolve fixed or intentionally generated incidents with `resolve_incident` or `resolve_incidents` so open incidents stay actionable.
 - Fall back to local CLI processing when the project is local-only.
 
+## Noise and Capture Policy Tools
+
+- `suggest_capture_rules_from_incident` — generate deterministic capture-rule suggestions from an incident bundle.
+- `create_capture_rule_from_incident_suggestion` — apply a confirmed suggestion.
+- `list_capture_rules`, `create_capture_rule`, `update_capture_rule`, `delete_capture_rule` — manage project capture rules.
+- `get_capture_policy`, `update_capture_policy` — review or update capture policy, including path-scoped client-error incident rules.
+
+Use these tools for repeated low-value operational noise only after inspecting incident evidence. Keep frontend suppression scoped by structured browser and client signals, and use path-scoped capture policy for known 4xx routes.
+
 ## Smoke-Test Cleanup Recipe
 
 1. Call `list_incidents` with `status: "open"`.

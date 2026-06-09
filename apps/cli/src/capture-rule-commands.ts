@@ -215,9 +215,8 @@ function mapErrorToExitCode(error: unknown): number {
   return 1;
 }
 
-function formatMatcher(rule: CaptureRule): string {
+function formatMatcherFromValue(matcher: CaptureRuleCreate["matcher"]): string {
   const parts: string[] = [];
-  const matcher = rule.matcher;
 
   if (matcher.event_types !== undefined) {
     parts.push(`event_types=${matcher.event_types.join(",")}`);
@@ -225,8 +224,35 @@ function formatMatcher(rule: CaptureRule): string {
   if (matcher.browser_event_kind !== undefined) {
     parts.push(`browser_event_kind=${matcher.browser_event_kind}`);
   }
+  if (matcher.browser_event_opaque !== undefined) {
+    parts.push(`browser_event_opaque=${String(matcher.browser_event_opaque)}`);
+  }
+  if (matcher.client_kind !== undefined) {
+    parts.push(`client_kind=${matcher.client_kind}`);
+  }
+  if (matcher.bot_family !== undefined) {
+    parts.push(`bot_family=${matcher.bot_family}`);
+  }
+  if (matcher.services !== undefined) {
+    parts.push(`services=${matcher.services.join(",")}`);
+  }
+  if (matcher.environments !== undefined) {
+    parts.push(`environments=${matcher.environments.join(",")}`);
+  }
+  if (matcher.message_equals !== undefined) {
+    parts.push(`message_equals=${JSON.stringify(matcher.message_equals)}`);
+  }
+  if (matcher.message_contains !== undefined) {
+    parts.push(`message_contains=${JSON.stringify(matcher.message_contains)}`);
+  }
+  if (matcher.error_name !== undefined) {
+    parts.push(`error_name=${matcher.error_name}`);
+  }
   if (matcher.resource_url?.host !== undefined) {
     parts.push(`resource_host=${matcher.resource_url.host}`);
+  }
+  if (matcher.resource_url?.path_equals !== undefined) {
+    parts.push(`resource_path=${matcher.resource_url.path_equals}`);
   }
   if (matcher.request_url?.path_equals !== undefined) {
     parts.push(`request_path=${matcher.request_url.path_equals}`);
@@ -239,6 +265,10 @@ function formatMatcher(rule: CaptureRule): string {
   }
 
   return parts.length > 0 ? parts.join(" ") : "matcher=custom";
+}
+
+function formatMatcher(rule: CaptureRule): string {
+  return formatMatcherFromValue(rule.matcher);
 }
 
 function formatRule(rule: CaptureRule): string {
@@ -270,7 +300,10 @@ function formatSuggestionResponse(response: CaptureRuleSuggestionsResponse): str
     .map((suggestion) =>
       [
         `${suggestion.suggestion_id} ${suggestion.recommended_action} ${suggestion.confidence} ${suggestion.label}`,
-        suggestion.reason
+        suggestion.reason,
+        `matcher: ${formatMatcherFromValue(suggestion.rule.matcher)}`,
+        `requires_confirmation: ${String(suggestion.requires_confirmation)}`,
+        `apply: debugbundle capture-rule create-from-suggestion <incident-id> --suggestion-id ${suggestion.suggestion_id}`
       ].join("\n")
     )
     .join("\n\n");

@@ -188,9 +188,12 @@ describe("cli setup command", () => {
 
     const skillContents = await readFile(join(rootDirectory, ".agents", "skills", "debugbundle", "SKILL.md"), "utf8");
     expect(skillContents).toContain("name: debugbundle");
-    expect(skillContents).toContain("resolve it with `debugbundle resolve <incident-id>` or MCP `resolve_incident`");
+    expect(skillContents).toContain("resolve it with `debugbundle resolve <incident-id> [incident-id ...]` or MCP `resolve_incident` / `resolve_incidents`");
     expect(skillContents).toContain("If `debugbundle doctor --json` reports `mode=connected` and the target environment is cloud-enabled, check both");
     expect(skillContents).toContain("For user-reported production incidents, check cloud incidents after local incidents and explicitly report whether each source had matches.");
+    expect(skillContents).toContain("## Noise Management");
+    expect(skillContents).toContain("debugbundle capture-rule suggest <incident-id> --json");
+    expect(skillContents).toContain("capture-policy client-error path rules");
     expect(skillContents).toContain("## Browser Capture and Relay Setup");
     expect(skillContents).toContain("Add `@debugbundle/sdk-browser` to each browser app");
     expect(skillContents).toContain("For split frontend/backend hosts, configure the browser endpoint to the API host relay URL");
@@ -199,10 +202,14 @@ describe("cli setup command", () => {
     expect(cliReferenceContents).toContain("debugbundle setup");
     expect(cliReferenceContents).toContain("debugbundle resolve <incident-id>");
     expect(cliReferenceContents).toContain("Smoke-Test Cleanup Recipe");
+    expect(cliReferenceContents).toContain("capture-rule create-from-suggestion");
+    expect(cliReferenceContents).toContain("capture-policy set [--project <id>] --client-error-path-rule");
     expect(cliReferenceContents).toContain("smoke test|dogfood|verification|synthetic");
 
     const mcpReferenceContents = await readFile(join(rootDirectory, ".agents", "skills", "debugbundle", "references", "mcp.md"), "utf8");
     expect(mcpReferenceContents).toContain("resolve_incident");
+    expect(mcpReferenceContents).toContain("suggest_capture_rules_from_incident");
+    expect(mcpReferenceContents).toContain("path-scoped client-error incident rules");
     expect(mcpReferenceContents).toContain("Smoke-Test Cleanup Recipe");
 
     expect(await readFile(join(rootDirectory, ".agents", "skills", "debugbundle", "references", "profile-enrichment.md"), "utf8")).toContain("validation_status");
@@ -215,6 +222,7 @@ describe("cli setup command", () => {
     const skillEvalsContents = await readFile(join(rootDirectory, ".agents", "skills", "debugbundle", "evals", "evals.json"), "utf8");
     expect(skillEvalsContents).toContain("incident_first_workflow");
     expect(skillEvalsContents).toContain("incident_resolution_hygiene");
+    expect(skillEvalsContents).toContain("noise_management_guidance");
     expect(skillEvalsContents).toContain("Check both local and cloud incident sources when the project is connected and the environment is cloud-enabled.");
     expect(skillEvalsContents).toContain("Explicitly report whether the local source, the cloud source, or both had matches.");
     expect(await readFile(join(rootDirectory, ".gitignore"), "utf8")).toContain("# DebugBundle (managed by debugbundle setup)");

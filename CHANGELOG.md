@@ -6,6 +6,18 @@ The format is based on Keep a Changelog and this project follows Semantic Versio
 
 ## [Unreleased]
 
+## [1.3.0] - 2026-06-09
+
+### Added
+
+- Added browser-noise capture-rule support for opaque browser events and user-agent-derived bot signals, including richer incident context guidance for repeated low-value frontend noise.
+- Added generated skill guidance for capture-rule suggestions and path-scoped client-error capture-policy review so agent workflows can suppress recurring operational noise more safely.
+
+### Changed
+
+- Expanded the browser SDK contract documentation around `beforeSend`, opaque browser failures, and bounded unhandled-rejection reason capture so the release train documents the new JS SDK behavior end to end.
+- Bumped `@debugbundle/shared-types` and `@debugbundle/redaction` to `1.2.0`, and `@debugbundle/cli` and `@debugbundle/mcp` to `1.3.0` for the coordinated browser-noise and agent-workflow release train.
+
 ## [1.2.0] - 2026-06-08
 
 ### Added

@@ -27,6 +27,16 @@
       ]
     },
     {
+      "name": "noise_management_guidance",
+      "prompt": "The same low-value frontend incident keeps reopening. Confirm the skill tells the agent how to evaluate operational noise without hiding real bugs.",
+      "expected_behavior": [
+        "Inspect incident evidence before creating a rule.",
+        "Use capture-rule suggestions for repeated operational noise.",
+        "Keep generic frontend suppression narrow with structured browser or bot signals.",
+        "Use capture-policy path rules for known route-scoped 4xx incidents."
+      ]
+    },
+    {
       "name": "artifact_path_discovery",
       "prompt": "The user reports an unknown local runtime error. Confirm the skill tells the agent which DebugBundle paths and commands to inspect first.",
       "expected_behavior": [

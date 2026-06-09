@@ -22,6 +22,17 @@
 - `debugbundle reopen <incident-id> [incident-id ...] [--source <local|cloud>] [--json]`
 - `debugbundle analyze --type improvement --local`
 
+## Noise Management
+
+- `debugbundle capture-rule suggest <incident-id> [--auth-file <path>] [--json]`
+- `debugbundle capture-rule create-from-suggestion <incident-id> --suggestion-id <id> [--name <name>] [--expires-at <ISO8601>] [--auth-file <path>] [--json]`
+- `debugbundle capture-rule list --project-id <id> [--auth-file <path>] [--json]`
+- `debugbundle capture-rule create --project-id <id> --name <name> --action <demote|sample|drop> --matcher-json <json> [--auth-file <path>] [--json]`
+- `debugbundle capture-policy get [--project <id>] [--json]`
+- `debugbundle capture-policy set [--project <id>] --client-error-path-rule <404=/path/*@GET,POST> [--json]`
+
+Use capture-rule suggestions for repeated operational noise after inspecting an incident bundle. Use capture-policy client-error path rules for route-scoped 4xx incidents instead of promoting all client errors.
+
 ## Operational Paths
 
 - `.debugbundle/profile.json` — committed project map and agent validation state

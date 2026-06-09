@@ -211,6 +211,15 @@ const BrowserExceptionEventSchema = z
   })
   .strict();
 
+const FrontendRejectionReasonSchema = z
+  .object({
+    kind: z.enum(["error", "string", "object", "null", "undefined", "unknown"]),
+    name: z.string().min(1).optional(),
+    message: z.string().min(1).optional(),
+    preview: z.string().min(1).optional()
+  })
+  .strict();
+
 const FrontendExceptionPayloadSchema = z
   .object({
     name: z.string().min(1),
@@ -224,6 +233,7 @@ const FrontendExceptionPayloadSchema = z
     breadcrumbs: z.array(FrontendExceptionBreadcrumbSchema).optional(),
     device: DeviceInfoSchema.nullable().optional(),
     browser_event: BrowserExceptionEventSchema.optional(),
+    rejection_reason: FrontendRejectionReasonSchema.optional(),
     dom_context: z
       .object({
         mode: z.literal("lightweight"),
@@ -734,6 +744,8 @@ export {
   type CaptureRuleEventType,
   BrowserEventKindSchema,
   type BrowserEventKind,
+  CaptureRuleClientKindSchema,
+  type CaptureRuleClientKind,
   CaptureRuleMatcherSchema,
   type CaptureRuleMatcher,
   CaptureRuleSchema,
@@ -758,6 +770,7 @@ export {
   isCaptureRuleActive,
   getCaptureRuleSpecificityScore,
   shouldSampleCaptureRuleEvent,
+  classifyCaptureRuleClientFromUserAgent,
   evaluateCaptureRules,
 } from "./capture-rules.js";
 

@@ -620,6 +620,12 @@ Note: `data` fields shown above are for `network_request` breadcrumbs. Other bre
     },
     "opaque": true
   },
+  "rejection_reason": {
+    "kind": "error | string | object | null | undefined | unknown",
+    "name": "string",
+    "message": "string",
+    "preview": "string"
+  },
   "device": {
     "user_agent": "string | null",
     "os": { "name": "string | null", "version": "string | null" },
@@ -637,6 +643,8 @@ Note: `data` fields shown above are for `network_request` breadcrumbs. Other bre
 ```
 
 `browser_event` is present when the Browser SDK captured the exception through a browser-native global hook such as `window` `error`. When `opaque` is `true`, the browser did not provide a usable JavaScript `Error` object; inspect `file_name`, `line_number`, `column_number`, `target.source_url`, optional technical `target.attributes`, or optional `page` lifecycle state for the best available source clue.
+
+`rejection_reason` is present when the Browser SDK captured a global `unhandledrejection` event. It preserves a bounded, sanitized description of the original rejection reason so generic messages such as `Unhandled promise rejection` can be triaged without relying only on the fallback exception message.
 
 ### 3.6 `deploy_metadata`
 ```json

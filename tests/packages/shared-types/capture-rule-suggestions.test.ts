@@ -164,4 +164,113 @@ describe("capture rule suggestions", () => {
       }
     });
   });
+
+  it("suggests scoped demotion for generic opaque browser Window errors", () => {
+    const suggestions = buildCaptureRuleSuggestions({
+      incident: {
+        incident_id: "inc_126",
+        project_id: "proj_123",
+        fingerprint: "fp_window_error",
+        fingerprint_version: "v1",
+        title: "Window error",
+        occurrence_count: 4,
+        matched_fields: ["browser_event_kind", "normalized_message"]
+      },
+      bundle: {
+        project: { environment: "production" },
+        service: { name: "saycheese-frontend" },
+        signal: {
+          signal_type: "frontend_exception",
+          source_event_types: ["frontend_exception"],
+          fingerprint: "fp_window_error"
+        },
+        context: {
+          frontend: {
+            exceptions: [
+              {
+                name: "WindowError",
+                message: "Window error",
+                browser_event: {
+                  kind: "window_error",
+                  opaque: true
+                }
+              }
+            ]
+          }
+        }
+      }
+    });
+
+    expect(suggestions[0]).toMatchObject({
+      suggestion_id: "opaque_window_generic_demote",
+      recommended_action: "demote",
+      confidence: "medium",
+      requires_confirmation: true,
+      rule: {
+        matcher: {
+          event_types: ["frontend_exception"],
+          runtime: ["browser"],
+          services: ["saycheese-frontend"],
+          environments: ["production"],
+          browser_event_kind: "window_error",
+          browser_event_opaque: true,
+          message_equals: "Window error"
+        }
+      }
+    });
+  });
+
+  it("suggests bot-scoped demotion for generic browser unhandled rejections", () => {
+    const suggestions = buildCaptureRuleSuggestions({
+      incident: {
+        incident_id: "inc_127",
+        project_id: "proj_123",
+        fingerprint: "fp_googlebot_rejection",
+        fingerprint_version: "v1",
+        title: "Unhandled promise rejection",
+        occurrence_count: 2,
+        matched_fields: ["normalized_message"]
+      },
+      bundle: {
+        project: { environment: "production" },
+        service: { name: "saycheese-frontend" },
+        signal: {
+          signal_type: "frontend_exception",
+          source_event_types: ["frontend_exception"],
+          fingerprint: "fp_googlebot_rejection"
+        },
+        context: {
+          device: {
+            user_agent:
+              "Mozilla/5.0 (Linux; Android 10) AppleWebKit/537.36 Chrome/148.0.0.0 Mobile Safari/537.36 Googlebot/2.1"
+          },
+          frontend: {
+            exceptions: [
+              {
+                name: "UnhandledRejection",
+                message: "Unhandled promise rejection"
+              }
+            ]
+          }
+        }
+      }
+    });
+
+    expect(suggestions[0]).toMatchObject({
+      suggestion_id: "bot_unhandled_rejection_demote",
+      recommended_action: "demote",
+      requires_confirmation: true,
+      rule: {
+        matcher: {
+          event_types: ["frontend_exception"],
+          runtime: ["browser"],
+          services: ["saycheese-frontend"],
+          environments: ["production"],
+          client_kind: "bot",
+          bot_family: "Googlebot",
+          message_equals: "Unhandled promise rejection"
+        }
+      }
+    });
+  });
 });

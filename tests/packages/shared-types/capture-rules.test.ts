@@ -9,6 +9,7 @@ import {
   CaptureRulesFileSchema,
   applyCaptureRuleEventClass,
   buildCaptureRuleEvaluationContext,
+  classifyCaptureRuleClientFromUserAgent,
   evaluateCaptureRules,
   getCaptureRuleSpecificityScore,
   isCaptureRuleActive,
@@ -65,6 +66,41 @@ describe("capture rule schemas", () => {
     expect(parsed.resource_url).toEqual({
       host: "analytics.example.com",
       path_prefix: "/bundle.js",
+    });
+  });
+
+  it("normalizes bot and opaque browser matchers", () => {
+    const parsed = CaptureRuleMatcherSchema.parse({
+      event_types: ["frontend_exception"],
+      browser_event_kind: "window_error",
+      browser_event_opaque: true,
+      client_kind: "bot",
+      bot_family: " Googlebot ",
+      message_equals: "Window error",
+    });
+
+    expect(parsed).toEqual({
+      event_types: ["frontend_exception"],
+      browser_event_kind: "window_error",
+      browser_event_opaque: true,
+      client_kind: "bot",
+      bot_family: "Googlebot",
+      message_equals: "Window error",
+    });
+  });
+
+  it("classifies capture rule clients from user agents", () => {
+    expect(classifyCaptureRuleClientFromUserAgent(null)).toEqual({ client_kind: "unknown" });
+    expect(classifyCaptureRuleClientFromUserAgent("Mozilla/5.0 Googlebot/2.1")).toEqual({
+      client_kind: "bot",
+      bot_family: "Googlebot",
+    });
+    expect(classifyCaptureRuleClientFromUserAgent("ExampleCrawler/1.0")).toEqual({
+      client_kind: "bot",
+      bot_family: "OtherBot",
+    });
+    expect(classifyCaptureRuleClientFromUserAgent("Mozilla/5.0 Chrome/148.0.0.0 Safari/537.36")).toEqual({
+      client_kind: "human",
     });
   });
 
@@ -246,6 +282,7 @@ describe("capture rule matching", () => {
         environment: "production",
         first_party: false,
         browser_event_kind: "resource_error",
+        client_kind: "unknown",
         resource_url: {
           host: "analytics.example.com",
           path: "/bundle.js",
@@ -281,6 +318,7 @@ describe("capture rule matching", () => {
         environment: "production",
         first_party: false,
         browser_event_kind: "resource_error",
+        client_kind: "unknown",
         resource_url: {
           host: "analytics.example.com",
           path: "/bundle.js",
@@ -318,6 +356,7 @@ describe("capture rule matching", () => {
         event_id: "00000000-0000-4000-8000-000000000203",
         event_type: "frontend_exception",
         runtime: "browser",
+        client_kind: "unknown",
         fingerprint: {
           version: "v1",
           value: "fp_browser_noise",
@@ -366,6 +405,7 @@ describe("capture rule matching", () => {
       error_name: "ResourceLoadError",
       message: "Failed to load resource",
       browser_event_kind: "resource_error",
+      client_kind: "unknown",
       resource_url: {
         host: "analytics.example.com",
         path: "/tag.js",
@@ -402,6 +442,58 @@ describe("capture rule matching", () => {
       host: "analytics.example.com",
       path: "/tag.js",
     });
+  });
+
+  it("matches opaque browser window errors with bot context", () => {
+    const opaqueBotRule: CaptureRule = {
+      ...baseRule,
+      id: "00000000-0000-4000-8000-000000000107",
+      matcher: {
+        event_types: ["frontend_exception"],
+        browser_event_kind: "window_error",
+        browser_event_opaque: true,
+        client_kind: "bot",
+        bot_family: "Googlebot",
+        message_equals: "Window error",
+      },
+    };
+
+    const context = buildCaptureRuleEvaluationContext({
+      project_id: baseRule.project_id,
+      event: {
+        event_id: "00000000-0000-4000-8000-000000000206",
+        event_type: "frontend_exception",
+        service: {
+          name: "web",
+          environment: "production",
+          runtime: "browser",
+        },
+        payload: {
+          name: "WindowError",
+          message: "Window error",
+          device: {
+            user_agent:
+              "Mozilla/5.0 (Linux; Android 10) AppleWebKit/537.36 Chrome/148.0.0.0 Mobile Safari/537.36 Googlebot/2.1",
+          },
+          browser_event: {
+            kind: "window_error",
+            opaque: true,
+          },
+        },
+      },
+    });
+
+    expect(context).toEqual(
+      expect.objectContaining({
+        browser_event_kind: "window_error",
+        browser_event_opaque: true,
+        client_kind: "bot",
+        bot_family: "Googlebot",
+      })
+    );
+    expect(evaluateCaptureRules([opaqueBotRule], context, "2026-05-26T10:00:00.000Z")?.rule_id).toBe(
+      opaqueBotRule.id
+    );
   });
 
   it("demotes event class when a demotion rule matched", () => {

@@ -62,6 +62,7 @@ Use `DEBUGBUNDLE_API_URL` only when the user is targeting self-hosted, staging, 
 3. Use reproduction artifacts when available before proposing a fix.
 4. For live debugging, use `activate_probe` only when the user asks for additional runtime evidence or the current bundle lacks enough context. Prefer short TTLs and scoped labels.
 5. After a fix is verified, resolve the incident with `resolve_incident`. Also resolve intentional verification incidents after they have served their purpose.
+6. For repeated low-value operational noise, inspect the incident evidence first, then evaluate capture-rule suggestions or path-scoped capture policy instead of repeatedly resolving the same pattern.
 
 ## Local Repository Setup
 

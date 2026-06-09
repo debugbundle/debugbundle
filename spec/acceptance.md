@@ -94,6 +94,14 @@ Last updated: 2026-05-29
 - **And** during sustained suppression, a checkpoint aggregate is emitted every 30 seconds
 - **And** on process restart, all suppression state resets (in-memory only)
 
+### AC-SDK-13a: Local beforeSend Hook
+- **Given** an SDK initialized with a `beforeSend` hook
+- **When** the SDK captures an event
+- **Then** the hook receives the fully built event before buffering and transport
+- **And** returning a valid event ships that event
+- **And** returning `null` drops the event locally
+- **And** hook exceptions or invalid returned events keep the original event and never throw into host code
+
 ### AC-SDK-14: Browser Device Context Capture
 - **Given** a browser app with `@debugbundle/sdk-browser` initialized
 - **When** a `frontend_exception` occurs
@@ -709,6 +717,7 @@ If CLI says something is healthy and MCP says something different, that is a pro
 - **Then** `.agents/skills/debugbundle/SKILL.md` exists per agentskills.io spec and teaches agents to use DebugBundle
 - **And** SKILL.md has YAML frontmatter with `name: debugbundle`
 - **And** `references/` directory contains `cli.md`, `mcp.md`, `bundle-schema.md`
+- **And** the skill includes high-level noise-management guidance for capture-rule suggestions and path-scoped client-error capture policy without duplicating the full matcher reference
 - **And** the file does not require manual editing to be functional
 - **And** old locations (`.debugbundle/skill/`, `skills/debugbundle/`) are not created
 
@@ -856,7 +865,7 @@ If CLI says something is healthy and MCP says something different, that is a pro
 ### AC-ONB-02: Skill Discovery
 - **Given** `debugbundle setup` has run
 - **Then** `.agents/skills/debugbundle/SKILL.md` exists per agentskills.io spec and is structured for agent discovery
-- **And** the skill teaches agents to: check incidents on bug reports, fetch/analyze bundles, validate the profile, and resolve incidents after a fix is verified or after intentional verification incidents have served their purpose
+- **And** the skill teaches agents to: check incidents on bug reports, fetch/analyze bundles, validate the profile, evaluate repeated low-value incidents for scoped capture-rule or path-scoped client-error capture-policy handling, and resolve incidents after a fix is verified or after intentional verification incidents have served their purpose
 
 ### AC-ONB-03: Two-Phase Profile Generation
 - **Given** a repository with `package.json`, `docker-compose.yml`, and `.github/workflows/`
@@ -1270,6 +1279,7 @@ If CLI says something is healthy and MCP says something different, that is a pro
 - **Then** each interface exposes deterministic suggestions derived from the incident and bundle
 - **And** owner/admin users can create a selected rule from the suggestion
 - **And** plain members can preview rules but cannot create, update, or delete them
+- **And** browser-noise suggestions can use structured fields such as `browser_event_opaque`, `client_kind`, and `bot_family` without requiring an exact-fingerprint-only fallback when bundle evidence is sufficient
 
 ### AC-EVT-08a: Ingestion Always Accepts 5xx Request Failures
 - **Given** a project with any capture preset or `capture_request_events` override

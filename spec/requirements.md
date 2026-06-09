@@ -41,6 +41,8 @@ Last updated: 2026-05-29
 
 **FR-SDK-13:** SDKs must support configurable sampling (0.0–1.0) to control the fraction of events captured. Default: 1.0 (capture all). Sampling applies before network transmission to reduce overhead.
 
+**FR-SDK-13a:** SDKs must support an optional synchronous `beforeSend` init hook where the runtime can safely inspect a fully built event before buffering. Returning `null` drops the event locally. Hook failures or invalid returned events must not throw into host code and must preserve the original event. The hook is for app-owned local policy such as final redaction or tenant-specific suppression; project capture rules remain the preferred operational noise-control surface.
+
 **FR-SDK-22:** Browser SDK must inject `X-DebugBundle-Trace-Id` header (UUID v4) into all outgoing `fetch`/`XMLHttpRequest` requests. Backend SDKs must read this header and attach the trace ID to all events from that request. If header is absent, backend events are ungrouped from frontend — no failure.
 
 **FR-SDK-16:** All backend SDKs must implement the universal SDK interface: `init`, `captureException`, `captureError` (alias), `captureLog`, `captureRequest`, `captureMessage`, `setContext`, `flush`. Method names must follow language-idiomatic conventions (camelCase for Node/PHP, snake_case for Python).
@@ -49,7 +51,7 @@ Last updated: 2026-05-29
 - **Node.js:** `captureExceptions()` (process uncaughtException), `captureRejections()` (process unhandledRejection), `captureConsole()` (console.error/warn wrapping, opt-in).
 - **PHP:** `captureErrors()` (set_error_handler), `captureExceptions()` (set_exception_handler), `captureShutdown()` (register_shutdown_function for fatal errors).
 - **Python:** `capture_exceptions()` (sys.excepthook), `capture_logging()` (logging module handler, opt-in), `capture_async()` (asyncio loop exception handler).
-- **Browser:** Global error listener (window error event), promise rejection listener (unhandledrejection), optional console wrapping.
+- **Browser:** Global error listener (window error event), promise rejection listener (unhandledrejection with bounded `rejection_reason` preservation when the browser exposes a reason), optional console wrapping.
 
 **FR-SDK-18:** Log capture must be in-process via logging library handler/transport plugins — never by reading log files. The DebugBundle handler sits alongside existing handlers (file, stdout). Logs are captured as structured records (level, message, context, timestamp), not raw text.
 
@@ -399,7 +401,7 @@ See `/spec/billing.md` and `/spec/system-emails.md` for the detailed source-of-t
 
 **FR-PROF-09:** The Project Profile must be updated when relevant architecture changes occur (new service, deployment target change, database change, critical path ownership change, build/test command change). `debugbundle doctor` should warn when `last_reviewed_at` exceeds a staleness threshold and report `validation_status`.
 
-**FR-PROF-10:** `debugbundle setup` must generate `.agents/skills/debugbundle/SKILL.md` per the agentskills.io specification that teaches AI agents how to: use the DebugBundle CLI/MCP, fetch and analyze bundles, run reproduction artifacts, validate the project profile, and auto-trigger DebugBundle workflows when the user reports a bug or issue.
+**FR-PROF-10:** `debugbundle setup` must generate `.agents/skills/debugbundle/SKILL.md` per the agentskills.io specification that teaches AI agents how to: use the DebugBundle CLI/MCP, fetch and analyze bundles, run reproduction artifacts, validate the project profile, evaluate repeated low-value incidents for scoped capture-rule or path-scoped client-error capture-policy handling, and auto-trigger DebugBundle workflows when the user reports a bug or issue.
 
 **FR-PROF-11:** The agent skill is placed at `.agents/skills/debugbundle/` following the agentskills.io specification. Old locations (`.debugbundle/skill/`, `skills/debugbundle/`) are removed.
 

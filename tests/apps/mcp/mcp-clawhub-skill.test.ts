@@ -21,6 +21,7 @@ describe("mcp ClawHub skill", () => {
     expect(skill).toContain("package: \"@debugbundle/mcp\"");
     expect(skill).toContain("\"args\": [\"@debugbundle/mcp\"]");
     expect(skill).toContain("should not replace a repository's generated `.agents/skills/debugbundle/SKILL.md`");
+    expect(skill).toContain("evaluate capture-rule suggestions or path-scoped capture policy");
     expect(skill).toContain("Do not use project tokens for retrieval or management operations");
   });
 });
