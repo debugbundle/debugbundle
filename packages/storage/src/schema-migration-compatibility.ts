@@ -17,6 +17,7 @@ const CURRENT_SCHEMA_SENTINEL_COLUMNS = [
   { table_name: "project_tokens", column_name: "allowed_origins" },
   { table_name: "projects", column_name: "improvement_bundle_sensitivity" },
   { table_name: "plan_cleanup_tasks", column_name: "cleanup_type" },
+  { table_name: "project_usage_counters", column_name: "updated_at" },
   { table_name: "trial_lifecycle_events", column_name: "dedupe_key" },
   { table_name: "users", column_name: "avatar_source" }
 ] as const;

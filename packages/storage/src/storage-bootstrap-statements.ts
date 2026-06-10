@@ -907,6 +907,15 @@ export const STORAGE_BOOTSTRAP_STATEMENTS = [
     )
   `,
   `
+    CREATE TABLE project_usage_counters (
+      project_id uuid NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+      period_starts_at timestamptz NOT NULL,
+      raw_ingested_events integer NOT NULL DEFAULT 0,
+      updated_at timestamptz NOT NULL DEFAULT now(),
+      PRIMARY KEY (project_id, period_starts_at)
+    )
+  `,
+  `
     CREATE TABLE operational_email_deliveries (
       id uuid PRIMARY KEY,
       organization_id uuid NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,

@@ -742,6 +742,21 @@ export const STORAGE_SCHEMA_MIGRATIONS = [
     statements: [
       "ALTER TABLE capture_policies ADD COLUMN IF NOT EXISTS immediate_client_error_path_rules jsonb"
     ]
+  }),
+  defineStorageSchemaMigration({
+    id: "202606100001_add_project_usage_counters",
+    description: "Add durable project-level raw ingestion counters for project dashboard metrics.",
+    statements: [
+      `
+        CREATE TABLE IF NOT EXISTS project_usage_counters (
+          project_id uuid NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+          period_starts_at timestamptz NOT NULL,
+          raw_ingested_events integer NOT NULL DEFAULT 0,
+          updated_at timestamptz NOT NULL DEFAULT now(),
+          PRIMARY KEY (project_id, period_starts_at)
+        )
+      `
+    ]
   })
 ] as const;
 

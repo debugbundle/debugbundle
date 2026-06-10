@@ -100,6 +100,8 @@ function createIngestionRateLimiterDependency(overrides: {
 
 function createBillingManagementDependency(overrides: {
   getBillingSummaryForOrganization?: BillingManagementDependency["getBillingSummaryForOrganization"];
+  incrementOrgUsageCounter?: BillingManagementDependency["incrementOrgUsageCounter"];
+  incrementProjectUsageCounter?: BillingManagementDependency["incrementProjectUsageCounter"];
 } = {}): BillingManagementDependency {
   return mockedObject<NonNullable<ApiServerDependencies["billingManagement"]>>({
     getBillingSummaryForOrganization:
@@ -121,6 +123,8 @@ function createBillingManagementDependency(overrides: {
           monthly_webhook_deliveries: { used: 0, limit: 100 }
         }
       }),
+    incrementOrgUsageCounter: overrides.incrementOrgUsageCounter ?? vi.fn().mockResolvedValue(undefined),
+    incrementProjectUsageCounter: overrides.incrementProjectUsageCounter ?? vi.fn().mockResolvedValue(undefined),
     createCheckoutLink: vi.fn().mockResolvedValue(null),
     createPortalLink: vi.fn().mockResolvedValue(null)
   });
@@ -1395,18 +1399,19 @@ describe("self-host mode ingestion bypass", () => {
     expect(persistAndEnqueue).toHaveBeenCalledOnce();
   });
 
-  it("should increment org usage counter after successful ingestion of billable events", async (): Promise<void> => {
+  it("should increment usage counters after successful ingestion of billable events", async (): Promise<void> => {
     const persistAndEnqueue = vi.fn().mockResolvedValue({ object_key: "raw-events/proj_123/path.json.gz" });
     const resolveProjectByTokenHash = vi.fn().mockResolvedValue({ project_id: "proj_123", organization_id: "org_123", organization_plan: "free" });
     const incrementOrgUsageCounter = vi.fn().mockResolvedValue(undefined);
+    const incrementProjectUsageCounter = vi.fn().mockResolvedValue(undefined);
 
     const app = createApiServer({
       ingestionPersistence: { persistAndEnqueue },
       ingestionMetadata: { resolveProjectByTokenHash },
-      billingManagement: {
-        ...createBillingManagementDependency(),
-        incrementOrgUsageCounter
-      },
+      billingManagement: createBillingManagementDependency({
+        incrementOrgUsageCounter,
+        incrementProjectUsageCounter
+      }),
       memberAuth: createMemberAuthDependency(),
       tokenManagement: createTokenManagementDependency(),
       incidentRetrieval: createIncidentRetrievalDependency(),
@@ -1449,20 +1454,80 @@ describe("self-host mode ingestion bypass", () => {
       period_starts_at: expect.any(String),
       count: 1
     });
+    expect(incrementProjectUsageCounter).toHaveBeenCalledWith({
+      project_id: "proj_123",
+      period_starts_at: expect.any(String),
+      count: 1
+    });
   });
 
-  it("should not increment org usage counter for non-billable operational events", async (): Promise<void> => {
+  it("should not reject ingestion when the project dashboard usage counter fails after persistence", async (): Promise<void> => {
     const persistAndEnqueue = vi.fn().mockResolvedValue({ object_key: "raw-events/proj_123/path.json.gz" });
     const resolveProjectByTokenHash = vi.fn().mockResolvedValue({ project_id: "proj_123", organization_id: "org_123", organization_plan: "free" });
     const incrementOrgUsageCounter = vi.fn().mockResolvedValue(undefined);
+    const incrementProjectUsageCounter = vi.fn().mockRejectedValue(new Error("project_counter_failed"));
 
     const app = createApiServer({
       ingestionPersistence: { persistAndEnqueue },
       ingestionMetadata: { resolveProjectByTokenHash },
-      billingManagement: {
-        ...createBillingManagementDependency(),
-        incrementOrgUsageCounter
+      billingManagement: createBillingManagementDependency({
+        incrementOrgUsageCounter,
+        incrementProjectUsageCounter
+      }),
+      memberAuth: createMemberAuthDependency(),
+      tokenManagement: createTokenManagementDependency(),
+      incidentRetrieval: createIncidentRetrievalDependency(),
+      objectStoreReader: createObjectStoreReaderDependency(),
+      webhookDelivery: createWebhookDeliveryDependency()
+    });
+
+    const event = createEventEnvelope({
+      event_type: "backend_exception",
+      project_token: "dbundle_proj_test",
+      service: {
+        name: "checkout-api",
+        environment: "production",
+        runtime: "node",
+        framework: "fastify"
       },
+      payload: {
+        name: "TypeError",
+        message: "boom",
+        stack: "TypeError: boom",
+        handled: false,
+        request: { method: "GET", path: "/users/123", query: {}, headers: {}, body: null },
+        response: { status_code: 500 },
+        runtime: { version: "22.0.0" }
+      }
+    });
+
+    const response = await app.inject({
+      method: "POST",
+      url: "/v1/events",
+      headers: { authorization: "Bearer dbundle_proj_test" },
+      payload: { events: [event] }
+    });
+
+    expect(response.statusCode).toBe(202);
+    expect(response.json().accepted).toBe(1);
+    expect(persistAndEnqueue).toHaveBeenCalledOnce();
+    expect(incrementOrgUsageCounter).toHaveBeenCalledOnce();
+    expect(incrementProjectUsageCounter).toHaveBeenCalledOnce();
+  });
+
+  it("should not increment usage counters for non-billable operational events", async (): Promise<void> => {
+    const persistAndEnqueue = vi.fn().mockResolvedValue({ object_key: "raw-events/proj_123/path.json.gz" });
+    const resolveProjectByTokenHash = vi.fn().mockResolvedValue({ project_id: "proj_123", organization_id: "org_123", organization_plan: "free" });
+    const incrementOrgUsageCounter = vi.fn().mockResolvedValue(undefined);
+    const incrementProjectUsageCounter = vi.fn().mockResolvedValue(undefined);
+
+    const app = createApiServer({
+      ingestionPersistence: { persistAndEnqueue },
+      ingestionMetadata: { resolveProjectByTokenHash },
+      billingManagement: createBillingManagementDependency({
+        incrementOrgUsageCounter,
+        incrementProjectUsageCounter
+      }),
       memberAuth: createMemberAuthDependency(),
       tokenManagement: createTokenManagementDependency(),
       incidentRetrieval: createIncidentRetrievalDependency(),
@@ -1499,5 +1564,6 @@ describe("self-host mode ingestion bypass", () => {
     expect(response.statusCode).toBe(202);
     // Counter should NOT be called since operational signals don't count toward billing
     expect(incrementOrgUsageCounter).not.toHaveBeenCalled();
+    expect(incrementProjectUsageCounter).not.toHaveBeenCalled();
   });
 });

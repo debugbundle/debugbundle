@@ -76,6 +76,7 @@ runIntegration("storage bootstrap integration", () => {
     expect(actualIndexes.has("sessions_token_hash_idx")).toBe(true);
     expect(actualIndexes.has("alert_deliveries_project_status_idx")).toBe(true);
     expect(actualIndexes.has("org_usage_counters_pkey")).toBe(true);
+    expect(actualIndexes.has("project_usage_counters_pkey")).toBe(true);
     expect(actualIndexes.has("processed_billing_events_pkey")).toBe(true);
     expect(actualIndexes.has("processed_github_marketplace_events_pkey")).toBe(true);
     expect(actualIndexes.has("organizations_stripe_customer_id_key")).toBe(true);
@@ -114,7 +115,8 @@ runIntegration("storage bootstrap integration", () => {
           "webhook_deliveries_webhook_id_fkey",
           "alert_deliveries_alert_id_fkey",
           "project_github_repos_installation_id_fkey",
-          "org_usage_counters_organization_id_fkey"
+          "org_usage_counters_organization_id_fkey",
+          "project_usage_counters_project_id_fkey"
         ]
       ]
     );
@@ -134,6 +136,7 @@ runIntegration("storage bootstrap integration", () => {
     expect(deleteBehaviorByConstraint.get("alert_deliveries_alert_id_fkey")).toBe("c");
     expect(deleteBehaviorByConstraint.get("project_github_repos_installation_id_fkey")).toBe("c");
     expect(deleteBehaviorByConstraint.get("org_usage_counters_organization_id_fkey")).toBe("c");
+    expect(deleteBehaviorByConstraint.get("project_usage_counters_project_id_fkey")).toBe("c");
   });
 
   it("seeds the migration ledger for a current bootstrap schema instead of replaying historical migrations", async (): Promise<void> => {

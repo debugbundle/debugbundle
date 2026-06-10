@@ -161,8 +161,58 @@ describe("postgres metadata store", () => {
     const listProjectsCall = calls.find((call) => call.sql.includes("FROM projects p"));
     expect(listProjectsCall).toBeDefined();
     expect(listProjectsCall!.sql).toContain("ie.event_class = 'incident_signal'");
+    expect(listProjectsCall!.sql).toContain("GREATEST");
+    expect(listProjectsCall!.sql).toContain("FROM project_usage_counters");
     expect(listProjectsCall!.sql).toContain("JOIN organizations o ON o.id = p.organization_id");
     expect(listProjectsCall!.sql).toContain("COALESCE(o.plan, 'free') AS organization_plan");
+  });
+
+  it("should floor user-scoped project ingested events with durable project counters", async (): Promise<void> => {
+    const calls: Array<{ sql: string; params: unknown[] }> = [];
+    const query = vi.fn().mockImplementation((sql: string, params: unknown[]) => {
+      calls.push({ sql, params });
+
+      if (sql.includes("information_schema.tables")) {
+        return { rows: [{ exists: false }] };
+      }
+
+      return {
+        rows: [
+          {
+            project_id: "proj_123",
+            organization_id: "org_123",
+            owner_user_id: "usr_123",
+            owner_email: "owen@example.com",
+            relationship: "owned",
+            effective_role: "owner",
+            name: "Main App",
+            slug: "main-app",
+            environment_default: "production",
+            organization_plan: "free",
+            metrics: {
+              monthly_bundle_requests: 12,
+              monthly_raw_ingested_events: 120,
+              retained_bundles: 6,
+              monthly_alert_deliveries: 4
+            },
+            created_at: "2026-03-16T00:00:00.000Z",
+            updated_at: "2026-03-16T00:00:00.000Z"
+          }
+        ]
+      };
+    });
+    const store = createPostgresMetadataStore({ query });
+
+    await store.listProjectsForUser!({
+      user_id: "usr_123",
+      now: "2026-03-19T00:00:00.000Z",
+      limit: 10
+    });
+
+    const listProjectsCall = calls.find((call) => call.sql.includes("FROM projects p"));
+    expect(listProjectsCall).toBeDefined();
+    expect(listProjectsCall!.sql).toContain("GREATEST");
+    expect(listProjectsCall!.sql).toContain("FROM project_usage_counters");
   });
 
   it("normalizes empty project metrics when the alert deliveries table exists", async (): Promise<void> => {
@@ -444,6 +494,10 @@ describe("postgres metadata store", () => {
       updated_at: "2026-03-18T00:00:00.000Z"
     });
     expect(duplicate).toBe("slug_taken");
+    const updateSql = updatedQuery.mock.calls
+      .map((call) => String(call[0]))
+      .find((sql) => sql.includes("WITH updated_project AS"));
+    expect(updateSql).toContain("FROM project_usage_counters");
   });
 
   it("should scope alert delivery metrics to the updated project in user-scoped project updates", async (): Promise<void> => {
@@ -516,6 +570,7 @@ describe("postgres metadata store", () => {
 
     expect(updateCall).toBeDefined();
     expect(updateCall?.sql).toContain("WHERE ad.project_id = up.project_id");
+    expect(updateCall?.sql).toContain("FROM project_usage_counters");
     expect(updateCall?.sql).not.toContain("WHERE ad.project_id = projects.id");
   });
 

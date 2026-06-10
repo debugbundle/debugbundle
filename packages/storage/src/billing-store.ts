@@ -131,6 +131,11 @@ export interface BillingStore {
     period_starts_at: string;
     count: number;
   }): Promise<void>;
+  incrementProjectUsageCounter(input: {
+    project_id: string;
+    period_starts_at: string;
+    count: number;
+  }): Promise<void>;
 }
 
 function normalizePlan(plan: string | null | undefined): TierName {
@@ -876,6 +881,20 @@ export function createPostgresBillingStore(
             updated_at = now()
         `,
         [input.organization_id, input.period_starts_at, input.count]
+      );
+    },
+
+    async incrementProjectUsageCounter(input): Promise<void> {
+      await db.query(
+        `
+          INSERT INTO project_usage_counters (project_id, period_starts_at, raw_ingested_events, updated_at)
+          VALUES ($1, $2::timestamptz, $3, now())
+          ON CONFLICT (project_id, period_starts_at)
+          DO UPDATE SET
+            raw_ingested_events = project_usage_counters.raw_ingested_events + EXCLUDED.raw_ingested_events,
+            updated_at = now()
+        `,
+        [input.project_id, input.period_starts_at, input.count]
       );
     }
   };

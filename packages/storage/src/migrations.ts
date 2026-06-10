@@ -40,6 +40,7 @@ export const REQUIRED_API_TABLES = [
   "alert_rules",
   "slack_destinations",
   "operational_email_deliveries",
+  "project_usage_counters",
   "agent_webhooks",
   "webhook_deliveries",
   "trial_lifecycle_events",

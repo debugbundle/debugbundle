@@ -419,6 +419,30 @@ describe("billing store – incrementOrgUsageCounter", () => {
   });
 });
 
+describe("billing store – incrementProjectUsageCounter", () => {
+  it("issues UPSERT SQL with correct parameters", async () => {
+    const calls: Array<{ sql: string; params: unknown[] }> = [];
+    const query = vi.fn().mockImplementation((sql: string, params: unknown[]) => {
+      calls.push({ sql, params });
+      return { rows: [] };
+    });
+
+    const store = createPostgresBillingStore({ query });
+    await store.incrementProjectUsageCounter({
+      project_id: "proj_abc",
+      period_starts_at: "2026-03-01T00:00:00.000Z",
+      count: 5
+    });
+
+    expect(calls).toHaveLength(1);
+    const call = calls[0]!;
+    expect(call.sql).toContain("INSERT INTO project_usage_counters");
+    expect(call.sql).toContain("ON CONFLICT");
+    expect(call.sql).toContain("raw_ingested_events + EXCLUDED.raw_ingested_events");
+    expect(call.params).toEqual(["proj_abc", "2026-03-01T00:00:00.000Z", 5]);
+  });
+});
+
 describe("billing store – trial lifecycle", () => {
   it("starts an eligible trial and returns the updated summary", async () => {
     const query = vi.fn().mockImplementation((sql: string) => {

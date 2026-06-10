@@ -133,6 +133,7 @@ describe("storage bootstrap schema", () => {
     expect(REQUIRED_API_TABLES).toContain("email_auth_challenges");
     expect(REQUIRED_API_TABLES).toContain("oauth_identities");
     expect(REQUIRED_API_TABLES).toContain("processed_billing_events");
+    expect(REQUIRED_API_TABLES).toContain("project_usage_counters");
     expect(REQUIRED_API_TABLES).toContain("processed_github_marketplace_events");
     expect(REQUIRED_API_TABLES).toContain("github_marketplace_accounts");
     expect(REQUIRED_API_TABLES).toContain("github_dispatch_deliveries");
@@ -170,6 +171,7 @@ describe("storage bootstrap schema", () => {
     expect(STORAGE_BOOTSTRAP_SQL.includes("CREATE INDEX plan_cleanup_tasks_pending_idx")).toBe(true);
     expect(STORAGE_BOOTSTRAP_SQL.includes("CREATE UNIQUE INDEX github_dispatch_deliveries_rule_dedupe_key_idx")).toBe(true);
     expect(STORAGE_BOOTSTRAP_SQL.includes("CREATE UNIQUE INDEX alert_email_digests_project_recipient_pending_idx")).toBe(true);
+    expect(STORAGE_BOOTSTRAP_SQL.includes("CREATE TABLE project_usage_counters")).toBe(true);
     expect(STORAGE_BOOTSTRAP_SQL.includes("UNIQUE (organization_id, slack_team_id, slack_channel_id)")).toBe(true);
   });
 

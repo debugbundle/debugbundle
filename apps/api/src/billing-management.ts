@@ -174,6 +174,11 @@ export function createBillingManagement(input: CreateBillingManagementInput): {
       period_starts_at: string;
       count: number;
     }): Promise<void>;
+    incrementProjectUsageCounter(input: {
+      project_id: string;
+      period_starts_at: string;
+      count: number;
+    }): Promise<void>;
     startTrial(input: {
       organization_id: string;
       target_plan: "solo" | "team";
@@ -437,6 +442,8 @@ export function createBillingManagement(input: CreateBillingManagementInput): {
         input.billingStore.getBillingSummaryForProject(inputValue),
       incrementOrgUsageCounter: (inputValue) =>
         input.billingStore.incrementOrgUsageCounter(inputValue),
+      incrementProjectUsageCounter: (inputValue) =>
+        input.billingStore.incrementProjectUsageCounter(inputValue),
       startTrial: (trialInput) =>
         input.billingStore.startTrialForOrganization({
           organization_id: trialInput.organization_id,

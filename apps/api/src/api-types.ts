@@ -208,6 +208,11 @@ export interface ApiDependencies {
       period_starts_at: string;
       count: number;
     }): Promise<void>;
+    incrementProjectUsageCounter?(input: {
+      project_id: string;
+      period_starts_at: string;
+      count: number;
+    }): Promise<void>;
     startTrial?(input: {
       organization_id: string;
       target_plan: "solo" | "team";

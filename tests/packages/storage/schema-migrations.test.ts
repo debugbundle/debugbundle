@@ -45,6 +45,9 @@ describe("storage schema migrations", () => {
     expect(query.mock.calls.map((call) => String(call[0]))).toContainEqual(
       expect.stringContaining("CREATE TABLE IF NOT EXISTS plan_cleanup_tasks")
     );
+    expect(query.mock.calls.map((call) => String(call[0]))).toContainEqual(
+      expect.stringContaining("CREATE TABLE IF NOT EXISTS project_usage_counters")
+    );
   });
 
   it("should skip already-applied migrations with matching checksums", async (): Promise<void> => {
@@ -203,6 +206,7 @@ describe("storage schema migrations", () => {
       { table_name: "organizations", column_name: "suspended_at" },
       { table_name: "organizations", column_name: "trial_plan" },
       { table_name: "plan_cleanup_tasks", column_name: "cleanup_type" },
+      { table_name: "project_usage_counters", column_name: "updated_at" },
       { table_name: "project_tokens", column_name: "allowed_origins" },
       { table_name: "projects", column_name: "improvement_bundle_sensitivity" },
       { table_name: "trial_lifecycle_events", column_name: "dedupe_key" },

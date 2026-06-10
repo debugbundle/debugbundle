@@ -350,6 +350,29 @@ export function registerIngestionRoutes(app: FastifyInstance, dependencies: ApiD
 
     if (
       billingCountedEventsCount > 0 &&
+      usageWindowStartsAt !== null &&
+      dependencies.billingManagement?.incrementProjectUsageCounter !== undefined
+    ) {
+      try {
+        await dependencies.billingManagement.incrementProjectUsageCounter({
+          project_id: project.project_id,
+          period_starts_at: usageWindowStartsAt,
+          count: billingCountedEventsCount
+        });
+      } catch (error) {
+        request.log.warn(
+          {
+            err: error,
+            project_id: project.project_id,
+            period_starts_at: usageWindowStartsAt
+          },
+          "project_usage_counter_increment_failed"
+        );
+      }
+    }
+
+    if (
+      billingCountedEventsCount > 0 &&
       previousRawIngestAllowanceUsed !== null &&
       rawIngestAllowanceLimit !== null &&
       dependencies.operationalEmailDelivery !== undefined

@@ -121,6 +121,37 @@ function buildProjectMetricsWindow(nowIso: string): { starts_at: string; ends_at
   };
 }
 
+function buildMonthlyRawIngestedEventsMetricSelect(input: {
+  projectIdSql: string;
+  startsAtSql: string;
+  endsAtSql: string;
+  billableIncidentEventsPredicate: string;
+}): string {
+  return `
+    SELECT GREATEST(
+      (
+        SELECT COUNT(*)::int
+        FROM incident_events ie
+        JOIN incidents i ON i.id = ie.incident_id
+        WHERE i.project_id = ${input.projectIdSql}
+          AND (${input.billableIncidentEventsPredicate})
+          AND ie.occurred_at >= ${input.startsAtSql}::timestamptz
+          AND ie.occurred_at < ${input.endsAtSql}::timestamptz
+      ),
+      COALESCE(
+        (
+          SELECT puc.raw_ingested_events::int
+          FROM project_usage_counters puc
+          WHERE puc.project_id = ${input.projectIdSql}
+            AND puc.period_starts_at = ${input.startsAtSql}::timestamptz
+          LIMIT 1
+        ),
+        0
+      )
+    )::int
+  `;
+}
+
 async function alertDeliveriesTableExists(db: Queryable): Promise<boolean> {
   const result = await db.query<{ exists: string | boolean } & Record<string, unknown>>(
     `
@@ -1418,13 +1449,12 @@ export function createPostgresMetadataStore(db: Queryable): PostgresMetadataStor
                   AND bg.created_at < $3::timestamptz
               ),
               'monthly_raw_ingested_events', (
-                SELECT COUNT(*)::int
-                FROM incident_events ie
-                JOIN incidents i ON i.id = ie.incident_id
-                WHERE i.project_id = p.id
-                  AND (${billableIncidentEventsPredicate})
-                  AND ie.occurred_at >= $2::timestamptz
-                  AND ie.occurred_at < $3::timestamptz
+                ${buildMonthlyRawIngestedEventsMetricSelect({
+                  projectIdSql: "p.id",
+                  startsAtSql: "$2",
+                  endsAtSql: "$3",
+                  billableIncidentEventsPredicate
+                })}
               ),
               'retained_bundles', (
                 SELECT COUNT(DISTINCT bg.incident_id)::int
@@ -1507,13 +1537,12 @@ export function createPostgresMetadataStore(db: Queryable): PostgresMetadataStor
                   AND bg.created_at < $3::timestamptz
               ),
               'monthly_raw_ingested_events', (
-                SELECT COUNT(*)::int
-                FROM incident_events ie
-                JOIN incidents i ON i.id = ie.incident_id
-                WHERE i.project_id = p.id
-                  AND (${billableIncidentEventsPredicate})
-                  AND ie.occurred_at >= $2::timestamptz
-                  AND ie.occurred_at < $3::timestamptz
+                ${buildMonthlyRawIngestedEventsMetricSelect({
+                  projectIdSql: "p.id",
+                  startsAtSql: "$2",
+                  endsAtSql: "$3",
+                  billableIncidentEventsPredicate
+                })}
               ),
               'retained_bundles', (
                 SELECT COUNT(DISTINCT bg.incident_id)::int
@@ -1774,13 +1803,12 @@ export function createPostgresMetadataStore(db: Queryable): PostgresMetadataStor
                     AND bg.created_at < $7::timestamptz
                 ),
                 'monthly_raw_ingested_events', (
-                  SELECT COUNT(*)::int
-                  FROM incident_events ie
-                  JOIN incidents i ON i.id = ie.incident_id
-                  WHERE i.project_id = up.project_id
-                    AND (${billableIncidentEventsPredicate})
-                    AND ie.occurred_at >= $6::timestamptz
-                    AND ie.occurred_at < $7::timestamptz
+                  ${buildMonthlyRawIngestedEventsMetricSelect({
+                    projectIdSql: "up.project_id",
+                    startsAtSql: "$6",
+                    endsAtSql: "$7",
+                    billableIncidentEventsPredicate
+                  })}
                 ),
                 'retained_bundles', (
                   SELECT COUNT(DISTINCT bg.incident_id)::int
@@ -2086,13 +2114,12 @@ export function createPostgresMetadataStore(db: Queryable): PostgresMetadataStor
                     AND bg.created_at < $7::timestamptz
                 ),
                 'monthly_raw_ingested_events', (
-                  SELECT COUNT(*)::int
-                  FROM incident_events ie
-                  JOIN incidents i ON i.id = ie.incident_id
-                  WHERE i.project_id = up.project_id
-                    AND (${billableIncidentEventsPredicate})
-                    AND ie.occurred_at >= $6::timestamptz
-                    AND ie.occurred_at < $7::timestamptz
+                  ${buildMonthlyRawIngestedEventsMetricSelect({
+                    projectIdSql: "up.project_id",
+                    startsAtSql: "$6",
+                    endsAtSql: "$7",
+                    billableIncidentEventsPredicate
+                  })}
                 ),
                 'retained_bundles', (
                   SELECT COUNT(DISTINCT bg.incident_id)::int

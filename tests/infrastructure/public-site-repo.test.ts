@@ -4,6 +4,8 @@ import { join } from 'node:path';
 
 import { describe, expect, it } from 'vitest';
 
+import { getSharedAgentInstallPrompt } from '../../site/src/lib/agent-install-prompt.js';
+
 const repoRoot = process.cwd();
 const siteRoot = join(repoRoot, 'site');
 const describePublicSiteRepo = existsSync(siteRoot) ? describe : describe.skip;
@@ -137,5 +139,16 @@ describePublicSiteRepo('public site repository export', () => {
     expect(pricing).toContain('Start Team trial');
     expect(pricing).toContain('30-day trial, no credit card required');
     expect(pricing).toContain('capacity after paid conversion');
+  });
+
+  it('tells the agent path to use the WordPress plugin instead of direct SDK installs on WordPress hosts', () => {
+    const sharedPrompt = getSharedAgentInstallPrompt();
+    const localOnlyPrompt = getSharedAgentInstallPrompt({ mode: 'local-only' });
+
+    for (const prompt of [sharedPrompt, localOnlyPrompt]) {
+      expect(prompt).toContain('https://debugbundle.com/docs/integrations/wordpress');
+      expect(prompt).toContain('use the DebugBundle WordPress plugin instead of installing the PHP SDK or Browser SDK directly on the WordPress host');
+      expect(prompt).toContain('let the plugin own backend capture, browser capture, relay setup, and token storage');
+    }
   });
 });
