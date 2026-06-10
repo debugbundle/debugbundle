@@ -929,8 +929,7 @@ describe("postgres metadata store project collaboration", () => {
           rows: []
         })
     });
-    const removeSuccessStore = createPostgresMetadataStore({
-      query: vi
+    const removeSuccessQuery = vi
         .fn()
         .mockResolvedValueOnce({
           rows: [{ actor_role: "admin" }]
@@ -949,6 +948,9 @@ describe("postgres metadata store project collaboration", () => {
             }
           ]
         })
+        .mockResolvedValue({ rows: [] });
+    const removeSuccessStore = createPostgresMetadataStore({
+      query: removeSuccessQuery
     });
 
     expect(
@@ -998,5 +1000,71 @@ describe("postgres metadata store project collaboration", () => {
         created_at: "2026-03-17T00:00:00.000Z"
       }
     });
+    expect(removeSuccessQuery.mock.calls.map((call) => String(call[0]))).toEqual(
+      expect.arrayContaining([
+        expect.stringContaining("DELETE FROM github_dispatch_rules"),
+        expect.stringContaining("DELETE FROM agent_webhooks"),
+        expect.stringContaining("DELETE FROM alert_rules")
+      ])
+    );
+  });
+
+  it("removes member-owned automation when a collaborator leaves a shared project", async (): Promise<void> => {
+    const query = vi
+      .fn()
+      .mockResolvedValueOnce({
+        rows: [{ owner_user_id: "usr_owner", owner_email: "owner@example.com", created_at: "2026-03-16T00:00:00.000Z" }]
+      })
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            user_id: "usr_member",
+            email: "member@example.com",
+            role: "member",
+            membership_type: "collaborator",
+            created_at: "2026-03-17T00:00:00.000Z"
+          }
+        ]
+      })
+      .mockResolvedValue({ rows: [] });
+    const store = createPostgresMetadataStore({ query });
+
+    await expect(
+      store.leaveProjectMembership!({
+        project_id: "proj_123",
+        user_id: "usr_member"
+      })
+    ).resolves.toEqual({
+      kind: "left",
+      member: {
+        user_id: "usr_member",
+        email: "member@example.com",
+        role: "member",
+        membership_type: "collaborator",
+        avatar_object_key: null,
+        created_at: "2026-03-17T00:00:00.000Z"
+      }
+    });
+
+    const calls = query.mock.calls.map((call) => ({
+      sql: String(call[0]),
+      params: call[1]
+    }));
+    expect(calls).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          sql: expect.stringContaining("DELETE FROM github_dispatch_rules"),
+          params: ["proj_123", "usr_member"]
+        }),
+        expect.objectContaining({
+          sql: expect.stringContaining("DELETE FROM agent_webhooks"),
+          params: ["proj_123", "usr_member"]
+        }),
+        expect.objectContaining({
+          sql: expect.stringContaining("DELETE FROM alert_rules"),
+          params: ["proj_123", "usr_member"]
+        })
+      ])
+    );
   });
 });

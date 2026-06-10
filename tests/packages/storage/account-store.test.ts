@@ -207,7 +207,40 @@ describe("postgres account store", () => {
     expect(query).toHaveBeenCalledWith("ROLLBACK", []);
   });
 
-  it("deletes organization and user-scoped data when no memberships remain", async (): Promise<void> => {
+  it("blocks deletion when the user owns a project in another organization", async (): Promise<void> => {
+    const query = vi.fn(async (sqlText: string) => {
+      if (sqlText === "BEGIN") {
+        return rowsResult([]);
+      }
+      if (sqlText.includes("SELECT role") && sqlText.includes("FROM organization_members")) {
+        return rowsResult([{ role: "owner" }]);
+      }
+      if (sqlText.includes("SELECT om.organization_id::text AS organization_id")) {
+        return rowsResult([]);
+      }
+      if (sqlText.includes("SELECT p.id::text AS project_id")) {
+        return rowsResult([{ project_id: "proj_other" }]);
+      }
+      if (sqlText === "ROLLBACK") {
+        return rowsResult([]);
+      }
+
+      throw new Error(`Unhandled SQL in deleteAccountForOrganization project-owner guard: ${sqlText}`);
+    });
+
+    const store = createPostgresAccountStore({ query } as Queryable);
+
+    const result = await store.deleteAccountForOrganization({
+      organization_id: "org_123",
+      user_id: "usr_123",
+      deleted_at: "2026-04-06T00:00:00.000Z"
+    });
+
+    expect(result).toBe("other_owned_projects_exist");
+    expect(query).toHaveBeenCalledWith("ROLLBACK", []);
+  });
+
+  it("deletes organization, remaining memberships, and the user record", async (): Promise<void> => {
     const query = vi.fn(async (sqlText: string) => {
       if (sqlText === "BEGIN" || sqlText === "COMMIT") {
         return rowsResult([]);
@@ -216,6 +249,9 @@ describe("postgres account store", () => {
         return rowsResult([{ role: "owner" }]);
       }
       if (sqlText.includes("SELECT om.organization_id::text AS organization_id")) {
+        return rowsResult([]);
+      }
+      if (sqlText.includes("SELECT p.id::text AS project_id")) {
         return rowsResult([]);
       }
       if (sqlText.includes("SELECT id::text AS project_id") && sqlText.includes("FROM projects")) {
@@ -236,8 +272,8 @@ describe("postgres account store", () => {
       if (sqlText.includes("DELETE FROM organizations")) {
         return rowsResult([{ organization_id: "org_123" }]);
       }
-      if (sqlText.includes("SELECT COUNT(*)::text AS membership_count")) {
-        return rowsResult([{ membership_count: "0" }]);
+      if (sqlText.includes("DELETE FROM organization_members") && sqlText.includes("WHERE user_id = $1")) {
+        return rowsResult([]);
       }
       if (sqlText.includes("DELETE FROM member_tokens") && sqlText.includes("WHERE user_id = $1")) {
         return rowsResult([{ token_id: "tok_user_123" }]);
@@ -266,6 +302,72 @@ describe("postgres account store", () => {
       deleted_project_ids: ["proj_123", "proj_456"],
       user_deleted: true,
       deleted_member_token_count: 2
+    });
+    expect(query).toHaveBeenCalledWith("COMMIT", []);
+  });
+
+  it("allows deletion when another organization still has a different owner and removes the collaborator membership", async (): Promise<void> => {
+    const query = vi.fn(async (sqlText: string) => {
+      if (sqlText === "BEGIN" || sqlText === "COMMIT") {
+        return rowsResult([]);
+      }
+      if (sqlText.includes("SELECT role") && sqlText.includes("FROM organization_members")) {
+        return rowsResult([{ role: "owner" }]);
+      }
+      if (sqlText.includes("SELECT om.organization_id::text AS organization_id")) {
+        return rowsResult([]);
+      }
+      if (sqlText.includes("SELECT p.id::text AS project_id")) {
+        return rowsResult([]);
+      }
+      if (sqlText.includes("SELECT id::text AS project_id") && sqlText.includes("FROM projects")) {
+        return rowsResult([{ project_id: "proj_123" }]);
+      }
+      if (sqlText.includes("DELETE FROM member_tokens") && sqlText.includes("WHERE organization_id = $1")) {
+        return rowsResult([]);
+      }
+      if (sqlText.includes("DELETE FROM processed_billing_events")) {
+        return rowsResult([]);
+      }
+      if (sqlText.includes("DELETE FROM audit_logs") && sqlText.includes("WHERE organization_id = $1")) {
+        return rowsResult([]);
+      }
+      if (sqlText.includes("DELETE FROM projects")) {
+        return rowsResult([]);
+      }
+      if (sqlText.includes("DELETE FROM organizations")) {
+        return rowsResult([{ organization_id: "org_123" }]);
+      }
+      if (sqlText.includes("DELETE FROM organization_members") && sqlText.includes("WHERE user_id = $1")) {
+        return rowsResult([]);
+      }
+      if (sqlText.includes("DELETE FROM member_tokens") && sqlText.includes("WHERE user_id = $1")) {
+        return rowsResult([{ token_id: "tok_user_123" }]);
+      }
+      if (sqlText.includes("DELETE FROM audit_logs") && sqlText.includes("WHERE actor_user_id = $1")) {
+        return rowsResult([]);
+      }
+      if (sqlText.includes("DELETE FROM users")) {
+        return rowsResult([]);
+      }
+
+      throw new Error(`Unhandled SQL in deleteAccountForOrganization collaborator cleanup: ${sqlText}`);
+    });
+
+    const store = createPostgresAccountStore({ query } as Queryable);
+
+    const result = await store.deleteAccountForOrganization({
+      organization_id: "org_123",
+      user_id: "usr_123",
+      deleted_at: "2026-04-06T00:00:00.000Z"
+    });
+
+    expect(result).toEqual({
+      deleted_at: "2026-04-06T00:00:00.000Z",
+      organization_id: "org_123",
+      deleted_project_ids: ["proj_123"],
+      user_deleted: true,
+      deleted_member_token_count: 1
     });
     expect(query).toHaveBeenCalledWith("COMMIT", []);
   });

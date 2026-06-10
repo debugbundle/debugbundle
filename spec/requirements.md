@@ -339,6 +339,9 @@ See `/spec/billing.md` and `/spec/system-emails.md` for the detailed source-of-t
 
 **FR-AUTH-04:** Browser auth: first-party passwordless email-code flow for both signup and login, plus GitHub OAuth. Redeeming a valid email code creates the account when needed, creates the browser session, and marks the email as verified. Verified email is required before first member token creation in the web app and before enabling billing or inviting members.
 
+**FR-AUTH-04a:** Owner-scoped browser account deletion must require two explicit confirmations before any destructive work begins: the exact phrase `Delete my account`, followed by a six-digit email OTP sent to the signed-in account email address. Deletion must fail closed when the phrase is wrong, the OTP is wrong or expired, or email delivery for the OTP is unavailable.
+On success, account deletion removes the user identity from every remaining organization membership and shared-project collaboration as part of deleting the user account. If the same user is still the sole owner of a different organization, or still owns any project in a different organization, the delete must be blocked until ownership is transferred or that organization/project is deleted.
+
 **FR-AUTH-05:** Agent-assisted signup flow supported (agent orchestrates, human completes trust step).
 
 **FR-AUTH-06:** Three effective project roles exist in V1: **Owner** (billing owner, delete project, manage all project resources), **Admin** (manage collaborators, capture policy, shared integrations, and all project-scoped automation resources except project deletion/billing takeover), and **Member** (all project data access plus normal project-scoped writes, but no collaborator management, no capture-policy edits, no shared integration management, and no mutation of another collaborator's project-scoped automation resources). Fine-grained RBAC beyond these role semantics is deferred to Enterprise.
@@ -354,6 +357,7 @@ See `/spec/billing.md` and `/spec/system-emails.md` for the detailed source-of-t
 **FR-AUTH-10a:** Collaborator-management surfaces are admin-only. Plain members must not be able to list pending invites, invite collaborators, cancel invites, change collaborator roles, remove collaborators, or see the members-management surface in the web app.
 
 **FR-AUTH-10b:** For project-scoped automation resources that members may create in shared projects, including alert rules, webhooks, and GitHub dispatch rules, owner and admin may manage every resource while member-role collaborators may mutate only the resources they created themselves.
+When a collaborator is removed from a project or leaves a shared project, DebugBundle must remove only that collaborator's project-scoped automation resources for that project, including alert rules, webhooks, and GitHub dispatch rules. Project resources owned by other collaborators or the project owner must remain.
 
 **FR-AUTH-11:** Member-authorized API operations must accept either a valid browser session or a valid member token. After principal resolution, both auth paths must run through the same authorization and domain logic.
 
@@ -367,7 +371,7 @@ See `/spec/billing.md` and `/spec/system-emails.md` for the detailed source-of-t
 
 ### 1.13 Email System
 
-**FR-EMAIL-01:** Transactional and product-critical lifecycle emails only: email sign-in codes, security alerts, billing events, invites, weekly reports, and mandatory operational owner notifications listed in `/spec/system-emails.md`.
+**FR-EMAIL-01:** Transactional and product-critical lifecycle emails only: email sign-in codes, account-deletion OTPs, security alerts, billing events, invites, weekly reports, and mandatory operational owner notifications listed in `/spec/system-emails.md`.
 
 **FR-EMAIL-02:** Provider abstraction (interface) with AWS SES as the default provider and support for alternate transports behind the same interface.
 

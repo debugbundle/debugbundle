@@ -363,6 +363,10 @@ export interface DeletedAccountRecord extends Record<string, unknown> {
   deleted_member_token_count: number;
 }
 
+export type AccountDeletionBlockedReason =
+  | "other_owned_organizations_exist"
+  | "other_owned_projects_exist";
+
 export interface ProjectMemberRecord {
   user_id: string;
   email: string;
@@ -1377,7 +1381,7 @@ export interface AccountLifecycleStore {
     organization_id: string;
     user_id: string;
     deleted_at: string;
-  }): Promise<DeletedAccountRecord | "other_owned_organizations_exist" | null>;
+  }): Promise<DeletedAccountRecord | AccountDeletionBlockedReason | null>;
   getUserAvatar(input: {
     user_id: string;
   }): Promise<UserAvatarRecord | null>;

@@ -400,6 +400,7 @@ runIntegration("project deletion integration", () => {
     await objectStore.putObject({ key: `raw-events/${projectId}/2026/03/21/00/evt1.json.gz`, body: dummyBody, contentType: "application/json", contentEncoding: "gzip" });
     await objectStore.putObject({ key: `raw-events/${projectId}/2026/03/21/01/evt2.json.gz`, body: dummyBody, contentType: "application/json", contentEncoding: "gzip" });
     await objectStore.putObject({ key: `bundles/${projectId}/inc1/bundle.json.gz`, body: dummyBody, contentType: "application/json", contentEncoding: "gzip" });
+    await objectStore.putObject({ key: `improvement-bundles/${projectId}/opp1/bundle.json.gz`, body: dummyBody, contentType: "application/json", contentEncoding: "gzip" });
     await objectStore.putObject({ key: `reproductions/${projectId}/inc1/reproduction.json.gz`, body: dummyBody, contentType: "application/json", contentEncoding: "gzip" });
     await objectStore.putObject({ key: `raw-events/${otherProjectId}/2026/03/21/00/evt3.json.gz`, body: dummyBody, contentType: "application/json", contentEncoding: "gzip" });
 
@@ -407,10 +408,12 @@ runIntegration("project deletion integration", () => {
 
     const targetRaw = await s3Admin.send(new ListObjectsV2Command({ Bucket: s3Bucket, Prefix: `raw-events/${projectId}/` }));
     const targetBundles = await s3Admin.send(new ListObjectsV2Command({ Bucket: s3Bucket, Prefix: `bundles/${projectId}/` }));
+    const targetImprovementBundles = await s3Admin.send(new ListObjectsV2Command({ Bucket: s3Bucket, Prefix: `improvement-bundles/${projectId}/` }));
     const targetRepros = await s3Admin.send(new ListObjectsV2Command({ Bucket: s3Bucket, Prefix: `reproductions/${projectId}/` }));
 
     expect(targetRaw.Contents ?? [], "raw-events should be empty").toHaveLength(0);
     expect(targetBundles.Contents ?? [], "bundles should be empty").toHaveLength(0);
+    expect(targetImprovementBundles.Contents ?? [], "improvement-bundles should be empty").toHaveLength(0);
     expect(targetRepros.Contents ?? [], "reproductions should be empty").toHaveLength(0);
 
     const otherRaw = await s3Admin.send(new ListObjectsV2Command({ Bucket: s3Bucket, Prefix: `raw-events/${otherProjectId}/` }));

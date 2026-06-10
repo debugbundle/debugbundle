@@ -11,6 +11,7 @@ export const REQUIRED_API_TABLES = [
   "users",
   "sessions",
   "email_auth_challenges",
+  "account_deletion_challenges",
   "github_device_authorizations",
   "oauth_identities",
   "organizations",

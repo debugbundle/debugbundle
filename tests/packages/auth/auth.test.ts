@@ -9,6 +9,7 @@ import {
   buildClearedSessionCookie,
   buildGithubOauthStateCookie,
   buildSessionCookie,
+  createAccountDeletionChallengeService,
   createWebSessionAuthService,
   generateEmailAuthCode,
   generateGithubOauthState,
@@ -931,5 +932,63 @@ describe("auth email-code and session primitives", () => {
       session_id: "ses_123",
     });
     await expect(inviteService.revokeSessionByToken("session-secret", { now: new Date("2026-03-17T00:30:00.000Z") })).resolves.toBe(true);
+  });
+
+  it("requests and verifies a dedicated account deletion OTP without reusing sign-in challenges", async (): Promise<void> => {
+    const now = new Date("2026-06-10T10:00:00.000Z");
+    const replaceAccountDeletionChallenge = vi.fn().mockResolvedValue(undefined);
+    const consumeAccountDeletionChallenge = vi.fn().mockResolvedValue({
+      email: "owen@example.com"
+    });
+    const sendAccountDeletionOtp = vi.fn().mockResolvedValue(undefined);
+    const service = createAccountDeletionChallengeService(
+      {
+        replaceAccountDeletionChallenge,
+        consumeAccountDeletionChallenge
+      },
+      {
+        authEmails: {
+          sendAccountDeletionOtp
+        }
+      }
+    );
+
+    const requested = await service.requestDeletionOtp({
+      organization_id: "org_123",
+      user_id: "usr_123",
+      email: "OWEN@example.com",
+      now
+    });
+    const verified = await service.verifyDeletionOtp({
+      organization_id: "org_123",
+      user_id: "usr_123",
+      email: "OWEN@example.com",
+      code: "123456",
+      now
+    });
+
+    expect(requested).toEqual({ ok: true, code_sent: true });
+    expect(replaceAccountDeletionChallenge).toHaveBeenCalledWith(
+      expect.objectContaining({
+        organization_id: "org_123",
+        user_id: "usr_123",
+        email: "owen@example.com",
+        expires_at: "2026-06-10T10:10:00.000Z",
+        replaced_at: now.toISOString()
+      })
+    );
+    expect(sendAccountDeletionOtp).toHaveBeenCalledWith({
+      email: "owen@example.com",
+      code: expect.stringMatching(/^\d{6}$/),
+      expires_in_minutes: 10
+    });
+    expect(consumeAccountDeletionChallenge).toHaveBeenCalledWith({
+      organization_id: "org_123",
+      user_id: "usr_123",
+      email: "owen@example.com",
+      code_hash: hashToken("123456"),
+      used_at: now.toISOString()
+    });
+    expect(verified).toEqual({ ok: true });
   });
 });

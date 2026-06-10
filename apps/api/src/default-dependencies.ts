@@ -1,6 +1,7 @@
 import { Pool } from "pg";
 
 import {
+  createAccountDeletionChallengeService,
   createGitHubCliAuthService,
   createWebSessionAuthService,
   type AuthEmailSender
@@ -152,6 +153,9 @@ export function createApiDependencies(input: CreateApiDependenciesInput): Defaul
       ...(input.githubOAuth === undefined ? {} : { githubOAuth: input.githubOAuth })
     }
   );
+  const accountDeletionAuth = createAccountDeletionChallengeService(authStore, {
+    ...(input.authEmails === undefined ? {} : { authEmails: input.authEmails })
+  });
   const githubCliAuth = createGitHubCliAuthService(authStore, {
     ...(input.githubOAuth === undefined ? {} : { githubOAuth: input.githubOAuth })
   });
@@ -222,6 +226,7 @@ export function createApiDependencies(input: CreateApiDependenciesInput): Defaul
     auditLogging: auditLogStore,
     memberAuth,
     webAuth,
+    accountDeletionAuth,
     githubCliAuth,
     ...(inviteEmails === undefined ? {} : { inviteEmails }),
     ...(input.billingEmails === undefined ? {} : { billingEmails: input.billingEmails }),
@@ -278,7 +283,11 @@ export function createApiDependencies(input: CreateApiDependenciesInput): Defaul
         deleted_at: string;
       }) => {
         const result = await accountStore.deleteAccountForOrganization(deleteInput);
-        if (result !== null && result !== "other_owned_organizations_exist") {
+        if (
+          result !== null &&
+          result !== "other_owned_organizations_exist" &&
+          result !== "other_owned_projects_exist"
+        ) {
           await Promise.all(
             result.deleted_project_ids.map((projectId) => deleteProjectObjects(input.objectStore, projectId).catch(() => undefined)),
           );

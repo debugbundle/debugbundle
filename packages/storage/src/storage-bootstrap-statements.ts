@@ -197,6 +197,26 @@ export const STORAGE_BOOTSTRAP_STATEMENTS = [
     ON email_auth_challenges (code_hash)
   `,
   `
+    CREATE TABLE account_deletion_challenges (
+      id uuid PRIMARY KEY,
+      organization_id uuid NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+      user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      email text NOT NULL,
+      code_hash text NOT NULL,
+      created_at timestamptz NOT NULL DEFAULT now(),
+      expires_at timestamptz NOT NULL,
+      used_at timestamptz
+    )
+  `,
+  `
+    CREATE INDEX account_deletion_challenges_scope_idx
+    ON account_deletion_challenges (organization_id, user_id, lower(email), created_at DESC)
+  `,
+  `
+    CREATE INDEX account_deletion_challenges_code_hash_idx
+    ON account_deletion_challenges (code_hash)
+  `,
+  `
     CREATE TABLE github_device_authorizations (
       id uuid PRIMARY KEY,
       device_code text NOT NULL UNIQUE,

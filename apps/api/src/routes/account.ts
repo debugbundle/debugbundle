@@ -9,16 +9,23 @@ import {
 import { buildGravatarAvatarUrl, importUserAvatarFromUrl } from "../../../../packages/storage/src/index.js";
 
 import type { ApiDependencies } from "../api-types.js";
+import { enforceRequestRateLimit } from "../api-helpers.js";
 import { buildAccountAvatarUrl } from "../avatar-urls.js";
 import { hashAuditIdentifier, recordAuditLog } from "../audit-logging.js";
-import { AccountDeleteBodySchema } from "../schemas.js";
+import { SMALL_REQUEST_BODY_LIMIT_BYTES } from "../http-limits.js";
+import {
+  AccountDeleteBodySchema,
+  AccountDeleteRequestOtpBodySchema
+} from "../schemas.js";
+
+const ACCOUNT_DELETE_CONFIRMATION_TEXT = "Delete my account";
 
 function shouldUseSecureCookies(): boolean {
   return process.env["AUTH_COOKIE_SECURE"] !== "false";
 }
 
-function normalizeEmail(value: string): string {
-  return value.trim().toLowerCase();
+function normalizeDeleteConfirmationText(value: string): string {
+  return value.trim();
 }
 
 export function registerAccountRoutes(app: FastifyInstance, dependencies: ApiDependencies): void {
@@ -156,8 +163,105 @@ export function registerAccountRoutes(app: FastifyInstance, dependencies: ApiDep
     });
   });
 
-  app.delete("/v1/account", async (request, reply) => {
-    if (dependencies.webAuth === undefined || dependencies.accountManagement === undefined) {
+  app.post("/v1/account/delete/request-otp", { bodyLimit: SMALL_REQUEST_BODY_LIMIT_BYTES }, async (request, reply) => {
+    if (
+      dependencies.webAuth === undefined ||
+      dependencies.accountManagement === undefined ||
+      dependencies.accountDeletionAuth === undefined
+    ) {
+      return reply.status(503).send({ error: "account_management_not_configured" });
+    }
+
+    const resolved = await resolveBrowserSessionOrReply(request.headers.cookie);
+    if ("error" in resolved) {
+      return reply.status(resolved.error === "account_management_not_configured" ? 503 : 401).send({ error: resolved.error });
+    }
+
+    if (
+      !(await enforceRequestRateLimit(request, reply, dependencies, {
+        bucket: "management-write",
+        subject: `account-delete:${resolved.session.user_id}`
+      }))
+    ) {
+      return;
+    }
+
+    if (resolved.session.role !== "owner") {
+      return reply.status(403).send({ error: "forbidden" });
+    }
+
+    const parsedBody = AccountDeleteRequestOtpBodySchema.safeParse(request.body);
+    if (!parsedBody.success) {
+      return reply.status(400).send({ error: "invalid_payload" });
+    }
+
+    if (normalizeDeleteConfirmationText(parsedBody.data.confirmation_text) !== ACCOUNT_DELETE_CONFIRMATION_TEXT) {
+      await recordAuditLog(dependencies.auditLogging, {
+        organization_id: resolved.session.organization_id,
+        actor_user_id: resolved.session.user_id,
+        actor_type: "browser_session",
+        action: "account.delete.otp.request",
+        target_type: "account",
+        target_id: resolved.session.organization_id,
+        status: "failure",
+        ip_address: request.ip,
+        metadata: {
+          reason: "invalid_confirmation"
+        }
+      });
+
+      return reply.status(400).send({ error: "invalid_confirmation" });
+    }
+
+    const requested = await dependencies.accountDeletionAuth.requestDeletionOtp({
+      organization_id: resolved.session.organization_id,
+      user_id: resolved.session.user_id,
+      email: resolved.session.email,
+      now: new Date()
+    });
+
+    if (!requested.code_sent) {
+      await recordAuditLog(dependencies.auditLogging, {
+        organization_id: resolved.session.organization_id,
+        actor_user_id: resolved.session.user_id,
+        actor_type: "browser_session",
+        action: "account.delete.otp.request",
+        target_type: "account",
+        target_id: resolved.session.organization_id,
+        status: "failure",
+        ip_address: request.ip,
+        metadata: {
+          reason: "delivery_unavailable",
+          email_hash: hashAuditIdentifier(resolved.session.email)
+        }
+      });
+
+      return reply.status(503).send({ error: "account_deletion_verification_unavailable" });
+    }
+
+    await recordAuditLog(dependencies.auditLogging, {
+      organization_id: resolved.session.organization_id,
+      actor_user_id: resolved.session.user_id,
+      actor_type: "browser_session",
+      action: "account.delete.otp.request",
+      target_type: "account",
+      target_id: resolved.session.organization_id,
+      status: "success",
+      ip_address: request.ip,
+      metadata: {
+        email_hash: hashAuditIdentifier(resolved.session.email)
+      }
+    });
+
+    return reply.status(200).send({ success: true });
+  });
+
+  app.delete("/v1/account", { bodyLimit: SMALL_REQUEST_BODY_LIMIT_BYTES }, async (request, reply) => {
+    if (
+      dependencies.webAuth === undefined ||
+      dependencies.accountManagement === undefined ||
+      dependencies.accountDeletionAuth === undefined
+    ) {
       return reply.status(503).send({ error: "account_management_not_configured" });
     }
 
@@ -173,6 +277,15 @@ export function registerAccountRoutes(app: FastifyInstance, dependencies: ApiDep
       return reply.status(401).send({ error: "invalid_session" });
     }
 
+    if (
+      !(await enforceRequestRateLimit(request, reply, dependencies, {
+        bucket: "management-write",
+        subject: `account-delete:${session.user_id}`
+      }))
+    ) {
+      return;
+    }
+
     if (session.role !== "owner") {
       return reply.status(403).send({ error: "forbidden" });
     }
@@ -182,7 +295,7 @@ export function registerAccountRoutes(app: FastifyInstance, dependencies: ApiDep
       return reply.status(400).send({ error: "invalid_payload" });
     }
 
-    if (normalizeEmail(parsedBody.data.email) !== normalizeEmail(session.email)) {
+    if (normalizeDeleteConfirmationText(parsedBody.data.confirmation_text) !== ACCOUNT_DELETE_CONFIRMATION_TEXT) {
       await recordAuditLog(dependencies.auditLogging, {
         organization_id: session.organization_id,
         actor_user_id: session.user_id,
@@ -193,12 +306,38 @@ export function registerAccountRoutes(app: FastifyInstance, dependencies: ApiDep
         status: "failure",
         ip_address: request.ip,
         metadata: {
-          reason: "invalid_confirmation",
-          email_hash: hashAuditIdentifier(parsedBody.data.email),
-        },
+          reason: "invalid_confirmation"
+        }
       });
 
       return reply.status(400).send({ error: "invalid_confirmation" });
+    }
+
+    const verification = await dependencies.accountDeletionAuth.verifyDeletionOtp({
+      organization_id: session.organization_id,
+      user_id: session.user_id,
+      email: session.email,
+      code: parsedBody.data.otp,
+      now: new Date()
+    });
+
+    if (!verification.ok) {
+      await recordAuditLog(dependencies.auditLogging, {
+        organization_id: session.organization_id,
+        actor_user_id: session.user_id,
+        actor_type: "browser_session",
+        action: "account.delete",
+        target_type: "account",
+        target_id: session.organization_id,
+        status: "failure",
+        ip_address: request.ip,
+        metadata: {
+          reason: "invalid_otp",
+          email_hash: hashAuditIdentifier(session.email)
+        }
+      });
+
+      return reply.status(400).send({ error: "invalid_otp" });
     }
 
     const deletedAt = new Date().toISOString();
@@ -223,11 +362,29 @@ export function registerAccountRoutes(app: FastifyInstance, dependencies: ApiDep
         status: "failure",
         ip_address: request.ip,
         metadata: {
-          reason: "other_owned_organizations_exist",
-        },
+          reason: "other_owned_organizations_exist"
+        }
       });
 
       return reply.status(409).send({ error: "other_owned_organizations_exist" });
+    }
+
+    if (deleted === "other_owned_projects_exist") {
+      await recordAuditLog(dependencies.auditLogging, {
+        organization_id: session.organization_id,
+        actor_user_id: session.user_id,
+        actor_type: "browser_session",
+        action: "account.delete",
+        target_type: "account",
+        target_id: session.organization_id,
+        status: "failure",
+        ip_address: request.ip,
+        metadata: {
+          reason: "other_owned_projects_exist"
+        }
+      });
+
+      return reply.status(409).send({ error: "other_owned_projects_exist" });
     }
 
     await recordAuditLog(dependencies.auditLogging, {
@@ -245,8 +402,8 @@ export function registerAccountRoutes(app: FastifyInstance, dependencies: ApiDep
         deleted_project_ids: deleted.deleted_project_ids,
         user_deleted: deleted.user_deleted,
         deleted_member_token_count: deleted.deleted_member_token_count,
-        email_hash: hashAuditIdentifier(session.email),
-      },
+        email_hash: hashAuditIdentifier(session.email)
+      }
     });
 
     reply.header("Set-Cookie", buildClearedSessionCookie({ secure: shouldUseSecureCookies() }));

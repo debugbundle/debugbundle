@@ -131,6 +131,7 @@ describe("storage bootstrap schema", () => {
 
   it("should expose required tables for auth, alert, billing, and github flows", (): void => {
     expect(REQUIRED_API_TABLES).toContain("email_auth_challenges");
+    expect(REQUIRED_API_TABLES).toContain("account_deletion_challenges");
     expect(REQUIRED_API_TABLES).toContain("oauth_identities");
     expect(REQUIRED_API_TABLES).toContain("processed_billing_events");
     expect(REQUIRED_API_TABLES).toContain("project_usage_counters");

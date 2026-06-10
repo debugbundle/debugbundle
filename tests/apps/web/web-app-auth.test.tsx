@@ -664,12 +664,25 @@ describe("web app - auth routes", () => {
         return jsonResponse(200, { projects: [] });
       }
 
+      if (url.endsWith("/v1/account/delete/request-otp") && init?.method === "POST") {
+        expect(init.headers).toEqual({
+          "Content-Type": "application/json",
+          "X-CSRF-Token": "csrf-token-123"
+        });
+        expect(init.body).toBe(JSON.stringify({ confirmation_text: "Delete my account" }));
+
+        return jsonResponse(200, { success: true });
+      }
+
       if (url.endsWith("/v1/account") && init?.method === "DELETE") {
         expect(init.headers).toEqual({
           "Content-Type": "application/json",
           "X-CSRF-Token": "csrf-token-123"
         });
-        expect(init.body).toBe(JSON.stringify({ email: "owen@example.com" }));
+        expect(init.body).toBe(JSON.stringify({
+          confirmation_text: "Delete my account",
+          otp: "123456"
+        }));
 
         return jsonResponse(200, {
           account: {
@@ -690,8 +703,10 @@ describe("web app - auth routes", () => {
     await user.click(await screen.findByRole("button", { name: /delete account/i }));
 
     const dialog = await screen.findByRole("alertdialog");
-    await user.type(within(dialog).getByLabelText(/confirm email address/i), "owen@example.com");
-    await user.click(within(dialog).getAllByRole("button", { name: /delete account/i })[0] as HTMLButtonElement);
+    await user.type(within(dialog).getByLabelText(/type the confirmation phrase/i), "Delete my account");
+    await user.click(within(dialog).getByRole("button", { name: /send email code/i }));
+    await user.type(await within(dialog).findByLabelText(/email verification code/i), "123456");
+    await user.click(within(dialog).getByRole("button", { name: /^delete account$/i }));
 
     expect(await screen.findByRole("heading", { name: /continue to debugbundle/i })).toBeInTheDocument();
   });

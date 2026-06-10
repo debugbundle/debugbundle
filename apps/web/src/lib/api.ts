@@ -94,7 +94,23 @@ function getBrowserTimeZone(): string {
   return Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
 }
 
-export async function deleteAccount(payload: { email: string }): Promise<DeletedAccountRecord> {
+export async function requestAccountDeletionOtp(payload: {
+  confirmation_text: string;
+}): Promise<void> {
+  await readJson<{ success: true }>(
+    await fetch(`${API_BASE}/v1/account/delete/request-otp`, {
+      method: "POST",
+      credentials: "include",
+      headers: buildBrowserSessionHeaders(true),
+      body: JSON.stringify(payload)
+    })
+  );
+}
+
+export async function deleteAccount(payload: {
+  confirmation_text: string;
+  otp: string;
+}): Promise<DeletedAccountRecord> {
   const body = await readJson<{ account: DeletedAccountRecord }>(
     await fetch(`${API_BASE}/v1/account`, {
       method: "DELETE",

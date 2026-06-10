@@ -9,6 +9,7 @@ type AuthRateLimiterDependency = MockedMethods<NonNullable<ApiServerDependencies
 type AuditLoggingDependency = MockedMethods<NonNullable<ApiServerDependencies["auditLogging"]>>;
 type WebAuthDependency = MockedMethods<NonNullable<ApiServerDependencies["webAuth"]>>;
 type GitHubCliAuthDependency = MockedMethods<NonNullable<ApiServerDependencies["githubCliAuth"]>>;
+type AccountDeletionAuthDependency = MockedMethods<NonNullable<ApiServerDependencies["accountDeletionAuth"]>>;
 type AccountManagementDependency = MockedMethods<NonNullable<ApiServerDependencies["accountManagement"]>>;
 type BillingManagementDependency = MockedMethods<NonNullable<ApiServerDependencies["billingManagement"]>>;
 type BillingAdminDependency = MockedMethods<NonNullable<ApiServerDependencies["billingAdmin"]>>;
@@ -18,6 +19,7 @@ function createServer(overrides: {
   auditLogging?: Partial<AuditLoggingDependency>;
   webAuth?: Partial<WebAuthDependency> | undefined;
   githubCliAuth?: Partial<GitHubCliAuthDependency> | undefined;
+  accountDeletionAuth?: Partial<AccountDeletionAuthDependency> | undefined;
   accountManagement?: Partial<AccountManagementDependency>;
   billingManagement?: BillingManagementDependency | undefined;
   billingAdmin?: Partial<BillingAdminDependency>;
@@ -26,6 +28,7 @@ function createServer(overrides: {
 } = {}): ReturnType<typeof createApiServer> {
   const hasWebAuthOverride = Object.prototype.hasOwnProperty.call(overrides, "webAuth");
   const hasGitHubCliAuthOverride = Object.prototype.hasOwnProperty.call(overrides, "githubCliAuth");
+  const hasAccountDeletionAuthOverride = Object.prototype.hasOwnProperty.call(overrides, "accountDeletionAuth");
   const hasBillingManagementOverride = Object.prototype.hasOwnProperty.call(overrides, "billingManagement");
   const hasBillingAdminOverride = Object.prototype.hasOwnProperty.call(overrides, "billingAdmin");
   const defaultWebAuth = mockedObject<NonNullable<ApiServerDependencies["webAuth"]>>({
@@ -130,6 +133,15 @@ function createServer(overrides: {
       }
     })
   });
+  const defaultAccountDeletionAuth = mockedObject<NonNullable<ApiServerDependencies["accountDeletionAuth"]>>({
+    requestDeletionOtp: vi.fn().mockResolvedValue({
+      ok: true,
+      code_sent: true
+    }),
+    verifyDeletionOtp: vi.fn().mockResolvedValue({
+      ok: true
+    })
+  });
 
   return createApiServer({
     ingestionPersistence: {
@@ -176,6 +188,18 @@ function createServer(overrides: {
             })
       : {
           githubCliAuth: defaultGitHubCliAuth
+        }),
+    ...(hasAccountDeletionAuthOverride
+      ? (overrides.accountDeletionAuth === undefined
+          ? {}
+          : {
+              accountDeletionAuth: mockedObject<NonNullable<ApiServerDependencies["accountDeletionAuth"]>>({
+                ...defaultAccountDeletionAuth,
+                ...overrides.accountDeletionAuth
+              })
+            })
+      : {
+          accountDeletionAuth: defaultAccountDeletionAuth
         }),
     tokenManagement: mockedObject<ApiServerDependencies["tokenManagement"]>({
       listProjectTokensForOrganization: vi.fn().mockResolvedValue([]),
@@ -2083,6 +2107,11 @@ describe("account routes backed by browser auth", () => {
 
   it("deletes the current account for owner browser sessions and clears the cookie", async (): Promise<void> => {
     const csrfToken = buildCsrfToken("session-secret");
+    const accountDeletionAuth = {
+      verifyDeletionOtp: vi.fn().mockResolvedValue({
+        ok: true
+      })
+    };
     const accountManagement = {
       deleteAccountForOrganization: vi.fn().mockResolvedValue({
         deleted_at: "2026-04-06T00:00:00.000Z",
@@ -2093,6 +2122,7 @@ describe("account routes backed by browser auth", () => {
       })
     };
     const app = createServer({
+      accountDeletionAuth,
       accountManagement,
       webAuth: {
         resolveSessionByToken: vi.fn().mockResolvedValue({
@@ -2119,7 +2149,8 @@ describe("account routes backed by browser auth", () => {
         "x-csrf-token": csrfToken
       },
       payload: {
-        email: "owen@example.com"
+        confirmation_text: "Delete my account",
+        otp: "123456"
       }
     });
 
@@ -2133,6 +2164,156 @@ describe("account routes backed by browser auth", () => {
         deleted_member_token_count: 2
       }
     });
+    expect(accountDeletionAuth.verifyDeletionOtp).toHaveBeenCalledWith({
+      organization_id: "org_123",
+      user_id: "usr_123",
+      email: "owen@example.com",
+      code: "123456",
+      now: expect.any(Date)
+    });
     expect(String(response.headers["set-cookie"])).toContain("Max-Age=0");
+  });
+
+  it("requests an account deletion OTP after the exact confirmation phrase", async (): Promise<void> => {
+    const csrfToken = buildCsrfToken("session-secret");
+    const accountDeletionAuth = {
+      requestDeletionOtp: vi.fn().mockResolvedValue({
+        ok: true,
+        code_sent: true
+      })
+    };
+    const app = createServer({
+      accountDeletionAuth,
+      webAuth: {
+        resolveSessionByToken: vi.fn().mockResolvedValue({
+          session_id: "ses_123",
+          user_id: "usr_123",
+          email: "owen@example.com",
+          email_verified_at: "2026-03-16T00:00:00.000Z",
+          organization_id: "org_123",
+          role: "owner",
+          created_at: "2026-03-16T00:00:00.000Z",
+          expires_at: "2026-03-16T12:00:00.000Z",
+          revoked_at: null,
+          has_email_auth: true,
+          has_github_oauth: false
+        })
+      }
+    });
+
+    const response = await app.inject({
+      method: "POST",
+      url: "/v1/account/delete/request-otp",
+      headers: {
+        cookie: `${SESSION_COOKIE_NAME}=session-secret`,
+        "x-csrf-token": csrfToken
+      },
+      payload: {
+        confirmation_text: "Delete my account"
+      }
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toEqual({
+      success: true
+    });
+    expect(accountDeletionAuth.requestDeletionOtp).toHaveBeenCalledWith({
+      organization_id: "org_123",
+      user_id: "usr_123",
+      email: "owen@example.com",
+      now: expect.any(Date)
+    });
+  });
+
+  it("rejects account deletion when the OTP is invalid", async (): Promise<void> => {
+    const csrfToken = buildCsrfToken("session-secret");
+    const app = createServer({
+      accountDeletionAuth: {
+        verifyDeletionOtp: vi.fn().mockResolvedValue({
+          ok: false,
+          error: "invalid_code"
+        })
+      },
+      webAuth: {
+        resolveSessionByToken: vi.fn().mockResolvedValue({
+          session_id: "ses_123",
+          user_id: "usr_123",
+          email: "owen@example.com",
+          email_verified_at: "2026-03-16T00:00:00.000Z",
+          organization_id: "org_123",
+          role: "owner",
+          created_at: "2026-03-16T00:00:00.000Z",
+          expires_at: "2026-03-16T12:00:00.000Z",
+          revoked_at: null,
+          has_email_auth: true,
+          has_github_oauth: false
+        })
+      }
+    });
+
+    const response = await app.inject({
+      method: "DELETE",
+      url: "/v1/account",
+      headers: {
+        cookie: `${SESSION_COOKIE_NAME}=session-secret`,
+        "x-csrf-token": csrfToken
+      },
+      payload: {
+        confirmation_text: "Delete my account",
+        otp: "123456"
+      }
+    });
+
+    expect(response.statusCode).toBe(400);
+    expect(response.json()).toEqual({
+      error: "invalid_otp"
+    });
+  });
+
+  it("rejects account deletion when the user still owns projects in another organization", async (): Promise<void> => {
+    const csrfToken = buildCsrfToken("session-secret");
+    const app = createServer({
+      accountDeletionAuth: {
+        verifyDeletionOtp: vi.fn().mockResolvedValue({
+          ok: true
+        })
+      },
+      accountManagement: {
+        deleteAccountForOrganization: vi.fn().mockResolvedValue("other_owned_projects_exist")
+      },
+      webAuth: {
+        resolveSessionByToken: vi.fn().mockResolvedValue({
+          session_id: "ses_123",
+          user_id: "usr_123",
+          email: "owen@example.com",
+          email_verified_at: "2026-03-16T00:00:00.000Z",
+          organization_id: "org_123",
+          role: "owner",
+          created_at: "2026-03-16T00:00:00.000Z",
+          expires_at: "2026-03-16T12:00:00.000Z",
+          revoked_at: null,
+          has_email_auth: true,
+          has_github_oauth: false
+        })
+      }
+    });
+
+    const response = await app.inject({
+      method: "DELETE",
+      url: "/v1/account",
+      headers: {
+        cookie: `${SESSION_COOKIE_NAME}=session-secret`,
+        "x-csrf-token": csrfToken
+      },
+      payload: {
+        confirmation_text: "Delete my account",
+        otp: "123456"
+      }
+    });
+
+    expect(response.statusCode).toBe(409);
+    expect(response.json()).toEqual({
+      error: "other_owned_projects_exist"
+    });
   });
 });

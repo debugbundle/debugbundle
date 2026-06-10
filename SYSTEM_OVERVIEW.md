@@ -149,7 +149,7 @@ apps/
       server.ts              — Route composition (delegates to route modules)
       routes/
         health.ts            — GET /health, /ready (503 when dependencies degraded), /live
-        account.ts           — Owner-scoped browser-session account export, cached-avatar retrieval/import, and destructive account deletion routes
+        account.ts           — Owner-scoped browser-session account export, cached-avatar retrieval/import, and destructive account deletion routes with phrase + email-OTP verification, collaborator-membership teardown on user deletion, and guards for external sole-owner/project-owner state
         auth.ts              — Web-auth signup, login, session, verification, password-reset, auth-method disclosure, and best-effort GitHub avatar import
         ingestion.ts         — POST /v1/events (with capture-policy enforcement)
         incidents.ts         — GET /v1/incidents, /v1/incidents/{id}, single + bulk resolve/reopen, bundle, reproduction, logs
@@ -190,7 +190,7 @@ packages/
       lib/session.tsx        — Session bootstrap, refresh, and context state
       lib/theme.tsx          — Light/dark/system theme state and DOM synchronization
       components/ui/         — shadcn-based UI primitives used across the app
-      pages/settings-page.tsx — Account settings page with auth-method-aware password management, explicit Gravatar import, account export, and destructive account deletion controls
+      pages/settings-page.tsx — Account settings page with auth-method-aware password management, explicit Gravatar import, account export, and destructive account deletion controls gated by an exact confirmation phrase plus email OTP
       components/system/     — App shell, page headers, callout cards, theme toggle, reusable user-avatar primitive, reusable plaintext secret reveal, and billing display primitives
 
 packages/

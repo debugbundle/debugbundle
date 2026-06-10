@@ -17,25 +17,37 @@ import {
 } from "../components/ui/alert-dialog.js";
 import { Button } from "../components/ui/button.js";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card.js";
-import { Field, FieldLabel } from "../components/ui/field.js";
+import { Field, FieldDescription, FieldLabel } from "../components/ui/field.js";
 import { Input } from "../components/ui/input.js";
-import { deleteAccount, exportAccountData, importAccountAvatarFromGravatar } from "../lib/api.js";
+import {
+  deleteAccount,
+  exportAccountData,
+  importAccountAvatarFromGravatar,
+  requestAccountDeletionOtp
+} from "../lib/api.js";
 import { showErrorToast, showSuccessToast } from "../lib/notify.js";
 import { useSession } from "../lib/session.js";
+
+const DELETE_ACCOUNT_CONFIRMATION_TEXT = "Delete my account";
 
 export function SettingsPage(): JSX.Element {
   const { session, setSession } = useSession();
   const navigate = useNavigate();
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
-  const [deleteConfirmationEmail, setDeleteConfirmationEmail] = useState("");
+  const [deleteConfirmationText, setDeleteConfirmationText] = useState("");
+  const [deleteOtp, setDeleteOtp] = useState("");
+  const [hasRequestedDeleteOtp, setHasRequestedDeleteOtp] = useState(false);
   const [deleteErrorMessage, setDeleteErrorMessage] = useState<string | null>(null);
   const [isExporting, setIsExporting] = useState(false);
   const [isImportingAvatar, setIsImportingAvatar] = useState(false);
+  const [isRequestingDeleteOtp, setIsRequestingDeleteOtp] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
 
   useEffect(() => {
     if (!isDeleteDialogOpen) {
-      setDeleteConfirmationEmail("");
+      setDeleteConfirmationText("");
+      setDeleteOtp("");
+      setHasRequestedDeleteOtp(false);
       setDeleteErrorMessage(null);
     }
   }, [isDeleteDialogOpen]);
@@ -47,7 +59,8 @@ export function SettingsPage(): JSX.Element {
   const canManageOrganizationAccount = session.role === "owner";
   const hasEmailCredential = session.auth_methods.email;
   const hasGithubCredential = session.auth_methods.github;
-  const deletionConfirmationMatched = deleteConfirmationEmail.trim().toLowerCase() === session.email.toLowerCase();
+  const deletionConfirmationMatched = deleteConfirmationText.trim() === DELETE_ACCOUNT_CONFIRMATION_TEXT;
+  const deletionOtpValid = /^\d{6}$/.test(deleteOtp.trim());
 
   async function handleExportAccountData(): Promise<void> {
     if (!canManageOrganizationAccount) {
@@ -72,9 +85,44 @@ export function SettingsPage(): JSX.Element {
     }
   }
 
+  async function handleRequestDeleteOtp(): Promise<void> {
+    if (!deletionConfirmationMatched) {
+      setDeleteErrorMessage(`Type ${DELETE_ACCOUNT_CONFIRMATION_TEXT} exactly to continue.`);
+      return;
+    }
+
+    setIsRequestingDeleteOtp(true);
+    setDeleteErrorMessage(null);
+
+    try {
+      await requestAccountDeletionOtp({
+        confirmation_text: deleteConfirmationText.trim()
+      });
+      setHasRequestedDeleteOtp(true);
+      setDeleteOtp("");
+      showSuccessToast("Verification code sent to your email.");
+    } catch (error) {
+      if (error instanceof Error && error.message === "account_deletion_verification_unavailable") {
+        setDeleteErrorMessage("Email verification is unavailable right now. Try again later.");
+      } else if (error instanceof Error && error.message === "rate_limited") {
+        setDeleteErrorMessage("Too many attempts. Wait a moment and try again.");
+      } else {
+        setDeleteErrorMessage("Could not send the verification code.");
+      }
+      showErrorToast("Could not send the verification code.");
+    } finally {
+      setIsRequestingDeleteOtp(false);
+    }
+  }
+
   async function handleDeleteAccount(): Promise<void> {
     if (!deletionConfirmationMatched) {
-      setDeleteErrorMessage("Enter your email address exactly to confirm deletion.");
+      setDeleteErrorMessage(`Type ${DELETE_ACCOUNT_CONFIRMATION_TEXT} exactly to continue.`);
+      return;
+    }
+
+    if (!deletionOtpValid) {
+      setDeleteErrorMessage("Enter the six-digit verification code from your email.");
       return;
     }
 
@@ -82,12 +130,14 @@ export function SettingsPage(): JSX.Element {
     setDeleteErrorMessage(null);
 
     try {
-      const email = session?.email;
-      if (email === undefined) {
+      if (session === null) {
         return;
       }
 
-      await deleteAccount({ email });
+      await deleteAccount({
+        confirmation_text: deleteConfirmationText.trim(),
+        otp: deleteOtp.trim()
+      });
       setSession(null);
       setIsDeleteDialogOpen(false);
       showSuccessToast("Account deleted successfully.");
@@ -95,6 +145,12 @@ export function SettingsPage(): JSX.Element {
     } catch (error) {
       if (error instanceof Error && error.message === "other_owned_organizations_exist") {
         setDeleteErrorMessage("Transfer or delete the other workspaces you own before deleting this account.");
+      } else if (error instanceof Error && error.message === "other_owned_projects_exist") {
+        setDeleteErrorMessage("Delete any projects you still own in other workspaces before deleting this account.");
+      } else if (error instanceof Error && error.message === "invalid_otp") {
+        setDeleteErrorMessage("That verification code is invalid or expired. Request a new code and try again.");
+      } else if (error instanceof Error && error.message === "rate_limited") {
+        setDeleteErrorMessage("Too many attempts. Wait a moment and try again.");
       } else {
         setDeleteErrorMessage("Could not delete this account.");
       }
@@ -260,31 +316,76 @@ export function SettingsPage(): JSX.Element {
                   <AlertDialogHeader>
                     <AlertDialogTitle>Delete account</AlertDialogTitle>
                     <AlertDialogDescription>
-                      Type your email address to confirm permanent deletion of this account and all retained project data.
+                      Type <span className="font-medium text-foreground">{DELETE_ACCOUNT_CONFIRMATION_TEXT}</span>, then confirm the one-time email code before permanent deletion.
                     </AlertDialogDescription>
                   </AlertDialogHeader>
                   <div className="space-y-3">
                     <Field>
-                      <FieldLabel htmlFor="delete-account-confirmation-email">Confirm email address</FieldLabel>
+                      <FieldLabel htmlFor="delete-account-confirmation-text">Type the confirmation phrase</FieldLabel>
                       <Input
-                        id="delete-account-confirmation-email"
-                        value={deleteConfirmationEmail}
-                        onChange={(event) => setDeleteConfirmationEmail(event.currentTarget.value)}
-                        placeholder={session.email}
+                        id="delete-account-confirmation-text"
+                        value={deleteConfirmationText}
+                        onChange={(event) => setDeleteConfirmationText(event.currentTarget.value)}
+                        placeholder={DELETE_ACCOUNT_CONFIRMATION_TEXT}
                         autoComplete="off"
-                        autoCapitalize="none"
+                        autoCapitalize="sentences"
                         autoCorrect="off"
                         spellCheck={false}
-                        disabled={isDeleting}
+                        disabled={isRequestingDeleteOtp || isDeleting}
                       />
+                      <FieldDescription>
+                        This extra phrase gate reduces accidental deletions before we email the verification code.
+                      </FieldDescription>
                     </Field>
+                    {!hasRequestedDeleteOtp ? null : (
+                      <Field>
+                        <FieldLabel htmlFor="delete-account-otp">Email verification code</FieldLabel>
+                        <Input
+                          id="delete-account-otp"
+                          inputMode="numeric"
+                          autoComplete="one-time-code"
+                          value={deleteOtp}
+                          onChange={(event) => setDeleteOtp(event.currentTarget.value.replace(/\D+/g, "").slice(0, 6))}
+                          placeholder="123456"
+                          disabled={isRequestingDeleteOtp || isDeleting}
+                        />
+                        <FieldDescription>
+                          Enter the six-digit code sent to {session.email}.
+                        </FieldDescription>
+                      </Field>
+                    )}
                     {deleteErrorMessage === null ? null : <p className="text-sm text-destructive">{deleteErrorMessage}</p>}
                   </div>
                   <AlertDialogFooter>
-                    <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
-                    <AlertDialogAction variant="destructive" onClick={() => void handleDeleteAccount()} disabled={isDeleting || !deletionConfirmationMatched}>
-                      {isDeleting ? "Deleting..." : "Delete account"}
-                    </AlertDialogAction>
+                    <AlertDialogCancel disabled={isRequestingDeleteOtp || isDeleting}>Cancel</AlertDialogCancel>
+                    {hasRequestedDeleteOtp ? (
+                      <>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={() => void handleRequestDeleteOtp()}
+                          disabled={isRequestingDeleteOtp || isDeleting || !deletionConfirmationMatched}
+                        >
+                          {isRequestingDeleteOtp ? "Resending..." : "Resend code"}
+                        </Button>
+                        <AlertDialogAction
+                          variant="destructive"
+                          onClick={() => void handleDeleteAccount()}
+                          disabled={isRequestingDeleteOtp || isDeleting || !deletionConfirmationMatched || !deletionOtpValid}
+                        >
+                          {isDeleting ? "Deleting..." : "Delete account"}
+                        </AlertDialogAction>
+                      </>
+                    ) : (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => void handleRequestDeleteOtp()}
+                        disabled={isRequestingDeleteOtp || isDeleting || !deletionConfirmationMatched}
+                      >
+                        {isRequestingDeleteOtp ? "Sending..." : "Send email code"}
+                      </Button>
+                    )}
                   </AlertDialogFooter>
                 </AlertDialogContent>
               </AlertDialog>

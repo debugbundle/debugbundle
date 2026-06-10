@@ -81,6 +81,39 @@ function mapOptionalRow<TInput, TOutput>(row: TInput | undefined, mapper: (value
   return row === undefined ? null : mapper(row);
 }
 
+async function deleteProjectMemberOwnedAutomation(
+  db: Queryable,
+  input: {
+    project_id: string;
+    user_id: string;
+  }
+): Promise<void> {
+  await db.query(
+    `
+      DELETE FROM github_dispatch_rules
+      WHERE project_id = $1::uuid
+        AND created_by_user_id = $2::uuid
+    `,
+    [input.project_id, input.user_id]
+  );
+  await db.query(
+    `
+      DELETE FROM agent_webhooks
+      WHERE project_id = $1::uuid
+        AND created_by_user_id = $2::uuid
+    `,
+    [input.project_id, input.user_id]
+  );
+  await db.query(
+    `
+      DELETE FROM alert_rules
+      WHERE project_id = $1::uuid
+        AND created_by_user_id = $2::uuid
+    `,
+    [input.project_id, input.user_id]
+  );
+}
+
 function optionalFieldValue<T>(include: boolean, value: T | null | undefined): T | null {
   if (!include) {
     return null;
@@ -1316,6 +1349,11 @@ export function createPostgresMetadataStore(db: Queryable): PostgresMetadataStor
         return null;
       }
 
+      await deleteProjectMemberOwnedAutomation(db, {
+        project_id: input.project_id,
+        user_id: input.user_id
+      });
+
       return {
         kind: "removed",
         member: mapProjectMemberRow(member)
@@ -1383,6 +1421,11 @@ export function createPostgresMetadataStore(db: Queryable): PostgresMetadataStor
       if (member === undefined) {
         return null;
       }
+
+      await deleteProjectMemberOwnedAutomation(db, {
+        project_id: input.project_id,
+        user_id: input.user_id
+      });
 
       return {
         kind: "left",

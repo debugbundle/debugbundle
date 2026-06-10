@@ -338,6 +338,53 @@ export function renderEmailAuthCodeEmail(input: {
   };
 }
 
+export function renderAccountDeletionOtpEmail(input: {
+  code: string;
+  settingsUrl?: string;
+  expiresInMinutes: number;
+  brandMarkUrl?: string | undefined;
+}): { subject: string; text: string; html: string } {
+  return {
+    subject: "Your DebugBundle account deletion code",
+    text: [
+      "Use this code to confirm permanent deletion of your DebugBundle account:",
+      "",
+      input.code,
+      "",
+      `This code expires in ${input.expiresInMinutes} minutes.`,
+      "",
+      "If you did not request account deletion, do not share this code.",
+      "",
+      ...(input.settingsUrl === undefined ? [] : [`Return to ${input.settingsUrl} to enter the code.`])
+    ].join("\n"),
+    html: renderEmailLayout({
+      brandMarkUrl: input.brandMarkUrl ?? buildEmailBrandMarkUrl(input.settingsUrl),
+      eyebrow: "Account deletion",
+      title: "Your DebugBundle account deletion code",
+      intro: "Use this code to confirm permanent deletion of your DebugBundle account.",
+      preheader: `Your account deletion code expires in ${input.expiresInMinutes} minutes.`,
+      bodyHtml: [
+        renderEmailPanel(
+          [
+            '<p style="margin:0;color:#78716c;font-size:12px;line-height:16px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;text-align:center;">Deletion code</p>',
+            `<p style="margin:12px 0 0;color:#1c1917;font-size:32px;line-height:36px;font-weight:700;letter-spacing:0.18em;text-align:center;">${escapeHtml(input.code)}</p>`
+          ].join("")
+        ),
+        renderEmailParagraph(`This code expires in ${input.expiresInMinutes} minutes.`),
+        renderEmailParagraph("If you did not request account deletion, do not share this code."),
+        ...(input.settingsUrl === undefined
+          ? []
+          : [
+              renderEmailButton({
+                label: "Return to account settings",
+                url: input.settingsUrl
+              })
+            ])
+      ].join("")
+    })
+  };
+}
+
 export function renderProjectInviteEmail(input: {
   acceptUrl: string;
   inviterName: string;

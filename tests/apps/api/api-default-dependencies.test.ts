@@ -22,6 +22,7 @@ const {
   createMemberAuthServiceMock,
   createGitHubOAuthClientMock,
   createGitHubCliAuthServiceMock,
+  createAccountDeletionChallengeServiceMock,
   createWebSessionAuthServiceMock,
   createIngestionPersistenceServiceMock,
   createPostgresMetadataStoreMock,
@@ -34,6 +35,7 @@ const {
   createIngestionMetadataServiceMock,
   createIncidentLifecycleServiceMock,
   createSesEmailTransportMock,
+  renderAccountDeletionOtpEmailMock,
   renderEmailAuthCodeEmailMock,
   renderProjectInviteEmailMock,
   recordPlanDowngradeCleanupAuditMock,
@@ -58,6 +60,7 @@ const {
   createMemberAuthServiceMock: vi.fn(),
   createGitHubOAuthClientMock: vi.fn(),
   createGitHubCliAuthServiceMock: vi.fn(),
+  createAccountDeletionChallengeServiceMock: vi.fn(),
   createWebSessionAuthServiceMock: vi.fn(),
   createIngestionPersistenceServiceMock: vi.fn(),
   createPostgresMetadataStoreMock: vi.fn(),
@@ -70,6 +73,7 @@ const {
   createIngestionMetadataServiceMock: vi.fn(),
   createIncidentLifecycleServiceMock: vi.fn(),
   createSesEmailTransportMock: vi.fn(),
+  renderAccountDeletionOtpEmailMock: vi.fn(),
   renderEmailAuthCodeEmailMock: vi.fn(),
   renderProjectInviteEmailMock: vi.fn(),
   recordPlanDowngradeCleanupAuditMock: vi.fn(),
@@ -94,6 +98,16 @@ vi.mock("../../../packages/storage/src/index.js", () => ({
     `improvement-bundles/${projectId}/${opportunityId}.json.gz`,
   buildReproductionObjectKey: (projectId: string, incidentId: string) => `reproductions/${projectId}/${incidentId}.json.gz`,
   buildBundleRegenerationLeaseKey: (incidentId: string) => `leases:bundle-regeneration:${incidentId}`,
+  buildUserAvatarObjectKey: (userId: string) => `avatars/users/${userId}/profile`,
+  deleteProjectObjects: async (
+    objectStore: { deleteObjectsByPrefix(prefix: string): Promise<void> },
+    projectId: string
+  ): Promise<void> => {
+    await objectStore.deleteObjectsByPrefix(`raw-events/${projectId}/`);
+    await objectStore.deleteObjectsByPrefix(`bundles/${projectId}/`);
+    await objectStore.deleteObjectsByPrefix(`improvement-bundles/${projectId}/`);
+    await objectStore.deleteObjectsByPrefix(`reproductions/${projectId}/`);
+  },
   createRedisQueueClient: createRedisQueueClientMock,
   createRedisIncidentFrequencyCounter: createRedisIncidentFrequencyCounterMock,
   createRedisAuthRateLimiter: createRedisAuthRateLimiterMock,
@@ -148,6 +162,7 @@ vi.mock("../../../packages/storage/src/index.js", () => ({
 vi.mock("../../../packages/auth/src/index.js", () => ({
   createGitHubOAuthClient: createGitHubOAuthClientMock,
   createGitHubCliAuthService: createGitHubCliAuthServiceMock,
+  createAccountDeletionChallengeService: createAccountDeletionChallengeServiceMock,
   createWebSessionAuthService: createWebSessionAuthServiceMock
 }));
 
@@ -158,6 +173,7 @@ vi.mock("../../../packages/email/src/index.js", () => ({
       : `${baseUrl.replace(/\/+$/, "")}/email/debugbundle-mark.png`,
   createSesEmailTransport: createSesEmailTransportMock,
   formatProductFromEmail: (fromEmail: string) => `DebugBundle <${fromEmail}>`,
+  renderAccountDeletionOtpEmail: renderAccountDeletionOtpEmailMock,
   renderEmailAuthCodeEmail: renderEmailAuthCodeEmailMock,
   renderProjectInviteEmail: renderProjectInviteEmailMock
 }));
@@ -196,6 +212,7 @@ describe("api default dependencies", () => {
     createMemberAuthServiceMock.mockReset();
     createGitHubOAuthClientMock.mockReset();
     createGitHubCliAuthServiceMock.mockReset();
+    createAccountDeletionChallengeServiceMock.mockReset();
     createWebSessionAuthServiceMock.mockReset();
     createIngestionPersistenceServiceMock.mockReset();
     createPostgresMetadataStoreMock.mockReset();
@@ -207,6 +224,7 @@ describe("api default dependencies", () => {
     createIngestionMetadataServiceMock.mockReset();
     createIncidentLifecycleServiceMock.mockReset();
     createSesEmailTransportMock.mockReset();
+    renderAccountDeletionOtpEmailMock.mockReset();
     renderEmailAuthCodeEmailMock.mockReset();
     renderProjectInviteEmailMock.mockReset();
     recordPlanDowngradeCleanupAuditMock.mockReset();
@@ -280,6 +298,10 @@ describe("api default dependencies", () => {
       claimDeviceAuth: vi.fn(),
       exchangeGitHubAccessToken: vi.fn()
     });
+    createAccountDeletionChallengeServiceMock.mockReturnValue({
+      requestDeletionOtp: vi.fn(),
+      verifyDeletionOtp: vi.fn()
+    });
     createWebSessionAuthServiceMock.mockReturnValue({
       requestEmailCode: vi.fn(),
       verifyEmailCode: vi.fn(),
@@ -290,6 +312,11 @@ describe("api default dependencies", () => {
       revokeSessionByToken: vi.fn()
     });
     createSesEmailTransportMock.mockReturnValue({ send: emailTransportSendMock });
+    renderAccountDeletionOtpEmailMock.mockReturnValue({
+      subject: "Your DebugBundle account deletion code",
+      text: "654321",
+      html: "<b>654321</b>"
+    });
     renderEmailAuthCodeEmailMock.mockReturnValue({ subject: "Your DebugBundle code", text: "123456", html: "<b>123456</b>" });
     renderProjectInviteEmailMock.mockReturnValue({ subject: "Invite", text: "invite-text", html: "invite-html" });
     createIngestionPersistenceServiceMock.mockReturnValue({ persistAndEnqueue: vi.fn() });
@@ -1443,16 +1470,28 @@ describe("api default dependencies", () => {
         | {
           authEmails?: {
             sendEmailAuthCode(input: { email: string; code: string; expires_in_minutes: number }): Promise<void>;
+            sendAccountDeletionOtp(input: { email: string; code: string; expires_in_minutes: number }): Promise<void>;
             sendProjectInviteEmail(input: { email: string; token: string; inviter_name: string }): Promise<void>;
           };
         }
       | undefined;
 
     expect(serviceOptions?.authEmails).toBeDefined();
+    expect(createAccountDeletionChallengeServiceMock).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        authEmails: serviceOptions?.authEmails
+      })
+    );
 
     await serviceOptions?.authEmails?.sendEmailAuthCode({
       email: "owen@example.com",
       code: "123456",
+      expires_in_minutes: 10
+    });
+    await serviceOptions?.authEmails?.sendAccountDeletionOtp({
+      email: "owen@example.com",
+      code: "654321",
       expires_in_minutes: 10
     });
     await serviceOptions?.authEmails?.sendProjectInviteEmail({
@@ -1467,12 +1506,18 @@ describe("api default dependencies", () => {
       expiresInMinutes: 10,
       brandMarkUrl: "https://app.debugbundle.test/email/debugbundle-mark.png"
     });
+    expect(renderAccountDeletionOtpEmailMock).toHaveBeenCalledWith({
+      code: "654321",
+      settingsUrl: "https://app.debugbundle.test/settings",
+      expiresInMinutes: 10,
+      brandMarkUrl: "https://app.debugbundle.test/email/debugbundle-mark.png"
+    });
     expect(renderProjectInviteEmailMock).toHaveBeenCalledWith({
       acceptUrl: "https://app.debugbundle.test/invite?token=invite-token",
       inviterName: "Owen Example",
       brandMarkUrl: "https://app.debugbundle.test/email/debugbundle-mark.png"
     });
-    expect(emailTransportSendMock).toHaveBeenCalledTimes(2);
+    expect(emailTransportSendMock).toHaveBeenCalledTimes(3);
   });
 
   it("should prefer the app origin over the public site for email brand assets when no explicit override is set", async (): Promise<void> => {
@@ -1849,6 +1894,95 @@ describe("api default dependencies", () => {
       { id: 1, full_name: "debugbundle/app" }
     ]);
     expect(listRepositories).toHaveBeenCalledWith({ installationId: 42 });
+  });
+
+  it("should delete every project object prefix and the user avatar during account deletion", async (): Promise<void> => {
+    const accountStore = {
+      exportAccountForOrganization: vi.fn().mockResolvedValue(null),
+      deleteAccountForOrganization: vi.fn().mockResolvedValue({
+        deleted_at: "2026-06-10T12:00:00.000Z",
+        organization_id: "org_123",
+        deleted_project_ids: ["proj_1", "proj_2"],
+        user_deleted: true,
+        deleted_member_token_count: 2
+      }),
+      getUserAvatar: vi.fn().mockResolvedValue(null),
+      saveUserAvatar: vi.fn().mockResolvedValue(null)
+    };
+    createPostgresAccountStoreMock.mockReturnValue(accountStore);
+
+    const objectStore = {
+      putObject: vi.fn(),
+      getObject: vi.fn(),
+      deleteObjectsByPrefix: vi.fn().mockResolvedValue(undefined),
+      deleteObject: vi.fn().mockResolvedValue(undefined)
+    };
+    const deps = createApiDependencies({
+      objectStore,
+      queue: { enqueue: vi.fn() },
+      db: { query: vi.fn() }
+    });
+
+    const deleted = await deps.accountManagement.deleteAccountForOrganization({
+      organization_id: "org_123",
+      user_id: "usr_123",
+      deleted_at: "2026-06-10T12:00:00.000Z"
+    });
+
+    expect(deleted).toMatchObject({
+      organization_id: "org_123",
+      deleted_project_ids: ["proj_1", "proj_2"],
+      user_deleted: true
+    });
+    expect(objectStore.deleteObjectsByPrefix).toHaveBeenCalledTimes(8);
+    expect(objectStore.deleteObjectsByPrefix.mock.calls).toEqual(
+      expect.arrayContaining([
+        ["raw-events/proj_1/"],
+        ["bundles/proj_1/"],
+        ["improvement-bundles/proj_1/"],
+        ["reproductions/proj_1/"],
+        ["raw-events/proj_2/"],
+        ["bundles/proj_2/"],
+        ["improvement-bundles/proj_2/"],
+        ["reproductions/proj_2/"]
+      ])
+    );
+    expect(objectStore.deleteObject).toHaveBeenCalledWith({
+      key: "avatars/users/usr_123/profile"
+    });
+  });
+
+  it("should not delete account objects when account deletion is blocked by external project ownership", async (): Promise<void> => {
+    const accountStore = {
+      exportAccountForOrganization: vi.fn().mockResolvedValue(null),
+      deleteAccountForOrganization: vi.fn().mockResolvedValue("other_owned_projects_exist"),
+      getUserAvatar: vi.fn().mockResolvedValue(null),
+      saveUserAvatar: vi.fn().mockResolvedValue(null)
+    };
+    createPostgresAccountStoreMock.mockReturnValue(accountStore);
+
+    const objectStore = {
+      putObject: vi.fn(),
+      getObject: vi.fn(),
+      deleteObjectsByPrefix: vi.fn().mockResolvedValue(undefined),
+      deleteObject: vi.fn().mockResolvedValue(undefined)
+    };
+    const deps = createApiDependencies({
+      objectStore,
+      queue: { enqueue: vi.fn() },
+      db: { query: vi.fn() }
+    });
+
+    await expect(
+      deps.accountManagement.deleteAccountForOrganization({
+        organization_id: "org_123",
+        user_id: "usr_123",
+        deleted_at: "2026-06-10T12:00:00.000Z"
+      })
+    ).resolves.toBe("other_owned_projects_exist");
+
+    expect(objectStore.deleteObjectsByPrefix).not.toHaveBeenCalled();
+    expect(objectStore.deleteObject).not.toHaveBeenCalled();
   });
 
   it("should enqueue webhook test deliveries and support the null branch", async (): Promise<void> => {

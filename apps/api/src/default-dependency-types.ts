@@ -1,4 +1,10 @@
-import type { AuthEmailSender, GitHubCliAuthService, GitHubOAuthConfig, WebSessionAuthService } from "../../../packages/auth/src/index.js";
+import type {
+  AccountDeletionChallengeService,
+  AuthEmailSender,
+  GitHubCliAuthService,
+  GitHubOAuthConfig,
+  WebSessionAuthService
+} from "../../../packages/auth/src/index.js";
 import type {
   IncidentFrequencyCounter,
   IngestionRateLimiter,
@@ -54,6 +60,7 @@ export interface DefaultApiDependencies
   extends Omit<
     ApiDependencies,
     | "accountManagement"
+    | "accountDeletionAuth"
     | "alertManagement"
     | "auditLogging"
     | "billingEmails"
@@ -100,6 +107,7 @@ export interface DefaultApiDependencies
     GitHubCliAuthService,
     "beginDeviceAuth" | "pollDeviceAuth" | "claimDeviceAuth" | "exchangeGitHubAccessToken"
   >;
+  accountDeletionAuth?: Pick<AccountDeletionChallengeService, "requestDeletionOtp" | "verifyDeletionOtp">;
   billingEmails?: BillingEmailService;
   tokenManagement: Pick<
     MetadataStore,

@@ -598,6 +598,17 @@ If CLI says something is healthy and MCP says something different, that is a pro
 - **And** it persists the resulting member-token auth state to `~/.debugbundle/auth.json`
 - **And** `--json` mode does not prompt and instead returns a validation error when no auth mode was supplied
 
+### AC-AUTH-11: Account Deletion Requires Phrase And OTP
+- **Given** an owner is signed into the web app
+- **When** they request account deletion
+- **Then** the server rejects the request unless the body contains the exact phrase `Delete my account`
+- **And** after the phrase is accepted, the server sends a six-digit email OTP to the signed-in account address before any deletion occurs
+- **And** the final delete request succeeds only when that OTP is valid and unexpired
+- **And** the delete flow fails closed when email delivery is unavailable, the phrase is wrong, or the OTP is wrong or expired
+- **And** on success the user is removed from every remaining organization membership and shared-project collaboration
+- **And** the delete remains blocked if that user is still the sole owner of a different organization
+- **And** the delete remains blocked if that user still owns any project in a different organization
+
 ---
 
 ## 11. Self-Host Acceptance

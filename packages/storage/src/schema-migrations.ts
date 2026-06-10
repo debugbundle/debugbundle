@@ -757,6 +757,32 @@ export const STORAGE_SCHEMA_MIGRATIONS = [
         )
       `
     ]
+  }),
+  defineStorageSchemaMigration({
+    id: "202606100002_add_account_deletion_challenges",
+    description: "Add scoped OTP challenges for account deletion confirmation.",
+    statements: [
+      `
+        CREATE TABLE IF NOT EXISTS account_deletion_challenges (
+          id uuid PRIMARY KEY,
+          organization_id uuid NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+          user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+          email text NOT NULL,
+          code_hash text NOT NULL,
+          created_at timestamptz NOT NULL DEFAULT now(),
+          expires_at timestamptz NOT NULL,
+          used_at timestamptz
+        )
+      `,
+      `
+        CREATE INDEX IF NOT EXISTS account_deletion_challenges_scope_idx
+        ON account_deletion_challenges (organization_id, user_id, lower(email), created_at DESC)
+      `,
+      `
+        CREATE INDEX IF NOT EXISTS account_deletion_challenges_code_hash_idx
+        ON account_deletion_challenges (code_hash)
+      `
+    ]
   })
 ] as const;
 

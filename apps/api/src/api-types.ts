@@ -8,9 +8,15 @@ import type {
   ImprovementSettings,
   ImprovementSettingsUpdate
 } from "../../../packages/shared-types/src/index.js";
-import type { AuthEmailSender, GitHubCliAuthService, WebSessionAuthService } from "../../../packages/auth/src/index.js";
+import type {
+  AccountDeletionChallengeService,
+  AuthEmailSender,
+  GitHubCliAuthService,
+  WebSessionAuthService
+} from "../../../packages/auth/src/index.js";
 import type { EmailMessage } from "../../../packages/email/src/index.js";
 import type {
+  AccountDeletionBlockedReason,
   AccountDataExportRecord,
   AuditLogStore,
   BillingSummaryRecord,
@@ -74,6 +80,7 @@ export interface ApiDependencies {
     GitHubCliAuthService,
     "beginDeviceAuth" | "pollDeviceAuth" | "claimDeviceAuth" | "exchangeGitHubAccessToken"
   > | undefined;
+  accountDeletionAuth?: Pick<AccountDeletionChallengeService, "requestDeletionOtp" | "verifyDeletionOtp"> | undefined;
   inviteEmails?: Pick<AuthEmailSender, "sendProjectInviteEmail">;
   billingEmails?: {
     getBillingContactForOrganization(input: { organization_id: string }): Promise<{
@@ -182,7 +189,7 @@ export interface ApiDependencies {
       organization_id: string;
       user_id: string;
       deleted_at: string;
-    }): Promise<DeletedAccountRecord | "other_owned_organizations_exist" | null>;
+    }): Promise<DeletedAccountRecord | AccountDeletionBlockedReason | null>;
     getUserAvatar(input: {
       user_id: string;
     }): Promise<UserAvatarRecord | null>;

@@ -38,9 +38,18 @@ export const SendSystemEmailPreviewBodySchema = z
   })
   .strict();
 
+const AccountDeleteConfirmationTextSchema = z.string().min(1).max(64);
+
 export const AccountDeleteBodySchema = z
   .object({
-    email: z.string().email()
+    confirmation_text: AccountDeleteConfirmationTextSchema,
+    otp: z.string().regex(/^\d{6}$/, "otp_code_invalid")
+  })
+  .strict();
+
+export const AccountDeleteRequestOtpBodySchema = z
+  .object({
+    confirmation_text: AccountDeleteConfirmationTextSchema
   })
   .strict();
 

@@ -4,6 +4,7 @@ import type { AuthEmailSender, GitHubOAuthConfig } from "../../../packages/auth/
 import { createGitHubOAuthClient } from "../../../packages/auth/src/index.js";
 import {
   buildEmailBrandMarkUrl,
+  renderAccountDeletionOtpEmail,
   renderEmailAuthCodeEmail,
   renderProjectInviteEmail,
   type EmailMessage,
@@ -314,6 +315,21 @@ export function createAuthEmailSender(input: {
         code,
         expiresInMinutes: expires_in_minutes,
         appUrl: `${baseUrl}/login`,
+        brandMarkUrl
+      });
+      await input.emailTransport.send({
+        to: [email],
+        subject: rendered.subject,
+        text: rendered.text,
+        html: rendered.html
+      });
+    },
+
+    async sendAccountDeletionOtp({ email, code, expires_in_minutes }): Promise<void> {
+      const rendered = renderAccountDeletionOtpEmail({
+        code,
+        expiresInMinutes: expires_in_minutes,
+        settingsUrl: `${baseUrl}/settings`,
         brandMarkUrl
       });
       await input.emailTransport.send({

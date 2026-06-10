@@ -58,6 +58,7 @@ import {
 } from "../../../packages/weekly-report-client/src/index.js";
 import {
   AccountDeleteBodySchema,
+  AccountDeleteRequestOtpBodySchema,
   AcceptInviteBodySchema,
   AlertsQuerySchema,
   BillingCheckoutBodySchema,
@@ -776,6 +777,23 @@ function buildPublicApiOperations(): OperationSpec[] {
       },
     },
     {
+      method: "post",
+      path: "/v1/account/delete/request-otp",
+      operationId: "requestAccountDeletionOtp",
+      summary: "Request an email OTP for account deletion",
+      tags: ["Account"],
+      security: browserSessionAuth,
+      requestBody: component("AccountDeleteRequestOtpBody", AccountDeleteRequestOtpBodySchema),
+      responses: {
+        "200": { description: "Deletion OTP requested.", schema: successResponse },
+        "400": { description: "Invalid confirmation payload.", schema: apiError },
+        "401": { description: "Browser session is missing or invalid.", schema: apiError },
+        "403": { description: "Owner access is required.", schema: apiError },
+        "429": { description: "Deletion verification requests are rate limited.", schema: apiError },
+        "503": { description: "Account deletion verification is unavailable.", schema: apiError },
+      },
+    },
+    {
       method: "delete",
       path: "/v1/account",
       operationId: "deleteAccount",
@@ -789,7 +807,8 @@ function buildPublicApiOperations(): OperationSpec[] {
         "401": { description: "Browser session is missing or invalid.", schema: apiError },
         "403": { description: "Owner access is required.", schema: apiError },
         "404": { description: "Account was not found.", schema: apiError },
-        "409": { description: "Other owner-scoped organizations still exist.", schema: apiError },
+        "409": { description: "Other owner-scoped organizations or projects still exist.", schema: apiError },
+        "429": { description: "Deletion attempts are rate limited.", schema: apiError },
         "503": { description: "Account management is not configured.", schema: apiError },
       },
     },

@@ -18,7 +18,8 @@ Every capability must be available through all applicable interfaces. Operations
 | Get current account avatar | `GET /v1/account/avatar` | — | — | Browser session only, cached first-party avatar bytes |
 | Import Gravatar avatar | `POST /v1/account/avatar/import-gravatar` | — | — | Browser session only, explicit user action from account settings |
 | Export account data | `GET /v1/account/export` | — | — | Browser session only, owner only |
-| Delete account | `DELETE /v1/account` | — | — | Browser session only, owner only |
+| Request account deletion OTP | `POST /v1/account/delete/request-otp` | — | — | Browser session only, owner only |
+| Delete account | `DELETE /v1/account` | — | — | Browser session only, owner only, requires confirmation phrase + OTP |
 | Accept project invite | `POST /v1/auth/project-invite/accept` | — | — | Browser session only |
 | GitHub sign-in start | `GET /v1/auth/github/start` | — | — | Browser redirect entry point only |
 | GitHub sign-in callback | `GET /v1/auth/github/callback` | — | — | Browser redirect callback only |
@@ -159,7 +160,8 @@ Stripe checkout and customer-portal billing routes remain browser-session-only i
 | GET | `/v1/account/avatar` | Browser Session | Return the signed-in user's cached avatar bytes when one has been imported |
 | POST | `/v1/account/avatar/import-gravatar` | Browser Session | Import and cache a Gravatar avatar server-side after explicit user action |
 | GET | `/v1/account/export` | Browser Session | Export retained organization-account data as a JSON attachment (owner only) |
-| DELETE | `/v1/account` | Browser Session | Permanently delete the current organization account after email confirmation (owner only) |
+| POST | `/v1/account/delete/request-otp` | Browser Session | Request an email OTP for account deletion after the exact confirmation phrase is provided (owner only) |
+| DELETE | `/v1/account` | Browser Session | Permanently delete the current organization account after phrase confirmation and OTP verification (owner only) |
 | POST | `/v1/auth/project-invite/accept` | Browser Session | Accept a pending project invite for the current signed-in user |
 | GET | `/v1/auth/github/start` | None | Start GitHub OAuth and set transient state cookie |
 | GET | `/v1/auth/github/callback` | None | Complete GitHub OAuth, issue browser session, and redirect back to the app |
@@ -208,17 +210,36 @@ The CLI bootstrap flow is additive and issues the same member-token credential u
 - `404 { "error": "gravatar_not_found" }` when no Gravatar image exists
 - `502 { "error": "avatar_import_failed" }` when the remote fetch fails or returns an unsupported image
 
-`DELETE /v1/account` requires an owner-scoped browser session plus a confirmation body that repeats the signed-in email address:
+`POST /v1/account/delete/request-otp` requires an owner-scoped browser session plus the exact confirmation phrase:
 
 ```json
 {
-  "email": "owner@example.com"
+  "confirmation_text": "Delete my account"
+}
+```
+
+On success, DebugBundle emails a six-digit OTP to the signed-in account email address.
+
+- Non-owner session: `403 { "error": "forbidden" }`
+- Confirmation phrase mismatch: `400 { "error": "invalid_confirmation" }`
+- Email delivery unavailable: `503 { "error": "account_deletion_verification_unavailable" }`
+
+`DELETE /v1/account` then requires the same phrase plus the emailed OTP:
+
+```json
+{
+  "confirmation_text": "Delete my account",
+  "otp": "123456"
 }
 ```
 
 - Non-owner session: `403 { "error": "forbidden" }`
-- Confirmation email mismatch: `400 { "error": "invalid_confirmation" }`
+- Confirmation phrase mismatch: `400 { "error": "invalid_confirmation" }`
+- OTP mismatch or expiry: `400 { "error": "invalid_otp" }`
 - User is still the sole owner of another organization: `409 { "error": "other_owned_organizations_exist" }`
+- User still owns projects in another organization: `409 { "error": "other_owned_projects_exist" }`
+
+On success, the delete removes the signed-in user from every remaining organization membership and shared-project collaboration by deleting the user identity. The sole-owner guard remains in place for any other organization that would otherwise be left without an owner, and deletion is blocked while the same identity still owns projects outside the organization being deleted.
 
 **Accept project invite request:**
 ```json
@@ -2144,7 +2165,7 @@ debugbundle project members remove <user-id> --project-id <id> [--auth-file <pat
 debugbundle project members leave --project-id <id> [--auth-file <path>] [--json]
 ```
 
-`project members list` lists the owner and collaborators for one project. `project members invites` lists pending invitations for that project. `project members invite` sends a collaborator invitation to the specified email (Team tier). `project members cancel-invite` cancels a pending invitation. `project members update-role` changes a collaborator's role. `project members remove` removes another collaborator from the project. `project members leave` removes the authenticated collaborator's own membership from that project. Listing is available to any authorized project member, while invite visibility and management remain owner/admin-only.
+`project members list` lists the owner and collaborators for one project. `project members invites` lists pending invitations for that project. `project members invite` sends a collaborator invitation to the specified email (Team tier). `project members cancel-invite` cancels a pending invitation. `project members update-role` changes a collaborator's role. `project members remove` removes another collaborator from the project. `project members leave` removes the authenticated collaborator's own membership from that project. Member removal and self-leave remove only that collaborator's project-scoped automation resources for that project, such as alert rules, webhooks, and GitHub dispatch rules; other project resources remain. Listing is available to any authorized project member, while invite visibility and management remain owner/admin-only.
 
 ### 2.16 GitHub Commands
 ```

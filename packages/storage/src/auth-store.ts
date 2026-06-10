@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 
 import type {
+  AccountDeletionChallengeStore,
   EmailAuthChallengeStore,
   GitHubCliAuthStore,
   GitHubDeviceAuthorizationRecord,
@@ -13,7 +14,11 @@ import type {
 
 import type { Queryable } from "./types.js";
 
-type PostgresAuthStore = WebSessionAuthStore & EmailAuthChallengeStore & GitHubCliAuthStore;
+type PostgresAuthStore =
+  & WebSessionAuthStore
+  & EmailAuthChallengeStore
+  & AccountDeletionChallengeStore
+  & GitHubCliAuthStore;
 
 function mapUserAccountRow(row: Record<string, unknown>): WebUserAccount {
   return {
@@ -756,6 +761,72 @@ export function createPostgresAuthStore(db: Queryable): PostgresAuthStore {
       return {
         email: String(row["email"]),
         accepted_terms_at: (row["accepted_terms_at"] as string | null) ?? null
+      };
+    },
+
+    async replaceAccountDeletionChallenge(input) {
+      await db.query(
+        `
+          WITH invalidated AS (
+            UPDATE account_deletion_challenges
+            SET used_at = $6::timestamptz
+            WHERE organization_id = $1::uuid
+              AND user_id = $2::uuid
+              AND lower(email) = lower($3)
+              AND used_at IS NULL
+          )
+          INSERT INTO account_deletion_challenges (
+            id,
+            organization_id,
+            user_id,
+            email,
+            code_hash,
+            expires_at,
+            created_at
+          )
+          VALUES ($7, $1::uuid, $2::uuid, $3, $4, $5::timestamptz, now())
+        `,
+        [
+          input.organization_id,
+          input.user_id,
+          input.email,
+          input.code_hash,
+          input.expires_at,
+          input.replaced_at,
+          randomUUID()
+        ]
+      );
+    },
+
+    async consumeAccountDeletionChallenge(input) {
+      const result = await db.query<Record<string, unknown>>(
+        `
+          UPDATE account_deletion_challenges
+          SET used_at = $5::timestamptz
+          WHERE organization_id = $1::uuid
+            AND user_id = $2::uuid
+            AND lower(email) = lower($3)
+            AND code_hash = $4
+            AND used_at IS NULL
+            AND expires_at > $5::timestamptz
+          RETURNING email
+        `,
+        [
+          input.organization_id,
+          input.user_id,
+          input.email,
+          input.code_hash,
+          input.used_at
+        ]
+      );
+
+      const row = result.rows[0];
+      if (row === undefined) {
+        return null;
+      }
+
+      return {
+        email: String(row["email"])
       };
     }
   };

@@ -1,5 +1,6 @@
 import type {
   AccountDataExportRecord,
+  AccountDeletionBlockedReason,
   AccountLifecycleStore,
   DeletedAccountRecord,
   Queryable,
@@ -547,7 +548,7 @@ export function createPostgresAccountStore(db: Queryable): AccountLifecycleStore
       };
     },
 
-    async deleteAccountForOrganization(input): Promise<DeletedAccountRecord | "other_owned_organizations_exist" | null> {
+    async deleteAccountForOrganization(input): Promise<DeletedAccountRecord | AccountDeletionBlockedReason | null> {
       await db.query("BEGIN", []);
 
       try {
@@ -589,6 +590,22 @@ export function createPostgresAccountStore(db: Queryable): AccountLifecycleStore
         if (blockingOwnership.rows[0] !== undefined) {
           await rollbackQuietly(db);
           return "other_owned_organizations_exist";
+        }
+
+        const blockingOwnedProject = await db.query<{ project_id: string }>(
+          `
+            SELECT p.id::text AS project_id
+            FROM projects p
+            WHERE p.owner_user_id = $2
+              AND p.organization_id <> $1
+            LIMIT 1
+          `,
+          [input.organization_id, input.user_id],
+        );
+
+        if (blockingOwnedProject.rows[0] !== undefined) {
+          await rollbackQuietly(db);
+          return "other_owned_projects_exist";
         }
 
         const projectIdRows = await db.query<{ project_id: string }>(
@@ -649,49 +666,42 @@ export function createPostgresAccountStore(db: Queryable): AccountLifecycleStore
           return null;
         }
 
-        const remainingMemberships = await db.query<{ membership_count: string }>(
+        let deletedMemberTokenCount = deletedOrgMemberTokens.rows.length;
+        await db.query(
           `
-            SELECT COUNT(*)::text AS membership_count
-            FROM organization_members
+            DELETE FROM organization_members
             WHERE user_id = $1
           `,
           [input.user_id],
         );
 
-        let deletedMemberTokenCount = deletedOrgMemberTokens.rows.length;
-        let userDeleted = false;
+        const deletedUserMemberTokens = await db.query<{ token_id: string }>(
+          `
+            DELETE FROM member_tokens
+            WHERE user_id = $1
+            RETURNING id::text AS token_id
+          `,
+          [input.user_id],
+        );
 
-        if (Number(remainingMemberships.rows[0]?.membership_count ?? "0") === 0) {
-          const deletedUserMemberTokens = await db.query<{ token_id: string }>(
-            `
-              DELETE FROM member_tokens
-              WHERE user_id = $1
-              RETURNING id::text AS token_id
-            `,
-            [input.user_id],
-          );
+        deletedMemberTokenCount += deletedUserMemberTokens.rows.length;
 
-          deletedMemberTokenCount += deletedUserMemberTokens.rows.length;
+        await db.query(
+          `
+            DELETE FROM audit_logs
+            WHERE actor_user_id = $1
+               OR target_id = $1::text
+          `,
+          [input.user_id],
+        );
 
-          await db.query(
-            `
-              DELETE FROM audit_logs
-              WHERE actor_user_id = $1
-                 OR target_id = $1::text
-            `,
-            [input.user_id],
-          );
-
-          await db.query(
-            `
-              DELETE FROM users
-              WHERE id = $1
-            `,
-            [input.user_id],
-          );
-
-          userDeleted = true;
-        }
+        await db.query(
+          `
+            DELETE FROM users
+            WHERE id = $1
+          `,
+          [input.user_id],
+        );
 
         await db.query("COMMIT", []);
 
@@ -699,7 +709,7 @@ export function createPostgresAccountStore(db: Queryable): AccountLifecycleStore
           deleted_at: input.deleted_at,
           organization_id: input.organization_id,
           deleted_project_ids: deletedProjectIds,
-          user_deleted: userDeleted,
+          user_deleted: true,
           deleted_member_token_count: deletedMemberTokenCount,
         };
       } catch (error) {

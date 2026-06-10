@@ -31,6 +31,7 @@ import {
   renderAlertEmail,
   renderAllowanceLimitReachedEmail,
   renderAllowanceWarning80Email,
+  renderAccountDeletionOtpEmail,
   renderEmailAuthCodeEmail,
   renderProjectInviteEmail,
   renderTrialConvertedEmail,
@@ -105,10 +106,15 @@ describe("email package", () => {
     expect(rendered.html).toContain(">None</p>");
   });
 
-  it("renders email auth code and invite emails with escaped content", () => {
+  it("renders email auth code, account deletion OTP, and invite emails with escaped content", () => {
     const emailCode = renderEmailAuthCodeEmail({
       code: "12<3456>",
       appUrl: "https://debugbundle.test/login?next=<dashboard>",
+      expiresInMinutes: 10
+    });
+    const accountDeletionOtp = renderAccountDeletionOtpEmail({
+      code: "65<4321>",
+      settingsUrl: "https://debugbundle.test/settings?next=<danger>",
       expiresInMinutes: 10
     });
     const invite = renderProjectInviteEmail({
@@ -124,6 +130,13 @@ describe("email package", () => {
     expect(emailCode.html).toContain("12&lt;3456&gt;");
     expect(emailCode.html).toContain("&lt;dashboard&gt;");
     expect(emailCode.html).toContain('src="https://debugbundle.test/email/debugbundle-mark.png"');
+    expect(accountDeletionOtp.subject).toContain("account deletion code");
+    expect(accountDeletionOtp.text).toContain("65<4321>");
+    expect(accountDeletionOtp.text).toContain("https://debugbundle.test/settings?next=<danger>");
+    expect(accountDeletionOtp.html).toContain("Your account deletion code expires in 10 minutes.");
+    expect(accountDeletionOtp.html).toContain("65&lt;4321&gt;");
+    expect(accountDeletionOtp.html).toContain("&lt;danger&gt;");
+    expect(accountDeletionOtp.html).toContain("Return to account settings");
     expect(invite.subject).toContain("project was shared");
     expect(invite.text).toContain("Owen Example shared a DebugBundle project with you.");
     expect(invite.text).toContain("https://debugbundle.test/accept?token=<secret>");
