@@ -544,6 +544,7 @@ export const IncidentsQuerySchema = z
     service: z.string().min(1).optional(),
     status: z.enum(["open", "resolved", "regressed"]).optional(),
     severity: z.enum(["low", "medium", "high", "critical"]).optional(),
+    first_seen_after: z.string().datetime().optional(),
     cursor: z.string().min(1).optional(),
     limit: z.coerce.number().int().min(1).max(100).default(20)
   })

@@ -332,6 +332,7 @@ export function createRetrievalApi(client: HttpClient): {
     service?: string;
     status?: string;
     severity?: string;
+    firstSeenAfter?: string;
     cursor?: string;
     limit?: number;
   }): Promise<{ incidents: Array<z.infer<typeof IncidentSchema>>; next_cursor: string | null }>;
@@ -393,6 +394,9 @@ export function createRetrievalApi(client: HttpClient): {
       }
       if (input.severity !== undefined) {
         query.set("severity", input.severity);
+      }
+      if (input.firstSeenAfter !== undefined) {
+        query.set("first_seen_after", input.firstSeenAfter);
       }
       if (input.cursor !== undefined) {
         query.set("cursor", input.cursor);

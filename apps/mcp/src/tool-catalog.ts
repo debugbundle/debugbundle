@@ -84,6 +84,7 @@ const listIncidentsInputSchema = z.object({
   service: z.string().optional(),
   status: z.string().optional(),
   severity: z.string().optional(),
+  firstSeenAfter: z.string().optional(),
   cursor: z.string().optional(),
   limit: z.number().optional(),
 });

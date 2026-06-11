@@ -201,7 +201,7 @@ Last updated: 2026-05-29
 
 ### 1.6 Retrieval API
 
-**FR-RET-01:** `GET /v1/incidents` — list/filter incidents (project_id, environment, service, status [open/resolved/regressed], severity, limit, cursor).
+**FR-RET-01:** `GET /v1/incidents` — list/filter incidents (project_id, environment, service, status [open/resolved/regressed], severity, `first_seen_after`, limit, cursor).
 
 **FR-RET-02:** `GET /v1/incidents/{id}` — incident metadata.
 

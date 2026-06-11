@@ -131,7 +131,8 @@ describe("local retrieval store", () => {
         environment: "staging",
         service: "worker-api",
         severity: "medium",
-        status: "resolved"
+        status: "resolved",
+        firstSeenAfter: "2026-03-19T00:00:00.000Z"
       },
       { cwd: () => rootDirectory }
     );
@@ -146,6 +147,16 @@ describe("local retrieval store", () => {
         })
       })
     );
+
+    const firstSeenFiltered = await listLocalIncidents(
+      {
+        projectId: "proj_123",
+        firstSeenAfter: "2026-03-19T12:00:00.000Z"
+      },
+      { cwd: () => rootDirectory }
+    );
+
+    expect(firstSeenFiltered.incidents.map((incident) => incident.incident_id)).toEqual(["inc_recent"]);
 
     const resolvedIncident = await resolveLocalIncident({ incidentId: "inc_recent" }, { cwd: () => rootDirectory });
     expect(resolvedIncident.status).toBe("resolved");

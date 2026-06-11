@@ -6,6 +6,18 @@ The format is based on Keep a Changelog and this project follows Semantic Versio
 
 ## [Unreleased]
 
+## [1.4.0] - 2026-06-11
+
+### Added
+
+- Added incident `first_seen_after` filtering across the hosted retrieval API, CLI retrieval commands, MCP retrieval tools, and the shared retrieval client so automation can scope incident queries to recent windows more precisely.
+- Added project incident dashboard metrics for open incidents, regressed incidents, incidents opened today, and incidents opened this month, including the new dashboard incidents-today table and project-listing metric fields.
+
+### Changed
+
+- Updated the hosted web dashboard and project overview surfaces to prioritize current incident health over bundle-volume counters, while preserving the existing project metrics payload as an additive-compatible contract.
+- Bumped the canonical core release to `1.4.0`, `@debugbundle/cli` to `1.4.0`, and `@debugbundle/mcp` to `1.4.0` for the coordinated incident-visibility and retrieval-filter release train.
+
 ## [1.3.0] - 2026-06-09
 
 ### Added

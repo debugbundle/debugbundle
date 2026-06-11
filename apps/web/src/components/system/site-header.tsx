@@ -90,6 +90,10 @@ export function SiteHeader(): JSX.Element {
                         environment_default: "",
                         organization_plan: "team",
                         metrics: {
+                          open_incidents: 0,
+                          regressed_incidents: 0,
+                          opened_incidents_today: 0,
+                          opened_incidents_month: 0,
                           monthly_bundle_requests: 0,
                           monthly_raw_ingested_events: 0,
                           retained_bundles: 0,

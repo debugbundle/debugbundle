@@ -363,6 +363,10 @@ const ProjectMemberResponseSchema = z.object({ member: ProjectMemberSchema }).st
 const ProjectInviteListResponseSchema = z.object({ invites: z.array(ProjectInviteSchema) }).strict();
 const ProjectInviteResponseSchema = z.object({ invite: ProjectInviteSchema }).strict();
 const ProjectUpdateResponseSchema = z.object({ project: DeletedProjectRecordSchema.extend({ metrics: z.object({
+  open_incidents: z.number().int().nonnegative(),
+  regressed_incidents: z.number().int().nonnegative(),
+  opened_incidents_today: z.number().int().nonnegative(),
+  opened_incidents_month: z.number().int().nonnegative(),
   monthly_bundle_requests: z.number().int().nonnegative(),
   monthly_raw_ingested_events: z.number().int().nonnegative(),
   retained_bundles: z.number().int().nonnegative(),

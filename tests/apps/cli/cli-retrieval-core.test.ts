@@ -689,7 +689,8 @@ describe("cli retrieval commands core", () => {
     const result = await listIncidentsWithAuthCommand(
       {
         authFilePath: "/tmp/auth.json",
-        projectId: "proj_123"
+        projectId: "proj_123",
+        firstSeenAfter: "2026-03-17T00:00:00.000Z"
       },
       {
         readAuthState,
@@ -703,10 +704,68 @@ describe("cli retrieval commands core", () => {
     });
     expect(listIncidents).toHaveBeenCalledWith({
       bearerToken: "dbundle_mem_saved",
-      projectId: "proj_123"
+      projectId: "proj_123",
+      firstSeenAfter: "2026-03-17T00:00:00.000Z"
     });
     expect(result.exitCode).toBe(0);
     expect(result.output).toBe("cloud | inc_123 | high | open | TypeError");
+  });
+
+  it("uses the explicit cloud source path for incidents retrieval and forwards first-seen filters", async () => {
+    const readAuthState = vi.fn().mockResolvedValue({
+      bearer_token: "dbundle_mem_saved",
+      base_url: "https://selfhost.debugbundle.test"
+    });
+    const httpClient = { request: vi.fn() };
+    const createHttpClient = vi.fn().mockReturnValue(httpClient);
+    const listIncidents = vi.fn().mockResolvedValue({
+      incidents: [
+        {
+          incident_id: "inc_123",
+          title: "TypeError",
+          severity: "high",
+          status: "open"
+        }
+      ],
+      next_cursor: null
+    });
+    const createApi = vi.fn().mockReturnValue({
+      listIncidents,
+      getIncident: vi.fn(),
+      getIncidentContext: vi.fn(),
+      getBundle: vi.fn(),
+      listLogs: vi.fn(),
+      getReproduction: vi.fn(),
+      listServices: vi.fn()
+    });
+
+    const result = await listIncidentsWithAuthCommand(
+      {
+        authFilePath: "/tmp/auth.json",
+        source: "cloud",
+        firstSeenAfter: "2026-03-17T00:00:00.000Z",
+        json: true
+      },
+      {
+        readAuthState,
+        createHttpClient,
+        createApi
+      }
+    );
+
+    expect(listIncidents).toHaveBeenCalledWith({
+      bearerToken: "dbundle_mem_saved",
+      firstSeenAfter: "2026-03-17T00:00:00.000Z"
+    });
+    expect(JSON.parse(result.output)).toEqual({
+      incidents: [
+        expect.objectContaining({
+          incident_id: "inc_123",
+          source: "cloud"
+        })
+      ],
+      next_cursor: null
+    });
   });
 
   it("loads stored auth state and forwards it into incident resolution", async () => {

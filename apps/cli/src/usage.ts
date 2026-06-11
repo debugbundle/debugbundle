@@ -22,7 +22,7 @@ export const CLI_USAGE_LINES = [
   '  debugbundle login --github-device [--label <label>] [--base-url <url>] [--auth-file <path>] [--json]',
   '  debugbundle profile validate [--json]',
   '  debugbundle whoami [--auth-file <path>] [--json]',
-  '  debugbundle incidents [--source <local|cloud>] [--project-id <id>] [--environment <name>] [--service <name>] [--status <status>] [--severity <severity>] [--cursor <cursor>] [--limit <n>] [--auth-file <path>] [--json]',
+  '  debugbundle incidents [--source <local|cloud>] [--project-id <id>] [--environment <name>] [--service <name>] [--status <status>] [--severity <severity>] [--first-seen-after <ISO8601>] [--cursor <cursor>] [--limit <n>] [--auth-file <path>] [--json]',
   '  debugbundle inspect <incident-id> [--source <local|cloud>] [--auth-file <path>] [--json]',
   '  debugbundle explain <incident-id> [--source <local|cloud>] [--auth-file <path>] [--json]',
   '  debugbundle resolve <incident-id> [incident-id ...] [--source <local|cloud>] [--auth-file <path>] [--json]',

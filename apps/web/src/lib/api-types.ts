@@ -64,6 +64,10 @@ export interface ProjectRecord {
   environment_default: string;
   organization_plan: "free" | "solo" | "team";
   metrics: {
+    open_incidents: number;
+    regressed_incidents: number;
+    opened_incidents_today: number;
+    opened_incidents_month: number;
     monthly_bundle_requests: number;
     monthly_raw_ingested_events: number;
     retained_bundles: number;

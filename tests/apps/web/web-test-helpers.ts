@@ -44,6 +44,10 @@ export interface ProjectRecord {
   effective_role?: "owner" | "admin" | "member";
   shared_access_suspended?: boolean;
   metrics: {
+    open_incidents: number;
+    regressed_incidents: number;
+    opened_incidents_today: number;
+    opened_incidents_month: number;
     monthly_bundle_requests: number;
     monthly_raw_ingested_events: number;
     retained_bundles: number;
@@ -324,7 +328,20 @@ export function createMemberTokenRecord(overrides: Partial<MemberTokenRecord> = 
   };
 }
 
-export function createProject(overrides: Partial<ProjectRecord> = {}): ProjectRecord {
+export function createProject(
+  overrides: Partial<Omit<ProjectRecord, "metrics">> & { metrics?: Partial<ProjectRecord["metrics"]> } = {}
+): ProjectRecord {
+  const defaultMetrics: ProjectRecord["metrics"] = {
+    open_incidents: 3,
+    regressed_incidents: 1,
+    opened_incidents_today: 1,
+    opened_incidents_month: 5,
+    monthly_bundle_requests: 12,
+    monthly_raw_ingested_events: 120,
+    retained_bundles: 6,
+    monthly_alert_deliveries: 4
+  };
+
   return {
     project_id: "proj_123",
     organization_id: "org_123",
@@ -337,15 +354,13 @@ export function createProject(overrides: Partial<ProjectRecord> = {}): ProjectRe
     slug: "main-app",
     environment_default: "production",
     organization_plan: "free",
+    ...overrides,
     metrics: {
-      monthly_bundle_requests: 12,
-      monthly_raw_ingested_events: 120,
-      retained_bundles: 6,
-      monthly_alert_deliveries: 4
+      ...defaultMetrics,
+      ...overrides.metrics
     },
-    created_at: "2026-03-17T00:00:00.000Z",
-    updated_at: "2026-03-17T00:00:00.000Z",
-    ...overrides
+    created_at: overrides.created_at ?? "2026-03-17T00:00:00.000Z",
+    updated_at: overrides.updated_at ?? "2026-03-17T00:00:00.000Z"
   };
 }
 

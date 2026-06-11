@@ -16,6 +16,10 @@ function projectFixture(overrides: Record<string, unknown> = {}): Record<string,
     environment_default: "production",
     organization_plan: "free",
     metrics: {
+      open_incidents: 0,
+      regressed_incidents: 0,
+      opened_incidents_today: 0,
+      opened_incidents_month: 1,
       monthly_bundle_requests: 1,
       monthly_raw_ingested_events: 2,
       retained_bundles: 3,
@@ -116,6 +120,10 @@ describe("project-management api client", () => {
         project: projectFixture({
           project_id: "proj_2",
           metrics: {
+            open_incidents: 0,
+            regressed_incidents: 0,
+            opened_incidents_today: 0,
+            opened_incidents_month: 0,
             monthly_bundle_requests: 0,
             monthly_raw_ingested_events: 0,
             retained_bundles: 0,

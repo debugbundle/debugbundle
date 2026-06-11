@@ -279,6 +279,10 @@ export interface ProjectRecord {
   environment_default: string;
   organization_plan: string;
   metrics: {
+    open_incidents: number;
+    regressed_incidents: number;
+    opened_incidents_today: number;
+    opened_incidents_month: number;
     monthly_bundle_requests: number;
     monthly_raw_ingested_events: number;
     retained_bundles: number;
@@ -951,6 +955,7 @@ export interface MetadataStore {
     service?: string;
     status?: "open" | "resolved" | "regressed";
     severity?: "low" | "medium" | "high" | "critical";
+    first_seen_after?: string;
     cursor?: IncidentsCursor;
     limit: number;
   }): Promise<IncidentRetrievalRecord[]>;

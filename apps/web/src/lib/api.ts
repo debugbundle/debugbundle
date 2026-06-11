@@ -82,6 +82,10 @@ function normalizeProjectRecord(
   return {
     ...project,
     metrics: {
+      open_incidents: project.metrics?.open_incidents ?? 0,
+      regressed_incidents: project.metrics?.regressed_incidents ?? 0,
+      opened_incidents_today: project.metrics?.opened_incidents_today ?? 0,
+      opened_incidents_month: project.metrics?.opened_incidents_month ?? 0,
       monthly_bundle_requests: project.metrics?.monthly_bundle_requests ?? 0,
       monthly_raw_ingested_events: project.metrics?.monthly_raw_ingested_events ?? 0,
       retained_bundles: project.metrics?.retained_bundles ?? 0,
@@ -172,6 +176,7 @@ export async function listIncidents(
         service?: string;
         status?: IncidentRecord["status"];
         severity?: IncidentRecord["severity"];
+        firstSeenAfter?: string;
       } = 20,
   cursor?: string
 ): Promise<{ incidents: IncidentRecord[]; nextCursor: string | null }> {
@@ -204,6 +209,9 @@ export async function listIncidents(
   }
   if (input.severity !== undefined) {
     searchParams.set("severity", input.severity);
+  }
+  if (input.firstSeenAfter !== undefined) {
+    searchParams.set("first_seen_after", input.firstSeenAfter);
   }
 
   const body = await readJson<{ incidents: IncidentRecord[]; next_cursor: string | null }>(

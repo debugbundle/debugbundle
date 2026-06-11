@@ -258,6 +258,7 @@ async function listAllCloudIncidents(
     service?: string;
     status?: string;
     severity?: string;
+    firstSeenAfter?: string;
   },
   api: {
     listIncidents(input: {
@@ -267,6 +268,7 @@ async function listAllCloudIncidents(
       service?: string;
       status?: string;
       severity?: string;
+      firstSeenAfter?: string;
       cursor?: string;
     }): Promise<{ incidents: IncidentLike[]; next_cursor: string | null }>;
   }
@@ -282,6 +284,7 @@ async function listAllCloudIncidents(
       ...(input.service === undefined ? {} : { service: input.service }),
       ...(input.status === undefined ? {} : { status: input.status }),
       ...(input.severity === undefined ? {} : { severity: input.severity }),
+      ...(input.firstSeenAfter === undefined ? {} : { firstSeenAfter: input.firstSeenAfter }),
       ...(cursor === undefined ? {} : { cursor })
     });
 
@@ -307,6 +310,7 @@ async function mapCombinedIncidentListResult(
     service?: string;
     status?: string;
     severity?: string;
+    firstSeenAfter?: string;
     cursor?: string;
     limit?: number;
     json?: boolean;
@@ -319,6 +323,7 @@ async function mapCombinedIncidentListResult(
       service?: string;
       status?: string;
       severity?: string;
+      firstSeenAfter?: string;
       cursor?: string;
     }): Promise<{ incidents: IncidentLike[]; next_cursor: string | null }>;
   },
@@ -332,7 +337,8 @@ async function mapCombinedIncidentListResult(
       ...(input.environment === undefined ? {} : { environment: input.environment }),
       ...(input.service === undefined ? {} : { service: input.service }),
       ...(input.status === undefined ? {} : { status: input.status }),
-      ...(input.severity === undefined ? {} : { severity: input.severity })
+      ...(input.severity === undefined ? {} : { severity: input.severity }),
+      ...(input.firstSeenAfter === undefined ? {} : { firstSeenAfter: input.firstSeenAfter })
     },
     dependencies
   );
@@ -343,15 +349,16 @@ async function mapCombinedIncidentListResult(
       ...(input.environment === undefined ? {} : { environment: input.environment }),
       ...(input.service === undefined ? {} : { service: input.service }),
       ...(input.status === undefined ? {} : { status: input.status }),
-      ...(input.severity === undefined ? {} : { severity: input.severity })
+      ...(input.severity === undefined ? {} : { severity: input.severity }),
+      ...(input.firstSeenAfter === undefined ? {} : { firstSeenAfter: input.firstSeenAfter })
     },
     api
   );
   const incidents = paginateIncidents<IncidentListEntry>(
     [...localIncidents.incidents, ...cloudIncidents] as IncidentListEntry[],
     {
-    ...(input.cursor === undefined ? {} : { cursor: input.cursor }),
-    ...(input.limit === undefined ? {} : { limit: input.limit })
+      ...(input.cursor === undefined ? {} : { cursor: input.cursor }),
+      ...(input.limit === undefined ? {} : { limit: input.limit })
     }
   );
 
@@ -373,6 +380,7 @@ export async function listIncidentsCommand(
     service?: string;
     status?: string;
     severity?: string;
+    firstSeenAfter?: string;
     cursor?: string;
     limit?: number;
     json?: boolean;
@@ -385,6 +393,7 @@ export async function listIncidentsCommand(
       service?: string;
       status?: string;
       severity?: string;
+      firstSeenAfter?: string;
       cursor?: string;
       limit?: number;
     }): Promise<{ incidents: IncidentLike[]; next_cursor: string | null }>;
@@ -398,6 +407,7 @@ export async function listIncidentsCommand(
       service?: string;
       status?: string;
       severity?: string;
+      firstSeenAfter?: string;
       cursor?: string;
       limit?: number;
     } = {
@@ -418,6 +428,9 @@ export async function listIncidentsCommand(
     }
     if (input.severity !== undefined) {
       requestInput.severity = input.severity;
+    }
+    if (input.firstSeenAfter !== undefined) {
+      requestInput.firstSeenAfter = input.firstSeenAfter;
     }
     if (input.cursor !== undefined) {
       requestInput.cursor = input.cursor;
@@ -452,6 +465,7 @@ export async function listIncidentsWithAuthCommand(
     service?: string;
     status?: string;
     severity?: string;
+    firstSeenAfter?: string;
     cursor?: string;
     limit?: number;
     json?: boolean;
@@ -467,6 +481,7 @@ export async function listIncidentsWithAuthCommand(
           ...(input.service === undefined ? {} : { service: input.service }),
           ...(input.status === undefined ? {} : { status: input.status }),
           ...(input.severity === undefined ? {} : { severity: input.severity }),
+          ...(input.firstSeenAfter === undefined ? {} : { firstSeenAfter: input.firstSeenAfter }),
           ...(input.cursor === undefined ? {} : { cursor: input.cursor }),
           ...(input.limit === undefined ? {} : { limit: input.limit })
         },
@@ -494,6 +509,7 @@ export async function listIncidentsWithAuthCommand(
           ...(input.service === undefined ? {} : { service: input.service }),
           ...(input.status === undefined ? {} : { status: input.status }),
           ...(input.severity === undefined ? {} : { severity: input.severity }),
+          ...(input.firstSeenAfter === undefined ? {} : { firstSeenAfter: input.firstSeenAfter }),
           ...(input.cursor === undefined ? {} : { cursor: input.cursor }),
           ...(input.limit === undefined ? {} : { limit: input.limit }),
           ...(input.json === undefined ? {} : { json: input.json })
@@ -519,6 +535,7 @@ export async function listIncidentsWithAuthCommand(
         service?: string;
         status?: string;
         severity?: string;
+        firstSeenAfter?: string;
         cursor?: string;
         limit?: number;
         json?: boolean;
@@ -540,6 +557,9 @@ export async function listIncidentsWithAuthCommand(
       }
       if (input.severity !== undefined) {
         commandInput.severity = input.severity;
+      }
+      if (input.firstSeenAfter !== undefined) {
+        commandInput.firstSeenAfter = input.firstSeenAfter;
       }
       if (input.cursor !== undefined) {
         commandInput.cursor = input.cursor;

@@ -156,6 +156,17 @@ function buildProjectMetricsWindow(nowIso: string): { starts_at: string; ends_at
   };
 }
 
+function buildProjectDayWindow(nowIso: string): { starts_at: string; ends_at: string } {
+  const now = new Date(nowIso);
+  const startsAt = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 0, 0, 0, 0));
+  const endsAt = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1, 0, 0, 0, 0));
+
+  return {
+    starts_at: startsAt.toISOString(),
+    ends_at: endsAt.toISOString()
+  };
+}
+
 function buildMonthlyRawIngestedEventsMetricSelect(input: {
   projectIdSql: string;
   startsAtSql: string;
@@ -184,6 +195,68 @@ function buildMonthlyRawIngestedEventsMetricSelect(input: {
         0
       )
     )::int
+  `;
+}
+
+function buildProjectMetricsJsonSql(input: {
+  projectIdSql: string;
+  monthStartsAtSql: string;
+  monthEndsAtSql: string;
+  dayStartsAtSql: string;
+  dayEndsAtSql: string;
+  billableIncidentEventsPredicate: string;
+  alertDeliveriesSelect: string;
+}): string {
+  return `
+    json_build_object(
+      'open_incidents', (
+        SELECT COUNT(*)::int
+        FROM incidents i
+        WHERE i.project_id = ${input.projectIdSql}
+          AND i.status <> 'resolved'
+      ),
+      'regressed_incidents', (
+        SELECT COUNT(*)::int
+        FROM incidents i
+        WHERE i.project_id = ${input.projectIdSql}
+          AND i.status = 'regressed'
+      ),
+      'opened_incidents_today', (
+        SELECT COUNT(*)::int
+        FROM incidents i
+        WHERE i.project_id = ${input.projectIdSql}
+          AND i.first_seen_at >= ${input.dayStartsAtSql}::timestamptz
+          AND i.first_seen_at < ${input.dayEndsAtSql}::timestamptz
+      ),
+      'opened_incidents_month', (
+        SELECT COUNT(*)::int
+        FROM incidents i
+        WHERE i.project_id = ${input.projectIdSql}
+          AND i.first_seen_at >= ${input.monthStartsAtSql}::timestamptz
+          AND i.first_seen_at < ${input.monthEndsAtSql}::timestamptz
+      ),
+      'monthly_bundle_requests', (
+        SELECT COUNT(*)::int
+        FROM bundle_generations bg
+        WHERE bg.project_id = ${input.projectIdSql}
+          AND bg.created_at >= ${input.monthStartsAtSql}::timestamptz
+          AND bg.created_at < ${input.monthEndsAtSql}::timestamptz
+      ),
+      'monthly_raw_ingested_events', (
+        ${buildMonthlyRawIngestedEventsMetricSelect({
+          projectIdSql: input.projectIdSql,
+          startsAtSql: input.monthStartsAtSql,
+          endsAtSql: input.monthEndsAtSql,
+          billableIncidentEventsPredicate: input.billableIncidentEventsPredicate
+        })}
+      ),
+      'retained_bundles', (
+        SELECT COUNT(DISTINCT bg.incident_id)::int
+        FROM bundle_generations bg
+        WHERE bg.project_id = ${input.projectIdSql}
+      ),
+      'monthly_alert_deliveries', ${input.alertDeliveriesSelect}
+    )
   `;
 }
 
@@ -264,6 +337,10 @@ function buildAlertDeliveriesCountSelect(input: {
 function normalizeProjectMetrics(value: unknown): ProjectRecord["metrics"] {
   if (typeof value !== "object" || value === null) {
     return {
+      open_incidents: 0,
+      regressed_incidents: 0,
+      opened_incidents_today: 0,
+      opened_incidents_month: 0,
       monthly_bundle_requests: 0,
       monthly_raw_ingested_events: 0,
       retained_bundles: 0,
@@ -274,6 +351,10 @@ function normalizeProjectMetrics(value: unknown): ProjectRecord["metrics"] {
   const metrics = value as Partial<ProjectRecord["metrics"]>;
 
   return {
+    open_incidents: metrics.open_incidents ?? 0,
+    regressed_incidents: metrics.regressed_incidents ?? 0,
+    opened_incidents_today: metrics.opened_incidents_today ?? 0,
+    opened_incidents_month: metrics.opened_incidents_month ?? 0,
     monthly_bundle_requests: metrics.monthly_bundle_requests ?? 0,
     monthly_raw_ingested_events: metrics.monthly_raw_ingested_events ?? 0,
     retained_bundles: metrics.retained_bundles ?? 0,
@@ -1485,6 +1566,7 @@ export function createPostgresMetadataStore(
 
     async listProjectsForUser(input): Promise<ProjectRecord[]> {
       const usageWindow = buildProjectMetricsWindow(input.now);
+      const dayWindow = buildProjectDayWindow(input.now);
       const hasAlertDeliveries = await alertDeliveriesTableExists(db);
       const hasAlertEmailDigests = await alertEmailDigestsTableExists(db);
       const organizationPlanSql = "COALESCE(o.plan, 'free')";
@@ -1533,29 +1615,15 @@ export function createPostgresMetadataStore(
             p.slug,
             p.environment_default,
             ${organizationPlanSql} AS organization_plan,
-            json_build_object(
-              'monthly_bundle_requests', (
-                SELECT COUNT(*)::int
-                FROM bundle_generations bg
-                WHERE bg.project_id = p.id
-                  AND bg.created_at >= $2::timestamptz
-                  AND bg.created_at < $3::timestamptz
-              ),
-              'monthly_raw_ingested_events', (
-                ${buildMonthlyRawIngestedEventsMetricSelect({
-                  projectIdSql: "p.id",
-                  startsAtSql: "$2",
-                  endsAtSql: "$3",
-                  billableIncidentEventsPredicate
-                })}
-              ),
-              'retained_bundles', (
-                SELECT COUNT(DISTINCT bg.incident_id)::int
-                FROM bundle_generations bg
-                WHERE bg.project_id = p.id
-              ),
-              'monthly_alert_deliveries', ${alertDeliveriesSelect}
-            ) AS metrics,
+            ${buildProjectMetricsJsonSql({
+              projectIdSql: "p.id",
+              monthStartsAtSql: "$2",
+              monthEndsAtSql: "$3",
+              dayStartsAtSql: "$4",
+              dayEndsAtSql: "$5",
+              billableIncidentEventsPredicate,
+              alertDeliveriesSelect
+            })} AS metrics,
             p.created_at::text AS created_at,
             p.updated_at::text AS updated_at
           FROM projects p
@@ -1570,9 +1638,9 @@ export function createPostgresMetadataStore(
             CASE WHEN p.owner_user_id = $1::uuid THEN 0 ELSE 1 END,
             p.created_at DESC,
             p.id DESC
-          LIMIT $4
+          LIMIT $6
         `,
-        [input.user_id, usageWindow.starts_at, usageWindow.ends_at, input.limit]
+        [input.user_id, usageWindow.starts_at, usageWindow.ends_at, dayWindow.starts_at, dayWindow.ends_at, input.limit]
       );
 
       return result.rows.map(mapProjectRow).map(applySharedAccessSuspension);
@@ -1580,6 +1648,7 @@ export function createPostgresMetadataStore(
 
     async listProjectsForOrganization(input): Promise<ProjectRecord[]> {
       const usageWindow = buildProjectMetricsWindow(input.now);
+      const dayWindow = buildProjectDayWindow(input.now);
       const hasAlertDeliveries = await alertDeliveriesTableExists(db);
       const hasAlertEmailDigests = await alertEmailDigestsTableExists(db);
       const organizationPlanSql = "COALESCE(o.plan, 'free')";
@@ -1621,29 +1690,15 @@ export function createPostgresMetadataStore(
             p.slug,
             p.environment_default,
             ${organizationPlanSql} AS organization_plan,
-            json_build_object(
-              'monthly_bundle_requests', (
-                SELECT COUNT(*)::int
-                FROM bundle_generations bg
-                WHERE bg.project_id = p.id
-                  AND bg.created_at >= $2::timestamptz
-                  AND bg.created_at < $3::timestamptz
-              ),
-              'monthly_raw_ingested_events', (
-                ${buildMonthlyRawIngestedEventsMetricSelect({
-                  projectIdSql: "p.id",
-                  startsAtSql: "$2",
-                  endsAtSql: "$3",
-                  billableIncidentEventsPredicate
-                })}
-              ),
-              'retained_bundles', (
-                SELECT COUNT(DISTINCT bg.incident_id)::int
-                FROM bundle_generations bg
-                WHERE bg.project_id = p.id
-              ),
-              'monthly_alert_deliveries', ${alertDeliveriesSelect}
-            ) AS metrics,
+            ${buildProjectMetricsJsonSql({
+              projectIdSql: "p.id",
+              monthStartsAtSql: "$2",
+              monthEndsAtSql: "$3",
+              dayStartsAtSql: "$4",
+              dayEndsAtSql: "$5",
+              billableIncidentEventsPredicate,
+              alertDeliveriesSelect
+            })} AS metrics,
             p.created_at::text AS created_at,
             p.updated_at::text AS updated_at
           FROM projects p
@@ -1651,9 +1706,9 @@ export function createPostgresMetadataStore(
           JOIN users owner_user ON owner_user.id = p.owner_user_id
           WHERE p.organization_id = $1
           ORDER BY p.created_at DESC, p.id DESC
-          LIMIT $4
+          LIMIT $6
         `,
-        [input.organization_id, usageWindow.starts_at, usageWindow.ends_at, input.limit]
+        [input.organization_id, usageWindow.starts_at, usageWindow.ends_at, dayWindow.starts_at, dayWindow.ends_at, input.limit]
       );
 
       return result.rows.map(mapProjectRow);
@@ -1736,6 +1791,10 @@ export function createPostgresMetadataStore(
               cp.environment_default,
               COALESCE(o.plan, 'free') AS organization_plan,
               json_build_object(
+                'open_incidents', 0,
+                'regressed_incidents', 0,
+                'opened_incidents_today', 0,
+                'opened_incidents_month', 0,
                 'monthly_bundle_requests', 0,
                 'monthly_raw_ingested_events', 0,
                 'retained_bundles', 0,
@@ -1797,6 +1856,7 @@ export function createPostgresMetadataStore(
     async updateProjectForUser(input): Promise<ProjectRecord | "slug_taken" | null> {
       try {
         const usageWindow = buildProjectMetricsWindow(new Date().toISOString());
+        const dayWindow = buildProjectDayWindow(new Date().toISOString());
         const hasAlertDeliveries = await alertDeliveriesTableExists(db);
         const hasAlertEmailDigests = await alertEmailDigestsTableExists(db);
         const billableIncidentEventsPredicate = buildBillableIncidentEventsPredicateSql({
@@ -1905,29 +1965,15 @@ export function createPostgresMetadataStore(
               up.slug,
               up.environment_default,
               COALESCE(o.plan, 'free') AS organization_plan,
-              json_build_object(
-                'monthly_bundle_requests', (
-                  SELECT COUNT(*)::int
-                  FROM bundle_generations bg
-                  WHERE bg.project_id = up.project_id
-                    AND bg.created_at >= $6::timestamptz
-                    AND bg.created_at < $7::timestamptz
-                ),
-                'monthly_raw_ingested_events', (
-                  ${buildMonthlyRawIngestedEventsMetricSelect({
-                    projectIdSql: "up.project_id",
-                    startsAtSql: "$6",
-                    endsAtSql: "$7",
-                    billableIncidentEventsPredicate
-                  })}
-                ),
-                'retained_bundles', (
-                  SELECT COUNT(DISTINCT bg.incident_id)::int
-                  FROM bundle_generations bg
-                  WHERE bg.project_id = up.project_id
-                ),
-                'monthly_alert_deliveries', ${alertDeliveriesSelect}
-              ) AS metrics,
+              ${buildProjectMetricsJsonSql({
+                projectIdSql: "up.project_id",
+                monthStartsAtSql: "$6",
+                monthEndsAtSql: "$7",
+                dayStartsAtSql: "$8",
+                dayEndsAtSql: "$9",
+                billableIncidentEventsPredicate,
+                alertDeliveriesSelect
+              })} AS metrics,
               up.created_at::text AS created_at,
               up.updated_at::text AS updated_at
             FROM updated_project up
@@ -1941,7 +1987,9 @@ export function createPostgresMetadataStore(
             input.slug ?? null,
             input.environment_default ?? null,
             usageWindow.starts_at,
-            usageWindow.ends_at
+            usageWindow.ends_at,
+            dayWindow.starts_at,
+            dayWindow.ends_at
           ]
         );
 
@@ -2106,6 +2154,10 @@ export function createPostgresMetadataStore(
               cp.environment_default,
               COALESCE(o.plan, 'free') AS organization_plan,
               json_build_object(
+                'open_incidents', 0,
+                'regressed_incidents', 0,
+                'opened_incidents_today', 0,
+                'opened_incidents_month', 0,
                 'monthly_bundle_requests', 0,
                 'monthly_raw_ingested_events', 0,
                 'retained_bundles', 0,
@@ -2166,6 +2218,7 @@ export function createPostgresMetadataStore(
     async updateProjectForOrganization(input): Promise<ProjectRecord | "slug_taken" | null> {
       try {
         const usageWindow = buildProjectMetricsWindow(new Date().toISOString());
+        const dayWindow = buildProjectDayWindow(new Date().toISOString());
         const hasAlertDeliveries = await alertDeliveriesTableExists(db);
         const hasAlertEmailDigests = await alertEmailDigestsTableExists(db);
         const billableIncidentEventsPredicate = buildBillableIncidentEventsPredicateSql({
@@ -2252,29 +2305,15 @@ export function createPostgresMetadataStore(
               up.slug,
               up.environment_default,
               COALESCE(o.plan, 'free') AS organization_plan,
-              json_build_object(
-                'monthly_bundle_requests', (
-                  SELECT COUNT(*)::int
-                  FROM bundle_generations bg
-                  WHERE bg.project_id = up.project_id
-                    AND bg.created_at >= $6::timestamptz
-                    AND bg.created_at < $7::timestamptz
-                ),
-                'monthly_raw_ingested_events', (
-                  ${buildMonthlyRawIngestedEventsMetricSelect({
-                    projectIdSql: "up.project_id",
-                    startsAtSql: "$6",
-                    endsAtSql: "$7",
-                    billableIncidentEventsPredicate
-                  })}
-                ),
-                'retained_bundles', (
-                  SELECT COUNT(DISTINCT bg.incident_id)::int
-                  FROM bundle_generations bg
-                  WHERE bg.project_id = up.project_id
-                ),
-                'monthly_alert_deliveries', ${alertDeliveriesSelect}
-              ) AS metrics,
+              ${buildProjectMetricsJsonSql({
+                projectIdSql: "up.project_id",
+                monthStartsAtSql: "$6",
+                monthEndsAtSql: "$7",
+                dayStartsAtSql: "$8",
+                dayEndsAtSql: "$9",
+                billableIncidentEventsPredicate,
+                alertDeliveriesSelect
+              })} AS metrics,
               up.created_at::text AS created_at,
               up.updated_at::text AS updated_at
             FROM updated_project up
@@ -2288,7 +2327,9 @@ export function createPostgresMetadataStore(
             input.slug ?? null,
             input.environment_default ?? null,
             usageWindow.starts_at,
-            usageWindow.ends_at
+            usageWindow.ends_at,
+            dayWindow.starts_at,
+            dayWindow.ends_at
           ]
         );
 
@@ -3078,6 +3119,11 @@ export function createPostgresMetadataStore(
       if (input.severity !== undefined) {
         params.push(input.severity);
         conditions.push(`i.severity = $${params.length}`);
+      }
+
+      if (input.first_seen_after !== undefined) {
+        params.push(input.first_seen_after);
+        conditions.push(`i.first_seen_at >= $${params.length}::timestamptz`);
       }
 
       if (input.cursor !== undefined) {

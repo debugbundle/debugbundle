@@ -110,6 +110,10 @@ describe("postgres metadata store project collaboration", () => {
               environment_default: "production",
               organization_plan: "team",
               metrics: {
+                open_incidents: 4,
+                regressed_incidents: 1,
+                opened_incidents_today: 1,
+                opened_incidents_month: 6,
                 monthly_bundle_requests: 12,
                 monthly_raw_ingested_events: 48,
                 retained_bundles: 3,
@@ -215,6 +219,10 @@ describe("postgres metadata store project collaboration", () => {
         environment_default: "production",
         organization_plan: "team",
         metrics: {
+          open_incidents: 4,
+          regressed_incidents: 1,
+          opened_incidents_today: 1,
+          opened_incidents_month: 6,
           monthly_bundle_requests: 12,
           monthly_raw_ingested_events: 48,
           retained_bundles: 3,
@@ -266,6 +274,10 @@ describe("postgres metadata store project collaboration", () => {
               environment_default: "production",
               organization_plan: "free",
               metrics: {
+                open_incidents: 0,
+                regressed_incidents: 0,
+                opened_incidents_today: 0,
+                opened_incidents_month: 0,
                 monthly_bundle_requests: 0,
                 monthly_raw_ingested_events: 0,
                 retained_bundles: 1,
@@ -319,6 +331,10 @@ describe("postgres metadata store project collaboration", () => {
         environment_default: "production",
         organization_plan: "free",
         metrics: {
+          open_incidents: 0,
+          regressed_incidents: 0,
+          opened_incidents_today: 0,
+          opened_incidents_month: 0,
           monthly_bundle_requests: 0,
           monthly_raw_ingested_events: 0,
           retained_bundles: 1,

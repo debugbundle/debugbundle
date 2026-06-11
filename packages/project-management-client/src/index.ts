@@ -2,6 +2,10 @@ import { z } from "zod";
 
 export const ProjectMetricsSchema = z
   .object({
+    open_incidents: z.number().int().nonnegative().default(0),
+    regressed_incidents: z.number().int().nonnegative().default(0),
+    opened_incidents_today: z.number().int().nonnegative().default(0),
+    opened_incidents_month: z.number().int().nonnegative().default(0),
     monthly_bundle_requests: z.number().int().nonnegative(),
     monthly_raw_ingested_events: z.number().int().nonnegative(),
     retained_bundles: z.number().int().nonnegative(),

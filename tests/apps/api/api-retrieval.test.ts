@@ -625,7 +625,7 @@ describe("api retrieval routes", () => {
 
     const response = await app.inject({
       method: "GET",
-      url: "/v1/incidents?project_id=550e8400-e29b-41d4-a716-446655440000&environment=production&service=checkout-api&status=open&severity=high&limit=1&cursor=2026-03-11T00:09:00.000Z|inc_122",
+      url: "/v1/incidents?project_id=550e8400-e29b-41d4-a716-446655440000&environment=production&service=checkout-api&status=open&severity=high&first_seen_after=2026-03-11T00:00:00.000Z&limit=1&cursor=2026-03-11T00:09:00.000Z|inc_122",
       headers: {
         authorization: "Bearer dbundle_mem_test"
       }
@@ -639,6 +639,7 @@ describe("api retrieval routes", () => {
       service: "checkout-api",
       status: "open",
       severity: "high",
+      first_seen_after: "2026-03-11T00:00:00.000Z",
       limit: 1,
       cursor: {
         last_seen_at: "2026-03-11T00:09:00.000Z",
@@ -679,6 +680,23 @@ describe("api retrieval routes", () => {
     const response = await app.inject({
       method: "GET",
       url: "/v1/incidents?cursor=not-a-valid-cursor",
+      headers: {
+        authorization: "Bearer dbundle_mem_test"
+      }
+    });
+
+    expect(response.statusCode).toBe(400);
+    expect(response.json()).toEqual({
+      error: "invalid_query"
+    });
+  });
+
+  it("should reject invalid incident first_seen_after filters", async (): Promise<void> => {
+    const app = createServer();
+
+    const response = await app.inject({
+      method: "GET",
+      url: "/v1/incidents?first_seen_after=not-a-timestamp",
       headers: {
         authorization: "Bearer dbundle_mem_test"
       }

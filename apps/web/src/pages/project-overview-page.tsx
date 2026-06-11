@@ -1,4 +1,4 @@
-import { ActivityIcon, BugIcon, DownloadIcon, InboxIcon, PackageIcon, SirenIcon, TrendingDownIcon, TrendingUpIcon } from "lucide-react";
+import { CalendarDaysIcon, CalendarIcon, DownloadIcon, PackageIcon, RotateCcwIcon, SirenIcon } from "lucide-react";
 import { useMemo, useState, type MouseEvent } from "react";
 import { Link, useNavigate, useOutletContext } from "react-router-dom";
 
@@ -72,66 +72,60 @@ export function ProjectOverviewPage(): JSX.Element {
 }
 
 function ProjectStatCards({ project }: { project: ProjectRecord }): JSX.Element {
-  const bundleRequests = project.metrics.monthly_bundle_requests;
-  const rawEvents = project.metrics.monthly_raw_ingested_events;
-  const retainedBundles = project.metrics.retained_bundles;
-  const alertDeliveries = project.metrics.monthly_alert_deliveries;
+  const openIncidents = project.metrics.open_incidents;
+  const openedToday = project.metrics.opened_incidents_today;
+  const openedMonth = project.metrics.opened_incidents_month;
+  const regressedIncidents = project.metrics.regressed_incidents;
 
   return (
     <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
       <Card>
         <CardHeader className="flex flex-row items-center justify-between pb-2">
-          <CardDescription>Bundle Requests</CardDescription>
-          <BugIcon className="size-4 text-muted-foreground" />
+          <CardDescription>Open incidents</CardDescription>
+          <SirenIcon className="size-4 text-muted-foreground" />
         </CardHeader>
         <CardContent>
-          <CardTitle className="text-2xl tabular-nums">{bundleRequests.toLocaleString()}</CardTitle>
-          <div className="mt-1 flex items-center gap-1 text-xs text-muted-foreground">
-            <Badge variant="outline" className="text-xs">This month</Badge>
-            Project-scoped generated bundles
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between pb-2">
-          <CardDescription>Ingested Events</CardDescription>
-          <InboxIcon className="size-4 text-muted-foreground" />
-        </CardHeader>
-        <CardContent>
-          <CardTitle className="text-2xl tabular-nums">{rawEvents.toLocaleString()}</CardTitle>
-          <p className="mt-1 flex items-center gap-1 text-xs text-muted-foreground">
-            {rawEvents > 0 ? <TrendingUpIcon className="size-3" /> : <TrendingDownIcon className="size-3" />}
-            Raw events ingested this month
-          </p>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between pb-2">
-          <CardDescription>Retained Bundles</CardDescription>
-          <ActivityIcon className="size-4 text-muted-foreground" />
-        </CardHeader>
-        <CardContent>
-          <CardTitle className="text-2xl tabular-nums">{retainedBundles.toLocaleString()}</CardTitle>
+          <CardTitle className="text-2xl tabular-nums">{openIncidents.toLocaleString()}</CardTitle>
           <div className="mt-1 flex items-center gap-1 text-xs text-muted-foreground">
             <Badge variant="outline" className="text-xs">Current</Badge>
-            Distinct incidents with retained bundles
+            Unresolved incidents in this project
           </div>
         </CardContent>
       </Card>
 
       <Card>
         <CardHeader className="flex flex-row items-center justify-between pb-2">
-          <CardDescription>Alert Deliveries</CardDescription>
-          <ActivityIcon className="size-4 text-muted-foreground" />
+          <CardDescription>New incidents today</CardDescription>
+          <CalendarDaysIcon className="size-4 text-muted-foreground" />
         </CardHeader>
         <CardContent>
-          <CardTitle className="text-2xl tabular-nums">{alertDeliveries.toLocaleString()}</CardTitle>
-          <p className="mt-1 flex items-center gap-1 text-xs text-muted-foreground">
-            {alertDeliveries > 0 ? <TrendingUpIcon className="size-3" /> : <TrendingDownIcon className="size-3" />}
-            Alert deliveries this month
-          </p>
+          <CardTitle className="text-2xl tabular-nums">{openedToday.toLocaleString()}</CardTitle>
+          <p className="mt-1 text-xs text-muted-foreground">Incidents first seen today in this project</p>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between pb-2">
+          <CardDescription>Opened this month</CardDescription>
+          <CalendarIcon className="size-4 text-muted-foreground" />
+        </CardHeader>
+        <CardContent>
+          <CardTitle className="text-2xl tabular-nums">{openedMonth.toLocaleString()}</CardTitle>
+          <div className="mt-1 flex items-center gap-1 text-xs text-muted-foreground">
+            <Badge variant="outline" className="text-xs">This month</Badge>
+            Incidents opened this month in this project
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between pb-2">
+          <CardDescription>Regressed incidents</CardDescription>
+          <RotateCcwIcon className="size-4 text-muted-foreground" />
+        </CardHeader>
+        <CardContent>
+          <CardTitle className="text-2xl tabular-nums">{regressedIncidents.toLocaleString()}</CardTitle>
+          <p className="mt-1 text-xs text-muted-foreground">Current regressed incidents in this project</p>
         </CardContent>
       </Card>
     </div>

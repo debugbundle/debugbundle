@@ -81,6 +81,10 @@ describe("postgres metadata store", () => {
           environment_default: "production",
           organization_plan: "free",
           metrics: {
+            open_incidents: 5,
+            regressed_incidents: 1,
+            opened_incidents_today: 2,
+            opened_incidents_month: 7,
             monthly_bundle_requests: 12,
             monthly_raw_ingested_events: 120,
             retained_bundles: 6,
@@ -114,6 +118,10 @@ describe("postgres metadata store", () => {
         shared_access_suspended: false,
         sharing_state: undefined,
         metrics: {
+          open_incidents: 5,
+          regressed_incidents: 1,
+          opened_incidents_today: 2,
+          opened_incidents_month: 7,
           monthly_bundle_requests: 12,
           monthly_raw_ingested_events: 120,
           retained_bundles: 6,
@@ -144,6 +152,10 @@ describe("postgres metadata store", () => {
             environment_default: "production",
             organization_plan: "free",
             metrics: {
+              open_incidents: 5,
+              regressed_incidents: 1,
+              opened_incidents_today: 2,
+              opened_incidents_month: 7,
               monthly_bundle_requests: 12,
               monthly_raw_ingested_events: 120,
               retained_bundles: 6,
@@ -168,6 +180,8 @@ describe("postgres metadata store", () => {
     expect(listProjectsCall!.sql).toContain("ie.event_class = 'incident_signal'");
     expect(listProjectsCall!.sql).toContain("GREATEST");
     expect(listProjectsCall!.sql).toContain("FROM project_usage_counters");
+    expect(listProjectsCall!.sql).toContain("'open_incidents'");
+    expect(listProjectsCall!.sql).toContain("'opened_incidents_today'");
     expect(listProjectsCall!.sql).toContain("JOIN organizations o ON o.id = p.organization_id");
     expect(listProjectsCall!.sql).toContain("COALESCE(o.plan, 'free') AS organization_plan");
   });
@@ -195,6 +209,10 @@ describe("postgres metadata store", () => {
             environment_default: "production",
             organization_plan: "free",
             metrics: {
+              open_incidents: 5,
+              regressed_incidents: 1,
+              opened_incidents_today: 2,
+              opened_incidents_month: 7,
               monthly_bundle_requests: 12,
               monthly_raw_ingested_events: 120,
               retained_bundles: 6,
@@ -255,6 +273,10 @@ describe("postgres metadata store", () => {
         project_id: "proj_123",
         organization_plan: "solo",
         metrics: {
+          open_incidents: 0,
+          regressed_incidents: 0,
+          opened_incidents_today: 0,
+          opened_incidents_month: 0,
           monthly_bundle_requests: 0,
           monthly_raw_ingested_events: 0,
           retained_bundles: 0,
@@ -280,6 +302,10 @@ describe("postgres metadata store", () => {
               environment_default: "production",
               organization_plan: "team",
               metrics: {
+                open_incidents: 0,
+                regressed_incidents: 0,
+                opened_incidents_today: 0,
+                opened_incidents_month: 0,
                 monthly_bundle_requests: 0,
                 monthly_raw_ingested_events: 0,
                 retained_bundles: 0,
@@ -303,6 +329,10 @@ describe("postgres metadata store", () => {
               environment_default: "staging",
               organization_plan: "team",
               metrics: {
+                open_incidents: 0,
+                regressed_incidents: 0,
+                opened_incidents_today: 0,
+                opened_incidents_month: 0,
                 monthly_bundle_requests: 0,
                 monthly_raw_ingested_events: 0,
                 retained_bundles: 0,
@@ -407,6 +437,10 @@ describe("postgres metadata store", () => {
           environment_default: "production",
           organization_plan: "free",
           metrics: {
+            open_incidents: 0,
+            regressed_incidents: 0,
+            opened_incidents_today: 0,
+            opened_incidents_month: 0,
             monthly_bundle_requests: 0,
             monthly_raw_ingested_events: 0,
             retained_bundles: 0,
@@ -448,6 +482,10 @@ describe("postgres metadata store", () => {
       shared_access_suspended: false,
       sharing_state: undefined,
       metrics: {
+        open_incidents: 0,
+        regressed_incidents: 0,
+        opened_incidents_today: 0,
+        opened_incidents_month: 0,
         monthly_bundle_requests: 0,
         monthly_raw_ingested_events: 0,
         retained_bundles: 0,
@@ -471,6 +509,10 @@ describe("postgres metadata store", () => {
           environment_default: "staging",
           organization_plan: "free",
           metrics: {
+            open_incidents: 5,
+            regressed_incidents: 1,
+            opened_incidents_today: 2,
+            opened_incidents_month: 7,
             monthly_bundle_requests: 12,
             monthly_raw_ingested_events: 120,
             retained_bundles: 6,
@@ -513,6 +555,10 @@ describe("postgres metadata store", () => {
       shared_access_suspended: false,
       sharing_state: undefined,
       metrics: {
+        open_incidents: 5,
+        regressed_incidents: 1,
+        opened_incidents_today: 2,
+        opened_incidents_month: 7,
         monthly_bundle_requests: 12,
         monthly_raw_ingested_events: 120,
         retained_bundles: 6,
@@ -551,6 +597,10 @@ describe("postgres metadata store", () => {
             environment_default: "development",
             organization_plan: "free",
             metrics: {
+              open_incidents: 5,
+              regressed_incidents: 1,
+              opened_incidents_today: 2,
+              opened_incidents_month: 7,
               monthly_bundle_requests: 12,
               monthly_raw_ingested_events: 120,
               retained_bundles: 6,
@@ -585,6 +635,10 @@ describe("postgres metadata store", () => {
       environment_default: "development",
       organization_plan: "free",
       metrics: {
+        open_incidents: 5,
+        regressed_incidents: 1,
+        opened_incidents_today: 2,
+        opened_incidents_month: 7,
         monthly_bundle_requests: 12,
         monthly_raw_ingested_events: 120,
         retained_bundles: 6,
@@ -1953,6 +2007,22 @@ describe("postgres metadata store", () => {
       })
     ]);
     expect(query).toHaveBeenCalledWith(expect.stringContaining("FROM incident_events ie"), ["org_123", null, 20]);
+  });
+
+  it("should filter incident listing by first_seen_after when provided", async (): Promise<void> => {
+    const query = vi.fn().mockResolvedValue({ rows: [] });
+    const store = createPostgresMetadataStore({ query });
+
+    await store.listIncidentsForOrganization({
+      organization_id: "org_123",
+      first_seen_after: "2026-03-10T00:00:00.000Z",
+      limit: 20
+    });
+
+    expect(query).toHaveBeenCalledWith(
+      expect.stringContaining("i.first_seen_at >= $3::timestamptz"),
+      ["org_123", null, "2026-03-10T00:00:00.000Z", 20]
+    );
   });
 
   it("should derive incident_reason for request anomaly incidents from matched_fields when no primary incident-signal row exists", async (): Promise<void> => {

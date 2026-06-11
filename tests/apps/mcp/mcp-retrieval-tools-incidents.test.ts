@@ -94,6 +94,7 @@ describe("mcp retrieval tools incidents", () => {
         service: "checkout-api",
         status: "open",
         severity: "high",
+        firstSeenAfter: "2026-03-11T00:00:00.000Z",
         cursor: "2026-03-11T00:08:00.000Z|inc_121",
         limit: 10
       })
@@ -108,6 +109,7 @@ describe("mcp retrieval tools incidents", () => {
       service: "checkout-api",
       status: "open",
       severity: "high",
+      firstSeenAfter: "2026-03-11T00:00:00.000Z",
       cursor: "2026-03-11T00:08:00.000Z|inc_121",
       limit: 10
     });

@@ -293,6 +293,7 @@ export async function listLocalIncidents(
     service?: string;
     status?: string;
     severity?: string;
+    firstSeenAfter?: string;
     cursor?: string;
     limit?: number;
   },
@@ -310,6 +311,7 @@ export async function listLocalIncidents(
       return incident.status === input.status;
     })
     .filter((incident) => (input.severity === undefined ? true : incident.severity === input.severity))
+    .filter((incident) => (input.firstSeenAfter === undefined ? true : incident.first_seen_at >= input.firstSeenAfter))
     .sort(sortIncidentsDescending);
 
   const startIndex = input.cursor === undefined ? 0 : incidents.findIndex((incident) => buildCursor(incident) === input.cursor) + 1;

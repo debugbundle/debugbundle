@@ -65,37 +65,39 @@ export function RecentProjectsTable(): JSX.Element {
             </Empty>
           ) : (
             <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Name</TableHead>
-                    <TableHead>Slug</TableHead>
-                    <TableHead>Environment</TableHead>
-                    <TableHead>Bundle Requests</TableHead>
-                    <TableHead>Ingested Events</TableHead>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Name</TableHead>
+                  <TableHead>Slug</TableHead>
+                  <TableHead>Environment</TableHead>
+                  <TableHead>Open incidents</TableHead>
+                  <TableHead>New today</TableHead>
+                  <TableHead>Opened this month</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {projects.map((project) => (
+                  <TableRow
+                    key={project.project_id}
+                    className="cursor-pointer"
+                    onClick={() => {
+                      void navigate(`/projects/${project.project_id}`);
+                    }}
+                  >
+                    <TableCell className="font-medium">
+                      <ProjectNameWithAccessIndicator project={project} />
+                    </TableCell>
+                    <TableCell className="text-muted-foreground">{project.slug}</TableCell>
+                    <TableCell>
+                      <Badge variant="outline">{project.environment_default}</Badge>
+                    </TableCell>
+                    <TableCell className="text-muted-foreground">{project.metrics.open_incidents.toLocaleString()}</TableCell>
+                    <TableCell className="text-muted-foreground">{project.metrics.opened_incidents_today.toLocaleString()}</TableCell>
+                    <TableCell className="text-muted-foreground">{project.metrics.opened_incidents_month.toLocaleString()}</TableCell>
                   </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {projects.map((project) => (
-                    <TableRow
-                      key={project.project_id}
-                      className="cursor-pointer"
-                      onClick={() => {
-                        void navigate(`/projects/${project.project_id}`);
-                      }}
-                    >
-                      <TableCell className="font-medium">
-                        <ProjectNameWithAccessIndicator project={project} />
-                      </TableCell>
-                      <TableCell className="text-muted-foreground">{project.slug}</TableCell>
-                      <TableCell>
-                        <Badge variant="outline">{project.environment_default}</Badge>
-                      </TableCell>
-                      <TableCell className="text-muted-foreground">{project.metrics.monthly_bundle_requests.toLocaleString()}</TableCell>
-                      <TableCell className="text-muted-foreground">{project.metrics.monthly_raw_ingested_events.toLocaleString()}</TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+                ))}
+              </TableBody>
+            </Table>
           )}
         </CardContent>
       </Card>

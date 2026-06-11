@@ -190,6 +190,10 @@ describe("capture-policy routes", () => {
               environment_default: "production",
               organization_plan: "free",
               metrics: {
+                open_incidents: 0,
+                regressed_incidents: 0,
+                opened_incidents_today: 0,
+                opened_incidents_month: 0,
                 monthly_bundle_requests: 0,
                 monthly_raw_ingested_events: 0,
                 retained_bundles: 0,
@@ -314,6 +318,10 @@ describe("capture-policy routes", () => {
               environment_default: "production",
               organization_plan: "solo",
               metrics: {
+                open_incidents: 0,
+                regressed_incidents: 0,
+                opened_incidents_today: 0,
+                opened_incidents_month: 0,
                 monthly_bundle_requests: 0,
                 monthly_raw_ingested_events: 0,
                 retained_bundles: 0,

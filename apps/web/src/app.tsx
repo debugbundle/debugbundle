@@ -18,6 +18,7 @@ import { AppSidebar } from "./components/system/app-sidebar.js";
 import { AppUpdateNotifier } from "./components/system/app-update-notifier.js";
 import { BrandLockup } from "./components/system/brand-lockup.js";
 import { CalloutCard } from "./components/system/callout-card.js";
+import { DashboardIncidentsToday } from "./components/system/dashboard-incidents-today.js";
 import { RecentProjectsTable } from "./components/system/recent-projects-table.js";
 import { GitHubMark } from "./components/system/github-mark.js";
 import { ProjectRouteProvider, type ActiveProjectRoute } from "./components/system/project-route-context.js";
@@ -889,6 +890,7 @@ function DashboardPage(): JSX.Element {
   return (
     <div className="flex flex-col gap-4 md:gap-6">
       <SectionCards />
+      <DashboardIncidentsToday />
       <RecentProjectsTable />
     </div>
   );

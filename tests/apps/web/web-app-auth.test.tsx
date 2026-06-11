@@ -222,7 +222,7 @@ describe("web app - auth routes", () => {
     await user.type(screen.getByLabelText(/six-digit code/i), "123456");
     await user.click(screen.getByRole("button", { name: /^verify code$/i }));
 
-    expect(await screen.findByText(/bundle requests/i)).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: /incidents today/i })).toBeInTheDocument();
   });
 
   it("validates the email field before requesting a code", async () => {
@@ -305,7 +305,7 @@ describe("web app - auth routes", () => {
 
     render(<App initialEntries={["/dashboard"]} />);
 
-    expect(await screen.findByText(/bundle requests/i)).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: /incidents today/i })).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: /owen@example.com/i }));
 
@@ -359,7 +359,7 @@ describe("web app - auth routes", () => {
     await user.type(await screen.findByLabelText(/six-digit code/i), "654321");
     await user.click(screen.getByRole("button", { name: /^verify code$/i }));
 
-    expect(await screen.findByText(/bundle requests/i)).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: /incidents today/i })).toBeInTheDocument();
   });
 
   it("shows a recoverable GitHub auth callback state when oauth exchange fails", async () => {

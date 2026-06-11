@@ -388,7 +388,7 @@ export async function assertWorkerRedisReady(redisUrl: string): Promise<void> {
 }
 
 export async function assertWorkerS3BucketReady(env: WorkerEnv): Promise<void> {
-  const s3 = new S3Client({
+  const s3Config = {
     endpoint: env.S3_ENDPOINT,
     region: env.S3_REGION,
     forcePathStyle: true,
@@ -396,7 +396,8 @@ export async function assertWorkerS3BucketReady(env: WorkerEnv): Promise<void> {
       accessKeyId: env.AWS_ACCESS_KEY_ID,
       secretAccessKey: env.AWS_SECRET_ACCESS_KEY
     }
-  });
+  };
+  const s3 = new S3Client(s3Config);
 
   await s3.send(new HeadBucketCommand({ Bucket: env.S3_BUCKET }));
 }

@@ -66,10 +66,10 @@ describe("web app — management routes", () => {
           projects: [
             createProject({
               metrics: {
-                monthly_bundle_requests: 12,
-                monthly_raw_ingested_events: 120,
-                retained_bundles: 6,
-                monthly_alert_deliveries: 4
+                open_incidents: 12,
+                regressed_incidents: 4,
+                opened_incidents_today: 1,
+                opened_incidents_month: 6
               }
             })
           ]
@@ -90,7 +90,7 @@ describe("web app — management routes", () => {
     expect(await screen.findByText(/main app/i)).toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: /main app/i })).not.toBeInTheDocument();
     expect(screen.getByText(/^12$/)).toBeInTheDocument();
-    expect(screen.getByText(/^120$/)).toBeInTheDocument();
+    expect(screen.getByText(/^1$/)).toBeInTheDocument();
     expect(screen.getByText(/^6$/)).toBeInTheDocument();
     expect(screen.getByText(/^4$/)).toBeInTheDocument();
 
@@ -3510,6 +3510,10 @@ describe("web app — management routes", () => {
         });
       }
 
+      if (url.includes("/v1/incidents?") && url.includes("first_seen_after=")) {
+        return jsonResponse(200, { incidents: [], next_cursor: null });
+      }
+
       return jsonResponse(404, { error: "not_found" });
     });
 
@@ -3521,7 +3525,8 @@ describe("web app — management routes", () => {
 
     const mainAppRow = screen.getByText(/main app/i).closest("tr");
     expect(mainAppRow).not.toBeNull();
-    expect(within(mainAppRow as HTMLTableRowElement).getAllByText(/^0$/)).toHaveLength(2);
+    expect(within(mainAppRow as HTMLTableRowElement).getAllByText(/^0$/)).toHaveLength(3);
+    expect(await screen.findByText(/no new incidents today/i)).toBeInTheDocument();
   });
 
   it("renders dashboard activity cards from project metrics instead of billing-cycle totals", async () => {
@@ -3548,6 +3553,10 @@ describe("web app — management routes", () => {
               project_id: "proj_123",
               name: "Main App",
               metrics: {
+                open_incidents: 7,
+                regressed_incidents: 1,
+                opened_incidents_today: 2,
+                opened_incidents_month: 9,
                 monthly_bundle_requests: 14,
                 monthly_raw_ingested_events: 44,
                 retained_bundles: 11,
@@ -3559,6 +3568,10 @@ describe("web app — management routes", () => {
               name: "Worker",
               slug: "worker",
               metrics: {
+                open_incidents: 5,
+                regressed_incidents: 2,
+                opened_incidents_today: 1,
+                opened_incidents_month: 6,
                 monthly_bundle_requests: 8,
                 monthly_raw_ingested_events: 6,
                 retained_bundles: 3,
@@ -3567,6 +3580,10 @@ describe("web app — management routes", () => {
             })
           ]
         });
+      }
+
+      if (url.includes("/v1/incidents?") && url.includes("first_seen_after=")) {
+        return jsonResponse(200, { incidents: [], next_cursor: null });
       }
 
       if (url.endsWith("/v1/billing") && init?.method === undefined) {
@@ -3610,17 +3627,70 @@ describe("web app — management routes", () => {
     render(<App initialEntries={["/dashboard"]} />);
 
     await waitFor(() => {
-      expect(cardWithValueExists("Bundle Requests", /^22$/)).toBe(true);
-      expect(cardWithValueExists("Ingested Events", /^50$/)).toBe(true);
-      expect(cardWithValueExists("Retained Bundles", /^14$/)).toBe(true);
-      expect(cardWithValueExists("Alert Deliveries", /^3$/)).toBe(true);
+      expect(cardWithValueExists("Open incidents", /^12$/)).toBe(true);
+      expect(cardWithValueExists("New incidents today", /^3$/)).toBe(true);
+      expect(cardWithValueExists("Opened this month", /^15$/)).toBe(true);
+      expect(cardWithValueExists("Regressed incidents", /^3$/)).toBe(true);
     });
 
-    expect(screen.getAllByText(/this month across all projects/i)).toHaveLength(3);
-    expect(screen.getByText(/current total across all projects/i)).toBeInTheDocument();
+    expect(screen.getByText(/current unresolved incidents across all projects/i)).toBeInTheDocument();
+    expect(screen.getByText(/incidents first seen today across all projects/i)).toBeInTheDocument();
+    expect(screen.getByText(/incidents opened this month across all projects/i)).toBeInTheDocument();
+    expect(screen.getByText(/current regressed incidents across all projects/i)).toBeInTheDocument();
     expect(fetchMock.mock.calls.some(([input]) => requestUrl(input).endsWith("/v1/billing"))).toBe(
       false
     );
+  });
+
+  it("renders incident rows in the dashboard incidents-today table", async () => {
+    const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = requestUrl(input);
+
+      if (url.endsWith("/v1/auth/session")) {
+        return jsonResponse(200, {
+          session: createSession()
+        });
+      }
+
+      if (url.endsWith("/v1/projects") && init?.method === undefined) {
+        return jsonResponse(200, {
+          projects: [createProject()]
+        });
+      }
+
+      if (url.includes("/v1/incidents?") && url.includes("first_seen_after=")) {
+        return jsonResponse(200, {
+          incidents: [
+            createIncident({
+              incident_id: "inc_today",
+              title: "Checkout timeout",
+              project_id: "proj_456",
+              project_name: "Worker",
+              service_name: null,
+              severity: "critical",
+              status: "regressed",
+              occurrence_count: 11,
+              last_seen_at: "2026-03-17T14:05:00.000Z"
+            })
+          ],
+          next_cursor: null
+        });
+      }
+
+      return jsonResponse(404, { error: "not_found" });
+    });
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<App initialEntries={["/dashboard"]} />);
+
+    expect(await screen.findByRole("heading", { name: /incidents today/i })).toBeInTheDocument();
+    expect(await screen.findByRole("link", { name: /checkout timeout/i })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /worker/i })).toBeInTheDocument();
+    expect(screen.getByText(/unknown service/i)).toBeInTheDocument();
+    expect(screen.getByText(/^critical$/i)).toBeInTheDocument();
+    expect(screen.getByText(/^regressed$/i)).toBeInTheDocument();
+    expect(screen.getByText(/^11$/)).toBeInTheDocument();
   });
 
   it("renders billing summary for owners and starts the Stripe checkout entry point from the billing page", async () => {

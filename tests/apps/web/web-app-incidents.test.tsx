@@ -1191,13 +1191,13 @@ describe("web app — incident and project detail routes", () => {
     expect(screen.queryByText(/export incidents as csv/i)).toBeNull();
   });
 
-  it("shows downward-trend project metrics when monthly counters are zero", async () => {
+  it("shows zeroed incident health metrics when a project has no current incidents", async () => {
     const project = createProject({
       metrics: {
-        monthly_bundle_requests: 0,
-        monthly_raw_ingested_events: 0,
-        retained_bundles: 0,
-        monthly_alert_deliveries: 0
+        open_incidents: 0,
+        regressed_incidents: 0,
+        opened_incidents_today: 0,
+        opened_incidents_month: 0
       }
     });
 
@@ -1224,8 +1224,8 @@ describe("web app — incident and project detail routes", () => {
     render(<App initialEntries={[`/projects/${project.project_id}`]} />);
 
     expect((await screen.findAllByText(/^0$/)).length).toBe(4);
-    expect(screen.getByText(/raw events ingested this month/i)).toBeInTheDocument();
-    expect(screen.getByText(/alert deliveries this month/i)).toBeInTheDocument();
+    expect(screen.getByText(/incidents first seen today in this project/i)).toBeInTheDocument();
+    expect(screen.getByText(/current regressed incidents in this project/i)).toBeInTheDocument();
   });
 
   it("sorts and pages project bundles", async () => {
