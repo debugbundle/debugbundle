@@ -52,6 +52,7 @@ import type {
   GitHubDispatchDeliveryRecord,
   GitHubDispatchRuleRecord,
   GitHubInstallationRecord,
+  AccountAnalyticsStore,
   GitHubRepositoryRecord,
   OperationalEmailDeliveryStore,
   ProjectGitHubRepoRecord,
@@ -62,6 +63,7 @@ import type {
 export interface ApiDependencies {
   ingestionPersistence: Pick<IngestionPersistenceService, "persistAndEnqueue">;
   ingestionMetadata: Pick<IngestionMetadataService, "resolveProjectByTokenHash">;
+  accountAnalytics?: Pick<AccountAnalyticsStore, "recordMetricDeltas"> | undefined;
   ingestionRateLimiter?: Pick<IngestionRateLimiter, "claimEvents"> | undefined;
   authRateLimiter?: Pick<AuthRateLimiter, "claimRequest"> | undefined;
   auditLogging?: Pick<AuditLogStore, "createAuditLog"> | undefined;

@@ -7,6 +7,7 @@ const API_TABLE_ROWS = [
   { table_name: "users" },
   { table_name: "sessions" },
   { table_name: "email_auth_challenges" },
+  { table_name: "account_deletion_challenges" },
   { table_name: "oauth_identities" },
   { table_name: "organizations" },
   { table_name: "organization_members" },
@@ -34,6 +35,11 @@ const API_TABLE_ROWS = [
   { table_name: "capture_rules" },
   { table_name: "audit_logs" },
   { table_name: "processed_billing_events" },
+  { table_name: "account_analytics_accounts" },
+  { table_name: "account_metric_periods" },
+  { table_name: "account_metric_events" },
+  { table_name: "account_payment_retention_records" },
+  { table_name: "account_payment_provider_events" },
   { table_name: "trial_lifecycle_events" },
   { table_name: "plan_cleanup_tasks" },
   { table_name: "project_usage_counters" },
@@ -75,7 +81,8 @@ function buildMigratedApiSchemaDb(): Queryable {
 describe("api runtime", () => {
   it("should parse environment with defaults", (): void => {
     const env = parseApiRuntimeEnv({
-      DEBUGBUNDLE_PROBE_TRIGGER_SECRET: "test-probe-secret"
+      DEBUGBUNDLE_PROBE_TRIGGER_SECRET: "test-probe-secret",
+      ANALYTICS_HASH_SECRET: "test-analytics-secret"
     });
 
     expect(env.API_PORT).toBe(3000);
@@ -87,6 +94,7 @@ describe("api runtime", () => {
   it("should parse require DB SSL mode", (): void => {
     const env = parseApiRuntimeEnv({
       DEBUGBUNDLE_PROBE_TRIGGER_SECRET: "test-probe-secret",
+      ANALYTICS_HASH_SECRET: "test-analytics-secret",
       DB_SSL_MODE: "require"
     });
 
@@ -98,10 +106,19 @@ describe("api runtime", () => {
     expect(() => parseApiRuntimeEnv({})).toThrow("DEBUGBUNDLE_PROBE_TRIGGER_SECRET");
   });
 
+  it("should require the analytics hash secret env var", (): void => {
+    expect(() =>
+      parseApiRuntimeEnv({
+        DEBUGBUNDLE_PROBE_TRIGGER_SECRET: "test-probe-secret"
+      })
+    ).toThrow("ANALYTICS_HASH_SECRET");
+  });
+
   it("should throw clear error for invalid port", (): void => {
     expect(() =>
       parseApiRuntimeEnv({
         DEBUGBUNDLE_PROBE_TRIGGER_SECRET: "test-probe-secret",
+        ANALYTICS_HASH_SECRET: "test-analytics-secret",
         API_PORT: "99999"
       })
     ).toThrow("api_runtime_env_invalid");

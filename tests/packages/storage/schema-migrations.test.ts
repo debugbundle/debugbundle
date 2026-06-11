@@ -48,6 +48,12 @@ describe("storage schema migrations", () => {
     expect(query.mock.calls.map((call) => String(call[0]))).toContainEqual(
       expect.stringContaining("CREATE TABLE IF NOT EXISTS project_usage_counters")
     );
+    expect(query.mock.calls.map((call) => String(call[0]))).toContainEqual(
+      expect.stringContaining("CREATE TABLE IF NOT EXISTS account_analytics_accounts")
+    );
+    expect(query.mock.calls.map((call) => String(call[0]))).toContainEqual(
+      expect.stringContaining("CREATE TABLE IF NOT EXISTS account_payment_retention_records")
+    );
   });
 
   it("should skip already-applied migrations with matching checksums", async (): Promise<void> => {
@@ -205,6 +211,8 @@ describe("storage schema migrations", () => {
       { table_name: "organization_members", column_name: "suspended_at" },
       { table_name: "organizations", column_name: "suspended_at" },
       { table_name: "organizations", column_name: "trial_plan" },
+      { table_name: "account_analytics_accounts", column_name: "metrics_collection_started_at" },
+      { table_name: "account_payment_retention_records", column_name: "provider" },
       { table_name: "plan_cleanup_tasks", column_name: "cleanup_type" },
       { table_name: "project_usage_counters", column_name: "updated_at" },
       { table_name: "project_tokens", column_name: "allowed_origins" },

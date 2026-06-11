@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 
 import { getTierCapabilities, type TierName } from "../../shared-types/src/index.js";
 
+import type { AccountAnalyticsStore } from "./account-analytics-store.js";
 import { buildBillableIncidentEventsPredicateSql } from "./helpers.js";
 import {
   isPlanDowngrade,
@@ -138,6 +139,28 @@ export interface BillingStore {
   }): Promise<void>;
 }
 
+type PostgresBillingStoreOptions = {
+  accountAnalyticsStore?: AccountAnalyticsStore;
+};
+
+async function recordBillingMetricDeltas(
+  accountAnalyticsStore: AccountAnalyticsStore | undefined,
+  tx: Queryable,
+  input: {
+    organization_id: string;
+    occurred_at: string;
+    source: string;
+    dedupe_key: string;
+    deltas: Partial<Record<"trial_started" | "trial_expired", number>>;
+  }
+): Promise<void> {
+  if (accountAnalyticsStore === undefined) {
+    return;
+  }
+
+  await accountAnalyticsStore.withDb(tx).recordMetricDeltas(input);
+}
+
 function normalizePlan(plan: string | null | undefined): TierName {
   if (plan === "solo" || plan === "team") {
     return plan;
@@ -265,8 +288,11 @@ async function tableExists(db: Queryable, tableName: string): Promise<boolean> {
 }
 
 export function createPostgresBillingStore(
-  db: Queryable
+  db: Queryable,
+  options: PostgresBillingStoreOptions = {}
 ): BillingStore & TrialLifecycleBillingStore {
+  const accountAnalyticsStore = options.accountAnalyticsStore;
+
   async function claimTrialLifecycleCandidates(input: {
     sql: string;
     params: unknown[];
@@ -720,32 +746,50 @@ export function createPostgresBillingStore(
     async startTrialForOrganization(
       input
     ): Promise<BillingSummaryRecord | "billing_not_found" | "trial_unavailable"> {
-      const result = await db.query<{ id: string }>(
-        `
-          UPDATE organizations
-          SET
-            plan = $2,
-            additional_capacity_units = 0,
-            stripe_customer_id = NULL,
-            stripe_subscription_id = NULL,
-            billing_state = 'trialing',
-            billing_period_starts_at = $3::timestamptz,
-            billing_period_ends_at = $4::timestamptz,
-            trial_plan = $2,
-            trial_started_at = $3::timestamptz,
-            trial_ends_at = $4::timestamptz,
-            trial_used_at = COALESCE((to_jsonb(organizations) ->> 'trial_used_at')::timestamptz, $3::timestamptz),
-            trial_expired_at = NULL
-          WHERE id = $1
-            AND COALESCE(plan, 'free') = 'free'
-            AND (to_jsonb(organizations) ->> 'trial_used_at') IS NULL
-            AND COALESCE(to_jsonb(organizations) ->> 'billing_state', '') <> 'trialing'
-          RETURNING id::text AS id
-        `,
-        [input.organization_id, input.target_plan, input.started_at, input.ends_at]
-      );
+      const started = await runInTransaction(db, async (tx) => {
+        const result = await tx.query<{ id: string }>(
+          `
+            UPDATE organizations
+            SET
+              plan = $2,
+              additional_capacity_units = 0,
+              stripe_customer_id = NULL,
+              stripe_subscription_id = NULL,
+              billing_state = 'trialing',
+              billing_period_starts_at = $3::timestamptz,
+              billing_period_ends_at = $4::timestamptz,
+              trial_plan = $2,
+              trial_started_at = $3::timestamptz,
+              trial_ends_at = $4::timestamptz,
+              trial_used_at = COALESCE((to_jsonb(organizations) ->> 'trial_used_at')::timestamptz, $3::timestamptz),
+              trial_expired_at = NULL
+            WHERE id = $1
+              AND COALESCE(plan, 'free') = 'free'
+              AND (to_jsonb(organizations) ->> 'trial_used_at') IS NULL
+              AND COALESCE(to_jsonb(organizations) ->> 'billing_state', '') <> 'trialing'
+            RETURNING id::text AS id
+          `,
+          [input.organization_id, input.target_plan, input.started_at, input.ends_at]
+        );
 
-      if (result.rows[0]?.id === undefined) {
+        if (result.rows[0]?.id === undefined) {
+          return false;
+        }
+
+        await recordBillingMetricDeltas(accountAnalyticsStore, tx, {
+          organization_id: input.organization_id,
+          occurred_at: input.started_at,
+          source: "trial_started",
+          dedupe_key: `trial_started:${input.organization_id}:${input.started_at}`,
+          deltas: {
+            trial_started: 1
+          }
+        });
+
+        return true;
+      });
+
+      if (!started) {
         const organizationResult = await db.query<{ id: string }>(
           `
             SELECT id::text AS id
@@ -822,6 +866,16 @@ export function createPostgresBillingStore(
             occurred_at: input.now
           });
         }
+
+        await recordBillingMetricDeltas(accountAnalyticsStore, tx, {
+          organization_id: input.organization_id,
+          occurred_at: input.now,
+          source: "trial_expired",
+          dedupe_key: `trial_expired:${input.organization_id}:${input.now}`,
+          deltas: {
+            trial_expired: 1
+          }
+        });
 
         return true;
       });

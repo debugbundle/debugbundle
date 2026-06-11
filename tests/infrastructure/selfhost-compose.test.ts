@@ -37,6 +37,7 @@ describe("self-host deployment baseline", () => {
 
     expect(envExample).toContain("SELFHOST_MODE=true");
     expect(envExample).toContain("DEBUGBUNDLE_PROBE_TRIGGER_SECRET=");
+    expect(envExample).toContain("ANALYTICS_HASH_SECRET=");
     expect(envExample).toContain("APP_BASE_URL=");
     expect(envExample).toContain("API_PORT=");
     expect(envExample).toContain("WEB_PORT=");

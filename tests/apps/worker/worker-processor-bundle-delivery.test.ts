@@ -287,7 +287,7 @@ describe("worker processor \u2013 bundle, delivery & sampling", () => {
         kind: "allowance_limit_reached",
         error_message: "operational_email_invalid_allowance_payload"
       }),
-      "worker_operational_email_delivery_failed"
+      "operational_email_delivery_failed"
     );
   });
 
@@ -402,6 +402,8 @@ describe("worker processor \u2013 bundle, delivery & sampling", () => {
     };
 
     const putObject = vi.fn().mockResolvedValue(undefined);
+    const recordMetricDeltas = vi.fn().mockResolvedValue("recorded");
+    const resolveOrganizationIdForProject = vi.fn().mockResolvedValue("org_123");
     const getBundleBuildContext = vi.fn().mockResolvedValue({
       incident_id: "inc_123",
       project_id: "proj_123",
@@ -435,6 +437,10 @@ describe("worker processor \u2013 bundle, delivery & sampling", () => {
         getBundleBuildContext,
         reserveBundleGeneration: vi.fn().mockResolvedValue(createReservedBundleGeneration({ generation_number: 1 }))
       },
+      accountAnalyticsStore: {
+        recordMetricDeltas
+      },
+      resolveOrganizationIdForProject,
       objectStore: {
         putObject
       }
@@ -454,6 +460,15 @@ describe("worker processor \u2013 bundle, delivery & sampling", () => {
       bundle_key: buildBundleObjectKey("proj_123", "inc_123"),
       bundle_version: 1,
       occurred_at: "2026-03-12T00:00:00.000Z"
+    });
+    expect(recordMetricDeltas).toHaveBeenCalledWith({
+      organization_id: "org_123",
+      occurred_at: "2026-03-12T00:00:00.000Z",
+      source: "worker.build_bundle",
+      dedupe_key: "failure_bundle_generation:inc_123:1",
+      deltas: {
+        failure_bundles_created: 1
+      }
     });
 
     const firstPayload = putObject.mock.calls[0]?.[0] as { body: Buffer };
@@ -483,6 +498,10 @@ describe("worker processor \u2013 bundle, delivery & sampling", () => {
         getBundleBuildContext,
         reserveBundleGeneration: vi.fn().mockResolvedValue(createReservedBundleGeneration({ generation_number: 1 }))
       },
+      accountAnalyticsStore: {
+        recordMetricDeltas
+      },
+      resolveOrganizationIdForProject,
       objectStore: {
         putObject
       }
@@ -589,6 +608,7 @@ describe("worker processor \u2013 bundle, delivery & sampling", () => {
     const reserveBundleGeneration = vi.fn();
     const markBundleGenerationFailure = vi.fn().mockResolvedValue(undefined);
     const putObject = vi.fn();
+    const recordMetricDeltas = vi.fn().mockResolvedValue("recorded");
 
     const result = await processNextBuildBundleJob({
       queue: {
@@ -623,6 +643,10 @@ describe("worker processor \u2013 bundle, delivery & sampling", () => {
         markBundleGenerationFailure,
         reserveBundleGeneration
       },
+      accountAnalyticsStore: {
+        recordMetricDeltas
+      },
+      resolveOrganizationIdForProject: vi.fn().mockResolvedValue("org_123"),
       objectStore: {
         putObject
       },
@@ -656,6 +680,15 @@ describe("worker processor \u2013 bundle, delivery & sampling", () => {
     expect(markBundleGenerationFailure).toHaveBeenCalledWith({
       incident_id: "inc_123",
       reason: "monthly_quota_exceeded"
+    });
+    expect(recordMetricDeltas).toHaveBeenCalledWith({
+      organization_id: "org_123",
+      occurred_at: "2026-03-12T00:00:00.000Z",
+      source: "worker.build_bundle",
+      dedupe_key: "failure_bundle_generation_failed:inc_123:evt_123",
+      deltas: {
+        failure_bundle_generations_failed: 1
+      }
     });
     expect(reserveBundleGeneration).not.toHaveBeenCalled();
     expect(putObject).not.toHaveBeenCalled();
@@ -738,6 +771,7 @@ describe("worker processor \u2013 bundle, delivery & sampling", () => {
   it("should record build_error failure when bundle generation throws after reservation", async (): Promise<void> => {
     const markBundleGenerationFailure = vi.fn().mockResolvedValue(undefined);
     const releaseLease = vi.fn().mockResolvedValue(undefined);
+    const recordMetricDeltas = vi.fn().mockResolvedValue("recorded");
 
     const result = await processNextBuildBundleJob({
       queue: {
@@ -775,6 +809,10 @@ describe("worker processor \u2013 bundle, delivery & sampling", () => {
         reserveBundleGeneration: vi.fn().mockResolvedValue(createReservedBundleGeneration()),
         listIncidentEventReferences: vi.fn().mockResolvedValue([])
       },
+      accountAnalyticsStore: {
+        recordMetricDeltas
+      },
+      resolveOrganizationIdForProject: vi.fn().mockResolvedValue("org_123"),
       objectStore: {
         putObject: vi.fn().mockRejectedValue(new Error("s3_write_failed"))
       }
@@ -785,11 +823,21 @@ describe("worker processor \u2013 bundle, delivery & sampling", () => {
       incident_id: "inc_123",
       reason: "build_error"
     });
+    expect(recordMetricDeltas).toHaveBeenCalledWith({
+      organization_id: "org_123",
+      occurred_at: "2026-03-12T00:00:00.000Z",
+      source: "worker.build_bundle",
+      dedupe_key: "failure_bundle_generation_failed:inc_123:evt_123",
+      deltas: {
+        failure_bundle_generations_failed: 1
+      }
+    });
     expect(releaseLease).toHaveBeenCalledWith("leases:bundle-regeneration:inc_123");
   });
 
   it("should prune oldest retained incidents after persisting a new bundle", async (): Promise<void> => {
     const deleteObject = vi.fn().mockResolvedValue(undefined);
+    const recordMetricDeltas = vi.fn().mockResolvedValue("recorded");
     const pruneRetainedBundleOwnersForProject = vi.fn().mockResolvedValue([
       {
         owner_type: "incident",
@@ -839,6 +887,10 @@ describe("worker processor \u2013 bundle, delivery & sampling", () => {
         reserveBundleGeneration: vi.fn().mockResolvedValue(createReservedBundleGeneration()),
         pruneRetainedBundleOwnersForProject
       },
+      accountAnalyticsStore: {
+        recordMetricDeltas
+      },
+      resolveOrganizationIdForProject: vi.fn().mockResolvedValue("org_123"),
       objectStore: {
         putObject: vi.fn().mockResolvedValue(undefined),
         deleteObject
@@ -883,6 +935,15 @@ describe("worker processor \u2013 bundle, delivery & sampling", () => {
     expect(deleteObject).toHaveBeenCalledWith({
       key: buildImprovementBundleObjectKey("proj_other", "imp_old")
     });
+    expect(recordMetricDeltas).toHaveBeenCalledWith({
+      organization_id: "org_123",
+      occurred_at: "2026-03-12T00:00:00.000Z",
+      source: "worker.build_bundle",
+      dedupe_key: "retention_bundle_rotation:failure:inc_123:1",
+      deltas: {
+        retention_bundle_owners_rotated: 2
+      }
+    });
   });
 
   it("should persist deterministic reproduction artifact bytes for build-reproduction jobs", async (): Promise<void> => {
@@ -890,6 +951,7 @@ describe("worker processor \u2013 bundle, delivery & sampling", () => {
 
     const getObject = vi.fn().mockResolvedValue(gzipSync(Buffer.from(JSON.stringify(bundle), "utf8")));
     const putObject = vi.fn().mockResolvedValue(undefined);
+    const recordMetricDeltas = vi.fn().mockResolvedValue("recorded");
 
     const result = await processNextBuildReproductionJob({
       queue: {
@@ -902,6 +964,10 @@ describe("worker processor \u2013 bundle, delivery & sampling", () => {
           occurred_at: "2026-03-12T00:00:00.000Z"
         })
       },
+      accountAnalyticsStore: {
+        recordMetricDeltas
+      },
+      resolveOrganizationIdForProject: vi.fn().mockResolvedValue("org_123"),
       objectStore: {
         getObject,
         putObject
@@ -919,6 +985,15 @@ describe("worker processor \u2013 bundle, delivery & sampling", () => {
         contentEncoding: "gzip"
       })
     );
+    expect(recordMetricDeltas).toHaveBeenCalledWith({
+      organization_id: "org_123",
+      occurred_at: "2026-03-12T00:00:00.000Z",
+      source: "worker.build_reproduction",
+      dedupe_key: "reproduction_created:inc_123:2",
+      deltas: {
+        reproductions_created: 1
+      }
+    });
 
     const firstPayload = putObject.mock.calls[0]?.[0] as { body: Buffer };
     expect(JSON.parse(gunzipSync(firstPayload.body).toString("utf8"))).toEqual({
@@ -962,6 +1037,42 @@ describe("worker processor \u2013 bundle, delivery & sampling", () => {
 
     const secondPayload = putObject.mock.calls[1]?.[0] as { body: Buffer };
     expect(firstPayload.body.equals(secondPayload.body)).toBe(true);
+  });
+
+  it("should record reproduction failure when the bundle artifact is missing", async (): Promise<void> => {
+    const recordMetricDeltas = vi.fn().mockResolvedValue("recorded");
+
+    const result = await processNextBuildReproductionJob({
+      queue: {
+        enqueue: vi.fn(),
+        dequeue: vi.fn().mockResolvedValue({
+          project_id: "proj_123",
+          incident_id: "inc_123",
+          bundle_key: "bundles/proj_123/inc_123/bundle.json.gz",
+          bundle_version: 1,
+          occurred_at: "2026-03-12T00:00:00.000Z"
+        })
+      },
+      accountAnalyticsStore: {
+        recordMetricDeltas
+      },
+      resolveOrganizationIdForProject: vi.fn().mockResolvedValue("org_123"),
+      objectStore: {
+        getObject: vi.fn().mockRejectedValue(new Error("missing_bundle")),
+        putObject: vi.fn()
+      }
+    });
+
+    expect(result).toEqual({ processed: false, reason: "bundle_missing" });
+    expect(recordMetricDeltas).toHaveBeenCalledWith({
+      organization_id: "org_123",
+      occurred_at: "2026-03-12T00:00:00.000Z",
+      source: "worker.build_reproduction",
+      dedupe_key: "reproduction_failed:inc_123:bundle_missing:2026-03-12T00:00:00.000Z",
+      deltas: {
+        reproductions_failed: 1
+      }
+    });
   });
 
   it("should persist low-confidence reproduction first and deterministically upgrade once request context appears", async (): Promise<void> => {
@@ -2531,6 +2642,67 @@ describe("worker processor \u2013 bundle, delivery & sampling", () => {
       error_message: null,
       response_code: 200
     });
+  });
+
+  it("should not retry delivered webhooks when account analytics recording fails", async (): Promise<void> => {
+    const queue = {
+      enqueue: vi.fn(),
+      dequeue: vi.fn().mockResolvedValue({ delivery_id: "del_123", attempt: 1 })
+    };
+    const recordMetricDeltas = vi.fn().mockRejectedValue(new Error("analytics_unavailable"));
+    const warn = vi.fn();
+
+    const webhookDeliveryStore = {
+      getDeliveryIntent: vi.fn().mockResolvedValue({
+        delivery_id: "del_123",
+        webhook_id: "wh_123",
+        project_id: "proj_123",
+        incident_id: "inc_123",
+        event_type: "bundle.reopened",
+        status: "pending",
+        attempt_count: 0,
+        occurred_at: "2026-03-11T00:00:00.000Z",
+        target_url: "https://hooks.example.test/debugbundle",
+        next_attempt_at: null,
+        last_response_code: null,
+        last_attempted_at: null,
+        last_error: null,
+        payload: { incident_id: "inc_123" },
+        signing_secret: "secret_123"
+      }),
+      markDeliveryAttempt: vi.fn().mockResolvedValue({ status: "delivered", next_attempt: null })
+    };
+
+    const lifecycleWebhookTransport = {
+      deliver: vi.fn().mockResolvedValue(undefined)
+    };
+
+    const result = await processNextDeliverWebhookJob({
+      queue,
+      webhookDeliveryStore,
+      lifecycleWebhookTransport,
+      accountAnalyticsStore: { recordMetricDeltas },
+      resolveOrganizationIdForProject: vi.fn().mockResolvedValue("org_123"),
+      logger: { warn }
+    });
+
+    expect(result).toEqual({ processed: true });
+    expect(lifecycleWebhookTransport.deliver).toHaveBeenCalledOnce();
+    expect(webhookDeliveryStore.markDeliveryAttempt).toHaveBeenCalledWith({
+      delivery_id: "del_123",
+      attempt: 1,
+      delivered: true,
+      error_message: null,
+      response_code: 200
+    });
+    expect(recordMetricDeltas).toHaveBeenCalledOnce();
+    expect(warn).toHaveBeenCalledWith(
+      expect.objectContaining({
+        project_id: "proj_123",
+        metric_source: "webhook_delivery_result"
+      }),
+      "worker_account_analytics_record_failed"
+    );
   });
 
   it("should pass verification.passed deliveries through the existing webhook transport", async (): Promise<void> => {

@@ -135,6 +135,11 @@ describe("storage bootstrap schema", () => {
     expect(REQUIRED_API_TABLES).toContain("oauth_identities");
     expect(REQUIRED_API_TABLES).toContain("processed_billing_events");
     expect(REQUIRED_API_TABLES).toContain("project_usage_counters");
+    expect(REQUIRED_API_TABLES).toContain("account_analytics_accounts");
+    expect(REQUIRED_API_TABLES).toContain("account_metric_periods");
+    expect(REQUIRED_API_TABLES).toContain("account_metric_events");
+    expect(REQUIRED_API_TABLES).toContain("account_payment_retention_records");
+    expect(REQUIRED_API_TABLES).toContain("account_payment_provider_events");
     expect(REQUIRED_API_TABLES).toContain("processed_github_marketplace_events");
     expect(REQUIRED_API_TABLES).toContain("github_marketplace_accounts");
     expect(REQUIRED_API_TABLES).toContain("github_dispatch_deliveries");
@@ -173,6 +178,11 @@ describe("storage bootstrap schema", () => {
     expect(STORAGE_BOOTSTRAP_SQL.includes("CREATE UNIQUE INDEX github_dispatch_deliveries_rule_dedupe_key_idx")).toBe(true);
     expect(STORAGE_BOOTSTRAP_SQL.includes("CREATE UNIQUE INDEX alert_email_digests_project_recipient_pending_idx")).toBe(true);
     expect(STORAGE_BOOTSTRAP_SQL.includes("CREATE TABLE project_usage_counters")).toBe(true);
+    expect(STORAGE_BOOTSTRAP_SQL.includes("CREATE TABLE account_analytics_accounts")).toBe(true);
+    expect(STORAGE_BOOTSTRAP_SQL.includes("CREATE TABLE account_metric_periods")).toBe(true);
+    expect(STORAGE_BOOTSTRAP_SQL.includes("CREATE TABLE account_metric_events")).toBe(true);
+    expect(STORAGE_BOOTSTRAP_SQL.includes("CREATE TABLE account_payment_retention_records")).toBe(true);
+    expect(STORAGE_BOOTSTRAP_SQL.includes("CREATE TABLE account_payment_provider_events")).toBe(true);
     expect(STORAGE_BOOTSTRAP_SQL.includes("UNIQUE (organization_id, slack_team_id, slack_channel_id)")).toBe(true);
   });
 
@@ -199,5 +209,7 @@ describe("storage bootstrap schema", () => {
     expect(STORAGE_BOOTSTRAP_SQL.includes("organizations_stripe_customer_id_key")).toBe(true);
     expect(STORAGE_BOOTSTRAP_SQL.includes("slack_destinations_org_active_idx")).toBe(true);
     expect(STORAGE_BOOTSTRAP_SQL.includes("github_marketplace_accounts_installation_idx")).toBe(true);
+    expect(STORAGE_BOOTSTRAP_SQL.includes("account_metric_periods_grain_period_metric_idx")).toBe(true);
+    expect(STORAGE_BOOTSTRAP_SQL.includes("account_payment_provider_events_provider_event_key")).toBe(true);
   });
 });

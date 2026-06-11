@@ -37,6 +37,7 @@ const {
   processNextGenerateWeeklyReportJobMock,
   frequencyCounterCloseMock,
   requestAnomalyCounterCloseMock,
+  createPostgresAccountAnalyticsStoreMock,
   createPostgresBillingStoreMock,
   createPostgresMetadataStoreMock,
   createPostgresImprovementOpportunityStoreMock,
@@ -73,6 +74,9 @@ const {
   processNextGenerateWeeklyReportJobMock: vi.fn(),
   frequencyCounterCloseMock: vi.fn().mockResolvedValue(undefined),
   requestAnomalyCounterCloseMock: vi.fn().mockResolvedValue(undefined),
+  createPostgresAccountAnalyticsStoreMock: vi.fn().mockReturnValue({
+    recordMetricDeltas: vi.fn().mockResolvedValue("recorded")
+  }),
   createPostgresBillingStoreMock: vi.fn().mockReturnValue({
     getBillingSummaryForProject: vi.fn().mockResolvedValue(null)
   }),
@@ -238,6 +242,7 @@ vi.mock("../../../packages/storage/src/index.js", async (importOriginal) => {
     recordObservation: vi.fn(),
     close: requestAnomalyCounterCloseMock
   }),
+  createPostgresAccountAnalyticsStore: createPostgresAccountAnalyticsStoreMock,
   createPostgresBillingStore: createPostgresBillingStoreMock,
   createPostgresMetadataStore: createPostgresMetadataStoreMock,
   createPostgresImprovementOpportunityStore: createPostgresImprovementOpportunityStoreMock,
@@ -255,6 +260,8 @@ vi.mock("../../../packages/storage/src/index.js", async (importOriginal) => {
 vi.mock("../../../packages/storage/src/migrations.js", () => ({
   REQUIRED_WORKER_TABLES: [
     "processed_events",
+    "organizations",
+    "projects",
     "services",
     "deployments",
     "improvement_opportunities",
@@ -268,7 +275,10 @@ vi.mock("../../../packages/storage/src/migrations.js", () => ({
     "alert_email_digest_items",
     "agent_webhooks",
     "webhook_deliveries",
-    "weekly_report_deliveries"
+    "weekly_report_deliveries",
+    "account_analytics_accounts",
+    "account_metric_periods",
+    "account_metric_events"
   ]
 }));
 
@@ -333,6 +343,8 @@ import { STORAGE_SCHEMA_MIGRATIONS } from "../../../packages/storage/src/schema-
 
 const WORKER_TABLE_ROWS = [
   { table_name: "processed_events" },
+  { table_name: "organizations" },
+  { table_name: "projects" },
   { table_name: "services" },
   { table_name: "deployments" },
   { table_name: "improvement_opportunities" },
@@ -346,7 +358,10 @@ const WORKER_TABLE_ROWS = [
   { table_name: "alert_email_digest_items" },
   { table_name: "agent_webhooks" },
   { table_name: "webhook_deliveries" },
-  { table_name: "weekly_report_deliveries" }
+  { table_name: "weekly_report_deliveries" },
+  { table_name: "account_analytics_accounts" },
+  { table_name: "account_metric_periods" },
+  { table_name: "account_metric_events" }
 ];
 
 function buildMigratedWorkerSchemaRows(sql: string): { rows: Record<string, unknown>[] } {
@@ -406,6 +421,7 @@ describe("worker runtime", () => {
     processNextCleanupRetentionJobMock.mockResolvedValue({ processed: false, reason: "no_jobs" });
     frequencyCounterCloseMock.mockClear();
     requestAnomalyCounterCloseMock.mockClear();
+    createPostgresAccountAnalyticsStoreMock.mockClear();
     createPostgresBillingStoreMock.mockClear();
     createPostgresMetadataStoreMock.mockClear();
     createPostgresImprovementOpportunityStoreMock.mockClear();
@@ -430,7 +446,7 @@ describe("worker runtime", () => {
   });
 
   it("should parse worker env with defaults", (): void => {
-    const env = parseWorkerEnv({});
+    const env = parseWorkerEnv({ ANALYTICS_HASH_SECRET: "test-analytics-secret" });
 
     expect(env.DB_HOST).toBe("localhost");
     expect(env.DB_SSL_MODE).toBe("disable");
@@ -439,13 +455,16 @@ describe("worker runtime", () => {
   });
 
   it("registers worker dogfooding during startup", async (): Promise<void> => {
-    await runWorkerFromEnv({ WORKER_RUN_ONCE: "1" });
+    await runWorkerFromEnv({ WORKER_RUN_ONCE: "1", ANALYTICS_HASH_SECRET: "test-analytics-secret" });
 
-    expect(registerWorkerDogfoodingMock).toHaveBeenCalledWith({ WORKER_RUN_ONCE: "1" });
+    expect(registerWorkerDogfoodingMock).toHaveBeenCalledWith({
+      WORKER_RUN_ONCE: "1",
+      ANALYTICS_HASH_SECRET: "test-analytics-secret"
+    });
   });
 
   it("should parse require DB SSL mode", (): void => {
-    const env = parseWorkerEnv({ DB_SSL_MODE: "require" });
+    const env = parseWorkerEnv({ DB_SSL_MODE: "require", ANALYTICS_HASH_SECRET: "test-analytics-secret" });
 
     expect(env.DB_SSL_MODE).toBe("require");
   });
@@ -460,21 +479,21 @@ describe("worker runtime", () => {
   });
 
   it("should throw clear error for invalid poll interval", (): void => {
-    expect(() => parseWorkerEnv({ WORKER_POLL_INTERVAL_MS: "5" })).toThrow("worker_env_invalid");
+    expect(() => parseWorkerEnv({ WORKER_POLL_INTERVAL_MS: "5", ANALYTICS_HASH_SECRET: "test-analytics-secret" })).toThrow("worker_env_invalid");
   });
 
   it("should reject retention cleanup intervals longer than 24 hours", (): void => {
-    expect(() => parseWorkerEnv({ RETENTION_CLEANUP_INTERVAL_MS: String(24 * 60 * 60 * 1000 + 1) })).toThrow(
+    expect(() => parseWorkerEnv({ RETENTION_CLEANUP_INTERVAL_MS: String(24 * 60 * 60 * 1000 + 1), ANALYTICS_HASH_SECRET: "test-analytics-secret" })).toThrow(
       "worker_env_invalid"
     );
   });
 
   it("should reject invalid run-once env values", (): void => {
-    expect(() => parseWorkerEnv({ WORKER_RUN_ONCE: "2" })).toThrow("worker_env_invalid");
+    expect(() => parseWorkerEnv({ WORKER_RUN_ONCE: "2", ANALYTICS_HASH_SECRET: "test-analytics-secret" })).toThrow("worker_env_invalid");
   });
 
   it("should reject invalid DB SSL mode values with a targeted error", (): void => {
-    expect(() => parseWorkerEnv({ DB_SSL_MODE: "broken" })).toThrow(
+    expect(() => parseWorkerEnv({ DB_SSL_MODE: "broken", ANALYTICS_HASH_SECRET: "test-analytics-secret" })).toThrow(
       "worker_env_invalid: DB_SSL_MODE: expected disable or require"
     );
   });
@@ -482,7 +501,8 @@ describe("worker runtime", () => {
   it("should treat empty optional GitHub app env vars as unset", (): void => {
     const env = parseWorkerEnv({
       GITHUB_APP_ID: "",
-      GITHUB_APP_PRIVATE_KEY: ""
+      GITHUB_APP_PRIVATE_KEY: "",
+      ANALYTICS_HASH_SECRET: "test-analytics-secret"
     });
 
     expect(env.GITHUB_APP_ID).toBeUndefined();
@@ -528,28 +548,10 @@ describe("worker runtime", () => {
   });
 
   it("should run one worker iteration and close resources", async (): Promise<void> => {
-    poolQueryMock.mockResolvedValueOnce({
-      rows: [
-        { table_name: "processed_events" },
-        { table_name: "services" },
-        { table_name: "deployments" },
-        { table_name: "improvement_opportunities" },
-        { table_name: "improvement_opportunity_events" },
-        { table_name: "bundle_generations" },
-        { table_name: "incidents" },
-        { table_name: "incident_events" },
-        { table_name: "alert_rules" },
-        { table_name: "alert_deliveries" },
-        { table_name: "alert_email_digests" },
-        { table_name: "alert_email_digest_items" },
-        { table_name: "agent_webhooks" },
-        { table_name: "webhook_deliveries" },
-        { table_name: "weekly_report_deliveries" }
-      ]
-    });
+    poolQueryMock.mockResolvedValueOnce({ rows: WORKER_TABLE_ROWS });
     processNextNormalizeEventsJobMock.mockResolvedValueOnce({ processed: true });
 
-    await runWorkerFromEnv({ WORKER_RUN_ONCE: "1" });
+    await runWorkerFromEnv({ WORKER_RUN_ONCE: "1", ANALYTICS_HASH_SECRET: "test-analytics-secret" });
 
     expect(redisPingMock).toHaveBeenCalledOnce();
     expect(redisQuitMock).toHaveBeenCalledOnce();
@@ -575,103 +577,31 @@ describe("worker runtime", () => {
   });
 
   it("should fail worker startup when redis preflight fails", async (): Promise<void> => {
-    poolQueryMock.mockResolvedValueOnce({
-      rows: [
-        { table_name: "processed_events" },
-        { table_name: "services" },
-        { table_name: "deployments" },
-        { table_name: "improvement_opportunities" },
-        { table_name: "improvement_opportunity_events" },
-        { table_name: "bundle_generations" },
-        { table_name: "incidents" },
-        { table_name: "incident_events" },
-        { table_name: "alert_rules" },
-        { table_name: "alert_deliveries" },
-        { table_name: "alert_email_digests" },
-        { table_name: "alert_email_digest_items" },
-        { table_name: "agent_webhooks" },
-        { table_name: "webhook_deliveries" },
-        { table_name: "weekly_report_deliveries" }
-      ]
-    });
+    poolQueryMock.mockResolvedValueOnce({ rows: WORKER_TABLE_ROWS });
     redisPingMock.mockResolvedValueOnce("NOPE");
 
-    await expect(runWorkerFromEnv({ WORKER_RUN_ONCE: "1" })).rejects.toThrow("worker_redis_not_ready");
+    await expect(runWorkerFromEnv({ WORKER_RUN_ONCE: "1", ANALYTICS_HASH_SECRET: "test-analytics-secret" })).rejects.toThrow("worker_redis_not_ready");
     expect(queueEnqueueMock).not.toHaveBeenCalled();
   });
 
   it("should wrap redis connectivity failures as worker_redis_unreachable", async (): Promise<void> => {
-    poolQueryMock.mockResolvedValueOnce({
-      rows: [
-        { table_name: "processed_events" },
-        { table_name: "services" },
-        { table_name: "deployments" },
-        { table_name: "improvement_opportunities" },
-        { table_name: "improvement_opportunity_events" },
-        { table_name: "bundle_generations" },
-        { table_name: "incidents" },
-        { table_name: "incident_events" },
-        { table_name: "alert_rules" },
-        { table_name: "alert_deliveries" },
-        { table_name: "alert_email_digests" },
-        { table_name: "alert_email_digest_items" },
-        { table_name: "agent_webhooks" },
-        { table_name: "webhook_deliveries" },
-        { table_name: "weekly_report_deliveries" }
-      ]
-    });
+    poolQueryMock.mockResolvedValueOnce({ rows: WORKER_TABLE_ROWS });
     redisPingMock.mockRejectedValueOnce(new Error("redis_down"));
 
-    await expect(runWorkerFromEnv({ WORKER_RUN_ONCE: "1" })).rejects.toThrow("worker_redis_unreachable: redis_down");
+    await expect(runWorkerFromEnv({ WORKER_RUN_ONCE: "1", ANALYTICS_HASH_SECRET: "test-analytics-secret" })).rejects.toThrow("worker_redis_unreachable: redis_down");
     expect(queueEnqueueMock).not.toHaveBeenCalled();
   });
 
   it("should wrap s3 preflight failures as worker_s3_bucket_unreachable", async (): Promise<void> => {
-    poolQueryMock.mockResolvedValueOnce({
-      rows: [
-        { table_name: "processed_events" },
-        { table_name: "services" },
-        { table_name: "deployments" },
-        { table_name: "improvement_opportunities" },
-        { table_name: "improvement_opportunity_events" },
-        { table_name: "bundle_generations" },
-        { table_name: "incidents" },
-        { table_name: "incident_events" },
-        { table_name: "alert_rules" },
-        { table_name: "alert_deliveries" },
-        { table_name: "alert_email_digests" },
-        { table_name: "alert_email_digest_items" },
-        { table_name: "agent_webhooks" },
-        { table_name: "webhook_deliveries" },
-        { table_name: "weekly_report_deliveries" }
-      ]
-    });
+    poolQueryMock.mockResolvedValueOnce({ rows: WORKER_TABLE_ROWS });
     s3SendMock.mockRejectedValueOnce(new Error("bucket_missing"));
 
-    await expect(runWorkerFromEnv({ WORKER_RUN_ONCE: "1" })).rejects.toThrow("worker_s3_bucket_unreachable: bucket_missing");
+    await expect(runWorkerFromEnv({ WORKER_RUN_ONCE: "1", ANALYTICS_HASH_SECRET: "test-analytics-secret" })).rejects.toThrow("worker_s3_bucket_unreachable: bucket_missing");
     expect(queueEnqueueMock).not.toHaveBeenCalled();
   });
 
   it("should initialize and close the github token cache when github app credentials are configured", async (): Promise<void> => {
-    poolQueryMock.mockResolvedValueOnce({
-      rows: [
-        { table_name: "processed_events" },
-        { table_name: "services" },
-        { table_name: "deployments" },
-        { table_name: "improvement_opportunities" },
-        { table_name: "improvement_opportunity_events" },
-        { table_name: "bundle_generations" },
-        { table_name: "incidents" },
-        { table_name: "incident_events" },
-        { table_name: "alert_rules" },
-        { table_name: "alert_deliveries" },
-        { table_name: "alert_email_digests" },
-        { table_name: "alert_email_digest_items" },
-        { table_name: "agent_webhooks" },
-        { table_name: "webhook_deliveries" },
-        { table_name: "weekly_report_deliveries" }
-      ]
-    });
+    poolQueryMock.mockResolvedValueOnce({ rows: WORKER_TABLE_ROWS });
     processNextNormalizeEventsJobMock.mockResolvedValueOnce({ processed: false, reason: "no_jobs" });
     processNextGroupIncidentJobMock.mockResolvedValueOnce({ processed: false, reason: "no_jobs" });
     processNextBuildBundleJobMock.mockResolvedValueOnce({ processed: false, reason: "no_jobs" });
@@ -682,6 +612,7 @@ describe("worker runtime", () => {
 
     await runWorkerFromEnv({
       WORKER_RUN_ONCE: "1",
+      ANALYTICS_HASH_SECRET: "test-analytics-secret",
       GITHUB_APP_ID: "123",
       GITHUB_APP_PRIVATE_KEY: "test-private-key"
     });
@@ -806,29 +737,11 @@ describe("worker runtime", () => {
   });
 
   it("should run group-incident processor when normalize queue has no work", async (): Promise<void> => {
-    poolQueryMock.mockResolvedValueOnce({
-      rows: [
-        { table_name: "processed_events" },
-        { table_name: "services" },
-        { table_name: "deployments" },
-        { table_name: "improvement_opportunities" },
-        { table_name: "improvement_opportunity_events" },
-        { table_name: "bundle_generations" },
-        { table_name: "incidents" },
-        { table_name: "incident_events" },
-        { table_name: "alert_rules" },
-        { table_name: "alert_deliveries" },
-        { table_name: "alert_email_digests" },
-        { table_name: "alert_email_digest_items" },
-        { table_name: "agent_webhooks" },
-        { table_name: "webhook_deliveries" },
-        { table_name: "weekly_report_deliveries" }
-      ]
-    });
+    poolQueryMock.mockResolvedValueOnce({ rows: WORKER_TABLE_ROWS });
     processNextNormalizeEventsJobMock.mockResolvedValueOnce({ processed: false, reason: "no_jobs" });
     processNextGroupIncidentJobMock.mockResolvedValueOnce({ processed: true });
 
-    await runWorkerFromEnv({ WORKER_RUN_ONCE: "1" });
+    await runWorkerFromEnv({ WORKER_RUN_ONCE: "1", ANALYTICS_HASH_SECRET: "test-analytics-secret" });
 
     expect(processNextNormalizeEventsJobMock).toHaveBeenCalledOnce();
     expect(processNextGroupIncidentJobMock).toHaveBeenCalledOnce();
@@ -868,6 +781,7 @@ describe("worker runtime", () => {
 
     await runWorkerFromEnv({
       WORKER_RUN_ONCE: "1",
+      ANALYTICS_HASH_SECRET: "test-analytics-secret",
       APP_BASE_URL: "https://app.debugbundle.test"
     });
 
@@ -888,31 +802,14 @@ describe("worker runtime", () => {
   });
 
   it("should run build-bundle processor when normalize/group queues are empty", async (): Promise<void> => {
-    poolQueryMock.mockResolvedValueOnce({
-      rows: [
-        { table_name: "processed_events" },
-        { table_name: "services" },
-        { table_name: "deployments" },
-        { table_name: "improvement_opportunities" },
-        { table_name: "improvement_opportunity_events" },
-        { table_name: "bundle_generations" },
-        { table_name: "incidents" },
-        { table_name: "incident_events" },
-        { table_name: "alert_rules" },
-        { table_name: "alert_deliveries" },
-        { table_name: "alert_email_digests" },
-        { table_name: "alert_email_digest_items" },
-        { table_name: "agent_webhooks" },
-        { table_name: "webhook_deliveries" },
-        { table_name: "weekly_report_deliveries" }
-      ]
-    });
+    poolQueryMock.mockResolvedValueOnce({ rows: WORKER_TABLE_ROWS });
     processNextNormalizeEventsJobMock.mockResolvedValueOnce({ processed: false, reason: "no_jobs" });
     processNextGroupIncidentJobMock.mockResolvedValueOnce({ processed: false, reason: "no_jobs" });
     processNextBuildBundleJobMock.mockResolvedValueOnce({ processed: true });
 
     await runWorkerFromEnv({
       WORKER_RUN_ONCE: "1",
+      ANALYTICS_HASH_SECRET: "test-analytics-secret",
       DEBUGBUNDLE_API_URL: "https://api.debugbundle.test",
       APP_BASE_URL: "https://app.debugbundle.test",
       PUBLIC_SITE_URL: "https://debugbundle.test"
@@ -933,31 +830,13 @@ describe("worker runtime", () => {
   });
 
   it("should run build-reproduction processor when normalize/group/build queues are empty", async (): Promise<void> => {
-    poolQueryMock.mockResolvedValueOnce({
-      rows: [
-        { table_name: "processed_events" },
-        { table_name: "services" },
-        { table_name: "deployments" },
-        { table_name: "improvement_opportunities" },
-        { table_name: "improvement_opportunity_events" },
-        { table_name: "bundle_generations" },
-        { table_name: "incidents" },
-        { table_name: "incident_events" },
-        { table_name: "alert_rules" },
-        { table_name: "alert_deliveries" },
-        { table_name: "alert_email_digests" },
-        { table_name: "alert_email_digest_items" },
-        { table_name: "agent_webhooks" },
-        { table_name: "webhook_deliveries" },
-        { table_name: "weekly_report_deliveries" }
-      ]
-    });
+    poolQueryMock.mockResolvedValueOnce({ rows: WORKER_TABLE_ROWS });
     processNextNormalizeEventsJobMock.mockResolvedValueOnce({ processed: false, reason: "no_jobs" });
     processNextGroupIncidentJobMock.mockResolvedValueOnce({ processed: false, reason: "no_jobs" });
     processNextBuildBundleJobMock.mockResolvedValueOnce({ processed: false, reason: "no_jobs" });
     processNextBuildReproductionJobMock.mockResolvedValueOnce({ processed: true });
 
-    await runWorkerFromEnv({ WORKER_RUN_ONCE: "1" });
+    await runWorkerFromEnv({ WORKER_RUN_ONCE: "1", ANALYTICS_HASH_SECRET: "test-analytics-secret" });
 
     expect(processNextBuildBundleJobMock).toHaveBeenCalledOnce();
     expect(processNextBuildReproductionJobMock).toHaveBeenCalledOnce();
@@ -965,32 +844,14 @@ describe("worker runtime", () => {
   });
 
   it("should run evaluate-alerts processor when normalize/group/build/reproduction queues are empty", async (): Promise<void> => {
-    poolQueryMock.mockResolvedValueOnce({
-      rows: [
-        { table_name: "processed_events" },
-        { table_name: "services" },
-        { table_name: "deployments" },
-        { table_name: "improvement_opportunities" },
-        { table_name: "improvement_opportunity_events" },
-        { table_name: "bundle_generations" },
-        { table_name: "incidents" },
-        { table_name: "incident_events" },
-        { table_name: "alert_rules" },
-        { table_name: "alert_deliveries" },
-        { table_name: "alert_email_digests" },
-        { table_name: "alert_email_digest_items" },
-        { table_name: "agent_webhooks" },
-        { table_name: "webhook_deliveries" },
-        { table_name: "weekly_report_deliveries" }
-      ]
-    });
+    poolQueryMock.mockResolvedValueOnce({ rows: WORKER_TABLE_ROWS });
     processNextNormalizeEventsJobMock.mockResolvedValueOnce({ processed: false, reason: "no_jobs" });
     processNextGroupIncidentJobMock.mockResolvedValueOnce({ processed: false, reason: "no_jobs" });
     processNextBuildBundleJobMock.mockResolvedValueOnce({ processed: false, reason: "no_jobs" });
     processNextBuildReproductionJobMock.mockResolvedValueOnce({ processed: false, reason: "no_jobs" });
     processNextEvaluateAlertsJobMock.mockResolvedValueOnce({ processed: true });
 
-    await runWorkerFromEnv({ WORKER_RUN_ONCE: "1" });
+    await runWorkerFromEnv({ WORKER_RUN_ONCE: "1", ANALYTICS_HASH_SECRET: "test-analytics-secret" });
 
     expect(processNextBuildBundleJobMock).toHaveBeenCalledOnce();
     expect(processNextBuildReproductionJobMock).toHaveBeenCalledOnce();
@@ -999,25 +860,7 @@ describe("worker runtime", () => {
   });
 
   it("should run deliver-webhook processor when normalize/group/build/reproduction queues are empty", async (): Promise<void> => {
-    poolQueryMock.mockResolvedValueOnce({
-      rows: [
-        { table_name: "processed_events" },
-        { table_name: "services" },
-        { table_name: "deployments" },
-        { table_name: "improvement_opportunities" },
-        { table_name: "improvement_opportunity_events" },
-        { table_name: "bundle_generations" },
-        { table_name: "incidents" },
-        { table_name: "incident_events" },
-        { table_name: "alert_rules" },
-        { table_name: "alert_deliveries" },
-        { table_name: "alert_email_digests" },
-        { table_name: "alert_email_digest_items" },
-        { table_name: "agent_webhooks" },
-        { table_name: "webhook_deliveries" },
-        { table_name: "weekly_report_deliveries" }
-      ]
-    });
+    poolQueryMock.mockResolvedValueOnce({ rows: WORKER_TABLE_ROWS });
     processNextNormalizeEventsJobMock.mockResolvedValueOnce({ processed: false, reason: "no_jobs" });
     processNextGroupIncidentJobMock.mockResolvedValueOnce({ processed: false, reason: "no_jobs" });
     processNextBuildBundleJobMock.mockResolvedValueOnce({ processed: false, reason: "no_jobs" });
@@ -1025,7 +868,7 @@ describe("worker runtime", () => {
     processNextEvaluateAlertsJobMock.mockResolvedValueOnce({ processed: false, reason: "no_jobs" });
     processNextDeliverWebhookJobMock.mockResolvedValueOnce({ processed: true });
 
-    await runWorkerFromEnv({ WORKER_RUN_ONCE: "1" });
+    await runWorkerFromEnv({ WORKER_RUN_ONCE: "1", ANALYTICS_HASH_SECRET: "test-analytics-secret" });
 
     expect(processNextBuildBundleJobMock).toHaveBeenCalledOnce();
     expect(processNextBuildReproductionJobMock).toHaveBeenCalledOnce();
@@ -1037,25 +880,7 @@ describe("worker runtime", () => {
   it("should run generate-weekly-report processor when other queues are empty", async (): Promise<void> => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-03-16T12:00:00.000Z"));
-    poolQueryMock.mockResolvedValueOnce({
-      rows: [
-        { table_name: "processed_events" },
-        { table_name: "services" },
-        { table_name: "deployments" },
-        { table_name: "improvement_opportunities" },
-        { table_name: "improvement_opportunity_events" },
-        { table_name: "bundle_generations" },
-        { table_name: "incidents" },
-        { table_name: "incident_events" },
-        { table_name: "alert_rules" },
-        { table_name: "alert_deliveries" },
-        { table_name: "alert_email_digests" },
-        { table_name: "alert_email_digest_items" },
-        { table_name: "agent_webhooks" },
-        { table_name: "webhook_deliveries" },
-        { table_name: "weekly_report_deliveries" }
-      ]
-    });
+    poolQueryMock.mockResolvedValueOnce({ rows: WORKER_TABLE_ROWS });
     processNextNormalizeEventsJobMock.mockResolvedValueOnce({ processed: false, reason: "no_jobs" });
     processNextGroupIncidentJobMock.mockResolvedValueOnce({ processed: false, reason: "no_jobs" });
     processNextBuildBundleJobMock.mockResolvedValueOnce({ processed: false, reason: "no_jobs" });
@@ -1094,7 +919,7 @@ describe("worker runtime", () => {
       getWeeklyProjectReport: vi.fn().mockResolvedValue(null)
     });
 
-    await runWorkerFromEnv({ WORKER_RUN_ONCE: "1" });
+    await runWorkerFromEnv({ WORKER_RUN_ONCE: "1", ANALYTICS_HASH_SECRET: "test-analytics-secret" });
 
     expect(queueEnqueueMock).toHaveBeenCalledWith("generate-weekly-report", {
       delivery_id: "wrd_123",
@@ -1121,7 +946,7 @@ describe("worker runtime", () => {
       deleteWeeklyReportChannelForOrganization: vi.fn().mockResolvedValue(null)
     });
 
-    await runWorkerFromEnv({ WORKER_RUN_ONCE: "1" });
+    await runWorkerFromEnv({ WORKER_RUN_ONCE: "1", ANALYTICS_HASH_SECRET: "test-analytics-secret" });
 
     expect(processNextDeliverAlertEmailDigestJobMock).toHaveBeenCalledOnce();
     expect(captureWorkerDogfoodingStepFailureMock).toHaveBeenCalledWith(
@@ -1133,25 +958,7 @@ describe("worker runtime", () => {
   });
 
   it("should run cleanup-retention when other worker lanes are idle", async (): Promise<void> => {
-    poolQueryMock.mockResolvedValueOnce({
-      rows: [
-        { table_name: "processed_events" },
-        { table_name: "services" },
-        { table_name: "deployments" },
-        { table_name: "improvement_opportunities" },
-        { table_name: "improvement_opportunity_events" },
-        { table_name: "bundle_generations" },
-        { table_name: "incidents" },
-        { table_name: "incident_events" },
-        { table_name: "alert_rules" },
-        { table_name: "alert_deliveries" },
-        { table_name: "alert_email_digests" },
-        { table_name: "alert_email_digest_items" },
-        { table_name: "agent_webhooks" },
-        { table_name: "webhook_deliveries" },
-        { table_name: "weekly_report_deliveries" }
-      ]
-    });
+    poolQueryMock.mockResolvedValueOnce({ rows: WORKER_TABLE_ROWS });
     processNextNormalizeEventsJobMock.mockResolvedValueOnce({ processed: false, reason: "no_jobs" });
     processNextGroupIncidentJobMock.mockResolvedValueOnce({ processed: false, reason: "no_jobs" });
     processNextBuildBundleJobMock.mockResolvedValueOnce({ processed: false, reason: "no_jobs" });
@@ -1161,7 +968,7 @@ describe("worker runtime", () => {
     processNextGenerateWeeklyReportJobMock.mockResolvedValueOnce({ processed: false, reason: "no_jobs" });
     processNextCleanupRetentionJobMock.mockResolvedValueOnce({ processed: true });
 
-    await runWorkerFromEnv({ WORKER_RUN_ONCE: "1" });
+    await runWorkerFromEnv({ WORKER_RUN_ONCE: "1", ANALYTICS_HASH_SECRET: "test-analytics-secret" });
 
     expect(queueAcquireLeaseMock).toHaveBeenCalledWith("leases:cleanup-retention:schedule", 21600);
     expect(queueEnqueueMock).toHaveBeenCalledWith("cleanup-retention", {
@@ -1171,30 +978,12 @@ describe("worker runtime", () => {
   });
 
   it("should close resources when processor throws", async (): Promise<void> => {
-    poolQueryMock.mockResolvedValueOnce({
-      rows: [
-        { table_name: "processed_events" },
-        { table_name: "services" },
-        { table_name: "deployments" },
-        { table_name: "improvement_opportunities" },
-        { table_name: "improvement_opportunity_events" },
-        { table_name: "bundle_generations" },
-        { table_name: "incidents" },
-        { table_name: "incident_events" },
-        { table_name: "alert_rules" },
-        { table_name: "alert_deliveries" },
-        { table_name: "alert_email_digests" },
-        { table_name: "alert_email_digest_items" },
-        { table_name: "agent_webhooks" },
-        { table_name: "webhook_deliveries" },
-        { table_name: "weekly_report_deliveries" }
-      ]
-    });
+    poolQueryMock.mockResolvedValueOnce({ rows: WORKER_TABLE_ROWS });
     processNextNormalizeEventsJobMock.mockRejectedValueOnce(new Error("worker failed"));
 
     // The worker loop catches processor errors so the worker stays alive.
     // With WORKER_RUN_ONCE it completes normally after the failed iteration.
-    await runWorkerFromEnv({ WORKER_RUN_ONCE: "1" });
+    await runWorkerFromEnv({ WORKER_RUN_ONCE: "1", ANALYTICS_HASH_SECRET: "test-analytics-secret" });
     expect(frequencyCounterCloseMock).toHaveBeenCalledOnce();
     expect(requestAnomalyCounterCloseMock).toHaveBeenCalledOnce();
     expect(queueCloseMock).toHaveBeenCalledOnce();
@@ -1210,11 +999,14 @@ describe("worker runtime", () => {
       }
     ]);
     const createDeliveryIntent = vi.fn().mockResolvedValue({ delivery_id: "del_123" });
+    const recordMetricDeltas = vi.fn().mockResolvedValue("recorded");
 
     const publisher = createLifecycleWebhookPublisher({
       fallbackTargetUrl: null,
       fallbackSigningSecret: null,
-      webhookDeliveryStore: { listMatchingWebhooks, createDeliveryIntent }
+      webhookDeliveryStore: { listMatchingWebhooks, createDeliveryIntent },
+      accountAnalyticsStore: { recordMetricDeltas },
+      resolveOrganizationIdForProject: vi.fn().mockResolvedValue("org_123")
     });
 
     await publisher.publish({
@@ -1261,6 +1053,15 @@ describe("worker runtime", () => {
         }
       })
     );
+    expect(recordMetricDeltas).toHaveBeenCalledWith({
+      organization_id: "org_123",
+      occurred_at: "2026-03-11T00:00:00.000Z",
+      source: "webhook_delivery_created",
+      dedupe_key: "webhook_delivery_created:del_123",
+      deltas: {
+        webhook_deliveries_created: 1
+      }
+    });
   });
 
   it("should skip lifecycle webhook intents when the monthly webhook quota is exhausted", async (): Promise<void> => {
@@ -1376,6 +1177,7 @@ describe("worker runtime", () => {
     const countInstallationGitHubDispatchesSince = vi.fn().mockResolvedValue(25);
     const createGitHubDispatchDeliveryIntent = vi.fn().mockResolvedValue({ delivery_id: "gdd_123", created: true });
     const createSkippedGitHubDispatchDelivery = vi.fn();
+    const recordMetricDeltas = vi.fn().mockResolvedValue("recorded");
 
     const publisher = createGitHubDispatchPublisher({
       githubStore: {
@@ -1385,7 +1187,9 @@ describe("worker runtime", () => {
         countInstallationGitHubDispatchesSince,
         createGitHubDispatchDeliveryIntent,
         createSkippedGitHubDispatchDelivery
-      }
+      },
+      accountAnalyticsStore: { recordMetricDeltas },
+      resolveOrganizationIdForProject: vi.fn().mockResolvedValue("org_123")
     });
 
     await publisher.publish({
@@ -1447,6 +1251,15 @@ describe("worker runtime", () => {
         }
       })
     );
+    expect(recordMetricDeltas).toHaveBeenCalledWith({
+      organization_id: "org_123",
+      occurred_at: "2026-03-11T00:00:00.000Z",
+      source: "github_dispatch_created",
+      dedupe_key: "github_dispatch_created:gdd_123",
+      deltas: {
+        github_dispatches_created: 1
+      }
+    });
   });
 
   it("should classify github dispatch event statuses and skip publishes during cooldown or quota limits", async (): Promise<void> => {

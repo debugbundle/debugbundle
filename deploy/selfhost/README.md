@@ -67,6 +67,7 @@ Set `SELFHOST_MODE=true` on API and Worker services to bypass all billing/quota 
 ```env
 SELFHOST_MODE=true
 DEBUGBUNDLE_PROBE_TRIGGER_SECRET=replace-with-a-long-random-secret
+ANALYTICS_HASH_SECRET=replace-with-a-long-random-secret
 ```
 
 When enabled:
@@ -80,6 +81,8 @@ This env var is the only mechanism for self-host mode. It is not stored in the d
 
 `DEBUGBUNDLE_PROBE_TRIGGER_SECRET` is required on the API service. The API now refuses to start without it so probe-trigger signing cannot silently fall back to an in-repo default.
 
+`ANALYTICS_HASH_SECRET` is required on API and Worker services. It signs deletion-safe account analytics identifiers; keep it stable across restarts and backups, and rotate only with a deliberate migration plan.
+
 ## Runtime Configuration
 
 The checked-in `.env.example` includes the baseline configuration needed to boot the stack:
@@ -87,6 +90,7 @@ The checked-in `.env.example` includes the baseline configuration needed to boot
 - `APP_BASE_URL`, `API_PORT`, and `WEB_PORT` define the browser and API entrypoints
 - `POSTGRES_*`, `REDIS_PORT`, `LOCALSTACK_PORT`, `S3_REGION`, and `S3_BUCKET` define the stateful services
 - `DEBUGBUNDLE_PROBE_TRIGGER_SECRET` is mandatory
+- `ANALYTICS_HASH_SECRET` is mandatory
 - `AUTH_COOKIE_SECURE=false` is the local default; set it to `true` behind HTTPS
 - GitHub OAuth, GitHub App, and GitHub Marketplace webhook variables remain optional until those features are enabled
 

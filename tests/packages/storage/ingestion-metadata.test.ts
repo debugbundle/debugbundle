@@ -52,6 +52,7 @@ describe("ingestion metadata service", () => {
       });
     const insertIncidentEvent = vi.fn().mockResolvedValue(undefined);
     const markIncidentSpiking = vi.fn().mockResolvedValue(false);
+    const recordMetricDeltas = vi.fn().mockResolvedValue("recorded");
 
     const store = createMetadataStore({
       resolveProjectByTokenHash: vi.fn().mockResolvedValue({ project_id: "proj_123" }),
@@ -60,7 +61,10 @@ describe("ingestion metadata service", () => {
       markIncidentSpiking
     });
 
-    const service = createIngestionMetadataService(store);
+    const serviceWithAnalytics = createIngestionMetadataService(store, {
+      accountAnalyticsStore: { recordMetricDeltas },
+      resolveOrganizationIdForProject: vi.fn().mockResolvedValue("org_123")
+    });
 
     const event = createEventEnvelope({
       event_type: "backend_exception",
@@ -91,7 +95,7 @@ describe("ingestion metadata service", () => {
       }
     });
 
-    await service.persistEventMetadata({
+    await serviceWithAnalytics.persistEventMetadata({
       projectId: "proj_123",
       event,
       normalizedEvent: normalizeEvent(event),
@@ -100,6 +104,73 @@ describe("ingestion metadata service", () => {
 
     expect(upsertIncident).toHaveBeenCalledOnce();
     expect(insertIncidentEvent).toHaveBeenCalledOnce();
+    expect(recordMetricDeltas).toHaveBeenCalledWith(
+      expect.objectContaining({
+        organization_id: "org_123",
+        source: "incident_persist",
+        deltas: expect.objectContaining({
+          incidents_opened: 1,
+          incident_occurrences: 1
+        })
+      })
+    );
+  });
+
+  it("records regression and severity occurrence metrics for non-duplicate persisted events", async (): Promise<void> => {
+    const recordMetricDeltas = vi.fn().mockResolvedValue("recorded");
+    const store = createMetadataStore({
+      upsertIncident: vi.fn().mockResolvedValue({
+        incident_id: "inc_123",
+        matched_fields: ["normalized_message"],
+        status: "regressed",
+        regressed_now: true,
+        occurrence_count: 4
+      }),
+      insertIncidentEvent: vi.fn().mockResolvedValue(undefined),
+      markIncidentSpiking: vi.fn().mockResolvedValue(false)
+    });
+
+    const service = createIngestionMetadataService(store, {
+      accountAnalyticsStore: { recordMetricDeltas },
+      resolveOrganizationIdForProject: vi.fn().mockResolvedValue("org_123")
+    });
+
+    const event = createEventEnvelope({
+      event_type: "backend_exception",
+      service: {
+        name: "checkout-api",
+        environment: "production",
+        runtime: "node",
+        framework: "fastify"
+      },
+      payload: {
+        name: "TypeError",
+        message: "boom",
+        stack: "TypeError: boom",
+        handled: false,
+        request: { method: "GET", path: "/users/123", query: {}, headers: {}, body: null },
+        response: { status_code: 500 },
+        runtime: { version: "22.0.0" }
+      }
+    });
+
+    await service.persistEventMetadata({
+      projectId: "proj_123",
+      event,
+      normalizedEvent: normalizeEvent(event),
+      fingerprint: "fp_123"
+    });
+
+    expect(recordMetricDeltas).toHaveBeenCalledWith(
+      expect.objectContaining({
+        organization_id: "org_123",
+        deltas: expect.objectContaining({
+          incidents_regressed: 1,
+          incident_occurrences: 1,
+          incident_occurrences_high_severity: 1
+        })
+      })
+    );
   });
 
   it("should return null for unknown token", async (): Promise<void> => {
@@ -204,6 +275,7 @@ describe("ingestion metadata service", () => {
 
   it("should record rolling counters and mark incident as spiking when threshold is crossed", async (): Promise<void> => {
     const markIncidentSpiking = vi.fn().mockResolvedValue(true);
+    const recordMetricDeltas = vi.fn().mockResolvedValue("recorded");
     const store = createMetadataStore({
       resolveProjectByTokenHash: vi.fn().mockResolvedValue({ project_id: "proj_123" }),
       upsertIncident: vi.fn().mockResolvedValue({
@@ -233,7 +305,9 @@ describe("ingestion metadata service", () => {
     };
 
     const service = createIngestionMetadataService(store, {
-      frequencyCounter
+      frequencyCounter,
+      accountAnalyticsStore: { recordMetricDeltas },
+      resolveOrganizationIdForProject: vi.fn().mockResolvedValue("org_123")
     });
 
     const event = createEventEnvelope({
@@ -277,10 +351,21 @@ describe("ingestion metadata service", () => {
       incident_id: "inc_123",
       detected_at: event.occurred_at
     });
+    expect(recordMetricDeltas).toHaveBeenCalledWith(
+      expect.objectContaining({
+        organization_id: "org_123",
+        deltas: expect.objectContaining({
+          incidents_opened: 1,
+          incident_occurrences: 1,
+          incidents_auto_detected_spiking: 1
+        })
+      })
+    );
   });
 
   it("should skip frequency mutation for duplicate grouped events", async (): Promise<void> => {
     const markIncidentSpiking = vi.fn().mockResolvedValue(true);
+    const recordMetricDeltas = vi.fn().mockResolvedValue("recorded");
     const store = createMetadataStore({
       resolveProjectByTokenHash: vi.fn().mockResolvedValue({ project_id: "proj_123" }),
       upsertIncident: vi.fn().mockResolvedValue({
@@ -311,7 +396,9 @@ describe("ingestion metadata service", () => {
     };
 
     const service = createIngestionMetadataService(store, {
-      frequencyCounter
+      frequencyCounter,
+      accountAnalyticsStore: { recordMetricDeltas },
+      resolveOrganizationIdForProject: vi.fn().mockResolvedValue("org_123")
     });
 
     const event = createEventEnvelope({
@@ -352,6 +439,7 @@ describe("ingestion metadata service", () => {
 
     expect(recordOccurrence).not.toHaveBeenCalled();
     expect(markIncidentSpiking).not.toHaveBeenCalled();
+    expect(recordMetricDeltas).not.toHaveBeenCalled();
   });
 
   it("should resolve project by pre-hashed token", async (): Promise<void> => {

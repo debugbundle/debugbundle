@@ -521,10 +521,10 @@ describe("api default dependencies", () => {
     const previousPlans = ["team", "solo"];
     const db = {
       query: vi.fn().mockImplementation((sql: string) => {
-        if (sql.includes("SELECT COALESCE(plan, 'free') AS plan")) {
+        if (sql.includes("SELECT") && sql.includes("additional_capacity_units")) {
           const plan = previousPlans[previousPlanIndex] ?? "free";
           previousPlanIndex += 1;
-          return { rows: [{ plan }] };
+          return { rows: [{ plan, additional_capacity_units: 0 }] };
         }
 
         if (sql.includes("UPDATE organizations")) {
@@ -661,13 +661,13 @@ describe("api default dependencies", () => {
     });
 
     expect(createIngestionPersistenceServiceMock).toHaveBeenCalledWith({ objectStore, queue });
-    expect(createPostgresMetadataStoreMock).toHaveBeenCalledWith(db);
-    expect(createPostgresAuthStoreMock).toHaveBeenCalledWith(db);
+    expect(createPostgresMetadataStoreMock).toHaveBeenCalledWith(db, {});
+    expect(createPostgresAuthStoreMock).toHaveBeenCalledWith(db, {});
     expect(createPostgresWeeklyReportChannelStoreMock).toHaveBeenCalledWith(db);
     expect(createMemberAuthServiceMock).toHaveBeenCalledWith(expect.anything());
     expect(createWebSessionAuthServiceMock).toHaveBeenCalledWith(expect.anything(), expect.any(Object));
     expect(createPostgresWebhookDeliveryStoreMock).toHaveBeenCalledWith(db);
-    expect(createIngestionMetadataServiceMock).toHaveBeenCalledWith(expect.anything());
+    expect(createIngestionMetadataServiceMock).toHaveBeenCalledWith(expect.anything(), {});
     expect(typeof deps.ingestionPersistence.persistAndEnqueue).toBe("function");
     expect(typeof deps.ingestionMetadata.resolveProjectByTokenHash).toBe("function");
     expect(typeof deps.ingestionMetadata.persistEventMetadata).toBe("function");
@@ -3405,7 +3405,7 @@ describe("api default dependencies", () => {
       upsertProjectGitHubRepoForOrganization: vi.fn()
     };
     const linkOrganizationToMarketplaceAccountByInstallationId = vi.fn().mockResolvedValue(null);
-    createPostgresGitHubStoreMock.mockReturnValueOnce(githubStore);
+    createPostgresGitHubStoreMock.mockReturnValue(githubStore);
     createPostgresGitHubMarketplaceStoreMock.mockReturnValueOnce({
       isEventProcessed: vi.fn(),
       markEventProcessed: vi.fn(),
@@ -3604,7 +3604,7 @@ describe("api default dependencies", () => {
       updateGitHubInstallationStatus: vi.fn(),
       upsertGitHubInstallationForOrganization: vi.fn()
     };
-    createPostgresGitHubStoreMock.mockReturnValueOnce(githubStore);
+    createPostgresGitHubStoreMock.mockReturnValue(githubStore);
     const githubAppClient = {
       getInstallUrl: vi.fn().mockResolvedValue("https://github.com/apps/debugbundle-automation/installations/new"),
       getInstallation: vi.fn(),

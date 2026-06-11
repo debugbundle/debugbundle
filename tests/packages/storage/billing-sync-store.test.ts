@@ -182,8 +182,17 @@ describe("createPostgresBillingSyncStore", () => {
     it("records cleanup-count audit metadata when Stripe sync lowers the plan", async () => {
       const { query, store } = createMockDb();
       query.mockImplementation((sql: string) => {
-        if (sql.includes("SELECT COALESCE(plan, 'free') AS plan")) {
-          return { rows: [{ plan: "team" }] };
+        if (sql.includes("trial_used_at")) {
+          return {
+            rows: [
+              {
+                plan: "team",
+                additional_capacity_units: 0,
+                trial_used_at: null,
+                trial_converted_at: null
+              }
+            ]
+          };
         }
 
         if (sql.includes("UPDATE organizations")) {
@@ -247,6 +256,72 @@ describe("createPostgresBillingSyncStore", () => {
           suspended_slack_destinations: 1
         }
       });
+    });
+
+    it("records billing lifecycle metrics for trial conversion and capacity changes", async () => {
+      const query = vi.fn().mockImplementation((sql: string) => {
+        if (sql.includes("SELECT") && sql.includes("trial_used_at")) {
+          return {
+            rows: [
+              {
+                plan: "solo",
+                additional_capacity_units: 1,
+                trial_used_at: "2026-03-01T00:00:00.000Z",
+                trial_converted_at: null
+              }
+            ]
+          };
+        }
+
+        return { rows: [], rowCount: 0 };
+      });
+      const recordMetricDeltas = vi.fn().mockResolvedValue("recorded");
+      const store = createPostgresBillingSyncStore(
+        {
+          query,
+          transaction: async <Result>(callback: (tx: { query: typeof query }) => Promise<Result>) =>
+            callback({ query })
+        },
+        {
+          accountAnalyticsStore: {
+            withDb: vi.fn().mockReturnValue({ recordMetricDeltas }),
+            ensureAnalyticsAccount: vi.fn(),
+            recordMetricDeltas,
+            markAccountDeleted: vi.fn(),
+            preserveBillingRetentionForDeletedOrganization: vi.fn(),
+            getAccountMetricSummary: vi.fn(),
+            listAccountMetricPeriods: vi.fn(),
+            getAggregateMetricSummary: vi.fn(),
+            backfillRetainedRowsForOrganization: vi.fn()
+          }
+        }
+      );
+
+      await store.updateEntitlements({
+        organization_id: "org_trial",
+        plan: "team",
+        additional_capacity_units: 3,
+        billing_state: "active",
+        stripe_customer_id: "cus_trial",
+        stripe_subscription_id: "sub_trial",
+        billing_period_starts_at: "2026-03-01T00:00:00.000Z",
+        billing_period_ends_at: "2026-04-01T00:00:00.000Z",
+        last_billing_sync_at: "2026-03-02T00:00:00.000Z",
+        last_billing_event_id: "evt_trial_convert"
+      });
+
+      expect(recordMetricDeltas).toHaveBeenCalledWith(
+        expect.objectContaining({
+          organization_id: "org_trial",
+          source: "billing_entitlements_updated",
+          dedupe_key: "billing_entitlements_updated:evt_trial_convert",
+          deltas: expect.objectContaining({
+            trial_converted: 1,
+            plan_upgraded: 1,
+            capacity_units_purchased: 2
+          })
+        })
+      );
     });
   });
 
@@ -327,6 +402,72 @@ describe("createPostgresBillingSyncStore", () => {
       expect(query).toHaveBeenCalledWith("BEGIN", []);
       expect(query).toHaveBeenCalledWith("ROLLBACK", []);
       expect(query).not.toHaveBeenCalledWith("COMMIT", []);
+    });
+
+    it("records downgrade and capacity reduction metrics when entitlements are revoked", async () => {
+      const query = vi.fn().mockImplementation((sql: string) => {
+        if (sql.includes("SELECT") && sql.includes("additional_capacity_units")) {
+          return { rows: [{ plan: "team", additional_capacity_units: 4 }] };
+        }
+
+        if (sql.includes("INSERT INTO audit_logs")) {
+          return {
+            rows: [
+              {
+                audit_log_id: "audit_123",
+                organization_id: "org_abc",
+                actor_user_id: null,
+                actor_type: "system",
+                action: "billing.plan_downgrade_cleanup",
+                target_type: "organization",
+                target_id: "org_abc",
+                status: "success",
+                ip_address: null,
+                metadata: {},
+                occurred_at: "2026-03-01T00:00:00.000Z",
+                created_at: "2026-03-01T00:00:00.000Z"
+              }
+            ]
+          };
+        }
+
+        return { rows: [], rowCount: 0 };
+      });
+      const recordMetricDeltas = vi.fn().mockResolvedValue("recorded");
+      const store = createPostgresBillingSyncStore(
+        {
+          query,
+          transaction: async <Result>(callback: (tx: { query: typeof query }) => Promise<Result>) =>
+            callback({ query })
+        },
+        {
+          accountAnalyticsStore: {
+            withDb: vi.fn().mockReturnValue({ recordMetricDeltas }),
+            ensureAnalyticsAccount: vi.fn(),
+            recordMetricDeltas,
+            markAccountDeleted: vi.fn(),
+            preserveBillingRetentionForDeletedOrganization: vi.fn(),
+            getAccountMetricSummary: vi.fn(),
+            listAccountMetricPeriods: vi.fn(),
+            getAggregateMetricSummary: vi.fn(),
+            backfillRetainedRowsForOrganization: vi.fn()
+          }
+        }
+      );
+
+      await store.revokeEntitlements("org_abc", "evt_cancel");
+
+      expect(recordMetricDeltas).toHaveBeenCalledWith(
+        expect.objectContaining({
+          organization_id: "org_abc",
+          source: "billing_entitlements_revoked",
+          dedupe_key: "billing_entitlements_revoked:evt_cancel",
+          deltas: expect.objectContaining({
+            plan_downgraded: 1,
+            capacity_units_reduced: 4
+          })
+        })
+      );
     });
   });
 

@@ -21,6 +21,7 @@ import { buildPostgresSslConfig } from "../../../packages/storage/src/postgres-s
 import {
   buildBundleRegenerationLeaseKey,
   buildUserAvatarObjectKey,
+  createPostgresAccountAnalyticsStore,
   createPostgresAccountStore,
   createPostgresAuditLogStore,
   createPostgresBillingStore,
@@ -45,6 +46,7 @@ import {
   createPostgresWebhookDeliveryStore,
   createRedisIncidentFrequencyCounter,
   createRedisQueueClient,
+  runInTransaction,
   createS3ObjectStoreClient,
   deleteProjectObjects,
   type ObjectStoreClient,
@@ -115,21 +117,41 @@ function createPoolQueryable(pool: Pool): Queryable {
 }
 
 export function createApiDependencies(input: CreateApiDependenciesInput): DefaultApiDependencies {
+  const rootDb = input.db;
+  const accountAnalyticsStore =
+    input.analyticsHashSecret === undefined
+      ? undefined
+      : createPostgresAccountAnalyticsStore({
+          db: input.db,
+          analyticsHashSecret: input.analyticsHashSecret
+        });
   const ingestionPersistence = createIngestionPersistenceService({
     objectStore: input.objectStore,
     queue: input.queue
   });
 
-  const accountStore = createPostgresAccountStore(input.db);
+  const accountStore = createPostgresAccountStore(input.db, {
+    ...(accountAnalyticsStore === undefined ? {} : { accountAnalyticsStore })
+  });
   const auditLogStore = createPostgresAuditLogStore(input.db);
-  const authStore = createPostgresAuthStore(input.db);
-  const billingStore = createPostgresBillingStore(input.db);
-  const billingSyncStore = createPostgresBillingSyncStore(input.db);
+  const authStore = createPostgresAuthStore(input.db, {
+    ...(accountAnalyticsStore === undefined ? {} : { accountAnalyticsStore })
+  });
+  const billingStore = createPostgresBillingStore(input.db, {
+    ...(accountAnalyticsStore === undefined ? {} : { accountAnalyticsStore })
+  });
+  const billingSyncStore = createPostgresBillingSyncStore(input.db, {
+    ...(accountAnalyticsStore === undefined ? {} : { accountAnalyticsStore })
+  });
   const capturePolicyStore = createPostgresCapturePolicyStore(input.db);
   const captureRuleStore = createPostgresCaptureRuleStore(input.db);
-  const improvementOpportunityStore = createPostgresImprovementOpportunityStore(input.db);
+  const improvementOpportunityStore = createPostgresImprovementOpportunityStore(input.db, {
+    ...(accountAnalyticsStore === undefined ? {} : { accountAnalyticsStore })
+  });
   const improvementSettingsStore = createPostgresImprovementSettingsStore(input.db);
-  const metadataStore = createPostgresMetadataStore(input.db);
+  const metadataStore = createPostgresMetadataStore(input.db, {
+    ...(accountAnalyticsStore === undefined ? {} : { accountAnalyticsStore })
+  });
   const githubStore = createPostgresGitHubStore(input.db);
   const githubMarketplaceStore = createPostgresGitHubMarketplaceStore(input.db);
   const slackDestinationStore = createPostgresSlackDestinationStore(input.db);
@@ -167,6 +189,7 @@ export function createApiDependencies(input: CreateApiDependenciesInput): Defaul
     webhookDeliveryStore: webhookDelivery,
     fallbackTargetUrl: input.lifecycleWebhookFallbackTargetUrl ?? null,
     fallbackSigningSecret: input.lifecycleWebhookFallbackSigningSecret ?? null,
+    ...(accountAnalyticsStore === undefined ? {} : { accountAnalyticsStore }),
     billingStore,
     operationalEmailDeliveryStore: operationalEmailDelivery
   });
@@ -194,8 +217,47 @@ export function createApiDependencies(input: CreateApiDependenciesInput): Defaul
   };
   const ingestionMetadata =
     input.frequencyCounter === undefined
-      ? createIngestionMetadataService(metadataStore)
-      : createIngestionMetadataService(metadataStore, { frequencyCounter: input.frequencyCounter });
+      ? createIngestionMetadataService(metadataStore, {
+          ...(accountAnalyticsStore === undefined
+            ? {}
+            : {
+                accountAnalyticsStore,
+                resolveOrganizationIdForProject: async (projectId: string) => {
+                  const result = await input.db.query<{ organization_id: string }>(
+                    `
+                      SELECT organization_id::text AS organization_id
+                      FROM projects
+                      WHERE id = $1::uuid
+                      LIMIT 1
+                    `,
+                    [projectId]
+                  );
+
+                  return result.rows[0]?.organization_id ?? null;
+                }
+              })
+        })
+      : createIngestionMetadataService(metadataStore, {
+          frequencyCounter: input.frequencyCounter,
+          ...(accountAnalyticsStore === undefined
+            ? {}
+            : {
+                accountAnalyticsStore,
+                resolveOrganizationIdForProject: async (projectId: string) => {
+                  const result = await input.db.query<{ organization_id: string }>(
+                    `
+                      SELECT organization_id::text AS organization_id
+                      FROM projects
+                      WHERE id = $1::uuid
+                      LIMIT 1
+                    `,
+                    [projectId]
+                  );
+
+                  return result.rows[0]?.organization_id ?? null;
+                }
+              })
+        });
   const authEmails = input.authEmails;
   const billingAdminEmails =
     input.billingAdminEmails === undefined
@@ -206,6 +268,7 @@ export function createApiDependencies(input: CreateApiDependenciesInput): Defaul
     ...(input.stripeConfig === undefined ? {} : { stripeConfig: input.stripeConfig }),
     billingStore,
     billingSyncStore,
+    ...(accountAnalyticsStore === undefined ? {} : { accountAnalyticsStore }),
     billingLinks,
     ...(input.appBaseUrl === undefined ? {} : { appBaseUrl: input.appBaseUrl })
   });
@@ -221,6 +284,7 @@ export function createApiDependencies(input: CreateApiDependenciesInput): Defaul
   return {
     ingestionPersistence,
     ingestionMetadata,
+    ...(accountAnalyticsStore === undefined ? {} : { accountAnalytics: accountAnalyticsStore }),
     ...(input.ingestionRateLimiter === undefined ? {} : { ingestionRateLimiter: input.ingestionRateLimiter }),
     ...(input.authRateLimiter === undefined ? {} : { authRateLimiter: input.authRateLimiter }),
     auditLogging: auditLogStore,
@@ -436,7 +500,24 @@ export function createApiDependencies(input: CreateApiDependenciesInput): Defaul
                 return "rule_limit_reached";
               }
 
-              const created = await githubStore.createProjectGitHubRuleForOrganization(requestInput);
+              const created = await runInTransaction(input.db, async (tx) => {
+                const txGitHubStore = createPostgresGitHubStore(tx);
+                const createdRule = await txGitHubStore.createProjectGitHubRuleForOrganization(requestInput);
+
+                if (createdRule !== null && accountAnalyticsStore !== undefined) {
+                  await accountAnalyticsStore.withDb(tx).recordMetricDeltas({
+                    organization_id: requestInput.organization_id,
+                    occurred_at: createdRule.created_at,
+                    source: "github_dispatch_rule_created",
+                    dedupe_key: `github_dispatch_rule_created:${createdRule.rule_id}`,
+                    deltas: {
+                      github_dispatch_rules_created: 1
+                    }
+                  });
+                }
+
+                return createdRule;
+              });
               return created ?? "project_not_found";
             },
             async updateProjectRuleForOrganization(requestInput: {
@@ -458,13 +539,31 @@ export function createApiDependencies(input: CreateApiDependenciesInput): Defaul
               const updated = await githubStore.updateProjectGitHubRuleForOrganization(requestInput);
               return updated ?? "rule_not_found";
             },
-            deleteProjectRuleForOrganization: (requestInput: {
+            deleteProjectRuleForOrganization: async (requestInput: {
               organization_id: string;
               project_id: string;
               rule_id: string;
               actor_user_id?: string;
               actor_role?: "owner" | "admin" | "member";
-            }) => githubStore.deleteProjectGitHubRuleForOrganization(requestInput),
+            }) =>
+              runInTransaction(input.db, async (tx) => {
+                const txGitHubStore = createPostgresGitHubStore(tx);
+                const deleted = await txGitHubStore.deleteProjectGitHubRuleForOrganization(requestInput);
+
+                if (deleted && accountAnalyticsStore !== undefined) {
+                  await accountAnalyticsStore.withDb(tx).recordMetricDeltas({
+                    organization_id: requestInput.organization_id,
+                    occurred_at: new Date().toISOString(),
+                    source: "github_dispatch_rule_deleted",
+                    dedupe_key: `github_dispatch_rule_deleted:${requestInput.rule_id}`,
+                    deltas: {
+                      github_dispatch_rules_deleted: 1
+                    }
+                  });
+                }
+
+                return deleted;
+              }),
             async setProjectRepoForOrganization(requestInput) {
               const installation = await githubStore.getGitHubInstallationForOrganization({
                 organization_id: requestInput.organization_id
@@ -505,19 +604,34 @@ export function createApiDependencies(input: CreateApiDependenciesInput): Defaul
                 project_id: requestInput.project_id
               });
               if (existingRules === null || existingRules.length === 0) {
-                await githubStore.createProjectGitHubRuleForOrganization({
-                  organization_id: requestInput.organization_id,
-                  project_id: requestInput.project_id,
-                  created_by_user_id: requestInput.created_by_user_id,
-                  name: "Default triage rule",
-                  enabled: true,
-                  event_types: ["bundle.created", "bundle.reopened"],
-                  environments: [],
-                  services: [],
-                  severity_min: "high",
-                  bundle_type: null,
-                  incident_status: "new_or_reopened",
-                  cooldown_seconds: 300
+                await runInTransaction(input.db, async (tx) => {
+                  const txGitHubStore = createPostgresGitHubStore(tx);
+                  const defaultRule = await txGitHubStore.createProjectGitHubRuleForOrganization({
+                    organization_id: requestInput.organization_id,
+                    project_id: requestInput.project_id,
+                    created_by_user_id: requestInput.created_by_user_id,
+                    name: "Default triage rule",
+                    enabled: true,
+                    event_types: ["bundle.created", "bundle.reopened"],
+                    environments: [],
+                    services: [],
+                    severity_min: "high",
+                    bundle_type: null,
+                    incident_status: "new_or_reopened",
+                    cooldown_seconds: 300
+                  });
+
+                  if (defaultRule !== null && accountAnalyticsStore !== undefined) {
+                    await accountAnalyticsStore.withDb(tx).recordMetricDeltas({
+                      organization_id: requestInput.organization_id,
+                      occurred_at: defaultRule.created_at,
+                      source: "github_dispatch_rule_created",
+                      dedupe_key: `github_dispatch_rule_created:${defaultRule.rule_id}`,
+                      deltas: {
+                        github_dispatch_rules_created: 1
+                      }
+                    });
+                  }
                 });
               }
 
@@ -621,35 +735,51 @@ export function createApiDependencies(input: CreateApiDependenciesInput): Defaul
           preset = getDefaultPreset(project.organization_plan);
         }
 
-        const record = await capturePolicyStore.upsertCapturePolicy({
-          project_id: input.project_id,
-          preset: input.update.preset ?? preset,
-          capture_logs:
-            input.update.capture_logs !== undefined
-              ? input.update.capture_logs
-              : (existingRecord?.capture_logs ?? null),
-          capture_request_events:
-            input.update.capture_request_events !== undefined
-              ? input.update.capture_request_events
-              : (existingRecord?.capture_request_events ?? null),
-          capture_breadcrumbs:
-            input.update.capture_breadcrumbs !== undefined
-              ? input.update.capture_breadcrumbs
-              : (existingRecord?.capture_breadcrumbs ?? null),
-          capture_probe_events:
-            input.update.capture_probe_events !== undefined
-              ? input.update.capture_probe_events
-              : (existingRecord?.capture_probe_events ?? null),
-          immediate_client_error_statuses:
-            input.update.immediate_client_error_statuses !== undefined
-              ? input.update.immediate_client_error_statuses
-              : (existingRecord?.immediate_client_error_statuses ?? null),
-          immediate_client_error_path_rules:
-            input.update.immediate_client_error_path_rules !== undefined
-              ? input.update.immediate_client_error_path_rules
-              : (existingRecord?.immediate_client_error_path_rules ?? null)
+        return runInTransaction(rootDb, async (tx) => {
+          const txCapturePolicyStore = createPostgresCapturePolicyStore(tx);
+          const record = await txCapturePolicyStore.upsertCapturePolicy({
+            project_id: input.project_id,
+            preset: input.update.preset ?? preset,
+            capture_logs:
+              input.update.capture_logs !== undefined
+                ? input.update.capture_logs
+                : (existingRecord?.capture_logs ?? null),
+            capture_request_events:
+              input.update.capture_request_events !== undefined
+                ? input.update.capture_request_events
+                : (existingRecord?.capture_request_events ?? null),
+            capture_breadcrumbs:
+              input.update.capture_breadcrumbs !== undefined
+                ? input.update.capture_breadcrumbs
+                : (existingRecord?.capture_breadcrumbs ?? null),
+            capture_probe_events:
+              input.update.capture_probe_events !== undefined
+                ? input.update.capture_probe_events
+                : (existingRecord?.capture_probe_events ?? null),
+            immediate_client_error_statuses:
+              input.update.immediate_client_error_statuses !== undefined
+                ? input.update.immediate_client_error_statuses
+                : (existingRecord?.immediate_client_error_statuses ?? null),
+            immediate_client_error_path_rules:
+              input.update.immediate_client_error_path_rules !== undefined
+                ? input.update.immediate_client_error_path_rules
+                : (existingRecord?.immediate_client_error_path_rules ?? null)
+          });
+
+          if (accountAnalyticsStore !== undefined) {
+            await accountAnalyticsStore.withDb(tx).recordMetricDeltas({
+              organization_id: input.organization_id,
+              occurred_at: record.updated_at,
+              source: "capture_policy_update",
+              dedupe_key: `capture_policy_update:${input.project_id}:${record.updated_at}`,
+              deltas: {
+                capture_policy_updates: 1
+              }
+            });
+          }
+
+          return record;
         });
-        return record;
       }
     },
     captureRuleManagement: {
@@ -675,20 +805,37 @@ export function createApiDependencies(input: CreateApiDependenciesInput): Defaul
           return null;
         }
 
-        return captureRuleStore.createCaptureRule({
-          id: input.id,
-          project_id: input.project_id,
-          name: input.create.name,
-          description: input.create.description,
-          enabled: input.create.enabled,
-          action: input.create.action,
-          matcher: input.create.matcher,
-          sample_rate: input.create.sample_rate,
-          sample_event_class: input.create.sample_event_class,
-          created_by_user_id: input.create.created_by_user_id,
-          created_from_incident_id: input.create.created_from_incident_id,
-          created_from_event_id: input.create.created_from_event_id,
-          expires_at: input.create.expires_at
+        return runInTransaction(rootDb, async (tx) => {
+          const txCaptureRuleStore = createPostgresCaptureRuleStore(tx);
+          const created = await txCaptureRuleStore.createCaptureRule({
+            id: input.id,
+            project_id: input.project_id,
+            name: input.create.name,
+            description: input.create.description,
+            enabled: input.create.enabled,
+            action: input.create.action,
+            matcher: input.create.matcher,
+            sample_rate: input.create.sample_rate,
+            sample_event_class: input.create.sample_event_class,
+            created_by_user_id: input.create.created_by_user_id,
+            created_from_incident_id: input.create.created_from_incident_id,
+            created_from_event_id: input.create.created_from_event_id,
+            expires_at: input.create.expires_at
+          });
+
+          if (created !== null && accountAnalyticsStore !== undefined) {
+            await accountAnalyticsStore.withDb(tx).recordMetricDeltas({
+              organization_id: input.organization_id,
+              occurred_at: created.created_at,
+              source: "capture_rule_created",
+              dedupe_key: `capture_rule_created:${created.id}`,
+              deltas: {
+                capture_rules_created: 1
+              }
+            });
+          }
+
+          return created;
         });
       },
       updateCaptureRuleForProject: (input: {
@@ -745,15 +892,31 @@ export function createApiDependencies(input: CreateApiDependenciesInput): Defaul
 
         return captureRuleStore.updateCaptureRule(update);
       },
-      deleteCaptureRuleForProject: (input: {
+      deleteCaptureRuleForProject: async (input: {
         organization_id: string;
         project_id: string;
         rule_id: string;
       }) => {
-        void input.organization_id;
-        return captureRuleStore.deleteCaptureRule({
-          id: input.rule_id,
-          project_id: input.project_id
+        return runInTransaction(rootDb, async (tx) => {
+          const txCaptureRuleStore = createPostgresCaptureRuleStore(tx);
+          const deleted = await txCaptureRuleStore.deleteCaptureRule({
+            id: input.rule_id,
+            project_id: input.project_id
+          });
+
+          if (deleted && accountAnalyticsStore !== undefined) {
+            await accountAnalyticsStore.withDb(tx).recordMetricDeltas({
+              organization_id: input.organization_id,
+              occurred_at: new Date().toISOString(),
+              source: "capture_rule_deleted",
+              dedupe_key: `capture_rule_deleted:${input.rule_id}`,
+              deltas: {
+                capture_rules_deleted: 1
+              }
+            });
+          }
+
+          return deleted;
         });
       },
       recordCaptureRuleMatch: (input: { project_id: string; rule_id: string; matched_at: string }) =>
@@ -974,6 +1137,9 @@ export function createApiDependenciesFromEnv(
     queue,
     objectStore,
     frequencyCounter,
+    ...(env["ANALYTICS_HASH_SECRET"] === undefined
+      ? {}
+      : { analyticsHashSecret: env["ANALYTICS_HASH_SECRET"] }),
     appBaseUrl,
     ...(authEmailSender === undefined ? {} : { authEmails: authEmailSender }),
     ...(billingEmails === undefined ? {} : { billingEmails }),

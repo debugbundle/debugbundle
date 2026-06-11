@@ -42,6 +42,11 @@ export const REQUIRED_API_TABLES = [
   "slack_destinations",
   "operational_email_deliveries",
   "project_usage_counters",
+  "account_analytics_accounts",
+  "account_metric_periods",
+  "account_metric_events",
+  "account_payment_retention_records",
+  "account_payment_provider_events",
   "agent_webhooks",
   "webhook_deliveries",
   "trial_lifecycle_events",
@@ -52,6 +57,8 @@ export const REQUIRED_API_TABLES = [
 
 export const REQUIRED_WORKER_TABLES = [
   "processed_events",
+  "organizations",
+  "projects",
   "capture_rules",
   "services",
   "deployments",
@@ -75,6 +82,9 @@ export const REQUIRED_WORKER_TABLES = [
   "agent_webhooks",
   "webhook_deliveries",
   "trial_lifecycle_events",
+  "account_analytics_accounts",
+  "account_metric_periods",
+  "account_metric_events",
 ] as const;
 
 const LEGACY_SCHEMA_TABLE = "schema_migrations";

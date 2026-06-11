@@ -13,13 +13,15 @@ import {
 import type { RuntimeLogger } from "../../../packages/runtime-logger/src/index.js";
 import {
   getAllowanceLimitBehavior,
-  getAllowanceMeterLabel
+  getAllowanceMeterLabel,
+  type AccountMetricKey
 } from "../../../packages/storage/src/index.js";
 import type {
   PostgresOperationalEmailDeliveryStore
 } from "../../../packages/storage/src/operational-email-delivery-store.js";
+import { recordProjectMetricDeltas, type WorkerAccountAnalyticsDependencies } from "./account-analytics.js";
 
-export interface DeliverOperationalEmailWorkerDependencies {
+export interface DeliverOperationalEmailWorkerDependencies extends WorkerAccountAnalyticsDependencies {
   logger?: Pick<RuntimeLogger, "warn">;
   appBaseUrl?: string | null;
   emailAssetBaseUrl?: string | null;
@@ -304,6 +306,24 @@ export async function processNextDeliverOperationalEmailJob(
       delivered: true,
       error_message: null
     });
+    if (delivery.project_id !== null) {
+      const deltas: Partial<Record<AccountMetricKey, number>> = {
+        operational_emails_sent: 1
+      };
+      if (delivery.kind === "allowance_warning_80") {
+        deltas["allowance_warning_emails_sent"] = 1;
+      } else if (delivery.kind === "allowance_limit_reached") {
+        deltas["allowance_limit_emails_sent"] = 1;
+      }
+
+      await recordProjectMetricDeltas(dependencies, {
+        projectId: delivery.project_id,
+        occurredAt: delivery.created_at,
+        source: "operational_email_result",
+        dedupeKey: `operational_email_result:${delivery.delivery_id}:delivered`,
+        deltas
+      });
+    }
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
     dependencies.logger?.warn(

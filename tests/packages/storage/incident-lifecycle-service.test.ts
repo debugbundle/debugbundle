@@ -108,11 +108,15 @@ describe("incident lifecycle service", () => {
   it("creates bundle.resolved webhook intents when allowance remains", async (): Promise<void> => {
     const incident = createResolvedIncident();
     const createDeliveryIntent = vi.fn().mockResolvedValue({ delivery_id: "del_123" });
+    const recordMetricDeltas = vi.fn().mockResolvedValue("recorded");
 
     const service = createIncidentLifecycleService({
       incidentStore: createIncidentResolutionStore({
         resolveIncidentForOrganization: vi.fn().mockResolvedValue(incident),
       }),
+      accountAnalyticsStore: {
+        recordMetricDeltas
+      },
       webhookDeliveryStore: {
         listMatchingWebhooks: vi.fn().mockResolvedValue([
           {
@@ -173,6 +177,25 @@ describe("incident lifecycle service", () => {
         incident_id: incident.incident_id,
         project_id: incident.project_id
       })
+    });
+    expect(recordMetricDeltas).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({
+        organization_id: "org_123",
+        source: "incident_resolved",
+        deltas: {
+          incidents_resolved: 1
+        }
+      })
+    );
+    expect(recordMetricDeltas).toHaveBeenNthCalledWith(2, {
+      organization_id: "org_123",
+      occurred_at: incident.resolved_at!,
+      source: "webhook_delivery_created",
+      dedupe_key: "webhook_delivery_created:del_123",
+      deltas: {
+        webhook_deliveries_created: 1
+      }
     });
   });
 
@@ -235,5 +258,43 @@ describe("incident lifecycle service", () => {
         resolved_at: incident.resolved_at!
       })
     ).resolves.toEqual(incident);
+  });
+
+  it("records reopen metrics when a resolved incident is reopened", async (): Promise<void> => {
+    const reopenedIncident = createResolvedIncident({
+      status: "open",
+      resolved_at: null
+    });
+    const recordMetricDeltas = vi.fn().mockResolvedValue("recorded");
+    const service = createIncidentLifecycleService({
+      incidentStore: createIncidentResolutionStore({
+        reopenIncidentForOrganization: vi.fn().mockResolvedValue(reopenedIncident)
+      }),
+      accountAnalyticsStore: {
+        recordMetricDeltas
+      },
+      webhookDeliveryStore: {
+        listMatchingWebhooks: vi.fn().mockResolvedValue([]),
+        createDeliveryIntent: vi.fn()
+      },
+      fallbackTargetUrl: null,
+      fallbackSigningSecret: null
+    });
+
+    const result = await service.reopenIncidentForOrganization({
+      organization_id: "org_123",
+      incident_id: reopenedIncident.incident_id
+    });
+
+    expect(result).toEqual(reopenedIncident);
+    expect(recordMetricDeltas).toHaveBeenCalledWith(
+      expect.objectContaining({
+        organization_id: "org_123",
+        source: "incident_reopened",
+        deltas: {
+          incidents_reopened: 1
+        }
+      })
+    );
   });
 });

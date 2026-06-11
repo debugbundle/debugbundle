@@ -8,6 +8,7 @@ import {
   type EventEnvelope,
   type ImmediateClientErrorPathRule
 } from "../../shared-types/src/index.js";
+import type { AccountAnalyticsStore } from "./account-analytics-store.js";
 import { buildRawEventObjectKey, hashToken, inferEventLogLevel, inferSeverity } from "./helpers.js";
 import type {
   IncidentFrequencyCounter,
@@ -25,6 +26,8 @@ import type {
 
 interface CreateIngestionMetadataServiceInput {
   frequencyCounter?: IncidentFrequencyCounter;
+  accountAnalyticsStore?: Pick<AccountAnalyticsStore, "recordMetricDeltas">;
+  resolveOrganizationIdForProject?: (projectId: string) => Promise<string | null>;
 }
 
 export function createIngestionMetadataService(
@@ -41,6 +44,7 @@ export function createIngestionMetadataService(
     },
 
     async persistEventMetadata(input: PersistEventMetadataInput): Promise<UpsertIncidentResult> {
+      const severity = inferSeverity(input.event.event_type);
       const incident = await store.upsertIncident({
         event_id: input.event.event_id,
         event_type: input.event.event_type,
@@ -51,7 +55,7 @@ export function createIngestionMetadataService(
         fingerprint_version: FINGERPRINT_VERSION,
         matched_fields: inferMatchedFields(input.normalizedEvent),
         title: input.normalizedEvent.normalized_message,
-        severity: inferSeverity(input.event.event_type),
+        severity,
         occurred_at: input.event.occurred_at,
         ...(input.event.event_type === "deploy_metadata"
           ? {
@@ -74,6 +78,7 @@ export function createIngestionMetadataService(
         level: inferEventLogLevel(input.event)
       });
 
+      let markedSpiking = false;
       if (options.frequencyCounter !== undefined) {
         if (incident.duplicate_event !== true) {
           const frequency = await options.frequencyCounter.recordOccurrence({
@@ -83,9 +88,59 @@ export function createIngestionMetadataService(
           });
 
           if (frequency.has_sufficient_baseline && frequency.is_spiking) {
-            await store.markIncidentSpiking({
+            markedSpiking = await store.markIncidentSpiking({
               incident_id: incident.incident_id,
               detected_at: input.event.occurred_at
+            });
+          }
+        }
+      }
+
+      if (
+        options.accountAnalyticsStore !== undefined &&
+        options.resolveOrganizationIdForProject !== undefined
+      ) {
+        const deltas: Partial<
+          Record<
+            | "incidents_opened"
+            | "incidents_regressed"
+            | "incident_occurrences"
+            | "incident_occurrences_high_severity"
+            | "incident_occurrences_critical_severity"
+            | "incidents_auto_detected_spiking",
+            number
+          >
+        > = {};
+
+        if (incident.duplicate_event !== true) {
+          deltas["incident_occurrences"] = 1;
+          if (severity === "high") {
+            deltas["incident_occurrences_high_severity"] = 1;
+          }
+          if (severity === "critical") {
+            deltas["incident_occurrences_critical_severity"] = 1;
+          }
+          if (incident.occurrence_count === 1) {
+            deltas["incidents_opened"] = 1;
+          }
+          if (incident.regressed_now) {
+            deltas["incidents_regressed"] = 1;
+          }
+        }
+
+        if (markedSpiking) {
+          deltas["incidents_auto_detected_spiking"] = 1;
+        }
+
+        if (Object.keys(deltas).length > 0) {
+          const organizationId = await options.resolveOrganizationIdForProject(input.projectId);
+          if (organizationId !== null) {
+            await options.accountAnalyticsStore.recordMetricDeltas({
+              organization_id: organizationId,
+              occurred_at: input.event.occurred_at,
+              source: "incident_persist",
+              dedupe_key: `incident_persist:${incident.incident_id}:${input.event.event_id}`,
+              deltas
             });
           }
         }

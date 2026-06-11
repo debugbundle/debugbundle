@@ -2,9 +2,11 @@ import { randomUUID } from "node:crypto";
 
 import { generateProbeTriggerToken } from "../../auth/src/index.js";
 import { getTierCapabilities, type TierName } from "../../shared-types/src/index.js";
+import type { AccountAnalyticsStore } from "./account-analytics-store.js";
 import { buildBillableIncidentEventsPredicateSql, getRequiredStringField } from "./helpers.js";
 import { deriveIncidentReasonFromSignal } from "./incident-reason.js";
 import { pruneRetainedBundleOwnersForProject } from "./retained-bundle-pruning.js";
+import { runInTransaction } from "./transaction.js";
 import type {
   AlertRuleRecord,
   BuildBundleJob,
@@ -350,6 +352,49 @@ function applyProjectAccessSuspension(access: ProjectAccessRecord): ProjectAcces
   };
 }
 
+type PostgresMetadataStoreOptions = {
+  accountAnalyticsStore?: AccountAnalyticsStore;
+};
+
+async function recordProjectMetric(
+  accountAnalyticsStore: AccountAnalyticsStore,
+  tx: Queryable,
+  input: {
+    organization_id: string;
+    project_id: string;
+    occurred_at: string;
+    metric_key: "project_created" | "project_deleted";
+  }
+): Promise<void> {
+  await accountAnalyticsStore.withDb(tx).recordMetricDeltas({
+    organization_id: input.organization_id,
+    occurred_at: input.occurred_at,
+    source: input.metric_key,
+    dedupe_key: `${input.metric_key}:${input.project_id}`,
+    deltas: {
+      [input.metric_key]: 1
+    }
+  });
+}
+
+async function recordProjectMetricDeltas(
+  accountAnalyticsStore: AccountAnalyticsStore | undefined,
+  tx: Queryable,
+  input: {
+    organization_id: string;
+    occurred_at: string;
+    source: string;
+    dedupe_key: string;
+    deltas: Partial<Record<"remote_probe_activations_created" | "remote_probe_activations_expired", number>>;
+  }
+): Promise<void> {
+  if (accountAnalyticsStore === undefined) {
+    return;
+  }
+
+  await accountAnalyticsStore.withDb(tx).recordMetricDeltas(input);
+}
+
 function mapProjectInviteRow(row: ProjectInviteRecord & Record<string, unknown>): ProjectInviteRecord {
   return {
     invite_id: row.invite_id,
@@ -571,7 +616,12 @@ function mapIncidentRetrievalRow(row: IncidentRetrievalRow): IncidentRetrievalRe
   };
 }
 
-export function createPostgresMetadataStore(db: Queryable): PostgresMetadataStore {
+export function createPostgresMetadataStore(
+  db: Queryable,
+  options: PostgresMetadataStoreOptions = {}
+): PostgresMetadataStore {
+  const accountAnalyticsStore = options.accountAnalyticsStore;
+
   return {
     async resolveProjectByTokenHash(tokenHash: string): Promise<ResolveProjectResult | null> {
       const result = await db.query<ResolveProjectResult & Record<string, unknown>>(
@@ -1610,8 +1660,9 @@ export function createPostgresMetadataStore(db: Queryable): PostgresMetadataStor
     },
 
     async createProjectForUser(input): Promise<ProjectRecord | null> {
-      try {
-        const result = await db.query<ProjectRecord & Record<string, unknown>>(
+      const createProject = async (queryable: Queryable): Promise<ProjectRecord | null> => {
+        try {
+          const result = await queryable.query<ProjectRecord & Record<string, unknown>>(
           `
             WITH created_project AS (
               INSERT INTO projects (
@@ -1709,21 +1760,38 @@ export function createPostgresMetadataStore(db: Queryable): PostgresMetadataStor
           ]
         );
 
-        return result.rows[0] === undefined ? null : mapProjectRow(result.rows[0]);
-      } catch (error) {
-        if (
-          typeof error === "object" &&
-          error !== null &&
-          "code" in error &&
-          error.code === "23505" &&
-          "constraint" in error &&
-          error.constraint === "projects_organization_id_slug_key"
-        ) {
-          return null;
-        }
+          const project = result.rows[0] === undefined ? null : mapProjectRow(result.rows[0]);
+          if (project !== null && accountAnalyticsStore !== undefined) {
+            await recordProjectMetric(accountAnalyticsStore, queryable, {
+              organization_id: project.organization_id,
+              project_id: project.project_id,
+              occurred_at: project.created_at,
+              metric_key: "project_created"
+            });
+          }
 
-        throw error;
+          return project;
+        } catch (error) {
+          if (
+            typeof error === "object" &&
+            error !== null &&
+            "code" in error &&
+            error.code === "23505" &&
+            "constraint" in error &&
+            error.constraint === "projects_organization_id_slug_key"
+          ) {
+            return null;
+          }
+
+          throw error;
+        }
+      };
+
+      if (accountAnalyticsStore === undefined) {
+        return createProject(db);
       }
+
+      return runInTransaction(db, createProject);
     },
 
     async updateProjectForUser(input): Promise<ProjectRecord | "slug_taken" | null> {
@@ -1895,7 +1963,8 @@ export function createPostgresMetadataStore(db: Queryable): PostgresMetadataStor
     },
 
     async deleteProjectForUser(input): Promise<DeletedProjectRecord | null> {
-      const result = await db.query<DeletedProjectRecord & Record<string, unknown>>(
+      const deleteProject = async (queryable: Queryable): Promise<DeletedProjectRecord | null> => {
+        const result = await queryable.query<DeletedProjectRecord & Record<string, unknown>>(
         `
           WITH deleted_project AS (
             DELETE FROM projects
@@ -1932,12 +2001,30 @@ export function createPostgresMetadataStore(db: Queryable): PostgresMetadataStor
         [input.user_id, input.project_id]
       );
 
-      return result.rows[0] === undefined ? null : mapDeletedProjectRow(result.rows[0]);
+        const project = result.rows[0] === undefined ? null : mapDeletedProjectRow(result.rows[0]);
+        if (project !== null && accountAnalyticsStore !== undefined) {
+          await recordProjectMetric(accountAnalyticsStore, queryable, {
+            organization_id: project.organization_id,
+            project_id: project.project_id,
+            occurred_at: new Date().toISOString(),
+            metric_key: "project_deleted"
+          });
+        }
+
+        return project;
+      };
+
+      if (accountAnalyticsStore === undefined) {
+        return deleteProject(db);
+      }
+
+      return runInTransaction(db, deleteProject);
     },
 
     async createProjectForOrganization(input): Promise<ProjectRecord | null> {
-      try {
-        const result = await db.query<ProjectRecord & Record<string, unknown>>(
+      const createProject = async (queryable: Queryable): Promise<ProjectRecord | null> => {
+        try {
+          const result = await queryable.query<ProjectRecord & Record<string, unknown>>(
           `
             WITH created_project AS (
               INSERT INTO projects (
@@ -2042,21 +2129,38 @@ export function createPostgresMetadataStore(db: Queryable): PostgresMetadataStor
           ]
         );
 
-        return result.rows[0] === undefined ? null : mapProjectRow(result.rows[0]);
-      } catch (error) {
-        if (
-          typeof error === "object" &&
-          error !== null &&
-          "code" in error &&
-          error.code === "23505" &&
-          "constraint" in error &&
-          error.constraint === "projects_organization_id_slug_key"
-        ) {
-          return null;
-        }
+          const project = result.rows[0] === undefined ? null : mapProjectRow(result.rows[0]);
+          if (project !== null && accountAnalyticsStore !== undefined) {
+            await recordProjectMetric(accountAnalyticsStore, queryable, {
+              organization_id: project.organization_id,
+              project_id: project.project_id,
+              occurred_at: project.created_at,
+              metric_key: "project_created"
+            });
+          }
 
-        throw error;
+          return project;
+        } catch (error) {
+          if (
+            typeof error === "object" &&
+            error !== null &&
+            "code" in error &&
+            error.code === "23505" &&
+            "constraint" in error &&
+            error.constraint === "projects_organization_id_slug_key"
+          ) {
+            return null;
+          }
+
+          throw error;
+        }
+      };
+
+      if (accountAnalyticsStore === undefined) {
+        return createProject(db);
       }
+
+      return runInTransaction(db, createProject);
     },
 
     async updateProjectForOrganization(input): Promise<ProjectRecord | "slug_taken" | null> {
@@ -2206,7 +2310,8 @@ export function createPostgresMetadataStore(db: Queryable): PostgresMetadataStor
     },
 
     async deleteProjectForOrganization(input): Promise<DeletedProjectRecord | null> {
-      const result = await db.query<DeletedProjectRecord & Record<string, unknown>>(
+      const deleteProject = async (queryable: Queryable): Promise<DeletedProjectRecord | null> => {
+        const result = await queryable.query<DeletedProjectRecord & Record<string, unknown>>(
         `
           WITH deleted_project AS (
             DELETE FROM projects
@@ -2242,7 +2347,24 @@ export function createPostgresMetadataStore(db: Queryable): PostgresMetadataStor
         [input.organization_id, input.project_id]
       );
 
-      return result.rows[0] === undefined ? null : mapDeletedProjectRow(result.rows[0]);
+        const project = result.rows[0] === undefined ? null : mapDeletedProjectRow(result.rows[0]);
+        if (project !== null && accountAnalyticsStore !== undefined) {
+          await recordProjectMetric(accountAnalyticsStore, queryable, {
+            organization_id: project.organization_id,
+            project_id: project.project_id,
+            occurred_at: new Date().toISOString(),
+            metric_key: "project_deleted"
+          });
+        }
+
+        return project;
+      };
+
+      if (accountAnalyticsStore === undefined) {
+        return deleteProject(db);
+      }
+
+      return runInTransaction(db, deleteProject);
     },
 
     async listProjectTokensForOrganization(input): Promise<ProjectTokenRecord[] | null> {
@@ -2743,44 +2865,6 @@ export function createPostgresMetadataStore(db: Queryable): PostgresMetadataStor
       expires_at: string;
       trigger_expires_at: string;
     }): Promise<{ organization_plan: TierName; activation: ProbeActivationRecord; trigger_token: string; concurrent_limit_exceeded?: boolean } | null> {
-      const scopedProject = await db.query<Record<string, unknown>>(
-        `
-          SELECT p.id, COALESCE(o.plan, 'free') AS organization_plan
-          FROM projects p
-          JOIN organizations o ON o.id = p.organization_id
-          WHERE p.id = $1
-            AND p.organization_id = $2
-          LIMIT 1
-        `,
-        [input.project_id, input.organization_id]
-      );
-
-      const project = scopedProject.rows[0];
-      if (project === undefined) {
-        return null;
-      }
-
-      /** Max 5 concurrent active (non-expired, non-deactivated) activations per project (FR-PRB-05). */
-      const countResult = await db.query<{ cnt: string }>(
-        `
-          SELECT COUNT(*)::text AS cnt
-          FROM probe_activations
-          WHERE project_id = $1
-            AND deactivated_at IS NULL
-            AND expires_at > now()
-        `,
-        [input.project_id]
-      );
-      const activeCount = Number(countResult.rows[0]?.cnt ?? "0");
-      if (activeCount >= 5) {
-        return {
-            organization_plan: normalizeOrganizationPlan(project["organization_plan"]),
-          activation: { activation_id: "", label_pattern: "", service: "", environment: "", expires_at: "", trigger_expires_at: "", },
-          trigger_token: "",
-          concurrent_limit_exceeded: true
-        };
-      }
-
       const activationId = randomUUID();
       const triggerToken = generateProbeTriggerToken({
         projectId: input.project_id,
@@ -2792,53 +2876,110 @@ export function createPostgresMetadataStore(db: Queryable): PostgresMetadataStor
           trigger_expires_at: input.trigger_expires_at
         }
       });
+      return runInTransaction(db, async (tx) => {
+        const scopedProject = await tx.query<Record<string, unknown>>(
+          `
+            SELECT p.id, COALESCE(o.plan, 'free') AS organization_plan
+            FROM projects p
+            JOIN organizations o ON o.id = p.organization_id
+            WHERE p.id = $1
+              AND p.organization_id = $2
+            LIMIT 1
+          `,
+          [input.project_id, input.organization_id]
+        );
 
-      const inserted = await db.query<ProbeActivationRecord & Record<string, unknown>>(
-        `
-          INSERT INTO probe_activations (
-            id,
-            project_id,
-            created_by_member_id,
-            label_pattern,
-            service,
-            environment,
-            trigger_token_hash,
-            trigger_expires_at,
-            expires_at,
-            created_at
-          )
-          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, now())
-          RETURNING
-            id AS activation_id,
-            label_pattern,
-            service,
-            environment,
-            expires_at::text AS expires_at,
-            trigger_expires_at::text AS trigger_expires_at
-        `,
-        [
-          activationId,
-          input.project_id,
-          input.created_by_member_id,
-          input.label_pattern,
-          input.service,
-          input.environment,
-          triggerToken.hash,
-          input.trigger_expires_at,
-          input.expires_at
-        ]
-      );
+        const project = scopedProject.rows[0];
+        if (project === undefined) {
+          return null;
+        }
 
-      const activation = inserted.rows[0];
-      if (activation === undefined) {
-        throw new Error("probe_activation_insert_failed");
-      }
+        /** Max 5 concurrent active (non-expired, non-deactivated) activations per project (FR-PRB-05). */
+        const countResult = await tx.query<{ cnt: string }>(
+          `
+            SELECT COUNT(*)::text AS cnt
+            FROM probe_activations
+            WHERE project_id = $1
+              AND deactivated_at IS NULL
+              AND expires_at > now()
+          `,
+          [input.project_id]
+        );
+        const activeCount = Number(countResult.rows[0]?.cnt ?? "0");
+        if (activeCount >= 5) {
+          return {
+            organization_plan: normalizeOrganizationPlan(project["organization_plan"]),
+            activation: {
+              activation_id: "",
+              label_pattern: "",
+              service: "",
+              environment: "",
+              expires_at: "",
+              trigger_expires_at: ""
+            },
+            trigger_token: "",
+            concurrent_limit_exceeded: true
+          };
+        }
 
-      return {
-        organization_plan: normalizeOrganizationPlan(project["organization_plan"]),
-        activation,
-        trigger_token: triggerToken.plaintext
-      };
+        const inserted = await tx.query<ProbeActivationRecord & Record<string, unknown> & { created_at: string }>(
+          `
+            INSERT INTO probe_activations (
+              id,
+              project_id,
+              created_by_member_id,
+              label_pattern,
+              service,
+              environment,
+              trigger_token_hash,
+              trigger_expires_at,
+              expires_at,
+              created_at
+            )
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, now())
+            RETURNING
+              id AS activation_id,
+              label_pattern,
+              service,
+              environment,
+              created_at::text AS created_at,
+              expires_at::text AS expires_at,
+              trigger_expires_at::text AS trigger_expires_at
+          `,
+          [
+            activationId,
+            input.project_id,
+            input.created_by_member_id,
+            input.label_pattern,
+            input.service,
+            input.environment,
+            triggerToken.hash,
+            input.trigger_expires_at,
+            input.expires_at
+          ]
+        );
+
+        const activation = inserted.rows[0];
+        if (activation === undefined) {
+          throw new Error("probe_activation_insert_failed");
+        }
+
+        await recordProjectMetricDeltas(accountAnalyticsStore, tx, {
+          organization_id: input.organization_id,
+          occurred_at: activation.created_at,
+          source: "remote_probe_activation_created",
+          dedupe_key: `remote_probe_activation_created:${activation.activation_id}`,
+          deltas: {
+            remote_probe_activations_created: 1
+          }
+        });
+
+        return {
+          organization_plan: normalizeOrganizationPlan(project["organization_plan"]),
+          activation,
+          trigger_token: triggerToken.plaintext
+        };
+      });
     },
 
     async deactivateProbeActivationForProjectInOrganization(input: {
@@ -2847,36 +2988,48 @@ export function createPostgresMetadataStore(db: Queryable): PostgresMetadataStor
       activation_id: string;
       deactivated_at: string;
     }): Promise<{ organization_plan: TierName; deactivated: { activation_id: string; deactivated_at: string } } | null> {
-      const result = await db.query<Record<string, unknown>>(
-        `
-          UPDATE probe_activations pa
-          SET deactivated_at = $1
-          FROM projects p
-          WHERE pa.id = $2
-            AND pa.project_id = $3
-            AND pa.project_id = p.id
-            AND p.organization_id = $4
-            AND pa.deactivated_at IS NULL
-          RETURNING
-            COALESCE((SELECT o.plan FROM organizations o WHERE o.id = p.organization_id), 'free') AS organization_plan,
-            pa.id AS activation_id,
-            pa.deactivated_at::text AS deactivated_at
-        `,
-        [input.deactivated_at, input.activation_id, input.project_id, input.organization_id]
-      );
+      return runInTransaction(db, async (tx) => {
+        const result = await tx.query<Record<string, unknown>>(
+          `
+            UPDATE probe_activations pa
+            SET deactivated_at = $1
+            FROM projects p
+            WHERE pa.id = $2
+              AND pa.project_id = $3
+              AND pa.project_id = p.id
+              AND p.organization_id = $4
+              AND pa.deactivated_at IS NULL
+            RETURNING
+              COALESCE((SELECT o.plan FROM organizations o WHERE o.id = p.organization_id), 'free') AS organization_plan,
+              pa.id AS activation_id,
+              pa.deactivated_at::text AS deactivated_at
+          `,
+          [input.deactivated_at, input.activation_id, input.project_id, input.organization_id]
+        );
 
-      const row = result.rows[0];
-      if (row === undefined) {
-        return null;
-      }
-
-      return {
-        organization_plan: normalizeOrganizationPlan(row["organization_plan"]),
-        deactivated: {
-          activation_id: getRequiredStringField(row, "activation_id"),
-          deactivated_at: getRequiredStringField(row, "deactivated_at")
+        const row = result.rows[0];
+        if (row === undefined) {
+          return null;
         }
-      };
+
+        await recordProjectMetricDeltas(accountAnalyticsStore, tx, {
+          organization_id: input.organization_id,
+          occurred_at: input.deactivated_at,
+          source: "remote_probe_activation_expired",
+          dedupe_key: `remote_probe_activation_expired:${input.activation_id}`,
+          deltas: {
+            remote_probe_activations_expired: 1
+          }
+        });
+
+        return {
+          organization_plan: normalizeOrganizationPlan(row["organization_plan"]),
+          deactivated: {
+            activation_id: getRequiredStringField(row, "activation_id"),
+            deactivated_at: getRequiredStringField(row, "deactivated_at")
+          }
+        };
+      });
     },
 
     async listIncidentsForOrganization(input): Promise<IncidentRetrievalRecord[]> {
@@ -3080,6 +3233,7 @@ export function createPostgresMetadataStore(db: Queryable): PostgresMetadataStor
                 )
               )
               AND i.id = $2
+              AND i.status <> 'open'
             RETURNING
               i.id AS incident_id,
               i.project_id,
@@ -3186,6 +3340,7 @@ export function createPostgresMetadataStore(db: Queryable): PostgresMetadataStor
             FROM accessible a, counts c
             WHERE c.requested_count = c.accessible_count
               AND i.id = a.incident_id
+              AND i.status <> 'open'
             RETURNING
               a.input_order,
               i.id AS incident_id,
@@ -3280,6 +3435,7 @@ export function createPostgresMetadataStore(db: Queryable): PostgresMetadataStor
                 )
               )
               AND i.id = $2
+              AND i.status <> 'open'
             RETURNING
               i.id AS incident_id,
               i.project_id,

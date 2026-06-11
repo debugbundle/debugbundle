@@ -2,6 +2,7 @@ import type Stripe from "stripe";
 
 import { MAX_BILLING_ADDITIONAL_CAPACITY_UNITS } from "../../../packages/shared-types/src/index.js";
 import type {
+  AccountAnalyticsStore,
   BillingStore,
   BillingSummaryRecord,
   BillingSyncStore,
@@ -122,8 +123,46 @@ interface CreateBillingManagementInput {
   stripeConfig?: StripeConfig;
   billingStore: BillingStore;
   billingSyncStore: BillingSyncStore;
+  accountAnalyticsStore?: AccountAnalyticsStore;
   billingLinks: BillingLinkProvider;
   appBaseUrl?: string;
+}
+
+function planRank(plan: "free" | "solo" | "team"): number {
+  switch (plan) {
+    case "team":
+      return 2;
+    case "solo":
+      return 1;
+    default:
+      return 0;
+  }
+}
+
+async function recordBillingMetricDeltas(
+  accountAnalyticsStore: AccountAnalyticsStore | undefined,
+  tx: Queryable,
+  input: {
+    organization_id: string;
+    occurred_at: string;
+    source: string;
+    dedupe_key: string;
+    deltas: Partial<
+      Record<
+        | "plan_upgraded"
+        | "plan_downgraded"
+        | "capacity_units_purchased"
+        | "capacity_units_reduced",
+        number
+      >
+    >;
+  }
+): Promise<void> {
+  if (accountAnalyticsStore === undefined) {
+    return;
+  }
+
+  await accountAnalyticsStore.withDb(tx).recordMetricDeltas(input);
 }
 
 async function getOrganizationBillingState(
@@ -360,9 +399,11 @@ export function createBillingManagement(input: CreateBillingManagementInput): {
             MAX_BILLING_ADDITIONAL_CAPACITY_UNITS
           );
     const updated = await runInTransaction(input.db, async (tx) => {
-      const previousResult = await tx.query<{ plan: string }>(
+      const previousResult = await tx.query<{ plan: string; additional_capacity_units: number }>(
         `
-          SELECT COALESCE(plan, 'free') AS plan
+          SELECT
+            COALESCE(plan, 'free') AS plan,
+            COALESCE(additional_capacity_units, 0)::int AS additional_capacity_units
           FROM organizations
           WHERE id = $1
           FOR UPDATE
@@ -371,6 +412,7 @@ export function createBillingManagement(input: CreateBillingManagementInput): {
       );
       const previousPlan = normalizePlanForDowngradeAudit(previousResult.rows[0]?.plan);
       const targetPlan = normalizePlanForDowngradeAudit(inputValue.plan);
+      const previousAdditionalCapacityUnits = previousResult.rows[0]?.additional_capacity_units ?? 0;
 
       const result = await tx.query<{ id: string }>(
         `
@@ -419,6 +461,23 @@ export function createBillingManagement(input: CreateBillingManagementInput): {
           occurred_at: inputValue.now
         });
       }
+
+      await recordBillingMetricDeltas(input.accountAnalyticsStore, tx, {
+        organization_id: inputValue.organization_id,
+        occurred_at: inputValue.now,
+        source: "billing_admin_override",
+        dedupe_key: `billing_admin_override:${inputValue.organization_id}:${inputValue.now}`,
+        deltas: {
+          ...(planRank(inputValue.plan) > planRank(previousPlan) ? { plan_upgraded: 1 } : {}),
+          ...(planRank(inputValue.plan) < planRank(previousPlan) ? { plan_downgraded: 1 } : {}),
+          ...(additionalCapacityUnits > previousAdditionalCapacityUnits
+            ? { capacity_units_purchased: additionalCapacityUnits - previousAdditionalCapacityUnits }
+            : {}),
+          ...(additionalCapacityUnits < previousAdditionalCapacityUnits
+            ? { capacity_units_reduced: previousAdditionalCapacityUnits - additionalCapacityUnits }
+            : {})
+        }
+      });
 
       return true;
     });

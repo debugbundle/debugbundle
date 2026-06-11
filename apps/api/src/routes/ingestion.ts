@@ -1,8 +1,10 @@
-import type { FastifyInstance } from "fastify";
+import type { FastifyBaseLogger, FastifyInstance } from "fastify";
 
 import { hashToken, readBearerToken, requireProjectToken } from "../../../../packages/auth/src/index.js";
 import { classifyEvent, validateEvent } from "../../../../packages/event-normalizer/src/index.js";
 import {
+  buildIngestionMetricBatch,
+  countsTowardMonthlyIngestAllowance,
   queueAllowanceLimitReachedNotification,
   queueAllowanceThresholdNotifications
 } from "../../../../packages/storage/src/index.js";
@@ -25,23 +27,81 @@ function toRetryAfterSeconds(retryAfterMs: number): string {
   return String(Math.max(1, Math.ceil(retryAfterMs / 1_000)));
 }
 
-function countsTowardMonthlyIngestAllowance(
-  organizationPlan: string | undefined,
-  eventClass: EventClass
-): boolean {
-  if (eventClass === "operational_signal") {
-    return false;
-  }
-
-  if (organizationPlan === "solo" || organizationPlan === "team") {
-    return true;
-  }
-
-  return eventClass === "incident_signal";
-}
-
 function getQuotaRetryAfterMs(resetAt: string, now: Date): number {
   return Math.max(1_000, new Date(resetAt).getTime() - now.getTime());
+}
+
+function readRejectedMetricEventId(candidate: unknown, index: number): string {
+  if (typeof candidate === "object" && candidate !== null) {
+    const eventId = (candidate as Record<string, unknown>)["event_id"];
+    if (typeof eventId === "string" && eventId.length > 0) {
+      return eventId;
+    }
+  }
+
+  return `invalid_event_index_${index}`;
+}
+
+type IngestionRejectedMetricEvent = {
+  event_id: string;
+  reason:
+    | "capture_policy_rejected"
+    | "capture_rule_dropped"
+    | "capture_rule_sampled_out"
+    | "invalid_event"
+    | "monthly_quota_exceeded"
+    | "rate_limited"
+    | "remote_probes_disabled";
+};
+
+type IngestionAcceptedMetricEvent = {
+  event_id: string;
+  event_class: EventClass;
+  event_type: string;
+};
+
+async function recordIngestionMetricBatchBestEffort(input: {
+  dependencies: ApiDependencies;
+  log: FastifyBaseLogger;
+  organization_id: string | undefined;
+  project_id: string;
+  organization_plan: string | undefined;
+  occurred_at: string;
+  accepted_events: IngestionAcceptedMetricEvent[];
+  rejected_events: IngestionRejectedMetricEvent[];
+}): Promise<void> {
+  if (input.dependencies.accountAnalytics === undefined || input.organization_id === undefined) {
+    return;
+  }
+
+  const metricBatch = buildIngestionMetricBatch({
+    project_id: input.project_id,
+    organization_plan: input.organization_plan,
+    accepted_events: input.accepted_events,
+    rejected_events: input.rejected_events
+  });
+  if (metricBatch === null) {
+    return;
+  }
+
+  try {
+    await input.dependencies.accountAnalytics.recordMetricDeltas({
+      organization_id: input.organization_id,
+      occurred_at: input.occurred_at,
+      source: "ingestion_batch",
+      dedupe_key: metricBatch.dedupe_key,
+      deltas: metricBatch.deltas
+    });
+  } catch (error) {
+    input.log.warn(
+      {
+        err: error,
+        project_id: input.project_id,
+        organization_id: input.organization_id
+      },
+      "ingestion_account_analytics_record_failed"
+    );
+  }
 }
 
 export function registerIngestionRoutes(app: FastifyInstance, dependencies: ApiDependencies): void {
@@ -94,6 +154,7 @@ export function registerIngestionRoutes(app: FastifyInstance, dependencies: ApiD
     }
 
     const errors: Array<{ index: number; reason: string }> = [];
+    const rejectedMetricEvents: IngestionRejectedMetricEvent[] = [];
     const validEvents: Array<{ index: number; event: ReturnType<typeof redactEvent> }> = [];
 
     for (const [index, candidate] of parsedBody.data.events.entries()) {
@@ -102,6 +163,10 @@ export function registerIngestionRoutes(app: FastifyInstance, dependencies: ApiD
         errors.push({
           index,
           reason: validation.error.issues[0]?.message ?? "invalid_event"
+        });
+        rejectedMetricEvents.push({
+          event_id: readRejectedMetricEventId(candidate, index),
+          reason: "invalid_event"
         });
         continue;
       }
@@ -130,6 +195,23 @@ export function registerIngestionRoutes(app: FastifyInstance, dependencies: ApiD
               reason: "rate_limited"
             }))
           );
+          rejectedMetricEvents.push(
+            ...validEvents.map(({ event }) => ({
+              event_id: event.event_id,
+              reason: "rate_limited" as const
+            }))
+          );
+
+          await recordIngestionMetricBatchBestEffort({
+            dependencies,
+            log: request.log,
+            organization_id: project.organization_id,
+            project_id: project.project_id,
+            organization_plan: project.organization_plan,
+            occurred_at: now.toISOString(),
+            accepted_events: [],
+            rejected_events: rejectedMetricEvents
+          });
 
           return reply.header("Retry-After", toRetryAfterSeconds(rateLimit.retry_after_ms)).status(429).send({
             accepted: 0,
@@ -180,6 +262,10 @@ export function registerIngestionRoutes(app: FastifyInstance, dependencies: ApiD
         entry.event.payload.activation_id.length > 0
       ) {
         errors.push({ index: entry.index, reason: "remote_probes_disabled" });
+        rejectedMetricEvents.push({
+          event_id: entry.event.event_id,
+          reason: "remote_probes_disabled"
+        });
         continue;
       }
 
@@ -217,12 +303,20 @@ export function registerIngestionRoutes(app: FastifyInstance, dependencies: ApiD
         if (captureRule?.outcome === "drop") {
           errors.push({ index: entry.index, reason: "capture_rule_dropped" });
           matchedRuleHits.push({ rule_id: captureRule.rule_id, matched_at: now.toISOString() });
+          rejectedMetricEvents.push({
+            event_id: entry.event.event_id,
+            reason: "capture_rule_dropped"
+          });
           continue;
         }
 
         if (captureRule?.outcome === "sampled_out") {
           errors.push({ index: entry.index, reason: "capture_rule_sampled_out" });
           matchedRuleHits.push({ rule_id: captureRule.rule_id, matched_at: now.toISOString() });
+          rejectedMetricEvents.push({
+            event_id: entry.event.event_id,
+            reason: "capture_rule_sampled_out"
+          });
           continue;
         }
 
@@ -242,6 +336,10 @@ export function registerIngestionRoutes(app: FastifyInstance, dependencies: ApiD
         capturedEvents.push(entry);
       } else {
         errors.push({ index: entry.index, reason: "capture_policy_rejected" });
+        rejectedMetricEvents.push({
+          event_id: entry.event.event_id,
+          reason: "capture_policy_rejected"
+        });
       }
     }
 
@@ -287,6 +385,23 @@ export function registerIngestionRoutes(app: FastifyInstance, dependencies: ApiD
               reason: "monthly_quota_exceeded"
             }))
           );
+          rejectedMetricEvents.push(
+            ...acceptedEvents.map(({ event }) => ({
+              event_id: event.event_id,
+              reason: "monthly_quota_exceeded" as const
+            }))
+          );
+
+          await recordIngestionMetricBatchBestEffort({
+            dependencies,
+            log: request.log,
+            organization_id: project.organization_id,
+            project_id: project.project_id,
+            organization_plan: project.organization_plan,
+            occurred_at: now.toISOString(),
+            accepted_events: [],
+            rejected_events: rejectedMetricEvents
+          });
 
           return reply.header("Retry-After", toRetryAfterSeconds(retryAfterMs)).status(429).send({
             accepted: 0,
@@ -388,6 +503,21 @@ export function registerIngestionRoutes(app: FastifyInstance, dependencies: ApiD
         usage_window_ends_at: usageWindowEndsAt
       });
     }
+
+    await recordIngestionMetricBatchBestEffort({
+      dependencies,
+      log: request.log,
+      organization_id: project.organization_id,
+      project_id: project.project_id,
+      organization_plan: project.organization_plan,
+      occurred_at: now.toISOString(),
+      accepted_events: acceptedEvents.map(({ event, eventClass }) => ({
+        event_id: event.event_id,
+        event_class: eventClass,
+        event_type: event.event_type
+      })),
+      rejected_events: rejectedMetricEvents
+    });
 
     let activeProbes: Array<{
       activation_id: string;

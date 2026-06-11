@@ -31,6 +31,7 @@ import {
   type ImprovementRuleThresholds
 } from "./improvement-rules.js";
 import type { IncidentLifecycleGitHubDispatchPublisher } from "./processor.js";
+import { recordProjectMetricDeltas, type WorkerAccountAnalyticsDependencies } from "./account-analytics.js";
 
 type ImprovementWebhookStore = Pick<WebhookDeliveryStore, "listMatchingWebhooks" | "createDeliveryIntent">;
 
@@ -55,7 +56,7 @@ async function deletePrunedBundleArtifacts(input: {
   });
 }
 
-export interface ImprovementBundleWorkerDependencies {
+export interface ImprovementBundleWorkerDependencies extends WorkerAccountAnalyticsDependencies {
   improvementOpportunityStore?: ImprovementOpportunityStore;
   billingStore?: Pick<BillingStore, "getBillingSummaryForProject">;
   webhookDeliveryStore?: ImprovementWebhookStore;
@@ -205,7 +206,7 @@ async function loadRepresentativeRequestContext(input: {
   };
 }
 
-async function publishImprovementBundleCreated(input: {
+async function publishImprovementBundleCreated(input: WorkerAccountAnalyticsDependencies & {
   webhookDeliveryStore?: ImprovementWebhookStore;
   billingStore?: Pick<BillingStore, "getBillingSummaryForProject">;
   operationalEmailDeliveryStore?: Pick<OperationalEmailDeliveryStore, "queueProjectOperationalEmailDelivery">;
@@ -283,7 +284,7 @@ async function publishImprovementBundleCreated(input: {
       break;
     }
 
-    await input.webhookDeliveryStore.createDeliveryIntent({
+    const delivery = await input.webhookDeliveryStore.createDeliveryIntent({
       webhook_id: target.webhook_id,
       project_id: input.project_id,
       incident_id: null,
@@ -314,6 +315,15 @@ async function publishImprovementBundleCreated(input: {
         deploy_branch: null,
         deploy_deployed_at: null,
         minutes_since_deploy: null
+      }
+    });
+    await recordProjectMetricDeltas(input, {
+      projectId: input.project_id,
+      occurredAt: input.occurred_at,
+      source: "webhook_delivery_created",
+      dedupeKey: `webhook_delivery_created:${delivery.delivery_id}`,
+      deltas: {
+        webhook_deliveries_created: 1
       }
     });
 
@@ -841,6 +851,15 @@ async function generateRecordedHostedImprovementBundle(input: {
         opportunity_id: input.recorded.opportunity_id,
         reason: "monthly_quota_exceeded"
       });
+      await recordProjectMetricDeltas(input.dependencies, {
+        projectId: input.project_id,
+        occurredAt: input.occurred_at,
+        source: "worker.improvement_bundle",
+        dedupeKey: `improvement_bundle_generation_failed:${input.recorded.opportunity_id}:${input.event_id}`,
+        deltas: {
+          improvement_bundle_generations_failed: 1
+        }
+      });
       return;
     }
   }
@@ -887,6 +906,15 @@ async function generateRecordedHostedImprovementBundle(input: {
       body: gzipSync(Buffer.from(JSON.stringify(bundle), "utf8")),
       contentType: "application/json",
       contentEncoding: "gzip"
+    });
+    await recordProjectMetricDeltas(input.dependencies, {
+      projectId: context.project_id,
+      occurredAt: input.occurred_at,
+      source: "worker.improvement_bundle",
+      dedupeKey: `improvement_bundle_generation:${context.opportunity_id}:${reserved.generation_number}`,
+      deltas: {
+        [reserved.generation_number > 1 ? "improvement_bundles_updated" : "improvement_bundles_created"]: 1
+      }
     });
 
     if (
@@ -947,6 +975,17 @@ async function generateRecordedHostedImprovementBundle(input: {
             dedupe_date: new Date().toISOString().slice(0, 10)
           });
         }
+        if (prunedOwners.length > 0) {
+          await recordProjectMetricDeltas(input.dependencies, {
+            projectId: context.project_id,
+            occurredAt: input.occurred_at,
+            source: "worker.improvement_bundle",
+            dedupeKey: `retention_bundle_rotation:improvement:${context.opportunity_id}:${reserved.generation_number}`,
+            deltas: {
+              retention_bundle_owners_rotated: prunedOwners.length
+            }
+          });
+        }
       }
     }
 
@@ -960,6 +999,12 @@ async function generateRecordedHostedImprovementBundle(input: {
       title: context.title,
       bundle_link: bundleLink,
       project_link: projectLink,
+      ...(input.dependencies.accountAnalyticsStore === undefined
+        ? {}
+        : { accountAnalyticsStore: input.dependencies.accountAnalyticsStore }),
+      ...(input.dependencies.resolveOrganizationIdForProject === undefined
+        ? {}
+        : { resolveOrganizationIdForProject: input.dependencies.resolveOrganizationIdForProject }),
       ...(input.dependencies.webhookDeliveryStore === undefined ? {} : { webhookDeliveryStore: input.dependencies.webhookDeliveryStore }),
       ...(input.dependencies.billingStore === undefined ? {} : { billingStore: input.dependencies.billingStore }),
       ...(input.dependencies.operationalEmailDeliveryStore === undefined
@@ -987,6 +1032,15 @@ async function generateRecordedHostedImprovementBundle(input: {
     await input.dependencies.improvementOpportunityStore.markImprovementBundleGenerationFailure({
       opportunity_id: input.recorded.opportunity_id,
       reason: "build_error"
+    });
+    await recordProjectMetricDeltas(input.dependencies, {
+      projectId: input.project_id,
+      occurredAt: input.occurred_at,
+      source: "worker.improvement_bundle",
+      dedupeKey: `improvement_bundle_generation_failed:${input.recorded.opportunity_id}:${input.event_id}`,
+      deltas: {
+        improvement_bundle_generations_failed: 1
+      }
     });
   }
 }

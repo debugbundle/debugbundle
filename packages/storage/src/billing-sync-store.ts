@@ -1,5 +1,6 @@
 import type { TierName } from "../../../packages/shared-types/src/index.js";
 
+import type { AccountAnalyticsStore } from "./account-analytics-store.js";
 import {
   isPlanDowngrade,
   normalizePlanForDowngradeAudit,
@@ -40,7 +41,54 @@ export interface BillingSyncStore {
   updateBillingState(organizationId: string, billingState: string, eventId: string): Promise<void>;
 }
 
-export function createPostgresBillingSyncStore(db: Queryable): BillingSyncStore {
+type PostgresBillingSyncStoreOptions = {
+  accountAnalyticsStore?: AccountAnalyticsStore;
+};
+
+function planRank(plan: TierName): number {
+  switch (plan) {
+    case "team":
+      return 2;
+    case "solo":
+      return 1;
+    default:
+      return 0;
+  }
+}
+
+async function recordBillingMetricDeltas(
+  accountAnalyticsStore: AccountAnalyticsStore | undefined,
+  tx: Queryable,
+  input: {
+    organization_id: string;
+    occurred_at: string;
+    source: string;
+    dedupe_key: string;
+    deltas: Partial<
+      Record<
+        | "trial_converted"
+        | "plan_upgraded"
+        | "plan_downgraded"
+        | "capacity_units_purchased"
+        | "capacity_units_reduced",
+        number
+      >
+    >;
+  }
+): Promise<void> {
+  if (accountAnalyticsStore === undefined) {
+    return;
+  }
+
+  await accountAnalyticsStore.withDb(tx).recordMetricDeltas(input);
+}
+
+export function createPostgresBillingSyncStore(
+  db: Queryable,
+  options: PostgresBillingSyncStoreOptions = {}
+): BillingSyncStore {
+  const accountAnalyticsStore = options.accountAnalyticsStore;
+
   return {
     async isEventProcessed(eventId: string): Promise<boolean> {
       const result = await db.query<{ exists: boolean }>(
@@ -67,9 +115,18 @@ export function createPostgresBillingSyncStore(db: Queryable): BillingSyncStore 
 
     async updateEntitlements(update: BillingEntitlementUpdate): Promise<void> {
       await runInTransaction(db, async (tx) => {
-        const previousResult = await tx.query<{ plan: string }>(
+        const previousResult = await tx.query<{
+          plan: string;
+          additional_capacity_units: number;
+          trial_used_at: string | null;
+          trial_converted_at: string | null;
+        }>(
           `
-            SELECT COALESCE(plan, 'free') AS plan
+            SELECT
+              COALESCE(plan, 'free') AS plan,
+              COALESCE(additional_capacity_units, 0)::int AS additional_capacity_units,
+              (to_jsonb(organizations) ->> 'trial_used_at') AS trial_used_at,
+              (to_jsonb(organizations) ->> 'trial_converted_at') AS trial_converted_at
             FROM organizations
             WHERE id = $1
             FOR UPDATE
@@ -78,6 +135,9 @@ export function createPostgresBillingSyncStore(db: Queryable): BillingSyncStore 
         );
         const previousPlan = normalizePlanForDowngradeAudit(previousResult.rows[0]?.plan);
         const targetPlan = normalizePlanForDowngradeAudit(update.plan);
+        const previousAdditionalCapacityUnits = previousResult.rows[0]?.additional_capacity_units ?? 0;
+        const previousTrialUsedAt = previousResult.rows[0]?.trial_used_at ?? null;
+        const previousTrialConvertedAt = previousResult.rows[0]?.trial_converted_at ?? null;
 
         await tx.query(
           `
@@ -130,6 +190,45 @@ export function createPostgresBillingSyncStore(db: Queryable): BillingSyncStore 
             occurred_at: update.last_billing_sync_at
           });
         }
+
+        const deltas: Partial<
+          Record<
+            | "trial_converted"
+            | "plan_upgraded"
+            | "plan_downgraded"
+            | "capacity_units_purchased"
+            | "capacity_units_reduced",
+            number
+          >
+        > = {};
+
+        if (
+          previousTrialUsedAt !== null &&
+          previousTrialConvertedAt === null &&
+          targetPlan !== "free"
+        ) {
+          deltas["trial_converted"] = 1;
+        }
+        if (planRank(targetPlan) > planRank(previousPlan)) {
+          deltas["plan_upgraded"] = 1;
+        } else if (planRank(targetPlan) < planRank(previousPlan)) {
+          deltas["plan_downgraded"] = 1;
+        }
+        if (update.additional_capacity_units > previousAdditionalCapacityUnits) {
+          deltas["capacity_units_purchased"] =
+            update.additional_capacity_units - previousAdditionalCapacityUnits;
+        } else if (update.additional_capacity_units < previousAdditionalCapacityUnits) {
+          deltas["capacity_units_reduced"] =
+            previousAdditionalCapacityUnits - update.additional_capacity_units;
+        }
+
+        await recordBillingMetricDeltas(accountAnalyticsStore, tx, {
+          organization_id: update.organization_id,
+          occurred_at: update.last_billing_sync_at,
+          source: "billing_entitlements_updated",
+          dedupe_key: `billing_entitlements_updated:${update.last_billing_event_id}`,
+          deltas
+        });
       });
     },
 
@@ -158,9 +257,11 @@ export function createPostgresBillingSyncStore(db: Queryable): BillingSyncStore 
 
     async revokeEntitlements(organizationId: string, eventId: string): Promise<void> {
       await runInTransaction(db, async (tx) => {
-        const previousResult = await tx.query<{ plan: string }>(
+        const previousResult = await tx.query<{ plan: string; additional_capacity_units: number }>(
           `
-            SELECT COALESCE(plan, 'free') AS plan
+            SELECT
+              COALESCE(plan, 'free') AS plan,
+              COALESCE(additional_capacity_units, 0)::int AS additional_capacity_units
             FROM organizations
             WHERE id = $1
             FOR UPDATE
@@ -168,6 +269,7 @@ export function createPostgresBillingSyncStore(db: Queryable): BillingSyncStore 
           [organizationId]
         );
         const previousPlan = normalizePlanForDowngradeAudit(previousResult.rows[0]?.plan);
+        const previousAdditionalCapacityUnits = previousResult.rows[0]?.additional_capacity_units ?? 0;
 
         await tx.query(
           `
@@ -201,6 +303,19 @@ export function createPostgresBillingSyncStore(db: Queryable): BillingSyncStore 
             occurred_at: new Date().toISOString()
           });
         }
+
+        await recordBillingMetricDeltas(accountAnalyticsStore, tx, {
+          organization_id: organizationId,
+          occurred_at: new Date().toISOString(),
+          source: "billing_entitlements_revoked",
+          dedupe_key: `billing_entitlements_revoked:${eventId}`,
+          deltas: {
+            ...(planRank(previousPlan) > planRank("free") ? { plan_downgraded: 1 } : {}),
+            ...(previousAdditionalCapacityUnits > 0
+              ? { capacity_units_reduced: previousAdditionalCapacityUnits }
+              : {})
+          }
+        });
       });
     },
 

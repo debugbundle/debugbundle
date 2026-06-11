@@ -4,6 +4,8 @@ const CURRENT_SCHEMA_SENTINEL_COLUMNS = [
   { table_name: "agent_webhooks", column_name: "created_by_user_id" },
   { table_name: "alert_rules", column_name: "created_by_user_id" },
   { table_name: "alert_rules", column_name: "cooldown_seconds" },
+  { table_name: "account_analytics_accounts", column_name: "metrics_collection_started_at" },
+  { table_name: "account_payment_retention_records", column_name: "provider" },
   { table_name: "capture_policies", column_name: "immediate_client_error_statuses" },
   { table_name: "capture_policies", column_name: "immediate_client_error_path_rules" },
   { table_name: "github_dispatch_rules", column_name: "created_by_user_id" },

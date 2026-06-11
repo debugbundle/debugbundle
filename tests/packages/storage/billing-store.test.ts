@@ -499,6 +499,79 @@ describe("billing store – trial lifecycle", () => {
     });
   });
 
+  it("records a trial_started account metric when a trial begins", async () => {
+    const query = vi.fn().mockImplementation((sql: string) => {
+      if (sql.includes("UPDATE organizations") && sql.includes("billing_state = 'trialing'")) {
+        return { rows: [{ id: "org_trial" }] };
+      }
+
+      if (sql.includes("FROM organizations")) {
+        return {
+          rows: [
+            {
+              plan: "solo",
+              billing_state: "trialing",
+              stripe_customer_id: null,
+              stripe_subscription_id: null,
+              additional_capacity_units: 0,
+              billing_period_starts_at: "2026-03-01T00:00:00.000Z",
+              billing_period_ends_at: "2026-03-31T00:00:00.000Z",
+              trial_plan: "solo",
+              trial_started_at: "2026-03-01T00:00:00.000Z",
+              trial_ends_at: "2026-03-31T00:00:00.000Z",
+              trial_used_at: "2026-03-01T00:00:00.000Z",
+              trial_converted_at: null,
+              trial_expired_at: null
+            }
+          ]
+        };
+      }
+
+      if (sql.includes("to_regclass")) {
+        return { rows: [{ exists: false }] };
+      }
+
+      return { rows: [{ count: 0 }] };
+    });
+    const recordMetricDeltas = vi.fn().mockResolvedValue("recorded");
+
+    const store = createPostgresBillingStore(
+      {
+        query,
+        transaction: async <Result>(callback: (tx: { query: typeof query }) => Promise<Result>) =>
+          callback({ query })
+      },
+      {
+        accountAnalyticsStore: {
+          withDb: vi.fn().mockReturnValue({ recordMetricDeltas }),
+          ensureAnalyticsAccount: vi.fn(),
+          recordMetricDeltas,
+          markAccountDeleted: vi.fn(),
+          preserveBillingRetentionForDeletedOrganization: vi.fn(),
+          getAccountMetricSummary: vi.fn(),
+          listAccountMetricPeriods: vi.fn(),
+          getAggregateMetricSummary: vi.fn(),
+          backfillRetainedRowsForOrganization: vi.fn()
+        }
+      }
+    );
+
+    await store.startTrialForOrganization({
+      organization_id: "org_trial",
+      target_plan: "solo",
+      started_at: "2026-03-01T00:00:00.000Z",
+      ends_at: "2026-03-31T00:00:00.000Z"
+    });
+
+    expect(recordMetricDeltas).toHaveBeenCalledWith(
+      expect.objectContaining({
+        organization_id: "org_trial",
+        source: "trial_started",
+        deltas: { trial_started: 1 }
+      })
+    );
+  });
+
   it("rejects starting a second trial after one has been used", async () => {
     const query = vi.fn().mockImplementation((sql: string) => {
       if (sql.includes("UPDATE organizations") && sql.includes("billing_state = 'trialing'")) {
@@ -578,6 +651,89 @@ describe("billing store – trial lifecycle", () => {
     ).toBe(true);
     expect(query).toHaveBeenCalledWith("BEGIN", []);
     expect(query).toHaveBeenCalledWith("COMMIT", []);
+  });
+
+  it("records a trial_expired account metric when a trial expires", async () => {
+    const query = vi.fn().mockImplementation((sql: string) => {
+      if (sql.includes("SELECT COALESCE(plan, 'free') AS plan")) {
+        return { rows: [{ plan: "free" }] };
+      }
+
+      if (sql.includes("UPDATE organizations") && sql.includes("billing_state = 'trial_expired'")) {
+        return { rows: [{ id: "org_trial" }] };
+      }
+
+      if (sql.includes("FROM organizations")) {
+        return {
+          rows: [
+            {
+              plan: "free",
+              billing_state: "trial_expired",
+              stripe_customer_id: null,
+              stripe_subscription_id: null,
+              additional_capacity_units: 0,
+              billing_period_starts_at: null,
+              billing_period_ends_at: null,
+              trial_plan: "solo",
+              trial_started_at: "2026-03-01T00:00:00.000Z",
+              trial_ends_at: "2026-03-31T00:00:00.000Z",
+              trial_used_at: "2026-03-01T00:00:00.000Z",
+              trial_converted_at: null,
+              trial_expired_at: "2026-04-01T00:00:00.000Z"
+            }
+          ]
+        };
+      }
+
+      if (sql.includes("JOIN github_dispatch_rules rules")) {
+        return { rows: [], rowCount: 0 };
+      }
+
+      if (sql.includes("INSERT INTO audit_logs")) {
+        return { rows: [] };
+      }
+
+      if (sql.includes("to_regclass")) {
+        return { rows: [{ exists: false }] };
+      }
+
+      return { rows: [{ count: 0 }] };
+    });
+    const recordMetricDeltas = vi.fn().mockResolvedValue("recorded");
+
+    const store = createPostgresBillingStore(
+      {
+        query,
+        transaction: async <Result>(callback: (tx: { query: typeof query }) => Promise<Result>) =>
+          callback({ query })
+      },
+      {
+        accountAnalyticsStore: {
+          withDb: vi.fn().mockReturnValue({ recordMetricDeltas }),
+          ensureAnalyticsAccount: vi.fn(),
+          recordMetricDeltas,
+          markAccountDeleted: vi.fn(),
+          preserveBillingRetentionForDeletedOrganization: vi.fn(),
+          getAccountMetricSummary: vi.fn(),
+          listAccountMetricPeriods: vi.fn(),
+          getAggregateMetricSummary: vi.fn(),
+          backfillRetainedRowsForOrganization: vi.fn()
+        }
+      }
+    );
+
+    await store.expireTrialForOrganization({
+      organization_id: "org_trial",
+      now: "2026-04-01T00:00:00.000Z"
+    });
+
+    expect(recordMetricDeltas).toHaveBeenCalledWith(
+      expect.objectContaining({
+        organization_id: "org_trial",
+        source: "trial_expired",
+        deltas: { trial_expired: 1 }
+      })
+    );
   });
 
   it("rolls back trial expiry when downgrade cleanup fails", async () => {

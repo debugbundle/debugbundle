@@ -1,3 +1,5 @@
+import type { AccountAnalyticsStore } from "./account-analytics-store.js";
+import { runInTransaction } from "./transaction.js";
 import type {
   AccountDataExportRecord,
   AccountDeletionBlockedReason,
@@ -74,7 +76,16 @@ function mapUserAvatarRow(row: Record<string, unknown>): UserAvatarRecord {
   };
 }
 
-export function createPostgresAccountStore(db: Queryable): AccountLifecycleStore {
+type PostgresAccountStoreOptions = {
+  accountAnalyticsStore?: AccountAnalyticsStore;
+};
+
+export function createPostgresAccountStore(
+  db: Queryable,
+  options: PostgresAccountStoreOptions = {}
+): AccountLifecycleStore {
+  const accountAnalyticsStore = options.accountAnalyticsStore;
+
   return {
     async exportAccountForOrganization(input): Promise<AccountDataExportRecord | null> {
       const user = await queryJsonRow(
@@ -549,10 +560,10 @@ export function createPostgresAccountStore(db: Queryable): AccountLifecycleStore
     },
 
     async deleteAccountForOrganization(input): Promise<DeletedAccountRecord | AccountDeletionBlockedReason | null> {
-      await db.query("BEGIN", []);
-
-      try {
-        const membership = await db.query<{ role: string }>(
+      const deleteAccount = async (
+        queryable: Queryable,
+      ): Promise<DeletedAccountRecord | AccountDeletionBlockedReason | null> => {
+        const membership = await queryable.query<{ role: string }>(
           `
             SELECT role
             FROM organization_members
@@ -560,15 +571,14 @@ export function createPostgresAccountStore(db: Queryable): AccountLifecycleStore
               AND user_id = $2
             LIMIT 1
           `,
-          [input.organization_id, input.user_id],
-        );
+            [input.organization_id, input.user_id],
+          );
 
-        if (membership.rows[0] === undefined) {
-          await rollbackQuietly(db);
-          return null;
-        }
+          if (membership.rows[0] === undefined) {
+            return null;
+          }
 
-        const blockingOwnership = await db.query<{ organization_id: string }>(
+          const blockingOwnership = await queryable.query<{ organization_id: string }>(
           `
             SELECT om.organization_id::text AS organization_id
             FROM organization_members om
@@ -584,15 +594,14 @@ export function createPostgresAccountStore(db: Queryable): AccountLifecycleStore
               )
             LIMIT 1
           `,
-          [input.organization_id, input.user_id],
-        );
+            [input.organization_id, input.user_id],
+          );
 
-        if (blockingOwnership.rows[0] !== undefined) {
-          await rollbackQuietly(db);
-          return "other_owned_organizations_exist";
-        }
+          if (blockingOwnership.rows[0] !== undefined) {
+            return "other_owned_organizations_exist";
+          }
 
-        const blockingOwnedProject = await db.query<{ project_id: string }>(
+          const blockingOwnedProject = await queryable.query<{ project_id: string }>(
           `
             SELECT p.id::text AS project_id
             FROM projects p
@@ -600,110 +609,165 @@ export function createPostgresAccountStore(db: Queryable): AccountLifecycleStore
               AND p.organization_id <> $1
             LIMIT 1
           `,
-          [input.organization_id, input.user_id],
-        );
+            [input.organization_id, input.user_id],
+          );
 
-        if (blockingOwnedProject.rows[0] !== undefined) {
-          await rollbackQuietly(db);
-          return "other_owned_projects_exist";
-        }
+          if (blockingOwnedProject.rows[0] !== undefined) {
+            return "other_owned_projects_exist";
+          }
 
-        const projectIdRows = await db.query<{ project_id: string }>(
+          const projectIdRows = await queryable.query<{ project_id: string }>(
           `
             SELECT id::text AS project_id
             FROM projects
             WHERE organization_id = $1
             ORDER BY created_at ASC, id ASC
           `,
-          [input.organization_id],
-        );
-        const deletedProjectIds = projectIdRows.rows.map((row) => row.project_id);
+            [input.organization_id],
+          );
+          const deletedProjectIds = projectIdRows.rows.map((row) => row.project_id);
 
-        const deletedOrgMemberTokens = await db.query<{ token_id: string }>(
+          const deletionSummary = await queryable.query<{
+            project_count: number;
+            open_incident_count: number;
+            open_improvement_count: number;
+          }>(
+            `
+              SELECT
+                (
+                  SELECT COUNT(*)::int
+                  FROM projects
+                  WHERE organization_id = $1::uuid
+                ) AS project_count,
+                (
+                  SELECT COUNT(*)::int
+                  FROM incidents i
+                  JOIN projects p ON p.id = i.project_id
+                  WHERE p.organization_id = $1::uuid
+                    AND i.status <> 'resolved'
+                ) AS open_incident_count,
+                (
+                  SELECT COUNT(*)::int
+                  FROM improvement_opportunities io
+                  JOIN projects p ON p.id = io.project_id
+                  WHERE p.organization_id = $1::uuid
+                    AND io.status <> 'resolved'
+                ) AS open_improvement_count
+            `,
+            [input.organization_id],
+          );
+          const deletionSummaryRow = deletionSummary.rows[0] ?? {
+            project_count: 0,
+            open_incident_count: 0,
+            open_improvement_count: 0
+          };
+
+          const deletedOrgMemberTokens = await queryable.query<{ token_id: string }>(
           `
             DELETE FROM member_tokens
             WHERE organization_id = $1
             RETURNING id::text AS token_id
           `,
-          [input.organization_id],
-        );
+            [input.organization_id],
+          );
 
-        await db.query(
+          if (accountAnalyticsStore !== undefined) {
+            const analyticsTx = accountAnalyticsStore.withDb(queryable);
+            await analyticsTx.preserveBillingRetentionForDeletedOrganization({
+              organization_id: input.organization_id,
+              deleted_at: input.deleted_at
+            });
+            await analyticsTx.recordMetricDeltas({
+              organization_id: input.organization_id,
+              occurred_at: input.deleted_at,
+              source: "account_deleted",
+              dedupe_key: `account_deleted:${input.organization_id}`,
+              deltas: {
+                account_deleted: 1,
+                projects_existing_at_account_deletion: deletionSummaryRow.project_count,
+                open_incidents_existing_at_account_deletion: deletionSummaryRow.open_incident_count,
+                open_improvements_existing_at_account_deletion: deletionSummaryRow.open_improvement_count
+              }
+            });
+            await analyticsTx.markAccountDeleted({
+              organization_id: input.organization_id,
+              deleted_at: input.deleted_at
+            });
+          }
+
+          await queryable.query(
           `
             DELETE FROM processed_billing_events
             WHERE organization_id = $1
           `,
-          [input.organization_id],
-        );
+            [input.organization_id],
+          );
 
-        await db.query(
+          await queryable.query(
           `
             DELETE FROM audit_logs
             WHERE organization_id = $1
           `,
-          [input.organization_id],
-        );
+            [input.organization_id],
+          );
 
-        await db.query(
+          await queryable.query(
           `
             DELETE FROM projects
             WHERE organization_id = $1
           `,
-          [input.organization_id],
-        );
+            [input.organization_id],
+          );
 
-        const deletedOrganization = await db.query<{ organization_id: string }>(
+          const deletedOrganization = await queryable.query<{ organization_id: string }>(
           `
             DELETE FROM organizations
             WHERE id = $1
             RETURNING id::text AS organization_id
           `,
-          [input.organization_id],
-        );
+            [input.organization_id],
+          );
 
-        if (deletedOrganization.rows[0] === undefined) {
-          await rollbackQuietly(db);
-          return null;
-        }
+          if (deletedOrganization.rows[0] === undefined) {
+            return null;
+          }
 
-        let deletedMemberTokenCount = deletedOrgMemberTokens.rows.length;
-        await db.query(
+          let deletedMemberTokenCount = deletedOrgMemberTokens.rows.length;
+          await queryable.query(
           `
             DELETE FROM organization_members
             WHERE user_id = $1
           `,
-          [input.user_id],
-        );
+            [input.user_id],
+          );
 
-        const deletedUserMemberTokens = await db.query<{ token_id: string }>(
+          const deletedUserMemberTokens = await queryable.query<{ token_id: string }>(
           `
             DELETE FROM member_tokens
             WHERE user_id = $1
             RETURNING id::text AS token_id
           `,
-          [input.user_id],
-        );
+            [input.user_id],
+          );
 
-        deletedMemberTokenCount += deletedUserMemberTokens.rows.length;
+          deletedMemberTokenCount += deletedUserMemberTokens.rows.length;
 
-        await db.query(
+          await queryable.query(
           `
             DELETE FROM audit_logs
             WHERE actor_user_id = $1
                OR target_id = $1::text
           `,
-          [input.user_id],
-        );
+            [input.user_id],
+          );
 
-        await db.query(
+          await queryable.query(
           `
             DELETE FROM users
             WHERE id = $1
           `,
-          [input.user_id],
-        );
-
-        await db.query("COMMIT", []);
+            [input.user_id],
+          );
 
         return {
           deleted_at: input.deleted_at,
@@ -712,10 +776,30 @@ export function createPostgresAccountStore(db: Queryable): AccountLifecycleStore
           user_deleted: true,
           deleted_member_token_count: deletedMemberTokenCount,
         };
-      } catch (error) {
-        await rollbackQuietly(db);
-        throw error;
+      };
+
+      if (accountAnalyticsStore === undefined) {
+        await db.query("BEGIN", []);
+        try {
+          const result = await deleteAccount(db);
+          if (
+            result === null ||
+            result === "other_owned_organizations_exist" ||
+            result === "other_owned_projects_exist"
+          ) {
+            await rollbackQuietly(db);
+            return result;
+          }
+
+          await db.query("COMMIT", []);
+          return result;
+        } catch (error) {
+          await rollbackQuietly(db);
+          throw error;
+        }
       }
+
+      return runInTransaction(db, async (tx) => deleteAccount(tx));
     },
     async getUserAvatar(input): Promise<UserAvatarRecord | null> {
       const result = await db.query<Record<string, unknown>>(

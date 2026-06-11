@@ -1,14 +1,6 @@
 import { createHash } from "node:crypto";
 import { gunzipSync, gzipSync } from "node:zlib";
 
-import {
-  buildEmailBrandMarkUrl,
-  renderAllowanceLimitReachedEmail,
-  renderAllowanceWarning80Email,
-  renderRetentionRotationNoticeEmail,
-  renderWebhookAutoDisabledEmail,
-  type EmailTransport
-} from "../../../packages/email/src/index.js";
 import type { RuntimeLogger } from "../../../packages/runtime-logger/src/index.js";
 import {
   FINGERPRINT_VERSION,
@@ -21,6 +13,7 @@ import {
 import { buildBundle, type BuildBundleInput } from "../../../packages/bundle-engine/src/index.js";
 import { buildReproduction } from "../../../packages/repro-engine/src/index.js";
 import type {
+  AccountMetricKey,
   AlertConditionType,
   AlertDeliveryStore,
   AlertRuleRecord,
@@ -59,8 +52,6 @@ import {
   buildImprovementBundleObjectKey,
   buildRawEventObjectKey,
   buildReproductionObjectKey,
-  getAllowanceLimitBehavior,
-  getAllowanceMeterLabel,
   queueAllowanceLimitReachedNotification,
   queueAllowanceThresholdNotifications,
   queueRetentionRotationNotice
@@ -79,6 +70,13 @@ import {
   maybeGenerateHostedIncidentImprovementBundle,
   type ImprovementBundleWorkerDependencies
 } from "./improvement-bundles.js";
+export {
+  processNextDeliverOperationalEmailJob
+} from "./operational-email-processor.js";
+export type {
+  DeliverOperationalEmailWorkerDependencies
+} from "./operational-email-processor.js";
+import { recordProjectMetricDeltas, type WorkerAccountAnalyticsDependencies } from "./account-analytics.js";
 
 type BundleLinkBaseUrls = NonNullable<BuildBundleInput["linkBaseUrls"]>;
 
@@ -225,6 +223,11 @@ export interface BuildBundleWorkerDependencies {
   operationalEmailDeliveryStore?: Pick<OperationalEmailDeliveryStore, "queueProjectOperationalEmailDelivery">;
 }
 
+export interface BuildReproductionWorkerDependencies extends WorkerAccountAnalyticsDependencies {
+  queue: WorkerQueue;
+  objectStore: ObjectStoreClient & ObjectStoreReader;
+}
+
 function normalizeWorkerBaseUrl(value: string | undefined): string | null {
   const trimmed = value?.trim();
   if (trimmed === undefined || trimmed.length === 0) {
@@ -368,7 +371,7 @@ export class GitHubDispatchDeliveryError extends Error {
   }
 }
 
-export interface DeliverGitHubDispatchWorkerDependencies {
+export interface DeliverGitHubDispatchWorkerDependencies extends WorkerAccountAnalyticsDependencies {
   queue: WorkerQueue;
   logger?: Pick<RuntimeLogger, "warn">;
   githubStore: Pick<GitHubStore, "getGitHubDispatchDeliveryIntent" | "markGitHubDispatchDeliveryAttempt">;
@@ -397,17 +400,12 @@ async function publishGitHubDispatchIfConfigured(
   await githubDispatchPublisher.publish(input);
 }
 
-export interface DeliverWebhookWorkerDependencies {
+export interface DeliverWebhookWorkerDependencies extends WorkerAccountAnalyticsDependencies {
   queue: WorkerQueue;
   logger?: Pick<RuntimeLogger, "warn">;
   webhookDeliveryStore: Pick<WebhookDeliveryStore, "getDeliveryIntent" | "markDeliveryAttempt">;
   lifecycleWebhookTransport: LifecycleWebhookTransport;
   onWebhookDisabled?: (input: { webhook_id: string; target_url: string }) => Promise<void>;
-}
-
-export interface BuildReproductionWorkerDependencies {
-  queue: WorkerQueue;
-  objectStore: ObjectStoreClient & ObjectStoreReader;
 }
 
 export interface AlertDeliveryTransport {
@@ -442,7 +440,7 @@ export class AlertDeliveryError extends Error {
   }
 }
 
-export interface EvaluateAlertsWorkerDependencies {
+export interface EvaluateAlertsWorkerDependencies extends WorkerAccountAnalyticsDependencies {
   queue: WorkerQueue;
   alertStore: AlertDeliveryStore;
   alertTransport: AlertDeliveryTransport;
@@ -450,27 +448,13 @@ export interface EvaluateAlertsWorkerDependencies {
   operationalEmailDeliveryStore?: Pick<OperationalEmailDeliveryStore, "queueProjectOperationalEmailDelivery">;
 }
 
-export interface DeliverAlertEmailDigestWorkerDependencies {
+export interface DeliverAlertEmailDigestWorkerDependencies extends WorkerAccountAnalyticsDependencies {
   queue: WorkerQueue;
   alertStore: Pick<AlertDeliveryStore, "getAlertEmailDigest" | "markAlertEmailDigestResult">;
   alertEmailDigestTransport: AlertEmailDigestTransport;
 }
 
-export interface DeliverOperationalEmailWorkerDependencies {
-  logger?: Pick<RuntimeLogger, "warn">;
-  appBaseUrl?: string | null;
-  emailAssetBaseUrl?: string | null;
-  operationalEmailDeliveryStore: Pick<
-    OperationalEmailDeliveryStore,
-    | "claimDueOperationalEmailDeliveries"
-    | "getOperationalEmailDelivery"
-    | "resolveOperationalEmailRecipientContext"
-    | "markOperationalEmailDeliveryAttempt"
-  >;
-  emailTransport: EmailTransport;
-}
-
-export interface GenerateWeeklyReportWorkerDependencies {
+export interface GenerateWeeklyReportWorkerDependencies extends WorkerAccountAnalyticsDependencies {
   queue: {
     dequeue(jobName: "generate-weekly-report"): Promise<GenerateWeeklyReportJob | null>;
   };
@@ -500,23 +484,6 @@ export interface WorkerProcessResult {
 }
 
 const ALERT_EMAIL_DIGEST_WINDOW_SECONDS = 10;
-
-type AllowanceNotificationPayload = {
-  meter: string;
-  used: number;
-  limit: number;
-  usage_window_ends_at?: string | null;
-} & Record<string, unknown>;
-
-type RetentionRotationNotificationPayload = {
-  rotated_owner_count: number;
-  retained_bundle_limit: number;
-} & Record<string, unknown>;
-
-type WebhookAutoDisabledNotificationPayload = {
-  webhook_id: string;
-  target_url: string;
-} & Record<string, unknown>;
 
 function getWorkerErrorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
@@ -559,17 +526,6 @@ function deriveIncidentTitle(job: Pick<GroupIncidentJob, "event_type" | "normali
     default:
       return humanizeEventType(job.event_type);
   }
-}
-
-function isAllowanceMeter(value: string): value is Parameters<typeof getAllowanceMeterLabel>[0] {
-  return (
-    value === "monthly_bundle_requests" ||
-    value === "monthly_raw_ingested_events" ||
-    value === "retained_bundle_cap" ||
-    value === "monthly_remote_activations" ||
-    value === "monthly_alert_deliveries" ||
-    value === "monthly_webhook_deliveries"
-  );
 }
 
 async function enqueueAlertEvaluation(
@@ -1232,6 +1188,16 @@ export async function processNextEvaluateAlertsJob(
       continue;
     }
 
+    await recordProjectMetricDeltas(dependencies, {
+      projectId: job.project_id,
+      occurredAt: job.occurred_at,
+      source: "alert_delivery_created",
+      dedupeKey: `alert_delivery_created:${intent.delivery_id}`,
+      deltas: {
+        alert_deliveries_created: 1
+      }
+    });
+
     if (remainingAlertDeliveries !== null) {
       const previousUsed = alertAllowanceUsed ?? 0;
       remainingAlertDeliveries -= 1;
@@ -1269,12 +1235,30 @@ export async function processNextEvaluateAlertsJob(
         delivered: true,
         error_message: null
       });
+      await recordProjectMetricDeltas(dependencies, {
+        projectId: job.project_id,
+        occurredAt: job.occurred_at,
+        source: "alert_delivery_result",
+        dedupeKey: `alert_delivery_result:${intent.delivery_id}:delivered`,
+        deltas: {
+          alert_deliveries_delivered: 1
+        }
+      });
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       await dependencies.alertStore.markAlertDeliveryResult({
         delivery_id: intent.delivery_id,
         delivered: false,
         error_message: message
+      });
+      await recordProjectMetricDeltas(dependencies, {
+        projectId: job.project_id,
+        occurredAt: job.occurred_at,
+        source: "alert_delivery_result",
+        dedupeKey: `alert_delivery_result:${intent.delivery_id}:failed`,
+        deltas: {
+          alert_deliveries_failed: 1
+        }
       });
     }
   }
@@ -1321,162 +1305,21 @@ export async function processNextDeliverAlertEmailDigestJob(
       delivered: true,
       error_message: null
     });
+    await recordProjectMetricDeltas(dependencies, {
+      projectId: digest.digest.project_id,
+      occurredAt: digest.digest.created_at,
+      source: "alert_email_digest_result",
+      dedupeKey: `alert_email_digest_result:${digest.digest.digest_id}:delivered`,
+      deltas: {
+        alert_email_digests_sent: 1
+      }
+    });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     await dependencies.alertStore.markAlertEmailDigestResult({
       digest_id: digest.digest.digest_id,
       delivered: false,
       error_message: message
-    });
-  }
-
-  return { processed: true };
-}
-
-export async function processNextDeliverOperationalEmailJob(
-  dependencies: DeliverOperationalEmailWorkerDependencies
-): Promise<WorkerProcessResult> {
-  const claimed = await dependencies.operationalEmailDeliveryStore.claimDueOperationalEmailDeliveries(1);
-  const next = claimed[0];
-  if (next === undefined) {
-    return { processed: false, reason: "no_jobs" };
-  }
-
-  const delivery = await dependencies.operationalEmailDeliveryStore.getOperationalEmailDelivery({
-    delivery_id: next.delivery_id
-  });
-  if (delivery === null) {
-    return { processed: true };
-  }
-
-  const recipientContext = await dependencies.operationalEmailDeliveryStore.resolveOperationalEmailRecipientContext({
-    organization_id: delivery.organization_id,
-    project_id: delivery.project_id
-  });
-  if (recipientContext === null) {
-    await dependencies.operationalEmailDeliveryStore.markOperationalEmailDeliveryAttempt({
-      delivery_id: delivery.delivery_id,
-      attempt: next.attempt,
-      delivered: false,
-      error_message: "operational_email_recipient_missing"
-    });
-    return { processed: true };
-  }
-
-  try {
-    const billingUrl = dependencies.appBaseUrl === null || dependencies.appBaseUrl === undefined
-      ? undefined
-      : `${dependencies.appBaseUrl}/billing`;
-    const webhooksUrl = dependencies.appBaseUrl === null || dependencies.appBaseUrl === undefined
-      ? undefined
-      : `${dependencies.appBaseUrl}/projects/${delivery.project_id}/webhooks`;
-    const brandMarkUrl = buildEmailBrandMarkUrl(dependencies.emailAssetBaseUrl ?? dependencies.appBaseUrl);
-
-    let rendered: ReturnType<typeof renderWebhookAutoDisabledEmail>;
-    switch (delivery.kind) {
-      case "webhook_auto_disabled": {
-        const payload = delivery.payload as WebhookAutoDisabledNotificationPayload;
-        if (typeof payload.webhook_id !== "string" || typeof payload.target_url !== "string") {
-          throw new Error("operational_email_invalid_webhook_auto_disabled_payload");
-        }
-        rendered = renderWebhookAutoDisabledEmail({
-          organizationName: recipientContext.organization_name,
-          projectName: recipientContext.project_name,
-          webhookId: payload.webhook_id,
-          targetUrl: payload.target_url,
-          ...(brandMarkUrl === undefined ? {} : { brandMarkUrl }),
-          ...(webhooksUrl === undefined ? {} : { webhooksUrl })
-        });
-        break;
-      }
-      case "allowance_warning_80":
-      case "allowance_limit_reached": {
-        const payload = delivery.payload as AllowanceNotificationPayload;
-        if (
-          typeof payload.meter !== "string" ||
-          !isAllowanceMeter(payload.meter) ||
-          typeof payload.used !== "number" ||
-          typeof payload.limit !== "number"
-        ) {
-          throw new Error("operational_email_invalid_allowance_payload");
-        }
-
-        const input = {
-          organizationName: recipientContext.organization_name,
-          projectName: recipientContext.project_name,
-          meterLabel: getAllowanceMeterLabel(payload.meter),
-          used: payload.used,
-          limit: payload.limit,
-          currentBehavior: getAllowanceLimitBehavior(payload.meter)
-        };
-        const usageWindowEndsAt =
-          typeof payload.usage_window_ends_at === "string" || payload.usage_window_ends_at === null
-            ? payload.usage_window_ends_at
-            : undefined;
-        const allowanceInput = {
-          ...input,
-          ...(brandMarkUrl === undefined ? {} : { brandMarkUrl }),
-          ...(usageWindowEndsAt === undefined ? {} : { usageWindowEndsAt }),
-          ...(billingUrl === undefined ? {} : { billingUrl })
-        };
-
-        rendered = delivery.kind === "allowance_warning_80"
-          ? renderAllowanceWarning80Email(allowanceInput)
-          : renderAllowanceLimitReachedEmail(allowanceInput);
-        break;
-      }
-      case "retention_rotation_notice": {
-        const payload = delivery.payload as RetentionRotationNotificationPayload;
-        if (
-          typeof payload.rotated_owner_count !== "number" ||
-          typeof payload.retained_bundle_limit !== "number"
-        ) {
-          throw new Error("operational_email_invalid_retention_rotation_payload");
-        }
-
-        rendered = renderRetentionRotationNoticeEmail({
-          organizationName: recipientContext.organization_name,
-          projectName: recipientContext.project_name,
-          rotatedOwnerCount: payload.rotated_owner_count,
-          retainedBundleLimit: payload.retained_bundle_limit,
-          ...(brandMarkUrl === undefined ? {} : { brandMarkUrl }),
-          ...(billingUrl === undefined ? {} : { billingUrl })
-        });
-        break;
-      }
-    }
-
-    await dependencies.emailTransport.send({
-      to: [recipientContext.recipient_email],
-      subject: rendered.subject,
-      text: rendered.text,
-      html: rendered.html
-    });
-
-    await dependencies.operationalEmailDeliveryStore.markOperationalEmailDeliveryAttempt({
-      delivery_id: delivery.delivery_id,
-      attempt: next.attempt,
-      delivered: true,
-      error_message: null
-    });
-  } catch (error) {
-    const errorMessage = getWorkerErrorMessage(error);
-    dependencies.logger?.warn(
-      {
-        attempt: next.attempt,
-        delivery_id: delivery.delivery_id,
-        kind: delivery.kind,
-        error_message: errorMessage,
-        organization_id: delivery.organization_id,
-        project_id: delivery.project_id
-      },
-      "worker_operational_email_delivery_failed"
-    );
-    await dependencies.operationalEmailDeliveryStore.markOperationalEmailDeliveryAttempt({
-      delivery_id: delivery.delivery_id,
-      attempt: next.attempt,
-      delivered: false,
-      error_message: errorMessage
     });
   }
 
@@ -1765,7 +1608,7 @@ async function collectCorrelatedLogEnvelopes(input: {
 }
 
 export async function processNextBuildBundleJob(
-  dependencies: BuildBundleWorkerDependencies
+  dependencies: BuildBundleWorkerDependencies & WorkerAccountAnalyticsDependencies
 ): Promise<WorkerProcessResult> {
   const job = await dependencies.queue.dequeue("build-bundle");
   if (job === null) {
@@ -1811,6 +1654,15 @@ export async function processNextBuildBundleJob(
         await dependencies.incidentStore.markBundleGenerationFailure?.({
           incident_id: incident.incident_id,
           reason: "monthly_quota_exceeded"
+        });
+        await recordProjectMetricDeltas(dependencies, {
+          projectId: incident.project_id,
+          occurredAt: job.occurred_at,
+          source: "worker.build_bundle",
+          dedupeKey: `failure_bundle_generation_failed:${job.incident_id}:${job.event_id}`,
+          deltas: {
+            failure_bundle_generations_failed: 1
+          }
         });
 
         return { processed: true };
@@ -1866,6 +1718,15 @@ export async function processNextBuildBundleJob(
       body,
       contentType: "application/json",
       contentEncoding: "gzip"
+    });
+    await recordProjectMetricDeltas(dependencies, {
+      projectId: incident.project_id,
+      occurredAt: job.occurred_at,
+      source: "worker.build_bundle",
+      dedupeKey: `failure_bundle_generation:${job.incident_id}:${bundleMetadata.generation_number}`,
+      deltas: {
+        [bundleMetadata.generation_number > 1 ? "failure_bundles_updated" : "failure_bundles_created"]: 1
+      }
     });
 
     if (!alreadyRecorded && billingSummary !== null && dependencies.operationalEmailDeliveryStore !== undefined) {
@@ -1934,6 +1795,17 @@ export async function processNextBuildBundleJob(
             dedupe_date: new Date().toISOString().slice(0, 10)
           });
         }
+        if (prunedOwners.length > 0) {
+          await recordProjectMetricDeltas(dependencies, {
+            projectId: incident.project_id,
+            occurredAt: job.occurred_at,
+            source: "worker.build_bundle",
+            dedupeKey: `retention_bundle_rotation:failure:${job.incident_id}:${bundleMetadata.generation_number}`,
+            deltas: {
+              retention_bundle_owners_rotated: prunedOwners.length
+            }
+          });
+        }
       }
     }
 
@@ -1969,6 +1841,15 @@ export async function processNextBuildBundleJob(
       incident_id: job.incident_id,
       reason: "build_error"
     });
+    await recordProjectMetricDeltas(dependencies, {
+      projectId: job.project_id,
+      occurredAt: job.occurred_at,
+      source: "worker.build_bundle",
+      dedupeKey: `failure_bundle_generation_failed:${job.incident_id}:${job.event_id}`,
+      deltas: {
+        failure_bundle_generations_failed: 1
+      }
+    });
 
     return { processed: true };
   } finally {
@@ -1990,6 +1871,15 @@ export async function processNextBuildReproductionJob(
   try {
     compressedBundle = await dependencies.objectStore.getObject({ key: job.bundle_key });
   } catch {
+    await recordProjectMetricDeltas(dependencies, {
+      projectId: job.project_id,
+      occurredAt: job.occurred_at,
+      source: "worker.build_reproduction",
+      dedupeKey: `reproduction_failed:${job.incident_id}:bundle_missing:${job.occurred_at}`,
+      deltas: {
+        reproductions_failed: 1
+      }
+    });
     return { processed: false, reason: "bundle_missing" };
   }
 
@@ -1997,17 +1887,48 @@ export async function processNextBuildReproductionJob(
   try {
     bundle = BundleV1Schema.parse(JSON.parse(gunzipSync(compressedBundle).toString("utf8")));
   } catch {
+    await recordProjectMetricDeltas(dependencies, {
+      projectId: job.project_id,
+      occurredAt: job.occurred_at,
+      source: "worker.build_reproduction",
+      dedupeKey: `reproduction_failed:${job.incident_id}:bundle_invalid:${job.occurred_at}`,
+      deltas: {
+        reproductions_failed: 1
+      }
+    });
     return { processed: false, reason: "bundle_invalid" };
   }
 
   const reproduction = buildReproduction(bundle);
   const body = gzipSync(Buffer.from(JSON.stringify(reproduction), "utf8"));
 
-  await dependencies.objectStore.putObject({
-    key: buildReproductionObjectKey(job.project_id, job.incident_id),
-    body,
-    contentType: "application/json",
-    contentEncoding: "gzip"
+  try {
+    await dependencies.objectStore.putObject({
+      key: buildReproductionObjectKey(job.project_id, job.incident_id),
+      body,
+      contentType: "application/json",
+      contentEncoding: "gzip"
+    });
+  } catch {
+    await recordProjectMetricDeltas(dependencies, {
+      projectId: job.project_id,
+      occurredAt: job.occurred_at,
+      source: "worker.build_reproduction",
+      dedupeKey: `reproduction_failed:${job.incident_id}:${bundle.metadata.generation_number}`,
+      deltas: {
+        reproductions_failed: 1
+      }
+    });
+    throw new Error("reproduction_write_failed");
+  }
+  await recordProjectMetricDeltas(dependencies, {
+    projectId: job.project_id,
+    occurredAt: job.occurred_at,
+    source: "worker.build_reproduction",
+    dedupeKey: `reproduction_created:${job.incident_id}:${bundle.metadata.generation_number}`,
+    deltas: {
+      reproductions_created: 1
+    }
   });
 
   return { processed: true };
@@ -2045,6 +1966,15 @@ export async function processNextDeliverWebhookJob(
       error_message: null,
       response_code: 200
     });
+    await recordProjectMetricDeltas(dependencies, {
+      projectId: delivery.project_id,
+      occurredAt: delivery.occurred_at,
+      source: "webhook_delivery_result",
+      dedupeKey: `webhook_delivery_result:${delivery.delivery_id}:delivered`,
+      deltas: {
+        webhook_deliveries_delivered: 1
+      }
+    });
     return { processed: true };
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
@@ -2067,6 +1997,21 @@ export async function processNextDeliverWebhookJob(
       error_message: errorMessage,
       response_code: responseCode
     });
+    if (markResult.status === "failed") {
+      const deltas: Partial<Record<AccountMetricKey, number>> = {
+        webhook_deliveries_failed: 1
+      };
+      if (markResult.webhook_disabled === true) {
+        deltas["webhooks_auto_disabled"] = 1;
+      }
+      await recordProjectMetricDeltas(dependencies, {
+        projectId: delivery.project_id,
+        occurredAt: delivery.occurred_at,
+        source: "webhook_delivery_result",
+        dedupeKey: `webhook_delivery_result:${delivery.delivery_id}:failed`,
+        deltas
+      });
+    }
 
     if (markResult.webhook_disabled === true && markResult.webhook_id !== undefined && dependencies.onWebhookDisabled !== undefined) {
       try {
@@ -2118,6 +2063,15 @@ export async function processNextGenerateWeeklyReportJob(
         delivered: false,
         error_message: "weekly_report_no_activity"
       });
+      await recordProjectMetricDeltas(dependencies, {
+        projectId,
+        occurredAt: job.window_end,
+        source: "weekly_report_result",
+        dedupeKey: `weekly_report_result:${deliveryId}:failed`,
+        deltas: {
+          weekly_reports_failed: 1
+        }
+      });
       continue;
     }
 
@@ -2129,6 +2083,15 @@ export async function processNextGenerateWeeklyReportJob(
         delivery_id: deliveryId,
         delivered: false,
         error_message: "weekly_report_channel_not_found"
+      });
+      await recordProjectMetricDeltas(dependencies, {
+        projectId,
+        occurredAt: job.window_end,
+        source: "weekly_report_result",
+        dedupeKey: `weekly_report_result:${deliveryId}:failed`,
+        deltas: {
+          weekly_reports_failed: 1
+        }
       });
       continue;
     }
@@ -2159,6 +2122,15 @@ export async function processNextGenerateWeeklyReportJob(
         delivered: true,
         error_message: null
       });
+      await recordProjectMetricDeltas(dependencies, {
+        projectId: delivery.report.project_id,
+        occurredAt: job.window_end,
+        source: "weekly_report_result",
+        dedupeKey: `weekly_report_result:${delivery.delivery_id}:delivered`,
+        deltas: {
+          weekly_reports_sent: 1
+        }
+      });
     }
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
@@ -2176,6 +2148,15 @@ export async function processNextGenerateWeeklyReportJob(
         delivery_id: delivery.delivery_id,
         delivered: false,
         error_message: message
+      });
+      await recordProjectMetricDeltas(dependencies, {
+        projectId: delivery.report.project_id,
+        occurredAt: job.window_end,
+        source: "weekly_report_result",
+        dedupeKey: `weekly_report_result:${delivery.delivery_id}:failed`,
+        deltas: {
+          weekly_reports_failed: 1
+        }
       });
     }
   }
@@ -2223,6 +2204,15 @@ export async function processNextDeliverGitHubDispatchJob(
       error_message: null,
       github_status_code: 204
     });
+    await recordProjectMetricDeltas(dependencies, {
+      projectId: delivery.project_id,
+      occurredAt: delivery.dispatch_payload["occurred_at"] as string ?? new Date().toISOString(),
+      source: "github_dispatch_result",
+      dedupeKey: `github_dispatch_result:${delivery.delivery_id}:delivered`,
+      deltas: {
+        github_dispatches_delivered: 1
+      }
+    });
   } catch (error) {
     const dispatchError = error instanceof GitHubDispatchDeliveryError ? error : null;
     dependencies.logger?.warn(
@@ -2246,6 +2236,15 @@ export async function processNextDeliverGitHubDispatchJob(
       ...(dispatchError?.retryAfterSeconds !== null && dispatchError?.retryAfterSeconds !== undefined
         ? { retry_after_seconds: dispatchError.retryAfterSeconds }
         : {})
+    });
+    await recordProjectMetricDeltas(dependencies, {
+      projectId: delivery.project_id,
+      occurredAt: delivery.dispatch_payload["occurred_at"] as string ?? new Date().toISOString(),
+      source: "github_dispatch_result",
+      dedupeKey: `github_dispatch_result:${delivery.delivery_id}:failed`,
+      deltas: {
+        github_dispatches_failed: 1
+      }
     });
   }
 

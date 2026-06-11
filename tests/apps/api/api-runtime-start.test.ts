@@ -94,6 +94,7 @@ function buildMigratedRuntimeSchemaRows(sql: string): { rows: Record<string, unk
         { table_name: "oauth_identities" },
         { table_name: "sessions" },
         { table_name: "email_auth_challenges" },
+        { table_name: "account_deletion_challenges" },
         { table_name: "email_verification_tokens" },
         { table_name: "password_reset_tokens" },
         { table_name: "organizations" },
@@ -122,6 +123,11 @@ function buildMigratedRuntimeSchemaRows(sql: string): { rows: Record<string, unk
         { table_name: "capture_rules" },
         { table_name: "audit_logs" },
         { table_name: "processed_billing_events" },
+        { table_name: "account_analytics_accounts" },
+        { table_name: "account_metric_periods" },
+        { table_name: "account_metric_events" },
+        { table_name: "account_payment_retention_records" },
+        { table_name: "account_payment_provider_events" },
         { table_name: "trial_lifecycle_events" },
         { table_name: "plan_cleanup_tasks" },
         { table_name: "project_usage_counters" },
@@ -191,6 +197,7 @@ describe("api runtime start", () => {
   it("should run startup guards and listen with parsed host/port", async (): Promise<void> => {
     await startApiServerFromEnv({
       DEBUGBUNDLE_PROBE_TRIGGER_SECRET: "test-probe-secret",
+      ANALYTICS_HASH_SECRET: "test-analytics-secret",
       API_HOST: "0.0.0.0",
       API_PORT: "3010"
     });
@@ -225,9 +232,12 @@ describe("api runtime start", () => {
   it("should fail startup when db schema guard reports missing tables", async (): Promise<void> => {
     queryMock.mockResolvedValue({ rows: [{ table_name: "projects" }] });
 
-    await expect(startApiServerFromEnv({ DEBUGBUNDLE_PROBE_TRIGGER_SECRET: "test-probe-secret" })).rejects.toThrow(
-      "db_schema_missing_tables"
-    );
+    await expect(
+      startApiServerFromEnv({
+        DEBUGBUNDLE_PROBE_TRIGGER_SECRET: "test-probe-secret",
+        ANALYTICS_HASH_SECRET: "test-analytics-secret"
+      })
+    ).rejects.toThrow("db_schema_missing_tables");
     expect(listenMock).not.toHaveBeenCalled();
   });
 
@@ -276,6 +286,7 @@ describe("api runtime start", () => {
 
     await startApiServerFromEnv({
       DEBUGBUNDLE_PROBE_TRIGGER_SECRET: "test-probe-secret",
+      ANALYTICS_HASH_SECRET: "test-analytics-secret",
       STRIPE_SECRET_KEY: "sk_test",
       STRIPE_WEBHOOK_SECRET: "whsec_test",
       STRIPE_SOLO_PRICE_ID: "price_solo",
@@ -306,6 +317,7 @@ describe("api runtime start", () => {
 
     await startApiServerFromEnv({
       DEBUGBUNDLE_PROBE_TRIGGER_SECRET: "test-probe-secret",
+      ANALYTICS_HASH_SECRET: "test-analytics-secret",
       STRIPE_SECRET_KEY: "sk_test",
       STRIPE_WEBHOOK_SECRET: "whsec_test",
       STRIPE_SOLO_PRICE_ID: "price_solo",

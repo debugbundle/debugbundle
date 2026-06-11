@@ -34,6 +34,7 @@ export interface RecordedImprovementOpportunityOccurrence {
   occurrence_count: number;
   bundle_generation_number: number;
   should_generate_bundle: boolean;
+  lifecycle_transition: "opened" | "reopened" | "none";
 }
 
 function stableJson(value: unknown): string {
@@ -114,9 +115,18 @@ export async function recordImprovementOpportunityOccurrence(
     occurrence_count: number;
     bundle_generation_number: number;
     event_recorded: boolean;
+    opportunity_created: boolean;
+    prior_status: "open" | "resolved" | "snoozed" | null;
   } & Record<string, unknown>>(
     `
-      WITH existing_event AS (
+      WITH existing_opportunity AS (
+        SELECT status
+        FROM improvement_opportunities
+        WHERE project_id = $2::uuid
+          AND fingerprint = $8
+        LIMIT 1
+      ),
+      existing_event AS (
         SELECT 1
         FROM improvement_opportunity_events ioe
         JOIN improvement_opportunities existing ON existing.id = ioe.improvement_opportunity_id
@@ -276,7 +286,9 @@ export async function recordImprovementOpportunityOccurrence(
           kind,
           occurrence_count,
           bundle_generation_number,
-          NOT EXISTS (SELECT 1 FROM existing_event) AS event_recorded
+          NOT EXISTS (SELECT 1 FROM existing_event) AS event_recorded,
+          NOT EXISTS (SELECT 1 FROM existing_opportunity) AS opportunity_created,
+          (SELECT status FROM existing_opportunity) AS prior_status
       ),
       inserted_event AS (
         INSERT INTO improvement_opportunity_events (
@@ -300,7 +312,9 @@ export async function recordImprovementOpportunityOccurrence(
         upserted.opportunity_id,
         upserted.occurrence_count,
         upserted.bundle_generation_number,
-        upserted.event_recorded AND EXISTS (SELECT 1 FROM inserted_event) AS event_recorded
+        upserted.event_recorded AND EXISTS (SELECT 1 FROM inserted_event) AS event_recorded,
+        upserted.opportunity_created,
+        upserted.prior_status
       FROM upserted
     `,
     [
@@ -335,6 +349,14 @@ export async function recordImprovementOpportunityOccurrence(
     opportunity_id: row.opportunity_id,
     occurrence_count: row.occurrence_count,
     bundle_generation_number: row.bundle_generation_number,
-    should_generate_bundle: row.event_recorded && row.bundle_generation_number === 0 && row.occurrence_count >= input.threshold
+    should_generate_bundle: row.event_recorded && row.bundle_generation_number === 0 && row.occurrence_count >= input.threshold,
+    lifecycle_transition:
+      row.event_recorded !== true
+        ? "none"
+        : row.opportunity_created === true
+          ? "opened"
+          : row.prior_status === "resolved" || row.prior_status === "snoozed"
+            ? "reopened"
+            : "none"
   };
 }

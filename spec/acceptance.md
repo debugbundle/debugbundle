@@ -609,6 +609,13 @@ If CLI says something is healthy and MCP says something different, that is a pro
 - **And** the delete remains blocked if that user is still the sole owner of a different organization
 - **And** the delete remains blocked if that user still owns any project in a different organization
 
+### AC-AUTH-11a: Account Deletion Preserves Deletion-Safe Analytics And Payment Retention
+- **Given** an owner account with retained usage history, billing sync history, and project/debugging data
+- **When** account deletion succeeds
+- **Then** the user, project, incident, bundle, reproduction, token, and retained debugging payload data are deleted as before
+- **And** anonymized aggregate account metrics remain stored without a join path back to deleted users or projects
+- **And** required payment/provider retention records remain stored outside the normal user export surface
+
 ---
 
 ## 11. Self-Host Acceptance

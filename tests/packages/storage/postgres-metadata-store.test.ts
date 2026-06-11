@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
 import {
+  createPostgresAccountAnalyticsStore,
   createPostgresWebhookDeliveryStore,
   createPostgresMetadataStore,
   type Queryable
@@ -34,7 +35,11 @@ describe("postgres metadata store", () => {
     const query = vi.fn().mockResolvedValue({
       rows: [{ project_id: "proj_123", organization_id: "org_123", organization_plan: "solo", revoked_at: null, expires_at: null }]
     });
-    const db: Queryable = { query: query as Queryable["query"] };
+    const db: Queryable = {
+      query: query as Queryable["query"],
+      transaction: async <Result>(callback: (tx: Queryable) => Promise<Result>) =>
+        callback({ query: query as Queryable["query"] })
+    };
     const store = createPostgresMetadataStore(db);
 
     const resolved = await store.resolveProjectByTokenHash("hash_abc");
@@ -327,6 +332,18 @@ describe("postgres metadata store", () => {
         };
       }
 
+      if (sql.includes("FROM account_analytics_accounts")) {
+        return { rows: [{ analytics_account_id: "analytics_123" }] };
+      }
+
+      if (sql.includes("INSERT INTO account_metric_events")) {
+        return { rows: [{ dedupe_key_hash: "hash_123" }] };
+      }
+
+      if (sql.includes("INSERT INTO account_metric_periods")) {
+        return { rows: [] };
+      }
+
       if (sql.includes("to_regclass")) {
         return { rows: [{ exists: false }] };
       }
@@ -334,7 +351,16 @@ describe("postgres metadata store", () => {
       return { rows: [] };
     });
 
-    const store = createPostgresMetadataStore({ query });
+    const transactionalDb: Queryable = {
+      query,
+      transaction: async <Result>(callback: (tx: Queryable) => Promise<Result>) =>
+        callback({ query } as Queryable)
+    };
+    const accountAnalyticsStore = createPostgresAccountAnalyticsStore({
+      db: transactionalDb,
+      analyticsHashSecret: "test-analytics-secret"
+    });
+    const store = createPostgresMetadataStore(transactionalDb, { accountAnalyticsStore });
 
     await store.createProjectForOrganization({
       organization_id: "org_123",
@@ -366,6 +392,8 @@ describe("postgres metadata store", () => {
 
     expect(deleteSql).toContain("JOIN organizations o ON o.id = dp.organization_id");
     expect(deleteSql).toContain("COALESCE(o.plan, 'free') AS organization_plan");
+    expect(calls).toContainEqual(expect.stringContaining("FROM account_analytics_accounts"));
+    expect(calls).toContainEqual(expect.stringContaining("INSERT INTO account_metric_periods"));
   });
 
   it("should create projects for an organization and map duplicate slug conflicts", async (): Promise<void> => {
@@ -1155,7 +1183,11 @@ describe("postgres metadata store", () => {
         ]
       });
 
-    const db: Queryable = { query: query as Queryable["query"] };
+    const db: Queryable = {
+      query: query as Queryable["query"],
+      transaction: async <Result>(callback: (tx: Queryable) => Promise<Result>) =>
+        callback({ query: query as Queryable["query"] })
+    };
     const store = createPostgresMetadataStore(db);
 
     const listed = await store.listActiveProbesForProjectInOrganization({
@@ -1283,7 +1315,11 @@ describe("postgres metadata store", () => {
     const originalSecret = process.env["DEBUGBUNDLE_PROBE_TRIGGER_SECRET"];
     process.env["DEBUGBUNDLE_PROBE_TRIGGER_SECRET"] = "test-probe-trigger-secret-for-storage";
     const outOfScopeQuery = vi.fn().mockResolvedValue({ rows: [] });
-    const outOfScopeDb: Queryable = { query: outOfScopeQuery as Queryable["query"] };
+    const outOfScopeDb: Queryable = {
+      query: outOfScopeQuery as Queryable["query"],
+      transaction: async <Result>(callback: (tx: Queryable) => Promise<Result>) =>
+        callback({ query: outOfScopeQuery as Queryable["query"] })
+    };
     const outOfScopeStore = createPostgresMetadataStore(outOfScopeDb);
 
     const listed = await outOfScopeStore.listActiveProbesForProjectInOrganization({
@@ -1317,7 +1353,11 @@ describe("postgres metadata store", () => {
       .mockResolvedValueOnce({ rows: [{ id: "proj_123", organization_plan: "solo" }] })
       .mockResolvedValueOnce({ rows: [{ cnt: "0" }] })
       .mockResolvedValueOnce({ rows: [] });
-    const insertFailureDb: Queryable = { query: insertFailureQuery as Queryable["query"] };
+    const insertFailureDb: Queryable = {
+      query: insertFailureQuery as Queryable["query"],
+      transaction: async <Result>(callback: (tx: Queryable) => Promise<Result>) =>
+        callback({ query: insertFailureQuery as Queryable["query"] })
+    };
     const insertFailureStore = createPostgresMetadataStore(insertFailureDb);
 
     await expect(
@@ -1341,11 +1381,17 @@ describe("postgres metadata store", () => {
   });
 
   it("should report concurrent probe activation limits when the project is already saturated", async (): Promise<void> => {
+    const originalSecret = process.env["DEBUGBUNDLE_PROBE_TRIGGER_SECRET"];
+    process.env["DEBUGBUNDLE_PROBE_TRIGGER_SECRET"] = "test-probe-trigger-secret-for-storage";
     const query = vi
       .fn()
       .mockResolvedValueOnce({ rows: [{ id: "proj_123", organization_plan: "team" }] })
       .mockResolvedValueOnce({ rows: [{ cnt: "5" }] });
-    const store = createPostgresMetadataStore({ query });
+    const store = createPostgresMetadataStore({
+      query,
+      transaction: async <Result>(callback: (tx: Queryable) => Promise<Result>) =>
+        callback({ query: query as Queryable["query"] })
+    });
 
     const result = await store.createProbeActivationForProjectInOrganization({
       organization_id: "org_123",
@@ -1364,6 +1410,12 @@ describe("postgres metadata store", () => {
       trigger_token: "",
       concurrent_limit_exceeded: true
     });
+
+    if (originalSecret === undefined) {
+      delete process.env["DEBUGBUNDLE_PROBE_TRIGGER_SECRET"];
+    } else {
+      process.env["DEBUGBUNDLE_PROBE_TRIGGER_SECRET"] = originalSecret;
+    }
   });
 
   it("should list incident logs with optional level and cursor filters", async (): Promise<void> => {
@@ -2041,6 +2093,115 @@ describe("postgres metadata store", () => {
     ]);
   });
 
+  it("records probe activation lifecycle metrics when analytics are enabled", async (): Promise<void> => {
+    const originalSecret = process.env["DEBUGBUNDLE_PROBE_TRIGGER_SECRET"];
+    process.env["DEBUGBUNDLE_PROBE_TRIGGER_SECRET"] = "test-probe-trigger-secret-for-storage";
+    const query = vi.fn(async (sql: string) => {
+      if (sql.includes("SELECT p.id, COALESCE(o.plan, 'free') AS organization_plan")) {
+        return {
+          rows: [{ id: "proj_123", organization_plan: "solo" }]
+        };
+      }
+
+      if (sql.includes("SELECT COUNT(*)::text AS cnt")) {
+        return { rows: [{ cnt: "0" }] };
+      }
+
+      if (sql.includes("INSERT INTO probe_activations")) {
+        return {
+          rows: [
+            {
+              activation_id: "11111111-1111-4111-8111-111111111111",
+              label_pattern: "checkout.*",
+              service: "*",
+              environment: "*",
+              created_at: "2026-03-11T00:00:00.000Z",
+              expires_at: "2026-03-11T01:00:00.000Z",
+              trigger_expires_at: "2026-03-12T01:00:00.000Z"
+            }
+          ]
+        };
+      }
+
+      if (sql.includes("UPDATE probe_activations pa")) {
+        return {
+          rows: [
+            {
+              organization_plan: "solo",
+              activation_id: "11111111-1111-4111-8111-111111111111",
+              deactivated_at: "2026-03-11T00:10:00.000Z"
+            }
+          ]
+        };
+      }
+
+      if (sql.includes("FROM account_analytics_accounts")) {
+        return { rows: [{ analytics_account_id: "analytics_123" }] };
+      }
+
+      if (sql.includes("INSERT INTO account_metric_events")) {
+        return { rows: [{ dedupe_key_hash: "hash_123" }] };
+      }
+
+      if (sql.includes("INSERT INTO account_metric_periods")) {
+        return { rows: [] };
+      }
+
+      throw new Error(`Unhandled SQL in probe analytics test: ${sql}`);
+    });
+
+    const transactionalDb: Queryable = {
+      query: query as Queryable["query"],
+      transaction: async <Result>(callback: (tx: Queryable) => Promise<Result>) =>
+        callback({ query: query as Queryable["query"] })
+    };
+    const accountAnalyticsStore = createPostgresAccountAnalyticsStore({
+      db: transactionalDb,
+      analyticsHashSecret: "test-analytics-secret"
+    });
+    const store = createPostgresMetadataStore(transactionalDb, { accountAnalyticsStore });
+
+    await store.createProbeActivationForProjectInOrganization({
+      organization_id: "org_123",
+      project_id: "proj_123",
+      created_by_member_id: "usr_123",
+      label_pattern: "checkout.*",
+      service: "*",
+      environment: "*",
+      expires_at: "2026-03-11T01:00:00.000Z",
+      trigger_expires_at: "2026-03-12T01:00:00.000Z"
+    });
+    await store.deactivateProbeActivationForProjectInOrganization({
+      organization_id: "org_123",
+      project_id: "proj_123",
+      activation_id: "11111111-1111-4111-8111-111111111111",
+      deactivated_at: "2026-03-11T00:10:00.000Z"
+    });
+
+    expect(query.mock.calls).toContainEqual([
+      expect.stringContaining("INSERT INTO account_metric_events"),
+      expect.arrayContaining([
+        expect.any(String),
+        "analytics_123",
+        "remote_probe_activation_created"
+      ])
+    ]);
+    expect(query.mock.calls).toContainEqual([
+      expect.stringContaining("INSERT INTO account_metric_events"),
+      expect.arrayContaining([
+        expect.any(String),
+        "analytics_123",
+        "remote_probe_activation_expired"
+      ])
+    ]);
+
+    if (originalSecret === undefined) {
+      delete process.env["DEBUGBUNDLE_PROBE_TRIGGER_SECRET"];
+    } else {
+      process.env["DEBUGBUNDLE_PROBE_TRIGGER_SECRET"] = originalSecret;
+    }
+  });
+
   it("should return null when listing services for an out-of-scope project", async (): Promise<void> => {
     const query = vi.fn().mockResolvedValue({ rows: [] });
     const store = createPostgresMetadataStore({ query });
@@ -2242,6 +2403,24 @@ describe("postgres metadata store", () => {
       "inc_123",
       null
     ]);
+  });
+
+  it("should return null when reopening an incident that is already open", async (): Promise<void> => {
+    const query = vi.fn().mockResolvedValue({
+      rows: [],
+      rowCount: 0
+    });
+
+    const store = createPostgresMetadataStore({ query });
+
+    const reopened = await store.reopenIncidentForOrganization({
+      organization_id: "org_123",
+      incident_id: "inc_123"
+    });
+
+    expect(reopened).toBeNull();
+    expect(query).toHaveBeenCalledOnce();
+    expect(String(query.mock.calls[0]?.[0] ?? "")).toContain("AND i.status <> 'open'");
   });
 
   it("should persist webhook delivery intent", async (): Promise<void> => {

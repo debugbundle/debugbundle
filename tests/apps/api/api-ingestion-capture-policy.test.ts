@@ -7,12 +7,14 @@ import { mockedObject, type MockedMethods } from "../../helpers/vitest.ts";
 type ApiServerDependencies = Parameters<typeof createApiServer>[0];
 type CapturePolicyManagementDependency = MockedMethods<NonNullable<ApiServerDependencies["capturePolicyManagement"]>>;
 type CaptureRuleManagementDependency = MockedMethods<NonNullable<ApiServerDependencies["captureRuleManagement"]>>;
+type AccountAnalyticsDependency = MockedMethods<NonNullable<ApiServerDependencies["accountAnalytics"]>>;
 
 function createBaseDependencies(overrides: {
   persistAndEnqueue?: ApiServerDependencies["ingestionPersistence"]["persistAndEnqueue"];
   resolveProjectByTokenHash?: ApiServerDependencies["ingestionMetadata"]["resolveProjectByTokenHash"];
   capturePolicyManagement?: CapturePolicyManagementDependency;
   captureRuleManagement?: CaptureRuleManagementDependency;
+  accountAnalytics?: AccountAnalyticsDependency;
   billingManagement?: ApiServerDependencies["billingManagement"];
 } = {}): Parameters<typeof createApiServer>[0] {
   return {
@@ -22,7 +24,7 @@ function createBaseDependencies(overrides: {
     ingestionMetadata: {
       resolveProjectByTokenHash:
         overrides.resolveProjectByTokenHash ??
-        vi.fn().mockResolvedValue({ project_id: "proj_123", organization_plan: "free" })
+        vi.fn().mockResolvedValue({ project_id: "proj_123", organization_id: "org_123", organization_plan: "free" })
     },
     memberAuth: {
       resolveMemberByTokenHash: vi.fn().mockResolvedValue({ member_id: "mem_123", organization_id: "org_123" })
@@ -49,6 +51,9 @@ function createBaseDependencies(overrides: {
       : {}),
     ...(overrides.captureRuleManagement !== undefined
       ? { captureRuleManagement: overrides.captureRuleManagement }
+      : {}),
+    ...(overrides.accountAnalytics !== undefined
+      ? { accountAnalytics: overrides.accountAnalytics }
       : {}),
     ...(overrides.billingManagement !== undefined
       ? { billingManagement: overrides.billingManagement }
@@ -141,6 +146,7 @@ function makeBackendException(): EventEnvelope {
 describe("ingestion capture policy enforcement", () => {
   it("should reject non-critical request_event on a minimal policy project", async (): Promise<void> => {
     const persistAndEnqueue = vi.fn().mockResolvedValue({ object_key: "raw-events/p/k.json.gz" });
+    const recordMetricDeltas = vi.fn().mockResolvedValue("recorded");
     const capturePolicyManagement = {
       getCapturePolicyForProject: vi.fn().mockResolvedValue({
         project_id: "proj_123",
@@ -155,7 +161,11 @@ describe("ingestion capture policy enforcement", () => {
       upsertCapturePolicyForProject: vi.fn()
     };
 
-    const app = createApiServer(createBaseDependencies({ persistAndEnqueue, capturePolicyManagement }));
+    const app = createApiServer(createBaseDependencies({
+      persistAndEnqueue,
+      capturePolicyManagement,
+      accountAnalytics: { recordMetricDeltas }
+    }));
 
     const response = await app.inject({
       method: "POST",
@@ -170,6 +180,15 @@ describe("ingestion capture policy enforcement", () => {
       rejected: 1,
       errors: [{ index: 0, reason: "capture_policy_rejected" }]
     });
+    expect(recordMetricDeltas).toHaveBeenCalledWith(
+      expect.objectContaining({
+        source: "ingestion_batch",
+        deltas: expect.objectContaining({
+          raw_events_rejected: 1,
+          events_rejected_capture_policy: 1
+        })
+      })
+    );
     expect(persistAndEnqueue).not.toHaveBeenCalled();
   });
 
@@ -640,9 +659,11 @@ describe("ingestion capture policy enforcement", () => {
 
   it("should reject capture-rule dropped events before persistence", async (): Promise<void> => {
     const persistAndEnqueue = vi.fn().mockResolvedValue({ object_key: "raw-events/p/k.json.gz" });
+    const recordMetricDeltas = vi.fn().mockResolvedValue("recorded");
 
     const app = createApiServer(createBaseDependencies({
       persistAndEnqueue,
+      accountAnalytics: { recordMetricDeltas },
       captureRuleManagement: {
         listCaptureRulesForProject: vi.fn(),
         listActiveCaptureRulesForProject: vi.fn().mockResolvedValue([
@@ -690,6 +711,15 @@ describe("ingestion capture policy enforcement", () => {
       rejected: 1,
       errors: [{ index: 0, reason: "capture_rule_dropped" }]
     });
+    expect(recordMetricDeltas).toHaveBeenCalledWith(
+      expect.objectContaining({
+        source: "ingestion_batch",
+        deltas: expect.objectContaining({
+          raw_events_rejected: 1,
+          events_rejected_capture_rule: 1
+        })
+      })
+    );
     expect(persistAndEnqueue).not.toHaveBeenCalled();
   });
 

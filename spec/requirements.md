@@ -341,6 +341,7 @@ See `/spec/billing.md` and `/spec/system-emails.md` for the detailed source-of-t
 
 **FR-AUTH-04a:** Owner-scoped browser account deletion must require two explicit confirmations before any destructive work begins: the exact phrase `Delete my account`, followed by a six-digit email OTP sent to the signed-in account email address. Deletion must fail closed when the phrase is wrong, the OTP is wrong or expired, or email delivery for the OTP is unavailable.
 On success, account deletion removes the user identity from every remaining organization membership and shared-project collaboration as part of deleting the user account. If the same user is still the sole owner of a different organization, or still owns any project in a different organization, the delete must be blocked until ownership is transferred or that organization/project is deleted.
+DebugBundle must preserve anonymized account-level aggregate usage metrics and required payment/provider-retention records after account deletion while still deleting product/debugging payload data on schedule.
 
 **FR-AUTH-05:** Agent-assisted signup flow supported (agent orchestrates, human completes trust step).
 

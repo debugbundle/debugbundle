@@ -1,4 +1,5 @@
 import type { BillingStore } from "./billing-store.js";
+import type { AccountAnalyticsStore } from "./account-analytics-store.js";
 import type { IncidentLifecycleService, IncidentRetrievalRecord, WebhookEventType } from "./types.js";
 import { queueAllowanceLimitReachedNotification, queueAllowanceThresholdNotifications } from "./operational-email-notifications.js";
 import type { OperationalEmailDeliveryStore } from "./types.js";
@@ -66,6 +67,7 @@ interface CreateIncidentLifecycleServiceInput {
   webhookDeliveryStore: IncidentLifecycleWebhookStore;
   fallbackTargetUrl: string | null;
   fallbackSigningSecret: string | null;
+  accountAnalyticsStore?: Pick<AccountAnalyticsStore, "recordMetricDeltas">;
   billingStore?: Pick<BillingStore, "getBillingSummaryForProject">;
   operationalEmailDeliveryStore?: Pick<OperationalEmailDeliveryStore, "queueProjectOperationalEmailDelivery">;
 }
@@ -98,6 +100,7 @@ function buildLifecyclePayload(eventType: WebhookEventType, incident: IncidentRe
 
 async function publishResolvedWebhook(
   input: CreateIncidentLifecycleServiceInput,
+  organizationId: string,
   incident: IncidentRetrievalRecord
 ): Promise<void> {
   const resolvedAt = incident.resolved_at;
@@ -168,7 +171,7 @@ async function publishResolvedWebhook(
       break;
     }
 
-    await input.webhookDeliveryStore.createDeliveryIntent({
+    const delivery = await input.webhookDeliveryStore.createDeliveryIntent({
       webhook_id: target.webhook_id,
       project_id: incident.project_id,
       incident_id: incident.incident_id,
@@ -177,6 +180,15 @@ async function publishResolvedWebhook(
       target_url: target.target_url,
       signing_secret: target.signing_secret,
       payload
+    });
+    await input.accountAnalyticsStore?.recordMetricDeltas({
+      organization_id: organizationId,
+      occurred_at: resolvedAt,
+      source: "webhook_delivery_created",
+      dedupe_key: `webhook_delivery_created:${delivery.delivery_id}`,
+      deltas: {
+        webhook_deliveries_created: 1
+      }
     });
     if (remainingWebhookDeliveries !== null) {
       const previousUsed = webhookAllowanceUsed ?? 0;
@@ -211,7 +223,16 @@ export function createIncidentLifecycleService(input: CreateIncidentLifecycleSer
       const requestedResolvedAt = resolveInput["resolved_at"];
 
       if (resolvedAt === requestedResolvedAt) {
-        await publishResolvedWebhook(input, resolvedIncident);
+        await input.accountAnalyticsStore?.recordMetricDeltas({
+          organization_id: resolveInput.organization_id,
+          occurred_at: requestedResolvedAt,
+          source: "incident_resolved",
+          dedupe_key: `incident_resolved:${resolvedIncident.incident_id}:${requestedResolvedAt}`,
+          deltas: {
+            incidents_resolved: 1
+          }
+        });
+        await publishResolvedWebhook(input, resolveInput.organization_id, resolvedIncident);
       }
 
       if (resolvedIncident.status === "resolved") {
@@ -228,13 +249,16 @@ export function createIncidentLifecycleService(input: CreateIncidentLifecycleSer
     async resolveIncidentsForOrganization(resolveInput: IncidentBulkResolutionInput): Promise<IncidentRetrievalRecord[]> {
       const incidents = await input.incidentStore.resolveIncidentsForOrganization(resolveInput);
 
+      const newlyResolvedIncidentIds: string[] = [];
+
       for (const incident of incidents) {
         const resolvedIncident: IncidentRetrievalRecord = incident;
         const resolvedAt = resolvedIncident["resolved_at"];
         const requestedResolvedAt = resolveInput["resolved_at"];
 
         if (resolvedAt === requestedResolvedAt) {
-          await publishResolvedWebhook(input, resolvedIncident);
+          newlyResolvedIncidentIds.push(resolvedIncident.incident_id);
+          await publishResolvedWebhook(input, resolveInput.organization_id, resolvedIncident);
         }
 
         if (resolvedIncident.status === "resolved") {
@@ -251,15 +275,51 @@ export function createIncidentLifecycleService(input: CreateIncidentLifecycleSer
         }
       }
 
+      if (newlyResolvedIncidentIds.length > 0) {
+        await input.accountAnalyticsStore?.recordMetricDeltas({
+          organization_id: resolveInput.organization_id,
+          occurred_at: resolveInput.resolved_at,
+          source: "incident_resolved_bulk",
+          dedupe_key: `incident_resolved_bulk:${newlyResolvedIncidentIds.sort().join(",")}:${resolveInput.resolved_at}`,
+          deltas: {
+            incidents_resolved: newlyResolvedIncidentIds.length
+          }
+        });
+      }
+
       return incidents;
     },
 
     async reopenIncidentForOrganization(reopenInput: IncidentReopenInput): Promise<IncidentRetrievalRecord | null> {
-      return input.incidentStore.reopenIncidentForOrganization(reopenInput);
+      const incident = await input.incidentStore.reopenIncidentForOrganization(reopenInput);
+      if (incident !== null) {
+        await input.accountAnalyticsStore?.recordMetricDeltas({
+          organization_id: reopenInput.organization_id,
+          occurred_at: new Date().toISOString(),
+          source: "incident_reopened",
+          dedupe_key: `incident_reopened:${incident.incident_id}`,
+          deltas: {
+            incidents_reopened: 1
+          }
+        });
+      }
+      return incident;
     },
 
     async reopenIncidentsForOrganization(reopenInput: IncidentBulkReopenInput): Promise<IncidentRetrievalRecord[]> {
-      return input.incidentStore.reopenIncidentsForOrganization(reopenInput);
+      const incidents = await input.incidentStore.reopenIncidentsForOrganization(reopenInput);
+      if (incidents.length > 0) {
+        await input.accountAnalyticsStore?.recordMetricDeltas({
+          organization_id: reopenInput.organization_id,
+          occurred_at: new Date().toISOString(),
+          source: "incident_reopened_bulk",
+          dedupe_key: `incident_reopened_bulk:${incidents.map((incident) => incident.incident_id).sort().join(",")}`,
+          deltas: {
+            incidents_reopened: incidents.length
+          }
+        });
+      }
+      return incidents;
     }
   };
 }

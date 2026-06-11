@@ -6,12 +6,15 @@ import type {
   GitHubCliAuthStore,
   GitHubDeviceAuthorizationRecord,
   GitHubUserAccountInput,
+  GitHubUserAccountResult,
   IssuedMemberTokenRecord,
   WebSessionAuthStore,
   WebSessionRecord,
   WebUserAccount
 } from "../../auth/src/index.js";
 
+import type { AccountAnalyticsStore } from "./account-analytics-store.js";
+import { runInTransaction } from "./transaction.js";
 import type { Queryable } from "./types.js";
 
 type PostgresAuthStore =
@@ -19,6 +22,10 @@ type PostgresAuthStore =
   & EmailAuthChallengeStore
   & AccountDeletionChallengeStore
   & GitHubCliAuthStore;
+
+type PostgresAuthStoreOptions = {
+  accountAnalyticsStore?: AccountAnalyticsStore;
+};
 
 function mapUserAccountRow(row: Record<string, unknown>): WebUserAccount {
   return {
@@ -78,7 +85,31 @@ function mapGitHubDeviceAuthorizationRow(row: Record<string, unknown>): GitHubDe
   };
 }
 
-export function createPostgresAuthStore(db: Queryable): PostgresAuthStore {
+async function recordAccountCreatedMetric(
+  accountAnalyticsStore: AccountAnalyticsStore,
+  tx: Queryable,
+  input: {
+    organization_id: string;
+    occurred_at: string;
+  }
+): Promise<void> {
+  await accountAnalyticsStore.withDb(tx).recordMetricDeltas({
+    organization_id: input.organization_id,
+    occurred_at: input.occurred_at,
+    source: "account_created",
+    dedupe_key: `account_created:${input.organization_id}`,
+    deltas: {
+      account_created: 1
+    }
+  });
+}
+
+export function createPostgresAuthStore(
+  db: Queryable,
+  options: PostgresAuthStoreOptions = {}
+): PostgresAuthStore {
+  const accountAnalyticsStore = options.accountAnalyticsStore;
+
   return {
     async findUserAccountByEmail(email) {
       const normalizedEmail = email.trim().toLowerCase();
@@ -131,50 +162,70 @@ export function createPostgresAuthStore(db: Queryable): PostgresAuthStore {
       const userId = randomUUID();
       const organizationId = randomUUID();
       const membershipId = randomUUID();
-      const result = await db.query<Record<string, unknown>>(
-        `
-          WITH inserted_user AS (
-            INSERT INTO users (id, email, accepted_terms_at, created_at, updated_at)
-            VALUES ($1, $2, $4::timestamptz, $3::timestamptz, $3::timestamptz)
-            ON CONFLICT (email) DO NOTHING
-            RETURNING id, email, email_verified_at::text AS email_verified_at
-          ),
-          inserted_organization AS (
-            INSERT INTO organizations (id, name, slug, created_at, updated_at)
-            SELECT $5, $6, $7, $3::timestamptz, $3::timestamptz
+      const createAccount = async (queryable: Queryable): Promise<WebUserAccount | null> => {
+        const result = await queryable.query<Record<string, unknown>>(
+          `
+            WITH inserted_user AS (
+              INSERT INTO users (id, email, accepted_terms_at, created_at, updated_at)
+              VALUES ($1, $2, $4::timestamptz, $3::timestamptz, $3::timestamptz)
+              ON CONFLICT (email) DO NOTHING
+              RETURNING id, email, email_verified_at::text AS email_verified_at
+            ),
+            inserted_organization AS (
+              INSERT INTO organizations (id, name, slug, created_at, updated_at)
+              SELECT $5, $6, $7, $3::timestamptz, $3::timestamptz
+              FROM inserted_user
+              RETURNING id
+            ),
+            inserted_membership AS (
+              INSERT INTO organization_members (id, organization_id, user_id, role, created_at)
+              SELECT $8, inserted_organization.id, inserted_user.id, 'owner', $3::timestamptz
+              FROM inserted_user
+              JOIN inserted_organization ON true
+              RETURNING organization_id, user_id, role
+            )
+            SELECT
+              inserted_user.id AS user_id,
+              inserted_user.email,
+              inserted_user.email_verified_at,
+              inserted_membership.organization_id,
+              inserted_membership.role
             FROM inserted_user
-            RETURNING id
-          ),
-          inserted_membership AS (
-            INSERT INTO organization_members (id, organization_id, user_id, role, created_at)
-            SELECT $8, inserted_organization.id, inserted_user.id, 'owner', $3::timestamptz
-            FROM inserted_user
-            JOIN inserted_organization ON true
-            RETURNING organization_id, user_id, role
-          )
-          SELECT
-            inserted_user.id AS user_id,
-            inserted_user.email,
-            inserted_user.email_verified_at,
-            inserted_membership.organization_id,
-            inserted_membership.role
-          FROM inserted_user
-          JOIN inserted_membership ON inserted_membership.user_id = inserted_user.id
-        `,
-        [
-          userId,
-          input.email,
-          input.created_at,
-          input.accepted_terms_at,
-          organizationId,
-          input.organization_name,
-          input.organization_slug,
-          membershipId
-        ]
-      );
+            JOIN inserted_membership ON inserted_membership.user_id = inserted_user.id
+          `,
+          [
+            userId,
+            input.email,
+            input.created_at,
+            input.accepted_terms_at,
+            organizationId,
+            input.organization_name,
+            input.organization_slug,
+            membershipId
+          ]
+        );
 
-      const row = result.rows[0];
-      return row === undefined ? null : mapUserAccountRow(row);
+        const row = result.rows[0];
+        if (row === undefined) {
+          return null;
+        }
+
+        const account = mapUserAccountRow(row);
+        if (accountAnalyticsStore !== undefined) {
+          await recordAccountCreatedMetric(accountAnalyticsStore, queryable, {
+            organization_id: account.organization_id,
+            occurred_at: input.created_at
+          });
+        }
+
+        return account;
+      };
+
+      if (accountAnalyticsStore === undefined) {
+        return createAccount(db);
+      }
+
+      return runInTransaction(db, createAccount);
     },
 
     async createSession(input) {
@@ -361,99 +412,115 @@ export function createPostgresAuthStore(db: Queryable): PostgresAuthStore {
         [input.email.trim().toLowerCase(), input.verified_at]
       );
 
-      let account = existingUserResult.rows[0];
-      let createdUser = false;
-      if (account === undefined) {
-        const userId = randomUUID();
-        const organizationId = randomUUID();
-        const membershipId = randomUUID();
-        const slugBase = input.email
-          .trim()
-          .toLowerCase()
-          .split("@")[0]
-          ?.replace(/[^a-z0-9]+/g, "-")
-          .replace(/^-+|-+$/g, "")
-          .slice(0, 40) || "workspace";
+      const upsertAccount = async (queryable: Queryable): Promise<GitHubUserAccountResult> => {
+        let account = existingUserResult.rows[0];
+        let createdUser = false;
+        if (account === undefined) {
+          const userId = randomUUID();
+          const organizationId = randomUUID();
+          const membershipId = randomUUID();
+          const slugBase = input.email
+            .trim()
+            .toLowerCase()
+            .split("@")[0]
+            ?.replace(/[^a-z0-9]+/g, "-")
+            .replace(/^-+|-+$/g, "")
+            .slice(0, 40) || "workspace";
 
-        const createdAccountResult = await db.query<Record<string, unknown>>(
+          const createdAccountResult = await queryable.query<Record<string, unknown>>(
+            `
+              WITH inserted_user AS (
+                INSERT INTO users (id, email, email_verified_at, accepted_terms_at, created_at, updated_at)
+                VALUES ($1, $2, $3::timestamptz, $4::timestamptz, $3::timestamptz, $3::timestamptz)
+                RETURNING id, email, email_verified_at::text AS email_verified_at
+              ),
+              inserted_organization AS (
+                INSERT INTO organizations (id, name, slug, created_at, updated_at)
+                SELECT $5, $6, $7, $3::timestamptz, $3::timestamptz
+                FROM inserted_user
+                RETURNING id
+              ),
+              inserted_membership AS (
+                INSERT INTO organization_members (id, organization_id, user_id, role, created_at)
+                SELECT $8, inserted_organization.id, inserted_user.id, 'owner', $3::timestamptz
+                FROM inserted_user
+                JOIN inserted_organization ON true
+                RETURNING organization_id, user_id, role
+              )
+              SELECT
+                inserted_user.id AS user_id,
+                inserted_user.email,
+                inserted_user.email_verified_at,
+                inserted_membership.organization_id,
+                inserted_membership.role
+              FROM inserted_user
+              JOIN inserted_membership ON inserted_membership.user_id = inserted_user.id
+            `,
+            [
+              userId,
+              input.email.trim().toLowerCase(),
+              input.verified_at,
+              input.accepted_terms_at ?? null,
+              organizationId,
+              `${slugBase.charAt(0).toUpperCase()}${slugBase.slice(1)} Workspace`,
+              `${slugBase}-${input.github_user_id.slice(0, 8)}`,
+              membershipId
+            ]
+          );
+
+          account = createdAccountResult.rows[0];
+          createdUser = true;
+        } else {
+          await queryable.query<Record<string, unknown>>(
+            `
+              UPDATE users
+              SET email_verified_at = COALESCE(email_verified_at, $2::timestamptz),
+                  accepted_terms_at = COALESCE(accepted_terms_at, $3::timestamptz),
+                  updated_at = $2::timestamptz
+              WHERE id = $1
+            `,
+            [account["user_id"], input.verified_at, input.accepted_terms_at ?? null]
+          );
+        }
+
+        if (account === undefined) {
+          throw new Error("github_user_account_upsert_failed");
+        }
+
+        if (createdUser && accountAnalyticsStore !== undefined) {
+          await recordAccountCreatedMetric(accountAnalyticsStore, queryable, {
+            organization_id: String(account["organization_id"]),
+            occurred_at: input.verified_at
+          });
+        }
+
+        await queryable.query<Record<string, unknown>>(
           `
-            WITH inserted_user AS (
-              INSERT INTO users (id, email, email_verified_at, accepted_terms_at, created_at, updated_at)
-              VALUES ($1, $2, $3::timestamptz, $4::timestamptz, $3::timestamptz, $3::timestamptz)
-              RETURNING id, email, email_verified_at::text AS email_verified_at
-            ),
-            inserted_organization AS (
-              INSERT INTO organizations (id, name, slug, created_at, updated_at)
-              SELECT $5, $6, $7, $3::timestamptz, $3::timestamptz
-              FROM inserted_user
-              RETURNING id
-            ),
-            inserted_membership AS (
-              INSERT INTO organization_members (id, organization_id, user_id, role, created_at)
-              SELECT $8, inserted_organization.id, inserted_user.id, 'owner', $3::timestamptz
-              FROM inserted_user
-              JOIN inserted_organization ON true
-              RETURNING organization_id, user_id, role
-            )
-            SELECT
-              inserted_user.id AS user_id,
-              inserted_user.email,
-              inserted_user.email_verified_at,
-              inserted_membership.organization_id,
-              inserted_membership.role
-            FROM inserted_user
-            JOIN inserted_membership ON inserted_membership.user_id = inserted_user.id
+            INSERT INTO oauth_identities (id, provider, provider_user_id, user_id, created_at, updated_at)
+            VALUES ($1, 'github', $2, $3, $4::timestamptz, $4::timestamptz)
+            ON CONFLICT (provider, provider_user_id)
+            DO UPDATE SET user_id = EXCLUDED.user_id, updated_at = EXCLUDED.updated_at
+            RETURNING id AS oauth_identity_id
           `,
-          [
-            userId,
-            input.email.trim().toLowerCase(),
-            input.verified_at,
-            input.accepted_terms_at ?? null,
-            organizationId,
-            `${slugBase.charAt(0).toUpperCase()}${slugBase.slice(1)} Workspace`,
-            `${slugBase}-${input.github_user_id.slice(0, 8)}`,
-            membershipId
-          ]
+          [randomUUID(), input.github_user_id, account["user_id"], input.verified_at]
         );
 
-        account = createdAccountResult.rows[0];
-        createdUser = true;
-      } else {
-        await db.query<Record<string, unknown>>(
-          `
-            UPDATE users
-            SET email_verified_at = COALESCE(email_verified_at, $2::timestamptz),
-                accepted_terms_at = COALESCE(accepted_terms_at, $3::timestamptz),
-                updated_at = $2::timestamptz
-            WHERE id = $1
-          `,
-          [account["user_id"], input.verified_at, input.accepted_terms_at ?? null]
-        );
-      }
-
-      if (account === undefined) {
-        throw new Error("github_user_account_upsert_failed");
-      }
-
-      await db.query<Record<string, unknown>>(
-        `
-          INSERT INTO oauth_identities (id, provider, provider_user_id, user_id, created_at, updated_at)
-          VALUES ($1, 'github', $2, $3, $4::timestamptz, $4::timestamptz)
-          ON CONFLICT (provider, provider_user_id)
-          DO UPDATE SET user_id = EXCLUDED.user_id, updated_at = EXCLUDED.updated_at
-          RETURNING id AS oauth_identity_id
-        `,
-        [randomUUID(), input.github_user_id, account["user_id"], input.verified_at]
-      );
-
-      return {
-        user_id: String(account["user_id"]),
-        email: String(account["email"]),
-        email_verified_at: input.verified_at,
-        organization_id: String(account["organization_id"]),
-        role: account["role"] === "owner" ? "owner" : "member",
-        created_user: createdUser
+        const role: "owner" | "member" = account["role"] === "owner" ? "owner" : "member";
+        return {
+          user_id: String(account["user_id"]),
+          email: String(account["email"]),
+          email_verified_at: input.verified_at,
+          organization_id: String(account["organization_id"]),
+          role,
+          created_user: createdUser
+        };
       };
+
+      if (accountAnalyticsStore === undefined) {
+        return upsertAccount(db);
+      }
+
+      return runInTransaction(db, upsertAccount);
     },
 
     async createGitHubDeviceAuthorization(input) {

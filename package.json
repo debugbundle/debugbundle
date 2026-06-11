@@ -25,6 +25,7 @@
     "turbo:test": "turbo run test",
     "turbo:build": "turbo run build",
     "db:bootstrap": "tsx scripts/bootstrap-storage.ts",
+    "db:backfill-account-analytics": "tsx scripts/backfill-account-analytics.ts",
     "db:migrate": "tsx scripts/migrate-storage.ts",
     "api:start": "tsx apps/api/src/main.ts",
     "api:check": "vitest run tests/apps/api/api-runtime.test.ts tests/apps/api/api-runtime-start.test.ts tests/apps/api/api-dogfooding.test.ts",

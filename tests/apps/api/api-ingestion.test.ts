@@ -15,6 +15,7 @@ type ProbeManagementDependency = MockedMethods<NonNullable<ApiServerDependencies
 type IngestionRateLimiterDependency = MockedMethods<NonNullable<ApiServerDependencies["ingestionRateLimiter"]>>;
 type BillingManagementDependency = MockedMethods<NonNullable<ApiServerDependencies["billingManagement"]>>;
 type ProjectManagementDependency = MockedMethods<NonNullable<ApiServerDependencies["projectManagement"]>>;
+type AccountAnalyticsDependency = MockedMethods<NonNullable<ApiServerDependencies["accountAnalytics"]>>;
 
 function createWebhookDeliveryDependency(): WebhookDeliveryDependency {
   return mockedObject<ApiServerDependencies["webhookDelivery"]>({
@@ -130,6 +131,14 @@ function createBillingManagementDependency(overrides: {
   });
 }
 
+function createAccountAnalyticsDependency(overrides: {
+  recordMetricDeltas?: AccountAnalyticsDependency["recordMetricDeltas"];
+} = {}): AccountAnalyticsDependency {
+  return mockedObject<NonNullable<ApiServerDependencies["accountAnalytics"]>>({
+    recordMetricDeltas: overrides.recordMetricDeltas ?? vi.fn().mockResolvedValue("recorded")
+  });
+}
+
 describe("api ingestion route", () => {
   it("should reject oversized ingestion payloads with 413", async (): Promise<void> => {
     const app = createApiServer({
@@ -199,6 +208,7 @@ describe("api ingestion route", () => {
     const persistAndEnqueue = vi.fn().mockResolvedValue({ object_key: "raw-events/proj_123/path.json.gz" });
     const resolveProjectByTokenHash = vi.fn().mockResolvedValue({ project_id: "proj_123", organization_id: "org_123", organization_plan: "free" });
     const queueProjectOperationalEmailDelivery = vi.fn().mockResolvedValue({ delivery_id: "op_123", created: true });
+    const recordMetricDeltas = vi.fn().mockResolvedValue("recorded");
     const getBillingSummaryForOrganization = vi.fn().mockResolvedValue({
       usage_window: {
         starts_at: "2026-03-01T00:00:00.000Z",
@@ -222,6 +232,7 @@ describe("api ingestion route", () => {
       ingestionMetadata: {
         resolveProjectByTokenHash
       },
+      accountAnalytics: createAccountAnalyticsDependency({ recordMetricDeltas }),
       billingManagement: createBillingManagementDependency({ getBillingSummaryForOrganization }),
       memberAuth: createMemberAuthDependency(),
       tokenManagement: createTokenManagementDependency(),
@@ -288,6 +299,16 @@ describe("api ingestion route", () => {
       organization_id: "org_123",
       now: expect.any(String)
     });
+    expect(recordMetricDeltas).toHaveBeenCalledWith(
+      expect.objectContaining({
+        organization_id: "org_123",
+        source: "ingestion_batch",
+        deltas: expect.objectContaining({
+          raw_events_rejected: 1,
+          events_rejected_quota: 1
+        })
+      })
+    );
     expect(persistAndEnqueue).not.toHaveBeenCalled();
     expect(queueProjectOperationalEmailDelivery).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -390,6 +411,7 @@ describe("api ingestion route", () => {
   it("should reject valid events with 429 when the ingestion rate limit is exceeded", async (): Promise<void> => {
     const persistAndEnqueue = vi.fn().mockResolvedValue({ object_key: "raw-events/proj_123/path.json.gz" });
     const resolveProjectByTokenHash = vi.fn().mockResolvedValue({ project_id: "proj_123", organization_id: "org_123", organization_plan: "free" });
+    const recordMetricDeltas = vi.fn().mockResolvedValue("recorded");
     const claimEvents = vi.fn().mockResolvedValue({
       allowed: false,
       limit: 1_000,
@@ -402,6 +424,7 @@ describe("api ingestion route", () => {
       ingestionMetadata: {
         resolveProjectByTokenHash
       },
+      accountAnalytics: createAccountAnalyticsDependency({ recordMetricDeltas }),
       ingestionRateLimiter: createIngestionRateLimiterDependency({ claimEvents }),
       memberAuth: createMemberAuthDependency(),
       tokenManagement: createTokenManagementDependency(),
@@ -470,6 +493,16 @@ describe("api ingestion route", () => {
         project_id: "proj_123",
         event_count: 1,
         limit: 1_000
+      })
+    );
+    expect(recordMetricDeltas).toHaveBeenCalledWith(
+      expect.objectContaining({
+        organization_id: "org_123",
+        source: "ingestion_batch",
+        deltas: expect.objectContaining({
+          raw_events_rejected: 1,
+          events_rejected_rate_limited: 1
+        })
       })
     );
     expect(persistAndEnqueue).not.toHaveBeenCalled();
@@ -1402,12 +1435,14 @@ describe("self-host mode ingestion bypass", () => {
   it("should increment usage counters after successful ingestion of billable events", async (): Promise<void> => {
     const persistAndEnqueue = vi.fn().mockResolvedValue({ object_key: "raw-events/proj_123/path.json.gz" });
     const resolveProjectByTokenHash = vi.fn().mockResolvedValue({ project_id: "proj_123", organization_id: "org_123", organization_plan: "free" });
+    const recordMetricDeltas = vi.fn().mockResolvedValue("recorded");
     const incrementOrgUsageCounter = vi.fn().mockResolvedValue(undefined);
     const incrementProjectUsageCounter = vi.fn().mockResolvedValue(undefined);
 
     const app = createApiServer({
       ingestionPersistence: { persistAndEnqueue },
       ingestionMetadata: { resolveProjectByTokenHash },
+      accountAnalytics: createAccountAnalyticsDependency({ recordMetricDeltas }),
       billingManagement: createBillingManagementDependency({
         incrementOrgUsageCounter,
         incrementProjectUsageCounter
@@ -1459,6 +1494,141 @@ describe("self-host mode ingestion bypass", () => {
       period_starts_at: expect.any(String),
       count: 1
     });
+    expect(recordMetricDeltas).toHaveBeenCalledWith(
+      expect.objectContaining({
+        organization_id: "org_123",
+        source: "ingestion_batch",
+        deltas: expect.objectContaining({
+          raw_events_accepted: 1,
+          billable_events_counted: 1,
+          incident_signal_events_counted: 1
+        })
+      })
+    );
+  });
+
+  it("should not reject accepted ingestion when account analytics recording fails after persistence", async (): Promise<void> => {
+    const persistAndEnqueue = vi.fn().mockResolvedValue({ object_key: "raw-events/proj_123/path.json.gz" });
+    const resolveProjectByTokenHash = vi.fn().mockResolvedValue({ project_id: "proj_123", organization_id: "org_123", organization_plan: "free" });
+    const recordMetricDeltas = vi.fn().mockRejectedValue(new Error("analytics_unavailable"));
+
+    const app = createApiServer({
+      ingestionPersistence: { persistAndEnqueue },
+      ingestionMetadata: { resolveProjectByTokenHash },
+      accountAnalytics: createAccountAnalyticsDependency({ recordMetricDeltas }),
+      billingManagement: createBillingManagementDependency(),
+      memberAuth: createMemberAuthDependency(),
+      tokenManagement: createTokenManagementDependency(),
+      incidentRetrieval: createIncidentRetrievalDependency(),
+      objectStoreReader: createObjectStoreReaderDependency(),
+      webhookDelivery: createWebhookDeliveryDependency()
+    });
+
+    const event = createEventEnvelope({
+      event_type: "backend_exception",
+      project_token: "dbundle_proj_test",
+      service: {
+        name: "checkout-api",
+        environment: "production",
+        runtime: "node",
+        framework: "fastify"
+      },
+      payload: {
+        name: "TypeError",
+        message: "boom",
+        stack: "TypeError: boom",
+        handled: false,
+        request: { method: "GET", path: "/users/123", query: {}, headers: {}, body: null },
+        response: { status_code: 500 },
+        runtime: { version: "22.0.0" }
+      }
+    });
+
+    const response = await app.inject({
+      method: "POST",
+      url: "/v1/events",
+      headers: { authorization: "Bearer dbundle_proj_test" },
+      payload: { events: [event] }
+    });
+
+    expect(response.statusCode).toBe(202);
+    expect(response.json()).toMatchObject({
+      accepted: 1,
+      rejected: 0,
+      errors: []
+    });
+    expect(persistAndEnqueue).toHaveBeenCalledOnce();
+    expect(recordMetricDeltas).toHaveBeenCalledOnce();
+  });
+
+  it("counts accepted probe events in account analytics", async (): Promise<void> => {
+    const persistAndEnqueue = vi.fn().mockResolvedValue({ object_key: "raw-events/proj_123/probe.json.gz" });
+    const resolveProjectByTokenHash = vi
+      .fn()
+      .mockResolvedValue({ project_id: "proj_123", organization_id: "org_123", organization_plan: "solo" });
+    const recordMetricDeltas = vi.fn().mockResolvedValue("recorded");
+
+    const app = createApiServer({
+      ingestionPersistence: { persistAndEnqueue },
+      ingestionMetadata: { resolveProjectByTokenHash },
+      accountAnalytics: createAccountAnalyticsDependency({ recordMetricDeltas }),
+      billingManagement: createBillingManagementDependency(),
+      capturePolicyManagement: {
+        getCapturePolicyForProject: vi.fn().mockResolvedValue({
+          project_id: "proj_123",
+          preset: "investigative",
+          capture_logs: null,
+          capture_request_events: null,
+          capture_breadcrumbs: null,
+          capture_probe_events: "standalone_when_activated",
+          immediate_client_error_statuses: null,
+          immediate_client_error_path_rules: null
+        }),
+        upsertCapturePolicyForProject: vi.fn()
+      },
+      memberAuth: createMemberAuthDependency(),
+      tokenManagement: createTokenManagementDependency(),
+      incidentRetrieval: createIncidentRetrievalDependency(),
+      objectStoreReader: createObjectStoreReaderDependency(),
+      webhookDelivery: createWebhookDeliveryDependency()
+    });
+
+    const event = createEventEnvelope({
+      event_type: "probe_event",
+      project_token: "dbundle_proj_test",
+      service: {
+        name: "checkout-api",
+        environment: "production",
+        runtime: "node",
+        framework: "fastify"
+      },
+      payload: {
+        label: "checkout.tax",
+        data: { rate: 0.2 },
+        activation_id: "00000000-0000-4000-8000-000000000123",
+        probe_label_pattern: "checkout.*"
+      }
+    });
+
+    const response = await app.inject({
+      method: "POST",
+      url: "/v1/events",
+      headers: { authorization: "Bearer dbundle_proj_test" },
+      payload: { events: [event] }
+    });
+
+    expect(response.statusCode).toBe(202);
+    expect(recordMetricDeltas).toHaveBeenCalledWith(
+      expect.objectContaining({
+        organization_id: "org_123",
+        source: "ingestion_batch",
+        deltas: expect.objectContaining({
+          raw_events_accepted: 1,
+          operational_signal_events_counted: 1,
+          probe_events_accepted: 1
+        })
+      })
+    );
   });
 
   it("should not reject ingestion when the project dashboard usage counter fails after persistence", async (): Promise<void> => {

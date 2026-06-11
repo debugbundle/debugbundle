@@ -39,6 +39,7 @@ export interface CreateApiDependenciesInput {
   objectStore: ObjectStoreClient & ObjectStoreReader & ObjectStorePrefixDeleter;
   queue: QueueClient;
   db: Queryable;
+  analyticsHashSecret?: string;
   frequencyCounter?: IncidentFrequencyCounter;
   ingestionRateLimiter?: IngestionRateLimiter;
   authRateLimiter?: AuthRateLimiter;

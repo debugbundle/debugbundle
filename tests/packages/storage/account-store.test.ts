@@ -1,8 +1,12 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { createPostgresAccountStore, type Queryable } from "../../../packages/storage/src/index.js";
+import {
+  createPostgresAccountAnalyticsStore,
+  createPostgresAccountStore,
+  type Queryable
+} from "../../../packages/storage/src/index.js";
 
-function rowsResult(rows: unknown[]): { rows: unknown[] } {
+function rowsResult<Row extends Record<string, unknown>>(rows: Row[]): { rows: Row[] } {
   return { rows };
 }
 
@@ -241,10 +245,7 @@ describe("postgres account store", () => {
   });
 
   it("deletes organization, remaining memberships, and the user record", async (): Promise<void> => {
-    const query = vi.fn(async (sqlText: string) => {
-      if (sqlText === "BEGIN" || sqlText === "COMMIT") {
-        return rowsResult([]);
-      }
+    const queryMock = vi.fn(async (sqlText: string) => {
       if (sqlText.includes("SELECT role") && sqlText.includes("FROM organization_members")) {
         return rowsResult([{ role: "owner" }]);
       }
@@ -257,8 +258,64 @@ describe("postgres account store", () => {
       if (sqlText.includes("SELECT id::text AS project_id") && sqlText.includes("FROM projects")) {
         return rowsResult([{ project_id: "proj_123" }, { project_id: "proj_456" }]);
       }
+      if (sqlText.includes("SELECT COUNT(*)::int") && sqlText.includes("FROM incidents i")) {
+        return rowsResult([
+          {
+            project_count: 2,
+            open_incident_count: 3,
+            open_improvement_count: 1
+          }
+        ]);
+      }
       if (sqlText.includes("DELETE FROM member_tokens") && sqlText.includes("WHERE organization_id = $1")) {
         return rowsResult([{ token_id: "tok_123" }]);
+      }
+      if (sqlText.includes("FROM account_analytics_accounts")) {
+        return rowsResult([{ analytics_account_id: "analytics_123" }]);
+      }
+      if (sqlText.includes("SELECT") && sqlText.includes("FROM organizations") && sqlText.includes("created_at::text AS created_at")) {
+        return rowsResult([
+          {
+            organization_id: "org_123",
+            created_at: "2026-04-01T00:00:00.000Z",
+            plan: "team",
+            additional_capacity_units: 2
+          }
+        ]);
+      }
+      if (sqlText.includes("INSERT INTO account_analytics_accounts")) {
+        return rowsResult([{ analytics_account_id: "analytics_123" }]);
+      }
+      if (sqlText.includes("FROM organizations") && sqlText.includes("stripe_customer_id")) {
+        return rowsResult([
+          {
+            analytics_account_id: "analytics_123",
+            organization_id_hash: "org_hash_123",
+            plan: "team",
+            billing_state: "active",
+            stripe_customer_id: "cus_123",
+            stripe_subscription_id: "sub_123",
+            billing_period_starts_at: "2026-04-01T00:00:00.000Z",
+            billing_period_ends_at: "2026-05-01T00:00:00.000Z",
+            additional_capacity_units: 2,
+            last_billing_event_id: "evt_123"
+          }
+        ]);
+      }
+      if (sqlText.includes("INSERT INTO account_payment_retention_records")) {
+        return rowsResult([]);
+      }
+      if (sqlText.includes("INSERT INTO account_payment_provider_events")) {
+        return rowsResult([]);
+      }
+      if (sqlText.includes("INSERT INTO account_metric_events")) {
+        return rowsResult([{ dedupe_key_hash: "hash_123" }]);
+      }
+      if (sqlText.includes("INSERT INTO account_metric_periods")) {
+        return rowsResult([]);
+      }
+      if (sqlText.includes("UPDATE account_analytics_accounts")) {
+        return rowsResult([]);
       }
       if (sqlText.includes("DELETE FROM processed_billing_events")) {
         return rowsResult([]);
@@ -287,8 +344,18 @@ describe("postgres account store", () => {
 
       throw new Error(`Unhandled SQL in deleteAccountForOrganization success: ${sqlText}`);
     });
+    const query = queryMock as Queryable["query"];
 
-    const store = createPostgresAccountStore({ query } as Queryable);
+    const transactionalDb: Queryable = {
+      query,
+      transaction: async <Result>(callback: (tx: Queryable) => Promise<Result>) =>
+        callback({ query } as Queryable)
+    };
+    const accountAnalyticsStore = createPostgresAccountAnalyticsStore({
+      db: transactionalDb,
+      analyticsHashSecret: "test-analytics-secret"
+    });
+    const store = createPostgresAccountStore(transactionalDb, { accountAnalyticsStore });
 
     const result = await store.deleteAccountForOrganization({
       organization_id: "org_123",
@@ -303,7 +370,18 @@ describe("postgres account store", () => {
       user_deleted: true,
       deleted_member_token_count: 2
     });
-    expect(query).toHaveBeenCalledWith("COMMIT", []);
+    expect(queryMock).toHaveBeenCalledWith(
+      expect.stringContaining("INSERT INTO account_payment_retention_records"),
+      expect.any(Array)
+    );
+    expect(queryMock).toHaveBeenCalledWith(
+      expect.stringContaining("INSERT INTO account_payment_provider_events"),
+      expect.any(Array)
+    );
+    expect(queryMock).toHaveBeenCalledWith(
+      expect.stringContaining("UPDATE account_analytics_accounts"),
+      ["analytics_123", "2026-04-06T00:00:00.000Z"]
+    );
   });
 
   it("allows deletion when another organization still has a different owner and removes the collaborator membership", async (): Promise<void> => {
@@ -322,6 +400,15 @@ describe("postgres account store", () => {
       }
       if (sqlText.includes("SELECT id::text AS project_id") && sqlText.includes("FROM projects")) {
         return rowsResult([{ project_id: "proj_123" }]);
+      }
+      if (sqlText.includes("SELECT COUNT(*)::int") && sqlText.includes("FROM incidents i")) {
+        return rowsResult([
+          {
+            project_count: 1,
+            open_incident_count: 0,
+            open_improvement_count: 0
+          }
+        ]);
       }
       if (sqlText.includes("DELETE FROM member_tokens") && sqlText.includes("WHERE organization_id = $1")) {
         return rowsResult([]);

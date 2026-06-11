@@ -240,6 +240,7 @@ On success, DebugBundle emails a six-digit OTP to the signed-in account email ad
 - User still owns projects in another organization: `409 { "error": "other_owned_projects_exist" }`
 
 On success, the delete removes the signed-in user from every remaining organization membership and shared-project collaboration by deleting the user identity. The sole-owner guard remains in place for any other organization that would otherwise be left without an owner, and deletion is blocked while the same identity still owns projects outside the organization being deleted.
+Anonymized aggregate account-usage metrics are preserved after deletion for lifecycle analytics, but they are not user-accessible after the account is gone and they do not retain project names, payloads, tokens, emails, or other customer content. Required payment/provider-retention records are also preserved outside the normal account export surface for accounting, tax, audit, fraud, chargeback, and webhook-idempotency needs.
 
 **Accept project invite request:**
 ```json

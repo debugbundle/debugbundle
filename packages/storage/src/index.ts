@@ -2,6 +2,17 @@
 // External consumers continue importing from this file unchanged.
 
 export * from "./types.js";
+export type {
+  AccountAnalyticsStore,
+  AccountMetricSummary,
+  AccountMetricPeriodRecord,
+  AccountMetricKey
+} from "./account-analytics-store.js";
+export {
+  ACCOUNT_METRIC_KEYS,
+  AccountMetricKeySchema,
+  createPostgresAccountAnalyticsStore
+} from "./account-analytics-store.js";
 export * from "./integration-secret-crypto.js";
 export * from "./incident-context.js";
 export * from "./incident-reason.js";
@@ -89,6 +100,10 @@ export { createRedisAuthRateLimiter } from "./auth-rate-limiter.js";
 export { createRedisIncidentFrequencyCounter } from "./frequency-counter.js";
 export { createRedisRequestAnomalyCounter } from "./frequency-counter.js";
 export { createRedisIngestionRateLimiter } from "./ingestion-rate-limiter.js";
+export {
+  buildIngestionMetricBatch,
+  countsTowardMonthlyIngestAllowance,
+} from "./ingestion-analytics.js";
 export {
   createIngestionMetadataService,
   createMemberAuthService,

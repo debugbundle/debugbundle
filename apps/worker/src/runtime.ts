@@ -22,6 +22,7 @@ import {
 import { REQUIRED_WORKER_TABLES } from "../../../packages/storage/src/migrations.js";
 import {
   createPostgresAlertDeliveryStore,
+  createPostgresAccountAnalyticsStore,
   createPostgresBillingStore,
   createPostgresGitHubStore,
   createPostgresImprovementOpportunityStore,
@@ -79,6 +80,7 @@ import {
 import { processNextDeliverOperationalEmailJob } from "./operational-email-processor.js";
 import { scheduleTrialLifecycleEmails } from "./trial-lifecycle-scheduler.js";
 import { captureWorkerDogfoodingStepFailure, registerWorkerDogfooding } from "./dogfooding.js";
+import { recordProjectMetricDeltas, type WorkerAccountAnalyticsDependencies } from "./account-analytics.js";
 
 const RETENTION_CLEANUP_LEASE_KEY = "leases:cleanup-retention:schedule";
 const WORKER_SHUTDOWN_GRACE_MS = 30_000;
@@ -110,7 +112,8 @@ const WorkerEnvSchema = z.object({
   LIFECYCLE_WEBHOOK_TARGET_URL: z.string().url().optional(),
   LIFECYCLE_WEBHOOK_SECRET: z.string().min(1).optional(),
   WORKER_HEALTH_PORT: z.coerce.number().int().min(0).max(65535).default(0),
-  WORKER_RUN_ONCE: z.enum(["0", "1"]).default("0")
+  WORKER_RUN_ONCE: z.enum(["0", "1"]).default("0"),
+  ANALYTICS_HASH_SECRET: z.string().min(1)
 });
 
 export type WorkerEnv = Omit<z.infer<typeof WorkerEnvSchema>, "DB_SSL_MODE"> & {
@@ -233,6 +236,20 @@ async function getProjectName(queryable: Queryable, projectId: string): Promise<
   return result.rows[0]?.name ?? null;
 }
 
+async function getProjectOrganizationId(queryable: Queryable, projectId: string): Promise<string | null> {
+  const result = await queryable.query<{ organization_id: string }>(
+    `
+      SELECT organization_id::text AS organization_id
+      FROM projects
+      WHERE id = $1::uuid
+      LIMIT 1
+    `,
+    [projectId]
+  );
+
+  return result.rows[0]?.organization_id ?? null;
+}
+
 async function getWebhookOwnerNotificationRecipient(
   queryable: Queryable,
   webhookId: string
@@ -307,7 +324,8 @@ export function parseWorkerEnv(env: Record<string, string | undefined>): WorkerE
     LIFECYCLE_WEBHOOK_TARGET_URL: readOptionalEnv(env["LIFECYCLE_WEBHOOK_TARGET_URL"]),
     LIFECYCLE_WEBHOOK_SECRET: readOptionalEnv(env["LIFECYCLE_WEBHOOK_SECRET"]),
     WORKER_HEALTH_PORT: env["WORKER_HEALTH_PORT"],
-    WORKER_RUN_ONCE: env["WORKER_RUN_ONCE"]
+    WORKER_RUN_ONCE: env["WORKER_RUN_ONCE"],
+    ANALYTICS_HASH_SECRET: env["ANALYTICS_HASH_SECRET"]
   });
 
   if (!parsed.success) {
@@ -436,7 +454,7 @@ export function createProcessedEventStore(db: Queryable): ProcessedEventStore {
   };
 }
 
-interface CreateLifecycleWebhookPublisherInput {
+interface CreateLifecycleWebhookPublisherInput extends WorkerAccountAnalyticsDependencies {
   fallbackTargetUrl: string | null;
   fallbackSigningSecret: string | null;
   webhookDeliveryStore: Pick<WebhookDeliveryStore, "listMatchingWebhooks" | "createDeliveryIntent">;
@@ -449,7 +467,7 @@ interface GitHubDispatchTokenCache {
   set(key: string, value: string, ttlSeconds: number): Promise<void>;
 }
 
-interface CreateGitHubDispatchPublisherInput {
+interface CreateGitHubDispatchPublisherInput extends WorkerAccountAnalyticsDependencies {
   githubStore: Pick<
     GitHubStore,
     | "listMatchingGitHubDispatchRules"
@@ -586,7 +604,7 @@ export function createGitHubDispatchPublisher(input: CreateGitHubDispatchPublish
           continue;
         }
 
-        await input.githubStore.createGitHubDispatchDeliveryIntent({
+        const delivery = await input.githubStore.createGitHubDispatchDeliveryIntent({
           rule_id: rule.rule_id,
           rule_name: rule.rule_name,
           project_id: event.project_id,
@@ -599,6 +617,18 @@ export function createGitHubDispatchPublisher(input: CreateGitHubDispatchPublish
           repo_name: rule.repo_name,
           dispatch_payload: dispatchPayload
         });
+
+        if (delivery.created) {
+          await recordProjectMetricDeltas(input, {
+            projectId: event.project_id,
+            occurredAt: event.occurred_at,
+            source: "github_dispatch_created",
+            dedupeKey: `github_dispatch_created:${delivery.delivery_id}`,
+            deltas: {
+              github_dispatches_created: 1
+            }
+          });
+        }
       }
     }
   };
@@ -672,7 +702,7 @@ export function createLifecycleWebhookPublisher(input: CreateLifecycleWebhookPub
           break;
         }
 
-        await input.webhookDeliveryStore.createDeliveryIntent({
+        const delivery = await input.webhookDeliveryStore.createDeliveryIntent({
           webhook_id: target.webhook_id,
           project_id: event.project_id,
           incident_id: event.incident_id,
@@ -702,6 +732,15 @@ export function createLifecycleWebhookPublisher(input: CreateLifecycleWebhookPub
             deploy_branch: event.regression_deploy?.branch ?? null,
             deploy_deployed_at: event.regression_deploy?.deployed_at ?? null,
             minutes_since_deploy: event.regression_deploy?.minutes_since_deploy ?? null
+          }
+        });
+        await recordProjectMetricDeltas(input, {
+          projectId: event.project_id,
+          occurredAt: event.occurred_at,
+          source: "webhook_delivery_created",
+          dedupeKey: `webhook_delivery_created:${delivery.delivery_id}`,
+          deltas: {
+            webhook_deliveries_created: 1
           }
         });
         if (remainingWebhookDeliveries !== null) {
@@ -1739,8 +1778,14 @@ export async function runWorkerFromEnv(envInput: Record<string, string | undefin
 
   const processedEventStore = createProcessedEventStore(queryable);
   const incidentStore = createPostgresMetadataStore(queryable);
-  const improvementOpportunityStore = createPostgresImprovementOpportunityStore(queryable);
   const billingStore = createPostgresBillingStore(queryable);
+  const accountAnalyticsStore = createPostgresAccountAnalyticsStore({
+    db: queryable,
+    analyticsHashSecret: env.ANALYTICS_HASH_SECRET
+  });
+  const improvementOpportunityStore = createPostgresImprovementOpportunityStore(queryable, {
+    accountAnalyticsStore
+  });
   const alertDeliveryStore = createPostgresAlertDeliveryStore(queryable);
   const operationalEmailDeliveryStore = createPostgresOperationalEmailDeliveryStore(queryable);
   const slackDestinationStore = createPostgresSlackDestinationStore(queryable);
@@ -1756,15 +1801,21 @@ export async function runWorkerFromEnv(envInput: Record<string, string | undefin
   const requestAnomalyCounter = createRedisRequestAnomalyCounter({
     redisUrl: env.REDIS_URL
   });
+  const resolveOrganizationIdForProject = (projectId: string): Promise<string | null> =>
+    getProjectOrganizationId(queryable, projectId);
   const lifecycleWebhookPublisher = createLifecycleWebhookPublisher({
     fallbackTargetUrl: env.LIFECYCLE_WEBHOOK_TARGET_URL ?? null,
     fallbackSigningSecret: env.LIFECYCLE_WEBHOOK_SECRET ?? null,
     webhookDeliveryStore,
     billingStore,
-    operationalEmailDeliveryStore
+    operationalEmailDeliveryStore,
+    accountAnalyticsStore,
+    resolveOrganizationIdForProject
   });
   const githubDispatchPublisher = createGitHubDispatchPublisher({
-    githubStore
+    githubStore,
+    accountAnalyticsStore,
+    resolveOrganizationIdForProject
   });
   const lifecycleWebhookTransport = createLifecycleWebhookTransport({
     timeoutMs: env.WEBHOOK_DELIVERY_TIMEOUT_MS
@@ -1891,6 +1942,8 @@ export async function runWorkerFromEnv(envInput: Record<string, string | undefin
             billingStore,
             webhookDeliveryStore,
             operationalEmailDeliveryStore,
+            accountAnalyticsStore,
+            resolveOrganizationIdForProject,
             fallbackTargetUrl: env.LIFECYCLE_WEBHOOK_TARGET_URL ?? null,
             fallbackSigningSecret: env.LIFECYCLE_WEBHOOK_SECRET ?? null,
             objectStore,
@@ -1917,6 +1970,8 @@ export async function runWorkerFromEnv(envInput: Record<string, string | undefin
               billingStore,
               webhookDeliveryStore,
               operationalEmailDeliveryStore,
+              accountAnalyticsStore,
+              resolveOrganizationIdForProject,
               fallbackTargetUrl: env.LIFECYCLE_WEBHOOK_TARGET_URL ?? null,
               fallbackSigningSecret: env.LIFECYCLE_WEBHOOK_SECRET ?? null,
               objectStore,
@@ -1936,7 +1991,9 @@ export async function runWorkerFromEnv(envInput: Record<string, string | undefin
               incidentStore,
               objectStore,
               billingStore,
-              operationalEmailDeliveryStore
+              operationalEmailDeliveryStore,
+              accountAnalyticsStore,
+              resolveOrganizationIdForProject
             })
           );
 
@@ -1944,7 +2001,9 @@ export async function runWorkerFromEnv(envInput: Record<string, string | undefin
               const buildReproductionResult = await runClaimedProcessStep("build-reproduction", async () =>
               processNextBuildReproductionJob({
                 queue,
-                objectStore
+                objectStore,
+                accountAnalyticsStore,
+                resolveOrganizationIdForProject
               })
             );
 
@@ -1955,7 +2014,9 @@ export async function runWorkerFromEnv(envInput: Record<string, string | undefin
                   alertStore: alertDeliveryStore,
                   alertTransport,
                   billingStore,
-                  operationalEmailDeliveryStore
+                  operationalEmailDeliveryStore,
+                  accountAnalyticsStore,
+                  resolveOrganizationIdForProject
                 })
               );
 
@@ -2008,7 +2069,9 @@ export async function runWorkerFromEnv(envInput: Record<string, string | undefin
                   processNextDeliverAlertEmailDigestJob({
                     queue,
                     alertStore: alertDeliveryStore,
-                    alertEmailDigestTransport
+                    alertEmailDigestTransport,
+                    accountAnalyticsStore,
+                    resolveOrganizationIdForProject
                   })
                 );
 
@@ -2019,7 +2082,9 @@ export async function runWorkerFromEnv(envInput: Record<string, string | undefin
                       appBaseUrl,
                       emailAssetBaseUrl,
                       operationalEmailDeliveryStore,
-                      emailTransport
+                      emailTransport,
+                      accountAnalyticsStore,
+                      resolveOrganizationIdForProject
                     });
                   });
                 }
@@ -2030,6 +2095,8 @@ export async function runWorkerFromEnv(envInput: Record<string, string | undefin
                     logger,
                     webhookDeliveryStore,
                     lifecycleWebhookTransport,
+                    accountAnalyticsStore,
+                    resolveOrganizationIdForProject,
                     async onWebhookDisabled({ webhook_id, target_url }) {
                       try {
                         const webhook = await getWebhookOwnerNotificationRecipient(queryable, webhook_id);
@@ -2058,7 +2125,9 @@ export async function runWorkerFromEnv(envInput: Record<string, string | undefin
                       queue,
                       logger,
                       githubStore,
-                      githubDispatchTransport
+                      githubDispatchTransport,
+                      accountAnalyticsStore,
+                      resolveOrganizationIdForProject
                     })
                   );
                 }
@@ -2070,7 +2139,9 @@ export async function runWorkerFromEnv(envInput: Record<string, string | undefin
                     weeklyReportingStore: incidentStore,
                     weeklyReportChannelStore,
                     weeklyReportDeliveryStore,
-                    weeklyReportTransport
+                    weeklyReportTransport,
+                    accountAnalyticsStore,
+                    resolveOrganizationIdForProject
                   })
                 );
 

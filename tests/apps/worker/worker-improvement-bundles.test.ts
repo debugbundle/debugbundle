@@ -31,7 +31,8 @@ describe("worker improvement bundles", () => {
 
     const putObject = vi.fn().mockResolvedValue(undefined);
     const createDeliveryIntent = vi.fn().mockResolvedValue({ delivery_id: "del_123" });
-  const githubDispatchPublish = vi.fn().mockResolvedValue(undefined);
+    const githubDispatchPublish = vi.fn().mockResolvedValue(undefined);
+    const recordMetricDeltas = vi.fn().mockResolvedValue("recorded");
 
     await maybeGenerateHostedImprovementBundle({
       project_id: "proj_123",
@@ -155,6 +156,10 @@ describe("worker improvement bundles", () => {
         githubDispatchPublisher: {
           publish: githubDispatchPublish
         },
+        accountAnalyticsStore: {
+          recordMetricDeltas
+        },
+        resolveOrganizationIdForProject: vi.fn().mockResolvedValue("org_123"),
         objectStore: {
           getObject: vi.fn().mockResolvedValue(gzipSync(Buffer.from(JSON.stringify(sampleEvent), "utf8"))),
           putObject
@@ -193,6 +198,24 @@ describe("worker improvement bundles", () => {
         bundle_type: "improvement"
       })
     );
+    expect(recordMetricDeltas).toHaveBeenNthCalledWith(1, {
+      organization_id: "org_123",
+      occurred_at: "2026-05-18T12:00:00.000Z",
+      source: "worker.improvement_bundle",
+      dedupe_key: "improvement_bundle_generation:imp_123:1",
+      deltas: {
+        improvement_bundles_created: 1
+      }
+    });
+    expect(recordMetricDeltas).toHaveBeenNthCalledWith(2, {
+      organization_id: "org_123",
+      occurred_at: "2026-05-18T12:00:00.000Z",
+      source: "webhook_delivery_created",
+      dedupe_key: "webhook_delivery_created:del_123",
+      deltas: {
+        webhook_deliveries_created: 1
+      }
+    });
   });
 
   it("does not generate hosted improvement bundles for Free projects", async () => {
@@ -368,6 +391,7 @@ describe("worker improvement bundles", () => {
   it("marks generation failure and stops when quota is exhausted", async () => {
     const markImprovementBundleGenerationFailure = vi.fn().mockResolvedValue(undefined);
     const putObject = vi.fn();
+    const recordMetricDeltas = vi.fn().mockResolvedValue("recorded");
 
     await maybeGenerateHostedImprovementBundle({
       project_id: "proj_123",
@@ -450,13 +474,26 @@ describe("worker improvement bundles", () => {
         objectStore: {
           getObject: vi.fn(),
           putObject
-        }
+        },
+        accountAnalyticsStore: {
+          recordMetricDeltas
+        },
+        resolveOrganizationIdForProject: vi.fn().mockResolvedValue("org_123")
       }
     });
 
     expect(markImprovementBundleGenerationFailure).toHaveBeenCalledWith({
       opportunity_id: "imp_quota",
       reason: "monthly_quota_exceeded"
+    });
+    expect(recordMetricDeltas).toHaveBeenCalledWith({
+      organization_id: "org_123",
+      occurred_at: "2026-05-18T12:00:00.000Z",
+      source: "worker.improvement_bundle",
+      dedupe_key: "improvement_bundle_generation_failed:imp_quota:00000000-0000-0000-0000-000000000003",
+      deltas: {
+        improvement_bundle_generations_failed: 1
+      }
     });
     expect(putObject).not.toHaveBeenCalled();
   });
@@ -481,6 +518,7 @@ describe("worker improvement bundles", () => {
       }
     });
     const markImprovementBundleGenerationFailure = vi.fn().mockResolvedValue(undefined);
+    const recordMetricDeltas = vi.fn().mockResolvedValue("recorded");
 
     await maybeGenerateHostedImprovementBundle({
       project_id: "proj_123",
@@ -588,13 +626,26 @@ describe("worker improvement bundles", () => {
         objectStore: {
           getObject: vi.fn(),
           putObject: vi.fn().mockRejectedValue(new Error("s3_write_failed"))
-        }
+        },
+        accountAnalyticsStore: {
+          recordMetricDeltas
+        },
+        resolveOrganizationIdForProject: vi.fn().mockResolvedValue("org_123")
       }
     });
 
     expect(markImprovementBundleGenerationFailure).toHaveBeenCalledWith({
       opportunity_id: "imp_failure",
       reason: "build_error"
+    });
+    expect(recordMetricDeltas).toHaveBeenCalledWith({
+      organization_id: "org_123",
+      occurred_at: "2026-05-18T12:00:00.000Z",
+      source: "worker.improvement_bundle",
+      dedupe_key: "improvement_bundle_generation_failed:imp_failure:00000000-0000-0000-0000-000000000031",
+      deltas: {
+        improvement_bundle_generations_failed: 1
+      }
     });
   });
 
@@ -1356,6 +1407,7 @@ describe("worker improvement bundles", () => {
       }
     ]);
     const deleteObject = vi.fn().mockResolvedValue(undefined);
+    const recordMetricDeltas = vi.fn().mockResolvedValue("recorded");
 
     await maybeGenerateHostedImprovementBundle({
       project_id: "proj_123",
@@ -1464,7 +1516,11 @@ describe("worker improvement bundles", () => {
           getObject: vi.fn(),
           putObject: vi.fn().mockResolvedValue(undefined),
           deleteObject
-        }
+        },
+        accountAnalyticsStore: {
+          recordMetricDeltas
+        },
+        resolveOrganizationIdForProject: vi.fn().mockResolvedValue("org_123")
       }
     });
 
@@ -1480,6 +1536,15 @@ describe("worker improvement bundles", () => {
     });
     expect(deleteObject).toHaveBeenCalledWith({
       key: buildImprovementBundleObjectKey("proj_other", "imp_old")
+    });
+    expect(recordMetricDeltas).toHaveBeenCalledWith({
+      organization_id: "org_123",
+      occurred_at: "2026-05-18T12:00:00.000Z",
+      source: "worker.improvement_bundle",
+      dedupe_key: "retention_bundle_rotation:improvement:imp_123:1",
+      deltas: {
+        retention_bundle_owners_rotated: 2
+      }
     });
   });
 });

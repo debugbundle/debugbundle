@@ -1,25 +1,68 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { createPostgresAuthStore, type Queryable } from "../../../packages/storage/src/index.js";
+import {
+  createPostgresAccountAnalyticsStore,
+  createPostgresAuthStore,
+  type Queryable
+} from "../../../packages/storage/src/index.js";
 
 describe("postgres auth store", () => {
   it("should create user accounts and verify emails", async (): Promise<void> => {
-    const query = vi
-      .fn()
-      .mockResolvedValueOnce({
-        rows: [
-          {
-            user_id: "usr_123",
-            email: "owen@example.com",
-            email_verified_at: null,
-            organization_id: "org_123",
-            role: "owner"
-          }
-        ]
-      })
-      .mockResolvedValueOnce({ rows: [{ user_id: "usr_123" }] })
-      .mockResolvedValueOnce({ rows: [{ user_id: "usr_123" }] });
-    const store = createPostgresAuthStore({ query } as Queryable);
+    const queryMock = vi.fn(async (sqlText: string) => {
+      if (sqlText.includes("WITH inserted_user AS")) {
+        return {
+          rows: [
+            {
+              user_id: "usr_123",
+              email: "owen@example.com",
+              email_verified_at: null,
+              organization_id: "org_123",
+              role: "owner"
+            }
+          ]
+        };
+      }
+      if (sqlText.includes("FROM account_analytics_accounts")) {
+        return { rows: [] };
+      }
+      if (sqlText.includes("FROM organizations")) {
+        return {
+          rows: [
+            {
+              organization_id: "org_123",
+              created_at: "2026-03-16T00:00:00.000Z",
+              plan: "free",
+              additional_capacity_units: 0
+            }
+          ]
+        };
+      }
+      if (sqlText.includes("INSERT INTO account_analytics_accounts")) {
+        return { rows: [{ analytics_account_id: "analytics_123" }] };
+      }
+      if (sqlText.includes("INSERT INTO account_metric_events")) {
+        return { rows: [{ dedupe_key_hash: "hash_123" }] };
+      }
+      if (sqlText.includes("INSERT INTO account_metric_periods")) {
+        return { rows: [] };
+      }
+      if (sqlText.includes("UPDATE users")) {
+        return { rows: [{ user_id: "usr_123" }] };
+      }
+
+      throw new Error(`Unhandled SQL in createUserAccount test: ${sqlText}`);
+    });
+    const query = queryMock as Queryable["query"];
+    const transactionalDb: Queryable = {
+      query,
+      transaction: async <Result>(callback: (tx: Queryable) => Promise<Result>) =>
+        callback({ query } as Queryable)
+    };
+    const accountAnalyticsStore = createPostgresAccountAnalyticsStore({
+      db: transactionalDb,
+      analyticsHashSecret: "test-analytics-secret"
+    });
+    const store = createPostgresAuthStore(transactionalDb, { accountAnalyticsStore });
 
     const created = await store.createUserAccount({
       email: "owen@example.com",
@@ -41,7 +84,10 @@ describe("postgres auth store", () => {
       role: "owner"
     });
     expect(verified).toBe(true);
-    expect(String(query.mock.calls[0]?.[0] ?? "")).toContain("accepted_terms_at");
+    expect(String(queryMock.mock.calls[0]?.[0] ?? "")).toContain("accepted_terms_at");
+    expect(queryMock.mock.calls.map((call) => String(call[0]))).toContainEqual(
+      expect.stringContaining("account_analytics_accounts")
+    );
   });
 
   it("should resolve a user account by normalized email", async (): Promise<void> => {

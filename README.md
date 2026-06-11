@@ -326,7 +326,7 @@ make build
 make ci
 ```
 
-`make dev` requires `DEBUGBUNDLE_PROBE_TRIGGER_SECRET` in `.env`. Start from `.env.example`, then keep local-only overrides in `.env.local` when needed.
+`make dev` requires `DEBUGBUNDLE_PROBE_TRIGGER_SECRET` and `ANALYTICS_HASH_SECRET` in `.env`. Start from `.env.example`, then keep local-only overrides in `.env.local` when needed.
 
 ## Self-Hosting
 

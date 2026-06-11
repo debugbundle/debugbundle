@@ -15,6 +15,7 @@ import { createStripeConfig } from "./stripe-config.js";
 const ApiRuntimeEnvSchema = z.object({
   API_HOST: z.string().min(1).default("0.0.0.0"),
   API_PORT: z.coerce.number().int().min(1).max(65535).default(3000),
+  ANALYTICS_HASH_SECRET: z.string().min(1),
   DEBUGBUNDLE_PROBE_TRIGGER_SECRET: z.string().min(1),
   DB_HOST: z.string().min(1).default("localhost"),
   DB_PORT: z.coerce.number().int().min(1).max(65535).default(5432),
@@ -69,6 +70,7 @@ export function parseApiRuntimeEnv(env: Record<string, string | undefined>): Api
   const result = ApiRuntimeEnvSchema.safeParse({
     API_HOST: env["API_HOST"],
     API_PORT: env["API_PORT"],
+    ANALYTICS_HASH_SECRET: env["ANALYTICS_HASH_SECRET"],
     DEBUGBUNDLE_PROBE_TRIGGER_SECRET: env["DEBUGBUNDLE_PROBE_TRIGGER_SECRET"],
     DB_HOST: env["DB_HOST"],
     DB_PORT: env["DB_PORT"],
