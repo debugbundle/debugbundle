@@ -6,9 +6,12 @@ import { describe, expect, it } from 'vitest';
 
 import { getSharedAgentInstallPrompt } from '../../site/src/lib/agent-install-prompt.js';
 
+type SharedAgentInstallPrompt = (input?: { mode?: 'shared' | 'local-only'; singleLine?: boolean }) => string;
+
 const repoRoot = process.cwd();
 const siteRoot = join(repoRoot, 'site');
 const describePublicSiteRepo = existsSync(siteRoot) ? describe : describe.skip;
+const readSharedAgentInstallPrompt = getSharedAgentInstallPrompt as SharedAgentInstallPrompt;
 
 describePublicSiteRepo('public site repository export', () => {
   it('is shaped for publishing as the dedicated debugbundle/site repository', () => {
@@ -142,8 +145,8 @@ describePublicSiteRepo('public site repository export', () => {
   });
 
   it('tells the agent path to use the WordPress plugin instead of direct SDK installs on WordPress hosts', () => {
-    const sharedPrompt = getSharedAgentInstallPrompt();
-    const localOnlyPrompt = getSharedAgentInstallPrompt({ mode: 'local-only' });
+    const sharedPrompt = readSharedAgentInstallPrompt();
+    const localOnlyPrompt = readSharedAgentInstallPrompt({ mode: 'local-only' });
 
     for (const prompt of [sharedPrompt, localOnlyPrompt]) {
       expect(prompt).toContain('https://debugbundle.com/docs/integrations/wordpress');
