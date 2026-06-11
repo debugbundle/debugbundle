@@ -289,7 +289,7 @@ function ImprovementBundleCard(input: {
       <CalloutCard
         eyebrow="Error"
         title="Could not load hosted bundle"
-        description="The improvement detail page could not load the hosted bundle right now. The captured evidence for this opportunity is still available below."
+        description="The improvement detail page could not load the hosted bundle right now. The captured evidence panel is still available on this page."
         tone="warning"
       />
     );
@@ -473,7 +473,7 @@ function getImprovementBundleFailurePresentation(reason: string | undefined): {
         eyebrow: "Quota reached",
         title: "Monthly bundle allowance reached",
         description:
-          "This opportunity crossed the hosted generation threshold, but the project has already used its monthly bundle allowance. The captured evidence for this opportunity is still available below.",
+          "This opportunity crossed the hosted generation threshold, but the project has already used its monthly bundle allowance. The captured evidence panel is still available on this page.",
         tone: "warning"
       };
     case "build_error":
@@ -481,7 +481,23 @@ function getImprovementBundleFailurePresentation(reason: string | undefined): {
         eyebrow: "Generation failed",
         title: "Bundle generation failed",
         description:
-          "DebugBundle could not finish generating the hosted improvement bundle for this opportunity. The captured evidence for this opportunity is still available below.",
+          "DebugBundle could not finish generating the hosted improvement bundle. The captured evidence panel is still available on this page, and a retry will start automatically when the opportunity is requested again.",
+        tone: "warning"
+      };
+    case "bundle_source_unavailable":
+      return {
+        eyebrow: "Source unavailable",
+        title: "Bundle source unavailable",
+        description:
+          "DebugBundle recorded this improvement, but the retained source event needed to rebuild the hosted bundle is no longer available. The captured evidence panel is still available on this page.",
+        tone: "warning"
+      };
+    case "bundle_generation_disabled":
+      return {
+        eyebrow: "Generation disabled",
+        title: "Hosted bundle generation is disabled",
+        description:
+          "DebugBundle recorded this improvement, but hosted improvement bundle generation is not currently enabled for this project. The captured evidence panel is still available on this page.",
         tone: "warning"
       };
     case "bundle_artifact_unavailable":
@@ -489,7 +505,7 @@ function getImprovementBundleFailurePresentation(reason: string | undefined): {
         eyebrow: "Artifact unavailable",
         title: "Bundle artifact unavailable",
         description:
-          "DebugBundle recorded this improvement, but the stored hosted bundle artifact could not be loaded. The captured evidence for this opportunity is still available below.",
+          "DebugBundle recorded this improvement, but the stored hosted bundle artifact could not be loaded. The captured evidence panel is still available on this page.",
         tone: "warning"
       };
     default:

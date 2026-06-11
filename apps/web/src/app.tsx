@@ -34,11 +34,13 @@ import {
   buildApiUrl,
   logout,
   requestEmailCode,
+  type SessionRecord,
   verifyEmailCode
 } from "./lib/api.js";
 import { showErrorToast, showInfoToast, showSuccessToast } from "./lib/notify.js";
 import { SessionProvider, useSession } from "./lib/session.js";
 import { BillingPage } from "./pages/billing-page.js";
+import { AdminAnalyticsPage } from "./pages/admin-analytics-page.js";
 import { ImprovementDetailPage } from "./pages/improvement-detail-page.js";
 import { ImprovementsPage } from "./pages/improvements-page.js";
 import { MemberTokensPage } from "./pages/member-tokens-page.js";
@@ -65,6 +67,7 @@ import { isSystemEmailReviewEnabled } from "./lib/system-email-previews.js";
 import { ThemeProvider, useTheme } from "./lib/theme.js";
 import { TooltipProvider } from "./components/ui/tooltip.js";
 import { SystemEmailReviewPage } from "./pages/system-email-review-page.js";
+import { NotFoundPage } from "./pages/not-found-page.js";
 
 const GITHUB_START_HREF = buildApiUrl("/v1/auth/github/start");
 const SIGNUP_TRIAL_STORAGE_KEY = "debugbundle.auth.signup_trial";
@@ -166,10 +169,12 @@ export function App({ initialEntries }: AppProps): JSX.Element {
       <BrowserRouter>
         <Routes>
           <Route element={<RootGate />}>
+            <Route index element={<RootRedirect />} />
             <Route path="/login" element={<LoginPage />} />
             <Route path="/signup" element={<SignupPage />} />
             <Route path="/invite" element={<ProjectInvitePage />} />
             <Route path="/auth/github/callback" element={<GithubAuthCallbackPage />} />
+            <Route path="/analytics" element={<AdminAnalyticsRoute />} />
             <Route element={<ProtectedLayout />}>
               <Route path="/dashboard" element={<DashboardPage />} />
               <Route path="/incidents" element={<IncidentsPage />} />
@@ -208,10 +213,12 @@ export function App({ initialEntries }: AppProps): JSX.Element {
       <MemoryRouter initialEntries={initialEntries}>
         <Routes>
           <Route element={<RootGate />}>
+            <Route index element={<RootRedirect />} />
             <Route path="/login" element={<LoginPage />} />
             <Route path="/signup" element={<SignupPage />} />
             <Route path="/invite" element={<ProjectInvitePage />} />
             <Route path="/auth/github/callback" element={<GithubAuthCallbackPage />} />
+            <Route path="/analytics" element={<AdminAnalyticsRoute />} />
             <Route element={<ProtectedLayout />}>
               <Route path="/dashboard" element={<DashboardPage />} />
               <Route path="/incidents" element={<IncidentsPage />} />
@@ -310,12 +317,43 @@ function RootRedirect(): JSX.Element {
 
 function ProtectedLayout(): JSX.Element {
   const { session, setSession } = useSession();
-  const navigate = useNavigate();
-  const [activeProject, setActiveProject] = useState<ActiveProjectRoute | null>(null);
 
   if (session === null) {
     return <Navigate replace to="/login" />;
   }
+
+  return (
+    <ProtectedShell session={session} setSession={setSession}>
+      <Outlet />
+    </ProtectedShell>
+  );
+}
+
+function AdminAnalyticsRoute(): JSX.Element {
+  const { session, setSession } = useSession();
+
+  if (session === null) {
+    return <NotFoundPage />;
+  }
+
+  return (
+    <ProtectedShell session={session} setSession={setSession}>
+      <AdminAnalyticsPage />
+    </ProtectedShell>
+  );
+}
+
+function ProtectedShell({
+  session,
+  setSession,
+  children
+}: {
+  session: SessionRecord;
+  setSession: (session: SessionRecord | null) => void;
+  children: React.ReactNode;
+}): JSX.Element {
+  const navigate = useNavigate();
+  const [activeProject, setActiveProject] = useState<ActiveProjectRoute | null>(null);
 
   async function handleSignOut(): Promise<void> {
     try {
@@ -342,7 +380,7 @@ function ProtectedLayout(): JSX.Element {
         <SidebarInset>
           <SiteHeader />
           <div className="flex min-w-0 flex-1 flex-col gap-4 overflow-hidden p-6">
-            <Outlet />
+            {children}
           </div>
         </SidebarInset>
       </SidebarProvider>

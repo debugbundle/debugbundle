@@ -8,6 +8,7 @@ function createDependencies(overrides: {
   memberAuth?: ApiDependencies["memberAuth"];
   projectManagement?: ApiDependencies["projectManagement"];
   improvementManagement?: ApiDependencies["improvementManagement"];
+  improvementBundleRegeneration?: ApiDependencies["improvementBundleRegeneration"];
   objectStoreReader?: ApiDependencies["objectStoreReader"];
 } = {}): ReturnType<typeof createApiServer> {
   return createApiServer({
@@ -51,6 +52,9 @@ function createDependencies(overrides: {
       deleteProjectForOrganization: vi.fn()
     },
     improvementManagement: overrides.improvementManagement,
+    ...(overrides.improvementBundleRegeneration === undefined
+      ? {}
+      : { improvementBundleRegeneration: overrides.improvementBundleRegeneration }),
     objectStoreReader: overrides.objectStoreReader ?? { getObject: vi.fn() },
     webhookDelivery: {
       listDeliveriesForWebhookInOrganization: vi.fn().mockResolvedValue(null)
@@ -462,6 +466,77 @@ describe("improvement routes", () => {
 
     expect(response.statusCode).toBe(200);
     expect(response.json()).toEqual({ status: "pending" });
+  });
+
+  it("queues improvement bundle regeneration for retryable missing artifacts", async () => {
+    const buildFailed = createImprovementRecord({
+      improvement_id: "imp_failed_retry",
+      bundle_generation_number: 1,
+      bundle_failure_reason: "build_error"
+    });
+    const requestRegeneration = vi.fn().mockResolvedValue(true);
+    const app = createDependencies({
+      improvementManagement: {
+        listImprovementsForOrganization: vi.fn(),
+        getImprovementForOrganization: vi.fn().mockResolvedValue(buildFailed),
+        resolveImprovementForOrganization: vi.fn(),
+        reopenImprovementForOrganization: vi.fn()
+      },
+      improvementBundleRegeneration: {
+        requestRegeneration
+      },
+      objectStoreReader: {
+        getObject: vi.fn().mockRejectedValue(new Error("s3_object_not_found"))
+      }
+    });
+
+    const response = await app.inject({
+      method: "GET",
+      url: "/v1/projects/00000000-0000-0000-0000-000000000001/improvements/imp_failed_retry/bundle",
+      headers: { authorization: "Bearer dbundle_mem_test_token" }
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toEqual({ status: "pending" });
+    expect(requestRegeneration).toHaveBeenCalledWith({
+      organization_id: "org_123",
+      project_id: "00000000-0000-0000-0000-000000000001",
+      opportunity_id: "imp_failed_retry"
+    });
+  });
+
+  it("returns source unavailable when improvement bundle regeneration cannot find source events", async () => {
+    const buildFailed = createImprovementRecord({
+      improvement_id: "imp_missing_source",
+      bundle_generation_number: 1,
+      bundle_failure_reason: "build_error"
+    });
+    const app = createDependencies({
+      improvementManagement: {
+        listImprovementsForOrganization: vi.fn(),
+        getImprovementForOrganization: vi.fn().mockResolvedValue(buildFailed),
+        resolveImprovementForOrganization: vi.fn(),
+        reopenImprovementForOrganization: vi.fn()
+      },
+      improvementBundleRegeneration: {
+        requestRegeneration: vi.fn().mockResolvedValue(false)
+      },
+      objectStoreReader: {
+        getObject: vi.fn().mockRejectedValue(new Error("s3_object_not_found"))
+      }
+    });
+
+    const response = await app.inject({
+      method: "GET",
+      url: "/v1/projects/00000000-0000-0000-0000-000000000001/improvements/imp_missing_source/bundle",
+      headers: { authorization: "Bearer dbundle_mem_test_token" }
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toEqual({
+      status: "failed",
+      reason: "bundle_source_unavailable"
+    });
   });
 
   it("returns failed states when a bundle is missing or unavailable", async () => {

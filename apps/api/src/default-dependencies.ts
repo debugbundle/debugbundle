@@ -20,6 +20,7 @@ import {
 import { buildPostgresSslConfig } from "../../../packages/storage/src/postgres-ssl.js";
 import {
   buildBundleRegenerationLeaseKey,
+  buildImprovementBundleRegenerationLeaseKey,
   buildUserAvatarObjectKey,
   createPostgresAccountAnalyticsStore,
   createPostgresAccountStore,
@@ -66,6 +67,7 @@ import {
   createBillingEmailService,
   createGithubOAuthConfigFromEnv,
   normalizeEmailForConfig,
+  readAdminAnalyticsEmailsFromEnv,
   readBillingAdminEmailsFromEnv,
   readNonEmptyEnv,
   resolveEmailAssetBaseUrl
@@ -82,6 +84,7 @@ export {
   getBooleanField,
   getStringField,
   normalizeEmailForConfig,
+  readAdminAnalyticsEmailsFromEnv,
   readCsvEnv,
   readNonEmptyEnv,
   stripTrailingSlash
@@ -259,6 +262,14 @@ export function createApiDependencies(input: CreateApiDependenciesInput): Defaul
               })
         });
   const authEmails = input.authEmails;
+  const normalizedAdminAnalyticsAccessEmails =
+    input.adminAnalyticsAccessEmails === undefined
+      ? []
+      : input.adminAnalyticsAccessEmails.map(normalizeEmailForConfig).filter((email) => email.length > 0);
+  const adminAnalyticsAccessEmails =
+    normalizedAdminAnalyticsAccessEmails.length === 0
+      ? null
+      : new Set(normalizedAdminAnalyticsAccessEmails);
   const billingAdminEmails =
     input.billingAdminEmails === undefined
       ? null
@@ -285,6 +296,15 @@ export function createApiDependencies(input: CreateApiDependenciesInput): Defaul
     ingestionPersistence,
     ingestionMetadata,
     ...(accountAnalyticsStore === undefined ? {} : { accountAnalytics: accountAnalyticsStore }),
+    ...(accountAnalyticsStore === undefined || adminAnalyticsAccessEmails === null
+      ? {}
+      : {
+          adminAnalytics: {
+            isOperatorAllowed: ({ email }: { email: string }) =>
+              adminAnalyticsAccessEmails.has(normalizeEmailForConfig(email)),
+            getSummary: (request: { now: string }) => accountAnalyticsStore.getAdminAnalyticsSummary(request)
+          }
+        }),
     ...(input.ingestionRateLimiter === undefined ? {} : { ingestionRateLimiter: input.ingestionRateLimiter }),
     ...(input.authRateLimiter === undefined ? {} : { authRateLimiter: input.authRateLimiter }),
     auditLogging: auditLogStore,
@@ -1024,6 +1044,70 @@ export function createApiDependencies(input: CreateApiDependenciesInput): Defaul
         return true;
       }
     },
+    improvementBundleRegeneration: {
+      async requestRegeneration(regenerationInput) {
+        const queueWithLease = input.queue as QueueClient &
+          Partial<Pick<RedisQueueClient, "acquireLease" | "releaseLease">> & {
+            enqueue(jobName: "build-improvement-bundle", payload: {
+              project_id: string;
+              opportunity_id: string;
+              event_id: string;
+              occurred_at: string;
+              occurrence_count: number;
+              trigger: "regeneration";
+            }): Promise<void>;
+          };
+        const leaseKey = buildImprovementBundleRegenerationLeaseKey(regenerationInput.opportunity_id);
+
+        if (queueWithLease.acquireLease !== undefined) {
+          const acquired = await queueWithLease.acquireLease(leaseKey, BUNDLE_REGENERATION_LEASE_TTL_SECONDS);
+          if (!acquired) {
+            return true;
+          }
+        }
+
+        const improvement = await improvementOpportunityStore.getImprovementForOrganization({
+          organization_id: regenerationInput.organization_id,
+          improvement_id: regenerationInput.opportunity_id
+        });
+
+        if (
+          improvement === null ||
+          improvement.project_id !== regenerationInput.project_id ||
+          improvement.kind === "recurring_incident" ||
+          improvement.kind === "post_deploy_regression"
+        ) {
+          await queueWithLease.releaseLease?.(leaseKey);
+          return false;
+        }
+
+        const [source] = await improvementOpportunityStore.listImprovementEventReferences({
+          opportunity_id: regenerationInput.opportunity_id,
+          limit: 1
+        });
+
+        if (source === undefined) {
+          await queueWithLease.releaseLease?.(leaseKey);
+          return false;
+        }
+
+        try {
+          await queueWithLease.enqueue("build-improvement-bundle", {
+            project_id: regenerationInput.project_id,
+            opportunity_id: regenerationInput.opportunity_id,
+            event_id: source.event_id,
+            occurred_at: source.occurred_at,
+            occurrence_count: improvement.occurrence_count,
+            trigger: "regeneration"
+          });
+        } catch (error) {
+          await queueWithLease.releaseLease?.(leaseKey);
+          throw error;
+        }
+
+        return true;
+      }
+    },
     alertManagement: {
       listAlertsForOrganization: (input) => metadataStore.listAlertsForOrganization(input),
       createAlertForOrganization: (input) => metadataStore.createAlertForOrganization(input),
@@ -1123,6 +1207,7 @@ export function createApiDependenciesFromEnv(
   const githubAppClient = createGitHubAppClientFromEnv(env);
   const lifecycleWebhookFallbackTargetUrl = readNonEmptyEnv(env, "LIFECYCLE_WEBHOOK_TARGET_URL");
   const lifecycleWebhookFallbackSigningSecret = readNonEmptyEnv(env, "LIFECYCLE_WEBHOOK_SECRET");
+  const adminAnalyticsAccessEmails = readAdminAnalyticsEmailsFromEnv(env);
   const billingAdminEmails = readBillingAdminEmailsFromEnv(env);
   const reviewAccessSecret = readNonEmptyEnv(env, "REVIEW_ACCESS_SECRET");
 
@@ -1142,6 +1227,7 @@ export function createApiDependenciesFromEnv(
       ? {}
       : { analyticsHashSecret: env["ANALYTICS_HASH_SECRET"] }),
     appBaseUrl,
+    ...(adminAnalyticsAccessEmails === undefined ? {} : { adminAnalyticsAccessEmails }),
     ...(authEmailSender === undefined ? {} : { authEmails: authEmailSender }),
     ...(billingEmails === undefined ? {} : { billingEmails }),
     ...(githubOAuth === undefined ? {} : { githubOAuth }),

@@ -301,6 +301,16 @@ export function readBillingAdminEmailsFromEnv(env: Record<string, string | undef
   return normalized.length > 0 ? normalized : undefined;
 }
 
+export function readAdminAnalyticsEmailsFromEnv(env: Record<string, string | undefined>): string[] | undefined {
+  const emails = readCsvEnv(env, "ADMIN_ANALYTICS_ACCESS_EMAILS");
+  if (emails === undefined) {
+    return undefined;
+  }
+
+  const normalized = [...new Set(emails.map(normalizeEmailForConfig).filter((email) => email.length > 0))];
+  return normalized.length > 0 ? normalized : undefined;
+}
+
 export function createAuthEmailSender(input: {
   emailTransport: EmailTransport;
   appBaseUrl: string;

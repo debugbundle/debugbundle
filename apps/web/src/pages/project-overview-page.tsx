@@ -1,4 +1,4 @@
-import { CalendarDaysIcon, CalendarIcon, DownloadIcon, PackageIcon, RotateCcwIcon, SirenIcon } from "lucide-react";
+import { BellRingIcon, CalendarDaysIcon, DownloadIcon, PackageIcon, RotateCcwIcon, SirenIcon } from "lucide-react";
 import { useMemo, useState, type MouseEvent } from "react";
 import { Link, useNavigate, useOutletContext } from "react-router-dom";
 
@@ -96,7 +96,7 @@ function ProjectStatCards({ project }: { project: ProjectRecord }): JSX.Element 
       <Card>
         <CardHeader className="flex flex-row items-center justify-between pb-2">
           <CardDescription>New incidents today</CardDescription>
-          <CalendarDaysIcon className="size-4 text-muted-foreground" />
+          <BellRingIcon className="size-4 text-muted-foreground" />
         </CardHeader>
         <CardContent>
           <CardTitle className="text-2xl tabular-nums">{openedToday.toLocaleString()}</CardTitle>
@@ -107,7 +107,7 @@ function ProjectStatCards({ project }: { project: ProjectRecord }): JSX.Element 
       <Card>
         <CardHeader className="flex flex-row items-center justify-between pb-2">
           <CardDescription>Opened this month</CardDescription>
-          <CalendarIcon className="size-4 text-muted-foreground" />
+          <CalendarDaysIcon className="size-4 text-muted-foreground" />
         </CardHeader>
         <CardContent>
           <CardTitle className="text-2xl tabular-nums">{openedMonth.toLocaleString()}</CardTitle>

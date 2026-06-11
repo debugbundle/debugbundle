@@ -1,7 +1,7 @@
 # Public Interfaces — DebugBundle
 
 Version: v1
-Last updated: 2026-06-06
+Last updated: 2026-06-12
 
 ---
 
@@ -173,6 +173,8 @@ Stripe checkout and customer-portal billing routes remain browser-session-only i
 Browser-session bootstrap endpoints exist for the SPA flow only. The separate GitHub CLI bootstrap endpoints are API-backed helpers used by `debugbundle login --github*`, while MCP still reuses the member-token auth state established by the CLI.
 
 `GET /review/access?token=<secret>&next=/login` is an internal reviewer bootstrap surface enabled only when `REVIEW_ACCESS_SECRET` is configured. It validates the token with a constant-time comparison, rate-limits like other auth-adjacent endpoints, sets only a short-lived HttpOnly review grant cookie, and redirects to the app. The reviewer still signs in normally; when their owner session resolves, the server applies the existing internally managed Team override path and clears the review grant cookie. The API also accepts `/v1/auth/review/access` as a versioned alias for the same handler.
+
+`GET /v1/admin/analytics/summary` is an internal browser-only operator surface for the hosted `/analytics` page. It is intentionally excluded from CLI/MCP parity because it is not a customer or automation capability. Access requires a valid browser session with verified email-code auth plus a normalized email present in `ADMIN_ANALYTICS_ACCESS_EMAILS`; member tokens are never accepted. Every unauthorized or unavailable state returns `404 { "error": "not_found" }` with `Cache-Control: no-store`, and the response body is aggregate-only with no account, user, project, email, token, or raw-event identifiers.
 
 `GET /v1/auth/session` returns either `session: null` or a session object with `auth_methods.email`, `auth_methods.github`, `avatar_url`, and `csrf_token`. Browser-session mutations continue to use `csrf_token` from the same session payload.
 

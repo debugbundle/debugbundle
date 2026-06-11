@@ -1,4 +1,4 @@
-import { CalendarDaysIcon, CalendarIcon, RotateCcwIcon, SirenIcon } from "lucide-react";
+import { BellRingIcon, CalendarDaysIcon, RotateCcwIcon, SirenIcon } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../ui/card.js";
@@ -72,7 +72,7 @@ export function SectionCards(): JSX.Element {
       <Card>
         <CardHeader className="flex flex-row items-center justify-between pb-2">
           <CardDescription>New incidents today</CardDescription>
-          <CalendarDaysIcon className="size-4 text-muted-foreground" />
+          <BellRingIcon className="size-4 text-muted-foreground" />
         </CardHeader>
         <CardContent>
           <CardTitle className="text-2xl tabular-nums">
@@ -87,7 +87,7 @@ export function SectionCards(): JSX.Element {
       <Card>
         <CardHeader className="flex flex-row items-center justify-between pb-2">
           <CardDescription>Opened this month</CardDescription>
-          <CalendarIcon className="size-4 text-muted-foreground" />
+          <CalendarDaysIcon className="size-4 text-muted-foreground" />
         </CardHeader>
         <CardContent>
           <CardTitle className="text-2xl tabular-nums">

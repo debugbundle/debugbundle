@@ -43,6 +43,7 @@ export interface CreateApiDependenciesInput {
   frequencyCounter?: IncidentFrequencyCounter;
   ingestionRateLimiter?: IngestionRateLimiter;
   authRateLimiter?: AuthRateLimiter;
+  adminAnalyticsAccessEmails?: string[];
   billingAdminEmails?: string[];
   authEmails?: AuthEmailSender;
   billingEmails?: BillingEmailService;

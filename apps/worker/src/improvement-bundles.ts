@@ -78,7 +78,7 @@ function isRequestEvent(event: EventEnvelope): event is Extract<EventEnvelope, {
   return event.event_type === "request_event";
 }
 
-type RecordedImprovementCandidate = {
+export type RecordedImprovementCandidate = {
   opportunity_id: string;
   occurrence_count: number;
   bundle_generation_number: number;
@@ -809,7 +809,7 @@ export async function maybeGenerateHostedIncidentImprovementBundle(input: {
   // intentionally does not generate duplicate improvement bundle artifacts here.
 }
 
-async function generateRecordedHostedImprovementBundle(input: {
+export async function generateRecordedHostedImprovementBundle(input: {
   project_id: string;
   event_id: string;
   occurred_at: string;

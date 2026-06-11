@@ -349,6 +349,173 @@ describe("postgres account analytics store", () => {
     );
   });
 
+  it("builds an admin analytics summary with activity KPIs and bounded rates", async (): Promise<void> => {
+    const queryMock = vi.fn(async (sqlText: string) => {
+      if (sqlText.includes("FROM account_metric_periods amp")) {
+        return rowsResult([
+          { metric_key: "raw_events_accepted", metric_value: 1200 },
+          { metric_key: "billable_events_counted", metric_value: 1100 },
+          { metric_key: "incident_signal_events_counted", metric_value: 400 },
+          { metric_key: "context_signal_events_counted", metric_value: 500 },
+          { metric_key: "operational_signal_events_counted", metric_value: 300 },
+          { metric_key: "cloud_verification_events_accepted", metric_value: 8 },
+          { metric_key: "local_verification_events_accepted", metric_value: 13 },
+          { metric_key: "incidents_opened", metric_value: 10 },
+          { metric_key: "incidents_resolved", metric_value: 15 },
+          { metric_key: "incidents_reopened", metric_value: 2 },
+          { metric_key: "incidents_regressed", metric_value: 1 },
+          { metric_key: "incident_occurrences", metric_value: 27 },
+          { metric_key: "incident_occurrences_high_severity", metric_value: 11 },
+          { metric_key: "incident_occurrences_critical_severity", metric_value: 4 },
+          { metric_key: "incidents_auto_detected_spiking", metric_value: 3 },
+          { metric_key: "failure_bundles_created", metric_value: 9 },
+          { metric_key: "failure_bundles_updated", metric_value: 6 },
+          { metric_key: "failure_bundle_generations_failed", metric_value: 1 },
+          { metric_key: "improvement_bundles_created", metric_value: 5 },
+          { metric_key: "improvement_bundle_generations_failed", metric_value: 2 },
+          { metric_key: "reproductions_created", metric_value: 7 },
+          { metric_key: "reproductions_failed", metric_value: 1 },
+          { metric_key: "improvements_opened", metric_value: 6 },
+          { metric_key: "improvements_resolved", metric_value: 3 },
+          { metric_key: "improvements_snoozed", metric_value: 1 },
+          { metric_key: "recurring_incident_improvements_opened", metric_value: 2 },
+          { metric_key: "post_deploy_regression_improvements_opened", metric_value: 1 },
+          { metric_key: "slow_request_improvements_opened", metric_value: 1 },
+          { metric_key: "request_failure_improvements_opened", metric_value: 1 },
+          { metric_key: "warning_log_improvements_opened", metric_value: 1 },
+          { metric_key: "trial_started", metric_value: 4 },
+          { metric_key: "trial_converted", metric_value: 2 },
+          { metric_key: "trial_expired", metric_value: 1 },
+          { metric_key: "plan_upgraded", metric_value: 3 },
+          { metric_key: "plan_downgraded", metric_value: 1 },
+          { metric_key: "capacity_units_purchased", metric_value: 12 },
+          { metric_key: "capacity_units_reduced", metric_value: 3 },
+          { metric_key: "raw_events_rejected", metric_value: 17 },
+          { metric_key: "events_rejected_malformed", metric_value: 4 },
+          { metric_key: "events_rejected_rate_limited", metric_value: 5 },
+          { metric_key: "events_rejected_quota", metric_value: 2 },
+          { metric_key: "events_rejected_capture_policy", metric_value: 3 },
+          { metric_key: "events_rejected_capture_rule", metric_value: 3 },
+          { metric_key: "alert_deliveries_failed", metric_value: 2 },
+          { metric_key: "webhook_deliveries_failed", metric_value: 1 },
+          { metric_key: "weekly_reports_failed", metric_value: 1 },
+          { metric_key: "github_dispatches_failed", metric_value: 2 },
+          { metric_key: "webhooks_auto_disabled", metric_value: 1 },
+          { metric_key: "operational_emails_sent", metric_value: 8 },
+          { metric_key: "allowance_warning_emails_sent", metric_value: 2 },
+          { metric_key: "allowance_limit_emails_sent", metric_value: 1 }
+        ]);
+      }
+      if (sqlText.includes("WITH windows (window_key, starts_at, ends_at)")) {
+        return rowsResult([
+          { window_key: "today", active_accounts: "3" },
+          { window_key: "this_week", active_accounts: "7" },
+          { window_key: "this_month", active_accounts: "11" }
+        ]);
+      }
+      if (sqlText.includes("COUNT(*) FILTER (WHERE account_deleted = false)")) {
+        return rowsResult([
+          {
+            active_accounts_total: "14",
+            deleted_accounts_total: "5",
+            new_accounts_today: "1",
+            new_accounts_this_week: "4",
+            new_accounts_this_month: "6",
+            deleted_accounts_this_month: "2",
+            collection_started_at: "2026-06-10T00:00:00.000Z"
+          }
+        ]);
+      }
+
+      throw new Error(`Unhandled SQL in getAdminAnalyticsSummary: ${sqlText}`);
+    });
+
+    const store = createPostgresAccountAnalyticsStore({
+      db: createTransactionalDb(queryMock as Queryable["query"]),
+      analyticsHashSecret: "test-analytics-secret"
+    });
+
+    const summary = await store.getAdminAnalyticsSummary({
+      now: "2026-06-12T15:30:00.000Z"
+    });
+
+    expect(summary.generated_at).toBe("2026-06-12T15:30:00.000Z");
+    expect(summary.collection_started_at).toBe("2026-06-10T00:00:00.000Z");
+    expect(summary.windows.today.starts_at).toBe("2026-06-12T00:00:00.000Z");
+    expect(summary.windows.this_week.starts_at).toBe("2026-06-08T00:00:00.000Z");
+    expect(summary.windows.this_month.starts_at).toBe("2026-06-01T00:00:00.000Z");
+    expect(summary.kpis).toMatchObject({
+      active_accounts_today: 3,
+      active_accounts_this_week: 7,
+      active_accounts_this_month: 11,
+      new_accounts_today: 1,
+      new_accounts_this_week: 4,
+      new_accounts_this_month: 6,
+      deleted_accounts_this_month: 2,
+      active_accounts_total: 14,
+      deleted_accounts_total: 5
+    });
+    expect(summary.usage.raw_events_accepted_this_month).toBe(1200);
+    expect(summary.incidents.resolution_rate_this_month).toBe(1);
+    expect(summary.improvements.resolution_rate_this_month).toBe(0.5);
+    expect(summary.health.webhook_deliveries_failed_this_month).toBe(1);
+    expect(summary).not.toHaveProperty("analytics_account_id");
+    expect(summary).not.toHaveProperty("organization_id");
+  });
+
+  it("excludes backfill-only rows from active account KPIs and falls back to zero-safe defaults", async (): Promise<void> => {
+    const queryMock = vi.fn(async (sqlText: string) => {
+      if (sqlText.includes("FROM account_metric_periods amp")) {
+        return rowsResult([]);
+      }
+      if (sqlText.includes("WITH windows (window_key, starts_at, ends_at)")) {
+        return rowsResult([
+          { window_key: "today", active_accounts: "0" },
+          { window_key: "this_week", active_accounts: "0" },
+          { window_key: "this_month", active_accounts: "0" }
+        ]);
+      }
+      if (sqlText.includes("COUNT(*) FILTER (WHERE account_deleted = false)")) {
+        return rowsResult([
+          {
+            active_accounts_total: "0",
+            deleted_accounts_total: "0",
+            new_accounts_today: "0",
+            new_accounts_this_week: "0",
+            new_accounts_this_month: "0",
+            deleted_accounts_this_month: "0",
+            collection_started_at: null
+          }
+        ]);
+      }
+
+      throw new Error(`Unhandled SQL in backfill-only admin summary test: ${sqlText}`);
+    });
+
+    const store = createPostgresAccountAnalyticsStore({
+      db: createTransactionalDb(queryMock as Queryable["query"]),
+      analyticsHashSecret: "test-analytics-secret"
+    });
+
+    const summary = await store.getAdminAnalyticsSummary({
+      now: "2026-06-12T15:30:00.000Z"
+    });
+
+    expect(summary.collection_started_at).toBe("2026-06-10T00:00:00.000Z");
+    expect(summary.kpis.active_accounts_today).toBe(0);
+    expect(summary.incidents.resolution_rate_this_month).toBe(0);
+    expect(summary.improvements.resolution_rate_this_month).toBe(0);
+    expect(queryMock).toHaveBeenCalledWith(
+      expect.stringContaining("ame.metric_source <> 'backfill_retained_rows'"),
+      [
+        "2026-06-12T00:00:00.000Z",
+        "2026-06-08T00:00:00.000Z",
+        "2026-06-01T00:00:00.000Z",
+        "2026-06-12T15:30:00.000Z"
+      ]
+    );
+  });
+
   it("backfills retained rows through the same deduplicated metric ledger", async (): Promise<void> => {
     const queryMock = vi.fn(async (sqlText: string) => {
       if (sqlText.includes("FROM account_analytics_accounts")) {

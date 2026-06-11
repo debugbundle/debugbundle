@@ -7,6 +7,7 @@ describe("request failure noise classification", () => {
     "/.env",
     "/autodiscover/autodiscover.json",
     "/backup/api_keys.json",
+    "/containers/json",
     "/developmentserver/metadatauploader",
     "/wp-config.php_old2024",
     "/wp-login.php",

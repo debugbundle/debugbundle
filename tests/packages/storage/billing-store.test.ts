@@ -551,6 +551,7 @@ describe("billing store – trial lifecycle", () => {
           getAccountMetricSummary: vi.fn(),
           listAccountMetricPeriods: vi.fn(),
           getAggregateMetricSummary: vi.fn(),
+          getAdminAnalyticsSummary: vi.fn(),
           backfillRetainedRowsForOrganization: vi.fn()
         }
       }
@@ -717,6 +718,7 @@ describe("billing store – trial lifecycle", () => {
           getAccountMetricSummary: vi.fn(),
           listAccountMetricPeriods: vi.fn(),
           getAggregateMetricSummary: vi.fn(),
+          getAdminAnalyticsSummary: vi.fn(),
           backfillRetainedRowsForOrganization: vi.fn()
         }
       }

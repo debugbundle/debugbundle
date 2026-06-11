@@ -218,6 +218,7 @@ describe("improvement opportunity store", () => {
         getAccountMetricSummary: vi.fn(),
         listAccountMetricPeriods: vi.fn(),
         getAggregateMetricSummary: vi.fn(),
+        getAdminAnalyticsSummary: vi.fn(),
         backfillRetainedRowsForOrganization: vi.fn()
       }
     });
@@ -282,6 +283,7 @@ describe("improvement opportunity store", () => {
         getAccountMetricSummary: vi.fn(),
         listAccountMetricPeriods: vi.fn(),
         getAggregateMetricSummary: vi.fn(),
+        getAdminAnalyticsSummary: vi.fn(),
         backfillRetainedRowsForOrganization: vi.fn()
       }
     });
@@ -350,6 +352,7 @@ describe("improvement opportunity store", () => {
         getAccountMetricSummary: vi.fn(),
         listAccountMetricPeriods: vi.fn(),
         getAggregateMetricSummary: vi.fn(),
+        getAdminAnalyticsSummary: vi.fn(),
         backfillRetainedRowsForOrganization: vi.fn()
       }
     });
@@ -419,6 +422,7 @@ describe("improvement opportunity store", () => {
         getAccountMetricSummary: vi.fn(),
         listAccountMetricPeriods: vi.fn(),
         getAggregateMetricSummary: vi.fn(),
+        getAdminAnalyticsSummary: vi.fn(),
         backfillRetainedRowsForOrganization: vi.fn()
       }
     });
@@ -886,6 +890,7 @@ describe("improvement opportunity store", () => {
         getAccountMetricSummary: vi.fn(),
         listAccountMetricPeriods: vi.fn(),
         getAggregateMetricSummary: vi.fn(),
+        getAdminAnalyticsSummary: vi.fn(),
         backfillRetainedRowsForOrganization: vi.fn()
       }
     });

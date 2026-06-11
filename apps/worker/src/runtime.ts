@@ -78,6 +78,7 @@ import {
   type WeeklyReportTransport
 } from "./processor.js";
 import { processNextDeliverOperationalEmailJob } from "./operational-email-processor.js";
+import { processNextBuildImprovementBundleJob, type ImprovementBundleJobQueue } from "./improvement-bundle-processor.js";
 import { scheduleTrialLifecycleEmails } from "./trial-lifecycle-scheduler.js";
 import { captureWorkerDogfoodingStepFailure, registerWorkerDogfooding } from "./dogfooding.js";
 import { recordProjectMetricDeltas, type WorkerAccountAnalyticsDependencies } from "./account-analytics.js";
@@ -1999,6 +2000,28 @@ export async function runWorkerFromEnv(envInput: Record<string, string | undefin
           );
 
           if (!buildBundleResult.processed) {
+            const buildImprovementBundleResult = await runClaimedProcessStep("build-improvement-bundle", async () =>
+              processNextBuildImprovementBundleJob({
+                queue: queue as unknown as ImprovementBundleJobQueue,
+                logger,
+                dependencies: {
+                  improvementOpportunityStore,
+                  billingStore,
+                  webhookDeliveryStore,
+                  operationalEmailDeliveryStore,
+                  accountAnalyticsStore,
+                  resolveOrganizationIdForProject,
+                  fallbackTargetUrl: env.LIFECYCLE_WEBHOOK_TARGET_URL ?? null,
+                  fallbackSigningSecret: env.LIFECYCLE_WEBHOOK_SECRET ?? null,
+                  objectStore,
+                  apiBaseUrl: normalizeWorkerBaseUrl(envInput["DEBUGBUNDLE_API_URL"] ?? envInput["API_BASE_URL"] ?? envInput["VITE_API_URL"]),
+                  appBaseUrl: normalizeWorkerBaseUrl(envInput["APP_BASE_URL"]),
+                  docsBaseUrl
+                }
+              })
+            );
+
+            if (!buildImprovementBundleResult.processed) {
               const buildReproductionResult = await runClaimedProcessStep("build-reproduction", async () =>
               processNextBuildReproductionJob({
                 queue,
@@ -2155,6 +2178,7 @@ export async function runWorkerFromEnv(envInput: Record<string, string | undefin
                   );
                 }
               }
+            }
             }
           }
         }

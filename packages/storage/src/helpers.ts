@@ -35,6 +35,10 @@ export function buildBundleRegenerationLeaseKey(incidentId: string): string {
   return `leases:bundle-regeneration:${incidentId}`;
 }
 
+export function buildImprovementBundleRegenerationLeaseKey(opportunityId: string): string {
+  return `leases:improvement-bundle-regeneration:${opportunityId}`;
+}
+
 const PROJECT_OBJECT_PREFIXES = ["raw-events", "bundles", "improvement-bundles", "reproductions"] as const;
 
 export async function deleteProjectObjects(

@@ -53,6 +53,7 @@ import type {
   GitHubDispatchRuleRecord,
   GitHubInstallationRecord,
   AccountAnalyticsStore,
+  AdminAnalyticsSummary,
   GitHubRepositoryRecord,
   OperationalEmailDeliveryStore,
   ProjectGitHubRepoRecord,
@@ -64,6 +65,10 @@ export interface ApiDependencies {
   ingestionPersistence: Pick<IngestionPersistenceService, "persistAndEnqueue">;
   ingestionMetadata: Pick<IngestionMetadataService, "resolveProjectByTokenHash">;
   accountAnalytics?: Pick<AccountAnalyticsStore, "recordMetricDeltas"> | undefined;
+  adminAnalytics?: {
+    isOperatorAllowed(input: { email: string }): boolean;
+    getSummary(input: { now: string }): Promise<AdminAnalyticsSummary>;
+  } | undefined;
   ingestionRateLimiter?: Pick<IngestionRateLimiter, "claimEvents"> | undefined;
   authRateLimiter?: Pick<AuthRateLimiter, "claimRequest"> | undefined;
   auditLogging?: Pick<AuditLogStore, "createAuditLog"> | undefined;
@@ -546,6 +551,13 @@ export interface ApiDependencies {
       organization_id: string;
       project_id: string;
       incident_id: string;
+    }): Promise<boolean>;
+  };
+  improvementBundleRegeneration?: {
+    requestRegeneration(input: {
+      organization_id: string;
+      project_id: string;
+      opportunity_id: string;
     }): Promise<boolean>;
   };
   alertManagement?: {

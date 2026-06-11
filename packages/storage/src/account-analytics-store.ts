@@ -119,6 +119,98 @@ export interface AccountMetricPeriodRecord {
 
 export type AccountMetricSummary = Record<AccountMetricKey, number>;
 
+export interface AdminAnalyticsTimeWindow {
+  starts_at: string;
+  ends_at: string;
+}
+
+export interface AdminAnalyticsSummary {
+  generated_at: string;
+  collection_started_at: string;
+  windows: {
+    today: AdminAnalyticsTimeWindow;
+    this_week: AdminAnalyticsTimeWindow;
+    this_month: AdminAnalyticsTimeWindow;
+    this_year: AdminAnalyticsTimeWindow;
+  };
+  kpis: {
+    active_accounts_today: number;
+    active_accounts_this_week: number;
+    active_accounts_this_month: number;
+    new_accounts_today: number;
+    new_accounts_this_week: number;
+    new_accounts_this_month: number;
+    deleted_accounts_this_month: number;
+    active_accounts_total: number;
+    deleted_accounts_total: number;
+  };
+  usage: {
+    raw_events_accepted_this_month: number;
+    billable_events_counted_this_month: number;
+    incident_signal_events_this_month: number;
+    context_signal_events_this_month: number;
+    operational_signal_events_this_month: number;
+    cloud_verification_events_this_month: number;
+    local_verification_events_this_month: number;
+  };
+  incidents: {
+    opened_this_month: number;
+    resolved_this_month: number;
+    reopened_this_month: number;
+    regressed_this_month: number;
+    occurrences_this_month: number;
+    high_severity_occurrences_this_month: number;
+    critical_severity_occurrences_this_month: number;
+    auto_detected_spikes_this_month: number;
+    resolution_rate_this_month: number;
+  };
+  bundles: {
+    failure_created_this_month: number;
+    failure_updated_this_month: number;
+    failure_generation_failed_this_month: number;
+    improvement_created_this_month: number;
+    improvement_generation_failed_this_month: number;
+    reproductions_created_this_month: number;
+    reproductions_failed_this_month: number;
+  };
+  improvements: {
+    opened_this_month: number;
+    resolved_this_month: number;
+    snoozed_this_month: number;
+    resolution_rate_this_month: number;
+    recurring_incident_opened_this_month: number;
+    post_deploy_regression_opened_this_month: number;
+    slow_request_opened_this_month: number;
+    request_failure_opened_this_month: number;
+    warning_log_opened_this_month: number;
+  };
+  billing: {
+    trials_started_this_month: number;
+    trials_converted_this_month: number;
+    trials_expired_this_month: number;
+    plan_upgrades_this_month: number;
+    plan_downgrades_this_month: number;
+    capacity_units_purchased_this_month: number;
+    capacity_units_reduced_this_month: number;
+  };
+  health: {
+    raw_events_rejected_this_month: number;
+    malformed_rejections_this_month: number;
+    rate_limited_rejections_this_month: number;
+    quota_rejections_this_month: number;
+    capture_policy_rejections_this_month: number;
+    capture_rule_rejections_this_month: number;
+    alert_deliveries_failed_this_month: number;
+    webhook_deliveries_failed_this_month: number;
+    weekly_reports_failed_this_month: number;
+    github_dispatches_failed_this_month: number;
+    webhooks_auto_disabled_this_month: number;
+    operational_emails_sent_this_month: number;
+    allowance_warning_emails_sent_this_month: number;
+    allowance_limit_emails_sent_this_month: number;
+  };
+}
+
 export interface AccountAnalyticsStore {
   withDb(db: Queryable): AccountAnalyticsStore;
   ensureAnalyticsAccount(input: EnsureAnalyticsAccountInput): Promise<{ analytics_account_id: string }>;
@@ -153,6 +245,9 @@ export interface AccountAnalyticsStore {
     period_starts_at?: string;
     account_deleted?: boolean;
   }): Promise<AccountMetricSummary>;
+  getAdminAnalyticsSummary(input: {
+    now: string;
+  }): Promise<AdminAnalyticsSummary>;
   backfillRetainedRowsForOrganization(input: {
     organization_id: string;
     backfilled_at: string;
@@ -173,6 +268,12 @@ function startOfUtcMonth(date: Date): string {
 
 function startOfUtcYear(date: Date): string {
   return new Date(Date.UTC(date.getUTCFullYear(), 0, 1)).toISOString();
+}
+
+function startOfUtcIsoWeek(date: Date): string {
+  const day = date.getUTCDay();
+  const diff = day === 0 ? -6 : 1 - day;
+  return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate() + diff)).toISOString();
 }
 
 function maxIsoTimestamp(left: string, right: string): string {
@@ -234,6 +335,41 @@ function normalizeSummaryPeriodStart(
   return periodGrain === "month" ? startOfUtcMonth(date) : startOfUtcYear(date);
 }
 
+function toCount(value: number | string | null | undefined): number {
+  return value === null || value === undefined ? 0 : Number(value);
+}
+
+function toBoundedRate(numerator: number, denominator: number): number {
+  if (denominator <= 0) {
+    return 0;
+  }
+
+  return Math.max(0, Math.min(1, numerator / denominator));
+}
+
+function buildAdminAnalyticsWindows(now: Date): AdminAnalyticsSummary["windows"] {
+  const endsAt = now.toISOString();
+
+  return {
+    today: {
+      starts_at: startOfUtcDay(now),
+      ends_at: endsAt
+    },
+    this_week: {
+      starts_at: startOfUtcIsoWeek(now),
+      ends_at: endsAt
+    },
+    this_month: {
+      starts_at: startOfUtcMonth(now),
+      ends_at: endsAt
+    },
+    this_year: {
+      starts_at: startOfUtcYear(now),
+      ends_at: endsAt
+    }
+  };
+}
+
 type AccountMetricRow = {
   period_starts_at: string;
   metric_key: AccountMetricKey;
@@ -244,6 +380,21 @@ type BackfillMetricRow = {
   period_starts_at: string;
   metric_key: AccountMetricKey;
   metric_value: string;
+};
+
+type AdminAnalyticsKpiCountsRow = {
+  active_accounts_total: string | null;
+  deleted_accounts_total: string | null;
+  new_accounts_today: string | null;
+  new_accounts_this_week: string | null;
+  new_accounts_this_month: string | null;
+  deleted_accounts_this_month: string | null;
+  collection_started_at: string | null;
+};
+
+type AdminAnalyticsActiveWindowRow = {
+  window_key: "today" | "this_week" | "this_month";
+  active_accounts: string | null;
 };
 
 function groupBackfillMetricRows(
@@ -741,6 +892,190 @@ export function createPostgresAccountAnalyticsStore(input: {
           );
 
           return summarizeMetricRows(result.rows);
+        });
+      },
+
+      async getAdminAnalyticsSummary(inputValue): Promise<AdminAnalyticsSummary> {
+        return inStoreTransaction(async (tx) => {
+          const now = new Date(inputValue.now);
+          const generatedAt = now.toISOString();
+          const windows = buildAdminAnalyticsWindows(now);
+          const monthSummary = await buildStore(tx, false).getAggregateMetricSummary({
+            period_grain: "month",
+            period_starts_at: windows.this_month.starts_at
+          });
+
+          const activeWindowResult = await tx.query<AdminAnalyticsActiveWindowRow>(
+            `
+              WITH windows (window_key, starts_at, ends_at) AS (
+                VALUES
+                  ('today', $1::timestamptz, $4::timestamptz),
+                  ('this_week', $2::timestamptz, $4::timestamptz),
+                  ('this_month', $3::timestamptz, $4::timestamptz)
+              )
+              SELECT
+                windows.window_key,
+                COUNT(DISTINCT ame.analytics_account_id)::text AS active_accounts
+              FROM windows
+              LEFT JOIN account_metric_events ame
+                ON ame.occurred_at >= windows.starts_at
+               AND ame.occurred_at < windows.ends_at
+               AND ame.metric_source <> 'backfill_retained_rows'
+               AND EXISTS (
+                 SELECT 1
+                 FROM jsonb_each_text(ame.metric_deltas) AS metric_delta(metric_key, metric_value)
+                 WHERE metric_delta.metric_key <> 'account_deleted'
+                   AND (metric_delta.metric_value)::bigint > 0
+               )
+              GROUP BY windows.window_key
+            `,
+            [
+              windows.today.starts_at,
+              windows.this_week.starts_at,
+              windows.this_month.starts_at,
+              generatedAt
+            ]
+          );
+
+          const kpiCountsResult = await tx.query<AdminAnalyticsKpiCountsRow>(
+            `
+              SELECT
+                COUNT(*) FILTER (WHERE account_deleted = false)::text AS active_accounts_total,
+                COUNT(*) FILTER (WHERE account_deleted = true)::text AS deleted_accounts_total,
+                COUNT(*) FILTER (
+                  WHERE created_at >= $1::timestamptz
+                    AND created_at < $4::timestamptz
+                )::text AS new_accounts_today,
+                COUNT(*) FILTER (
+                  WHERE created_at >= $2::timestamptz
+                    AND created_at < $4::timestamptz
+                )::text AS new_accounts_this_week,
+                COUNT(*) FILTER (
+                  WHERE created_at >= $3::timestamptz
+                    AND created_at < $4::timestamptz
+                )::text AS new_accounts_this_month,
+                COUNT(*) FILTER (
+                  WHERE deleted_at >= $3::timestamptz
+                    AND deleted_at < $4::timestamptz
+                )::text AS deleted_accounts_this_month,
+                COALESCE(MIN(metrics_collection_started_at)::text, $5::text) AS collection_started_at
+              FROM account_analytics_accounts
+            `,
+            [
+              windows.today.starts_at,
+              windows.this_week.starts_at,
+              windows.this_month.starts_at,
+              generatedAt,
+              DEFAULT_METRICS_COLLECTION_STARTED_AT
+            ]
+          );
+
+          const activeByWindow = new Map(
+            activeWindowResult.rows.map((row) => [row.window_key, toCount(row.active_accounts)])
+          );
+          const counts = kpiCountsResult.rows[0] ?? {
+            active_accounts_total: "0",
+            deleted_accounts_total: "0",
+            new_accounts_today: "0",
+            new_accounts_this_week: "0",
+            new_accounts_this_month: "0",
+            deleted_accounts_this_month: "0",
+            collection_started_at: DEFAULT_METRICS_COLLECTION_STARTED_AT
+          };
+
+          return {
+            generated_at: generatedAt,
+            collection_started_at: counts.collection_started_at ?? DEFAULT_METRICS_COLLECTION_STARTED_AT,
+            windows,
+            kpis: {
+              active_accounts_today: activeByWindow.get("today") ?? 0,
+              active_accounts_this_week: activeByWindow.get("this_week") ?? 0,
+              active_accounts_this_month: activeByWindow.get("this_month") ?? 0,
+              new_accounts_today: toCount(counts.new_accounts_today),
+              new_accounts_this_week: toCount(counts.new_accounts_this_week),
+              new_accounts_this_month: toCount(counts.new_accounts_this_month),
+              deleted_accounts_this_month: toCount(counts.deleted_accounts_this_month),
+              active_accounts_total: toCount(counts.active_accounts_total),
+              deleted_accounts_total: toCount(counts.deleted_accounts_total)
+            },
+            usage: {
+              raw_events_accepted_this_month: monthSummary.raw_events_accepted,
+              billable_events_counted_this_month: monthSummary.billable_events_counted,
+              incident_signal_events_this_month: monthSummary.incident_signal_events_counted,
+              context_signal_events_this_month: monthSummary.context_signal_events_counted,
+              operational_signal_events_this_month: monthSummary.operational_signal_events_counted,
+              cloud_verification_events_this_month: monthSummary.cloud_verification_events_accepted,
+              local_verification_events_this_month: monthSummary.local_verification_events_accepted
+            },
+            incidents: {
+              opened_this_month: monthSummary.incidents_opened,
+              resolved_this_month: monthSummary.incidents_resolved,
+              reopened_this_month: monthSummary.incidents_reopened,
+              regressed_this_month: monthSummary.incidents_regressed,
+              occurrences_this_month: monthSummary.incident_occurrences,
+              high_severity_occurrences_this_month: monthSummary.incident_occurrences_high_severity,
+              critical_severity_occurrences_this_month: monthSummary.incident_occurrences_critical_severity,
+              auto_detected_spikes_this_month: monthSummary.incidents_auto_detected_spiking,
+              resolution_rate_this_month: toBoundedRate(
+                monthSummary.incidents_resolved,
+                monthSummary.incidents_opened
+              )
+            },
+            bundles: {
+              failure_created_this_month: monthSummary.failure_bundles_created,
+              failure_updated_this_month: monthSummary.failure_bundles_updated,
+              failure_generation_failed_this_month: monthSummary.failure_bundle_generations_failed,
+              improvement_created_this_month: monthSummary.improvement_bundles_created,
+              improvement_generation_failed_this_month:
+                monthSummary.improvement_bundle_generations_failed,
+              reproductions_created_this_month: monthSummary.reproductions_created,
+              reproductions_failed_this_month: monthSummary.reproductions_failed
+            },
+            improvements: {
+              opened_this_month: monthSummary.improvements_opened,
+              resolved_this_month: monthSummary.improvements_resolved,
+              snoozed_this_month: monthSummary.improvements_snoozed,
+              resolution_rate_this_month: toBoundedRate(
+                monthSummary.improvements_resolved,
+                monthSummary.improvements_opened
+              ),
+              recurring_incident_opened_this_month:
+                monthSummary.recurring_incident_improvements_opened,
+              post_deploy_regression_opened_this_month:
+                monthSummary.post_deploy_regression_improvements_opened,
+              slow_request_opened_this_month: monthSummary.slow_request_improvements_opened,
+              request_failure_opened_this_month:
+                monthSummary.request_failure_improvements_opened,
+              warning_log_opened_this_month: monthSummary.warning_log_improvements_opened
+            },
+            billing: {
+              trials_started_this_month: monthSummary.trial_started,
+              trials_converted_this_month: monthSummary.trial_converted,
+              trials_expired_this_month: monthSummary.trial_expired,
+              plan_upgrades_this_month: monthSummary.plan_upgraded,
+              plan_downgrades_this_month: monthSummary.plan_downgraded,
+              capacity_units_purchased_this_month: monthSummary.capacity_units_purchased,
+              capacity_units_reduced_this_month: monthSummary.capacity_units_reduced
+            },
+            health: {
+              raw_events_rejected_this_month: monthSummary.raw_events_rejected,
+              malformed_rejections_this_month: monthSummary.events_rejected_malformed,
+              rate_limited_rejections_this_month: monthSummary.events_rejected_rate_limited,
+              quota_rejections_this_month: monthSummary.events_rejected_quota,
+              capture_policy_rejections_this_month: monthSummary.events_rejected_capture_policy,
+              capture_rule_rejections_this_month: monthSummary.events_rejected_capture_rule,
+              alert_deliveries_failed_this_month: monthSummary.alert_deliveries_failed,
+              webhook_deliveries_failed_this_month: monthSummary.webhook_deliveries_failed,
+              weekly_reports_failed_this_month: monthSummary.weekly_reports_failed,
+              github_dispatches_failed_this_month: monthSummary.github_dispatches_failed,
+              webhooks_auto_disabled_this_month: monthSummary.webhooks_auto_disabled,
+              operational_emails_sent_this_month: monthSummary.operational_emails_sent,
+              allowance_warning_emails_sent_this_month:
+                monthSummary.allowance_warning_emails_sent,
+              allowance_limit_emails_sent_this_month:
+                monthSummary.allowance_limit_emails_sent
+            }
+          };
         });
       },
 

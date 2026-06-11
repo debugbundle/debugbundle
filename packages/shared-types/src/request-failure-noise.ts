@@ -33,6 +33,7 @@ function isRouteOnlyExternalProbe(normalizedRoute: string): boolean {
     "/__debug__/render_panel",
     "/actuator",
     "/autodiscover/autodiscover.json",
+    "/containers/json",
     "/developmentserver/metadatauploader",
     "/cpanel",
     "/favicon.ico",

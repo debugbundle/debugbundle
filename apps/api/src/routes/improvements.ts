@@ -17,12 +17,16 @@ import {
   ProjectImprovementParamsSchema
 } from "../schemas.js";
 
-function buildBundlePendingOrFailureState(input: {
+async function buildBundlePendingOrFailureState(input: {
+  dependencies: ApiDependencies;
+  organizationId: string;
+  projectId: string;
+  opportunityId: string;
   kind: string;
   relatedIncidentIds: string[];
   bundleGenerationNumber: number;
   bundleFailureReason: string | null;
-}): { status: "pending" } | { status: "failed"; reason: string; related_incident_ids?: string[] } {
+}): Promise<{ status: "pending" } | { status: "failed"; reason: string; related_incident_ids?: string[] }> {
   if (input.kind === "recurring_incident" || input.kind === "post_deploy_regression") {
     return {
       status: "failed",
@@ -31,17 +35,52 @@ function buildBundlePendingOrFailureState(input: {
     };
   }
 
-  if (input.bundleFailureReason !== null) {
+  if (input.bundleFailureReason === "monthly_quota_exceeded" || input.bundleFailureReason === "bundle_generation_disabled") {
     return {
       status: "failed",
       reason: input.bundleFailureReason
     };
   }
 
-  if (input.bundleGenerationNumber === 0) {
+  if (input.bundleGenerationNumber === 0 && input.bundleFailureReason === null) {
     return {
       status: "failed",
       reason: "bundle_not_generated_yet"
+    };
+  }
+
+  if (input.bundleFailureReason === "build_error" || input.bundleGenerationNumber > 0) {
+    if (input.dependencies.improvementBundleRegeneration !== undefined) {
+      const regenerationQueued = await input.dependencies.improvementBundleRegeneration.requestRegeneration({
+        organization_id: input.organizationId,
+        project_id: input.projectId,
+        opportunity_id: input.opportunityId
+      });
+
+      if (!regenerationQueued) {
+        return {
+          status: "failed",
+          reason: "bundle_source_unavailable"
+        };
+      }
+
+      return {
+        status: "pending"
+      };
+    }
+
+    if (input.bundleFailureReason !== null) {
+      return {
+        status: "failed",
+        reason: input.bundleFailureReason
+      };
+    }
+  }
+
+  if (input.bundleFailureReason !== null) {
+    return {
+      status: "failed",
+      reason: input.bundleFailureReason
     };
   }
 
@@ -253,7 +292,11 @@ export function registerImprovementRoutes(app: FastifyInstance, dependencies: Ap
     } catch (error) {
       if (isObjectNotFoundError(error)) {
         return reply.status(200).send(
-          buildBundlePendingOrFailureState({
+          await buildBundlePendingOrFailureState({
+            dependencies,
+            organizationId: auth.access.organization_id,
+            projectId: parsedParams.data.id,
+            opportunityId: parsedParams.data.improvementId,
             kind: typeof improvement.kind === "string" ? improvement.kind : "",
             relatedIncidentIds: Array.isArray(improvement.related_incident_ids) ? improvement.related_incident_ids : [],
             bundleGenerationNumber: improvement.bundle_generation_number,

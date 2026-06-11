@@ -17,6 +17,98 @@ export interface SessionRecord {
   csrf_token: string;
 }
 
+export interface AdminAnalyticsTimeWindow {
+  starts_at: string;
+  ends_at: string;
+}
+
+export interface AdminAnalyticsSummary {
+  generated_at: string;
+  collection_started_at: string;
+  windows: {
+    today: AdminAnalyticsTimeWindow;
+    this_week: AdminAnalyticsTimeWindow;
+    this_month: AdminAnalyticsTimeWindow;
+    this_year: AdminAnalyticsTimeWindow;
+  };
+  kpis: {
+    active_accounts_today: number;
+    active_accounts_this_week: number;
+    active_accounts_this_month: number;
+    new_accounts_today: number;
+    new_accounts_this_week: number;
+    new_accounts_this_month: number;
+    deleted_accounts_this_month: number;
+    active_accounts_total: number;
+    deleted_accounts_total: number;
+  };
+  usage: {
+    raw_events_accepted_this_month: number;
+    billable_events_counted_this_month: number;
+    incident_signal_events_this_month: number;
+    context_signal_events_this_month: number;
+    operational_signal_events_this_month: number;
+    cloud_verification_events_this_month: number;
+    local_verification_events_this_month: number;
+  };
+  incidents: {
+    opened_this_month: number;
+    resolved_this_month: number;
+    reopened_this_month: number;
+    regressed_this_month: number;
+    occurrences_this_month: number;
+    high_severity_occurrences_this_month: number;
+    critical_severity_occurrences_this_month: number;
+    auto_detected_spikes_this_month: number;
+    resolution_rate_this_month: number;
+  };
+  bundles: {
+    failure_created_this_month: number;
+    failure_updated_this_month: number;
+    failure_generation_failed_this_month: number;
+    improvement_created_this_month: number;
+    improvement_generation_failed_this_month: number;
+    reproductions_created_this_month: number;
+    reproductions_failed_this_month: number;
+  };
+  improvements: {
+    opened_this_month: number;
+    resolved_this_month: number;
+    snoozed_this_month: number;
+    resolution_rate_this_month: number;
+    recurring_incident_opened_this_month: number;
+    post_deploy_regression_opened_this_month: number;
+    slow_request_opened_this_month: number;
+    request_failure_opened_this_month: number;
+    warning_log_opened_this_month: number;
+  };
+  billing: {
+    trials_started_this_month: number;
+    trials_converted_this_month: number;
+    trials_expired_this_month: number;
+    plan_upgrades_this_month: number;
+    plan_downgrades_this_month: number;
+    capacity_units_purchased_this_month: number;
+    capacity_units_reduced_this_month: number;
+  };
+  health: {
+    raw_events_rejected_this_month: number;
+    malformed_rejections_this_month: number;
+    rate_limited_rejections_this_month: number;
+    quota_rejections_this_month: number;
+    capture_policy_rejections_this_month: number;
+    capture_rule_rejections_this_month: number;
+    alert_deliveries_failed_this_month: number;
+    webhook_deliveries_failed_this_month: number;
+    weekly_reports_failed_this_month: number;
+    github_dispatches_failed_this_month: number;
+    webhooks_auto_disabled_this_month: number;
+    operational_emails_sent_this_month: number;
+    allowance_warning_emails_sent_this_month: number;
+    allowance_limit_emails_sent_this_month: number;
+  };
+}
+
 export interface ImportedAccountAvatarRecord {
   source: "github" | "gravatar";
   avatar_url: string;

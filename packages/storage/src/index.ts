@@ -4,6 +4,8 @@
 export * from "./types.js";
 export type {
   AccountAnalyticsStore,
+  AdminAnalyticsSummary,
+  AdminAnalyticsTimeWindow,
   AccountMetricSummary,
   AccountMetricPeriodRecord,
   AccountMetricKey
@@ -32,9 +34,11 @@ export {
   buildReproductionObjectKey,
   buildUserAvatarObjectKey,
   buildBundleRegenerationLeaseKey,
+  buildImprovementBundleRegenerationLeaseKey,
   deleteProjectObjects,
   hashToken
 } from "./helpers.js";
+export type { BuildImprovementBundleJob } from "./improvement-bundle-jobs.js";
 export { createPostgresAlertDeliveryStore } from "./alert-delivery-store.js";
 export { createPostgresAccountStore } from "./account-store.js";
 export { createPostgresAuditLogStore } from "./audit-log-store.js";

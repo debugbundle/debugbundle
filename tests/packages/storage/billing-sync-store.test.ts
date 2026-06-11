@@ -292,6 +292,7 @@ describe("createPostgresBillingSyncStore", () => {
             getAccountMetricSummary: vi.fn(),
             listAccountMetricPeriods: vi.fn(),
             getAggregateMetricSummary: vi.fn(),
+            getAdminAnalyticsSummary: vi.fn(),
             backfillRetainedRowsForOrganization: vi.fn()
           }
         }
@@ -450,6 +451,7 @@ describe("createPostgresBillingSyncStore", () => {
             getAccountMetricSummary: vi.fn(),
             listAccountMetricPeriods: vi.fn(),
             getAggregateMetricSummary: vi.fn(),
+            getAdminAnalyticsSummary: vi.fn(),
             backfillRetainedRowsForOrganization: vi.fn()
           }
         }

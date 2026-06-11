@@ -7,6 +7,7 @@ import {
 import type {
   AlertChannel,
   AlertConditionType,
+  AdminAnalyticsSummary,
   AlertRecord,
   CreatedMemberToken,
   CreatedProjectToken,
@@ -34,6 +35,7 @@ import type {
 
 export * from "./api-types.js";
 export {
+  ApiRequestError,
   buildApiUrl,
   buildBrowserSessionHeaders,
   InvalidSessionError,
@@ -149,6 +151,16 @@ export async function listMemberTokens(): Promise<MemberTokenRecord[]> {
   );
 
   return body.tokens;
+}
+
+export async function getAdminAnalyticsSummary(): Promise<AdminAnalyticsSummary> {
+  const body = await readJson<{ summary: AdminAnalyticsSummary }>(
+    await fetch(`${API_BASE}/v1/admin/analytics/summary`, {
+      credentials: "include"
+    })
+  );
+
+  return body.summary;
 }
 
 export async function listProjects(): Promise<ProjectRecord[]> {

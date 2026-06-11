@@ -12,6 +12,7 @@ const {
   createS3ObjectStoreClientMock,
   createPostgresAccountStoreMock,
   createPostgresAuditLogStoreMock,
+  createPostgresAccountAnalyticsStoreMock,
   createPostgresAuthStoreMock,
   createPostgresBillingStoreMock,
   createPostgresBillingSyncStoreMock,
@@ -50,6 +51,7 @@ const {
   createS3ObjectStoreClientMock: vi.fn(),
   createPostgresAccountStoreMock: vi.fn(),
   createPostgresAuditLogStoreMock: vi.fn(),
+  createPostgresAccountAnalyticsStoreMock: vi.fn(),
   createPostgresAuthStoreMock: vi.fn(),
   createPostgresBillingStoreMock: vi.fn(),
   createPostgresBillingSyncStoreMock: vi.fn(),
@@ -98,6 +100,8 @@ vi.mock("../../../packages/storage/src/index.js", () => ({
     `improvement-bundles/${projectId}/${opportunityId}.json.gz`,
   buildReproductionObjectKey: (projectId: string, incidentId: string) => `reproductions/${projectId}/${incidentId}.json.gz`,
   buildBundleRegenerationLeaseKey: (incidentId: string) => `leases:bundle-regeneration:${incidentId}`,
+  buildImprovementBundleRegenerationLeaseKey: (opportunityId: string) =>
+    `leases:improvement-bundle-regeneration:${opportunityId}`,
   buildUserAvatarObjectKey: (userId: string) => `avatars/users/${userId}/profile`,
   deleteProjectObjects: async (
     objectStore: { deleteObjectsByPrefix(prefix: string): Promise<void> },
@@ -115,6 +119,7 @@ vi.mock("../../../packages/storage/src/index.js", () => ({
   createS3ObjectStoreClient: createS3ObjectStoreClientMock,
   createPostgresAccountStore: createPostgresAccountStoreMock,
   createPostgresAuditLogStore: createPostgresAuditLogStoreMock,
+  createPostgresAccountAnalyticsStore: createPostgresAccountAnalyticsStoreMock,
   createPostgresAuthStore: createPostgresAuthStoreMock,
   createPostgresBillingStore: createPostgresBillingStoreMock,
   createPostgresCapturePolicyStore: createPostgresCapturePolicyStoreMock,
@@ -202,6 +207,7 @@ describe("api default dependencies", () => {
     createRedisQueueClientMock.mockReset();
     createS3ObjectStoreClientMock.mockReset();
     createPostgresAuditLogStoreMock.mockReset();
+    createPostgresAccountAnalyticsStoreMock.mockReset();
     createPostgresAuthStoreMock.mockReset();
     createPostgresBillingStoreMock.mockReset();
     createPostgresBillingSyncStoreMock.mockReset();
@@ -237,6 +243,9 @@ describe("api default dependencies", () => {
     createRedisIngestionRateLimiterMock.mockReturnValue({ claimEvents: vi.fn(), close: vi.fn() });
     createS3ObjectStoreClientMock.mockReturnValue({ putObject: vi.fn(), getObject: vi.fn() });
     createPostgresAuditLogStoreMock.mockReturnValue({ createAuditLog: vi.fn() });
+    createPostgresAccountAnalyticsStoreMock.mockReturnValue({
+      getAdminAnalyticsSummary: vi.fn()
+    });
     createPostgresAuthStoreMock.mockReturnValue({
       createUserAccount: vi.fn(),
       createSession: vi.fn(),
@@ -1677,6 +1686,29 @@ describe("api default dependencies", () => {
     expect(billingAdmin?.isOperatorAllowed({ email: "owen@example.com" })).toBe(true);
     expect(billingAdmin?.isOperatorAllowed({ email: "ADMIN@example.com" })).toBe(true);
     expect(billingAdmin?.isOperatorAllowed({ email: "regular@example.com" })).toBe(false);
+  });
+
+  it("should configure admin analytics access emails from runtime env", (): void => {
+    const dependencies = createApiDependenciesFromEnv({
+      ANALYTICS_HASH_SECRET: "analytics-hash-secret",
+      ADMIN_ANALYTICS_ACCESS_EMAILS: " Owen@Example.com, admin@example.com ,owen@example.com"
+    });
+    const adminAnalytics = dependencies.adminAnalytics;
+
+    expect(adminAnalytics).toBeDefined();
+    expect(adminAnalytics?.isOperatorAllowed({ email: "owen@example.com" })).toBe(true);
+    expect(adminAnalytics?.isOperatorAllowed({ email: "ADMIN@example.com" })).toBe(true);
+    expect(adminAnalytics?.isOperatorAllowed({ email: "regular@example.com" })).toBe(false);
+  });
+
+  it("should keep admin analytics unavailable when access emails are empty", (): void => {
+    const dependencies = createApiDependenciesFromEnv({
+      ANALYTICS_HASH_SECRET: "analytics-hash-secret",
+      ADMIN_ANALYTICS_ACCESS_EMAILS: " , "
+    });
+
+    expect(dependencies.accountAnalytics).toBeDefined();
+    expect(dependencies.adminAnalytics).toBeUndefined();
   });
 
   it("should compose billing admin override support for review access without operator emails", (): void => {

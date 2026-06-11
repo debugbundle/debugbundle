@@ -742,6 +742,7 @@ export function createPostgresImprovementOpportunityStore(
               '/__debug__/render_panel',
               '/actuator',
               '/autodiscover/autodiscover.json',
+              '/containers/json',
               '/cpanel',
               '/favicon.ico',
               '/geoserver/web',
