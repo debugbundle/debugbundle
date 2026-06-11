@@ -117,6 +117,7 @@ export async function recordImprovementOpportunityOccurrence(
     event_recorded: boolean;
     opportunity_created: boolean;
     prior_status: "open" | "resolved" | "snoozed" | null;
+    prior_snoozed_until: string | null;
   } & Record<string, unknown>>(
     `
       WITH existing_opportunity AS (
@@ -215,6 +216,10 @@ export async function recordImprovementOpportunityOccurrence(
           END,
           status = CASE
             WHEN EXISTS (SELECT 1 FROM existing_event) THEN improvement_opportunities.status
+            WHEN improvement_opportunities.status = 'snoozed'
+              AND improvement_opportunities.snoozed_until IS NOT NULL
+              AND improvement_opportunities.snoozed_until > EXCLUDED.last_detected_at
+              THEN 'snoozed'
             ELSE 'open'
           END,
           severity = CASE
@@ -266,14 +271,26 @@ export async function recordImprovementOpportunityOccurrence(
           END,
           resolved_at = CASE
             WHEN EXISTS (SELECT 1 FROM existing_event) THEN improvement_opportunities.resolved_at
+            WHEN improvement_opportunities.status = 'snoozed'
+              AND improvement_opportunities.snoozed_until IS NOT NULL
+              AND improvement_opportunities.snoozed_until > EXCLUDED.last_detected_at
+              THEN improvement_opportunities.resolved_at
             ELSE NULL
           END,
           resolved_by_user_id = CASE
             WHEN EXISTS (SELECT 1 FROM existing_event) THEN improvement_opportunities.resolved_by_user_id
+            WHEN improvement_opportunities.status = 'snoozed'
+              AND improvement_opportunities.snoozed_until IS NOT NULL
+              AND improvement_opportunities.snoozed_until > EXCLUDED.last_detected_at
+              THEN improvement_opportunities.resolved_by_user_id
             ELSE NULL
           END,
           snoozed_until = CASE
             WHEN EXISTS (SELECT 1 FROM existing_event) THEN improvement_opportunities.snoozed_until
+            WHEN improvement_opportunities.status = 'snoozed'
+              AND improvement_opportunities.snoozed_until IS NOT NULL
+              AND improvement_opportunities.snoozed_until > EXCLUDED.last_detected_at
+              THEN improvement_opportunities.snoozed_until
             ELSE NULL
           END,
           updated_at = CASE
@@ -288,7 +305,8 @@ export async function recordImprovementOpportunityOccurrence(
           bundle_generation_number,
           NOT EXISTS (SELECT 1 FROM existing_event) AS event_recorded,
           NOT EXISTS (SELECT 1 FROM existing_opportunity) AS opportunity_created,
-          (SELECT status FROM existing_opportunity) AS prior_status
+          (SELECT status FROM existing_opportunity) AS prior_status,
+          (SELECT snoozed_until::text FROM existing_opportunity) AS prior_snoozed_until
       ),
       inserted_event AS (
         INSERT INTO improvement_opportunity_events (
@@ -345,17 +363,23 @@ export async function recordImprovementOpportunityOccurrence(
     return null;
   }
 
+  const priorSnoozeActive =
+    row.prior_status === "snoozed" &&
+    row.prior_snoozed_until !== null &&
+    Date.parse(row.prior_snoozed_until) > Date.parse(input.occurred_at);
+
   return {
     opportunity_id: row.opportunity_id,
     occurrence_count: row.occurrence_count,
     bundle_generation_number: row.bundle_generation_number,
-    should_generate_bundle: row.event_recorded && row.bundle_generation_number === 0 && row.occurrence_count >= input.threshold,
+    should_generate_bundle:
+      row.event_recorded && !priorSnoozeActive && row.bundle_generation_number === 0 && row.occurrence_count >= input.threshold,
     lifecycle_transition:
       row.event_recorded !== true
         ? "none"
         : row.opportunity_created === true
           ? "opened"
-          : row.prior_status === "resolved" || row.prior_status === "snoozed"
+          : row.prior_status === "resolved" || (row.prior_status === "snoozed" && !priorSnoozeActive)
             ? "reopened"
             : "none"
   };

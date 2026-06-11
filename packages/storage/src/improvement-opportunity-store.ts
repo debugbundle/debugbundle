@@ -341,6 +341,30 @@ async function getImprovementLifecycleState(
 type ImprovementOpportunityRow = ImprovementOpportunityRecord & Record<string, unknown>;
 type ImprovementRetrievalRow = ImprovementRetrievalRecord & Record<string, unknown>;
 
+function buildEffectiveImprovementStatusSql(): string {
+  return `
+    CASE
+      WHEN io.status = 'snoozed'
+        AND io.snoozed_until IS NOT NULL
+        AND io.snoozed_until <= now()
+        THEN 'open'
+      ELSE io.status
+    END
+  `;
+}
+
+function buildEffectiveImprovementSnoozedUntilSql(): string {
+  return `
+    CASE
+      WHEN io.status = 'snoozed'
+        AND io.snoozed_until IS NOT NULL
+        AND io.snoozed_until <= now()
+        THEN NULL
+      ELSE io.snoozed_until::text
+    END
+  `;
+}
+
 function buildImprovementSelectClause(): string {
   return `
     io.id::text AS improvement_id,
@@ -353,7 +377,7 @@ function buildImprovementSelectClause(): string {
     s.framework AS service_framework,
     io.environment,
     io.kind,
-    io.status,
+    ${buildEffectiveImprovementStatusSql()} AS status,
     io.severity,
     io.confidence::float8 AS confidence,
     io.fingerprint,
@@ -365,7 +389,7 @@ function buildImprovementSelectClause(): string {
     io.first_detected_at::text AS first_detected_at,
     io.last_detected_at::text AS last_detected_at,
     io.resolved_at::text AS resolved_at,
-    io.snoozed_until::text AS snoozed_until,
+    ${buildEffectiveImprovementSnoozedUntilSql()} AS snoozed_until,
     io.bundle_generation_number,
     io.bundle_created_at::text AS bundle_created_at,
     io.bundle_updated_at::text AS bundle_updated_at,
@@ -757,7 +781,7 @@ export function createPostgresImprovementOpportunityStore(
       }
       if (input.status !== undefined) {
         parameters.push(input.status);
-        predicates.push(`io.status = $${parameters.length}`);
+        predicates.push(`${buildEffectiveImprovementStatusSql()} = $${parameters.length}`);
       }
       if (input.severity !== undefined) {
         parameters.push(input.severity);

@@ -20,9 +20,9 @@ export function CursorPaginationControls({
   }
 
   return (
-    <div className="flex flex-col gap-3 border-t pt-4 sm:flex-row sm:items-center sm:justify-between">
+    <div className="flex flex-wrap items-center gap-3 border-t pt-4">
       <p className="text-sm text-muted-foreground">Page {page}</p>
-      <Pagination className="mx-0 w-auto justify-start sm:justify-end">
+      <Pagination className="mx-0 ml-auto w-auto shrink-0 justify-end">
         <PaginationContent>
           <PaginationItem>
             <PaginationPrevious type="button" onClick={onPreviousPage} disabled={page === 1 || isLoading} />

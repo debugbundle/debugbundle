@@ -182,6 +182,139 @@ describe("improvement opportunity store", () => {
     expect(sql).toContain("EXISTS (SELECT 1 FROM inserted_event)");
   });
 
+  it("keeps snoozed improvements snoozed until the snooze window expires", async () => {
+    const query = vi
+      .fn()
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            opportunity_id: "imp_123",
+            occurrence_count: 6,
+            bundle_generation_number: 0,
+            event_recorded: true,
+            opportunity_created: false,
+            prior_status: "snoozed",
+            prior_snoozed_until: "2026-05-25T13:00:00.000Z"
+          }
+        ]
+      })
+      .mockResolvedValueOnce({
+        rows: [{ organization_id: "org_123" }]
+      });
+    const recordMetricDeltas = vi.fn().mockResolvedValue("recorded");
+    const tx = { query };
+    const db = {
+      query,
+      transaction: async <Result>(callback: (queryable: typeof tx) => Promise<Result>): Promise<Result> => callback(tx)
+    };
+
+    const store = createPostgresImprovementOpportunityStore(db, {
+      accountAnalyticsStore: {
+        withDb: vi.fn().mockReturnValue({ recordMetricDeltas }),
+        ensureAnalyticsAccount: vi.fn(),
+        recordMetricDeltas,
+        markAccountDeleted: vi.fn(),
+        preserveBillingRetentionForDeletedOrganization: vi.fn(),
+        getAccountMetricSummary: vi.fn(),
+        listAccountMetricPeriods: vi.fn(),
+        getAggregateMetricSummary: vi.fn(),
+        backfillRetainedRowsForOrganization: vi.fn()
+      }
+    });
+
+    const result = await store.recordWarningHotspot({
+      project_id: "proj_123",
+      service_name: "checkout-api",
+      environment: "production",
+      normalized_message: "Payment provider warning",
+      source_event_id: "evt_124",
+      occurred_at: "2026-05-20T12:00:00.000Z",
+      severity: "medium",
+      confidence: 0.7,
+      threshold: 5
+    });
+
+    expect(result).toEqual({
+      opportunity_id: "imp_123",
+      occurrence_count: 6,
+      bundle_generation_number: 0,
+      should_generate_bundle: false
+    });
+    const sql = String(query.mock.calls[0]?.[0] ?? "");
+    expect(sql).toContain("improvement_opportunities.status = 'snoozed'");
+    expect(sql).toContain("improvement_opportunities.snoozed_until > EXCLUDED.last_detected_at");
+    expect(recordMetricDeltas).not.toHaveBeenCalled();
+  });
+
+  it("reopens snoozed improvements after the snooze window expires", async () => {
+    const query = vi
+      .fn()
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            opportunity_id: "imp_123",
+            occurrence_count: 6,
+            bundle_generation_number: 0,
+            event_recorded: true,
+            opportunity_created: false,
+            prior_status: "snoozed",
+            prior_snoozed_until: "2026-05-19T12:00:00.000Z"
+          }
+        ]
+      })
+      .mockResolvedValueOnce({
+        rows: [{ organization_id: "org_123" }]
+      });
+    const recordMetricDeltas = vi.fn().mockResolvedValue("recorded");
+    const tx = { query };
+    const db = {
+      query,
+      transaction: async <Result>(callback: (queryable: typeof tx) => Promise<Result>): Promise<Result> => callback(tx)
+    };
+
+    const store = createPostgresImprovementOpportunityStore(db, {
+      accountAnalyticsStore: {
+        withDb: vi.fn().mockReturnValue({ recordMetricDeltas }),
+        ensureAnalyticsAccount: vi.fn(),
+        recordMetricDeltas,
+        markAccountDeleted: vi.fn(),
+        preserveBillingRetentionForDeletedOrganization: vi.fn(),
+        getAccountMetricSummary: vi.fn(),
+        listAccountMetricPeriods: vi.fn(),
+        getAggregateMetricSummary: vi.fn(),
+        backfillRetainedRowsForOrganization: vi.fn()
+      }
+    });
+
+    const result = await store.recordWarningHotspot({
+      project_id: "proj_123",
+      service_name: "checkout-api",
+      environment: "production",
+      normalized_message: "Payment provider warning",
+      source_event_id: "evt_125",
+      occurred_at: "2026-05-20T12:00:00.000Z",
+      severity: "medium",
+      confidence: 0.7,
+      threshold: 5
+    });
+
+    expect(result).toEqual({
+      opportunity_id: "imp_123",
+      occurrence_count: 6,
+      bundle_generation_number: 0,
+      should_generate_bundle: true
+    });
+    expect(recordMetricDeltas).toHaveBeenCalledWith({
+      organization_id: "org_123",
+      occurred_at: "2026-05-20T12:00:00.000Z",
+      source: "improvement_occurrence",
+      dedupe_key: "improvement_occurrence:imp_123:evt_125",
+      deltas: {
+        improvements_reopened: 1
+      }
+    });
+  });
+
   it("records opened improvement metrics when a new warning hotspot is persisted", async () => {
     const query = vi
       .fn()
@@ -529,6 +662,30 @@ describe("improvement opportunity store", () => {
     expect(result).toEqual([]);
     expect(String(query.mock.calls[0]?.[0] ?? "")).toContain("io.status <> 'open'");
     expect(query.mock.calls[0]?.[1]).toEqual(["org_123", null, 10]);
+  });
+
+  it("treats expired snoozes as open during retrieval", async () => {
+    const query = vi.fn().mockResolvedValue({ rows: [] });
+
+    const store = createPostgresImprovementOpportunityStore({ query });
+    await store.listImprovementsForOrganization({
+      organization_id: "org_123",
+      status: "open",
+      limit: 10
+    });
+    await store.getImprovementForOrganization({
+      organization_id: "org_123",
+      improvement_id: "imp_123"
+    });
+
+    const listSql = String(query.mock.calls[0]?.[0] ?? "");
+    const getSql = String(query.mock.calls[1]?.[0] ?? "");
+
+    expect(listSql).toContain("WHEN io.status = 'snoozed'");
+    expect(listSql).toContain("io.snoozed_until <= now()");
+    expect(listSql).toContain("THEN 'open'");
+    expect(getSql).toContain("WHEN io.status = 'snoozed'");
+    expect(getSql).toContain("THEN NULL");
   });
 
   it("returns improvement retrieval records or null for organization lookups", async () => {

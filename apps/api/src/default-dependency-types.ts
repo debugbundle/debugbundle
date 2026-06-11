@@ -159,6 +159,7 @@ export interface DefaultApiDependencies
     | "getImprovementForOrganization"
     | "resolveImprovementForOrganization"
     | "reopenImprovementForOrganization"
+    | "snoozeImprovementForOrganization"
   >;
   incidentRetrieval: Pick<
     MetadataStore,

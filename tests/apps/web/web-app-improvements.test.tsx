@@ -660,6 +660,12 @@ describe("web app — improvements", () => {
       bundle_created_at: null,
       bundle_updated_at: null
     });
+    const failedGenerationImprovement = createImprovement({
+      improvement_id: "imp_build_error",
+      kind: "warning_hotspot",
+      bundle_generation_number: 2,
+      bundle_failure_reason: "build_error"
+    });
     const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
       const url = requestUrl(input);
 
@@ -683,6 +689,16 @@ describe("web app — improvements", () => {
       if (url.endsWith(`/v1/projects/${unavailableImprovement.project_id}/improvements/${unavailableImprovement.improvement_id}/bundle`)) {
         return jsonResponse(200, { status: "failed", reason: "bundle_not_generated_yet" });
       }
+      if (url.endsWith(`/v1/improvements/${failedGenerationImprovement.improvement_id}`) && init?.method === undefined) {
+        return jsonResponse(200, { improvement: failedGenerationImprovement });
+      }
+      if (
+        url.endsWith(
+          `/v1/projects/${failedGenerationImprovement.project_id}/improvements/${failedGenerationImprovement.improvement_id}/bundle`
+        )
+      ) {
+        return jsonResponse(200, { status: "failed", reason: "build_error" });
+      }
 
       return jsonResponse(404, { error: "not_found" });
     });
@@ -705,6 +721,17 @@ describe("web app — improvements", () => {
     expect(await screen.findByText(/request failure/i)).toBeInTheDocument();
     expect(await screen.findByText(/bundle not generated yet/i)).toBeInTheDocument();
     expect(await screen.findByText(/2 of 10 required signals/i)).toBeInTheDocument();
+
+    unmount();
+    render(
+      <App initialEntries={[`/projects/${failedGenerationImprovement.project_id}/improvements/${failedGenerationImprovement.improvement_id}`]} />
+    );
+
+    expect(await screen.findByText(/warning hotspot/i)).toBeInTheDocument();
+    expect(await screen.findByText(/bundle generation failed/i)).toBeInTheDocument();
+    expect(
+      await screen.findByText(/could not finish generating the hosted improvement bundle/i)
+    ).toBeInTheDocument();
   });
 
   it("points incident-derived improvements at their related incident bundle", async () => {

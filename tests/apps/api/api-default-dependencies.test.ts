@@ -710,6 +710,11 @@ describe("api default dependencies", () => {
     expect(typeof deps.incidentRetrieval.getIncidentForOrganization).toBe("function");
     expect(typeof deps.incidentRetrieval.listIncidentLogsForOrganization).toBe("function");
     expect(typeof deps.incidentRetrieval.listServicesForOrganization).toBe("function");
+    expect(typeof deps.improvementManagement?.listImprovementsForOrganization).toBe("function");
+    expect(typeof deps.improvementManagement?.getImprovementForOrganization).toBe("function");
+    expect(typeof deps.improvementManagement?.resolveImprovementForOrganization).toBe("function");
+    expect(typeof deps.improvementManagement?.reopenImprovementForOrganization).toBe("function");
+    expect(typeof deps.improvementManagement?.snoozeImprovementForOrganization).toBe("function");
     expect(typeof deps.objectStoreReader.getObject).toBe("function");
     expect(typeof deps.bundleRegeneration.requestRegeneration).toBe("function");
     expect(typeof deps.alertManagement.listAlertsForOrganization).toBe("function");
@@ -739,6 +744,31 @@ describe("api default dependencies", () => {
       organization_id: "org_123",
       project_id: "proj_123",
       limit: 10
+    });
+    void deps.improvementManagement?.listImprovementsForOrganization({
+      organization_id: "org_123",
+      project_id: "proj_123",
+      status: "open",
+      limit: 10
+    });
+    void deps.improvementManagement?.getImprovementForOrganization({
+      organization_id: "org_123",
+      improvement_id: "imp_123"
+    });
+    void deps.improvementManagement?.resolveImprovementForOrganization?.({
+      organization_id: "org_123",
+      improvement_id: "imp_123",
+      resolved_by_member_id: "usr_123",
+      resolved_at: "2026-03-11T00:00:00.000Z"
+    });
+    void deps.improvementManagement?.reopenImprovementForOrganization?.({
+      organization_id: "org_123",
+      improvement_id: "imp_123"
+    });
+    void deps.improvementManagement?.snoozeImprovementForOrganization?.({
+      organization_id: "org_123",
+      improvement_id: "imp_123",
+      snoozed_until: "2026-03-18T00:00:00.000Z"
     });
     void deps.tokenManagement.listProjectTokensForOrganization({
       organization_id: "org_123",
@@ -936,6 +966,13 @@ describe("api default dependencies", () => {
       createProjectForOrganization: ReturnType<typeof vi.fn>;
       updateProjectForOrganization: ReturnType<typeof vi.fn>;
     };
+    const improvementOpportunityStore = createPostgresImprovementOpportunityStoreMock.mock.results[0]?.value as {
+      listImprovementsForOrganization: ReturnType<typeof vi.fn>;
+      getImprovementForOrganization: ReturnType<typeof vi.fn>;
+      resolveImprovementForOrganization: ReturnType<typeof vi.fn>;
+      reopenImprovementForOrganization: ReturnType<typeof vi.fn>;
+      snoozeImprovementForOrganization: ReturnType<typeof vi.fn>;
+    };
     const webhookStore = createPostgresWebhookDeliveryStoreMock.mock.results[0]?.value as {
       createTestDeliveryForOrganization: ReturnType<typeof vi.fn>;
     };
@@ -959,6 +996,31 @@ describe("api default dependencies", () => {
       organization_id: "org_123",
       project_id: "proj_123",
       limit: 10
+    });
+    expect(improvementOpportunityStore.listImprovementsForOrganization).toHaveBeenCalledWith({
+      organization_id: "org_123",
+      project_id: "proj_123",
+      status: "open",
+      limit: 10
+    });
+    expect(improvementOpportunityStore.getImprovementForOrganization).toHaveBeenCalledWith({
+      organization_id: "org_123",
+      improvement_id: "imp_123"
+    });
+    expect(improvementOpportunityStore.resolveImprovementForOrganization).toHaveBeenCalledWith({
+      organization_id: "org_123",
+      improvement_id: "imp_123",
+      resolved_by_member_id: "usr_123",
+      resolved_at: "2026-03-11T00:00:00.000Z"
+    });
+    expect(improvementOpportunityStore.reopenImprovementForOrganization).toHaveBeenCalledWith({
+      organization_id: "org_123",
+      improvement_id: "imp_123"
+    });
+    expect(improvementOpportunityStore.snoozeImprovementForOrganization).toHaveBeenCalledWith({
+      organization_id: "org_123",
+      improvement_id: "imp_123",
+      snoozed_until: "2026-03-18T00:00:00.000Z"
     });
     expect(metadataStore.listProjectTokensForOrganization).toHaveBeenCalledWith({
       organization_id: "org_123",

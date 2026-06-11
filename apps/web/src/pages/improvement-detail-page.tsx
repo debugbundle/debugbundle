@@ -17,6 +17,7 @@ import {
   type BundleRecord,
   type ImprovementRecord
 } from "../lib/api.js";
+import { ApiRequestError } from "../lib/api-client.js";
 import { showErrorToast, showSuccessToast } from "../lib/notify.js";
 import { useDelayedVisibility } from "../lib/use-delayed-visibility.js";
 import { cn } from "../lib/utils.js";
@@ -103,8 +104,8 @@ export function ImprovementDetailPage(): JSX.Element {
                         const reopened = await reopenImprovement(improvement.improvement_id);
                         setImprovement(reopened);
                         showSuccessToast("Improvement reopened successfully.");
-                      } catch {
-                        showErrorToast("Could not reopen improvement.");
+                      } catch (error) {
+                        showErrorToast(getImprovementMutationErrorMessage("reopen", error));
                       } finally {
                         setIsMutating(false);
                       }
@@ -128,8 +129,8 @@ export function ImprovementDetailPage(): JSX.Element {
                           const snoozed = await snoozeImprovement(improvement.improvement_id, snoozedUntil);
                           setImprovement(snoozed);
                           showSuccessToast("Improvement snoozed for 7 days.");
-                        } catch {
-                          showErrorToast("Could not snooze improvement.");
+                        } catch (error) {
+                          showErrorToast(getImprovementMutationErrorMessage("snooze", error));
                         } finally {
                           setIsMutating(false);
                         }
@@ -150,8 +151,8 @@ export function ImprovementDetailPage(): JSX.Element {
                           const resolved = await resolveImprovement(improvement.improvement_id);
                           setImprovement(resolved);
                           showSuccessToast("Improvement resolved successfully.");
-                        } catch {
-                          showErrorToast("Could not resolve improvement.");
+                        } catch (error) {
+                          showErrorToast(getImprovementMutationErrorMessage("resolve", error));
                         } finally {
                           setIsMutating(false);
                         }
@@ -283,6 +284,17 @@ function ImprovementBundleCard(input: {
     );
   }
 
+  if (bundleState.status === "error") {
+    return (
+      <CalloutCard
+        eyebrow="Error"
+        title="Could not load hosted bundle"
+        description="The improvement detail page could not load the hosted bundle right now. The captured evidence for this opportunity is still available below."
+        tone="warning"
+      />
+    );
+  }
+
   if (bundleState.status !== "ready") {
     if (bundleState.status === "failed" && bundleState.reason === "bundle_not_generated_yet") {
       const threshold = getEvidenceThreshold(input.evidence);
@@ -296,6 +308,18 @@ function ImprovementBundleCard(input: {
           title="Bundle not generated yet"
           description={`DebugBundle is tracking this opportunity, but it is below the hosted bundle threshold. ${progressDescription}`}
           tone="neutral"
+        />
+      );
+    }
+
+    if (bundleState.status === "failed") {
+      const presentation = getImprovementBundleFailurePresentation(bundleState.reason);
+      return (
+        <CalloutCard
+          eyebrow={presentation.eyebrow}
+          title={presentation.title}
+          description={presentation.description}
+          tone={presentation.tone}
         />
       );
     }
@@ -434,6 +458,79 @@ function formatImprovementKind(kind: ImprovementRecord["kind"]): string {
       return "Recurring incident";
     case "post_deploy_regression":
       return "Post-deploy regression";
+  }
+}
+
+function getImprovementBundleFailurePresentation(reason: string | undefined): {
+  eyebrow: string;
+  title: string;
+  description: string;
+  tone: "neutral" | "warning";
+} {
+  switch (reason) {
+    case "monthly_quota_exceeded":
+      return {
+        eyebrow: "Quota reached",
+        title: "Monthly bundle allowance reached",
+        description:
+          "This opportunity crossed the hosted generation threshold, but the project has already used its monthly bundle allowance. The captured evidence for this opportunity is still available below.",
+        tone: "warning"
+      };
+    case "build_error":
+      return {
+        eyebrow: "Generation failed",
+        title: "Bundle generation failed",
+        description:
+          "DebugBundle could not finish generating the hosted improvement bundle for this opportunity. The captured evidence for this opportunity is still available below.",
+        tone: "warning"
+      };
+    case "bundle_artifact_unavailable":
+      return {
+        eyebrow: "Artifact unavailable",
+        title: "Bundle artifact unavailable",
+        description:
+          "DebugBundle recorded this improvement, but the stored hosted bundle artifact could not be loaded. The captured evidence for this opportunity is still available below.",
+        tone: "warning"
+      };
+    default:
+      return {
+        eyebrow: "Unavailable",
+        title: "Bundle not available",
+        description:
+          reason === undefined
+            ? "A hosted improvement bundle is not available for this opportunity right now."
+            : `A hosted improvement bundle is not available for this opportunity right now. Failure code: ${reason}.`,
+        tone: "warning"
+      };
+  }
+}
+
+function getImprovementMutationErrorMessage(
+  action: "resolve" | "reopen" | "snooze",
+  error: unknown
+): string {
+  if (error instanceof ApiRequestError) {
+    switch (error.code) {
+      case "improvement_not_found":
+        return "This improvement is no longer available.";
+      case "invalid_snooze_until":
+        return "Choose a future snooze time.";
+      case "improvement_snooze_unavailable":
+        return "Improvement snoozing is unavailable right now.";
+      case "improvement_resolution_unavailable":
+        return "Improvement resolution is unavailable right now.";
+      case "improvement_reopen_unavailable":
+        return "Improvement reopening is unavailable right now.";
+    }
+  }
+
+  switch (action) {
+    case "resolve":
+      return "Could not resolve improvement.";
+    case "reopen":
+      return "Could not reopen improvement.";
+    case "snooze":
+      return "Could not snooze improvement.";
   }
 }
 

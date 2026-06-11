@@ -959,7 +959,8 @@ export function createApiDependencies(input: CreateApiDependenciesInput): Defaul
       listImprovementsForOrganization: (input) => improvementOpportunityStore.listImprovementsForOrganization(input),
       getImprovementForOrganization: (input) => improvementOpportunityStore.getImprovementForOrganization(input),
       resolveImprovementForOrganization: (input) => improvementOpportunityStore.resolveImprovementForOrganization(input),
-      reopenImprovementForOrganization: (input) => improvementOpportunityStore.reopenImprovementForOrganization(input)
+      reopenImprovementForOrganization: (input) => improvementOpportunityStore.reopenImprovementForOrganization(input),
+      snoozeImprovementForOrganization: (input) => improvementOpportunityStore.snoozeImprovementForOrganization!(input)
     },
     incidentRetrieval: {
       listIncidentsForOrganization: (input) => metadataStore.listIncidentsForOrganization(input),
