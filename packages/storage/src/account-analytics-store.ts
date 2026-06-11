@@ -776,7 +776,7 @@ export function createPostgresAccountAnalyticsStore(input: {
                 SELECT
                   period_starts_at,
                   metric_key,
-                  SUM(metric_value)::text AS metric_value
+                  SUM(metric_value::bigint)::text AS metric_value
                 FROM (
                   SELECT
                     date_trunc('day', i.created_at)::timestamptz::text AS period_starts_at,
@@ -827,7 +827,7 @@ export function createPostgresAccountAnalyticsStore(input: {
                 SELECT
                   period_starts_at,
                   metric_key,
-                  SUM(metric_value)::text AS metric_value
+                  SUM(metric_value::bigint)::text AS metric_value
                 FROM (
                   SELECT
                     date_trunc('day', ie.occurred_at)::timestamptz::text AS period_starts_at,
@@ -871,7 +871,7 @@ export function createPostgresAccountAnalyticsStore(input: {
                 SELECT
                   period_starts_at,
                   metric_key,
-                  SUM(metric_value)::text AS metric_value
+                  SUM(metric_value::bigint)::text AS metric_value
                 FROM (
                   SELECT
                     date_trunc('day', bg.created_at)::timestamptz::text AS period_starts_at,
@@ -897,7 +897,7 @@ export function createPostgresAccountAnalyticsStore(input: {
                 SELECT
                   period_starts_at,
                   metric_key,
-                  SUM(metric_value)::text AS metric_value
+                  SUM(metric_value::bigint)::text AS metric_value
                 FROM (
                   SELECT
                     date_trunc('day', io.first_detected_at)::timestamptz::text AS period_starts_at,
@@ -953,7 +953,7 @@ export function createPostgresAccountAnalyticsStore(input: {
                 SELECT
                   period_starts_at,
                   metric_key,
-                  SUM(metric_value)::text AS metric_value
+                  SUM(metric_value::bigint)::text AS metric_value
                 FROM (
                   SELECT
                     date_trunc('day', ad.created_at)::timestamptz::text AS period_starts_at,
@@ -1009,7 +1009,7 @@ export function createPostgresAccountAnalyticsStore(input: {
                 SELECT
                   period_starts_at,
                   metric_key,
-                  SUM(metric_value)::text AS metric_value
+                  SUM(metric_value::bigint)::text AS metric_value
                 FROM (
                   SELECT
                     date_trunc('day', wd.created_at)::timestamptz::text AS period_starts_at,
@@ -1052,7 +1052,7 @@ export function createPostgresAccountAnalyticsStore(input: {
                 SELECT
                   period_starts_at,
                   metric_key,
-                  SUM(metric_value)::text AS metric_value
+                  SUM(metric_value::bigint)::text AS metric_value
                 FROM (
                   SELECT
                     date_trunc('day', wrd.delivered_at)::timestamptz::text AS period_starts_at,
@@ -1084,7 +1084,7 @@ export function createPostgresAccountAnalyticsStore(input: {
                 SELECT
                   period_starts_at,
                   metric_key,
-                  SUM(metric_value)::text AS metric_value
+                  SUM(metric_value::bigint)::text AS metric_value
                 FROM (
                   SELECT
                     date_trunc('day', gdd.created_at)::timestamptz::text AS period_starts_at,
@@ -1140,7 +1140,7 @@ export function createPostgresAccountAnalyticsStore(input: {
                 SELECT
                   period_starts_at,
                   metric_key,
-                  SUM(metric_value)::text AS metric_value
+                  SUM(metric_value::bigint)::text AS metric_value
                 FROM (
                   SELECT
                     date_trunc('day', pa.created_at)::timestamptz::text AS period_starts_at,
