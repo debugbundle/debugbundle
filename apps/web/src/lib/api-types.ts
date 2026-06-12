@@ -109,6 +109,10 @@ export interface AdminAnalyticsSummary {
   };
 }
 
+export interface AdminAnalyticsAccessStatus {
+  status: "ready" | "email_auth_required";
+}
+
 export interface ImportedAccountAvatarRecord {
   source: "github" | "gravatar";
   avatar_url: string;

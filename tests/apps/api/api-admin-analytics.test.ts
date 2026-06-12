@@ -163,6 +163,80 @@ function createServer(overrides: {
 }
 
 describe("api admin analytics routes", () => {
+  it("returns email-auth-required access status for allowlisted GitHub-authenticated sessions", async (): Promise<void> => {
+    const app = createServer({
+      adminAnalytics: {
+        isOperatorAllowed: ({ email }) => email === "owen@example.com",
+        getSummary: vi.fn()
+      },
+      webAuth: createWebAuth({
+        resolveSessionByToken: vi.fn().mockResolvedValue({
+          session_id: "sess_123",
+          user_id: "usr_123",
+          email: "owen@example.com",
+          email_verified_at: "2026-06-01T00:00:00.000Z",
+          organization_id: "org_123",
+          role: "owner",
+          created_at: "2026-06-01T00:00:00.000Z",
+          expires_at: "2026-06-19T00:00:00.000Z",
+          revoked_at: null,
+          session_auth_method: "github_oauth",
+          has_email_auth: true,
+          has_github_oauth: true
+        })
+      })
+    });
+
+    const response = await app.inject({
+      method: "GET",
+      url: "/v1/admin/analytics/access-status",
+      headers: {
+        cookie: "dbundle_session=session-secret"
+      }
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.headers["cache-control"]).toBe("no-store");
+    expect(response.json()).toEqual({ status: "email_auth_required" });
+  });
+
+  it("returns ready access status for allowlisted email-authenticated sessions", async (): Promise<void> => {
+    const app = createServer({
+      adminAnalytics: {
+        isOperatorAllowed: ({ email }) => email === "owen@example.com",
+        getSummary: vi.fn()
+      },
+      webAuth: createWebAuth({
+        resolveSessionByToken: vi.fn().mockResolvedValue({
+          session_id: "sess_123",
+          user_id: "usr_123",
+          email: "owen@example.com",
+          email_verified_at: "2026-06-01T00:00:00.000Z",
+          organization_id: "org_123",
+          role: "owner",
+          created_at: "2026-06-01T00:00:00.000Z",
+          expires_at: "2026-06-19T00:00:00.000Z",
+          revoked_at: null,
+          session_auth_method: "email_code",
+          has_email_auth: true,
+          has_github_oauth: true
+        })
+      })
+    });
+
+    const response = await app.inject({
+      method: "GET",
+      url: "/v1/admin/analytics/access-status",
+      headers: {
+        cookie: "dbundle_session=session-secret"
+      }
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.headers["cache-control"]).toBe("no-store");
+    expect(response.json()).toEqual({ status: "ready" });
+  });
+
   it("returns the aggregate summary for allowlisted verified browser sessions", async (): Promise<void> => {
     const createAuditLog = vi.fn().mockResolvedValue(undefined);
     const getSummary = vi.fn().mockResolvedValue(createSummary());
@@ -226,6 +300,43 @@ describe("api admin analytics routes", () => {
     const response = await app.inject({
       method: "GET",
       url: "/v1/admin/analytics/summary"
+    });
+
+    expect(response.statusCode).toBe(404);
+    expect(response.headers["cache-control"]).toBe("no-store");
+    expect(response.json()).toEqual({ error: "not_found" });
+  });
+
+  it("returns not found access status for non-allowlisted sessions", async (): Promise<void> => {
+    const app = createServer({
+      adminAnalytics: {
+        isOperatorAllowed: () => false,
+        getSummary: vi.fn()
+      },
+      webAuth: createWebAuth({
+        resolveSessionByToken: vi.fn().mockResolvedValue({
+          session_id: "sess_123",
+          user_id: "usr_123",
+          email: "someone@example.com",
+          email_verified_at: "2026-06-01T00:00:00.000Z",
+          organization_id: "org_123",
+          role: "owner",
+          created_at: "2026-06-01T00:00:00.000Z",
+          expires_at: "2026-06-19T00:00:00.000Z",
+          revoked_at: null,
+          session_auth_method: "github_oauth",
+          has_email_auth: true,
+          has_github_oauth: true
+        })
+      })
+    });
+
+    const response = await app.inject({
+      method: "GET",
+      url: "/v1/admin/analytics/access-status",
+      headers: {
+        cookie: "dbundle_session=session-secret"
+      }
     });
 
     expect(response.statusCode).toBe(404);

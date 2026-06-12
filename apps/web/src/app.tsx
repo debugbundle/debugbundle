@@ -67,7 +67,6 @@ import { isSystemEmailReviewEnabled } from "./lib/system-email-previews.js";
 import { ThemeProvider, useTheme } from "./lib/theme.js";
 import { TooltipProvider } from "./components/ui/tooltip.js";
 import { SystemEmailReviewPage } from "./pages/system-email-review-page.js";
-import { NotFoundPage } from "./pages/not-found-page.js";
 
 const GITHUB_START_HREF = buildApiUrl("/v1/auth/github/start");
 const SIGNUP_TRIAL_STORAGE_KEY = "debugbundle.auth.signup_trial";
@@ -333,7 +332,7 @@ function AdminAnalyticsRoute(): JSX.Element {
   const { session, setSession } = useSession();
 
   if (session === null) {
-    return <NotFoundPage />;
+    return <Navigate replace to="/" />;
   }
 
   return (

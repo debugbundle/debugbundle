@@ -1,18 +1,31 @@
-import { ActivityIcon, GaugeIcon, HeartPulseIcon, PackageIcon, UsersIcon } from "lucide-react";
+import { ActivityIcon, GaugeIcon, HeartPulseIcon, LoaderCircleIcon, PackageIcon, UsersIcon } from "lucide-react";
 import { useEffect, useState, type ReactNode } from "react";
+import { useNavigate } from "react-router-dom";
 
 import { PageHeader } from "../components/system/page-header.js";
 import { Badge } from "../components/ui/badge.js";
+import { Button } from "../components/ui/button.js";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card.js";
+import { Field, FieldDescription, FieldLabel } from "../components/ui/field.js";
+import { Input } from "../components/ui/input.js";
 import { Notice } from "../components/ui/notice.js";
 import { Skeleton } from "../components/ui/skeleton.js";
-import { ApiRequestError, getAdminAnalyticsSummary, type AdminAnalyticsSummary } from "../lib/api.js";
-import { NotFoundPage } from "./not-found-page.js";
+import {
+  ApiRequestError,
+  getAdminAnalyticsAccessStatus,
+  getAdminAnalyticsSummary,
+  requestEmailCode,
+  type AdminAnalyticsSummary,
+  verifyEmailCode
+} from "../lib/api.js";
+import { showSuccessToast } from "../lib/notify.js";
+import { useSession } from "../lib/session.js";
 
 type AdminAnalyticsState =
   | { status: "loading" }
   | { status: "ready"; summary: AdminAnalyticsSummary }
-  | { status: "not_found" }
+  | { status: "email_auth_required" }
+  | { status: "redirecting" }
   | { status: "error" };
 
 const INTEGER_FORMAT = new Intl.NumberFormat();
@@ -38,7 +51,10 @@ interface StatCardEntry {
 }
 
 export function AdminAnalyticsPage(): JSX.Element {
+  const navigate = useNavigate();
+  const { session, setSession } = useSession();
   const [state, setState] = useState<AdminAnalyticsState>({ status: "loading" });
+  const [reloadToken, setReloadToken] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
@@ -55,7 +71,31 @@ export function AdminAnalyticsPage(): JSX.Element {
         }
 
         if (error instanceof ApiRequestError && error.status === 404) {
-          setState({ status: "not_found" });
+          try {
+            const accessStatus = await getAdminAnalyticsAccessStatus();
+            if (cancelled) {
+              return;
+            }
+
+            setState(
+              accessStatus.status === "email_auth_required"
+                ? { status: "email_auth_required" }
+                : { status: "error" }
+            );
+          } catch (accessError) {
+            if (cancelled) {
+              return;
+            }
+
+            if (accessError instanceof ApiRequestError && accessError.status === 404) {
+              setState({ status: "redirecting" });
+              void navigate("/", { replace: true });
+              return;
+            }
+
+            setState({ status: "error" });
+          }
+
           return;
         }
 
@@ -66,10 +106,35 @@ export function AdminAnalyticsPage(): JSX.Element {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [navigate, reloadToken]);
 
-  if (state.status === "not_found") {
-    return <NotFoundPage />;
+  if (state.status === "redirecting") {
+    return <AdminAnalyticsSkeleton />;
+  }
+
+  if (state.status === "email_auth_required") {
+    return (
+      <div className="space-y-6">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <div className="space-y-2">
+            <h1 className="text-2xl font-semibold tracking-tight">Analytics</h1>
+            <PageHeader description="Aggregate internal analytics for product health, adoption, and operator-facing trends." />
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <Badge variant="outline">Email auth required</Badge>
+          </div>
+        </div>
+
+        <AdminAnalyticsEmailGate
+          email={session?.email ?? ""}
+          onVerified={(nextSession) => {
+            setSession(nextSession);
+            setState({ status: "loading" });
+            setReloadToken((current) => current + 1);
+          }}
+        />
+      </div>
+    );
   }
 
   if (state.status === "error") {
@@ -370,6 +435,120 @@ function DetailRow({ label, value }: { label: string; value: number }): JSX.Elem
       <span className="text-muted-foreground">{label}</span>
       <span className="tabular-nums">{INTEGER_FORMAT.format(value)}</span>
     </div>
+  );
+}
+
+function AdminAnalyticsEmailGate(input: {
+  email: string;
+  onVerified: (session: Awaited<ReturnType<typeof verifyEmailCode>>) => void;
+}): JSX.Element {
+  const [code, setCode] = useState("");
+  const [step, setStep] = useState<"request" | "verify">("request");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  async function handleSendCode(): Promise<void> {
+    setIsSubmitting(true);
+    setErrorMessage(null);
+
+    try {
+      await requestEmailCode({
+        email: input.email,
+        accepted_terms: true
+      });
+      setStep("verify");
+      setCode("");
+      showSuccessToast("Sign-in code sent successfully.");
+    } catch {
+      setErrorMessage("We could not send a sign-in code right now. Try again in a moment.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
+  async function handleVerifyCode(): Promise<void> {
+    if (!/^\d{6}$/.test(code)) {
+      setErrorMessage("Enter the six-digit code from your email.");
+      return;
+    }
+
+    setIsSubmitting(true);
+    setErrorMessage(null);
+
+    try {
+      const nextSession = await verifyEmailCode({
+        email: input.email,
+        code
+      });
+      input.onVerified(nextSession);
+      showSuccessToast("Signed in successfully.");
+    } catch {
+      setErrorMessage("That code is invalid or expired. Request a new code and try again.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
+  return (
+    <Card className="max-w-xl">
+      <CardHeader>
+        <CardTitle>Continue with email</CardTitle>
+        <CardDescription>
+          Analytics access requires an email-authenticated session, even when you already signed in with GitHub.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <Notice tone="info">
+          We&apos;ll send a six-digit sign-in code to <span className="font-medium">{input.email}</span>.
+        </Notice>
+
+        {step === "verify" ? (
+          <Field data-invalid={errorMessage !== null || undefined}>
+            <FieldLabel htmlFor="admin-analytics-email-code">Six-digit code</FieldLabel>
+            <Input
+              id="admin-analytics-email-code"
+              inputMode="numeric"
+              autoComplete="one-time-code"
+              value={code}
+              aria-invalid={errorMessage !== null || undefined}
+              onChange={(event) => {
+                setCode(event.currentTarget.value.replace(/\D+/g, "").slice(0, 6));
+                setErrorMessage(null);
+              }}
+            />
+            <FieldDescription>
+              Enter the latest code we sent to your email to reopen this page.
+            </FieldDescription>
+          </Field>
+        ) : null}
+
+        {errorMessage === null ? null : <Notice tone="destructive">{errorMessage}</Notice>}
+
+        <div className="flex flex-col gap-3 sm:flex-row">
+          {step === "request" ? (
+            <Button className="sm:w-auto" disabled={isSubmitting} onClick={() => void handleSendCode()}>
+              {isSubmitting ? <LoaderCircleIcon className="animate-spin" /> : null}
+              Send code
+            </Button>
+          ) : (
+            <>
+              <Button className="sm:w-auto" disabled={isSubmitting} onClick={() => void handleVerifyCode()}>
+                {isSubmitting ? <LoaderCircleIcon className="animate-spin" /> : null}
+                Verify code
+              </Button>
+              <Button
+                variant="outline"
+                className="sm:w-auto"
+                disabled={isSubmitting}
+                onClick={() => void handleSendCode()}
+              >
+                Resend code
+              </Button>
+            </>
+          )}
+        </div>
+      </CardContent>
+    </Card>
   );
 }
 

@@ -144,7 +144,7 @@ describe("web app — admin analytics", () => {
     expect(screen.queryByRole("link", { name: /^analytics$/i })).not.toBeInTheDocument();
   });
 
-  it("renders the not-found page for analytics 404 responses", async () => {
+  it("shows the email-code gate for allowlisted analytics sessions authenticated with GitHub", async () => {
     const fetchMock = vi.fn((input: RequestInfo | URL) => {
       const url = requestUrl(input);
 
@@ -158,6 +158,10 @@ describe("web app — admin analytics", () => {
         return jsonResponse(404, { error: "not_found" });
       }
 
+      if (url.endsWith("/v1/admin/analytics/access-status")) {
+        return jsonResponse(200, { status: "email_auth_required" });
+      }
+
       return jsonResponse(404, { error: "not_found" });
     });
 
@@ -165,11 +169,54 @@ describe("web app — admin analytics", () => {
 
     render(<App initialEntries={["/analytics"]} />);
 
-    expect(await screen.findByText(/page not found/i)).toBeInTheDocument();
-    expect(screen.getByText(/route is unavailable or does not exist/i)).toBeInTheDocument();
+    expect(await screen.findByText(/continue with email/i)).toBeInTheDocument();
+    expect(screen.getByText(/analytics access requires an email-authenticated session/i)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /send code/i })).toBeInTheDocument();
   });
 
-  it("shows not-found instead of the login flow for signed-out direct analytics visits", async () => {
+  it("redirects signed-in non-admin analytics visits back to the normal app flow", async () => {
+    const fetchMock = vi.fn((input: RequestInfo | URL) => {
+      const url = requestUrl(input);
+
+      if (url.endsWith("/v1/auth/session")) {
+        return jsonResponse(200, {
+          session: createSession()
+        });
+      }
+
+      if (url.endsWith("/v1/admin/analytics/summary")) {
+        return jsonResponse(404, { error: "not_found" });
+      }
+
+      if (url.endsWith("/v1/admin/analytics/access-status")) {
+        return jsonResponse(404, { error: "not_found" });
+      }
+
+      if (url.endsWith("/v1/projects")) {
+        return jsonResponse(200, {
+          projects: []
+        });
+      }
+
+      if (url.includes("/v1/incidents?")) {
+        return jsonResponse(200, {
+          incidents: [],
+          next_cursor: null
+        });
+      }
+
+      return jsonResponse(404, { error: "not_found" });
+    });
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<App initialEntries={["/analytics"]} />);
+
+    expect(await screen.findByRole("heading", { name: /incidents today/i })).toBeInTheDocument();
+    expect(screen.queryByText(/page not found/i)).not.toBeInTheDocument();
+  });
+
+  it("redirects signed-out direct analytics visits into the normal login flow", async () => {
     const fetchMock = vi.fn((input: RequestInfo | URL) => {
       const url = requestUrl(input);
 
@@ -186,7 +233,7 @@ describe("web app — admin analytics", () => {
 
     render(<App initialEntries={["/analytics"]} />);
 
-    expect(await screen.findByText(/page not found/i)).toBeInTheDocument();
-    expect(screen.queryByText(/sign in with email/i)).not.toBeInTheDocument();
+    expect(await screen.findByRole("link", { name: /continue with github/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /send code/i })).toBeInTheDocument();
   });
 });

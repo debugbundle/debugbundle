@@ -7,6 +7,7 @@ import {
 import type {
   AlertChannel,
   AlertConditionType,
+  AdminAnalyticsAccessStatus,
   AdminAnalyticsSummary,
   AlertRecord,
   CreatedMemberToken,
@@ -161,6 +162,14 @@ export async function getAdminAnalyticsSummary(): Promise<AdminAnalyticsSummary>
   );
 
   return body.summary;
+}
+
+export async function getAdminAnalyticsAccessStatus(): Promise<AdminAnalyticsAccessStatus> {
+  return await readJson<AdminAnalyticsAccessStatus>(
+    await fetch(`${API_BASE}/v1/admin/analytics/access-status`, {
+      credentials: "include"
+    })
+  );
 }
 
 export async function listProjects(): Promise<ProjectRecord[]> {
