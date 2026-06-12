@@ -3279,7 +3279,7 @@ export function createPostgresMetadataStore(
                 )
               )
               AND i.id = $2
-              AND i.status <> 'open'
+              AND i.status <> 'resolved'
             RETURNING
               i.id AS incident_id,
               i.project_id,
@@ -3386,7 +3386,7 @@ export function createPostgresMetadataStore(
             FROM accessible a, counts c
             WHERE c.requested_count = c.accessible_count
               AND i.id = a.incident_id
-              AND i.status <> 'open'
+              AND i.status <> 'resolved'
             RETURNING
               a.input_order,
               i.id AS incident_id,
