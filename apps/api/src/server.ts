@@ -1,11 +1,19 @@
 import Fastify, { type FastifyBaseLogger, type FastifyInstance } from "fastify";
 
 import { debugBundleRelayPlugin } from "@debugbundle/sdk-node/relay/fastify";
-import { SESSION_COOKIE_NAME, isValidCsrfToken, readCookieValue } from "../../../packages/auth/src/index.js";
+import {
+  SESSION_COOKIE_NAME,
+  isValidCsrfToken,
+  readCookieValue
+} from "../../../packages/auth/src/index.js";
 import type { RuntimeLogger } from "../../../packages/runtime-logger/src/index.js";
 
 import type { ApiDependencies } from "./api-types.js";
-import { registerApiDogfooding, resolveApiDogfoodingConfig, type ApiDogfoodingSdk } from "./dogfooding.ts";
+import {
+  registerApiDogfooding,
+  resolveApiDogfoodingConfig,
+  type ApiDogfoodingSdk
+} from "./dogfooding.ts";
 import { SMALL_REQUEST_BODY_LIMIT_BYTES } from "./http-limits.ts";
 import { registerAuthRoutes } from "./routes/auth.js";
 import { registerAlertRoutes } from "./routes/alerts.js";
@@ -17,7 +25,10 @@ import { registerCapturePolicyRoutes } from "./routes/capture-policy.js";
 import { registerCaptureRuleRoutes } from "./routes/capture-rules.js";
 import { registerGitHubRoutes } from "./routes/github.js";
 import { registerHealthRoutes } from "./routes/health.js";
-import { registerGitHubMarketplaceWebhookRoute, type GitHubMarketplaceWebhookDependencies } from "./routes/github-marketplace-webhook.js";
+import {
+  registerGitHubMarketplaceWebhookRoute,
+  type GitHubMarketplaceWebhookDependencies
+} from "./routes/github-marketplace-webhook.js";
 import { registerImprovementRoutes } from "./routes/improvements.js";
 import { registerImprovementSettingsRoutes } from "./routes/improvement-settings.js";
 import { registerProjectMemberRoutes } from "./routes/project-members.js";
@@ -26,7 +37,10 @@ import { registerProbeRoutes } from "./routes/probes.js";
 import { registerSystemEmailReviewRoutes } from "./routes/system-email-review.js";
 import { registerServicesRoutes } from "./routes/services.js";
 import { registerSlackRoutes } from "./routes/slack.js";
-import { registerStripeWebhookRoute, type StripeWebhookDependencies } from "./routes/stripe-webhook.js";
+import {
+  registerStripeWebhookRoute,
+  type StripeWebhookDependencies
+} from "./routes/stripe-webhook.js";
 import { registerTokenRoutes } from "./routes/tokens.js";
 import { registerWebhookRoutes } from "./routes/webhooks.js";
 import { registerWeeklyReportChannelRoutes } from "./routes/weekly-report-channels.js";
@@ -50,6 +64,7 @@ const ALLOWED_CORS_HEADERS = ["Authorization", "Content-Type", "X-CSRF-Token"];
 const ALLOWED_CORS_METHODS = ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"];
 const SDK_PROJECT_TOKEN_CORS_PATHS = new Set(["/v1/events", "/v1/sdk/config"]);
 const DEFAULT_API_REQUEST_TIMEOUT_MS = 30_000;
+const API_SEARCH_CRAWLER_POLICY = "noindex, nofollow, noarchive";
 const apiRequestTimeouts = new WeakMap<object, NodeJS.Timeout>();
 const CSRF_EXEMPT_ROUTE_KEYS = new Set([
   "POST /v1/auth/request-code",
@@ -91,7 +106,11 @@ function resolveAllowedCorsOrigins(env: Record<string, string | undefined>): str
 }
 
 function appendVaryHeader(existing: string | string[] | number | undefined, value: string): string {
-  const current = Array.isArray(existing) ? existing.join(", ") : typeof existing === "string" ? existing : "";
+  const current = Array.isArray(existing)
+    ? existing.join(", ")
+    : typeof existing === "string"
+      ? existing
+      : "";
   const entries = current
     .split(",")
     .map((entry) => entry.trim())
@@ -104,8 +123,14 @@ function appendVaryHeader(existing: string | string[] | number | undefined, valu
   return [...entries, value].join(", ");
 }
 
-function isCorsPreflightRequest(request: { method: string; headers: Record<string, unknown> }): boolean {
-  return request.method === "OPTIONS" && typeof request.headers["access-control-request-method"] === "string";
+function isCorsPreflightRequest(request: {
+  method: string;
+  headers: Record<string, unknown>;
+}): boolean {
+  return (
+    request.method === "OPTIONS" &&
+    typeof request.headers["access-control-request-method"] === "string"
+  );
 }
 
 function getRequestPath(url: string): string {
@@ -184,7 +209,8 @@ function registerApiCsrfProtection(app: FastifyInstance): void {
 
 function registerApiCors(app: FastifyInstance, allowedOrigins: string[]): void {
   app.addHook("onRequest", async (request, reply) => {
-    const requestOrigin = typeof request.headers.origin === "string" ? request.headers.origin : undefined;
+    const requestOrigin =
+      typeof request.headers.origin === "string" ? request.headers.origin : undefined;
 
     if (requestOrigin === undefined) {
       return;
@@ -200,8 +226,14 @@ function registerApiCors(app: FastifyInstance, allowedOrigins: string[]): void {
           return;
         }
 
-        reply.header("Vary", appendVaryHeader(reply.getHeader("Vary"), "Access-Control-Request-Method"));
-        reply.header("Vary", appendVaryHeader(reply.getHeader("Vary"), "Access-Control-Request-Headers"));
+        reply.header(
+          "Vary",
+          appendVaryHeader(reply.getHeader("Vary"), "Access-Control-Request-Method")
+        );
+        reply.header(
+          "Vary",
+          appendVaryHeader(reply.getHeader("Vary"), "Access-Control-Request-Headers")
+        );
         reply.header("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
         reply.header("Access-Control-Allow-Headers", "Authorization, Content-Type");
         reply.header("Access-Control-Max-Age", "86400");
@@ -223,8 +255,14 @@ function registerApiCors(app: FastifyInstance, allowedOrigins: string[]): void {
       return;
     }
 
-    reply.header("Vary", appendVaryHeader(reply.getHeader("Vary"), "Access-Control-Request-Method"));
-    reply.header("Vary", appendVaryHeader(reply.getHeader("Vary"), "Access-Control-Request-Headers"));
+    reply.header(
+      "Vary",
+      appendVaryHeader(reply.getHeader("Vary"), "Access-Control-Request-Method")
+    );
+    reply.header(
+      "Vary",
+      appendVaryHeader(reply.getHeader("Vary"), "Access-Control-Request-Headers")
+    );
     reply.header("Access-Control-Allow-Methods", ALLOWED_CORS_METHODS.join(", "));
     reply.header("Access-Control-Allow-Headers", ALLOWED_CORS_HEADERS.join(", "));
     reply.header("Access-Control-Max-Age", "86400");
@@ -233,9 +271,21 @@ function registerApiCors(app: FastifyInstance, allowedOrigins: string[]): void {
   });
 }
 
-export function createApiServer(dependencies: ApiDependencies, options: ApiServerOptions = {}): FastifyInstance {
+function registerApiSearchCrawlerControls(app: FastifyInstance): void {
+  app.addHook("onSend", async (_request, reply, payload) => {
+    reply.header("X-Robots-Tag", API_SEARCH_CRAWLER_POLICY);
+    return payload;
+  });
+}
+
+export function createApiServer(
+  dependencies: ApiDependencies,
+  options: ApiServerOptions = {}
+): FastifyInstance {
   const app: FastifyInstance = Fastify({
-    ...(options.logger === undefined ? { logger: false } : { loggerInstance: options.logger as FastifyBaseLogger }),
+    ...(options.logger === undefined
+      ? { logger: false }
+      : { loggerInstance: options.logger as FastifyBaseLogger }),
     bodyLimit: SMALL_REQUEST_BODY_LIMIT_BYTES
   });
   const dogfoodingEnv = options.dogfoodingEnv ?? process.env;
@@ -249,6 +299,7 @@ export function createApiServer(dependencies: ApiDependencies, options: ApiServe
   const requestTimeoutMs = options.requestTimeoutMs ?? DEFAULT_API_REQUEST_TIMEOUT_MS;
 
   registerApiCors(app, allowedOrigins);
+  registerApiSearchCrawlerControls(app);
   registerApiRequestTimeout(app, requestTimeoutMs);
   registerApiCsrfProtection(app);
 

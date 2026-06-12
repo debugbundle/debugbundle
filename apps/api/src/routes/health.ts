@@ -1,8 +1,16 @@
 import { createHash } from "node:crypto";
 import type { FastifyInstance } from "fastify";
 
-import { deriveProbeTriggerTokenKey, requireProjectToken } from "../../../../packages/auth/src/index.js";
-import { getTierCapabilities, resolvePolicy, PRESET_DEFAULTS, getDefaultPreset } from "../../../../packages/shared-types/src/index.js";
+import {
+  deriveProbeTriggerTokenKey,
+  requireProjectToken
+} from "../../../../packages/auth/src/index.js";
+import {
+  getTierCapabilities,
+  resolvePolicy,
+  PRESET_DEFAULTS,
+  getDefaultPreset
+} from "../../../../packages/shared-types/src/index.js";
 import type { ResolvedCapturePolicy } from "../../../../packages/shared-types/src/index.js";
 import type { ApiDependencies, ApiServerContext } from "../api-types.js";
 import { isProjectTokenOriginAllowed } from "../project-token-origins.js";
@@ -15,7 +23,18 @@ const API_SECURITY_TXT = [
   "Expires: 2027-05-07T00:00:00.000Z"
 ].join("\n");
 
-export function registerHealthRoutes(app: FastifyInstance, dependencies: ApiDependencies, context: ApiServerContext): void {
+const API_ROBOTS_TXT = ["User-agent: *", "Disallow: /"].join("\n");
+
+export function registerHealthRoutes(
+  app: FastifyInstance,
+  dependencies: ApiDependencies,
+  context: ApiServerContext
+): void {
+  app.get("/robots.txt", async (_request, reply) => {
+    reply.header("Content-Type", "text/plain; charset=utf-8");
+    return reply.status(200).send(`${API_ROBOTS_TXT}\n`);
+  });
+
   app.get("/.well-known/security.txt", async (_request, reply) => {
     reply.header("Content-Type", "text/plain; charset=utf-8");
     return reply.status(200).send(`${API_SECURITY_TXT}\n`);
@@ -56,14 +75,17 @@ export function registerHealthRoutes(app: FastifyInstance, dependencies: ApiDepe
   app.get("/v1/sdk/config", async (request, reply) => {
     const projectAuth = await requireProjectToken({
       authorizationHeader: request.headers.authorization,
-      resolveByTokenHash: (tokenHash) => dependencies.ingestionMetadata.resolveProjectByTokenHash(tokenHash)
+      resolveByTokenHash: (tokenHash) =>
+        dependencies.ingestionMetadata.resolveProjectByTokenHash(tokenHash)
     });
     if (!projectAuth.ok) {
       return reply.status(401).send({
         error: "invalid_project_token"
       });
     }
-    if (!isProjectTokenOriginAllowed({ headers: request.headers, projectToken: projectAuth.context })) {
+    if (
+      !isProjectTokenOriginAllowed({ headers: request.headers, projectToken: projectAuth.context })
+    ) {
       return reply.status(403).send({
         error: "origin_not_allowed"
       });
@@ -80,7 +102,10 @@ export function registerHealthRoutes(app: FastifyInstance, dependencies: ApiDepe
           });
 
     const defaultPreset = getDefaultPreset(projectAuth.context.organization_plan);
-    let capturePolicy: ResolvedCapturePolicy = { preset: defaultPreset, ...PRESET_DEFAULTS[defaultPreset] };
+    let capturePolicy: ResolvedCapturePolicy = {
+      preset: defaultPreset,
+      ...PRESET_DEFAULTS[defaultPreset]
+    };
     if (dependencies.capturePolicyManagement !== undefined) {
       const policyRecord = await dependencies.capturePolicyManagement.getCapturePolicyForProject({
         organization_id: "",
@@ -111,7 +136,7 @@ export function registerHealthRoutes(app: FastifyInstance, dependencies: ApiDepe
         : {})
     };
 
-    const etag = `"${createHash("sha256").update(JSON.stringify(responseBody), "utf8").digest("hex").slice(0, 16)}"`;;
+    const etag = `"${createHash("sha256").update(JSON.stringify(responseBody), "utf8").digest("hex").slice(0, 16)}"`;
     reply.header("Cache-Control", "public, s-maxage=30");
     reply.header("ETag", etag);
 
