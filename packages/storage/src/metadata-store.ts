@@ -213,7 +213,7 @@ function buildProjectMetricsJsonSql(input: {
         SELECT COUNT(*)::int
         FROM incidents i
         WHERE i.project_id = ${input.projectIdSql}
-          AND i.status <> 'resolved'
+          AND i.status = 'open'
       ),
       'regressed_incidents', (
         SELECT COUNT(*)::int

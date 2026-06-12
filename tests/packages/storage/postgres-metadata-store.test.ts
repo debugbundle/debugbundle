@@ -186,6 +186,61 @@ describe("postgres metadata store", () => {
     expect(listProjectsCall!.sql).toContain("COALESCE(o.plan, 'free') AS organization_plan");
   });
 
+  it("should count open incidents separately from regressed incidents in project metrics", async (): Promise<void> => {
+    const calls: Array<{ sql: string; params: unknown[] }> = [];
+    const query = vi.fn().mockImplementation((sql: string, params: unknown[]) => {
+      calls.push({ sql, params });
+
+      if (sql.includes("to_regclass")) {
+        return { rows: [{ exists: false }] };
+      }
+
+      return {
+        rows: [
+          {
+            project_id: "proj_123",
+            organization_id: "org_123",
+            owner_user_id: "usr_123",
+            owner_email: "owen@example.com",
+            relationship: "owned",
+            effective_role: "owner",
+            name: "Main App",
+            slug: "main-app",
+            environment_default: "production",
+            organization_plan: "free",
+            metrics: {
+              open_incidents: 5,
+              regressed_incidents: 1,
+              opened_incidents_today: 2,
+              opened_incidents_month: 7,
+              monthly_bundle_requests: 12,
+              monthly_raw_ingested_events: 120,
+              retained_bundles: 6,
+              monthly_alert_deliveries: 4
+            },
+            created_at: "2026-03-16T00:00:00.000Z",
+            updated_at: "2026-03-16T00:00:00.000Z"
+          }
+        ]
+      };
+    });
+    const store = createPostgresMetadataStore({ query });
+
+    await store.listProjectsForUser!({
+      user_id: "usr_123",
+      now: "2026-03-19T00:00:00.000Z",
+      limit: 10
+    });
+
+    const listProjectsCall = calls.find((call) => call.sql.includes("FROM projects p"));
+    expect(listProjectsCall).toBeDefined();
+    expect(listProjectsCall!.sql).toContain("'open_incidents'");
+    expect(listProjectsCall!.sql).toContain("AND i.status = 'open'");
+    expect(listProjectsCall!.sql).toContain("'regressed_incidents'");
+    expect(listProjectsCall!.sql).toContain("AND i.status = 'regressed'");
+    expect(listProjectsCall!.sql).not.toContain("AND i.status <> 'resolved'");
+  });
+
   it("should floor user-scoped project ingested events with durable project counters", async (): Promise<void> => {
     const calls: Array<{ sql: string; params: unknown[] }> = [];
     const query = vi.fn().mockImplementation((sql: string, params: unknown[]) => {
