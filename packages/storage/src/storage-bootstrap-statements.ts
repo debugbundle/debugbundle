@@ -164,6 +164,7 @@ export const STORAGE_BOOTSTRAP_STATEMENTS = [
       user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
       organization_id uuid NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
       session_token_hash text UNIQUE NOT NULL,
+      auth_method text CHECK (auth_method IS NULL OR auth_method IN ('email_code', 'github_oauth')),
       created_at timestamptz NOT NULL DEFAULT now(),
       expires_at timestamptz NOT NULL,
       revoked_at timestamptz

@@ -52,7 +52,7 @@ export function registerAdminAnalyticsRoutes(app: FastifyInstance, dependencies:
       return sendNotFound(reply);
     }
 
-    if (session.email_verified_at === null || session.has_email_auth !== true) {
+    if (session.email_verified_at === null || session.session_auth_method !== "email_code") {
       await recordAuditLog(dependencies.auditLogging, {
         organization_id: session.organization_id,
         actor_user_id: session.user_id,

@@ -200,7 +200,7 @@ packages/
       index.ts               — Barrel re-export (public API)
       types.ts               — All storage type definitions and interfaces
       helpers.ts             — Object key builders, token hashing
-      auth-store.ts          — Postgres auth persistence (account creation, passwords, sessions, verification/reset tokens, and session auth-method flags)
+      auth-store.ts          — Postgres auth persistence (account creation, passwords, sessions, verification/reset tokens, linked auth-method disclosure, and per-session login-method tracking for security-sensitive gates)
       account-store.ts       — Postgres account export aggregation for retained organization/project records and account-deletion lifecycle persistence, including deletion-safe analytics/payment-retention handoff before destructive cleanup
       account-analytics-store.ts — Postgres deletion-safe account analytics ledger, internal month/year/lifetime query helpers, aggregate admin analytics summary reads, best-effort retained-row backfill, and payment/provider retention snapshot persistence for deleted accounts
       integration-secret-crypto.ts — Shared encryption/decryption helpers for stored integration secrets such as Slack webhook URLs

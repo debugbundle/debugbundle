@@ -877,6 +877,19 @@ export const STORAGE_SCHEMA_MIGRATIONS = [
         ON account_payment_provider_events (provider, provider_event_id)
       `
     ]
+  }),
+  defineStorageSchemaMigration({
+    id: "202606120001_add_session_auth_method",
+    description: "Track the auth method used to create each browser session.",
+    statements: [
+      "ALTER TABLE sessions ADD COLUMN IF NOT EXISTS auth_method text",
+      "ALTER TABLE sessions DROP CONSTRAINT IF EXISTS sessions_auth_method_check",
+      `
+        ALTER TABLE sessions
+        ADD CONSTRAINT sessions_auth_method_check
+        CHECK (auth_method IS NULL OR auth_method IN ('email_code', 'github_oauth'))
+      `
+    ]
   })
 ] as const;
 

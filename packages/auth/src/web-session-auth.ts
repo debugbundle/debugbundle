@@ -339,7 +339,8 @@ export function createWebSessionAuthService(
         user_id: account.user_id,
         organization_id: account.organization_id,
         session_token_hash: hashToken(sessionToken),
-        expires_at: new Date(now.getTime() + sessionLifetimeMs).toISOString()
+        expires_at: new Date(now.getTime() + sessionLifetimeMs).toISOString(),
+        auth_method: "email_code"
       });
       if (session === null) {
         return {
@@ -438,7 +439,8 @@ export function createWebSessionAuthService(
         user_id: resolvedAccount.user_id,
         organization_id: resolvedAccount.organization_id,
         session_token_hash: hashToken(sessionToken),
-        expires_at: new Date(now.getTime() + sessionLifetimeMs).toISOString()
+        expires_at: new Date(now.getTime() + sessionLifetimeMs).toISOString(),
+        auth_method: "github_oauth"
       });
       if (session === null) {
         return {

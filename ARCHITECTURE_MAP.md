@@ -323,7 +323,7 @@ The public documentation/marketing/blog site lives in the standalone public repo
 - **Internal structure:**
   - `types.ts` — all storage type definitions and interfaces
   - `helpers.ts` — object key builders, token hashing
-  - `auth-store.ts` — Postgres account creation, password credential, session, one-time token persistence, and session auth-method flags
+  - `auth-store.ts` — Postgres account creation, password credential, session, one-time token persistence, linked auth-method disclosure, and per-session login-method tracking
   - `account-store.ts` — Postgres account export aggregation for retained organization/project records and destructive account-deletion lifecycle persistence, including analytics/payment-retention handoff before org cleanup
   - `account-analytics-store.ts` — Postgres deletion-safe account analytics ledger, internal month/year/lifetime query helpers, aggregate admin analytics summary reads, retained-row backfill, and payment/provider retention snapshot persistence for deleted accounts
   - `integration-secret-crypto.ts` — shared encryption/decryption helpers for stored integration secrets such as Slack webhook URLs

@@ -38,6 +38,8 @@ function mapUserAccountRow(row: Record<string, unknown>): WebUserAccount {
 }
 
 function mapSessionRow(row: Record<string, unknown>): WebSessionRecord {
+  const sessionAuthMethod = row["session_auth_method"];
+
   return {
     session_id: String(row["session_id"]),
     user_id: String(row["user_id"]),
@@ -48,6 +50,10 @@ function mapSessionRow(row: Record<string, unknown>): WebSessionRecord {
     created_at: String(row["created_at"]),
     expires_at: String(row["expires_at"]),
     revoked_at: (row["revoked_at"] as string | null) ?? null,
+    session_auth_method:
+      sessionAuthMethod === "email_code" || sessionAuthMethod === "github_oauth"
+        ? sessionAuthMethod
+        : null,
     has_email_auth: row["has_email_auth"] === true,
     has_github_oauth: row["has_github_oauth"] === true,
     avatar_object_key: (row["avatar_object_key"] as string | null) ?? null
@@ -242,10 +248,18 @@ export function createPostgresAuthStore(
             LIMIT 1
           ),
           inserted AS (
-            INSERT INTO sessions (id, user_id, organization_id, session_token_hash, expires_at, created_at)
-            SELECT $1, $2, organization_id, $4, $5::timestamptz, now()
+            INSERT INTO sessions (
+              id,
+              user_id,
+              organization_id,
+              session_token_hash,
+              expires_at,
+              created_at,
+              auth_method
+            )
+            SELECT $1, $2, organization_id, $4, $5::timestamptz, now(), $6
             FROM active_membership
-            RETURNING id, user_id, organization_id, created_at, expires_at, revoked_at
+            RETURNING id, user_id, organization_id, created_at, expires_at, revoked_at, auth_method
           )
           SELECT
             inserted.id AS session_id,
@@ -257,6 +271,7 @@ export function createPostgresAuthStore(
             inserted.created_at::text AS created_at,
             inserted.expires_at::text AS expires_at,
             inserted.revoked_at::text AS revoked_at,
+            inserted.auth_method AS session_auth_method,
             true AS has_email_auth,
             u.avatar_object_key,
             EXISTS (
@@ -275,7 +290,14 @@ export function createPostgresAuthStore(
             AND org.suspended_at IS NULL
           LIMIT 1
         `,
-        [randomUUID(), input.user_id, input.organization_id, input.session_token_hash, input.expires_at]
+        [
+          randomUUID(),
+          input.user_id,
+          input.organization_id,
+          input.session_token_hash,
+          input.expires_at,
+          input.auth_method
+        ]
       );
 
       const row = result.rows[0];
@@ -295,6 +317,7 @@ export function createPostgresAuthStore(
             s.created_at::text AS created_at,
             s.expires_at::text AS expires_at,
             s.revoked_at::text AS revoked_at,
+            s.auth_method AS session_auth_method,
             true AS has_email_auth,
             u.avatar_object_key,
             EXISTS (

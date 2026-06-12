@@ -214,6 +214,7 @@ function buildSessionResponse(
     created_at: string;
     expires_at: string;
     revoked_at: string | null;
+    session_auth_method?: "email_code" | "github_oauth" | null;
     has_email_auth?: boolean;
     has_github_oauth?: boolean;
     avatar_object_key?: string | null;
@@ -222,7 +223,10 @@ function buildSessionResponse(
     avatar_url?: string | null;
   } = {}
 ): {
-  session: Omit<typeof session, "has_email_auth" | "has_github_oauth"> & {
+    session: Omit<
+      typeof session,
+      "has_email_auth" | "has_github_oauth" | "session_auth_method"
+    > & {
     csrf_token: string;
     avatar_url: string | null;
     auth_methods: {
@@ -231,7 +235,14 @@ function buildSessionResponse(
     };
   };
 } {
-  const { has_email_auth, has_github_oauth, avatar_object_key, ...publicSession } = session;
+  const {
+    has_email_auth,
+    has_github_oauth,
+    session_auth_method: _sessionAuthMethod,
+    avatar_object_key,
+    ...publicSession
+  } = session;
+  void _sessionAuthMethod;
   const avatarUrl =
     options.avatar_url !== undefined
       ? options.avatar_url

@@ -183,6 +183,7 @@ describe("api admin analytics routes", () => {
           created_at: "2026-06-01T00:00:00.000Z",
           expires_at: "2026-06-19T00:00:00.000Z",
           revoked_at: null,
+          session_auth_method: "email_code",
           has_email_auth: true,
           has_github_oauth: true
         })
@@ -278,6 +279,7 @@ describe("api admin analytics routes", () => {
           created_at: "2026-06-01T00:00:00.000Z",
           expires_at: "2026-06-19T00:00:00.000Z",
           revoked_at: null,
+          session_auth_method: "email_code",
           has_email_auth: true,
           has_github_oauth: false
         })
@@ -326,6 +328,7 @@ describe("api admin analytics routes", () => {
           created_at: "2026-06-01T00:00:00.000Z",
           expires_at: "2026-06-19T00:00:00.000Z",
           revoked_at: null,
+          session_auth_method: "email_code",
           has_email_auth: true,
           has_github_oauth: false
         })
@@ -354,7 +357,7 @@ describe("api admin analytics routes", () => {
     );
   });
 
-  it("returns not found for allowlisted GitHub-only sessions", async (): Promise<void> => {
+  it("returns not found for allowlisted sessions authenticated via GitHub", async (): Promise<void> => {
     const createAuditLog = vi.fn().mockResolvedValue(undefined);
     const getSummary = vi.fn();
     const app = createServer({
@@ -374,7 +377,8 @@ describe("api admin analytics routes", () => {
           created_at: "2026-06-01T00:00:00.000Z",
           expires_at: "2026-06-19T00:00:00.000Z",
           revoked_at: null,
-          has_email_auth: false,
+          session_auth_method: "github_oauth",
+          has_email_auth: true,
           has_github_oauth: true
         })
       })
@@ -417,6 +421,7 @@ describe("api admin analytics routes", () => {
           created_at: "2026-06-01T00:00:00.000Z",
           expires_at: "2026-06-19T00:00:00.000Z",
           revoked_at: null,
+          session_auth_method: "email_code",
           has_email_auth: true,
           has_github_oauth: false
         })

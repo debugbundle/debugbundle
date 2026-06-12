@@ -131,6 +131,7 @@ describe("postgres auth store", () => {
             created_at: "2026-03-16T00:00:00.000Z",
             expires_at: "2026-03-16T12:00:00.000Z",
             revoked_at: null,
+            session_auth_method: "email_code",
             has_email_auth: true,
             has_github_oauth: false
           }
@@ -148,6 +149,7 @@ describe("postgres auth store", () => {
             created_at: "2026-03-16T00:00:00.000Z",
             expires_at: "2026-03-16T12:00:00.000Z",
             revoked_at: null,
+            session_auth_method: "email_code",
             has_email_auth: true,
             has_github_oauth: false
           }
@@ -161,7 +163,8 @@ describe("postgres auth store", () => {
       user_id: "usr_123",
       organization_id: "org_123",
       session_token_hash: "hash_session",
-      expires_at: "2026-03-16T12:00:00.000Z"
+      expires_at: "2026-03-16T12:00:00.000Z",
+      auth_method: "email_code"
     });
     const resolved = await store.resolveSessionByTokenHash("hash_session");
     const revoked = await store.revokeSessionByTokenHash({
@@ -192,7 +195,8 @@ describe("postgres auth store", () => {
       user_id: "usr_123",
       organization_id: "org_123",
       session_token_hash: "hash_session",
-      expires_at: "2026-03-16T12:00:00.000Z"
+      expires_at: "2026-03-16T12:00:00.000Z",
+      auth_method: "email_code"
     });
 
     expect(created).toBeNull();
@@ -849,6 +853,7 @@ describe("postgres auth store", () => {
       created_at: "2026-03-17T00:00:00.000Z",
       expires_at: "2026-03-17T12:00:00.000Z",
       revoked_at: null,
+      session_auth_method: null,
       avatar_object_key: null,
       has_email_auth: true,
       has_github_oauth: true

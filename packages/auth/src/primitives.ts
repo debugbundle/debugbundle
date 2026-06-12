@@ -54,6 +54,7 @@ export interface WebSessionRecord {
   created_at: string;
   expires_at: string;
   revoked_at: string | null;
+  session_auth_method?: "email_code" | "github_oauth" | null;
   has_email_auth?: boolean;
   has_github_oauth?: boolean;
   avatar_object_key?: string | null;
@@ -64,6 +65,7 @@ export interface CreateSessionInput {
   organization_id: string;
   session_token_hash: string;
   expires_at: string;
+  auth_method: "email_code" | "github_oauth";
 }
 
 export interface CreateUserAccountInput {

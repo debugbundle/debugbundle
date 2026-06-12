@@ -318,6 +318,13 @@ describe("auth email-code and session primitives", () => {
       user_id: "usr_123",
       verified_at: now.toISOString()
     });
+    expect(createSession).toHaveBeenCalledWith(
+      expect.objectContaining({
+        user_id: "usr_123",
+        organization_id: "org_123",
+        auth_method: "email_code"
+      })
+    );
     expect(verified.ok).toBe(true);
     if (!verified.ok) {
       return;
@@ -419,6 +426,13 @@ describe("auth email-code and session primitives", () => {
       user_id: "usr_123",
       verified_at: now.toISOString()
     });
+    expect(createSession).toHaveBeenCalledWith(
+      expect.objectContaining({
+        user_id: "usr_123",
+        organization_id: "org_123",
+        auth_method: "email_code"
+      })
+    );
     expect(verified.ok).toBe(true);
     if (!verified.ok) {
       return;
@@ -585,6 +599,13 @@ describe("auth email-code and session primitives", () => {
       verified_at: now.toISOString(),
       accepted_terms_at: now.toISOString()
     });
+    expect(createSession).toHaveBeenCalledWith(
+      expect.objectContaining({
+        user_id: "usr_123",
+        organization_id: "org_123",
+        auth_method: "github_oauth"
+      })
+    );
     expect(completed.redirect_url).toBe("http://localhost:5291/auth/github/callback");
     expect(buildSessionCookie(completed.session_token, completed.session.expires_at)).toContain(`${SESSION_COOKIE_NAME}=`);
     expect(buildClearedSessionCookie()).toContain("Max-Age=0");
@@ -603,24 +624,25 @@ describe("auth email-code and session primitives", () => {
       role: "owner",
       created_user: true
     });
+    const createSession = vi.fn().mockResolvedValue({
+      session_id: "ses_999",
+      user_id: "usr_999",
+      email: "outsider@example.com",
+      email_verified_at: "2026-03-17T00:00:00.000Z",
+      organization_id: "org_999",
+      role: "owner",
+      created_at: "2026-03-17T00:00:00.000Z",
+      expires_at: "2026-03-24T00:00:00.000Z",
+      revoked_at: null,
+      has_email_auth: false,
+      has_github_oauth: true
+    });
     const service = createWebSessionAuthService(
       {
         findUserAccountByEmail: vi.fn().mockResolvedValue(null),
         findGitHubUserAccountByProviderUserId: vi.fn().mockResolvedValue(null),
         createUserAccount: vi.fn(),
-        createSession: vi.fn().mockResolvedValue({
-          session_id: "ses_999",
-          user_id: "usr_999",
-          email: "outsider@example.com",
-          email_verified_at: "2026-03-17T00:00:00.000Z",
-          organization_id: "org_999",
-          role: "owner",
-          created_at: "2026-03-17T00:00:00.000Z",
-          expires_at: "2026-03-24T00:00:00.000Z",
-          revoked_at: null,
-          has_email_auth: false,
-          has_github_oauth: true
-        }),
+        createSession,
         resolveSessionByTokenHash: vi.fn(),
         revokeSessionByTokenHash: vi.fn(),
         revokeOtherSessionsForUser: vi.fn().mockResolvedValue(0),
@@ -665,6 +687,13 @@ describe("auth email-code and session primitives", () => {
       verified_at: now.toISOString(),
       accepted_terms_at: now.toISOString()
     });
+    expect(createSession).toHaveBeenCalledWith(
+      expect.objectContaining({
+        user_id: "usr_999",
+        organization_id: "org_999",
+        auth_method: "github_oauth"
+      })
+    );
   });
 
   it("completes GitHub auth without forwarding absent accepted terms state", async (): Promise<void> => {
@@ -680,24 +709,25 @@ describe("auth email-code and session primitives", () => {
       role: "owner",
       created_user: false
     });
+    const createSession = vi.fn().mockResolvedValue({
+      session_id: "ses_124",
+      user_id: "usr_124",
+      email: "owen@example.com",
+      email_verified_at: "2026-03-17T00:00:00.000Z",
+      organization_id: "org_124",
+      role: "owner",
+      created_at: "2026-03-17T00:00:00.000Z",
+      expires_at: "2026-03-24T00:00:00.000Z",
+      revoked_at: null,
+      has_email_auth: false,
+      has_github_oauth: true
+    });
     const service = createWebSessionAuthService(
       {
         findUserAccountByEmail: vi.fn(),
         findGitHubUserAccountByProviderUserId: vi.fn(),
         createUserAccount: vi.fn(),
-        createSession: vi.fn().mockResolvedValue({
-          session_id: "ses_124",
-          user_id: "usr_124",
-          email: "owen@example.com",
-          email_verified_at: "2026-03-17T00:00:00.000Z",
-          organization_id: "org_124",
-          role: "owner",
-          created_at: "2026-03-17T00:00:00.000Z",
-          expires_at: "2026-03-24T00:00:00.000Z",
-          revoked_at: null,
-          has_email_auth: false,
-          has_github_oauth: true
-        }),
+        createSession,
         resolveSessionByTokenHash: vi.fn(),
         revokeSessionByTokenHash: vi.fn(),
         revokeOtherSessionsForUser: vi.fn().mockResolvedValue(0),
@@ -740,6 +770,13 @@ describe("auth email-code and session primitives", () => {
       email: "owen@example.com",
       verified_at: now.toISOString()
     });
+    expect(createSession).toHaveBeenCalledWith(
+      expect.objectContaining({
+        user_id: "usr_124",
+        organization_id: "org_124",
+        auth_method: "github_oauth"
+      })
+    );
   });
 
   it("fails closed when GitHub auth reaches a suspended account", async (): Promise<void> => {
