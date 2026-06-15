@@ -551,9 +551,8 @@ describe("availability check store", () => {
       })
     ).resolves.toBeNull();
 
-    const rowUndefinedStore = createPostgresAvailabilityCheckStore(
-      createSequentialDb([{ rows: [] }]) as never
-    );
+    const rowUndefinedDb = createSequentialDb([{ rows: [] }]);
+    const rowUndefinedStore = createPostgresAvailabilityCheckStore(rowUndefinedDb as never);
     await expect(
       rowUndefinedStore.recordCheckExecution({
         check_id: "chk_1",
@@ -564,6 +563,11 @@ describe("availability check store", () => {
         result: successResult
       })
     ).resolves.toBeNull();
+    const recordSql = String(rowUndefinedDb.query.mock.calls[0]?.[0] ?? "");
+    expect(recordSql).toMatch(/SELECT\s+c\.id::text AS check_id/s);
+    expect(recordSql).toMatch(/c\.project_id::text AS project_id/s);
+    expect(recordSql).toMatch(/c\.name,\s+c\.url,\s+c\.method,/s);
+    expect(recordSql).toMatch(/FOR UPDATE OF c/s);
 
     const failureStore = createPostgresAvailabilityCheckStore(
       createSequentialDb([

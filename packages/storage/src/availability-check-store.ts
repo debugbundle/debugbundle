@@ -548,26 +548,26 @@ export function createPostgresAvailabilityCheckStore(db: Queryable): Availabilit
         const currentResult = await tx.query<Record<string, unknown>>(
           `
             SELECT
-              id::text AS check_id,
-              project_id::text AS project_id,
+              c.id::text AS check_id,
+              c.project_id::text AS project_id,
               p.organization_id::text AS organization_id,
               p.owner_user_id::text AS owner_user_id,
               COALESCE(o.plan, 'free') AS organization_plan,
-              name,
-              url,
-              method,
-              expected_status_min,
-              expected_status_max,
-              timeout_ms,
-              interval_seconds,
-              failure_threshold,
-              recovery_threshold,
-              environment,
-              service_name,
-              status,
-              consecutive_failures,
-              consecutive_successes,
-              linked_incident_id::text AS linked_incident_id,
+              c.name,
+              c.url,
+              c.method,
+              c.expected_status_min,
+              c.expected_status_max,
+              c.timeout_ms,
+              c.interval_seconds,
+              c.failure_threshold,
+              c.recovery_threshold,
+              c.environment,
+              c.service_name,
+              c.status,
+              c.consecutive_failures,
+              c.consecutive_successes,
+              c.linked_incident_id::text AS linked_incident_id,
               i.status AS linked_incident_status
             FROM availability_checks c
             JOIN projects p ON p.id = c.project_id
@@ -577,7 +577,7 @@ export function createPostgresAvailabilityCheckStore(db: Queryable): Availabilit
               AND c.claimed_at = $2::timestamptz
               AND c.next_check_at = $3::timestamptz
               AND c.deleted_at IS NULL
-            FOR UPDATE
+            FOR UPDATE OF c
           `,
           [input.check_id, input.claimed_at, input.scheduled_for]
         );
