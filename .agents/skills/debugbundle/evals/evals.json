@@ -37,6 +37,15 @@
       ]
     },
     {
+      "name": "operational_controls_guidance",
+      "prompt": "The user reports missing webhook deliveries and asks whether probes or alerts are available. Confirm the skill points the agent to the relevant operational controls and docs.",
+      "expected_behavior": [
+        "Inspect alert and webhook configuration plus webhook delivery history before changing application code.",
+        "Use probes for targeted evidence gathering with narrow scope and TTL.",
+        "Point to the full CLI, MCP, alerts, webhooks, probes, capture policy, availability checks, and ingestion documentation URLs."
+      ]
+    },
+    {
       "name": "artifact_path_discovery",
       "prompt": "The user reports an unknown local runtime error. Confirm the skill tells the agent which DebugBundle paths and commands to inspect first.",
       "expected_behavior": [

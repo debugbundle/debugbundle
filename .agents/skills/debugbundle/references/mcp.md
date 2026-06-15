@@ -27,6 +27,22 @@ Use the same incident-first workflow through MCP when an agent is operating in c
 
 Use these tools for repeated low-value operational noise only after inspecting incident evidence. Keep frontend suppression scoped by structured browser and client signals, and use path-scoped capture policy for known 4xx routes.
 
+## Probe Tools
+
+- `activate_probe` — activate a remote probe pattern with optional service/environment scope and TTL.
+- `list_active_probes` — list active probe activations for a project.
+- `deactivate_probe` — deactivate one active probe.
+
+Use probes for targeted evidence gathering when incident bundles do not contain enough runtime context.
+
+## Notification Tools
+
+- `list_alerts`, `create_alert`, `update_alert`, `delete_alert` — manage incident alert rules.
+- `list_webhooks`, `create_webhook`, `update_webhook`, `delete_webhook` — manage signed webhook destinations.
+- `test_webhook`, `list_webhook_deliveries` — validate webhook delivery and inspect delivery history.
+
+Use these tools when the reported problem is missing, duplicate, delayed, disabled, or failed notification delivery.
+
 ## Availability Check Tools
 
 - `list_health_checks` — list hosted health checks and plan limits for a project.
@@ -37,6 +53,18 @@ Use these tools for repeated low-value operational noise only after inspecting i
 - `list_health_check_daily_rollups` — inspect retained per-day status history for one check.
 
 Use these tools for endpoint downtime, public reachability, and project Health tab issues. Start with list/results/rollups, use `test_health_check` before saving target changes, and inspect the linked normal incident bundle when failures crossed the configured threshold.
+
+## Documentation URLs
+
+- MCP overview: `https://debugbundle.com/docs/mcp`
+- MCP workflows: `https://debugbundle.com/docs/mcp/workflows`
+- MCP tools: `https://debugbundle.com/docs/mcp/tools`
+- Availability checks: `https://debugbundle.com/docs/availability-checks`
+- Probes: `https://debugbundle.com/docs/probes`
+- Capture policy and rules: `https://debugbundle.com/docs/capture-policy`
+- Alerts: `https://debugbundle.com/docs/alerts`
+- Webhooks: `https://debugbundle.com/docs/webhooks`
+- API ingestion: `https://debugbundle.com/docs/api/ingestion`
 
 ## Smoke-Test Cleanup Recipe
 

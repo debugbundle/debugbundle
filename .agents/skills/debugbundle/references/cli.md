@@ -33,6 +33,30 @@
 
 Use capture-rule suggestions for repeated operational noise after inspecting an incident bundle. Use capture-policy client-error path rules for route-scoped 4xx incidents instead of promoting all client errors.
 
+## Probes
+
+- `debugbundle probe activate <project-id> --label-pattern <pattern> [--service <name>] [--environment <name>] [--ttl-seconds <n>] [--trigger-ttl-seconds <n>] [--auth-file <path>] [--json]`
+- `debugbundle probe list <project-id> [--auth-file <path>] [--json]`
+- `debugbundle probe deactivate <project-id> <activation-id> [--auth-file <path>] [--json]`
+
+Use probes for targeted evidence gathering when bundle context is insufficient. Prefer narrow label patterns, scoped service/environment values, and explicit TTLs.
+
+## Notifications
+
+- `debugbundle alert list --project-id <id> [--limit <n>] [--auth-file <path>] [--json]`
+- `debugbundle alert create --project-id <id> --channel <channel> --condition <condition> [--service-id <id>] [--severity-min <level>] [--cooldown <seconds>] --config-json <json> [--is-enabled <true|false>] [--auth-file <path>] [--json]`
+- `debugbundle alert update <alert-id> --project-id <id> [--service-id <id|null>] [--channel <channel>] [--condition <condition>] [--severity-min <level|null>] [--cooldown <seconds>] [--config-json <json|null>] [--is-enabled <true|false>] [--auth-file <path>] [--json]`
+- `debugbundle alert delete <alert-id> --project-id <id> [--auth-file <path>] [--json]`
+- `debugbundle webhook list --project-id <id> [--limit <n>] [--auth-file <path>] [--json]`
+- `debugbundle webhook create --project-id <id> --url <url> --event <event[,event]> [--environment <env[,env]>] [--service <svc[,svc]>] [--severity-min <level>] [--bundle-type <type[,type]>] [--verification <true|false>] [--is-enabled <true|false>] [--auth-file <path>] [--json]`
+- `debugbundle webhook update <webhook-id> --project-id <id> [--url <url>] [--event <event[,event]>] [--environment <env[,env]>] [--service <svc[,svc]>] [--severity-min <level>] [--bundle-type <type[,type]>] [--verification <true|false>] [--is-enabled <true|false>] [--auth-file <path>] [--json]`
+- `debugbundle webhook delete <webhook-id> --project-id <id> [--auth-file <path>] [--json]`
+- `debugbundle webhook test <webhook-id> --project-id <id> [--event <verification.passed|verification.failed>] [--auth-file <path>] [--json]`
+- `debugbundle webhook deliveries <webhook-id> --project-id <id> [--limit <n>] [--auth-file <path>] [--json]`
+- `debugbundle webhook retry <webhook-id> <delivery-id> --project-id <id> [--auth-file <path>] [--json]`
+
+Use alert commands for notification routing and webhook commands for signed event delivery, delivery history, synthetic tests, and manual retries.
+
 ## Availability Checks
 
 - `debugbundle health checks list --project-id <id> [--limit <n>] [--auth-file <path>] [--json]`
@@ -45,6 +69,19 @@ Use capture-rule suggestions for repeated operational noise after inspecting an 
 - `debugbundle health checks daily-rollups <check-id> --project-id <id> [--limit <n>] [--auth-file <path>] [--json]`
 
 Use availability-check commands for hosted endpoint reachability. Prefer `test` before saving a new target. `test` is side-effect-free and does not create incidents or retained history. Saved checks remain visible after downgrade, but checks beyond current count or interval limits pause until the project becomes eligible again.
+
+## Documentation URLs
+
+- CLI overview: `https://debugbundle.com/docs/cli`
+- Cloud workflow: `https://debugbundle.com/docs/cli/cloud-workflow`
+- API overview: `https://debugbundle.com/docs/api`
+- API ingestion: `https://debugbundle.com/docs/api/ingestion`
+- Alerts: `https://debugbundle.com/docs/alerts` and `https://debugbundle.com/docs/cli/alerts`
+- Webhooks: `https://debugbundle.com/docs/webhooks`, `https://debugbundle.com/docs/cli/webhooks`, and `https://debugbundle.com/docs/api/webhooks`
+- Probes: `https://debugbundle.com/docs/probes` and `https://debugbundle.com/docs/api/probes`
+- Capture policy and rules: `https://debugbundle.com/docs/capture-policy`
+- Availability checks: `https://debugbundle.com/docs/availability-checks`
+- MCP tool catalog: `https://debugbundle.com/docs/mcp/tools`
 
 ## Operational Paths
 

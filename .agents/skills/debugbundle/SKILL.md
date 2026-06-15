@@ -2,9 +2,10 @@
 name: debugbundle
 description: >-
   Investigate runtime incidents, inspect debug bundles, generate reproductions,
-  run improvement analysis, and inspect hosted availability checks using the
-  DebugBundle CLI and local project scaffold. Use when the user reports a bug,
-  runtime failure, production incident, endpoint downtime, or health-check issue.
+  run improvement analysis, and inspect operational controls using the DebugBundle
+  CLI and local project scaffold. Use when the user reports a bug, runtime
+  failure, production incident, endpoint downtime, health-check issue, missing
+  notification, webhook delivery failure, probe request, or noisy incident.
 metadata:
   author: debugbundle
   version: "1.0"
@@ -42,9 +43,16 @@ Key local paths:
 4. Apply the narrowest fix, then validate it with the repository test workflow from `.debugbundle/profile.json`.
 5. When the fix is confirmed, or when the incident was intentionally generated for smoke, verification, or dogfooding, resolve it with `debugbundle resolve <incident-id> [incident-id ...]` or MCP `resolve_incident` / `resolve_incidents` so the open queue stays actionable.
 
-## Availability Checks
+## Investigation Controls
 
-Use hosted availability checks for endpoint downtime, public reachability, or project Health tab issues. These are DebugBundle-run external `GET`/`HEAD` checks, not SDK events from the customer app.
+Use these controls when the user's issue is about observability behavior, notification delivery, targeted evidence gathering, or event noise rather than only application code.
+
+- Availability checks: use hosted health checks for endpoint downtime, public reachability, or project Health tab issues. These are DebugBundle-run external `GET`/`HEAD` checks, not SDK events from the customer app.
+- Probes: inspect active probes with `debugbundle probe list <project-id> --json` or MCP `list_active_probes` before activating more probes. Activate probes only when targeted runtime evidence is needed and the user has asked for investigation.
+- Capture policy and rules: inspect policy/rules before suppressing noisy incidents. Prefer `debugbundle capture-rule suggest <incident-id> --json` and narrow capture-policy path rules over broad drops or demotions.
+- Alerts and webhooks: when the user reports missing, duplicate, or failed notifications, inspect alert config, webhook config, and webhook delivery history before changing application code.
+
+## Availability Checks
 
 - Start with `debugbundle health checks list --project-id <id> --json` or MCP `list_health_checks` to inspect saved checks and plan limits.
 - For a failing check, inspect `debugbundle health checks results <check-id> --project-id <id> --json` and `debugbundle health checks daily-rollups <check-id> --project-id <id> --json` before changing code.
@@ -68,6 +76,25 @@ When incident evidence shows repeated low-value operational noise rather than a 
 - Prefer project capture rules for operational noise because they are centralized, auditable, and enforced by ingestion and processing. Use SDK `beforeSend` only for app-owned local policy such as final redaction or events that must never leave the runtime.
 - Scope frontend noise by structured evidence such as service, environment, `browser_event_kind`, `browser_event_opaque`, `client_kind`, `bot_family`, and message fields. Do not broadly demote generic `Unhandled promise rejection` incidents without bot-scoped or otherwise narrow evidence.
 - For expected or intentionally promoted 4xx responses on known routes, use capture-policy client-error path rules instead of promoting all client errors: `debugbundle capture-policy set --client-error-path-rule <status=/path/*@GET>`.
+
+## Notification Delivery
+
+When notification or automation delivery is the reported failure, inspect configuration and delivery records before changing incident logic.
+
+- Alerts route incident notifications to configured channels. Start with `debugbundle alert list --project-id <id> --json` and confirm condition, severity, service, cooldown, channel, and enabled state.
+- Webhooks deliver signed lifecycle events to external systems. Start with `debugbundle webhook list --project-id <id> --json`, then inspect `debugbundle webhook deliveries <webhook-id> --project-id <id> --json` before retrying or testing.
+- Webhook tests and retries are side-effecting delivery actions. Use them only when validating a destination or replaying an explicit failed delivery.
+
+## Full Documentation
+
+- CLI: `https://debugbundle.com/docs/cli`
+- MCP tools: `https://debugbundle.com/docs/mcp/tools`
+- Availability checks: `https://debugbundle.com/docs/availability-checks`
+- Probes: `https://debugbundle.com/docs/probes`
+- Capture policy and rules: `https://debugbundle.com/docs/capture-policy`
+- Alerts: `https://debugbundle.com/docs/alerts` and `https://debugbundle.com/docs/cli/alerts`
+- Webhooks: `https://debugbundle.com/docs/webhooks` and `https://debugbundle.com/docs/cli/webhooks`
+- API ingestion: `https://debugbundle.com/docs/api/ingestion`
 
 ## Profile Validation
 

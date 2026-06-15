@@ -271,6 +271,30 @@ describe("cli validate command", () => {
       "For user-reported production incidents, check cloud incidents after local incidents and explicitly report whether each source had matches."
     );
     expect(await readFile(join(rootDirectory, ".agents", "skills", "debugbundle", "SKILL.md"), "utf8")).toContain(
+      "## Investigation Controls"
+    );
+    expect(await readFile(join(rootDirectory, ".agents", "skills", "debugbundle", "SKILL.md"), "utf8")).toContain(
+      "## Availability Checks"
+    );
+    expect(await readFile(join(rootDirectory, ".agents", "skills", "debugbundle", "SKILL.md"), "utf8")).toContain(
+      "## Notification Delivery"
+    );
+    expect(await readFile(join(rootDirectory, ".agents", "skills", "debugbundle", "references", "cli.md"), "utf8")).toContain(
+      "debugbundle health checks list --project-id <id>"
+    );
+    expect(await readFile(join(rootDirectory, ".agents", "skills", "debugbundle", "references", "cli.md"), "utf8")).toContain(
+      "debugbundle webhook deliveries <webhook-id> --project-id <id>"
+    );
+    expect(await readFile(join(rootDirectory, ".agents", "skills", "debugbundle", "references", "mcp.md"), "utf8")).toContain(
+      "## Availability Check Tools"
+    );
+    expect(await readFile(join(rootDirectory, ".agents", "skills", "debugbundle", "references", "mcp.md"), "utf8")).toContain(
+      "## Probe Tools"
+    );
+    expect(await readFile(join(rootDirectory, ".agents", "skills", "debugbundle", "references", "mcp.md"), "utf8")).toContain(
+      "https://debugbundle.com/docs/api/ingestion"
+    );
+    expect(await readFile(join(rootDirectory, ".agents", "skills", "debugbundle", "SKILL.md"), "utf8")).toContain(
       "## Noise Management"
     );
     expect(await readFile(join(rootDirectory, ".agents", "skills", "debugbundle", "SKILL.md"), "utf8")).toContain(

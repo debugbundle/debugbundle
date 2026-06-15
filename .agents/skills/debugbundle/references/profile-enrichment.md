@@ -8,4 +8,6 @@ Checklist:
 - add critical paths for ingestion, processing, retrieval, SDK capture, auth, billing, and any project-specific high-risk workflows
 - confirm `repo.generated_paths` and `repo.do_not_edit_paths` match the local scaffold
 - confirm build, test, lint, and install workflows in `developer_workflows`
+- for browser frontends, confirm `@debugbundle/sdk-browser` is initialized and a backend `/debugbundle/browser` relay is reachable
+- for split frontend/backend hosts, confirm the browser SDK uses the API relay URL and the backend allowlists the frontend origin
 - update `debugbundle.last_reviewed_at` and set `debugbundle.validation_status` to `agent-validated` when complete

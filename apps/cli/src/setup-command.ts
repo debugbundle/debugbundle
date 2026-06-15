@@ -146,7 +146,7 @@ function buildManagedAgentsSection(): string {
     "- Read `.agents/skills/debugbundle/SKILL.md` for the full debugging workflow.",
     "- Use `debugbundle inspect <incident-id>` or MCP `get_bundle` when a user reports an issue.",
     "- Run reproduction artifacts from `.debugbundle/bundles/local/reproductions/` before proposing a fix.",
-    "- After a fix is verified, or after an intentional smoke or dogfood incident has served its purpose, resolve it with `debugbundle resolve <incident-id>` or MCP `resolve_incident` so open incidents remain actionable.",
+    "- After a fix is verified, or after an intentional smoke or dogfood incident has served its purpose, resolve it with `debugbundle resolve <incident-id> [incident-id ...]` or MCP `resolve_incident` / `resolve_incidents` so open incidents remain actionable.",
     "- Use `debugbundle doctor` to validate local DebugBundle setup or connectivity issues.",
     MANAGED_AGENTS_END
   ].join("\n");
@@ -627,4 +627,3 @@ export async function setupCommand(
     };
   }
 }
-
