@@ -156,6 +156,60 @@ describe("web app — management routes", () => {
         });
       }
 
+      if (url.endsWith("/v1/projects/proj_123/probes")) {
+        return jsonResponse(200, {
+          activations: [
+            {
+              activation_id: "probe_123",
+              label_pattern: "checkout.*",
+              service: "checkout",
+              environment: "production",
+              expires_at: "2026-03-17T10:00:00.000Z",
+              trigger_expires_at: "2026-03-18T10:00:00.000Z"
+            }
+          ]
+        });
+      }
+
+      if (url.endsWith("/v1/projects/proj_123/availability-checks?limit=100")) {
+        return jsonResponse(200, {
+          checks: [
+            {
+              check_id: "chk_123",
+              project_id: "proj_123",
+              name: "API health",
+              url: "https://api.debugbundle.com/health",
+              method: "GET",
+              expected_status_min: 200,
+              expected_status_max: 399,
+              timeout_ms: 5000,
+              interval_seconds: 30,
+              failure_threshold: 3,
+              recovery_threshold: 2,
+              environment: "production",
+              service_name: "api",
+              enabled: true,
+              status: "passing",
+              paused_reason: null,
+              organization_plan: "team",
+              consecutive_failures: 0,
+              consecutive_successes: 24,
+              linked_incident_id: null,
+              last_checked_at: "2026-03-17T09:00:00.000Z",
+              next_check_at: "2026-03-17T09:00:30.000Z",
+              last_result_status: "success",
+              last_result_http_status: 200,
+              last_result_error_kind: null,
+              last_result_error_message: null,
+              last_result_duration_ms: 108,
+              created_at: "2026-03-17T08:00:00.000Z",
+              updated_at: "2026-03-17T09:00:00.000Z"
+            }
+          ],
+          limits: { max_checks_per_project: 25, min_interval_seconds: 30 }
+        });
+      }
+
       if (url.endsWith("/v1/projects/proj_123/capture-policy")) {
         return jsonResponse(200, {
           access_mode: "manage",
@@ -249,12 +303,16 @@ describe("web app — management routes", () => {
     expect(await screen.findByText(/setup at a glance/i)).toBeInTheDocument();
     expect(await screen.findByText(/^2 rules$/i)).toBeInTheDocument();
     expect(screen.getByText(/^2 endpoints$/i)).toBeInTheDocument();
+    expect(screen.getByText(/^1 active$/i)).toBeInTheDocument();
+    expect(screen.getByText(/^1 check$/i)).toBeInTheDocument();
     expect(screen.getByText(/^connected$/i)).toBeInTheDocument();
     expect(screen.getByText(/^balanced preset$/i)).toBeInTheDocument();
-    expect(screen.getAllByText(/^1 enabled$/i)).toHaveLength(3);
+    expect(screen.getAllByText(/^1 enabled$/i)).toHaveLength(4);
     expect(screen.getByText(/^2 recipients$/i)).toBeInTheDocument();
     expect(screen.getByText(/^2 client 4xx$/i)).toBeInTheDocument();
+    expect(screen.getByText(/^matching sdk probe labels can ship independently before the next error\.$/i)).toBeInTheDocument();
     expect(screen.getByText(/^3 event types subscribed across endpoints\.$/i)).toBeInTheDocument();
+    expect(screen.getByText(/^plan minimum interval 30s with 30-day retained history\.$/i)).toBeInTheDocument();
     expect(screen.getByText(/^2 dispatch rules configured for debugbundle\/app\.$/i)).toBeInTheDocument();
     expect(screen.getByText(/^monday at 09:00 utc$/i)).toBeInTheDocument();
     expect(screen.getByText(/^warning logs, failed requests, exception breadcrumb trails$/i)).toBeInTheDocument();
@@ -285,6 +343,17 @@ describe("web app — management routes", () => {
 
       if (url.endsWith("/v1/webhooks?project_id=proj_123&limit=100")) {
         return jsonResponse(200, { webhooks: [] });
+      }
+
+      if (url.endsWith("/v1/projects/proj_123/probes")) {
+        return jsonResponse(200, { activations: [] });
+      }
+
+      if (url.endsWith("/v1/projects/proj_123/availability-checks?limit=100")) {
+        return jsonResponse(200, {
+          checks: [],
+          limits: { max_checks_per_project: 1, min_interval_seconds: 300 }
+        });
       }
 
       if (url.endsWith("/v1/weekly-report-channels?project_id=proj_123&limit=100")) {
@@ -335,8 +404,29 @@ describe("web app — management routes", () => {
     render(<App initialEntries={["/projects/proj_123"]} />);
 
     expect(await screen.findByText(/setup at a glance/i)).toBeInTheDocument();
-    expect(await screen.findByText(/^solo\+ only$/i)).toBeInTheDocument();
-    expect(screen.getByText(/^unavailable$/i)).toBeInTheDocument();
+    const probesDescription = screen.getByText(
+      /^always-on probe buffers still work in the sdk, but remote probe activation requires solo or team\.$/i
+    );
+    const probesBlock = probesDescription.closest("div.rounded-lg");
+    expect(probesBlock).not.toBeNull();
+    expect(within(probesBlock as HTMLDivElement).getByText(/^solo\+ only$/i)).toBeInTheDocument();
+    expect(within(probesBlock as HTMLDivElement).getByText(/^unavailable$/i)).toBeInTheDocument();
+    expect(probesDescription).toBeInTheDocument();
+    const githubDescription = screen.getByText(
+      /^repository dispatch automation is not available on the free plan\.$/i
+    );
+    const githubBlock = githubDescription.closest("div.rounded-lg");
+    expect(githubBlock).not.toBeNull();
+    expect(within(githubBlock as HTMLDivElement).getByText(/^solo\+ only$/i)).toBeInTheDocument();
+    expect(within(githubBlock as HTMLDivElement).getByText(/^unavailable$/i)).toBeInTheDocument();
+    expect(githubDescription).toBeInTheDocument();
+    const healthChecksBlock = screen.getByText(/^health checks$/i).closest("div.rounded-lg");
+    expect(healthChecksBlock).not.toBeNull();
+    expect(within(healthChecksBlock as HTMLDivElement).getByText(/^not configured$/i)).toBeInTheDocument();
+    expect(within(healthChecksBlock as HTMLDivElement).getByText(/^off$/i)).toBeInTheDocument();
+    expect(
+      within(healthChecksBlock as HTMLDivElement).getByText(/^no hosted health checks are configured yet\.$/i)
+    ).toBeInTheDocument();
     expect(
       fetchMock.mock.calls.some(([input]) =>
         requestUrl(input).endsWith("/v1/alerts?project_id=proj_123&limit=100")

@@ -71,6 +71,7 @@ describe('public site content source', () => {
     expect(existsSync(join(publicSiteRoot, 'content/docs/mcp/tools.mdx'))).toBe(true);
     expect(existsSync(join(publicSiteRoot, 'content/docs/mcp/workflows.mdx'))).toBe(true);
     expect(existsSync(join(publicSiteRoot, 'content/docs/alerts.mdx'))).toBe(true);
+    expect(existsSync(join(publicSiteRoot, 'content/docs/availability-checks.mdx'))).toBe(true);
     expect(existsSync(join(publicSiteRoot, 'content/docs/probes.mdx'))).toBe(true);
     expect(existsSync(join(publicSiteRoot, 'content/docs/bundles/index.mdx'))).toBe(true);
     expect(existsSync(join(publicSiteRoot, 'content/docs/bundles/schema.mdx'))).toBe(true);

@@ -460,6 +460,9 @@ describe("postgres metadata store project collaboration", () => {
           rows: []
         })
         .mockResolvedValueOnce({
+          rows: []
+        })
+        .mockResolvedValueOnce({
           rows: [
             {
               invite_id: "inv_123",
@@ -483,6 +486,9 @@ describe("postgres metadata store project collaboration", () => {
         })
         .mockResolvedValueOnce({
           rows: [{ collaborator_count: "2" }]
+        })
+        .mockResolvedValueOnce({
+          rows: []
         })
         .mockResolvedValueOnce({
           rows: []
@@ -532,6 +538,72 @@ describe("postgres metadata store project collaboration", () => {
       kind: "invite_exists",
       owner_plan: "team"
     });
+  });
+
+  it("retires expired pending invites before creating a replacement invite", async (): Promise<void> => {
+    const query = vi
+      .fn()
+      .mockResolvedValueOnce({
+        rows: [{ owner_plan: "team", actor_role: "owner", actor_membership_type: "owner" }]
+      })
+      .mockResolvedValueOnce({
+        rows: [{ collaborator_count: "2" }]
+      })
+      .mockResolvedValueOnce({
+        rows: []
+      })
+      .mockResolvedValueOnce({
+        rows: []
+      })
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            invite_id: "inv_reissued",
+            project_id: "proj_123",
+            email: "dev@example.com",
+            role: "member",
+            invited_by_user_id: "usr_owner",
+            accepted_at: null,
+            canceled_at: null,
+            expires_at: "2026-03-30T00:00:00.000Z",
+            created_at: "2026-03-20T00:00:00.000Z"
+          }
+        ]
+      });
+    const store = createPostgresMetadataStore({ query });
+
+    const result = await store.createInviteForProject!({
+      project_id: "proj_123",
+      user_id: "usr_owner",
+      email: " Dev@example.com ",
+      role: "member",
+      invited_by_user_id: "usr_owner",
+      invite_token_hash: "hash_reissued",
+      expires_at: "2026-03-30T00:00:00.000Z"
+    });
+
+    expect(result).toEqual({
+      kind: "created",
+      owner_plan: "team",
+      invite: {
+        invite_id: "inv_reissued",
+        project_id: "proj_123",
+        email: "dev@example.com",
+        role: "member",
+        invited_by_user_id: "usr_owner",
+        accepted_at: null,
+        canceled_at: null,
+        expires_at: "2026-03-30T00:00:00.000Z",
+        created_at: "2026-03-20T00:00:00.000Z"
+      }
+    });
+    expect(query.mock.calls.map((call) => String(call[0]))).toContainEqual(
+      expect.stringContaining("SET canceled_at = now()")
+    );
+    expect(query).toHaveBeenCalledWith(
+      expect.stringContaining("AND expires_at <= now()"),
+      ["proj_123", "dev@example.com"]
+    );
   });
 
   it("covers invite cancellation and acceptance outcomes", async (): Promise<void> => {

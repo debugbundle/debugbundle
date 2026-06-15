@@ -27,6 +27,17 @@ Use the same incident-first workflow through MCP when an agent is operating in c
 
 Use these tools for repeated low-value operational noise only after inspecting incident evidence. Keep frontend suppression scoped by structured browser and client signals, and use path-scoped capture policy for known 4xx routes.
 
+## Availability Check Tools
+
+- `list_health_checks` — list hosted health checks and plan limits for a project.
+- `get_health_check` — fetch one hosted health check by id.
+- `test_health_check` — run a side-effect-free target test without opening incidents or writing retained history.
+- `create_health_check`, `update_health_check`, `delete_health_check` — manage saved hosted health checks when the user explicitly asks to change monitoring.
+- `list_health_check_results` — inspect recent raw executions for one check.
+- `list_health_check_daily_rollups` — inspect retained per-day status history for one check.
+
+Use these tools for endpoint downtime, public reachability, and project Health tab issues. Start with list/results/rollups, use `test_health_check` before saving target changes, and inspect the linked normal incident bundle when failures crossed the configured threshold.
+
 ## Smoke-Test Cleanup Recipe
 
 1. Call `list_incidents` with `status: "open"`.

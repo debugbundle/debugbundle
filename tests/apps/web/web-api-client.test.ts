@@ -4,10 +4,13 @@ import {
   buildApiUrl,
   bulkReopenIncidents,
   bulkResolveIncidents,
+  createProjectAvailabilityCheck,
   createProjectAlert,
   createProjectWebhook,
+  deleteProjectAvailabilityCheck,
   deleteAlert,
   exportAccountData,
+  getProjectAvailabilityCheck,
   getBillingSummary,
   getGitHubInstallUrl,
   getIncidentBundle,
@@ -15,10 +18,15 @@ import {
   getSession,
   InvalidSessionError,
   listIncidents,
+  listProjectAvailabilityCheckDailyRollups,
+  listProjectAvailabilityCheckResults,
+  listProjectAvailabilityChecks,
   logout,
   subscribeToBrowserSessionInvalidation,
   resetBrowserSessionClientState,
   testProjectWebhook,
+  testProjectAvailabilityCheck,
+  updateProjectAvailabilityCheck,
   updateProjectAlert,
   verifyEmailCode
 } from "../../../apps/web/src/lib/api.ts";
@@ -31,6 +39,205 @@ afterEach(() => {
 });
 
 describe("web api client", () => {
+  it("calls project availability-check endpoints with browser-session credentials", async () => {
+    const check = {
+      check_id: "chk_1",
+      project_id: "proj_1",
+      name: "Primary app",
+      url: "https://app.example.com/health",
+      method: "GET",
+      expected_status_min: 200,
+      expected_status_max: 399,
+      timeout_ms: 5000,
+      interval_seconds: 60,
+      failure_threshold: 3,
+      recovery_threshold: 2,
+      environment: "production",
+      service_name: "web",
+      enabled: true,
+      status: "passing",
+      paused_reason: null,
+      organization_plan: "solo",
+      consecutive_failures: 0,
+      consecutive_successes: 12,
+      linked_incident_id: null,
+      last_checked_at: "2026-06-15T10:00:00.000Z",
+      next_check_at: "2026-06-15T10:01:00.000Z",
+      last_result_status: "success",
+      last_result_http_status: 200,
+      last_result_error_kind: null,
+      last_result_error_message: null,
+      last_result_duration_ms: 180,
+      created_at: "2026-06-15T09:00:00.000Z",
+      updated_at: "2026-06-15T10:00:00.000Z"
+    };
+    const result = {
+      result_id: "res_1",
+      check_id: "chk_1",
+      project_id: "proj_1",
+      started_at: "2026-06-15T10:00:00.000Z",
+      completed_at: "2026-06-15T10:00:00.180Z",
+      duration_ms: 180,
+      status: "success",
+      http_status: 200,
+      error_kind: null,
+      error_message: null,
+      redirect_count: 0,
+      checked_url_host: "app.example.com",
+      final_url: "https://app.example.com/health"
+    };
+    const rollup = {
+      check_id: "chk_1",
+      project_id: "proj_1",
+      day: "2026-06-15",
+      state: "operational",
+      total_checks: 1440,
+      successful_checks: 1438,
+      failed_checks: 2,
+      degraded_checks: 0,
+      avg_duration_ms: 185,
+      first_checked_at: "2026-06-15T00:00:00.000Z",
+      last_checked_at: "2026-06-15T23:59:00.000Z",
+      downtime_seconds: 60,
+      incident_ids: []
+    };
+    const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+
+      if (url.endsWith("/v1/projects/proj_1/availability-checks?limit=50")) {
+        return Promise.resolve(
+          new Response(JSON.stringify({ checks: [check], limits: { max_checks_per_project: 5, min_interval_seconds: 60 } }), {
+            status: 200
+          })
+        );
+      }
+      if (url.endsWith("/v1/projects/proj_1/availability-checks/chk_1") && init?.method === undefined) {
+        return Promise.resolve(
+          new Response(JSON.stringify({ check, limits: { max_checks_per_project: 5, min_interval_seconds: 60 } }), {
+            status: 200
+          })
+        );
+      }
+      if (url.endsWith("/v1/projects/proj_1/availability-checks") && init?.method === "POST") {
+        return Promise.resolve(new Response(JSON.stringify({ check }), { status: 201 }));
+      }
+      if (url.endsWith("/v1/projects/proj_1/availability-checks/chk_1") && init?.method === "PATCH") {
+        return Promise.resolve(new Response(JSON.stringify({ check: { ...check, enabled: false } }), { status: 200 }));
+      }
+      if (url.endsWith("/v1/projects/proj_1/availability-checks/chk_1") && init?.method === "DELETE") {
+        return Promise.resolve(new Response(JSON.stringify({ deleted: true }), { status: 200 }));
+      }
+      if (url.endsWith("/v1/projects/proj_1/availability-checks/test")) {
+        return Promise.resolve(
+          new Response(
+            JSON.stringify({
+              normalized_url: "https://app.example.com/health",
+              result: {
+                status: "success",
+                http_status: 200,
+                duration_ms: 180,
+                error_kind: null,
+                error_message: null,
+                checked_url_host: "app.example.com",
+                checked_url_path: "/health",
+                checked_url_query: {},
+                final_url: "https://app.example.com/health",
+                redirect_count: 0
+              }
+            }),
+            { status: 200 }
+          )
+        );
+      }
+      if (url.endsWith("/v1/projects/proj_1/availability-checks/chk_1/results?limit=7")) {
+        return Promise.resolve(new Response(JSON.stringify({ results: [result] }), { status: 200 }));
+      }
+      if (url.endsWith("/v1/projects/proj_1/availability-checks/chk_1/daily-rollups?limit=9")) {
+        return Promise.resolve(new Response(JSON.stringify({ rollups: [rollup] }), { status: 200 }));
+      }
+
+      return Promise.resolve(new Response(JSON.stringify({ error: "not_found" }), { status: 404 }));
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(listProjectAvailabilityChecks("proj_1", 50)).resolves.toEqual({
+      checks: [check],
+      limits: { max_checks_per_project: 5, min_interval_seconds: 60 }
+    });
+    await expect(getProjectAvailabilityCheck("proj_1", "chk_1")).resolves.toEqual({
+      check,
+      limits: { max_checks_per_project: 5, min_interval_seconds: 60 }
+    });
+    await expect(
+      createProjectAvailabilityCheck("proj_1", {
+        name: "Primary app",
+        url: "https://app.example.com/health",
+        method: "GET",
+        expected_status_min: 200,
+        expected_status_max: 399,
+        timeout_ms: 5000,
+        interval_seconds: 60,
+        failure_threshold: 3,
+        recovery_threshold: 2,
+        environment: "production",
+        service_name: "web",
+        enabled: true
+      })
+    ).resolves.toEqual(check);
+    await expect(updateProjectAvailabilityCheck("proj_1", "chk_1", { enabled: false })).resolves.toEqual({
+      ...check,
+      enabled: false
+    });
+    await expect(deleteProjectAvailabilityCheck("proj_1", "chk_1")).resolves.toBeUndefined();
+    await expect(
+      testProjectAvailabilityCheck("proj_1", {
+        url: "https://app.example.com/health",
+        method: "GET",
+        expected_status_min: 200,
+        expected_status_max: 399,
+        timeout_ms: 5000
+      })
+    ).resolves.toEqual(expect.objectContaining({ normalized_url: "https://app.example.com/health" }));
+    await expect(listProjectAvailabilityCheckResults("proj_1", "chk_1", 7)).resolves.toEqual([result]);
+    await expect(listProjectAvailabilityCheckDailyRollups("proj_1", "chk_1", 9)).resolves.toEqual([rollup]);
+
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      1,
+      buildApiUrl("/v1/projects/proj_1/availability-checks?limit=50"),
+      { credentials: "include" }
+    );
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      3,
+      buildApiUrl("/v1/projects/proj_1/availability-checks"),
+      expect.objectContaining({
+        method: "POST",
+        credentials: "include",
+        body: JSON.stringify({
+          name: "Primary app",
+          url: "https://app.example.com/health",
+          method: "GET",
+          expected_status_min: 200,
+          expected_status_max: 399,
+          timeout_ms: 5000,
+          interval_seconds: 60,
+          failure_threshold: 3,
+          recovery_threshold: 2,
+          environment: "production",
+          service_name: "web",
+          enabled: true
+        })
+      })
+    );
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      5,
+      buildApiUrl("/v1/projects/proj_1/availability-checks/chk_1"),
+      expect.objectContaining({
+        method: "DELETE",
+        credentials: "include"
+      })
+    );
+  });
+
   it("notifies invalid-session listeners once until a new session is remembered", async () => {
     const notifications: number[] = [];
     const unsubscribe = subscribeToBrowserSessionInvalidation(() => {

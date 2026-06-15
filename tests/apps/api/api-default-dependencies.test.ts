@@ -18,6 +18,7 @@ const {
   createPostgresBillingSyncStoreMock,
   createPostgresCapturePolicyStoreMock,
   createPostgresCaptureRuleStoreMock,
+  createPostgresAvailabilityCheckStoreMock,
   createPostgresImprovementOpportunityStoreMock,
   createPostgresImprovementSettingsStoreMock,
   createMemberAuthServiceMock,
@@ -36,6 +37,8 @@ const {
   createIngestionMetadataServiceMock,
   createIncidentLifecycleServiceMock,
   createSesEmailTransportMock,
+  executeAvailabilityCheckMock,
+  validateAvailabilityCheckDefinitionMock,
   renderAccountDeletionOtpEmailMock,
   renderEmailAuthCodeEmailMock,
   renderProjectInviteEmailMock,
@@ -57,6 +60,7 @@ const {
   createPostgresBillingSyncStoreMock: vi.fn(),
   createPostgresCapturePolicyStoreMock: vi.fn(),
   createPostgresCaptureRuleStoreMock: vi.fn(),
+  createPostgresAvailabilityCheckStoreMock: vi.fn(),
   createPostgresImprovementOpportunityStoreMock: vi.fn(),
   createPostgresImprovementSettingsStoreMock: vi.fn(),
   createMemberAuthServiceMock: vi.fn(),
@@ -75,6 +79,8 @@ const {
   createIngestionMetadataServiceMock: vi.fn(),
   createIncidentLifecycleServiceMock: vi.fn(),
   createSesEmailTransportMock: vi.fn(),
+  executeAvailabilityCheckMock: vi.fn(),
+  validateAvailabilityCheckDefinitionMock: vi.fn(),
   renderAccountDeletionOtpEmailMock: vi.fn(),
   renderEmailAuthCodeEmailMock: vi.fn(),
   renderProjectInviteEmailMock: vi.fn(),
@@ -112,6 +118,8 @@ vi.mock("../../../packages/storage/src/index.js", () => ({
     await objectStore.deleteObjectsByPrefix(`improvement-bundles/${projectId}/`);
     await objectStore.deleteObjectsByPrefix(`reproductions/${projectId}/`);
   },
+  executeAvailabilityCheck: executeAvailabilityCheckMock,
+  validateAvailabilityCheckDefinition: validateAvailabilityCheckDefinitionMock,
   createRedisQueueClient: createRedisQueueClientMock,
   createRedisIncidentFrequencyCounter: createRedisIncidentFrequencyCounterMock,
   createRedisAuthRateLimiter: createRedisAuthRateLimiterMock,
@@ -123,6 +131,7 @@ vi.mock("../../../packages/storage/src/index.js", () => ({
   createPostgresAuthStore: createPostgresAuthStoreMock,
   createPostgresBillingStore: createPostgresBillingStoreMock,
   createPostgresCapturePolicyStore: createPostgresCapturePolicyStoreMock,
+  createPostgresAvailabilityCheckStore: createPostgresAvailabilityCheckStoreMock,
   createMemberAuthService: createMemberAuthServiceMock,
   createIngestionPersistenceService: createIngestionPersistenceServiceMock,
   createPostgresMetadataStore: createPostgresMetadataStoreMock,
@@ -213,6 +222,7 @@ describe("api default dependencies", () => {
     createPostgresBillingSyncStoreMock.mockReset();
     createPostgresCapturePolicyStoreMock.mockReset();
     createPostgresCaptureRuleStoreMock.mockReset();
+    createPostgresAvailabilityCheckStoreMock.mockReset();
     createPostgresImprovementOpportunityStoreMock.mockReset();
     createPostgresImprovementSettingsStoreMock.mockReset();
     createMemberAuthServiceMock.mockReset();
@@ -230,12 +240,29 @@ describe("api default dependencies", () => {
     createIngestionMetadataServiceMock.mockReset();
     createIncidentLifecycleServiceMock.mockReset();
     createSesEmailTransportMock.mockReset();
+    executeAvailabilityCheckMock.mockReset();
+    validateAvailabilityCheckDefinitionMock.mockReset();
     renderAccountDeletionOtpEmailMock.mockReset();
     renderEmailAuthCodeEmailMock.mockReset();
     renderProjectInviteEmailMock.mockReset();
     recordPlanDowngradeCleanupAuditMock.mockReset();
     emailTransportSendMock.mockReset();
     recordPlanDowngradeCleanupAuditMock.mockResolvedValue(undefined);
+    validateAvailabilityCheckDefinitionMock.mockResolvedValue({
+      normalized_url: "https://app.example.com/health"
+    });
+    executeAvailabilityCheckMock.mockResolvedValue({
+      status: "success",
+      http_status: 200,
+      duration_ms: 100,
+      error_kind: null,
+      error_message: null,
+      checked_url_host: "app.example.com",
+      checked_url_path: "/health",
+      checked_url_query: {},
+      final_url: "https://app.example.com/health",
+      redirect_count: 0
+    });
 
     createRedisQueueClientMock.mockReturnValue({ enqueue: vi.fn() });
     createRedisIncidentFrequencyCounterMock.mockReturnValue({ recordOccurrence: vi.fn(), close: vi.fn() });
@@ -282,6 +309,21 @@ describe("api default dependencies", () => {
       updateCaptureRule: vi.fn(),
       deleteCaptureRule: vi.fn(),
       recordCaptureRuleMatch: vi.fn()
+    });
+    createPostgresAvailabilityCheckStoreMock.mockReturnValue({
+      listChecksForProjectInOrganization: vi.fn(),
+      getCheckForProjectInOrganization: vi.fn(),
+      createCheckForProjectInOrganization: vi.fn(),
+      updateCheckForProjectInOrganization: vi.fn(),
+      deleteCheckForProjectInOrganization: vi.fn(),
+      listResultsForCheckInOrganization: vi.fn(),
+      listDailyRollupsForCheckInOrganization: vi.fn(),
+      claimNextDueCheck: vi.fn(),
+      recordCheckExecution: vi.fn(),
+      linkIncidentToCheck: vi.fn(),
+      appendIncidentToDailyRollup: vi.fn(),
+      purgeExpiredResults: vi.fn(),
+      purgeExpiredDailyRollups: vi.fn()
     });
     createPostgresImprovementOpportunityStoreMock.mockReturnValue({
       listImprovementsForOrganization: vi.fn(),
@@ -1143,6 +1185,77 @@ describe("api default dependencies", () => {
       delivery_id: "del_123",
       attempt: 1
     });
+  });
+
+  it("should validate and normalize saved availability-check targets through default dependencies", async (): Promise<void> => {
+    validateAvailabilityCheckDefinitionMock
+      .mockResolvedValueOnce({ normalized_url: "https://app.example.com/health" })
+      .mockResolvedValueOnce({ normalized_url: "https://checkout.example.com/health" });
+
+    const deps = createApiDependencies({
+      objectStore: {
+        putObject: vi.fn(),
+        getObject: vi.fn(),
+        deleteObjectsByPrefix: vi.fn()
+      },
+      queue: {
+        enqueue: vi.fn()
+      },
+      db: {
+        query: vi.fn()
+      }
+    });
+    const availabilityCheckStore = createPostgresAvailabilityCheckStoreMock.mock.results[0]?.value as {
+      createCheckForProjectInOrganization: ReturnType<typeof vi.fn>;
+      updateCheckForProjectInOrganization: ReturnType<typeof vi.fn>;
+    };
+
+    await deps.availabilityCheckManagement.createCheckForProjectInOrganization({
+      organization_id: "org_123",
+      project_id: "proj_123",
+      created_by_user_id: "usr_123",
+      name: "Primary app",
+      url: "https://app.example.com/health?token=secret",
+      method: "GET",
+      expected_status_min: 200,
+      expected_status_max: 399,
+      timeout_ms: 5000,
+      interval_seconds: 60,
+      failure_threshold: 3,
+      recovery_threshold: 2,
+      enabled: true,
+      now: "2026-06-15T10:00:00.000Z"
+    });
+    await deps.availabilityCheckManagement.updateCheckForProjectInOrganization({
+      organization_id: "org_123",
+      project_id: "proj_123",
+      check_id: "chk_123",
+      url: "https://checkout.example.com/health?token=secret",
+      now: "2026-06-15T10:01:00.000Z"
+    });
+
+    expect(validateAvailabilityCheckDefinitionMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        url: "https://app.example.com/health?token=secret",
+        method: "GET"
+      })
+    );
+    expect(validateAvailabilityCheckDefinitionMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        url: "https://checkout.example.com/health?token=secret",
+        method: "GET"
+      })
+    );
+    expect(availabilityCheckStore.createCheckForProjectInOrganization).toHaveBeenCalledWith(
+      expect.objectContaining({
+        url: "https://app.example.com/health"
+      })
+    );
+    expect(availabilityCheckStore.updateCheckForProjectInOrganization).toHaveBeenCalledWith(
+      expect.objectContaining({
+        url: "https://checkout.example.com/health"
+      })
+    );
   });
 
   it("should prefill checkout email for first-time Stripe customers", async (): Promise<void> => {

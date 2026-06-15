@@ -1,6 +1,6 @@
 ---
 name: debugbundle
-description: Use DebugBundle MCP and CLI workflows to investigate incidents, fetch bundles, run verification, and guide fixes.
+description: Use DebugBundle MCP and CLI workflows to investigate incidents, fetch bundles, inspect hosted health checks, run verification, and guide fixes.
 version: 1.0.0
 metadata:
   openclaw:
@@ -26,7 +26,7 @@ metadata:
 
 # DebugBundle
 
-Use this skill when a user asks you to investigate a bug, production incident, runtime failure, DebugBundle bundle, probe, alert, webhook, or project setup.
+Use this skill when a user asks you to investigate a bug, production incident, runtime failure, endpoint downtime, DebugBundle bundle, health check, probe, alert, webhook, or project setup.
 
 ## Skill Scope
 
@@ -61,8 +61,9 @@ Use `DEBUGBUNDLE_API_URL` only when the user is targeting self-hosted, staging, 
 2. For bug reports, check incidents before inspecting code. Start with `list_incidents`, then fetch `get_incident_context` or `get_bundle`.
 3. Use reproduction artifacts when available before proposing a fix.
 4. For live debugging, use `activate_probe` only when the user asks for additional runtime evidence or the current bundle lacks enough context. Prefer short TTLs and scoped labels.
-5. After a fix is verified, resolve the incident with `resolve_incident`. Also resolve intentional verification incidents after they have served their purpose.
-6. For repeated low-value operational noise, inspect the incident evidence first, then evaluate capture-rule suggestions or path-scoped capture policy instead of repeatedly resolving the same pattern.
+5. For endpoint downtime or Health tab issues, start with `list_health_checks`, inspect `list_health_check_results` and `list_health_check_daily_rollups`, and use `test_health_check` before creating or updating saved monitoring.
+6. After a fix is verified, resolve the incident with `resolve_incident`. Also resolve intentional verification incidents after they have served their purpose.
+7. For repeated low-value operational noise, inspect the incident evidence first, then evaluate capture-rule suggestions or path-scoped capture policy instead of repeatedly resolving the same pattern.
 
 ## Local Repository Setup
 
@@ -81,6 +82,15 @@ npx @debugbundle/cli verify cloud --trigger-5xx
 ```
 
 After setup, read `.agents/skills/debugbundle/SKILL.md` and follow its project-local instructions.
+
+## Hosted Health Checks
+
+Hosted health checks are DebugBundle-run external `GET`/`HEAD` requests, not SDK events from the customer's app. Use them for public endpoint reachability and downtime investigations.
+
+- Read with `list_health_checks`, `get_health_check`, `list_health_check_results`, and `list_health_check_daily_rollups`.
+- Test target behavior with `test_health_check`; it is side-effect-free and does not open incidents or write retained history.
+- Create, update, delete, enable, or disable checks only when the user explicitly asks to change monitoring.
+- Avoid private, localhost, metadata-service, credentialed, or state-mutating targets.
 
 ## Safety
 

@@ -152,6 +152,32 @@ describe("retrieval parity mapping contract", () => {
     );
   });
 
+  it("should keep health-check parity operations documented across API, CLI, and MCP", async (): Promise<void> => {
+    const contract = await readFile(CONTRACT_PATH, "utf8");
+
+    expect(contract).toContain(
+      "| List health checks | `GET /v1/projects/{id}/availability-checks` | `health checks list` | `list_health_checks` | Browser Session or Member Token; readable to any authorized project member |"
+    );
+    expect(contract).toContain(
+      "| Create health check | `POST /v1/projects/{id}/availability-checks` | `health checks create` | `create_health_check` | Browser Session or Member Token, owner/admin only |"
+    );
+    expect(contract).toContain(
+      "| Test health check target | `POST /v1/projects/{id}/availability-checks/test` | `health checks test` | `test_health_check` | Browser Session or Member Token, owner/admin only, side-effect-free |"
+    );
+    expect(contract).toContain(
+      "| List health check daily rollups | `GET /v1/projects/{id}/availability-checks/{checkId}/daily-rollups` | `health checks daily-rollups` | `list_health_check_daily_rollups` | Browser Session or Member Token; readable to any authorized project member |"
+    );
+    expect(contract).toContain(
+      "list_health_checks         → same result as GET /v1/projects/{id}/availability-checks"
+    );
+    expect(contract).toContain(
+      "list_health_check_results  → same result as GET /v1/projects/{id}/availability-checks/{checkId}/results"
+    );
+    expect(contract).toContain(
+      "list_health_check_daily_rollups → same result as GET /v1/projects/{id}/availability-checks/{checkId}/daily-rollups"
+    );
+  });
+
   it("should keep project lifecycle operations mapped across API, CLI, and MCP", async (): Promise<void> => {
     const contract = await readFile(CONTRACT_PATH, "utf8");
 

@@ -19,6 +19,7 @@ import type {
   createIngestionMetadataService,
   createIngestionPersistenceService,
   createMemberAuthService,
+  createPostgresAvailabilityCheckStore,
   createPostgresAuditLogStore,
   createPostgresBillingSyncStore,
   createPostgresImprovementOpportunityStore,
@@ -64,6 +65,7 @@ export interface DefaultApiDependencies
     | "accountManagement"
     | "accountDeletionAuth"
     | "alertManagement"
+    | "availabilityCheckManagement"
     | "auditLogging"
     | "billingEmails"
     | "billingManagement"
@@ -182,6 +184,9 @@ export interface DefaultApiDependencies
     MetadataStore,
     "listAlertsForOrganization" | "createAlertForOrganization" | "updateAlertForOrganization" | "deleteAlertForOrganization"
   >;
+  availabilityCheckManagement: ReturnType<typeof createPostgresAvailabilityCheckStore> & {
+    testCheck: NonNullable<ApiDependencies["availabilityCheckManagement"]>["testCheck"];
+  };
   slackManagement: ReturnType<typeof createPostgresSlackDestinationStore>;
   weeklyReportManagement: ReturnType<typeof createPostgresWeeklyReportChannelStore>;
   operationalEmailDelivery: ReturnType<typeof createPostgresOperationalEmailDeliveryStore>;

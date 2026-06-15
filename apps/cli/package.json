@@ -1,6 +1,6 @@
 {
   "name": "@debugbundle/cli",
-  "version": "1.4.0",
+  "version": "1.5.0",
   "private": false,
   "description": "Command-line interface for DebugBundle",
   "license": "AGPL-3.0-only",

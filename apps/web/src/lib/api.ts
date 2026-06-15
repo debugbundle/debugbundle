@@ -10,6 +10,11 @@ import type {
   AdminAnalyticsAccessStatus,
   AdminAnalyticsSummary,
   AlertRecord,
+  AvailabilityCheckDailyRollupRecord,
+  AvailabilityCheckLimits,
+  AvailabilityCheckRecord,
+  AvailabilityCheckResultRecord,
+  AvailabilityCheckTestResult,
   CreatedMemberToken,
   CreatedProjectToken,
   CreatedWebhookRecord,
@@ -712,6 +717,162 @@ export async function createProjectProbeActivation(
       body: JSON.stringify(payload)
     })
   );
+}
+
+export async function listProjectAvailabilityChecks(
+  projectId: string,
+  limit = 20
+): Promise<{ checks: AvailabilityCheckRecord[]; limits: AvailabilityCheckLimits }> {
+  const body = await readJson<{
+    checks: AvailabilityCheckRecord[];
+    limits: AvailabilityCheckLimits;
+  }>(
+    await fetch(
+      `${API_BASE}/v1/projects/${projectId}/availability-checks?limit=${encodeURIComponent(String(limit))}`,
+      {
+        credentials: "include"
+      }
+    )
+  );
+
+  return body;
+}
+
+export async function getProjectAvailabilityCheck(
+  projectId: string,
+  checkId: string
+): Promise<{ check: AvailabilityCheckRecord; limits: AvailabilityCheckLimits }> {
+  return await readJson<{ check: AvailabilityCheckRecord; limits: AvailabilityCheckLimits }>(
+    await fetch(`${API_BASE}/v1/projects/${projectId}/availability-checks/${checkId}`, {
+      credentials: "include"
+    })
+  );
+}
+
+export async function createProjectAvailabilityCheck(
+  projectId: string,
+  payload: {
+    name: string;
+    url: string;
+    method: "GET" | "HEAD";
+    expected_status_min: number;
+    expected_status_max: number;
+    timeout_ms: number;
+    interval_seconds: number;
+    failure_threshold: number;
+    recovery_threshold: number;
+    environment?: string;
+    service_name?: string | null;
+    enabled: boolean;
+  }
+): Promise<AvailabilityCheckRecord> {
+  const body = await readJson<{ check: AvailabilityCheckRecord }>(
+    await fetch(`${API_BASE}/v1/projects/${projectId}/availability-checks`, {
+      method: "POST",
+      credentials: "include",
+      headers: buildBrowserSessionHeaders(true),
+      body: JSON.stringify(payload)
+    })
+  );
+
+  return body.check;
+}
+
+export async function updateProjectAvailabilityCheck(
+  projectId: string,
+  checkId: string,
+  payload: {
+    name?: string;
+    url?: string;
+    method?: "GET" | "HEAD";
+    expected_status_min?: number;
+    expected_status_max?: number;
+    timeout_ms?: number;
+    interval_seconds?: number;
+    failure_threshold?: number;
+    recovery_threshold?: number;
+    environment?: string;
+    service_name?: string | null;
+    enabled?: boolean;
+  }
+): Promise<AvailabilityCheckRecord> {
+  const body = await readJson<{ check: AvailabilityCheckRecord }>(
+    await fetch(`${API_BASE}/v1/projects/${projectId}/availability-checks/${checkId}`, {
+      method: "PATCH",
+      credentials: "include",
+      headers: buildBrowserSessionHeaders(true),
+      body: JSON.stringify(payload)
+    })
+  );
+
+  return body.check;
+}
+
+export async function deleteProjectAvailabilityCheck(
+  projectId: string,
+  checkId: string
+): Promise<void> {
+  await readJson(
+    await fetch(`${API_BASE}/v1/projects/${projectId}/availability-checks/${checkId}`, {
+      method: "DELETE",
+      credentials: "include",
+      headers: buildBrowserSessionHeaders()
+    })
+  );
+}
+
+export async function testProjectAvailabilityCheck(
+  projectId: string,
+  payload: {
+    url: string;
+    method: "GET" | "HEAD";
+    expected_status_min: number;
+    expected_status_max: number;
+    timeout_ms: number;
+  }
+): Promise<AvailabilityCheckTestResult> {
+  return await readJson<AvailabilityCheckTestResult>(
+    await fetch(`${API_BASE}/v1/projects/${projectId}/availability-checks/test`, {
+      method: "POST",
+      credentials: "include",
+      headers: buildBrowserSessionHeaders(true),
+      body: JSON.stringify(payload)
+    })
+  );
+}
+
+export async function listProjectAvailabilityCheckResults(
+  projectId: string,
+  checkId: string,
+  limit = 20
+): Promise<AvailabilityCheckResultRecord[]> {
+  const body = await readJson<{ results: AvailabilityCheckResultRecord[] }>(
+    await fetch(
+      `${API_BASE}/v1/projects/${projectId}/availability-checks/${checkId}/results?limit=${encodeURIComponent(String(limit))}`,
+      {
+        credentials: "include"
+      }
+    )
+  );
+
+  return body.results;
+}
+
+export async function listProjectAvailabilityCheckDailyRollups(
+  projectId: string,
+  checkId: string,
+  limit = 30
+): Promise<AvailabilityCheckDailyRollupRecord[]> {
+  const body = await readJson<{ rollups: AvailabilityCheckDailyRollupRecord[] }>(
+    await fetch(
+      `${API_BASE}/v1/projects/${projectId}/availability-checks/${checkId}/daily-rollups?limit=${encodeURIComponent(String(limit))}`,
+      {
+        credentials: "include"
+      }
+    )
+  );
+
+  return body.rollups;
 }
 
 export async function deactivateProjectProbeActivation(

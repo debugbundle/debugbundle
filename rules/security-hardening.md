@@ -1,7 +1,7 @@
 # Security Hardening Rules — DebugBundle
 
 Version: v1
-Last updated: 2026-05-28
+Last updated: 2026-06-15
 
 These rules are ongoing enforcement requirements derived from the Phase 20 hardening audit.
 They apply to **every future change** — not just the initial hardening pass.
@@ -110,6 +110,7 @@ The following categories of actions must produce `audit_logs` entries:
 - Billing access (checkout, portal, webhook processing)
 - Session creation and revocation
 - Config changes (capture policy, webhooks, alerts)
+- Hosted availability-check creation, update, deletion, and target tests
 
 New security-relevant routes or actions must add audit logging in the same change. Audit logging is fail-open (failures log warnings but do not block the request).
 
@@ -122,6 +123,9 @@ Every route that performs destructive or privileged operations (project deletion
 
 ### SEC-26: Relay Credential Rejection
 Browser relay handlers must strip or reject `project_token`, `organization_id`, and authentication headers from incoming browser requests. Browser events must never carry cloud credentials. Server-side relay attaches credentials during forwarding only.
+
+### SEC-27: Hosted Outbound Request Guardrails
+Any DebugBundle-hosted outbound request feature, including availability checks, must enforce SSRF guardrails before every request and every redirect. Allowed targets are external `http`/`https` URLs on ports 80 or 443 only. Embedded credentials, localhost, private hostnames, private/reserved IP ranges, metadata service addresses, and unsafe redirects must fail closed. Retained evidence, audit logs, synthetic events, and bundle context must not store raw query values or URL fragments from checked targets.
 
 ---
 

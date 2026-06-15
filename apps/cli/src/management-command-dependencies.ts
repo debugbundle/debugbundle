@@ -60,6 +60,16 @@ import type {
   listActiveProbesWithAuthCommand as defaultListActiveProbesCommand
 } from "./probe-commands.js";
 import type {
+  createHealthCheckWithAuthCommand as defaultCreateHealthCheckCommand,
+  deleteHealthCheckWithAuthCommand as defaultDeleteHealthCheckCommand,
+  getHealthCheckWithAuthCommand as defaultGetHealthCheckCommand,
+  listHealthCheckDailyRollupsWithAuthCommand as defaultListHealthCheckDailyRollupsCommand,
+  listHealthCheckResultsWithAuthCommand as defaultListHealthCheckResultsCommand,
+  listHealthChecksWithAuthCommand as defaultListHealthChecksCommand,
+  testHealthCheckWithAuthCommand as defaultTestHealthCheckCommand,
+  updateHealthCheckWithAuthCommand as defaultUpdateHealthCheckCommand
+} from "./health-check-commands.js";
+import type {
   createProjectWithAuthCommand as defaultCreateProjectCommand,
   deleteProjectWithAuthCommand as defaultDeleteProjectCommand,
   listProjectsWithAuthCommand as defaultListProjectsCommand,
@@ -148,6 +158,14 @@ export type ManagementCommandDependencies = {
   activateProbeCommand?: typeof defaultActivateProbeCommand;
   listActiveProbesCommand?: typeof defaultListActiveProbesCommand;
   deactivateProbeCommand?: typeof defaultDeactivateProbeCommand;
+  listHealthChecksCommand?: typeof defaultListHealthChecksCommand;
+  getHealthCheckCommand?: typeof defaultGetHealthCheckCommand;
+  createHealthCheckCommand?: typeof defaultCreateHealthCheckCommand;
+  updateHealthCheckCommand?: typeof defaultUpdateHealthCheckCommand;
+  deleteHealthCheckCommand?: typeof defaultDeleteHealthCheckCommand;
+  testHealthCheckCommand?: typeof defaultTestHealthCheckCommand;
+  listHealthCheckResultsCommand?: typeof defaultListHealthCheckResultsCommand;
+  listHealthCheckDailyRollupsCommand?: typeof defaultListHealthCheckDailyRollupsCommand;
   listMembersCommand?: typeof defaultListMembersCommand;
   listInvitesCommand?: typeof defaultListInvitesCommand;
   inviteMemberCommand?: typeof defaultInviteMemberCommand;

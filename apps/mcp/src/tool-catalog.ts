@@ -6,9 +6,12 @@ import { BILLING_MCP_TOOL_NAMES } from './billing-tools.js';
 import { CAPTURE_RULE_MCP_TOOL_NAMES } from './capture-rule-tools.js';
 import { CAPTURE_POLICY_MCP_TOOL_NAMES } from './capture-policy-tools.js';
 import { GITHUB_MCP_TOOL_NAMES } from './github-tools.js';
+import { HEALTH_CHECK_MCP_TOOL_NAMES } from './health-check-tools.js';
+import { HEALTH_CHECK_MCP_TOOL_CATALOG } from './health-check-tool-catalog.js';
 import { IMPROVEMENT_MCP_TOOL_NAMES } from './improvement-tools.js';
 import { IMPROVEMENT_SETTINGS_MCP_TOOL_NAMES } from './improvement-settings-tools.js';
 import { MEMBER_MCP_TOOL_NAMES } from './member-tools.js';
+import { PROBE_MCP_TOOL_CATALOG } from './probe-tool-catalog.js';
 import { PROBE_MCP_TOOL_NAMES } from './probe-tools.js';
 import { PROJECT_MCP_TOOL_NAMES } from './project-tools.js';
 import { RETRIEVAL_MCP_TOOL_NAMES } from './retrieval-tools.js';
@@ -26,6 +29,7 @@ type McpToolName =
   | (typeof CAPTURE_RULE_MCP_TOOL_NAMES)[number]
   | (typeof CAPTURE_POLICY_MCP_TOOL_NAMES)[number]
   | (typeof GITHUB_MCP_TOOL_NAMES)[number]
+  | (typeof HEALTH_CHECK_MCP_TOOL_NAMES)[number]
   | (typeof IMPROVEMENT_MCP_TOOL_NAMES)[number]
   | (typeof IMPROVEMENT_SETTINGS_MCP_TOOL_NAMES)[number]
   | (typeof MEMBER_MCP_TOOL_NAMES)[number]
@@ -46,6 +50,7 @@ type McpToolGroup =
   | 'capture_rules'
   | 'capture_policy'
   | 'github'
+  | 'health_checks'
   | 'improvements'
   | 'improvement_settings'
   | 'members'
@@ -827,39 +832,8 @@ export const MCP_TOOL_CATALOG = [
       }),
     }),
   },
-  {
-    name: 'activate_probe',
-    group: 'probes',
-    description: 'Activate a remote probe on a project.',
-    inputSchema: z.object({
-      bearerToken: z.string(),
-      projectId: z.string(),
-      labelPattern: z.string(),
-      service: z.string().optional(),
-      environment: z.string().optional(),
-      ttlSeconds: z.number().optional(),
-      triggerTtlSeconds: z.number().optional(),
-    }),
-  },
-  {
-    name: 'list_active_probes',
-    group: 'probes',
-    description: 'List active probe activations for a project.',
-    inputSchema: z.object({
-      bearerToken: z.string(),
-      projectId: z.string(),
-    }),
-  },
-  {
-    name: 'deactivate_probe',
-    group: 'probes',
-    description: 'Deactivate a probe activation.',
-    inputSchema: z.object({
-      bearerToken: z.string(),
-      projectId: z.string(),
-      activationId: z.string(),
-    }),
-  },
+  ...PROBE_MCP_TOOL_CATALOG,
+  ...HEALTH_CHECK_MCP_TOOL_CATALOG,
   {
     name: 'get_billing_summary',
     group: 'billing',

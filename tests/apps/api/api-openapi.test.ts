@@ -25,5 +25,8 @@ describe("api openapi spec", () => {
     expect(document.paths?.["/v1/auth/logout"]?.["post"]?.security).toEqual([{ browserSession: [] }]);
     expect(document.paths?.["/v1/auth/github/start"]?.["get"]?.responses).toHaveProperty("302");
     expect(document.paths?.["/v1/projects/{id}/tokens"]?.["get"]?.responses).toHaveProperty("200");
+    expect(document.paths?.["/v1/projects/{id}/availability-checks"]?.["get"]?.operationId).toBe("listAvailabilityChecks");
+    expect(document.paths?.["/v1/projects/{id}/availability-checks/{checkId}"]?.["patch"]?.operationId).toBe("updateAvailabilityCheck");
+    expect(document.paths?.["/v1/projects/{id}/availability-checks/test"]?.["post"]?.responses).toHaveProperty("200");
   });
 });

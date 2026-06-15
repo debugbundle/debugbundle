@@ -15,6 +15,7 @@ describe('Phase 15 — Homepage, Marketing & Blog', () => {
 
       // Must have a real hero with product value proposition
       expect(landing).toContain('DebugBundle');
+      expect(landing).toContain('Hosted health checks');
       // Must link to docs and app
       expect(landing).toContain('/docs/');
       expect(landing).toContain('app.debugbundle.com');

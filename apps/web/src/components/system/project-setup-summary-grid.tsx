@@ -5,13 +5,16 @@ import {
   getProjectCapturePolicy,
   getProjectGitHubRepo,
   getProjectImprovementSettings,
+  listProjectAvailabilityChecks,
   listProjectGitHubRules,
   listProjectAlerts,
+  listProjectProbeActivations,
   listProjectWeeklyReportChannels,
   listProjectWebhooks,
   type AlertRecord,
   type GitHubDispatchRuleRecord,
   type GitHubInstallationRecord,
+  type ProbeActivationRecord,
   type ProjectCapturePolicyResponse,
   type ProjectGitHubRepoRecord,
   type ProjectImprovementSettingsResponse,
@@ -43,6 +46,8 @@ interface GitHubOverviewSummary {
 interface ProjectSetupSummaryState {
   alerts: SummaryLoadState<AlertRecord[]>;
   webhooks: SummaryLoadState<WebhookRecord[]>;
+  probes: SummaryLoadState<ProbeActivationRecord[]>;
+  healthChecks: SummaryLoadState<Awaited<ReturnType<typeof listProjectAvailabilityChecks>>>;
   github: GitHubSummaryLoadState;
   weeklyReports: SummaryLoadState<WeeklyReportChannelRecord[]>;
   capturePolicy: SummaryLoadState<ProjectCapturePolicyResponse>;
@@ -61,6 +66,8 @@ export function ProjectSetupSummaryGrid({ project }: { project: ProjectRecord })
       const [
         alertsResult,
         webhooksResult,
+        probesResult,
+        healthChecksResult,
         capturePolicyResult,
         improvementSettingsResult,
         weeklyReportsResult,
@@ -68,6 +75,8 @@ export function ProjectSetupSummaryGrid({ project }: { project: ProjectRecord })
       ] = await Promise.allSettled([
         listProjectAlerts(project.project_id, PROJECT_SETUP_SUMMARY_LIST_LIMIT),
         listProjectWebhooks(project.project_id, PROJECT_SETUP_SUMMARY_LIST_LIMIT),
+        listProjectProbeActivations(project.project_id),
+        listProjectAvailabilityChecks(project.project_id, PROJECT_SETUP_SUMMARY_LIST_LIMIT),
         getProjectCapturePolicy(project.project_id),
         getProjectImprovementSettings(project.project_id),
         listProjectWeeklyReportChannels(project.project_id, PROJECT_SETUP_SUMMARY_LIST_LIMIT),
@@ -81,6 +90,8 @@ export function ProjectSetupSummaryGrid({ project }: { project: ProjectRecord })
       setSummary({
         alerts: toSummaryLoadState(alertsResult),
         webhooks: toSummaryLoadState(webhooksResult),
+        probes: toSummaryLoadState(probesResult),
+        healthChecks: toSummaryLoadState(healthChecksResult),
         capturePolicy: toSummaryLoadState(capturePolicyResult),
         improvementSettings: toSummaryLoadState(improvementSettingsResult),
         weeklyReports: toSummaryLoadState(weeklyReportsResult),
@@ -101,6 +112,8 @@ export function ProjectSetupSummaryGrid({ project }: { project: ProjectRecord })
     <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
       {renderAlertsSummaryBlock(summary.alerts)}
       {renderWebhooksSummaryBlock(summary.webhooks)}
+      {renderHealthChecksSummaryBlock(summary.healthChecks)}
+      {renderProbesSummaryBlock(summary.probes, project.organization_plan)}
       {renderGitHubSummaryBlock(summary.github, project.organization_plan)}
       {renderWeeklyReportsSummaryBlock(summary.weeklyReports)}
       {renderCapturePolicySummaryBlock(summary.capturePolicy)}
@@ -113,6 +126,8 @@ function buildLoadingProjectSetupSummary(): ProjectSetupSummaryState {
   return {
     alerts: { status: "loading" },
     webhooks: { status: "loading" },
+    probes: { status: "loading" },
+    healthChecks: { status: "loading" },
     github: { status: "loading" },
     weeklyReports: { status: "loading" },
     capturePolicy: { status: "loading" },
@@ -151,6 +166,8 @@ function isProjectSetupSummaryLoading(summary: ProjectSetupSummaryState): boolea
   return (
     summary.alerts.status === "loading" ||
     summary.webhooks.status === "loading" ||
+    summary.probes.status === "loading" ||
+    summary.healthChecks.status === "loading" ||
     summary.weeklyReports.status === "loading" ||
     summary.capturePolicy.status === "loading" ||
     summary.improvementSettings.status === "loading" ||
@@ -161,7 +178,7 @@ function isProjectSetupSummaryLoading(summary: ProjectSetupSummaryState): boolea
 function ProjectSetupSummarySkeleton(): JSX.Element {
   return (
     <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-      {Array.from({ length: 6 }, (_, index) => (
+      {Array.from({ length: 8 }, (_, index) => (
         <div key={index} className="rounded-lg border border-border/80 bg-background/60 p-4">
           <Skeleton className="h-3 w-24" />
           <Skeleton className="mt-3 h-7 w-28" />
@@ -240,6 +257,119 @@ function renderWebhooksSummaryBlock(summary: SummaryLoadState<WebhookRecord[]>):
         totalWebhooks === 0
           ? "No project webhooks are configured yet."
           : `${distinctEventCount} event type${distinctEventCount === 1 ? "" : "s"} subscribed across endpoints.`
+      }
+    />
+  );
+}
+
+function renderProbesSummaryBlock(
+  summary: SummaryLoadState<ProbeActivationRecord[]>,
+  organizationPlan: ProjectRecord["organization_plan"]
+): JSX.Element {
+  if (summary.status === "loading") {
+    return <SetupSummaryBlock label="Probes" value="Loading..." badge={{ label: "Loading", variant: "outline" }} description="Loading remote probe status." />;
+  }
+
+  if (summary.status === "error") {
+    return (
+      <SetupSummaryBlock
+        label="Probes"
+        value="Unavailable"
+        badge={{ label: "Could not load", variant: "outline" }}
+        description="Remote probe activations could not be loaded for this project."
+      />
+    );
+  }
+
+  const totalActivations = summary.data.length;
+  const globalActivations = summary.data.filter(
+    (activation) => activation.service === "*" && activation.environment === "*"
+  ).length;
+  const remoteProbesEnabled = organizationPlan !== "free";
+
+  if (!remoteProbesEnabled) {
+    return (
+      <SetupSummaryBlock
+        label="Probes"
+        value={totalActivations > 0 ? "Paused" : "Solo+ only"}
+        badge={{
+          label: totalActivations > 0 ? "Upgrade required" : "Unavailable",
+          variant: totalActivations > 0 ? "warning" : "outline"
+        }}
+        description={
+          totalActivations > 0
+            ? "Saved remote probe activations are preserved and will resume after the project returns to Solo or Team."
+            : "Always-on probe buffers still work in the SDK, but remote probe activation requires Solo or Team."
+        }
+      />
+    );
+  }
+
+  return (
+    <SetupSummaryBlock
+      label="Probes"
+      value={totalActivations === 0 ? "Not configured" : `${formatBoundedCount(totalActivations, PROJECT_SETUP_SUMMARY_LIST_LIMIT)} active`}
+      badge={{
+        label:
+          totalActivations === 0
+            ? "Off"
+            : globalActivations > 0
+              ? `${globalActivations} global`
+              : "Scoped",
+        variant: totalActivations === 0 ? "secondary" : "success"
+      }}
+      description={
+        totalActivations === 0
+          ? "No remote probe activations are configured yet."
+          : "Matching SDK probe labels can ship independently before the next error."
+      }
+    />
+  );
+}
+
+function renderHealthChecksSummaryBlock(
+  summary: SummaryLoadState<Awaited<ReturnType<typeof listProjectAvailabilityChecks>>>
+): JSX.Element {
+  if (summary.status === "loading") {
+    return <SetupSummaryBlock label="Health checks" value="Loading..." badge={{ label: "Loading", variant: "outline" }} description="Loading health-check status." />;
+  }
+
+  if (summary.status === "error") {
+    return (
+      <SetupSummaryBlock
+        label="Health checks"
+        value="Unavailable"
+        badge={{ label: "Could not load", variant: "outline" }}
+        description="Health-check counts could not be loaded for this project."
+      />
+    );
+  }
+
+  const totalChecks = summary.data.checks.length;
+  const enabledChecks = summary.data.checks.filter((check) => check.enabled).length;
+  const pausedChecks = summary.data.checks.filter((check) => check.status === "paused").length;
+
+  return (
+    <SetupSummaryBlock
+      label="Health checks"
+      value={
+        totalChecks === 0
+          ? "Not configured"
+          : `${formatBoundedCount(totalChecks, PROJECT_SETUP_SUMMARY_LIST_LIMIT)} check${totalChecks === 1 ? "" : "s"}`
+      }
+      badge={{
+        label:
+          pausedChecks > 0
+            ? `${pausedChecks} paused`
+            : enabledChecks > 0
+              ? `${enabledChecks} enabled`
+              : "Off",
+        variant: pausedChecks > 0 ? "warning" : enabledChecks > 0 ? "success" : "secondary"
+      }}
+      description={
+        totalChecks === 0
+          ? "No hosted health checks are configured yet."
+          : `Plan minimum interval ${summary.data.limits.min_interval_seconds}s with 30-day retained history.`
       }
     />
   );

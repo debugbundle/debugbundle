@@ -18,6 +18,9 @@ import type { EmailMessage } from "../../../packages/email/src/index.js";
 import type {
   AccountDeletionBlockedReason,
   AccountDataExportRecord,
+  AvailabilityCheckDailyRollupRecord,
+  AvailabilityCheckRecord,
+  AvailabilityCheckResultRecord,
   AuditLogStore,
   BillingSummaryRecord,
   AlertChannel,
@@ -261,6 +264,93 @@ export interface ApiDependencies {
       organization_id: string;
       now: string;
     }): Promise<BillingSummaryRecord | "billing_not_configured" | "billing_not_found" | "no_active_subscription" | "capacity_reduction_not_found">;
+  } | undefined;
+  availabilityCheckManagement?: {
+    listChecksForProjectInOrganization(input: {
+      organization_id: string;
+      project_id: string;
+      limit: number;
+    }): Promise<AvailabilityCheckRecord[] | null>;
+    getCheckForProjectInOrganization(input: {
+      organization_id: string;
+      project_id: string;
+      check_id: string;
+    }): Promise<AvailabilityCheckRecord | null>;
+    createCheckForProjectInOrganization(input: {
+      organization_id: string;
+      project_id: string;
+      created_by_user_id: string;
+      name: string;
+      url: string;
+      method: "GET" | "HEAD";
+      expected_status_min: number;
+      expected_status_max: number;
+      timeout_ms: number;
+      interval_seconds: number;
+      failure_threshold: number;
+      recovery_threshold: number;
+      environment?: string | null;
+      service_name?: string | null;
+      enabled: boolean;
+      now: string;
+    }): Promise<AvailabilityCheckRecord | "project_not_found" | "limit_reached" | "interval_too_low">;
+    updateCheckForProjectInOrganization(input: {
+      organization_id: string;
+      project_id: string;
+      check_id: string;
+      name?: string;
+      url?: string;
+      method?: "GET" | "HEAD";
+      expected_status_min?: number;
+      expected_status_max?: number;
+      timeout_ms?: number;
+      interval_seconds?: number;
+      failure_threshold?: number;
+      recovery_threshold?: number;
+      environment?: string | null;
+      service_name?: string | null;
+      enabled?: boolean;
+      now: string;
+    }): Promise<AvailabilityCheckRecord | "check_not_found" | "interval_too_low">;
+    deleteCheckForProjectInOrganization(input: {
+      organization_id: string;
+      project_id: string;
+      check_id: string;
+      deleted_at: string;
+    }): Promise<boolean>;
+    listResultsForCheckInOrganization(input: {
+      organization_id: string;
+      project_id: string;
+      check_id: string;
+      limit: number;
+    }): Promise<AvailabilityCheckResultRecord[] | null>;
+    listDailyRollupsForCheckInOrganization(input: {
+      organization_id: string;
+      project_id: string;
+      check_id: string;
+      limit: number;
+    }): Promise<AvailabilityCheckDailyRollupRecord[] | null>;
+    testCheck(input: {
+      url: string;
+      method: "GET" | "HEAD";
+      expected_status_min: number;
+      expected_status_max: number;
+      timeout_ms: number;
+    }): Promise<{
+      normalized_url: string;
+      result: {
+        status: string;
+        http_status: number | null;
+        duration_ms: number;
+        error_kind: string | null;
+        error_message: string | null;
+        checked_url_host: string;
+        checked_url_path: string;
+        checked_url_query: Record<string, string>;
+        final_url: string;
+        redirect_count: number;
+      };
+    }>;
   } | undefined;
   billingAdmin?: {
     isOperatorAllowed(input: { email: string }): boolean;

@@ -33,6 +33,19 @@
 
 Use capture-rule suggestions for repeated operational noise after inspecting an incident bundle. Use capture-policy client-error path rules for route-scoped 4xx incidents instead of promoting all client errors.
 
+## Availability Checks
+
+- `debugbundle health checks list --project-id <id> [--limit <n>] [--auth-file <path>] [--json]`
+- `debugbundle health checks get <check-id> --project-id <id> [--auth-file <path>] [--json]`
+- `debugbundle health checks create --project-id <id> --name <name> --url <url> --interval-seconds <n> [--method <GET|HEAD>] [--expected-status-min <code>] [--expected-status-max <code>] [--timeout-ms <n>] [--failure-threshold <n>] [--recovery-threshold <n>] [--environment <name>] [--service <name|null>] [--enabled <true|false>] [--auth-file <path>] [--json]`
+- `debugbundle health checks update <check-id> --project-id <id> [--name <name>] [--url <url>] [--method <GET|HEAD>] [--expected-status-min <code>] [--expected-status-max <code>] [--timeout-ms <n>] [--interval-seconds <n>] [--failure-threshold <n>] [--recovery-threshold <n>] [--environment <name>] [--service <name|null>] [--enabled <true|false>] [--auth-file <path>] [--json]`
+- `debugbundle health checks delete <check-id> --project-id <id> [--auth-file <path>] [--json]`
+- `debugbundle health checks test --project-id <id> --url <url> [--method <GET|HEAD>] [--expected-status-min <code>] [--expected-status-max <code>] [--timeout-ms <n>] [--auth-file <path>] [--json]`
+- `debugbundle health checks results <check-id> --project-id <id> [--limit <n>] [--auth-file <path>] [--json]`
+- `debugbundle health checks daily-rollups <check-id> --project-id <id> [--limit <n>] [--auth-file <path>] [--json]`
+
+Use availability-check commands for hosted endpoint reachability. Prefer `test` before saving a new target. `test` is side-effect-free and does not create incidents or retained history. Saved checks remain visible after downgrade, but checks beyond current count or interval limits pause until the project becomes eligible again.
+
 ## Operational Paths
 
 - `.debugbundle/profile.json` — committed project map and agent validation state

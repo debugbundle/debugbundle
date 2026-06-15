@@ -1,7 +1,7 @@
 # Acceptance Criteria — DebugBundle
 
 Version: v1
-Last updated: 2026-05-29
+Last updated: 2026-06-15
 
 ---
 
@@ -188,6 +188,43 @@ Last updated: 2026-05-29
 - **Given** an invalid or revoked project token
 - **When** `POST /v1/events` is called
 - **Then** the API returns a 401 unauthorized response
+
+---
+
+## 2a. Availability Check Acceptance
+
+### AC-AVC-01: Create And Execute Hosted Health Check
+- **Given** an owner or admin configures a project health check with a valid external URL
+- **When** the hosted worker executes the check on schedule
+- **Then** DebugBundle stores the raw result and updates the check's latest status fields
+- **And** the result is readable through API, CLI, MCP, and web project views
+
+### AC-AVC-02: Failure Threshold Opens Incident And Recovery Resolves It
+- **Given** a health check with `failure_threshold: 3` and `recovery_threshold: 2`
+- **When** three consecutive executions fail
+- **Then** DebugBundle opens or regresses one linked availability incident for that check using the normal incident lifecycle
+- **And** bundle generation, alerts, and webhook delivery behave the same as other incident sources
+- **When** two consecutive executions later succeed
+- **Then** DebugBundle auto-resolves the linked availability incident
+
+### AC-AVC-03: Tier Limits Pause But Do Not Hide Preserved Checks
+- **Given** a project that previously configured health checks on a higher plan
+- **When** the project downgrades below the configured count or interval allowance
+- **Then** existing checks remain readable through API, CLI, MCP, and web
+- **And** out-of-policy checks show paused state and stop executing
+- **And** create/update attempts that violate current tier limits return explicit limit errors
+
+### AC-AVC-04: Health Check Test Is Side-Effect-Free
+- **Given** an owner or admin runs a one-off health-check test against a valid target
+- **When** the test endpoint completes
+- **Then** DebugBundle returns the execution result using the same target validation and request guardrails as saved checks
+- **And** no incident is opened, no retained history row is written, and no counters are advanced
+
+### AC-AVC-05: Thirty-Day Retention Keeps Status History Ready
+- **Given** a project with health-check executions across more than 30 days
+- **When** retention cleanup runs
+- **Then** raw results and daily rollups older than 30 days are purged
+- **And** at least one retained daily state row remains available for each in-window day that had health-check activity
 
 ---
 

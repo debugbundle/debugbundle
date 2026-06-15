@@ -22,6 +22,7 @@ import {
   buildBundleRegenerationLeaseKey,
   buildImprovementBundleRegenerationLeaseKey,
   buildUserAvatarObjectKey,
+  createPostgresAvailabilityCheckStore,
   createPostgresAccountAnalyticsStore,
   createPostgresAccountStore,
   createPostgresAuditLogStore,
@@ -50,6 +51,8 @@ import {
   runInTransaction,
   createS3ObjectStoreClient,
   deleteProjectObjects,
+  executeAvailabilityCheck,
+  validateAvailabilityCheckDefinition,
   type ObjectStoreClient,
   type Queryable,
   type QueueClient,
@@ -152,6 +155,7 @@ export function createApiDependencies(input: CreateApiDependenciesInput): Defaul
     ...(accountAnalyticsStore === undefined ? {} : { accountAnalyticsStore })
   });
   const improvementSettingsStore = createPostgresImprovementSettingsStore(input.db);
+  const availabilityCheckStore = createPostgresAvailabilityCheckStore(input.db);
   const metadataStore = createPostgresMetadataStore(input.db, {
     ...(accountAnalyticsStore === undefined ? {} : { accountAnalyticsStore })
   });
@@ -973,6 +977,45 @@ export function createApiDependencies(input: CreateApiDependenciesInput): Defaul
         }
 
         return improvementSettingsStore.updateImprovementSettings(update);
+      }
+    },
+    availabilityCheckManagement: {
+      ...availabilityCheckStore,
+      createCheckForProjectInOrganization: async (request) => {
+        const validated = await validateAvailabilityCheckDefinition(request);
+        return await availabilityCheckStore.createCheckForProjectInOrganization({
+          ...request,
+          url: validated.normalized_url
+        });
+      },
+      updateCheckForProjectInOrganization: async (request) => {
+        if (request.url === undefined) {
+          return await availabilityCheckStore.updateCheckForProjectInOrganization(request);
+        }
+
+        const validated = await validateAvailabilityCheckDefinition({
+          url: request.url,
+          method: request.method ?? "GET",
+          expected_status_min: request.expected_status_min ?? 200,
+          expected_status_max: request.expected_status_max ?? 399,
+          timeout_ms: request.timeout_ms ?? 5000
+        });
+        return await availabilityCheckStore.updateCheckForProjectInOrganization({
+          ...request,
+          url: validated.normalized_url
+        });
+      },
+      testCheck: async (request) => {
+        const validated = await validateAvailabilityCheckDefinition(request);
+        const result = await executeAvailabilityCheck({
+          ...request,
+          url: validated.normalized_url
+        });
+
+        return {
+          normalized_url: validated.normalized_url,
+          result
+        };
       }
     },
     improvementManagement: {

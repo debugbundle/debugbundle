@@ -176,6 +176,7 @@ describe('public site machine-readable artifacts', () => {
     expect(content).toContain('- CLI cloud workflow: https://debugbundle.com/docs/cli/cloud-workflow/');
     expect(content).toContain('- API overview: https://debugbundle.com/docs/api/');
     expect(content).toContain('- MCP tools: https://debugbundle.com/docs/mcp/tools/');
+    expect(content).toContain('- Availability checks: https://debugbundle.com/docs/availability-checks/');
     expect(content).toContain('- GitHub automation: https://debugbundle.com/docs/agent-workflows/automation-recipes/');
     expect(content).toContain('- Agent workflows: https://debugbundle.com/docs/agent-workflows/');
     expect(content).toContain('- Reference index: https://debugbundle.com/docs/v1/reference/');

@@ -73,6 +73,21 @@ export { createPostgresGitHubMarketplaceStore } from "./github-marketplace-store
 export { createIncidentLifecycleService } from "./incident-lifecycle-service.js";
 export { createPostgresMetadataStore } from "./metadata-store.js";
 export { createPostgresOperationalEmailDeliveryStore } from "./operational-email-delivery-store.js";
+export type {
+  AvailabilityCheckDailyRollupRecord,
+  AvailabilityCheckHealthStatus,
+  AvailabilityCheckRecord,
+  AvailabilityCheckResultRecord,
+  AvailabilityCheckStore,
+  ClaimedAvailabilityCheck,
+  RecordedAvailabilityCheckExecution
+} from "./availability-check-store-types.js";
+export { createPostgresAvailabilityCheckStore } from "./availability-check-store.js";
+export {
+  executeAvailabilityCheck,
+  validateAvailabilityCheckDefinition,
+  AvailabilityCheckValidationError
+} from "./availability-check-executor.js";
 export type { OrganizationPlanCleanupService } from "./plan-downgrade-cleanup.js";
 export { createOrganizationPlanCleanupService } from "./plan-downgrade-cleanup.js";
 export {

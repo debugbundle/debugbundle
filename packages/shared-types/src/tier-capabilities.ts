@@ -32,6 +32,8 @@ export const TIER_CAPABILITIES = {
     monthly_remote_activations: 0,
     monthly_alert_deliveries: 25,
     monthly_webhook_deliveries: 100,
+    availability_checks_per_project: 1,
+    availability_check_min_interval_seconds: 300,
   },
   solo: {
     remote_probes: true,
@@ -53,6 +55,8 @@ export const TIER_CAPABILITIES = {
     monthly_remote_activations: 25,
     monthly_alert_deliveries: 75,
     monthly_webhook_deliveries: 250,
+    availability_checks_per_project: 5,
+    availability_check_min_interval_seconds: 60,
   },
   team: {
     remote_probes: true,
@@ -74,6 +78,8 @@ export const TIER_CAPABILITIES = {
     monthly_remote_activations: 50,
     monthly_alert_deliveries: 300,
     monthly_webhook_deliveries: 1_000,
+    availability_checks_per_project: 25,
+    availability_check_min_interval_seconds: 30,
   },
 } as const;
 
@@ -99,6 +105,8 @@ export interface TierCapabilities {
   readonly monthly_remote_activations: number;
   readonly monthly_alert_deliveries: number;
   readonly monthly_webhook_deliveries: number;
+  readonly availability_checks_per_project: number;
+  readonly availability_check_min_interval_seconds: number;
 }
 
 /**
@@ -125,6 +133,8 @@ const SELFHOST_CAPABILITIES: TierCapabilities = {
   monthly_remote_activations: 1_000_000,
   monthly_alert_deliveries: 1_000_000,
   monthly_webhook_deliveries: 1_000_000,
+  availability_checks_per_project: 1_000_000,
+  availability_check_min_interval_seconds: 30,
 };
 
 /** Whether the instance is running in self-host mode (all tier limits bypassed). */

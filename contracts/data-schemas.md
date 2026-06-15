@@ -1,7 +1,7 @@
 # Data Schemas — DebugBundle
 
 Version: v1
-Last updated: 2026-03-11
+Last updated: 2026-06-15
 
 ---
 
@@ -856,6 +856,95 @@ Emitted by SDKs when duplicate suppression is active:
 - `incidents_project_env_service_fingerprint_idx` UNIQUE on (project_id, environment, service_id, fingerprint)
 - `incidents_status_idx` on (project_id, status)
 
+### 5.8a availability_checks
+| Column | Type | Constraints |
+|--------|------|-------------|
+| id | uuid | PK |
+| project_id | uuid | FK → projects, CASCADE |
+| created_by_user_id | uuid | FK → users, SET NULL |
+| name | text | NOT NULL |
+| url | text | NOT NULL |
+| method | text | NOT NULL, CHECK IN (`GET`, `HEAD`) |
+| expected_status_min | integer | NOT NULL DEFAULT `200`, CHECK `100..599` |
+| expected_status_max | integer | NOT NULL DEFAULT `399`, CHECK `100..599` |
+| timeout_ms | integer | NOT NULL DEFAULT `5000`, CHECK `500..5000` |
+| interval_seconds | integer | NOT NULL, CHECK `>= 30` |
+| failure_threshold | integer | NOT NULL DEFAULT `3`, CHECK `1..10` |
+| recovery_threshold | integer | NOT NULL DEFAULT `2`, CHECK `1..10` |
+| environment | text | NOT NULL DEFAULT `production` |
+| service_name | text | |
+| enabled | boolean | NOT NULL DEFAULT `true` |
+| status | text | NOT NULL DEFAULT `unknown`, CHECK IN (`unknown`, `passing`, `failing`) |
+| consecutive_failures | integer | NOT NULL DEFAULT `0` |
+| consecutive_successes | integer | NOT NULL DEFAULT `0` |
+| linked_incident_id | uuid | FK → incidents, SET NULL |
+| last_checked_at | timestamptz | |
+| next_check_at | timestamptz | |
+| claimed_at | timestamptz | |
+| last_result_status | text | nullable result-status enum |
+| last_result_http_status | integer | |
+| last_result_error_kind | text | |
+| last_result_error_message | text | |
+| last_result_duration_ms | integer | |
+| deleted_at | timestamptz | Soft-delete marker for future status-history surfaces |
+| created_at | timestamptz | NOT NULL DEFAULT now() |
+| updated_at | timestamptz | NOT NULL DEFAULT now() |
+
+**Indexes:**
+- `availability_checks_project_created_idx` on `(project_id, created_at DESC)`
+- `availability_checks_due_idx` on `(next_check_at, project_id)`
+- `availability_checks_claimed_idx` on `(claimed_at)`
+
+### 5.8b availability_check_results
+| Column | Type | Constraints |
+|--------|------|-------------|
+| id | uuid | PK |
+| check_id | uuid | FK → availability_checks, CASCADE |
+| project_id | uuid | FK → projects, CASCADE |
+| started_at | timestamptz | NOT NULL |
+| completed_at | timestamptz | NOT NULL |
+| duration_ms | integer | NOT NULL |
+| status | text | NOT NULL, CHECK IN (`success`, `http_status_mismatch`, `timeout`, `dns_error`, `tls_error`, `connection_error`, `redirect_blocked`, `security_blocked`, `internal_error`) |
+| http_status | integer | |
+| error_kind | text | |
+| error_message | text | |
+| redirect_count | integer | NOT NULL DEFAULT `0` |
+| checked_url_host | text | NOT NULL |
+| checked_url_path | text | NOT NULL |
+| final_url | text | NOT NULL |
+| created_at | timestamptz | NOT NULL DEFAULT now() |
+
+Detailed execution history is retained for 30 days and then purged by retention cleanup. Response bodies and raw resolved IP addresses are intentionally not stored.
+
+**Indexes:**
+- `availability_check_results_check_started_idx` on `(check_id, started_at DESC)`
+- `availability_check_results_project_started_idx` on `(project_id, started_at DESC)`
+
+### 5.8c availability_check_daily_rollups
+| Column | Type | Constraints |
+|--------|------|-------------|
+| id | uuid | PK |
+| check_id | uuid | FK → availability_checks, CASCADE |
+| project_id | uuid | FK → projects, CASCADE |
+| day | date | NOT NULL |
+| state | text | NOT NULL, CHECK IN (`unknown`, `operational`, `degraded`, `down`, `paused`) |
+| total_checks | integer | NOT NULL DEFAULT `0` |
+| successful_checks | integer | NOT NULL DEFAULT `0` |
+| failed_checks | integer | NOT NULL DEFAULT `0` |
+| degraded_checks | integer | NOT NULL DEFAULT `0` |
+| avg_duration_ms | integer | |
+| first_checked_at | timestamptz | |
+| last_checked_at | timestamptz | |
+| downtime_seconds | integer | NOT NULL DEFAULT `0` |
+| incident_ids | uuid[] | NOT NULL DEFAULT empty array |
+| created_at | timestamptz | NOT NULL DEFAULT now() |
+| updated_at | timestamptz | NOT NULL DEFAULT now() |
+| UNIQUE | `(check_id, day)` |
+
+Daily rollups are retained for at least 30 days so project status-history surfaces can be layered on later without reshaping the data model.
+
+**Index:** `availability_check_daily_rollups_project_day_idx` on `(project_id, day DESC)`
+
 ### 5.9 incident_events
 | Column | Type | Constraints |
 |--------|------|-------------|
@@ -1174,6 +1263,106 @@ Browser relay events are written to the user's project root under `.debugbundle/
 The `.debugbundle/local/browser-relay-spool/` directory is intentionally separate from `.debugbundle/local/events/` so connected relay durability does not create a second local incident-processing stream unless explicitly configured.
 
 ---
+
+## 6. Availability Check API Record Schemas
+
+Hosted availability checks are project-scoped external HTTP checks executed by DebugBundle infrastructure. These records back the API, CLI, MCP, and web `Health` tab surfaces.
+
+### 6.1 AvailabilityCheckRecord
+
+```json
+{
+  "check_id": "uuid",
+  "project_id": "uuid",
+  "name": "Checkout homepage",
+  "url": "https://example.com/health",
+  "method": "GET",
+  "expected_status_min": 200,
+  "expected_status_max": 399,
+  "timeout_ms": 5000,
+  "interval_seconds": 300,
+  "failure_threshold": 3,
+  "recovery_threshold": 2,
+  "environment": "production",
+  "service_name": "frontend",
+  "enabled": true,
+  "status": "passing",
+  "paused_reason": null,
+  "organization_plan": "free",
+  "consecutive_failures": 0,
+  "consecutive_successes": 4,
+  "linked_incident_id": null,
+  "last_checked_at": "ISO8601 | null",
+  "next_check_at": "ISO8601 | null",
+  "last_result_status": "success | http_status_mismatch | timeout | dns_error | tls_error | connection_error | redirect_blocked | security_blocked | internal_error | null",
+  "last_result_http_status": 200,
+  "last_result_error_kind": null,
+  "last_result_error_message": null,
+  "last_result_duration_ms": 184,
+  "created_at": "ISO8601",
+  "updated_at": "ISO8601"
+}
+```
+
+### 6.2 AvailabilityCheckResultRecord
+
+```json
+{
+  "result_id": "uuid",
+  "check_id": "uuid",
+  "project_id": "uuid",
+  "started_at": "ISO8601",
+  "completed_at": "ISO8601",
+  "duration_ms": 184,
+  "status": "success",
+  "http_status": 200,
+  "error_kind": null,
+  "error_message": null,
+  "redirect_count": 0,
+  "checked_url_host": "example.com",
+  "final_url": "https://example.com/health"
+}
+```
+
+### 6.3 AvailabilityCheckDailyRollupRecord
+
+```json
+{
+  "check_id": "uuid",
+  "project_id": "uuid",
+  "day": "YYYY-MM-DD",
+  "state": "operational",
+  "total_checks": 288,
+  "successful_checks": 288,
+  "failed_checks": 0,
+  "degraded_checks": 0,
+  "avg_duration_ms": 173,
+  "first_checked_at": "ISO8601 | null",
+  "last_checked_at": "ISO8601 | null",
+  "downtime_seconds": 0,
+  "incident_ids": []
+}
+```
+
+### 6.4 AvailabilityCheckTestResult
+
+```json
+{
+  "normalized_url": "https://example.com/health",
+  "result": {
+    "status": "success",
+    "http_status": 200,
+    "duration_ms": 184,
+    "error_kind": null,
+    "error_message": null,
+    "checked_url_host": "example.com",
+    "checked_url_path": "/health",
+    "checked_url_query": {},
+    "final_url": "https://example.com/health",
+    "redirect_count": 0
+  }
+}
+```
 
 ## 7. Project Profile Schema (profile.json)
 

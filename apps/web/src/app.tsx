@@ -58,6 +58,7 @@ import {
   ProjectOverviewPage
 } from "./pages/project-overview-page.js";
 import { ProjectImprovementsPage } from "./pages/project-improvements-page.js";
+import { ProjectHealthPage } from "./pages/project-health-page.js";
 import { ProjectProbesPage } from "./pages/project-probes-page.js";
 import { ProjectSettingsPage } from "./pages/project-settings-page.js";
 import { SettingsPage } from "./pages/settings-page.js";
@@ -193,6 +194,7 @@ export function App({ initialEntries }: AppProps): JSX.Element {
                 <Route path="improvements/:improvementId" element={<ImprovementDetailPage />} />
                 <Route path="bundles" element={<ProjectBundlesPage />} />
                 <Route path="bundles/:incidentId" element={<IncidentDetailPage />} />
+                <Route path="health" element={<ProjectHealthPage />} />
                 <Route path="probes" element={<ProjectProbesPage />} />
                 <Route path="github" element={<ProjectGitHubPage />} />
                 <Route path="members" element={<ProjectMembersPage />} />
@@ -237,6 +239,7 @@ export function App({ initialEntries }: AppProps): JSX.Element {
                 <Route path="improvements/:improvementId" element={<ImprovementDetailPage />} />
                 <Route path="bundles" element={<ProjectBundlesPage />} />
                 <Route path="bundles/:incidentId" element={<IncidentDetailPage />} />
+                <Route path="health" element={<ProjectHealthPage />} />
                 <Route path="probes" element={<ProjectProbesPage />} />
                 <Route path="github" element={<ProjectGitHubPage />} />
                 <Route path="members" element={<ProjectMembersPage />} />

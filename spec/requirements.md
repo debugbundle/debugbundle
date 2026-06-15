@@ -1,7 +1,7 @@
 # Requirements — DebugBundle
 
 Version: v1
-Last updated: 2026-05-29
+Last updated: 2026-06-15
 
 ---
 
@@ -121,6 +121,18 @@ Last updated: 2026-05-29
 **FR-PRB-11:** Browser SDKs must strip the `_debug_probe` query parameter from the URL bar after reading (via `history.replaceState`). Trigger tokens delivered via header are consumed silently. Trigger tokens are single-use per request context — they do not persist across requests or page navigations.
 
 **FR-PRB-12:** SDKs must expose ring buffer configuration options: `maxProbeLabels` (default: 50), `maxProbeEntriesPerLabel` (default: 10), `probeFlushOnError` (default: true).
+
+### 1.1b Availability Checks
+
+**FR-AVC-01:** DebugBundle must support project-scoped hosted availability checks executed by DebugBundle infrastructure, not by customer SDKs. V1 availability checks support only `GET` and `HEAD` requests against validated external `http`/`https` targets.
+
+**FR-AVC-02:** Availability checks must reuse the existing incident lifecycle, bundle generation, alerting, webhook delivery, CLI, MCP, and project navigation surfaces. When consecutive failures reach `failure_threshold`, DebugBundle opens or regresses one active availability incident for that check. When consecutive successes reach `recovery_threshold`, DebugBundle auto-resolves the linked availability incident.
+
+**FR-AVC-03:** Availability checks must be manageable through API, CLI, MCP, and web using the same domain services. Authorized project members may read checks and retained results. Owner/admin callers may create, update, delete, enable/disable, and test checks. Test execution must be side-effect-free in V1 and must not create incidents or retained history rows.
+
+**FR-AVC-04:** Hosted availability checks must enforce tier limits per project: Free `1` check with minimum `300` second interval, Solo `5` checks with minimum `60` second interval, Team `25` checks with minimum `30` second interval. Checks that exceed current plan limits after downgrade remain visible but pause execution until the project is eligible again.
+
+**FR-AVC-05:** DebugBundle must retain availability-check raw execution results and per-day rollups for at least 30 days, then purge older records. The retained daily rollups must be sufficient to back a future project status-history surface without a schema redesign.
 
 ### 1.2 Ingestion API
 

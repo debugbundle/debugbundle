@@ -20,6 +20,7 @@ import { registerAlertRoutes } from "./routes/alerts.js";
 import { registerAccountRoutes } from "./routes/account.js";
 import { registerAdminAnalyticsRoutes } from "./routes/admin-analytics.js";
 import { registerAdminBillingRoutes } from "./routes/admin-billing.js";
+import { registerAvailabilityCheckRoutes } from "./routes/availability-checks.js";
 import { registerBillingRoutes } from "./routes/billing.js";
 import { registerCapturePolicyRoutes } from "./routes/capture-policy.js";
 import { registerCaptureRuleRoutes } from "./routes/capture-rules.js";
@@ -330,6 +331,7 @@ export function createApiServer(
   registerHealthRoutes(app, dependencies, context);
   registerProjectMemberRoutes(app, dependencies);
   registerProjectRoutes(app, dependencies);
+  registerAvailabilityCheckRoutes(app, dependencies);
   registerProbeRoutes(app, dependencies);
   registerSystemEmailReviewRoutes(app, dependencies, dogfoodingEnv);
   registerSlackRoutes(app, dependencies);

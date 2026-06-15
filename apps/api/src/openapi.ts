@@ -60,6 +60,9 @@ import {
   AccountDeleteBodySchema,
   AccountDeleteRequestOtpBodySchema,
   AcceptInviteBodySchema,
+  AvailabilityCheckCreateBodySchema,
+  AvailabilityCheckTestBodySchema,
+  AvailabilityCheckUpdateBodySchema,
   AlertsQuerySchema,
   BillingCheckoutBodySchema,
   BillingCheckoutConfirmBodySchema,
@@ -95,6 +98,7 @@ import {
   ProjectTokenParamsSchema,
   ProbeActivateBodySchema,
   ProbeDeactivateBodySchema,
+  ProjectAvailabilityCheckParamsSchema,
   RequestEmailCodeBodySchema,
   ServicesQuerySchema,
   SlackAppCallbackQuerySchema,
@@ -428,6 +432,142 @@ const HealthResponseSchema = z.object({ status: z.literal("ok"), version: z.stri
 const ReadyResponseSchema = z.object({ status: z.literal("ready") }).strict();
 const NotReadyResponseSchema = z.object({ status: z.literal("not_ready"), reason: z.string() }).strict();
 const LiveResponseSchema = z.object({ status: z.literal("live") }).strict();
+const AvailabilityCheckResultStatusSchema = z.enum([
+  "success",
+  "http_status_mismatch",
+  "timeout",
+  "dns_error",
+  "tls_error",
+  "connection_error",
+  "redirect_blocked",
+  "security_blocked",
+  "internal_error"
+]);
+const AvailabilityCheckHealthStatusSchema = z.enum(["unknown", "passing", "failing", "paused"]);
+const AvailabilityCheckLimitsSchema = z
+  .object({
+    max_checks_per_project: z.number().int().nonnegative(),
+    min_interval_seconds: z.number().int().positive()
+  })
+  .strict();
+const AvailabilityCheckRecordSchema = z
+  .object({
+    check_id: z.string().uuid(),
+    project_id: z.string().uuid(),
+    name: z.string(),
+    url: z.string().url(),
+    method: z.enum(["GET", "HEAD"]),
+    expected_status_min: z.number().int().min(100).max(599),
+    expected_status_max: z.number().int().min(100).max(599),
+    timeout_ms: z.number().int().min(500).max(5000),
+    interval_seconds: z.number().int().min(30),
+    failure_threshold: z.number().int().min(1).max(10),
+    recovery_threshold: z.number().int().min(1).max(10),
+    environment: z.string(),
+    service_name: z.string().nullable(),
+    enabled: z.boolean(),
+    status: AvailabilityCheckHealthStatusSchema,
+    paused_reason: z.string().nullable(),
+    organization_plan: z.enum(["free", "solo", "team"]),
+    consecutive_failures: z.number().int().nonnegative(),
+    consecutive_successes: z.number().int().nonnegative(),
+    linked_incident_id: z.string().uuid().nullable(),
+    last_checked_at: z.string().datetime().nullable(),
+    next_check_at: z.string().datetime().nullable(),
+    last_result_status: AvailabilityCheckResultStatusSchema.nullable(),
+    last_result_http_status: z.number().int().nullable(),
+    last_result_error_kind: z.string().nullable(),
+    last_result_error_message: z.string().nullable(),
+    last_result_duration_ms: z.number().int().nullable(),
+    created_at: z.string().datetime(),
+    updated_at: z.string().datetime()
+  })
+  .strict();
+const AvailabilityCheckResultRecordSchema = z
+  .object({
+    result_id: z.string().uuid(),
+    check_id: z.string().uuid(),
+    project_id: z.string().uuid(),
+    started_at: z.string().datetime(),
+    completed_at: z.string().datetime(),
+    duration_ms: z.number().int().nonnegative(),
+    status: AvailabilityCheckResultStatusSchema,
+    http_status: z.number().int().nullable(),
+    error_kind: z.string().nullable(),
+    error_message: z.string().nullable(),
+    redirect_count: z.number().int().nonnegative(),
+    checked_url_host: z.string(),
+    final_url: z.string().url()
+  })
+  .strict();
+const AvailabilityCheckDailyRollupRecordSchema = z
+  .object({
+    check_id: z.string().uuid(),
+    project_id: z.string().uuid(),
+    day: z.string(),
+    state: z.enum(["unknown", "operational", "degraded", "down", "paused"]),
+    total_checks: z.number().int().nonnegative(),
+    successful_checks: z.number().int().nonnegative(),
+    failed_checks: z.number().int().nonnegative(),
+    degraded_checks: z.number().int().nonnegative(),
+    avg_duration_ms: z.number().int().nullable(),
+    first_checked_at: z.string().datetime().nullable(),
+    last_checked_at: z.string().datetime().nullable(),
+    downtime_seconds: z.number().int().nonnegative(),
+    incident_ids: z.array(z.string().uuid())
+  })
+  .strict();
+const AvailabilityCheckListResponseSchema = z
+  .object({
+    checks: z.array(AvailabilityCheckRecordSchema),
+    limits: AvailabilityCheckLimitsSchema
+  })
+  .strict();
+const AvailabilityCheckResponseSchema = z
+  .object({
+    check: AvailabilityCheckRecordSchema,
+    limits: AvailabilityCheckLimitsSchema
+  })
+  .strict();
+const AvailabilityCheckMutationResponseSchema = z
+  .object({
+    check: AvailabilityCheckRecordSchema
+  })
+  .strict();
+const AvailabilityCheckDeleteResponseSchema = z
+  .object({
+    deleted: z.literal(true)
+  })
+  .strict();
+const AvailabilityCheckResultsResponseSchema = z
+  .object({
+    results: z.array(AvailabilityCheckResultRecordSchema)
+  })
+  .strict();
+const AvailabilityCheckDailyRollupsResponseSchema = z
+  .object({
+    rollups: z.array(AvailabilityCheckDailyRollupRecordSchema)
+  })
+  .strict();
+const AvailabilityCheckTestResponseSchema = z
+  .object({
+    normalized_url: z.string().url(),
+    result: z
+      .object({
+        status: AvailabilityCheckResultStatusSchema,
+        http_status: z.number().int().nullable(),
+        duration_ms: z.number().int().nonnegative(),
+        error_kind: z.string().nullable(),
+        error_message: z.string().nullable(),
+        checked_url_host: z.string(),
+        checked_url_path: z.string(),
+        checked_url_query: z.record(z.string(), z.string()),
+        final_url: z.string().url(),
+        redirect_count: z.number().int().nonnegative()
+      })
+      .strict()
+  })
+  .strict();
 
 function component(name: string, schema: unknown): SchemaComponent {
   return { name, schema };
@@ -543,6 +683,13 @@ function buildPublicApiOperations(): OperationSpec[] {
   const readyResponse = component("ReadyResponse", ReadyResponseSchema);
   const notReadyResponse = component("NotReadyResponse", NotReadyResponseSchema);
   const liveResponse = component("LiveResponse", LiveResponseSchema);
+  const availabilityCheckListResponse = component("AvailabilityCheckListResponse", AvailabilityCheckListResponseSchema);
+  const availabilityCheckResponse = component("AvailabilityCheckResponse", AvailabilityCheckResponseSchema);
+  const availabilityCheckMutationResponse = component("AvailabilityCheckMutationResponse", AvailabilityCheckMutationResponseSchema);
+  const availabilityCheckDeleteResponse = component("AvailabilityCheckDeleteResponse", AvailabilityCheckDeleteResponseSchema);
+  const availabilityCheckResultsResponse = component("AvailabilityCheckResultsResponse", AvailabilityCheckResultsResponseSchema);
+  const availabilityCheckDailyRollupsResponse = component("AvailabilityCheckDailyRollupsResponse", AvailabilityCheckDailyRollupsResponseSchema);
+  const availabilityCheckTestResponse = component("AvailabilityCheckTestResponse", AvailabilityCheckTestResponseSchema);
 
   return [
     {
@@ -1285,6 +1432,138 @@ function buildPublicApiOperations(): OperationSpec[] {
         "403": { description: "Owner access is required, and paused shared collaborator access cannot delete the project.", schema: apiError },
         "404": { description: "Project was not found or projects are unavailable.", schema: apiError },
       },
+    },
+    {
+      method: "get",
+      path: "/v1/projects/{id}/availability-checks",
+      operationId: "listAvailabilityChecks",
+      summary: "List hosted health checks for a project",
+      tags: ["Health"],
+      security: anyMemberAuth,
+      params: ProjectParamsSchema,
+      query: TokenListQuerySchema,
+      responses: {
+        "200": { description: "Hosted health checks plus project plan limits.", schema: availabilityCheckListResponse },
+        "400": { description: "Invalid project id or query parameters.", schema: apiError },
+        "401": { description: "Authentication is invalid.", schema: apiError },
+        "404": { description: "Project was not found or availability checks are unavailable.", schema: apiError }
+      }
+    },
+    {
+      method: "post",
+      path: "/v1/projects/{id}/availability-checks",
+      operationId: "createAvailabilityCheck",
+      summary: "Create a hosted health check",
+      tags: ["Health"],
+      security: anyMemberAuth,
+      params: ProjectParamsSchema,
+      requestBody: component("AvailabilityCheckCreateBody", AvailabilityCheckCreateBodySchema),
+      responses: {
+        "201": { description: "Hosted health check created.", schema: availabilityCheckMutationResponse },
+        "400": { description: "Invalid project id, payload, or blocked target.", schema: apiError },
+        "401": { description: "Authentication is invalid.", schema: apiError },
+        "403": { description: "Owner or admin project access is required.", schema: apiError },
+        "404": { description: "Project was not found or availability checks are unavailable.", schema: apiError },
+        "409": { description: "Tier count or minimum-interval limit was reached.", schema: apiError }
+      }
+    },
+    {
+      method: "get",
+      path: "/v1/projects/{id}/availability-checks/{checkId}",
+      operationId: "getAvailabilityCheck",
+      summary: "Get one hosted health check",
+      tags: ["Health"],
+      security: anyMemberAuth,
+      params: ProjectAvailabilityCheckParamsSchema,
+      responses: {
+        "200": { description: "Hosted health check detail plus project plan limits.", schema: availabilityCheckResponse },
+        "400": { description: "Invalid project id or check id.", schema: apiError },
+        "401": { description: "Authentication is invalid.", schema: apiError },
+        "404": { description: "Health check was not found or availability checks are unavailable.", schema: apiError }
+      }
+    },
+    {
+      method: "patch",
+      path: "/v1/projects/{id}/availability-checks/{checkId}",
+      operationId: "updateAvailabilityCheck",
+      summary: "Update a hosted health check",
+      tags: ["Health"],
+      security: anyMemberAuth,
+      params: ProjectAvailabilityCheckParamsSchema,
+      requestBody: component("AvailabilityCheckUpdateBody", AvailabilityCheckUpdateBodySchema),
+      responses: {
+        "200": { description: "Hosted health check updated.", schema: availabilityCheckMutationResponse },
+        "400": { description: "Invalid project id, check id, payload, or blocked target.", schema: apiError },
+        "401": { description: "Authentication is invalid.", schema: apiError },
+        "403": { description: "Owner or admin project access is required.", schema: apiError },
+        "404": { description: "Health check was not found or availability checks are unavailable.", schema: apiError },
+        "409": { description: "Minimum-interval limit was reached.", schema: apiError }
+      }
+    },
+    {
+      method: "delete",
+      path: "/v1/projects/{id}/availability-checks/{checkId}",
+      operationId: "deleteAvailabilityCheck",
+      summary: "Delete a hosted health check",
+      tags: ["Health"],
+      security: anyMemberAuth,
+      params: ProjectAvailabilityCheckParamsSchema,
+      responses: {
+        "200": { description: "Hosted health check deleted.", schema: availabilityCheckDeleteResponse },
+        "400": { description: "Invalid project id or check id.", schema: apiError },
+        "401": { description: "Authentication is invalid.", schema: apiError },
+        "403": { description: "Owner or admin project access is required.", schema: apiError },
+        "404": { description: "Health check was not found or availability checks are unavailable.", schema: apiError }
+      }
+    },
+    {
+      method: "get",
+      path: "/v1/projects/{id}/availability-checks/{checkId}/results",
+      operationId: "listAvailabilityCheckResults",
+      summary: "List retained health-check execution results",
+      tags: ["Health"],
+      security: anyMemberAuth,
+      params: ProjectAvailabilityCheckParamsSchema,
+      query: TokenListQuerySchema,
+      responses: {
+        "200": { description: "Recent retained execution results.", schema: availabilityCheckResultsResponse },
+        "400": { description: "Invalid project id, check id, or query parameters.", schema: apiError },
+        "401": { description: "Authentication is invalid.", schema: apiError },
+        "404": { description: "Health check was not found or availability checks are unavailable.", schema: apiError }
+      }
+    },
+    {
+      method: "get",
+      path: "/v1/projects/{id}/availability-checks/{checkId}/daily-rollups",
+      operationId: "listAvailabilityCheckDailyRollups",
+      summary: "List retained per-day health-check history",
+      tags: ["Health"],
+      security: anyMemberAuth,
+      params: ProjectAvailabilityCheckParamsSchema,
+      query: TokenListQuerySchema,
+      responses: {
+        "200": { description: "Retained daily health history.", schema: availabilityCheckDailyRollupsResponse },
+        "400": { description: "Invalid project id, check id, or query parameters.", schema: apiError },
+        "401": { description: "Authentication is invalid.", schema: apiError },
+        "404": { description: "Health check was not found or availability checks are unavailable.", schema: apiError }
+      }
+    },
+    {
+      method: "post",
+      path: "/v1/projects/{id}/availability-checks/test",
+      operationId: "testAvailabilityCheck",
+      summary: "Run a side-effect-free hosted health-check test",
+      tags: ["Health"],
+      security: anyMemberAuth,
+      params: ProjectParamsSchema,
+      requestBody: component("AvailabilityCheckTestBody", AvailabilityCheckTestBodySchema),
+      responses: {
+        "200": { description: "Side-effect-free health-check test result.", schema: availabilityCheckTestResponse },
+        "400": { description: "Invalid project id, payload, or blocked target.", schema: apiError },
+        "401": { description: "Authentication is invalid.", schema: apiError },
+        "403": { description: "Owner or admin project access is required.", schema: apiError },
+        "404": { description: "Project was not found or availability checks are unavailable.", schema: apiError }
+      }
     },
     {
       method: "get",

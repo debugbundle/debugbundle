@@ -104,6 +104,14 @@ Every capability must be available through all applicable interfaces. Operations
 | Activate probes (remote) | `POST /v1/projects/{id}/probes/activate` | `probe activate` | `activate_probe` | Browser Session or Member Token, Solo+ only |
 | List active probes (remote) | `GET /v1/projects/{id}/probes` | `probe list` | `list_active_probes` | Browser Session or Member Token, preserved activations remain readable while paused on Free |
 | Deactivate probes (remote) | `POST /v1/projects/{id}/probes/deactivate` | `probe deactivate` | `deactivate_probe` | Browser Session or Member Token cleanup action; allowed after downgrade |
+| List health checks | `GET /v1/projects/{id}/availability-checks` | `health checks list` | `list_health_checks` | Browser Session or Member Token; readable to any authorized project member |
+| Get health check | `GET /v1/projects/{id}/availability-checks/{checkId}` | `health checks get` | `get_health_check` | Browser Session or Member Token; readable to any authorized project member |
+| Create health check | `POST /v1/projects/{id}/availability-checks` | `health checks create` | `create_health_check` | Browser Session or Member Token, owner/admin only |
+| Update health check | `PATCH /v1/projects/{id}/availability-checks/{checkId}` | `health checks update` | `update_health_check` | Browser Session or Member Token, owner/admin only |
+| Delete health check | `DELETE /v1/projects/{id}/availability-checks/{checkId}` | `health checks delete` | `delete_health_check` | Browser Session or Member Token, owner/admin only |
+| Test health check target | `POST /v1/projects/{id}/availability-checks/test` | `health checks test` | `test_health_check` | Browser Session or Member Token, owner/admin only, side-effect-free |
+| List health check results | `GET /v1/projects/{id}/availability-checks/{checkId}/results` | `health checks results` | `list_health_check_results` | Browser Session or Member Token; readable to any authorized project member |
+| List health check daily rollups | `GET /v1/projects/{id}/availability-checks/{checkId}/daily-rollups` | `health checks daily-rollups` | `list_health_check_daily_rollups` | Browser Session or Member Token; readable to any authorized project member |
 | Get capture policy | `GET /v1/projects/{id}/capture-policy` | `capture-policy get` | `get_capture_policy` | Browser Session or Member Token; member receives preview-only payload |
 | Update capture policy | `PATCH /v1/projects/{id}/capture-policy` | `capture-policy set` | `update_capture_policy` | Browser Session or Member Token, owner/admin only |
 | List capture rules | `GET /v1/projects/{id}/capture-rules` | `capture-rule list` | `list_capture_rules` | Browser Session or Member Token; members receive preview-only payload |
@@ -1401,6 +1409,136 @@ Free-tier projects receive: `{ "probes_enabled": true, "remote_probes_enabled": 
 | Browser config delivery (remote) | N/A | Session-start check + ingestion piggybacking |
 | Backend config delivery (remote) | N/A | 60s polling (CDN-cached) |
 
+### 1.8a Availability Checks
+
+Availability checks are hosted external HTTP checks executed by DebugBundle infrastructure, not by customer SDKs. V1 supports `GET` and `HEAD` targets only. Failures reuse the same incident, bundle, alert, webhook, CLI, MCP, and project-navigation model as the rest of DebugBundle rather than creating a separate uptime product. Saved checks remain visible after downgrade; checks that exceed the current plan's count or interval limits are marked paused and stop executing until the project becomes eligible again.
+
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| GET | `/v1/projects/{id}/availability-checks` | Browser Session or Member Token | List health checks plus plan-derived limits for the project |
+| GET | `/v1/projects/{id}/availability-checks/{checkId}` | Browser Session or Member Token | Fetch one health check plus current plan-derived limits |
+| POST | `/v1/projects/{id}/availability-checks` | Browser Session or Member Token (owner/admin) | Create a hosted health check |
+| PATCH | `/v1/projects/{id}/availability-checks/{checkId}` | Browser Session or Member Token (owner/admin) | Update a hosted health check |
+| DELETE | `/v1/projects/{id}/availability-checks/{checkId}` | Browser Session or Member Token (owner/admin) | Delete a hosted health check |
+| POST | `/v1/projects/{id}/availability-checks/test` | Browser Session or Member Token (owner/admin) | Run a side-effect-free target test using the same validation and execution rules as saved checks |
+| GET | `/v1/projects/{id}/availability-checks/{checkId}/results` | Browser Session or Member Token | List recent raw execution results for a health check |
+| GET | `/v1/projects/{id}/availability-checks/{checkId}/daily-rollups` | Browser Session or Member Token | List retained per-day state rollups for a health check |
+
+**Create request:**
+```json
+{
+  "name": "Primary app",
+  "url": "https://app.example.com/health",
+  "method": "GET",
+  "expected_status_min": 200,
+  "expected_status_max": 399,
+  "timeout_ms": 5000,
+  "interval_seconds": 60,
+  "failure_threshold": 3,
+  "recovery_threshold": 2,
+  "environment": "production",
+  "service_name": "web",
+  "enabled": true
+}
+```
+
+| Field | Required | Default | Constraint |
+|-------|----------|---------|------------|
+| `name` | Yes | — | 1-120 chars |
+| `url` | Yes | — | `http` or `https` only; credentials forbidden; local/private targets blocked |
+| `method` | No | `GET` | `GET` or `HEAD` |
+| `expected_status_min` | No | `200` | integer `100-599`, must be `<= expected_status_max` |
+| `expected_status_max` | No | `399` | integer `100-599`, must be `>= expected_status_min` |
+| `timeout_ms` | No | `5000` | integer `500-5000` |
+| `interval_seconds` | Yes | — | integer `30-86400`, but plan minimums may be higher |
+| `failure_threshold` | No | `3` | integer `1-10` |
+| `recovery_threshold` | No | `2` | integer `1-10` |
+| `environment` | No | project-default behavior | optional project-scoped environment label |
+| `service_name` | No | `null` | optional service label used for filtering and incident grouping |
+| `enabled` | No | `true` | disabled checks remain visible and retained but do not execute |
+
+**List response:**
+```json
+{
+  "checks": [
+    {
+      "check_id": "uuid",
+      "name": "Primary app",
+      "url": "https://app.example.com/health",
+      "method": "GET",
+      "interval_seconds": 60,
+      "status": "passing",
+      "paused_reason": null,
+      "environment": "production",
+      "service_name": "web",
+      "last_checked_at": "ISO8601",
+      "next_check_at": "ISO8601",
+      "last_result_status": "success",
+      "last_result_http_status": 200,
+      "last_result_duration_ms": 183
+    }
+  ],
+  "limits": {
+    "max_checks_per_project": 5,
+    "min_interval_seconds": 60
+  }
+}
+```
+
+`status` is one of `unknown`, `passing`, `failing`, or `paused`. `paused` is used for disabled checks and for preserved checks that exceed current plan limits after downgrade. The worker retains raw results and daily rollups for 30 days so the project can later expose a status-history page without schema changes.
+
+**Results response:**
+```json
+{
+  "results": [
+    {
+      "result_id": "uuid",
+      "started_at": "ISO8601",
+      "completed_at": "ISO8601",
+      "duration_ms": 183,
+      "status": "success",
+      "http_status": 200,
+      "error_kind": null,
+      "error_message": null,
+      "redirect_count": 0,
+      "checked_url_host": "app.example.com",
+      "final_url": "https://app.example.com/health"
+    }
+  ]
+}
+```
+
+**Daily rollups response:**
+```json
+{
+  "rollups": [
+    {
+      "day": "2026-06-15",
+      "state": "operational",
+      "total_checks": 1440,
+      "successful_checks": 1439,
+      "failed_checks": 1,
+      "degraded_checks": 0,
+      "avg_duration_ms": 190,
+      "downtime_seconds": 30,
+      "incident_ids": []
+    }
+  ]
+}
+```
+
+Guardrails:
+
+| Constraint | Free | Solo | Team |
+|------------|------|------|------|
+| Max checks per project | 1 | 5 | 25 |
+| Minimum interval | 300s (5m) | 60s | 30s |
+| History retention | 30 days | 30 days | 30 days |
+| Read access | Authorized project member | Authorized project member | Authorized project member |
+| Create/update/delete/test | Owner/admin | Owner/admin | Owner/admin |
+
+When consecutive failures reach `failure_threshold`, DebugBundle opens or regresses the linked availability incident for that check using the normal incident lifecycle. When consecutive successes reach `recovery_threshold`, DebugBundle auto-resolves the linked availability incident.
+
 ### 1.9 Capture Policy
 
 Per-project capture policy controls what event classes the SDK captures and the ingestion API accepts.
@@ -2088,6 +2226,20 @@ debugbundle probe deactivate <project-id> <activation-id> [--auth-file <path>] [
 
 These commands manage remote probe activations. `probe activate` remains a Solo+ mutation, `probe list` stays readable on Free after downgrade, and `probe deactivate` remains available as cleanup for preserved activations. Always-on probes require no CLI commands — they operate automatically in the SDK.
 
+### 2.11a Health Check Commands
+```
+debugbundle health checks list --project-id <id> [--limit <n>] [--auth-file <path>] [--json]
+debugbundle health checks get <check-id> --project-id <id> [--auth-file <path>] [--json]
+debugbundle health checks create --project-id <id> --name <name> --url <url> --interval-seconds <n> [--method <GET|HEAD>] [--expected-status-min <code>] [--expected-status-max <code>] [--timeout-ms <n>] [--failure-threshold <n>] [--recovery-threshold <n>] [--environment <name>] [--service <name|null>] [--enabled <true|false>] [--auth-file <path>] [--json]
+debugbundle health checks update <check-id> --project-id <id> [--name <name>] [--url <url>] [--method <GET|HEAD>] [--expected-status-min <code>] [--expected-status-max <code>] [--timeout-ms <n>] [--interval-seconds <n>] [--failure-threshold <n>] [--recovery-threshold <n>] [--environment <name>] [--service <name|null>] [--enabled <true|false>] [--auth-file <path>] [--json]
+debugbundle health checks delete <check-id> --project-id <id> [--auth-file <path>] [--json]
+debugbundle health checks test --project-id <id> --url <url> [--method <GET|HEAD>] [--expected-status-min <code>] [--expected-status-max <code>] [--timeout-ms <n>] [--auth-file <path>] [--json]
+debugbundle health checks results <check-id> --project-id <id> [--limit <n>] [--auth-file <path>] [--json]
+debugbundle health checks daily-rollups <check-id> --project-id <id> [--limit <n>] [--auth-file <path>] [--json]
+```
+
+These commands manage hosted health checks without requiring SDK changes. Read commands are available to any authorized project member. Create, update, delete, and test require owner/admin authorization. `health checks test` is side-effect-free and does not create incidents or retained history. Passing `--service null` during create or update clears the optional service label.
+
 ### 2.12 Capture Policy Commands
 ```
 debugbundle capture-policy get [--project <id>] [--json]
@@ -2278,6 +2430,20 @@ debugbundle_deactivate_probe  → same result as POST /v1/projects/{id}/probes/d
 ```
 
 These tools manage remote probe activations. `activate_probe` remains a Solo+ mutation, while `list_active_probes` stays readable on Free after downgrade and `deactivate_probe` remains available as cleanup for preserved activations. Always-on probes require no MCP tools — they operate automatically in the SDK.
+
+### 3.4a Health Check Tools
+```
+list_health_checks         → same result as GET /v1/projects/{id}/availability-checks
+get_health_check           → same result as GET /v1/projects/{id}/availability-checks/{checkId}
+create_health_check        → same result as POST /v1/projects/{id}/availability-checks
+update_health_check        → same result as PATCH /v1/projects/{id}/availability-checks/{checkId}
+delete_health_check        → same result as DELETE /v1/projects/{id}/availability-checks/{checkId}
+test_health_check          → same result as POST /v1/projects/{id}/availability-checks/test
+list_health_check_results  → same result as GET /v1/projects/{id}/availability-checks/{checkId}/results
+list_health_check_daily_rollups → same result as GET /v1/projects/{id}/availability-checks/{checkId}/daily-rollups
+```
+
+These tools expose the hosted health-check management surface for agents and automations. Read operations are available to any authorized project member. Create, update, delete, and test require owner/admin authorization. `test_health_check` is side-effect-free and does not open incidents or write retained history.
 
 ### 3.5 Capture Policy Tools
 ```

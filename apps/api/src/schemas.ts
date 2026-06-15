@@ -623,6 +623,13 @@ export const ProjectCaptureRuleParamsSchema = z
   })
   .strict();
 
+export const ProjectAvailabilityCheckParamsSchema = z
+  .object({
+    id: z.string().uuid(),
+    checkId: z.string().uuid()
+  })
+  .strict();
+
 export const ProjectImprovementParamsSchema = z
   .object({
     id: z.string().uuid(),
@@ -690,6 +697,66 @@ export const TokenListQuerySchema = z
     limit: z.coerce.number().int().min(1).max(100).default(20)
   })
   .strict();
+
+const AvailabilityCheckBodyShape = {
+  name: z.string().min(1).max(120),
+  url: z.string().url(),
+  method: z.enum(["GET", "HEAD"]).default("GET"),
+  expected_status_min: z.coerce.number().int().min(100).max(599).default(200),
+  expected_status_max: z.coerce.number().int().min(100).max(599).default(399),
+  timeout_ms: z.coerce.number().int().min(500).max(5000).default(5000),
+  interval_seconds: z.coerce.number().int().min(30).max(86400),
+  failure_threshold: z.coerce.number().int().min(1).max(10).default(3),
+  recovery_threshold: z.coerce.number().int().min(1).max(10).default(2),
+  environment: z.string().min(1).max(50).optional(),
+  service_name: z.string().min(1).max(120).nullable().optional(),
+  enabled: z.boolean().default(true)
+} as const;
+
+const AvailabilityCheckBodyBaseObjectSchema = z
+  .object({
+    ...AvailabilityCheckBodyShape
+  })
+  .strict();
+
+const AvailabilityCheckBodyBaseSchema = AvailabilityCheckBodyBaseObjectSchema
+  .refine((value) => value.expected_status_min <= value.expected_status_max, {
+    message: "expected_status_range_invalid"
+  });
+
+export const AvailabilityCheckCreateBodySchema = AvailabilityCheckBodyBaseSchema;
+
+export const AvailabilityCheckUpdateBodySchema = z
+  .object({
+    ...AvailabilityCheckBodyShape
+  })
+  .partial()
+  .strict()
+  .refine((value: Record<string, unknown>) => Object.keys(value).length > 0, {
+    message: "update_requires_changes"
+  })
+  .refine(
+    (value) =>
+      value.expected_status_min === undefined ||
+      value.expected_status_max === undefined ||
+      value.expected_status_min <= value.expected_status_max,
+    {
+      message: "expected_status_range_invalid"
+    }
+  );
+
+export const AvailabilityCheckTestBodySchema = z
+  .object({
+    url: z.string().url(),
+    method: z.enum(["GET", "HEAD"]).default("GET"),
+    expected_status_min: z.coerce.number().int().min(100).max(599).default(200),
+    expected_status_max: z.coerce.number().int().min(100).max(599).default(399),
+    timeout_ms: z.coerce.number().int().min(500).max(5000).default(5000)
+  })
+  .strict()
+  .refine((value) => value.expected_status_min <= value.expected_status_max, {
+    message: "expected_status_range_invalid"
+  });
 
 export const ProjectsQuerySchema = TokenListQuerySchema;
 

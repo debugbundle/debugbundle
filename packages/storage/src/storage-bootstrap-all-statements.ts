@@ -1,0 +1,7 @@
+import { AVAILABILITY_CHECK_BOOTSTRAP_STATEMENTS } from "./availability-check-bootstrap-statements.js";
+import { STORAGE_BOOTSTRAP_STATEMENTS as CORE_STORAGE_BOOTSTRAP_STATEMENTS } from "./storage-bootstrap-statements.js";
+
+export const STORAGE_BOOTSTRAP_STATEMENTS = [
+  ...CORE_STORAGE_BOOTSTRAP_STATEMENTS,
+  ...AVAILABILITY_CHECK_BOOTSTRAP_STATEMENTS
+] as const;

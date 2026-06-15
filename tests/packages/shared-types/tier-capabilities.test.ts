@@ -61,6 +61,15 @@ describe("tier capabilities", () => {
     expect(getTierCapabilities("team").cloud_improvement_bundles).toBe(true);
   });
 
+  it("should expose health-check limits per tier", (): void => {
+    expect(getTierCapabilities("free").availability_checks_per_project).toBe(1);
+    expect(getTierCapabilities("free").availability_check_min_interval_seconds).toBe(300);
+    expect(getTierCapabilities("solo").availability_checks_per_project).toBe(5);
+    expect(getTierCapabilities("solo").availability_check_min_interval_seconds).toBe(60);
+    expect(getTierCapabilities("team").availability_checks_per_project).toBe(25);
+    expect(getTierCapabilities("team").availability_check_min_interval_seconds).toBe(30);
+  });
+
   it("should gate member invites for team tier only", (): void => {
     expect(getTierCapabilities("free").member_invites).toBe(false);
     expect(getTierCapabilities("solo").member_invites).toBe(false);
@@ -149,6 +158,8 @@ describe("tier capabilities", () => {
     expect(typeof caps.slack_integration).toBe("boolean");
     expect(typeof caps.included_capacity_units).toBe("number");
     expect(typeof caps.ingestion_rate_per_min).toBe("number");
+    expect(typeof caps.availability_checks_per_project).toBe("number");
+    expect(typeof caps.availability_check_min_interval_seconds).toBe("number");
   });
 });
 
@@ -189,6 +200,8 @@ describe("self-host mode", () => {
       expect(caps.cloud_improvement_bundles).toBe(true);
       expect(caps.shared_dashboards).toBe(true);
       expect(caps.member_invites).toBe(true);
+      expect(caps.availability_checks_per_project).toBeGreaterThanOrEqual(1_000_000);
+      expect(caps.availability_check_min_interval_seconds).toBe(30);
       expect(caps.included_capacity_units).toBeGreaterThanOrEqual(1_000_000);
       expect(caps.max_members).toBeGreaterThanOrEqual(1_000);
       expect(caps.ingestion_rate_per_min).toBeGreaterThanOrEqual(1_000_000);

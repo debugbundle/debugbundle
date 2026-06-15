@@ -66,6 +66,10 @@ describe('public site reference documentation', () => {
           commandPath: 'webhook retry',
           usage: 'debugbundle webhook retry <webhook-id> <delivery-id> --project-id <id> [--auth-file <path>] [--json]',
         }),
+        expect.objectContaining({
+          commandPath: 'health checks test',
+          usage: expect.stringContaining('debugbundle health checks test --project-id <id> --url <url>'),
+        }),
       ]),
     );
   });
@@ -74,10 +78,13 @@ describe('public site reference documentation', () => {
     const { mcpGroups: groups } = await buildReferenceData();
     const retrievalGroup = groups.find((group) => group.group === 'retrieval');
     const bundleTool = retrievalGroup?.tools.find((tool) => tool.name === 'get_bundle');
+    const healthCheckGroup = groups.find((group) => group.group === 'health_checks');
 
     expect(retrievalGroup?.tools).toEqual(expect.arrayContaining([expect.objectContaining({ name: 'get_bundle' })]));
     expect(bundleTool?.requiredArguments).toEqual(['incidentId']);
     expect(bundleTool?.optionalArguments).toContain('source');
+    expect(healthCheckGroup?.label).toBe('Health Checks');
+    expect(healthCheckGroup?.tools).toEqual(expect.arrayContaining([expect.objectContaining({ name: 'test_health_check' })]));
   });
 
   it('builds webhook, schema, and error-code references from shipped contracts', async () => {

@@ -15,6 +15,7 @@ import { createCapturePolicyApi } from "../../cli/src/capture-policy-commands.js
 import { createImprovementSettingsApi } from "../../cli/src/improvement-settings-commands.js";
 import { createMemberApi } from "../../cli/src/member-commands.js";
 import { createProbeApi } from "../../cli/src/probe-commands.js";
+import { createHealthCheckApi } from "../../cli/src/health-check-commands.js";
 import { doctorCommand } from "../../cli/src/doctor-command.js";
 import { smokeCommand } from "../../cli/src/smoke-command.js";
 import { validateCommand } from "../../cli/src/validate-command.js";
@@ -29,6 +30,7 @@ import { createImprovementMcpTools } from "./improvement-tools.js";
 import { createImprovementSettingsMcpTools } from "./improvement-settings-tools.js";
 import { createMemberMcpTools } from "./member-tools.js";
 import { createProbeMcpTools } from "./probe-tools.js";
+import { createHealthCheckMcpTools } from "./health-check-tools.js";
 import { createProjectMcpTools } from "./project-tools.js";
 import { createRetrievalMcpTools } from "./retrieval-tools.js";
 import { createServicesMcpTools } from "./services-tools.js";
@@ -110,6 +112,7 @@ export async function createDefaultMcpTools(input: { apiBaseUrl?: string } = {})
       ...createCapturePolicyMcpTools(createCapturePolicyApi(httpClient)),
       ...createImprovementSettingsMcpTools(createImprovementSettingsApi(httpClient)),
       ...createProbeMcpTools(createProbeApi(httpClient)),
+      ...createHealthCheckMcpTools(createHealthCheckApi(httpClient)),
       ...createBillingMcpTools(createBillingApi(httpClient)),
       ...createMemberMcpTools(createMemberApi(httpClient)),
       ...createGitHubMcpTools(createGitHubManagementApi(httpClient))

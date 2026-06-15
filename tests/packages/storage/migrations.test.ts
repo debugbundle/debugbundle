@@ -149,6 +149,9 @@ describe("storage bootstrap schema", () => {
     expect(REQUIRED_WORKER_TABLES).toContain("alert_email_digest_items");
     expect(REQUIRED_WORKER_TABLES).toContain("slack_destinations");
     expect(REQUIRED_WORKER_TABLES).toContain("weekly_report_deliveries");
+    expect(REQUIRED_API_TABLES).toContain("availability_checks");
+    expect(REQUIRED_API_TABLES).toContain("availability_check_results");
+    expect(REQUIRED_WORKER_TABLES).toContain("availability_check_daily_rollups");
   });
 
   it("should describe the final schema directly without schema evolution sql", (): void => {
@@ -211,5 +214,10 @@ describe("storage bootstrap schema", () => {
     expect(STORAGE_BOOTSTRAP_SQL.includes("github_marketplace_accounts_installation_idx")).toBe(true);
     expect(STORAGE_BOOTSTRAP_SQL.includes("account_metric_periods_grain_period_metric_idx")).toBe(true);
     expect(STORAGE_BOOTSTRAP_SQL.includes("account_payment_provider_events_provider_event_key")).toBe(true);
+    expect(STORAGE_BOOTSTRAP_SQL.includes("CREATE TABLE availability_checks")).toBe(true);
+    expect(STORAGE_BOOTSTRAP_SQL.includes("CREATE TABLE availability_check_results")).toBe(true);
+    expect(STORAGE_BOOTSTRAP_SQL.includes("CREATE TABLE availability_check_daily_rollups")).toBe(true);
+    expect(STORAGE_BOOTSTRAP_SQL.includes("availability_checks_due_idx")).toBe(true);
+    expect(STORAGE_BOOTSTRAP_SQL.includes("availability_check_results_check_started_idx")).toBe(true);
   });
 });

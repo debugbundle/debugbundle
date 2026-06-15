@@ -1,4 +1,4 @@
-import { STORAGE_BOOTSTRAP_STATEMENTS } from "./storage-bootstrap-statements.js";
+import { STORAGE_BOOTSTRAP_STATEMENTS } from "./storage-bootstrap-all-statements.js";
 
 export interface Queryable {
   query<Row extends Record<string, unknown>>(
@@ -53,6 +53,10 @@ export const REQUIRED_API_TABLES = [
   "plan_cleanup_tasks",
   "processed_billing_events",
   "processed_github_marketplace_events"
+  ,
+  "availability_checks",
+  "availability_check_results",
+  "availability_check_daily_rollups"
 ] as const;
 
 export const REQUIRED_WORKER_TABLES = [
@@ -85,6 +89,9 @@ export const REQUIRED_WORKER_TABLES = [
   "account_analytics_accounts",
   "account_metric_periods",
   "account_metric_events",
+  "availability_checks",
+  "availability_check_results",
+  "availability_check_daily_rollups",
 ] as const;
 
 const LEGACY_SCHEMA_TABLE = "schema_migrations";

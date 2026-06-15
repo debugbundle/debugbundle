@@ -6,6 +6,17 @@ The format is based on Keep a Changelog and this project follows Semantic Versio
 
 ## [Unreleased]
 
+## [1.5.0] - 2026-06-15
+
+### Added
+
+- Added hosted availability checks across API, CLI, MCP, worker scheduling/execution, web project health views, storage, and public contracts, including side-effect-free target tests, retained recent results, and retained daily rollups.
+
+### Changed
+
+- Added the production schema migration, startup migration assertions, tier-capability limits, and SSRF/outbound-request hardening required for the new availability-check path.
+- Bumped the canonical core release to `1.5.0`, `@debugbundle/cli` to `1.5.0`, `@debugbundle/mcp` to `1.5.0`, and `@debugbundle/shared-types` plus `@debugbundle/redaction` to `1.3.0` for the coordinated availability-check release train.
+
 ## [1.4.0] - 2026-06-11
 
 ### Added

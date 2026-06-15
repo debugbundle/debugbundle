@@ -23,7 +23,9 @@ import { REQUIRED_WORKER_TABLES } from "../../../packages/storage/src/migrations
 import {
   createPostgresAlertDeliveryStore,
   createPostgresAccountAnalyticsStore,
+  createPostgresAvailabilityCheckStore,
   createPostgresBillingStore,
+  createIncidentLifecycleService,
   createPostgresGitHubStore,
   createPostgresImprovementOpportunityStore,
   createPostgresOperationalEmailDeliveryStore,
@@ -77,6 +79,7 @@ import {
   type WorkerQueue,
   type WeeklyReportTransport
 } from "./processor.js";
+import { processNextAvailabilityCheck } from "./availability-checks.js";
 import { processNextDeliverOperationalEmailJob } from "./operational-email-processor.js";
 import { processNextBuildImprovementBundleJob, type ImprovementBundleJobQueue } from "./improvement-bundle-processor.js";
 import { scheduleTrialLifecycleEmails } from "./trial-lifecycle-scheduler.js";
@@ -1788,11 +1791,22 @@ export async function runWorkerFromEnv(envInput: Record<string, string | undefin
   const improvementOpportunityStore = createPostgresImprovementOpportunityStore(queryable, {
     accountAnalyticsStore
   });
+  const availabilityCheckStore = createPostgresAvailabilityCheckStore(queryable);
   const alertDeliveryStore = createPostgresAlertDeliveryStore(queryable);
   const operationalEmailDeliveryStore = createPostgresOperationalEmailDeliveryStore(queryable);
   const slackDestinationStore = createPostgresSlackDestinationStore(queryable);
   const webhookDeliveryStore = createPostgresWebhookDeliveryStore(queryable);
   const githubStore = createPostgresGitHubStore(queryable);
+  const incidentLifecycle = createIncidentLifecycleService({
+    incidentStore,
+    improvementStore: improvementOpportunityStore,
+    webhookDeliveryStore,
+    fallbackTargetUrl: env.LIFECYCLE_WEBHOOK_TARGET_URL ?? null,
+    fallbackSigningSecret: env.LIFECYCLE_WEBHOOK_SECRET ?? null,
+    accountAnalyticsStore,
+    billingStore,
+    operationalEmailDeliveryStore
+  });
   const retentionStore = createPostgresRetentionStore(queryable);
   const weeklyReportChannelStore = createPostgresWeeklyReportChannelStore(queryable);
   const weeklyReportDeliveryStore = createPostgresWeeklyReportDeliveryStore(queryable);
@@ -1957,6 +1971,19 @@ export async function runWorkerFromEnv(envInput: Record<string, string | undefin
       );
 
       if (!normalizeResult.processed) {
+        const availabilityResult = await runClaimedProcessStep("availability-checks", async () =>
+          processNextAvailabilityCheck({
+            availabilityCheckStore,
+            incidentStore,
+            incidentLifecycle,
+            queue,
+            objectStore,
+            lifecycleWebhookPublisher,
+            githubDispatchPublisher
+          })
+        );
+
+        if (!availabilityResult.processed) {
           const groupResult = await runClaimedProcessStep("group-incident", async () =>
           processNextGroupIncidentJob({
             queue,
@@ -2181,6 +2208,7 @@ export async function runWorkerFromEnv(envInput: Record<string, string | undefin
             }
             }
           }
+        }
         }
       }
 

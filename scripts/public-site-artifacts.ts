@@ -105,6 +105,7 @@ const securityLabelMap: Record<string, string> = {
 const mcpGroupLabels: Record<string, string> = {
   alerts: 'Alerts',
   analyze: 'Analyze',
+  health_checks: 'Health Checks',
   projects: 'Projects',
   retrieval: 'Retrieval',
   services: 'Services',
@@ -244,6 +245,7 @@ function buildLlmsTxt(): string {
       `- Improvement bundles: ${toAbsoluteUrl('/docs/bundles/improvement-bundles/')}`,
       `- Incidents: ${toAbsoluteUrl('/docs/incidents/')}`,
       `- Reproduction artifacts: ${toAbsoluteUrl('/docs/incidents/reproduction/')}`,
+      `- Availability checks: ${toAbsoluteUrl('/docs/availability-checks/')}`,
       `- Probes: ${toAbsoluteUrl('/docs/probes/')}`,
       `- Webhooks: ${toAbsoluteUrl('/docs/webhooks/')}`,
       `- Webhook events: ${toAbsoluteUrl('/docs/webhooks/events/')}`,

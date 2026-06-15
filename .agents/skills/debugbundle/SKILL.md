@@ -2,8 +2,9 @@
 name: debugbundle
 description: >-
   Investigate runtime incidents, inspect debug bundles, generate reproductions,
-  and run improvement analysis using the DebugBundle CLI and local project scaffold.
-  Use when the user reports a bug, runtime failure, or asks about production incidents.
+  run improvement analysis, and inspect hosted availability checks using the
+  DebugBundle CLI and local project scaffold. Use when the user reports a bug,
+  runtime failure, production incident, endpoint downtime, or health-check issue.
 metadata:
   author: debugbundle
   version: "1.0"
@@ -40,6 +41,17 @@ Key local paths:
 3. Run `debugbundle analyze --type improvement --local` after local processing when you need a deterministic change plan.
 4. Apply the narrowest fix, then validate it with the repository test workflow from `.debugbundle/profile.json`.
 5. When the fix is confirmed, or when the incident was intentionally generated for smoke, verification, or dogfooding, resolve it with `debugbundle resolve <incident-id> [incident-id ...]` or MCP `resolve_incident` / `resolve_incidents` so the open queue stays actionable.
+
+## Availability Checks
+
+Use hosted availability checks for endpoint downtime, public reachability, or project Health tab issues. These are DebugBundle-run external `GET`/`HEAD` checks, not SDK events from the customer app.
+
+- Start with `debugbundle health checks list --project-id <id> --json` or MCP `list_health_checks` to inspect saved checks and plan limits.
+- For a failing check, inspect `debugbundle health checks results <check-id> --project-id <id> --json` and `debugbundle health checks daily-rollups <check-id> --project-id <id> --json` before changing code.
+- Use `debugbundle health checks test --project-id <id> --url <url> --json` or MCP `test_health_check` before creating or updating a saved check. Tests are side-effect-free: no incidents, retained history rows, or counters.
+- Create, update, delete, enable, or disable checks only when the user explicitly asks to change monitoring.
+- Availability incidents reuse the normal incident lifecycle. If a check opened an incident, fetch the incident context, bundle, and reproduction before proposing a fix, then resolve only after the endpoint recovers or the intentional verification incident has served its purpose.
+- Do not configure private, localhost, metadata-service, credentialed, or state-mutating targets. V1 health-check targets must be external `http`/`https` URLs on safe ports.
 
 ## Incident Hygiene
 

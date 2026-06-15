@@ -1072,6 +1072,19 @@ export function createPostgresMetadataStore(
         };
       }
 
+      await db.query(
+        `
+          UPDATE project_invites
+          SET canceled_at = now()
+          WHERE project_id = $1::uuid
+            AND lower(email) = $2
+            AND accepted_at IS NULL
+            AND canceled_at IS NULL
+            AND expires_at <= now()
+        `,
+        [input.project_id, normalizedEmail]
+      );
+
       try {
         const result = await db.query<ProjectInviteRecord & Record<string, unknown>>(
           `
