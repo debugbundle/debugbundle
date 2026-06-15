@@ -61,7 +61,12 @@ export interface ApiServerOptions {
   readinessCheck?: () => Promise<void>;
 }
 
-const ALLOWED_CORS_HEADERS = ["Authorization", "Content-Type", "X-CSRF-Token"];
+const ALLOWED_CORS_HEADERS = [
+  "Authorization",
+  "Content-Type",
+  "X-CSRF-Token",
+  "X-Debugbundle-Trace-Id"
+];
 const ALLOWED_CORS_METHODS = ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"];
 const SDK_PROJECT_TOKEN_CORS_PATHS = new Set(["/v1/events", "/v1/sdk/config"]);
 const DEFAULT_API_REQUEST_TIMEOUT_MS = 30_000;

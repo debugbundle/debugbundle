@@ -213,7 +213,7 @@ describe("api server version context", () => {
       headers: {
         origin: "https://app.debugbundle.com",
         "access-control-request-method": "POST",
-        "access-control-request-headers": "content-type,x-csrf-token"
+        "access-control-request-headers": "content-type,x-csrf-token,x-debugbundle-trace-id"
       }
     });
 
@@ -222,6 +222,7 @@ describe("api server version context", () => {
     expect(response.headers["access-control-allow-credentials"]).toBe("true");
     expect(response.headers["access-control-allow-methods"]).toContain("POST");
     expect(response.headers["access-control-allow-headers"]).toContain("X-CSRF-Token");
+    expect(response.headers["access-control-allow-headers"]).toContain("X-Debugbundle-Trace-Id");
     expect(response.headers["vary"]).toContain("Origin");
     expect(response.headers["vary"]).toContain("Access-Control-Request-Method");
     expect(response.headers["vary"]).toContain("Access-Control-Request-Headers");
