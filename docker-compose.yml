@@ -1,3 +1,6 @@
+x-node-pnpm-env: &node-pnpm-env
+  PNPM_CONFIG_CONFIRM_MODULES_PURGE: "false"
+
 services:
   postgres:
     image: postgres:17
@@ -70,6 +73,7 @@ services:
       - .:/workspace
     working_dir: /workspace
     environment:
+      <<: *node-pnpm-env
       DB_HOST: postgres
       DB_PORT: "5432"
       DB_USER: debugbundle
@@ -92,6 +96,7 @@ services:
       - .:/workspace
     working_dir: /workspace
     environment:
+      <<: *node-pnpm-env
       DB_HOST: postgres
       DB_PORT: "5432"
       DB_USER: debugbundle
@@ -123,6 +128,7 @@ services:
     ports:
       - "3003:3000"
     environment:
+      <<: *node-pnpm-env
       API_HOST: "0.0.0.0"
       API_PORT: "3000"
       APP_BASE_URL: ${APP_BASE_URL:-http://localhost:5291}
@@ -190,6 +196,7 @@ services:
       - .:/workspace
     working_dir: /workspace
     environment:
+      <<: *node-pnpm-env
       DB_HOST: postgres
       DB_PORT: "5432"
       DB_USER: debugbundle
@@ -219,6 +226,7 @@ services:
     ports:
       - "${WEB_PORT:-5291}:5291"
     environment:
+      <<: *node-pnpm-env
       VITE_DEV_API_PROXY_TARGET: http://api:3000
       VITE_API_URL: ${VITE_API_URL:-http://localhost:3003}
       VITE_DEBUGBUNDLE_DOGFOOD_ENABLED: ${VITE_DEBUGBUNDLE_DOGFOOD_ENABLED:-}

@@ -111,12 +111,13 @@ export function DashboardIncidentsToday(): JSX.Element {
           }
         >
           {() => (
-            <Table className="min-w-[860px]">
+            <Table className="min-w-[980px]">
               <TableHeader>
                 <TableRow>
                   <TableHead className="w-[28%]">Incident</TableHead>
                   <TableHead className="w-[13%]">Project</TableHead>
                   <TableHead className="w-[13%]">Service</TableHead>
+                  <TableHead className="w-[12%]">Environment</TableHead>
                   <TableHead>Severity</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead className="whitespace-nowrap">Occurrences</TableHead>
@@ -169,6 +170,9 @@ function DashboardIncidentRow(input: {
       </TableCell>
       <TableCell className="text-sm text-muted-foreground whitespace-normal break-words align-middle">
         {incident.service_name ?? "Unknown service"}
+      </TableCell>
+      <TableCell className="text-sm text-muted-foreground whitespace-normal break-words align-middle">
+        {incident.environment}
       </TableCell>
       <TableCell>
         <Badge variant={severityVariantMap[incident.severity]}>{incident.severity}</Badge>

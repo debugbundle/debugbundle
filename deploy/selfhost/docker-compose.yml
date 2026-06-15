@@ -1,3 +1,6 @@
+x-node-pnpm-env: &node-pnpm-env
+  PNPM_CONFIG_CONFIRM_MODULES_PURGE: "false"
+
 services:
   postgres:
     image: postgres:17
@@ -59,6 +62,8 @@ services:
     working_dir: /workspace
     volumes:
       - ../..:/workspace
+    environment:
+      <<: *node-pnpm-env
     command: sh -lc "corepack enable && corepack pnpm install --force --frozen-lockfile"
 
   db-bootstrap:
@@ -74,6 +79,7 @@ services:
     volumes:
       - ../..:/workspace
     environment:
+      <<: *node-pnpm-env
       DB_HOST: postgres
       DB_PORT: "5432"
       DB_USER: ${POSTGRES_USER:-debugbundle}
@@ -96,6 +102,7 @@ services:
     volumes:
       - ../..:/workspace
     environment:
+      <<: *node-pnpm-env
       DB_HOST: postgres
       DB_PORT: "5432"
       DB_USER: ${POSTGRES_USER:-debugbundle}
@@ -126,6 +133,7 @@ services:
     ports:
       - "${API_PORT:-3004}:3000"
     environment:
+      <<: *node-pnpm-env
       SELFHOST_MODE: ${SELFHOST_MODE:-true}
       API_HOST: 0.0.0.0
       API_PORT: "3000"
@@ -183,6 +191,7 @@ services:
     volumes:
       - ../..:/workspace
     environment:
+      <<: *node-pnpm-env
       SELFHOST_MODE: ${SELFHOST_MODE:-true}
       DB_HOST: postgres
       DB_PORT: "5432"
@@ -228,6 +237,7 @@ services:
     ports:
       - "${WEB_PORT:-5291}:${WEB_PORT:-5291}"
     environment:
+      <<: *node-pnpm-env
       VITE_API_URL: ${VITE_API_URL:-http://localhost:3004}
     command: sh -lc "corepack enable && corepack pnpm --filter @debugbundle/web build && corepack pnpm --filter @debugbundle/web exec vite preview --host 0.0.0.0 --port ${WEB_PORT:-5291}"
     healthcheck:

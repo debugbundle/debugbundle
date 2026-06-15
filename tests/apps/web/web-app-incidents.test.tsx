@@ -511,7 +511,13 @@ describe("web app — incident and project detail routes", () => {
     const user = userEvent.setup();
     const project = createProject();
     const incidents = [
-      createIncident({ project_id: project.project_id, project_name: project.name, service_id: "svc_123", service_name: "Checkout API" }),
+      createIncident({
+        project_id: project.project_id,
+        project_name: project.name,
+        service_id: "svc_123",
+        service_name: "Checkout API",
+        environment: "production"
+      }),
       createIncident({
         incident_id: "inc_456",
         project_id: project.project_id,
@@ -521,6 +527,7 @@ describe("web app — incident and project detail routes", () => {
         status: "regressed",
         service_id: "svc_456",
         service_name: "Signin Worker",
+        environment: "staging",
         occurrence_count: 19
       })
     ];
@@ -554,11 +561,14 @@ describe("web app — incident and project detail routes", () => {
     await chooseStatusFilterOption(user, "workspace-incidents-status-filter", /all statuses/i);
     expect(await screen.findByText(/database timeout during signin/i)).toBeInTheDocument();
 
-    // Project and service columns exist
+    // Project, service, and environment columns exist
     const projectLinks = await screen.findAllByText(/main app/i);
     expect(projectLinks.length).toBeGreaterThan(0);
     expect(await screen.findByText(/checkout api/i)).toBeInTheDocument();
     expect(await screen.findByText(/signin worker/i)).toBeInTheDocument();
+    expect(screen.getByRole("columnheader", { name: /environment/i })).toBeInTheDocument();
+    expect(screen.getByText(/^production$/i)).toBeInTheDocument();
+    expect(screen.getByText(/^staging$/i)).toBeInTheDocument();
 
     // Incident titles are clickable links
     const incidentLink = screen.getByRole("link", { name: /typeerror in checkout handler/i });
@@ -742,6 +752,42 @@ describe("web app — incident and project detail routes", () => {
 
     const rows = screen.getAllByRole("row");
     expect(within(rows[1] as HTMLTableRowElement).getByText(/quiet failure/i)).toBeInTheDocument();
+  });
+
+  it("renders the environment column in the project incidents table", async () => {
+    const project = createProject();
+    const incident = createIncident({
+      project_id: project.project_id,
+      title: "Production checkout failure",
+      service_name: "Checkout API",
+      environment: "production"
+    });
+
+    const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = requestUrl(input);
+
+      if (url.endsWith("/v1/auth/session")) {
+        return jsonResponse(200, { session: createSession() });
+      }
+
+      if (url.endsWith("/v1/projects") && init?.method === undefined) {
+        return jsonResponse(200, { projects: [project] });
+      }
+
+      if (url.includes("/v1/incidents") && url.includes(`project_id=${project.project_id}`)) {
+        return jsonResponse(200, { incidents: [incident], next_cursor: null });
+      }
+
+      return jsonResponse(404, { error: "not_found" });
+    });
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<App initialEntries={[`/projects/${project.project_id}/incidents`]} />);
+
+    expect(await screen.findByText(/production checkout failure/i)).toBeInTheDocument();
+    expect(screen.getByRole("columnheader", { name: /environment/i })).toBeInTheDocument();
+    expect(screen.getByText(/^production$/i)).toBeInTheDocument();
   });
 
   it("defaults the project incidents tab to open and lets users switch the status filter", async () => {

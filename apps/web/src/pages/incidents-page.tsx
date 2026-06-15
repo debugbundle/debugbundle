@@ -178,15 +178,16 @@ export function IncidentsPage(): JSX.Element {
                     }}
                   />
                 </div>
-                <Table className="min-w-[860px]">
+                <Table className="min-w-[980px]">
                   <TableHeader>
                     <TableRow>
-                      <TableHead className="w-10">
+                      <TableHead className="w-8">
                         <span className="sr-only">Select incidents</span>
                       </TableHead>
                       <SortableTableHead label="Incident" field="title" sort={sort} onSortChange={(field) => setSort((current) => toggleSort(current, field))} className="w-[28%]" />
                       <SortableTableHead label="Project" field="project_name" sort={sort} onSortChange={(field) => setSort((current) => toggleSort(current, field))} className="w-[13%]" />
                       <SortableTableHead label="Service" field="service_name" sort={sort} onSortChange={(field) => setSort((current) => toggleSort(current, field))} className="w-[13%]" />
+                      <SortableTableHead label="Environment" field="environment" sort={sort} onSortChange={(field) => setSort((current) => toggleSort(current, field))} className="w-[12%]" />
                       <SortableTableHead label="Severity" field="severity" sort={sort} onSortChange={(field) => setSort((current) => toggleSort(current, field))} />
                       <SortableTableHead label="Status" field="status" sort={sort} onSortChange={(field) => setSort((current) => toggleSort(current, field))} />
                       <SortableTableHead label="Occurrences" field="occurrence_count" sort={sort} onSortChange={(field) => setSort((current) => toggleSort(current, field))} className="whitespace-nowrap" />
@@ -235,6 +236,9 @@ export function IncidentsPage(): JSX.Element {
                         </TableCell>
                         <TableCell className="text-sm text-muted-foreground whitespace-normal break-words align-middle">
                           {formatServiceName(incident.service_name)}
+                        </TableCell>
+                        <TableCell className="text-sm text-muted-foreground whitespace-normal break-words align-middle">
+                          {incident.environment}
                         </TableCell>
                         <TableCell>
                           <Badge variant={severityVariantMap[incident.severity]}>{incident.severity}</Badge>
@@ -312,7 +316,7 @@ function formatServiceName(value: string | null): string {
   return value ?? "Unknown service";
 }
 
-type IncidentSortField = "title" | "project_name" | "service_name" | "severity" | "status" | "occurrence_count" | "last_seen_at";
+type IncidentSortField = "title" | "project_name" | "service_name" | "environment" | "severity" | "status" | "occurrence_count" | "last_seen_at";
 type IncidentStatusFilter = IncidentRecord["status"] | "all";
 
 const INCIDENT_STATUS_FILTER_OPTIONS: Array<{ value: IncidentStatusFilter; label: string }> = [
@@ -372,6 +376,8 @@ function sortIncidents(incidents: IncidentRecord[] | null, sort: SortState<Incid
         return left.project_name.localeCompare(right.project_name);
       case "service_name":
         return formatServiceName(left.service_name).localeCompare(formatServiceName(right.service_name));
+      case "environment":
+        return left.environment.localeCompare(right.environment);
       case "severity":
         return severityRank[left.severity] - severityRank[right.severity];
       case "status":

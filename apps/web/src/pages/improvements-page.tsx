@@ -269,7 +269,7 @@ export function ImprovementsTable(input: {
     <Table className="min-w-[920px]">
       <TableHeader>
         <TableRow>
-          <TableHead className="w-10">
+          <TableHead className="w-8">
             <span className="sr-only">Select improvements</span>
           </TableHead>
           <SortableTableHead label="Improvement" field="title" sort={sort} onSortChange={onSortChange} className="w-[30%]" />

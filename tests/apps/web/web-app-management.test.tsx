@@ -431,7 +431,7 @@ describe("web app — management routes", () => {
     expect(await screen.findByText(/database timeout during signin/i)).toBeInTheDocument();
     expect(screen.getByText(/^critical$/i)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /next/i })).toBeEnabled();
-    expect(incidentTable.className.includes("min-w-[860px]")).toBe(true);
+    expect(incidentTable.className.includes("min-w-[980px]")).toBe(true);
   });
 
   it("sorts the projects inventory by bundle requests", async () => {
@@ -3667,6 +3667,7 @@ describe("web app — management routes", () => {
               project_id: "proj_456",
               project_name: "Worker",
               service_name: null,
+              environment: "production",
               severity: "critical",
               status: "regressed",
               occurrence_count: 11,
@@ -3684,10 +3685,16 @@ describe("web app — management routes", () => {
 
     render(<App initialEntries={["/dashboard"]} />);
 
-    expect(await screen.findByRole("heading", { name: /incidents today/i })).toBeInTheDocument();
-    expect(await screen.findByRole("link", { name: /checkout timeout/i })).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: /worker/i })).toBeInTheDocument();
-    expect(screen.getByText(/unknown service/i)).toBeInTheDocument();
+    const heading = await screen.findByRole("heading", { name: /incidents today/i });
+    const incidentsTodayCard = heading.closest('[data-slot="card"]');
+    expect(incidentsTodayCard).not.toBeNull();
+    const card = within(incidentsTodayCard as HTMLElement);
+
+    expect(await card.findByRole("link", { name: /checkout timeout/i })).toBeInTheDocument();
+    expect(card.getByRole("link", { name: /worker/i })).toBeInTheDocument();
+    expect(card.getByText(/unknown service/i)).toBeInTheDocument();
+    expect(card.getByRole("columnheader", { name: /environment/i })).toBeInTheDocument();
+    expect(card.getByText(/^production$/i)).toBeInTheDocument();
     expect(screen.getByText(/^critical$/i)).toBeInTheDocument();
     expect(screen.getByText(/^regressed$/i)).toBeInTheDocument();
     expect(screen.getByText(/^11$/)).toBeInTheDocument();

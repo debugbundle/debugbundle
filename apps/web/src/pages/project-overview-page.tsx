@@ -479,14 +479,15 @@ export function IncidentTable({
   onIncidentRowClick: (event: MouseEvent<HTMLTableRowElement>, incident: IncidentRecord) => void;
 }): JSX.Element {
   return (
-    <Table className="min-w-[760px] md:min-w-0 md:table-fixed">
+    <Table className="min-w-[900px] md:min-w-0 md:table-fixed">
       <TableHeader>
         <TableRow>
-          <TableHead className="w-10">
+          <TableHead className="w-8">
             <span className="sr-only">Select incidents</span>
           </TableHead>
           <SortableTableHead label="Incident" field="title" sort={sort} onSortChange={onSortChange} className="w-[34%]" />
           <SortableTableHead label="Service" field="service_name" sort={sort} onSortChange={onSortChange} className="w-[16%]" />
+          <SortableTableHead label="Environment" field="environment" sort={sort} onSortChange={onSortChange} className="w-[14%]" />
           <SortableTableHead label="Severity" field="severity" sort={sort} onSortChange={onSortChange} />
           <SortableTableHead label="Status" field="status" sort={sort} onSortChange={onSortChange} />
           <SortableTableHead label="Occurrences" field="occurrence_count" sort={sort} onSortChange={onSortChange} className="whitespace-nowrap" />
@@ -531,6 +532,9 @@ export function IncidentTable({
             <TableCell className="text-sm text-muted-foreground whitespace-normal break-words align-middle">
               {formatServiceName(incident.service_name)}
             </TableCell>
+            <TableCell className="text-sm text-muted-foreground whitespace-normal break-words align-middle">
+              {incident.environment}
+            </TableCell>
             <TableCell>
               <Badge variant={severityVariantMap[incident.severity]}>{incident.severity}</Badge>
             </TableCell>
@@ -570,7 +574,7 @@ function formatServiceName(value: string | null): string {
   return value ?? "Unknown service";
 }
 
-type ProjectIncidentSortField = "title" | "service_name" | "severity" | "status" | "occurrence_count" | "last_seen_at";
+type ProjectIncidentSortField = "title" | "service_name" | "environment" | "severity" | "status" | "occurrence_count" | "last_seen_at";
 type ProjectBundleSortField = "title" | "severity" | "status" | "last_seen_at";
 type ProjectIncidentStatusFilter = IncidentRecord["status"] | "all";
 
@@ -671,6 +675,8 @@ function compareIncidentLike(
       return left.title.localeCompare(right.title);
     case "service_name":
       return formatServiceName(left.service_name).localeCompare(formatServiceName(right.service_name));
+    case "environment":
+      return left.environment.localeCompare(right.environment);
     case "severity":
       return severityRank[left.severity] - severityRank[right.severity];
     case "status":
