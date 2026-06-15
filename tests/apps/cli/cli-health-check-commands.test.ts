@@ -1,6 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
 
 import { CliAuthStateError } from "../../../apps/cli/src/auth-state.js";
+import type {
+  HealthCheckHttpRequest,
+  HealthCheckHttpResponse
+} from "../../../apps/cli/src/health-check-command-types.js";
 import {
   HealthCheckApiError,
   createHealthCheckApi,
@@ -262,7 +266,8 @@ describe("cli health check commands", () => {
 
   it("serializes health-check api requests and maps non-standard error bodies", async () => {
     const httpClient = {
-      request: vi.fn(async (request) => {
+      request: vi.fn(
+        async (request: HealthCheckHttpRequest): Promise<HealthCheckHttpResponse> => {
         if (request.method === "GET" && request.path.includes("/availability-checks?")) {
           return { status: 200, body: { checks: [checkFixture], limits: { max_checks_per_project: 5, min_interval_seconds: 60 } } };
         }
@@ -305,7 +310,8 @@ describe("cli health check commands", () => {
           return { status: 200, body: { rollups: [dailyRollupFixture] } };
         }
         return { status: 418, body: "teapot" };
-      })
+        }
+      )
     };
     const api = createHealthCheckApi(httpClient);
 

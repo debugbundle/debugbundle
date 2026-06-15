@@ -102,7 +102,10 @@ describe("web api client", () => {
       incident_ids: []
     };
     const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
-      const url = String(input);
+      const url =
+        typeof input === "string" ? input :
+        input instanceof URL ? input.toString() :
+        input.url;
 
       if (url.endsWith("/v1/projects/proj_1/availability-checks?limit=50")) {
         return Promise.resolve(

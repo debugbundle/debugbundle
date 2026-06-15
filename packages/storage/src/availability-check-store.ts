@@ -17,6 +17,7 @@ import {
 import type {
   AvailabilityCheckDailyRollupRecord,
   AvailabilityCheckHealthStatus,
+  AvailabilityCheckRecord,
   AvailabilityCheckResultRecord,
   AvailabilityCheckStore,
   ClaimedAvailabilityCheck,
@@ -82,7 +83,7 @@ export function createPostgresAvailabilityCheckStore(db: Queryable): Availabilit
       project_id: string;
       check_id: string;
     }
-  ) => {
+  ): Promise<AvailabilityCheckRecord | null> => {
     const result = await queryable.query<Record<string, unknown>>(listChecksQuery, [
       input.project_id,
       input.organization_id,

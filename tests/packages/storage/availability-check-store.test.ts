@@ -73,7 +73,9 @@ function buildClaimedRow(
 
 function createSequentialDb(results: Array<{ rows: Record<string, unknown>[] }>) {
   const queue = [...results];
-  const query = vi.fn(async (_sql: string, _values?: unknown[]) => {
+  const query = vi.fn(async (sql: string, values?: unknown[]) => {
+    void sql;
+    void values;
     const next = queue.shift();
     if (next === undefined) {
       throw new Error("unexpected query");
@@ -93,14 +95,18 @@ function createSplitTransactionalDb(input: {
 }) {
   const dbQueue = [...(input.dbResults ?? [])];
   const txQueue = [...input.txResults];
-  const dbQuery = vi.fn(async (_sql: string, _values?: unknown[]) => {
+  const dbQuery = vi.fn(async (sql: string, values?: unknown[]) => {
+    void sql;
+    void values;
     const next = dbQueue.shift();
     if (next === undefined) {
       throw new Error("unexpected db query");
     }
     return next;
   });
-  const txQuery = vi.fn(async (_sql: string, _values?: unknown[]) => {
+  const txQuery = vi.fn(async (sql: string, values?: unknown[]) => {
+    void sql;
+    void values;
     const next = txQueue.shift();
     if (next === undefined) {
       throw new Error("unexpected tx query");
