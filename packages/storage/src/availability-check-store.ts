@@ -465,18 +465,18 @@ export function createPostgresAvailabilityCheckStore(db: Queryable): Availabilit
               AND (c.claimed_at IS NULL OR c.claimed_at < $2::timestamptz)
           ),
           candidate AS (
-            SELECT id
+            SELECT ranked.id AS check_id
             FROM ranked
             WHERE check_rank <= ${buildPlanEligibilityCaseSql("limit").replace(/o\.plan/g, "organization_plan")}
               AND interval_seconds >= ${buildPlanEligibilityCaseSql("interval").replace(/o\.plan/g, "organization_plan")}
-            ORDER BY next_check_at ASC, id ASC
+            ORDER BY ranked.next_check_at ASC, ranked.id ASC
             LIMIT 1
           )
           UPDATE availability_checks c
           SET claimed_at = $1::timestamptz,
               updated_at = now()
           FROM ranked
-          JOIN candidate ON candidate.id = ranked.id
+          JOIN candidate ON candidate.check_id = ranked.id
           WHERE c.id = ranked.id
             AND c.deleted_at IS NULL
             AND c.enabled = true

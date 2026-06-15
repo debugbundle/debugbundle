@@ -87,6 +87,15 @@ function resolveDogfoodingEndpoint(env: WebDogfoodingEnv): string {
   return new URL("/v1/events", apiBaseUrl).toString();
 }
 
+function resolveTracePropagationTargets(env: WebDogfoodingEnv): string[] | undefined {
+  const apiBaseUrl = normalizeText(env.VITE_API_URL);
+  if (apiBaseUrl === null || !isAbsoluteHttpUrl(apiBaseUrl)) {
+    return undefined;
+  }
+
+  return [new URL(apiBaseUrl).toString()];
+}
+
 export function resolveWebDogfoodingConfig(env: WebDogfoodingEnv): WebDogfoodingConfig | null {
   const enabledFlag = parseBooleanFlag(env.VITE_DEBUGBUNDLE_DOGFOOD_ENABLED, "VITE_DEBUGBUNDLE_DOGFOOD_ENABLED");
   if (enabledFlag === false) {
@@ -128,6 +137,7 @@ export function initializeWebDogfooding(
       delete target.__DEBUGBUNDLE_DOGFOOD__;
       return null;
     }
+    const tracePropagationTargets = resolveTracePropagationTargets(env);
 
     sdk.init({
       ...(config.projectToken === null || isRelayEndpoint(config.endpoint) ? {} : { projectToken: config.projectToken }),
@@ -135,7 +145,8 @@ export function initializeWebDogfooding(
       environment: config.environment,
       service: config.service,
       captureConsole: config.captureConsole,
-      breadcrumbsOnErrorOnly: false
+      breadcrumbsOnErrorOnly: false,
+      ...(tracePropagationTargets === undefined ? {} : { tracePropagationTargets })
     } satisfies DebugBundleBrowserInitConfig);
 
     if (config.exposeTriggers) {

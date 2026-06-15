@@ -532,15 +532,18 @@ describe("availability check store", () => {
   });
 
   it("claims due checks and records executions across status transitions", async () => {
-    const claimStore = createPostgresAvailabilityCheckStore(
-      createSequentialDb([{ rows: [buildClaimedRow()] }, { rows: [] }]) as never
-    );
+    const claimDb = createSequentialDb([{ rows: [buildClaimedRow()] }, { rows: [] }]);
+    const claimStore = createPostgresAvailabilityCheckStore(claimDb as never);
     await expect(
       claimStore.claimNextDueCheck({
         now: "2026-06-15T10:00:00.000Z",
         claim_timeout_before: "2026-06-15T09:59:00.000Z"
       })
     ).resolves.toEqual(expect.objectContaining({ check_id: "chk_1", prior_status: "passing" }));
+    const claimSql = String(claimDb.query.mock.calls[0]?.[0] ?? "");
+    expect(claimSql).toMatch(/candidate AS \(\s+SELECT ranked\.id AS check_id\s+FROM ranked/s);
+    expect(claimSql).toMatch(/ORDER BY ranked\.next_check_at ASC, ranked\.id ASC/s);
+    expect(claimSql).toMatch(/JOIN candidate ON candidate\.check_id = ranked\.id/s);
     await expect(
       claimStore.claimNextDueCheck({
         now: "2026-06-15T10:00:00.000Z",

@@ -123,7 +123,8 @@ describe("web dogfooding", () => {
       environment: "development",
       service: "debugbundle-web",
       captureConsole: false,
-      breadcrumbsOnErrorOnly: false
+      breadcrumbsOnErrorOnly: false,
+      tracePropagationTargets: ["http://localhost:3001/"]
     });
     expect(target.__DEBUGBUNDLE_DOGFOOD__).toBeDefined();
 
@@ -204,6 +205,36 @@ describe("web dogfooding", () => {
       service: "debugbundle-web",
       captureConsole: false,
       breadcrumbsOnErrorOnly: false
+    });
+  });
+
+  it("allowlists the configured api base url for split-origin request promotion", () => {
+    const sdk = {
+      init: vi.fn()
+    };
+    const target: DogfoodingWindowTarget = {
+      setTimeout: vi.fn()
+    };
+
+    initializeWebDogfooding(
+      {
+        DEV: false,
+        MODE: "production",
+        VITE_API_URL: "https://api.debugbundle.com",
+        VITE_DEBUGBUNDLE_DOGFOOD_PROJECT_TOKEN: "dbundle_proj_browser"
+      },
+      target,
+      sdk
+    );
+
+    expect(sdk.init).toHaveBeenCalledWith({
+      projectToken: "dbundle_proj_browser",
+      endpoint: "https://api.debugbundle.com/v1/events",
+      environment: "production",
+      service: "debugbundle-web",
+      captureConsole: false,
+      breadcrumbsOnErrorOnly: false,
+      tracePropagationTargets: ["https://api.debugbundle.com/"]
     });
   });
 
