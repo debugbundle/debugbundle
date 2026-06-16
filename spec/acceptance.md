@@ -226,6 +226,14 @@ Last updated: 2026-06-15
 - **Then** raw results and daily rollups older than 30 days are purged
 - **And** at least one retained daily state row remains available for each in-window day that had health-check activity
 
+### AC-AVC-06: Workspace Health Status Page
+- **Given** a signed-in member with access to projects that have hosted health checks
+- **When** the member opens the authenticated Health Status page
+- **Then** DebugBundle shows project-grouped health-check rows with a compact 30-day daily status strip
+- **And** projects with multiple health checks can expand to show each check's retained status strip, current state, and uptime percentage
+- **And** projects without health checks do not appear in the status list
+- **And** the existing project Health tab remains the management surface for creating, editing, testing, and deleting checks
+
 ---
 
 ## 3. Bundle Generation Acceptance

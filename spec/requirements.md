@@ -134,6 +134,8 @@ Last updated: 2026-06-15
 
 **FR-AVC-05:** DebugBundle must retain availability-check raw execution results and per-day rollups for at least 30 days, then purge older records. The retained daily rollups must be sufficient to back a future project status-history surface without a schema redesign.
 
+**FR-AVC-06:** The authenticated web app must provide a workspace Health Status page that summarizes retained availability-check status across projects the signed-in member can access. The page must group checks by project, show one compact daily status block for each retained day, expose per-check detail through progressive disclosure, and reuse the existing project Health tab for check management.
+
 ### 1.2 Ingestion API
 
 **FR-ING-01:** `POST /v1/events` — accept batched event payloads, authenticate project token, validate event envelope, apply schema checks.

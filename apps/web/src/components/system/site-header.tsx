@@ -16,6 +16,7 @@ import { SidebarTrigger } from "../ui/sidebar.js";
 const routeTitles: Record<string, string> = {
   "/dashboard": "Dashboard",
   "/incidents": "Incidents",
+  "/health-status": "Health Status",
   "/improvements": "Improvements",
   "/projects": "Projects",
   "/billing": "Billing",
@@ -42,6 +43,7 @@ const projectTabLabels: Record<string, string> = {
   alerts: "Alerts",
   webhooks: "Webhooks",
   github: "GitHub",
+  health: "Health",
   incidents: "Incidents",
   improvements: "Improvements",
   bundles: "Bundles"

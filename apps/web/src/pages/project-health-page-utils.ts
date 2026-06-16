@@ -1,4 +1,7 @@
 import {
+  listProjectAvailabilityCheckDailyRollups,
+  listProjectAvailabilityCheckResults,
+  listProjectAvailabilityChecks,
   isInvalidSessionError,
   type AvailabilityCheckLimits,
   type AvailabilityCheckDailyRollupRecord,
@@ -22,11 +25,50 @@ export interface AvailabilityCheckFormState {
 }
 
 const DEFAULT_NEW_CHECK_INTERVAL_SECONDS = 60;
+const MIN_AUTO_REFRESH_INTERVAL_MS = 15_000;
+export const PENDING_HEALTH_CHECK_REFRESH_INTERVAL_MS = 2_000;
+
+export interface AvailabilityChecksRefreshState {
+  checks: AvailabilityCheckRecord[];
+  limits: AvailabilityCheckLimits;
+  selectedCheckId: string | null;
+}
 
 export function getDefaultAvailabilityCheckIntervalSeconds(
   limits: AvailabilityCheckLimits | null
 ): number {
   return Math.max(limits?.min_interval_seconds ?? 300, DEFAULT_NEW_CHECK_INTERVAL_SECONDS);
+}
+
+export function getHealthChecksAutoRefreshIntervalMs(
+  checks: AvailabilityCheckRecord[] | null
+): number | null {
+  if (checks === null) {
+    return null;
+  }
+
+  const activeIntervals = checks
+    .filter((check) => check.enabled && check.status !== "paused")
+    .map((check) => check.interval_seconds * 1_000)
+    .filter((intervalMs) => Number.isFinite(intervalMs) && intervalMs > 0);
+
+  if (activeIntervals.length === 0) {
+    return null;
+  }
+
+  return Math.max(Math.min(...activeIntervals), MIN_AUTO_REFRESH_INTERVAL_MS);
+}
+
+export function hasPendingInitialHealthCheckResult(
+  checks: AvailabilityCheckRecord[] | null
+): boolean {
+  return (checks ?? []).some(
+    (check) =>
+      check.enabled &&
+      check.status === "unknown" &&
+      check.last_checked_at === null &&
+      check.next_check_at !== null
+  );
 }
 
 export function buildCheckDraft(formState: AvailabilityCheckFormState):
@@ -196,4 +238,83 @@ export function getAvailabilityErrorMessage(error: unknown): string {
   }
 
   return "Could not complete the health-check request.";
+}
+
+export async function loadProjectAvailabilityChecks(input: {
+  projectId: string;
+  setChecks: (value: AvailabilityCheckRecord[] | null) => void;
+  setLimits: (value: AvailabilityCheckLimits | null) => void;
+  setLoadErrorMessage: (value: string | null) => void;
+}): Promise<void> {
+  try {
+    const response = await listProjectAvailabilityChecks(input.projectId, 50);
+    input.setChecks(response.checks);
+    input.setLimits(response.limits);
+    input.setLoadErrorMessage(null);
+  } catch (error) {
+    input.setChecks([]);
+    input.setLimits(null);
+    input.setLoadErrorMessage(getAvailabilityErrorMessage(error));
+  }
+}
+
+export async function refreshProjectAvailabilityChecks(input: {
+  projectId: string;
+  setChecks: (value: AvailabilityCheckRecord[] | null) => void;
+  setLimits: (value: AvailabilityCheckLimits | null) => void;
+  setLoadErrorMessage: (value: string | null) => void;
+  preferredCheckId: string | null;
+  setSelectedCheckId: (value: string | null) => void;
+}): Promise<AvailabilityChecksRefreshState> {
+  const response = await listProjectAvailabilityChecks(input.projectId, 50);
+  input.setChecks(response.checks);
+  input.setLimits(response.limits);
+  input.setLoadErrorMessage(null);
+
+  if (response.checks.length === 0) {
+    input.setSelectedCheckId(null);
+    return {
+      checks: response.checks,
+      limits: response.limits,
+      selectedCheckId: null
+    };
+  }
+
+  const nextSelectedCheckId =
+    input.preferredCheckId !== null &&
+    response.checks.some((check) => check.check_id === input.preferredCheckId)
+      ? input.preferredCheckId
+      : response.checks[0]!.check_id;
+  input.setSelectedCheckId(nextSelectedCheckId);
+
+  return {
+    checks: response.checks,
+    limits: response.limits,
+    selectedCheckId: nextSelectedCheckId
+  };
+}
+
+export async function loadProjectAvailabilityCheckHistory(input: {
+  projectId: string;
+  selectedCheckId: string;
+  setResults: (value: AvailabilityCheckResultRecord[] | null) => void;
+  setRollups: (value: AvailabilityCheckDailyRollupRecord[] | null) => void;
+}): Promise<void> {
+  try {
+    const [nextResults, nextRollups] = await Promise.all([
+      listProjectAvailabilityCheckResults(input.projectId, input.selectedCheckId, 20),
+      listProjectAvailabilityCheckDailyRollups(input.projectId, input.selectedCheckId, 30)
+    ]);
+    input.setResults(nextResults);
+    input.setRollups(nextRollups);
+  } catch (error) {
+    if (isInvalidSessionError(error)) {
+      input.setResults([]);
+      input.setRollups([]);
+      return;
+    }
+
+    input.setResults([]);
+    input.setRollups([]);
+  }
 }

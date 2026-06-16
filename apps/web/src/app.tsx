@@ -47,6 +47,7 @@ import { MemberTokensPage } from "./pages/member-tokens-page.js";
 import { ProjectsPage, ProjectTokensPage } from "./pages/management-pages.js";
 import { IncidentsPage } from "./pages/incidents-page.js";
 import { IncidentDetailPage } from "./pages/incident-detail-page.js";
+import { HealthStatusPage } from "./pages/health-status-page.js";
 import { ProjectLayout } from "./components/system/project-layout.js";
 import { ProjectAlertsPage } from "./pages/project-alerts-page.js";
 import { ProjectInvitePage } from "./pages/project-invite-page.js";
@@ -179,6 +180,7 @@ export function App({ initialEntries }: AppProps): JSX.Element {
               <Route path="/dashboard" element={<DashboardPage />} />
               <Route path="/incidents" element={<IncidentsPage />} />
               <Route path="/incidents/:incidentId" element={<IncidentDetailPage />} />
+              <Route path="/health-status" element={<HealthStatusPage />} />
               <Route path="/improvements" element={<ImprovementsPage />} />
               <Route path="/billing" element={<BillingPage />} />
               <Route path="/projects" element={<ProjectsPage />} />
@@ -224,6 +226,7 @@ export function App({ initialEntries }: AppProps): JSX.Element {
               <Route path="/dashboard" element={<DashboardPage />} />
               <Route path="/incidents" element={<IncidentsPage />} />
               <Route path="/incidents/:incidentId" element={<IncidentDetailPage />} />
+              <Route path="/health-status" element={<HealthStatusPage />} />
               <Route path="/improvements" element={<ImprovementsPage />} />
               <Route path="/billing" element={<BillingPage />} />
               <Route path="/projects" element={<ProjectsPage />} />

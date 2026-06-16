@@ -1,6 +1,7 @@
 import {
   CreditCardIcon,
   FolderKanbanIcon,
+  HeartPulseIcon,
   HomeIcon,
   KeySquareIcon,
   SparklesIcon,
@@ -27,6 +28,7 @@ import {
 const navMain = [
   { to: "/dashboard", label: "Dashboard", icon: HomeIcon },
   { to: "/incidents", label: "Incidents", icon: SirenIcon },
+  { to: "/health-status", label: "Health Status", icon: HeartPulseIcon },
   { to: "/improvements", label: "Improvements", icon: SparklesIcon },
   { to: "/projects", label: "Projects", icon: FolderKanbanIcon },
   { to: "/billing", label: "Billing", icon: CreditCardIcon },

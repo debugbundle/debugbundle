@@ -33,9 +33,6 @@ import {
   createProjectAvailabilityCheck,
   deleteProjectAvailabilityCheck,
   isInvalidSessionError,
-  listProjectAvailabilityCheckDailyRollups,
-  listProjectAvailabilityCheckResults,
-  listProjectAvailabilityChecks,
   testProjectAvailabilityCheck,
   updateProjectAvailabilityCheck,
   type AvailabilityCheckDailyRollupRecord,
@@ -46,6 +43,7 @@ import {
 } from "../lib/api.js";
 import { showErrorToast, showSuccessToast } from "../lib/notify.js";
 import { getProjectEffectiveRole } from "../lib/project-access.js";
+import { CUSTOM_PROJECT_ENVIRONMENT_VALUE, PROJECT_ENVIRONMENT_OPTIONS } from "../lib/project-form.js";
 import { useDelayedVisibility } from "../lib/use-delayed-visibility.js";
 import {
   availabilityResultVariant,
@@ -58,7 +56,13 @@ import {
   formatDowntime,
   formatPausedReason,
   getDefaultAvailabilityCheckIntervalSeconds,
+  getHealthChecksAutoRefreshIntervalMs,
+  hasPendingInitialHealthCheckResult,
   getAvailabilityErrorMessage,
+  loadProjectAvailabilityCheckHistory,
+  loadProjectAvailabilityChecks,
+  PENDING_HEALTH_CHECK_REFRESH_INTERVAL_MS,
+  refreshProjectAvailabilityChecks,
   type AvailabilityCheckFormState
 } from "./project-health-page-utils.js";
 
@@ -97,6 +101,7 @@ export function ProjectHealthPage(): JSX.Element {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [formMode, setFormMode] = useState<FormMode>("create");
   const [editingCheckId, setEditingCheckId] = useState<string | null>(null);
+  const [customEnvironment, setCustomEnvironment] = useState("");
   const [formState, setFormState] = useState<AvailabilityCheckFormState>({
     ...DEFAULT_FORM_STATE,
     environment: project.environment_default
@@ -120,6 +125,13 @@ export function ProjectHealthPage(): JSX.Element {
     limits === null ||
     (checks !== null && checks.length >= limits.max_checks_per_project);
   const defaultIntervalSeconds = getDefaultAvailabilityCheckIntervalSeconds(limits);
+  const autoRefreshIntervalMs = getHealthChecksAutoRefreshIntervalMs(checks);
+  const refreshIntervalMs = hasPendingInitialHealthCheckResult(checks)
+    ? PENDING_HEALTH_CHECK_REFRESH_INTERVAL_MS
+    : autoRefreshIntervalMs;
+  const selectedEnvironmentOption = PROJECT_ENVIRONMENT_OPTIONS.some((option) => option.value === formState.environment)
+    ? formState.environment
+    : CUSTOM_PROJECT_ENVIRONMENT_VALUE;
   const testResultNotice =
     testMessage === null ? null : (
       <Notice tone={testResult?.result.status === "success" ? "success" : "warning"} title={testResult === null ? "Test failed" : "Latest test result"}>
@@ -135,7 +147,7 @@ export function ProjectHealthPage(): JSX.Element {
     );
 
   useEffect(() => {
-    void loadChecks(projectId, setChecks, setLimits, setLoadErrorMessage);
+    void loadProjectAvailabilityChecks({ projectId, setChecks, setLimits, setLoadErrorMessage });
   }, [projectId]);
 
   useEffect(() => {
@@ -162,27 +174,84 @@ export function ProjectHealthPage(): JSX.Element {
 
     setResults(null);
     setRollups(null);
-
-    void (async () => {
-      try {
-        const [nextResults, nextRollups] = await Promise.all([
-          listProjectAvailabilityCheckResults(projectId, selectedCheckId, 20),
-          listProjectAvailabilityCheckDailyRollups(projectId, selectedCheckId, 30)
-        ]);
-        setResults(nextResults);
-        setRollups(nextRollups);
-      } catch (error) {
-        if (isInvalidSessionError(error)) {
-          setResults([]);
-          setRollups([]);
-          return;
-        }
-
-        setResults([]);
-        setRollups([]);
-      }
-    })();
+    void loadProjectAvailabilityCheckHistory({ projectId, selectedCheckId, setResults, setRollups });
   }, [projectId, selectedCheckId]);
+
+  useEffect(() => {
+    if (refreshIntervalMs === null) {
+      return;
+    }
+
+    let disposed = false;
+    let timeoutId: number | null = null;
+
+    const clearScheduledRefresh = (): void => {
+      if (timeoutId !== null) {
+        window.clearTimeout(timeoutId);
+        timeoutId = null;
+      }
+    };
+
+    const scheduleNextRefresh = (): void => {
+      clearScheduledRefresh();
+
+      if (disposed || document.visibilityState !== "visible") {
+        return;
+      }
+
+      timeoutId = window.setTimeout(() => {
+        void runRefresh();
+      }, refreshIntervalMs);
+    };
+
+    const runRefresh = async (): Promise<void> => {
+      clearScheduledRefresh();
+
+      try {
+        const refreshState = await refreshProjectAvailabilityChecks({
+          projectId,
+          setChecks,
+          setLimits,
+          setLoadErrorMessage,
+          preferredCheckId: selectedCheckId,
+          setSelectedCheckId
+        });
+
+        if (refreshState.selectedCheckId !== null) {
+          await loadProjectAvailabilityCheckHistory({
+            projectId,
+            selectedCheckId: refreshState.selectedCheckId,
+            setResults,
+            setRollups
+          });
+        }
+      } catch (error) {
+        if (!isInvalidSessionError(error)) {
+          setLoadErrorMessage(getAvailabilityErrorMessage(error));
+        }
+      } finally {
+        scheduleNextRefresh();
+      }
+    };
+
+    const handleVisibilityChange = (): void => {
+      if (document.visibilityState === "visible") {
+        void runRefresh();
+        return;
+      }
+
+      clearScheduledRefresh();
+    };
+
+    scheduleNextRefresh();
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    return () => {
+      disposed = true;
+      clearScheduledRefresh();
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, [projectId, refreshIntervalMs, selectedCheckId]);
 
   function resetForm(mode: FormMode, check?: AvailabilityCheckRecord): void {
     setFormMode(mode);
@@ -191,14 +260,25 @@ export function ProjectHealthPage(): JSX.Element {
     setTestMessage(null);
 
     if (check === undefined) {
+      const defaultEnvironment = project.environment_default;
+      setCustomEnvironment(
+        PROJECT_ENVIRONMENT_OPTIONS.some((option) => option.value === defaultEnvironment)
+          ? ""
+          : defaultEnvironment
+      );
       setFormState({
         ...DEFAULT_FORM_STATE,
         interval_seconds: String(defaultIntervalSeconds),
-        environment: project.environment_default
+        environment: defaultEnvironment
       });
       return;
     }
 
+    setCustomEnvironment(
+      PROJECT_ENVIRONMENT_OPTIONS.some((option) => option.value === check.environment)
+        ? ""
+        : check.environment
+    );
     setFormState({
       name: check.name,
       url: check.url,
@@ -213,6 +293,20 @@ export function ProjectHealthPage(): JSX.Element {
       service_name: check.service_name ?? "",
       enabled: check.enabled
     });
+  }
+
+  function handleEnvironmentChange(value: string): void {
+    if (value === CUSTOM_PROJECT_ENVIRONMENT_VALUE) {
+      setFormState((current) => ({ ...current, environment: customEnvironment }));
+      return;
+    }
+
+    setFormState((current) => ({ ...current, environment: value }));
+  }
+
+  function handleCustomEnvironmentChange(value: string): void {
+    setCustomEnvironment(value);
+    setFormState((current) => ({ ...current, environment: value }));
   }
 
   function openCreateDialog(): void {
@@ -251,7 +345,14 @@ export function ProjectHealthPage(): JSX.Element {
           ? await createProjectAvailabilityCheck(projectId, draft)
           : await updateProjectAvailabilityCheck(projectId, editingCheckId!, draft);
 
-      await refreshChecks(projectId, setChecks, setLimits, setLoadErrorMessage, saved.check_id, setSelectedCheckId);
+      await refreshProjectAvailabilityChecks({
+        projectId,
+        setChecks,
+        setLimits,
+        setLoadErrorMessage,
+        preferredCheckId: saved.check_id,
+        setSelectedCheckId
+      });
       setIsFormOpen(false);
       showSuccessToast(
         formMode === "create" ? "Health check created successfully." : "Health check updated successfully."
@@ -301,7 +402,14 @@ export function ProjectHealthPage(): JSX.Element {
 
     try {
       await deleteProjectAvailabilityCheck(projectId, checkId);
-      await refreshChecks(projectId, setChecks, setLimits, setLoadErrorMessage, null, setSelectedCheckId);
+      await refreshProjectAvailabilityChecks({
+        projectId,
+        setChecks,
+        setLimits,
+        setLoadErrorMessage,
+        preferredCheckId: null,
+        setSelectedCheckId
+      });
       showSuccessToast("Health check deleted successfully.");
     } catch (error) {
       showErrorToast(getAvailabilityErrorMessage(error));
@@ -441,9 +549,6 @@ export function ProjectHealthPage(): JSX.Element {
                 <div className="grid gap-4 md:grid-cols-3">
                   <Field>
                     <FieldLabel htmlFor="health-check-interval">Interval (seconds)</FieldLabel>
-                    <FieldDescription>
-                      Minimum for this plan: {limits?.min_interval_seconds ?? 30}s.
-                    </FieldDescription>
                     <Input
                       id="health-check-interval"
                       type="number"
@@ -489,14 +594,30 @@ export function ProjectHealthPage(): JSX.Element {
                   <Field>
                     <FieldLabel htmlFor="health-check-environment">Environment label</FieldLabel>
                     <FieldDescription>Defaults to the project environment so incidents line up with the rest of the project.</FieldDescription>
-                    <Input
-                      id="health-check-environment"
-                      value={formState.environment}
-                      onChange={(event) => {
-                        const value = event.currentTarget.value;
-                        setFormState((current) => ({ ...current, environment: value }));
-                      }}
-                    />
+                    <Select value={selectedEnvironmentOption} onValueChange={handleEnvironmentChange}>
+                      <SelectTrigger id="health-check-environment" className="w-full">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent position="popper">
+                        <SelectGroup>
+                          {PROJECT_ENVIRONMENT_OPTIONS.map((option) => (
+                            <SelectItem key={option.value} value={option.value}>
+                              {option.label}
+                            </SelectItem>
+                          ))}
+                        </SelectGroup>
+                      </SelectContent>
+                    </Select>
+                    {selectedEnvironmentOption !== CUSTOM_PROJECT_ENVIRONMENT_VALUE ? null : (
+                      <Input
+                        id="health-check-environment-custom"
+                        aria-label="Custom environment"
+                        value={customEnvironment}
+                        onChange={(event) => handleCustomEnvironmentChange(event.currentTarget.value)}
+                        placeholder="preview"
+                        required
+                      />
+                    )}
                   </Field>
                   <Field>
                     <FieldLabel htmlFor="health-check-service">Service label</FieldLabel>
@@ -508,7 +629,6 @@ export function ProjectHealthPage(): JSX.Element {
                         const value = event.currentTarget.value;
                         setFormState((current) => ({ ...current, service_name: value }));
                       }}
-                      placeholder="checkout"
                     />
                   </Field>
                 </div>
@@ -840,41 +960,4 @@ function DetailRow(input: { label: string; value: string; monospace?: boolean })
       </p>
     </div>
   );
-}
-
-async function loadChecks(
-  projectId: string,
-  setChecks: (value: AvailabilityCheckRecord[] | null) => void,
-  setLimits: (value: AvailabilityCheckLimits | null) => void,
-  setLoadErrorMessage: (value: string | null) => void
-): Promise<void> {
-  try {
-    const response = await listProjectAvailabilityChecks(projectId, 50);
-    setChecks(response.checks);
-    setLimits(response.limits);
-    setLoadErrorMessage(null);
-  } catch (error) {
-    setChecks([]);
-    setLimits(null);
-    setLoadErrorMessage(getAvailabilityErrorMessage(error));
-  }
-}
-
-async function refreshChecks(
-  projectId: string,
-  setChecks: (value: AvailabilityCheckRecord[] | null) => void,
-  setLimits: (value: AvailabilityCheckLimits | null) => void,
-  setLoadErrorMessage: (value: string | null) => void,
-  preferredCheckId: string | null,
-  setSelectedCheckId: (value: string | null) => void
-): Promise<void> {
-  const response = await listProjectAvailabilityChecks(projectId, 50);
-  setChecks(response.checks);
-  setLimits(response.limits);
-  setLoadErrorMessage(null);
-  if (response.checks.length === 0) {
-    setSelectedCheckId(null);
-    return;
-  }
-  setSelectedCheckId(preferredCheckId ?? response.checks[0]!.check_id);
 }
