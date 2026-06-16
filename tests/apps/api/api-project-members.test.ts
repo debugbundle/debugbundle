@@ -96,6 +96,7 @@ function createServer(overrides: {
         : ({
             resolveProjectAccessForUser: vi.fn().mockResolvedValue({
               project_id: PROJECT_ID,
+              project_name: "Checkout API",
               organization_id: "org_123",
               owner_user_id: "usr_123",
               owner_email: "owner@example.com",
@@ -385,7 +386,8 @@ describe("api project member routes", () => {
     expect(inviteEmails.sendProjectInviteEmail).toHaveBeenCalledWith({
       email: "new@example.com",
       token: expect.stringMatching(/^dbundle_invite_/),
-      inviter_name: "Owner"
+      inviter_name: "Owner",
+      project_title: "Checkout API"
     });
   });
 

@@ -822,6 +822,7 @@ export function createPostgresMetadataStore(
         `
           SELECT
             p.id AS project_id,
+            p.name AS project_name,
             p.organization_id,
             p.owner_user_id,
             owner_user.email AS owner_email,

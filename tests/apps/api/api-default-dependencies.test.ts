@@ -1655,7 +1655,12 @@ describe("api default dependencies", () => {
           authEmails?: {
             sendEmailAuthCode(input: { email: string; code: string; expires_in_minutes: number }): Promise<void>;
             sendAccountDeletionOtp(input: { email: string; code: string; expires_in_minutes: number }): Promise<void>;
-            sendProjectInviteEmail(input: { email: string; token: string; inviter_name: string }): Promise<void>;
+            sendProjectInviteEmail(input: {
+              email: string;
+              token: string;
+              inviter_name: string;
+              project_title: string;
+            }): Promise<void>;
           };
         }
       | undefined;
@@ -1681,7 +1686,8 @@ describe("api default dependencies", () => {
     await serviceOptions?.authEmails?.sendProjectInviteEmail({
       email: "invitee@example.com",
       token: "invite-token",
-      inviter_name: "Owen Example"
+      inviter_name: "Owen Far",
+      project_title: "Checkout API"
     });
 
     expect(renderEmailAuthCodeEmailMock).toHaveBeenCalledWith({
@@ -1698,7 +1704,8 @@ describe("api default dependencies", () => {
     });
     expect(renderProjectInviteEmailMock).toHaveBeenCalledWith({
       acceptUrl: "https://app.debugbundle.test/invite?token=invite-token",
-      inviterName: "Owen Example",
+      inviterName: "Owen Far",
+      projectName: "Checkout API",
       brandMarkUrl: "https://app.debugbundle.test/email/debugbundle-mark.png"
     });
     expect(emailTransportSendMock).toHaveBeenCalledTimes(3);

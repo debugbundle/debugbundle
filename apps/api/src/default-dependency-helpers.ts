@@ -350,10 +350,11 @@ export function createAuthEmailSender(input: {
       });
     },
 
-    async sendProjectInviteEmail({ email, token, inviter_name }): Promise<void> {
+    async sendProjectInviteEmail({ email, token, inviter_name, project_title }): Promise<void> {
       const rendered = renderProjectInviteEmail({
         acceptUrl: `${baseUrl}/invite?token=${encodeURIComponent(token)}`,
         inviterName: inviter_name,
+        projectName: project_title,
         brandMarkUrl
       });
       await input.emailTransport.send({

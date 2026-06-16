@@ -119,7 +119,8 @@ describe("email package", () => {
     });
     const invite = renderProjectInviteEmail({
       acceptUrl: "https://debugbundle.test/accept?token=<secret>",
-      inviterName: "Owen Example"
+      inviterName: "Owen Far",
+      projectName: "Checkout <API>"
     });
 
     expect(emailCode.subject).toContain("sign-in code");
@@ -137,11 +138,13 @@ describe("email package", () => {
     expect(accountDeletionOtp.html).toContain("65&lt;4321&gt;");
     expect(accountDeletionOtp.html).toContain("&lt;danger&gt;");
     expect(accountDeletionOtp.html).toContain("Return to account settings");
-    expect(invite.subject).toContain("project was shared");
-    expect(invite.text).toContain("Owen Example shared a DebugBundle project with you.");
+    expect(invite.subject).toBe("A DebugBundle project was shared with you");
+    expect(invite.text).toContain('Owen Far shared "Checkout <API>" with you in DebugBundle.');
     expect(invite.text).toContain("https://debugbundle.test/accept?token=<secret>");
-    expect(invite.html).toContain("Owen Example invited you to a shared project.");
-    expect(invite.html).toContain("Owen Example");
+    expect(invite.html).toContain("Checkout &lt;API&gt; was shared with you");
+    expect(invite.html).toContain("Owen Far shared Checkout &lt;API&gt; with you in DebugBundle.");
+    expect(invite.html).toContain("Owen Far");
+    expect(invite.html).toContain("Checkout &lt;API&gt;");
     expect(invite.html).toContain("&lt;secret&gt;");
     expect(invite.html).toContain('src="https://debugbundle.test/email/debugbundle-mark.png"');
   });

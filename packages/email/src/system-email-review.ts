@@ -78,7 +78,8 @@ export const SYSTEM_EMAIL_REVIEW_ENTRIES: readonly SystemEmailReviewEntry[] = [
     get preview() {
       return renderProjectInviteEmail({
         acceptUrl: "https://app.debugbundle.local/invite?token=dbundle_invite_preview_123",
-        inviterName: "Owen Example",
+        inviterName: "Owen Far",
+        projectName: "Checkout API",
         brandMarkUrl: SAMPLE_EMAIL_BRAND_MARK_URL
       });
     }

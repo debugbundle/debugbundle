@@ -296,6 +296,7 @@ export type DeletedProjectRecord = Omit<ProjectRecord, "metrics">;
 
 export interface ProjectAccessRecord {
   project_id: string;
+  project_name?: string;
   organization_id: string;
   owner_user_id: string;
   owner_email: string;

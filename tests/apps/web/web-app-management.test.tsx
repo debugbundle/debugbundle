@@ -3732,6 +3732,109 @@ describe("web app — management routes", () => {
     );
   });
 
+  it("opens the incidents page from the dashboard open-incidents card", async () => {
+    const user = userEvent.setup();
+    const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = requestUrl(input);
+
+      if (url.endsWith("/v1/auth/session")) {
+        return jsonResponse(200, {
+          session: createSession()
+        });
+      }
+
+      if (url.endsWith("/v1/projects") && init?.method === undefined) {
+        return jsonResponse(200, {
+          projects: [createProject()]
+        });
+      }
+
+      if (url.includes("/v1/incidents?") && url.includes("first_seen_after=")) {
+        return jsonResponse(200, {
+          incidents: [
+            createIncident({
+              incident_id: "inc_today",
+              title: "Checkout timeout"
+            })
+          ],
+          next_cursor: null
+        });
+      }
+
+      if (url.includes("/v1/incidents?")) {
+        return jsonResponse(200, { incidents: [], next_cursor: null });
+      }
+
+      return jsonResponse(404, { error: "not_found" });
+    });
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<App initialEntries={["/dashboard"]} />);
+
+    await screen.findByText(/current unresolved incidents across all projects/i);
+
+    const openIncidentsCard = screen.getByText(/current unresolved incidents across all projects/i).closest("a");
+    expect(openIncidentsCard).not.toBeNull();
+
+    await user.click(openIncidentsCard as HTMLAnchorElement);
+
+    expect(await screen.findByRole("heading", { name: /incident inventory/i })).toBeInTheDocument();
+  });
+
+  it("scrolls to the incidents-today panel from the dashboard new-incidents card", async () => {
+    const user = userEvent.setup();
+    const scrollIntoView = vi.fn();
+
+    Object.defineProperty(window.HTMLElement.prototype, "scrollIntoView", {
+      configurable: true,
+      value: scrollIntoView
+    });
+
+    const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = requestUrl(input);
+
+      if (url.endsWith("/v1/auth/session")) {
+        return jsonResponse(200, {
+          session: createSession()
+        });
+      }
+
+      if (url.endsWith("/v1/projects") && init?.method === undefined) {
+        return jsonResponse(200, {
+          projects: [createProject()]
+        });
+      }
+
+      if (url.includes("/v1/incidents?") && url.includes("first_seen_after=")) {
+        return jsonResponse(200, {
+          incidents: [
+            createIncident({
+              incident_id: "inc_today",
+              title: "Checkout timeout"
+            })
+          ],
+          next_cursor: null
+        });
+      }
+
+      return jsonResponse(404, { error: "not_found" });
+    });
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<App initialEntries={["/dashboard"]} />);
+
+    await screen.findByRole("heading", { name: /incidents today/i });
+    await user.click(screen.getByRole("button", { name: /new incidents today/i }));
+
+    expect(scrollIntoView).toHaveBeenCalledTimes(1);
+    expect(scrollIntoView).toHaveBeenCalledWith({
+      behavior: "smooth",
+      block: "start"
+    });
+  });
+
   it("renders incident rows in the dashboard incidents-today table", async () => {
     const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
       const url = requestUrl(input);

@@ -178,6 +178,7 @@ describe("web app — project health page", () => {
     await user.click(screen.getByRole("button", { name: /^close$/i }));
 
     await user.click(screen.getByRole("button", { name: /create health check/i }));
+    expect(screen.getByLabelText(/interval/i)).toHaveValue(60);
     await user.type(screen.getByLabelText(/^name$/i), "Checkout app");
     await user.clear(screen.getByLabelText(/check url/i));
     await user.type(screen.getByLabelText(/check url/i), "https://checkout.example.com/health");

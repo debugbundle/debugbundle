@@ -59,7 +59,7 @@ export function DashboardIncidentsToday(): JSX.Element {
   }, [refreshToken]);
 
   return (
-    <Card className="min-w-0">
+    <Card id="dashboard-incidents-today" className="min-w-0">
       <CardHeader className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex w-full items-center justify-between gap-3 sm:w-auto">
           <div className="space-y-1.5">
@@ -79,7 +79,7 @@ export function DashboardIncidentsToday(): JSX.Element {
             onRefresh={() => setRefreshToken((current) => current + 1)}
             className="hidden sm:inline-flex"
           />
-          <Button asChild variant="outline" size="sm">
+          <Button asChild variant="outline" size="sm" className="hidden sm:inline-flex">
             <Link to="/incidents">Open incidents</Link>
           </Button>
         </div>

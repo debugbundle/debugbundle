@@ -388,21 +388,22 @@ export function renderAccountDeletionOtpEmail(input: {
 export function renderProjectInviteEmail(input: {
   acceptUrl: string;
   inviterName: string;
+  projectName: string;
   brandMarkUrl?: string | undefined;
 }): { subject: string; text: string; html: string } {
   return {
     subject: "A DebugBundle project was shared with you",
     text: [
-      `${input.inviterName} shared a DebugBundle project with you.`,
+      `${input.inviterName} shared "${input.projectName}" with you in DebugBundle.`,
       "",
       input.acceptUrl
     ].join("\n"),
     html: renderEmailLayout({
       brandMarkUrl: input.brandMarkUrl ?? buildEmailBrandMarkUrl(input.acceptUrl),
       eyebrow: "Project invite",
-      title: "A DebugBundle project was shared with you",
-      intro: `${escapeHtml(input.inviterName)} shared a DebugBundle project with you. Open the invite link to accept access to the shared project.`,
-      preheader: `${input.inviterName} invited you to a shared project.`,
+      title: `${input.projectName} was shared with you`,
+      intro: `${escapeHtml(input.inviterName)} shared ${escapeHtml(input.projectName)} with you in DebugBundle. Open the invite link to accept access to the shared project.`,
+      preheader: `${input.inviterName} invited you to ${input.projectName}.`,
       bodyHtml: [
         renderEmailButton({
           label: "Open invite",

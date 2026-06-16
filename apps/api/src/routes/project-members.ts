@@ -290,7 +290,8 @@ export function registerProjectMemberRoutes(app: FastifyInstance, dependencies: 
     await dependencies.inviteEmails?.sendProjectInviteEmail({
       email: result.invite.email,
       token: inviteToken.plaintext,
-      inviter_name: deriveInviteSenderName(auth.member.email ?? auth.access.owner_email)
+      inviter_name: deriveInviteSenderName(auth.member.email ?? auth.access.owner_email),
+      project_title: auth.access.project_name ?? "a DebugBundle project"
     });
 
     return reply.status(201).send({ invite: result.invite });

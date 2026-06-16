@@ -29,6 +29,7 @@ describe("postgres metadata store project collaboration", () => {
           rows: [
             {
               project_id: "proj_123",
+              project_name: "Checkout API",
               organization_id: "org_123",
               owner_user_id: "usr_owner",
               owner_email: "owner@example.com",
@@ -161,6 +162,7 @@ describe("postgres metadata store project collaboration", () => {
     });
     expect(access).toEqual({
       project_id: "proj_123",
+      project_name: "Checkout API",
       organization_id: "org_123",
       owner_user_id: "usr_owner",
       owner_email: "owner@example.com",
@@ -242,6 +244,7 @@ describe("postgres metadata store project collaboration", () => {
           rows: [
             {
               project_id: "proj_shared",
+              project_name: "Shared Dashboard",
               organization_id: "org_free",
               owner_user_id: "usr_owner",
               owner_email: "owner@example.com",
@@ -307,6 +310,7 @@ describe("postgres metadata store project collaboration", () => {
 
     expect(access).toEqual({
       project_id: "proj_shared",
+      project_name: "Shared Dashboard",
       organization_id: "org_free",
       owner_user_id: "usr_owner",
       owner_email: "owner@example.com",

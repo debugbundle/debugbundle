@@ -57,6 +57,7 @@ import {
   formatDay,
   formatDowntime,
   formatPausedReason,
+  getDefaultAvailabilityCheckIntervalSeconds,
   getAvailabilityErrorMessage,
   type AvailabilityCheckFormState
 } from "./project-health-page-utils.js";
@@ -73,7 +74,7 @@ const DEFAULT_FORM_STATE: AvailabilityCheckFormState = {
   expected_status_min: "200",
   expected_status_max: "399",
   timeout_ms: "5000",
-  interval_seconds: "300",
+  interval_seconds: String(getDefaultAvailabilityCheckIntervalSeconds(null)),
   failure_threshold: "3",
   recovery_threshold: "2",
   environment: "",
@@ -118,6 +119,7 @@ export function ProjectHealthPage(): JSX.Element {
     !canManageChecks ||
     limits === null ||
     (checks !== null && checks.length >= limits.max_checks_per_project);
+  const defaultIntervalSeconds = getDefaultAvailabilityCheckIntervalSeconds(limits);
   const testResultNotice =
     testMessage === null ? null : (
       <Notice tone={testResult?.result.status === "success" ? "success" : "warning"} title={testResult === null ? "Test failed" : "Latest test result"}>
@@ -191,7 +193,7 @@ export function ProjectHealthPage(): JSX.Element {
     if (check === undefined) {
       setFormState({
         ...DEFAULT_FORM_STATE,
-        interval_seconds: String(limits?.min_interval_seconds ?? 300),
+        interval_seconds: String(defaultIntervalSeconds),
         environment: project.environment_default
       });
       return;
@@ -439,7 +441,9 @@ export function ProjectHealthPage(): JSX.Element {
                 <div className="grid gap-4 md:grid-cols-3">
                   <Field>
                     <FieldLabel htmlFor="health-check-interval">Interval (seconds)</FieldLabel>
-                    <FieldDescription>Minimum for this plan: {limits?.min_interval_seconds ?? 30}s.</FieldDescription>
+                    <FieldDescription>
+                      Minimum for this plan: {limits?.min_interval_seconds ?? 30}s.
+                    </FieldDescription>
                     <Input
                       id="health-check-interval"
                       type="number"
@@ -496,7 +500,7 @@ export function ProjectHealthPage(): JSX.Element {
                   </Field>
                   <Field>
                     <FieldLabel htmlFor="health-check-service">Service label</FieldLabel>
-                    <FieldDescription>Optional service name to group uptime incidents with the same service filters used elsewhere.</FieldDescription>
+                    <FieldDescription>Optional service name to group uptime incidents with the same service filters.</FieldDescription>
                     <Input
                       id="health-check-service"
                       value={formState.service_name}

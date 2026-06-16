@@ -9,6 +9,7 @@ import {
   formatDateTime,
   formatDowntime,
   formatPausedReason,
+  getDefaultAvailabilityCheckIntervalSeconds,
   getAvailabilityErrorMessage
 } from "../../../apps/web/src/pages/project-health-page-utils.js";
 
@@ -71,5 +72,12 @@ describe("web project health helpers", () => {
   it("formats dates as non-empty user-facing strings", () => {
     expect(formatDateTime("2026-06-15T10:00:00.000Z")).not.toHaveLength(0);
     expect(formatDay("2026-06-15")).not.toHaveLength(0);
+  });
+
+  it("chooses a conservative default interval for new checks", () => {
+    expect(getDefaultAvailabilityCheckIntervalSeconds(null)).toBe(300);
+    expect(getDefaultAvailabilityCheckIntervalSeconds({ max_checks_per_project: 1, min_interval_seconds: 300 })).toBe(300);
+    expect(getDefaultAvailabilityCheckIntervalSeconds({ max_checks_per_project: 5, min_interval_seconds: 60 })).toBe(60);
+    expect(getDefaultAvailabilityCheckIntervalSeconds({ max_checks_per_project: 25, min_interval_seconds: 30 })).toBe(60);
   });
 });

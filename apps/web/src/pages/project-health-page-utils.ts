@@ -1,5 +1,6 @@
 import {
   isInvalidSessionError,
+  type AvailabilityCheckLimits,
   type AvailabilityCheckDailyRollupRecord,
   type AvailabilityCheckRecord,
   type AvailabilityCheckResultRecord
@@ -18,6 +19,14 @@ export interface AvailabilityCheckFormState {
   environment: string;
   service_name: string;
   enabled: boolean;
+}
+
+const DEFAULT_NEW_CHECK_INTERVAL_SECONDS = 60;
+
+export function getDefaultAvailabilityCheckIntervalSeconds(
+  limits: AvailabilityCheckLimits | null
+): number {
+  return Math.max(limits?.min_interval_seconds ?? 300, DEFAULT_NEW_CHECK_INTERVAL_SECONDS);
 }
 
 export function buildCheckDraft(formState: AvailabilityCheckFormState):
