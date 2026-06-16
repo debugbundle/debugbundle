@@ -149,7 +149,7 @@
   }
 
   body {
-    @apply bg-background text-foreground;
+    @apply bg-sidebar text-foreground;
     margin: 0;
     font-family: var(--font-sans);
   }
@@ -164,6 +164,6 @@
     font: inherit;
   }
   html {
-    @apply font-sans;
+    @apply bg-sidebar font-sans;
   }
 }

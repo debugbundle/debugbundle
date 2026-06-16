@@ -154,7 +154,7 @@ describe("availability check store helpers", () => {
         final_url: "https://app.example.com/health",
         redirect_count: 0
       })
-    ).toBe("down");
+    ).toBe("degraded");
   });
 
   it("computes schedule and day buckets from execution timestamps", () => {

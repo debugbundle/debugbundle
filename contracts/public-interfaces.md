@@ -1527,6 +1527,8 @@ Availability checks are hosted external HTTP checks executed by DebugBundle infr
 }
 ```
 
+Daily rollup `state` is intentionally less sensitive than raw execution status. A failed execution below the configured consecutive `failure_threshold` records failed checks, downtime estimate, and a `degraded` day, but it does not mark the full day `down`. A day is `down` only after the threshold-backed availability incident path opens or regresses an incident and appends that incident id to the rollup.
+
 Guardrails:
 
 | Constraint | Free | Solo | Team |

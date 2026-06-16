@@ -4,7 +4,9 @@ import type { AvailabilityCheckRecord } from "../../../apps/web/src/lib/api.js";
 import {
   availabilityResultVariant,
   availabilityStatusVariant,
+  dailyStateClassName,
   dailyStateVariant,
+  formatDailyStateLabel,
   formatAvailabilityStatus,
   formatDay,
   formatDateTime,
@@ -32,6 +34,46 @@ describe("web project health helpers", () => {
     expect(dailyStateVariant("paused")).toBe("warning");
     expect(dailyStateVariant("down")).toBe("destructive");
     expect(dailyStateVariant("unknown")).toBe("outline");
+    expect(
+      formatDailyStateLabel(
+        {
+          check_id: "check_1",
+          project_id: "project_1",
+          day: "2026-06-16",
+          state: "degraded",
+          total_checks: 10,
+          successful_checks: 9,
+          failed_checks: 1,
+          degraded_checks: 1,
+          avg_duration_ms: 123,
+          first_checked_at: "2026-06-16T00:00:00.000Z",
+          last_checked_at: "2026-06-16T01:00:00.000Z",
+          downtime_seconds: 60,
+          incident_ids: []
+        },
+        3
+      )
+    ).toBe("Brief interruption");
+    expect(
+      dailyStateClassName(
+        {
+          check_id: "check_1",
+          project_id: "project_1",
+          day: "2026-06-16",
+          state: "degraded",
+          total_checks: 10,
+          successful_checks: 7,
+          failed_checks: 3,
+          degraded_checks: 3,
+          avg_duration_ms: 123,
+          first_checked_at: "2026-06-16T00:00:00.000Z",
+          last_checked_at: "2026-06-16T01:00:00.000Z",
+          downtime_seconds: 180,
+          incident_ids: []
+        },
+        3
+      )
+    ).toBe("bg-warning text-warning-foreground");
 
     expect(formatAvailabilityStatus("unknown")).toBe("Unknown");
     expect(formatAvailabilityStatus("passing")).toBe("Passing");

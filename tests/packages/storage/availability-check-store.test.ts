@@ -695,14 +695,13 @@ describe("availability check store", () => {
   });
 
   it("links incidents, appends rollup incidents, and purges expired history", async () => {
-    const store = createPostgresAvailabilityCheckStore(
-      createSequentialDb([
-        { rows: [] },
-        { rows: [] },
-        { rows: [{ count: "4" }] },
-        { rows: [{ count: "2" }] }
-      ]) as never
-    );
+    const db = createSequentialDb([
+      { rows: [] },
+      { rows: [] },
+      { rows: [{ count: "4" }] },
+      { rows: [{ count: "2" }] }
+    ]);
+    const store = createPostgresAvailabilityCheckStore(db as never);
 
     await expect(
       store.linkIncidentToCheck({
@@ -720,6 +719,7 @@ describe("availability check store", () => {
         incident_id: "inc_1"
       })
     ).resolves.toBeUndefined();
+    expect(String(db.query.mock.calls[1]?.[0] ?? "")).toContain("state = 'down'");
 
     await expect(
       store.purgeExpiredResults({ now: "2026-07-15T10:00:00.000Z" })

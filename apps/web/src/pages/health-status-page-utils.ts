@@ -5,10 +5,12 @@ import type {
 } from "../lib/api.js";
 
 export type HealthStatusDayState = AvailabilityCheckDailyRollupRecord["state"];
+export type HealthStatusImpact = "none" | "minor" | "elevated" | "outage";
 
 export interface HealthStatusDay {
   day: string;
   state: HealthStatusDayState;
+  impact: HealthStatusImpact;
   total_checks: number;
   successful_checks: number;
   failed_checks: number;
@@ -56,7 +58,7 @@ export function buildHealthStatusProjects(
     .map((projectInput) => {
       const checks = projectInput.checks.map((check) => {
         const rollups = projectInput.rollupsByCheckId.get(check.check_id) ?? [];
-        const days = buildCheckDays(dayRange, rollups);
+        const days = buildCheckDays(dayRange, rollups, check.failure_threshold);
 
         return {
           check,
@@ -105,6 +107,19 @@ export function formatHealthStatusLabel(state: HealthStatusDayState): string {
   }
 }
 
+export function formatHealthDayStatusLabel(day: HealthStatusDay): string {
+  switch (day.impact) {
+    case "outage":
+      return "Down";
+    case "elevated":
+      return "Unstable";
+    case "minor":
+      return "Brief interruption";
+    case "none":
+      return formatHealthStatusLabel(day.state);
+  }
+}
+
 export function formatStatusDayLabel(day: HealthStatusDay): string {
   const formattedDay = new Intl.DateTimeFormat(undefined, {
     month: "short",
@@ -115,7 +130,7 @@ export function formatStatusDayLabel(day: HealthStatusDay): string {
     return `${formattedDay}: ${formatHealthStatusLabel(day.state).toLowerCase()}, no checks recorded`;
   }
 
-  return `${formattedDay}: ${formatHealthStatusLabel(day.state).toLowerCase()}, ${day.failed_checks} failed of ${day.total_checks} checks, ${formatDowntime(day.downtime_seconds)} downtime`;
+  return `${formattedDay}: ${formatHealthDayStatusLabel(day).toLowerCase()}, ${day.failed_checks} failed of ${day.total_checks} checks, ${formatDowntime(day.downtime_seconds)} downtime`;
 }
 
 export function formatDowntime(seconds: number): string {
@@ -137,7 +152,8 @@ export function formatDowntime(seconds: number): string {
 
 function buildCheckDays(
   dayRange: string[],
-  rollups: AvailabilityCheckDailyRollupRecord[]
+  rollups: AvailabilityCheckDailyRollupRecord[],
+  failureThreshold: number
 ): HealthStatusDay[] {
   const rollupsByDay = new Map(rollups.map((rollup) => [rollup.day, rollup]));
 
@@ -150,6 +166,7 @@ function buildCheckDays(
     return {
       day,
       state: rollup.state,
+      impact: deriveHealthStatusImpact(rollup, failureThreshold),
       total_checks: rollup.total_checks,
       successful_checks: rollup.successful_checks,
       failed_checks: rollup.failed_checks,
@@ -177,6 +194,7 @@ function mergeProjectDays(
     return {
       day,
       state: deriveAggregateDayState(checkDays.map((checkDay) => checkDay.state)),
+      impact: deriveAggregateImpact(checkDays.map((checkDay) => checkDay.impact)),
       total_checks: sum(checkDays, (checkDay) => checkDay.total_checks),
       successful_checks: sum(checkDays, (checkDay) => checkDay.successful_checks),
       failed_checks: sum(checkDays, (checkDay) => checkDay.failed_checks),
@@ -200,6 +218,21 @@ function deriveProjectCurrentState(statuses: AvailabilityCheckRecord["status"][]
   return "unknown";
 }
 
+export function deriveHealthStatusImpact(
+  day: Pick<HealthStatusDay, "state" | "failed_checks" | "degraded_checks" | "incident_ids">,
+  failureThreshold: number
+): HealthStatusImpact {
+  if (day.state === "down" || day.incident_ids.length > 0) {
+    return "outage";
+  }
+
+  if (day.failed_checks > 0 || day.degraded_checks > 0 || day.state === "degraded") {
+    return day.failed_checks >= failureThreshold ? "elevated" : "minor";
+  }
+
+  return "none";
+}
+
 function deriveAggregateDayState(states: HealthStatusDayState[]): HealthStatusDayState {
   if (states.includes("down")) {
     return "down";
@@ -214,6 +247,13 @@ function deriveAggregateDayState(states: HealthStatusDayState[]): HealthStatusDa
     return "paused";
   }
   return "unknown";
+}
+
+function deriveAggregateImpact(impacts: HealthStatusImpact[]): HealthStatusImpact {
+  return impacts.reduce<HealthStatusImpact>(
+    (highest, impact) => (impactRank(impact) > impactRank(highest) ? impact : highest),
+    "none"
+  );
 }
 
 function countActiveAvailabilityIncidents(checks: HealthStatusCheckSummary[]): number {
@@ -240,6 +280,7 @@ function emptyStatusDay(day: string): HealthStatusDay {
   return {
     day,
     state: "unknown",
+    impact: "none",
     total_checks: 0,
     successful_checks: 0,
     failed_checks: 0,
@@ -259,6 +300,19 @@ function sortStatusProjects(
   }
 
   return left.project.name.localeCompare(right.project.name);
+}
+
+function impactRank(impact: HealthStatusImpact): number {
+  switch (impact) {
+    case "outage":
+      return 3;
+    case "elevated":
+      return 2;
+    case "minor":
+      return 1;
+    case "none":
+      return 0;
+  }
 }
 
 function stateRank(state: HealthStatusDayState): number {

@@ -125,11 +125,7 @@ export function deriveAvailabilityCheckDailyState(
     return "operational";
   }
 
-  if (result.status === "http_status_mismatch" && result.http_status !== null && result.http_status < 500) {
-    return "degraded";
-  }
-
-  return "down";
+  return "degraded";
 }
 
 export function computeAvailabilityCheckNextScheduledAt(input: {

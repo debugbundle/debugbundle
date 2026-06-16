@@ -3,6 +3,8 @@ import { describe, expect, it } from "vitest";
 import {
   buildHealthStatusDayRange,
   buildHealthStatusProjects,
+  deriveHealthStatusImpact,
+  formatHealthDayStatusLabel,
   formatStatusDayLabel,
   formatStatusUptime
 } from "../../../apps/web/src/pages/health-status-page-utils.js";
@@ -119,7 +121,7 @@ describe("health status helpers", () => {
                   successful_checks: 9,
                   failed_checks: 1,
                   downtime_seconds: 60,
-                  state: "down"
+                  state: "degraded"
                 })
               ]
             ]
@@ -132,7 +134,7 @@ describe("health status helpers", () => {
     expect(summaries).toHaveLength(1);
     expect(summaries[0]?.checks[0]?.days).toEqual([
       expect.objectContaining({ day: "2026-06-14", state: "unknown", total_checks: 0 }),
-      expect.objectContaining({ day: "2026-06-15", state: "down", failed_checks: 1 }),
+      expect.objectContaining({ day: "2026-06-15", state: "degraded", impact: "minor", failed_checks: 1 }),
       expect.objectContaining({ day: "2026-06-16", state: "unknown", total_checks: 0 })
     ]);
     expect(summaries[0]?.uptime_percentage).toBe(90);
@@ -168,14 +170,30 @@ describe("health status helpers", () => {
     expect(formatStatusUptime(99.987)).toBe("99.99%");
     expect(
       formatStatusDayLabel(
-        buildRollup({
-          day: "2026-06-15",
-          state: "degraded",
-          total_checks: 12,
-          failed_checks: 2,
-          downtime_seconds: 120
-        })
+        {
+          ...buildRollup({
+            day: "2026-06-15",
+            state: "degraded",
+            total_checks: 12,
+            failed_checks: 2,
+            downtime_seconds: 120
+          }),
+          impact: "minor",
+        }
       )
-    ).toContain("degraded, 2 failed of 12 checks, 2m downtime");
+    ).toContain("brief interruption, 2 failed of 12 checks, 2m downtime");
+  });
+
+  it("separates degraded blips from threshold-backed outage days", () => {
+    const minorDay = buildRollup({ state: "degraded", failed_checks: 1, degraded_checks: 1 });
+    const elevatedDay = buildRollup({ state: "degraded", failed_checks: 3, degraded_checks: 3 });
+    const outageDay = buildRollup({ state: "down", failed_checks: 3, incident_ids: ["inc_1"] });
+
+    expect(deriveHealthStatusImpact(minorDay, 3)).toBe("minor");
+    expect(formatHealthDayStatusLabel({ ...minorDay, impact: "minor" })).toBe("Brief interruption");
+    expect(deriveHealthStatusImpact(elevatedDay, 3)).toBe("elevated");
+    expect(formatHealthDayStatusLabel({ ...elevatedDay, impact: "elevated" })).toBe("Unstable");
+    expect(deriveHealthStatusImpact(outageDay, 3)).toBe("outage");
+    expect(formatHealthDayStatusLabel({ ...outageDay, impact: "outage" })).toBe("Down");
   });
 });

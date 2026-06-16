@@ -49,7 +49,9 @@ import {
   availabilityResultVariant,
   availabilityStatusVariant,
   buildCheckDraft,
+  dailyStateClassName,
   dailyStateVariant,
+  formatDailyStateLabel,
   formatAvailabilityStatus,
   formatDateTime,
   formatDay,
@@ -932,8 +934,11 @@ export function ProjectHealthPage(): JSX.Element {
                           {rollup.total_checks} checks • {rollup.successful_checks} healthy • {rollup.failed_checks} failed
                         </p>
                       </div>
-                      <Badge variant={dailyStateVariant(rollup.state)}>
-                        {rollup.state}
+                      <Badge
+                        variant={dailyStateVariant(rollup.state)}
+                        className={dailyStateClassName(rollup, selectedCheck.failure_threshold)}
+                      >
+                        {formatDailyStateLabel(rollup, selectedCheck.failure_threshold)}
                       </Badge>
                     </div>
                     <div className="mt-3 grid gap-2 text-xs text-muted-foreground">

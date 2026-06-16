@@ -389,7 +389,12 @@ export function createPostgresAvailabilityCheckStore(db: Queryable): Availabilit
             d.check_id::text AS check_id,
             d.project_id::text AS project_id,
             d.day::text AS day,
-            d.state,
+            CASE
+              WHEN cardinality(COALESCE(d.incident_ids, ARRAY[]::uuid[])) > 0 THEN 'down'
+              WHEN d.state = 'paused' THEN 'paused'
+              WHEN d.failed_checks > 0 OR d.degraded_checks > 0 OR d.state = 'degraded' THEN 'degraded'
+              ELSE d.state
+            END AS state,
             d.total_checks,
             d.successful_checks,
             d.failed_checks,
@@ -799,8 +804,8 @@ export function createPostgresAvailabilityCheckStore(db: Queryable): Availabilit
             ON CONFLICT (check_id, day)
             DO UPDATE SET
               state = CASE
-                WHEN EXCLUDED.state = 'down' OR availability_check_daily_rollups.state = 'down' THEN 'down'
-                WHEN EXCLUDED.state = 'degraded' OR availability_check_daily_rollups.state = 'degraded' THEN 'degraded'
+                WHEN cardinality(COALESCE(availability_check_daily_rollups.incident_ids, ARRAY[]::uuid[])) > 0 THEN 'down'
+                WHEN EXCLUDED.state = 'degraded' OR availability_check_daily_rollups.failed_checks > 0 OR availability_check_daily_rollups.degraded_checks > 0 THEN 'degraded'
                 WHEN EXCLUDED.state = 'paused' OR availability_check_daily_rollups.state = 'paused' THEN 'paused'
                 ELSE 'operational'
               END,
@@ -868,6 +873,7 @@ export function createPostgresAvailabilityCheckStore(db: Queryable): Availabilit
         `
           UPDATE availability_check_daily_rollups
           SET
+            state = 'down',
             incident_ids = ARRAY(
               SELECT DISTINCT incident_id
               FROM unnest(array_append(incident_ids, $4::uuid)) AS incident_id

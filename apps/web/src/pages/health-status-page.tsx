@@ -269,7 +269,7 @@ function StatusHistoryStrip({
                 className={cn(
                   "h-5 min-w-1 flex-1 rounded-[2px] border outline-none focus-visible:ring-2 focus-visible:ring-ring/60",
                   compact ? "sm:h-4" : "sm:h-5",
-                  statusDayClassName(day.state)
+                  statusDayClassName(day)
                 )}
               />
             </TooltipTrigger>
@@ -385,17 +385,20 @@ function statusBadgeVariant(
   return "outline";
 }
 
-function statusDayClassName(state: HealthStatusDayState): string {
-  if (state === "operational") {
-    return "border-success/80 bg-success";
-  }
-  if (state === "degraded") {
-    return "border-warning/80 bg-warning";
-  }
-  if (state === "down") {
+function statusDayClassName(day: HealthStatusDay): string {
+  if (day.impact === "outage") {
     return "border-destructive/80 bg-destructive";
   }
-  if (state === "paused") {
+  if (day.impact === "elevated") {
+    return "border-warning bg-warning";
+  }
+  if (day.impact === "minor") {
+    return "border-warning/60 bg-warning/55";
+  }
+  if (day.state === "operational") {
+    return "border-success/80 bg-success";
+  }
+  if (day.state === "paused") {
     return "border-border bg-muted";
   }
   return "border-border/60 bg-muted/40";

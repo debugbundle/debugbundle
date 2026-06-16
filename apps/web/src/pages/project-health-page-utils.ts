@@ -8,6 +8,11 @@ import {
   type AvailabilityCheckRecord,
   type AvailabilityCheckResultRecord
 } from "../lib/api.js";
+import {
+  deriveHealthStatusImpact,
+  formatHealthStatusLabel,
+  type HealthStatusImpact
+} from "./health-status-page-utils.js";
 
 export interface AvailabilityCheckFormState {
   name: string;
@@ -165,6 +170,32 @@ export function dailyStateVariant(
   return "outline";
 }
 
+export function dailyStateClassName(
+  rollup: AvailabilityCheckDailyRollupRecord,
+  failureThreshold: number
+): string | undefined {
+  const impact = deriveHealthStatusImpact(rollup, failureThreshold);
+
+  if (impact === "elevated") {
+    return "bg-warning text-warning-foreground";
+  }
+  if (impact === "minor") {
+    return "bg-warning/55 text-warning-foreground";
+  }
+  return undefined;
+}
+
+export function formatDailyStateLabel(
+  rollup: AvailabilityCheckDailyRollupRecord,
+  failureThreshold: number
+): string {
+  const impact = deriveHealthStatusImpact(rollup, failureThreshold);
+
+  return impact === "minor" || impact === "elevated"
+    ? formatDailyImpactLabel(impact)
+    : formatHealthStatusLabel(rollup.state);
+}
+
 export function formatAvailabilityStatus(status: AvailabilityCheckRecord["status"]): string {
   return status === "unknown" ? "Unknown" : status === "passing" ? "Passing" : status === "failing" ? "Failing" : "Paused";
 }
@@ -189,6 +220,10 @@ export function formatDateTime(value: string): string {
     hour: "numeric",
     minute: "2-digit"
   }).format(new Date(value));
+}
+
+function formatDailyImpactLabel(impact: Extract<HealthStatusImpact, "minor" | "elevated">): string {
+  return impact === "minor" ? "Brief interruption" : "Unstable";
 }
 
 export function formatDay(value: string): string {
