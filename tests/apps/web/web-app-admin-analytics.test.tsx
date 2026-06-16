@@ -108,6 +108,43 @@ function createSummary() {
   };
 }
 
+function createMalformedBreakdown() {
+  return {
+    generated_at: "2026-06-12T15:30:00.000Z",
+    window: {
+      starts_at: "2026-06-01T00:00:00.000Z",
+      ends_at: "2026-06-12T15:30:00.000Z"
+    },
+    total_malformed_rejections_this_month: 4,
+    top_sources: [
+      {
+        project_id: "project_123",
+        project_name: "Tasktime",
+        project_slug: "tasktime",
+        service_name: "web",
+        service_environment: "production",
+        service_runtime: "node",
+        sdk_name: "@debugbundle/node",
+        sdk_version: "1.4.0",
+        event_type: "log",
+        occurrences: 3,
+        last_seen_at: "2026-06-12T15:29:00.000Z"
+      }
+    ],
+    top_validation_failures: [
+      {
+        sdk_name: "@debugbundle/node",
+        sdk_version: "1.4.0",
+        event_type: "log",
+        validation_code: "invalid_type",
+        validation_path: "payload.stack",
+        occurrences: 2,
+        last_seen_at: "2026-06-12T15:28:00.000Z"
+      }
+    ]
+  };
+}
+
 afterEach(() => {
   resetBrowserSessionClientState();
   vi.unstubAllGlobals();
@@ -130,6 +167,12 @@ describe("web app — admin analytics", () => {
         });
       }
 
+      if (url.endsWith("/v1/admin/analytics/malformed-rejections")) {
+        return jsonResponse(200, {
+          breakdown: createMalformedBreakdown()
+        });
+      }
+
       return jsonResponse(404, { error: "not_found" });
     });
 
@@ -141,6 +184,10 @@ describe("web app — admin analytics", () => {
     expect(screen.getByText("Active this month")).toBeInTheDocument();
     expect(screen.getByText("1,200")).toBeInTheDocument();
     expect(screen.getByText("80%")).toBeInTheDocument();
+    expect(screen.getByText("Malformed rejection breakdown")).toBeInTheDocument();
+    expect(screen.getByText("Top sources")).toBeInTheDocument();
+    expect(screen.getByText("Tasktime")).toBeInTheDocument();
+    expect(screen.getByText("payload.stack")).toBeInTheDocument();
     expect(screen.queryByRole("link", { name: /^analytics$/i })).not.toBeInTheDocument();
   });
 

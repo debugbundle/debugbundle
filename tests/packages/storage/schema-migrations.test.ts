@@ -55,6 +55,9 @@ describe("storage schema migrations", () => {
       expect.stringContaining("CREATE TABLE IF NOT EXISTS account_payment_retention_records")
     );
     expect(query.mock.calls.map((call) => String(call[0]))).toContainEqual(
+      expect.stringContaining("CREATE TABLE IF NOT EXISTS ingestion_rejection_diagnostic_periods")
+    );
+    expect(query.mock.calls.map((call) => String(call[0]))).toContainEqual(
       expect.stringContaining("UPDATE project_invites")
     );
     expect(query.mock.calls.map((call) => String(call[0]))).toContainEqual(

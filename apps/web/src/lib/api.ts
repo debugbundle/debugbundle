@@ -8,6 +8,7 @@ import type {
   AlertChannel,
   AlertConditionType,
   AdminAnalyticsAccessStatus,
+  AdminMalformedRejectionBreakdown,
   AdminAnalyticsSummary,
   AlertRecord,
   AvailabilityCheckDailyRollupRecord,
@@ -167,6 +168,16 @@ export async function getAdminAnalyticsSummary(): Promise<AdminAnalyticsSummary>
   );
 
   return body.summary;
+}
+
+export async function getAdminMalformedRejectionBreakdown(): Promise<AdminMalformedRejectionBreakdown> {
+  const body = await readJson<{ breakdown: AdminMalformedRejectionBreakdown }>(
+    await fetch(`${API_BASE}/v1/admin/analytics/malformed-rejections`, {
+      credentials: "include"
+    })
+  );
+
+  return body.breakdown;
 }
 
 export async function getAdminAnalyticsAccessStatus(): Promise<AdminAnalyticsAccessStatus> {

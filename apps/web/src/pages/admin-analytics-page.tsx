@@ -13,8 +13,10 @@ import { Skeleton } from "../components/ui/skeleton.js";
 import {
   ApiRequestError,
   getAdminAnalyticsAccessStatus,
+  getAdminMalformedRejectionBreakdown,
   getAdminAnalyticsSummary,
   requestEmailCode,
+  type AdminMalformedRejectionBreakdown,
   type AdminAnalyticsSummary,
   verifyEmailCode
 } from "../lib/api.js";
@@ -23,7 +25,7 @@ import { useSession } from "../lib/session.js";
 
 type AdminAnalyticsState =
   | { status: "loading" }
-  | { status: "ready"; summary: AdminAnalyticsSummary }
+  | { status: "ready"; summary: AdminAnalyticsSummary; malformedBreakdown: AdminMalformedRejectionBreakdown | null }
   | { status: "email_auth_required" }
   | { status: "redirecting" }
   | { status: "error" };
@@ -61,9 +63,12 @@ export function AdminAnalyticsPage(): JSX.Element {
 
     void (async () => {
       try {
-        const summary = await getAdminAnalyticsSummary();
+        const [summary, malformedBreakdown] = await Promise.all([
+          getAdminAnalyticsSummary(),
+          getAdminMalformedRejectionBreakdown().catch(() => null)
+        ]);
         if (!cancelled) {
-          setState({ status: "ready", summary });
+          setState({ status: "ready", summary, malformedBreakdown });
         }
       } catch (error) {
         if (cancelled) {
@@ -152,7 +157,7 @@ export function AdminAnalyticsPage(): JSX.Element {
     return <AdminAnalyticsSkeleton />;
   }
 
-  const { summary } = state;
+  const { malformedBreakdown, summary } = state;
 
   const activityCards: StatCardEntry[] = [
     {
@@ -382,6 +387,8 @@ export function AdminAnalyticsPage(): JSX.Element {
           <DetailRow label="Deleted accounts total" value={summary.kpis.deleted_accounts_total} />
         </CardContent>
       </Card>
+
+      <MalformedRejectionBreakdownCard breakdown={malformedBreakdown} />
     </div>
   );
 }
@@ -435,6 +442,162 @@ function DetailRow({ label, value }: { label: string; value: number }): JSX.Elem
       <span className="text-muted-foreground">{label}</span>
       <span className="tabular-nums">{INTEGER_FORMAT.format(value)}</span>
     </div>
+  );
+}
+
+function MalformedRejectionBreakdownCard({
+  breakdown
+}: {
+  breakdown: AdminMalformedRejectionBreakdown | null;
+}): JSX.Element {
+  if (breakdown === null) {
+    return (
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between pb-2">
+          <div>
+            <CardTitle>Malformed rejection breakdown</CardTitle>
+            <CardDescription>
+              Source and validation-failure diagnostics for malformed raw event rejects this month.
+            </CardDescription>
+          </div>
+          <GaugeIcon className="size-4 text-muted-foreground" />
+        </CardHeader>
+        <CardContent>
+          <Notice tone="info">Malformed rejection diagnostics are not available for this environment yet.</Notice>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  const sourceItems = breakdown.top_sources.map((source, index) => ({
+    key: [
+      source.project_id ?? `project-${index}`,
+      source.service_name ?? "service",
+      source.service_environment ?? "environment",
+      source.service_runtime ?? "runtime",
+      source.sdk_name ?? "sdk",
+      source.sdk_version ?? "version",
+      source.event_type ?? "event"
+    ].join(":"),
+    title: source.project_name ?? source.project_slug ?? source.project_id ?? "Unknown project",
+    subtitle: [
+      source.service_name ?? "unknown service",
+      source.service_environment ?? "unknown environment",
+      source.service_runtime ?? "unknown runtime"
+    ].join(" • "),
+    metadata: [
+      source.sdk_name ?? "unknown SDK",
+      source.sdk_version ?? "unknown version",
+      source.event_type ?? "unknown event type",
+      source.last_seen_at === null
+        ? "last seen unknown"
+        : `last seen ${DATE_TIME_FORMAT.format(new Date(source.last_seen_at))}`
+    ].join(" • "),
+    count: source.occurrences
+  }));
+  const failureItems = breakdown.top_validation_failures.map((failure, index) => ({
+    key: [
+      failure.validation_path ?? `path-${index}`,
+      failure.validation_code ?? "code",
+      failure.event_type ?? "event",
+      failure.sdk_name ?? "sdk",
+      failure.sdk_version ?? "version"
+    ].join(":"),
+    title: failure.validation_path ?? "Unknown validation path",
+    subtitle: [failure.validation_code ?? "unknown validation code", failure.event_type ?? "unknown event type"].join(
+      " • "
+    ),
+    metadata: [
+      failure.sdk_name ?? "unknown SDK",
+      failure.sdk_version ?? "unknown version",
+      failure.last_seen_at === null
+        ? "last seen unknown"
+        : `last seen ${DATE_TIME_FORMAT.format(new Date(failure.last_seen_at))}`
+    ].join(" • "),
+    count: failure.occurrences
+  }));
+
+  return (
+    <Card>
+      <CardHeader className="flex flex-row items-center justify-between pb-2">
+        <div>
+          <CardTitle>Malformed rejection breakdown</CardTitle>
+          <CardDescription>
+            Source and validation-failure diagnostics for malformed raw event rejects this month.
+          </CardDescription>
+        </div>
+        <GaugeIcon className="size-4 text-muted-foreground" />
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div className="grid gap-3 rounded-lg border bg-muted/20 p-4 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end">
+          <div className="space-y-1">
+            <p className="text-sm font-medium">Month-to-date malformed rejects</p>
+            <p className="text-xs text-muted-foreground">UTC window {formatRange(breakdown.window)}</p>
+          </div>
+          <p className="text-3xl font-semibold tabular-nums">
+            {INTEGER_FORMAT.format(breakdown.total_malformed_rejections_this_month)}
+          </p>
+        </div>
+
+        <div className="grid gap-4 xl:grid-cols-2">
+          <BreakdownSection
+            title="Top sources"
+            emptyLabel="No malformed rejection sources recorded yet."
+            items={sourceItems}
+          />
+          <BreakdownSection
+            title="Top validation failures"
+            emptyLabel="No malformed validation failures recorded yet."
+            items={failureItems}
+          />
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function BreakdownSection({
+  title,
+  emptyLabel,
+  items
+}: {
+  title: string;
+  emptyLabel: string;
+  items: Array<{
+    key: string;
+    title: string;
+    subtitle: string;
+    metadata: string;
+    count: number;
+  }>;
+}): JSX.Element {
+  return (
+    <section className="space-y-3 rounded-lg border p-4">
+      <div>
+        <h3 className="text-sm font-semibold">{title}</h3>
+        <p className="text-xs text-muted-foreground">Highest-volume malformed rejection signatures this month.</p>
+      </div>
+
+      {items.length === 0 ? (
+        <Notice tone="info">{emptyLabel}</Notice>
+      ) : (
+        <div className="space-y-3">
+          {items.map((item) => (
+            <div
+              key={item.key}
+              className="grid gap-2 rounded-lg border bg-muted/20 p-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-start"
+            >
+              <div className="space-y-1">
+                <p className="text-sm font-medium">{item.title}</p>
+                <p className="text-xs text-muted-foreground">{item.subtitle}</p>
+                <p className="text-xs text-muted-foreground">{item.metadata}</p>
+              </div>
+              <p className="text-lg font-semibold tabular-nums">{INTEGER_FORMAT.format(item.count)}</p>
+            </div>
+          ))}
+        </div>
+      )}
+    </section>
   );
 }
 
@@ -578,6 +741,10 @@ function formatValue(value: number, tone: "number" | "percent" = "number"): stri
   return tone === "percent" ? PERCENT_FORMAT.format(value) : INTEGER_FORMAT.format(value);
 }
 
-function formatRange(window: AdminAnalyticsSummary["windows"][keyof AdminAnalyticsSummary["windows"]]): string {
+function formatRange(
+  window:
+    | AdminAnalyticsSummary["windows"][keyof AdminAnalyticsSummary["windows"]]
+    | AdminMalformedRejectionBreakdown["window"]
+): string {
   return `${DATE_FORMAT.format(new Date(window.starts_at))} to ${DATE_FORMAT.format(new Date(window.ends_at))}`;
 }

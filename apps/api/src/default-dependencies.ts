@@ -28,6 +28,7 @@ import {
   createPostgresAuditLogStore,
   createPostgresBillingStore,
   createPostgresBillingSyncStore,
+  createPostgresIngestionRejectionDiagnosticStore,
   createPostgresAuthStore,
   createPostgresCapturePolicyStore,
   createPostgresCaptureRuleStore,
@@ -130,6 +131,12 @@ export function createApiDependencies(input: CreateApiDependenciesInput): Defaul
       : createPostgresAccountAnalyticsStore({
           db: input.db,
           analyticsHashSecret: input.analyticsHashSecret
+        });
+  const ingestionRejectionDiagnosticStore =
+    accountAnalyticsStore === undefined
+      ? undefined
+      : createPostgresIngestionRejectionDiagnosticStore({
+          db: input.db
         });
   const ingestionPersistence = createIngestionPersistenceService({
     objectStore: input.objectStore,
@@ -300,13 +307,25 @@ export function createApiDependencies(input: CreateApiDependenciesInput): Defaul
     ingestionPersistence,
     ingestionMetadata,
     ...(accountAnalyticsStore === undefined ? {} : { accountAnalytics: accountAnalyticsStore }),
+    ...(ingestionRejectionDiagnosticStore === undefined
+      ? {}
+      : { ingestionRejectionDiagnostics: ingestionRejectionDiagnosticStore }),
     ...(accountAnalyticsStore === undefined || adminAnalyticsAccessEmails === null
       ? {}
       : {
           adminAnalytics: {
             isOperatorAllowed: ({ email }: { email: string }) =>
               adminAnalyticsAccessEmails.has(normalizeEmailForConfig(email)),
-            getSummary: (request: { now: string }) => accountAnalyticsStore.getAdminAnalyticsSummary(request)
+            getSummary: (request: { now: string }) => accountAnalyticsStore.getAdminAnalyticsSummary(request),
+            getMalformedRejectionBreakdown: (request: { now: string; limit: number }) =>
+              ingestionRejectionDiagnosticStore?.getMalformedRejectionBreakdown(request) ??
+              Promise.resolve({
+                generated_at: request.now,
+                window: { starts_at: request.now, ends_at: request.now },
+                total_malformed_rejections_this_month: 0,
+                top_sources: [],
+                top_validation_failures: []
+              })
           }
         }),
     ...(input.ingestionRateLimiter === undefined ? {} : { ingestionRateLimiter: input.ingestionRateLimiter }),

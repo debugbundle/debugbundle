@@ -16,6 +16,9 @@ type IngestionRateLimiterDependency = MockedMethods<NonNullable<ApiServerDepende
 type BillingManagementDependency = MockedMethods<NonNullable<ApiServerDependencies["billingManagement"]>>;
 type ProjectManagementDependency = MockedMethods<NonNullable<ApiServerDependencies["projectManagement"]>>;
 type AccountAnalyticsDependency = MockedMethods<NonNullable<ApiServerDependencies["accountAnalytics"]>>;
+type IngestionRejectionDiagnosticsDependency = MockedMethods<
+  NonNullable<ApiServerDependencies["ingestionRejectionDiagnostics"]>
+>;
 
 function createWebhookDeliveryDependency(): WebhookDeliveryDependency {
   return mockedObject<ApiServerDependencies["webhookDelivery"]>({
@@ -136,6 +139,14 @@ function createAccountAnalyticsDependency(overrides: {
 } = {}): AccountAnalyticsDependency {
   return mockedObject<NonNullable<ApiServerDependencies["accountAnalytics"]>>({
     recordMetricDeltas: overrides.recordMetricDeltas ?? vi.fn().mockResolvedValue("recorded")
+  });
+}
+
+function createIngestionRejectionDiagnosticsDependency(overrides: {
+  recordRejectedDiagnostics?: IngestionRejectionDiagnosticsDependency["recordRejectedDiagnostics"];
+} = {}): IngestionRejectionDiagnosticsDependency {
+  return mockedObject<NonNullable<ApiServerDependencies["ingestionRejectionDiagnostics"]>>({
+    recordRejectedDiagnostics: overrides.recordRejectedDiagnostics ?? vi.fn().mockResolvedValue(undefined)
   });
 }
 
@@ -1178,6 +1189,154 @@ describe("api ingestion route", () => {
 
     expect(response.statusCode).toBe(400);
     expect(response.json<{ errors: Array<{ reason: string }> }>().errors[0]?.reason).toBe("malformed_payload");
+  });
+
+  it("records sanitized diagnostics for invalid events without persisting them", async (): Promise<void> => {
+    const persistAndEnqueue = vi.fn().mockResolvedValue({ object_key: "raw-events/proj_123/path.json.gz" });
+    const recordMetricDeltas = vi.fn().mockResolvedValue("recorded");
+    const recordRejectedDiagnostics = vi.fn().mockResolvedValue(undefined);
+
+    const app = createApiServer({
+      ingestionPersistence: { persistAndEnqueue },
+      ingestionMetadata: {
+        resolveProjectByTokenHash: vi.fn().mockResolvedValue({
+          project_id: "proj_123",
+          organization_id: "org_123",
+          organization_plan: "free"
+        })
+      },
+      accountAnalytics: createAccountAnalyticsDependency({ recordMetricDeltas }),
+      ingestionRejectionDiagnostics: createIngestionRejectionDiagnosticsDependency({
+        recordRejectedDiagnostics
+      }),
+      memberAuth: createMemberAuthDependency(),
+      tokenManagement: createTokenManagementDependency(),
+      incidentRetrieval: createIncidentRetrievalDependency(),
+      objectStoreReader: createObjectStoreReaderDependency(),
+      webhookDelivery: createWebhookDeliveryDependency()
+    });
+
+    const response = await app.inject({
+      method: "POST",
+      url: "/v1/events",
+      headers: {
+        authorization: "Bearer dbundle_proj_test"
+      },
+      payload: {
+        events: [
+          {
+            schema_version: "2026-03-01",
+            event_id: "33333333-3333-4333-8333-333333333333",
+            event_type: "frontend_exception",
+            sdk_name: "@debugbundle/sdk-browser",
+            sdk_version: "0.1.0",
+            service: {
+              name: "tasktime-web",
+              environment: "production",
+              runtime: "browser"
+            },
+            occurred_at: "2026-06-16T08:24:04.562Z",
+            payload: {
+              name: "TypeError",
+              message: "boom"
+            }
+          }
+        ]
+      }
+    });
+
+    expect(response.statusCode).toBe(202);
+    expect(response.json()).toMatchObject({
+      accepted: 0,
+      rejected: 1,
+      errors: [{ index: 0, reason: expect.any(String) }]
+    });
+    expect(recordMetricDeltas).toHaveBeenCalledWith(
+      expect.objectContaining({
+        deltas: expect.objectContaining({
+          raw_events_rejected: 1,
+          events_rejected_malformed: 1
+        })
+      })
+    );
+    expect(recordRejectedDiagnostics).toHaveBeenCalledWith({
+      organization_id: "org_123",
+      occurred_at: expect.any(String),
+      events: [
+        expect.objectContaining({
+          rejection_reason: "invalid_event",
+          project_id: "proj_123",
+          sdk_name: "@debugbundle/sdk-browser",
+          sdk_version: "0.1.0",
+          event_type: "frontend_exception",
+          service_name: "tasktime-web",
+          service_environment: "production",
+          service_runtime: "browser",
+          validation_path: "payload.stack"
+        })
+      ]
+    });
+    expect(persistAndEnqueue).not.toHaveBeenCalled();
+  });
+
+  it("does not record rejection diagnostics for duplicate analytics batches", async (): Promise<void> => {
+    const persistAndEnqueue = vi.fn().mockResolvedValue({ object_key: "raw-events/proj_123/path.json.gz" });
+    const recordMetricDeltas = vi.fn().mockResolvedValue("duplicate");
+    const recordRejectedDiagnostics = vi.fn().mockResolvedValue(undefined);
+
+    const app = createApiServer({
+      ingestionPersistence: { persistAndEnqueue },
+      ingestionMetadata: {
+        resolveProjectByTokenHash: vi.fn().mockResolvedValue({
+          project_id: "proj_123",
+          organization_id: "org_123",
+          organization_plan: "free"
+        })
+      },
+      accountAnalytics: createAccountAnalyticsDependency({ recordMetricDeltas }),
+      ingestionRejectionDiagnostics: createIngestionRejectionDiagnosticsDependency({
+        recordRejectedDiagnostics
+      }),
+      memberAuth: createMemberAuthDependency(),
+      tokenManagement: createTokenManagementDependency(),
+      incidentRetrieval: createIncidentRetrievalDependency(),
+      objectStoreReader: createObjectStoreReaderDependency(),
+      webhookDelivery: createWebhookDeliveryDependency()
+    });
+
+    const response = await app.inject({
+      method: "POST",
+      url: "/v1/events",
+      headers: {
+        authorization: "Bearer dbundle_proj_test"
+      },
+      payload: {
+        events: [
+          {
+            schema_version: "2026-03-01",
+            event_id: "33333333-3333-4333-8333-333333333333",
+            event_type: "frontend_exception",
+            sdk_name: "@debugbundle/sdk-browser",
+            sdk_version: "0.1.0",
+            service: {
+              name: "tasktime-web",
+              environment: "production",
+              runtime: "browser"
+            },
+            occurred_at: "2026-06-16T08:24:04.562Z",
+            payload: {
+              name: "TypeError",
+              message: "boom"
+            }
+          }
+        ]
+      }
+    });
+
+    expect(response.statusCode).toBe(202);
+    expect(recordMetricDeltas).toHaveBeenCalled();
+    expect(recordRejectedDiagnostics).not.toHaveBeenCalled();
+    expect(persistAndEnqueue).not.toHaveBeenCalled();
   });
 
   it("should reject malformed bearer authorization header", async (): Promise<void> => {

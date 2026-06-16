@@ -885,5 +885,53 @@ export const STORAGE_SCHEMA_MIGRATIONS = [
           AND expires_at <= now()
       `
     ]
+  }),
+  defineStorageSchemaMigration({
+    id: "202606140001_add_ingestion_rejection_diagnostics",
+    description: "Track sanitized ingestion rejection diagnostics for operator breakdowns.",
+    statements: [
+      `
+        CREATE TABLE IF NOT EXISTS ingestion_rejection_diagnostic_periods (
+          analytics_account_id uuid NOT NULL REFERENCES account_analytics_accounts(analytics_account_id),
+          period_starts_at timestamptz NOT NULL,
+          rejection_reason text NOT NULL,
+          project_id_text text NOT NULL DEFAULT '',
+          service_name text NOT NULL DEFAULT '',
+          service_environment text NOT NULL DEFAULT '',
+          service_runtime text NOT NULL DEFAULT '',
+          sdk_name text NOT NULL DEFAULT '',
+          sdk_version text NOT NULL DEFAULT '',
+          event_type text NOT NULL DEFAULT '',
+          validation_code text NOT NULL DEFAULT '',
+          validation_path text NOT NULL DEFAULT '',
+          occurrences bigint NOT NULL DEFAULT 0,
+          first_seen_at timestamptz NOT NULL,
+          last_seen_at timestamptz NOT NULL,
+          updated_at timestamptz NOT NULL DEFAULT now(),
+          PRIMARY KEY (
+            analytics_account_id,
+            period_starts_at,
+            rejection_reason,
+            project_id_text,
+            service_name,
+            service_environment,
+            service_runtime,
+            sdk_name,
+            sdk_version,
+            event_type,
+            validation_code,
+            validation_path
+          )
+        )
+      `,
+      `
+        CREATE INDEX IF NOT EXISTS ingestion_rejection_diagnostic_periods_reason_period_idx
+        ON ingestion_rejection_diagnostic_periods (
+          rejection_reason,
+          period_starts_at,
+          last_seen_at DESC
+        )
+      `
+    ]
   })
 ] as const;

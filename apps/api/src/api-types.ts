@@ -58,6 +58,8 @@ import type {
   AccountAnalyticsStore,
   AdminAnalyticsSummary,
   GitHubRepositoryRecord,
+  IngestionRejectionDiagnosticStore,
+  AdminMalformedRejectionBreakdown,
   OperationalEmailDeliveryStore,
   ProjectGitHubRepoRecord,
   WebhookEventType,
@@ -68,9 +70,17 @@ export interface ApiDependencies {
   ingestionPersistence: Pick<IngestionPersistenceService, "persistAndEnqueue">;
   ingestionMetadata: Pick<IngestionMetadataService, "resolveProjectByTokenHash">;
   accountAnalytics?: Pick<AccountAnalyticsStore, "recordMetricDeltas"> | undefined;
+  ingestionRejectionDiagnostics?: Pick<
+    IngestionRejectionDiagnosticStore,
+    "recordRejectedDiagnostics"
+  > | undefined;
   adminAnalytics?: {
     isOperatorAllowed(input: { email: string }): boolean;
     getSummary(input: { now: string }): Promise<AdminAnalyticsSummary>;
+    getMalformedRejectionBreakdown(input: {
+      now: string;
+      limit: number;
+    }): Promise<AdminMalformedRejectionBreakdown>;
   } | undefined;
   ingestionRateLimiter?: Pick<IngestionRateLimiter, "claimEvents"> | undefined;
   authRateLimiter?: Pick<AuthRateLimiter, "claimRequest"> | undefined;

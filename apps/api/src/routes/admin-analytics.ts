@@ -142,4 +142,102 @@ export function registerAdminAnalyticsRoutes(app: FastifyInstance, dependencies:
     applyNoStore(reply);
     return reply.status(200).send({ summary });
   });
+
+  app.get("/v1/admin/analytics/malformed-rejections", async (request, reply) => {
+    if (request.headers.authorization !== undefined || dependencies.webAuth === undefined) {
+      return sendNotFound(reply);
+    }
+
+    const sessionToken = readCookieValue(request.headers.cookie, SESSION_COOKIE_NAME);
+    if (sessionToken === null) {
+      return sendNotFound(reply);
+    }
+
+    const session = await dependencies.webAuth.resolveSessionByToken(sessionToken);
+    if (session === null) {
+      return sendNotFound(reply);
+    }
+
+    const emailHash = hashAuditIdentifier(session.email);
+
+    if (dependencies.adminAnalytics === undefined) {
+      await recordAuditLog(dependencies.auditLogging, {
+        organization_id: session.organization_id,
+        actor_user_id: session.user_id,
+        actor_type: "browser_session",
+        action: "analytics.admin_malformed_rejections",
+        target_type: "admin_analytics",
+        target_id: "malformed_rejections",
+        status: "failure",
+        ip_address: request.ip,
+        metadata: {
+          reason: "analytics_unavailable",
+          email_hash: emailHash
+        }
+      });
+
+      return sendNotFound(reply);
+    }
+
+    if (session.email_verified_at === null || session.session_auth_method !== "email_code") {
+      await recordAuditLog(dependencies.auditLogging, {
+        organization_id: session.organization_id,
+        actor_user_id: session.user_id,
+        actor_type: "browser_session",
+        action: "analytics.admin_malformed_rejections",
+        target_type: "admin_analytics",
+        target_id: "malformed_rejections",
+        status: "failure",
+        ip_address: request.ip,
+        metadata: {
+          reason: "email_auth_required",
+          email_hash: emailHash
+        }
+      });
+
+      return sendNotFound(reply);
+    }
+
+    if (!dependencies.adminAnalytics.isOperatorAllowed({ email: session.email })) {
+      await recordAuditLog(dependencies.auditLogging, {
+        organization_id: session.organization_id,
+        actor_user_id: session.user_id,
+        actor_type: "browser_session",
+        action: "analytics.admin_malformed_rejections",
+        target_type: "admin_analytics",
+        target_id: "malformed_rejections",
+        status: "failure",
+        ip_address: request.ip,
+        metadata: {
+          reason: "not_allowlisted",
+          email_hash: emailHash
+        }
+      });
+
+      return sendNotFound(reply);
+    }
+
+    const breakdown = await dependencies.adminAnalytics.getMalformedRejectionBreakdown({
+      now: new Date().toISOString(),
+      limit: 10
+    });
+
+    await recordAuditLog(dependencies.auditLogging, {
+      organization_id: session.organization_id,
+      actor_user_id: session.user_id,
+      actor_type: "browser_session",
+      action: "analytics.admin_malformed_rejections",
+      target_type: "admin_analytics",
+      target_id: "malformed_rejections",
+      status: "success",
+      ip_address: request.ip,
+      metadata: {
+        reason: "success",
+        email_hash: emailHash
+      }
+    });
+
+    applyNoStore(reply);
+    return reply.status(200).send({ breakdown });
+  });
 }

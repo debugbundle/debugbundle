@@ -15,6 +15,15 @@ export {
   AccountMetricKeySchema,
   createPostgresAccountAnalyticsStore
 } from "./account-analytics-store.js";
+export type {
+  AdminMalformedRejectionBreakdown,
+  AdminMalformedRejectionFailure,
+  AdminMalformedRejectionSource,
+  IngestionRejectedDiagnosticReason,
+  IngestionRejectionDiagnosticStore,
+  RejectedIngestionDiagnosticEvent
+} from "./ingestion-rejection-diagnostic-store.js";
+export { createPostgresIngestionRejectionDiagnosticStore } from "./ingestion-rejection-diagnostic-store.js";
 export * from "./integration-secret-crypto.js";
 export * from "./incident-context.js";
 export * from "./incident-reason.js";

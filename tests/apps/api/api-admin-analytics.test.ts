@@ -120,11 +120,58 @@ function createSummary() {
   };
 }
 
+function createMalformedBreakdown() {
+  return {
+    generated_at: "2026-06-16T09:00:00.000Z",
+    window: {
+      starts_at: "2026-06-01T00:00:00.000Z",
+      ends_at: "2026-06-16T09:00:00.000Z"
+    },
+    total_malformed_rejections_this_month: 100862,
+    top_sources: [
+      {
+        project_id: "23bf8e03-0d65-4b4e-a6f6-9a9d90cea7ef",
+        project_name: "tasktime",
+        project_slug: "tasktime",
+        service_name: "tasktime-web",
+        service_environment: "production",
+        service_runtime: "browser",
+        sdk_name: "@debugbundle/sdk-browser",
+        sdk_version: "0.1.0",
+        event_type: "frontend_exception",
+        occurrences: 100000,
+        last_seen_at: "2026-06-16T08:24:04.562Z"
+      }
+    ],
+    top_validation_failures: [
+      {
+        sdk_name: "@debugbundle/sdk-browser",
+        sdk_version: "0.1.0",
+        event_type: "frontend_exception",
+        validation_code: "invalid_type",
+        validation_path: "payload.stack",
+        occurrences: 100000,
+        last_seen_at: "2026-06-16T08:24:04.562Z"
+      }
+    ]
+  };
+}
+
 function createServer(overrides: {
-  adminAnalytics?: ApiServerDependencies["adminAnalytics"];
+  adminAnalytics?: Partial<NonNullable<ApiServerDependencies["adminAnalytics"]>>;
   auditLogging?: ApiServerDependencies["auditLogging"];
   webAuth?: NonNullable<ApiServerDependencies["webAuth"]>;
 } = {}): ReturnType<typeof createApiServer> {
+  const adminAnalytics =
+    overrides.adminAnalytics === undefined
+      ? undefined
+      : {
+          isOperatorAllowed: () => true,
+          getSummary: vi.fn().mockResolvedValue(createSummary()),
+          getMalformedRejectionBreakdown: vi.fn().mockResolvedValue(createMalformedBreakdown()),
+          ...overrides.adminAnalytics
+        };
+
   return createApiServer({
     ingestionPersistence: {
       persistAndEnqueue: vi.fn()
@@ -156,7 +203,7 @@ function createServer(overrides: {
       listDeliveriesForWebhookInOrganization: vi.fn().mockResolvedValue({ deliveries: [] }),
       retryDeliveryForOrganization: vi.fn().mockResolvedValue(null)
     },
-    ...(overrides.adminAnalytics === undefined ? {} : { adminAnalytics: overrides.adminAnalytics }),
+    ...(adminAnalytics === undefined ? {} : { adminAnalytics }),
     ...(overrides.auditLogging === undefined ? {} : { auditLogging: overrides.auditLogging }),
     ...(overrides.webAuth === undefined ? {} : { webAuth: overrides.webAuth })
   });
@@ -305,6 +352,57 @@ describe("api admin analytics routes", () => {
     expect(response.statusCode).toBe(404);
     expect(response.headers["cache-control"]).toBe("no-store");
     expect(response.json()).toEqual({ error: "not_found" });
+  });
+
+  it("returns the malformed rejection breakdown for allowlisted email-authenticated sessions", async (): Promise<void> => {
+    const createAuditLog = vi.fn().mockResolvedValue(undefined);
+    const getMalformedRejectionBreakdown = vi.fn().mockResolvedValue(createMalformedBreakdown());
+    const app = createServer({
+      auditLogging: { createAuditLog },
+      adminAnalytics: {
+        isOperatorAllowed: ({ email }) => email === "owen@example.com",
+        getMalformedRejectionBreakdown
+      },
+      webAuth: createWebAuth({
+        resolveSessionByToken: vi.fn().mockResolvedValue({
+          session_id: "sess_123",
+          user_id: "usr_123",
+          email: "owen@example.com",
+          email_verified_at: "2026-06-01T00:00:00.000Z",
+          organization_id: "org_123",
+          role: "owner",
+          created_at: "2026-06-01T00:00:00.000Z",
+          expires_at: "2026-06-19T00:00:00.000Z",
+          revoked_at: null,
+          session_auth_method: "email_code",
+          has_email_auth: true,
+          has_github_oauth: true
+        })
+      })
+    });
+
+    const response = await app.inject({
+      method: "GET",
+      url: "/v1/admin/analytics/malformed-rejections",
+      headers: {
+        cookie: "dbundle_session=session-secret"
+      }
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.headers["cache-control"]).toBe("no-store");
+    expect(response.json()).toEqual({ breakdown: createMalformedBreakdown() });
+    expect(getMalformedRejectionBreakdown).toHaveBeenCalledWith({
+      now: expect.any(String),
+      limit: 10
+    });
+    expect(createAuditLog).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: "analytics.admin_malformed_rejections",
+        target_id: "malformed_rejections",
+        status: "success"
+      })
+    );
   });
 
   it("returns not found access status for non-allowlisted sessions", async (): Promise<void> => {
@@ -572,6 +670,28 @@ describe("api admin analytics routes", () => {
     const response = await app.inject({
       method: "GET",
       url: "/v1/admin/analytics/summary",
+      headers: {
+        authorization: "Bearer dbundle_mem_test",
+        cookie: "dbundle_session=session-secret"
+      }
+    });
+
+    expect(response.statusCode).toBe(404);
+    expect(response.headers["cache-control"]).toBe("no-store");
+    expect(response.json()).toEqual({ error: "not_found" });
+  });
+
+  it("does not accept member-token auth for malformed rejection diagnostics", async (): Promise<void> => {
+    const app = createServer({
+      adminAnalytics: {
+        isOperatorAllowed: () => true
+      },
+      webAuth: createWebAuth()
+    });
+
+    const response = await app.inject({
+      method: "GET",
+      url: "/v1/admin/analytics/malformed-rejections",
       headers: {
         authorization: "Bearer dbundle_mem_test",
         cookie: "dbundle_session=session-secret"

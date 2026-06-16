@@ -109,6 +109,41 @@ export interface AdminAnalyticsSummary {
   };
 }
 
+export interface AdminMalformedRejectionSource {
+  project_id: string | null;
+  project_name: string | null;
+  project_slug: string | null;
+  service_name: string | null;
+  service_environment: string | null;
+  service_runtime: string | null;
+  sdk_name: string | null;
+  sdk_version: string | null;
+  event_type: string | null;
+  occurrences: number;
+  last_seen_at: string | null;
+}
+
+export interface AdminMalformedRejectionFailure {
+  sdk_name: string | null;
+  sdk_version: string | null;
+  event_type: string | null;
+  validation_code: string | null;
+  validation_path: string | null;
+  occurrences: number;
+  last_seen_at: string | null;
+}
+
+export interface AdminMalformedRejectionBreakdown {
+  generated_at: string;
+  window: {
+    starts_at: string;
+    ends_at: string;
+  };
+  total_malformed_rejections_this_month: number;
+  top_sources: AdminMalformedRejectionSource[];
+  top_validation_failures: AdminMalformedRejectionFailure[];
+}
+
 export interface AdminAnalyticsAccessStatus {
   status: "ready" | "email_auth_required";
 }

@@ -1,4 +1,5 @@
 import type { FastifyBaseLogger, FastifyInstance } from "fastify";
+import type { ZodIssue } from "zod";
 
 import { hashToken, readBearerToken, requireProjectToken } from "../../../../packages/auth/src/index.js";
 import { classifyEvent, validateEvent } from "../../../../packages/event-normalizer/src/index.js";
@@ -60,6 +61,19 @@ type IngestionAcceptedMetricEvent = {
   event_type: string;
 };
 
+type IngestionRejectedDiagnosticEvent = {
+  rejection_reason: IngestionRejectedMetricEvent["reason"];
+  project_id: string;
+  sdk_name: string | null;
+  sdk_version: string | null;
+  event_type: string | null;
+  service_name: string | null;
+  service_environment: string | null;
+  service_runtime: string | null;
+  validation_code: string | null;
+  validation_path: string | null;
+};
+
 async function recordIngestionMetricBatchBestEffort(input: {
   dependencies: ApiDependencies;
   log: FastifyBaseLogger;
@@ -69,9 +83,9 @@ async function recordIngestionMetricBatchBestEffort(input: {
   occurred_at: string;
   accepted_events: IngestionAcceptedMetricEvent[];
   rejected_events: IngestionRejectedMetricEvent[];
-}): Promise<void> {
+}): Promise<"recorded" | "skipped"> {
   if (input.dependencies.accountAnalytics === undefined || input.organization_id === undefined) {
-    return;
+    return "skipped";
   }
 
   const metricBatch = buildIngestionMetricBatch({
@@ -81,17 +95,18 @@ async function recordIngestionMetricBatchBestEffort(input: {
     rejected_events: input.rejected_events
   });
   if (metricBatch === null) {
-    return;
+    return "skipped";
   }
 
   try {
-    await input.dependencies.accountAnalytics.recordMetricDeltas({
+    const result = await input.dependencies.accountAnalytics.recordMetricDeltas({
       organization_id: input.organization_id,
       occurred_at: input.occurred_at,
       source: "ingestion_batch",
       dedupe_key: metricBatch.dedupe_key,
       deltas: metricBatch.deltas
     });
+    return result === "recorded" ? "recorded" : "skipped";
   } catch (error) {
     input.log.warn(
       {
@@ -100,6 +115,122 @@ async function recordIngestionMetricBatchBestEffort(input: {
         organization_id: input.organization_id
       },
       "ingestion_account_analytics_record_failed"
+    );
+    return "skipped";
+  }
+}
+
+function sanitizeDiagnosticText(candidate: string | null | undefined, maxLength = 160): string | null {
+  if (typeof candidate !== "string") {
+    return null;
+  }
+
+  const normalized = candidate.replace(/\s+/g, " ").trim();
+  if (normalized.length === 0) {
+    return null;
+  }
+
+  return normalized.slice(0, maxLength);
+}
+
+function readObjectField(candidate: unknown, key: string): Record<string, unknown> | null {
+  if (typeof candidate !== "object" || candidate === null) {
+    return null;
+  }
+
+  const value = (candidate as Record<string, unknown>)[key];
+  if (typeof value !== "object" || value === null || Array.isArray(value)) {
+    return null;
+  }
+
+  return value as Record<string, unknown>;
+}
+
+function readStringField(candidate: unknown, key: string, maxLength = 160): string | null {
+  if (typeof candidate !== "object" || candidate === null) {
+    return null;
+  }
+
+  return sanitizeDiagnosticText((candidate as Record<string, unknown>)[key] as string | null | undefined, maxLength);
+}
+
+function readValidationPath(issue: ZodIssue | undefined): string | null {
+  if (issue === undefined || issue.path.length === 0) {
+    return null;
+  }
+
+  return sanitizeDiagnosticText(issue.path.map((segment) => String(segment)).join("."), 160);
+}
+
+function buildRejectedDiagnosticFromCandidate(input: {
+  project_id: string;
+  rejection_reason: IngestionRejectedMetricEvent["reason"];
+  candidate: unknown;
+  validation_issue?: ZodIssue;
+}): IngestionRejectedDiagnosticEvent {
+  const service = readObjectField(input.candidate, "service");
+
+  return {
+    rejection_reason: input.rejection_reason,
+    project_id: input.project_id,
+    sdk_name: readStringField(input.candidate, "sdk_name", 120),
+    sdk_version: readStringField(input.candidate, "sdk_version", 64),
+    event_type: readStringField(input.candidate, "event_type", 80),
+    service_name: readStringField(service, "name", 120),
+    service_environment: readStringField(service, "environment", 80),
+    service_runtime: readStringField(service, "runtime", 80),
+    validation_code: sanitizeDiagnosticText(input.validation_issue?.code ?? null, 80),
+    validation_path: readValidationPath(input.validation_issue)
+  };
+}
+
+function buildRejectedDiagnosticFromEvent(input: {
+  project_id: string;
+  rejection_reason: IngestionRejectedMetricEvent["reason"];
+  event: ReturnType<typeof redactEvent>;
+}): IngestionRejectedDiagnosticEvent {
+  return {
+    rejection_reason: input.rejection_reason,
+    project_id: input.project_id,
+    sdk_name: sanitizeDiagnosticText(input.event.sdk_name, 120),
+    sdk_version: sanitizeDiagnosticText(input.event.sdk_version, 64),
+    event_type: sanitizeDiagnosticText(input.event.event_type, 80),
+    service_name: sanitizeDiagnosticText(input.event.service.name, 120),
+    service_environment: sanitizeDiagnosticText(input.event.service.environment, 80),
+    service_runtime: sanitizeDiagnosticText(input.event.service.runtime ?? null, 80),
+    validation_code: null,
+    validation_path: null
+  };
+}
+
+async function recordRejectedDiagnosticsBestEffort(input: {
+  dependencies: ApiDependencies;
+  log: FastifyBaseLogger;
+  organization_id: string | undefined;
+  occurred_at: string;
+  rejected_events: IngestionRejectedDiagnosticEvent[];
+}): Promise<void> {
+  if (
+    input.organization_id === undefined ||
+    input.dependencies.ingestionRejectionDiagnostics === undefined ||
+    input.rejected_events.length === 0
+  ) {
+    return;
+  }
+
+  try {
+    await input.dependencies.ingestionRejectionDiagnostics.recordRejectedDiagnostics({
+      organization_id: input.organization_id,
+      occurred_at: input.occurred_at,
+      events: input.rejected_events
+    });
+  } catch (error) {
+    input.log.warn(
+      {
+        err: error,
+        organization_id: input.organization_id
+      },
+      "ingestion_rejection_diagnostics_record_failed"
     );
   }
 }
@@ -155,6 +286,7 @@ export function registerIngestionRoutes(app: FastifyInstance, dependencies: ApiD
 
     const errors: Array<{ index: number; reason: string }> = [];
     const rejectedMetricEvents: IngestionRejectedMetricEvent[] = [];
+    const rejectedDiagnosticEvents: IngestionRejectedDiagnosticEvent[] = [];
     const validEvents: Array<{ index: number; event: ReturnType<typeof redactEvent> }> = [];
 
     for (const [index, candidate] of parsedBody.data.events.entries()) {
@@ -168,6 +300,16 @@ export function registerIngestionRoutes(app: FastifyInstance, dependencies: ApiD
           event_id: readRejectedMetricEventId(candidate, index),
           reason: "invalid_event"
         });
+        rejectedDiagnosticEvents.push(
+          buildRejectedDiagnosticFromCandidate({
+            project_id: project.project_id,
+            rejection_reason: "invalid_event",
+            candidate,
+            ...(validation.error.issues[0] === undefined
+              ? {}
+              : { validation_issue: validation.error.issues[0] })
+          })
+        );
         continue;
       }
 
@@ -201,8 +343,17 @@ export function registerIngestionRoutes(app: FastifyInstance, dependencies: ApiD
               reason: "rate_limited" as const
             }))
           );
+          rejectedDiagnosticEvents.push(
+            ...validEvents.map(({ event }) =>
+              buildRejectedDiagnosticFromEvent({
+                project_id: project.project_id,
+                rejection_reason: "rate_limited",
+                event
+              })
+            )
+          );
 
-          await recordIngestionMetricBatchBestEffort({
+          const metricRecordResult = await recordIngestionMetricBatchBestEffort({
             dependencies,
             log: request.log,
             organization_id: project.organization_id,
@@ -212,6 +363,15 @@ export function registerIngestionRoutes(app: FastifyInstance, dependencies: ApiD
             accepted_events: [],
             rejected_events: rejectedMetricEvents
           });
+          if (metricRecordResult === "recorded") {
+            await recordRejectedDiagnosticsBestEffort({
+              dependencies,
+              log: request.log,
+              organization_id: project.organization_id,
+              occurred_at: now.toISOString(),
+              rejected_events: rejectedDiagnosticEvents
+            });
+          }
 
           return reply.header("Retry-After", toRetryAfterSeconds(rateLimit.retry_after_ms)).status(429).send({
             accepted: 0,
@@ -266,6 +426,13 @@ export function registerIngestionRoutes(app: FastifyInstance, dependencies: ApiD
           event_id: entry.event.event_id,
           reason: "remote_probes_disabled"
         });
+        rejectedDiagnosticEvents.push(
+          buildRejectedDiagnosticFromEvent({
+            project_id: project.project_id,
+            rejection_reason: "remote_probes_disabled",
+            event: entry.event
+          })
+        );
         continue;
       }
 
@@ -307,6 +474,13 @@ export function registerIngestionRoutes(app: FastifyInstance, dependencies: ApiD
             event_id: entry.event.event_id,
             reason: "capture_rule_dropped"
           });
+          rejectedDiagnosticEvents.push(
+            buildRejectedDiagnosticFromEvent({
+              project_id: project.project_id,
+              rejection_reason: "capture_rule_dropped",
+              event: entry.event
+            })
+          );
           continue;
         }
 
@@ -317,6 +491,13 @@ export function registerIngestionRoutes(app: FastifyInstance, dependencies: ApiD
             event_id: entry.event.event_id,
             reason: "capture_rule_sampled_out"
           });
+          rejectedDiagnosticEvents.push(
+            buildRejectedDiagnosticFromEvent({
+              project_id: project.project_id,
+              rejection_reason: "capture_rule_sampled_out",
+              event: entry.event
+            })
+          );
           continue;
         }
 
@@ -340,6 +521,13 @@ export function registerIngestionRoutes(app: FastifyInstance, dependencies: ApiD
           event_id: entry.event.event_id,
           reason: "capture_policy_rejected"
         });
+        rejectedDiagnosticEvents.push(
+          buildRejectedDiagnosticFromEvent({
+            project_id: project.project_id,
+            rejection_reason: "capture_policy_rejected",
+            event: entry.event
+          })
+        );
       }
     }
 
@@ -391,8 +579,17 @@ export function registerIngestionRoutes(app: FastifyInstance, dependencies: ApiD
               reason: "monthly_quota_exceeded" as const
             }))
           );
+          rejectedDiagnosticEvents.push(
+            ...acceptedEvents.map(({ event }) =>
+              buildRejectedDiagnosticFromEvent({
+                project_id: project.project_id,
+                rejection_reason: "monthly_quota_exceeded",
+                event
+              })
+            )
+          );
 
-          await recordIngestionMetricBatchBestEffort({
+          const metricRecordResult = await recordIngestionMetricBatchBestEffort({
             dependencies,
             log: request.log,
             organization_id: project.organization_id,
@@ -402,6 +599,15 @@ export function registerIngestionRoutes(app: FastifyInstance, dependencies: ApiD
             accepted_events: [],
             rejected_events: rejectedMetricEvents
           });
+          if (metricRecordResult === "recorded") {
+            await recordRejectedDiagnosticsBestEffort({
+              dependencies,
+              log: request.log,
+              organization_id: project.organization_id,
+              occurred_at: now.toISOString(),
+              rejected_events: rejectedDiagnosticEvents
+            });
+          }
 
           return reply.header("Retry-After", toRetryAfterSeconds(retryAfterMs)).status(429).send({
             accepted: 0,
@@ -504,7 +710,7 @@ export function registerIngestionRoutes(app: FastifyInstance, dependencies: ApiD
       });
     }
 
-    await recordIngestionMetricBatchBestEffort({
+    const metricRecordResult = await recordIngestionMetricBatchBestEffort({
       dependencies,
       log: request.log,
       organization_id: project.organization_id,
@@ -518,6 +724,15 @@ export function registerIngestionRoutes(app: FastifyInstance, dependencies: ApiD
       })),
       rejected_events: rejectedMetricEvents
     });
+    if (metricRecordResult === "recorded") {
+      await recordRejectedDiagnosticsBestEffort({
+        dependencies,
+        log: request.log,
+        organization_id: project.organization_id,
+        occurred_at: now.toISOString(),
+        rejected_events: rejectedDiagnosticEvents
+      });
+    }
 
     let activeProbes: Array<{
       activation_id: string;
