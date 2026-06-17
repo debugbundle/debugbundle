@@ -3681,6 +3681,73 @@ describe("web app — management routes", () => {
     expect(await screen.findByText(/no new incidents today/i)).toBeInTheDocument();
   });
 
+  it("opens the create-project dialog directly from the dashboard empty state", async () => {
+    const user = userEvent.setup();
+    let projects: ReturnType<typeof createProject>[] = [];
+
+    const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = requestUrl(input);
+
+      if (url.endsWith("/v1/auth/session")) {
+        return jsonResponse(200, {
+          session: createSession()
+        });
+      }
+
+      if (url.endsWith("/v1/projects") && init?.method === undefined) {
+        return jsonResponse(200, { projects });
+      }
+
+      if (url.endsWith("/v1/projects") && init?.method === "POST") {
+        expect(init.body).toBe(
+          JSON.stringify({
+            name: "First Project",
+            slug: "first-project",
+            environment_default: "production",
+            color_tag: null,
+            weekly_report_timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC"
+          })
+        );
+
+        const createdProject = createProject({
+          project_id: "proj_first",
+          name: "First Project",
+          slug: "first-project"
+        });
+        projects = [createdProject];
+
+        return jsonResponse(201, {
+          project: createdProject
+        });
+      }
+
+      if (url.includes("/v1/incidents?") && url.includes("project_id=proj_first")) {
+        return jsonResponse(200, { incidents: [], next_cursor: null });
+      }
+
+      if (url.includes("/v1/incidents?") && url.includes("first_seen_after=")) {
+        return jsonResponse(200, { incidents: [], next_cursor: null });
+      }
+
+      return jsonResponse(404, { error: "not_found" });
+    });
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<App initialEntries={["/dashboard"]} />);
+
+    expect(await screen.findByText(/no projects yet/i)).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: /^create project$/i }));
+
+    const dialog = await screen.findByRole("dialog");
+    await user.type(within(dialog).getByLabelText(/project name/i), "First Project");
+    await user.click(within(dialog).getByRole("button", { name: /^create project$/i }));
+
+    expect(await screen.findByText(/project details/i)).toBeInTheDocument();
+    expect(screen.getByText(/^first-project$/i)).toBeInTheDocument();
+  });
+
   it("renders dashboard activity cards from project metrics instead of billing-cycle totals", async () => {
     function cardWithValueExists(label: string, value: RegExp): boolean {
       return screen.queryAllByText(value).some((element) => {

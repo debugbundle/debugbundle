@@ -1,6 +1,6 @@
 import { FolderIcon, PlusIcon } from "lucide-react";
 import { useEffect, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 
 import { Badge } from "../ui/badge.js";
 import { Button } from "../ui/button.js";
@@ -8,6 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "../ui/card.js";
 import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "../ui/empty.js";
 import { Skeleton } from "../ui/skeleton.js";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../ui/table.js";
+import { CreateProjectDialog } from "./create-project-dialog.js";
 import { ProjectNameWithAccessIndicator } from "./project-name-with-access-indicator.js";
 import { listProjects, type ProjectRecord } from "../../lib/api.js";
 import { useDelayedVisibility } from "../../lib/use-delayed-visibility.js";
@@ -55,12 +56,14 @@ export function RecentProjectsTable(): JSX.Element {
                 </EmptyDescription>
               </EmptyHeader>
               <EmptyContent>
-                <Button asChild>
-                  <Link to="/projects">
-                    <PlusIcon data-icon="inline-start" />
-                    Create project
-                  </Link>
-                </Button>
+                <CreateProjectDialog
+                  trigger={
+                    <Button type="button">
+                      <PlusIcon data-icon="inline-start" />
+                      Create project
+                    </Button>
+                  }
+                />
               </EmptyContent>
             </Empty>
           ) : (

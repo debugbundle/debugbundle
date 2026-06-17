@@ -1,10 +1,9 @@
 import { FolderIcon, KeyRoundIcon, PlusIcon } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useOutletContext } from "react-router-dom";
-import { DialogFormContent } from "../components/system/dialog-form-content.js";
+import { CreateProjectDialog } from "../components/system/create-project-dialog.js";
 import { PageHeader } from "../components/system/page-header.js";
 import { PlaintextTokenReveal } from "../components/system/plaintext-token-reveal.js";
-import { ProjectColorTagPicker } from "../components/system/project-color-tag-picker.js";
 import { ProjectNameWithAccessIndicator } from "../components/system/project-name-with-access-indicator.js";
 import { ProjectResourceEmptyState } from "../components/system/project-resource-empty-state.js";
 import type { ProjectContext } from "../components/system/project-layout.js";
@@ -28,12 +27,11 @@ import { Dialog, DialogTrigger } from "../components/ui/dialog.js";
 import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "../components/ui/empty.js";
 import { Field, FieldDescription, FieldGroup, FieldLabel } from "../components/ui/field.js";
 import { Input } from "../components/ui/input.js";
-import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select.js";
 import { Skeleton } from "../components/ui/skeleton.js";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../components/ui/table.js";
 import { Textarea } from "../components/ui/textarea.js";
+import { DialogFormContent } from "../components/system/dialog-form-content.js";
 import {
-  createProject,
   createProjectToken,
   isInvalidSessionError,
   listProjects,
@@ -45,7 +43,6 @@ import {
 } from "../lib/api.js";
 import { showErrorToast, showSuccessToast } from "../lib/notify.js";
 import { getProjectEffectiveRole } from "../lib/project-access.js";
-import { CUSTOM_PROJECT_ENVIRONMENT_VALUE, PROJECT_ENVIRONMENT_OPTIONS, slugifyProjectName } from "../lib/project-form.js";
 
 export { BillingPage } from "./billing-page.js";
 
@@ -57,12 +54,6 @@ export function ProjectsPage(): JSX.Element {
     direction: "asc"
   });
   const [isCreateOpen, setIsCreateOpen] = useState(false);
-  const [name, setName] = useState("");
-  const [slug, setSlug] = useState("");
-  const [isSlugManuallyEdited, setIsSlugManuallyEdited] = useState(false);
-  const [environmentDefault, setEnvironmentDefault] = useState("production");
-  const [customEnvironmentDefault, setCustomEnvironmentDefault] = useState("");
-  const [colorTag, setColorTag] = useState<ProjectRecord["color_tag"]>(null);
 
   useEffect(() => {
     void (async () => {
@@ -80,140 +71,25 @@ export function ProjectsPage(): JSX.Element {
   }, []);
 
   const sortedProjects = useMemo(() => sortProjects(projects, sort), [projects, sort]);
-  const selectedProjectEnvironment = PROJECT_ENVIRONMENT_OPTIONS.some((option) => option.value === environmentDefault)
-    ? environmentDefault
-    : CUSTOM_PROJECT_ENVIRONMENT_VALUE;
-
-  async function handleCreateProject(event: React.FormEvent<HTMLFormElement>): Promise<void> {
-    event.preventDefault();
-
-    try {
-      const created = await createProject({
-        name,
-        slug,
-        environment_default: environmentDefault,
-        color_tag: colorTag
-      });
-      setProjects((current) => [...(current ?? []), created]);
-      setName("");
-      setSlug("");
-      setIsSlugManuallyEdited(false);
-      setEnvironmentDefault("production");
-      setCustomEnvironmentDefault("");
-      setColorTag(null);
-      setIsCreateOpen(false);
-      void navigate(`/projects/${created.project_id}`);
-    } catch {
-      showErrorToast("Could not create project.");
-    }
-  }
-
-  function handleProjectNameChange(value: string): void {
-    setName(value);
-
-    if (isSlugManuallyEdited) {
-      return;
-    }
-
-    setSlug(slugifyProjectName(value));
-  }
-
-  function handleProjectSlugChange(value: string): void {
-    setSlug(value);
-    setIsSlugManuallyEdited(value !== slugifyProjectName(name));
-  }
-
-  function handleProjectEnvironmentChange(value: string): void {
-    if (value === CUSTOM_PROJECT_ENVIRONMENT_VALUE) {
-      setEnvironmentDefault(customEnvironmentDefault);
-      return;
-    }
-
-    setEnvironmentDefault(value);
-  }
-
-  function handleCustomProjectEnvironmentChange(value: string): void {
-    setCustomEnvironmentDefault(value);
-    setEnvironmentDefault(value);
-  }
 
   return (
     <div className="space-y-8">
       <PageHeader
         description="Create and manage projects in this workspace."
         actions={
-          <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
-            <DialogTrigger asChild>
+          <CreateProjectDialog
+            open={isCreateOpen}
+            onOpenChange={setIsCreateOpen}
+            onCreated={(created) => {
+              setProjects((current) => [...(current ?? []), created]);
+            }}
+            trigger={
               <Button type="button">
                 <PlusIcon data-icon="inline-start" />
                 Create project
               </Button>
-            </DialogTrigger>
-            <DialogFormContent
-              title="Create project"
-              description="Add a new project in this workspace."
-              size="lg"
-              footer={<Button type="submit">Create project</Button>}
-              onSubmit={(event) => void handleCreateProject(event)}
-            >
-                <FieldGroup>
-                  <Field>
-                    <FieldLabel htmlFor="project-name">Project name</FieldLabel>
-                    <Input id="project-name" value={name} onChange={(event) => handleProjectNameChange(event.currentTarget.value)} />
-                  </Field>
-                  <Field>
-                    <FieldLabel htmlFor="project-slug">Project slug</FieldLabel>
-                    <Input
-                      id="project-slug"
-                      value={slug}
-                      onChange={(event) => handleProjectSlugChange(event.currentTarget.value)}
-                      autoCapitalize="none"
-                      autoCorrect="off"
-                      spellCheck={false}
-                    />
-                  </Field>
-                  <Field>
-                    <FieldLabel>Color tag</FieldLabel>
-                    <ProjectColorTagPicker value={colorTag} onChange={setColorTag} />
-                  </Field>
-                  <Field>
-                    <FieldLabel id="project-environment-default-label" htmlFor="project-environment-default">Default environment</FieldLabel>
-                    <FieldDescription>Used as the initial environment in setup snippets and project defaults.</FieldDescription>
-                    <Select
-                      value={selectedProjectEnvironment}
-                      onValueChange={handleProjectEnvironmentChange}
-                    >
-                      <SelectTrigger
-                        id="project-environment-default"
-                        aria-labelledby="project-environment-default-label project-environment-default"
-                        className="w-full"
-                      >
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent position="popper">
-                        <SelectGroup>
-                          {PROJECT_ENVIRONMENT_OPTIONS.map((option) => (
-                            <SelectItem key={option.value} value={option.value}>
-                              {option.label}
-                            </SelectItem>
-                          ))}
-                        </SelectGroup>
-                      </SelectContent>
-                    </Select>
-                    {selectedProjectEnvironment !== CUSTOM_PROJECT_ENVIRONMENT_VALUE ? null : (
-                      <Input
-                        id="project-environment-default-custom"
-                        aria-label="Custom environment"
-                        value={customEnvironmentDefault}
-                        onChange={(event) => handleCustomProjectEnvironmentChange(event.currentTarget.value)}
-                        placeholder="preview"
-                        required
-                      />
-                    )}
-                  </Field>
-                </FieldGroup>
-            </DialogFormContent>
-          </Dialog>
+            }
+          />
         }
       />
 
