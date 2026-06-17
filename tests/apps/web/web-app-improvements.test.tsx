@@ -13,6 +13,7 @@ function createImprovement(overrides: Partial<ImprovementRecord> = {}): Improvem
     improvement_id: "imp_123",
     project_id: "proj_123",
     project_name: "Main App",
+    project_color_tag: null,
     project_slug: "main-app",
     service_id: null,
     service_name: "checkout-api",
@@ -100,7 +101,7 @@ describe("web app — improvements", () => {
   });
 
   it("renders the workspace improvements page", async () => {
-    const improvement = createImprovement();
+    const improvement = createImprovement({ project_color_tag: "violet" });
     vi.stubGlobal(
       "fetch",
       vi.fn((input: RequestInfo | URL) => {
@@ -123,6 +124,7 @@ describe("web app — improvements", () => {
     expect(await screen.findByText(/warning hotspot: payment provider warning/i)).toBeInTheDocument();
     expect(screen.getByText(/repeated warning log pattern detected/i)).toBeInTheDocument();
     expect(screen.getAllByText(/^open$/i).length).toBeGreaterThan(0);
+    expect(document.querySelector('[data-project-color-tag="violet"]')).not.toBeNull();
   });
 
   it("supports workspace improvement sorting across the visible columns", async () => {

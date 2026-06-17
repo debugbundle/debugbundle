@@ -120,10 +120,6 @@ function normalizeDiagnosticText(candidate: string | null | undefined, maxLength
   return normalized.slice(0, maxLength);
 }
 
-function toNullableText(value: string): string | null {
-  return value.length === 0 ? null : value;
-}
-
 function toCount(value: string | number): number {
   return typeof value === "number" ? value : Number(value);
 }

@@ -6,7 +6,8 @@ import type {
   CaptureRuleUpdate,
   EventEnvelope,
   ImprovementSettings,
-  ImprovementSettingsUpdate
+  ImprovementSettingsUpdate,
+  ProjectColorTag
 } from "../../../packages/shared-types/src/index.js";
 import type {
   AccountDeletionChallengeService,
@@ -162,6 +163,7 @@ export interface ApiDependencies {
       name: string;
       slug: string;
       environment_default: string;
+      color_tag?: ProjectColorTag | null;
       weekly_report_timezone: string;
     }): Promise<ProjectRecord | null>;
     updateProjectForUser?(input: {
@@ -170,6 +172,7 @@ export interface ApiDependencies {
       name?: string;
       slug?: string;
       environment_default?: string;
+      color_tag?: ProjectColorTag | null;
     }): Promise<ProjectRecord | "slug_taken" | null>;
     deleteProjectForUser?(input: {
       user_id: string;
@@ -185,6 +188,7 @@ export interface ApiDependencies {
       name: string;
       slug: string;
       environment_default: string;
+      color_tag?: ProjectColorTag | null;
       weekly_report_timezone?: string;
     }): Promise<ProjectRecord | null>;
     updateProjectForOrganization(input: {
@@ -193,6 +197,7 @@ export interface ApiDependencies {
       name?: string;
       slug?: string;
       environment_default?: string;
+      color_tag?: ProjectColorTag | null;
     }): Promise<ProjectRecord | "slug_taken" | null>;
     deleteProjectForOrganization(input: {
       organization_id: string;

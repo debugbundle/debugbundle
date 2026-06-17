@@ -53,6 +53,7 @@ export function registerProjectRoutes(app: FastifyInstance, dependencies: ApiDep
       name: parsedBody.data.name,
       slug: parsedBody.data.slug,
       environment_default: parsedBody.data.environment_default,
+      color_tag: parsedBody.data.color_tag,
       weekly_report_timezone: parsedBody.data.weekly_report_timezone
     });
 
@@ -108,7 +109,8 @@ export function registerProjectRoutes(app: FastifyInstance, dependencies: ApiDep
       ...(parsedBody.data.slug === undefined ? {} : { slug: parsedBody.data.slug }),
       ...(parsedBody.data.environment_default === undefined
         ? {}
-        : { environment_default: parsedBody.data.environment_default })
+        : { environment_default: parsedBody.data.environment_default }),
+      ...(parsedBody.data.color_tag === undefined ? {} : { color_tag: parsedBody.data.color_tag })
     });
 
     if (project === "slug_taken") {

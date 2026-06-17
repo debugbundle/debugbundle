@@ -104,14 +104,16 @@ describe("mcp project tools", () => {
       bearerToken: "dbundle_mem_x",
       name: "App",
       slug: "app",
-      environmentDefault: "staging"
+      environmentDefault: "staging",
+      colorTag: "blue"
     });
 
     expect(api.createProject).toHaveBeenCalledWith({
       bearerToken: "dbundle_mem_x",
       name: "App",
       slug: "app",
-      environmentDefault: "staging"
+      environmentDefault: "staging",
+      colorTag: "blue"
     });
 
     await tools.update_project({
@@ -119,7 +121,8 @@ describe("mcp project tools", () => {
       projectId: "proj_3",
       name: "Renamed",
       slug: "renamed",
-      environmentDefault: "production"
+      environmentDefault: "production",
+      colorTag: null
     });
 
     expect(api.updateProject).toHaveBeenCalledWith({
@@ -127,7 +130,8 @@ describe("mcp project tools", () => {
       projectId: "proj_3",
       name: "Renamed",
       slug: "renamed",
-      environmentDefault: "production"
+      environmentDefault: "production",
+      colorTag: null
     });
   });
 });

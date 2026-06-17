@@ -62,6 +62,8 @@ export const STORAGE_BOOTSTRAP_STATEMENTS = [
       name text NOT NULL,
       slug text NOT NULL,
       environment_default text NOT NULL DEFAULT 'production',
+      color_tag text
+        CHECK (color_tag IN ('red', 'orange', 'amber', 'yellow', 'lime', 'green', 'emerald', 'teal', 'cyan', 'sky', 'blue', 'indigo', 'violet', 'purple', 'fuchsia', 'pink', 'rose', 'slate') OR color_tag IS NULL),
       automated_improvement_bundles_enabled boolean NOT NULL DEFAULT true,
       improvement_bundle_sensitivity text NOT NULL DEFAULT 'high_confidence'
         CHECK (improvement_bundle_sensitivity IN ('high_confidence', 'balanced', 'verbose')),

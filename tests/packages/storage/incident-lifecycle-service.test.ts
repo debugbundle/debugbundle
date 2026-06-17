@@ -8,6 +8,7 @@ function createResolvedIncident(overrides: Partial<IncidentRetrievalRecord> = {}
     incident_id: "inc_123",
     project_id: "proj_123",
     project_name: "Checkout",
+    project_color_tag: null,
     service_id: "svc_123",
     service_name: "api",
     latest_deployment_id: null,

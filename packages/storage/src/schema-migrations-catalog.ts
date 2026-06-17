@@ -933,5 +933,21 @@ export const STORAGE_SCHEMA_MIGRATIONS = [
         )
       `
     ]
+  }),
+  defineStorageSchemaMigration({
+    id: "202606170001_add_project_color_tags",
+    description: "Add optional project color tags for project metadata and retrieval surfaces.",
+    statements: [
+      "ALTER TABLE projects ADD COLUMN IF NOT EXISTS color_tag text",
+      "ALTER TABLE projects DROP CONSTRAINT IF EXISTS projects_color_tag_check",
+      `
+        ALTER TABLE projects
+        ADD CONSTRAINT projects_color_tag_check
+        CHECK (
+          color_tag IN ('red', 'orange', 'amber', 'yellow', 'lime', 'green', 'emerald', 'teal', 'cyan', 'sky', 'blue', 'indigo', 'violet', 'purple', 'fuchsia', 'pink', 'rose', 'slate')
+          OR color_tag IS NULL
+        )
+      `
+    ]
   })
 ] as const;

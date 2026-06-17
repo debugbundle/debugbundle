@@ -453,10 +453,10 @@ describe("web api client", () => {
 
     await verifyEmailCode({ email: "owen@example.com", code: "123456" });
     await expect(bulkResolveIncidents(["inc_1", "inc_2"])).resolves.toEqual([
-      { incident_id: "inc_1", status: "resolved" }
+      { incident_id: "inc_1", status: "resolved", project_color_tag: null }
     ]);
     await expect(bulkReopenIncidents(["inc_1", "inc_2"])).resolves.toEqual([
-      { incident_id: "inc_1", status: "open" }
+      { incident_id: "inc_1", status: "open", project_color_tag: null }
     ]);
 
     expect(fetchMock).toHaveBeenNthCalledWith(2, buildApiUrl("/v1/incidents/resolve"), {

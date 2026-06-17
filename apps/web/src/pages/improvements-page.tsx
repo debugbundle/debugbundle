@@ -3,6 +3,7 @@ import { useMemo, useState, type MouseEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
 
 import { CursorPaginationControls } from "../components/system/cursor-pagination-controls.js";
+import { ProjectColorTagDot } from "../components/system/project-color-tag-dot.js";
 import { HostedImprovementsUpgradeCallout } from "../components/system/hosted-improvements-upgrade-callout.js";
 import { PageHeader } from "../components/system/page-header.js";
 import { ResourceListState } from "../components/system/resource-list-state.js";
@@ -318,7 +319,8 @@ export function ImprovementsTable(input: {
             </TableCell>
             {!projectScoped ? (
               <TableCell className="text-sm text-muted-foreground whitespace-normal break-words align-middle">
-                <Link to={`/projects/${improvement.project_id}`} className="hover:underline" data-row-interactive="true">
+                <Link to={`/projects/${improvement.project_id}`} className="inline-flex items-center gap-2 hover:underline" data-row-interactive="true">
+                  <ProjectColorTagDot colorTag={improvement.project_color_tag} />
                   {improvement.project_name}
                 </Link>
               </TableCell>

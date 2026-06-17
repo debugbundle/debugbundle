@@ -375,6 +375,7 @@ function mapProjectRow(row: ProjectRecord & Record<string, unknown>): ProjectRec
     name: row.name,
     slug: row.slug,
     environment_default: row.environment_default,
+    color_tag: row.color_tag ?? null,
     organization_plan: row.organization_plan,
     metrics: normalizeProjectMetrics(row.metrics),
     created_at: row.created_at,
@@ -395,6 +396,7 @@ function mapDeletedProjectRow(row: DeletedProjectRecord & Record<string, unknown
     name: row.name,
     slug: row.slug,
     environment_default: row.environment_default,
+    color_tag: row.color_tag ?? null,
     organization_plan: row.organization_plan,
     created_at: row.created_at,
     updated_at: row.updated_at
@@ -677,6 +679,7 @@ function mapIncidentRetrievalRow(row: IncidentRetrievalRow): IncidentRetrievalRe
     incident_id: row.incident_id,
     project_id: row.project_id,
     project_name: row.project_name,
+    project_color_tag: row.project_color_tag ?? null,
     service_id: row.service_id,
     service_name: row.service_name,
     latest_deployment_id: row.latest_deployment_id,
@@ -823,6 +826,7 @@ export function createPostgresMetadataStore(
           SELECT
             p.id AS project_id,
             p.name AS project_name,
+            p.color_tag AS project_color_tag,
             p.organization_id,
             p.owner_user_id,
             owner_user.email AS owner_email,
@@ -1628,6 +1632,7 @@ export function createPostgresMetadataStore(
             p.name,
             p.slug,
             p.environment_default,
+            p.color_tag,
             ${organizationPlanSql} AS organization_plan,
             ${buildProjectMetricsJsonSql({
               projectIdSql: "p.id",
@@ -1703,6 +1708,7 @@ export function createPostgresMetadataStore(
             p.name,
             p.slug,
             p.environment_default,
+            p.color_tag,
             ${organizationPlanSql} AS organization_plan,
             ${buildProjectMetricsJsonSql({
               projectIdSql: "p.id",
@@ -1741,6 +1747,7 @@ export function createPostgresMetadataStore(
                 name,
                 slug,
                 environment_default,
+                color_tag,
                 created_at,
                 updated_at
               )
@@ -1751,6 +1758,7 @@ export function createPostgresMetadataStore(
                 $4,
                 $5,
                 $6,
+                $7,
                 now(),
                 now()
             )
@@ -1761,6 +1769,7 @@ export function createPostgresMetadataStore(
                 name,
                 slug,
                 environment_default,
+                color_tag,
                 created_at,
                 updated_at
             )
@@ -1778,13 +1787,13 @@ export function createPostgresMetadataStore(
                 updated_at
               )
               SELECT
-                $7::uuid,
+                $8::uuid,
                 cp.project_id,
                 'email',
                 jsonb_build_object('to', jsonb_build_array(owner_user.email)),
                 'monday',
                 9,
-                $8,
+                $9,
                 true,
                 now(),
                 now()
@@ -1803,6 +1812,7 @@ export function createPostgresMetadataStore(
               cp.name,
               cp.slug,
               cp.environment_default,
+              cp.color_tag,
               COALESCE(o.plan, 'free') AS organization_plan,
               json_build_object(
                 'open_incidents', 0,
@@ -1828,6 +1838,7 @@ export function createPostgresMetadataStore(
             input.name,
             input.slug,
             input.environment_default,
+            input.color_tag ?? null,
             randomUUID(),
             input.weekly_report_timezone
           ]
@@ -1889,8 +1900,8 @@ export function createPostgresMetadataStore(
                             SELECT ad.created_at
                             FROM alert_deliveries ad
                             WHERE ad.project_id = up.project_id
-                              AND ad.created_at >= $6::timestamptz
-                              AND ad.created_at < $7::timestamptz
+                              AND ad.created_at >= $8::timestamptz
+                              AND ad.created_at < $9::timestamptz
                           `
                         : null,
                       hasAlertEmailDigests
@@ -1898,8 +1909,8 @@ export function createPostgresMetadataStore(
                             SELECT dig.created_at
                             FROM alert_email_digests dig
                             WHERE dig.project_id = up.project_id
-                              AND dig.created_at >= $6::timestamptz
-                              AND dig.created_at < $7::timestamptz
+                              AND dig.created_at >= $8::timestamptz
+                              AND dig.created_at < $9::timestamptz
                           `
                         : null
                     ]
@@ -1917,6 +1928,7 @@ export function createPostgresMetadataStore(
                 name = COALESCE($3, name),
                 slug = COALESCE($4, slug),
                 environment_default = COALESCE($5, environment_default),
+                color_tag = CASE WHEN $6::boolean THEN $7::text ELSE color_tag END,
                 updated_at = now()
               WHERE id = $2::uuid
                 AND (
@@ -1935,6 +1947,7 @@ export function createPostgresMetadataStore(
                 name,
                 slug,
                 environment_default,
+                color_tag,
                 created_at,
                 updated_at
             )
@@ -1978,13 +1991,14 @@ export function createPostgresMetadataStore(
               up.name,
               up.slug,
               up.environment_default,
+              up.color_tag,
               COALESCE(o.plan, 'free') AS organization_plan,
               ${buildProjectMetricsJsonSql({
                 projectIdSql: "up.project_id",
-                monthStartsAtSql: "$6",
-                monthEndsAtSql: "$7",
-                dayStartsAtSql: "$8",
-                dayEndsAtSql: "$9",
+                monthStartsAtSql: "$8",
+                monthEndsAtSql: "$9",
+                dayStartsAtSql: "$10",
+                dayEndsAtSql: "$11",
                 billableIncidentEventsPredicate,
                 alertDeliveriesSelect
               })} AS metrics,
@@ -2000,6 +2014,8 @@ export function createPostgresMetadataStore(
             input.name ?? null,
             input.slug ?? null,
             input.environment_default ?? null,
+            input.color_tag !== undefined,
+            input.color_tag ?? null,
             usageWindow.starts_at,
             usageWindow.ends_at,
             dayWindow.starts_at,
@@ -2039,6 +2055,7 @@ export function createPostgresMetadataStore(
               name,
               slug,
               environment_default,
+              color_tag,
               created_at,
               updated_at
           )
@@ -2053,6 +2070,7 @@ export function createPostgresMetadataStore(
             dp.name,
             dp.slug,
             dp.environment_default,
+            dp.color_tag,
             COALESCE(o.plan, 'free') AS organization_plan,
             dp.created_at::text AS created_at,
             dp.updated_at::text AS updated_at
@@ -2096,6 +2114,7 @@ export function createPostgresMetadataStore(
                 name,
                 slug,
                 environment_default,
+                color_tag,
                 created_at,
                 updated_at
               )
@@ -2113,6 +2132,7 @@ export function createPostgresMetadataStore(
                 $3,
                 $4,
                 $5,
+                $6,
                 now(),
                 now()
               FROM organizations o
@@ -2124,6 +2144,7 @@ export function createPostgresMetadataStore(
                 name,
                 slug,
                 environment_default,
+                color_tag,
                 created_at,
                 updated_at
             )
@@ -2141,13 +2162,13 @@ export function createPostgresMetadataStore(
                 updated_at
               )
               SELECT
-                $6::uuid,
+                $7::uuid,
                 cp.project_id,
                 'email',
                 jsonb_build_object('to', jsonb_build_array(owner_user.email)),
                 'monday',
                 9,
-                $7,
+                $8,
                 true,
                 now(),
                 now()
@@ -2166,6 +2187,7 @@ export function createPostgresMetadataStore(
               cp.name,
               cp.slug,
               cp.environment_default,
+              cp.color_tag,
               COALESCE(o.plan, 'free') AS organization_plan,
               json_build_object(
                 'open_incidents', 0,
@@ -2190,6 +2212,7 @@ export function createPostgresMetadataStore(
             input.name,
             input.slug,
             input.environment_default,
+            input.color_tag ?? null,
             randomUUID(),
             input.weekly_report_timezone ?? "UTC"
           ]
@@ -2251,8 +2274,8 @@ export function createPostgresMetadataStore(
                             SELECT ad.created_at
                             FROM alert_deliveries ad
                             WHERE ad.project_id = up.project_id
-                              AND ad.created_at >= $6::timestamptz
-                              AND ad.created_at < $7::timestamptz
+                              AND ad.created_at >= $8::timestamptz
+                              AND ad.created_at < $9::timestamptz
                           `
                         : null,
                       hasAlertEmailDigests
@@ -2260,8 +2283,8 @@ export function createPostgresMetadataStore(
                             SELECT dig.created_at
                             FROM alert_email_digests dig
                             WHERE dig.project_id = up.project_id
-                              AND dig.created_at >= $6::timestamptz
-                              AND dig.created_at < $7::timestamptz
+                              AND dig.created_at >= $8::timestamptz
+                              AND dig.created_at < $9::timestamptz
                           `
                         : null
                     ]
@@ -2279,6 +2302,7 @@ export function createPostgresMetadataStore(
                 name = COALESCE($3, name),
                 slug = COALESCE($4, slug),
                 environment_default = COALESCE($5, environment_default),
+                color_tag = CASE WHEN $6::boolean THEN $7::text ELSE color_tag END,
                 updated_at = now()
               WHERE organization_id = $1 AND id = $2
               RETURNING
@@ -2288,6 +2312,7 @@ export function createPostgresMetadataStore(
                 name,
                 slug,
                 environment_default,
+                color_tag,
                 created_at,
                 updated_at
             )
@@ -2318,13 +2343,14 @@ export function createPostgresMetadataStore(
               up.name,
               up.slug,
               up.environment_default,
+              up.color_tag,
               COALESCE(o.plan, 'free') AS organization_plan,
               ${buildProjectMetricsJsonSql({
                 projectIdSql: "up.project_id",
-                monthStartsAtSql: "$6",
-                monthEndsAtSql: "$7",
-                dayStartsAtSql: "$8",
-                dayEndsAtSql: "$9",
+                monthStartsAtSql: "$8",
+                monthEndsAtSql: "$9",
+                dayStartsAtSql: "$10",
+                dayEndsAtSql: "$11",
                 billableIncidentEventsPredicate,
                 alertDeliveriesSelect
               })} AS metrics,
@@ -2340,6 +2366,8 @@ export function createPostgresMetadataStore(
             input.name ?? null,
             input.slug ?? null,
             input.environment_default ?? null,
+            input.color_tag !== undefined,
+            input.color_tag ?? null,
             usageWindow.starts_at,
             usageWindow.ends_at,
             dayWindow.starts_at,
@@ -2378,6 +2406,7 @@ export function createPostgresMetadataStore(
               name,
               slug,
               environment_default,
+              color_tag,
               created_at,
               updated_at
           )
@@ -2392,6 +2421,7 @@ export function createPostgresMetadataStore(
             dp.name,
             dp.slug,
             dp.environment_default,
+            dp.color_tag,
             COALESCE(o.plan, 'free') AS organization_plan,
             dp.created_at::text AS created_at,
             dp.updated_at::text AS updated_at
@@ -3159,6 +3189,7 @@ export function createPostgresMetadataStore(
             i.id AS incident_id,
             i.project_id,
             p.name AS project_name,
+            p.color_tag AS project_color_tag,
             i.service_id,
             s.name AS service_name,
             i.latest_deployment_id::text AS latest_deployment_id,
@@ -3206,6 +3237,7 @@ export function createPostgresMetadataStore(
             i.id AS incident_id,
             i.project_id,
             p.name AS project_name,
+            p.color_tag AS project_color_tag,
             i.service_id,
             s.name AS service_name,
             i.latest_deployment_id::text AS latest_deployment_id,
@@ -3317,6 +3349,7 @@ export function createPostgresMetadataStore(
             updated.incident_id,
             updated.project_id,
             p.name AS project_name,
+            p.color_tag AS project_color_tag,
             updated.service_id,
             s.name AS service_name,
             updated.latest_deployment_id,
@@ -3426,6 +3459,7 @@ export function createPostgresMetadataStore(
             updated.incident_id,
             updated.project_id,
             p.name AS project_name,
+            p.color_tag AS project_color_tag,
             updated.service_id,
             s.name AS service_name,
             updated.latest_deployment_id,
@@ -3519,6 +3553,7 @@ export function createPostgresMetadataStore(
             updated.incident_id,
             updated.project_id,
             p.name AS project_name,
+            p.color_tag AS project_color_tag,
             updated.service_id,
             s.name AS service_name,
             updated.latest_deployment_id,
@@ -3628,6 +3663,7 @@ export function createPostgresMetadataStore(
             updated.incident_id,
             updated.project_id,
             p.name AS project_name,
+            p.color_tag AS project_color_tag,
             updated.service_id,
             s.name AS service_name,
             updated.latest_deployment_id,
@@ -4167,6 +4203,7 @@ export function createPostgresMetadataStore(
           SELECT
             $1::text AS project_id,
             p.name AS project_name,
+            p.color_tag AS project_color_tag,
             $2::timestamptz::text AS window_start,
             $3::timestamptz::text AS window_end,
             COALESCE((

@@ -101,6 +101,7 @@ function createIncidentFixture() {
     incident_id: "inc_perf",
     project_id: "550e8400-e29b-41d4-a716-446655440000",
     project_name: "Main App",
+    project_color_tag: null,
     service_id: "svc_perf",
     service_name: "checkout-api",
     latest_deployment_id: null,

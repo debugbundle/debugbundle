@@ -13,6 +13,7 @@ function createImprovement(overrides: Partial<ImprovementRecord> = {}): Improvem
     improvement_id: "imp_123",
     project_id: "proj_123",
     project_name: "Main App",
+    project_color_tag: null,
     project_slug: "main-app",
     service_id: null,
     service_name: "checkout-api",

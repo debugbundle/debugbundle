@@ -185,4 +185,48 @@ describe("cli project commands", () => {
     expect(slugConflict.exitCode).toBe(5);
     expect(slugConflict.output).toContain("project_slug_taken");
   });
+
+  it("forwards color tag updates through create and update commands", async () => {
+    const createProject = vi.fn().mockResolvedValue({
+      project_id: "proj_3",
+      name: "New App",
+      slug: "new-app"
+    });
+    const updateProject = vi.fn().mockResolvedValue({
+      project_id: "proj_1",
+      name: "Renamed App",
+      slug: "main-app"
+    });
+
+    await createProjectCommand(
+      {
+        bearerToken: "dbundle_mem_x",
+        name: "New App",
+        slug: "new-app",
+        colorTag: "blue"
+      },
+      { createProject }
+    );
+
+    await updateProjectCommand(
+      {
+        bearerToken: "dbundle_mem_x",
+        projectId: "proj_1",
+        colorTag: null
+      },
+      { updateProject }
+    );
+
+    expect(createProject).toHaveBeenCalledWith({
+      bearerToken: "dbundle_mem_x",
+      name: "New App",
+      slug: "new-app",
+      colorTag: "blue"
+    });
+    expect(updateProject).toHaveBeenCalledWith({
+      bearerToken: "dbundle_mem_x",
+      projectId: "proj_1",
+      colorTag: null
+    });
+  });
 });

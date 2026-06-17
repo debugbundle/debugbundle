@@ -85,7 +85,7 @@ export function RecentProjectsTable(): JSX.Element {
                     }}
                   >
                     <TableCell className="font-medium">
-                      <ProjectNameWithAccessIndicator project={project} />
+                      <ProjectNameWithAccessIndicator project={project} showColorTag />
                     </TableCell>
                     <TableCell className="text-muted-foreground">{project.slug}</TableCell>
                     <TableCell>

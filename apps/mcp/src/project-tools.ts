@@ -17,6 +17,7 @@ export function createProjectMcpTools(api: {
     name: string;
     slug: string;
     environmentDefault?: string;
+    colorTag?: string | null;
   }): Promise<unknown>;
   updateProject(input: {
     bearerToken: string;
@@ -24,6 +25,7 @@ export function createProjectMcpTools(api: {
     name?: string;
     slug?: string;
     environmentDefault?: string;
+    colorTag?: string | null;
   }): Promise<unknown>;
   deleteProject(input: { bearerToken: string; projectId: string }): Promise<unknown>;
 }): Record<(typeof PROJECT_MCP_TOOL_NAMES)[number], (input: Record<string, unknown>) => Promise<unknown>> {
@@ -50,6 +52,7 @@ export function createProjectMcpTools(api: {
           name: string;
           slug: string;
           environmentDefault?: string;
+          colorTag?: string | null;
         } = {
           bearerToken: String(input["bearerToken"]),
           name: String(input["name"]),
@@ -57,6 +60,9 @@ export function createProjectMcpTools(api: {
         };
         if (typeof input["environmentDefault"] === "string") {
           requestInput.environmentDefault = input["environmentDefault"];
+        }
+        if (input["colorTag"] === null || typeof input["colorTag"] === "string") {
+          requestInput.colorTag = input["colorTag"];
         }
 
         return { project: await api.createProject(requestInput) };
@@ -73,6 +79,7 @@ export function createProjectMcpTools(api: {
           name?: string;
           slug?: string;
           environmentDefault?: string;
+          colorTag?: string | null;
         } = {
           bearerToken: String(input["bearerToken"]),
           projectId: String(input["projectId"])
@@ -85,6 +92,9 @@ export function createProjectMcpTools(api: {
         }
         if (typeof input["environmentDefault"] === "string") {
           requestInput.environmentDefault = input["environmentDefault"];
+        }
+        if (input["colorTag"] === null || typeof input["colorTag"] === "string") {
+          requestInput.colorTag = input["colorTag"];
         }
 
         return { project: await api.updateProject(requestInput) };

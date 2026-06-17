@@ -90,6 +90,7 @@ function normalizeProjectRecord(
 ): ProjectRecord {
   return {
     ...project,
+    color_tag: project.color_tag ?? null,
     metrics: {
       open_incidents: project.metrics?.open_incidents ?? 0,
       regressed_incidents: project.metrics?.regressed_incidents ?? 0,
@@ -100,6 +101,20 @@ function normalizeProjectRecord(
       retained_bundles: project.metrics?.retained_bundles ?? 0,
       monthly_alert_deliveries: project.metrics?.monthly_alert_deliveries ?? 0
     }
+  };
+}
+
+function normalizeIncidentRecord(incident: IncidentRecord): IncidentRecord {
+  return {
+    ...incident,
+    project_color_tag: incident.project_color_tag ?? null
+  };
+}
+
+function normalizeImprovementRecord(improvement: ImprovementRecord): ImprovementRecord {
+  return {
+    ...improvement,
+    project_color_tag: improvement.project_color_tag ?? null
   };
 }
 
@@ -258,7 +273,7 @@ export async function listIncidents(
   );
 
   return {
-    incidents: body.incidents,
+    incidents: body.incidents.map(normalizeIncidentRecord),
     nextCursor: body.next_cursor
   };
 }
@@ -308,7 +323,7 @@ export async function listImprovements(
   );
 
   return {
-    improvements: body.improvements,
+    improvements: body.improvements.map(normalizeImprovementRecord),
     nextCursor: body.next_cursor
   };
 }
@@ -332,6 +347,7 @@ export async function createProject(payload: {
   name: string;
   slug: string;
   environment_default: string;
+  color_tag?: ProjectRecord["color_tag"];
   weekly_report_timezone?: string;
 }): Promise<ProjectRecord> {
   const body = await readJson<{
@@ -357,6 +373,7 @@ export async function updateProject(
     name?: string;
     slug?: string;
     environment_default?: string;
+    color_tag?: ProjectRecord["color_tag"];
   }
 ): Promise<ProjectRecord> {
   const body = await readJson<{
@@ -948,7 +965,7 @@ export async function getIncident(incidentId: string): Promise<IncidentRecord> {
     })
   );
 
-  return body.incident;
+  return normalizeIncidentRecord(body.incident);
 }
 
 export async function getImprovement(improvementId: string): Promise<ImprovementRecord> {
@@ -958,7 +975,7 @@ export async function getImprovement(improvementId: string): Promise<Improvement
     })
   );
 
-  return body.improvement;
+  return normalizeImprovementRecord(body.improvement);
 }
 
 export async function resolveIncident(incidentId: string): Promise<IncidentRecord> {
@@ -970,7 +987,7 @@ export async function resolveIncident(incidentId: string): Promise<IncidentRecor
     })
   );
 
-  return body.incident;
+  return normalizeIncidentRecord(body.incident);
 }
 
 export async function bulkResolveIncidents(incidentIds: string[]): Promise<IncidentRecord[]> {
@@ -983,7 +1000,7 @@ export async function bulkResolveIncidents(incidentIds: string[]): Promise<Incid
     })
   );
 
-  return body.incidents;
+  return body.incidents.map(normalizeIncidentRecord);
 }
 
 export async function reopenIncident(incidentId: string): Promise<IncidentRecord> {
@@ -995,7 +1012,7 @@ export async function reopenIncident(incidentId: string): Promise<IncidentRecord
     })
   );
 
-  return body.incident;
+  return normalizeIncidentRecord(body.incident);
 }
 
 export async function bulkReopenIncidents(incidentIds: string[]): Promise<IncidentRecord[]> {
@@ -1008,7 +1025,7 @@ export async function bulkReopenIncidents(incidentIds: string[]): Promise<Incide
     })
   );
 
-  return body.incidents;
+  return body.incidents.map(normalizeIncidentRecord);
 }
 
 export async function resolveImprovement(improvementId: string): Promise<ImprovementRecord> {
@@ -1020,7 +1037,7 @@ export async function resolveImprovement(improvementId: string): Promise<Improve
     })
   );
 
-  return body.improvement;
+  return normalizeImprovementRecord(body.improvement);
 }
 
 export async function reopenImprovement(improvementId: string): Promise<ImprovementRecord> {
@@ -1032,7 +1049,7 @@ export async function reopenImprovement(improvementId: string): Promise<Improvem
     })
   );
 
-  return body.improvement;
+  return normalizeImprovementRecord(body.improvement);
 }
 
 export async function snoozeImprovement(
@@ -1051,7 +1068,7 @@ export async function snoozeImprovement(
     })
   );
 
-  return body.improvement;
+  return normalizeImprovementRecord(body.improvement);
 }
 
 export interface BundleRecord {

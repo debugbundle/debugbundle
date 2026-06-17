@@ -402,7 +402,7 @@ Current API implementation scope (Phase 1 continuation):
 - `POST /v1/incidents/{id}/reopen` response body: `{ incident: IncidentRetrievalRecord }`
 - `POST /v1/incidents/reopen` request body: `{ incident_ids: string[] }` (1-1000 hosted incident UUID strings, duplicates ignored before execution)
 - `POST /v1/incidents/reopen` response body: `{ incidents: IncidentRetrievalRecord[] }`
-- `IncidentRetrievalRecord` fields: `incident_id`, `project_id`, `project_name`, `service_id`, `service_name`, `latest_deployment_id`, `environment`, `fingerprint`, `fingerprint_version`, `title`, `severity`, `status`, `first_seen_at`, `last_seen_at`, `occurrence_count`, `spike_detected_at`, `resolved_at`, `regressed_at`, `matched_fields`, `incident_reason`
+- `IncidentRetrievalRecord` fields: `incident_id`, `project_id`, `project_name`, `project_color_tag`, `service_id`, `service_name`, `latest_deployment_id`, `environment`, `fingerprint`, `fingerprint_version`, `title`, `severity`, `status`, `first_seen_at`, `last_seen_at`, `occurrence_count`, `spike_detected_at`, `resolved_at`, `regressed_at`, `matched_fields`, `incident_reason`
 - `IncidentContextRecord` fields: `incident`, `incident_reason`, `primary_signal`, `bundle`, `reproduction`, `logs`, `deploy`, `grouping`, `visibility`, `redaction`, `browser_signal`, `suggested_next_checks`
 - `primary_signal` summarizes the current incident's primary failing signal without requiring an LLM call. `logs.source` is one of `retrieval`, `bundle_context`, or `none`. `bundle` and `reproduction` use deterministic artifact states: `ready`, `pending`, or `failed`.
 - `visibility` explains four operator-facing behaviors directly in retrieval output: how repeated failures group into the current fingerprint, when bundle regeneration occurs (including current precedence), how spike detection differs from incident creation, and how alert/webhook/GitHub cooldown windows suppress repeated lifecycle notifications.
@@ -452,7 +452,7 @@ Current API implementation scope:
 - `POST /v1/improvements/{id}/reopen` response body: `{ improvement: ImprovementRetrievalRecord }`
 - `POST /v1/improvements/{id}/snooze` request body: `{ snoozed_until: string }`; response body: `{ improvement: ImprovementRetrievalRecord }`
 - `GET /v1/projects/{id}/improvements/{improvementId}/bundle` response body: hosted improvement artifact JSON when present; `{ "status": "pending" }` while an artifact is still expected; `{ "status": "failed", "reason": "bundle_not_generated_yet" }` when a directly fetched opportunity is still below the hosted generation threshold; `{ "status": "failed", "reason": "..." }` when no artifact is currently available. Incident-derived opportunities (`recurring_incident`, `post_deploy_regression`) may return `{ "status": "failed", "reason": "covered_by_incident_bundle", "related_incident_ids": string[] }` because agents should fetch the related incident bundle instead of a duplicate improvement artifact.
-- `ImprovementRetrievalRecord` fields: `improvement_id`, `project_id`, `project_name`, `project_slug`, `service_id`, `service_name`, `service_runtime`, `service_framework`, `environment`, `kind`, `status`, `severity`, `confidence`, `fingerprint`, `title`, `summary`, `occurrence_count`, `evidence`, `related_incident_ids`, `first_detected_at`, `last_detected_at`, `resolved_at`, `snoozed_until`, `bundle_generation_number`, `bundle_created_at`, `bundle_updated_at`, `bundle_failure_reason`
+- `ImprovementRetrievalRecord` fields: `improvement_id`, `project_id`, `project_name`, `project_color_tag`, `project_slug`, `service_id`, `service_name`, `service_runtime`, `service_framework`, `environment`, `kind`, `status`, `severity`, `confidence`, `fingerprint`, `title`, `summary`, `occurrence_count`, `evidence`, `related_incident_ids`, `first_detected_at`, `last_detected_at`, `resolved_at`, `snoozed_until`, `bundle_generation_number`, `bundle_created_at`, `bundle_updated_at`, `bundle_failure_reason`
 
 ### 1.3 Services
 
@@ -601,7 +601,7 @@ Invite creation also sends a transactional invite email containing a one-time ac
 |--------|------|------|-------------|
 | GET | `/v1/projects` | Browser Session or Member Token | List projects visible to the caller, including owned and shared projects |
 | POST | `/v1/projects` | Browser Session or Member Token (owner only) | Create new project in caller organization |
-| PATCH | `/v1/projects/{id}` | Browser Session or Member Token (owner only) | Update project name, slug, or default environment |
+| PATCH | `/v1/projects/{id}` | Browser Session or Member Token (owner only) | Update project name, slug, default environment, or optional color tag |
 | DELETE | `/v1/projects/{id}` | Browser Session or Member Token (owner only) | Delete project and its project-scoped resources |
 
 **List projects query:**
@@ -614,9 +614,12 @@ When a collaborator keeps saved access to a shared project but the owner's curre
 {
   "name": "Main App",
   "slug": "main-app",
-  "environment_default": "production"
+  "environment_default": "production",
+  "color_tag": "blue"
 }
 ```
+
+`color_tag` is optional. Accepted values are `red`, `orange`, `amber`, `yellow`, `lime`, `green`, `emerald`, `teal`, `cyan`, `sky`, `blue`, `indigo`, `violet`, `purple`, `fuchsia`, `pink`, `rose`, and `slate`.
 
 **Project response shape:**
 ```json
@@ -627,6 +630,7 @@ When a collaborator keeps saved access to a shared project but the owner's curre
     "name": "Main App",
     "slug": "main-app",
     "environment_default": "production",
+    "color_tag": "blue",
     "organization_plan": "free",
     "relationship": "owned",
     "effective_role": "owner",
@@ -643,11 +647,12 @@ When a collaborator keeps saved access to a shared project but the owner's curre
 {
   "name": "Main App",
   "slug": "main-app",
-  "environment_default": "production"
+  "environment_default": "production",
+  "color_tag": null
 }
 ```
 
-All update fields are optional, but at least one field must be present.
+All update fields are optional, but at least one field must be present. Set `color_tag` to `null` to clear a previously assigned tag.
 
 `organization_plan` is the owning organization's active billing tier projected onto project-shaped responses for capability decisions. It is not a project-specific subscription. `sharing_state` exists in addition to `relationship` so owners can tell when one of their own projects has already been shared with collaborators.
 
@@ -2503,6 +2508,7 @@ debugbundle_delete_project    → same result as DELETE /v1/projects/{id}
 ```
 
 These tools manage project lifecycle. `create_project`, `update_project`, and `delete_project` are owner-only.
+`create_project` accepts optional `colorTag`; `update_project` accepts optional `colorTag` and clears the tag when `null` is provided. The value set matches the shared palette documented for `color_tag` on `POST /v1/projects`.
 
 ### 3.8 Member Tools
 ```

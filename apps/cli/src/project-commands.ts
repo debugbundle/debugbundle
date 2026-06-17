@@ -1,4 +1,5 @@
 import { ProjectManagementApiError } from "../../../packages/project-management-client/src/index.js";
+import type { ProjectColorTag } from "../../../packages/shared-types/src/index.js";
 
 import { createAuthenticatedProjectManagementApi, runAuthenticatedCliCommand } from "./auth-context.js";
 import type { CliCommandResult } from "./token-commands.js";
@@ -78,6 +79,7 @@ export async function createProjectCommand(
     name: string;
     slug: string;
     environmentDefault?: string;
+    colorTag?: ProjectColorTag | null;
     json?: boolean;
   },
   api: {
@@ -86,6 +88,7 @@ export async function createProjectCommand(
       name: string;
       slug: string;
       environmentDefault?: string;
+      colorTag?: ProjectColorTag | null;
     }): Promise<ProjectLike>;
   }
 ): Promise<CliCommandResult> {
@@ -95,6 +98,7 @@ export async function createProjectCommand(
       name: string;
       slug: string;
       environmentDefault?: string;
+      colorTag?: ProjectColorTag | null;
     } = {
       bearerToken: input.bearerToken,
       name: input.name,
@@ -102,6 +106,9 @@ export async function createProjectCommand(
     };
     if (input.environmentDefault !== undefined) {
       requestInput.environmentDefault = input.environmentDefault;
+    }
+    if (input.colorTag !== undefined) {
+      requestInput.colorTag = input.colorTag;
     }
 
     const project = await api.createProject(requestInput);
@@ -121,6 +128,7 @@ export async function updateProjectCommand(
     name?: string;
     slug?: string;
     environmentDefault?: string;
+    colorTag?: ProjectColorTag | null;
     json?: boolean;
   },
   api: {
@@ -130,6 +138,7 @@ export async function updateProjectCommand(
       name?: string;
       slug?: string;
       environmentDefault?: string;
+      colorTag?: ProjectColorTag | null;
     }): Promise<ProjectLike>;
   }
 ): Promise<CliCommandResult> {
@@ -140,6 +149,7 @@ export async function updateProjectCommand(
       name?: string;
       slug?: string;
       environmentDefault?: string;
+      colorTag?: ProjectColorTag | null;
     } = {
       bearerToken: input.bearerToken,
       projectId: input.projectId
@@ -152,6 +162,9 @@ export async function updateProjectCommand(
     }
     if (input.environmentDefault !== undefined) {
       requestInput.environmentDefault = input.environmentDefault;
+    }
+    if (input.colorTag !== undefined) {
+      requestInput.colorTag = input.colorTag;
     }
 
     const project = await api.updateProject(requestInput);
@@ -220,6 +233,7 @@ export async function createProjectWithAuthCommand(
     name: string;
     slug: string;
     environmentDefault?: string;
+    colorTag?: ProjectColorTag | null;
     json?: boolean;
   },
   dependencies?: Parameters<typeof createAuthenticatedProjectManagementApi>[1]
@@ -233,6 +247,7 @@ export async function createProjectWithAuthCommand(
         name: string;
         slug: string;
         environmentDefault?: string;
+        colorTag?: ProjectColorTag | null;
         json?: boolean;
       } = {
         bearerToken: authState.bearer_token,
@@ -241,6 +256,9 @@ export async function createProjectWithAuthCommand(
       };
       if (input.environmentDefault !== undefined) {
         commandInput.environmentDefault = input.environmentDefault;
+      }
+      if (input.colorTag !== undefined) {
+        commandInput.colorTag = input.colorTag;
       }
       if (input.json !== undefined) {
         commandInput.json = input.json;
@@ -260,6 +278,7 @@ export async function updateProjectWithAuthCommand(
     name?: string;
     slug?: string;
     environmentDefault?: string;
+    colorTag?: ProjectColorTag | null;
     json?: boolean;
   },
   dependencies?: Parameters<typeof createAuthenticatedProjectManagementApi>[1]
@@ -274,6 +293,7 @@ export async function updateProjectWithAuthCommand(
         name?: string;
         slug?: string;
         environmentDefault?: string;
+        colorTag?: ProjectColorTag | null;
         json?: boolean;
       } = {
         bearerToken: authState.bearer_token,
@@ -287,6 +307,9 @@ export async function updateProjectWithAuthCommand(
       }
       if (input.environmentDefault !== undefined) {
         commandInput.environmentDefault = input.environmentDefault;
+      }
+      if (input.colorTag !== undefined) {
+        commandInput.colorTag = input.colorTag;
       }
       if (input.json !== undefined) {
         commandInput.json = input.json;

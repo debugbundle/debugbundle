@@ -14,6 +14,7 @@ function projectFixture(overrides: Record<string, unknown> = {}): Record<string,
     name: "Checkout",
     slug: "checkout",
     environment_default: "production",
+    color_tag: null,
     organization_plan: "free",
     metrics: {
       open_incidents: 0,
@@ -113,6 +114,48 @@ describe("project-management api client", () => {
     });
   });
 
+  it("defaults missing project color tags to null for older API responses", async () => {
+    const projectWithoutColorTag = projectFixture();
+    delete projectWithoutColorTag["color_tag"];
+    const deletedProjectWithoutColorTag = deletedProjectFixture();
+    delete deletedProjectWithoutColorTag["color_tag"];
+    const request = vi.fn<HttpClient["request"]>()
+      .mockResolvedValueOnce({
+        status: 200,
+        body: {
+          projects: [projectWithoutColorTag]
+        }
+      })
+      .mockResolvedValueOnce({
+        status: 201,
+        body: {
+          project: projectWithoutColorTag
+        }
+      })
+      .mockResolvedValueOnce({
+        status: 200,
+        body: {
+          project: deletedProjectWithoutColorTag
+        }
+      });
+
+    const api = createProjectManagementApi({ request });
+
+    await expect(api.listProjects({ bearerToken: "dbundle_mem_x" })).resolves.toEqual([
+      expect.objectContaining({ color_tag: null })
+    ]);
+    await expect(
+      api.createProject({
+        bearerToken: "dbundle_mem_x",
+        name: "Checkout",
+        slug: "checkout"
+      })
+    ).resolves.toMatchObject({ color_tag: null });
+    await expect(api.deleteProject({ bearerToken: "dbundle_mem_x", projectId: "proj_2" })).resolves.toMatchObject({
+      color_tag: null
+    });
+  });
+
   it("creates projects through the project route", async () => {
     const request = vi.fn<HttpClient["request"]>().mockResolvedValue({
       status: 201,
@@ -138,7 +181,8 @@ describe("project-management api client", () => {
       bearerToken: "dbundle_mem_x",
       name: "Checkout",
       slug: "checkout",
-      environmentDefault: "production"
+      environmentDefault: "production",
+      colorTag: "blue"
     });
 
     expect(project.project_id).toBe("proj_2");
@@ -149,7 +193,8 @@ describe("project-management api client", () => {
       body: {
         name: "Checkout",
         slug: "checkout",
-        environment_default: "production"
+        environment_default: "production",
+        color_tag: "blue"
       }
     });
   });

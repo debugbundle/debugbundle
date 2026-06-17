@@ -799,3 +799,9 @@ export {
   ImprovementSettingsUpdateSchema,
   type ImprovementSettingsUpdate
 } from "./improvement-settings.js";
+
+export {
+  PROJECT_COLOR_TAG_VALUES,
+  ProjectColorTagSchema,
+  type ProjectColorTag
+} from "./project-color-tags.js";

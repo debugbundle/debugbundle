@@ -1,4 +1,7 @@
-import { MAX_BILLING_ADDITIONAL_CAPACITY_UNITS } from "../../../packages/shared-types/src/index.js";
+import {
+  MAX_BILLING_ADDITIONAL_CAPACITY_UNITS,
+  ProjectColorTagSchema
+} from "../../../packages/shared-types/src/index.js";
 import { z } from "zod";
 
 export const RequestedTrialPlanSchema = z.enum(["solo", "team"]);
@@ -798,6 +801,7 @@ export const CreateProjectBodySchema = z
     name: z.string().min(1).max(120),
     slug: z.string().min(1).max(80).regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/),
     environment_default: z.string().min(1).max(50).default("production"),
+    color_tag: ProjectColorTagSchema.nullable().default(null),
     weekly_report_timezone: z.string().min(1).default("UTC").refine((value) => isValidTimeZone(value), "invalid_timezone")
   })
   .strict();
@@ -806,7 +810,8 @@ export const UpdateProjectBodySchema = z
   .object({
     name: z.string().min(1).max(120).optional(),
     slug: z.string().min(1).max(80).regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/).optional(),
-    environment_default: z.string().min(1).max(50).optional()
+    environment_default: z.string().min(1).max(50).optional(),
+    color_tag: ProjectColorTagSchema.nullable().optional()
   })
   .strict()
   .refine((value) => Object.keys(value).length > 0, {

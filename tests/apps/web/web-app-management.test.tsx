@@ -404,7 +404,7 @@ describe("web app — management routes", () => {
     render(<App initialEntries={["/projects/proj_123"]} />);
 
     expect(await screen.findByText(/setup at a glance/i)).toBeInTheDocument();
-    const probesDescription = screen.getByText(
+    const probesDescription = await screen.findByText(
       /^always-on probe buffers still work in the sdk, but remote probe activation requires solo or team\.$/i
     );
     const probesBlock = probesDescription.closest("div.rounded-lg");
@@ -541,6 +541,7 @@ describe("web app — management routes", () => {
             createProject({
               name: "Zeta App",
               slug: "zeta-app",
+              color_tag: "lime",
               metrics: {
                 monthly_bundle_requests: 4,
                 monthly_raw_ingested_events: 40,
@@ -578,6 +579,7 @@ describe("web app — management routes", () => {
 
     const rows = screen.getAllByRole("row");
     expect(within(rows[1] as HTMLTableRowElement).getByText(/alpha app/i)).toBeInTheDocument();
+    expect(document.querySelector('[data-project-color-tag="lime"]')).not.toBeNull();
 
     const tableContainer = screen.getByRole("table").parentElement;
     expect(tableContainer).not.toBeNull();
@@ -654,6 +656,7 @@ describe("web app — management routes", () => {
             name: "Ops API",
             slug: "ops-api",
             environment_default: "staging",
+            color_tag: "blue",
             weekly_report_timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC"
           })
         );
@@ -662,7 +665,8 @@ describe("web app — management routes", () => {
           project_id: "proj_456",
           name: "Ops API",
           slug: "ops-api",
-          environment_default: "staging"
+          environment_default: "staging",
+          color_tag: "blue"
         });
         projects = [existingProject, createdProject];
 
@@ -700,6 +704,7 @@ describe("web app — management routes", () => {
     await user.type(await screen.findByLabelText(/project name/i), "Ops API");
     expect(screen.getByLabelText(/project slug/i)).toHaveValue("ops-api");
     await chooseSelectOption(user, /default environment/i, /^staging$/i);
+    await user.click(screen.getByRole("button", { name: /set color tag to blue/i }));
     await user.click(screen.getByRole("button", { name: /^create project$/i }));
 
     expect(await screen.findByText(/project details/i)).toBeInTheDocument();
@@ -742,6 +747,7 @@ describe("web app — management routes", () => {
             name: "Ops Platform",
             slug: "ops-control-plane",
             environment_default: "preview",
+            color_tag: null,
             weekly_report_timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC"
           })
         );
@@ -2132,7 +2138,8 @@ describe("web app — management routes", () => {
           JSON.stringify({
             name: "Main API",
             slug: "main-api",
-            environment_default: "preview"
+            environment_default: "preview",
+            color_tag: "amber"
           })
         );
 
@@ -2141,6 +2148,7 @@ describe("web app — management routes", () => {
             name: "Main API",
             slug: "main-api",
             environment_default: "preview",
+            color_tag: "amber",
             updated_at: "2026-03-18T00:00:00.000Z"
           })
         });
@@ -2161,6 +2169,7 @@ describe("web app — management routes", () => {
     await user.type(screen.getByLabelText(/project slug/i), "main-api");
     await chooseSelectOption(user, /default environment/i, /^custom$/i);
     await user.type(screen.getByLabelText(/custom environment/i), "preview");
+    await user.click(screen.getByRole("button", { name: /set color tag to amber/i }));
     await user.click(screen.getByRole("button", { name: /save changes/i }));
 
     await waitFor(() => {
@@ -2175,6 +2184,59 @@ describe("web app — management routes", () => {
     expect((await screen.findAllByText(/^main api$/i)).length).toBeGreaterThan(0);
     expect(screen.getByText(/^main-api$/i)).toBeInTheDocument();
     expect(screen.getByText(/^preview$/i)).toBeInTheDocument();
+  });
+
+  it("clears a project color tag from the project settings modal", async () => {
+    const user = userEvent.setup();
+    const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = requestUrl(input);
+
+      if (url.endsWith("/v1/auth/session")) {
+        return jsonResponse(200, {
+          session: createSession({ role: "member" })
+        });
+      }
+
+      if (url.endsWith("/v1/projects") && init?.method === undefined) {
+        return jsonResponse(200, {
+          projects: [createProject({ relationship: "shared", effective_role: "admin", color_tag: "rose" })]
+        });
+      }
+
+      if (url.endsWith("/v1/projects/proj_123") && init?.method === "PATCH") {
+        expect(init.body).toBe(JSON.stringify({ color_tag: null }));
+
+        return jsonResponse(200, {
+          project: createProject({
+            color_tag: null,
+            updated_at: "2026-03-18T00:00:00.000Z"
+          })
+        });
+      }
+
+      return jsonResponse(404, { error: "not_found" });
+    });
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<App initialEntries={["/projects/proj_123/settings"]} />);
+
+    await user.click(await screen.findByRole("button", { name: /edit project/i }));
+    expect(await screen.findByRole("button", { name: /clear color tag/i })).toHaveAttribute("aria-pressed", "false");
+    await user.click(screen.getByRole("button", { name: /clear color tag/i }));
+    expect(screen.getByRole("button", { name: /clear color tag/i })).toHaveAttribute("aria-pressed", "true");
+    await user.click(screen.getByRole("button", { name: /save changes/i }));
+
+    await waitFor(() => {
+      expect(
+        fetchMock.mock.calls.some(
+          ([input, requestInit]) =>
+            requestUrl(input).endsWith("/v1/projects/proj_123") && requestInit?.method === "PATCH"
+        )
+      ).toBe(true);
+    });
+
+    expect(document.querySelector('[data-project-color-tag="rose"]')).toBeNull();
   });
 
   it("links into project settings from the projects management table", async () => {

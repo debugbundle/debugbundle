@@ -3,6 +3,7 @@ import { useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 
 import { CursorPaginationControls } from "../components/system/cursor-pagination-controls.js";
+import { ProjectColorTagDot } from "../components/system/project-color-tag-dot.js";
 import { PageHeader } from "../components/system/page-header.js";
 import { ResourceListState } from "../components/system/resource-list-state.js";
 import {
@@ -230,7 +231,8 @@ export function IncidentsPage(): JSX.Element {
                           </p>
                         </TableCell>
                         <TableCell className="text-sm text-muted-foreground whitespace-normal break-words align-middle">
-                          <Link to={`/projects/${incident.project_id}`} className="hover:underline" data-row-interactive="true">
+                          <Link to={`/projects/${incident.project_id}`} className="inline-flex items-center gap-2 hover:underline" data-row-interactive="true">
+                            <ProjectColorTagDot colorTag={incident.project_color_tag} />
                             {incident.project_name}
                           </Link>
                         </TableCell>

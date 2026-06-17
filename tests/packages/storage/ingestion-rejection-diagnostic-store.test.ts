@@ -19,7 +19,8 @@ function createTransactionalDb(query: Queryable["query"]): Queryable {
 
 describe("postgres ingestion rejection diagnostic store", () => {
   it("records aggregated rejection diagnostics once per grouped signature", async (): Promise<void> => {
-    const queryMock = vi.fn(async (sqlText: string, _params?: unknown[]) => {
+    const queryMock = vi.fn(async (sqlText: string, params?: unknown[]) => {
+      void params;
       if (sqlText.includes("FROM account_analytics_accounts")) {
         return rowsResult([{ analytics_account_id: "analytics_123" }]);
       }
@@ -93,7 +94,8 @@ describe("postgres ingestion rejection diagnostic store", () => {
   });
 
   it("returns the malformed rejection breakdown for the current month", async (): Promise<void> => {
-    const queryMock = vi.fn(async (sqlText: string, _params?: unknown[]) => {
+    const queryMock = vi.fn(async (sqlText: string, params?: unknown[]) => {
+      void params;
       if (sqlText.includes("COALESCE(SUM(occurrences), 0)::text AS total")) {
         return rowsResult([{ total: "100862" }]);
       }

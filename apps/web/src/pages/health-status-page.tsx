@@ -189,7 +189,7 @@ function ProjectStatusRow({
             </Button>
           ) : null}
           <div className="min-w-0">
-            <ProjectNameWithAccessIndicator project={project.project} />
+            <ProjectNameWithAccessIndicator project={project.project} showColorTag />
             <p className="text-xs text-muted-foreground">
               {project.checks.length} health check{project.checks.length === 1 ? "" : "s"}
               {project.active_incident_count > 0

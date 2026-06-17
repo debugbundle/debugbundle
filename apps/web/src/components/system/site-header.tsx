@@ -91,6 +91,7 @@ export function SiteHeader(): JSX.Element {
                         slug: "",
                         environment_default: "",
                         organization_plan: "team",
+                        color_tag: null,
                         metrics: {
                           open_incidents: 0,
                           regressed_incidents: 0,

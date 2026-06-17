@@ -514,6 +514,7 @@ describe("web app — incident and project detail routes", () => {
       createIncident({
         project_id: project.project_id,
         project_name: project.name,
+        project_color_tag: "blue",
         service_id: "svc_123",
         service_name: "Checkout API",
         environment: "production"
@@ -522,6 +523,7 @@ describe("web app — incident and project detail routes", () => {
         incident_id: "inc_456",
         project_id: project.project_id,
         project_name: project.name,
+        project_color_tag: "blue",
         title: "Database timeout during signin",
         severity: "critical",
         status: "regressed",
@@ -569,6 +571,7 @@ describe("web app — incident and project detail routes", () => {
     expect(screen.getByRole("columnheader", { name: /environment/i })).toBeInTheDocument();
     expect(screen.getByText(/^production$/i)).toBeInTheDocument();
     expect(screen.getByText(/^staging$/i)).toBeInTheDocument();
+    expect(document.querySelectorAll('[data-project-color-tag="blue"]').length).toBeGreaterThan(0);
 
     // Incident titles are clickable links
     const incidentLink = screen.getByRole("link", { name: /typeerror in checkout handler/i });

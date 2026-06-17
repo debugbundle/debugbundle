@@ -1,4 +1,7 @@
-import { getTierCapabilities } from "../../../packages/shared-types/src/index.js";
+import {
+  getTierCapabilities,
+  type ProjectColorTag
+} from "../../../packages/shared-types/src/index.js";
 
 export interface SessionRecord {
   session_id: string;
@@ -36,6 +39,7 @@ export interface ProjectRecord {
   name: string;
   slug: string;
   environment_default: string;
+  color_tag: ProjectColorTag | null;
   organization_plan: "free" | "solo" | "team";
   owner_user_id?: string;
   owner_email?: string;
@@ -73,6 +77,7 @@ export interface IncidentRecord {
   incident_id: string;
   project_id: string;
   project_name: string;
+  project_color_tag: ProjectColorTag | null;
   service_id: string;
   service_name: string | null;
   latest_deployment_id: string | null;
@@ -353,6 +358,7 @@ export function createProject(
     name: "Main App",
     slug: "main-app",
     environment_default: "production",
+    color_tag: null,
     organization_plan: "free",
     ...overrides,
     metrics: {
@@ -383,6 +389,7 @@ export function createIncident(overrides: Partial<IncidentRecord> = {}): Inciden
     incident_id: "inc_123",
     project_id: "proj_123",
     project_name: "Main App",
+    project_color_tag: null,
     service_id: "svc_123",
     service_name: "checkout-api",
     latest_deployment_id: null,

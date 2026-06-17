@@ -1,4 +1,22 @@
 import { z } from "zod";
+import { ProjectColorTagSchema, type ProjectColorTag } from "../../shared-types/src/index.js";
+
+const ProjectColorTagResponseSchema = z.unknown().transform((value, context): ProjectColorTag | null => {
+  if (value === undefined || value === null) {
+    return null;
+  }
+
+  const parsed = ProjectColorTagSchema.safeParse(value);
+  if (!parsed.success) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "Invalid project color tag"
+    });
+    return z.NEVER;
+  }
+
+  return parsed.data;
+});
 
 export const IncidentReasonSchema = z
   .object({
@@ -15,6 +33,7 @@ export const IncidentSchema = z
     incident_id: z.string(),
     project_id: z.string(),
     project_name: z.string(),
+    project_color_tag: ProjectColorTagResponseSchema,
     service_id: z.string().nullable(),
     service_name: z.string().nullable(),
     latest_deployment_id: z.string().nullable(),
@@ -40,6 +59,7 @@ export const ImprovementSchema = z
     improvement_id: z.string(),
     project_id: z.string(),
     project_name: z.string(),
+    project_color_tag: ProjectColorTagResponseSchema,
     project_slug: z.string(),
     service_id: z.string().nullable(),
     service_name: z.string(),
@@ -66,6 +86,16 @@ export const ImprovementSchema = z
     bundle_failure_reason: z.string().nullable()
   })
   .strict();
+
+type ParsedIncidentRecord = z.infer<typeof IncidentSchema>;
+export type IncidentRecord = Omit<ParsedIncidentRecord, "project_color_tag"> & {
+  project_color_tag: ProjectColorTag | null;
+};
+
+type ParsedImprovementRecord = z.infer<typeof ImprovementSchema>;
+export type ImprovementRecord = Omit<ParsedImprovementRecord, "project_color_tag"> & {
+  project_color_tag: ProjectColorTag | null;
+};
 
 export const ServiceSchema = z
   .object({
@@ -206,6 +236,11 @@ export const IncidentContextSchema = z
   })
   .strict();
 
+type ParsedIncidentContext = z.infer<typeof IncidentContextSchema>;
+export type IncidentContextRecord = Omit<ParsedIncidentContext, "incident"> & {
+  incident: IncidentRecord;
+};
+
 export const ServicesResponseSchema = z
   .object({
     services: z.array(ServiceSchema)
@@ -304,7 +339,7 @@ function parseApiError(status: number, body: unknown): never {
 
 async function expectParsed<TParsed>(
   responsePromise: Promise<HttpResponse>,
-  schema: z.ZodType<TParsed>
+  schema: z.ZodType<TParsed, z.ZodTypeDef, unknown>
 ): Promise<TParsed> {
   const response = await responsePromise;
   if (response.status < 200 || response.status >= 300) {
@@ -324,6 +359,27 @@ async function expectServices(responsePromise: Promise<HttpResponse>): Promise<A
   return parsed.services;
 }
 
+function normalizeIncidentRecord(incident: ParsedIncidentRecord): IncidentRecord {
+  return {
+    ...incident,
+    project_color_tag: incident.project_color_tag
+  };
+}
+
+function normalizeIncidentContext(context: ParsedIncidentContext): IncidentContextRecord {
+  return {
+    ...context,
+    incident: normalizeIncidentRecord(context.incident)
+  };
+}
+
+function normalizeImprovementRecord(improvement: ParsedImprovementRecord): ImprovementRecord {
+  return {
+    ...improvement,
+    project_color_tag: improvement.project_color_tag
+  };
+}
+
 export function createRetrievalApi(client: HttpClient): {
   listIncidents(input: {
     bearerToken: string;
@@ -335,13 +391,13 @@ export function createRetrievalApi(client: HttpClient): {
     firstSeenAfter?: string;
     cursor?: string;
     limit?: number;
-  }): Promise<{ incidents: Array<z.infer<typeof IncidentSchema>>; next_cursor: string | null }>;
-  getIncident(input: { bearerToken: string; incidentId: string }): Promise<z.infer<typeof IncidentSchema>>;
-  getIncidentContext(input: { bearerToken: string; incidentId: string }): Promise<z.infer<typeof IncidentContextSchema>>;
-  resolveIncident(input: { bearerToken: string; incidentId: string }): Promise<z.infer<typeof IncidentSchema>>;
-  resolveIncidents(input: { bearerToken: string; incidentIds: string[] }): Promise<Array<z.infer<typeof IncidentSchema>>>;
-  reopenIncident(input: { bearerToken: string; incidentId: string }): Promise<z.infer<typeof IncidentSchema>>;
-  reopenIncidents(input: { bearerToken: string; incidentIds: string[] }): Promise<Array<z.infer<typeof IncidentSchema>>>;
+  }): Promise<{ incidents: IncidentRecord[]; next_cursor: string | null }>;
+  getIncident(input: { bearerToken: string; incidentId: string }): Promise<IncidentRecord>;
+  getIncidentContext(input: { bearerToken: string; incidentId: string }): Promise<IncidentContextRecord>;
+  resolveIncident(input: { bearerToken: string; incidentId: string }): Promise<IncidentRecord>;
+  resolveIncidents(input: { bearerToken: string; incidentIds: string[] }): Promise<IncidentRecord[]>;
+  reopenIncident(input: { bearerToken: string; incidentId: string }): Promise<IncidentRecord>;
+  reopenIncidents(input: { bearerToken: string; incidentIds: string[] }): Promise<IncidentRecord[]>;
   getBundle(input: { bearerToken: string; incidentId: string }): Promise<z.infer<typeof PendingStatusSchema> | z.infer<typeof BundleSchema>>;
   listLogs(input: {
     bearerToken: string;
@@ -362,15 +418,15 @@ export function createRetrievalApi(client: HttpClient): {
     kind?: string;
     cursor?: string;
     limit?: number;
-  }): Promise<{ improvements: Array<z.infer<typeof ImprovementSchema>>; next_cursor: string | null }>;
-  getImprovement(input: { bearerToken: string; improvementId: string }): Promise<z.infer<typeof ImprovementSchema>>;
-  resolveImprovement(input: { bearerToken: string; improvementId: string }): Promise<z.infer<typeof ImprovementSchema>>;
-  reopenImprovement(input: { bearerToken: string; improvementId: string }): Promise<z.infer<typeof ImprovementSchema>>;
+  }): Promise<{ improvements: ImprovementRecord[]; next_cursor: string | null }>;
+  getImprovement(input: { bearerToken: string; improvementId: string }): Promise<ImprovementRecord>;
+  resolveImprovement(input: { bearerToken: string; improvementId: string }): Promise<ImprovementRecord>;
+  reopenImprovement(input: { bearerToken: string; improvementId: string }): Promise<ImprovementRecord>;
   snoozeImprovement(input: {
     bearerToken: string;
     improvementId: string;
     snoozedUntil: string;
-  }): Promise<z.infer<typeof ImprovementSchema>>;
+  }): Promise<ImprovementRecord>;
   getImprovementBundle(input: {
     bearerToken: string;
     projectId: string;
@@ -416,7 +472,7 @@ export function createRetrievalApi(client: HttpClient): {
       );
 
       return {
-        incidents: parsed.incidents,
+        incidents: parsed.incidents.map(normalizeIncidentRecord),
         next_cursor: parsed.next_cursor ?? null
       };
     },
@@ -430,10 +486,10 @@ export function createRetrievalApi(client: HttpClient): {
         IncidentResponseSchema
       );
 
-      return parsed.incident;
+      return normalizeIncidentRecord(parsed.incident);
     },
     async getIncidentContext(input) {
-      return await expectParsed(
+      const parsed = await expectParsed(
         client.request({
           method: "GET",
           path: `/v1/incidents/${input.incidentId}/context`,
@@ -441,6 +497,8 @@ export function createRetrievalApi(client: HttpClient): {
         }),
         IncidentContextSchema
       );
+
+      return normalizeIncidentContext(parsed);
     },
     async resolveIncident(input) {
       const parsed = await expectParsed(
@@ -452,7 +510,7 @@ export function createRetrievalApi(client: HttpClient): {
         IncidentResponseSchema
       );
 
-      return parsed.incident;
+      return normalizeIncidentRecord(parsed.incident);
     },
     async resolveIncidents(input) {
       const parsed = await expectParsed(
@@ -467,7 +525,7 @@ export function createRetrievalApi(client: HttpClient): {
         BulkIncidentResponseSchema
       );
 
-      return parsed.incidents;
+      return parsed.incidents.map(normalizeIncidentRecord);
     },
     async reopenIncident(input) {
       const parsed = await expectParsed(
@@ -479,7 +537,7 @@ export function createRetrievalApi(client: HttpClient): {
         IncidentResponseSchema
       );
 
-      return parsed.incident;
+      return normalizeIncidentRecord(parsed.incident);
     },
     async reopenIncidents(input) {
       const parsed = await expectParsed(
@@ -494,7 +552,7 @@ export function createRetrievalApi(client: HttpClient): {
         BulkIncidentResponseSchema
       );
 
-      return parsed.incidents;
+      return parsed.incidents.map(normalizeIncidentRecord);
     },
     async getBundle(input) {
       const bundle = await expectParsed(
@@ -598,7 +656,7 @@ export function createRetrievalApi(client: HttpClient): {
       );
 
       return {
-        improvements: parsed.improvements,
+        improvements: parsed.improvements.map(normalizeImprovementRecord),
         next_cursor: parsed.next_cursor ?? null
       };
     },
@@ -612,7 +670,7 @@ export function createRetrievalApi(client: HttpClient): {
         ImprovementResponseSchema
       );
 
-      return parsed.improvement;
+      return normalizeImprovementRecord(parsed.improvement);
     },
     async resolveImprovement(input) {
       const parsed = await expectParsed(
@@ -624,7 +682,7 @@ export function createRetrievalApi(client: HttpClient): {
         ImprovementResponseSchema
       );
 
-      return parsed.improvement;
+      return normalizeImprovementRecord(parsed.improvement);
     },
     async reopenImprovement(input) {
       const parsed = await expectParsed(
@@ -636,7 +694,7 @@ export function createRetrievalApi(client: HttpClient): {
         ImprovementResponseSchema
       );
 
-      return parsed.improvement;
+      return normalizeImprovementRecord(parsed.improvement);
     },
     async snoozeImprovement(input) {
       const parsed = await expectParsed(
@@ -649,7 +707,7 @@ export function createRetrievalApi(client: HttpClient): {
         ImprovementResponseSchema
       );
 
-      return parsed.improvement;
+      return normalizeImprovementRecord(parsed.improvement);
     },
     async getImprovementBundle(input) {
       return await expectParsed(

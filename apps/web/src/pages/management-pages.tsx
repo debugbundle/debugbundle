@@ -4,6 +4,7 @@ import { useNavigate, useOutletContext } from "react-router-dom";
 import { DialogFormContent } from "../components/system/dialog-form-content.js";
 import { PageHeader } from "../components/system/page-header.js";
 import { PlaintextTokenReveal } from "../components/system/plaintext-token-reveal.js";
+import { ProjectColorTagPicker } from "../components/system/project-color-tag-picker.js";
 import { ProjectNameWithAccessIndicator } from "../components/system/project-name-with-access-indicator.js";
 import { ProjectResourceEmptyState } from "../components/system/project-resource-empty-state.js";
 import type { ProjectContext } from "../components/system/project-layout.js";
@@ -61,6 +62,7 @@ export function ProjectsPage(): JSX.Element {
   const [isSlugManuallyEdited, setIsSlugManuallyEdited] = useState(false);
   const [environmentDefault, setEnvironmentDefault] = useState("production");
   const [customEnvironmentDefault, setCustomEnvironmentDefault] = useState("");
+  const [colorTag, setColorTag] = useState<ProjectRecord["color_tag"]>(null);
 
   useEffect(() => {
     void (async () => {
@@ -89,7 +91,8 @@ export function ProjectsPage(): JSX.Element {
       const created = await createProject({
         name,
         slug,
-        environment_default: environmentDefault
+        environment_default: environmentDefault,
+        color_tag: colorTag
       });
       setProjects((current) => [...(current ?? []), created]);
       setName("");
@@ -97,6 +100,7 @@ export function ProjectsPage(): JSX.Element {
       setIsSlugManuallyEdited(false);
       setEnvironmentDefault("production");
       setCustomEnvironmentDefault("");
+      setColorTag(null);
       setIsCreateOpen(false);
       void navigate(`/projects/${created.project_id}`);
     } catch {
@@ -169,8 +173,12 @@ export function ProjectsPage(): JSX.Element {
                     />
                   </Field>
                   <Field>
+                    <FieldLabel>Color tag</FieldLabel>
+                    <ProjectColorTagPicker value={colorTag} onChange={setColorTag} />
+                  </Field>
+                  <Field>
                     <FieldLabel id="project-environment-default-label" htmlFor="project-environment-default">Default environment</FieldLabel>
-                    <FieldDescription>Used as the initial environment in setup snippets and project defaults. You can change it later.</FieldDescription>
+                    <FieldDescription>Used as the initial environment in setup snippets and project defaults.</FieldDescription>
                     <Select
                       value={selectedProjectEnvironment}
                       onValueChange={handleProjectEnvironmentChange}
@@ -263,7 +271,7 @@ export function ProjectsPage(): JSX.Element {
                       }}
                     >
                       <TableCell className="font-medium">
-                        <ProjectNameWithAccessIndicator project={project} />
+                        <ProjectNameWithAccessIndicator project={project} showColorTag />
                       </TableCell>
                       <TableCell>{project.slug}</TableCell>
                       <TableCell>

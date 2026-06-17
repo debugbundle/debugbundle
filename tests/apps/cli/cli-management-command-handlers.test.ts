@@ -434,10 +434,10 @@ describe("cli management command handlers", () => {
     await handleBillingCommand(parseArgv(["billing", "capacity", "cancel-reduction"]), { cancelBillingCapacityReductionCommand });
 
     await handleProjectCommand(parseArgv(["projects", "list", "--limit", "15", "--json"]), { listProjectsCommand });
-    await handleProjectCommand(parseArgv(["projects", "create", "--name", "Checkout App", "--slug", "checkout-app", "--environment-default", "production"]), {
+    await handleProjectCommand(parseArgv(["projects", "create", "--name", "Checkout App", "--slug", "checkout-app", "--environment-default", "production", "--color-tag", "blue"]), {
       createProjectCommand
     });
-    await handleProjectCommand(parseArgv(["projects", "update", "proj_1", "--name", "Checkout API", "--environment-default", "staging"]), {
+    await handleProjectCommand(parseArgv(["projects", "update", "proj_1", "--name", "Checkout API", "--environment-default", "staging", "--clear-color-tag"]), {
       updateProjectCommand
     });
     await handleProjectCommand(parseArgv(["projects", "delete", "proj_1", "--json"]), { deleteProjectCommand });
@@ -598,8 +598,8 @@ describe("cli management command handlers", () => {
     expect(cancelBillingCapacityReductionCommand).toHaveBeenCalledWith({ authFilePath: undefined, json: undefined });
 
     expect(listProjectsCommand).toHaveBeenCalledWith({ authFilePath: undefined, json: true, limit: 15 });
-    expect(createProjectCommand).toHaveBeenCalledWith({ authFilePath: undefined, json: undefined, name: "Checkout App", slug: "checkout-app", environmentDefault: "production" });
-    expect(updateProjectCommand).toHaveBeenCalledWith({ authFilePath: undefined, json: undefined, projectId: "proj_1", name: "Checkout API", environmentDefault: "staging" });
+    expect(createProjectCommand).toHaveBeenCalledWith({ authFilePath: undefined, json: undefined, name: "Checkout App", slug: "checkout-app", environmentDefault: "production", colorTag: "blue" });
+    expect(updateProjectCommand).toHaveBeenCalledWith({ authFilePath: undefined, json: undefined, projectId: "proj_1", name: "Checkout API", environmentDefault: "staging", colorTag: null });
     expect(deleteProjectCommand).toHaveBeenCalledWith({ authFilePath: undefined, json: true, projectId: "proj_1" });
 
     expect(listProjectTokensCommand).toHaveBeenCalledWith({ authFilePath: undefined, json: undefined, projectId: "proj_1", limit: 20 });
@@ -691,6 +691,40 @@ describe("cli management command handlers", () => {
       channelId: "wr_2",
       config: { slackDestinationId: "sd_456" }
     });
+  });
+
+  it("rejects invalid project color tag values before calling the project command", async () => {
+    const createProjectCommand = vi.fn();
+
+    await expect(
+      handleProjectCommand(
+        parseArgv(["projects", "create", "--name", "Checkout App", "--slug", "checkout-app", "--color-tag", "invalid"]),
+        { createProjectCommand }
+      )
+    ).rejects.toThrow("Invalid value for --color-tag.");
+
+    expect(createProjectCommand).not.toHaveBeenCalled();
+  });
+
+  it("rejects ambiguous or unsupported project color tag clearing flags", async () => {
+    const createProjectCommand = vi.fn();
+    const updateProjectCommand = vi.fn();
+
+    await expect(
+      handleProjectCommand(
+        parseArgv(["projects", "create", "--name", "Checkout App", "--slug", "checkout-app", "--clear-color-tag"]),
+        { createProjectCommand }
+      )
+    ).rejects.toThrow("Unknown option --clear-color-tag.");
+    await expect(
+      handleProjectCommand(
+        parseArgv(["projects", "update", "proj_1", "--color-tag", "blue", "--clear-color-tag"]),
+        { updateProjectCommand }
+      )
+    ).rejects.toThrow("Use either --color-tag or --clear-color-tag.");
+
+    expect(createProjectCommand).not.toHaveBeenCalled();
+    expect(updateProjectCommand).not.toHaveBeenCalled();
   });
 
   it("rejects invalid management subcommands and missing required options across handlers", async () => {

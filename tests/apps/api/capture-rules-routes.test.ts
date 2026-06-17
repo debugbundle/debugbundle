@@ -96,6 +96,7 @@ function createIncidentFixture(): Awaited<ReturnType<ApiDependencies["incidentRe
     incident_id: "inc_123",
     project_id: "00000000-0000-0000-0000-000000000001",
     project_name: "Main App",
+    project_color_tag: null,
     service_id: "svc_123",
     service_name: "web",
     environment: "production",

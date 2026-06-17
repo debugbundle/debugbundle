@@ -21,6 +21,7 @@ function buildProject(overrides: Partial<ProjectRecord> = {}): ProjectRecord {
     name: "Primary app",
     slug: "primary-app",
     environment_default: "production",
+    color_tag: null,
     organization_plan: "team",
     metrics: {
       open_incidents: 0,

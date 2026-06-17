@@ -2,6 +2,7 @@ import { PencilIcon, Settings2Icon, Trash2Icon } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useNavigate, useOutletContext } from "react-router-dom";
 import { DialogFormContent } from "../components/system/dialog-form-content.js";
+import { ProjectColorTagPicker } from "../components/system/project-color-tag-picker.js";
 import { ProjectCapturePolicyCard } from "../components/system/project-capture-policy-card.js";
 import { ProjectCaptureRulesCard } from "../components/system/project-capture-rules-card.js";
 import { ProjectImprovementSettingsCard } from "../components/system/project-improvement-settings-card.js";
@@ -42,6 +43,7 @@ export function ProjectSettingsPage(): JSX.Element {
   const [slug, setSlug] = useState(project.slug);
   const [environmentDefault, setEnvironmentDefault] = useState(project.environment_default);
   const [customEnvironmentDefault, setCustomEnvironmentDefault] = useState("");
+  const [colorTag, setColorTag] = useState(project.color_tag);
   const [deleteConfirmationInput, setDeleteConfirmationInput] = useState("");
   const [isSaving, setIsSaving] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -59,6 +61,7 @@ export function ProjectSettingsPage(): JSX.Element {
     setName(project.name);
     setSlug(project.slug);
     setEnvironmentDefault(project.environment_default);
+    setColorTag(project.color_tag);
     setCustomEnvironmentDefault(
       PROJECT_ENVIRONMENT_OPTIONS.some((option) => option.value === project.environment_default) ? "" : project.environment_default
     );
@@ -81,7 +84,8 @@ export function ProjectSettingsPage(): JSX.Element {
       const updatedProject = await updateProject(project.project_id, {
         name,
         slug,
-        environment_default: environmentDefault
+        environment_default: environmentDefault,
+        color_tag: colorTag
       });
       onProjectUpdated(updatedProject);
       setIsEditOpen(false);
@@ -257,6 +261,11 @@ export function ProjectSettingsPage(): JSX.Element {
                 <FieldLabel htmlFor="edit-project-slug">Project slug</FieldLabel>
                 <Input id="edit-project-slug" value={slug} onChange={(event) => setSlug(event.currentTarget.value)} />
                 <FieldDescription>Lowercase letters, numbers, and single dashes only.</FieldDescription>
+              </Field>
+              <Field>
+                <FieldLabel>Color tag</FieldLabel>
+                <FieldDescription>Optional visual identifier used when this project appears in shared tables.</FieldDescription>
+                <ProjectColorTagPicker value={colorTag} onChange={setColorTag} disabled={!canManageProject || isSaving} />
               </Field>
               <Field>
                 <FieldLabel id="edit-project-environment-default-label" htmlFor="edit-project-environment-default">Default environment</FieldLabel>

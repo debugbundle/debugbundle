@@ -1,5 +1,7 @@
 import { z } from 'zod';
 
+import { ProjectColorTagSchema } from '../../../packages/shared-types/src/index.js';
+
 import { ALERT_MCP_TOOL_NAMES } from './alert-tools.js';
 import { ANALYZE_MCP_TOOL_NAMES } from './analyze-tools.js';
 import { BILLING_MCP_TOOL_NAMES } from './billing-tools.js';
@@ -697,6 +699,7 @@ export const MCP_TOOL_CATALOG = [
       name: z.string(),
       slug: z.string(),
       environmentDefault: z.string().optional(),
+      colorTag: ProjectColorTagSchema.nullable().optional(),
     }),
   },
   {
@@ -709,6 +712,7 @@ export const MCP_TOOL_CATALOG = [
       name: z.string().optional(),
       slug: z.string().optional(),
       environmentDefault: z.string().optional(),
+      colorTag: ProjectColorTagSchema.nullable().optional(),
     }),
   },
   {

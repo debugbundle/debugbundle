@@ -20,11 +20,13 @@ import {
   listProjectsWithAuthCommand as defaultListProjectsCommand,
   updateProjectWithAuthCommand as defaultUpdateProjectCommand
 } from "./project-commands.js";
+import { PROJECT_COLOR_TAG_VALUES, type ProjectColorTag } from "../../../packages/shared-types/src/index.js";
 import {
   appendCommonAuthOptions,
   CliInputError,
   ensureNoExtraPositionals,
   expectNoUnknownOptions,
+  readBooleanOption,
   readIntegerOption,
   readLimitOption,
   readStringListOption,
@@ -41,6 +43,19 @@ import {
   revokeMemberTokenWithAuthCommand as defaultRevokeMemberTokenCommand,
   revokeProjectTokenWithAuthCommand as defaultRevokeProjectTokenCommand
 } from "./token-commands.js";
+
+function readProjectColorTagOption(parsedArgv: ParsedArgv): ProjectColorTag | undefined {
+  const colorTag = readStringOption(parsedArgv, "color-tag");
+  if (colorTag === undefined) {
+    return undefined;
+  }
+
+  if (PROJECT_COLOR_TAG_VALUES.includes(colorTag as ProjectColorTag)) {
+    return colorTag as ProjectColorTag;
+  }
+
+  throw new CliInputError("Invalid value for --color-tag.");
+}
 
 export async function handleBillingCommand(parsedArgv: ParsedArgv, dependencies: ManagementCommandDependencies): Promise<CliCommandResult> {
   const action = requirePositional(parsedArgv, 1, "action");
@@ -230,7 +245,7 @@ export async function handleProjectCommand(parsedArgv: ParsedArgv, dependencies:
   }
 
   if (action === "create") {
-    expectNoUnknownOptions(parsedArgv, ["auth-file", "json", "name", "slug", "environment-default"]);
+    expectNoUnknownOptions(parsedArgv, ["auth-file", "json", "name", "slug", "environment-default", "color-tag"]);
     ensureNoExtraPositionals(parsedArgv, 2);
 
     const name = readStringOption(parsedArgv, "name");
@@ -246,6 +261,7 @@ export async function handleProjectCommand(parsedArgv: ParsedArgv, dependencies:
       name: string;
       slug: string;
       environmentDefault?: string;
+      colorTag?: ProjectColorTag | null;
       authFilePath?: string;
       json?: boolean;
     });
@@ -253,12 +269,16 @@ export async function handleProjectCommand(parsedArgv: ParsedArgv, dependencies:
     if (environmentDefault !== undefined) {
       input.environmentDefault = environmentDefault;
     }
+    const colorTag = readProjectColorTagOption(parsedArgv);
+    if (colorTag !== undefined) {
+      input.colorTag = colorTag;
+    }
 
     return await (dependencies.createProjectCommand ?? defaultCreateProjectCommand)(input);
   }
 
   if (action === "update") {
-    expectNoUnknownOptions(parsedArgv, ["auth-file", "json", "name", "slug", "environment-default"]);
+    expectNoUnknownOptions(parsedArgv, ["auth-file", "json", "name", "slug", "environment-default", "color-tag", "clear-color-tag"]);
     ensureNoExtraPositionals(parsedArgv, 3);
 
     const input = appendCommonAuthOptions(parsedArgv, {
@@ -268,6 +288,7 @@ export async function handleProjectCommand(parsedArgv: ParsedArgv, dependencies:
       name?: string;
       slug?: string;
       environmentDefault?: string;
+      colorTag?: ProjectColorTag | null;
       authFilePath?: string;
       json?: boolean;
     });
@@ -283,8 +304,19 @@ export async function handleProjectCommand(parsedArgv: ParsedArgv, dependencies:
     if (environmentDefault !== undefined) {
       input.environmentDefault = environmentDefault;
     }
+    if (readBooleanOption(parsedArgv, "clear-color-tag") === true) {
+      if (readStringOption(parsedArgv, "color-tag") !== undefined) {
+        throw new CliInputError("Use either --color-tag or --clear-color-tag.");
+      }
+      input.colorTag = null;
+    } else {
+      const colorTag = readProjectColorTagOption(parsedArgv);
+      if (colorTag !== undefined) {
+        input.colorTag = colorTag;
+      }
+    }
 
-    if (input.name === undefined && input.slug === undefined && input.environmentDefault === undefined) {
+    if (input.name === undefined && input.slug === undefined && input.environmentDefault === undefined && input.colorTag === undefined) {
       throw new CliInputError("At least one project field must be provided.");
     }
 

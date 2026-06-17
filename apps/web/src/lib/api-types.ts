@@ -1,3 +1,5 @@
+import type { ProjectColorTag } from "../../../../packages/shared-types/src/index.js";
+
 export interface SessionRecord {
   session_id: string;
   user_id: string;
@@ -193,6 +195,7 @@ export interface ProjectRecord {
   name: string;
   slug: string;
   environment_default: string;
+  color_tag: ProjectColorTag | null;
   organization_plan: "free" | "solo" | "team";
   metrics: {
     open_incidents: number;
@@ -220,6 +223,7 @@ export interface DeletedProjectRecord {
   name: string;
   slug: string;
   environment_default: string;
+  color_tag: ProjectColorTag | null;
   organization_plan: "free" | "solo" | "team";
   created_at: string;
   updated_at: string;
@@ -427,6 +431,7 @@ export interface IncidentRecord {
   incident_id: string;
   project_id: string;
   project_name: string;
+  project_color_tag: ProjectColorTag | null;
   service_id: string;
   service_name: string | null;
   latest_deployment_id: string | null;
@@ -449,6 +454,7 @@ export interface ImprovementRecord {
   improvement_id: string;
   project_id: string;
   project_name: string;
+  project_color_tag: ProjectColorTag | null;
   project_slug: string;
   service_id: string | null;
   service_name: string;

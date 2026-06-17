@@ -52,6 +52,7 @@ export function parseArgv(argv: string[]): ParsedArgv {
       || token === "--github"
       || token === "--github-cli"
       || token === "--github-device"
+      || token === "--clear-color-tag"
     ) {
       options.set(token.slice(2), true);
       continue;

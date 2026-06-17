@@ -243,7 +243,7 @@ The public documentation/marketing/blog site lives in the standalone public repo
   - `routes/project-members.ts` — project-scoped collaborator listing for any authorized member, cached member-avatar reads, pending-invite lifecycle, invite creation with transactional invite email delivery, role updates, member removal, and collaborator self-leave with removed-member automation cleanup
   - `routes/billing.ts` — owner-scoped billing summary and allowance-capacity management for browser sessions or member tokens, plus browser-only Stripe checkout and customer-portal handoff
   - `routes/stripe-webhook.ts` — Stripe webhook ingestion with raw-body signature verification, idempotent event processing, and entitlement recomputation for checkout.session.completed, subscription.created/updated/deleted, invoice.paid, and invoice.payment_failed events, including synced Stripe billing-period boundaries used by billing summaries
-  - `routes/projects.ts` — organization-scoped project list/create/update/delete with owner-only destructive enforcement
+  - `routes/projects.ts` — organization-scoped project list/create/update/delete with owner-only destructive enforcement and optional project color-tag metadata
   - `routes/services.ts` — project-scoped service retrieval
   - `routes/alerts.ts` — alert rule CRUD plus reusable Slack destination ID validation for connected Slack alerts
   - `routes/slack.ts` — Slack OAuth connect flow plus reusable Slack destination list/test/delete routes shared by web, CLI, and MCP
@@ -328,7 +328,7 @@ The public documentation/marketing/blog site lives in the standalone public repo
   - `account-store.ts` — Postgres account export aggregation for retained organization/project records and destructive account-deletion lifecycle persistence, including analytics/payment-retention handoff before org cleanup
   - `account-analytics-store.ts` — Postgres deletion-safe account analytics ledger, internal month/year/lifetime query helpers, aggregate admin analytics summary reads, retained-row backfill, and payment/provider retention snapshot persistence for deleted accounts
   - `integration-secret-crypto.ts` — shared encryption/decryption helpers for stored integration secrets such as Slack webhook URLs
-  - `metadata-store.ts` — Postgres metadata store (account membership, explicit project ownership + `project_members`, invite-token-backed `project_invites`, invite cancellation/acceptance, collaborator self-leave/removal with member-owned automation cleanup, project list/create + tokens, project dashboard metrics, incidents, probes, capture-policy/rule and GitHub-rule mutation flows, deployments, alerts, weekly-report aggregation, incident-event retention reasons)
+  - `metadata-store.ts` — Postgres metadata store (account membership, explicit project ownership + `project_members`, invite-token-backed `project_invites`, invite cancellation/acceptance, collaborator self-leave/removal with member-owned automation cleanup, project list/create + tokens + color tags, project dashboard metrics, incidents, probes, capture-policy/rule and GitHub-rule mutation flows, deployments, alerts, weekly-report aggregation, incident-event retention reasons)
   - `availability-check-store.ts` / helpers / executor — hosted health-check CRUD, secure target validation, due-check claiming, execution recording, incident linkage, and 30-day result/rollup retention
   - `ingestion-analytics.ts` — shared ingestion-side aggregation helpers that translate accepted/rejected batch outcomes into account analytics metric deltas
   - `improvement-opportunity-store.ts` — Postgres hosted improvement automation persistence (project execution settings lookup, deterministic warning-hotspot/slow-request/request-failure opportunity storage with below-threshold list suppression, incident-derived opportunity storage with `related_incident_ids`, auto-resolution when all related incidents are resolved, improvement-event sampling, improvement bundle generation reservation/failure tracking, retained-bundle-cap pruning for improvement/incident owners)
@@ -370,7 +370,7 @@ The public documentation/marketing/blog site lives in the standalone public repo
 
 ### `packages/project-management-client`
 
-- **Owns:** Authenticated project list/create HTTP client used by CLI connect flows
+- **Owns:** Authenticated project list/create/update HTTP client used by CLI and MCP project-management flows, including optional project color-tag metadata
 - **Exports:** `createProjectManagementApi()`, response/error contracts
 - **Key constraint:** Owns project-management path construction and response-shape validation so connect logic stays out of raw HTTP route strings
 

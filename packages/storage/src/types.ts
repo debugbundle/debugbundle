@@ -5,6 +5,7 @@ import type {
   EventClass,
   EventEnvelope,
   ImmediateClientErrorPathRule,
+  ProjectColorTag,
   TierName
 } from "../../shared-types/src/index.js";
 import type { IncidentReason } from "./incident-reason.js";
@@ -277,6 +278,7 @@ export interface ProjectRecord {
   name: string;
   slug: string;
   environment_default: string;
+  color_tag: ProjectColorTag | null;
   organization_plan: string;
   metrics: {
     open_incidents: number;
@@ -796,6 +798,7 @@ export interface IncidentRetrievalRecord extends Record<string, unknown> {
   incident_id: string;
   project_id: string;
   project_name: string;
+  project_color_tag: ProjectColorTag | null;
   service_id: string | null;
   service_name: string | null;
   latest_deployment_id: string | null;
@@ -819,6 +822,7 @@ export interface ImprovementRetrievalRecord extends Record<string, unknown> {
   improvement_id: string;
   project_id: string;
   project_name: string;
+  project_color_tag: ProjectColorTag | null;
   project_slug: string;
   service_id: string | null;
   service_name: string;
@@ -1339,6 +1343,7 @@ export interface ProjectManagementStore {
     name: string;
     slug: string;
     environment_default: string;
+    color_tag?: ProjectColorTag | null;
     weekly_report_timezone: string;
   }): Promise<ProjectRecord | null>;
   updateProjectForUser?(input: {
@@ -1347,6 +1352,7 @@ export interface ProjectManagementStore {
     name?: string;
     slug?: string;
     environment_default?: string;
+    color_tag?: ProjectColorTag | null;
   }): Promise<ProjectRecord | "slug_taken" | null>;
   deleteProjectForUser?(input: {
     user_id: string;
@@ -1362,6 +1368,7 @@ export interface ProjectManagementStore {
     name: string;
     slug: string;
     environment_default: string;
+    color_tag?: ProjectColorTag | null;
     weekly_report_timezone?: string;
   }): Promise<ProjectRecord | null>;
   updateProjectForOrganization(input: {
@@ -1370,6 +1377,7 @@ export interface ProjectManagementStore {
     name?: string;
     slug?: string;
     environment_default?: string;
+    color_tag?: ProjectColorTag | null;
   }): Promise<ProjectRecord | "slug_taken" | null>;
   deleteProjectForOrganization(input: {
     organization_id: string;

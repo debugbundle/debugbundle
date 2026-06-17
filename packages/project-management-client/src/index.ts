@@ -1,4 +1,22 @@
 import { z } from "zod";
+import { ProjectColorTagSchema, type ProjectColorTag } from "../../shared-types/src/index.js";
+
+const ProjectColorTagResponseSchema = z.unknown().transform((value, context): ProjectColorTag | null => {
+  if (value === undefined || value === null) {
+    return null;
+  }
+
+  const parsed = ProjectColorTagSchema.safeParse(value);
+  if (!parsed.success) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "Invalid project color tag"
+    });
+    return z.NEVER;
+  }
+
+  return parsed.data;
+});
 
 export const ProjectMetricsSchema = z
   .object({
@@ -25,11 +43,17 @@ export const ProjectRecordSchema = z
     name: z.string(),
     slug: z.string(),
     environment_default: z.string(),
+    color_tag: ProjectColorTagResponseSchema,
     organization_plan: z.enum(["free", "solo", "team"]),
     metrics: ProjectMetricsSchema,
     created_at: z.string(),
     updated_at: z.string()
   });
+
+type ParsedProjectRecord = z.infer<typeof ProjectRecordSchema>;
+export type ProjectRecord = Omit<ParsedProjectRecord, "color_tag"> & {
+  color_tag: ProjectColorTag | null;
+};
 
 export const ProjectListResponseSchema = z
   .object({
@@ -54,10 +78,16 @@ export const DeletedProjectRecordSchema = z
     name: z.string(),
     slug: z.string(),
     environment_default: z.string(),
+    color_tag: ProjectColorTagResponseSchema,
     organization_plan: z.enum(["free", "solo", "team"]),
     created_at: z.string(),
     updated_at: z.string()
   });
+
+type ParsedDeletedProjectRecord = z.infer<typeof DeletedProjectRecordSchema>;
+export type DeletedProjectRecord = Omit<ParsedDeletedProjectRecord, "color_tag"> & {
+  color_tag: ProjectColorTag | null;
+};
 
 export const ProjectDeleteResponseSchema = z
   .object({
@@ -106,7 +136,21 @@ function parseApiError(status: number, body: unknown): never {
   throw new ProjectManagementApiError(status, parsed.data.error);
 }
 
-async function expectProjects(responsePromise: Promise<HttpResponse>): Promise<Array<z.infer<typeof ProjectRecordSchema>>> {
+function normalizeProjectRecord(project: ParsedProjectRecord): ProjectRecord {
+  return {
+    ...project,
+    color_tag: project.color_tag
+  };
+}
+
+function normalizeDeletedProjectRecord(project: ParsedDeletedProjectRecord): DeletedProjectRecord {
+  return {
+    ...project,
+    color_tag: project.color_tag
+  };
+}
+
+async function expectProjects(responsePromise: Promise<HttpResponse>): Promise<ProjectRecord[]> {
   const response = await responsePromise;
   if (response.status < 200 || response.status >= 300) {
     parseApiError(response.status, response.body);
@@ -117,10 +161,10 @@ async function expectProjects(responsePromise: Promise<HttpResponse>): Promise<A
     throw new ProjectManagementApiError(response.status, "invalid_response_shape");
   }
 
-  return parsed.data.projects;
+  return parsed.data.projects.map(normalizeProjectRecord);
 }
 
-async function expectProject(responsePromise: Promise<HttpResponse>): Promise<z.infer<typeof ProjectRecordSchema>> {
+async function expectProject(responsePromise: Promise<HttpResponse>): Promise<ProjectRecord> {
   const response = await responsePromise;
   if (response.status < 200 || response.status >= 300) {
     parseApiError(response.status, response.body);
@@ -131,10 +175,10 @@ async function expectProject(responsePromise: Promise<HttpResponse>): Promise<z.
     throw new ProjectManagementApiError(response.status, "invalid_response_shape");
   }
 
-  return parsed.data.project;
+  return normalizeProjectRecord(parsed.data.project);
 }
 
-async function expectDeletedProject(responsePromise: Promise<HttpResponse>): Promise<z.infer<typeof DeletedProjectRecordSchema>> {
+async function expectDeletedProject(responsePromise: Promise<HttpResponse>): Promise<DeletedProjectRecord> {
   const response = await responsePromise;
   if (response.status < 200 || response.status >= 300) {
     parseApiError(response.status, response.body);
@@ -145,25 +189,27 @@ async function expectDeletedProject(responsePromise: Promise<HttpResponse>): Pro
     throw new ProjectManagementApiError(response.status, "invalid_response_shape");
   }
 
-  return parsed.data.project;
+  return normalizeDeletedProjectRecord(parsed.data.project);
 }
 
 export function createProjectManagementApi(client: HttpClient): {
-  listProjects(input: { bearerToken: string; limit?: number }): Promise<Array<z.infer<typeof ProjectRecordSchema>>>;
+  listProjects(input: { bearerToken: string; limit?: number }): Promise<ProjectRecord[]>;
   createProject(input: {
     bearerToken: string;
     name: string;
     slug: string;
     environmentDefault?: string;
-  }): Promise<z.infer<typeof ProjectRecordSchema>>;
+    colorTag?: z.infer<typeof ProjectColorTagSchema> | null;
+  }): Promise<ProjectRecord>;
   updateProject(input: {
     bearerToken: string;
     projectId: string;
     name?: string;
     slug?: string;
     environmentDefault?: string;
-  }): Promise<z.infer<typeof ProjectRecordSchema>>;
-  deleteProject(input: { bearerToken: string; projectId: string }): Promise<z.infer<typeof DeletedProjectRecordSchema>>;
+    colorTag?: z.infer<typeof ProjectColorTagSchema> | null;
+  }): Promise<ProjectRecord>;
+  deleteProject(input: { bearerToken: string; projectId: string }): Promise<DeletedProjectRecord>;
 } {
   return {
     async listProjects(input) {
@@ -186,14 +232,15 @@ export function createProjectManagementApi(client: HttpClient): {
           body: {
             name: input.name,
             slug: input.slug,
-            ...(input.environmentDefault === undefined ? {} : { environment_default: input.environmentDefault })
+            ...(input.environmentDefault === undefined ? {} : { environment_default: input.environmentDefault }),
+            ...(input.colorTag === undefined ? {} : { color_tag: input.colorTag })
           }
         })
       );
     },
 
     async updateProject(input) {
-      const body: Record<string, string> = {};
+      const body: Record<string, string | null> = {};
       if (input.name !== undefined) {
         body["name"] = input.name;
       }
@@ -202,6 +249,9 @@ export function createProjectManagementApi(client: HttpClient): {
       }
       if (input.environmentDefault !== undefined) {
         body["environment_default"] = input.environmentDefault;
+      }
+      if (input.colorTag !== undefined) {
+        body["color_tag"] = input.colorTag;
       }
 
       return expectProject(

@@ -42,6 +42,7 @@ describe("retrieval api client", () => {
           incident_id: "inc_123",
           project_id: "proj_123",
           project_name: "Main App",
+          project_color_tag: null,
           service_id: "svc_123",
           service_name: "checkout-api",
           latest_deployment_id: null,
@@ -144,6 +145,41 @@ describe("retrieval api client", () => {
       method: "GET",
       path: "/v1/incidents/inc_123",
       bearerToken: "dbundle_mem_x"
+    });
+  });
+
+  it("defaults missing project color tags to null for older incident responses", async () => {
+    const request = vi.fn<HttpClient["request"]>().mockResolvedValue({
+      status: 200,
+      body: {
+        incident: {
+          incident_id: "inc_123",
+          project_id: "proj_123",
+          project_name: "Main App",
+          service_id: "svc_123",
+          service_name: "checkout-api",
+          latest_deployment_id: null,
+          environment: "production",
+          fingerprint: "fp_123",
+          fingerprint_version: "v1",
+          title: "TypeError",
+          severity: "high",
+          status: "open",
+          first_seen_at: "2026-03-11T00:00:00.000Z",
+          last_seen_at: "2026-03-11T00:10:00.000Z",
+          occurrence_count: 3,
+          spike_detected_at: null,
+          resolved_at: null,
+          regressed_at: null,
+          matched_fields: ["fingerprint"]
+        }
+      }
+    });
+
+    const api = createRetrievalApi({ request });
+
+    await expect(api.getIncident({ bearerToken: "dbundle_mem_x", incidentId: "inc_123" })).resolves.toMatchObject({
+      project_color_tag: null
     });
   });
 
@@ -306,6 +342,7 @@ describe("retrieval api client", () => {
       incident_id: "00000000-0000-0000-0000-000000000101",
       project_id: "proj_123",
       project_name: "Main App",
+      project_color_tag: null,
       service_id: "svc_123",
       service_name: "checkout-api",
       latest_deployment_id: null,
@@ -372,6 +409,49 @@ describe("retrieval api client", () => {
       body: {
         incident_ids: ["00000000-0000-0000-0000-000000000101"]
       }
+    });
+  });
+
+  it("defaults missing project color tags to null for older improvement responses", async () => {
+    const request = vi.fn<HttpClient["request"]>().mockResolvedValue({
+      status: 200,
+      body: {
+        improvement: {
+          improvement_id: "imp_123",
+          project_id: "proj_123",
+          project_name: "Main App",
+          project_slug: "main-app",
+          service_id: null,
+          service_name: "checkout-api",
+          service_runtime: "node",
+          service_framework: "fastify",
+          environment: "production",
+          kind: "warning_hotspot",
+          status: "open",
+          severity: "medium",
+          confidence: 0.75,
+          fingerprint: "fp_123",
+          title: "Warning hotspot",
+          summary: "Repeated warning log pattern.",
+          occurrence_count: 5,
+          evidence: {},
+          related_incident_ids: [],
+          first_detected_at: "2026-03-11T00:00:00.000Z",
+          last_detected_at: "2026-03-11T00:10:00.000Z",
+          resolved_at: null,
+          snoozed_until: null,
+          bundle_generation_number: 1,
+          bundle_created_at: null,
+          bundle_updated_at: null,
+          bundle_failure_reason: null
+        }
+      }
+    });
+
+    const api = createRetrievalApi({ request });
+
+    await expect(api.getImprovement({ bearerToken: "dbundle_mem_x", improvementId: "imp_123" })).resolves.toMatchObject({
+      project_color_tag: null
     });
   });
 
