@@ -8,6 +8,7 @@ import type {
 import type {
   AvailabilityCheckDailyRollupRecord,
   AvailabilityCheckHealthStatus,
+  AvailabilityIncidentStatus,
   AvailabilityCheckRecord
 } from "./availability-check-store-types.js";
 
@@ -77,6 +78,12 @@ export function mapAvailabilityCheckRow(row: Record<string, unknown>): Availabil
     Boolean(row["within_plan_limit"]),
     Boolean(row["meets_plan_interval"])
   );
+  const linkedIncidentStatus =
+    row["linked_incident_status"] === "open" ||
+    row["linked_incident_status"] === "resolved" ||
+    row["linked_incident_status"] === "regressed"
+      ? (row["linked_incident_status"] as AvailabilityIncidentStatus)
+      : null;
 
   return {
     check_id: String(row["check_id"]),
@@ -99,6 +106,7 @@ export function mapAvailabilityCheckRow(row: Record<string, unknown>): Availabil
     consecutive_failures: Number(row["consecutive_failures"]),
     consecutive_successes: Number(row["consecutive_successes"]),
     linked_incident_id: typeof row["linked_incident_id"] === "string" ? row["linked_incident_id"] : null,
+    linked_incident_status: linkedIncidentStatus,
     last_checked_at: typeof row["last_checked_at"] === "string" ? row["last_checked_at"] : null,
     next_check_at: typeof row["next_check_at"] === "string" ? row["next_check_at"] : null,
     last_result_status:

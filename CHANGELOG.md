@@ -6,6 +6,13 @@ The format is based on Keep a Changelog and this project follows Semantic Versio
 
 ## [Unreleased]
 
+## [1.5.2] - 2026-06-18
+
+### Changed
+
+- Exposed linked availability-incident status through the shared health-check response contract so CLI, API, and web clients can distinguish active incidents from resolved ones without breaking existing consumers.
+- Updated availability health surfaces to stop treating resolved linked incidents as active, so project health badges and aggregate status counts clear correctly after incident resolution.
+
 ## [1.5.0] - 2026-06-15
 
 ### Added

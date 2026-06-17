@@ -444,6 +444,7 @@ const AvailabilityCheckResultStatusSchema = z.enum([
   "internal_error"
 ]);
 const AvailabilityCheckHealthStatusSchema = z.enum(["unknown", "passing", "failing", "paused"]);
+const AvailabilityIncidentStatusSchema = z.enum(["open", "resolved", "regressed"]);
 const AvailabilityCheckLimitsSchema = z
   .object({
     max_checks_per_project: z.number().int().nonnegative(),
@@ -472,6 +473,7 @@ const AvailabilityCheckRecordSchema = z
     consecutive_failures: z.number().int().nonnegative(),
     consecutive_successes: z.number().int().nonnegative(),
     linked_incident_id: z.string().uuid().nullable(),
+    linked_incident_status: AvailabilityIncidentStatusSchema.nullable(),
     last_checked_at: z.string().datetime().nullable(),
     next_check_at: z.string().datetime().nullable(),
     last_result_status: AvailabilityCheckResultStatusSchema.nullable(),

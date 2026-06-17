@@ -272,6 +272,7 @@ export type AvailabilityCheckResultStatus =
   | "internal_error";
 
 export type AvailabilityCheckHealthStatus = "unknown" | "passing" | "failing" | "paused";
+export type AvailabilityIncidentStatus = "open" | "resolved" | "regressed";
 
 export interface AvailabilityCheckLimits {
   max_checks_per_project: number;
@@ -299,6 +300,7 @@ export interface AvailabilityCheckRecord {
   consecutive_failures: number;
   consecutive_successes: number;
   linked_incident_id: string | null;
+  linked_incident_status: AvailabilityIncidentStatus | null;
   last_checked_at: string | null;
   next_check_at: string | null;
   last_result_status: AvailabilityCheckResultStatus | null;

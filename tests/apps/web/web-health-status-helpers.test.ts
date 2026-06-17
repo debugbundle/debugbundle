@@ -61,6 +61,7 @@ function buildCheck(overrides: Partial<AvailabilityCheckRecord> = {}): Availabil
     consecutive_failures: 0,
     consecutive_successes: 4,
     linked_incident_id: null,
+    linked_incident_status: null,
     last_checked_at: "2026-06-15T10:00:00.000Z",
     next_check_at: "2026-06-15T10:01:00.000Z",
     last_result_status: "success",
@@ -149,7 +150,12 @@ describe("health status helpers", () => {
           project,
           checks: [
             buildCheck({ check_id: "chk_ok", status: "passing", linked_incident_id: null }),
-            buildCheck({ check_id: "chk_down", status: "failing", linked_incident_id: "inc_1" })
+            buildCheck({
+              check_id: "chk_down",
+              status: "failing",
+              linked_incident_id: "inc_1",
+              linked_incident_status: "open"
+            })
           ],
           rollupsByCheckId: new Map([
             ["chk_ok", [buildRollup({ check_id: "chk_ok", state: "operational" })]],
@@ -163,6 +169,29 @@ describe("health status helpers", () => {
     expect(summaries[0]?.current_state).toBe("down");
     expect(summaries[0]?.active_incident_count).toBe(1);
     expect(summaries[0]?.days[0]).toEqual(expect.objectContaining({ state: "degraded" }));
+  });
+
+  it("ignores resolved linked incidents in the active count", () => {
+    const project = buildProject();
+    const summaries = buildHealthStatusProjects(
+      [
+        {
+          project,
+          checks: [
+            buildCheck({
+              check_id: "chk_down",
+              status: "failing",
+              linked_incident_id: "inc_1",
+              linked_incident_status: "resolved"
+            })
+          ],
+          rollupsByCheckId: new Map([["chk_down", [buildRollup({ check_id: "chk_down", state: "degraded" })]]])
+        }
+      ],
+      ["2026-06-15"]
+    );
+
+    expect(summaries[0]?.active_incident_count).toBe(0);
   });
 
   it("formats uptime and accessible day labels", () => {

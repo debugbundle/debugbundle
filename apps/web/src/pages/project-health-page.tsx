@@ -718,11 +718,11 @@ export function ProjectHealthPage(): JSX.Element {
                               <div className="flex flex-wrap items-center gap-2">
                                 <span className="block max-w-full truncate font-medium text-foreground">{check.name}</span>
                                 {!check.enabled ? <Badge variant="outline">Disabled</Badge> : null}
-                                {check.linked_incident_id === null ? null : (
+                                {hasVisibleLinkedIncident(check) ? (
                                   <Badge variant="warning">
                                     <Link to={`/incidents/${check.linked_incident_id}`}>Open incident</Link>
                                   </Badge>
-                                )}
+                                ) : null}
                               </div>
                               <p className="truncate text-xs text-muted-foreground">
                                 {check.environment}
@@ -953,6 +953,18 @@ export function ProjectHealthPage(): JSX.Element {
         </Card>
       </div>
     </div>
+  );
+}
+
+function hasVisibleLinkedIncident(check: AvailabilityCheckRecord): boolean {
+  if (check.linked_incident_id === null) {
+    return false;
+  }
+
+  return (
+    check.linked_incident_status === "open" ||
+    check.linked_incident_status === "regressed" ||
+    check.linked_incident_status == null
   );
 }
 

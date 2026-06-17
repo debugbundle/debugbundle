@@ -32,6 +32,7 @@ const checkFixture = {
   consecutive_failures: 0,
   consecutive_successes: 4,
   linked_incident_id: null,
+  linked_incident_status: null,
   last_checked_at: "2026-06-15T10:00:00.000Z",
   next_check_at: "2026-06-15T10:01:00.000Z",
   last_result_status: "success" as const,
@@ -208,7 +209,7 @@ describe("api availability check routes", () => {
     });
     expect(listResponse.statusCode).toBe(200);
     expect(listResponse.json()).toMatchObject({
-      checks: [expect.objectContaining({ check_id: checkFixture.check_id })],
+      checks: [expect.objectContaining({ check_id: checkFixture.check_id, linked_incident_status: null })],
       limits: { max_checks_per_project: 5, min_interval_seconds: 60 }
     });
 
@@ -219,7 +220,7 @@ describe("api availability check routes", () => {
     });
     expect(getResponse.statusCode).toBe(200);
     expect(getResponse.json()).toMatchObject({
-      check: expect.objectContaining({ check_id: checkFixture.check_id })
+      check: expect.objectContaining({ check_id: checkFixture.check_id, linked_incident_status: null })
     });
 
     const createResponse = await app.inject({

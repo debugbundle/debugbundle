@@ -28,5 +28,11 @@ describe("api openapi spec", () => {
     expect(document.paths?.["/v1/projects/{id}/availability-checks"]?.["get"]?.operationId).toBe("listAvailabilityChecks");
     expect(document.paths?.["/v1/projects/{id}/availability-checks/{checkId}"]?.["patch"]?.operationId).toBe("updateAvailabilityCheck");
     expect(document.paths?.["/v1/projects/{id}/availability-checks/test"]?.["post"]?.responses).toHaveProperty("200");
+    const availabilityCheckResponseSchema = (document as {
+      components?: {
+        schemas?: Record<string, { properties?: Record<string, { properties?: Record<string, unknown> }> }>;
+      };
+    }).components?.schemas?.["AvailabilityCheckResponse"];
+    expect(availabilityCheckResponseSchema?.properties?.["check"]?.properties).toHaveProperty("linked_incident_status");
   });
 });

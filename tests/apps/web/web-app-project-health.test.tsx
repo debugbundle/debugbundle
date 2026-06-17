@@ -35,6 +35,7 @@ function createHealthCheck(overrides: Partial<AvailabilityCheckRecord> = {}): Av
     consecutive_failures: 0,
     consecutive_successes: 12,
     linked_incident_id: null,
+    linked_incident_status: null,
     last_checked_at: "2026-06-15T10:00:00.000Z",
     next_check_at: "2026-06-15T10:01:00.000Z",
     last_result_status: "success",
@@ -207,5 +208,55 @@ describe("web app — project health page", () => {
         )
       ).toBe(true);
     });
+  });
+
+  it("hides the linked incident badge after the incident is resolved", async () => {
+    const project = createProject({
+      project_id: "proj_123",
+      name: "Main App",
+      organization_plan: "team",
+      effective_role: "owner"
+    });
+    const checks = [
+      createHealthCheck({
+        linked_incident_id: "inc_123",
+        linked_incident_status: "resolved",
+        status: "failing"
+      })
+    ];
+
+    vi.stubGlobal(
+      "fetch",
+      vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+        const url = requestUrl(input);
+
+        if (url.endsWith("/v1/auth/session")) {
+          return jsonResponse(200, { session: createSession({ organization_plan: "team" }) });
+        }
+        if (url.endsWith("/v1/projects") && init?.method === undefined) {
+          return jsonResponse(200, { projects: [project] });
+        }
+        if (url.endsWith("/v1/projects/proj_123/availability-checks?limit=50")) {
+          return jsonResponse(200, {
+            checks,
+            limits: { max_checks_per_project: 25, min_interval_seconds: 30 }
+          });
+        }
+        if (url.endsWith("/v1/projects/proj_123/availability-checks/chk_1/results?limit=20")) {
+          return jsonResponse(200, { results: [] });
+        }
+        if (url.endsWith("/v1/projects/proj_123/availability-checks/chk_1/daily-rollups?limit=30")) {
+          return jsonResponse(200, { rollups: [] });
+        }
+
+        return jsonResponse(404, { error: "not_found" });
+      })
+    );
+
+    render(<App initialEntries={["/projects/proj_123/health"]} />);
+
+    expect(await screen.findByRole("heading", { name: "Health checks" })).toBeInTheDocument();
+    expect(await screen.findByText("Primary app")).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Open incident" })).not.toBeInTheDocument();
   });
 });

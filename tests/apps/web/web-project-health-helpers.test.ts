@@ -151,6 +151,7 @@ describe("web project health helpers", () => {
       consecutive_failures: 0,
       consecutive_successes: 12,
       linked_incident_id: null,
+      linked_incident_status: null,
       last_checked_at: null,
       next_check_at: null,
       last_result_status: "success",

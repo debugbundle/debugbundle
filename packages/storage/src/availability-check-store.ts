@@ -46,6 +46,7 @@ export function createPostgresAvailabilityCheckStore(db: Queryable): Availabilit
         c.consecutive_failures,
         c.consecutive_successes,
         c.linked_incident_id::text AS linked_incident_id,
+        i.status AS linked_incident_status,
         c.last_checked_at::text AS last_checked_at,
         c.next_check_at::text AS next_check_at,
         c.last_result_status,
@@ -62,6 +63,7 @@ export function createPostgresAvailabilityCheckStore(db: Queryable): Availabilit
       FROM availability_checks c
       JOIN projects p ON p.id = c.project_id
       JOIN organizations o ON o.id = p.organization_id
+      LEFT JOIN incidents i ON i.id = c.linked_incident_id
       WHERE c.project_id = $1::uuid
         AND p.organization_id = $2::uuid
         AND c.deleted_at IS NULL

@@ -195,6 +195,7 @@ describe("web app — management routes", () => {
               consecutive_failures: 0,
               consecutive_successes: 24,
               linked_incident_id: null,
+              linked_incident_status: null,
               last_checked_at: "2026-03-17T09:00:00.000Z",
               next_check_at: "2026-03-17T09:00:30.000Z",
               last_result_status: "success",

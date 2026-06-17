@@ -259,8 +259,15 @@ function deriveAggregateImpact(impacts: HealthStatusImpact[]): HealthStatusImpac
 function countActiveAvailabilityIncidents(checks: HealthStatusCheckSummary[]): number {
   const incidentIds = new Set<string>();
   for (const summary of checks) {
-    if (summary.check.status === "failing" && summary.check.linked_incident_id !== null) {
-      incidentIds.add(summary.check.linked_incident_id);
+    const linkedIncidentId = summary.check.linked_incident_id;
+    const linkedIncidentStatus = summary.check.linked_incident_status;
+    const hasActiveLinkedIncident =
+      linkedIncidentId !== null &&
+      (linkedIncidentStatus === "open" ||
+        linkedIncidentStatus === "regressed" ||
+        (linkedIncidentStatus == null && summary.check.status === "failing"));
+    if (hasActiveLinkedIncident) {
+      incidentIds.add(linkedIncidentId);
     }
   }
   return incidentIds.size;

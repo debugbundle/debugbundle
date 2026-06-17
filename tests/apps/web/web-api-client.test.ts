@@ -61,6 +61,7 @@ describe("web api client", () => {
       consecutive_failures: 0,
       consecutive_successes: 12,
       linked_incident_id: null,
+      linked_incident_status: null,
       last_checked_at: "2026-06-15T10:00:00.000Z",
       next_check_at: "2026-06-15T10:01:00.000Z",
       last_result_status: "success",

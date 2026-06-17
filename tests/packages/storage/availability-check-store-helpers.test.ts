@@ -34,6 +34,7 @@ const baseRow = {
   consecutive_failures: 0,
   consecutive_successes: 7,
   linked_incident_id: null,
+  linked_incident_status: null,
   last_checked_at: "2026-06-15T10:00:00.000Z",
   next_check_at: "2026-06-15T10:01:00.000Z",
   last_result_status: "success",
@@ -73,6 +74,7 @@ describe("availability check store helpers", () => {
         paused_reason: null,
         service_name: "web",
         organization_plan: "solo",
+        linked_incident_status: null,
         last_result_status: "success",
         last_result_http_status: 200
       })

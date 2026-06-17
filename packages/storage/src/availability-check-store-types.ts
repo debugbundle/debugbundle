@@ -7,6 +7,7 @@ import type {
 } from "./availability-check-executor.js";
 
 export type AvailabilityCheckHealthStatus = "unknown" | "passing" | "failing" | "paused";
+export type AvailabilityIncidentStatus = "open" | "resolved" | "regressed";
 
 export interface AvailabilityCheckRecord extends AvailabilityCheckDefinition {
   check_id: string;
@@ -24,6 +25,7 @@ export interface AvailabilityCheckRecord extends AvailabilityCheckDefinition {
   consecutive_failures: number;
   consecutive_successes: number;
   linked_incident_id: string | null;
+  linked_incident_status: AvailabilityIncidentStatus | null;
   last_checked_at: string | null;
   next_check_at: string | null;
   last_result_status: AvailabilityCheckResultStatus | null;
