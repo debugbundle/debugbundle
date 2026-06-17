@@ -99,6 +99,7 @@ These behaviors are mandatory across all SDKs. A new language SDK is non-complia
 | `captureRouteChanges` | boolean | `true` | Enable/disable route change breadcrumb capture. |
 | `captureConsole` | boolean | `false` | Enable/disable console.error/warn breadcrumb capture (opt-in). |
 | `networkFilter` | object | `{}` | Filter network breadcrumbs. Fields: `urlPatterns` (string[]/RegExp[] allow list), `urlDenyPatterns` (string[]/RegExp[] deny list), `statusCodes` (default: `[400-599]` — only 4xx/5xx), `minResponseTime` (ms, omit faster requests). |
+| `tracePropagationTargets` | string[] | same-origin only | Cross-origin first-party URL substrings allowed to receive `X-DebugBundle-Trace-Id`. Third-party absolute URLs are not traced by default. |
 | `sessionSampleRate` | number (0.0–1.0) | `1.0` | Session-level sampling. Decision made once per session — entire journey captured or nothing. Independent of `sampleRate`. |
 | `maxEventsPerSession` | number | `100` | Hard cap on events per session. After cap, only `frontend_exception` events are captured. |
 | `beforeSend` | `(event) → event \| null` | — | Browser-supported synchronous final hook before buffering. Returning `null` drops the event locally. |
@@ -116,7 +117,7 @@ fetch("/v1/auth/session", {
 });
 ```
 
-When present, the browser SDK must copy this metadata into the captured `network_request` breadcrumb payload and must not forward the `debugbundle` field to the actual HTTP request.
+When present, the browser SDK must copy this metadata into the captured `network_request` breadcrumb payload and must not forward the `debugbundle` field to the actual HTTP request. Wrapping `fetch()` must otherwise preserve native fetch behavior: callers may pass `string`, `URL`, or `Request` inputs, and headers may be omitted or provided as `Headers`, header tuple arrays, or header records. If the SDK adds `X-DebugBundle-Trace-Id`, it must add it to the effective request headers without dropping caller-provided headers such as `Authorization`. If a `Request` input and `init.headers` are both present, `init.headers` follows native fetch override semantics.
 
 Browser `window` `error` captures must preserve browser-native event metadata when available. If the browser does not expose a usable `Error` object, the SDK may synthesize a fallback error message, but it must also attach `payload.browser_event` with `kind`, `message`, `file_name`, `line_number`, `column_number`, `target`, and `opaque` fields so bundles can explain the signal without attributing it to the SDK listener frame. Resource-load errors should use `kind: "resource_error"` and include `target.source_url` when the browser exposes a failing script, stylesheet, image, or similar target. Bundle generation must treat opaque browser-native signals as low-confidence source data and must not infer an application frame from known SDK listener assets alone.
 
@@ -403,11 +404,11 @@ Browser `unhandledrejection` captures may include `frontend_exception.payload.re
 
 ## 3.7 Cross-Context Trace Correlation
 
-The browser SDK injects a `X-DebugBundle-Trace-Id` header (UUID v4) into all outgoing `fetch` and `XMLHttpRequest` requests. Backend SDKs read this header and tag all events from that request with the trace ID.
+The browser SDK injects a `X-DebugBundle-Trace-Id` header (UUID v4) into same-origin `fetch` and `XMLHttpRequest` requests, and into cross-origin first-party requests that match `tracePropagationTargets`. Backend SDKs read this header and tag all events from that request with the trace ID. The SDK must not inject trace headers into arbitrary third-party absolute URLs by default.
 
 ### Browser SDK (Automatic)
 ```js
-// When Network capture is enabled (default), outgoing requests include:
+// Same-origin and explicitly allowlisted outgoing requests include:
 // X-DebugBundle-Trace-Id: <uuid-v4>
 // The SDK wraps fetch() and XMLHttpRequest.open() to inject the header.
 ```
@@ -439,7 +440,7 @@ Incidents use `trace_id` to link frontend breadcrumbs to backend exceptions. Thi
 
 | Behavior | Rule |
 |----------|------|
-| Header injection | Browser SDK wraps `fetch`/`XHR`, injects `X-DebugBundle-Trace-Id` (UUID v4) |
+| Header injection | Browser SDK wraps `fetch`/`XHR`, injects `X-DebugBundle-Trace-Id` (UUID v4) into same-origin or explicitly allowlisted first-party requests |
 | Header reading | Backend middleware reads header, attaches to event context |
 | Missing header | No failure — backend events ungrouped from frontend |
 | Trace ID format | UUID v4, generated per outgoing browser request |

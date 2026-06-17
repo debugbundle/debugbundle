@@ -82,10 +82,13 @@ Last updated: 2026-06-15
 
 ### AC-SDK-12: Cross-Context Trace Correlation
 - **Given** a browser SDK and Node.js backend SDK both initialized
-- **When** the browser makes a `fetch` request to the backend
+- **When** the browser makes a same-origin `fetch` request to the backend, or a cross-origin first-party `fetch` request whose URL matches `tracePropagationTargets`
 - **Then** the browser SDK injects `X-DebugBundle-Trace-Id` (UUID v4) into the request
+- **And** existing application headers are preserved when `RequestInit.headers` is a `Headers` instance, header tuple array, or header record
+- **And** existing application headers are preserved when the caller passes a `Request` object with headers
 - **And** the backend SDK reads the header and tags all events from that request with the trace ID
 - **And** the generated bundle links frontend breadcrumbs to backend exceptions via the shared trace ID
+- **And** absolute third-party URLs that do not match `tracePropagationTargets` do not receive the trace header
 
 ### AC-SDK-13: Loop Protection Recovery
 - **Given** SDK in suppression mode (>10 identical errors in 2s)

@@ -2594,7 +2594,7 @@ debugbundle.captureException(err);
 debugbundle.captureMessage('User clicked broken link', 'warning');
 ```
 
-For split frontend/backend deployments, keep relay mode explicit and point `endpoint` at the backend relay URL. For frontend-only deployments without a backend, use direct mode with a dedicated public write-only `projectToken` and allowed browser origins.
+For split frontend/backend deployments, keep relay mode explicit and point `endpoint` at the backend relay URL. Add the backend API origin to `tracePropagationTargets` when cross-origin first-party requests should receive `X-DebugBundle-Trace-Id` and be eligible for policy-driven request-failure promotion. The browser fetch wrapper must preserve native `fetch` input and header semantics, including `Headers`, tuple arrays, record headers, and `Request` object headers. For frontend-only deployments without a backend, use direct mode with a dedicated public write-only `projectToken` and allowed browser origins.
 
 ### 4.3 Python SDK (`debugbundle-python`)
 
