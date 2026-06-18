@@ -56,7 +56,7 @@ describe("web app — incident table interactions", () => {
         return jsonResponse(200, { session: createSession() });
       }
 
-      if (url.includes("/v1/incidents?") && url.includes("status=open") && init?.method === undefined) {
+      if (url.includes("/v1/incidents?") && url.includes("status=active") && init?.method === undefined) {
         return jsonResponse(200, { incidents: [incident], next_cursor: null });
       }
 
@@ -247,7 +247,11 @@ describe("web app — incident table interactions", () => {
       if (url.includes("/v1/incidents?") && init?.method === undefined) {
         const request = new URL(url, "https://app.debugbundle.test");
         const status = request.searchParams.get("status");
-        const incidents = status === null ? incidentState : incidentState.filter((incident) => incident.status === status);
+        const incidents = status === null
+          ? incidentState
+          : status === "active"
+            ? incidentState.filter((incident) => incident.status === "open" || incident.status === "regressed")
+            : incidentState.filter((incident) => incident.status === status);
         return jsonResponse(200, { incidents, next_cursor: null });
       }
 
@@ -318,7 +322,11 @@ describe("web app — incident table interactions", () => {
       if (url.includes("/v1/incidents?") && init?.method === undefined) {
         const request = new URL(url, "https://app.debugbundle.test");
         const status = request.searchParams.get("status");
-        const incidents = status === null ? incidentState : incidentState.filter((incident) => incident.status === status);
+        const incidents = status === null
+          ? incidentState
+          : status === "active"
+            ? incidentState.filter((incident) => incident.status === "open" || incident.status === "regressed")
+            : incidentState.filter((incident) => incident.status === status);
         return jsonResponse(200, { incidents, next_cursor: null });
       }
 
@@ -376,7 +384,7 @@ describe("web app — incident table interactions", () => {
         return jsonResponse(200, { projects: [project] });
       }
 
-      if (url.includes("/v1/incidents?") && url.includes(`project_id=${project.project_id}`) && url.includes("status=open") && init?.method === undefined) {
+      if (url.includes("/v1/incidents?") && url.includes(`project_id=${project.project_id}`) && url.includes("status=active") && init?.method === undefined) {
         return jsonResponse(200, { incidents: [incident], next_cursor: null });
       }
 
@@ -450,7 +458,11 @@ describe("web app — incident table interactions", () => {
       if (url.includes("/v1/incidents?") && url.includes(`project_id=${project.project_id}`) && init?.method === undefined) {
         const request = new URL(url, "https://app.debugbundle.test");
         const status = request.searchParams.get("status");
-        const incidents = status === null ? incidentState : incidentState.filter((incident) => incident.status === status);
+        const incidents = status === null
+          ? incidentState
+          : status === "active"
+            ? incidentState.filter((incident) => incident.status === "open" || incident.status === "regressed")
+            : incidentState.filter((incident) => incident.status === status);
         return jsonResponse(200, { incidents, next_cursor: null });
       }
 

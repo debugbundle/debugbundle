@@ -1017,7 +1017,7 @@ export function createApiDependencies(input: CreateApiDependenciesInput): Defaul
           method: request.method ?? "GET",
           expected_status_min: request.expected_status_min ?? 200,
           expected_status_max: request.expected_status_max ?? 399,
-          timeout_ms: request.timeout_ms ?? 5000
+          timeout_ms: request.timeout_ms ?? 2500
         });
         return await availabilityCheckStore.updateCheckForProjectInOrganization({
           ...request,

@@ -543,13 +543,50 @@ describe("availability check store", () => {
     const claimSql = String(claimDb.query.mock.calls[0]?.[0] ?? "");
     expect(claimSql).toMatch(/candidate AS \(\s+SELECT ranked\.id AS check_id\s+FROM ranked/s);
     expect(claimSql).toMatch(/ORDER BY ranked\.next_check_at ASC, ranked\.id ASC/s);
+    expect(claimSql).toMatch(/LIMIT \$3/s);
     expect(claimSql).toMatch(/JOIN candidate ON candidate\.check_id = ranked\.id/s);
+    expect(claimDb.query.mock.calls[0]?.[1]).toEqual([
+      "2026-06-15T10:00:00.000Z",
+      "2026-06-15T09:59:00.000Z",
+      1
+    ]);
     await expect(
       claimStore.claimNextDueCheck({
         now: "2026-06-15T10:00:00.000Z",
         claim_timeout_before: "2026-06-15T09:59:00.000Z"
       })
     ).resolves.toBeNull();
+
+    const batchClaimDb = createSequentialDb([
+      {
+        rows: [
+          buildClaimedRow({
+            check_id: "chk_2",
+            due_at: "2026-06-15T10:00:30.000Z"
+          }),
+          buildClaimedRow({
+            check_id: "chk_1",
+            due_at: "2026-06-15T10:00:00.000Z"
+          })
+        ]
+      }
+    ]);
+    const batchClaimStore = createPostgresAvailabilityCheckStore(batchClaimDb as never);
+    await expect(
+      batchClaimStore.claimDueChecks({
+        now: "2026-06-15T10:01:00.000Z",
+        claim_timeout_before: "2026-06-15T09:56:00.000Z",
+        limit: 20
+      })
+    ).resolves.toEqual([
+      expect.objectContaining({ check_id: "chk_1" }),
+      expect.objectContaining({ check_id: "chk_2" })
+    ]);
+    expect(batchClaimDb.query.mock.calls[0]?.[1]).toEqual([
+      "2026-06-15T10:01:00.000Z",
+      "2026-06-15T09:56:00.000Z",
+      20
+    ]);
 
     const rowUndefinedDb = createSequentialDb([{ rows: [] }]);
     const rowUndefinedStore = createPostgresAvailabilityCheckStore(rowUndefinedDb as never);

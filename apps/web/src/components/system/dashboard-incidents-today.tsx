@@ -12,6 +12,7 @@ import { Badge } from "../ui/badge.js";
 import { Button } from "../ui/button.js";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../ui/card.js";
 import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "../ui/empty.js";
+import { ProjectColorTagDot } from "./project-color-tag-dot.js";
 import { ResourceListState } from "./resource-list-state.js";
 import { Skeleton } from "../ui/skeleton.js";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../ui/table.js";
@@ -164,7 +165,8 @@ function DashboardIncidentRow(input: {
         </p>
       </TableCell>
       <TableCell className="text-sm text-muted-foreground whitespace-normal break-words align-middle">
-        <Link to={`/projects/${incident.project_id}`} className="hover:underline" data-row-interactive="true">
+        <Link to={`/projects/${incident.project_id}`} className="inline-flex items-center gap-2 hover:underline" data-row-interactive="true">
+          <ProjectColorTagDot colorTag={incident.project_color_tag} />
           {incident.project_name}
         </Link>
       </TableCell>

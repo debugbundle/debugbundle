@@ -867,7 +867,7 @@ Emitted by SDKs when duplicate suppression is active:
 | method | text | NOT NULL, CHECK IN (`GET`, `HEAD`) |
 | expected_status_min | integer | NOT NULL DEFAULT `200`, CHECK `100..599` |
 | expected_status_max | integer | NOT NULL DEFAULT `399`, CHECK `100..599` |
-| timeout_ms | integer | NOT NULL DEFAULT `5000`, CHECK `500..5000` |
+| timeout_ms | integer | NOT NULL DEFAULT `2500`, CHECK `500..5000` |
 | interval_seconds | integer | NOT NULL, CHECK `>= 30` |
 | failure_threshold | integer | NOT NULL DEFAULT `3`, CHECK `1..10` |
 | recovery_threshold | integer | NOT NULL DEFAULT `2`, CHECK `1..10` |
@@ -1279,7 +1279,7 @@ Hosted availability checks are project-scoped external HTTP checks executed by D
   "method": "GET",
   "expected_status_min": 200,
   "expected_status_max": 399,
-  "timeout_ms": 5000,
+  "timeout_ms": 2500,
   "interval_seconds": 300,
   "failure_threshold": 3,
   "recovery_threshold": 2,

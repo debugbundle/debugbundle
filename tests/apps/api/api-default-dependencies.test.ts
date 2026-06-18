@@ -34,6 +34,7 @@ const {
   createPostgresWebhookDeliveryStoreMock,
   createPostgresGitHubStoreMock,
   createPostgresGitHubMarketplaceStoreMock,
+  createPostgresIngestionRejectionDiagnosticStoreMock,
   createIngestionMetadataServiceMock,
   createIncidentLifecycleServiceMock,
   createSesEmailTransportMock,
@@ -76,6 +77,7 @@ const {
   createPostgresWebhookDeliveryStoreMock: vi.fn(),
   createPostgresGitHubStoreMock: vi.fn(),
   createPostgresGitHubMarketplaceStoreMock: vi.fn(),
+  createPostgresIngestionRejectionDiagnosticStoreMock: vi.fn(),
   createIngestionMetadataServiceMock: vi.fn(),
   createIncidentLifecycleServiceMock: vi.fn(),
   createSesEmailTransportMock: vi.fn(),
@@ -141,6 +143,7 @@ vi.mock("../../../packages/storage/src/index.js", () => ({
   createPostgresWebhookDeliveryStore: createPostgresWebhookDeliveryStoreMock,
   createPostgresGitHubStore: createPostgresGitHubStoreMock,
   createPostgresGitHubMarketplaceStore: createPostgresGitHubMarketplaceStoreMock,
+  createPostgresIngestionRejectionDiagnosticStore: createPostgresIngestionRejectionDiagnosticStoreMock,
   createIngestionMetadataService: createIngestionMetadataServiceMock,
   createIncidentLifecycleService: createIncidentLifecycleServiceMock,
   createPostgresBillingSyncStore: createPostgresBillingSyncStoreMock,
@@ -237,6 +240,7 @@ describe("api default dependencies", () => {
     createPostgresWeeklyReportChannelStoreMock.mockReset();
     createPostgresWebhookDeliveryStoreMock.mockReset();
     createPostgresGitHubMarketplaceStoreMock.mockReset();
+    createPostgresIngestionRejectionDiagnosticStoreMock.mockReset();
     createIngestionMetadataServiceMock.mockReset();
     createIncidentLifecycleServiceMock.mockReset();
     createSesEmailTransportMock.mockReset();

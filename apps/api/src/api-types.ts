@@ -591,7 +591,7 @@ export interface ApiDependencies {
       project_id?: string;
       environment?: string;
       service?: string;
-      status?: "open" | "resolved" | "regressed";
+      status?: "active" | "open" | "resolved" | "regressed";
       severity?: "low" | "medium" | "high" | "critical";
       cursor?: { last_seen_at: string; incident_id: string };
       limit: number;

@@ -22,6 +22,7 @@ import type {
   DeletedAccountRecord,
   DeletedProjectRecord,
   IncidentRecord,
+  IncidentStatusFilter,
   ImprovementRecord,
   MemberTokenRecord,
   ProbeActivationRecord,
@@ -94,6 +95,7 @@ function normalizeProjectRecord(
     metrics: {
       open_incidents: project.metrics?.open_incidents ?? 0,
       regressed_incidents: project.metrics?.regressed_incidents ?? 0,
+      attention_incidents_today: project.metrics?.attention_incidents_today ?? project.metrics?.opened_incidents_today ?? 0,
       opened_incidents_today: project.metrics?.opened_incidents_today ?? 0,
       opened_incidents_month: project.metrics?.opened_incidents_month ?? 0,
       monthly_bundle_requests: project.metrics?.monthly_bundle_requests ?? 0,
@@ -226,7 +228,7 @@ export async function listIncidents(
         projectId?: string;
         environment?: string;
         service?: string;
-        status?: IncidentRecord["status"];
+        status?: IncidentStatusFilter;
         severity?: IncidentRecord["severity"];
         firstSeenAfter?: string;
       } = 20,
@@ -1165,7 +1167,7 @@ export async function listProjectIncidents(
   projectId: string,
   limit = 50,
   cursor?: string,
-  status?: IncidentRecord["status"]
+  status?: IncidentStatusFilter
 ): Promise<{ incidents: IncidentRecord[]; nextCursor: string | null }> {
   const searchParams = new URLSearchParams({
     project_id: projectId,

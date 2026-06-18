@@ -208,7 +208,8 @@ describe("mcp retrieval tools artifacts", () => {
       next_cursor: null
     });
     expect(listIncidents).toHaveBeenCalledWith({
-      bearerToken: "dbundle_mem_x"
+      bearerToken: "dbundle_mem_x",
+      status: "active"
     });
     expect(getLogs).toHaveBeenCalledWith({
       bearerToken: "dbundle_mem_x",

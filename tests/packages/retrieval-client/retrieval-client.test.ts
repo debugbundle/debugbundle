@@ -27,7 +27,8 @@ describe("retrieval api client", () => {
             spike_detected_at: null,
             resolved_at: null,
             regressed_at: null,
-            matched_fields: ["fingerprint"]
+            matched_fields: ["fingerprint"],
+            api_added_field: "future-safe"
           }
         ]
       }
@@ -280,6 +281,15 @@ describe("retrieval api client", () => {
           fields: ["request.headers.authorization"],
           notes: "sensitive headers removed"
         },
+        browser_signal: {
+          browser_event_kind: "error",
+          browser_event_opaque: false,
+          browser_event_message: "Window error",
+          client_kind: "human",
+          bot_family: null,
+          api_added_field: "future-safe"
+        },
+        api_added_field: "future-safe",
         suggested_next_checks: ["Inspect the POST /checkout handler behind this 5xx path."]
       }
     });
@@ -288,6 +298,7 @@ describe("retrieval api client", () => {
     const context = await api.getIncidentContext({ bearerToken: "dbundle_mem_x", incidentId: "inc_123" });
 
     expect(context.primary_signal.response_status).toBe(503);
+    expect(context.browser_signal?.browser_event_kind).toBe("error");
     expect(context.grouping.matched_fields).toEqual(["route_template"]);
     expect(context.visibility.bundle_regeneration).toContain("regression reopen");
     expect(request).toHaveBeenCalledWith({

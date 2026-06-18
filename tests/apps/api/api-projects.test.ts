@@ -141,6 +141,7 @@ describe("api project routes", () => {
           metrics: {
             open_incidents: 5,
             regressed_incidents: 1,
+            attention_incidents_today: 2,
             opened_incidents_today: 2,
             opened_incidents_month: 7,
             monthly_bundle_requests: 12,
@@ -179,6 +180,7 @@ describe("api project routes", () => {
           metrics: {
             open_incidents: 5,
             regressed_incidents: 1,
+            attention_incidents_today: 2,
             opened_incidents_today: 2,
             opened_incidents_month: 7,
             monthly_bundle_requests: 12,
@@ -232,6 +234,7 @@ describe("api project routes", () => {
           metrics: {
             open_incidents: 1,
             regressed_incidents: 0,
+            attention_incidents_today: 0,
             opened_incidents_today: 0,
             opened_incidents_month: 1,
             monthly_bundle_requests: 1,
@@ -276,6 +279,7 @@ describe("api project routes", () => {
           metrics: {
             open_incidents: 1,
             regressed_incidents: 0,
+            attention_incidents_today: 0,
             opened_incidents_today: 0,
             opened_incidents_month: 1,
             monthly_bundle_requests: 1,
@@ -303,6 +307,7 @@ describe("api project routes", () => {
         metrics: {
           open_incidents: 0,
           regressed_incidents: 0,
+          attention_incidents_today: 0,
           opened_incidents_today: 0,
           opened_incidents_month: 0,
           monthly_bundle_requests: 0,
@@ -337,6 +342,7 @@ describe("api project routes", () => {
       name: "Main App",
       slug: "main-app",
       environment_default: "production",
+      color_tag: null,
       weekly_report_timezone: "UTC"
     });
   });
@@ -424,6 +430,7 @@ describe("api project routes", () => {
         metrics: {
           open_incidents: 5,
           regressed_incidents: 1,
+          attention_incidents_today: 2,
           opened_incidents_today: 2,
           opened_incidents_month: 7,
           monthly_bundle_requests: 12,
@@ -479,6 +486,7 @@ describe("api project routes", () => {
       name: "Main App",
       slug: "main-app",
       environment_default: "staging",
+      color_tag: null,
       weekly_report_timezone: "Europe/Ljubljana"
     });
   });

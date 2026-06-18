@@ -307,6 +307,9 @@ export async function listLocalIncidents(
       if (input.status === undefined || input.status === "all") {
         return true;
       }
+      if (input.status === "active") {
+        return incident.status === "open";
+      }
 
       return incident.status === input.status;
     })

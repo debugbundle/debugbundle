@@ -28,7 +28,7 @@ import { useCursorPagination } from "../lib/use-cursor-pagination.js";
 
 export function IncidentsPage(): JSX.Element {
   const navigate = useNavigate();
-  const [statusFilter, setStatusFilter] = useState<IncidentStatusFilter>("open");
+  const [statusFilter, setStatusFilter] = useState<IncidentStatusFilter>("active");
   const [sort, setSort] = useState<SortState<IncidentSortField>>({
     field: "last_seen_at",
     direction: "desc"
@@ -297,10 +297,10 @@ const severityVariantMap: Record<IncidentRecord["severity"], "secondary" | "warn
   critical: "destructive"
 };
 
-const statusVariantMap: Record<IncidentRecord["status"], "secondary" | "warning" | "success"> = {
+const statusVariantMap: Record<IncidentRecord["status"], "destructive" | "warning" | "success"> = {
   open: "warning",
   resolved: "success",
-  regressed: "secondary"
+  regressed: "destructive"
 };
 
 function formatOccurrenceSummary(value: number): string {
@@ -319,17 +319,23 @@ function formatServiceName(value: string | null): string {
 }
 
 type IncidentSortField = "title" | "project_name" | "service_name" | "environment" | "severity" | "status" | "occurrence_count" | "last_seen_at";
-type IncidentStatusFilter = IncidentRecord["status"] | "all";
+type IncidentStatusFilter = "active" | IncidentRecord["status"] | "all";
 
 const INCIDENT_STATUS_FILTER_OPTIONS: Array<{ value: IncidentStatusFilter; label: string }> = [
+  { value: "active", label: "Needs attention" },
   { value: "open", label: "Open" },
+  { value: "regressed", label: "Regressed" },
   { value: "all", label: "All statuses" },
-  { value: "resolved", label: "Resolved" },
-  { value: "regressed", label: "Regressed" }
+  { value: "resolved", label: "Resolved" }
 ];
 
 function getWorkspaceIncidentEmptyState(statusFilter: IncidentStatusFilter): { title: string; description: string } {
   switch (statusFilter) {
+    case "active":
+      return {
+        title: "No incidents need attention",
+        description: "Open and regressed incidents will appear here when grouped failures need attention."
+      };
     case "open":
       return {
         title: "No open incidents",
@@ -365,9 +371,9 @@ function sortIncidents(incidents: IncidentRecord[] | null, sort: SortState<Incid
     critical: 3
   };
   const statusRank: Record<IncidentRecord["status"], number> = {
-    open: 0,
-    regressed: 1,
-    resolved: 2
+    resolved: 0,
+    open: 1,
+    regressed: 2
   };
 
   const sorted = [...incidents].sort((left, right) => {

@@ -56,7 +56,7 @@ describe("cli retrieval commands core", () => {
 
     expect(result.exitCode).toBe(0);
     expect(result.output).toBe(incidentsListGolden);
-    expect(listIncidents).toHaveBeenCalledWith({ bearerToken: "dbundle_mem_x" });
+    expect(listIncidents).toHaveBeenCalledWith({ bearerToken: "dbundle_mem_x", status: "active" });
   });
 
   it("renders mixed-source incident rows with explicit and unknown source labels", async () => {
@@ -557,6 +557,22 @@ describe("cli retrieval commands core", () => {
     expect(result.output).toContain("incident_not_found");
   });
 
+  it("suggests updating the CLI when cloud retrieval returns an unparseable success payload", async () => {
+    const result = await getIncidentContextCommand(
+      {
+        bearerToken: "dbundle_mem_x",
+        incidentId: "inc_123"
+      },
+      {
+        getIncidentContext: vi.fn().mockRejectedValue(new RetrievalApiError(200, "invalid_response_shape"))
+      }
+    );
+
+    expect(result.exitCode).toBe(1);
+    expect(result.output).toContain("retrieval_api_error: 200:invalid_response_shape");
+    expect(result.output).toContain("Update DebugBundle CLI and retry: npm install -g @debugbundle/cli@latest");
+  });
+
   it("forwards log filters and preserves next_cursor in json mode", async () => {
     const getLogs = vi.fn().mockResolvedValue({
       logs: [
@@ -705,6 +721,7 @@ describe("cli retrieval commands core", () => {
     expect(listIncidents).toHaveBeenCalledWith({
       bearerToken: "dbundle_mem_saved",
       projectId: "proj_123",
+      status: "active",
       firstSeenAfter: "2026-03-17T00:00:00.000Z"
     });
     expect(result.exitCode).toBe(0);
@@ -755,6 +772,7 @@ describe("cli retrieval commands core", () => {
 
     expect(listIncidents).toHaveBeenCalledWith({
       bearerToken: "dbundle_mem_saved",
+      status: "active",
       firstSeenAfter: "2026-03-17T00:00:00.000Z"
     });
     expect(JSON.parse(result.output)).toEqual({
@@ -765,6 +783,47 @@ describe("cli retrieval commands core", () => {
         })
       ],
       next_cursor: null
+    });
+  });
+
+  it("omits the incident status filter when all statuses are requested", async () => {
+    const readAuthState = vi.fn().mockResolvedValue({
+      bearer_token: "dbundle_mem_saved",
+      base_url: "https://selfhost.debugbundle.test"
+    });
+    const httpClient = { request: vi.fn() };
+    const createHttpClient = vi.fn().mockReturnValue(httpClient);
+    const listIncidents = vi.fn().mockResolvedValue({
+      incidents: [],
+      next_cursor: null
+    });
+    const createApi = vi.fn().mockReturnValue({
+      listIncidents,
+      getIncident: vi.fn(),
+      getIncidentContext: vi.fn(),
+      getBundle: vi.fn(),
+      listLogs: vi.fn(),
+      getReproduction: vi.fn(),
+      listServices: vi.fn()
+    });
+
+    const result = await listIncidentsWithAuthCommand(
+      {
+        authFilePath: "/tmp/auth.json",
+        source: "cloud",
+        status: "all",
+        json: true
+      },
+      {
+        readAuthState,
+        createHttpClient,
+        createApi
+      }
+    );
+
+    expect(result.exitCode).toBe(0);
+    expect(listIncidents).toHaveBeenCalledWith({
+      bearerToken: "dbundle_mem_saved"
     });
   });
 
@@ -874,7 +933,8 @@ describe("cli retrieval commands core", () => {
     );
 
     expect(listIncidents).toHaveBeenCalledWith({
-      bearerToken: "dbundle_mem_saved"
+      bearerToken: "dbundle_mem_saved",
+      status: "active"
     });
     expect(getBundle).toHaveBeenCalledWith({
       bearerToken: "dbundle_mem_saved",
@@ -1162,7 +1222,8 @@ describe("cli retrieval commands core", () => {
 
     expect(result.exitCode).toBe(0);
     expect(listIncidents).toHaveBeenCalledWith({
-      bearerToken: "dbundle_mem_saved"
+      bearerToken: "dbundle_mem_saved",
+      status: "active"
     });
     expect(JSON.parse(result.output)).toEqual({
       incidents: expect.arrayContaining([

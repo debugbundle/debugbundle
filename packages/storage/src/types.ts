@@ -283,6 +283,7 @@ export interface ProjectRecord {
   metrics: {
     open_incidents: number;
     regressed_incidents: number;
+    attention_incidents_today: number;
     opened_incidents_today: number;
     opened_incidents_month: number;
     monthly_bundle_requests: number;
@@ -818,6 +819,8 @@ export interface IncidentRetrievalRecord extends Record<string, unknown> {
   incident_reason?: IncidentReason;
 }
 
+export type IncidentRetrievalStatusFilter = "active" | IncidentRetrievalRecord["status"];
+
 export interface ImprovementRetrievalRecord extends Record<string, unknown> {
   improvement_id: string;
   project_id: string;
@@ -958,7 +961,7 @@ export interface MetadataStore {
     project_id?: string;
     environment?: string;
     service?: string;
-    status?: "open" | "resolved" | "regressed";
+    status?: IncidentRetrievalStatusFilter;
     severity?: "low" | "medium" | "high" | "critical";
     first_seen_after?: string;
     cursor?: IncidentsCursor;

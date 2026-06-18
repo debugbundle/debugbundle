@@ -68,6 +68,7 @@ describe("web app — management routes", () => {
               metrics: {
                 open_incidents: 12,
                 regressed_incidents: 4,
+                attention_incidents_today: 1,
                 opened_incidents_today: 1,
                 opened_incidents_month: 6
               }
@@ -451,7 +452,7 @@ describe("web app — management routes", () => {
         });
       }
 
-      if (url.endsWith("/v1/incidents?limit=20&status=open") && init?.method === undefined) {
+      if (url.endsWith("/v1/incidents?limit=20&status=active") && init?.method === undefined) {
         return jsonResponse(200, {
           incidents: [anomalyIncident],
           next_cursor: null
@@ -487,7 +488,7 @@ describe("web app — management routes", () => {
       await screen.findByRole("heading", { name: /incidents/i, level: 1 })
     ).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /incidents/i })).toHaveAttribute("href", "/incidents");
-    expect(screen.getByRole("combobox", { name: /status/i })).toHaveTextContent(/^open$/i);
+    expect(screen.getByRole("combobox", { name: /status/i })).toHaveTextContent(/^needs attention$/i);
     expect(
       await screen.findByText(/request anomaly: get \/checkout\/:orderid returned 404 repeatedly/i)
     ).toBeInTheDocument();
@@ -598,7 +599,7 @@ describe("web app — management routes", () => {
         });
       }
 
-      if (url.endsWith("/v1/incidents?limit=20&status=open") && init?.method === undefined) {
+      if (url.endsWith("/v1/incidents?limit=20&status=active") && init?.method === undefined) {
         return jsonResponse(200, {
           incidents: [],
           next_cursor: null
@@ -615,8 +616,8 @@ describe("web app — management routes", () => {
     expect(
       await screen.findByRole("heading", { name: /incidents/i, level: 1 })
     ).toBeInTheDocument();
-    expect(await screen.findByText(/no open incidents/i)).toBeInTheDocument();
-    expect(screen.getByText(/incoming open incidents will appear here/i)).toBeInTheDocument();
+    expect(await screen.findByText(/no incidents need attention/i)).toBeInTheDocument();
+    expect(screen.getByText(/open and regressed incidents will appear here/i)).toBeInTheDocument();
   });
 
   it("creates a project and opens its overview directly", async () => {
@@ -3775,6 +3776,7 @@ describe("web app — management routes", () => {
               metrics: {
                 open_incidents: 7,
                 regressed_incidents: 1,
+                attention_incidents_today: 2,
                 opened_incidents_today: 2,
                 opened_incidents_month: 9,
                 monthly_bundle_requests: 14,
@@ -3790,6 +3792,7 @@ describe("web app — management routes", () => {
               metrics: {
                 open_incidents: 5,
                 regressed_incidents: 2,
+                attention_incidents_today: 1,
                 opened_incidents_today: 1,
                 opened_incidents_month: 6,
                 monthly_bundle_requests: 8,
@@ -3848,13 +3851,13 @@ describe("web app — management routes", () => {
 
     await waitFor(() => {
       expect(cardWithValueExists("Open incidents", /^12$/)).toBe(true);
-      expect(cardWithValueExists("New incidents today", /^3$/)).toBe(true);
+      expect(cardWithValueExists("Incidents today", /^3$/)).toBe(true);
       expect(cardWithValueExists("Opened this month", /^15$/)).toBe(true);
       expect(cardWithValueExists("Regressed incidents", /^3$/)).toBe(true);
     });
 
     expect(screen.getByText(/current unresolved incidents across all projects/i)).toBeInTheDocument();
-    expect(screen.getByText(/incidents first seen today across all projects/i)).toBeInTheDocument();
+    expect(screen.getByText(/opened or regressed today across all projects/i)).toBeInTheDocument();
     expect(screen.getByText(/incidents opened this month across all projects/i)).toBeInTheDocument();
     expect(screen.getByText(/current regressed incidents across all projects/i)).toBeInTheDocument();
     expect(fetchMock.mock.calls.some(([input]) => requestUrl(input).endsWith("/v1/billing"))).toBe(
@@ -3956,7 +3959,7 @@ describe("web app — management routes", () => {
     render(<App initialEntries={["/dashboard"]} />);
 
     await screen.findByRole("heading", { name: /incidents today/i });
-    await user.click(screen.getByRole("button", { name: /new incidents today/i }));
+    await user.click(screen.getByRole("button", { name: /incidents today/i }));
 
     expect(scrollIntoView).toHaveBeenCalledTimes(1);
     expect(scrollIntoView).toHaveBeenCalledWith({
@@ -3989,6 +3992,7 @@ describe("web app — management routes", () => {
               title: "Checkout timeout",
               project_id: "proj_456",
               project_name: "Worker",
+              project_color_tag: "emerald",
               service_name: null,
               environment: "production",
               severity: "critical",
@@ -4012,9 +4016,11 @@ describe("web app — management routes", () => {
     const incidentsTodayCard = heading.closest('[data-slot="card"]');
     expect(incidentsTodayCard).not.toBeNull();
     const card = within(incidentsTodayCard as HTMLElement);
+    const cardElement = incidentsTodayCard as HTMLElement;
 
     expect(await card.findByRole("link", { name: /checkout timeout/i })).toBeInTheDocument();
     expect(card.getByRole("link", { name: /worker/i })).toBeInTheDocument();
+    expect(cardElement.querySelector('[data-project-color-tag="emerald"]')).not.toBeNull();
     expect(card.getByText(/unknown service/i)).toBeInTheDocument();
     expect(card.getByRole("columnheader", { name: /environment/i })).toBeInTheDocument();
     expect(card.getByText(/^production$/i)).toBeInTheDocument();
@@ -4901,8 +4907,8 @@ describe("web app — management routes", () => {
     render(<App initialEntries={[`/projects/${project.project_id}/incidents`]} />);
 
     const statusFilter = await screen.findByRole("combobox", { name: /status/i });
-    expect(await screen.findByText(/no open incidents for this project/i)).toBeInTheDocument();
-    expect(statusFilter).toHaveTextContent(/^open$/i);
+    expect(await screen.findByText(/no incidents need attention for this project/i)).toBeInTheDocument();
+    expect(statusFilter).toHaveTextContent(/^needs attention$/i);
 
     await chooseSelectOption(user, /status/i, /^resolved$/i);
     expect(await screen.findByText(/no resolved incidents for this project/i)).toBeInTheDocument();
@@ -4941,8 +4947,8 @@ describe("web app — management routes", () => {
     render(<App initialEntries={[`/projects/${project.project_id}/bundles`]} />);
 
     const statusFilter = await screen.findByRole("combobox", { name: /status/i });
-    expect(await screen.findByText(/no bundles for open incidents/i)).toBeInTheDocument();
-    expect(statusFilter).toHaveTextContent(/^open$/i);
+    expect(await screen.findByText(/no bundles need attention/i)).toBeInTheDocument();
+    expect(statusFilter).toHaveTextContent(/^needs attention$/i);
 
     await chooseSelectOption(user, /status/i, /^resolved$/i);
     expect(await screen.findByText(/no bundles for resolved incidents/i)).toBeInTheDocument();
@@ -4978,7 +4984,7 @@ describe("web app — management routes", () => {
         return jsonResponse(200, { projects: [project] });
       }
 
-      if (url.includes(`/v1/incidents?project_id=${project.project_id}&limit=20&status=open`)) {
+      if (url.includes(`/v1/incidents?project_id=${project.project_id}&limit=20&status=active`)) {
         return jsonResponse(200, { incidents: [incident], next_cursor: null });
       }
 

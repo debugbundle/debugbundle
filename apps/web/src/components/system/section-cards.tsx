@@ -8,7 +8,7 @@ import { listProjects, type ProjectRecord } from "../../lib/api.js";
 interface DashboardMetrics {
   openIncidents: number;
   regressedIncidents: number;
-  openedIncidentsToday: number;
+  attentionIncidentsToday: number;
   openedIncidentsMonth: number;
 }
 
@@ -17,13 +17,13 @@ function aggregateProjectMetrics(projects: ProjectRecord[]): DashboardMetrics {
     (totals, project) => ({
       openIncidents: totals.openIncidents + project.metrics.open_incidents,
       regressedIncidents: totals.regressedIncidents + project.metrics.regressed_incidents,
-      openedIncidentsToday: totals.openedIncidentsToday + project.metrics.opened_incidents_today,
+      attentionIncidentsToday: totals.attentionIncidentsToday + project.metrics.attention_incidents_today,
       openedIncidentsMonth: totals.openedIncidentsMonth + project.metrics.opened_incidents_month
     }),
     {
       openIncidents: 0,
       regressedIncidents: 0,
-      openedIncidentsToday: 0,
+      attentionIncidentsToday: 0,
       openedIncidentsMonth: 0
     }
   );
@@ -41,7 +41,7 @@ export function SectionCards(): JSX.Element {
         setMetrics({
           openIncidents: 0,
           regressedIncidents: 0,
-          openedIncidentsToday: 0,
+          attentionIncidentsToday: 0,
           openedIncidentsMonth: 0
         });
       }
@@ -49,7 +49,7 @@ export function SectionCards(): JSX.Element {
   }, []);
 
   const openIncidents = metrics?.openIncidents;
-  const openedToday = metrics?.openedIncidentsToday;
+  const attentionToday = metrics?.attentionIncidentsToday;
   const openedMonth = metrics?.openedIncidentsMonth;
   const regressedIncidents = metrics?.regressedIncidents;
 
@@ -89,15 +89,15 @@ export function SectionCards(): JSX.Element {
       >
         <Card className="h-full cursor-pointer transition-colors hover:bg-muted/30">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardDescription>New incidents today</CardDescription>
+            <CardDescription>Incidents today</CardDescription>
             <BellRingIcon className="size-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
             <CardTitle className="text-2xl tabular-nums">
-              {openedToday !== undefined ? openedToday.toLocaleString() : "\u2014"}
+              {attentionToday !== undefined ? attentionToday.toLocaleString() : "\u2014"}
             </CardTitle>
             <p className="mt-1 text-xs text-muted-foreground">
-              {openedToday !== undefined ? "Incidents first seen today across all projects" : "Loading\u2026"}
+              {attentionToday !== undefined ? "Opened or regressed today across all projects" : "Loading\u2026"}
             </p>
           </CardContent>
         </Card>

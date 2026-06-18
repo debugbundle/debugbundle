@@ -674,6 +674,20 @@ describe("api retrieval routes", () => {
     });
   });
 
+  it("accepts active as an incident status list filter", async (): Promise<void> => {
+    const app = createServer();
+
+    const response = await app.inject({
+      method: "GET",
+      url: "/v1/incidents?status=active&limit=20",
+      headers: {
+        authorization: "Bearer dbundle_mem_test"
+      }
+    });
+
+    expect(response.statusCode).toBe(200);
+  });
+
   it("should reject invalid incidents cursor values", async (): Promise<void> => {
     const app = createServer();
 

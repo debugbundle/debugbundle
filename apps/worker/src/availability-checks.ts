@@ -1,5 +1,6 @@
 import { gzipSync } from "node:zlib";
 
+import type { RuntimeLogger } from "../../../packages/runtime-logger/src/index.js";
 import { createEventEnvelope, type EventEnvelope } from "../../../packages/shared-types/src/index.js";
 import {
   buildRawEventObjectKey,
@@ -9,6 +10,7 @@ import {
   type IncidentLifecycleService,
   type MetadataStore
 } from "../../../packages/storage/src/index.js";
+import { captureWorkerDogfoodingCapacityWarning } from "./dogfooding.js";
 
 type AvailabilityAlertConditionType =
   | "new_incident"
@@ -116,12 +118,40 @@ export interface ProcessAvailabilityChecksInput {
   objectStore: AvailabilityObjectStore;
   lifecycleWebhookPublisher: AvailabilityLifecycleWebhookPublisher;
   githubDispatchPublisher?: AvailabilityGitHubDispatchPublisher | null;
+  logger?: Pick<RuntimeLogger, "info" | "warn" | "error">;
+  batchSize?: number;
+  concurrency?: number;
+  purgeRetainedDataOnNoDue?: boolean;
   now?: Date;
 }
 
 export interface AvailabilityCheckProcessResult {
   processed: boolean;
   reason?: "no_checks_due" | "check_missing";
+  claimed_count?: number;
+  completed_count?: number;
+  failed_count?: number;
+  oldest_due_lag_ms?: number;
+  timeout_count?: number;
+  avg_duration_ms?: number | null;
+}
+
+interface ClaimedCheckProcessResult {
+  completed: boolean;
+  reason?: "check_missing" | "check_failed";
+  duration_ms?: number;
+  timed_out?: boolean;
+}
+
+interface AvailabilityCapacitySummary {
+  claimed_count: number;
+  completed_count: number;
+  failed_count: number;
+  oldest_due_lag_ms: number;
+  timeout_count: number;
+  avg_duration_ms: number | null;
+  capacity_warning: "none" | "warning" | "critical";
+  saturated: boolean;
 }
 
 function getSyntheticResponseStatus(
@@ -483,35 +513,52 @@ async function recordAvailabilityIncident(input: {
   }
 }
 
-export async function processNextAvailabilityCheck(
-  input: ProcessAvailabilityChecksInput
-): Promise<AvailabilityCheckProcessResult> {
-  const now = input.now ?? new Date();
-  const claimed = await input.availabilityCheckStore.claimNextDueCheck({
-    now: now.toISOString(),
-    claim_timeout_before: new Date(now.getTime() - 5 * 60_000).toISOString()
-  });
+async function runWithConcurrency<Item, Result>(
+  items: Item[],
+  concurrency: number,
+  worker: (item: Item) => Promise<Result>
+): Promise<Result[]> {
+  const results: Result[] = [];
+  let nextIndex = 0;
+  const workerCount = Math.min(Math.max(1, concurrency), items.length);
 
-  if (claimed === null) {
-    await input.availabilityCheckStore.purgeExpiredResults({ now: now.toISOString() });
-    await input.availabilityCheckStore.purgeExpiredDailyRollups({ now: now.toISOString() });
-    return { processed: false, reason: "no_checks_due" };
+  await Promise.all(
+    Array.from({ length: workerCount }, async () => {
+      for (;;) {
+        const index = nextIndex;
+        nextIndex += 1;
+        const item = items[index];
+        if (item === undefined) {
+          return;
+        }
+
+        results[index] = await worker(item);
+      }
+    })
+  );
+
+  return results;
+}
+
+async function processClaimedAvailabilityCheck(
+  input: ProcessAvailabilityChecksInput & {
+    check: ClaimedAvailabilityCheck;
   }
-
+): Promise<ClaimedCheckProcessResult> {
   const startedAt = new Date().toISOString();
-  const result = await executeAvailabilityCheck(claimed);
+  const result = await executeAvailabilityCheck(input.check);
   const completedAt = new Date().toISOString();
   const recorded = await input.availabilityCheckStore.recordCheckExecution({
-    check_id: claimed.check_id,
-    claimed_at: claimed.claimed_at,
+    check_id: input.check.check_id,
+    claimed_at: input.check.claimed_at,
     started_at: startedAt,
     completed_at: completedAt,
-    scheduled_for: claimed.due_at,
+    scheduled_for: input.check.due_at,
     result
   });
 
   if (recorded === null) {
-    return { processed: true, reason: "check_missing" };
+    return { completed: false, reason: "check_missing" };
   }
 
   if (recorded.emit_failure_event) {
@@ -552,5 +599,172 @@ export async function processNextAvailabilityCheck(
     });
   }
 
-  return { processed: true };
+  return {
+    completed: true,
+    duration_ms: recorded.result.duration_ms,
+    timed_out: recorded.result.status === "timeout"
+  };
+}
+
+function summarizeAvailabilityCapacity(input: {
+  now: Date;
+  checks: ClaimedAvailabilityCheck[];
+  batchSize: number;
+  concurrency: number;
+  results: ClaimedCheckProcessResult[];
+}): AvailabilityCapacitySummary {
+  const completedResults = input.results.filter((result) => result.completed);
+  const durationTotal = completedResults.reduce((sum, result) => sum + (result.duration_ms ?? 0), 0);
+  const oldestDueLagMs = input.checks.reduce((oldest, check) => {
+    const lag = input.now.getTime() - new Date(check.due_at).getTime();
+    return Math.max(oldest, Number.isFinite(lag) ? lag : 0);
+  }, 0);
+  const minIntervalMs = input.checks.reduce((min, check) => {
+    const intervalMs = check.interval_seconds * 1000;
+    return Math.min(min, intervalMs);
+  }, Number.POSITIVE_INFINITY);
+  const thresholdMs = Number.isFinite(minIntervalMs) ? minIntervalMs : 30_000;
+  const saturated = input.checks.length >= input.batchSize;
+  const capacityWarning =
+    oldestDueLagMs > thresholdMs * 2
+      ? "critical"
+      : oldestDueLagMs > thresholdMs || (saturated && oldestDueLagMs > 5_000)
+        ? "warning"
+        : "none";
+
+  return {
+    claimed_count: input.checks.length,
+    completed_count: completedResults.length,
+    failed_count: input.results.filter((result) => result.reason === "check_failed").length,
+    oldest_due_lag_ms: Math.max(0, oldestDueLagMs),
+    timeout_count: input.results.filter((result) => result.timed_out === true).length,
+    avg_duration_ms: completedResults.length === 0 ? null : durationTotal / completedResults.length,
+    capacity_warning: capacityWarning,
+    saturated
+  };
+}
+
+export async function processAvailabilityCheckBatch(
+  input: ProcessAvailabilityChecksInput
+): Promise<AvailabilityCheckProcessResult> {
+  const now = input.now ?? new Date();
+  const batchSize = Math.max(1, input.batchSize ?? 1);
+  const concurrency = Math.max(1, Math.min(input.concurrency ?? 1, batchSize));
+  const claimInput = {
+    now: now.toISOString(),
+    claim_timeout_before: new Date(now.getTime() - 5 * 60_000).toISOString()
+  };
+  const claimed =
+    "claimDueChecks" in input.availabilityCheckStore &&
+    typeof input.availabilityCheckStore.claimDueChecks === "function"
+      ? await input.availabilityCheckStore.claimDueChecks({
+          ...claimInput,
+          limit: batchSize
+        })
+      : await input.availabilityCheckStore.claimNextDueCheck(claimInput).then((check) =>
+          check === null ? [] : [check]
+        );
+
+  if (claimed.length === 0) {
+    if (input.purgeRetainedDataOnNoDue !== false) {
+      await input.availabilityCheckStore.purgeExpiredResults({ now: now.toISOString() });
+      await input.availabilityCheckStore.purgeExpiredDailyRollups({ now: now.toISOString() });
+    }
+    return { processed: false, reason: "no_checks_due" };
+  }
+
+  const results = await runWithConcurrency(claimed, concurrency, async (check) => {
+    try {
+      return await processClaimedAvailabilityCheck({
+        ...input,
+        check
+      });
+    } catch (error) {
+      input.logger?.error(
+        {
+          error_message: error instanceof Error ? error.message : "availability_check_failed",
+          check_id: check.check_id,
+          project_id: check.project_id
+        },
+        "availability_check_failed"
+      );
+      return { completed: false, reason: "check_failed" as const };
+    }
+  });
+
+  const summary = summarizeAvailabilityCapacity({
+    now,
+    checks: claimed,
+    batchSize,
+    concurrency,
+    results
+  });
+
+  if (summary.claimed_count !== undefined && summary.claimed_count > 0) {
+    input.logger?.info(
+      {
+        claimed_count: summary.claimed_count,
+        completed_count: summary.completed_count,
+        failed_count: summary.failed_count,
+        oldest_due_lag_ms: summary.oldest_due_lag_ms,
+        timeout_count: summary.timeout_count,
+        avg_duration_ms: summary.avg_duration_ms,
+        concurrency,
+        batch_size: batchSize,
+        saturated: summary.saturated
+      },
+      "availability_check_batch_processed"
+    );
+  }
+
+  if (summary.capacity_warning !== "none") {
+    input.logger?.warn(
+      {
+        severity: summary.capacity_warning,
+        oldest_due_lag_ms: summary.oldest_due_lag_ms,
+        claimed_count: summary.claimed_count,
+        concurrency,
+        batch_size: batchSize,
+        timeout_count: summary.timeout_count,
+        avg_duration_ms: summary.avg_duration_ms,
+        saturated: summary.saturated
+      },
+      "availability_check_capacity_warning"
+    );
+    captureWorkerDogfoodingCapacityWarning({
+      severity: summary.capacity_warning,
+      oldest_due_lag_ms: summary.oldest_due_lag_ms ?? 0,
+      claimed_count: summary.claimed_count ?? claimed.length,
+      concurrency,
+      batch_size: batchSize,
+      timeout_count: summary.timeout_count ?? 0,
+      avg_duration_ms: summary.avg_duration_ms ?? null,
+      saturated: summary.saturated
+    });
+  }
+
+  return {
+    processed: true,
+    ...(claimed.length === 1 && results[0]?.reason === "check_missing" ? { reason: "check_missing" as const } : {}),
+    claimed_count: summary.claimed_count,
+    completed_count: summary.completed_count,
+    failed_count: summary.failed_count,
+    oldest_due_lag_ms: summary.oldest_due_lag_ms,
+    timeout_count: summary.timeout_count,
+    avg_duration_ms: summary.avg_duration_ms
+  };
+}
+
+export async function processNextAvailabilityCheck(
+  input: ProcessAvailabilityChecksInput
+): Promise<AvailabilityCheckProcessResult> {
+  const result = await processAvailabilityCheckBatch({
+    ...input,
+    batchSize: 1,
+    concurrency: 1
+  });
+
+  return result.reason === undefined
+    ? { processed: result.processed }
+    : { processed: result.processed, reason: result.reason };
 }

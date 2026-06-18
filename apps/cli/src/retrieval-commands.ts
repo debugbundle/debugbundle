@@ -76,6 +76,18 @@ function mapErrorToExitCode(error: unknown): number {
   return 1;
 }
 
+function formatRetrievalErrorOutput(error: unknown): string {
+  const message = error instanceof Error ? error.message : String(error);
+  if (error instanceof RetrievalApiError && error.status === 200 && error.code === "invalid_response_shape") {
+    return [
+      message,
+      "The cloud API returned a success response that this CLI version could not parse. Update DebugBundle CLI and retry: npm install -g @debugbundle/cli@latest"
+    ].join("\n");
+  }
+
+  return message;
+}
+
 function formatIncidentTable(incidents: IncidentLike[]): string {
   if (incidents.length === 0) {
     return "No incidents found.";
@@ -213,7 +225,7 @@ type AuthenticatedRetrievalDependencies = Parameters<typeof createAuthenticatedR
 function mapErrorToResult(error: unknown): CliCommandResult {
   return {
     exitCode: mapErrorToExitCode(error),
-    output: error instanceof Error ? error.message : String(error)
+    output: formatRetrievalErrorOutput(error)
   };
 }
 
@@ -372,6 +384,14 @@ function mapAuthOrRetrievalError(error: unknown): CliCommandResult {
   return mapCliAuthErrorToResult(error) ?? mapErrorToResult(error);
 }
 
+function resolveIncidentListStatusFilter(status: string | undefined): string | undefined {
+  if (status === "all") {
+    return undefined;
+  }
+
+  return status ?? "active";
+}
+
 export async function listIncidentsCommand(
   input: {
     bearerToken: string;
@@ -400,6 +420,7 @@ export async function listIncidentsCommand(
   }
 ): Promise<CliCommandResult> {
   try {
+    const statusFilter = resolveIncidentListStatusFilter(input.status);
     const requestInput: {
       bearerToken: string;
       projectId?: string;
@@ -423,8 +444,8 @@ export async function listIncidentsCommand(
     if (input.service !== undefined) {
       requestInput.service = input.service;
     }
-    if (input.status !== undefined) {
-      requestInput.status = input.status;
+    if (statusFilter !== undefined) {
+      requestInput.status = statusFilter;
     }
     if (input.severity !== undefined) {
       requestInput.severity = input.severity;
@@ -452,7 +473,7 @@ export async function listIncidentsCommand(
       output: formatIncidentTable(incidents.incidents)
     };
   } catch (error) {
-    return { exitCode: mapErrorToExitCode(error), output: error instanceof Error ? error.message : String(error) };
+    return { exitCode: mapErrorToExitCode(error), output: formatRetrievalErrorOutput(error) };
   }
 }
 
@@ -472,6 +493,8 @@ export async function listIncidentsWithAuthCommand(
   },
   dependencies?: AuthenticatedRetrievalDependencies
 ): Promise<CliCommandResult> {
+  const statusFilter = resolveIncidentListStatusFilter(input.status);
+
   if (await shouldUseLocalRetrieval(input.source, dependencies)) {
     try {
       const incidents = await listLocalIncidents(
@@ -479,7 +502,7 @@ export async function listIncidentsWithAuthCommand(
           ...(input.projectId === undefined ? {} : { projectId: input.projectId }),
           ...(input.environment === undefined ? {} : { environment: input.environment }),
           ...(input.service === undefined ? {} : { service: input.service }),
-          ...(input.status === undefined ? {} : { status: input.status }),
+          ...(statusFilter === undefined ? {} : { status: statusFilter }),
           ...(input.severity === undefined ? {} : { severity: input.severity }),
           ...(input.firstSeenAfter === undefined ? {} : { firstSeenAfter: input.firstSeenAfter }),
           ...(input.cursor === undefined ? {} : { cursor: input.cursor }),
@@ -507,7 +530,7 @@ export async function listIncidentsWithAuthCommand(
           ...(input.projectId === undefined ? {} : { projectId: input.projectId }),
           ...(input.environment === undefined ? {} : { environment: input.environment }),
           ...(input.service === undefined ? {} : { service: input.service }),
-          ...(input.status === undefined ? {} : { status: input.status }),
+          ...(statusFilter === undefined ? {} : { status: statusFilter }),
           ...(input.severity === undefined ? {} : { severity: input.severity }),
           ...(input.firstSeenAfter === undefined ? {} : { firstSeenAfter: input.firstSeenAfter }),
           ...(input.cursor === undefined ? {} : { cursor: input.cursor }),
@@ -604,7 +627,7 @@ export async function getIncidentCommand(
       output: formatIncidentDetail(incident)
     };
   } catch (error) {
-    return { exitCode: mapErrorToExitCode(error), output: error instanceof Error ? error.message : String(error) };
+    return { exitCode: mapErrorToExitCode(error), output: formatRetrievalErrorOutput(error) };
   }
 }
 
@@ -662,7 +685,7 @@ export async function getIncidentContextCommand(
       output: input.json ? JSON.stringify(context) : formatIncidentContextDetail(context)
     };
   } catch (error) {
-    return { exitCode: mapErrorToExitCode(error), output: error instanceof Error ? error.message : String(error) };
+    return { exitCode: mapErrorToExitCode(error), output: formatRetrievalErrorOutput(error) };
   }
 }
 
@@ -817,7 +840,7 @@ export async function resolveIncidentCommand(
       output: formatIncidentDetail(incident)
     };
   } catch (error) {
-    return { exitCode: mapErrorToExitCode(error), output: error instanceof Error ? error.message : String(error) };
+    return { exitCode: mapErrorToExitCode(error), output: formatRetrievalErrorOutput(error) };
   }
 }
 
@@ -1045,7 +1068,7 @@ export async function reopenIncidentCommand(
       output: formatIncidentDetail(incident)
     };
   } catch (error) {
-    return { exitCode: mapErrorToExitCode(error), output: error instanceof Error ? error.message : String(error) };
+    return { exitCode: mapErrorToExitCode(error), output: formatRetrievalErrorOutput(error) };
   }
 }
 
@@ -1236,7 +1259,7 @@ export async function getBundleCommand(
       output: input.json ? JSON.stringify(bundle) : formatObjectOutput(bundle)
     };
   } catch (error) {
-    return { exitCode: mapErrorToExitCode(error), output: error instanceof Error ? error.message : String(error) };
+    return { exitCode: mapErrorToExitCode(error), output: formatRetrievalErrorOutput(error) };
   }
 }
 
@@ -1344,7 +1367,7 @@ export async function getLogsCommand(
       output: input.json ? JSON.stringify(logs) : formatLogsTable(logs.logs)
     };
   } catch (error) {
-    return { exitCode: mapErrorToExitCode(error), output: error instanceof Error ? error.message : String(error) };
+    return { exitCode: mapErrorToExitCode(error), output: formatRetrievalErrorOutput(error) };
   }
 }
 
@@ -1406,7 +1429,7 @@ export async function getReproductionCommand(
       output: input.json ? JSON.stringify(reproduction) : formatObjectOutput(reproduction)
     };
   } catch (error) {
-    return { exitCode: mapErrorToExitCode(error), output: error instanceof Error ? error.message : String(error) };
+    return { exitCode: mapErrorToExitCode(error), output: formatRetrievalErrorOutput(error) };
   }
 }
 

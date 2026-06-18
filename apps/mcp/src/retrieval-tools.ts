@@ -89,6 +89,14 @@ async function shouldCombineLocalAndCloudSource(input: Record<string, unknown>):
   return (await readLocalConnectionConfig())?.mode === "connected";
 }
 
+function resolveIncidentListStatusFilter(status: string | undefined): string | undefined {
+  if (status === "all") {
+    return undefined;
+  }
+
+  return status ?? "active";
+}
+
 function readIncidentListFilters(input: Record<string, unknown>): {
   projectId?: string;
   environment?: string;
@@ -119,8 +127,9 @@ function readIncidentListFilters(input: Record<string, unknown>): {
   if (typeof input["service"] === "string") {
     requestInput.service = input["service"];
   }
-  if (typeof input["status"] === "string") {
-    requestInput.status = input["status"];
+  const status = resolveIncidentListStatusFilter(typeof input["status"] === "string" ? input["status"] : undefined);
+  if (status !== undefined) {
+    requestInput.status = status;
   }
   if (typeof input["severity"] === "string") {
     requestInput.severity = input["severity"];

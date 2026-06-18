@@ -113,6 +113,7 @@ describe("postgres metadata store project collaboration", () => {
               metrics: {
                 open_incidents: 4,
                 regressed_incidents: 1,
+                attention_incidents_today: 1,
                 opened_incidents_today: 1,
                 opened_incidents_month: 6,
                 monthly_bundle_requests: 12,
@@ -219,10 +220,12 @@ describe("postgres metadata store project collaboration", () => {
         name: "Checkout App",
         slug: "checkout-app",
         environment_default: "production",
+        color_tag: null,
         organization_plan: "team",
         metrics: {
           open_incidents: 4,
           regressed_incidents: 1,
+          attention_incidents_today: 1,
           opened_incidents_today: 1,
           opened_incidents_month: 6,
           monthly_bundle_requests: 12,
@@ -279,6 +282,7 @@ describe("postgres metadata store project collaboration", () => {
               metrics: {
                 open_incidents: 0,
                 regressed_incidents: 0,
+                attention_incidents_today: 0,
                 opened_incidents_today: 0,
                 opened_incidents_month: 0,
                 monthly_bundle_requests: 0,
@@ -333,10 +337,12 @@ describe("postgres metadata store project collaboration", () => {
         name: "Shared App",
         slug: "shared-app",
         environment_default: "production",
+        color_tag: null,
         organization_plan: "free",
         metrics: {
           open_incidents: 0,
           regressed_incidents: 0,
+          attention_incidents_today: 0,
           opened_incidents_today: 0,
           opened_incidents_month: 0,
           monthly_bundle_requests: 0,

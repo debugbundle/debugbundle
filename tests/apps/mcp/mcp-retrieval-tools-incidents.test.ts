@@ -143,6 +143,39 @@ describe("mcp retrieval tools incidents", () => {
     );
   });
 
+  it("omits the cloud status filter when list_incidents receives status all", async () => {
+    const listIncidents = vi.fn().mockResolvedValue({
+      incidents: [{ incident_id: "inc_resolved" }],
+      next_cursor: null
+    });
+
+    const tools = createRetrievalMcpTools({
+      listIncidents,
+      getIncident: vi.fn(),
+      getIncidentContext: vi.fn(),
+      resolveIncident: vi.fn(),
+      reopenIncident: vi.fn(),
+      getBundle: vi.fn(),
+      getLogs: vi.fn(),
+      getReproduction: vi.fn()
+    });
+
+    await expect(
+      tools.list_incidents({
+        bearerToken: "dbundle_mem_x",
+        source: "cloud",
+        status: "all"
+      })
+    ).resolves.toEqual({
+      incidents: [{ incident_id: "inc_resolved", source: "cloud" }],
+      next_cursor: null
+    });
+
+    expect(listIncidents).toHaveBeenCalledWith({
+      bearerToken: "dbundle_mem_x"
+    });
+  });
+
   it("returns incident payload for resolve_incident", async () => {
     const resolveIncident = vi.fn().mockResolvedValue({
       incident_id: "inc_123",

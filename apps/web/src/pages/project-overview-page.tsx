@@ -73,7 +73,7 @@ export function ProjectOverviewPage(): JSX.Element {
 
 function ProjectStatCards({ project }: { project: ProjectRecord }): JSX.Element {
   const openIncidents = project.metrics.open_incidents;
-  const openedToday = project.metrics.opened_incidents_today;
+  const attentionToday = project.metrics.attention_incidents_today;
   const openedMonth = project.metrics.opened_incidents_month;
   const regressedIncidents = project.metrics.regressed_incidents;
 
@@ -95,12 +95,12 @@ function ProjectStatCards({ project }: { project: ProjectRecord }): JSX.Element 
 
       <Card>
         <CardHeader className="flex flex-row items-center justify-between pb-2">
-          <CardDescription>New incidents today</CardDescription>
+          <CardDescription>Incidents today</CardDescription>
           <BellRingIcon className="size-4 text-muted-foreground" />
         </CardHeader>
         <CardContent>
-          <CardTitle className="text-2xl tabular-nums">{openedToday.toLocaleString()}</CardTitle>
-          <p className="mt-1 text-xs text-muted-foreground">Incidents first seen today in this project</p>
+          <CardTitle className="text-2xl tabular-nums">{attentionToday.toLocaleString()}</CardTitle>
+          <p className="mt-1 text-xs text-muted-foreground">Opened or regressed today in this project</p>
         </CardContent>
       </Card>
 
@@ -135,7 +135,7 @@ function ProjectStatCards({ project }: { project: ProjectRecord }): JSX.Element 
 export function ProjectIncidentsPage(): JSX.Element {
   const navigate = useNavigate();
   const { projectId } = useOutletContext<ProjectContext>();
-  const [statusFilter, setStatusFilter] = useState<ProjectIncidentStatusFilter>("open");
+  const [statusFilter, setStatusFilter] = useState<ProjectIncidentStatusFilter>("active");
   const [sort, setSort] = useState<SortState<ProjectIncidentSortField>>({
     field: "last_seen_at",
     direction: "desc"
@@ -327,7 +327,7 @@ export function ProjectIncidentsPage(): JSX.Element {
 
 export function ProjectBundlesPage(): JSX.Element {
   const { projectId } = useOutletContext<ProjectContext>();
-  const [statusFilter, setStatusFilter] = useState<ProjectIncidentStatusFilter>("open");
+  const [statusFilter, setStatusFilter] = useState<ProjectIncidentStatusFilter>("active");
   const [sort, setSort] = useState<SortState<ProjectBundleSortField>>({
     field: "last_seen_at",
     direction: "desc"
@@ -557,10 +557,10 @@ const severityVariantMap: Record<IncidentRecord["severity"], "secondary" | "warn
   critical: "destructive"
 };
 
-const statusVariantMap: Record<IncidentRecord["status"], "secondary" | "warning" | "success"> = {
+const statusVariantMap: Record<IncidentRecord["status"], "destructive" | "warning" | "success"> = {
   open: "warning",
   resolved: "success",
-  regressed: "secondary"
+  regressed: "destructive"
 };
 
 function formatDate(value: string): string {
@@ -576,17 +576,23 @@ function formatServiceName(value: string | null): string {
 
 type ProjectIncidentSortField = "title" | "service_name" | "environment" | "severity" | "status" | "occurrence_count" | "last_seen_at";
 type ProjectBundleSortField = "title" | "severity" | "status" | "last_seen_at";
-type ProjectIncidentStatusFilter = IncidentRecord["status"] | "all";
+type ProjectIncidentStatusFilter = "active" | IncidentRecord["status"] | "all";
 
 const INCIDENT_STATUS_FILTER_OPTIONS: Array<{ value: ProjectIncidentStatusFilter; label: string }> = [
+  { value: "active", label: "Needs attention" },
   { value: "open", label: "Open" },
+  { value: "regressed", label: "Regressed" },
   { value: "all", label: "All statuses" },
-  { value: "resolved", label: "Resolved" },
-  { value: "regressed", label: "Regressed" }
+  { value: "resolved", label: "Resolved" }
 ];
 
 function getProjectIncidentEmptyState(statusFilter: ProjectIncidentStatusFilter): { title: string; description: string } {
   switch (statusFilter) {
+    case "active":
+      return {
+        title: "No incidents need attention for this project",
+        description: "Open and regressed incidents will appear here when this project has grouped failures that need attention."
+      };
     case "open":
       return {
         title: "No open incidents for this project",
@@ -612,6 +618,11 @@ function getProjectIncidentEmptyState(statusFilter: ProjectIncidentStatusFilter)
 
 function getProjectBundleEmptyState(statusFilter: ProjectIncidentStatusFilter): { title: string; description: string } {
   switch (statusFilter) {
+    case "active":
+      return {
+        title: "No bundles need attention",
+        description: "Bundles for open and regressed incidents will appear here once this project has processed grouped failures."
+      };
     case "open":
       return {
         title: "No bundles for open incidents",
@@ -665,9 +676,9 @@ function compareIncidentLike(
     critical: 3
   };
   const statusRank: Record<IncidentRecord["status"], number> = {
-    open: 0,
-    regressed: 1,
-    resolved: 2
+    resolved: 0,
+    open: 1,
+    regressed: 2
   };
 
   switch (field) {

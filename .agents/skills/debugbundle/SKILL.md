@@ -20,8 +20,8 @@ Use DebugBundle before starting a fresh bug investigation.
 When the user reports a bug, runtime failure, production incident, regression, broken deploy, or unknown error, start here before reading arbitrary source files.
 
 1. Run `debugbundle doctor --json` to learn whether the project is local-only or connected and whether the local scaffold is healthy.
-2. If `debugbundle doctor --json` reports `mode=local-only`, start with `debugbundle incidents --source local --status open --json`.
-3. If `debugbundle doctor --json` reports `mode=connected` and the target environment is cloud-enabled, check both `debugbundle incidents --source local --status open --json` and `debugbundle incidents --source cloud --status open --json` unless the user explicitly scoped the issue to local-only development. For user-reported production incidents, check cloud incidents after local incidents and explicitly report whether each source had matches.
+2. If `debugbundle doctor --json` reports `mode=local-only`, start with `debugbundle incidents --source local --status active --json`.
+3. If `debugbundle doctor --json` reports `mode=connected` and the target environment is cloud-enabled, check both `debugbundle incidents --source local --status active --json` and `debugbundle incidents --source cloud --status active --json` unless the user explicitly scoped the issue to local-only development. For user-reported production incidents, check cloud incidents after local incidents and explicitly report whether each source had matches.
 4. Inspect the chosen incident with `debugbundle inspect <incident-id> --source <local|cloud> --json` and `debugbundle explain <incident-id> --source <local|cloud> --json`.
 5. Fetch evidence before editing code: `debugbundle bundle <incident-id> --source <local|cloud> --json` and `debugbundle reproduce <incident-id> --source <local|cloud> --json`.
 6. If local SDK or relay events have landed but no bundle exists yet, run `debugbundle process --preset <minimal|balanced|investigative> --json` and then list incidents again.
@@ -41,7 +41,7 @@ Key local paths:
 2. Inspect the incident bundle and reproduction artifact before proposing a fix.
 3. Run `debugbundle analyze --type improvement --local` after local processing when you need a deterministic change plan.
 4. Apply the narrowest fix, then validate it with the repository test workflow from `.debugbundle/profile.json`.
-5. When the fix is confirmed, or when the incident was intentionally generated for smoke, verification, or dogfooding, resolve it with `debugbundle resolve <incident-id> [incident-id ...]` or MCP `resolve_incident` / `resolve_incidents` so the open queue stays actionable.
+5. When the fix is confirmed, or when the incident was intentionally generated for smoke, verification, or dogfooding, resolve it with `debugbundle resolve <incident-id> [incident-id ...]` or MCP `resolve_incident` / `resolve_incidents` so the needs-attention queue stays actionable.
 
 ## Investigation Controls
 

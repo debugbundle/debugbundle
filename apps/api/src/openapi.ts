@@ -369,6 +369,7 @@ const ProjectInviteResponseSchema = z.object({ invite: ProjectInviteSchema }).st
 const ProjectUpdateResponseSchema = z.object({ project: DeletedProjectRecordSchema.extend({ metrics: z.object({
   open_incidents: z.number().int().nonnegative(),
   regressed_incidents: z.number().int().nonnegative(),
+  attention_incidents_today: z.number().int().nonnegative(),
   opened_incidents_today: z.number().int().nonnegative(),
   opened_incidents_month: z.number().int().nonnegative(),
   monthly_bundle_requests: z.number().int().nonnegative(),

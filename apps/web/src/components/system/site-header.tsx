@@ -95,6 +95,7 @@ export function SiteHeader(): JSX.Element {
                         metrics: {
                           open_incidents: 0,
                           regressed_incidents: 0,
+                          attention_incidents_today: 0,
                           opened_incidents_today: 0,
                           opened_incidents_month: 0,
                           monthly_bundle_requests: 0,

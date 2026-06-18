@@ -136,7 +136,7 @@ export async function handleHealthCommand(
         method,
         expectedStatusMin: readIntegerOption(parsedArgv, "expected-status-min") ?? 200,
         expectedStatusMax: readIntegerOption(parsedArgv, "expected-status-max") ?? 399,
-        timeoutMs: readIntegerOption(parsedArgv, "timeout-ms") ?? 5000,
+        timeoutMs: readIntegerOption(parsedArgv, "timeout-ms") ?? 2500,
         intervalSeconds,
         failureThreshold: readIntegerOption(parsedArgv, "failure-threshold") ?? 3,
         recoveryThreshold: readIntegerOption(parsedArgv, "recovery-threshold") ?? 2,
@@ -277,7 +277,7 @@ export async function handleHealthCommand(
         method,
         expectedStatusMin: readIntegerOption(parsedArgv, "expected-status-min") ?? 200,
         expectedStatusMax: readIntegerOption(parsedArgv, "expected-status-max") ?? 399,
-        timeoutMs: readIntegerOption(parsedArgv, "timeout-ms") ?? 5000
+        timeoutMs: readIntegerOption(parsedArgv, "timeout-ms") ?? 2500
       })
     );
   }

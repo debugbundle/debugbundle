@@ -83,6 +83,7 @@ describe("postgres metadata store", () => {
           metrics: {
             open_incidents: 5,
             regressed_incidents: 1,
+            attention_incidents_today: 2,
             opened_incidents_today: 2,
             opened_incidents_month: 7,
             monthly_bundle_requests: 12,
@@ -110,6 +111,7 @@ describe("postgres metadata store", () => {
         name: "Main App",
         slug: "main-app",
         environment_default: "production",
+        color_tag: null,
         organization_plan: "free",
         owner_user_id: undefined,
         owner_email: undefined,
@@ -120,6 +122,7 @@ describe("postgres metadata store", () => {
         metrics: {
           open_incidents: 5,
           regressed_incidents: 1,
+          attention_incidents_today: 2,
           opened_incidents_today: 2,
           opened_incidents_month: 7,
           monthly_bundle_requests: 12,
@@ -154,6 +157,7 @@ describe("postgres metadata store", () => {
             metrics: {
               open_incidents: 5,
               regressed_incidents: 1,
+              attention_incidents_today: 2,
               opened_incidents_today: 2,
               opened_incidents_month: 7,
               monthly_bundle_requests: 12,
@@ -211,6 +215,7 @@ describe("postgres metadata store", () => {
             metrics: {
               open_incidents: 5,
               regressed_incidents: 1,
+              attention_incidents_today: 2,
               opened_incidents_today: 2,
               opened_incidents_month: 7,
               monthly_bundle_requests: 12,
@@ -266,6 +271,7 @@ describe("postgres metadata store", () => {
             metrics: {
               open_incidents: 5,
               regressed_incidents: 1,
+              attention_incidents_today: 2,
               opened_incidents_today: 2,
               opened_incidents_month: 7,
               monthly_bundle_requests: 12,
@@ -330,6 +336,7 @@ describe("postgres metadata store", () => {
         metrics: {
           open_incidents: 0,
           regressed_incidents: 0,
+          attention_incidents_today: 0,
           opened_incidents_today: 0,
           opened_incidents_month: 0,
           monthly_bundle_requests: 0,
@@ -359,6 +366,7 @@ describe("postgres metadata store", () => {
               metrics: {
                 open_incidents: 0,
                 regressed_incidents: 0,
+                attention_incidents_today: 0,
                 opened_incidents_today: 0,
                 opened_incidents_month: 0,
                 monthly_bundle_requests: 0,
@@ -386,6 +394,7 @@ describe("postgres metadata store", () => {
               metrics: {
                 open_incidents: 0,
                 regressed_incidents: 0,
+                attention_incidents_today: 0,
                 opened_incidents_today: 0,
                 opened_incidents_month: 0,
                 monthly_bundle_requests: 0,
@@ -494,6 +503,7 @@ describe("postgres metadata store", () => {
           metrics: {
             open_incidents: 0,
             regressed_incidents: 0,
+            attention_incidents_today: 0,
             opened_incidents_today: 0,
             opened_incidents_month: 0,
             monthly_bundle_requests: 0,
@@ -529,6 +539,7 @@ describe("postgres metadata store", () => {
       name: "Main App",
       slug: "main-app",
       environment_default: "production",
+      color_tag: null,
       organization_plan: "free",
       owner_user_id: undefined,
       owner_email: undefined,
@@ -539,6 +550,7 @@ describe("postgres metadata store", () => {
       metrics: {
         open_incidents: 0,
         regressed_incidents: 0,
+        attention_incidents_today: 0,
         opened_incidents_today: 0,
         opened_incidents_month: 0,
         monthly_bundle_requests: 0,
@@ -566,6 +578,7 @@ describe("postgres metadata store", () => {
           metrics: {
             open_incidents: 5,
             regressed_incidents: 1,
+            attention_incidents_today: 2,
             opened_incidents_today: 2,
             opened_incidents_month: 7,
             monthly_bundle_requests: 12,
@@ -602,6 +615,7 @@ describe("postgres metadata store", () => {
       name: "Main App API",
       slug: "main-app-api",
       environment_default: "staging",
+      color_tag: null,
       organization_plan: "free",
       owner_user_id: undefined,
       owner_email: undefined,
@@ -612,6 +626,7 @@ describe("postgres metadata store", () => {
       metrics: {
         open_incidents: 5,
         regressed_incidents: 1,
+        attention_incidents_today: 2,
         opened_incidents_today: 2,
         opened_incidents_month: 7,
         monthly_bundle_requests: 12,
@@ -654,6 +669,7 @@ describe("postgres metadata store", () => {
             metrics: {
               open_incidents: 5,
               regressed_incidents: 1,
+              attention_incidents_today: 2,
               opened_incidents_today: 2,
               opened_incidents_month: 7,
               monthly_bundle_requests: 12,
@@ -688,10 +704,12 @@ describe("postgres metadata store", () => {
       name: "Main App API",
       slug: "main-app-api",
       environment_default: "development",
+      color_tag: null,
       organization_plan: "free",
       metrics: {
         open_incidents: 5,
         regressed_incidents: 1,
+        attention_incidents_today: 2,
         opened_incidents_today: 2,
         opened_incidents_month: 7,
         monthly_bundle_requests: 12,
@@ -746,6 +764,7 @@ describe("postgres metadata store", () => {
       name: "Main App",
       slug: "main-app",
       environment_default: "production",
+      color_tag: null,
       organization_plan: "free",
       owner_user_id: undefined,
       owner_email: undefined,
@@ -877,6 +896,21 @@ describe("postgres metadata store", () => {
         updated_at: "2026-03-15T00:00:00.000Z"
       }
     ]);
+  });
+
+  it("should filter active incident lists to open and regressed incidents", async (): Promise<void> => {
+    const query = vi.fn().mockResolvedValue({ rows: [] });
+    const store = createPostgresMetadataStore({ query });
+
+    await store.listIncidentsForOrganization({
+      organization_id: "org_123",
+      status: "active",
+      limit: 20
+    });
+
+    const sql = String(query.mock.calls[0]?.[0] ?? "");
+    expect(sql).toContain("i.status IN ('open', 'regressed')");
+    expect(query.mock.calls[0]?.[1]).toEqual(["org_123", null, 20]);
   });
 
   it("should create, update, and delete a scoped alert", async (): Promise<void> => {
@@ -2439,6 +2473,7 @@ describe("postgres metadata store", () => {
       incident_id: "inc_123",
       project_id: "proj_123",
       project_name: "Main App",
+      project_color_tag: null,
       service_id: "svc_123",
       service_name: "checkout-api",
       latest_deployment_id: null,
@@ -2505,6 +2540,7 @@ describe("postgres metadata store", () => {
       incident_id: "inc_123",
       project_id: "proj_123",
       project_name: "Main App",
+      project_color_tag: null,
       service_id: "svc_123",
       service_name: "checkout-api",
       latest_deployment_id: null,

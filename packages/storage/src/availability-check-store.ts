@@ -97,6 +97,123 @@ export function createPostgresAvailabilityCheckStore(db: Queryable): Availabilit
     return row === undefined ? null : mapAvailabilityCheckRow(row);
   };
 
+  const mapClaimedAvailabilityCheck = (row: Record<string, unknown>): ClaimedAvailabilityCheck => ({
+    check_id: String(row["check_id"]),
+    project_id: String(row["project_id"]),
+    organization_id: String(row["organization_id"]),
+    owner_user_id: String(row["owner_user_id"]),
+    organization_plan: normalizeAvailabilityCheckPlan(row["organization_plan"]),
+    name: String(row["name"]),
+    url: String(row["url"]),
+    method: row["method"] as AvailabilityCheckMethod,
+    expected_status_min: Number(row["expected_status_min"]),
+    expected_status_max: Number(row["expected_status_max"]),
+    timeout_ms: Number(row["timeout_ms"]),
+    interval_seconds: Number(row["interval_seconds"]),
+    failure_threshold: Number(row["failure_threshold"]),
+    recovery_threshold: Number(row["recovery_threshold"]),
+    environment: String(row["environment"]),
+    service_name: typeof row["service_name"] === "string" ? row["service_name"] : null,
+    due_at: String(row["due_at"]),
+    claimed_at: String(row["claimed_at"]),
+    linked_incident_id: typeof row["linked_incident_id"] === "string" ? row["linked_incident_id"] : null,
+    prior_status:
+      row["prior_status"] === "passing" || row["prior_status"] === "failing"
+        ? row["prior_status"]
+        : "unknown",
+    consecutive_failures: Number(row["consecutive_failures"]),
+    consecutive_successes: Number(row["consecutive_successes"])
+  });
+
+  const claimDueChecks = async (input: {
+    now: string;
+    claim_timeout_before: string;
+    limit: number;
+  }): Promise<ClaimedAvailabilityCheck[]> => {
+    const result = await db.query<Record<string, unknown>>(
+      `
+        WITH ranked AS (
+          SELECT
+            c.id,
+            c.project_id,
+            p.organization_id,
+            p.owner_user_id,
+            COALESCE(o.plan, 'free') AS organization_plan,
+            c.name,
+            c.url,
+            c.method,
+            c.expected_status_min,
+            c.expected_status_max,
+            c.timeout_ms,
+            c.interval_seconds,
+            c.failure_threshold,
+            c.recovery_threshold,
+            c.environment,
+            c.service_name,
+            c.status,
+            c.consecutive_failures,
+            c.consecutive_successes,
+            c.linked_incident_id,
+            c.next_check_at,
+            ROW_NUMBER() OVER (PARTITION BY c.project_id ORDER BY c.created_at ASC, c.id ASC) AS check_rank
+          FROM availability_checks c
+          JOIN projects p ON p.id = c.project_id
+          JOIN organizations o ON o.id = p.organization_id
+          WHERE c.deleted_at IS NULL
+            AND c.enabled = true
+            AND c.next_check_at <= $1::timestamptz
+            AND (c.claimed_at IS NULL OR c.claimed_at < $2::timestamptz)
+        ),
+        candidate AS (
+          SELECT ranked.id AS check_id
+          FROM ranked
+          WHERE check_rank <= ${buildPlanEligibilityCaseSql("limit").replace(/o\.plan/g, "organization_plan")}
+            AND interval_seconds >= ${buildPlanEligibilityCaseSql("interval").replace(/o\.plan/g, "organization_plan")}
+          ORDER BY ranked.next_check_at ASC, ranked.id ASC
+          LIMIT $3
+        )
+        UPDATE availability_checks c
+        SET claimed_at = $1::timestamptz,
+            updated_at = now()
+        FROM ranked
+        JOIN candidate ON candidate.check_id = ranked.id
+        WHERE c.id = ranked.id
+          AND c.deleted_at IS NULL
+          AND c.enabled = true
+          AND c.next_check_at <= $1::timestamptz
+          AND (c.claimed_at IS NULL OR c.claimed_at < $2::timestamptz)
+        RETURNING
+          c.id::text AS check_id,
+          c.project_id::text AS project_id,
+          ranked.organization_id::text AS organization_id,
+          ranked.owner_user_id::text AS owner_user_id,
+          ranked.organization_plan,
+          c.name,
+          c.url,
+          c.method,
+          c.expected_status_min,
+          c.expected_status_max,
+          c.timeout_ms,
+          c.interval_seconds,
+          c.failure_threshold,
+          c.recovery_threshold,
+          c.environment,
+          c.service_name,
+          c.next_check_at::text AS due_at,
+          c.claimed_at::text AS claimed_at,
+          c.linked_incident_id::text AS linked_incident_id,
+          c.status AS prior_status,
+          c.consecutive_failures,
+          c.consecutive_successes
+      `,
+      [input.now, input.claim_timeout_before, input.limit]
+    );
+
+    return result.rows
+      .map(mapClaimedAvailabilityCheck)
+      .sort((left, right) => left.due_at.localeCompare(right.due_at) || left.check_id.localeCompare(right.check_id));
+  };
+
   return {
     async listChecksForProjectInOrganization(input) {
       const result = await db.query<Record<string, unknown>>(listChecksQuery, [
@@ -437,117 +554,16 @@ export function createPostgresAvailabilityCheckStore(db: Queryable): Availabilit
     },
 
     async claimNextDueCheck(input) {
-      const result = await db.query<Record<string, unknown>>(
-        `
-          WITH ranked AS (
-            SELECT
-              c.id,
-              c.project_id,
-              p.organization_id,
-              p.owner_user_id,
-              COALESCE(o.plan, 'free') AS organization_plan,
-              c.name,
-              c.url,
-              c.method,
-              c.expected_status_min,
-              c.expected_status_max,
-              c.timeout_ms,
-              c.interval_seconds,
-              c.failure_threshold,
-              c.recovery_threshold,
-              c.environment,
-              c.service_name,
-              c.status,
-              c.consecutive_failures,
-              c.consecutive_successes,
-              c.linked_incident_id,
-              c.next_check_at,
-              ROW_NUMBER() OVER (PARTITION BY c.project_id ORDER BY c.created_at ASC, c.id ASC) AS check_rank
-            FROM availability_checks c
-            JOIN projects p ON p.id = c.project_id
-            JOIN organizations o ON o.id = p.organization_id
-            WHERE c.deleted_at IS NULL
-              AND c.enabled = true
-              AND c.next_check_at <= $1::timestamptz
-              AND (c.claimed_at IS NULL OR c.claimed_at < $2::timestamptz)
-          ),
-          candidate AS (
-            SELECT ranked.id AS check_id
-            FROM ranked
-            WHERE check_rank <= ${buildPlanEligibilityCaseSql("limit").replace(/o\.plan/g, "organization_plan")}
-              AND interval_seconds >= ${buildPlanEligibilityCaseSql("interval").replace(/o\.plan/g, "organization_plan")}
-            ORDER BY ranked.next_check_at ASC, ranked.id ASC
-            LIMIT 1
-          )
-          UPDATE availability_checks c
-          SET claimed_at = $1::timestamptz,
-              updated_at = now()
-          FROM ranked
-          JOIN candidate ON candidate.check_id = ranked.id
-          WHERE c.id = ranked.id
-            AND c.deleted_at IS NULL
-            AND c.enabled = true
-            AND c.next_check_at <= $1::timestamptz
-            AND (c.claimed_at IS NULL OR c.claimed_at < $2::timestamptz)
-          RETURNING
-            c.id::text AS check_id,
-            c.project_id::text AS project_id,
-            ranked.organization_id::text AS organization_id,
-            ranked.owner_user_id::text AS owner_user_id,
-            ranked.organization_plan,
-            c.name,
-            c.url,
-            c.method,
-            c.expected_status_min,
-            c.expected_status_max,
-            c.timeout_ms,
-            c.interval_seconds,
-            c.failure_threshold,
-            c.recovery_threshold,
-            c.environment,
-            c.service_name,
-            c.next_check_at::text AS due_at,
-            c.claimed_at::text AS claimed_at,
-            c.linked_incident_id::text AS linked_incident_id,
-            c.status AS prior_status,
-            c.consecutive_failures,
-            c.consecutive_successes
-        `,
-        [input.now, input.claim_timeout_before]
-      );
+      const checks = await claimDueChecks({
+        ...input,
+        limit: 1
+      });
 
-      const row = result.rows[0];
-      if (row === undefined) {
-        return null;
-      }
+      return checks[0] ?? null;
+    },
 
-      return {
-        check_id: String(row["check_id"]),
-        project_id: String(row["project_id"]),
-        organization_id: String(row["organization_id"]),
-        owner_user_id: String(row["owner_user_id"]),
-        organization_plan: normalizeAvailabilityCheckPlan(row["organization_plan"]),
-        name: String(row["name"]),
-        url: String(row["url"]),
-        method: row["method"] as AvailabilityCheckMethod,
-        expected_status_min: Number(row["expected_status_min"]),
-        expected_status_max: Number(row["expected_status_max"]),
-        timeout_ms: Number(row["timeout_ms"]),
-        interval_seconds: Number(row["interval_seconds"]),
-        failure_threshold: Number(row["failure_threshold"]),
-        recovery_threshold: Number(row["recovery_threshold"]),
-        environment: String(row["environment"]),
-        service_name: typeof row["service_name"] === "string" ? row["service_name"] : null,
-        due_at: String(row["due_at"]),
-        claimed_at: String(row["claimed_at"]),
-        linked_incident_id: typeof row["linked_incident_id"] === "string" ? row["linked_incident_id"] : null,
-        prior_status:
-          row["prior_status"] === "passing" || row["prior_status"] === "failing"
-            ? row["prior_status"]
-            : "unknown",
-        consecutive_failures: Number(row["consecutive_failures"]),
-        consecutive_successes: Number(row["consecutive_successes"])
-      };
+    async claimDueChecks(input) {
+      return await claimDueChecks(input);
     },
 
     async recordCheckExecution(input) {

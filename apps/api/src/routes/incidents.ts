@@ -190,7 +190,7 @@ export function registerIncidentRoutes(app: FastifyInstance, dependencies: ApiDe
       project_id?: string;
       environment?: string;
       service?: string;
-      status?: "open" | "resolved" | "regressed";
+      status?: "active" | "open" | "resolved" | "regressed";
       severity?: "low" | "medium" | "high" | "critical";
       first_seen_after?: string;
       cursor?: { last_seen_at: string; incident_id: string };

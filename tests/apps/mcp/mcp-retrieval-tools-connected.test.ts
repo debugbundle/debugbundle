@@ -62,7 +62,8 @@ describe("mcp retrieval tools connected mode", () => {
         next_cursor: null
       });
       expect(listIncidents).toHaveBeenCalledWith({
-        bearerToken: "dbundle_mem_x"
+        bearerToken: "dbundle_mem_x",
+        status: "active"
       });
     } finally {
       cwdSpy.mockRestore();

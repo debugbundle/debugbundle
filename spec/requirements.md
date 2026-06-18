@@ -215,7 +215,11 @@ Last updated: 2026-06-15
 
 ### 1.6 Retrieval API
 
-**FR-RET-01:** `GET /v1/incidents` — list/filter incidents (project_id, environment, service, status [open/resolved/regressed], severity, `first_seen_after`, limit, cursor).
+**FR-RET-01:** `GET /v1/incidents` — list/filter incidents (project_id, environment, service, status [active/open/resolved/regressed], severity, `first_seen_after`, limit, cursor). `active` means open or regressed incidents.
+
+Project list/detail metrics must include `attention_incidents_today`, counting incidents first opened today or regressed today, while preserving `opened_incidents_today` as first-opened-only.
+
+`debugbundle incidents` and MCP `list_incidents` must default to the `active` filter. `--status all` / `status: "all"` must remain available to list resolved incidents together with open and regressed incidents.
 
 **FR-RET-02:** `GET /v1/incidents/{id}` — incident metadata.
 

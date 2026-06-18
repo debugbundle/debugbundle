@@ -46,6 +46,7 @@ const API_TABLE_ROWS = [
   { table_name: "trial_lifecycle_events" },
   { table_name: "plan_cleanup_tasks" },
   { table_name: "project_usage_counters" },
+  { table_name: "ingestion_rejection_diagnostic_periods" },
   { table_name: "github_installations" },
   { table_name: "github_marketplace_accounts" },
   { table_name: "project_github_repos" },

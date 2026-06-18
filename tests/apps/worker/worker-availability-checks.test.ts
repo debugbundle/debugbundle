@@ -1,7 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { gunzipSync } from "node:zlib";
 
-const { executeAvailabilityCheckMock } = vi.hoisted(() => ({
+const { captureCapacityWarningMock, executeAvailabilityCheckMock } = vi.hoisted(() => ({
+  captureCapacityWarningMock: vi.fn(),
   executeAvailabilityCheckMock: vi.fn()
 }));
 
@@ -14,7 +15,14 @@ vi.mock("../../../packages/storage/src/index.js", async (importOriginal) => {
   };
 });
 
-import { processNextAvailabilityCheck } from "../../../apps/worker/src/availability-checks.js";
+vi.mock("../../../apps/worker/src/dogfooding.js", () => ({
+  captureWorkerDogfoodingCapacityWarning: captureCapacityWarningMock
+}));
+
+import {
+  processAvailabilityCheckBatch,
+  processNextAvailabilityCheck
+} from "../../../apps/worker/src/availability-checks.js";
 import type {
   ClaimedAvailabilityCheck,
   RecordedAvailabilityCheckExecution
@@ -94,6 +102,7 @@ function createRecordedExecution(
 describe("worker availability checks", () => {
   beforeEach(() => {
     executeAvailabilityCheckMock.mockReset();
+    captureCapacityWarningMock.mockReset();
   });
 
   it("purges retained availability data when no checks are due", async () => {
@@ -120,6 +129,137 @@ describe("worker availability checks", () => {
     expect(availabilityCheckStore.purgeExpiredDailyRollups).toHaveBeenCalledWith({
       now: "2026-06-15T10:00:00.000Z"
     });
+  });
+
+  it("claims and executes due checks in a bounded batch", async () => {
+    const checks = [
+      createClaimedCheck({ check_id: "11111111-1111-4111-8111-111111111111" }),
+      createClaimedCheck({ check_id: "11111111-1111-4111-8111-111111111112" }),
+      createClaimedCheck({ check_id: "11111111-1111-4111-8111-111111111113" })
+    ];
+    let active = 0;
+    let maxActive = 0;
+    executeAvailabilityCheckMock.mockImplementation(async () => {
+      active += 1;
+      maxActive = Math.max(maxActive, active);
+      await Promise.resolve();
+      active -= 1;
+      return createExecutionResult();
+    });
+    const availabilityCheckStore = {
+      claimDueChecks: vi.fn().mockResolvedValue(checks),
+      recordCheckExecution: vi.fn().mockImplementation(async ({ check_id }: { check_id: string }) =>
+        createRecordedExecution(checks.find((check) => check.check_id === check_id) ?? checks[0]!)
+      ),
+      purgeExpiredResults: vi.fn(),
+      purgeExpiredDailyRollups: vi.fn()
+    };
+
+    const result = await processAvailabilityCheckBatch({
+      availabilityCheckStore: availabilityCheckStore as never,
+      incidentStore: {} as never,
+      incidentLifecycle: {
+        resolveIncidentForOrganization: vi.fn()
+      },
+      queue: {
+        enqueue: vi.fn()
+      } as never,
+      objectStore: {
+        putObject: vi.fn()
+      } as never,
+      lifecycleWebhookPublisher: {
+        publish: vi.fn()
+      } as never,
+      batchSize: 3,
+      concurrency: 2,
+      now: new Date("2026-06-15T10:00:30.000Z")
+    });
+
+    expect(result).toEqual(
+      expect.objectContaining({
+        processed: true,
+        claimed_count: 3,
+        completed_count: 3,
+        failed_count: 0
+      })
+    );
+    expect(maxActive).toBe(2);
+    expect(availabilityCheckStore.claimDueChecks).toHaveBeenCalledWith({
+      now: "2026-06-15T10:00:30.000Z",
+      claim_timeout_before: "2026-06-15T09:55:30.000Z",
+      limit: 3
+    });
+    expect(availabilityCheckStore.recordCheckExecution).toHaveBeenCalledTimes(3);
+  });
+
+  it("emits a rate-limited dogfood capacity warning when due checks are late", async () => {
+    const checks = [
+      createClaimedCheck({
+        check_id: "11111111-1111-4111-8111-111111111111",
+        due_at: "2026-06-15T09:57:00.000Z",
+        interval_seconds: 60
+      }),
+      createClaimedCheck({
+        check_id: "11111111-1111-4111-8111-111111111112",
+        due_at: "2026-06-15T09:57:30.000Z",
+        interval_seconds: 60
+      })
+    ];
+    executeAvailabilityCheckMock.mockResolvedValue(createExecutionResult({ status: "timeout" }));
+    const logger = {
+      info: vi.fn(),
+      warn: vi.fn(),
+      error: vi.fn()
+    };
+
+    await processAvailabilityCheckBatch({
+      availabilityCheckStore: {
+        claimDueChecks: vi.fn().mockResolvedValue(checks),
+        recordCheckExecution: vi.fn().mockImplementation(async ({ check_id }: { check_id: string }) =>
+          createRecordedExecution(checks.find((check) => check.check_id === check_id) ?? checks[0]!, {
+            result: { status: "timeout", duration_ms: 2500 }
+          })
+        ),
+        purgeExpiredResults: vi.fn(),
+        purgeExpiredDailyRollups: vi.fn()
+      } as never,
+      incidentStore: {} as never,
+      incidentLifecycle: {
+        resolveIncidentForOrganization: vi.fn()
+      },
+      queue: {
+        enqueue: vi.fn()
+      } as never,
+      objectStore: {
+        putObject: vi.fn()
+      } as never,
+      lifecycleWebhookPublisher: {
+        publish: vi.fn()
+      } as never,
+      logger,
+      batchSize: 2,
+      concurrency: 2,
+      now: new Date("2026-06-15T10:00:00.000Z")
+    });
+
+    expect(logger.warn).toHaveBeenCalledWith(
+      expect.objectContaining({
+        severity: "critical",
+        claimed_count: 2,
+        saturated: true
+      }),
+      "availability_check_capacity_warning"
+    );
+    expect(captureCapacityWarningMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        severity: "critical",
+        claimed_count: 2,
+        concurrency: 2,
+        batch_size: 2,
+        timeout_count: 2,
+        saturated: true
+      })
+    );
   });
 
   it("opens and links an availability incident when a threshold-qualified failure is recorded", async () => {

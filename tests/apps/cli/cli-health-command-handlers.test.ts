@@ -100,7 +100,7 @@ describe("cli health command handlers", () => {
       method: "GET",
       expectedStatusMin: 200,
       expectedStatusMax: 399,
-      timeoutMs: 5000,
+      timeoutMs: 2500,
       intervalSeconds: 60,
       failureThreshold: 3,
       recoveryThreshold: 2,
@@ -129,7 +129,7 @@ describe("cli health command handlers", () => {
       method: "HEAD",
       expectedStatusMin: 200,
       expectedStatusMax: 399,
-      timeoutMs: 5000
+      timeoutMs: 2500
     });
     expect(listHealthCheckResultsCommand).toHaveBeenCalledWith({
       authFilePath: undefined,

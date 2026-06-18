@@ -451,6 +451,9 @@ describe("worker runtime", () => {
     expect(env.DB_HOST).toBe("localhost");
     expect(env.DB_SSL_MODE).toBe("disable");
     expect(env.WORKER_POLL_INTERVAL_MS).toBe(1000);
+    expect(env.AVAILABILITY_CHECK_LOOP_INTERVAL_MS).toBe(250);
+    expect(env.AVAILABILITY_CHECK_CLAIM_BATCH_SIZE).toBe(20);
+    expect(env.AVAILABILITY_CHECK_CONCURRENCY).toBe(8);
     expect(env.RETENTION_CLEANUP_INTERVAL_MS).toBe(6 * 60 * 60 * 1000);
   });
 

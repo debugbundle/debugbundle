@@ -228,6 +228,22 @@ function buildProjectMetricsJsonSql(input: {
           AND i.first_seen_at >= ${input.dayStartsAtSql}::timestamptz
           AND i.first_seen_at < ${input.dayEndsAtSql}::timestamptz
       ),
+      'attention_incidents_today', (
+        SELECT COUNT(*)::int
+        FROM incidents i
+        WHERE i.project_id = ${input.projectIdSql}
+          AND (
+            (
+              i.first_seen_at >= ${input.dayStartsAtSql}::timestamptz
+              AND i.first_seen_at < ${input.dayEndsAtSql}::timestamptz
+            )
+            OR (
+              i.regressed_at IS NOT NULL
+              AND i.regressed_at >= ${input.dayStartsAtSql}::timestamptz
+              AND i.regressed_at < ${input.dayEndsAtSql}::timestamptz
+            )
+          )
+      ),
       'opened_incidents_month', (
         SELECT COUNT(*)::int
         FROM incidents i
@@ -339,6 +355,7 @@ function normalizeProjectMetrics(value: unknown): ProjectRecord["metrics"] {
     return {
       open_incidents: 0,
       regressed_incidents: 0,
+      attention_incidents_today: 0,
       opened_incidents_today: 0,
       opened_incidents_month: 0,
       monthly_bundle_requests: 0,
@@ -353,6 +370,7 @@ function normalizeProjectMetrics(value: unknown): ProjectRecord["metrics"] {
   return {
     open_incidents: metrics.open_incidents ?? 0,
     regressed_incidents: metrics.regressed_incidents ?? 0,
+    attention_incidents_today: metrics.attention_incidents_today ?? metrics.opened_incidents_today ?? 0,
     opened_incidents_today: metrics.opened_incidents_today ?? 0,
     opened_incidents_month: metrics.opened_incidents_month ?? 0,
     monthly_bundle_requests: metrics.monthly_bundle_requests ?? 0,
@@ -1817,6 +1835,7 @@ export function createPostgresMetadataStore(
               json_build_object(
                 'open_incidents', 0,
                 'regressed_incidents', 0,
+                'attention_incidents_today', 0,
                 'opened_incidents_today', 0,
                 'opened_incidents_month', 0,
                 'monthly_bundle_requests', 0,
@@ -2192,6 +2211,7 @@ export function createPostgresMetadataStore(
               json_build_object(
                 'open_incidents', 0,
                 'regressed_incidents', 0,
+                'attention_incidents_today', 0,
                 'opened_incidents_today', 0,
                 'opened_incidents_month', 0,
                 'monthly_bundle_requests', 0,
@@ -3155,7 +3175,9 @@ export function createPostgresMetadataStore(
         conditions.push(`s.name = $${params.length}`);
       }
 
-      if (input.status !== undefined) {
+      if (input.status === "active") {
+        conditions.push(`i.status IN ('open', 'regressed')`);
+      } else if (input.status !== undefined) {
         params.push(input.status);
         conditions.push(`i.status = $${params.length}`);
       }
@@ -3301,8 +3323,15 @@ export function createPostgresMetadataStore(
           WITH updated AS (
             UPDATE incidents i
             SET status = 'resolved',
-                resolved_at = COALESCE(i.resolved_at, $4::timestamptz),
-                resolved_by_member_id = COALESCE(i.resolved_by_member_id, $3::uuid),
+                resolved_at = CASE
+                  WHEN i.status = 'regressed' THEN $4::timestamptz
+                  ELSE COALESCE(i.resolved_at, $4::timestamptz)
+                END,
+                resolved_by_member_id = CASE
+                  WHEN i.status = 'regressed' THEN $3::uuid
+                  ELSE COALESCE(i.resolved_by_member_id, $3::uuid)
+                END,
+                regressed_at = NULL,
                 updated_at = now()
             FROM projects p
             WHERE i.project_id = p.id
@@ -3427,8 +3456,15 @@ export function createPostgresMetadataStore(
           updated AS (
             UPDATE incidents i
             SET status = 'resolved',
-                resolved_at = COALESCE(i.resolved_at, $4::timestamptz),
-                resolved_by_member_id = COALESCE(i.resolved_by_member_id, $3::uuid),
+                resolved_at = CASE
+                  WHEN i.status = 'regressed' THEN $4::timestamptz
+                  ELSE COALESCE(i.resolved_at, $4::timestamptz)
+                END,
+                resolved_by_member_id = CASE
+                  WHEN i.status = 'regressed' THEN $3::uuid
+                  ELSE COALESCE(i.resolved_by_member_id, $3::uuid)
+                END,
+                regressed_at = NULL,
                 updated_at = now()
             FROM accessible a, counts c
             WHERE c.requested_count = c.accessible_count

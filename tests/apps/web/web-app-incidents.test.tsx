@@ -541,8 +541,8 @@ describe("web app — incident and project detail routes", () => {
         return jsonResponse(200, { session: createSession() });
       }
 
-      if (url.includes("/v1/incidents?") && url.includes("limit=20") && url.includes("status=open") && init?.method === undefined) {
-        return jsonResponse(200, { incidents: [incidents[0]], next_cursor: null });
+      if (url.includes("/v1/incidents?") && url.includes("limit=20") && url.includes("status=active") && init?.method === undefined) {
+        return jsonResponse(200, { incidents, next_cursor: null });
       }
 
       if (url.includes("/v1/incidents?") && url.includes("limit=20") && !url.includes("status=") && init?.method === undefined) {
@@ -557,8 +557,8 @@ describe("web app — incident and project detail routes", () => {
     render(<App initialEntries={["/incidents"]} />);
 
     expect(await screen.findByText(/typeerror in checkout handler/i)).toBeInTheDocument();
-    expect(await findStatusFilterTrigger("workspace-incidents-status-filter")).toHaveTextContent(/^open$/i);
-    expect(screen.queryByText(/database timeout during signin/i)).toBeNull();
+    expect(await findStatusFilterTrigger("workspace-incidents-status-filter")).toHaveTextContent(/^needs attention$/i);
+    expect(screen.getByText(/database timeout during signin/i)).toBeInTheDocument();
 
     await chooseStatusFilterOption(user, "workspace-incidents-status-filter", /all statuses/i);
     expect(await screen.findByText(/database timeout during signin/i)).toBeInTheDocument();
@@ -591,11 +591,11 @@ describe("web app — incident and project detail routes", () => {
         return jsonResponse(200, { session: createSession() });
       }
 
-      if (url.includes("/v1/incidents?") && url.includes("limit=20") && url.includes("status=open") && !url.includes("cursor=") && init?.method === undefined) {
+      if (url.includes("/v1/incidents?") && url.includes("limit=20") && url.includes("status=active") && !url.includes("cursor=") && init?.method === undefined) {
         return jsonResponse(200, { incidents: [firstIncident], next_cursor: "cursor_2" });
       }
 
-      if (url.includes("/v1/incidents?") && url.includes("limit=20") && url.includes("cursor=cursor_2") && url.includes("status=open") && init?.method === undefined) {
+      if (url.includes("/v1/incidents?") && url.includes("limit=20") && url.includes("cursor=cursor_2") && url.includes("status=active") && init?.method === undefined) {
         return jsonResponse(200, { incidents: [secondIncident], next_cursor: null });
       }
 
@@ -635,7 +635,7 @@ describe("web app — incident and project detail routes", () => {
         return jsonResponse(200, { session: createSession() });
       }
 
-      if (url.includes("/v1/incidents?") && url.includes("limit=20") && url.includes("status=open") && init?.method === undefined) {
+      if (url.includes("/v1/incidents?") && url.includes("limit=20") && url.includes("status=active") && init?.method === undefined) {
         workspaceIncidentRequests += 1;
         return jsonResponse(200, {
           incidents: workspaceIncidentRequests === 1 ? [initialIncident] : [refreshedIncident],
@@ -679,7 +679,7 @@ describe("web app — incident and project detail routes", () => {
         return jsonResponse(200, { session: createSession() });
       }
 
-      if (url.includes("/v1/incidents?") && url.includes("limit=20") && url.includes("status=open") && init?.method === undefined) {
+      if (url.includes("/v1/incidents?") && url.includes("limit=20") && url.includes("status=active") && init?.method === undefined) {
         workspaceIncidentRequests += 1;
         return jsonResponse(200, {
           incidents: workspaceIncidentRequests === 1 ? [initialIncident] : [refreshedIncident],
@@ -793,10 +793,16 @@ describe("web app — incident and project detail routes", () => {
     expect(screen.getByText(/^production$/i)).toBeInTheDocument();
   });
 
-  it("defaults the project incidents tab to open and lets users switch the status filter", async () => {
+  it("defaults the project incidents tab to active and lets users switch the status filter", async () => {
     const user = userEvent.setup();
     const project = createProject();
     const openIncident = createIncident({ project_id: project.project_id, title: "Open project incident" });
+    const regressedIncident = createIncident({
+      incident_id: "inc_regressed_project",
+      project_id: project.project_id,
+      title: "Regressed project incident",
+      status: "regressed"
+    });
     const resolvedIncident = createIncident({
       incident_id: "inc_resolved_project",
       project_id: project.project_id,
@@ -815,8 +821,8 @@ describe("web app — incident and project detail routes", () => {
         return jsonResponse(200, { projects: [project] });
       }
 
-      if (url.endsWith(`/v1/incidents?project_id=${project.project_id}&limit=20&status=open`) && init?.method === undefined) {
-        return jsonResponse(200, { incidents: [openIncident], next_cursor: null });
+      if (url.endsWith(`/v1/incidents?project_id=${project.project_id}&limit=20&status=active`) && init?.method === undefined) {
+        return jsonResponse(200, { incidents: [regressedIncident, openIncident], next_cursor: null });
       }
 
       if (url.endsWith(`/v1/incidents?project_id=${project.project_id}&limit=20&status=resolved`) && init?.method === undefined) {
@@ -831,7 +837,8 @@ describe("web app — incident and project detail routes", () => {
     render(<App initialEntries={[`/projects/${project.project_id}/incidents`]} />);
 
     const statusFilter = await findStatusFilterTrigger("project-incidents-status-filter");
-    expect(statusFilter).toHaveTextContent(/^open$/i);
+    expect(statusFilter).toHaveTextContent(/^needs attention$/i);
+    expect(await screen.findByText(/regressed project incident/i)).toBeInTheDocument();
     expect(await screen.findByText(/open project incident/i)).toBeInTheDocument();
     expect(screen.queryByText(/resolved project incident/i)).toBeNull();
 
@@ -862,7 +869,7 @@ describe("web app — incident and project detail routes", () => {
         return jsonResponse(200, { projects: [project] });
       }
 
-      if (url.endsWith(`/v1/incidents?project_id=${project.project_id}&limit=20&status=open`) && init?.method === undefined) {
+      if (url.endsWith(`/v1/incidents?project_id=${project.project_id}&limit=20&status=active`) && init?.method === undefined) {
         projectIncidentRequests += 1;
         return jsonResponse(200, {
           incidents: projectIncidentRequests === 1 ? [initialIncident] : [refreshedIncident],
@@ -887,10 +894,16 @@ describe("web app — incident and project detail routes", () => {
     expect(projectIncidentRequests).toBe(2);
   });
 
-  it("defaults the project bundles tab to open and lets users switch the status filter", async () => {
+  it("defaults the project bundles tab to active and lets users switch the status filter", async () => {
     const user = userEvent.setup();
     const project = createProject();
     const openIncident = createIncident({ project_id: project.project_id, title: "Open bundle incident" });
+    const regressedIncident = createIncident({
+      incident_id: "inc_regressed_bundle",
+      project_id: project.project_id,
+      title: "Regressed bundle incident",
+      status: "regressed"
+    });
     const resolvedIncident = createIncident({
       incident_id: "inc_resolved_bundle",
       project_id: project.project_id,
@@ -909,8 +922,8 @@ describe("web app — incident and project detail routes", () => {
         return jsonResponse(200, { projects: [project] });
       }
 
-      if (url.endsWith(`/v1/incidents?project_id=${project.project_id}&limit=20&status=open`) && init?.method === undefined) {
-        return jsonResponse(200, { incidents: [openIncident], next_cursor: null });
+      if (url.endsWith(`/v1/incidents?project_id=${project.project_id}&limit=20&status=active`) && init?.method === undefined) {
+        return jsonResponse(200, { incidents: [regressedIncident, openIncident], next_cursor: null });
       }
 
       if (url.endsWith(`/v1/incidents?project_id=${project.project_id}&limit=20&status=resolved`) && init?.method === undefined) {
@@ -925,7 +938,8 @@ describe("web app — incident and project detail routes", () => {
     render(<App initialEntries={[`/projects/${project.project_id}/bundles`]} />);
 
     const statusFilter = await findStatusFilterTrigger("project-bundles-status-filter");
-    expect(statusFilter).toHaveTextContent(/^open$/i);
+    expect(statusFilter).toHaveTextContent(/^needs attention$/i);
+    expect(await screen.findByText(/regressed bundle incident/i)).toBeInTheDocument();
     expect(await screen.findByText(/open bundle incident/i)).toBeInTheDocument();
     expect(screen.queryByText(/resolved bundle incident/i)).toBeNull();
 
@@ -956,7 +970,7 @@ describe("web app — incident and project detail routes", () => {
         return jsonResponse(200, { projects: [project] });
       }
 
-      if (url.endsWith(`/v1/incidents?project_id=${project.project_id}&limit=20&status=open`) && init?.method === undefined) {
+      if (url.endsWith(`/v1/incidents?project_id=${project.project_id}&limit=20&status=active`) && init?.method === undefined) {
         projectBundleRequests += 1;
         return jsonResponse(200, {
           incidents: projectBundleRequests === 1 ? [initialIncident] : [refreshedIncident],
@@ -997,7 +1011,7 @@ describe("web app — incident and project detail routes", () => {
         return jsonResponse(200, { session: createSession() });
       }
 
-      if (url.includes("/v1/incidents?") && url.includes("limit=20") && url.includes("status=open") && init?.method === undefined) {
+      if (url.includes("/v1/incidents?") && url.includes("limit=20") && url.includes("status=active") && init?.method === undefined) {
         return jsonResponse(200, { incidents: [incident], next_cursor: null });
       }
 
@@ -1245,6 +1259,7 @@ describe("web app — incident and project detail routes", () => {
       metrics: {
         open_incidents: 0,
         regressed_incidents: 0,
+        attention_incidents_today: 0,
         opened_incidents_today: 0,
         opened_incidents_month: 0
       }
@@ -1273,7 +1288,7 @@ describe("web app — incident and project detail routes", () => {
     render(<App initialEntries={[`/projects/${project.project_id}`]} />);
 
     expect((await screen.findAllByText(/^0$/)).length).toBe(4);
-    expect(screen.getByText(/incidents first seen today in this project/i)).toBeInTheDocument();
+    expect(screen.getByText(/opened or regressed today in this project/i)).toBeInTheDocument();
     expect(screen.getByText(/current regressed incidents in this project/i)).toBeInTheDocument();
   });
 
@@ -1285,7 +1300,7 @@ describe("web app — incident and project detail routes", () => {
       project_id: project.project_id,
       title: "Alpha bundle incident",
       severity: "low",
-      status: "resolved",
+      status: "regressed",
       last_seen_at: "2026-03-17T00:01:00.000Z"
     });
     const zuluIncident = createIncident({
@@ -1316,11 +1331,11 @@ describe("web app — incident and project detail routes", () => {
         return jsonResponse(200, { projects: [project] });
       }
 
-      if (url.endsWith(`/v1/incidents?project_id=${project.project_id}&limit=20&status=open`) && init?.method === undefined) {
+      if (url.endsWith(`/v1/incidents?project_id=${project.project_id}&limit=20&status=active`) && init?.method === undefined) {
         return jsonResponse(200, { incidents: [alphaIncident, zuluIncident], next_cursor: "cursor_2" });
       }
 
-      if (url.endsWith(`/v1/incidents?project_id=${project.project_id}&limit=20&cursor=cursor_2&status=open`) && init?.method === undefined) {
+      if (url.endsWith(`/v1/incidents?project_id=${project.project_id}&limit=20&cursor=cursor_2&status=active`) && init?.method === undefined) {
         return jsonResponse(200, { incidents: [secondPageIncident], next_cursor: null });
       }
 
@@ -1380,7 +1395,7 @@ describe("web app — incident and project detail routes", () => {
     render(<App initialEntries={[`/projects/${project.project_id}/incidents`]} />);
 
     expect(await screen.findByText(/main app/i)).toBeInTheDocument();
-    expect(await screen.findByText(/no open incidents for this project/i)).toBeInTheDocument();
+    expect(await screen.findByText(/no incidents need attention for this project/i)).toBeInTheDocument();
   });
 
   it("shows every workspace incident empty state as the status filter changes", async () => {
@@ -1404,8 +1419,8 @@ describe("web app — incident and project detail routes", () => {
     render(<App initialEntries={["/incidents"]} />);
 
     const statusFilter = await findStatusFilterTrigger("workspace-incidents-status-filter");
-    expect(await screen.findByText(/no open incidents/i)).toBeInTheDocument();
-    expect(statusFilter).toHaveTextContent(/^open$/i);
+    expect(await screen.findByText(/no incidents need attention/i)).toBeInTheDocument();
+    expect(statusFilter).toHaveTextContent(/^needs attention$/i);
 
     await chooseStatusFilterOption(user, "workspace-incidents-status-filter", /^resolved$/i);
     expect(await screen.findByText(/no resolved incidents/i)).toBeInTheDocument();
@@ -1426,7 +1441,7 @@ describe("web app — incident and project detail routes", () => {
         project_name: "Alpha App",
         title: "Alpha failure",
         severity: "low",
-        status: "resolved",
+        status: "regressed",
         service_name: null,
         occurrence_count: 1,
         last_seen_at: "2026-03-17T00:01:00.000Z"
@@ -1567,7 +1582,7 @@ describe("web app — incident and project detail routes", () => {
         title: "Alpha project incident",
         service_name: null,
         severity: "low",
-        status: "resolved",
+        status: "regressed",
         occurrence_count: 1,
         last_seen_at: "2026-03-17T00:01:00.000Z"
       }),

@@ -382,7 +382,7 @@ Rate-limited responses also include `Retry-After: <seconds>` so SDKs can back of
 | GET | `/v1/incidents/{id}/reproduction` | Browser Session or Member Token | Get reproduction artifact |
 | GET | `/v1/logs` | Browser Session or Member Token | Query logs by incident |
 
-**Query params (list incidents):** `project_id`, `environment`, `service`, `status` (open/resolved/regressed), `severity`, `first_seen_after`, `limit`, `cursor`
+**Query params (list incidents):** `project_id`, `environment`, `service`, `status` (`active`/open/resolved/regressed; `active` means open or regressed), `severity`, `first_seen_after`, `limit`, `cursor`
 
 Current API implementation scope (Phase 7 continuation): `GET /v1/incidents` supports organization-scoped filtering by `project_id`, `environment`, `service`, `status`, `severity`, `first_seen_after`, plus cursor-based pagination via `cursor` and `limit` (1-100, default 20).
 
@@ -404,6 +404,7 @@ Current API implementation scope (Phase 1 continuation):
 - `POST /v1/incidents/reopen` response body: `{ incidents: IncidentRetrievalRecord[] }`
 - `IncidentRetrievalRecord` fields: `incident_id`, `project_id`, `project_name`, `project_color_tag`, `service_id`, `service_name`, `latest_deployment_id`, `environment`, `fingerprint`, `fingerprint_version`, `title`, `severity`, `status`, `first_seen_at`, `last_seen_at`, `occurrence_count`, `spike_detected_at`, `resolved_at`, `regressed_at`, `matched_fields`, `incident_reason`
 - `IncidentContextRecord` fields: `incident`, `incident_reason`, `primary_signal`, `bundle`, `reproduction`, `logs`, `deploy`, `grouping`, `visibility`, `redaction`, `browser_signal`, `suggested_next_checks`
+- Retrieval clients must validate required fields but tolerate additive success fields so cloud API enrichments do not break installed CLI versions that do not consume the new fields.
 - `primary_signal` summarizes the current incident's primary failing signal without requiring an LLM call. `logs.source` is one of `retrieval`, `bundle_context`, or `none`. `bundle` and `reproduction` use deterministic artifact states: `ready`, `pending`, or `failed`.
 - `visibility` explains four operator-facing behaviors directly in retrieval output: how repeated failures group into the current fingerprint, when bundle regeneration occurs (including current precedence), how spike detection differs from incident creation, and how alert/webhook/GitHub cooldown windows suppress repeated lifecycle notifications.
 - `incident_reason` is deterministically derived from the incident's primary `incident_signal` metadata. Current kinds: `backend_exception`, `frontend_exception`, `request_failure`, `error_log`. Example:
@@ -655,6 +656,8 @@ When a collaborator keeps saved access to a shared project but the owner's curre
 All update fields are optional, but at least one field must be present. Set `color_tag` to `null` to clear a previously assigned tag.
 
 `organization_plan` is the owning organization's active billing tier projected onto project-shaped responses for capability decisions. It is not a project-specific subscription. `sharing_state` exists in addition to `relationship` so owners can tell when one of their own projects has already been shared with collaborators.
+
+Project `metrics.attention_incidents_today` counts incidents first opened today or regressed today. `metrics.opened_incidents_today` remains first-opened-only for compatibility.
 
 - Authorization failure: `401 { "error": "invalid_member_token" }`
 - Forbidden for non-owner callers: `403 { "error": "forbidden" }`
@@ -1439,7 +1442,7 @@ Availability checks are hosted external HTTP checks executed by DebugBundle infr
   "method": "GET",
   "expected_status_min": 200,
   "expected_status_max": 399,
-  "timeout_ms": 5000,
+  "timeout_ms": 2500,
   "interval_seconds": 60,
   "failure_threshold": 3,
   "recovery_threshold": 2,
@@ -1456,7 +1459,7 @@ Availability checks are hosted external HTTP checks executed by DebugBundle infr
 | `method` | No | `GET` | `GET` or `HEAD` |
 | `expected_status_min` | No | `200` | integer `100-599`, must be `<= expected_status_max` |
 | `expected_status_max` | No | `399` | integer `100-599`, must be `>= expected_status_min` |
-| `timeout_ms` | No | `5000` | integer `500-5000` |
+| `timeout_ms` | No | `2500` | integer `500-5000` |
 | `interval_seconds` | Yes | — | integer `30-86400`, but plan minimums may be higher |
 | `failure_threshold` | No | `3` | integer `1-10` |
 | `recovery_threshold` | No | `2` | integer `1-10` |
@@ -2151,7 +2154,7 @@ All setup and verification commands with `--json` must return:
 
 ### 2.4 Data Commands
 ```
-debugbundle incidents [--source <local|cloud>] [--project-id <id>] [--environment <env>] [--service <name>] [--status <open|resolved|regressed>] [--severity <level>] [--first-seen-after <ISO8601>] [--cursor <cursor>] [--limit <n>] [--json]
+debugbundle incidents [--source <local|cloud>] [--project-id <id>] [--environment <env>] [--service <name>] [--status <active|open|resolved|regressed|all>] [--severity <level>] [--first-seen-after <ISO8601>] [--cursor <cursor>] [--limit <n>] [--json]
 debugbundle inspect <incident-id> [--source <local|cloud>] [--json]
 debugbundle resolve <incident-id> [incident-id ...] [--source <local|cloud>] [--json]
 debugbundle reopen <incident-id> [incident-id ...] [--source <local|cloud>] [--json]
@@ -2160,10 +2163,13 @@ debugbundle logs <incident-id> [--level <level>] [--cursor <cursor>] [--limit <n
 debugbundle reproduce <incident-id> [--source <local|cloud>] [--json]
 debugbundle services [--json]
 ```
+`debugbundle incidents` defaults to `--status active` so the CLI shows incidents that need attention (`open` or `regressed`). Use `--status all` to omit the status filter and include resolved incidents.
 
 Current local CLI retrieval behavior: when `.debugbundle/local/connection.json` is configured with `"mode": "local-only"`, `debugbundle incidents`, `debugbundle inspect`, `debugbundle resolve`, `debugbundle reopen`, `debugbundle bundle`, and `debugbundle reproduce` read `.debugbundle/local/state.json`, `.debugbundle/bundles/local/`, and `.debugbundle/bundles/local/reproductions/` directly without requiring `debugbundle login`. Local incident listing preserves the machine-readable `{ incidents, next_cursor }` shape and applies `project_id`, `environment`, `service`, `status`, `severity`, `first_seen_after` / `--first-seen-after`, `cursor`, and `limit` filters against the local incident index.
 
 Current connected-mode retrieval behavior: when `.debugbundle/local/connection.json` is configured as `"connected"`, `debugbundle incidents` now merges matching local and cloud incidents by default, preserves `cursor` / `limit` pagination after the merged sort order is applied, and annotates cloud-backed incident payloads with `source: "cloud"` so origin is explicit in both human and JSON output. `--source local` and `--source cloud` still narrow the same commands to a single store. `debugbundle inspect`, `debugbundle resolve`, `debugbundle reopen`, `debugbundle bundle`, and `debugbundle reproduce` now probe the local store first and then fall back to cloud. When multiple cloud-backed incident ids are passed to `debugbundle resolve` or `debugbundle reopen`, the CLI collapses them into one hosted bulk mutation request while keeping local incidents on the existing local-state path. When `debugbundle bundle` or `debugbundle reproduce` fetches from cloud, the returned payload is also written to `.debugbundle/bundles/cloud/<incident-id>.bundle.json` or `.debugbundle/bundles/cloud/reproductions/<incident-id>.reproduction.json`, overwriting the cached snapshot on later explicit fetches; cloud resolve and cloud reopen rewrite cached status fields when a cached copy exists, and the same explicit cloud cache activity prunes `.debugbundle/bundles/cloud/` entries older than 30 days since last access.
+
+When cloud retrieval returns `retrieval_api_error: 200:invalid_response_shape`, the CLI should include an update hint because the most common cause is an older installed CLI parsing a newer cloud response shape.
 
 Current local CLI retrieval limitation: `debugbundle logs` still requires the authenticated cloud path in the current implementation; local log projection is not part of this slice.
 
@@ -2402,7 +2408,7 @@ Current MCP alert, Slack-destination, weekly-report, and webhook behavior is a t
 
 Current MCP local retrieval behavior: when no `bearerToken` is supplied and the project is configured as local-only, `debugbundle_list_incidents`, `debugbundle_get_incident`, `debugbundle_resolve_incident`, `debugbundle_resolve_incidents`, `debugbundle_reopen_incident`, `debugbundle_reopen_incidents`, `debugbundle_get_bundle`, and `debugbundle_get_reproduction` read the same local store used by the CLI (`.debugbundle/local/state.json`, `.debugbundle/bundles/local/`, `.debugbundle/bundles/local/reproductions/`) and return the same machine-readable payloads without cloud auth.
 
-Current connected-mode MCP retrieval behavior: when the project is configured as `"connected"`, `debugbundle_list_incidents` now merges matching local and cloud incidents by default, preserves merged `cursor` / `limit` pagination, and annotates cloud-backed incident payloads with `source: "cloud"` so callers can distinguish origin explicitly. `source: "local"` and `source: "cloud"` still narrow the same MCP retrieval/lifecycle tools to a single store. `debugbundle_get_incident`, `debugbundle_resolve_incident`, `debugbundle_resolve_incidents`, `debugbundle_reopen_incident`, `debugbundle_reopen_incidents`, `debugbundle_get_bundle`, and `debugbundle_get_reproduction` now probe the local store first and fall back to cloud. When MCP resolves or reopens multiple cloud-backed incidents, it collapses them into one hosted bulk mutation request while keeping local incidents on the existing local-state path. When MCP fetches a cloud bundle or reproduction, the same payload is written into `.debugbundle/bundles/cloud/` so the local artifact cache matches explicit connected-mode fetches across both agent-facing surfaces; cloud resolve and cloud reopen rewrite cached status fields when a cached copy exists, and explicit cloud cache activity prunes `.debugbundle/bundles/cloud/` entries older than 30 days since last access.
+Current connected-mode MCP retrieval behavior: when the project is configured as `"connected"`, `debugbundle_list_incidents` now merges matching local and cloud incidents by default, defaults omitted status to `active` (`open` or `regressed`), preserves merged `cursor` / `limit` pagination, and annotates cloud-backed incident payloads with `source: "cloud"` so callers can distinguish origin explicitly. `status: "all"` omits the status filter and includes resolved incidents with open and regressed incidents. `source: "local"` and `source: "cloud"` still narrow the same MCP retrieval/lifecycle tools to a single store. `debugbundle_get_incident`, `debugbundle_resolve_incident`, `debugbundle_resolve_incidents`, `debugbundle_reopen_incident`, `debugbundle_reopen_incidents`, `debugbundle_get_bundle`, and `debugbundle_get_reproduction` now probe the local store first and fall back to cloud. When MCP resolves or reopens multiple cloud-backed incidents, it collapses them into one hosted bulk mutation request while keeping local incidents on the existing local-state path. When MCP fetches a cloud bundle or reproduction, the same payload is written into `.debugbundle/bundles/cloud/` so the local artifact cache matches explicit connected-mode fetches across both agent-facing surfaces; cloud resolve and cloud reopen rewrite cached status fields when a cached copy exists, and explicit cloud cache activity prunes `.debugbundle/bundles/cloud/` entries older than 30 days since last access.
 
 Current MCP retrieval limitation: `debugbundle_get_logs` remains cloud-backed in the current implementation and still requires a bearer token.
 

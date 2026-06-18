@@ -10,6 +10,9 @@ const dogfoodingLogger = createRuntimeLoggerFromEnv({
 });
 
 let workerDogfoodingEnabled = false;
+let lastCapacityWarningAtMs = 0;
+
+const CAPACITY_WARNING_MIN_INTERVAL_MS = 15 * 60 * 1000;
 
 export interface WorkerDogfoodingConfig {
   enabled: true;
@@ -130,6 +133,7 @@ export function registerWorkerDogfooding(
   logger: Pick<typeof dogfoodingLogger, "warn"> = dogfoodingLogger
 ): WorkerDogfoodingConfig | null {
   workerDogfoodingEnabled = false;
+  lastCapacityWarningAtMs = 0;
 
   try {
     const config = resolveWorkerDogfoodingConfig(env);
@@ -174,6 +178,47 @@ export function captureWorkerDogfoodingStepFailure(
   if (error instanceof Error && typeof error.stack === "string" && error.stack.length > 0) {
     reportedError.stack = error.stack;
   }
+
+  sdk.captureError(reportedError, { handled: true });
+}
+
+export function captureWorkerDogfoodingCapacityWarning(
+  input: {
+    severity: "warning" | "critical";
+    oldest_due_lag_ms: number;
+    claimed_count: number;
+    concurrency: number;
+    batch_size: number;
+    timeout_count: number;
+    avg_duration_ms: number | null;
+    saturated: boolean;
+  },
+  sdk: WorkerDogfoodingSdk = debugbundle,
+  now: Date = new Date()
+): void {
+  if (!workerDogfoodingEnabled) {
+    return;
+  }
+
+  const nowMs = now.getTime();
+  if (nowMs - lastCapacityWarningAtMs < CAPACITY_WARNING_MIN_INTERVAL_MS) {
+    return;
+  }
+  lastCapacityWarningAtMs = nowMs;
+
+  const reportedError = new Error(
+    [
+      "availability_check_capacity_warning",
+      `severity=${input.severity}`,
+      `oldest_due_lag_ms=${Math.max(0, Math.round(input.oldest_due_lag_ms))}`,
+      `claimed_count=${input.claimed_count}`,
+      `concurrency=${input.concurrency}`,
+      `batch_size=${input.batch_size}`,
+      `timeout_count=${input.timeout_count}`,
+      `avg_duration_ms=${input.avg_duration_ms === null ? "null" : Math.round(input.avg_duration_ms)}`,
+      `saturated=${input.saturated ? "true" : "false"}`
+    ].join(" ")
+  );
 
   sdk.captureError(reportedError, { handled: true });
 }

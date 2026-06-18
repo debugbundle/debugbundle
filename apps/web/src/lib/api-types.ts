@@ -200,6 +200,7 @@ export interface ProjectRecord {
   metrics: {
     open_incidents: number;
     regressed_incidents: number;
+    attention_incidents_today: number;
     opened_incidents_today: number;
     opened_incidents_month: number;
     monthly_bundle_requests: number;
@@ -451,6 +452,8 @@ export interface IncidentRecord {
   regressed_at: string | null;
   matched_fields: string[];
 }
+
+export type IncidentStatusFilter = "active" | IncidentRecord["status"];
 
 export interface ImprovementRecord {
   improvement_id: string;

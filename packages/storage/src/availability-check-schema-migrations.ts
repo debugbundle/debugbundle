@@ -246,5 +246,16 @@ export const AVAILABILITY_CHECK_STORAGE_SCHEMA_MIGRATIONS = [
         ON availability_check_daily_rollups (project_id, day DESC)
       `
     ]
+  }),
+  defineAvailabilityCheckStorageSchemaMigration({
+    id: "202606180001_lower_availability_check_timeout_default",
+    description:
+      "Lower the database default timeout for newly inserted availability checks while preserving existing rows and the explicit 5000ms maximum.",
+    statements: [
+      `
+        ALTER TABLE availability_checks
+        ALTER COLUMN timeout_ms SET DEFAULT 2500
+      `
+    ]
   })
 ] as const;

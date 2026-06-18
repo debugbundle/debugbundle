@@ -170,6 +170,11 @@ export interface AvailabilityCheckStore {
     now: string;
     claim_timeout_before: string;
   }): Promise<ClaimedAvailabilityCheck | null>;
+  claimDueChecks(input: {
+    now: string;
+    claim_timeout_before: string;
+    limit: number;
+  }): Promise<ClaimedAvailabilityCheck[]>;
   recordCheckExecution(input: {
     check_id: string;
     claimed_at: string;

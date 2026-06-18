@@ -545,7 +545,7 @@ export const IncidentsQuerySchema = z
     project_id: z.string().uuid().optional(),
     environment: z.string().min(1).optional(),
     service: z.string().min(1).optional(),
-    status: z.enum(["open", "resolved", "regressed"]).optional(),
+    status: z.enum(["active", "open", "resolved", "regressed"]).optional(),
     severity: z.enum(["low", "medium", "high", "critical"]).optional(),
     first_seen_after: z.string().datetime().optional(),
     cursor: z.string().min(1).optional(),
@@ -707,7 +707,7 @@ const AvailabilityCheckBodyShape = {
   method: z.enum(["GET", "HEAD"]).default("GET"),
   expected_status_min: z.coerce.number().int().min(100).max(599).default(200),
   expected_status_max: z.coerce.number().int().min(100).max(599).default(399),
-  timeout_ms: z.coerce.number().int().min(500).max(5000).default(5000),
+  timeout_ms: z.coerce.number().int().min(500).max(5000).default(2500),
   interval_seconds: z.coerce.number().int().min(30).max(86400),
   failure_threshold: z.coerce.number().int().min(1).max(10).default(3),
   recovery_threshold: z.coerce.number().int().min(1).max(10).default(2),
@@ -754,7 +754,7 @@ export const AvailabilityCheckTestBodySchema = z
     method: z.enum(["GET", "HEAD"]).default("GET"),
     expected_status_min: z.coerce.number().int().min(100).max(599).default(200),
     expected_status_max: z.coerce.number().int().min(100).max(599).default(399),
-    timeout_ms: z.coerce.number().int().min(500).max(5000).default(5000)
+    timeout_ms: z.coerce.number().int().min(500).max(5000).default(2500)
   })
   .strict()
   .refine((value) => value.expected_status_min <= value.expected_status_max, {

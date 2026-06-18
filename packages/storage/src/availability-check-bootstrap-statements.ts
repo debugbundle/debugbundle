@@ -9,7 +9,7 @@ export const AVAILABILITY_CHECK_BOOTSTRAP_STATEMENTS = [
       method text NOT NULL CHECK (method IN ('GET', 'HEAD')),
       expected_status_min integer NOT NULL DEFAULT 200 CHECK (expected_status_min BETWEEN 100 AND 599),
       expected_status_max integer NOT NULL DEFAULT 399 CHECK (expected_status_max BETWEEN 100 AND 599),
-      timeout_ms integer NOT NULL DEFAULT 5000 CHECK (timeout_ms BETWEEN 500 AND 5000),
+      timeout_ms integer NOT NULL DEFAULT 2500 CHECK (timeout_ms BETWEEN 500 AND 5000),
       interval_seconds integer NOT NULL CHECK (interval_seconds >= 30),
       failure_threshold integer NOT NULL DEFAULT 3 CHECK (failure_threshold BETWEEN 1 AND 10),
       recovery_threshold integer NOT NULL DEFAULT 2 CHECK (recovery_threshold BETWEEN 1 AND 10),

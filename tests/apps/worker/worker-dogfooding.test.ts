@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
 import {
+  captureWorkerDogfoodingCapacityWarning,
   captureWorkerDogfoodingStepFailure,
   createHostedDogfoodingTransport,
   registerWorkerDogfooding,
@@ -80,6 +81,44 @@ describe("worker dogfooding", () => {
     }));
     expect(dogfoodingSdk.captureError).toHaveBeenCalledWith(
       expect.objectContaining({ message: "worker_step_failed:schedule-weekly-reports:weekly_conflict" }),
+      { handled: true }
+    );
+  });
+
+  it("captures capacity warnings through dogfooding with local rate limiting", () => {
+    const dogfoodingSdk = {
+      init: vi.fn(),
+      captureError: vi.fn()
+    };
+
+    registerWorkerDogfooding(
+      {
+        NODE_ENV: "production",
+        DEBUGBUNDLE_API_URL: "https://api.debugbundle.com",
+        DEBUGBUNDLE_WORKER_DOGFOOD_PROJECT_TOKEN: "dbundle_proj_worker"
+      },
+      dogfoodingSdk
+    );
+
+    const warning = {
+      severity: "critical" as const,
+      oldest_due_lag_ms: 120_000,
+      claimed_count: 20,
+      concurrency: 8,
+      batch_size: 20,
+      timeout_count: 3,
+      avg_duration_ms: 950,
+      saturated: true
+    };
+
+    captureWorkerDogfoodingCapacityWarning(warning, dogfoodingSdk, new Date("2026-06-15T10:00:00.000Z"));
+    captureWorkerDogfoodingCapacityWarning(warning, dogfoodingSdk, new Date("2026-06-15T10:05:00.000Z"));
+
+    expect(dogfoodingSdk.captureError).toHaveBeenCalledTimes(1);
+    expect(dogfoodingSdk.captureError).toHaveBeenCalledWith(
+      expect.objectContaining({
+        message: expect.stringContaining("availability_check_capacity_warning severity=critical")
+      }),
       { handled: true }
     );
   });

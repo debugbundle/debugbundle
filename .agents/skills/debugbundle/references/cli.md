@@ -13,7 +13,7 @@
 
 ## Investigation
 
-- `debugbundle incidents [--source <local|cloud>] [--project-id <id>] [--environment <name>] [--service <name>] [--status <status>] [--severity <severity>] [--cursor <cursor>] [--limit <n>] [--json]`
+- `debugbundle incidents [--source <local|cloud>] [--project-id <id>] [--environment <name>] [--service <name>] [--status <active|open|resolved|regressed|all>] [--severity <severity>] [--cursor <cursor>] [--limit <n>] [--json]`
 - `debugbundle inspect <incident-id> [--source <local|cloud>] [--json]`
 - `debugbundle explain <incident-id> [--source <local|cloud>] [--json]`
 - `debugbundle bundle <incident-id> [--source <local|cloud>] [--json]`
@@ -103,15 +103,15 @@ Leave incidents open when the failure is still live or the fix is not yet confir
 Review open incidents and resolve the intentionally generated ones:
 
 ```bash
-debugbundle incidents --status open --json
+debugbundle incidents --status active --json
 debugbundle resolve <incident-id> [incident-id ...]
-debugbundle incidents --status open --json
+debugbundle incidents --status active --json
 ```
 
 If you want a title-based batch cleanup and have `jq` available:
 
 ```bash
-debugbundle incidents --status open --json \
+debugbundle incidents --status active --json \
   | jq -r '.incidents[] | select(.title | test("smoke test|dogfood|verification|synthetic"; "i")) | .incident_id' \
   | xargs debugbundle resolve
 ```

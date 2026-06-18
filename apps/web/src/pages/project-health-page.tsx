@@ -79,7 +79,7 @@ const DEFAULT_FORM_STATE: AvailabilityCheckFormState = {
   method: "GET",
   expected_status_min: "200",
   expected_status_max: "399",
-  timeout_ms: "5000",
+  timeout_ms: "2500",
   interval_seconds: String(getDefaultAvailabilityCheckIntervalSeconds(null)),
   failure_threshold: "3",
   recovery_threshold: "2",

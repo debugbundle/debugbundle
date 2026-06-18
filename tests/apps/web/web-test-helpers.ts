@@ -50,6 +50,7 @@ export interface ProjectRecord {
   metrics: {
     open_incidents: number;
     regressed_incidents: number;
+    attention_incidents_today: number;
     opened_incidents_today: number;
     opened_incidents_month: number;
     monthly_bundle_requests: number;
@@ -339,6 +340,7 @@ export function createProject(
   const defaultMetrics: ProjectRecord["metrics"] = {
     open_incidents: 3,
     regressed_incidents: 1,
+    attention_incidents_today: 1,
     opened_incidents_today: 1,
     opened_incidents_month: 5,
     monthly_bundle_requests: 12,

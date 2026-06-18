@@ -74,7 +74,7 @@ export function RecentProjectsTable(): JSX.Element {
                   <TableHead>Slug</TableHead>
                   <TableHead>Environment</TableHead>
                   <TableHead>Open incidents</TableHead>
-                  <TableHead>New today</TableHead>
+                  <TableHead>Incidents today</TableHead>
                   <TableHead>Opened this month</TableHead>
                 </TableRow>
               </TableHeader>
@@ -95,7 +95,7 @@ export function RecentProjectsTable(): JSX.Element {
                       <Badge variant="outline">{project.environment_default}</Badge>
                     </TableCell>
                     <TableCell className="text-muted-foreground">{project.metrics.open_incidents.toLocaleString()}</TableCell>
-                    <TableCell className="text-muted-foreground">{project.metrics.opened_incidents_today.toLocaleString()}</TableCell>
+                    <TableCell className="text-muted-foreground">{project.metrics.attention_incidents_today.toLocaleString()}</TableCell>
                     <TableCell className="text-muted-foreground">{project.metrics.opened_incidents_month.toLocaleString()}</TableCell>
                   </TableRow>
                 ))}
