@@ -1719,7 +1719,7 @@ function createClaimTrackingWorkerQueue(queue: RedisQueueClient): ClaimTrackingW
   };
 }
 
-async function runAvailabilityCheckLoop(input: {
+export async function runAvailabilityCheckLoop(input: {
   logger: RuntimeLogger;
   shutdownState: WorkerShutdownState;
   intervalMs: number;

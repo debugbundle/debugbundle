@@ -337,6 +337,7 @@ import {
   createProcessedEventStore,
   parseWorkerEnv,
   resolveWorkerEmailAssetBaseUrl,
+  runAvailabilityCheckLoop,
   runWorkerFromEnv
 } from "../../../apps/worker/src/runtime.js";
 import { STORAGE_SCHEMA_MIGRATIONS } from "../../../packages/storage/src/schema-migrations.js";
@@ -577,6 +578,23 @@ describe("worker runtime", () => {
     expect(requestAnomalyCounterCloseMock).toHaveBeenCalledOnce();
     expect(queueCloseMock).toHaveBeenCalledOnce();
     expect(poolEndMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("should run the availability-check loop until shutdown is requested", async (): Promise<void> => {
+    const shutdownState = createWorkerShutdownState();
+    const processBatch = vi.fn().mockImplementation(async () => {
+      shutdownState.requestShutdown();
+      return { processed: false, reason: "no_jobs" };
+    });
+
+    await runAvailabilityCheckLoop({
+      logger: { error: vi.fn() } as never,
+      shutdownState,
+      intervalMs: 1,
+      processBatch
+    });
+
+    expect(processBatch).toHaveBeenCalledOnce();
   });
 
   it("should fail worker startup when redis preflight fails", async (): Promise<void> => {
