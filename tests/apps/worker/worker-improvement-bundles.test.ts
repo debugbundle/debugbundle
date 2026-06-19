@@ -108,13 +108,7 @@ describe("worker improvement bundles", () => {
             bundle_source_event_id: sampleEvent.event_id,
             bundle_failure_reason: null
           }),
-          listImprovementEventReferences: vi.fn().mockResolvedValue([
-            {
-              event_id: sampleEvent.event_id,
-              event_type: "log_event",
-              occurred_at: sampleEvent.occurred_at
-            }
-          ]),
+          listImprovementEventReferences: vi.fn().mockResolvedValue([]),
           markImprovementBundleGenerationFailure: vi.fn(),
           pruneRetainedBundleOwnersForProject: vi.fn().mockResolvedValue([])
         },
@@ -181,6 +175,10 @@ describe("worker improvement bundles", () => {
     const payload = putObject.mock.calls[0]?.[0] as { body: Buffer };
     const parsed = BundleV1Schema.parse(JSON.parse(gunzipSync(payload.body).toString("utf8")));
     expect(parsed.bundle_type).toBe("improvement");
+    expect(parsed.sdk).toEqual({
+      name: sampleEvent.sdk_name,
+      version: sampleEvent.sdk_version
+    });
     expect(parsed.signal.signal_type).toBe("warning");
     expect(parsed.links.self).toBe("https://api.debugbundle.test/v1/projects/proj_123/improvements/imp_123/bundle");
     expect(parsed.context.logs?.items).toHaveLength(1);

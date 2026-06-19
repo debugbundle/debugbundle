@@ -51,6 +51,7 @@ export async function processNextBuildImprovementBundleJob(input: {
     await generateRecordedHostedImprovementBundle({
       project_id: job.project_id,
       event_id: job.event_id,
+      ...(job.event_type === undefined ? {} : { event_type: job.event_type }),
       occurred_at: job.occurred_at,
       recorded: {
         opportunity_id: job.opportunity_id,

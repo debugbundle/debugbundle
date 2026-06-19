@@ -1114,6 +1114,7 @@ export function createApiDependencies(input: CreateApiDependenciesInput): Defaul
               project_id: string;
               opportunity_id: string;
               event_id: string;
+              event_type?: "log_event" | "request_event";
               occurred_at: string;
               occurrence_count: number;
               trigger: "regeneration";
@@ -1153,11 +1154,17 @@ export function createApiDependencies(input: CreateApiDependenciesInput): Defaul
           return false;
         }
 
+        if (source.event_type !== "log_event" && source.event_type !== "request_event") {
+          await queueWithLease.releaseLease?.(leaseKey);
+          return false;
+        }
+
         try {
           await queueWithLease.enqueue("build-improvement-bundle", {
             project_id: regenerationInput.project_id,
             opportunity_id: regenerationInput.opportunity_id,
             event_id: source.event_id,
+            event_type: source.event_type,
             occurred_at: source.occurred_at,
             occurrence_count: improvement.occurrence_count,
             trigger: "regeneration"

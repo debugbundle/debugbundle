@@ -1681,13 +1681,15 @@ Response `200`:
       "confidence": "high | medium | low",
       "reason": "string",
       "requires_confirmation": false,
+      "created_rule_id": "uuid | null",
+      "created_rule_enabled": true,
       "rule": {}
     }
   ]
 }
 ```
 
-Suggestions are deterministic from stored incident + bundle evidence. `pending` indicates the bundle is not ready yet. `failed` indicates the bundle cannot currently support suggestion generation.
+Suggestions are deterministic from stored incident + bundle evidence. `created_rule_id` is populated when the suggested condition already has a matching project rule, including disabled rules. `pending` indicates the bundle is not ready yet. `failed` indicates the bundle cannot currently support suggestion generation.
 
 **Create a capture rule from a suggestion:**
 
@@ -1709,6 +1711,8 @@ Request body:
 ```
 
 Response `201`: same `{"rule": ...}` shape as direct capture-rule creation.
+
+Response `200`: same `{"rule": ...}` shape when a matching rule already exists for the selected incident suggestion. This makes the suggestion workflow idempotent and prevents duplicate rules for the same suggested condition.
 
 **Error responses:**
 - `401` — missing or invalid auth

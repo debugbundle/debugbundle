@@ -1,15 +1,34 @@
-import { gunzipSync } from "node:zlib";
+import { gunzipSync, gzipSync } from "node:zlib";
 
 import { describe, expect, it, vi } from "vitest";
 
 import { processNextBuildImprovementBundleJob } from "../../../apps/worker/src/improvement-bundle-processor.js";
 import { buildImprovementBundleObjectKey } from "../../../packages/storage/src/index.js";
+import { createEventEnvelope } from "../../../packages/shared-types/src/index.js";
 
 describe("worker improvement bundle retry processor", () => {
   it("rebuilds a hosted improvement bundle from a queued retry job", async () => {
     const putObject = vi.fn().mockResolvedValue(undefined);
     const releaseLease = vi.fn().mockResolvedValue(undefined);
     const markImprovementBundleGenerationFailure = vi.fn().mockResolvedValue(undefined);
+    const sourceEvent = createEventEnvelope({
+      event_id: "00000000-0000-0000-0000-000000000031",
+      event_type: "log_event",
+      sdk_name: "debugbundle-node",
+      sdk_version: "0.2.0",
+      occurred_at: "2026-05-18T12:00:00.000Z",
+      service: {
+        name: "checkout-api",
+        environment: "production",
+        runtime: "node",
+        framework: "fastify"
+      },
+      payload: {
+        level: "warning",
+        message: "payment provider warning",
+        attributes: {}
+      }
+    });
 
     const result = await processNextBuildImprovementBundleJob({
       queue: {
@@ -17,6 +36,7 @@ describe("worker improvement bundle retry processor", () => {
           project_id: "proj_123",
           opportunity_id: "imp_retry",
           event_id: "00000000-0000-0000-0000-000000000031",
+          event_type: "log_event",
           occurred_at: "2026-05-18T12:00:00.000Z",
           occurrence_count: 8,
           trigger: "regeneration"
@@ -83,7 +103,7 @@ describe("worker improvement bundle retry processor", () => {
           pruneRetainedBundleOwnersForProject: vi.fn().mockResolvedValue([])
         },
         objectStore: {
-          getObject: vi.fn(),
+          getObject: vi.fn().mockResolvedValue(gzipSync(Buffer.from(JSON.stringify(sourceEvent), "utf8"))),
           putObject
         }
       }
@@ -103,6 +123,10 @@ describe("worker improvement bundle retry processor", () => {
       expect.objectContaining({
         bundle_type: "improvement",
         bundle_id: "improvement_bundle_imp_retry",
+        sdk: {
+          name: "debugbundle-node",
+          version: "0.2.0"
+        },
         metadata: expect.objectContaining({ generation_number: 2 })
       })
     );

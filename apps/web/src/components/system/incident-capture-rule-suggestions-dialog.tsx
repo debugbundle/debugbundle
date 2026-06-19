@@ -36,13 +36,11 @@ export function IncidentCaptureRuleSuggestionsDialog({
 }: IncidentCaptureRuleSuggestionsDialogProps): JSX.Element {
   const [suggestionState, setSuggestionState] = useState<SuggestionState>({ status: "idle" });
   const [isCreatingSuggestionId, setIsCreatingSuggestionId] = useState<string | null>(null);
-  const [createdSuggestionIds, setCreatedSuggestionIds] = useState<string[]>([]);
 
   useEffect(() => {
     if (!open) {
       setSuggestionState({ status: "idle" });
       setIsCreatingSuggestionId(null);
-      setCreatedSuggestionIds([]);
       return;
     }
 
@@ -73,11 +71,27 @@ export function IncidentCaptureRuleSuggestionsDialog({
     setIsCreatingSuggestionId(suggestion.suggestion_id);
 
     try {
-      await createCaptureRuleFromIncidentSuggestion(incidentId, {
+      const rule = await createCaptureRuleFromIncidentSuggestion(incidentId, {
         suggestion_id: suggestion.suggestion_id
       });
-      setCreatedSuggestionIds((current) =>
-        current.includes(suggestion.suggestion_id) ? current : [...current, suggestion.suggestion_id]
+      setSuggestionState((current) =>
+        current.status !== "ready"
+          ? current
+          : {
+              ...current,
+              response: {
+                ...current.response,
+                suggestions: current.response.suggestions.map((candidate) =>
+                  candidate.suggestion_id === suggestion.suggestion_id
+                    ? {
+                        ...candidate,
+                        created_rule_id: rule.id,
+                        created_rule_enabled: rule.enabled
+                      }
+                    : candidate
+                )
+              }
+            }
       );
       showSuccessToast("Capture rule created successfully.");
     } catch {
@@ -148,7 +162,7 @@ export function IncidentCaptureRuleSuggestionsDialog({
         ) : (
           <div className="space-y-4">
             {readyResponse.suggestions.map((suggestion) => {
-              const isCreated = createdSuggestionIds.includes(suggestion.suggestion_id);
+              const isCreated = suggestion.created_rule_id !== null;
               const isCreating = isCreatingSuggestionId === suggestion.suggestion_id;
 
               return (
@@ -162,7 +176,11 @@ export function IncidentCaptureRuleSuggestionsDialog({
                         </Badge>
                         <Badge variant="outline">{suggestion.confidence}</Badge>
                         {suggestion.requires_confirmation ? <Badge variant="warning">review carefully</Badge> : null}
-                        {isCreated ? <Badge variant="success">created</Badge> : null}
+                        {isCreated ? (
+                          <Badge variant={suggestion.created_rule_enabled === false ? "outline" : "success"}>
+                            {suggestion.created_rule_enabled === false ? "exists disabled" : "rule exists"}
+                          </Badge>
+                        ) : null}
                       </div>
                       <p className="max-w-2xl text-sm leading-6 text-muted-foreground">{suggestion.reason}</p>
                       <p className="text-xs leading-5 text-muted-foreground">
@@ -176,7 +194,7 @@ export function IncidentCaptureRuleSuggestionsDialog({
                         disabled={isCreating || isCreated}
                         onClick={() => void handleCreateSuggestion(suggestion)}
                       >
-                        {isCreating ? "Creating..." : isCreated ? "Created" : "Create rule"}
+                        {isCreating ? "Creating..." : isCreated ? "Rule exists" : "Create rule"}
                       </Button>
                     </div>
                   </div>

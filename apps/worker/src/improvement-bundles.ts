@@ -104,6 +104,46 @@ function parseEventEnvelopeFromRaw(rawBody: Buffer): EventEnvelope | null {
   }
 }
 
+async function loadImprovementBundleSdk(input: {
+  objectStore: ObjectStoreReader;
+  projectId: string;
+  sourceEventId: string;
+  references: Array<{ event_id: string; occurred_at: string }>;
+}): Promise<{ name: string; version: string }> {
+  const orderedReferences = [
+    ...input.references.filter((reference) => reference.event_id === input.sourceEventId),
+    ...input.references.filter((reference) => reference.event_id !== input.sourceEventId).reverse()
+  ];
+
+  for (const reference of orderedReferences) {
+    const key = buildRawEventObjectKey({
+      projectId: input.projectId,
+      eventId: reference.event_id,
+      occurredAt: new Date(reference.occurred_at)
+    });
+
+    try {
+      const rawBody = await input.objectStore.getObject({ key });
+      const envelope = parseEventEnvelopeFromRaw(rawBody);
+      if (envelope === null || envelope.event_type === "probe_event") {
+        continue;
+      }
+
+      return {
+        name: envelope.sdk_name,
+        version: envelope.sdk_version
+      };
+    } catch {
+      // Raw-event lookup failures should not block deterministic improvement generation.
+    }
+  }
+
+  return {
+    name: "unknown",
+    version: "unknown"
+  };
+}
+
 async function loadSampleLogItems(input: {
   objectStore: ObjectStoreReader;
   projectId: string;
@@ -356,20 +396,24 @@ async function buildHostedImprovementBundle(input: {
     generation_number: number;
     created_at: string;
     updated_at: string;
+    source_event_id: string;
   };
   apiBaseUrl: string | null;
   appBaseUrl: string | null;
   docsBaseUrl: string | null;
 }): Promise<ReturnType<typeof BundleV1Schema.parse>> {
+  const bundleSdk = await loadImprovementBundleSdk({
+    objectStore: input.objectStore,
+    projectId: input.context.project_id,
+    sourceEventId: input.reserved.source_event_id,
+    references: input.references
+  });
   const baseBundle = {
     bundle_version: 1 as const,
     bundle_id: `improvement_bundle_${input.context.opportunity_id}`,
     bundle_type: "improvement" as const,
     captured_at: input.reserved.updated_at,
-    sdk: {
-      name: "debugbundle-worker",
-      version: "0.1.0"
-    },
+    sdk: bundleSdk,
     project: {
       id: input.context.project_id,
       slug: input.context.project_slug,
@@ -734,9 +778,11 @@ export async function maybeGenerateHostedImprovementBundle(input: {
     return;
   }
 
+  const sourceEventType = isWarningLogEvent(input.event) || isRequestEvent(input.event) ? input.event.event_type : undefined;
   await generateRecordedHostedImprovementBundle({
     project_id: input.project_id,
     event_id: input.event.event_id,
+    ...(sourceEventType === undefined ? {} : { event_type: sourceEventType }),
     occurred_at: input.event.occurred_at,
     recorded,
     thresholds,
@@ -812,6 +858,7 @@ export async function maybeGenerateHostedIncidentImprovementBundle(input: {
 export async function generateRecordedHostedImprovementBundle(input: {
   project_id: string;
   event_id: string;
+  event_type?: "log_event" | "request_event";
   occurred_at: string;
   recorded: RecordedImprovementCandidate;
   thresholds: ImprovementRuleThresholds;
@@ -883,12 +930,23 @@ export async function generateRecordedHostedImprovementBundle(input: {
       opportunity_id: input.recorded.opportunity_id,
       limit: 5
     });
+    const referencesWithSource =
+      input.event_type === undefined || references.some((reference) => reference.event_id === input.event_id)
+        ? references
+        : [
+            ...references,
+            {
+              event_id: input.event_id,
+              event_type: input.event_type,
+              occurred_at: input.occurred_at
+            }
+          ];
     const apiBaseUrl = normalizeBaseUrl(input.dependencies.apiBaseUrl);
     const appBaseUrl = normalizeBaseUrl(input.dependencies.appBaseUrl);
     const docsBaseUrl = normalizeBaseUrl(input.dependencies.docsBaseUrl);
     const bundle = await buildHostedImprovementBundle({
       context,
-      references,
+      references: referencesWithSource,
       thresholds: input.thresholds,
       objectStore: input.dependencies.objectStore,
       reserved,

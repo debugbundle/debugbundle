@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { buildApiUrl, InvalidSessionError, resetBrowserSessionClientState } from "../../../apps/web/src/lib/api.ts";
 import {
+  createProjectCaptureRule,
   createCaptureRuleFromIncidentSuggestion,
   deleteProjectCaptureRule,
   listProjectCaptureRules,
@@ -16,11 +17,14 @@ afterEach(() => {
 });
 
 describe("web capture-rules api", () => {
-  it("builds list, update, delete, suggest, and create-from-suggestion requests", async () => {
+  it("builds list, create, update, delete, suggest, and create-from-suggestion requests", async () => {
     const fetchMock = vi
       .fn()
       .mockResolvedValueOnce(
         new Response(JSON.stringify({ access_mode: "manage", rules: [] }), { status: 200 })
+      )
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ rule: { id: "rule_created", enabled: true } }), { status: 201 })
       )
       .mockResolvedValueOnce(
         new Response(JSON.stringify({ rule: { id: "rule_1", enabled: false } }), { status: 200 })
@@ -36,6 +40,19 @@ describe("web capture-rules api", () => {
     vi.stubGlobal("fetch", fetchMock);
 
     await listProjectCaptureRules("proj_1");
+    await createProjectCaptureRule("proj_1", {
+      name: "Demote analytics noise",
+      description: null,
+      enabled: true,
+      action: "demote",
+      matcher: {
+        event_types: ["frontend_exception"],
+        browser_event_kind: "resource_error",
+        resource_url: { host: "analytics.example.com" }
+      },
+      sample_rate: null,
+      sample_event_class: null
+    });
     await updateProjectCaptureRule("proj_1", "rule_1", { enabled: false });
     await deleteProjectCaptureRule("proj_1", "rule_1");
     await suggestCaptureRulesFromIncident("inc_1");
@@ -48,6 +65,26 @@ describe("web capture-rules api", () => {
     });
     expect(fetchMock).toHaveBeenNthCalledWith(
       2,
+      buildApiUrl("/v1/projects/proj_1/capture-rules"),
+      expect.objectContaining({
+        method: "POST",
+        body: JSON.stringify({
+          name: "Demote analytics noise",
+          description: null,
+          enabled: true,
+          action: "demote",
+          matcher: {
+            event_types: ["frontend_exception"],
+            browser_event_kind: "resource_error",
+            resource_url: { host: "analytics.example.com" }
+          },
+          sample_rate: null,
+          sample_event_class: null
+        })
+      })
+    );
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      3,
       buildApiUrl("/v1/projects/proj_1/capture-rules/rule_1"),
       expect.objectContaining({
         method: "PATCH",
@@ -55,21 +92,21 @@ describe("web capture-rules api", () => {
       })
     );
     expect(fetchMock).toHaveBeenNthCalledWith(
-      3,
+      4,
       buildApiUrl("/v1/projects/proj_1/capture-rules/rule_1"),
       expect.objectContaining({
         method: "DELETE"
       })
     );
     expect(fetchMock).toHaveBeenNthCalledWith(
-      4,
+      5,
       buildApiUrl("/v1/incidents/inc_1/capture-rule-suggestion"),
       expect.objectContaining({
         method: "POST"
       })
     );
     expect(fetchMock).toHaveBeenNthCalledWith(
-      5,
+      6,
       buildApiUrl("/v1/incidents/inc_1/capture-rules"),
       expect.objectContaining({
         method: "POST",

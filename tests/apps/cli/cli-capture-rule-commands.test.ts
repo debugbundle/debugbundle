@@ -142,6 +142,8 @@ describe("cli capture-rule commands", () => {
               confidence: "high",
               reason: "Known third-party resource noise.",
               requires_confirmation: false,
+              created_rule_id: rule.id,
+              created_rule_enabled: false,
               rule: {
                 name: "Demote resource errors from analytics.example.com",
                 description: null,
@@ -177,7 +179,8 @@ describe("cli capture-rule commands", () => {
     expect(suggested.exitCode).toBe(0);
     expect(suggested.output).toContain("primary_resource_host_demote");
     expect(suggested.output).toContain("Known third-party resource noise.");
-    expect(created.output).toContain("Capture rule created.");
+    expect(suggested.output).toContain(`existing_rule: ${rule.id} (disabled)`);
+    expect(created.output).toContain("Capture rule applied.");
   });
 
   it("loads stored auth state and forwards it into list/delete commands", async () => {
@@ -285,7 +288,7 @@ describe("cli capture-rule commands", () => {
     expect(badRequest.output).toBe("Invalid capture rule create payload.");
   });
 
-  it("builds CRUD requests against the capture-rule API", async () => {
+  it("builds CRUD requests against the capture-rule API and accepts idempotent suggestion creates", async () => {
     const request = vi
       .fn()
       .mockResolvedValueOnce({
@@ -307,7 +310,7 @@ describe("cli capture-rule commands", () => {
         }
       })
       .mockResolvedValueOnce({
-        status: 201,
+        status: 200,
         body: { rule }
       })
       .mockResolvedValueOnce({

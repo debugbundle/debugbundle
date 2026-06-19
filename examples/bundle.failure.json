@@ -4,7 +4,7 @@
   "bundle_type": "failure",
   "captured_at": "2026-03-12T00:00:00.000Z",
   "sdk": {
-    "name": "debugbundle-worker",
+    "name": "debugbundle-node",
     "version": "0.1.0"
   },
   "project": {
@@ -21,7 +21,7 @@
     "region": null
   },
   "signal": {
-    "signal_id": "evt_fixture",
+    "signal_id": "00000000-0000-4000-8000-000000000111",
     "signal_type": "exception",
     "severity": "high",
     "fingerprint": "fp_fixture",
@@ -36,9 +36,9 @@
   "summary": {
     "title": "TypeError at checkout",
     "description": "Deterministic bundle generated from deploy_metadata",
-    "likely_cause": null,
-    "confidence": 0,
-    "recommended_action": null,
+    "likely_cause": "backend_exception occurred while handling GET /checkout.",
+    "confidence": 0.55,
+    "recommended_action": "Inspect the first application frame and the captured request/response context.",
     "severity": "high",
     "error_type": "backend_exception",
     "error_message": "TypeError at checkout",
@@ -66,13 +66,41 @@
       "handled": false,
       "top_frames": []
     },
-    "request": null,
-    "response": null,
+    "request": {
+      "version": 1,
+      "method": "GET",
+      "path": "/checkout",
+      "route_template": "/checkout",
+      "query": {},
+      "headers": {},
+      "body": null,
+      "request_id": null
+    },
+    "response": {
+      "version": 1,
+      "status_code": 500,
+      "duration_ms": null
+    },
     "logs": null,
     "frontend": null,
     "environment": null,
     "deploy": null,
-    "runtime": null,
+    "runtime": {
+      "version": 1,
+      "name": "node",
+      "runtime_version": "24.0.0",
+      "platform": null,
+      "arch": null,
+      "pid": null,
+      "cwd": null,
+      "uptime_sec": null,
+      "hostname": null,
+      "thread_id": null,
+      "framework": "fastify",
+      "framework_version": null,
+      "memory": null,
+      "framework_extras": null
+    },
     "git": null,
     "dependencies": null,
     "probe_data": {

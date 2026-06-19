@@ -134,7 +134,7 @@ export function createCaptureRuleApi(httpClient: {
         body: input.create
       });
 
-      if (response.status !== 201) {
+      if (response.status !== 200 && response.status !== 201) {
         throw toApiError(response.status, response.body, "Failed to create capture rule from suggestion.");
       }
 
@@ -303,6 +303,9 @@ function formatSuggestionResponse(response: CaptureRuleSuggestionsResponse): str
         suggestion.reason,
         `matcher: ${formatMatcherFromValue(suggestion.rule.matcher)}`,
         `requires_confirmation: ${String(suggestion.requires_confirmation)}`,
+        suggestion.created_rule_id == null
+          ? "existing_rule: none"
+          : `existing_rule: ${suggestion.created_rule_id} (${suggestion.created_rule_enabled === false ? "disabled" : "enabled"})`,
         `apply: debugbundle capture-rule create-from-suggestion <incident-id> --suggestion-id ${suggestion.suggestion_id}`
       ].join("\n")
     )
@@ -452,7 +455,7 @@ export async function createCaptureRuleFromIncidentSuggestionCommand(
 
     return {
       exitCode: 0,
-      output: input.json ? JSON.stringify(response) : `Capture rule created.\n${formatRule(response.rule)}`
+      output: input.json ? JSON.stringify(response) : `Capture rule applied.\n${formatRule(response.rule)}`
     };
   } catch (error) {
     return {

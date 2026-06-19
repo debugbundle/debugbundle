@@ -1346,6 +1346,8 @@ If CLI says something is healthy and MCP says something different, that is a pro
 - **When** capture-rule suggestions are requested via API, CLI, MCP, or web
 - **Then** each interface exposes deterministic suggestions derived from the incident and bundle
 - **And** owner/admin users can create a selected rule from the suggestion
+- **And** suggestions indicate when a matching rule already exists and expose the existing rule id
+- **And** creating the same suggestion again returns the existing rule instead of creating a duplicate
 - **And** plain members can preview rules but cannot create, update, or delete them
 - **And** browser-noise suggestions can use structured fields such as `browser_event_opaque`, `client_kind`, and `bot_family` without requiring an exact-fingerprint-only fallback when bundle evidence is sufficient
 

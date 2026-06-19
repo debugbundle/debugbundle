@@ -10,8 +10,9 @@ export type CaptureRuleEventType =
   | "deploy_metadata"
   | "error_suppressed"
   | "probe_event";
-export type CaptureRuleRuntime = "node" | "python" | "php" | "browser";
+export type CaptureRuleRuntime = "browser" | "node" | "python" | "php" | "java" | "go" | "ruby" | "unknown";
 export type CaptureRuleBrowserEventKind = "window_error" | "resource_error";
+export type CaptureRuleClientKind = "human" | "bot" | "unknown";
 
 export interface CaptureRuleUrlMatcher {
   host?: string;
@@ -30,6 +31,9 @@ export interface CaptureRuleMatcher {
   message_contains?: string;
   message_equals?: string;
   browser_event_kind?: CaptureRuleBrowserEventKind;
+  browser_event_opaque?: boolean;
+  client_kind?: CaptureRuleClientKind;
+  bot_family?: string;
   resource_url?: CaptureRuleUrlMatcher;
   request_url?: CaptureRuleUrlMatcher;
   status_codes?: number[];
@@ -76,6 +80,20 @@ export interface ProjectCaptureRuleUpdate {
   expires_at?: string | null;
 }
 
+export interface ProjectCaptureRuleCreate {
+  name: string;
+  description?: string | null;
+  enabled?: boolean;
+  action: CaptureRuleAction;
+  matcher: CaptureRuleMatcher;
+  sample_rate?: number | null;
+  sample_event_class?: "preserve" | "context" | null;
+  created_by_user_id?: string | null;
+  created_from_incident_id?: string | null;
+  created_from_event_id?: string | null;
+  expires_at?: string | null;
+}
+
 export interface CaptureRuleSuggestion {
   suggestion_id: string;
   label: string;
@@ -83,6 +101,8 @@ export interface CaptureRuleSuggestion {
   confidence: "high" | "medium" | "low";
   reason: string;
   requires_confirmation: boolean;
+  created_rule_id: string | null;
+  created_rule_enabled: boolean | null;
   rule: {
     name: string;
     description: string | null;
@@ -123,6 +143,22 @@ export async function listProjectCaptureRules(projectId: string): Promise<Projec
       credentials: "include"
     })
   );
+}
+
+export async function createProjectCaptureRule(
+  projectId: string,
+  create: ProjectCaptureRuleCreate
+): Promise<ProjectCaptureRule> {
+  const body = await readCaptureRuleJson<{ rule: ProjectCaptureRule }>(
+    await fetch(buildApiUrl(`/v1/projects/${projectId}/capture-rules`), {
+      method: "POST",
+      credentials: "include",
+      headers: buildBrowserSessionHeaders(true),
+      body: JSON.stringify(create)
+    })
+  );
+
+  return body.rule;
 }
 
 export async function updateProjectCaptureRule(

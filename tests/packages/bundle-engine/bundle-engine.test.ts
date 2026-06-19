@@ -10,6 +10,38 @@ const deployMetadataGoldenFixture = readFileSync(
   "utf8"
 ).trim();
 
+const deployMetadataSourceEnvelope = createEventEnvelope({
+  event_id: "00000000-0000-4000-8000-000000000111",
+  event_type: "backend_exception",
+  sdk_name: "debugbundle-node",
+  sdk_version: "0.1.0",
+  occurred_at: "2026-03-12T00:00:00.000Z",
+  service: {
+    name: "checkout-api",
+    environment: "production",
+    runtime: "node",
+    framework: "fastify"
+  },
+  payload: {
+    name: "backend_exception",
+    message: "TypeError at checkout",
+    stack: "unavailable",
+    handled: false,
+    request: {
+      method: "GET",
+      path: "/checkout",
+      query: {},
+      headers: {}
+    },
+    response: {
+      status_code: 500
+    },
+    runtime: {
+      version: "24.0.0"
+    }
+  }
+});
+
 describe("bundle-engine", () => {
   it("should produce deterministic deploy_metadata bundle output matching golden fixture", (): void => {
     const bundle = buildBundle({
@@ -36,10 +68,10 @@ describe("bundle-engine", () => {
         generation_number: 3,
         created_at: "2026-03-12T00:00:00.000Z",
         updated_at: "2026-03-12T00:00:00.000Z",
-        source_event_id: "evt_fixture",
+        source_event_id: "00000000-0000-4000-8000-000000000111",
         source_occurred_at: "2026-03-12T00:00:00.000Z"
       },
-      sourceEnvelopes: [],
+      sourceEnvelopes: [deployMetadataSourceEnvelope],
       probeDataItems: []
     });
 
@@ -146,6 +178,10 @@ describe("bundle-engine", () => {
     });
 
     expect(bundle.service.id).toBe("svc_unknown");
+    expect(bundle.sdk).toEqual({
+      name: "unknown",
+      version: "unknown"
+    });
     expect(bundle.summary.error_type).toBe("backend_exception");
     expect(bundle.summary.signals.new_deploy).toBe(false);
     expect(bundle.summary.signals.regression_suspected).toBe(true);

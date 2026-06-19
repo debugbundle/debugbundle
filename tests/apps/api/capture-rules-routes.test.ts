@@ -304,6 +304,43 @@ describe("capture rule routes", () => {
     });
   });
 
+  it("marks incident suggestions that already have matching capture rules", async () => {
+    const existingRule = {
+      ...rule,
+      created_from_incident_id: null
+    };
+    const objectStoreReader = { getObject: vi.fn().mockResolvedValue(createBrowserNoiseBundleBuffer()) };
+    const app = createDependencies({
+      incidentRetrieval: {
+        listIncidentsForOrganization: vi.fn().mockResolvedValue([]),
+        getIncidentForOrganization: vi.fn().mockResolvedValue(createIncidentFixture()),
+        listIncidentLogsForOrganization: vi.fn().mockResolvedValue([]),
+        getBundleFailureReasonForOrganization: vi.fn().mockResolvedValue(null)
+      },
+      captureRuleManagement: {
+        listCaptureRulesForProject: vi.fn().mockResolvedValue([existingRule]),
+        listActiveCaptureRulesForProject: vi.fn(),
+        createCaptureRuleForProject: vi.fn(),
+        updateCaptureRuleForProject: vi.fn(),
+        deleteCaptureRuleForProject: vi.fn()
+      },
+      objectStoreReader
+    });
+
+    const response = await app.inject({
+      method: "POST",
+      url: "/v1/incidents/inc_123/capture-rule-suggestion",
+      headers: { authorization: "Bearer dbundle_mem_test_token" }
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json().suggestions[0]).toMatchObject({
+      suggestion_id: "primary_resource_host_demote",
+      created_rule_id: rule.id,
+      created_rule_enabled: true
+    });
+  });
+
   it("returns pending suggestions and requests bundle regeneration when the bundle is missing", async () => {
     const requestRegeneration = vi.fn().mockResolvedValue(true);
     const objectStoreReader = {
@@ -391,6 +428,47 @@ describe("capture rule routes", () => {
         })
       })
     );
+  });
+
+  it("returns an existing matching rule instead of duplicating a selected suggestion", async () => {
+    const existingRule = {
+      ...rule,
+      created_from_incident_id: null
+    };
+    const createCaptureRuleForProject = vi.fn();
+    const objectStoreReader = { getObject: vi.fn().mockResolvedValue(createBrowserNoiseBundleBuffer()) };
+    const app = createDependencies({
+      auditLogging: {
+        createAuditLog: vi.fn().mockResolvedValue(undefined)
+      },
+      incidentRetrieval: {
+        listIncidentsForOrganization: vi.fn().mockResolvedValue([]),
+        getIncidentForOrganization: vi.fn().mockResolvedValue(createIncidentFixture()),
+        listIncidentLogsForOrganization: vi.fn().mockResolvedValue([]),
+        getBundleFailureReasonForOrganization: vi.fn().mockResolvedValue(null)
+      },
+      captureRuleManagement: {
+        listCaptureRulesForProject: vi.fn().mockResolvedValue([existingRule]),
+        listActiveCaptureRulesForProject: vi.fn(),
+        createCaptureRuleForProject,
+        updateCaptureRuleForProject: vi.fn(),
+        deleteCaptureRuleForProject: vi.fn()
+      },
+      objectStoreReader
+    });
+
+    const response = await app.inject({
+      method: "POST",
+      url: "/v1/incidents/inc_123/capture-rules",
+      headers: { authorization: "Bearer dbundle_mem_test_token" },
+      payload: {
+        suggestion_id: "primary_resource_host_demote"
+      }
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toEqual({ rule: existingRule });
+    expect(createCaptureRuleForProject).not.toHaveBeenCalled();
   });
 
   it("updates capture rules for owners and admins", async () => {

@@ -20,6 +20,8 @@ export const CaptureRuleSuggestionSchema = z.object({
   confidence: CaptureRuleSuggestionConfidenceSchema,
   reason: z.string().min(1).max(500),
   requires_confirmation: z.boolean(),
+  created_rule_id: z.string().min(1).max(120).nullable().default(null),
+  created_rule_enabled: z.boolean().nullable().default(null),
   rule: CaptureRuleCreateSchema
 });
 

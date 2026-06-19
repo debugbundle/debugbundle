@@ -21,6 +21,38 @@ const deployMetadataGoldenFixture = readFileSync(
   "utf8"
 ).trim();
 
+const deployMetadataSourceEnvelope = createEventEnvelope({
+  event_id: "00000000-0000-4000-8000-000000000111",
+  event_type: "backend_exception",
+  sdk_name: "debugbundle-node",
+  sdk_version: "0.1.0",
+  occurred_at: "2026-03-12T00:00:00.000Z",
+  service: {
+    name: "checkout-api",
+    environment: "production",
+    runtime: "node",
+    framework: "fastify"
+  },
+  payload: {
+    name: "backend_exception",
+    message: "TypeError at checkout",
+    stack: "unavailable",
+    handled: false,
+    request: {
+      method: "GET",
+      path: "/checkout",
+      query: {},
+      headers: {}
+    },
+    response: {
+      status_code: 500
+    },
+    runtime: {
+      version: "24.0.0"
+    }
+  }
+});
+
 function createReservedBundleGeneration(overrides?: Partial<{
   generation_number: number;
   created_at: string;
@@ -1266,7 +1298,7 @@ describe("worker processor \u2013 bundle, delivery & sampling", () => {
         dequeue: vi.fn().mockResolvedValue({
           project_id: "proj_fixture",
           incident_id: "inc_fixture",
-          event_id: "evt_fixture",
+          event_id: "00000000-0000-4000-8000-000000000111",
           occurred_at: "2026-03-12T00:00:00.000Z",
           occurrence_count: 3,
           trigger: "deploy_metadata"
@@ -1290,15 +1322,23 @@ describe("worker processor \u2013 bundle, delivery & sampling", () => {
           occurrence_count: 3,
           source_event_types: ["request_event", "backend_exception"]
         }),
+        listIncidentEventReferences: vi.fn().mockResolvedValue([
+          {
+            event_id: "00000000-0000-4000-8000-000000000111",
+            event_type: "backend_exception",
+            occurred_at: "2026-03-12T00:00:00.000Z"
+          }
+        ]),
         reserveBundleGeneration: vi.fn().mockResolvedValue(
           createReservedBundleGeneration({
             generation_number: 3,
-            source_event_id: "evt_fixture",
+            source_event_id: "00000000-0000-4000-8000-000000000111",
             trigger: "deploy_metadata"
           })
         )
       },
       objectStore: {
+        getObject: vi.fn().mockResolvedValue(gzipSync(Buffer.from(JSON.stringify(deployMetadataSourceEnvelope), "utf8"))),
         putObject
       }
     });

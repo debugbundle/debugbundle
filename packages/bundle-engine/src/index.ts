@@ -136,6 +136,29 @@ function selectPrimarySignalEnvelope(envelopes: EventEnvelope[], sourceEventId: 
   );
 }
 
+function deriveBundleSdk(envelopes: EventEnvelope[], sourceEventId: string): BundleV1["sdk"] {
+  const sourceEnvelope = envelopes.find((envelope) => envelope.event_id === sourceEventId);
+  if (sourceEnvelope !== undefined) {
+    return {
+      name: sourceEnvelope.sdk_name,
+      version: sourceEnvelope.sdk_version
+    };
+  }
+
+  const latestCapturedEnvelope = selectLatestEnvelope(envelopes, (envelope) => envelope.event_type !== "probe_event");
+  if (latestCapturedEnvelope !== null) {
+    return {
+      name: latestCapturedEnvelope.sdk_name,
+      version: latestCapturedEnvelope.sdk_version
+    };
+  }
+
+  return {
+    name: "unknown",
+    version: "unknown"
+  };
+}
+
 function mapSignalType(eventType: EventEnvelope["event_type"] | null): BundleV1["signal"]["signal_type"] {
   if (eventType === "request_event") {
     return "request_failure";
@@ -973,6 +996,7 @@ export function buildBundle(input: BuildBundleInput): BundleV1 {
     primarySignalEnvelope !== null
       ? toIsoTimestamp(primarySignalEnvelope.occurred_at)
       : toIsoTimestamp(input.bundleMetadata.source_occurred_at);
+  const bundleSdk = deriveBundleSdk(sourceEnvelopes, input.bundleMetadata.source_event_id);
   const serviceRuntime =
     input.incident.service_runtime ??
     selectLatestEnvelope(sourceEnvelopes, (envelope) => envelope.event_type !== "probe_event")?.service.runtime ??
@@ -998,10 +1022,7 @@ export function buildBundle(input: BuildBundleInput): BundleV1 {
     bundle_id: `bnd_${input.incident.incident_id}`,
     bundle_type: "failure",
     captured_at: capturedAt,
-    sdk: {
-      name: "debugbundle-worker",
-      version: "0.1.0"
-    },
+    sdk: bundleSdk,
     project: {
       id: input.incident.project_id,
       slug: input.incident.project_id,

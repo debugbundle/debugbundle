@@ -16,6 +16,7 @@ import {
   type CaptureRuleResponse,
   type CaptureRuleSuggestionsResponse,
   type CaptureRulesResponse,
+  type CaptureRule,
   type BundleV1,
 } from "../../../../packages/shared-types/src/index.js";
 import { buildBundleObjectKey } from "../../../../packages/storage/src/index.js";
@@ -47,6 +48,65 @@ function buildCaptureRuleSuggestionsResponse(
   input: CaptureRuleSuggestionsResponse
 ): CaptureRuleSuggestionsResponse {
   return CaptureRuleSuggestionsResponseSchema.parse(input);
+}
+
+function stableStringify(value: unknown): string {
+  if (Array.isArray(value)) {
+    return `[${value.map(stableStringify).sort().join(",")}]`;
+  }
+
+  if (value !== null && typeof value === "object") {
+    return `{${Object.entries(value as Record<string, unknown>)
+      .sort(([left], [right]) => left.localeCompare(right))
+      .map(([key, entry]) => `${JSON.stringify(key)}:${stableStringify(entry)}`)
+      .join(",")}}`;
+  }
+
+  return JSON.stringify(value);
+}
+
+function captureRuleMatchesSuggestion(rule: CaptureRule, suggestionRule: CaptureRuleCreate): boolean {
+  return (
+    rule.action === suggestionRule.action &&
+    rule.sample_rate === suggestionRule.sample_rate &&
+    rule.sample_event_class === suggestionRule.sample_event_class &&
+    stableStringify(rule.matcher) === stableStringify(suggestionRule.matcher)
+  );
+}
+
+function findExistingRuleForSuggestion(rules: CaptureRule[], suggestionRule: CaptureRuleCreate): CaptureRule | null {
+  return rules.find((rule) => captureRuleMatchesSuggestion(rule, suggestionRule)) ?? null;
+}
+
+async function listExistingCaptureRulesForSuggestions(input: {
+  dependencies: ApiDependencies;
+  organizationId: string;
+  projectId: string;
+}): Promise<CaptureRule[]> {
+  if (input.dependencies.captureRuleManagement === undefined) {
+    return [];
+  }
+
+  return (
+    (await input.dependencies.captureRuleManagement.listCaptureRulesForProject({
+      organization_id: input.organizationId,
+      project_id: input.projectId
+    })) ?? []
+  );
+}
+
+function annotateCaptureRuleSuggestions(input: {
+  suggestions: CaptureRuleSuggestionsResponse["suggestions"];
+  existingRules: CaptureRule[];
+}): CaptureRuleSuggestionsResponse["suggestions"] {
+  return input.suggestions.map((suggestion) => {
+    const existingRule = findExistingRuleForSuggestion(input.existingRules, suggestion.rule);
+    return {
+      ...suggestion,
+      created_rule_id: existingRule?.id ?? null,
+      created_rule_enabled: existingRule?.enabled ?? null
+    };
+  });
 }
 
 async function readBundleForCaptureRuleSuggestions(input: {
@@ -273,19 +333,29 @@ export function registerCaptureRuleRoutes(app: FastifyInstance, dependencies: Ap
       );
     }
 
+    const suggestions = buildCaptureRuleSuggestions({
+      incident: {
+        incident_id: incident.incident_id,
+        project_id: incident.project_id,
+        fingerprint: incident.fingerprint,
+        fingerprint_version: incident.fingerprint_version,
+        title: incident.title,
+        occurrence_count: incident.occurrence_count,
+        matched_fields: incident.matched_fields
+      },
+      bundle: bundle.bundle
+    });
+    const existingRules = await listExistingCaptureRulesForSuggestions({
+      dependencies,
+      organizationId: member.organization_id,
+      projectId: incident.project_id
+    });
+
     return reply.status(200).send(
       buildCaptureRuleSuggestionsResponse({
-        suggestions: buildCaptureRuleSuggestions({
-          incident: {
-            incident_id: incident.incident_id,
-            project_id: incident.project_id,
-            fingerprint: incident.fingerprint,
-            fingerprint_version: incident.fingerprint_version,
-            title: incident.title,
-            occurrence_count: incident.occurrence_count,
-            matched_fields: incident.matched_fields
-          },
-          bundle: bundle.bundle
+        suggestions: annotateCaptureRuleSuggestions({
+          suggestions,
+          existingRules
         }),
         bundle_status: "ready"
       })
@@ -371,6 +441,16 @@ export function registerCaptureRuleRoutes(app: FastifyInstance, dependencies: Ap
       ...(parsedBody.data.enabled === undefined ? {} : { enabled: parsedBody.data.enabled }),
       ...(parsedBody.data.expires_at === undefined ? {} : { expires_at: parsedBody.data.expires_at })
     };
+
+    const existingRules = await listExistingCaptureRulesForSuggestions({
+      dependencies,
+      organizationId: member.organization_id,
+      projectId: incident.project_id
+    });
+    const existingRule = findExistingRuleForSuggestion(existingRules, create);
+    if (existingRule !== null) {
+      return reply.status(200).send(buildCaptureRuleResponse(existingRule));
+    }
 
     const rule = await dependencies.captureRuleManagement.createCaptureRuleForProject({
       organization_id: member.organization_id,

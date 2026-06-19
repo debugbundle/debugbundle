@@ -1,8 +1,9 @@
-import { LinkIcon, RotateCcwIcon, ShieldAlertIcon, ShieldOffIcon, Trash2Icon } from "lucide-react";
+import { LinkIcon, PlusIcon, RotateCcwIcon, ShieldAlertIcon, ShieldOffIcon, Trash2Icon } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 
 import {
+  createProjectCaptureRule,
   deleteProjectCaptureRule,
   listProjectCaptureRules,
   updateProjectCaptureRule,
@@ -13,7 +14,7 @@ import { showErrorToast, showSuccessToast } from "../../lib/notify.js";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "../ui/alert-dialog.js";
 import { Badge } from "../ui/badge.js";
 import { Button } from "../ui/button.js";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../ui/card.js";
+import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "../ui/card.js";
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "../ui/empty.js";
 import { Field, FieldDescription, FieldGroup, FieldLabel } from "../ui/field.js";
 import { Input } from "../ui/input.js";
@@ -21,6 +22,13 @@ import { Skeleton } from "../ui/skeleton.js";
 import { Switch } from "../ui/switch.js";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../ui/table.js";
 import { Textarea } from "../ui/textarea.js";
+import {
+  buildProjectCaptureRuleCreate,
+  CaptureRuleCreateForm,
+  createDefaultCaptureRuleCreateDraft,
+  getCaptureRuleCreateDraftValidationError,
+  type CaptureRuleCreateDraft
+} from "./capture-rule-create-form.js";
 import { Dialog } from "../ui/dialog.js";
 import { DialogFormContent } from "./dialog-form-content.js";
 
@@ -65,6 +73,10 @@ export function ProjectCaptureRulesCard({ projectId, canEdit }: ProjectCaptureRu
   const [pendingDeleteRule, setPendingDeleteRule] = useState<ProjectCaptureRule | null>(null);
   const [isDeletingRuleId, setIsDeletingRuleId] = useState<string | null>(null);
   const [isTogglingRuleId, setIsTogglingRuleId] = useState<string | null>(null);
+  const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [createDraft, setCreateDraft] = useState<CaptureRuleCreateDraft>(createDefaultCaptureRuleCreateDraft());
+  const [isCreating, setIsCreating] = useState(false);
+  const [hasSubmittedCreate, setHasSubmittedCreate] = useState(false);
 
   async function loadRules(showRefreshing = false): Promise<void> {
     if (showRefreshing) {
@@ -107,6 +119,36 @@ export function ProjectCaptureRulesCard({ projectId, canEdit }: ProjectCaptureRu
   const editDraft = draft ?? (editingRule === null ? null : buildDraft(editingRule));
   const isEditDirty =
     editingRule !== null && editDraft !== null ? !draftsEqual(editDraft, buildDraft(editingRule)) : false;
+  const createValidationError = getCaptureRuleCreateDraftValidationError(createDraft);
+
+  async function handleCreateRule(event: React.FormEvent<HTMLFormElement>): Promise<void> {
+    event.preventDefault();
+    if (createValidationError !== null) {
+      setHasSubmittedCreate(true);
+      return;
+    }
+
+    setIsCreating(true);
+    try {
+      const created = await createProjectCaptureRule(projectId, buildProjectCaptureRuleCreate(createDraft));
+      setRulesResponse((current) =>
+        current === null
+          ? current
+          : {
+              ...current,
+              rules: [created, ...current.rules.filter((candidate) => candidate.id !== created.id)]
+            }
+      );
+      setCreateDraft(createDefaultCaptureRuleCreateDraft());
+      setHasSubmittedCreate(false);
+      setIsCreateOpen(false);
+      showSuccessToast("Capture rule created successfully.");
+    } catch {
+      showErrorToast("Could not create capture rule.");
+    } finally {
+      setIsCreating(false);
+    }
+  }
 
   async function handleToggleEnabled(rule: ProjectCaptureRule): Promise<void> {
     setIsTogglingRuleId(rule.id);
@@ -193,9 +235,23 @@ export function ProjectCaptureRulesCard({ projectId, canEdit }: ProjectCaptureRu
   return (
     <>
       <Card>
-        <CardHeader>
+        <CardHeader className="gap-1">
           <CardTitle>Capture rules</CardTitle>
           <CardDescription>Review which noisy patterns are being demoted, sampled, or dropped before they keep reopening incidents.</CardDescription>
+          {showPreviewOnly ? null : (
+            <CardAction className="max-sm:col-span-full max-sm:col-start-1 max-sm:row-start-3 max-sm:row-span-1 max-sm:mt-3">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={isRefreshing}
+                onClick={() => void loadRules(true)}
+              >
+                <RotateCcwIcon data-icon="inline-start" />
+                {isRefreshing ? "Refreshing..." : "Refresh rules"}
+              </Button>
+            </CardAction>
+          )}
         </CardHeader>
         <CardContent className="space-y-6">
           <div className="rounded-lg border border-border/80 bg-background/60 p-4 text-sm text-muted-foreground">
@@ -206,9 +262,15 @@ export function ProjectCaptureRulesCard({ projectId, canEdit }: ProjectCaptureRu
             <p className="mt-2 leading-6">
               {showPreviewOnly
                 ? "Members can review project capture rules here. Owners and admins create and manage these rules from incident detail pages and project settings."
-                : "Create new rules from noisy incident detail pages, then use this table to pause, review, or retire them without losing visibility into important first-party failures."}
+                : "Create rules from noisy incident suggestions or define a manual rule here when you already know the exact structured condition to demote, sample, or drop."}
             </p>
-            <div className="mt-3">
+            <div className="mt-3 flex flex-wrap gap-2">
+              {showPreviewOnly ? null : (
+                <Button type="button" size="sm" onClick={() => setIsCreateOpen(true)}>
+                  <PlusIcon data-icon="inline-start" />
+                  Create rule
+                </Button>
+              )}
               <Button asChild type="button" variant="outline" size="sm">
                 <Link to={`/projects/${projectId}/incidents`}>
                   <LinkIcon data-icon="inline-start" />
@@ -235,7 +297,7 @@ export function ProjectCaptureRulesCard({ projectId, canEdit }: ProjectCaptureRu
                 </EmptyMedia>
                 <EmptyTitle>No capture rules yet</EmptyTitle>
                 <EmptyDescription>
-                  Create one from a recurring browser incident when you decide that future matches should be demoted, sampled, or dropped.
+                  Create one from a recurring incident or define a manual matcher when the noisy pattern is already known.
                 </EmptyDescription>
               </EmptyHeader>
             </Empty>
@@ -315,14 +377,6 @@ export function ProjectCaptureRulesCard({ projectId, canEdit }: ProjectCaptureRu
             </Table>
           )}
 
-          {showPreviewOnly ? null : (
-            <div className="flex justify-end">
-              <Button type="button" variant="outline" size="sm" disabled={isRefreshing} onClick={() => void loadRules(true)}>
-                <RotateCcwIcon data-icon="inline-start" />
-                {isRefreshing ? "Refreshing..." : "Refresh rules"}
-              </Button>
-            </div>
-          )}
         </CardContent>
       </Card>
 
@@ -423,6 +477,49 @@ export function ProjectCaptureRulesCard({ projectId, canEdit }: ProjectCaptureRu
         )}
       </Dialog>
 
+      <Dialog
+        open={isCreateOpen}
+        onOpenChange={(open) => {
+          if (!open) {
+            setCreateDraft(createDefaultCaptureRuleCreateDraft());
+            setHasSubmittedCreate(false);
+          }
+          setIsCreateOpen(open);
+        }}
+      >
+        <DialogFormContent
+          title="Create capture rule"
+          description="Define a targeted matcher for known noisy events. Narrow rules are safer than broad demote or drop rules."
+          size="xl"
+          onSubmit={(event) => void handleCreateRule(event)}
+          footer={
+            <>
+              <Button
+                type="button"
+                variant="outline"
+                disabled={isCreating}
+                onClick={() => {
+                  setCreateDraft(createDefaultCaptureRuleCreateDraft());
+                  setHasSubmittedCreate(false);
+                }}
+              >
+                Reset
+              </Button>
+              <Button type="submit" disabled={isCreating}>
+                {isCreating ? "Creating..." : "Create rule"}
+              </Button>
+            </>
+          }
+        >
+          {!hasSubmittedCreate || createValidationError === null ? null : (
+            <div className="rounded-lg border border-destructive/25 bg-destructive/5 p-3 text-sm text-destructive">
+              {createValidationError}
+            </div>
+          )}
+          <CaptureRuleCreateForm draft={createDraft} disabled={isCreating} onDraftChange={setCreateDraft} />
+        </DialogFormContent>
+      </Dialog>
+
       <AlertDialog open={pendingDeleteRule !== null} onOpenChange={(open) => (open ? undefined : setPendingDeleteRule(null))}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -463,6 +560,33 @@ function formatMatcherSummary(rule: ProjectCaptureRule): string {
   }
   if (rule.matcher.browser_event_kind !== undefined) {
     parts.push(`browser: ${rule.matcher.browser_event_kind}`);
+  }
+  if (rule.matcher.browser_event_opaque !== undefined) {
+    parts.push(rule.matcher.browser_event_opaque ? "opaque browser event" : "non-opaque browser event");
+  }
+  if (rule.matcher.runtime?.length) {
+    parts.push(`runtime: ${rule.matcher.runtime.join(", ")}`);
+  }
+  if (rule.matcher.services?.length) {
+    parts.push(`services: ${rule.matcher.services.join(", ")}`);
+  }
+  if (rule.matcher.environments?.length) {
+    parts.push(`environments: ${rule.matcher.environments.join(", ")}`);
+  }
+  if (rule.matcher.client_kind !== undefined) {
+    parts.push(`client: ${rule.matcher.client_kind}`);
+  }
+  if (rule.matcher.bot_family !== undefined) {
+    parts.push(`bot: ${rule.matcher.bot_family}`);
+  }
+  if (rule.matcher.error_name !== undefined) {
+    parts.push(`error: ${rule.matcher.error_name}`);
+  }
+  if (rule.matcher.message_equals !== undefined) {
+    parts.push(`message: ${rule.matcher.message_equals}`);
+  }
+  if (rule.matcher.message_contains !== undefined) {
+    parts.push(`message contains: ${rule.matcher.message_contains}`);
   }
   if (rule.matcher.resource_url !== undefined) {
     parts.push(`resource: ${formatUrlMatcher(rule.matcher.resource_url)}`);

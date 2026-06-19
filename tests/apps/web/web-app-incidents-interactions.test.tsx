@@ -96,6 +96,7 @@ describe("web app — incident table interactions", () => {
       project_name: project.name,
       service_name: "Checkout API"
     });
+    let captureRuleCreated = false;
 
     const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
       const url = requestUrl(input);
@@ -127,6 +128,8 @@ describe("web app — incident table interactions", () => {
               confidence: "high",
               reason: "Known third-party resource noise.",
               requires_confirmation: false,
+              created_rule_id: captureRuleCreated ? "rule_1" : null,
+              created_rule_enabled: captureRuleCreated ? true : null,
               rule: {
                 name: "Demote resource errors from analytics.example.com",
                 description: null,
@@ -151,6 +154,7 @@ describe("web app — incident table interactions", () => {
 
       if (url.endsWith(`/v1/incidents/${incident.incident_id}/capture-rules`) && init?.method === "POST") {
         expect(init.body).toBe(JSON.stringify({ suggestion_id: "primary_resource_host_demote" }));
+        captureRuleCreated = true;
         return jsonResponse(201, {
           rule: {
             id: "rule_1",
@@ -201,12 +205,12 @@ describe("web app — incident table interactions", () => {
       ).toBe(true);
     });
 
-    expect(await screen.findByRole("button", { name: /^created$/i })).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: /^rule exists$/i })).toBeInTheDocument();
 
     await user.click(screen.getAllByRole("button", { name: /^close$/i }).at(-1) as HTMLButtonElement);
     await user.click(screen.getByRole("button", { name: /capture rules/i }));
 
-    expect(await screen.findByRole("button", { name: /^create rule$/i })).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: /^rule exists$/i })).toBeInTheDocument();
   });
 
   it("bulk resolves workspace incidents from the table with one request", async () => {
