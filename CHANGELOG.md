@@ -6,12 +6,18 @@ The format is based on Keep a Changelog and this project follows Semantic Versio
 
 ## [Unreleased]
 
-## [1.5.2] - 2026-06-18
+## [1.5.2] - 2026-06-19
 
 ### Changed
 
 - Exposed linked availability-incident status through the shared health-check response contract so CLI, API, and web clients can distinguish active incidents from resolved ones without breaking existing consumers.
 - Updated availability health surfaces to stop treating resolved linked incidents as active, so project health badges and aggregate status counts clear correctly after incident resolution.
+- Promoted the hosted dogfooding manifests to `@debugbundle/shared-types@1.3.1`, `@debugbundle/redaction@1.3.1`, `@debugbundle/sdk-node@1.3.1`, and `@debugbundle/sdk-browser@1.3.1` after the coordinated shared and JS SDK release train completed.
+- Published the coordinated server-SDK patch line at `debugbundle-python@1.1.2`, `debugbundle/sdk-php@1.1.2`, `debugbundle@1.1.2`, `github.com/debugbundle/debugbundle-go@v1.1.1`, the `com.debugbundle` Java SDK family at `1.1.1`, and the NuGet `DebugBundle.*` package family at `1.1.1`, followed by `debugbundle-wordpress@1.2.3`.
+
+### Fixed
+
+- Normalized hosted ingestion and event normalization to tolerate installed SDK envelope drift while the patched SDK releases move custom app context into envelope `context`, remove legacy request payload extras, and preserve redaction on the canonical event path.
 
 ## [1.5.0] - 2026-06-15
 
