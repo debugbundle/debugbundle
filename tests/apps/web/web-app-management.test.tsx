@@ -7,6 +7,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { App } from "../../../apps/web/src/app.tsx";
 import { resetBrowserSessionClientState } from "../../../apps/web/src/lib/api.ts";
+import { getLocalDayWindow } from "../../../apps/web/src/lib/incidents-today.ts";
 import {
   createAlert,
   createBillingSummary,
@@ -90,7 +91,7 @@ describe("web app — management routes", () => {
 
     expect(await screen.findByText(/main app/i)).toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: /main app/i })).not.toBeInTheDocument();
-    expect(screen.getByText(/^12$/)).toBeInTheDocument();
+    expect(screen.getByText(/^16$/)).toBeInTheDocument();
     expect(screen.getByText(/^1$/)).toBeInTheDocument();
     expect(screen.getByText(/^6$/)).toBeInTheDocument();
     expect(screen.getByText(/^4$/)).toBeInTheDocument();
@@ -3664,7 +3665,7 @@ describe("web app — management routes", () => {
         });
       }
 
-      if (url.includes("/v1/incidents?") && url.includes("first_seen_after=")) {
+      if (url.includes("/v1/incidents?")) {
         return jsonResponse(200, { incidents: [], next_cursor: null });
       }
 
@@ -3680,7 +3681,7 @@ describe("web app — management routes", () => {
     const mainAppRow = screen.getByText(/main app/i).closest("tr");
     expect(mainAppRow).not.toBeNull();
     expect(within(mainAppRow as HTMLTableRowElement).getAllByText(/^0$/)).toHaveLength(3);
-    expect(await screen.findByText(/no new incidents today/i)).toBeInTheDocument();
+    expect(await screen.findByText(/no incidents today/i)).toBeInTheDocument();
   });
 
   it("opens the create-project dialog directly from the dashboard empty state", async () => {
@@ -3727,7 +3728,7 @@ describe("web app — management routes", () => {
         return jsonResponse(200, { incidents: [], next_cursor: null });
       }
 
-      if (url.includes("/v1/incidents?") && url.includes("first_seen_after=")) {
+      if (url.includes("/v1/incidents?")) {
         return jsonResponse(200, { incidents: [], next_cursor: null });
       }
 
@@ -3850,13 +3851,13 @@ describe("web app — management routes", () => {
     render(<App initialEntries={["/dashboard"]} />);
 
     await waitFor(() => {
-      expect(cardWithValueExists("Open incidents", /^12$/)).toBe(true);
+      expect(cardWithValueExists("Active incidents", /^15$/)).toBe(true);
       expect(cardWithValueExists("Incidents today", /^3$/)).toBe(true);
       expect(cardWithValueExists("Opened this month", /^15$/)).toBe(true);
       expect(cardWithValueExists("Regressed incidents", /^3$/)).toBe(true);
     });
 
-    expect(screen.getByText(/current unresolved incidents across all projects/i)).toBeInTheDocument();
+    expect(screen.getByText(/open or regressed incidents across all projects/i)).toBeInTheDocument();
     expect(screen.getByText(/opened or regressed today across all projects/i)).toBeInTheDocument();
     expect(screen.getByText(/incidents opened this month across all projects/i)).toBeInTheDocument();
     expect(screen.getByText(/current regressed incidents across all projects/i)).toBeInTheDocument();
@@ -3882,7 +3883,7 @@ describe("web app — management routes", () => {
         });
       }
 
-      if (url.includes("/v1/incidents?") && url.includes("first_seen_after=")) {
+      if (url.includes("/v1/incidents?")) {
         return jsonResponse(200, {
           incidents: [
             createIncident({
@@ -3905,9 +3906,9 @@ describe("web app — management routes", () => {
 
     render(<App initialEntries={["/dashboard"]} />);
 
-    await screen.findByText(/current unresolved incidents across all projects/i);
+    await screen.findByText(/open or regressed incidents across all projects/i);
 
-    const openIncidentsCard = screen.getByText(/current unresolved incidents across all projects/i).closest("a");
+    const openIncidentsCard = screen.getByText(/open or regressed incidents across all projects/i).closest("a");
     expect(openIncidentsCard).not.toBeNull();
 
     await user.click(openIncidentsCard as HTMLAnchorElement);
@@ -3939,7 +3940,7 @@ describe("web app — management routes", () => {
         });
       }
 
-      if (url.includes("/v1/incidents?") && url.includes("first_seen_after=")) {
+      if (url.includes("/v1/incidents?")) {
         return jsonResponse(200, {
           incidents: [
             createIncident({
@@ -3969,6 +3970,10 @@ describe("web app — management routes", () => {
   });
 
   it("renders incident rows in the dashboard incidents-today table", async () => {
+    const todayWindow = getLocalDayWindow();
+    const firstSeenAt = new Date(todayWindow.startsAtMs + 30 * 60 * 1000).toISOString();
+    const lastSeenAt = new Date(todayWindow.startsAtMs + 2 * 60 * 60 * 1000).toISOString();
+
     const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
       const url = requestUrl(input);
 
@@ -3984,7 +3989,7 @@ describe("web app — management routes", () => {
         });
       }
 
-      if (url.includes("/v1/incidents?") && url.includes("first_seen_after=")) {
+      if (url.includes("/v1/incidents?")) {
         return jsonResponse(200, {
           incidents: [
             createIncident({
@@ -3997,8 +4002,10 @@ describe("web app — management routes", () => {
               environment: "production",
               severity: "critical",
               status: "regressed",
+              first_seen_at: firstSeenAt,
+              last_seen_at: lastSeenAt,
               occurrence_count: 11,
-              last_seen_at: "2026-03-17T14:05:00.000Z"
+              regressed_at: firstSeenAt
             })
           ],
           next_cursor: null
