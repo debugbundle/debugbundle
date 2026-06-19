@@ -92,6 +92,7 @@ const listIncidentsInputSchema = z.object({
   status: z.string().optional(),
   severity: z.string().optional(),
   firstSeenAfter: z.string().optional(),
+  attentionAfter: z.string().optional(),
   cursor: z.string().optional(),
   limit: z.number().optional(),
 });

@@ -964,6 +964,7 @@ export interface MetadataStore {
     status?: IncidentRetrievalStatusFilter;
     severity?: "low" | "medium" | "high" | "critical";
     first_seen_after?: string;
+    attention_after?: string;
     cursor?: IncidentsCursor;
     limit: number;
   }): Promise<IncidentRetrievalRecord[]>;

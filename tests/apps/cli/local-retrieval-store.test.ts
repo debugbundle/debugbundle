@@ -158,6 +158,15 @@ describe("local retrieval store", () => {
 
     expect(firstSeenFiltered.incidents.map((incident) => incident.incident_id)).toEqual(["inc_recent"]);
 
+    const attentionFiltered = await listLocalIncidents(
+      {
+        attentionAfter: "2026-03-19T12:00:00.000Z"
+      },
+      { cwd: () => rootDirectory }
+    );
+
+    expect(attentionFiltered.incidents.map((incident) => incident.incident_id)).toEqual(["inc_recent"]);
+
     const resolvedIncident = await resolveLocalIncident({ incidentId: "inc_recent" }, { cwd: () => rootDirectory });
     expect(resolvedIncident.status).toBe("resolved");
     expect(typeof resolvedIncident.resolved_at).toBe("string");

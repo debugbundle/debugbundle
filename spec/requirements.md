@@ -215,7 +215,7 @@ Last updated: 2026-06-15
 
 ### 1.6 Retrieval API
 
-**FR-RET-01:** `GET /v1/incidents` — list/filter incidents (project_id, environment, service, status [active/open/resolved/regressed], severity, `first_seen_after`, limit, cursor). `active` means open or regressed incidents.
+**FR-RET-01:** `GET /v1/incidents` — list/filter incidents (project_id, environment, service, status [active/open/resolved/regressed], severity, `first_seen_after`, `attention_after`, limit, cursor). `active` means open or regressed incidents. `attention_after` means first opened at or after the supplied timestamp or regressed at or after the supplied timestamp.
 
 Project list/detail metrics must include `attention_incidents_today`, counting incidents first opened today or regressed today, while preserving `opened_incidents_today` as first-opened-only.
 

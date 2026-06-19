@@ -548,6 +548,7 @@ export const IncidentsQuerySchema = z
     status: z.enum(["active", "open", "resolved", "regressed"]).optional(),
     severity: z.enum(["low", "medium", "high", "critical"]).optional(),
     first_seen_after: z.string().datetime().optional(),
+    attention_after: z.string().datetime().optional(),
     cursor: z.string().min(1).optional(),
     limit: z.coerce.number().int().min(1).max(100).default(20)
   })

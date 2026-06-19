@@ -104,6 +104,7 @@ function readIncidentListFilters(input: Record<string, unknown>): {
   status?: string;
   severity?: string;
   firstSeenAfter?: string;
+  attentionAfter?: string;
   cursor?: string;
   limit?: number;
 } {
@@ -114,6 +115,7 @@ function readIncidentListFilters(input: Record<string, unknown>): {
     status?: string;
     severity?: string;
     firstSeenAfter?: string;
+    attentionAfter?: string;
     cursor?: string;
     limit?: number;
   } = {};
@@ -137,6 +139,9 @@ function readIncidentListFilters(input: Record<string, unknown>): {
   if (typeof input["firstSeenAfter"] === "string") {
     requestInput.firstSeenAfter = input["firstSeenAfter"];
   }
+  if (typeof input["attentionAfter"] === "string") {
+    requestInput.attentionAfter = input["attentionAfter"];
+  }
   if (typeof input["cursor"] === "string") {
     requestInput.cursor = input["cursor"];
   }
@@ -158,6 +163,7 @@ async function listAllCloudIncidents(
       status?: string;
       severity?: string;
       firstSeenAfter?: string;
+      attentionAfter?: string;
       cursor?: string;
     }): Promise<{ incidents: unknown[]; next_cursor: string | null }>;
   }
@@ -175,6 +181,7 @@ async function listAllCloudIncidents(
       ...(filters.status === undefined ? {} : { status: filters.status }),
       ...(filters.severity === undefined ? {} : { severity: filters.severity }),
       ...(filters.firstSeenAfter === undefined ? {} : { firstSeenAfter: filters.firstSeenAfter }),
+      ...(filters.attentionAfter === undefined ? {} : { attentionAfter: filters.attentionAfter }),
       ...(cursor === undefined ? {} : { cursor })
     });
 
@@ -247,6 +254,7 @@ export function createRetrievalMcpTools(api: {
     status?: string;
     severity?: string;
     firstSeenAfter?: string;
+    attentionAfter?: string;
     cursor?: string;
     limit?: number;
   }): Promise<{ incidents: unknown[]; next_cursor: string | null }>;
@@ -287,7 +295,8 @@ export function createRetrievalMcpTools(api: {
             ...(incidentFilters.service === undefined ? {} : { service: incidentFilters.service }),
             ...(incidentFilters.status === undefined ? {} : { status: incidentFilters.status }),
             ...(incidentFilters.severity === undefined ? {} : { severity: incidentFilters.severity }),
-            ...(incidentFilters.firstSeenAfter === undefined ? {} : { firstSeenAfter: incidentFilters.firstSeenAfter })
+            ...(incidentFilters.firstSeenAfter === undefined ? {} : { firstSeenAfter: incidentFilters.firstSeenAfter }),
+            ...(incidentFilters.attentionAfter === undefined ? {} : { attentionAfter: incidentFilters.attentionAfter })
           });
           const cloudIncidents = await listAllCloudIncidents(input, {
             listIncidents: (requestInput) => api.listIncidents(requestInput)
@@ -310,6 +319,7 @@ export function createRetrievalMcpTools(api: {
           status?: string;
           severity?: string;
           firstSeenAfter?: string;
+          attentionAfter?: string;
           cursor?: string;
           limit?: number;
         } = {
@@ -332,6 +342,9 @@ export function createRetrievalMcpTools(api: {
         }
         if (incidentFilters.firstSeenAfter !== undefined) {
           requestInput.firstSeenAfter = incidentFilters.firstSeenAfter;
+        }
+        if (incidentFilters.attentionAfter !== undefined) {
+          requestInput.attentionAfter = incidentFilters.attentionAfter;
         }
         if (incidentFilters.cursor !== undefined) {
           requestInput.cursor = incidentFilters.cursor;

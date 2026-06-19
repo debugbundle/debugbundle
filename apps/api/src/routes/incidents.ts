@@ -193,6 +193,7 @@ export function registerIncidentRoutes(app: FastifyInstance, dependencies: ApiDe
       status?: "active" | "open" | "resolved" | "regressed";
       severity?: "low" | "medium" | "high" | "critical";
       first_seen_after?: string;
+      attention_after?: string;
       cursor?: { last_seen_at: string; incident_id: string };
       limit: number;
     } = {
@@ -218,6 +219,9 @@ export function registerIncidentRoutes(app: FastifyInstance, dependencies: ApiDe
     }
     if (parsedQuery.data.first_seen_after !== undefined) {
       incidentsRequest.first_seen_after = parsedQuery.data.first_seen_after;
+    }
+    if (parsedQuery.data.attention_after !== undefined) {
+      incidentsRequest.attention_after = parsedQuery.data.attention_after;
     }
     if (parsedCursor !== null) {
       incidentsRequest.cursor = parsedCursor;

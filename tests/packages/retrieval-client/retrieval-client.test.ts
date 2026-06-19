@@ -90,6 +90,7 @@ describe("retrieval api client", () => {
       service: "checkout-api",
       status: "open",
       severity: "high",
+      attentionAfter: "2026-03-11T00:00:00.000Z",
       limit: 10,
       cursor: "2026-03-11T00:09:00.000Z|inc_122"
       })
@@ -97,7 +98,7 @@ describe("retrieval api client", () => {
 
     expect(request).toHaveBeenCalledWith({
       method: "GET",
-      path: "/v1/incidents?project_id=proj_123&environment=production&service=checkout-api&status=open&severity=high&cursor=2026-03-11T00%3A09%3A00.000Z%7Cinc_122&limit=10",
+      path: "/v1/incidents?project_id=proj_123&environment=production&service=checkout-api&status=open&severity=high&attention_after=2026-03-11T00%3A00%3A00.000Z&cursor=2026-03-11T00%3A09%3A00.000Z%7Cinc_122&limit=10",
       bearerToken: "dbundle_mem_x"
     });
   });

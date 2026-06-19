@@ -382,9 +382,9 @@ Rate-limited responses also include `Retry-After: <seconds>` so SDKs can back of
 | GET | `/v1/incidents/{id}/reproduction` | Browser Session or Member Token | Get reproduction artifact |
 | GET | `/v1/logs` | Browser Session or Member Token | Query logs by incident |
 
-**Query params (list incidents):** `project_id`, `environment`, `service`, `status` (`active`/open/resolved/regressed; `active` means open or regressed), `severity`, `first_seen_after`, `limit`, `cursor`
+**Query params (list incidents):** `project_id`, `environment`, `service`, `status` (`active`/open/resolved/regressed; `active` means open or regressed), `severity`, `first_seen_after`, `attention_after`, `limit`, `cursor`
 
-Current API implementation scope (Phase 7 continuation): `GET /v1/incidents` supports organization-scoped filtering by `project_id`, `environment`, `service`, `status`, `severity`, `first_seen_after`, plus cursor-based pagination via `cursor` and `limit` (1-100, default 20).
+Current API implementation scope (Phase 7 continuation): `GET /v1/incidents` supports organization-scoped filtering by `project_id`, `environment`, `service`, `status`, `severity`, `first_seen_after`, `attention_after`, plus cursor-based pagination via `cursor` and `limit` (1-100, default 20). `attention_after` matches incidents first seen at or after the provided timestamp or regressed at or after the provided timestamp.
 
 Low-value external-probe `GET`/`404` routes such as common WordPress, OWA, RDWeb, VPN, `/.env`, and autodiscover scanner paths may still exist as accepted request telemetry when capture policy allows them, but they should not appear as normal incidents unless the project explicitly promotes that status or a narrow status+path rule.
 
@@ -2154,7 +2154,7 @@ All setup and verification commands with `--json` must return:
 
 ### 2.4 Data Commands
 ```
-debugbundle incidents [--source <local|cloud>] [--project-id <id>] [--environment <env>] [--service <name>] [--status <active|open|resolved|regressed|all>] [--severity <level>] [--first-seen-after <ISO8601>] [--cursor <cursor>] [--limit <n>] [--json]
+debugbundle incidents [--source <local|cloud>] [--project-id <id>] [--environment <env>] [--service <name>] [--status <active|open|resolved|regressed|all>] [--severity <level>] [--first-seen-after <ISO8601>] [--attention-after <ISO8601>] [--cursor <cursor>] [--limit <n>] [--json]
 debugbundle inspect <incident-id> [--source <local|cloud>] [--json]
 debugbundle resolve <incident-id> [incident-id ...] [--source <local|cloud>] [--json]
 debugbundle reopen <incident-id> [incident-id ...] [--source <local|cloud>] [--json]
@@ -2165,7 +2165,7 @@ debugbundle services [--json]
 ```
 `debugbundle incidents` defaults to `--status active` so the CLI shows incidents that need attention (`open` or `regressed`). Use `--status all` to omit the status filter and include resolved incidents.
 
-Current local CLI retrieval behavior: when `.debugbundle/local/connection.json` is configured with `"mode": "local-only"`, `debugbundle incidents`, `debugbundle inspect`, `debugbundle resolve`, `debugbundle reopen`, `debugbundle bundle`, and `debugbundle reproduce` read `.debugbundle/local/state.json`, `.debugbundle/bundles/local/`, and `.debugbundle/bundles/local/reproductions/` directly without requiring `debugbundle login`. Local incident listing preserves the machine-readable `{ incidents, next_cursor }` shape and applies `project_id`, `environment`, `service`, `status`, `severity`, `first_seen_after` / `--first-seen-after`, `cursor`, and `limit` filters against the local incident index.
+Current local CLI retrieval behavior: when `.debugbundle/local/connection.json` is configured with `"mode": "local-only"`, `debugbundle incidents`, `debugbundle inspect`, `debugbundle resolve`, `debugbundle reopen`, `debugbundle bundle`, and `debugbundle reproduce` read `.debugbundle/local/state.json`, `.debugbundle/bundles/local/`, and `.debugbundle/bundles/local/reproductions/` directly without requiring `debugbundle login`. Local incident listing preserves the machine-readable `{ incidents, next_cursor }` shape and applies `project_id`, `environment`, `service`, `status`, `severity`, `first_seen_after` / `--first-seen-after`, `attention_after` / `--attention-after`, `cursor`, and `limit` filters against the local incident index.
 
 Current connected-mode retrieval behavior: when `.debugbundle/local/connection.json` is configured as `"connected"`, `debugbundle incidents` now merges matching local and cloud incidents by default, preserves `cursor` / `limit` pagination after the merged sort order is applied, and annotates cloud-backed incident payloads with `source: "cloud"` so origin is explicit in both human and JSON output. `--source local` and `--source cloud` still narrow the same commands to a single store. `debugbundle inspect`, `debugbundle resolve`, `debugbundle reopen`, `debugbundle bundle`, and `debugbundle reproduce` now probe the local store first and then fall back to cloud. When multiple cloud-backed incident ids are passed to `debugbundle resolve` or `debugbundle reopen`, the CLI collapses them into one hosted bulk mutation request while keeping local incidents on the existing local-state path. When `debugbundle bundle` or `debugbundle reproduce` fetches from cloud, the returned payload is also written to `.debugbundle/bundles/cloud/<incident-id>.bundle.json` or `.debugbundle/bundles/cloud/reproductions/<incident-id>.reproduction.json`, overwriting the cached snapshot on later explicit fetches; cloud resolve and cloud reopen rewrite cached status fields when a cached copy exists, and the same explicit cloud cache activity prunes `.debugbundle/bundles/cloud/` entries older than 30 days since last access.
 

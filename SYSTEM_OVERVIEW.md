@@ -100,6 +100,8 @@ DebugBundle supports two runtime modes: **local-only** (no cloud account require
 └─────────────────────────────────────────────────────────────────┘
 ```
 
+Incident retrieval now supports an additive `attention_after` lower-bound filter across API, CLI, MCP, and local retrieval so operators can page through incidents first opened or regressed after a chosen timestamp without client-side truncation.
+
 ---
 
 ## Core Lifecycle

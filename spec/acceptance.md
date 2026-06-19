@@ -358,6 +358,7 @@ Last updated: 2026-06-15
 - **When** `GET /v1/incidents?environment=production&severity=high&status=open` is called
 - **Then** only matching incidents are returned
 - **And** `first_seen_after` limits results to incidents first seen on or after the supplied timestamp
+- **And** `attention_after` limits results to incidents first seen on or after the supplied timestamp or regressed on or after the supplied timestamp
 - **And** results are paginated with cursor-based pagination
 - **And** the response includes `project_name`, `service_name`, `fingerprint_version`, `spike_detected_at`, `resolved_at`, `regressed_at`, `matched_fields`, and `occurrence_count`
 

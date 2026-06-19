@@ -376,6 +376,7 @@ export function createRetrievalApi(client: HttpClient): {
     status?: string;
     severity?: string;
     firstSeenAfter?: string;
+    attentionAfter?: string;
     cursor?: string;
     limit?: number;
   }): Promise<{ incidents: IncidentRecord[]; next_cursor: string | null }>;
@@ -440,6 +441,9 @@ export function createRetrievalApi(client: HttpClient): {
       }
       if (input.firstSeenAfter !== undefined) {
         query.set("first_seen_after", input.firstSeenAfter);
+      }
+      if (input.attentionAfter !== undefined) {
+        query.set("attention_after", input.attentionAfter);
       }
       if (input.cursor !== undefined) {
         query.set("cursor", input.cursor);

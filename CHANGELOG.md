@@ -6,6 +6,17 @@ The format is based on Keep a Changelog and this project follows Semantic Versio
 
 ## [Unreleased]
 
+## [1.5.4] - 2026-06-19
+
+### Added
+
+- Added incident `attention_after` filtering across the hosted retrieval API, CLI retrieval commands, MCP retrieval tools, local retrieval, and the shared retrieval client so dashboard and automation views can page through incidents opened or regressed after a chosen timestamp.
+
+### Changed
+
+- Updated the hosted dashboard incidents-today table to keep the new shared pagination controls while using the existing incidents cursor API in a mixed-version-safe way, so stale local API processes do not fail on the additive `attention_after` filter rollout.
+- Bumped the canonical core release to `1.5.4`, `@debugbundle/cli` to `1.5.4`, and `@debugbundle/mcp` to `1.5.4` for the coordinated incident-attention retrieval release train.
+
 ## [1.5.3] - 2026-06-19
 
 ### Changed

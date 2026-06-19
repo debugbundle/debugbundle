@@ -37,6 +37,7 @@ export type LocalIncidentRecord = {
   severity: string;
   status: "open" | "resolved";
   resolved_at?: string | null;
+  regressed_at?: string | null;
   first_seen_at: string;
   last_seen_at: string;
   occurrence_count: number;
@@ -126,7 +127,11 @@ function parseLocalIncident(candidate: unknown): LocalIncidentRecord {
     throw createReadError(400, "invalid_local_state");
   }
   const resolvedAt = candidate["resolved_at"];
+  const regressedAt = candidate["regressed_at"];
   if (resolvedAt !== undefined && resolvedAt !== null && typeof resolvedAt !== "string") {
+    throw createReadError(400, "invalid_local_state");
+  }
+  if (regressedAt !== undefined && regressedAt !== null && typeof regressedAt !== "string") {
     throw createReadError(400, "invalid_local_state");
   }
   if (typeof candidate["occurrence_count"] !== "number" || typeof candidate["generation_number"] !== "number") {
@@ -167,6 +172,7 @@ function parseLocalIncident(candidate: unknown): LocalIncidentRecord {
     severity: candidate["severity"] as string,
     status: candidate["status"],
     ...(resolvedAt === undefined ? {} : { resolved_at: resolvedAt }),
+    ...(regressedAt === undefined ? {} : { regressed_at: regressedAt }),
     first_seen_at: candidate["first_seen_at"] as string,
     last_seen_at: candidate["last_seen_at"] as string,
     occurrence_count: candidate["occurrence_count"],
@@ -294,6 +300,7 @@ export async function listLocalIncidents(
     status?: string;
     severity?: string;
     firstSeenAfter?: string;
+    attentionAfter?: string;
     cursor?: string;
     limit?: number;
   },
@@ -315,6 +322,13 @@ export async function listLocalIncidents(
     })
     .filter((incident) => (input.severity === undefined ? true : incident.severity === input.severity))
     .filter((incident) => (input.firstSeenAfter === undefined ? true : incident.first_seen_at >= input.firstSeenAfter))
+    .filter((incident) => {
+      if (input.attentionAfter === undefined) {
+        return true;
+      }
+
+      return incident.first_seen_at >= input.attentionAfter || (incident.regressed_at != null && incident.regressed_at >= input.attentionAfter);
+    })
     .sort(sortIncidentsDescending);
 
   const startIndex = input.cursor === undefined ? 0 : incidents.findIndex((incident) => buildCursor(incident) === input.cursor) + 1;

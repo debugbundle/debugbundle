@@ -396,7 +396,7 @@ export async function runCli(argv: string[], dependencies: CliDependencies = {})
     }
 
     if (command === "incidents") {
-      expectNoUnknownOptions(parsedArgv, ["auth-file", "json", "source", "project-id", "environment", "service", "status", "severity", "first-seen-after", "cursor", "limit"]);
+      expectNoUnknownOptions(parsedArgv, ["auth-file", "json", "source", "project-id", "environment", "service", "status", "severity", "first-seen-after", "attention-after", "cursor", "limit"]);
       ensureNoExtraPositionals(parsedArgv, 1);
 
       const input = appendCommonAuthOptions(parsedArgv, {} as {
@@ -408,6 +408,7 @@ export async function runCli(argv: string[], dependencies: CliDependencies = {})
         status?: string;
         severity?: string;
         firstSeenAfter?: string;
+        attentionAfter?: string;
         cursor?: string;
         limit?: number;
         source?: "local" | "cloud";
@@ -439,6 +440,10 @@ export async function runCli(argv: string[], dependencies: CliDependencies = {})
       const firstSeenAfter = readStringOption(parsedArgv, "first-seen-after");
       if (firstSeenAfter !== undefined) {
         input.firstSeenAfter = firstSeenAfter;
+      }
+      const attentionAfter = readStringOption(parsedArgv, "attention-after");
+      if (attentionAfter !== undefined) {
+        input.attentionAfter = attentionAfter;
       }
       const cursor = readStringOption(parsedArgv, "cursor");
       if (cursor !== undefined) {

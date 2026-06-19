@@ -3192,6 +3192,20 @@ export function createPostgresMetadataStore(
         conditions.push(`i.first_seen_at >= $${params.length}::timestamptz`);
       }
 
+      if (input.attention_after !== undefined) {
+        params.push(input.attention_after);
+        const attentionAfterIndex = params.length;
+        conditions.push(
+          `(
+            i.first_seen_at >= $${attentionAfterIndex}::timestamptz
+            OR (
+              i.regressed_at IS NOT NULL
+              AND i.regressed_at >= $${attentionAfterIndex}::timestamptz
+            )
+          )`
+        );
+      }
+
       if (input.cursor !== undefined) {
         params.push(input.cursor.last_seen_at);
         const lastSeenAtIndex = params.length;

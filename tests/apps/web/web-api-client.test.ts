@@ -416,7 +416,8 @@ describe("web api client", () => {
       environment: "production",
       service: "checkout-api",
       status: "resolved",
-      severity: "high"
+      severity: "high",
+      attentionAfter: "2026-03-11T00:00:00.000Z"
     });
     const installUrl = await getGitHubInstallUrl();
     const installUrlWithReturnTo = await getGitHubInstallUrl("/projects/proj_1/github", "proj_1");
@@ -425,7 +426,7 @@ describe("web api client", () => {
     expect(fetchMock).toHaveBeenNthCalledWith(
       1,
       buildApiUrl(
-        "/v1/incidents?limit=5&cursor=cursor_1&project_id=proj_1&environment=production&service=checkout-api&status=resolved&severity=high"
+        "/v1/incidents?limit=5&cursor=cursor_1&project_id=proj_1&environment=production&service=checkout-api&status=resolved&severity=high&attention_after=2026-03-11T00%3A00%3A00.000Z"
       ),
       { credentials: "include" }
     );

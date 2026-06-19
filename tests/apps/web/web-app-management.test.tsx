@@ -4036,6 +4036,169 @@ describe("web app — management routes", () => {
     expect(screen.getByText(/^11$/)).toBeInTheDocument();
   });
 
+  it("paginates the dashboard incidents-today table with the shared controls", async () => {
+    const user = userEvent.setup();
+    const todayWindow = getLocalDayWindow();
+    const firstSeenAt = new Date(todayWindow.startsAtMs + 30 * 60 * 1000).toISOString();
+    const todayIncidents = Array.from({ length: 11 }, (_, index) =>
+      createIncident({
+        incident_id: `inc_today_${index + 1}`,
+        title: index === 0 ? "Checkout timeout" : index === 10 ? "Retry storm" : `Dashboard incident ${index + 1}`,
+        first_seen_at: firstSeenAt,
+        regressed_at: null
+      })
+    );
+    const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = requestUrl(input);
+
+      if (url.endsWith("/v1/auth/session")) {
+        return jsonResponse(200, {
+          session: createSession()
+        });
+      }
+
+      if (url.endsWith("/v1/projects") && init?.method === undefined) {
+        return jsonResponse(200, {
+          projects: [createProject()]
+        });
+      }
+
+      if (url.includes("/v1/incidents?")) {
+        return jsonResponse(200, {
+          incidents: todayIncidents,
+          next_cursor: null
+        });
+      }
+
+      return jsonResponse(404, { error: "not_found" });
+    });
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<App initialEntries={["/dashboard"]} />);
+
+    const heading = await screen.findByRole("heading", { name: /incidents today/i });
+    const incidentsTodayCard = heading.closest('[data-slot="card"]');
+    expect(incidentsTodayCard).not.toBeNull();
+    const card = within(incidentsTodayCard as HTMLElement);
+
+    expect(await card.findByRole("link", { name: /checkout timeout/i })).toBeInTheDocument();
+    expect(card.getByText(/page 1/i)).toBeInTheDocument();
+
+    await user.click(card.getByRole("button", { name: /go to next page/i }));
+
+    expect(await card.findByRole("link", { name: /retry storm/i })).toBeInTheDocument();
+    expect(card.getByText(/page 2/i)).toBeInTheDocument();
+    expect(fetchMock.mock.calls.some(([input]) => requestUrl(input).includes("attention_after="))).toBe(false);
+  });
+
+  it("loads the dashboard incidents-today table without requiring the attention_after API filter", async () => {
+    const todayWindow = getLocalDayWindow();
+    const firstSeenAt = new Date(todayWindow.startsAtMs + 30 * 60 * 1000).toISOString();
+    const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = requestUrl(input);
+
+      if (url.endsWith("/v1/auth/session")) {
+        return jsonResponse(200, {
+          session: createSession()
+        });
+      }
+
+      if (url.endsWith("/v1/projects") && init?.method === undefined) {
+        return jsonResponse(200, {
+          projects: [createProject()]
+        });
+      }
+
+      if (url.includes("/v1/incidents?") && url.includes("attention_after=")) {
+        return jsonResponse(400, {
+          error: "invalid_query"
+        });
+      }
+
+      if (url.includes("/v1/incidents?")) {
+        return jsonResponse(200, {
+          incidents: [
+            createIncident({
+              incident_id: "inc_today_dashboard",
+              title: "Dashboard incident",
+              first_seen_at: firstSeenAt,
+              regressed_at: null
+            })
+          ],
+          next_cursor: null
+        });
+      }
+
+      return jsonResponse(404, { error: "not_found" });
+    });
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<App initialEntries={["/dashboard"]} />);
+
+    const heading = await screen.findByRole("heading", { name: /incidents today/i });
+    const incidentsTodayCard = heading.closest('[data-slot="card"]');
+    expect(incidentsTodayCard).not.toBeNull();
+    const card = within(incidentsTodayCard as HTMLElement);
+
+    expect(await card.findByRole("link", { name: /dashboard incident/i })).toBeInTheDocument();
+    expect(fetchMock.mock.calls.some(([input]) => requestUrl(input).includes("attention_after="))).toBe(false);
+    expect(screen.queryByText(/could not load the current page/i)).not.toBeInTheDocument();
+  });
+
+  it("does not scan older dashboard incidents-today pages after reaching incidents before today", async () => {
+    const todayWindow = getLocalDayWindow();
+    const oldIncidentAt = new Date(todayWindow.startsAtMs - 60 * 60 * 1000).toISOString();
+    const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = requestUrl(input);
+
+      if (url.endsWith("/v1/auth/session")) {
+        return jsonResponse(200, {
+          session: createSession()
+        });
+      }
+
+      if (url.endsWith("/v1/projects") && init?.method === undefined) {
+        return jsonResponse(200, {
+          projects: [createProject()]
+        });
+      }
+
+      if (url.includes("/v1/incidents?") && url.includes("cursor=cursor_2")) {
+        return jsonResponse(500, {
+          error: "unexpected_scan"
+        });
+      }
+
+      if (url.includes("/v1/incidents?")) {
+        return jsonResponse(200, {
+          incidents: [
+            createIncident({
+              incident_id: "inc_old",
+              title: "Old incident",
+              first_seen_at: oldIncidentAt,
+              last_seen_at: oldIncidentAt,
+              regressed_at: null
+            })
+          ],
+          next_cursor: "cursor_2"
+        });
+      }
+
+      return jsonResponse(404, { error: "not_found" });
+    });
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<App initialEntries={["/dashboard"]} />);
+
+    expect(await screen.findByText(/no incidents today/i)).toBeInTheDocument();
+    expect(fetchMock.mock.calls.some(([input]) => requestUrl(input).includes("cursor=cursor_2"))).toBe(false);
+    expect(fetchMock.mock.calls.some(([input]) => requestUrl(input).includes("attention_after="))).toBe(false);
+    expect(screen.queryByText(/could not load the current page/i)).not.toBeInTheDocument();
+  });
+
   it("renders billing summary for owners and starts the Stripe checkout entry point from the billing page", async () => {
     const user = userEvent.setup();
     const locationAssign = vi.fn();

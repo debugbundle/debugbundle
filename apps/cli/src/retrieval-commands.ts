@@ -271,6 +271,7 @@ async function listAllCloudIncidents(
     status?: string;
     severity?: string;
     firstSeenAfter?: string;
+    attentionAfter?: string;
   },
   api: {
     listIncidents(input: {
@@ -281,6 +282,7 @@ async function listAllCloudIncidents(
       status?: string;
       severity?: string;
       firstSeenAfter?: string;
+      attentionAfter?: string;
       cursor?: string;
     }): Promise<{ incidents: IncidentLike[]; next_cursor: string | null }>;
   }
@@ -297,6 +299,7 @@ async function listAllCloudIncidents(
       ...(input.status === undefined ? {} : { status: input.status }),
       ...(input.severity === undefined ? {} : { severity: input.severity }),
       ...(input.firstSeenAfter === undefined ? {} : { firstSeenAfter: input.firstSeenAfter }),
+      ...(input.attentionAfter === undefined ? {} : { attentionAfter: input.attentionAfter }),
       ...(cursor === undefined ? {} : { cursor })
     });
 
@@ -323,6 +326,7 @@ async function mapCombinedIncidentListResult(
     status?: string;
     severity?: string;
     firstSeenAfter?: string;
+    attentionAfter?: string;
     cursor?: string;
     limit?: number;
     json?: boolean;
@@ -336,6 +340,7 @@ async function mapCombinedIncidentListResult(
       status?: string;
       severity?: string;
       firstSeenAfter?: string;
+      attentionAfter?: string;
       cursor?: string;
     }): Promise<{ incidents: IncidentLike[]; next_cursor: string | null }>;
   },
@@ -350,7 +355,8 @@ async function mapCombinedIncidentListResult(
       ...(input.service === undefined ? {} : { service: input.service }),
       ...(input.status === undefined ? {} : { status: input.status }),
       ...(input.severity === undefined ? {} : { severity: input.severity }),
-      ...(input.firstSeenAfter === undefined ? {} : { firstSeenAfter: input.firstSeenAfter })
+      ...(input.firstSeenAfter === undefined ? {} : { firstSeenAfter: input.firstSeenAfter }),
+      ...(input.attentionAfter === undefined ? {} : { attentionAfter: input.attentionAfter })
     },
     dependencies
   );
@@ -362,7 +368,8 @@ async function mapCombinedIncidentListResult(
       ...(input.service === undefined ? {} : { service: input.service }),
       ...(input.status === undefined ? {} : { status: input.status }),
       ...(input.severity === undefined ? {} : { severity: input.severity }),
-      ...(input.firstSeenAfter === undefined ? {} : { firstSeenAfter: input.firstSeenAfter })
+      ...(input.firstSeenAfter === undefined ? {} : { firstSeenAfter: input.firstSeenAfter }),
+      ...(input.attentionAfter === undefined ? {} : { attentionAfter: input.attentionAfter })
     },
     api
   );
@@ -401,6 +408,7 @@ export async function listIncidentsCommand(
     status?: string;
     severity?: string;
     firstSeenAfter?: string;
+    attentionAfter?: string;
     cursor?: string;
     limit?: number;
     json?: boolean;
@@ -414,6 +422,7 @@ export async function listIncidentsCommand(
       status?: string;
       severity?: string;
       firstSeenAfter?: string;
+      attentionAfter?: string;
       cursor?: string;
       limit?: number;
     }): Promise<{ incidents: IncidentLike[]; next_cursor: string | null }>;
@@ -429,6 +438,7 @@ export async function listIncidentsCommand(
       status?: string;
       severity?: string;
       firstSeenAfter?: string;
+      attentionAfter?: string;
       cursor?: string;
       limit?: number;
     } = {
@@ -452,6 +462,9 @@ export async function listIncidentsCommand(
     }
     if (input.firstSeenAfter !== undefined) {
       requestInput.firstSeenAfter = input.firstSeenAfter;
+    }
+    if (input.attentionAfter !== undefined) {
+      requestInput.attentionAfter = input.attentionAfter;
     }
     if (input.cursor !== undefined) {
       requestInput.cursor = input.cursor;
@@ -487,6 +500,7 @@ export async function listIncidentsWithAuthCommand(
     status?: string;
     severity?: string;
     firstSeenAfter?: string;
+    attentionAfter?: string;
     cursor?: string;
     limit?: number;
     json?: boolean;
@@ -505,6 +519,7 @@ export async function listIncidentsWithAuthCommand(
           ...(statusFilter === undefined ? {} : { status: statusFilter }),
           ...(input.severity === undefined ? {} : { severity: input.severity }),
           ...(input.firstSeenAfter === undefined ? {} : { firstSeenAfter: input.firstSeenAfter }),
+          ...(input.attentionAfter === undefined ? {} : { attentionAfter: input.attentionAfter }),
           ...(input.cursor === undefined ? {} : { cursor: input.cursor }),
           ...(input.limit === undefined ? {} : { limit: input.limit })
         },
@@ -533,6 +548,7 @@ export async function listIncidentsWithAuthCommand(
           ...(statusFilter === undefined ? {} : { status: statusFilter }),
           ...(input.severity === undefined ? {} : { severity: input.severity }),
           ...(input.firstSeenAfter === undefined ? {} : { firstSeenAfter: input.firstSeenAfter }),
+          ...(input.attentionAfter === undefined ? {} : { attentionAfter: input.attentionAfter }),
           ...(input.cursor === undefined ? {} : { cursor: input.cursor }),
           ...(input.limit === undefined ? {} : { limit: input.limit }),
           ...(input.json === undefined ? {} : { json: input.json })
@@ -559,6 +575,7 @@ export async function listIncidentsWithAuthCommand(
         status?: string;
         severity?: string;
         firstSeenAfter?: string;
+        attentionAfter?: string;
         cursor?: string;
         limit?: number;
         json?: boolean;
@@ -583,6 +600,9 @@ export async function listIncidentsWithAuthCommand(
       }
       if (input.firstSeenAfter !== undefined) {
         commandInput.firstSeenAfter = input.firstSeenAfter;
+      }
+      if (input.attentionAfter !== undefined) {
+        commandInput.attentionAfter = input.attentionAfter;
       }
       if (input.cursor !== undefined) {
         commandInput.cursor = input.cursor;

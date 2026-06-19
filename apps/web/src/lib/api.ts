@@ -231,6 +231,7 @@ export async function listIncidents(
         status?: IncidentStatusFilter;
         severity?: IncidentRecord["severity"];
         firstSeenAfter?: string;
+        attentionAfter?: string;
       } = 20,
   cursor?: string
 ): Promise<{ incidents: IncidentRecord[]; nextCursor: string | null }> {
@@ -266,6 +267,9 @@ export async function listIncidents(
   }
   if (input.firstSeenAfter !== undefined) {
     searchParams.set("first_seen_after", input.firstSeenAfter);
+  }
+  if (input.attentionAfter !== undefined) {
+    searchParams.set("attention_after", input.attentionAfter);
   }
 
   const body = await readJson<{ incidents: IncidentRecord[]; next_cursor: string | null }>(

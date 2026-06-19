@@ -2114,6 +2114,22 @@ describe("postgres metadata store", () => {
     );
   });
 
+  it("should filter incident listing by attention_after when provided", async (): Promise<void> => {
+    const query = vi.fn().mockResolvedValue({ rows: [] });
+    const store = createPostgresMetadataStore({ query });
+
+    await store.listIncidentsForOrganization({
+      organization_id: "org_123",
+      attention_after: "2026-03-10T00:00:00.000Z",
+      limit: 20
+    });
+
+    expect(query).toHaveBeenCalledWith(
+      expect.stringContaining("i.regressed_at IS NOT NULL"),
+      ["org_123", null, "2026-03-10T00:00:00.000Z", 20]
+    );
+  });
+
   it("should derive incident_reason for request anomaly incidents from matched_fields when no primary incident-signal row exists", async (): Promise<void> => {
     const query = vi.fn().mockResolvedValue({
       rows: [
