@@ -6,6 +6,18 @@ The format is based on Keep a Changelog and this project follows Semantic Versio
 
 ## [Unreleased]
 
+## [1.6.0] - 2026-06-20
+
+### Added
+
+- Capture-rule suggestions now surface existing matching project rules and make repeated suggestion application idempotent across API, CLI, MCP, and the hosted web app, so operators do not create duplicate demote/sample/drop rules for the same noisy pattern.
+- Added manual project capture-rule creation in the hosted settings UI so owners and admins can define targeted structured matchers without waiting for an incident-derived suggestion first.
+
+### Changed
+
+- Failure and hosted improvement bundles now preserve the originating SDK name and version from the source event instead of stamping worker placeholder metadata, so downstream analysis and fixture artifacts reflect the real capture runtime.
+- Bumped the canonical core release to `1.6.0`, `@debugbundle/cli` to `1.6.0`, `@debugbundle/mcp` to `1.6.0`, and the coordinated shared JS packages to `@debugbundle/shared-types@1.4.0` plus `@debugbundle/redaction@1.4.0`.
+
 ## [1.5.4] - 2026-06-19
 
 ### Added

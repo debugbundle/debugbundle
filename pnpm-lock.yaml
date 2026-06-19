@@ -18,14 +18,14 @@ importers:
         specifier: workspace:*
         version: link:packages/auth
       '@debugbundle/redaction':
-        specifier: 1.3.1
-        version: 1.3.1
+        specifier: 1.4.0
+        version: 1.4.0
       '@debugbundle/sdk-node':
         specifier: 1.3.1
         version: 1.3.1
       '@debugbundle/shared-types':
-        specifier: 1.3.1
-        version: 1.3.1
+        specifier: 1.4.0
+        version: 1.4.0
       '@node-rs/argon2':
         specifier: ^2.0.2
         version: 2.0.2
@@ -590,6 +590,9 @@ packages:
   '@debugbundle/redaction@1.3.1':
     resolution: {integrity: sha512-OAufUzqVn1zAJKMfENFCa1az+KMzwljXLdWtQSWfGSRCDUoPXp1sSg/b6Btwe0utV/9KfTGpsNzqXA9eL4PB9g==}
 
+  '@debugbundle/redaction@1.4.0':
+    resolution: {integrity: sha512-F4MBTQunXKZ/Qly3T2tjZJr8PS+ieZJMjHnZV/qbyGL/EPVrAq8eYAtplgs0KbX9fRz3kAssUfPKYXu7zTb8dg==}
+
   '@debugbundle/sdk-browser@1.3.1':
     resolution: {integrity: sha512-GmYOygbWG6rj/JmXneTA9jti5/LyqrcPRICN1h6FuwthL3Os09Dg1riWPInYQ8Uxb+uxhKTNM24WxzonH4lIJA==}
 
@@ -598,6 +601,9 @@ packages:
 
   '@debugbundle/shared-types@1.3.1':
     resolution: {integrity: sha512-nX6jMJjxkh/D++49rYTSQYF2KQv43ft779Z81V6y0+sqVwbpdZ4v4RCAJmFu7QguNlU8cN7OGg78cBOpYePUfw==}
+
+  '@debugbundle/shared-types@1.4.0':
+    resolution: {integrity: sha512-v71wZonhC+yBzasuN93sy8M/fhwBAFz9E1tSiNKjWB9Jacy+TFKy9c7Q7so3Q8yObTxX4Gwu7iERhoBH1C5E+Q==}
 
   '@dotenvx/dotenvx@1.60.0':
     resolution: {integrity: sha512-zWepVRNan/5gCALiT/QCHVsmxvq81xenBqGRyoTUy+ClJ+Mgs+tTJ6h4f65nqs8ijVFe6xg4lIQAIwe+HfgWXg==}
@@ -5312,6 +5318,8 @@ snapshots:
 
   '@debugbundle/redaction@1.3.1': {}
 
+  '@debugbundle/redaction@1.4.0': {}
+
   '@debugbundle/sdk-browser@1.3.1':
     dependencies:
       '@debugbundle/redaction': 1.3.1
@@ -5324,6 +5332,10 @@ snapshots:
       zod: 3.25.76
 
   '@debugbundle/shared-types@1.3.1':
+    dependencies:
+      zod: 3.25.76
+
+  '@debugbundle/shared-types@1.4.0':
     dependencies:
       zod: 3.25.76
 
