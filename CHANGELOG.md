@@ -6,6 +6,12 @@ The format is based on Keep a Changelog and this project follows Semantic Versio
 
 ## [Unreleased]
 
+## [1.6.1] - 2026-06-20
+
+### Changed
+
+- Promoted the hosted dogfooding manifests to `@debugbundle/shared-types@1.4.0`, `@debugbundle/redaction@1.4.0`, `@debugbundle/sdk-node@1.4.0`, and `@debugbundle/sdk-browser@1.4.0` after the coordinated shared and JS SDK release train completed.
+
 ## [1.6.0] - 2026-06-20
 
 ### Added
