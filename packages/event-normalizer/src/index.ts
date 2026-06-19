@@ -27,7 +27,7 @@ export interface NormalizedEvent {
 
 export const FINGERPRINT_VERSION = "v1";
 
-const CORRELATION_KEYS = ["request_id", "trace_id", "session_id", "user_id_hash"] as const;
+type CorrelationKey = "request_id" | "trace_id" | "session_id" | "user_id_hash";
 
 const PAYLOAD_ALLOWED_KEYS: Record<string, Set<string>> = {
   backend_exception: new Set(["name", "message", "stack", "handled", "request", "response", "runtime", "probe_data"]),
@@ -111,7 +111,7 @@ function mergeContext(
   };
 }
 
-function normalizeCorrelation(candidate: unknown): Record<(typeof CORRELATION_KEYS)[number], string | null> | undefined {
+function normalizeCorrelation(candidate: unknown): Record<CorrelationKey, string | null> | undefined {
   if (!isRecord(candidate)) {
     return undefined;
   }
