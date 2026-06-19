@@ -40,12 +40,18 @@ const ServiceSchema = z.object({
 
 const CorrelationSchema = z
   .object({
-    request_id: z.string().nullable(),
-    trace_id: z.string().nullable(),
-    session_id: z.string().nullable(),
-    user_id_hash: z.string().nullable()
+    request_id: z.string().nullable().optional(),
+    trace_id: z.string().nullable().optional(),
+    session_id: z.string().nullable().optional(),
+    user_id_hash: z.string().nullable().optional()
   })
-  .strict();
+  .strict()
+  .transform((value) => ({
+    request_id: value.request_id ?? null,
+    trace_id: value.trace_id ?? null,
+    session_id: value.session_id ?? null,
+    user_id_hash: value.user_id_hash ?? null
+  }));
 
 const InlineProbeDataItemSchema = z
   .object({
@@ -285,7 +291,8 @@ const EnvelopeBaseSchema = z
     sdk_version: z.string().min(1),
     service: ServiceSchema,
     occurred_at: z.string().datetime(),
-    correlation: CorrelationSchema.optional()
+    correlation: CorrelationSchema.optional(),
+    context: z.record(z.string(), z.unknown()).optional()
   })
   .strict();
 
@@ -302,8 +309,17 @@ export const EventEnvelopeSchema = z.discriminatedUnion("event_type", [
 
 export type EventEnvelope = z.infer<typeof EventEnvelopeSchema>;
 
+type CorrelationInput = {
+  request_id?: string | null;
+  trace_id?: string | null;
+  session_id?: string | null;
+  user_id_hash?: string | null;
+};
+
 type CreateEnvelopeInput = Omit<EventEnvelope, "schema_version" | "event_id" | "occurred_at" | "correlation" | "sdk_name" | "sdk_version"> &
-  Partial<Pick<EventEnvelope, "schema_version" | "event_id" | "occurred_at" | "correlation" | "sdk_name" | "sdk_version">>;
+  Partial<Pick<EventEnvelope, "schema_version" | "event_id" | "occurred_at" | "sdk_name" | "sdk_version">> & {
+    correlation?: CorrelationInput | undefined;
+  };
 
 export function createEventEnvelope(input: CreateEnvelopeInput): EventEnvelope {
   const candidate = {
@@ -322,6 +338,7 @@ export function createEventEnvelope(input: CreateEnvelopeInput): EventEnvelope {
       session_id: null,
       user_id_hash: null
     },
+    context: input.context,
     payload: input.payload
   };
 

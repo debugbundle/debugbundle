@@ -27,6 +27,199 @@ export interface NormalizedEvent {
 
 export const FINGERPRINT_VERSION = "v1";
 
+const CORRELATION_KEYS = ["request_id", "trace_id", "session_id", "user_id_hash"] as const;
+
+const PAYLOAD_ALLOWED_KEYS: Record<string, Set<string>> = {
+  backend_exception: new Set(["name", "message", "stack", "handled", "request", "response", "runtime", "probe_data"]),
+  request_event: new Set([
+    "method",
+    "path",
+    "query",
+    "headers",
+    "body",
+    "response_status",
+    "duration_ms",
+    "route_template",
+    "response_headers",
+    "response_body"
+  ]),
+  log_event: new Set(["level", "message", "attributes"]),
+  frontend_breadcrumb: new Set(["breadcrumb_type", "route", "data"]),
+  frontend_exception: new Set([
+    "name",
+    "message",
+    "stack",
+    "route",
+    "browser",
+    "breadcrumbs",
+    "device",
+    "browser_event",
+    "rejection_reason",
+    "dom_context",
+    "probe_data"
+  ]),
+  deploy_metadata: new Set(["commit_sha", "version", "branch", "environment", "deployed_at"]),
+  error_suppressed: new Set(["fingerprint", "suppressed_count", "window_seconds", "first_seen", "last_seen"]),
+  probe_event: new Set(["label", "data", "activation_id", "probe_label_pattern"])
+};
+
+function isRecord(candidate: unknown): candidate is Record<string, unknown> {
+  return typeof candidate === "object" && candidate !== null && !Array.isArray(candidate);
+}
+
+function cloneRecord(candidate: Record<string, unknown>): Record<string, unknown> {
+  return { ...candidate };
+}
+
+function readString(candidate: unknown): string | null {
+  if (typeof candidate === "string") {
+    return candidate;
+  }
+  if (typeof candidate === "number" || typeof candidate === "boolean") {
+    return String(candidate);
+  }
+  return null;
+}
+
+function readNonNegativeNumber(candidate: unknown, fallback: number): number {
+  if (typeof candidate === "number" && Number.isFinite(candidate) && candidate >= 0) {
+    return candidate;
+  }
+  if (typeof candidate === "string" && candidate.trim().length > 0) {
+    const parsed = Number(candidate);
+    if (Number.isFinite(parsed) && parsed >= 0) {
+      return parsed;
+    }
+  }
+  return fallback;
+}
+
+function normalizeMap(candidate: unknown): Record<string, unknown> {
+  return isRecord(candidate) ? cloneRecord(candidate) : {};
+}
+
+function mergeContext(
+  baseContext: Record<string, unknown>,
+  incomingContext: unknown
+): Record<string, unknown> {
+  if (!isRecord(incomingContext)) {
+    return baseContext;
+  }
+  return {
+    ...baseContext,
+    ...incomingContext
+  };
+}
+
+function normalizeCorrelation(candidate: unknown): Record<(typeof CORRELATION_KEYS)[number], string | null> | undefined {
+  if (!isRecord(candidate)) {
+    return undefined;
+  }
+
+  return {
+    request_id: readString(candidate["request_id"]),
+    trace_id: readString(candidate["trace_id"]),
+    session_id: readString(candidate["session_id"]),
+    user_id_hash: readString(candidate["user_id_hash"])
+  };
+}
+
+function normalizeBackendExceptionPayload(payload: Record<string, unknown>): void {
+  const request = normalizeMap(payload["request"]);
+  payload["request"] = {
+    method: readString(request["method"]) ?? "UNKNOWN",
+    path: readString(request["path"]) ?? "/",
+    query: normalizeMap(request["query"]),
+    headers: normalizeMap(request["headers"]),
+    ...("body" in request ? { body: request["body"] ?? null } : {})
+  };
+
+  const response = normalizeMap(payload["response"]);
+  payload["response"] = {
+    status_code: readNonNegativeNumber(response["status_code"], 0),
+    ...("headers" in response ? { headers: normalizeMap(response["headers"]) } : {}),
+    ...("body" in response ? { body: response["body"] } : {})
+  };
+}
+
+function normalizeRequestEventPayload(payload: Record<string, unknown>): void {
+  payload["query"] = normalizeMap(payload["query"]);
+  payload["headers"] = normalizeMap(payload["headers"]);
+  payload["response_status"] = readNonNegativeNumber(payload["response_status"], 0);
+  payload["duration_ms"] = readNonNegativeNumber(payload["duration_ms"], 0);
+}
+
+function normalizePayloadExtras(input: {
+  eventType: string;
+  payload: Record<string, unknown>;
+  context: Record<string, unknown>;
+}): Record<string, unknown> {
+  const allowedKeys = PAYLOAD_ALLOWED_KEYS[input.eventType];
+  if (allowedKeys === undefined) {
+    return input.context;
+  }
+
+  let context = input.context;
+  for (const key of Object.keys(input.payload)) {
+    if (allowedKeys.has(key)) {
+      continue;
+    }
+    context = mergeContext(context, { [key]: input.payload[key] });
+    delete input.payload[key];
+  }
+  return context;
+}
+
+export function normalizeCompatibleEventCandidate(candidate: unknown): unknown {
+  if (!isRecord(candidate)) {
+    return candidate;
+  }
+
+  const event = cloneRecord(candidate);
+  const eventType = typeof event["event_type"] === "string" ? event["event_type"] : "";
+  let context = normalizeMap(event["context"]);
+
+  if (typeof event["sdk_language"] === "string") {
+    context = mergeContext(context, { sdk_language: event["sdk_language"] });
+    delete event["sdk_language"];
+  }
+
+  const correlation = normalizeCorrelation(event["correlation"]);
+  if (correlation !== undefined) {
+    event["correlation"] = correlation;
+  }
+
+  if (isRecord(event["payload"])) {
+    const payload = cloneRecord(event["payload"]);
+    context = mergeContext(context, payload["context"]);
+    delete payload["context"];
+
+    if (eventType === "backend_exception") {
+      normalizeBackendExceptionPayload(payload);
+    }
+    if (eventType === "request_event") {
+      const attributes = isRecord(payload["attributes"]) ? payload["attributes"] : null;
+      if (typeof payload["route_template"] !== "string" && typeof attributes?.["route_template"] === "string") {
+        payload["route_template"] = attributes["route_template"];
+      }
+      context = mergeContext(context, attributes);
+      delete payload["attributes"];
+      normalizeRequestEventPayload(payload);
+    }
+
+    context = normalizePayloadExtras({ eventType, payload, context });
+    event["payload"] = payload;
+  }
+
+  if (Object.keys(context).length > 0) {
+    event["context"] = context;
+  } else {
+    delete event["context"];
+  }
+
+  return event;
+}
+
 export function inferMatchedFields(event: NormalizedEvent): string[] {
   const matchedFields: string[] = ["environment", "normalized_message"];
 
@@ -362,7 +555,7 @@ function stableJson(value: unknown): string {
 }
 
 export function validateEvent(candidate: unknown): ReturnType<typeof EventEnvelopeSchema.safeParse> {
-  return EventEnvelopeSchema.safeParse(candidate);
+  return EventEnvelopeSchema.safeParse(normalizeCompatibleEventCandidate(candidate));
 }
 
 export function normalizeEvent(event: EventEnvelope): NormalizedEvent {

@@ -27,7 +27,7 @@ Every SDK must unit-test the following behaviors by **mocking the HTTP transport
 | Redaction | Default and custom sensitive fields are scrubbed before send |
 | Retry + backoff | 429/5xx → bounded retry with exponential backoff; 4xx (non-429) → drop |
 | Safe degradation | Network timeout → buffer, no crash; invalid server response → ignore |
-| Event envelope shape | Emitted payloads conform to the `EventEnvelope` schema from `contracts/data-schemas.md` |
+| Event envelope shape | Emitted envelopes conform to the `EventEnvelope` schema from `contracts/data-schemas.md`, with arbitrary app context only in envelope `context` and strict event-type payloads |
 | Vanilla hooks | Language-native error/exception hooks capture correctly |
 | Log capture | Logger integration captures at configured level; auto-detection works |
 | Framework integrations | Middleware/handlers capture request metadata, unhandled errors, response status |
@@ -51,7 +51,7 @@ Every SDK must unit-test the following behaviors by **mocking the HTTP transport
 
 Each SDK must include a test suite that validates compliance against `contracts/sdk-interface.md`:
 
-1. **Envelope schema validation** — Serialize a captured event and validate against the JSON Schema derived from `EventEnvelopeSchema` (available at the public site: `/schemas/bundle.json`).
+1. **Envelope schema validation** — Serialize every captured event type and validate against the JSON Schema derived from `EventEnvelopeSchema` (available at the public site: `/schemas/bundle.json`). The validation fixture must include custom context and fail if an SDK emits ad-hoc root fields, `payload.context`, or event-type payload extras such as `request_event.payload.attributes`.
 2. **Universal interface existence** — Assert all 9 core methods exist and accept the documented parameter signatures.
 3. **Safety invariants** — Assert `INV-2` (SDK never crashes host): invalid config, null inputs, network failures, and malformed server responses all result in silent degradation.
 4. **Redaction contract** — Default sensitive fields list matches `contracts/sdk-interface.md` §6.

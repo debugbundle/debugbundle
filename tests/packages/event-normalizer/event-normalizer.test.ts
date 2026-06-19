@@ -3,12 +3,153 @@ import { describe, expect, it } from "vitest";
 import {
   fingerprint,
   inferMatchedFields,
+  normalizeCompatibleEventCandidate,
   normalizeEvent,
   validateEvent
 } from "../../../packages/event-normalizer/src/index.js";
 import { createEventEnvelope } from "../../../packages/shared-types/src/index.js";
 
 describe("event-normalizer", () => {
+  it("normalizes installed SDK legacy context placements before schema validation", (): void => {
+    const result = validateEvent({
+      schema_version: "2026-03-01",
+      event_id: "550e8400-e29b-41d4-a716-446655440000",
+      event_type: "request_event",
+      occurred_at: "2026-03-10T00:00:00.000Z",
+      sdk_name: "@debugbundle/sdk-java",
+      sdk_version: "1.1.0",
+      service: {
+        name: "patients-api",
+        environment: "production",
+        runtime: "java",
+        framework: null
+      },
+      correlation: {},
+      context: {
+        request_id: "req-root",
+        tenant: "healthbrain"
+      },
+      payload: {
+        method: "GET",
+        path: "/patients",
+        query: null,
+        headers: null,
+        response_status: "503",
+        duration_ms: "42",
+        attributes: {
+          route_template: "/patients",
+          controller: "PatientsController"
+        }
+      }
+    });
+
+    expect(result.success).toBe(true);
+    if (!result.success) return;
+    expect(result.data.correlation).toEqual({
+      request_id: null,
+      trace_id: null,
+      session_id: null,
+      user_id_hash: null
+    });
+    expect(result.data.context).toEqual({
+      request_id: "req-root",
+      tenant: "healthbrain",
+      route_template: "/patients",
+      controller: "PatientsController"
+    });
+    expect(result.data.payload).toMatchObject({
+      query: {},
+      headers: {},
+      response_status: 503,
+      duration_ms: 42,
+      route_template: "/patients"
+    });
+    expect("attributes" in result.data.payload).toBe(false);
+  });
+
+  it("normalizes installed SDK backend exception fallbacks", (): void => {
+    const result = validateEvent({
+      schema_version: "2026-03-01",
+      event_id: "550e8400-e29b-41d4-a716-446655440001",
+      event_type: "backend_exception",
+      occurred_at: "2026-03-10T00:00:00.000Z",
+      sdk_name: "debugbundle/sdk-php",
+      sdk_version: "1.1.0",
+      sdk_language: "php",
+      service: {
+        name: "saycheese-backend",
+        environment: "production",
+        runtime: "php",
+        framework: null
+      },
+      correlation: {
+        trace_id: "trace-1"
+      },
+      payload: {
+        name: "RuntimeException",
+        message: "Redis unavailable",
+        stack: "RuntimeException: Redis unavailable",
+        handled: true,
+        request: null,
+        response: null,
+        runtime: {
+          version: "8.3.0"
+        },
+        context: {
+          job: "queue"
+        }
+      }
+    });
+
+    expect(result.success).toBe(true);
+    if (!result.success) return;
+    expect(result.data.context).toEqual({
+      sdk_language: "php",
+      job: "queue"
+    });
+    expect(result.data.event_type).toBe("backend_exception");
+    if (result.data.event_type !== "backend_exception") return;
+    expect(result.data.correlation).toEqual({
+      request_id: null,
+      trace_id: "trace-1",
+      session_id: null,
+      user_id_hash: null
+    });
+    expect(result.data.payload.request).toEqual({
+      method: "UNKNOWN",
+      path: "/",
+      query: {},
+      headers: {}
+    });
+    expect(result.data.payload.response).toEqual({
+      status_code: 0
+    });
+    expect("context" in result.data.payload).toBe(false);
+  });
+
+  it("keeps malformed required payload fields rejected after compatibility normalization", (): void => {
+    const candidate = normalizeCompatibleEventCandidate({
+      schema_version: "2026-03-01",
+      event_id: "550e8400-e29b-41d4-a716-446655440002",
+      event_type: "log_event",
+      occurred_at: "2026-03-10T00:00:00.000Z",
+      sdk_name: "debugbundle-python",
+      sdk_version: "1.1.0",
+      service: {
+        name: "api",
+        environment: "production",
+        runtime: "python"
+      },
+      payload: {
+        level: "error",
+        message: 123,
+        attributes: {}
+      }
+    });
+
+    expect(validateEvent(candidate).success).toBe(false);
+  });
+
   it("should normalize dynamic route segments and volatile message values", (): void => {
     const event = createEventEnvelope({
       event_type: "backend_exception",

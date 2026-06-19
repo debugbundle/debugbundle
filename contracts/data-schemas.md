@@ -5,6 +5,44 @@ Last updated: 2026-06-15
 
 ---
 
+## 0. Event Envelope Schema
+
+SDK ingestion events use the canonical `EventEnvelopeSchema` exported by `packages/shared-types`.
+
+Top-level envelope fields are strict. SDKs may include optional application metadata in `context`, but must not add ad-hoc root fields such as `sdk_language`.
+
+```json
+{
+  "schema_version": "2026-03-01",
+  "event_id": "550e8400-e29b-41d4-a716-446655440000",
+  "event_type": "backend_exception",
+  "sdk_name": "@debugbundle/sdk-node",
+  "sdk_version": "1.2.0",
+  "service": {
+    "name": "checkout-api",
+    "runtime": "node",
+    "framework": "express",
+    "environment": "production"
+  },
+  "occurred_at": "2026-06-19T08:00:00.000Z",
+  "correlation": {
+    "request_id": "req_123",
+    "trace_id": "trace_123"
+  },
+  "context": {
+    "tenant": "acme",
+    "route_template": "/orders/{id}"
+  },
+  "payload": {}
+}
+```
+
+Rules:
+1. `payload` is closed per `event_type`; SDKs must not put arbitrary app context into event payloads.
+2. Cross-cutting app or framework context belongs in optional envelope `context`.
+3. Correlation identifiers belong in optional envelope `correlation`. SDKs may emit sparse correlation objects and may omit unknown fields.
+4. Compatibility normalization may accept older installed SDK shapes, but new SDK releases must emit the canonical envelope directly and validate emitted events against this contract.
+
 ## 1. Bundle Schema
 
 The canonical debugging artifact. A bundle is a **captured image in time** of a debugging-relevant failure or improvement signal. It must be portable, self-explaining, agent-readable, and support partial/optional contexts.

@@ -423,8 +423,11 @@ The browser SDK injects a `X-DebugBundle-Trace-Id` header (UUID v4) into same-or
 ### Event Envelope
 ```json
 {
+  "schema_version": "2026-03-01",
   "event_type": "backend_exception",
-  "trace_id": "550e8400-e29b-41d4-a716-446655440000",
+  "correlation": {
+    "trace_id": "550e8400-e29b-41d4-a716-446655440000"
+  },
   "...": "..."
 }
 ```
@@ -444,7 +447,7 @@ Incidents use `trace_id` to link frontend breadcrumbs to backend exceptions. Thi
 | Header reading | Backend middleware reads header, attaches to event context |
 | Missing header | No failure — backend events ungrouped from frontend |
 | Trace ID format | UUID v4, generated per outgoing browser request |
-| Envelope field | `trace_id` (top-level, optional) |
+| Envelope field | `correlation.trace_id` (optional) |
 
 ---
 
@@ -482,11 +485,11 @@ Captured logs are emitted as `log_event` normalized events:
 {
   "event_type": "log_event",
   "timestamp": "ISO8601",
+  "context": { "host": "db-primary", "timeout_ms": 5000 },
   "payload": {
     "level": "error",
     "message": "Database connection timeout",
-    "logger": "app.db",
-    "context": { "host": "db-primary", "timeout_ms": 5000 }
+    "attributes": { "logger": "app.db" }
   }
 }
 ```
@@ -511,17 +514,22 @@ All SDKs must normalize captured data into the canonical event envelope (see `/c
 
 ```
 {
+  "schema_version": "2026-03-01",
+  "event_id": "<uuid-v4>",
   "event_type": "<type>",
-  "timestamp": "ISO8601",
-  "service": "<service>",
-  "environment": "<environment>",
+  "occurred_at": "ISO8601",
+  "service": { "name": "<service>", "runtime": "<runtime>", "environment": "<environment>" },
   "sdk_name": "@debugbundle/sdk-<lang>",
   "sdk_version": "<version>",
+  "correlation": { "trace_id": "<optional>", "request_id": "<optional>" },
+  "context": { "...": "optional app/framework context" },
   "payload": { ... }
 }
 ```
 
 SDK name follows the pattern `@debugbundle/sdk-{language}`.
+
+SDKs must keep payloads event-type-specific and strict. `captureException`, `captureRequest`, `captureLog`, `captureMessage`, probes, and framework middleware may collect extra application context, but that context belongs in envelope `context` after redaction. SDKs must not place arbitrary context under `payload.context`, must not place request-only metadata under `request_event.payload.attributes`, and must not add root metadata fields outside the envelope contract. Existing ingestion compatibility shims are for installed SDKs only; new SDK versions must emit canonical envelopes directly.
 
 ---
 

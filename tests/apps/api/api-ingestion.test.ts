@@ -1160,6 +1160,89 @@ describe("api ingestion route", () => {
     expect(persistAndEnqueue).toHaveBeenCalledOnce();
   });
 
+  it("accepts installed SDK legacy event context shapes after compatibility normalization", async (): Promise<void> => {
+    const persistAndEnqueue = vi.fn().mockResolvedValue({ object_key: "raw-events/proj_123/path.json.gz" });
+    const resolveProjectByTokenHash = vi.fn().mockResolvedValue({ project_id: "proj_123" });
+
+    const app = createApiServer({
+      ingestionPersistence: {
+        persistAndEnqueue
+      },
+      ingestionMetadata: {
+        resolveProjectByTokenHash
+      },
+      memberAuth: createMemberAuthDependency(),
+      tokenManagement: createTokenManagementDependency(),
+      incidentRetrieval: createIncidentRetrievalDependency(),
+      objectStoreReader: createObjectStoreReaderDependency(),
+      webhookDelivery: createWebhookDeliveryDependency()
+    });
+
+    const response = await app.inject({
+      method: "POST",
+      url: "/v1/events",
+      headers: {
+        authorization: "Bearer dbundle_proj_test"
+      },
+      payload: {
+        events: [
+          {
+            schema_version: "2026-03-01",
+            event_id: "550e8400-e29b-41d4-a716-446655440000",
+            event_type: "request_event",
+            occurred_at: "2026-03-10T00:00:00.000Z",
+            sdk_name: "@debugbundle/sdk-java",
+            sdk_version: "1.1.0",
+            service: {
+              name: "patients-api",
+              environment: "production",
+              runtime: "java",
+              framework: null
+            },
+            correlation: {},
+            context: {
+              tenant: "healthbrain"
+            },
+            payload: {
+              method: "GET",
+              path: "/patients",
+              query: null,
+              headers: null,
+              response_status: "503",
+              duration_ms: "42",
+              attributes: {
+                route_template: "/patients/{id}",
+                controller: "PatientsController"
+              }
+            }
+          }
+        ]
+      }
+    });
+
+    expect(response.statusCode).toBe(202);
+    expect(response.json()).toMatchObject({
+      accepted: 1,
+      rejected: 0,
+      errors: []
+    });
+    expect(persistAndEnqueue).toHaveBeenCalledOnce();
+    expect(persistAndEnqueue.mock.calls[0]?.[0]).toMatchObject({
+      context: {
+        tenant: "healthbrain",
+        route_template: "/patients/{id}",
+        controller: "PatientsController"
+      },
+      payload: {
+        query: {},
+        headers: {},
+        response_status: 503,
+        duration_ms: 42,
+        route_template: "/patients/{id}"
+      }
+    });
+  });
+
   it("should reject malformed request body before event processing", async (): Promise<void> => {
     const app = createApiServer({
       ingestionPersistence: {

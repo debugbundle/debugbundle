@@ -184,6 +184,43 @@ describe("shared-types event envelope", () => {
     expect(EventTypeValues).toContain(parsed.event_type);
   });
 
+  it("should parse additive envelope context and sparse correlation metadata", (): void => {
+    const envelope = createEventEnvelope({
+      event_type: "log_event",
+      service: {
+        name: "checkout-api",
+        environment: "production",
+        runtime: "node",
+        framework: "fastify"
+      },
+      correlation: {
+        trace_id: "trace-123"
+      },
+      context: {
+        tenant: "acme",
+        feature: "checkout"
+      },
+      payload: {
+        level: "error",
+        message: "payment retry failed",
+        attributes: {}
+      }
+    });
+
+    const parsed = EventEnvelopeSchema.parse(envelope);
+
+    expect(parsed.correlation).toEqual({
+      request_id: null,
+      trace_id: "trace-123",
+      session_id: null,
+      user_id_hash: null
+    });
+    expect(parsed.context).toEqual({
+      tenant: "acme",
+      feature: "checkout"
+    });
+  });
+
   it("should reject missing required fields", (): void => {
     const invalidEnvelope = {
       schema_version: "2026-03-01",
