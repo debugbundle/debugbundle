@@ -11,6 +11,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from ".
 import { CreateProjectDialog } from "./create-project-dialog.js";
 import { ProjectNameWithAccessIndicator } from "./project-name-with-access-indicator.js";
 import { listProjects, type ProjectRecord } from "../../lib/api.js";
+import { getActiveIncidentCount } from "../../lib/project-metrics.js";
 import { useDelayedVisibility } from "../../lib/use-delayed-visibility.js";
 
 export function RecentProjectsTable(): JSX.Element {
@@ -73,7 +74,7 @@ export function RecentProjectsTable(): JSX.Element {
                   <TableHead>Name</TableHead>
                   <TableHead>Slug</TableHead>
                   <TableHead>Environment</TableHead>
-                  <TableHead>Open incidents</TableHead>
+                  <TableHead>Active incidents</TableHead>
                   <TableHead>Incidents today</TableHead>
                   <TableHead>Opened this month</TableHead>
                 </TableRow>
@@ -94,7 +95,7 @@ export function RecentProjectsTable(): JSX.Element {
                     <TableCell>
                       <Badge variant="outline">{project.environment_default}</Badge>
                     </TableCell>
-                    <TableCell className="text-muted-foreground">{project.metrics.open_incidents.toLocaleString()}</TableCell>
+                    <TableCell className="text-muted-foreground">{getActiveIncidentCount(project.metrics).toLocaleString()}</TableCell>
                     <TableCell className="text-muted-foreground">{project.metrics.attention_incidents_today.toLocaleString()}</TableCell>
                     <TableCell className="text-muted-foreground">{project.metrics.opened_incidents_month.toLocaleString()}</TableCell>
                   </TableRow>

@@ -4,9 +4,10 @@ import { Link } from "react-router-dom";
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../ui/card.js";
 import { listProjects, type ProjectRecord } from "../../lib/api.js";
+import { getActiveIncidentCount } from "../../lib/project-metrics.js";
 
 interface DashboardMetrics {
-  openIncidents: number;
+  activeIncidents: number;
   regressedIncidents: number;
   attentionIncidentsToday: number;
   openedIncidentsMonth: number;
@@ -15,13 +16,13 @@ interface DashboardMetrics {
 function aggregateProjectMetrics(projects: ProjectRecord[]): DashboardMetrics {
   return projects.reduce<DashboardMetrics>(
     (totals, project) => ({
-      openIncidents: totals.openIncidents + project.metrics.open_incidents,
+      activeIncidents: totals.activeIncidents + getActiveIncidentCount(project.metrics),
       regressedIncidents: totals.regressedIncidents + project.metrics.regressed_incidents,
       attentionIncidentsToday: totals.attentionIncidentsToday + project.metrics.attention_incidents_today,
       openedIncidentsMonth: totals.openedIncidentsMonth + project.metrics.opened_incidents_month
     }),
     {
-      openIncidents: 0,
+      activeIncidents: 0,
       regressedIncidents: 0,
       attentionIncidentsToday: 0,
       openedIncidentsMonth: 0
@@ -39,7 +40,7 @@ export function SectionCards(): JSX.Element {
         setMetrics(aggregateProjectMetrics(projects));
       } catch {
         setMetrics({
-          openIncidents: 0,
+          activeIncidents: 0,
           regressedIncidents: 0,
           attentionIncidentsToday: 0,
           openedIncidentsMonth: 0
@@ -48,7 +49,7 @@ export function SectionCards(): JSX.Element {
     })();
   }, []);
 
-  const openIncidents = metrics?.openIncidents;
+  const activeIncidents = metrics?.activeIncidents;
   const attentionToday = metrics?.attentionIncidentsToday;
   const openedMonth = metrics?.openedIncidentsMonth;
   const regressedIncidents = metrics?.regressedIncidents;
@@ -68,15 +69,15 @@ export function SectionCards(): JSX.Element {
       >
         <Card className="h-full cursor-pointer transition-colors hover:bg-muted/30">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardDescription>Open incidents</CardDescription>
+            <CardDescription>Active incidents</CardDescription>
             <SirenIcon className="size-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
             <CardTitle className="text-2xl tabular-nums">
-              {openIncidents !== undefined ? openIncidents.toLocaleString() : "\u2014"}
+              {activeIncidents !== undefined ? activeIncidents.toLocaleString() : "\u2014"}
             </CardTitle>
             <p className="mt-1 text-xs text-muted-foreground">
-              {openIncidents !== undefined ? "Current unresolved incidents across all projects" : "Loading\u2026"}
+              {activeIncidents !== undefined ? "Open or regressed incidents across all projects" : "Loading\u2026"}
             </p>
           </CardContent>
         </Card>

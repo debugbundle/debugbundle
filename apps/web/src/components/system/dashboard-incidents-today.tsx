@@ -4,6 +4,7 @@ import { Link, useNavigate } from "react-router-dom";
 
 import { formatIncidentMatchedFields } from "../../lib/incident-copy.js";
 import { listIncidents, type IncidentRecord } from "../../lib/api.js";
+import { getLocalDayWindow, isIncidentAttentionToday } from "../../lib/incidents-today.js";
 import {
   shouldIgnoreTableRowActivation
 } from "./selectable-table-actions.js";
@@ -16,11 +17,6 @@ import { ProjectColorTagDot } from "./project-color-tag-dot.js";
 import { ResourceListState } from "./resource-list-state.js";
 import { Skeleton } from "../ui/skeleton.js";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../ui/table.js";
-
-function getStartOfCurrentUtcDayIso(): string {
-  const now = new Date();
-  return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 0, 0, 0, 0)).toISOString();
-}
 
 export function DashboardIncidentsToday(): JSX.Element {
   const navigate = useNavigate();
@@ -35,13 +31,16 @@ export function DashboardIncidentsToday(): JSX.Element {
 
     void (async () => {
       try {
+        const todayWindow = getLocalDayWindow();
         const response = await listIncidents({
-          limit: 10,
-          firstSeenAfter: getStartOfCurrentUtcDayIso()
+          limit: 100
         });
 
         if (!isCancelled) {
-          setIncidents(Array.isArray(response.incidents) ? response.incidents : []);
+          const attentionToday = Array.isArray(response.incidents)
+            ? response.incidents.filter((incident) => isIncidentAttentionToday(incident, todayWindow)).slice(0, 10)
+            : [];
+          setIncidents(attentionToday);
         }
       } catch {
         if (!isCancelled) {
@@ -65,7 +64,7 @@ export function DashboardIncidentsToday(): JSX.Element {
         <div className="flex w-full items-center justify-between gap-3 sm:w-auto">
           <div className="space-y-1.5">
             <CardTitle>Incidents today</CardTitle>
-            <CardDescription>New incidents first seen today across this workspace.</CardDescription>
+            <CardDescription>Incidents opened or regressed today across this workspace.</CardDescription>
           </div>
           <TableRefreshButton
             isLoading={isLoading}
@@ -100,8 +99,8 @@ export function DashboardIncidentsToday(): JSX.Element {
                 <EmptyMedia variant="icon">
                   <SirenIcon />
                 </EmptyMedia>
-                <EmptyTitle>No new incidents today</EmptyTitle>
-                <EmptyDescription>New incidents that open today will appear here.</EmptyDescription>
+                <EmptyTitle>No incidents today</EmptyTitle>
+                <EmptyDescription>Incidents opened or regressed today will appear here.</EmptyDescription>
               </EmptyHeader>
               <EmptyContent>
                 <Button asChild type="button" variant="outline">

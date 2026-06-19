@@ -31,6 +31,7 @@ import {
 } from "../lib/api.js";
 import { formatIncidentMatchedFields } from "../lib/incident-copy.js";
 import { formatProjectRelationship, getProjectEffectiveRole, getProjectOwnerEmail, isSharedProject } from "../lib/project-access.js";
+import { getActiveIncidentCount } from "../lib/project-metrics.js";
 import { showErrorToast, showInfoToast, showSuccessToast } from "../lib/notify.js";
 import { useCursorPagination } from "../lib/use-cursor-pagination.js";
 
@@ -72,7 +73,7 @@ export function ProjectOverviewPage(): JSX.Element {
 }
 
 function ProjectStatCards({ project }: { project: ProjectRecord }): JSX.Element {
-  const openIncidents = project.metrics.open_incidents;
+  const activeIncidents = getActiveIncidentCount(project.metrics);
   const attentionToday = project.metrics.attention_incidents_today;
   const openedMonth = project.metrics.opened_incidents_month;
   const regressedIncidents = project.metrics.regressed_incidents;
@@ -81,14 +82,14 @@ function ProjectStatCards({ project }: { project: ProjectRecord }): JSX.Element 
     <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
       <Card>
         <CardHeader className="flex flex-row items-center justify-between pb-2">
-          <CardDescription>Open incidents</CardDescription>
+          <CardDescription>Active incidents</CardDescription>
           <SirenIcon className="size-4 text-muted-foreground" />
         </CardHeader>
         <CardContent>
-          <CardTitle className="text-2xl tabular-nums">{openIncidents.toLocaleString()}</CardTitle>
+          <CardTitle className="text-2xl tabular-nums">{activeIncidents.toLocaleString()}</CardTitle>
           <div className="mt-1 flex items-center gap-1 text-xs text-muted-foreground">
             <Badge variant="outline" className="text-xs">Current</Badge>
-            Unresolved incidents in this project
+            Open or regressed incidents in this project
           </div>
         </CardContent>
       </Card>
