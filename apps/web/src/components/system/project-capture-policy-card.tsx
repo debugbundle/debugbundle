@@ -345,13 +345,13 @@ export function ProjectCapturePolicyCard({ projectId, organizationPlan, canEdit 
           </div>
 
           {canEdit ? (
-            <div className="flex flex-wrap gap-2">
-              <Button type="submit" disabled={isSaveDisabled}>
-                {isSaving ? "Saving..." : "Save capture policy"}
-              </Button>
+            <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
               <Button type="button" variant="outline" onClick={handleReset} disabled={isDisabled || !isDirty}>
                 <RotateCcwIcon data-icon="inline-start" />
                 Reset changes
+              </Button>
+              <Button type="submit" disabled={isSaveDisabled}>
+                {isSaving ? "Saving..." : "Save capture policy"}
               </Button>
             </div>
           ) : null}

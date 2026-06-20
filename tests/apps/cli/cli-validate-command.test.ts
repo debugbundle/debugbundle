@@ -300,5 +300,14 @@ describe("cli validate command", () => {
     expect(await readFile(join(rootDirectory, ".agents", "skills", "debugbundle", "SKILL.md"), "utf8")).toContain(
       "debugbundle capture-rule suggest <incident-id> --json"
     );
+    expect(await readFile(join(rootDirectory, ".agents", "skills", "debugbundle", "SKILL.md"), "utf8")).toContain(
+      "https://debugbundle.com/docs/managing-noise"
+    );
+    expect(await readFile(join(rootDirectory, ".agents", "skills", "debugbundle", "references", "cli.md"), "utf8")).toContain(
+      "https://debugbundle.com/docs/managing-noise"
+    );
+    expect(await readFile(join(rootDirectory, ".agents", "skills", "debugbundle", "references", "mcp.md"), "utf8")).toContain(
+      "https://debugbundle.com/docs/managing-noise"
+    );
   });
 });

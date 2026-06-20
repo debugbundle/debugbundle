@@ -3,6 +3,7 @@ import type {
   AvailabilityCheckRecord,
   ProjectRecord
 } from "../lib/api.js";
+import { computeAvailabilityUptimePercentage, formatAvailabilityUptime } from "../lib/health-status-metrics.js";
 
 export type HealthStatusDayState = AvailabilityCheckDailyRollupRecord["state"];
 export type HealthStatusImpact = "none" | "minor" | "elevated" | "outage";
@@ -81,15 +82,7 @@ export function buildHealthStatusProjects(
 }
 
 export function formatStatusUptime(value: number | null): string {
-  if (value === null) {
-    return "No data";
-  }
-
-  if (value === 100) {
-    return "100%";
-  }
-
-  return `${value.toFixed(2)}%`;
+  return formatAvailabilityUptime(value);
 }
 
 export function formatHealthStatusLabel(state: HealthStatusDayState): string {
@@ -274,13 +267,7 @@ function countActiveAvailabilityIncidents(checks: HealthStatusCheckSummary[]): n
 }
 
 function computeUptimePercentage(days: HealthStatusDay[]): number | null {
-  const totalChecks = sum(days, (day) => day.total_checks);
-  if (totalChecks === 0) {
-    return null;
-  }
-
-  const failedChecks = sum(days, (day) => day.failed_checks);
-  return Math.max(0, Math.min(100, ((totalChecks - failedChecks) / totalChecks) * 100));
+  return computeAvailabilityUptimePercentage(days);
 }
 
 function emptyStatusDay(day: string): HealthStatusDay {

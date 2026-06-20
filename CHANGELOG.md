@@ -6,6 +6,18 @@ The format is based on Keep a Changelog and this project follows Semantic Versio
 
 ## [Unreleased]
 
+## [1.6.2] - 2026-06-21
+
+### Added
+
+- Added a public managing-noise documentation page plus linked agent-workflow guidance, and updated the CLI local scaffold validation so the new doc and skill-file handling ship together.
+
+### Changed
+
+- Replaced the dashboard and project-overview opened-this-month card with a linked health-status-today card that reuses retained health-check uptime semantics from the main Health Status page, while keeping unset and no-data states explicit.
+- Aligned project-settings action rows with the existing product UX by anchoring primary actions to the bottom right and placing secondary actions to their left in the capture-policy, automated-improvement, weekly-report, and destructive-action surfaces.
+- Tightened worker availability-capacity dogfood warnings so non-saturated due-check lag stays informational instead of opening false-positive capacity incidents, and bumped `@debugbundle/cli` to `1.6.2` for the coordinated release train.
+
 ## [1.6.1] - 2026-06-20
 
 ### Changed

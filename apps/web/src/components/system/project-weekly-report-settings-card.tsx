@@ -673,13 +673,13 @@ export function ProjectWeeklyReportSettingsCard({
 
               {emailValidationMessage === null ? null : <p className="text-sm text-destructive">{emailValidationMessage}</p>}
 
-              <div className="flex flex-wrap items-center gap-3">
-                <Button type="submit" disabled={isEmailSaveDisabled}>
-                  {isSavingEmail ? "Saving..." : "Save email weekly report"}
-                </Button>
+              <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
                 <Button type="button" variant="outline" disabled={!isEmailDirty || isSavingEmail} onClick={handleResetEmail}>
                   <RotateCcwIcon data-icon="inline-start" />
                   Reset
+                </Button>
+                <Button type="submit" disabled={isEmailSaveDisabled}>
+                  {isSavingEmail ? "Saving..." : "Save email weekly report"}
                 </Button>
               </div>
             </div>

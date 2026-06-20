@@ -626,9 +626,9 @@ function summarizeAvailabilityCapacity(input: {
   const thresholdMs = Number.isFinite(minIntervalMs) ? minIntervalMs : 30_000;
   const saturated = input.checks.length >= input.batchSize;
   const capacityWarning =
-    oldestDueLagMs > thresholdMs * 2
+    saturated && oldestDueLagMs > thresholdMs * 2
       ? "critical"
-      : oldestDueLagMs > thresholdMs || (saturated && oldestDueLagMs > 5_000)
+      : saturated && (oldestDueLagMs > thresholdMs || oldestDueLagMs > 5_000)
         ? "warning"
         : "none";
 

@@ -92,6 +92,7 @@ When notification or automation delivery is the reported failure, inspect config
 - Availability checks: `https://debugbundle.com/docs/availability-checks`
 - Probes: `https://debugbundle.com/docs/probes`
 - Capture policy and rules: `https://debugbundle.com/docs/capture-policy`
+- Managing noise: `https://debugbundle.com/docs/managing-noise`
 - Alerts: `https://debugbundle.com/docs/alerts` and `https://debugbundle.com/docs/cli/alerts`
 - Webhooks: `https://debugbundle.com/docs/webhooks` and `https://debugbundle.com/docs/cli/webhooks`
 - API ingestion: `https://debugbundle.com/docs/api/ingestion`

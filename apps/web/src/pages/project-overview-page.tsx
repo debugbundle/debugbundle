@@ -1,5 +1,5 @@
-import { BellRingIcon, CalendarDaysIcon, DownloadIcon, PackageIcon, RotateCcwIcon, SirenIcon } from "lucide-react";
-import { useMemo, useState, type MouseEvent } from "react";
+import { BellRingIcon, DownloadIcon, HeartPulseIcon, PackageIcon, RotateCcwIcon, SirenIcon } from "lucide-react";
+import { useEffect, useMemo, useState, type MouseEvent } from "react";
 import { Link, useNavigate, useOutletContext } from "react-router-dom";
 
 import { CursorPaginationControls } from "../components/system/cursor-pagination-controls.js";
@@ -25,15 +25,21 @@ import {
   bulkReopenIncidents,
   bulkResolveIncidents,
   getIncidentBundle,
+  listProjectAvailabilityCheckDailyRollups,
+  listProjectAvailabilityChecks,
+  type AvailabilityCheckDailyRollupRecord,
   listProjectIncidents,
   type IncidentRecord,
   type ProjectRecord
 } from "../lib/api.js";
+import { summarizeHealthStatusToday, type HealthStatusTodaySummary } from "../lib/health-status-summary.js";
 import { formatIncidentMatchedFields } from "../lib/incident-copy.js";
 import { formatProjectRelationship, getProjectEffectiveRole, getProjectOwnerEmail, isSharedProject } from "../lib/project-access.js";
 import { getActiveIncidentCount } from "../lib/project-metrics.js";
 import { showErrorToast, showInfoToast, showSuccessToast } from "../lib/notify.js";
 import { useCursorPagination } from "../lib/use-cursor-pagination.js";
+
+const HEALTH_STATUS_HISTORY_DAYS = 30;
 
 export function ProjectOverviewPage(): JSX.Element {
   const { project } = useOutletContext<ProjectContext>();
@@ -73,10 +79,55 @@ export function ProjectOverviewPage(): JSX.Element {
 }
 
 function ProjectStatCards({ project }: { project: ProjectRecord }): JSX.Element {
+  const [healthStatusToday, setHealthStatusToday] = useState<HealthStatusTodaySummary | null>(null);
   const activeIncidents = getActiveIncidentCount(project.metrics);
   const attentionToday = project.metrics.attention_incidents_today;
-  const openedMonth = project.metrics.opened_incidents_month;
   const regressedIncidents = project.metrics.regressed_incidents;
+
+  useEffect(() => {
+    let canceled = false;
+
+    void (async () => {
+      setHealthStatusToday(null);
+
+      try {
+        const response = await listProjectAvailabilityChecks(project.project_id, 100);
+        const rollupEntries = await Promise.all(
+          response.checks.map(async (check) => {
+            try {
+              return [
+                check.check_id,
+                await listProjectAvailabilityCheckDailyRollups(
+                  project.project_id,
+                  check.check_id,
+                  HEALTH_STATUS_HISTORY_DAYS
+                )
+              ] as const;
+            } catch {
+              return [check.check_id, [] as AvailabilityCheckDailyRollupRecord[]] as const;
+            }
+          })
+        );
+        if (!canceled) {
+          setHealthStatusToday(
+            summarizeHealthStatusToday(
+              response.checks,
+              new Map<string, AvailabilityCheckDailyRollupRecord[]>(rollupEntries),
+              "project"
+            )
+          );
+        }
+      } catch {
+        if (!canceled) {
+          setHealthStatusToday(summarizeHealthStatusToday([], new Map(), "project"));
+        }
+      }
+    })();
+
+    return () => {
+      canceled = true;
+    };
+  }, [project.project_id]);
 
   return (
     <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -105,19 +156,25 @@ function ProjectStatCards({ project }: { project: ProjectRecord }): JSX.Element 
         </CardContent>
       </Card>
 
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between pb-2">
-          <CardDescription>Opened this month</CardDescription>
-          <CalendarDaysIcon className="size-4 text-muted-foreground" />
-        </CardHeader>
-        <CardContent>
-          <CardTitle className="text-2xl tabular-nums">{openedMonth.toLocaleString()}</CardTitle>
-          <div className="mt-1 flex items-center gap-1 text-xs text-muted-foreground">
-            <Badge variant="outline" className="text-xs">This month</Badge>
-            Incidents opened this month in this project
-          </div>
-        </CardContent>
-      </Card>
+      <Link
+        to={`/projects/${project.project_id}/health`}
+        className="block rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+      >
+        <Card className="h-full cursor-pointer transition-colors hover:bg-muted/30">
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardDescription>Health status today</CardDescription>
+            <HeartPulseIcon className="size-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <CardTitle className="text-2xl">
+              {healthStatusToday !== null ? healthStatusToday.value : "\u2014"}
+            </CardTitle>
+            <p className="mt-1 text-xs text-muted-foreground">
+              {healthStatusToday !== null ? healthStatusToday.description : "Loading\u2026"}
+            </p>
+          </CardContent>
+        </Card>
+      </Link>
 
       <Card>
         <CardHeader className="flex flex-row items-center justify-between pb-2">

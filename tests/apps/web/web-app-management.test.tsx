@@ -6,7 +6,11 @@ import { StrictMode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { App } from "../../../apps/web/src/app.tsx";
-import { resetBrowserSessionClientState } from "../../../apps/web/src/lib/api.ts";
+import {
+  resetBrowserSessionClientState,
+  type AvailabilityCheckDailyRollupRecord,
+  type AvailabilityCheckRecord
+} from "../../../apps/web/src/lib/api.ts";
 import { getLocalDayWindow } from "../../../apps/web/src/lib/incidents-today.ts";
 import {
   createAlert,
@@ -44,6 +48,63 @@ async function chooseSelectOption(
 ): Promise<void> {
   await openSelect(label);
   await user.click(await screen.findByRole("option", { name: optionName }));
+}
+
+function createHealthCheck(overrides: Partial<AvailabilityCheckRecord> = {}): AvailabilityCheckRecord {
+  return {
+    check_id: "chk_123",
+    project_id: "proj_123",
+    name: "Primary app",
+    url: "https://app.example.com/health",
+    method: "GET",
+    expected_status_min: 200,
+    expected_status_max: 399,
+    timeout_ms: 5000,
+    interval_seconds: 60,
+    failure_threshold: 3,
+    recovery_threshold: 2,
+    environment: "production",
+    service_name: "web",
+    enabled: true,
+    status: "passing",
+    paused_reason: null,
+    organization_plan: "team",
+    consecutive_failures: 0,
+    consecutive_successes: 12,
+    linked_incident_id: null,
+    linked_incident_status: null,
+    last_checked_at: "2026-06-15T10:00:00.000Z",
+    next_check_at: "2026-06-15T10:01:00.000Z",
+    last_result_status: "success",
+    last_result_http_status: 200,
+    last_result_error_kind: null,
+    last_result_error_message: null,
+    last_result_duration_ms: 180,
+    created_at: "2026-06-15T09:00:00.000Z",
+    updated_at: "2026-06-15T10:00:00.000Z",
+    ...overrides
+  };
+}
+
+function createHealthRollup(
+  overrides: Partial<AvailabilityCheckDailyRollupRecord> = {}
+): AvailabilityCheckDailyRollupRecord {
+  return {
+    check_id: "chk_123",
+    project_id: "proj_123",
+    day: "2026-06-15",
+    state: "operational",
+    total_checks: 1250,
+    successful_checks: 1250,
+    failed_checks: 0,
+    degraded_checks: 0,
+    avg_duration_ms: 180,
+    first_checked_at: "2026-06-15T00:00:00.000Z",
+    last_checked_at: "2026-06-15T23:59:00.000Z",
+    downtime_seconds: 0,
+    incident_ids: [],
+    ...overrides
+  };
 }
 
 afterEach(() => {
@@ -93,7 +154,9 @@ describe("web app — management routes", () => {
     expect(screen.queryByRole("heading", { name: /main app/i })).not.toBeInTheDocument();
     expect(screen.getByText(/^16$/)).toBeInTheDocument();
     expect(screen.getByText(/^1$/)).toBeInTheDocument();
-    expect(screen.getByText(/^6$/)).toBeInTheDocument();
+    expect(screen.getByText(/health status today/i)).toBeInTheDocument();
+    expect(await screen.findByText(/^not set$/i)).toBeInTheDocument();
+    expect(screen.getByText(/no health checks configured/i)).toBeInTheDocument();
     expect(screen.getByText(/^4$/)).toBeInTheDocument();
 
     expect(screen.getByRole("tab", { name: /overview/i })).toBeInTheDocument();
@@ -210,6 +273,12 @@ describe("web app — management routes", () => {
             }
           ],
           limits: { max_checks_per_project: 25, min_interval_seconds: 30 }
+        });
+      }
+
+      if (url.endsWith("/v1/projects/proj_123/availability-checks/chk_123/daily-rollups?limit=30")) {
+        return jsonResponse(200, {
+          rollups: [createHealthRollup()]
         });
       }
 
@@ -3806,6 +3875,42 @@ describe("web app — management routes", () => {
         });
       }
 
+      if (url.endsWith("/v1/projects/proj_123/availability-checks?limit=100")) {
+        return jsonResponse(200, {
+          checks: [createHealthCheck({ project_id: "proj_123", status: "passing" })],
+          limits: { max_checks_per_project: 5, min_interval_seconds: 60 }
+        });
+      }
+
+      if (url.endsWith("/v1/projects/proj_456/availability-checks?limit=100")) {
+        return jsonResponse(200, {
+          checks: [createHealthCheck({ check_id: "chk_456", project_id: "proj_456", status: "failing" })],
+          limits: { max_checks_per_project: 5, min_interval_seconds: 60 }
+        });
+      }
+
+      if (url.endsWith("/v1/projects/proj_123/availability-checks/chk_123/daily-rollups?limit=30")) {
+        return jsonResponse(200, {
+          rollups: [createHealthRollup({ check_id: "chk_123", project_id: "proj_123" })]
+        });
+      }
+
+      if (url.endsWith("/v1/projects/proj_456/availability-checks/chk_456/daily-rollups?limit=30")) {
+        return jsonResponse(200, {
+          rollups: [
+            createHealthRollup({
+              check_id: "chk_456",
+              project_id: "proj_456",
+              state: "degraded",
+              successful_checks: 1249,
+              failed_checks: 1,
+              degraded_checks: 1,
+              downtime_seconds: 60
+            })
+          ]
+        });
+      }
+
       if (url.includes("/v1/incidents?") && url.includes("first_seen_after=")) {
         return jsonResponse(200, { incidents: [], next_cursor: null });
       }
@@ -3853,13 +3958,13 @@ describe("web app — management routes", () => {
     await waitFor(() => {
       expect(cardWithValueExists("Active incidents", /^15$/)).toBe(true);
       expect(cardWithValueExists("Incidents today", /^3$/)).toBe(true);
-      expect(cardWithValueExists("Opened this month", /^15$/)).toBe(true);
+      expect(cardWithValueExists("Health status today", /^99\.96%$/)).toBe(true);
       expect(cardWithValueExists("Regressed incidents", /^3$/)).toBe(true);
     });
 
     expect(screen.getByText(/open or regressed incidents across all projects/i)).toBeInTheDocument();
     expect(screen.getByText(/opened or regressed today across all projects/i)).toBeInTheDocument();
-    expect(screen.getByText(/incidents opened this month across all projects/i)).toBeInTheDocument();
+    expect(screen.getByText(/1 check failing across all projects/i)).toBeInTheDocument();
     expect(screen.getByText(/current regressed incidents across all projects/i)).toBeInTheDocument();
     expect(fetchMock.mock.calls.some(([input]) => requestUrl(input).endsWith("/v1/billing"))).toBe(
       false
@@ -3914,6 +4019,51 @@ describe("web app — management routes", () => {
     await user.click(openIncidentsCard as HTMLAnchorElement);
 
     expect(await screen.findByRole("heading", { name: /incident inventory/i })).toBeInTheDocument();
+  });
+
+  it("opens the workspace health status page from the dashboard health-status card", async () => {
+    const user = userEvent.setup();
+    const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = requestUrl(input);
+
+      if (url.endsWith("/v1/auth/session")) {
+        return jsonResponse(200, {
+          session: createSession()
+        });
+      }
+
+      if (url.endsWith("/v1/projects") && init?.method === undefined) {
+        return jsonResponse(200, {
+          projects: [createProject()]
+        });
+      }
+
+      if (url.endsWith("/v1/projects/proj_123/availability-checks?limit=100")) {
+        return jsonResponse(200, {
+          checks: [],
+          limits: { max_checks_per_project: 1, min_interval_seconds: 300 }
+        });
+      }
+
+      if (url.includes("/v1/incidents?")) {
+        return jsonResponse(200, { incidents: [], next_cursor: null });
+      }
+
+      return jsonResponse(404, { error: "not_found" });
+    });
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<App initialEntries={["/dashboard"]} />);
+
+    const healthStatusCard = await screen.findByRole("link", { name: /health status today/i });
+    await screen.findByText(/^not set$/i);
+    expect(healthStatusCard).toHaveTextContent(/not set/i);
+
+    await user.click(healthStatusCard);
+
+    expect(await screen.findByRole("heading", { name: /health status/i, level: 1 })).toBeInTheDocument();
+    expect(await screen.findByText(/no health checks yet/i)).toBeInTheDocument();
   });
 
   it("scrolls to the incidents-today panel from the dashboard new-incidents card", async () => {

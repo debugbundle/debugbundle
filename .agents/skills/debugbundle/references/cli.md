@@ -80,6 +80,7 @@ Use availability-check commands for hosted endpoint reachability. Prefer `test` 
 - Webhooks: `https://debugbundle.com/docs/webhooks`, `https://debugbundle.com/docs/cli/webhooks`, and `https://debugbundle.com/docs/api/webhooks`
 - Probes: `https://debugbundle.com/docs/probes` and `https://debugbundle.com/docs/api/probes`
 - Capture policy and rules: `https://debugbundle.com/docs/capture-policy`
+- Managing noise: `https://debugbundle.com/docs/managing-noise`
 - Availability checks: `https://debugbundle.com/docs/availability-checks`
 - MCP tool catalog: `https://debugbundle.com/docs/mcp/tools`
 

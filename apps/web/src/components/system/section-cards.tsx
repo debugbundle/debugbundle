@@ -1,33 +1,88 @@
-import { BellRingIcon, CalendarDaysIcon, RotateCcwIcon, SirenIcon } from "lucide-react";
+import { BellRingIcon, HeartPulseIcon, RotateCcwIcon, SirenIcon } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../ui/card.js";
-import { listProjects, type ProjectRecord } from "../../lib/api.js";
+import {
+  listProjectAvailabilityCheckDailyRollups,
+  listProjectAvailabilityChecks,
+  listProjects,
+  type AvailabilityCheckDailyRollupRecord,
+  type ProjectRecord
+} from "../../lib/api.js";
+import { summarizeHealthStatusToday, type HealthStatusTodaySummary } from "../../lib/health-status-summary.js";
 import { getActiveIncidentCount } from "../../lib/project-metrics.js";
+import { isSharedProjectAccessSuspended } from "../../lib/project-access.js";
+
+const HEALTH_STATUS_HISTORY_DAYS = 30;
 
 interface DashboardMetrics {
   activeIncidents: number;
   regressedIncidents: number;
   attentionIncidentsToday: number;
-  openedIncidentsMonth: number;
+  healthStatusToday: HealthStatusTodaySummary;
 }
 
-function aggregateProjectMetrics(projects: ProjectRecord[]): DashboardMetrics {
-  return projects.reduce<DashboardMetrics>(
+async function aggregateProjectMetrics(projects: ProjectRecord[]): Promise<DashboardMetrics> {
+  const incidentMetrics = projects.reduce<Omit<DashboardMetrics, "healthStatusToday">>(
     (totals, project) => ({
       activeIncidents: totals.activeIncidents + getActiveIncidentCount(project.metrics),
       regressedIncidents: totals.regressedIncidents + project.metrics.regressed_incidents,
-      attentionIncidentsToday: totals.attentionIncidentsToday + project.metrics.attention_incidents_today,
-      openedIncidentsMonth: totals.openedIncidentsMonth + project.metrics.opened_incidents_month
+      attentionIncidentsToday: totals.attentionIncidentsToday + project.metrics.attention_incidents_today
     }),
     {
       activeIncidents: 0,
       regressedIncidents: 0,
-      attentionIncidentsToday: 0,
-      openedIncidentsMonth: 0
+      attentionIncidentsToday: 0
     }
   );
+  const availabilityResponses = await Promise.all(
+    projects
+      .filter((project) => !isSharedProjectAccessSuspended(project))
+      .map(async (project) => {
+        try {
+          const response = await listProjectAvailabilityChecks(project.project_id, 100);
+          const rollupEntries = await Promise.all(
+            response.checks.map(async (check) => {
+              try {
+                return [
+                  check.check_id,
+                  await listProjectAvailabilityCheckDailyRollups(
+                    project.project_id,
+                    check.check_id,
+                    HEALTH_STATUS_HISTORY_DAYS
+                  )
+                ] as const;
+              } catch {
+                return [check.check_id, [] as AvailabilityCheckDailyRollupRecord[]] as const;
+              }
+            })
+          );
+
+          return {
+            checks: response.checks,
+            rollupsByCheckId: new Map<string, AvailabilityCheckDailyRollupRecord[]>(rollupEntries)
+          };
+        } catch {
+          return { checks: [], rollupsByCheckId: new Map<string, AvailabilityCheckDailyRollupRecord[]>() };
+        }
+      })
+  );
+  const rollupsByCheckId = new Map<string, AvailabilityCheckDailyRollupRecord[]>();
+  for (const response of availabilityResponses) {
+    for (const [checkId, rollups] of response.rollupsByCheckId) {
+      rollupsByCheckId.set(checkId, rollups);
+    }
+  }
+
+  return {
+    ...incidentMetrics,
+    healthStatusToday: summarizeHealthStatusToday(
+      availabilityResponses.flatMap((response) => response.checks),
+      rollupsByCheckId,
+      "workspace"
+    )
+  };
 }
 
 export function SectionCards(): JSX.Element {
@@ -37,13 +92,13 @@ export function SectionCards(): JSX.Element {
     void (async () => {
       try {
         const projects = await listProjects();
-        setMetrics(aggregateProjectMetrics(projects));
+        setMetrics(await aggregateProjectMetrics(projects));
       } catch {
         setMetrics({
           activeIncidents: 0,
           regressedIncidents: 0,
           attentionIncidentsToday: 0,
-          openedIncidentsMonth: 0
+          healthStatusToday: summarizeHealthStatusToday([], new Map(), "workspace")
         });
       }
     })();
@@ -51,7 +106,7 @@ export function SectionCards(): JSX.Element {
 
   const activeIncidents = metrics?.activeIncidents;
   const attentionToday = metrics?.attentionIncidentsToday;
-  const openedMonth = metrics?.openedIncidentsMonth;
+  const healthStatusToday = metrics?.healthStatusToday;
   const regressedIncidents = metrics?.regressedIncidents;
 
   function scrollToIncidentsToday(): void {
@@ -104,20 +159,25 @@ export function SectionCards(): JSX.Element {
         </Card>
       </button>
 
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between pb-2">
-          <CardDescription>Opened this month</CardDescription>
-          <CalendarDaysIcon className="size-4 text-muted-foreground" />
-        </CardHeader>
-        <CardContent>
-          <CardTitle className="text-2xl tabular-nums">
-            {openedMonth !== undefined ? openedMonth.toLocaleString() : "\u2014"}
-          </CardTitle>
-          <p className="mt-1 text-xs text-muted-foreground">
-            {openedMonth !== undefined ? "Incidents opened this month across all projects" : "Loading\u2026"}
-          </p>
-        </CardContent>
-      </Card>
+      <Link
+        to="/health-status"
+        className="block rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+      >
+        <Card className="h-full cursor-pointer transition-colors hover:bg-muted/30">
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardDescription>Health status today</CardDescription>
+            <HeartPulseIcon className="size-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <CardTitle className="text-2xl">
+              {healthStatusToday !== undefined ? healthStatusToday.value : "\u2014"}
+            </CardTitle>
+            <p className="mt-1 text-xs text-muted-foreground">
+              {healthStatusToday !== undefined ? healthStatusToday.description : "Loading\u2026"}
+            </p>
+          </CardContent>
+        </Card>
+      </Link>
 
       <Card>
         <CardHeader className="flex flex-row items-center justify-between pb-2">

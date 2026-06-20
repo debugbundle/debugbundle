@@ -8,6 +8,7 @@ import {
   formatStatusDayLabel,
   formatStatusUptime
 } from "../../../apps/web/src/pages/health-status-page-utils.js";
+import { summarizeHealthStatusToday } from "../../../apps/web/src/lib/health-status-summary.js";
 import type {
   AvailabilityCheckDailyRollupRecord,
   AvailabilityCheckRecord,
@@ -98,6 +99,53 @@ function buildRollup(
 }
 
 describe("health status helpers", () => {
+  it("summarizes current health status for today cards", () => {
+    expect(summarizeHealthStatusToday([], new Map(), "workspace")).toEqual({
+      state: "not_set",
+      value: "Not set",
+      description: "No health checks configured"
+    });
+    expect(
+      summarizeHealthStatusToday(
+        [buildCheck(), buildCheck({ check_id: "chk_2" })],
+        new Map([
+          ["chk_1", [buildRollup()]],
+          ["chk_2", [buildRollup({ check_id: "chk_2" })]]
+        ]),
+        "workspace"
+      )
+    ).toEqual({
+      state: "operational",
+      value: "100%",
+      description: "2 checks passing across all projects"
+    });
+    expect(
+      summarizeHealthStatusToday(
+        [buildCheck({ status: "failing" })],
+        new Map([["chk_1", [buildRollup({ total_checks: 10, successful_checks: 9, failed_checks: 1 })]]]),
+        "project"
+      )
+    ).toEqual({
+      state: "down",
+      value: "90.00%",
+      description: "1 check failing in this project"
+    });
+    expect(
+      summarizeHealthStatusToday(
+        [buildCheck(), buildCheck({ check_id: "chk_2", status: "failing" })],
+        new Map([
+          ["chk_1", [buildRollup({ total_checks: 1250, successful_checks: 1250 })]],
+          ["chk_2", [buildRollup({ check_id: "chk_2", total_checks: 1250, successful_checks: 1249, failed_checks: 1 })]]
+        ]),
+        "workspace"
+      )
+    ).toEqual({
+      state: "down",
+      value: "99.96%",
+      description: "1 check failing across all projects"
+    });
+  });
+
   it("builds a UTC 30-day range ending on the provided day", () => {
     expect(buildHealthStatusDayRange(new Date("2026-06-16T18:30:00.000Z"), 3)).toEqual([
       "2026-06-14",

@@ -199,6 +199,7 @@ describe("cli setup command", () => {
     expect(skillContents).toContain("## Noise Management");
     expect(skillContents).toContain("debugbundle capture-rule suggest <incident-id> --json");
     expect(skillContents).toContain("capture-policy client-error path rules");
+    expect(skillContents).toContain("https://debugbundle.com/docs/managing-noise");
     expect(skillContents).toContain("## Notification Delivery");
     expect(skillContents).toContain("debugbundle webhook deliveries <webhook-id> --project-id <id> --json");
     expect(skillContents).toContain("https://debugbundle.com/docs/api/ingestion");
@@ -218,6 +219,7 @@ describe("cli setup command", () => {
     expect(cliReferenceContents).toContain("debugbundle health checks list --project-id <id>");
     expect(cliReferenceContents).toContain("debugbundle resolve <incident-id> [incident-id ...]");
     expect(cliReferenceContents).toContain("https://debugbundle.com/docs/probes");
+    expect(cliReferenceContents).toContain("https://debugbundle.com/docs/managing-noise");
     expect(cliReferenceContents).toContain("https://debugbundle.com/docs/api/ingestion");
     expect(cliReferenceContents).toContain("Smoke-Test Cleanup Recipe");
     expect(cliReferenceContents).toContain("capture-rule create-from-suggestion");
@@ -233,6 +235,7 @@ describe("cli setup command", () => {
     expect(mcpReferenceContents).toContain("## Availability Check Tools");
     expect(mcpReferenceContents).toContain("list_health_checks");
     expect(mcpReferenceContents).toContain("https://debugbundle.com/docs/mcp/tools");
+    expect(mcpReferenceContents).toContain("https://debugbundle.com/docs/managing-noise");
     expect(mcpReferenceContents).toContain("suggest_capture_rules_from_incident");
     expect(mcpReferenceContents).toContain("path-scoped client-error incident rules");
     expect(mcpReferenceContents).toContain("Smoke-Test Cleanup Recipe");

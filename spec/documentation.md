@@ -133,6 +133,7 @@ The complete docs page tree for `/docs`. Every entry below is a page that must e
 | 3 | `/docs/project-setup/local-only` | Local-Only Mode | Guide | Complete local-only workflow without a cloud account. File transport, `debugbundle process`, local incident management. |
 | 4 | `/docs/project-setup/connect-to-cloud` | Connect to Cloud | Guide | Upgrading from local-only to connected: `debugbundle connect`, environment delivery policy, member token setup. |
 | 5 | `/docs/capture-policy` | Capture Policy | Concept+Guide | Event classes (A/B/C), capture presets (minimal/balanced/investigative), per-project overrides, how policies affect billing, SDK-side enforcement. |
+| 6 | `/docs/managing-noise` | Managing Noise | Guide | How operators and agents reduce recurring low-value incidents using bundle evidence, capture-rule suggestions, scoped capture rules, and client-error path rules. |
 
 ### 1.10 Self-Hosting
 
@@ -223,6 +224,7 @@ Fumadocs uses `meta.json` files in content directories to control sidebar orderi
     "---Configuration---",
     "project-setup/...",
     "capture-policy",
+    "managing-noise",
     "---Self-Hosting---",
     "self-hosting",
     "---Security---",
@@ -557,15 +559,16 @@ Implementation should proceed in this order (most impactful first):
 47. `/docs/project-setup/local-only`
 48. `/docs/project-setup/connect-to-cloud`
 49. `/docs/capture-policy`
-50. `/docs/self-hosting`
-51. `/docs/security/redaction`
-52. `/docs/security/tokens`
-53. `/docs/agent-workflows`
-54. `/docs/agent-workflows/skill-file`
-55. `/docs/agent-workflows/automation-recipes`
-56. `/docs/pricing`
-57. `/docs/billing`
-58. `/docs/api/billing`
+50. `/docs/managing-noise`
+51. `/docs/self-hosting`
+52. `/docs/security/redaction`
+53. `/docs/security/tokens`
+54. `/docs/agent-workflows`
+55. `/docs/agent-workflows/skill-file`
+56. `/docs/agent-workflows/automation-recipes`
+57. `/docs/pricing`
+58. `/docs/billing`
+59. `/docs/api/billing`
 59. `/docs/changelog`
 60. `/docs/llms-txt`
 

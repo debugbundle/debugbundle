@@ -274,20 +274,17 @@ export function ProjectImprovementSettingsCard({
           )}
 
           {showManageControls ? (
-            <div className="flex flex-wrap items-center gap-3">
-              <Button type="submit" disabled={isSaveDisabled}>
-                Save improvement settings
-              </Button>
+            <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
               <Button type="button" variant="outline" disabled={!isDirty || isSaving} onClick={handleReset}>
                 <RotateCcwIcon data-icon="inline-start" />
                 Reset
               </Button>
+              <Button type="submit" disabled={isSaveDisabled}>
+                Save improvement settings
+              </Button>
             </div>
           ) : null}
 
-          {settingsDraft.cloud_automation_available ? (
-            <p className="text-sm text-muted-foreground">Counts toward the existing bundle allowance.</p>
-          ) : null}
         </form>
       </CardContent>
     </Card>

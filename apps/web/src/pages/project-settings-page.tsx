@@ -193,12 +193,14 @@ export function ProjectSettingsPage(): JSX.Element {
               </p>
             </div>
             <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
-              <AlertDialogTrigger asChild>
-                <Button type="button" variant="destructive" disabled={!canDeleteProject || isDeleting}>
-                  <Trash2Icon data-icon="inline-start" />
-                  Delete project
-                </Button>
-              </AlertDialogTrigger>
+              <div className="flex justify-end">
+                <AlertDialogTrigger asChild>
+                  <Button type="button" variant="destructive" disabled={!canDeleteProject || isDeleting}>
+                    <Trash2Icon data-icon="inline-start" />
+                    Delete project
+                  </Button>
+                </AlertDialogTrigger>
+              </div>
               <AlertDialogContent>
                 <AlertDialogHeader>
                   <AlertDialogTitle>Delete project</AlertDialogTitle>
