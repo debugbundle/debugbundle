@@ -48,7 +48,8 @@ afterEach(() => {
 describe("web app — incident and project detail routes", () => {
   it("shows incident detail page with metadata, severity badge, and bundle/reproduction tabs", async () => {
     const incident = createIncident({
-      fingerprint: "fp_checkout_timeout_route_template_production_checkout_api_1234567890abcdefghijklmnopqrstuvwxyz"
+      fingerprint:
+        "fp_checkout_timeout_route_template_production_checkout_api_1234567890abcdefghijklmnopqrstuvwxyz"
     });
     const fetchMock = vi.fn((input: RequestInfo | URL) => {
       const url = requestUrl(input);
@@ -98,12 +99,23 @@ describe("web app — incident and project detail routes", () => {
 
     // Bundle tab loads by default — verify the bundle card content
     expect(await screen.findByText(/full bundle artifact for this incident/i)).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /copy/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /^copy$/i })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /download/i })).toBeInTheDocument();
 
     const fingerprintValue = screen.getByText(incident.fingerprint);
     expect(fingerprintValue).toHaveAttribute("title", incident.fingerprint);
     expect(fingerprintValue.className.includes("truncate")).toBe(true);
+    expect(screen.queryByText(/^fingerprint version$/i)).toBeNull();
+
+    const incidentCopyButton = screen.getByRole("button", { name: /copy incident id/i });
+    const incidentRow = incidentCopyButton.parentElement;
+    expect(incidentRow).not.toBeNull();
+    expect(within(incidentRow as HTMLElement).getByText(incident.incident_id)).toBeInTheDocument();
+    expect(incidentCopyButton).toBeInTheDocument();
+
+    const fingerprintRow = screen.getByText(/^fingerprint$/i).closest("div");
+    expect(fingerprintRow).not.toBeNull();
+    expect(within(fingerprintRow as HTMLElement).getByText(/^v1$/i)).toBeInTheDocument();
 
     expect(container.querySelector('[data-token="property"]')).not.toBeNull();
     expect(container.querySelector('[data-token="string"]')).not.toBeNull();
@@ -140,11 +152,17 @@ describe("web app — incident and project detail routes", () => {
 
     render(<App initialEntries={[`/incidents/${incident.incident_id}`]} />);
 
-    expect(await screen.findByText(/request anomaly: get \/checkout\/:orderid returned 404 repeatedly/i)).toBeInTheDocument();
     expect(
-      screen.getByText("Request anomaly threshold crossed. Grouped by route template, HTTP method, and HTTP status.")
+      await screen.findByText(/request anomaly: get \/checkout\/:orderid returned 404 repeatedly/i)
     ).toBeInTheDocument();
-    expect(screen.queryByText(/request_anomaly, route_template, http_method, http_status/i)).toBeNull();
+    expect(
+      screen.getByText(
+        "Request anomaly threshold crossed. Grouped by route template, HTTP method, and HTTP status."
+      )
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByText(/request_anomaly, route_template, http_method, http_status/i)
+    ).toBeNull();
   });
 
   it("allows resolving an incident from the detail page", async () => {
@@ -165,7 +183,10 @@ describe("web app — incident and project detail routes", () => {
         return jsonResponse(200, { incident });
       }
 
-      if (url.endsWith(`/v1/incidents/${incident.incident_id}/resolve`) && init?.method === "POST") {
+      if (
+        url.endsWith(`/v1/incidents/${incident.incident_id}/resolve`) &&
+        init?.method === "POST"
+      ) {
         return jsonResponse(200, { incident: resolvedIncident });
       }
 
@@ -240,7 +261,9 @@ describe("web app — incident and project detail routes", () => {
     const pendingTitle = await screen.findByText(/bundle is being generated/i);
     expect(pendingTitle).toBeInTheDocument();
     expect(pendingTitle.closest("[data-tone='neutral']")).not.toBeNull();
-    expect(pendingTitle.closest("[data-tone='neutral']")?.querySelector(".animate-spin")).not.toBeNull();
+    expect(
+      pendingTitle.closest("[data-tone='neutral']")?.querySelector(".animate-spin")
+    ).not.toBeNull();
   });
 
   it("polls a pending bundle until the artifact is ready", async () => {
@@ -289,7 +312,11 @@ describe("web app — incident and project detail routes", () => {
 
     expect(await screen.findByText(/bundle is being generated/i)).toBeInTheDocument();
 
-    expect(await screen.findByText(/full bundle artifact for this incident/i, undefined, { timeout: 4_000 })).toBeInTheDocument();
+    expect(
+      await screen.findByText(/full bundle artifact for this incident/i, undefined, {
+        timeout: 4_000
+      })
+    ).toBeInTheDocument();
     expect(bundleRequestCount).toBe(2);
   });
 
@@ -389,7 +416,9 @@ describe("web app — incident and project detail routes", () => {
     expect(await screen.findByText(/typeerror in checkout handler/i)).toBeInTheDocument();
 
     const user = userEvent.setup();
-    const incidentRow = screen.getByRole("link", { name: /typeerror in checkout handler/i }).closest("tr");
+    const incidentRow = screen
+      .getByRole("link", { name: /typeerror in checkout handler/i })
+      .closest("tr");
     expect(incidentRow).not.toBeNull();
     const rowButtons = within(incidentRow as HTMLTableRowElement).getAllByRole("button");
     expect(rowButtons.length).toBeGreaterThan(0);
@@ -430,7 +459,9 @@ describe("web app — incident and project detail routes", () => {
 
     vi.stubGlobal("fetch", fetchMock);
 
-    const { container } = render(<App initialEntries={[`/projects/${project.project_id}/bundles`]} />);
+    const { container } = render(
+      <App initialEntries={[`/projects/${project.project_id}/bundles`]} />
+    );
 
     expect(await screen.findByText(/debug bundles/i)).toBeInTheDocument();
     expect(container.querySelector('[data-slot="skeleton"]')).toBeNull();
@@ -472,7 +503,9 @@ describe("web app — incident and project detail routes", () => {
 
     vi.stubGlobal("fetch", fetchMock);
 
-    const { container } = render(<App initialEntries={[`/projects/${project.project_id}/bundles`]} />);
+    const { container } = render(
+      <App initialEntries={[`/projects/${project.project_id}/bundles`]} />
+    );
 
     expect(await screen.findByText(/debug bundles/i)).toBeInTheDocument();
 
@@ -541,11 +574,21 @@ describe("web app — incident and project detail routes", () => {
         return jsonResponse(200, { session: createSession() });
       }
 
-      if (url.includes("/v1/incidents?") && url.includes("limit=20") && url.includes("status=active") && init?.method === undefined) {
+      if (
+        url.includes("/v1/incidents?") &&
+        url.includes("limit=20") &&
+        url.includes("status=active") &&
+        init?.method === undefined
+      ) {
         return jsonResponse(200, { incidents, next_cursor: null });
       }
 
-      if (url.includes("/v1/incidents?") && url.includes("limit=20") && !url.includes("status=") && init?.method === undefined) {
+      if (
+        url.includes("/v1/incidents?") &&
+        url.includes("limit=20") &&
+        !url.includes("status=") &&
+        init?.method === undefined
+      ) {
         return jsonResponse(200, { incidents, next_cursor: "cursor_2" });
       }
 
@@ -557,7 +600,9 @@ describe("web app — incident and project detail routes", () => {
     render(<App initialEntries={["/incidents"]} />);
 
     expect(await screen.findByText(/typeerror in checkout handler/i)).toBeInTheDocument();
-    expect(await findStatusFilterTrigger("workspace-incidents-status-filter")).toHaveTextContent(/^needs attention$/i);
+    expect(await findStatusFilterTrigger("workspace-incidents-status-filter")).toHaveTextContent(
+      /^needs attention$/i
+    );
     expect(screen.getByText(/database timeout during signin/i)).toBeInTheDocument();
 
     await chooseStatusFilterOption(user, "workspace-incidents-status-filter", /all statuses/i);
@@ -581,8 +626,17 @@ describe("web app — incident and project detail routes", () => {
   it("pages through incident results using the next cursor controls", async () => {
     const user = userEvent.setup();
     const project = createProject();
-    const firstIncident = createIncident({ project_id: project.project_id, project_name: project.name, title: "Alpha failure" });
-    const secondIncident = createIncident({ incident_id: "inc_456", project_id: project.project_id, project_name: project.name, title: "Zulu failure" });
+    const firstIncident = createIncident({
+      project_id: project.project_id,
+      project_name: project.name,
+      title: "Alpha failure"
+    });
+    const secondIncident = createIncident({
+      incident_id: "inc_456",
+      project_id: project.project_id,
+      project_name: project.name,
+      title: "Zulu failure"
+    });
 
     const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
       const url = requestUrl(input);
@@ -591,11 +645,23 @@ describe("web app — incident and project detail routes", () => {
         return jsonResponse(200, { session: createSession() });
       }
 
-      if (url.includes("/v1/incidents?") && url.includes("limit=20") && url.includes("status=active") && !url.includes("cursor=") && init?.method === undefined) {
+      if (
+        url.includes("/v1/incidents?") &&
+        url.includes("limit=20") &&
+        url.includes("status=active") &&
+        !url.includes("cursor=") &&
+        init?.method === undefined
+      ) {
         return jsonResponse(200, { incidents: [firstIncident], next_cursor: "cursor_2" });
       }
 
-      if (url.includes("/v1/incidents?") && url.includes("limit=20") && url.includes("cursor=cursor_2") && url.includes("status=active") && init?.method === undefined) {
+      if (
+        url.includes("/v1/incidents?") &&
+        url.includes("limit=20") &&
+        url.includes("cursor=cursor_2") &&
+        url.includes("status=active") &&
+        init?.method === undefined
+      ) {
         return jsonResponse(200, { incidents: [secondIncident], next_cursor: null });
       }
 
@@ -619,7 +685,11 @@ describe("web app — incident and project detail routes", () => {
   it("refreshes the main incidents table without reloading the page", async () => {
     const user = userEvent.setup();
     const project = createProject();
-    const initialIncident = createIncident({ project_id: project.project_id, project_name: project.name, title: "Initial workspace incident" });
+    const initialIncident = createIncident({
+      project_id: project.project_id,
+      project_name: project.name,
+      title: "Initial workspace incident"
+    });
     const refreshedIncident = createIncident({
       incident_id: "inc_workspace_refreshed",
       project_id: project.project_id,
@@ -635,7 +705,12 @@ describe("web app — incident and project detail routes", () => {
         return jsonResponse(200, { session: createSession() });
       }
 
-      if (url.includes("/v1/incidents?") && url.includes("limit=20") && url.includes("status=active") && init?.method === undefined) {
+      if (
+        url.includes("/v1/incidents?") &&
+        url.includes("limit=20") &&
+        url.includes("status=active") &&
+        init?.method === undefined
+      ) {
         workspaceIncidentRequests += 1;
         return jsonResponse(200, {
           incidents: workspaceIncidentRequests === 1 ? [initialIncident] : [refreshedIncident],
@@ -663,7 +738,11 @@ describe("web app — incident and project detail routes", () => {
   it("keeps the refresh button spinning for at least one second after a workspace refresh", async () => {
     const user = userEvent.setup();
     const project = createProject();
-    const initialIncident = createIncident({ project_id: project.project_id, project_name: project.name, title: "Initial workspace incident" });
+    const initialIncident = createIncident({
+      project_id: project.project_id,
+      project_name: project.name,
+      title: "Initial workspace incident"
+    });
     const refreshedIncident = createIncident({
       incident_id: "inc_workspace_refreshed_spin",
       project_id: project.project_id,
@@ -679,7 +758,12 @@ describe("web app — incident and project detail routes", () => {
         return jsonResponse(200, { session: createSession() });
       }
 
-      if (url.includes("/v1/incidents?") && url.includes("limit=20") && url.includes("status=active") && init?.method === undefined) {
+      if (
+        url.includes("/v1/incidents?") &&
+        url.includes("limit=20") &&
+        url.includes("status=active") &&
+        init?.method === undefined
+      ) {
         workspaceIncidentRequests += 1;
         return jsonResponse(200, {
           incidents: workspaceIncidentRequests === 1 ? [initialIncident] : [refreshedIncident],
@@ -711,9 +795,12 @@ describe("web app — incident and project detail routes", () => {
     expect(refreshButton).toHaveAttribute("aria-busy", "true");
     expect(refreshIcon).toHaveClass("animate-spin");
 
-    await waitFor(() => {
-      expect(refreshButton).not.toBeDisabled();
-    }, { timeout: 2_000 });
+    await waitFor(
+      () => {
+        expect(refreshButton).not.toBeDisabled();
+      },
+      { timeout: 2_000 }
+    );
 
     expect(Date.now() - refreshStartedAt).toBeGreaterThanOrEqual(1_000);
     await waitFor(() => {
@@ -725,8 +812,17 @@ describe("web app — incident and project detail routes", () => {
   it("sorts the project incidents table by occurrence count", async () => {
     const user = userEvent.setup();
     const project = createProject();
-    const noisyIncident = createIncident({ project_id: project.project_id, title: "Noisy failure", occurrence_count: 20 });
-    const quietIncident = createIncident({ incident_id: "inc_456", project_id: project.project_id, title: "Quiet failure", occurrence_count: 2 });
+    const noisyIncident = createIncident({
+      project_id: project.project_id,
+      title: "Noisy failure",
+      occurrence_count: 20
+    });
+    const quietIncident = createIncident({
+      incident_id: "inc_456",
+      project_id: project.project_id,
+      title: "Quiet failure",
+      occurrence_count: 2
+    });
 
     const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
       const url = requestUrl(input);
@@ -796,7 +892,10 @@ describe("web app — incident and project detail routes", () => {
   it("defaults the project incidents tab to active and lets users switch the status filter", async () => {
     const user = userEvent.setup();
     const project = createProject();
-    const openIncident = createIncident({ project_id: project.project_id, title: "Open project incident" });
+    const openIncident = createIncident({
+      project_id: project.project_id,
+      title: "Open project incident"
+    });
     const regressedIncident = createIncident({
       incident_id: "inc_regressed_project",
       project_id: project.project_id,
@@ -821,11 +920,20 @@ describe("web app — incident and project detail routes", () => {
         return jsonResponse(200, { projects: [project] });
       }
 
-      if (url.endsWith(`/v1/incidents?project_id=${project.project_id}&limit=20&status=active`) && init?.method === undefined) {
-        return jsonResponse(200, { incidents: [regressedIncident, openIncident], next_cursor: null });
+      if (
+        url.endsWith(`/v1/incidents?project_id=${project.project_id}&limit=20&status=active`) &&
+        init?.method === undefined
+      ) {
+        return jsonResponse(200, {
+          incidents: [regressedIncident, openIncident],
+          next_cursor: null
+        });
       }
 
-      if (url.endsWith(`/v1/incidents?project_id=${project.project_id}&limit=20&status=resolved`) && init?.method === undefined) {
+      if (
+        url.endsWith(`/v1/incidents?project_id=${project.project_id}&limit=20&status=resolved`) &&
+        init?.method === undefined
+      ) {
         return jsonResponse(200, { incidents: [resolvedIncident], next_cursor: null });
       }
 
@@ -850,7 +958,10 @@ describe("web app — incident and project detail routes", () => {
   it("refreshes the project incidents table without reloading the page", async () => {
     const user = userEvent.setup();
     const project = createProject();
-    const initialIncident = createIncident({ project_id: project.project_id, title: "Initial project incident" });
+    const initialIncident = createIncident({
+      project_id: project.project_id,
+      title: "Initial project incident"
+    });
     const refreshedIncident = createIncident({
       incident_id: "inc_refreshed_project",
       project_id: project.project_id,
@@ -869,7 +980,10 @@ describe("web app — incident and project detail routes", () => {
         return jsonResponse(200, { projects: [project] });
       }
 
-      if (url.endsWith(`/v1/incidents?project_id=${project.project_id}&limit=20&status=active`) && init?.method === undefined) {
+      if (
+        url.endsWith(`/v1/incidents?project_id=${project.project_id}&limit=20&status=active`) &&
+        init?.method === undefined
+      ) {
         projectIncidentRequests += 1;
         return jsonResponse(200, {
           incidents: projectIncidentRequests === 1 ? [initialIncident] : [refreshedIncident],
@@ -897,7 +1011,10 @@ describe("web app — incident and project detail routes", () => {
   it("defaults the project bundles tab to active and lets users switch the status filter", async () => {
     const user = userEvent.setup();
     const project = createProject();
-    const openIncident = createIncident({ project_id: project.project_id, title: "Open bundle incident" });
+    const openIncident = createIncident({
+      project_id: project.project_id,
+      title: "Open bundle incident"
+    });
     const regressedIncident = createIncident({
       incident_id: "inc_regressed_bundle",
       project_id: project.project_id,
@@ -922,11 +1039,20 @@ describe("web app — incident and project detail routes", () => {
         return jsonResponse(200, { projects: [project] });
       }
 
-      if (url.endsWith(`/v1/incidents?project_id=${project.project_id}&limit=20&status=active`) && init?.method === undefined) {
-        return jsonResponse(200, { incidents: [regressedIncident, openIncident], next_cursor: null });
+      if (
+        url.endsWith(`/v1/incidents?project_id=${project.project_id}&limit=20&status=active`) &&
+        init?.method === undefined
+      ) {
+        return jsonResponse(200, {
+          incidents: [regressedIncident, openIncident],
+          next_cursor: null
+        });
       }
 
-      if (url.endsWith(`/v1/incidents?project_id=${project.project_id}&limit=20&status=resolved`) && init?.method === undefined) {
+      if (
+        url.endsWith(`/v1/incidents?project_id=${project.project_id}&limit=20&status=resolved`) &&
+        init?.method === undefined
+      ) {
         return jsonResponse(200, { incidents: [resolvedIncident], next_cursor: null });
       }
 
@@ -951,7 +1077,10 @@ describe("web app — incident and project detail routes", () => {
   it("refreshes the project bundles table without reloading the page", async () => {
     const user = userEvent.setup();
     const project = createProject();
-    const initialIncident = createIncident({ project_id: project.project_id, title: "Initial bundle incident" });
+    const initialIncident = createIncident({
+      project_id: project.project_id,
+      title: "Initial bundle incident"
+    });
     const refreshedIncident = createIncident({
       incident_id: "inc_refreshed_bundle",
       project_id: project.project_id,
@@ -970,7 +1099,10 @@ describe("web app — incident and project detail routes", () => {
         return jsonResponse(200, { projects: [project] });
       }
 
-      if (url.endsWith(`/v1/incidents?project_id=${project.project_id}&limit=20&status=active`) && init?.method === undefined) {
+      if (
+        url.endsWith(`/v1/incidents?project_id=${project.project_id}&limit=20&status=active`) &&
+        init?.method === undefined
+      ) {
         projectBundleRequests += 1;
         return jsonResponse(200, {
           incidents: projectBundleRequests === 1 ? [initialIncident] : [refreshedIncident],
@@ -1011,7 +1143,12 @@ describe("web app — incident and project detail routes", () => {
         return jsonResponse(200, { session: createSession() });
       }
 
-      if (url.includes("/v1/incidents?") && url.includes("limit=20") && url.includes("status=active") && init?.method === undefined) {
+      if (
+        url.includes("/v1/incidents?") &&
+        url.includes("limit=20") &&
+        url.includes("status=active") &&
+        init?.method === undefined
+      ) {
         return jsonResponse(200, { incidents: [incident], next_cursor: null });
       }
 
@@ -1056,8 +1193,13 @@ describe("web app — incident and project detail routes", () => {
 
     render(<App initialEntries={[`/projects/${project.project_id}/incidents`]} />);
 
-    const incidentLink = await screen.findByRole("link", { name: /typeerror in checkout handler/i });
-    expect(incidentLink).toHaveAttribute("href", `/projects/${project.project_id}/incidents/${incident.incident_id}`);
+    const incidentLink = await screen.findByRole("link", {
+      name: /typeerror in checkout handler/i
+    });
+    expect(incidentLink).toHaveAttribute(
+      "href",
+      `/projects/${project.project_id}/incidents/${incident.incident_id}`
+    );
   });
 
   it("keeps project bundle links inside the project shell", async () => {
@@ -1087,7 +1229,10 @@ describe("web app — incident and project detail routes", () => {
     render(<App initialEntries={[`/projects/${project.project_id}/bundles`]} />);
 
     const viewBundleLink = await screen.findByRole("link", { name: /view bundle/i });
-    expect(viewBundleLink).toHaveAttribute("href", `/projects/${project.project_id}/bundles/${incident.incident_id}`);
+    expect(viewBundleLink).toHaveAttribute(
+      "href",
+      `/projects/${project.project_id}/bundles/${incident.incident_id}`
+    );
   });
 
   it("renders scoped incident detail with project navigation and scoped back link", async () => {
@@ -1132,11 +1277,15 @@ describe("web app — incident and project detail routes", () => {
 
     vi.stubGlobal("fetch", fetchMock);
 
-    render(<App initialEntries={[`/projects/${project.project_id}/bundles/${incident.incident_id}`]} />);
+    render(
+      <App initialEntries={[`/projects/${project.project_id}/bundles/${incident.incident_id}`]} />
+    );
 
     expect(await screen.findByText(/typeerror in checkout handler/i)).toBeInTheDocument();
     const projectLinks = screen.getAllByRole("link", { name: /main app/i });
-    expect(projectLinks.some((link) => link.getAttribute("href") === `/projects/${project.project_id}`)).toBe(true);
+    expect(
+      projectLinks.some((link) => link.getAttribute("href") === `/projects/${project.project_id}`)
+    ).toBe(true);
     expect(screen.getByRole("link", { name: /back to bundles/i })).toHaveAttribute(
       "href",
       `/projects/${project.project_id}/bundles`
@@ -1175,7 +1324,9 @@ describe("web app — incident and project detail routes", () => {
 
     vi.stubGlobal("fetch", fetchMock);
 
-    render(<App initialEntries={[`/projects/${project.project_id}/incidents/${incident.incident_id}`]} />);
+    render(
+      <App initialEntries={[`/projects/${project.project_id}/incidents/${incident.incident_id}`]} />
+    );
 
     expect(await screen.findByText(/typeerror in checkout handler/i)).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /back to incidents/i })).toHaveAttribute(
@@ -1186,7 +1337,11 @@ describe("web app — incident and project detail routes", () => {
 
   it("shows project overview with incidents tab listing project-scoped incidents", async () => {
     const project = createProject();
-    const incident = createIncident({ project_id: project.project_id, project_name: project.name, service_name: "Checkout API" });
+    const incident = createIncident({
+      project_id: project.project_id,
+      project_name: project.name,
+      service_name: "Checkout API"
+    });
 
     const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
       const url = requestUrl(input);
@@ -1287,7 +1442,9 @@ describe("web app — incident and project detail routes", () => {
 
     render(<App initialEntries={[`/projects/${project.project_id}`]} />);
 
-    expect((await screen.findAllByText(/^0$/)).length).toBe(4);
+    expect((await screen.findAllByText(/^0$/)).length).toBe(3);
+    expect(await screen.findByText(/^not set$/i)).toBeInTheDocument();
+    expect(await screen.findByText(/no health checks configured/i)).toBeInTheDocument();
     expect(screen.getByText(/opened or regressed today in this project/i)).toBeInTheDocument();
     expect(screen.getByText(/current regressed incidents in this project/i)).toBeInTheDocument();
   });
@@ -1331,11 +1488,22 @@ describe("web app — incident and project detail routes", () => {
         return jsonResponse(200, { projects: [project] });
       }
 
-      if (url.endsWith(`/v1/incidents?project_id=${project.project_id}&limit=20&status=active`) && init?.method === undefined) {
-        return jsonResponse(200, { incidents: [alphaIncident, zuluIncident], next_cursor: "cursor_2" });
+      if (
+        url.endsWith(`/v1/incidents?project_id=${project.project_id}&limit=20&status=active`) &&
+        init?.method === undefined
+      ) {
+        return jsonResponse(200, {
+          incidents: [alphaIncident, zuluIncident],
+          next_cursor: "cursor_2"
+        });
       }
 
-      if (url.endsWith(`/v1/incidents?project_id=${project.project_id}&limit=20&cursor=cursor_2&status=active`) && init?.method === undefined) {
+      if (
+        url.endsWith(
+          `/v1/incidents?project_id=${project.project_id}&limit=20&cursor=cursor_2&status=active`
+        ) &&
+        init?.method === undefined
+      ) {
         return jsonResponse(200, { incidents: [secondPageIncident], next_cursor: null });
       }
 
@@ -1395,7 +1563,9 @@ describe("web app — incident and project detail routes", () => {
     render(<App initialEntries={[`/projects/${project.project_id}/incidents`]} />);
 
     expect(await screen.findByText(/main app/i)).toBeInTheDocument();
-    expect(await screen.findByText(/no incidents need attention for this project/i)).toBeInTheDocument();
+    expect(
+      await screen.findByText(/no incidents need attention for this project/i)
+    ).toBeInTheDocument();
   });
 
   it("shows every workspace incident empty state as the status filter changes", async () => {
@@ -1407,7 +1577,11 @@ describe("web app — incident and project detail routes", () => {
         return jsonResponse(200, { session: createSession() });
       }
 
-      if (url.includes("/v1/incidents?") && url.includes("limit=20") && init?.method === undefined) {
+      if (
+        url.includes("/v1/incidents?") &&
+        url.includes("limit=20") &&
+        init?.method === undefined
+      ) {
         return jsonResponse(200, { incidents: [], next_cursor: null });
       }
 
@@ -1466,7 +1640,11 @@ describe("web app — incident and project detail routes", () => {
         return jsonResponse(200, { session: createSession() });
       }
 
-      if (url.includes("/v1/incidents?") && url.includes("limit=20") && init?.method === undefined) {
+      if (
+        url.includes("/v1/incidents?") &&
+        url.includes("limit=20") &&
+        init?.method === undefined
+      ) {
         return jsonResponse(200, { incidents, next_cursor: null });
       }
 
@@ -1514,7 +1692,9 @@ describe("web app — incident and project detail routes", () => {
     const writeTextMock = vi.fn().mockResolvedValue(undefined);
     const createObjectUrlMock = vi.fn(() => "blob:incident-artifact");
     const revokeObjectUrlMock = vi.fn();
-    const clickMock = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => undefined);
+    const clickMock = vi
+      .spyOn(HTMLAnchorElement.prototype, "click")
+      .mockImplementation(() => undefined);
 
     Object.defineProperty(window.navigator, "clipboard", {
       configurable: true,
@@ -1653,7 +1833,9 @@ describe("web app — incident and project detail routes", () => {
     const incident = createIncident({ project_id: project.project_id });
     const createObjectUrlMock = vi.fn(() => "blob:incident-export");
     const revokeObjectUrlMock = vi.fn();
-    const clickMock = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => undefined);
+    const clickMock = vi
+      .spyOn(HTMLAnchorElement.prototype, "click")
+      .mockImplementation(() => undefined);
 
     vi.stubGlobal("URL", {
       createObjectURL: createObjectUrlMock,
@@ -1710,6 +1892,9 @@ describe("web app — incident and project detail routes", () => {
     render(<App initialEntries={["/projects/proj_nonexistent"]} />);
 
     expect(await screen.findByText(/this project is not available/i)).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: /back to projects/i })).toHaveAttribute("href", "/projects");
+    expect(screen.getByRole("link", { name: /back to projects/i })).toHaveAttribute(
+      "href",
+      "/projects"
+    );
   });
 });

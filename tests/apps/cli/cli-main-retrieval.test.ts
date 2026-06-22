@@ -9,34 +9,37 @@ describe("cli main retrieval routing", () => {
       output: "incidents"
     });
 
-    const result = await runCli([
-      "incidents",
-      "--source",
-      "local",
-      "--project-id",
-      "proj_123",
-      "--environment",
-      "production",
-      "--service",
-      "checkout-api",
-      "--status",
-      "open",
-      "--severity",
-      "high",
-      "--first-seen-after",
-      "2026-03-11T00:00:00.000Z",
-      "--attention-after",
-      "2026-03-11T01:00:00.000Z",
-      "--cursor",
-      "cursor_123",
-      "--limit",
-      "10",
-      "--auth-file",
-      "/tmp/auth.json",
-      "--json"
-    ], {
-      listIncidentsCommand
-    });
+    const result = await runCli(
+      [
+        "incidents",
+        "--source",
+        "local",
+        "--project-id",
+        "proj_123",
+        "--environment",
+        "production",
+        "--service",
+        "checkout-api",
+        "--status",
+        "open",
+        "--severity",
+        "high",
+        "--first-seen-after",
+        "2026-03-11T00:00:00.000Z",
+        "--attention-after",
+        "2026-03-11T01:00:00.000Z",
+        "--cursor",
+        "cursor_123",
+        "--limit",
+        "10",
+        "--auth-file",
+        "/tmp/auth.json",
+        "--json"
+      ],
+      {
+        listIncidentsCommand
+      }
+    );
 
     expect(listIncidentsCommand).toHaveBeenCalledWith({
       source: "local",
@@ -59,25 +62,16 @@ describe("cli main retrieval routing", () => {
     const getBundleCommand = vi.fn().mockResolvedValue({ exitCode: 0, output: "bundle" });
     const listServicesCommand = vi.fn().mockResolvedValue({ exitCode: 0, output: "services" });
 
-    const bundleResult = await runCli([
-      "bundle",
-      "inc_123",
-      "--auth-file",
-      "/tmp/auth.json"
-    ], {
+    const bundleResult = await runCli(["bundle", "inc_123", "--auth-file", "/tmp/auth.json"], {
       getBundleCommand
     });
 
-    const servicesResult = await runCli([
-      "services",
-      "--project-id",
-      "proj_123",
-      "--limit",
-      "25",
-      "--json"
-    ], {
-      listServicesCommand
-    });
+    const servicesResult = await runCli(
+      ["services", "--project-id", "proj_123", "--limit", "25", "--json"],
+      {
+        listServicesCommand
+      }
+    );
 
     expect(getBundleCommand).toHaveBeenCalledWith({
       incidentId: "inc_123",
@@ -97,84 +91,52 @@ describe("cli main retrieval routing", () => {
     const getIncidentContextCommand = vi.fn().mockResolvedValue({ exitCode: 0, output: "context" });
     const resolveIncidentCommand = vi.fn().mockResolvedValue({ exitCode: 0, output: "resolved" });
     const reopenIncidentCommand = vi.fn().mockResolvedValue({ exitCode: 0, output: "reopened" });
-    const getReproductionCommand = vi.fn().mockResolvedValue({ exitCode: 0, output: "reproduction" });
+    const getReproductionCommand = vi
+      .fn()
+      .mockResolvedValue({ exitCode: 0, output: "reproduction" });
     const getLogsCommand = vi.fn().mockResolvedValue({ exitCode: 0, output: "logs" });
     const whoamiCommand = vi.fn().mockResolvedValue({ exitCode: 0, output: "whoami" });
 
-    const inspectResult = await runCli([
-      "inspect",
-      "inc_123",
-      "--source",
-      "local",
-      "--auth-file",
-      "/tmp/auth.json",
-      "--json"
-    ], {
-      getIncidentCommand
-    });
+    const inspectResult = await runCli(
+      ["inspect", "inc_123", "--source", "local", "--auth-file", "/tmp/auth.json", "--json"],
+      {
+        getIncidentCommand
+      }
+    );
 
-    const explainResult = await runCli([
-      "explain",
-      "inc_123",
-      "--source",
-      "cloud",
-      "--auth-file",
-      "/tmp/auth.json",
-      "--json"
-    ], {
-      getIncidentContextCommand
-    });
+    const explainResult = await runCli(
+      ["explain", "inc_123", "--source", "cloud", "--auth-file", "/tmp/auth.json", "--json"],
+      {
+        getIncidentContextCommand
+      }
+    );
 
-    const resolveResult = await runCli([
-      "resolve",
-      "inc_123",
-      "--source",
-      "local",
-      "--auth-file",
-      "/tmp/auth.json",
-      "--json"
-    ], {
-      resolveIncidentCommand
-    });
+    const resolveResult = await runCli(
+      ["resolve", "inc_123", "--source", "local", "--auth-file", "/tmp/auth.json", "--json"],
+      {
+        resolveIncidentCommand
+      }
+    );
 
-    const reopenResult = await runCli([
-      "reopen",
-      "inc_456",
-      "--source",
-      "local",
-      "--json"
-    ], {
+    const reopenResult = await runCli(["reopen", "inc_456", "--source", "local", "--json"], {
       reopenIncidentCommand
     });
 
-    const reproduceResult = await runCli([
-      "reproduce",
-      "inc_123",
-      "--source",
-      "local",
-      "--auth-file",
-      "/tmp/auth.json"
-    ], {
-      getReproductionCommand
-    });
+    const reproduceResult = await runCli(
+      ["reproduce", "inc_123", "--source", "local", "--auth-file", "/tmp/auth.json"],
+      {
+        getReproductionCommand
+      }
+    );
 
-    const logsResult = await runCli([
-      "logs",
-      "inc_123",
-      "--level=error",
-      "--cursor=cursor_123",
-      "--limit=5",
-      "--json"
-    ], {
-      getLogsCommand
-    });
+    const logsResult = await runCli(
+      ["logs", "inc_123", "--level=error", "--cursor=cursor_123", "--limit=5", "--json"],
+      {
+        getLogsCommand
+      }
+    );
 
-    const whoamiResult = await runCli([
-      "whoami",
-      "--auth-file",
-      "/tmp/auth.json",
-      "--json"
-    ], {
+    const whoamiResult = await runCli(["whoami", "--auth-file", "/tmp/auth.json", "--json"], {
       whoamiCommand
     });
 
@@ -226,4 +188,49 @@ describe("cli main retrieval routing", () => {
     expect(whoamiResult.exitCode).toBe(0);
   });
 
+  it("routes multiple incident ids for bulk resolve and reopen commands", async () => {
+    const resolveIncidentCommand = vi.fn().mockResolvedValue({ exitCode: 0, output: "resolved" });
+    const reopenIncidentCommand = vi.fn().mockResolvedValue({ exitCode: 0, output: "reopened" });
+
+    const resolveResult = await runCli(
+      [
+        "resolve",
+        "00000000-0000-0000-0000-000000000101",
+        "00000000-0000-0000-0000-000000000102",
+        "--source",
+        "cloud",
+        "--json"
+      ],
+      {
+        resolveIncidentCommand
+      }
+    );
+
+    const reopenResult = await runCli(
+      [
+        "reopen",
+        "00000000-0000-0000-0000-000000000101",
+        "00000000-0000-0000-0000-000000000102",
+        "--source",
+        "cloud",
+        "--json"
+      ],
+      {
+        reopenIncidentCommand
+      }
+    );
+
+    expect(resolveIncidentCommand).toHaveBeenCalledWith({
+      incidentIds: ["00000000-0000-0000-0000-000000000101", "00000000-0000-0000-0000-000000000102"],
+      source: "cloud",
+      json: true
+    });
+    expect(reopenIncidentCommand).toHaveBeenCalledWith({
+      incidentIds: ["00000000-0000-0000-0000-000000000101", "00000000-0000-0000-0000-000000000102"],
+      source: "cloud",
+      json: true
+    });
+    expect(resolveResult.exitCode).toBe(0);
+    expect(reopenResult.exitCode).toBe(0);
+  });
 });

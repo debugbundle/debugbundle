@@ -138,7 +138,9 @@ describe("relay compliance fixtures", () => {
     expect(rateLimitFixture?.kind).toBe("sequence");
     if (rateLimitFixture?.kind === "sequence") {
       expect(rateLimitFixture.relayOptions.rateLimitPerMinute).toBe(3);
-      expect(rateLimitFixture.requests.map((entry) => entry.expectedStatus)).toEqual([202, 202, 202, 429, 202]);
+      expect(rateLimitFixture.requests.map((entry) => entry.expectedStatus)).toEqual([
+        202, 202, 202, 429, 202
+      ]);
     }
   });
 
@@ -147,8 +149,12 @@ describe("relay compliance fixtures", () => {
       JSON.parse(await readFile(relayComplianceFixturePath, "utf8"))
     );
 
-    const smugglingFixture = parsed.cases.find((fixture) => fixture.id === "credential-smuggling-payload");
-    const connectedForwardingFixture = parsed.cases.find((fixture) => fixture.id === "connected-cloud-forwarding");
+    const smugglingFixture = parsed.cases.find(
+      (fixture) => fixture.id === "credential-smuggling-payload"
+    );
+    const connectedForwardingFixture = parsed.cases.find(
+      (fixture) => fixture.id === "connected-cloud-forwarding"
+    );
 
     expect(smugglingFixture?.kind).toBe("handler");
     if (smugglingFixture?.kind === "handler") {
@@ -159,7 +165,9 @@ describe("relay compliance fixtures", () => {
 
     expect(connectedForwardingFixture?.kind).toBe("delivery");
     if (connectedForwardingFixture?.kind === "delivery") {
-      expect(connectedForwardingFixture.expectedForwardRequest?.events[0]?.project_token).toBe("dbundle_proj_test");
+      expect(connectedForwardingFixture.expectedForwardRequest?.events[0]?.project_token).toBe(
+        "dbundle_proj_test"
+      );
       expect(connectedForwardingFixture.relayOptions.durableWrite).toBe(false);
     }
   });

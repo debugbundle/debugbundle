@@ -147,7 +147,11 @@ export const GitHubProjectRepoBodySchema = z
   })
   .strict();
 
-export const GitHubDispatchIncidentStatusSchema = z.enum(["new_only", "reopened_only", "new_or_reopened"]);
+export const GitHubDispatchIncidentStatusSchema = z.enum([
+  "new_only",
+  "reopened_only",
+  "new_or_reopened"
+]);
 
 export const GitHubDispatchEventTypeSchema = z.enum([
   "bundle.created",
@@ -198,7 +202,13 @@ export const GitHubDispatchRuleParamsSchema = z
   })
   .strict();
 
-export const GitHubDispatchDeliveryStatusSchema = z.enum(["pending", "retrying", "delivered", "failed", "skipped"]);
+export const GitHubDispatchDeliveryStatusSchema = z.enum([
+  "pending",
+  "retrying",
+  "delivered",
+  "failed",
+  "skipped"
+]);
 
 export const GitHubDispatchDeliveriesQuerySchema = z
   .object({
@@ -260,7 +270,9 @@ export const WeeklyReportScheduleDayOfWeekSchema = z.enum([
 
 function isValidTimeZone(value: string): boolean {
   try {
-    void new Intl.DateTimeFormat("en-US", { timeZone: value }).format(new Date("2026-03-15T00:00:00.000Z"));
+    void new Intl.DateTimeFormat("en-US", { timeZone: value }).format(
+      new Date("2026-03-15T00:00:00.000Z")
+    );
     return true;
   } catch {
     return false;
@@ -271,7 +283,10 @@ const WeeklyReportScheduleSchema = z
   .object({
     day_of_week: WeeklyReportScheduleDayOfWeekSchema,
     hour_of_day: z.coerce.number().int().min(0).max(23),
-    timezone: z.string().min(1).refine((value) => isValidTimeZone(value), "invalid_timezone")
+    timezone: z
+      .string()
+      .min(1)
+      .refine((value) => isValidTimeZone(value), "invalid_timezone")
   })
   .strict();
 
@@ -497,48 +512,53 @@ const BaseUpdateAlertBodySchema = {
   is_enabled: z.boolean().optional()
 } as const;
 
-export const UpdateAlertBodySchema = z.union([
-  z
-    .object({
-      ...BaseUpdateAlertBodySchema,
-      channel: z.literal("email"),
-      config: AlertEmailConfigSchema.nullable().optional()
-    })
-    .strict(),
-  z
-    .object({
-      ...BaseUpdateAlertBodySchema,
-      channel: z.literal("slack"),
-      config: AlertSlackConfigSchema.nullable().optional()
-    })
-    .strict(),
-  z
-    .object({
-      ...BaseUpdateAlertBodySchema,
-      channel: z.literal("discord"),
-      config: AlertDiscordConfigSchema.nullable().optional()
-    })
-    .strict(),
-  z
-    .object({
-      ...BaseUpdateAlertBodySchema,
-      channel: z.literal("webhook"),
-      config: AlertWebhookConfigSchema.nullable().optional()
-    })
-    .strict(),
-  z
-    .object({
-      ...BaseUpdateAlertBodySchema,
-      channel: AlertChannelSchema.optional()
-    })
-    .strict()
-])
+export const UpdateAlertBodySchema = z
+  .union([
+    z
+      .object({
+        ...BaseUpdateAlertBodySchema,
+        channel: z.literal("email"),
+        config: AlertEmailConfigSchema.nullable().optional()
+      })
+      .strict(),
+    z
+      .object({
+        ...BaseUpdateAlertBodySchema,
+        channel: z.literal("slack"),
+        config: AlertSlackConfigSchema.nullable().optional()
+      })
+      .strict(),
+    z
+      .object({
+        ...BaseUpdateAlertBodySchema,
+        channel: z.literal("discord"),
+        config: AlertDiscordConfigSchema.nullable().optional()
+      })
+      .strict(),
+    z
+      .object({
+        ...BaseUpdateAlertBodySchema,
+        channel: z.literal("webhook"),
+        config: AlertWebhookConfigSchema.nullable().optional()
+      })
+      .strict(),
+    z
+      .object({
+        ...BaseUpdateAlertBodySchema,
+        channel: AlertChannelSchema.optional()
+      })
+      .strict()
+  ])
   .refine((value) => Object.keys(value).length > 0, {
     message: "update_requires_changes"
   })
-  .refine((value) => !Object.prototype.hasOwnProperty.call(value, "config") || value.channel !== undefined, {
-    message: "channel_required_for_config"
-  });
+  .refine(
+    (value) =>
+      !Object.prototype.hasOwnProperty.call(value, "config") || value.channel !== undefined,
+    {
+      message: "channel_required_for_config"
+    }
+  );
 
 export const IncidentsQuerySchema = z
   .object({
@@ -562,7 +582,13 @@ export const ImprovementsQuerySchema = z
     status: z.enum(["open", "resolved", "snoozed"]).optional(),
     severity: z.enum(["low", "medium", "high", "critical"]).optional(),
     kind: z
-      .enum(["warning_hotspot", "slow_request", "request_failure_pattern", "recurring_incident", "post_deploy_regression"])
+      .enum([
+        "warning_hotspot",
+        "slow_request",
+        "request_failure_pattern",
+        "recurring_incident",
+        "post_deploy_regression"
+      ])
       .optional(),
     cursor: z.string().min(1).optional(),
     limit: z.coerce.number().int().min(1).max(100).default(20)
@@ -578,7 +604,7 @@ export const BulkIncidentMutationBodySchema = z
 export const IncidentsCursorSchema = z
   .object({
     last_seen_at: z.string().datetime(),
-    incident_id: z.string().min(1)
+    incident_id: z.string().uuid()
   })
   .strict();
 
@@ -604,7 +630,7 @@ export const ServicesQuerySchema = z
 
 export const IncidentParamsSchema = z
   .object({
-    id: z.string().min(1)
+    id: z.string().uuid()
   })
   .strict();
 
@@ -723,10 +749,12 @@ const AvailabilityCheckBodyBaseObjectSchema = z
   })
   .strict();
 
-const AvailabilityCheckBodyBaseSchema = AvailabilityCheckBodyBaseObjectSchema
-  .refine((value) => value.expected_status_min <= value.expected_status_max, {
+const AvailabilityCheckBodyBaseSchema = AvailabilityCheckBodyBaseObjectSchema.refine(
+  (value) => value.expected_status_min <= value.expected_status_max,
+  {
     message: "expected_status_range_invalid"
-  });
+  }
+);
 
 export const AvailabilityCheckCreateBodySchema = AvailabilityCheckBodyBaseSchema;
 
@@ -784,7 +812,11 @@ export const BillingCheckoutConfirmBodySchema = z
 
 export const BillingCapacityChangeBodySchema = z
   .object({
-    target_additional_capacity_units: z.coerce.number().int().min(0).max(MAX_BILLING_ADDITIONAL_CAPACITY_UNITS)
+    target_additional_capacity_units: z.coerce
+      .number()
+      .int()
+      .min(0)
+      .max(MAX_BILLING_ADDITIONAL_CAPACITY_UNITS)
   })
   .strict();
 
@@ -792,7 +824,11 @@ export const AdminBillingOverrideBodySchema = z
   .object({
     organization_id: z.string().uuid().optional(),
     plan: z.enum(["free", "solo", "team"]),
-    additional_capacity_units: z.coerce.number().int().min(0).max(MAX_BILLING_ADDITIONAL_CAPACITY_UNITS),
+    additional_capacity_units: z.coerce
+      .number()
+      .int()
+      .min(0)
+      .max(MAX_BILLING_ADDITIONAL_CAPACITY_UNITS),
     reason: z.string().min(3).max(500)
   })
   .strict();
@@ -800,17 +836,30 @@ export const AdminBillingOverrideBodySchema = z
 export const CreateProjectBodySchema = z
   .object({
     name: z.string().min(1).max(120),
-    slug: z.string().min(1).max(80).regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/),
+    slug: z
+      .string()
+      .min(1)
+      .max(80)
+      .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/),
     environment_default: z.string().min(1).max(50).default("production"),
     color_tag: ProjectColorTagSchema.nullable().default(null),
-    weekly_report_timezone: z.string().min(1).default("UTC").refine((value) => isValidTimeZone(value), "invalid_timezone")
+    weekly_report_timezone: z
+      .string()
+      .min(1)
+      .default("UTC")
+      .refine((value) => isValidTimeZone(value), "invalid_timezone")
   })
   .strict();
 
 export const UpdateProjectBodySchema = z
   .object({
     name: z.string().min(1).max(120).optional(),
-    slug: z.string().min(1).max(80).regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/).optional(),
+    slug: z
+      .string()
+      .min(1)
+      .max(80)
+      .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/)
+      .optional(),
     environment_default: z.string().min(1).max(50).optional(),
     color_tag: ProjectColorTagSchema.nullable().optional()
   })
@@ -847,7 +896,7 @@ export const CreateProjectTokenBodySchema = z
 
 export const LogsQuerySchema = z
   .object({
-    incident_id: z.string().min(1),
+    incident_id: z.string().uuid(),
     level: z.string().min(1).optional(),
     cursor: z.string().min(1).optional(),
     limit: z.coerce.number().int().min(1).max(100).default(20)

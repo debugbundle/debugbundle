@@ -5,7 +5,10 @@ import { userEvent } from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { App } from "../../../apps/web/src/app.tsx";
-import { resetBrowserSessionClientState, type ImprovementRecord } from "../../../apps/web/src/lib/api.ts";
+import {
+  resetBrowserSessionClientState,
+  type ImprovementRecord
+} from "../../../apps/web/src/lib/api.ts";
 import { createProject, createSession, jsonResponse, requestUrl } from "./web-test-helpers.js";
 
 function createImprovement(overrides: Partial<ImprovementRecord> = {}): ImprovementRecord {
@@ -75,7 +78,8 @@ function getImprovementLinks(): HTMLAnchorElement[] {
     .getAllByRole("link")
     .filter(
       (element): element is HTMLAnchorElement =>
-        element instanceof HTMLAnchorElement && /\/improvements\/imp_/.test(element.getAttribute("href") ?? "")
+        element instanceof HTMLAnchorElement &&
+        /\/improvements\/imp_/.test(element.getAttribute("href") ?? "")
     );
 }
 
@@ -95,9 +99,13 @@ describe("web app — improvements", () => {
 
     render(<App initialEntries={["/improvements"]} />);
 
-    expect(await screen.findByText(/upgrade to solo or team to unlock hosted improvements/i)).toBeInTheDocument();
+    expect(
+      await screen.findByText(/upgrade to solo or team to unlock hosted improvements/i)
+    ).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /open billing/i })).toHaveAttribute("href", "/billing");
-    expect(fetchMock.mock.calls.some(([input]) => requestUrl(input).includes("/v1/improvements"))).toBe(false);
+    expect(
+      fetchMock.mock.calls.some(([input]) => requestUrl(input).includes("/v1/improvements"))
+    ).toBe(false);
   });
 
   it("renders the workspace improvements page", async () => {
@@ -121,8 +129,12 @@ describe("web app — improvements", () => {
 
     render(<App initialEntries={["/improvements"]} />);
 
-    expect(await screen.findByText(/warning hotspot: payment provider warning/i)).toBeInTheDocument();
+    expect(
+      await screen.findByText(/warning hotspot: payment provider warning/i)
+    ).toBeInTheDocument();
     expect(screen.getByText(/repeated warning log pattern detected/i)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /^environment$/i })).toBeInTheDocument();
+    expect(screen.getByText(/^production$/i)).toBeInTheDocument();
     expect(screen.getAllByText(/^open$/i).length).toBeGreaterThan(0);
     expect(document.querySelector('[data-project-color-tag="violet"]')).not.toBeNull();
   });
@@ -136,6 +148,7 @@ describe("web app — improvements", () => {
         project_name: "Zeta App",
         project_slug: "zeta-app",
         service_name: "checkout-api",
+        environment: "staging",
         kind: "warning_hotspot",
         status: "open",
         severity: "high",
@@ -149,6 +162,7 @@ describe("web app — improvements", () => {
         project_name: "Alpha App",
         project_slug: "alpha-app",
         service_name: "auth-api",
+        environment: "development",
         kind: "recurring_incident",
         status: "snoozed",
         severity: "low",
@@ -162,6 +176,7 @@ describe("web app — improvements", () => {
         project_name: "Delta App",
         project_slug: "delta-app",
         service_name: "billing-api",
+        environment: "production",
         kind: "post_deploy_regression",
         status: "resolved",
         severity: "critical",
@@ -217,6 +232,11 @@ describe("web app — improvements", () => {
       expect(getImprovementLinks()[0]).toHaveTextContent(/^alpha recurring incident$/i);
     });
 
+    await user.click(screen.getByRole("button", { name: /^environment$/i }));
+    await waitFor(() => {
+      expect(getImprovementLinks()[0]).toHaveTextContent(/^alpha recurring incident$/i);
+    });
+
     await user.click(screen.getByRole("button", { name: /^severity$/i }));
     await waitFor(() => {
       expect(getImprovementLinks()[0]).toHaveTextContent(/^alpha recurring incident$/i);
@@ -235,7 +255,10 @@ describe("web app — improvements", () => {
     expect(
       fetchMock.mock.calls.some(([input]) => {
         const url = requestUrl(input);
-        return url.includes("/v1/improvements?") && !new URL(url, "https://app.debugbundle.test").searchParams.has("status");
+        return (
+          url.includes("/v1/improvements?") &&
+          !new URL(url, "https://app.debugbundle.test").searchParams.has("status")
+        );
       })
     ).toBe(true);
   });
@@ -280,7 +303,11 @@ describe("web app — improvements", () => {
   });
 
   it("shows an upgrade notice on the project improvements tab for free plans without calling hosted improvement routes", async () => {
-    const project = createProject({ project_id: "proj_123", name: "Main App", organization_plan: "free" });
+    const project = createProject({
+      project_id: "proj_123",
+      name: "Main App",
+      organization_plan: "free"
+    });
     const fetchMock = vi.fn((input: RequestInfo | URL) => {
       const url = requestUrl(input);
 
@@ -298,13 +325,24 @@ describe("web app — improvements", () => {
 
     render(<App initialEntries={["/projects/proj_123/improvements"]} />);
 
-    expect(await screen.findByText(/upgrade to solo or team to unlock hosted improvements/i)).toBeInTheDocument();
-    expect(screen.getByRole("tab", { name: /improvements/i })).toHaveAttribute("data-state", "active");
-    expect(fetchMock.mock.calls.some(([input]) => requestUrl(input).includes("/v1/improvements"))).toBe(false);
+    expect(
+      await screen.findByText(/upgrade to solo or team to unlock hosted improvements/i)
+    ).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: /improvements/i })).toHaveAttribute(
+      "data-state",
+      "active"
+    );
+    expect(
+      fetchMock.mock.calls.some(([input]) => requestUrl(input).includes("/v1/improvements"))
+    ).toBe(false);
   });
 
   it("renders the project improvements tab", async () => {
-    const project = createProject({ project_id: "proj_123", name: "Main App", organization_plan: "solo" });
+    const project = createProject({
+      project_id: "proj_123",
+      name: "Main App",
+      organization_plan: "solo"
+    });
     const improvement = createImprovement();
     vi.stubGlobal(
       "fetch",
@@ -328,13 +366,24 @@ describe("web app — improvements", () => {
     render(<App initialEntries={["/projects/proj_123/improvements"]} />);
 
     expect(await screen.findByText(/project improvements/i)).toBeInTheDocument();
-    expect(screen.getByRole("tab", { name: /improvements/i })).toHaveAttribute("data-state", "active");
-    expect(await screen.findByText(/warning hotspot: payment provider warning/i)).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: /improvements/i })).toHaveAttribute(
+      "data-state",
+      "active"
+    );
+    expect(
+      await screen.findByText(/warning hotspot: payment provider warning/i)
+    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /^environment$/i })).toBeInTheDocument();
+    expect(screen.getByText(/^production$/i)).toBeInTheDocument();
   });
 
   it("shows the project improvements empty state when a filter has no matches", async () => {
     const user = userEvent.setup();
-    const project = createProject({ project_id: "proj_123", name: "Main App", organization_plan: "solo" });
+    const project = createProject({
+      project_id: "proj_123",
+      name: "Main App",
+      organization_plan: "solo"
+    });
     const fetchMock = vi.fn((input: RequestInfo | URL) => {
       const url = requestUrl(input);
 
@@ -344,10 +393,18 @@ describe("web app — improvements", () => {
       if (url.endsWith("/v1/projects")) {
         return jsonResponse(200, { projects: [project] });
       }
-      if (url.includes("/v1/improvements?") && url.includes("project_id=proj_123") && url.includes("status=open")) {
+      if (
+        url.includes("/v1/improvements?") &&
+        url.includes("project_id=proj_123") &&
+        url.includes("status=open")
+      ) {
         return jsonResponse(200, { improvements: [createImprovement()], next_cursor: null });
       }
-      if (url.includes("/v1/improvements?") && url.includes("project_id=proj_123") && url.includes("status=resolved")) {
+      if (
+        url.includes("/v1/improvements?") &&
+        url.includes("project_id=proj_123") &&
+        url.includes("status=resolved")
+      ) {
         return jsonResponse(200, { improvements: [], next_cursor: null });
       }
 
@@ -363,16 +420,23 @@ describe("web app — improvements", () => {
     await chooseStatusFilterOption(user, "project-improvements-status-filter", /^resolved$/i);
 
     expect(await screen.findByText(/no improvements for this filter/i)).toBeInTheDocument();
-    expect(screen.getByText(/hosted analysis has enough signal for this project/i)).toBeInTheDocument();
+    expect(
+      screen.getByText(/hosted analysis has enough signal for this project/i)
+    ).toBeInTheDocument();
   });
 
   it("supports project improvement sorting across the visible columns", async () => {
     const user = userEvent.setup();
-    const project = createProject({ project_id: "proj_123", name: "Main App", organization_plan: "solo" });
+    const project = createProject({
+      project_id: "proj_123",
+      name: "Main App",
+      organization_plan: "solo"
+    });
     const improvements = [
       createImprovement({
         improvement_id: "imp_project_alpha",
         service_name: "checkout-api",
+        environment: "staging",
         kind: "warning_hotspot",
         status: "open",
         severity: "high",
@@ -383,6 +447,7 @@ describe("web app — improvements", () => {
       createImprovement({
         improvement_id: "imp_project_beta",
         service_name: "auth-api",
+        environment: "development",
         kind: "recurring_incident",
         status: "snoozed",
         severity: "low",
@@ -393,6 +458,7 @@ describe("web app — improvements", () => {
       createImprovement({
         improvement_id: "imp_project_gamma",
         service_name: "billing-api",
+        environment: "production",
         kind: "post_deploy_regression",
         status: "resolved",
         severity: "critical",
@@ -445,6 +511,11 @@ describe("web app — improvements", () => {
       expect(getImprovementLinks()[0]).toHaveTextContent(/^alpha recurring incident$/i);
     });
 
+    await user.click(screen.getByRole("button", { name: /^environment$/i }));
+    await waitFor(() => {
+      expect(getImprovementLinks()[0]).toHaveTextContent(/^alpha recurring incident$/i);
+    });
+
     await user.click(screen.getByRole("button", { name: /^severity$/i }));
     await waitFor(() => {
       expect(getImprovementLinks()[0]).toHaveTextContent(/^alpha recurring incident$/i);
@@ -473,10 +544,15 @@ describe("web app — improvements", () => {
         }
         if (url.endsWith("/v1/projects") && init?.method === undefined) {
           return jsonResponse(200, {
-            projects: [createProject({ project_id: improvement.project_id, organization_plan: "solo" })]
+            projects: [
+              createProject({ project_id: improvement.project_id, organization_plan: "solo" })
+            ]
           });
         }
-        if (url.endsWith(`/v1/improvements/${improvement.improvement_id}`) && init?.method === undefined) {
+        if (
+          url.endsWith(`/v1/improvements/${improvement.improvement_id}`) &&
+          init?.method === undefined
+        ) {
           return jsonResponse(404, { error: "not_found" });
         }
 
@@ -484,13 +560,18 @@ describe("web app — improvements", () => {
       })
     );
 
-    render(<App initialEntries={[`/projects/${improvement.project_id}/improvements/${improvement.improvement_id}`]} />);
+    render(
+      <App
+        initialEntries={[
+          `/projects/${improvement.project_id}/improvements/${improvement.improvement_id}`
+        ]}
+      />
+    );
 
     expect(await screen.findByText(/improvement not available/i)).toBeInTheDocument();
-    expect(screen.getAllByRole("link", { name: /back to project improvements/i })[0]).toHaveAttribute(
-      "href",
-      `/projects/${improvement.project_id}/improvements`
-    );
+    expect(
+      screen.getAllByRole("link", { name: /back to project improvements/i })[0]
+    ).toHaveAttribute("href", `/projects/${improvement.project_id}/improvements`);
   });
 
   it("allows reopening and snoozing an improvement and supports copying and downloading a ready bundle", async () => {
@@ -541,19 +622,34 @@ describe("web app — improvements", () => {
       }
       if (url.endsWith("/v1/projects") && init?.method === undefined) {
         return jsonResponse(200, {
-          projects: [createProject({ project_id: improvement.project_id, organization_plan: "solo" })]
+          projects: [
+            createProject({ project_id: improvement.project_id, organization_plan: "solo" })
+          ]
         });
       }
-      if (url.endsWith(`/v1/improvements/${improvement.improvement_id}`) && init?.method === undefined) {
+      if (
+        url.endsWith(`/v1/improvements/${improvement.improvement_id}`) &&
+        init?.method === undefined
+      ) {
         return jsonResponse(200, { improvement });
       }
-      if (url.endsWith(`/v1/improvements/${improvement.improvement_id}/reopen`) && init?.method === "POST") {
+      if (
+        url.endsWith(`/v1/improvements/${improvement.improvement_id}/reopen`) &&
+        init?.method === "POST"
+      ) {
         return jsonResponse(200, { improvement: reopenedImprovement });
       }
-      if (url.endsWith(`/v1/improvements/${improvement.improvement_id}/snooze`) && init?.method === "POST") {
+      if (
+        url.endsWith(`/v1/improvements/${improvement.improvement_id}/snooze`) &&
+        init?.method === "POST"
+      ) {
         return jsonResponse(200, { improvement: snoozedImprovement });
       }
-      if (url.endsWith(`/v1/projects/${improvement.project_id}/improvements/${improvement.improvement_id}/bundle`)) {
+      if (
+        url.endsWith(
+          `/v1/projects/${improvement.project_id}/improvements/${improvement.improvement_id}/bundle`
+        )
+      ) {
         return jsonResponse(200, {
           bundle_id: "bundle_ready_123",
           incident_id: "inc_123",
@@ -572,7 +668,13 @@ describe("web app — improvements", () => {
 
     vi.stubGlobal("fetch", fetchMock);
 
-    render(<App initialEntries={[`/projects/${improvement.project_id}/improvements/${improvement.improvement_id}`]} />);
+    render(
+      <App
+        initialEntries={[
+          `/projects/${improvement.project_id}/improvements/${improvement.improvement_id}`
+        ]}
+      />
+    );
 
     expect(await screen.findByText(/slow request/i)).toBeInTheDocument();
     expect(await screen.findByRole("heading", { name: /improvement bundle/i })).toBeInTheDocument();
@@ -584,7 +686,9 @@ describe("web app — improvements", () => {
     expect(await screen.findByText(/snoozed until/i)).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: /^copy$/i }));
-    expect(clipboardWriteText).toHaveBeenCalledWith(expect.stringContaining('"bundle_id": "bundle_ready_123"'));
+    expect(clipboardWriteText).toHaveBeenCalledWith(
+      expect.stringContaining('"bundle_id": "bundle_ready_123"')
+    );
 
     await user.click(screen.getByRole("button", { name: /^download$/i }));
     expect(createObjectURL).toHaveBeenCalledTimes(1);
@@ -592,10 +696,14 @@ describe("web app — improvements", () => {
     expect(revokeObjectURL).toHaveBeenCalledWith("blob:improvement-bundle");
 
     expect(
-      fetchMock.mock.calls.some(([input]) => requestUrl(input).includes(`/v1/improvements/${improvement.improvement_id}/reopen`))
+      fetchMock.mock.calls.some(([input]) =>
+        requestUrl(input).includes(`/v1/improvements/${improvement.improvement_id}/reopen`)
+      )
     ).toBe(true);
     expect(
-      fetchMock.mock.calls.some(([input]) => requestUrl(input).includes(`/v1/improvements/${improvement.improvement_id}/snooze`))
+      fetchMock.mock.calls.some(([input]) =>
+        requestUrl(input).includes(`/v1/improvements/${improvement.improvement_id}/snooze`)
+      )
     ).toBe(true);
   });
 
@@ -613,16 +721,28 @@ describe("web app — improvements", () => {
       }
       if (url.endsWith("/v1/projects")) {
         return jsonResponse(200, {
-          projects: [createProject({ project_id: improvement.project_id, organization_plan: "solo" })]
+          projects: [
+            createProject({ project_id: improvement.project_id, organization_plan: "solo" })
+          ]
         });
       }
-      if (url.endsWith(`/v1/improvements/${improvement.improvement_id}`) && init?.method === undefined) {
+      if (
+        url.endsWith(`/v1/improvements/${improvement.improvement_id}`) &&
+        init?.method === undefined
+      ) {
         return jsonResponse(200, { improvement });
       }
-      if (url.endsWith(`/v1/improvements/${improvement.improvement_id}/resolve`) && init?.method === "POST") {
+      if (
+        url.endsWith(`/v1/improvements/${improvement.improvement_id}/resolve`) &&
+        init?.method === "POST"
+      ) {
         return jsonResponse(200, { improvement: resolvedImprovement });
       }
-      if (url.endsWith(`/v1/projects/${improvement.project_id}/improvements/${improvement.improvement_id}/bundle`)) {
+      if (
+        url.endsWith(
+          `/v1/projects/${improvement.project_id}/improvements/${improvement.improvement_id}/bundle`
+        )
+      ) {
         return jsonResponse(200, { status: "pending" });
       }
 
@@ -631,7 +751,13 @@ describe("web app — improvements", () => {
 
     vi.stubGlobal("fetch", fetchMock);
 
-    render(<App initialEntries={[`/projects/${improvement.project_id}/improvements/${improvement.improvement_id}`]} />);
+    render(
+      <App
+        initialEntries={[
+          `/projects/${improvement.project_id}/improvements/${improvement.improvement_id}`
+        ]}
+      />
+    );
 
     const user = userEvent.setup();
 
@@ -676,22 +802,41 @@ describe("web app — improvements", () => {
       }
       if (url.endsWith("/v1/projects") && init?.method === undefined) {
         return jsonResponse(200, {
-          projects: [createProject({ project_id: pendingImprovement.project_id, organization_plan: "solo" })]
+          projects: [
+            createProject({ project_id: pendingImprovement.project_id, organization_plan: "solo" })
+          ]
         });
       }
-      if (url.endsWith(`/v1/improvements/${pendingImprovement.improvement_id}`) && init?.method === undefined) {
+      if (
+        url.endsWith(`/v1/improvements/${pendingImprovement.improvement_id}`) &&
+        init?.method === undefined
+      ) {
         return jsonResponse(200, { improvement: pendingImprovement });
       }
-      if (url.endsWith(`/v1/projects/${pendingImprovement.project_id}/improvements/${pendingImprovement.improvement_id}/bundle`)) {
+      if (
+        url.endsWith(
+          `/v1/projects/${pendingImprovement.project_id}/improvements/${pendingImprovement.improvement_id}/bundle`
+        )
+      ) {
         return jsonResponse(200, { status: "pending" });
       }
-      if (url.endsWith(`/v1/improvements/${unavailableImprovement.improvement_id}`) && init?.method === undefined) {
+      if (
+        url.endsWith(`/v1/improvements/${unavailableImprovement.improvement_id}`) &&
+        init?.method === undefined
+      ) {
         return jsonResponse(200, { improvement: unavailableImprovement });
       }
-      if (url.endsWith(`/v1/projects/${unavailableImprovement.project_id}/improvements/${unavailableImprovement.improvement_id}/bundle`)) {
+      if (
+        url.endsWith(
+          `/v1/projects/${unavailableImprovement.project_id}/improvements/${unavailableImprovement.improvement_id}/bundle`
+        )
+      ) {
         return jsonResponse(200, { status: "failed", reason: "bundle_not_generated_yet" });
       }
-      if (url.endsWith(`/v1/improvements/${failedGenerationImprovement.improvement_id}`) && init?.method === undefined) {
+      if (
+        url.endsWith(`/v1/improvements/${failedGenerationImprovement.improvement_id}`) &&
+        init?.method === undefined
+      ) {
         return jsonResponse(200, { improvement: failedGenerationImprovement });
       }
       if (
@@ -708,17 +853,29 @@ describe("web app — improvements", () => {
     vi.stubGlobal("fetch", fetchMock);
 
     const { unmount } = render(
-      <App initialEntries={[`/projects/${pendingImprovement.project_id}/improvements/${pendingImprovement.improvement_id}`]} />
+      <App
+        initialEntries={[
+          `/projects/${pendingImprovement.project_id}/improvements/${pendingImprovement.improvement_id}`
+        ]}
+      />
     );
 
     expect(await screen.findByText(/slow request/i)).toBeInTheDocument();
     const pendingTitle = await screen.findByText(/bundle is being generated/i);
     expect(pendingTitle).toBeInTheDocument();
     expect(pendingTitle.closest("[data-tone='neutral']")).not.toBeNull();
-    expect(pendingTitle.closest("[data-tone='neutral']")?.querySelector(".animate-spin")).not.toBeNull();
+    expect(
+      pendingTitle.closest("[data-tone='neutral']")?.querySelector(".animate-spin")
+    ).not.toBeNull();
 
     unmount();
-    render(<App initialEntries={[`/projects/${unavailableImprovement.project_id}/improvements/${unavailableImprovement.improvement_id}`]} />);
+    render(
+      <App
+        initialEntries={[
+          `/projects/${unavailableImprovement.project_id}/improvements/${unavailableImprovement.improvement_id}`
+        ]}
+      />
+    );
 
     expect(await screen.findByText(/request failure/i)).toBeInTheDocument();
     expect(await screen.findByText(/bundle not generated yet/i)).toBeInTheDocument();
@@ -726,7 +883,11 @@ describe("web app — improvements", () => {
 
     unmount();
     render(
-      <App initialEntries={[`/projects/${failedGenerationImprovement.project_id}/improvements/${failedGenerationImprovement.improvement_id}`]} />
+      <App
+        initialEntries={[
+          `/projects/${failedGenerationImprovement.project_id}/improvements/${failedGenerationImprovement.improvement_id}`
+        ]}
+      />
     );
 
     expect(await screen.findByText(/warning hotspot/i)).toBeInTheDocument();
@@ -750,13 +911,22 @@ describe("web app — improvements", () => {
       }
       if (url.endsWith("/v1/projects") && init?.method === undefined) {
         return jsonResponse(200, {
-          projects: [createProject({ project_id: improvement.project_id, organization_plan: "solo" })]
+          projects: [
+            createProject({ project_id: improvement.project_id, organization_plan: "solo" })
+          ]
         });
       }
-      if (url.endsWith(`/v1/improvements/${improvement.improvement_id}`) && init?.method === undefined) {
+      if (
+        url.endsWith(`/v1/improvements/${improvement.improvement_id}`) &&
+        init?.method === undefined
+      ) {
         return jsonResponse(200, { improvement });
       }
-      if (url.endsWith(`/v1/projects/${improvement.project_id}/improvements/${improvement.improvement_id}/bundle`)) {
+      if (
+        url.endsWith(
+          `/v1/projects/${improvement.project_id}/improvements/${improvement.improvement_id}/bundle`
+        )
+      ) {
         return jsonResponse(200, {
           status: "failed",
           reason: "covered_by_incident_bundle",
@@ -769,7 +939,13 @@ describe("web app — improvements", () => {
 
     vi.stubGlobal("fetch", fetchMock);
 
-    render(<App initialEntries={[`/projects/${improvement.project_id}/improvements/${improvement.improvement_id}`]} />);
+    render(
+      <App
+        initialEntries={[
+          `/projects/${improvement.project_id}/improvements/${improvement.improvement_id}`
+        ]}
+      />
+    );
 
     expect(await screen.findByText(/recurring incident/i)).toBeInTheDocument();
     expect(await screen.findByText(/use the related incident bundle/i)).toBeInTheDocument();
@@ -804,36 +980,61 @@ describe("web app — improvements", () => {
       }
       if (url.endsWith("/v1/projects") && init?.method === undefined) {
         return jsonResponse(200, {
-          projects: [createProject({ project_id: resolvedImprovement.project_id, organization_plan: "solo" })]
+          projects: [
+            createProject({ project_id: resolvedImprovement.project_id, organization_plan: "solo" })
+          ]
         });
       }
-      if (url.endsWith(`/v1/improvements/${resolvedImprovement.improvement_id}`) && init?.method === undefined) {
+      if (
+        url.endsWith(`/v1/improvements/${resolvedImprovement.improvement_id}`) &&
+        init?.method === undefined
+      ) {
         return jsonResponse(200, { improvement: resolvedImprovement });
       }
-      if (url.endsWith(`/v1/projects/${resolvedImprovement.project_id}/improvements/${resolvedImprovement.improvement_id}/bundle`)) {
+      if (
+        url.endsWith(
+          `/v1/projects/${resolvedImprovement.project_id}/improvements/${resolvedImprovement.improvement_id}/bundle`
+        )
+      ) {
         return jsonResponse(200, {
           bundle_id: "bundle_reopen_failure",
           project_id: resolvedImprovement.project_id,
           version: "v1"
         });
       }
-      if (url.endsWith(`/v1/improvements/${resolvedImprovement.improvement_id}/reopen`) && init?.method === "POST") {
+      if (
+        url.endsWith(`/v1/improvements/${resolvedImprovement.improvement_id}/reopen`) &&
+        init?.method === "POST"
+      ) {
         return jsonResponse(500, { error: "boom" });
       }
-      if (url.endsWith(`/v1/improvements/${openImprovement.improvement_id}`) && init?.method === undefined) {
+      if (
+        url.endsWith(`/v1/improvements/${openImprovement.improvement_id}`) &&
+        init?.method === undefined
+      ) {
         return jsonResponse(200, { improvement: openImprovement });
       }
-      if (url.endsWith(`/v1/projects/${openImprovement.project_id}/improvements/${openImprovement.improvement_id}/bundle`)) {
+      if (
+        url.endsWith(
+          `/v1/projects/${openImprovement.project_id}/improvements/${openImprovement.improvement_id}/bundle`
+        )
+      ) {
         return jsonResponse(200, {
           bundle_id: "bundle_action_failure",
           project_id: openImprovement.project_id,
           version: "v1"
         });
       }
-      if (url.endsWith(`/v1/improvements/${openImprovement.improvement_id}/resolve`) && init?.method === "POST") {
+      if (
+        url.endsWith(`/v1/improvements/${openImprovement.improvement_id}/resolve`) &&
+        init?.method === "POST"
+      ) {
         return jsonResponse(500, { error: "boom" });
       }
-      if (url.endsWith(`/v1/improvements/${openImprovement.improvement_id}/snooze`) && init?.method === "POST") {
+      if (
+        url.endsWith(`/v1/improvements/${openImprovement.improvement_id}/snooze`) &&
+        init?.method === "POST"
+      ) {
         return jsonResponse(500, { error: "boom" });
       }
 
@@ -843,7 +1044,11 @@ describe("web app — improvements", () => {
     vi.stubGlobal("fetch", fetchMock);
 
     const { unmount } = render(
-      <App initialEntries={[`/projects/${resolvedImprovement.project_id}/improvements/${resolvedImprovement.improvement_id}`]} />
+      <App
+        initialEntries={[
+          `/projects/${resolvedImprovement.project_id}/improvements/${resolvedImprovement.improvement_id}`
+        ]}
+      />
     );
 
     expect(await screen.findByRole("button", { name: /^reopen$/i })).toBeInTheDocument();
@@ -852,7 +1057,13 @@ describe("web app — improvements", () => {
     await user.click(screen.getByRole("button", { name: /^copy$/i }));
 
     unmount();
-    render(<App initialEntries={[`/projects/${openImprovement.project_id}/improvements/${openImprovement.improvement_id}`]} />);
+    render(
+      <App
+        initialEntries={[
+          `/projects/${openImprovement.project_id}/improvements/${openImprovement.improvement_id}`
+        ]}
+      />
+    );
 
     expect(await screen.findByRole("button", { name: /snooze 7 days/i })).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: /mark resolved/i }));

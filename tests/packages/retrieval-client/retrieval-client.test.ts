@@ -1,6 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { RetrievalApiError, createRetrievalApi, type HttpClient } from "../../../packages/retrieval-client/src/index.js";
+import {
+  RetrievalApiError,
+  createRetrievalApi,
+  type HttpClient
+} from "../../../packages/retrieval-client/src/index.js";
 
 describe("retrieval api client", () => {
   it("calls incidents list route with optional limit", async () => {
@@ -84,15 +88,15 @@ describe("retrieval api client", () => {
 
     await expect(
       api.listIncidents({
-      bearerToken: "dbundle_mem_x",
-      projectId: "proj_123",
-      environment: "production",
-      service: "checkout-api",
-      status: "open",
-      severity: "high",
-      attentionAfter: "2026-03-11T00:00:00.000Z",
-      limit: 10,
-      cursor: "2026-03-11T00:09:00.000Z|inc_122"
+        bearerToken: "dbundle_mem_x",
+        projectId: "proj_123",
+        environment: "production",
+        service: "checkout-api",
+        status: "open",
+        severity: "high",
+        attentionAfter: "2026-03-11T00:00:00.000Z",
+        limit: 10,
+        cursor: "2026-03-11T00:09:00.000Z|inc_122"
       })
     ).resolves.toEqual({ incidents: [], next_cursor: "2026-03-11T00:09:00.000Z|inc_122" });
 
@@ -132,7 +136,8 @@ describe("retrieval api client", () => {
             description: "request_event matched the 5xx request incident rule",
             event_type: "request_event",
             event_class: "incident_signal",
-            matched_policy: "Immediate request failure statuses bypass capture_request_events suppression"
+            matched_policy:
+              "Immediate request failure statuses bypass capture_request_events suppression"
           }
         }
       }
@@ -180,7 +185,9 @@ describe("retrieval api client", () => {
 
     const api = createRetrievalApi({ request });
 
-    await expect(api.getIncident({ bearerToken: "dbundle_mem_x", incidentId: "inc_123" })).resolves.toMatchObject({
+    await expect(
+      api.getIncident({ bearerToken: "dbundle_mem_x", incidentId: "inc_123" })
+    ).resolves.toMatchObject({
       project_color_tag: null
     });
   });
@@ -214,7 +221,8 @@ describe("retrieval api client", () => {
             description: "request_event matched the 5xx request incident rule",
             event_type: "request_event",
             event_class: "incident_signal",
-            matched_policy: "Immediate request failure statuses bypass capture_request_events suppression"
+            matched_policy:
+              "Immediate request failure statuses bypass capture_request_events suppression"
           }
         },
         incident_reason: {
@@ -222,7 +230,8 @@ describe("retrieval api client", () => {
           description: "request_event matched the 5xx request incident rule",
           event_type: "request_event",
           event_class: "incident_signal",
-          matched_policy: "Immediate request failure statuses bypass capture_request_events suppression"
+          matched_policy:
+            "Immediate request failure statuses bypass capture_request_events suppression"
         },
         primary_signal: {
           kind: "request_failure",
@@ -272,10 +281,14 @@ describe("retrieval api client", () => {
           matched_fields: ["route_template"]
         },
         visibility: {
-          grouping: "Repeated request-failure incidents with the same normalized route template, request method, response status, service, and environment reuse this incident fingerprint. This incident currently groups POST /checkout with matched fields route_template.",
-          bundle_regeneration: "Bundle status is ready. New incidents create a bundle immediately, while regeneration currently prioritizes regression reopen, then deploy metadata, reproduction-confidence changes, and finally new context updates.",
-          spike_detection: "This incident is not currently marked as spiking. Spike detection is evaluated after grouping and only marks an existing incident when short-term frequency has sufficient baseline and exceeds the spike threshold.",
-          notification_cooldown: "Webhook and GitHub lifecycle notifications use per-rule cooldown windows to suppress repeated bundle.reopened or incident.spike_detected deliveries for the same incident/event fingerprint."
+          grouping:
+            "Repeated request-failure incidents with the same normalized route template, request method, response status, service, and environment reuse this incident fingerprint. This incident currently groups POST /checkout with matched fields route_template.",
+          bundle_regeneration:
+            "Bundle status is ready. New incidents create a bundle immediately, while regeneration currently prioritizes regression reopen, then deploy metadata, reproduction-confidence changes, and finally new context updates.",
+          spike_detection:
+            "This incident is not currently marked as spiking. Spike detection is evaluated after grouping and only marks an existing incident when short-term frequency has sufficient baseline and exceeds the spike threshold.",
+          notification_cooldown:
+            "Webhook and GitHub lifecycle notifications use per-rule cooldown windows to suppress repeated bundle.reopened or incident.spike_detected deliveries for the same incident/event fingerprint."
         },
         redaction: {
           redacted: true,
@@ -296,7 +309,10 @@ describe("retrieval api client", () => {
     });
 
     const api = createRetrievalApi({ request });
-    const context = await api.getIncidentContext({ bearerToken: "dbundle_mem_x", incidentId: "inc_123" });
+    const context = await api.getIncidentContext({
+      bearerToken: "dbundle_mem_x",
+      incidentId: "inc_123"
+    });
 
     expect(context.primary_signal.response_status).toBe(503);
     expect(context.browser_signal?.browser_event_kind).toBe("error");
@@ -338,7 +354,10 @@ describe("retrieval api client", () => {
     });
 
     const api = createRetrievalApi({ request });
-    const incident = await api.resolveIncident({ bearerToken: "dbundle_mem_x", incidentId: "inc_123" });
+    const incident = await api.resolveIncident({
+      bearerToken: "dbundle_mem_x",
+      incidentId: "inc_123"
+    });
 
     expect(incident.status).toBe("resolved");
     expect(incident.resolved_at).toBe("2026-03-11T00:12:00.000Z");
@@ -396,13 +415,19 @@ describe("retrieval api client", () => {
     await expect(
       api.resolveIncidents({
         bearerToken: "dbundle_mem_x",
-        incidentIds: ["00000000-0000-0000-0000-000000000101"]
+        incidentIds: [
+          "00000000-0000-0000-0000-000000000101",
+          "00000000-0000-0000-0000-000000000102"
+        ]
       })
     ).resolves.toEqual([resolvedIncident]);
     await expect(
       api.reopenIncidents({
         bearerToken: "dbundle_mem_x",
-        incidentIds: ["00000000-0000-0000-0000-000000000101"]
+        incidentIds: [
+          "00000000-0000-0000-0000-000000000101",
+          "00000000-0000-0000-0000-000000000102"
+        ]
       })
     ).resolves.toEqual([reopenedIncident]);
 
@@ -411,7 +436,10 @@ describe("retrieval api client", () => {
       path: "/v1/incidents/resolve",
       bearerToken: "dbundle_mem_x",
       body: {
-        incident_ids: ["00000000-0000-0000-0000-000000000101"]
+        incident_ids: [
+          "00000000-0000-0000-0000-000000000101",
+          "00000000-0000-0000-0000-000000000102"
+        ]
       }
     });
     expect(request).toHaveBeenNthCalledWith(2, {
@@ -419,7 +447,10 @@ describe("retrieval api client", () => {
       path: "/v1/incidents/reopen",
       bearerToken: "dbundle_mem_x",
       body: {
-        incident_ids: ["00000000-0000-0000-0000-000000000101"]
+        incident_ids: [
+          "00000000-0000-0000-0000-000000000101",
+          "00000000-0000-0000-0000-000000000102"
+        ]
       }
     });
   });
@@ -462,7 +493,9 @@ describe("retrieval api client", () => {
 
     const api = createRetrievalApi({ request });
 
-    await expect(api.getImprovement({ bearerToken: "dbundle_mem_x", improvementId: "imp_123" })).resolves.toMatchObject({
+    await expect(
+      api.getImprovement({ bearerToken: "dbundle_mem_x", improvementId: "imp_123" })
+    ).resolves.toMatchObject({
       project_color_tag: null
     });
   });
@@ -543,7 +576,10 @@ describe("retrieval api client", () => {
     });
 
     const api = createRetrievalApi({ request });
-    const reproduction = await api.getReproduction({ bearerToken: "dbundle_mem_x", incidentId: "inc_123" });
+    const reproduction = await api.getReproduction({
+      bearerToken: "dbundle_mem_x",
+      incidentId: "inc_123"
+    });
 
     expect(reproduction).toEqual({
       possible: true,
@@ -662,9 +698,9 @@ describe("retrieval api client", () => {
 
     const api = createRetrievalApi({ request });
 
-    await expect(api.listServices({ bearerToken: "dbundle_mem_x", projectId: "proj_missing" })).rejects.toEqual(
-      new RetrievalApiError(404, "project_not_found")
-    );
+    await expect(
+      api.listServices({ bearerToken: "dbundle_mem_x", projectId: "proj_missing" })
+    ).rejects.toEqual(new RetrievalApiError(404, "project_not_found"));
   });
 
   it("throws invalid_response_shape for malformed success payloads", async () => {
@@ -677,9 +713,9 @@ describe("retrieval api client", () => {
 
     const api = createRetrievalApi({ request });
 
-    await expect(api.listServices({ bearerToken: "dbundle_mem_x", projectId: "proj_123" })).rejects.toEqual(
-      new RetrievalApiError(200, "invalid_response_shape")
-    );
+    await expect(
+      api.listServices({ bearerToken: "dbundle_mem_x", projectId: "proj_123" })
+    ).rejects.toEqual(new RetrievalApiError(200, "invalid_response_shape"));
   });
 
   it("throws structured api errors for incident retrieval", async () => {
@@ -692,8 +728,8 @@ describe("retrieval api client", () => {
 
     const api = createRetrievalApi({ request });
 
-    await expect(api.getIncident({ bearerToken: "dbundle_mem_x", incidentId: "inc_missing" })).rejects.toEqual(
-      new RetrievalApiError(404, "incident_not_found")
-    );
+    await expect(
+      api.getIncident({ bearerToken: "dbundle_mem_x", incidentId: "inc_missing" })
+    ).rejects.toEqual(new RetrievalApiError(404, "incident_not_found"));
   });
 });

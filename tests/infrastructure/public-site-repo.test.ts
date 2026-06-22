@@ -15,6 +15,7 @@ describePublicSiteRepo("public site repository export", () => {
       "pnpm-lock.yaml",
       "README.md",
       "headers-manifest.json",
+      "redirects-manifest.json",
       "LICENSE",
       "SECURITY.md",
       "CHANGELOG.md",
@@ -135,7 +136,11 @@ describePublicSiteRepo("public site repository export", () => {
           entry === "node_modules" ||
           entry === ".next" ||
           entry === "out" ||
-          entry === ".source"
+          entry === ".source" ||
+          entry === ".git" ||
+          entry === ".pnpm-store" ||
+          entry === "tsconfig.tsbuildinfo" ||
+          entry === ".DS_Store"
         ) {
           continue;
         }

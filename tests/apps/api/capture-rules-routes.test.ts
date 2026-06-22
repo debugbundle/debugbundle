@@ -6,20 +6,24 @@ import type { ApiDependencies } from "../../../apps/api/src/api-types.js";
 import { createApiServer } from "../../../apps/api/src/server.js";
 import { createBundleWithRequestContext } from "../../helpers/repro-engine.js";
 
-function createDependencies(overrides: {
-  auditLogging?: ApiDependencies["auditLogging"];
-  memberAuth?: ApiDependencies["memberAuth"];
-  captureRuleManagement?: ApiDependencies["captureRuleManagement"];
-  projectManagement?: ApiDependencies["projectManagement"];
-  authRateLimiter?: ApiDependencies["authRateLimiter"];
-  incidentRetrieval?: ApiDependencies["incidentRetrieval"];
-  bundleRegeneration?: ApiDependencies["bundleRegeneration"];
-  objectStoreReader?: ApiDependencies["objectStoreReader"];
-} = {}): ReturnType<typeof createApiServer> {
+function createDependencies(
+  overrides: {
+    auditLogging?: ApiDependencies["auditLogging"];
+    memberAuth?: ApiDependencies["memberAuth"];
+    captureRuleManagement?: ApiDependencies["captureRuleManagement"];
+    projectManagement?: ApiDependencies["projectManagement"];
+    authRateLimiter?: ApiDependencies["authRateLimiter"];
+    incidentRetrieval?: ApiDependencies["incidentRetrieval"];
+    bundleRegeneration?: ApiDependencies["bundleRegeneration"];
+    objectStoreReader?: ApiDependencies["objectStoreReader"];
+  } = {}
+): ReturnType<typeof createApiServer> {
   return createApiServer({
     ingestionPersistence: { persistAndEnqueue: vi.fn() },
     ingestionMetadata: { resolveProjectByTokenHash: vi.fn() },
-    ...(overrides.authRateLimiter === undefined ? {} : { authRateLimiter: overrides.authRateLimiter }),
+    ...(overrides.authRateLimiter === undefined
+      ? {}
+      : { authRateLimiter: overrides.authRateLimiter }),
     memberAuth: overrides.memberAuth ?? {
       resolveMemberByTokenHash: vi.fn().mockResolvedValue({
         member_id: "usr_owner",
@@ -47,7 +51,9 @@ function createDependencies(overrides: {
       listDeliveriesForWebhookInOrganization: vi.fn().mockResolvedValue(null)
     },
     ...(overrides.auditLogging === undefined ? {} : { auditLogging: overrides.auditLogging }),
-    ...(overrides.bundleRegeneration === undefined ? {} : { bundleRegeneration: overrides.bundleRegeneration }),
+    ...(overrides.bundleRegeneration === undefined
+      ? {}
+      : { bundleRegeneration: overrides.bundleRegeneration }),
     projectManagement: overrides.projectManagement ?? {
       resolveProjectAccessForUser: vi.fn().mockResolvedValue({
         project_id: "00000000-0000-0000-0000-000000000001",
@@ -91,9 +97,11 @@ const rule = {
   updated_at: "2026-05-26T10:00:00.000Z"
 };
 
-function createIncidentFixture(): Awaited<ReturnType<ApiDependencies["incidentRetrieval"]["getIncidentForOrganization"]>> {
+function createIncidentFixture(): Awaited<
+  ReturnType<ApiDependencies["incidentRetrieval"]["getIncidentForOrganization"]>
+> {
   return {
-    incident_id: "inc_123",
+    incident_id: "550e8400-e29b-41d4-a716-446655440123",
     project_id: "00000000-0000-0000-0000-000000000001",
     project_name: "Main App",
     project_color_tag: null,
@@ -267,7 +275,9 @@ describe("capture rule routes", () => {
   });
 
   it("returns deterministic incident-based suggestions when the incident bundle is ready", async () => {
-    const objectStoreReader = { getObject: vi.fn().mockResolvedValue(createBrowserNoiseBundleBuffer()) };
+    const objectStoreReader = {
+      getObject: vi.fn().mockResolvedValue(createBrowserNoiseBundleBuffer())
+    };
     const app = createDependencies({
       incidentRetrieval: {
         listIncidentsForOrganization: vi.fn().mockResolvedValue([]),
@@ -280,7 +290,7 @@ describe("capture rule routes", () => {
 
     const response = await app.inject({
       method: "POST",
-      url: "/v1/incidents/inc_123/capture-rule-suggestion",
+      url: "/v1/incidents/550e8400-e29b-41d4-a716-446655440123/capture-rule-suggestion",
       headers: { authorization: "Bearer dbundle_mem_test_token" }
     });
 
@@ -309,7 +319,9 @@ describe("capture rule routes", () => {
       ...rule,
       created_from_incident_id: null
     };
-    const objectStoreReader = { getObject: vi.fn().mockResolvedValue(createBrowserNoiseBundleBuffer()) };
+    const objectStoreReader = {
+      getObject: vi.fn().mockResolvedValue(createBrowserNoiseBundleBuffer())
+    };
     const app = createDependencies({
       incidentRetrieval: {
         listIncidentsForOrganization: vi.fn().mockResolvedValue([]),
@@ -329,7 +341,7 @@ describe("capture rule routes", () => {
 
     const response = await app.inject({
       method: "POST",
-      url: "/v1/incidents/inc_123/capture-rule-suggestion",
+      url: "/v1/incidents/550e8400-e29b-41d4-a716-446655440123/capture-rule-suggestion",
       headers: { authorization: "Bearer dbundle_mem_test_token" }
     });
 
@@ -361,7 +373,7 @@ describe("capture rule routes", () => {
 
     const response = await app.inject({
       method: "POST",
-      url: "/v1/incidents/inc_123/capture-rule-suggestion",
+      url: "/v1/incidents/550e8400-e29b-41d4-a716-446655440123/capture-rule-suggestion",
       headers: { authorization: "Bearer dbundle_mem_test_token" }
     });
 
@@ -373,13 +385,15 @@ describe("capture rule routes", () => {
     expect(requestRegeneration).toHaveBeenCalledWith({
       organization_id: "org_123",
       project_id: "00000000-0000-0000-0000-000000000001",
-      incident_id: "inc_123"
+      incident_id: "550e8400-e29b-41d4-a716-446655440123"
     });
   });
 
   it("creates a capture rule from a selected suggestion", async () => {
     const createCaptureRuleForProject = vi.fn().mockResolvedValue(rule);
-    const objectStoreReader = { getObject: vi.fn().mockResolvedValue(createBrowserNoiseBundleBuffer()) };
+    const objectStoreReader = {
+      getObject: vi.fn().mockResolvedValue(createBrowserNoiseBundleBuffer())
+    };
     const app = createDependencies({
       auditLogging: {
         createAuditLog: vi.fn().mockResolvedValue(undefined)
@@ -402,7 +416,7 @@ describe("capture rule routes", () => {
 
     const response = await app.inject({
       method: "POST",
-      url: "/v1/incidents/inc_123/capture-rules",
+      url: "/v1/incidents/550e8400-e29b-41d4-a716-446655440123/capture-rules",
       headers: { authorization: "Bearer dbundle_mem_test_token" },
       payload: {
         suggestion_id: "primary_resource_host_demote",
@@ -419,7 +433,7 @@ describe("capture rule routes", () => {
         create: expect.objectContaining({
           name: "Demote analytics noise",
           action: "demote",
-          created_from_incident_id: "inc_123",
+          created_from_incident_id: "550e8400-e29b-41d4-a716-446655440123",
           matcher: {
             event_types: ["frontend_exception"],
             browser_event_kind: "resource_error",
@@ -436,7 +450,9 @@ describe("capture rule routes", () => {
       created_from_incident_id: null
     };
     const createCaptureRuleForProject = vi.fn();
-    const objectStoreReader = { getObject: vi.fn().mockResolvedValue(createBrowserNoiseBundleBuffer()) };
+    const objectStoreReader = {
+      getObject: vi.fn().mockResolvedValue(createBrowserNoiseBundleBuffer())
+    };
     const app = createDependencies({
       auditLogging: {
         createAuditLog: vi.fn().mockResolvedValue(undefined)
@@ -459,7 +475,7 @@ describe("capture rule routes", () => {
 
     const response = await app.inject({
       method: "POST",
-      url: "/v1/incidents/inc_123/capture-rules",
+      url: "/v1/incidents/550e8400-e29b-41d4-a716-446655440123/capture-rules",
       headers: { authorization: "Bearer dbundle_mem_test_token" },
       payload: {
         suggestion_id: "primary_resource_host_demote"

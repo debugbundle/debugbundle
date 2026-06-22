@@ -14,9 +14,28 @@ import {
 import { toggleSort, type SortState } from "../components/system/sortable-table-head.js";
 import { TableRefreshButton } from "../components/system/table-refresh-button.js";
 import type { ProjectContext } from "../components/system/project-layout.js";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card.js";
-import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "../components/ui/empty.js";
-import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select.js";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle
+} from "../components/ui/card.js";
+import {
+  Empty,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle
+} from "../components/ui/empty.js";
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectTrigger,
+  SelectValue
+} from "../components/ui/select.js";
 import { Skeleton } from "../components/ui/skeleton.js";
 import { listProjectImprovements, reopenImprovement, resolveImprovement } from "../lib/api.js";
 import { showErrorToast, showInfoToast, showSuccessToast } from "../lib/notify.js";
@@ -28,12 +47,13 @@ import {
   type ImprovementStatusFilter
 } from "./improvements-page.js";
 
-const IMPROVEMENT_STATUS_FILTER_OPTIONS: Array<{ value: ImprovementStatusFilter; label: string }> = [
-  { value: "open", label: "Open" },
-  { value: "all", label: "All statuses" },
-  { value: "resolved", label: "Resolved" },
-  { value: "snoozed", label: "Snoozed" }
-];
+const IMPROVEMENT_STATUS_FILTER_OPTIONS: Array<{ value: ImprovementStatusFilter; label: string }> =
+  [
+    { value: "open", label: "Open" },
+    { value: "all", label: "All statuses" },
+    { value: "resolved", label: "Resolved" },
+    { value: "snoozed", label: "Snoozed" }
+  ];
 
 export function ProjectImprovementsPage(): JSX.Element {
   const navigate = useNavigate();
@@ -45,7 +65,15 @@ export function ProjectImprovementsPage(): JSX.Element {
   });
   const [bulkAction, setBulkAction] = useState<"resolved" | "unresolved" | null>(null);
   const hostedImprovementsEnabled = project.organization_plan !== "free";
-  const { items: improvements, isLoading, page, hasNextPage, goToNextPage, goToPreviousPage, refreshPage } = useCursorPagination(
+  const {
+    items: improvements,
+    isLoading,
+    page,
+    hasNextPage,
+    goToNextPage,
+    goToPreviousPage,
+    refreshPage
+  } = useCursorPagination(
     async (cursor) => {
       if (!hostedImprovementsEnabled) {
         return {
@@ -54,7 +82,12 @@ export function ProjectImprovementsPage(): JSX.Element {
         };
       }
 
-      const response = await listProjectImprovements(projectId, 20, cursor ?? undefined, statusFilter === "all" ? undefined : statusFilter);
+      const response = await listProjectImprovements(
+        projectId,
+        20,
+        cursor ?? undefined,
+        statusFilter === "all" ? undefined : statusFilter
+      );
       return {
         items: response.improvements,
         nextCursor: response.nextCursor
@@ -78,6 +111,8 @@ export function ProjectImprovementsPage(): JSX.Element {
           return left.project_name.localeCompare(right.project_name);
         case "service_name":
           return left.service_name.localeCompare(right.service_name);
+        case "environment":
+          return left.environment.localeCompare(right.environment);
         case "severity":
           return severityRank[left.severity] - severityRank[right.severity];
         case "status":
@@ -85,15 +120,25 @@ export function ProjectImprovementsPage(): JSX.Element {
         case "occurrence_count":
           return left.occurrence_count - right.occurrence_count;
         case "last_detected_at":
-          return new Date(left.last_detected_at).getTime() - new Date(right.last_detected_at).getTime();
+          return (
+            new Date(left.last_detected_at).getTime() - new Date(right.last_detected_at).getTime()
+          );
       }
     });
 
     return sort.direction === "asc" ? sorted : sorted.reverse();
   }, [improvements, sort]);
-  const selection = useVisibleRowSelection(useMemo(() => sortedImprovements.map((improvement) => improvement.improvement_id), [sortedImprovements]));
+  const selection = useVisibleRowSelection(
+    useMemo(
+      () => sortedImprovements.map((improvement) => improvement.improvement_id),
+      [sortedImprovements]
+    )
+  );
   const selectedImprovements = useMemo(
-    () => sortedImprovements.filter((improvement) => selection.selectedIdSet.has(improvement.improvement_id)),
+    () =>
+      sortedImprovements.filter((improvement) =>
+        selection.selectedIdSet.has(improvement.improvement_id)
+      ),
     [sortedImprovements, selection.selectedIdSet]
   );
 
@@ -124,9 +169,13 @@ export function ProjectImprovementsPage(): JSX.Element {
       }
 
       if (successCount === improvementsToUpdate.length) {
-        showSuccessToast(`Marked ${successCount} improvement${successCount === 1 ? "" : "s"} as ${action}.`);
+        showSuccessToast(
+          `Marked ${successCount} improvement${successCount === 1 ? "" : "s"} as ${action}.`
+        );
       } else if (successCount > 0) {
-        showInfoToast(`Marked ${successCount} of ${improvementsToUpdate.length} improvements as ${action}.`);
+        showInfoToast(
+          `Marked ${successCount} of ${improvementsToUpdate.length} improvements as ${action}.`
+        );
       } else {
         showErrorToast(`Could not mark the selected improvements as ${action}.`);
       }
@@ -147,16 +196,34 @@ export function ProjectImprovementsPage(): JSX.Element {
             <div className="flex w-full items-start justify-between gap-3 sm:block sm:w-auto">
               <div className="space-y-1.5">
                 <CardTitle>Project improvements</CardTitle>
-                <CardDescription>Deterministic improvement opportunities for this project.</CardDescription>
+                <CardDescription>
+                  Deterministic improvement opportunities for this project.
+                </CardDescription>
               </div>
-              <TableRefreshButton isLoading={isLoading} onRefresh={() => void refreshPage()} mobileIconOnly className="shrink-0 sm:hidden" />
+              <TableRefreshButton
+                isLoading={isLoading}
+                onRefresh={() => void refreshPage()}
+                mobileIconOnly
+                className="shrink-0 sm:hidden"
+              />
             </div>
             <div className="flex w-full items-center gap-2 sm:w-auto sm:justify-end">
-              <TableRefreshButton isLoading={isLoading} onRefresh={() => void refreshPage()} className="hidden sm:inline-flex" />
-              <label id="project-improvements-status-filter-label" htmlFor="project-improvements-status-filter" className="sr-only sm:not-sr-only sm:text-sm sm:font-medium sm:text-foreground">
+              <TableRefreshButton
+                isLoading={isLoading}
+                onRefresh={() => void refreshPage()}
+                className="hidden sm:inline-flex"
+              />
+              <label
+                id="project-improvements-status-filter-label"
+                htmlFor="project-improvements-status-filter"
+                className="sr-only sm:not-sr-only sm:text-sm sm:font-medium sm:text-foreground"
+              >
                 Status
               </label>
-              <Select value={statusFilter} onValueChange={(value) => setStatusFilter(value as ImprovementStatusFilter)}>
+              <Select
+                value={statusFilter}
+                onValueChange={(value) => setStatusFilter(value as ImprovementStatusFilter)}
+              >
                 <SelectTrigger
                   id="project-improvements-status-filter"
                   aria-labelledby="project-improvements-status-filter-label project-improvements-status-filter"
@@ -192,7 +259,10 @@ export function ProjectImprovementsPage(): JSX.Element {
                       <SparklesIcon />
                     </EmptyMedia>
                     <EmptyTitle>No improvements for this filter</EmptyTitle>
-                    <EmptyDescription>Improvement opportunities will appear here when hosted analysis has enough signal for this project.</EmptyDescription>
+                    <EmptyDescription>
+                      Improvement opportunities will appear here when hosted analysis has enough
+                      signal for this project.
+                    </EmptyDescription>
                   </EmptyHeader>
                 </Empty>
               }
@@ -206,10 +276,24 @@ export function ProjectImprovementsPage(): JSX.Element {
                       selectedCount={selection.selectedCount}
                       allSelected={selection.allSelected}
                       isBusy={bulkAction !== null}
-                      primaryActionLabel={bulkAction === "resolved" ? "Marking resolved..." : "Mark selected resolved"}
-                      secondaryActionLabel={bulkAction === "unresolved" ? "Marking unresolved..." : "Mark selected unresolved"}
-                      primaryActionDisabled={selection.selectedCount === 0 || selectedImprovements.every((improvement) => improvement.status === "resolved")}
-                      secondaryActionDisabled={selection.selectedCount === 0 || selectedImprovements.every((improvement) => improvement.status === "open")}
+                      primaryActionLabel={
+                        bulkAction === "resolved" ? "Marking resolved..." : "Mark selected resolved"
+                      }
+                      secondaryActionLabel={
+                        bulkAction === "unresolved"
+                          ? "Marking unresolved..."
+                          : "Mark selected unresolved"
+                      }
+                      primaryActionDisabled={
+                        selection.selectedCount === 0 ||
+                        selectedImprovements.every(
+                          (improvement) => improvement.status === "resolved"
+                        )
+                      }
+                      secondaryActionDisabled={
+                        selection.selectedCount === 0 ||
+                        selectedImprovements.every((improvement) => improvement.status === "open")
+                      }
                       onToggleSelectAll={selection.toggleSelectAll}
                       onClearSelection={selection.clearSelection}
                       onPrimaryAction={() => {
@@ -231,7 +315,9 @@ export function ProjectImprovementsPage(): JSX.Element {
                         return;
                       }
 
-                      void navigate(`/projects/${projectId}/improvements/${improvement.improvement_id}`);
+                      void navigate(
+                        `/projects/${projectId}/improvements/${improvement.improvement_id}`
+                      );
                     }}
                     projectScoped
                   />
@@ -254,9 +340,17 @@ export function ProjectImprovementsPage(): JSX.Element {
         allSelected={selection.allSelected}
         isBusy={bulkAction !== null}
         primaryActionLabel={bulkAction === "resolved" ? "Marking resolved..." : "Mark resolved"}
-        secondaryActionLabel={bulkAction === "unresolved" ? "Marking unresolved..." : "Mark unresolved"}
-        primaryActionDisabled={selection.selectedCount === 0 || selectedImprovements.every((improvement) => improvement.status === "resolved")}
-        secondaryActionDisabled={selection.selectedCount === 0 || selectedImprovements.every((improvement) => improvement.status === "open")}
+        secondaryActionLabel={
+          bulkAction === "unresolved" ? "Marking unresolved..." : "Mark unresolved"
+        }
+        primaryActionDisabled={
+          selection.selectedCount === 0 ||
+          selectedImprovements.every((improvement) => improvement.status === "resolved")
+        }
+        secondaryActionDisabled={
+          selection.selectedCount === 0 ||
+          selectedImprovements.every((improvement) => improvement.status === "open")
+        }
         onToggleSelectAll={selection.toggleSelectAll}
         onClearSelection={selection.clearSelection}
         onPrimaryAction={() => {

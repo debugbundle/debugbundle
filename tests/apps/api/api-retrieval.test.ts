@@ -5,7 +5,9 @@ import { createApiServer } from "../../../apps/api/src/server.ts";
 import { mockedObject, type MockedMethods } from "../../helpers/vitest.ts";
 
 type ApiServerDependencies = Parameters<typeof createApiServer>[0];
-type AuthRateLimiterDependency = MockedMethods<NonNullable<ApiServerDependencies["authRateLimiter"]>>;
+type AuthRateLimiterDependency = MockedMethods<
+  NonNullable<ApiServerDependencies["authRateLimiter"]>
+>;
 type TokenManagementDependency = MockedMethods<ApiServerDependencies["tokenManagement"]>;
 
 function createTokenManagementDependency(): TokenManagementDependency {
@@ -19,10 +21,12 @@ function createTokenManagementDependency(): TokenManagementDependency {
   });
 }
 
-function createServer(overrides: { authRateLimiter?: Partial<AuthRateLimiterDependency> } = {}): ReturnType<typeof createApiServer> {
+function createServer(
+  overrides: { authRateLimiter?: Partial<AuthRateLimiterDependency> } = {}
+): ReturnType<typeof createApiServer> {
   const projectId = "550e8400-e29b-41d4-a716-446655440000";
   const incidentRecord = {
-    incident_id: "inc_123",
+    incident_id: "550e8400-e29b-41d4-a716-446655440123",
     project_id: projectId,
     project_name: "Main App",
     service_id: "svc_123",
@@ -63,7 +67,9 @@ function createServer(overrides: { authRateLimiter?: Partial<AuthRateLimiterDepe
       level: null
     }
   ]);
-  const getObject = vi.fn().mockResolvedValue(gzipSync(Buffer.from(JSON.stringify({ bundle_version: 1 }), "utf8")));
+  const getObject = vi
+    .fn()
+    .mockResolvedValue(gzipSync(Buffer.from(JSON.stringify({ bundle_version: 1 }), "utf8")));
 
   return createApiServer({
     ingestionPersistence: {
@@ -76,16 +82,20 @@ function createServer(overrides: { authRateLimiter?: Partial<AuthRateLimiterDepe
       ? {}
       : {
           authRateLimiter: {
-            claimRequest: overrides.authRateLimiter.claimRequest ?? vi.fn().mockResolvedValue({
-              allowed: true,
-              limit: 100,
-              remaining: 99,
-              retry_after_ms: 0
-            })
+            claimRequest:
+              overrides.authRateLimiter.claimRequest ??
+              vi.fn().mockResolvedValue({
+                allowed: true,
+                limit: 100,
+                remaining: 99,
+                retry_after_ms: 0
+              })
           }
         }),
     memberAuth: {
-      resolveMemberByTokenHash: vi.fn().mockResolvedValue({ member_id: "mem_123", organization_id: "org_123" })
+      resolveMemberByTokenHash: vi
+        .fn()
+        .mockResolvedValue({ member_id: "mem_123", organization_id: "org_123" })
     },
     tokenManagement: createTokenManagementDependency(),
     incidentRetrieval: {
@@ -108,7 +118,7 @@ describe("api retrieval routes", () => {
   it("should return deterministic one-call incident context", async (): Promise<void> => {
     const projectId = "550e8400-e29b-41d4-a716-446655440000";
     const incidentRecord = {
-      incident_id: "inc_123",
+      incident_id: "550e8400-e29b-41d4-a716-446655440123",
       project_id: projectId,
       project_name: "Main App",
       service_id: "svc_123",
@@ -132,7 +142,8 @@ describe("api retrieval routes", () => {
         description: "request_event matched the immediate request failure incident rule",
         event_type: "request_event" as const,
         event_class: "incident_signal" as const,
-        matched_policy: "Immediate request failure statuses bypass capture_request_events suppression"
+        matched_policy:
+          "Immediate request failure statuses bypass capture_request_events suppression"
       }
     };
 
@@ -144,7 +155,9 @@ describe("api retrieval routes", () => {
         resolveProjectByTokenHash: vi.fn()
       },
       memberAuth: {
-        resolveMemberByTokenHash: vi.fn().mockResolvedValue({ member_id: "mem_123", organization_id: "org_123" })
+        resolveMemberByTokenHash: vi
+          .fn()
+          .mockResolvedValue({ member_id: "mem_123", organization_id: "org_123" })
       },
       tokenManagement: createTokenManagementDependency(),
       incidentRetrieval: {
@@ -230,7 +243,7 @@ describe("api retrieval routes", () => {
 
     const response = await app.inject({
       method: "GET",
-      url: "/v1/incidents/inc_123/context",
+      url: "/v1/incidents/550e8400-e29b-41d4-a716-446655440123/context",
       headers: {
         authorization: "Bearer dbundle_mem_test"
       }
@@ -302,10 +315,14 @@ describe("api retrieval routes", () => {
         matched_fields: ["route_template"]
       },
       visibility: {
-        grouping: "Repeated request-failure incidents with the same normalized route template, request method, response status, service, and environment reuse this incident fingerprint. This incident currently groups POST /checkout with matched fields route_template.",
-        bundle_regeneration: "Bundle status is ready. New incidents create a bundle immediately, while regeneration currently prioritizes regression reopen, then deploy metadata, reproduction-confidence changes, and finally new context updates.",
-        spike_detection: "This incident is not currently marked as spiking. Spike detection is evaluated after grouping and only marks an existing incident when short-term frequency has sufficient baseline and exceeds the spike threshold.",
-        notification_cooldown: "Webhook and GitHub lifecycle notifications use per-rule cooldown windows to suppress repeated bundle.reopened or incident.spike_detected deliveries for the same incident/event fingerprint."
+        grouping:
+          "Repeated request-failure incidents with the same normalized route template, request method, response status, service, and environment reuse this incident fingerprint. This incident currently groups POST /checkout with matched fields route_template.",
+        bundle_regeneration:
+          "Bundle status is ready. New incidents create a bundle immediately, while regeneration currently prioritizes regression reopen, then deploy metadata, reproduction-confidence changes, and finally new context updates.",
+        spike_detection:
+          "This incident is not currently marked as spiking. Spike detection is evaluated after grouping and only marks an existing incident when short-term frequency has sufficient baseline and exceeds the spike threshold.",
+        notification_cooldown:
+          "Webhook and GitHub lifecycle notifications use per-rule cooldown windows to suppress repeated bundle.reopened or incident.spike_detected deliveries for the same incident/event fingerprint."
       },
       redaction: {
         redacted: true,
@@ -343,7 +360,9 @@ describe("api retrieval routes", () => {
         resolveProjectByTokenHash: vi.fn()
       },
       memberAuth: {
-        resolveMemberByTokenHash: vi.fn().mockResolvedValue({ member_id: "mem_123", organization_id: "org_123" })
+        resolveMemberByTokenHash: vi
+          .fn()
+          .mockResolvedValue({ member_id: "mem_123", organization_id: "org_123" })
       },
       tokenManagement: createTokenManagementDependency(),
       incidentRetrieval: {
@@ -402,7 +421,9 @@ describe("api retrieval routes", () => {
         resolveProjectByTokenHash: vi.fn()
       },
       memberAuth: {
-        resolveMemberByTokenHash: vi.fn().mockResolvedValue({ member_id: "mem_123", organization_id: "org_123" })
+        resolveMemberByTokenHash: vi
+          .fn()
+          .mockResolvedValue({ member_id: "mem_123", organization_id: "org_123" })
       },
       tokenManagement: createTokenManagementDependency(),
       incidentRetrieval: {
@@ -460,7 +481,9 @@ describe("api retrieval routes", () => {
         resolveProjectByTokenHash: vi.fn()
       },
       memberAuth: {
-        resolveMemberByTokenHash: vi.fn().mockResolvedValue({ member_id: "mem_123", organization_id: "org_123" })
+        resolveMemberByTokenHash: vi
+          .fn()
+          .mockResolvedValue({ member_id: "mem_123", organization_id: "org_123" })
       },
       tokenManagement: createTokenManagementDependency(),
       incidentRetrieval: {
@@ -520,7 +543,7 @@ describe("api retrieval routes", () => {
     expect(response.json()).toEqual({
       incidents: [
         {
-          incident_id: "inc_123",
+          incident_id: "550e8400-e29b-41d4-a716-446655440123",
           project_id: "550e8400-e29b-41d4-a716-446655440000",
           project_name: "Main App",
           service_id: "svc_123",
@@ -576,7 +599,7 @@ describe("api retrieval routes", () => {
   it("should apply incident filters and return cursor-based pagination metadata", async (): Promise<void> => {
     const listIncidentsForOrganization = vi.fn().mockResolvedValue([
       {
-        incident_id: "inc_123",
+        incident_id: "550e8400-e29b-41d4-a716-446655440123",
         project_id: "550e8400-e29b-41d4-a716-446655440000",
         project_name: "Main App",
         service_id: "svc_123",
@@ -605,7 +628,9 @@ describe("api retrieval routes", () => {
         resolveProjectByTokenHash: vi.fn()
       },
       memberAuth: {
-        resolveMemberByTokenHash: vi.fn().mockResolvedValue({ member_id: "mem_123", organization_id: "org_123" })
+        resolveMemberByTokenHash: vi
+          .fn()
+          .mockResolvedValue({ member_id: "mem_123", organization_id: "org_123" })
       },
       tokenManagement: createTokenManagementDependency(),
       incidentRetrieval: {
@@ -625,7 +650,7 @@ describe("api retrieval routes", () => {
 
     const response = await app.inject({
       method: "GET",
-      url: "/v1/incidents?project_id=550e8400-e29b-41d4-a716-446655440000&environment=production&service=checkout-api&status=open&severity=high&first_seen_after=2026-03-11T00:00:00.000Z&attention_after=2026-03-11T01:00:00.000Z&limit=1&cursor=2026-03-11T00:09:00.000Z|inc_122",
+      url: "/v1/incidents?project_id=550e8400-e29b-41d4-a716-446655440000&environment=production&service=checkout-api&status=open&severity=high&first_seen_after=2026-03-11T00:00:00.000Z&attention_after=2026-03-11T01:00:00.000Z&limit=1&cursor=2026-03-11T00:09:00.000Z|550e8400-e29b-41d4-a716-446655440122",
       headers: {
         authorization: "Bearer dbundle_mem_test"
       }
@@ -644,14 +669,14 @@ describe("api retrieval routes", () => {
       limit: 1,
       cursor: {
         last_seen_at: "2026-03-11T00:09:00.000Z",
-        incident_id: "inc_122"
+        incident_id: "550e8400-e29b-41d4-a716-446655440122"
       }
     });
     expect(response.statusCode).toBe(200);
     expect(response.json()).toEqual({
       incidents: [
         {
-          incident_id: "inc_123",
+          incident_id: "550e8400-e29b-41d4-a716-446655440123",
           project_id: "550e8400-e29b-41d4-a716-446655440000",
           project_name: "Main App",
           service_id: "svc_123",
@@ -671,7 +696,7 @@ describe("api retrieval routes", () => {
           matched_fields: ["fingerprint"]
         }
       ],
-      next_cursor: "2026-03-11T00:10:00.000Z|inc_123"
+      next_cursor: "2026-03-11T00:10:00.000Z|550e8400-e29b-41d4-a716-446655440123"
     });
   });
 
@@ -740,12 +765,57 @@ describe("api retrieval routes", () => {
     });
   });
 
+  it("should reject malformed incident route ids before incident storage lookup", async (): Promise<void> => {
+    const getIncidentForOrganization = vi.fn();
+    const app = createApiServer({
+      ingestionPersistence: {
+        persistAndEnqueue: vi.fn()
+      },
+      ingestionMetadata: {
+        resolveProjectByTokenHash: vi.fn()
+      },
+      memberAuth: {
+        resolveMemberByTokenHash: vi
+          .fn()
+          .mockResolvedValue({ member_id: "mem_123", organization_id: "org_123" })
+      },
+      tokenManagement: createTokenManagementDependency(),
+      incidentRetrieval: {
+        listIncidentsForOrganization: vi.fn().mockResolvedValue([]),
+        getIncidentForOrganization,
+        listIncidentLogsForOrganization: vi.fn().mockResolvedValue([]),
+        listServicesForOrganization: vi.fn().mockResolvedValue([])
+      },
+      objectStoreReader: {
+        getObject: vi.fn()
+      },
+      webhookDelivery: {
+        listDeliveriesForWebhookInOrganization: vi.fn().mockResolvedValue({ deliveries: [] }),
+        retryDeliveryForOrganization: vi.fn().mockResolvedValue(null)
+      }
+    });
+
+    const response = await app.inject({
+      method: "GET",
+      url: "/v1/incidents/8cc5e97f-800b-4cfc-8a7ebbb58484/bundle",
+      headers: {
+        authorization: "Bearer dbundle_mem_test"
+      }
+    });
+
+    expect(response.statusCode).toBe(400);
+    expect(response.json()).toEqual({
+      error: "invalid_incident_id"
+    });
+    expect(getIncidentForOrganization).not.toHaveBeenCalled();
+  });
+
   it("should return incident details for authenticated member token", async (): Promise<void> => {
     const app = createServer();
 
     const response = await app.inject({
       method: "GET",
-      url: "/v1/incidents/inc_123",
+      url: "/v1/incidents/550e8400-e29b-41d4-a716-446655440123",
       headers: {
         authorization: "Bearer dbundle_mem_test"
       }
@@ -754,7 +824,7 @@ describe("api retrieval routes", () => {
     expect(response.statusCode).toBe(200);
     expect(response.json()).toEqual({
       incident: {
-        incident_id: "inc_123",
+        incident_id: "550e8400-e29b-41d4-a716-446655440123",
         project_id: "550e8400-e29b-41d4-a716-446655440000",
         project_name: "Main App",
         service_id: "svc_123",
@@ -785,13 +855,15 @@ describe("api retrieval routes", () => {
         resolveProjectByTokenHash: vi.fn()
       },
       memberAuth: {
-        resolveMemberByTokenHash: vi.fn().mockResolvedValue({ member_id: "mem_123", organization_id: "org_123" })
+        resolveMemberByTokenHash: vi
+          .fn()
+          .mockResolvedValue({ member_id: "mem_123", organization_id: "org_123" })
       },
       tokenManagement: createTokenManagementDependency(),
       incidentRetrieval: {
         listIncidentsForOrganization: vi.fn().mockResolvedValue([]),
         getIncidentForOrganization: vi.fn().mockResolvedValue({
-          incident_id: "inc_5xx",
+          incident_id: "550e8400-e29b-41d4-a716-4466554405aa",
           project_id: "550e8400-e29b-41d4-a716-446655440000",
           project_name: "Main App",
           service_id: "svc_123",
@@ -815,7 +887,8 @@ describe("api retrieval routes", () => {
             description: "request_event matched the immediate request failure incident rule",
             event_type: "request_event",
             event_class: "incident_signal",
-            matched_policy: "Immediate request failure statuses bypass capture_request_events suppression"
+            matched_policy:
+              "Immediate request failure statuses bypass capture_request_events suppression"
           }
         }),
         listIncidentLogsForOrganization: vi.fn().mockResolvedValue([]),
@@ -832,7 +905,7 @@ describe("api retrieval routes", () => {
 
     const response = await app.inject({
       method: "GET",
-      url: "/v1/incidents/inc_5xx",
+      url: "/v1/incidents/550e8400-e29b-41d4-a716-4466554405aa",
       headers: {
         authorization: "Bearer dbundle_mem_test"
       }
@@ -841,13 +914,14 @@ describe("api retrieval routes", () => {
     expect(response.statusCode).toBe(200);
     expect(response.json()).toEqual({
       incident: expect.objectContaining({
-        incident_id: "inc_5xx",
+        incident_id: "550e8400-e29b-41d4-a716-4466554405aa",
         incident_reason: {
           kind: "request_failure",
           description: "request_event matched the immediate request failure incident rule",
           event_type: "request_event",
           event_class: "incident_signal",
-          matched_policy: "Immediate request failure statuses bypass capture_request_events suppression"
+          matched_policy:
+            "Immediate request failure statuses bypass capture_request_events suppression"
         }
       })
     });
@@ -855,7 +929,7 @@ describe("api retrieval routes", () => {
 
   it("should resolve an incident for an authenticated member token", async (): Promise<void> => {
     const resolveIncidentForOrganization = vi.fn().mockResolvedValue({
-      incident_id: "inc_123",
+      incident_id: "550e8400-e29b-41d4-a716-446655440123",
       project_id: "550e8400-e29b-41d4-a716-446655440000",
       project_name: "Main App",
       service_id: "svc_123",
@@ -884,13 +958,15 @@ describe("api retrieval routes", () => {
         resolveProjectByTokenHash: vi.fn()
       },
       memberAuth: {
-        resolveMemberByTokenHash: vi.fn().mockResolvedValue({ member_id: "usr_123", organization_id: "org_123" })
+        resolveMemberByTokenHash: vi
+          .fn()
+          .mockResolvedValue({ member_id: "usr_123", organization_id: "org_123" })
       },
       tokenManagement: createTokenManagementDependency(),
       incidentRetrieval: {
         listIncidentsForOrganization: vi.fn().mockResolvedValue([]),
         getIncidentForOrganization: vi.fn().mockResolvedValue({
-          incident_id: "inc_123",
+          incident_id: "550e8400-e29b-41d4-a716-446655440123",
           project_id: "550e8400-e29b-41d4-a716-446655440000",
           project_name: "Main App",
           service_id: "svc_123",
@@ -925,7 +1001,7 @@ describe("api retrieval routes", () => {
 
     const response = await app.inject({
       method: "POST",
-      url: "/v1/incidents/inc_123/resolve",
+      url: "/v1/incidents/550e8400-e29b-41d4-a716-446655440123/resolve",
       headers: {
         authorization: "Bearer dbundle_mem_test"
       }
@@ -934,14 +1010,14 @@ describe("api retrieval routes", () => {
     expect(response.statusCode).toBe(200);
     expect(resolveIncidentForOrganization).toHaveBeenCalledWith({
       organization_id: "org_123",
-      incident_id: "inc_123",
+      incident_id: "550e8400-e29b-41d4-a716-446655440123",
       user_id: "usr_123",
       resolved_by_member_id: "usr_123",
       resolved_at: expect.any(String)
     });
     expect(response.json()).toEqual({
       incident: {
-        incident_id: "inc_123",
+        incident_id: "550e8400-e29b-41d4-a716-446655440123",
         project_id: "550e8400-e29b-41d4-a716-446655440000",
         project_name: "Main App",
         service_id: "svc_123",
@@ -966,7 +1042,7 @@ describe("api retrieval routes", () => {
 
   it("should reopen an incident for an authenticated member token", async (): Promise<void> => {
     const reopenIncidentForOrganization = vi.fn().mockResolvedValue({
-      incident_id: "inc_123",
+      incident_id: "550e8400-e29b-41d4-a716-446655440123",
       project_id: "550e8400-e29b-41d4-a716-446655440000",
       project_name: "Main App",
       service_id: "svc_123",
@@ -995,13 +1071,15 @@ describe("api retrieval routes", () => {
         resolveProjectByTokenHash: vi.fn()
       },
       memberAuth: {
-        resolveMemberByTokenHash: vi.fn().mockResolvedValue({ member_id: "usr_123", organization_id: "org_123" })
+        resolveMemberByTokenHash: vi
+          .fn()
+          .mockResolvedValue({ member_id: "usr_123", organization_id: "org_123" })
       },
       tokenManagement: createTokenManagementDependency(),
       incidentRetrieval: {
         listIncidentsForOrganization: vi.fn().mockResolvedValue([]),
         getIncidentForOrganization: vi.fn().mockResolvedValue({
-          incident_id: "inc_123",
+          incident_id: "550e8400-e29b-41d4-a716-446655440123",
           project_id: "550e8400-e29b-41d4-a716-446655440000",
           project_name: "Main App",
           service_id: "svc_123",
@@ -1037,7 +1115,7 @@ describe("api retrieval routes", () => {
 
     const response = await app.inject({
       method: "POST",
-      url: "/v1/incidents/inc_123/reopen",
+      url: "/v1/incidents/550e8400-e29b-41d4-a716-446655440123/reopen",
       headers: {
         authorization: "Bearer dbundle_mem_test"
       }
@@ -1046,12 +1124,12 @@ describe("api retrieval routes", () => {
     expect(response.statusCode).toBe(200);
     expect(reopenIncidentForOrganization).toHaveBeenCalledWith({
       organization_id: "org_123",
-      incident_id: "inc_123",
+      incident_id: "550e8400-e29b-41d4-a716-446655440123",
       user_id: "usr_123"
     });
     expect(response.json()).toEqual({
       incident: {
-        incident_id: "inc_123",
+        incident_id: "550e8400-e29b-41d4-a716-446655440123",
         project_id: "550e8400-e29b-41d4-a716-446655440000",
         project_name: "Main App",
         service_id: "svc_123",
@@ -1079,56 +1157,63 @@ describe("api retrieval routes", () => {
     const ownedIncidentId = "550e8400-e29b-41d4-a716-446655440102";
     const resolveIncidentsForOrganization = vi
       .fn()
-      .mockImplementationOnce(async (input: { organization_id: string; incident_ids: string[] }) => [
-        {
-          incident_id: input.incident_ids[0]!,
-          project_id: "550e8400-e29b-41d4-a716-446655440001",
-          project_name: "Shared App",
-          service_id: "svc_456",
-          service_name: "checkout-api",
-          latest_deployment_id: null,
-          environment: "production",
-          fingerprint: "fp_shared",
-          fingerprint_version: "v1",
-          title: "Shared incident",
-          severity: "high",
-          status: "resolved",
-          first_seen_at: "2026-03-11T00:00:00.000Z",
-          last_seen_at: "2026-03-11T00:10:00.000Z",
-          occurrence_count: 3,
-          spike_detected_at: null,
-          resolved_at: "2026-03-11T00:12:00.000Z",
-          regressed_at: null,
-          matched_fields: ["fingerprint"]
-        }
-      ])
-      .mockImplementationOnce(async (input: { organization_id: string; incident_ids: string[] }) => [
-        {
-          incident_id: input.incident_ids[0]!,
-          project_id: "550e8400-e29b-41d4-a716-446655440002",
-          project_name: "Owned App",
-          service_id: "svc_789",
-          service_name: "payments-api",
-          latest_deployment_id: null,
-          environment: "production",
-          fingerprint: "fp_owned",
-          fingerprint_version: "v1",
-          title: "Owned incident",
-          severity: "medium",
-          status: "resolved",
-          first_seen_at: "2026-03-11T00:05:00.000Z",
-          last_seen_at: "2026-03-11T00:15:00.000Z",
-          occurrence_count: 2,
-          spike_detected_at: null,
-          resolved_at: "2026-03-11T00:12:00.000Z",
-          regressed_at: null,
-          matched_fields: ["fingerprint"]
-        }
-      ]);
+      .mockImplementationOnce(
+        async (input: { organization_id: string; incident_ids: string[] }) => [
+          {
+            incident_id: input.incident_ids[0]!,
+            project_id: "550e8400-e29b-41d4-a716-446655440001",
+            project_name: "Shared App",
+            service_id: "svc_456",
+            service_name: "checkout-api",
+            latest_deployment_id: null,
+            environment: "production",
+            fingerprint: "fp_shared",
+            fingerprint_version: "v1",
+            title: "Shared incident",
+            severity: "high",
+            status: "resolved",
+            first_seen_at: "2026-03-11T00:00:00.000Z",
+            last_seen_at: "2026-03-11T00:10:00.000Z",
+            occurrence_count: 3,
+            spike_detected_at: null,
+            resolved_at: "2026-03-11T00:12:00.000Z",
+            regressed_at: null,
+            matched_fields: ["fingerprint"]
+          }
+        ]
+      )
+      .mockImplementationOnce(
+        async (input: { organization_id: string; incident_ids: string[] }) => [
+          {
+            incident_id: input.incident_ids[0]!,
+            project_id: "550e8400-e29b-41d4-a716-446655440002",
+            project_name: "Owned App",
+            service_id: "svc_789",
+            service_name: "payments-api",
+            latest_deployment_id: null,
+            environment: "production",
+            fingerprint: "fp_owned",
+            fingerprint_version: "v1",
+            title: "Owned incident",
+            severity: "medium",
+            status: "resolved",
+            first_seen_at: "2026-03-11T00:05:00.000Z",
+            last_seen_at: "2026-03-11T00:15:00.000Z",
+            occurrence_count: 2,
+            spike_detected_at: null,
+            resolved_at: "2026-03-11T00:12:00.000Z",
+            regressed_at: null,
+            matched_fields: ["fingerprint"]
+          }
+        ]
+      );
 
     const resolveProjectAccessForUser = vi
       .fn()
-      .mockResolvedValueOnce({ project_id: "550e8400-e29b-41d4-a716-446655440001", organization_id: "org_shared" })
+      .mockResolvedValueOnce({
+        project_id: "550e8400-e29b-41d4-a716-446655440001",
+        organization_id: "org_shared"
+      })
       .mockResolvedValueOnce(null);
 
     const app = createApiServer({
@@ -1139,7 +1224,9 @@ describe("api retrieval routes", () => {
         resolveProjectByTokenHash: vi.fn()
       },
       memberAuth: {
-        resolveMemberByTokenHash: vi.fn().mockResolvedValue({ member_id: "usr_123", organization_id: "org_123" })
+        resolveMemberByTokenHash: vi
+          .fn()
+          .mockResolvedValue({ member_id: "usr_123", organization_id: "org_123" })
       },
       tokenManagement: createTokenManagementDependency(),
       projectManagement: {
@@ -1308,7 +1395,9 @@ describe("api retrieval routes", () => {
         resolveProjectByTokenHash: vi.fn()
       },
       memberAuth: {
-        resolveMemberByTokenHash: vi.fn().mockResolvedValue({ member_id: "usr_123", organization_id: "org_123" })
+        resolveMemberByTokenHash: vi
+          .fn()
+          .mockResolvedValue({ member_id: "usr_123", organization_id: "org_123" })
       },
       tokenManagement: createTokenManagementDependency(),
       incidentRetrieval: {
@@ -1402,7 +1491,7 @@ describe("api retrieval routes", () => {
 
     const response = await app.inject({
       method: "GET",
-      url: "/v1/incidents/inc_123/bundle",
+      url: "/v1/incidents/550e8400-e29b-41d4-a716-446655440123/bundle",
       headers: {
         authorization: "Bearer dbundle_mem_test"
       }
@@ -1422,13 +1511,15 @@ describe("api retrieval routes", () => {
         resolveProjectByTokenHash: vi.fn()
       },
       memberAuth: {
-        resolveMemberByTokenHash: vi.fn().mockResolvedValue({ member_id: "mem_123", organization_id: "org_123" })
+        resolveMemberByTokenHash: vi
+          .fn()
+          .mockResolvedValue({ member_id: "mem_123", organization_id: "org_123" })
       },
       tokenManagement: createTokenManagementDependency(),
       incidentRetrieval: {
         listIncidentsForOrganization: vi.fn().mockResolvedValue([]),
         getIncidentForOrganization: vi.fn().mockResolvedValue({
-          incident_id: "inc_123",
+          incident_id: "550e8400-e29b-41d4-a716-446655440123",
           project_id: "proj_123",
           service_id: null,
           environment: "production",
@@ -1461,7 +1552,7 @@ describe("api retrieval routes", () => {
 
     const response = await app.inject({
       method: "GET",
-      url: "/v1/incidents/inc_123/bundle",
+      url: "/v1/incidents/550e8400-e29b-41d4-a716-446655440123/bundle",
       headers: {
         authorization: "Bearer dbundle_mem_test"
       }
@@ -1472,7 +1563,7 @@ describe("api retrieval routes", () => {
     expect(requestRegeneration).toHaveBeenCalledWith({
       organization_id: "org_123",
       project_id: "proj_123",
-      incident_id: "inc_123"
+      incident_id: "550e8400-e29b-41d4-a716-446655440123"
     });
   });
 
@@ -1512,7 +1603,7 @@ describe("api retrieval routes", () => {
       incidentRetrieval: {
         listIncidentsForOrganization: vi.fn().mockResolvedValue([]),
         getIncidentForOrganization: vi.fn().mockResolvedValue({
-          incident_id: "inc_shared",
+          incident_id: "550e8400-e29b-41d4-a716-4466554405bb",
           project_id: "proj_shared",
           project_name: "Shared App",
           service_id: null,
@@ -1550,7 +1641,7 @@ describe("api retrieval routes", () => {
 
     const response = await app.inject({
       method: "GET",
-      url: "/v1/incidents/inc_shared/bundle",
+      url: "/v1/incidents/550e8400-e29b-41d4-a716-4466554405bb/bundle",
       headers: {
         authorization: "Bearer dbundle_mem_test"
       }
@@ -1560,12 +1651,12 @@ describe("api retrieval routes", () => {
     expect(response.json()).toEqual({ status: "pending" });
     expect(getBundleFailureReasonForOrganization).toHaveBeenCalledWith({
       organization_id: "org_owner",
-      incident_id: "inc_shared"
+      incident_id: "550e8400-e29b-41d4-a716-4466554405bb"
     });
     expect(requestRegeneration).toHaveBeenCalledWith({
       organization_id: "org_owner",
       project_id: "proj_shared",
-      incident_id: "inc_shared"
+      incident_id: "550e8400-e29b-41d4-a716-4466554405bb"
     });
   });
 
@@ -1599,13 +1690,15 @@ describe("api retrieval routes", () => {
         resolveProjectByTokenHash: vi.fn()
       },
       memberAuth: {
-        resolveMemberByTokenHash: vi.fn().mockResolvedValue({ member_id: "mem_123", organization_id: "org_123" })
+        resolveMemberByTokenHash: vi
+          .fn()
+          .mockResolvedValue({ member_id: "mem_123", organization_id: "org_123" })
       },
       tokenManagement: createTokenManagementDependency(),
       incidentRetrieval: {
         listIncidentsForOrganization: vi.fn().mockResolvedValue([]),
         getIncidentForOrganization: vi.fn().mockResolvedValue({
-          incident_id: "inc_123",
+          incident_id: "550e8400-e29b-41d4-a716-446655440123",
           project_id: "proj_123",
           service_id: null,
           environment: "production",
@@ -1625,7 +1718,9 @@ describe("api retrieval routes", () => {
         listIncidentLogsForOrganization: vi.fn().mockResolvedValue([])
       },
       objectStoreReader: {
-        getObject: vi.fn().mockResolvedValue(gzipSync(Buffer.from(JSON.stringify(reproduction), "utf8")))
+        getObject: vi
+          .fn()
+          .mockResolvedValue(gzipSync(Buffer.from(JSON.stringify(reproduction), "utf8")))
       },
       webhookDelivery: {
         listDeliveriesForWebhookInOrganization: vi.fn().mockResolvedValue({ deliveries: [] }),
@@ -1635,7 +1730,7 @@ describe("api retrieval routes", () => {
 
     const response = await app.inject({
       method: "GET",
-      url: "/v1/incidents/inc_123/reproduction",
+      url: "/v1/incidents/550e8400-e29b-41d4-a716-446655440123/reproduction",
       headers: {
         authorization: "Bearer dbundle_mem_test"
       }
@@ -1650,7 +1745,7 @@ describe("api retrieval routes", () => {
 
     const response = await app.inject({
       method: "GET",
-      url: "/v1/logs?incident_id=inc_123&limit=5",
+      url: "/v1/logs?incident_id=550e8400-e29b-41d4-a716-446655440123&limit=5",
       headers: {
         authorization: "Bearer dbundle_mem_test"
       }
@@ -1680,13 +1775,15 @@ describe("api retrieval routes", () => {
         resolveProjectByTokenHash: vi.fn()
       },
       memberAuth: {
-        resolveMemberByTokenHash: vi.fn().mockResolvedValue({ member_id: "mem_123", organization_id: "org_123" })
+        resolveMemberByTokenHash: vi
+          .fn()
+          .mockResolvedValue({ member_id: "mem_123", organization_id: "org_123" })
       },
       tokenManagement: createTokenManagementDependency(),
       incidentRetrieval: {
         listIncidentsForOrganization: vi.fn().mockResolvedValue([]),
         getIncidentForOrganization: vi.fn().mockResolvedValue({
-          incident_id: "inc_123",
+          incident_id: "550e8400-e29b-41d4-a716-446655440123",
           project_id: "proj_123",
           service_id: null,
           environment: "production",
@@ -1716,7 +1813,7 @@ describe("api retrieval routes", () => {
 
     const response = await app.inject({
       method: "GET",
-      url: "/v1/incidents/inc_123/bundle",
+      url: "/v1/incidents/550e8400-e29b-41d4-a716-446655440123/bundle",
       headers: {
         authorization: "Bearer dbundle_mem_test"
       }
@@ -1738,13 +1835,15 @@ describe("api retrieval routes", () => {
         resolveProjectByTokenHash: vi.fn()
       },
       memberAuth: {
-        resolveMemberByTokenHash: vi.fn().mockResolvedValue({ member_id: "mem_123", organization_id: "org_123" })
+        resolveMemberByTokenHash: vi
+          .fn()
+          .mockResolvedValue({ member_id: "mem_123", organization_id: "org_123" })
       },
       tokenManagement: createTokenManagementDependency(),
       incidentRetrieval: {
         listIncidentsForOrganization: vi.fn().mockResolvedValue([]),
         getIncidentForOrganization: vi.fn().mockResolvedValue({
-          incident_id: "inc_123",
+          incident_id: "550e8400-e29b-41d4-a716-446655440123",
           project_id: "proj_123",
           service_id: null,
           environment: "production",
@@ -1775,7 +1874,7 @@ describe("api retrieval routes", () => {
 
     const response = await app.inject({
       method: "GET",
-      url: "/v1/incidents/inc_123/bundle",
+      url: "/v1/incidents/550e8400-e29b-41d4-a716-446655440123/bundle",
       headers: {
         authorization: "Bearer dbundle_mem_test"
       }
@@ -1798,13 +1897,15 @@ describe("api retrieval routes", () => {
         resolveProjectByTokenHash: vi.fn()
       },
       memberAuth: {
-        resolveMemberByTokenHash: vi.fn().mockResolvedValue({ member_id: "mem_123", organization_id: "org_123" })
+        resolveMemberByTokenHash: vi
+          .fn()
+          .mockResolvedValue({ member_id: "mem_123", organization_id: "org_123" })
       },
       tokenManagement: createTokenManagementDependency(),
       incidentRetrieval: {
         listIncidentsForOrganization: vi.fn().mockResolvedValue([]),
         getIncidentForOrganization: vi.fn().mockResolvedValue({
-          incident_id: "inc_123",
+          incident_id: "550e8400-e29b-41d4-a716-446655440123",
           project_id: "proj_123",
           service_id: null,
           environment: "production",
@@ -1838,7 +1939,7 @@ describe("api retrieval routes", () => {
 
     const response = await app.inject({
       method: "GET",
-      url: "/v1/incidents/inc_123/bundle",
+      url: "/v1/incidents/550e8400-e29b-41d4-a716-446655440123/bundle",
       headers: {
         authorization: "Bearer dbundle_mem_test"
       }
@@ -1849,7 +1950,7 @@ describe("api retrieval routes", () => {
     expect(requestRegeneration).toHaveBeenCalledWith({
       organization_id: "org_123",
       project_id: "proj_123",
-      incident_id: "inc_123"
+      incident_id: "550e8400-e29b-41d4-a716-446655440123"
     });
   });
 
@@ -1863,13 +1964,15 @@ describe("api retrieval routes", () => {
         resolveProjectByTokenHash: vi.fn()
       },
       memberAuth: {
-        resolveMemberByTokenHash: vi.fn().mockResolvedValue({ member_id: "mem_123", organization_id: "org_123" })
+        resolveMemberByTokenHash: vi
+          .fn()
+          .mockResolvedValue({ member_id: "mem_123", organization_id: "org_123" })
       },
       tokenManagement: createTokenManagementDependency(),
       incidentRetrieval: {
         listIncidentsForOrganization: vi.fn().mockResolvedValue([]),
         getIncidentForOrganization: vi.fn().mockResolvedValue({
-          incident_id: "inc_123",
+          incident_id: "550e8400-e29b-41d4-a716-446655440123",
           project_id: "proj_123",
           service_id: null,
           environment: "production",
@@ -1903,7 +2006,7 @@ describe("api retrieval routes", () => {
 
     const response = await app.inject({
       method: "GET",
-      url: "/v1/incidents/inc_123/bundle",
+      url: "/v1/incidents/550e8400-e29b-41d4-a716-446655440123/bundle",
       headers: {
         authorization: "Bearer dbundle_mem_test"
       }
@@ -1917,7 +2020,7 @@ describe("api retrieval routes", () => {
     expect(requestRegeneration).toHaveBeenCalledWith({
       organization_id: "org_123",
       project_id: "proj_123",
-      incident_id: "inc_123"
+      incident_id: "550e8400-e29b-41d4-a716-446655440123"
     });
   });
 
@@ -1945,7 +2048,9 @@ describe("api retrieval routes", () => {
         resolveProjectByTokenHash: vi.fn()
       },
       memberAuth: {
-        resolveMemberByTokenHash: vi.fn().mockResolvedValue({ member_id: "mem_123", organization_id: "org_123" })
+        resolveMemberByTokenHash: vi
+          .fn()
+          .mockResolvedValue({ member_id: "mem_123", organization_id: "org_123" })
       },
       tokenManagement: createTokenManagementDependency(),
       incidentRetrieval: {
@@ -1965,7 +2070,7 @@ describe("api retrieval routes", () => {
 
     const response = await app.inject({
       method: "GET",
-      url: "/v1/incidents/inc_missing",
+      url: "/v1/incidents/550e8400-e29b-41d4-a716-446655440404",
       headers: {
         authorization: "Bearer dbundle_mem_test"
       }
@@ -1980,7 +2085,7 @@ describe("api retrieval routes", () => {
 
     const response = await app.inject({
       method: "GET",
-      url: "/v1/incidents/inc_123/bundle"
+      url: "/v1/incidents/550e8400-e29b-41d4-a716-446655440123/bundle"
     });
 
     expect(response.statusCode).toBe(401);
@@ -1996,7 +2101,9 @@ describe("api retrieval routes", () => {
         resolveProjectByTokenHash: vi.fn()
       },
       memberAuth: {
-        resolveMemberByTokenHash: vi.fn().mockResolvedValue({ member_id: "mem_123", organization_id: "org_123" })
+        resolveMemberByTokenHash: vi
+          .fn()
+          .mockResolvedValue({ member_id: "mem_123", organization_id: "org_123" })
       },
       tokenManagement: createTokenManagementDependency(),
       incidentRetrieval: {
@@ -2016,7 +2123,7 @@ describe("api retrieval routes", () => {
 
     const response = await app.inject({
       method: "GET",
-      url: "/v1/incidents/inc_missing/bundle",
+      url: "/v1/incidents/550e8400-e29b-41d4-a716-446655440404/bundle",
       headers: {
         authorization: "Bearer dbundle_mem_test"
       }
@@ -2035,13 +2142,15 @@ describe("api retrieval routes", () => {
         resolveProjectByTokenHash: vi.fn()
       },
       memberAuth: {
-        resolveMemberByTokenHash: vi.fn().mockResolvedValue({ member_id: "mem_123", organization_id: "org_123" })
+        resolveMemberByTokenHash: vi
+          .fn()
+          .mockResolvedValue({ member_id: "mem_123", organization_id: "org_123" })
       },
       tokenManagement: createTokenManagementDependency(),
       incidentRetrieval: {
         listIncidentsForOrganization: vi.fn().mockResolvedValue([]),
         getIncidentForOrganization: vi.fn().mockResolvedValue({
-          incident_id: "inc_123",
+          incident_id: "550e8400-e29b-41d4-a716-446655440123",
           project_id: "proj_123",
           service_id: null,
           environment: "production",
@@ -2064,7 +2173,9 @@ describe("api retrieval routes", () => {
         getObject: vi
           .fn()
           .mockRejectedValueOnce(new Error("s3_object_not_found"))
-          .mockResolvedValueOnce(gzipSync(Buffer.from(JSON.stringify({ bundle_version: 1 }), "utf8")))
+          .mockResolvedValueOnce(
+            gzipSync(Buffer.from(JSON.stringify({ bundle_version: 1 }), "utf8"))
+          )
       },
       webhookDelivery: {
         listDeliveriesForWebhookInOrganization: vi.fn().mockResolvedValue({ deliveries: [] }),
@@ -2074,7 +2185,7 @@ describe("api retrieval routes", () => {
 
     const response = await app.inject({
       method: "GET",
-      url: "/v1/incidents/inc_123/reproduction",
+      url: "/v1/incidents/550e8400-e29b-41d4-a716-446655440123/reproduction",
       headers: {
         authorization: "Bearer dbundle_mem_test"
       }
@@ -2093,13 +2204,15 @@ describe("api retrieval routes", () => {
         resolveProjectByTokenHash: vi.fn()
       },
       memberAuth: {
-        resolveMemberByTokenHash: vi.fn().mockResolvedValue({ member_id: "mem_123", organization_id: "org_123" })
+        resolveMemberByTokenHash: vi
+          .fn()
+          .mockResolvedValue({ member_id: "mem_123", organization_id: "org_123" })
       },
       tokenManagement: createTokenManagementDependency(),
       incidentRetrieval: {
         listIncidentsForOrganization: vi.fn().mockResolvedValue([]),
         getIncidentForOrganization: vi.fn().mockResolvedValue({
-          incident_id: "inc_123",
+          incident_id: "550e8400-e29b-41d4-a716-446655440123",
           project_id: "proj_123",
           service_id: null,
           environment: "production",
@@ -2129,7 +2242,7 @@ describe("api retrieval routes", () => {
 
     const response = await app.inject({
       method: "GET",
-      url: "/v1/incidents/inc_123/reproduction",
+      url: "/v1/incidents/550e8400-e29b-41d4-a716-446655440123/reproduction",
       headers: {
         authorization: "Bearer dbundle_mem_test"
       }
@@ -2158,7 +2271,9 @@ describe("api retrieval routes", () => {
         resolveProjectByTokenHash: vi.fn()
       },
       memberAuth: {
-        resolveMemberByTokenHash: vi.fn().mockResolvedValue({ member_id: "mem_123", organization_id: "org_123" })
+        resolveMemberByTokenHash: vi
+          .fn()
+          .mockResolvedValue({ member_id: "mem_123", organization_id: "org_123" })
       },
       tokenManagement: createTokenManagementDependency(),
       incidentRetrieval: {
@@ -2178,7 +2293,7 @@ describe("api retrieval routes", () => {
 
     const response = await app.inject({
       method: "GET",
-      url: "/v1/logs?incident_id=inc_123&level=error&cursor=2026-03-11T00:10:00.000Z|550e8400-e29b-41d4-a716-446655440001&limit=1",
+      url: "/v1/logs?incident_id=550e8400-e29b-41d4-a716-446655440123&level=error&cursor=2026-03-11T00:10:00.000Z|550e8400-e29b-41d4-a716-446655440001&limit=1",
       headers: {
         authorization: "Bearer dbundle_mem_test"
       }
@@ -2188,7 +2303,7 @@ describe("api retrieval routes", () => {
     expect(listIncidentLogsForOrganization).toHaveBeenCalledWith({
       organization_id: "org_123",
       user_id: "mem_123",
-      incident_id: "inc_123",
+      incident_id: "550e8400-e29b-41d4-a716-446655440123",
       level: "error",
       cursor: {
         occurred_at: "2026-03-11T00:10:00.000Z",
@@ -2225,12 +2340,55 @@ describe("api retrieval routes", () => {
     expect(response.json()).toEqual({ error: "invalid_query" });
   });
 
+  it("should reject logs query when incident id is malformed", async (): Promise<void> => {
+    const listIncidentLogsForOrganization = vi.fn();
+    const app = createApiServer({
+      ingestionPersistence: {
+        persistAndEnqueue: vi.fn()
+      },
+      ingestionMetadata: {
+        resolveProjectByTokenHash: vi.fn()
+      },
+      memberAuth: {
+        resolveMemberByTokenHash: vi
+          .fn()
+          .mockResolvedValue({ member_id: "mem_123", organization_id: "org_123" })
+      },
+      tokenManagement: createTokenManagementDependency(),
+      incidentRetrieval: {
+        listIncidentsForOrganization: vi.fn().mockResolvedValue([]),
+        getIncidentForOrganization: vi.fn().mockResolvedValue(null),
+        listServicesForOrganization: vi.fn().mockResolvedValue([]),
+        listIncidentLogsForOrganization
+      },
+      objectStoreReader: {
+        getObject: vi.fn()
+      },
+      webhookDelivery: {
+        listDeliveriesForWebhookInOrganization: vi.fn().mockResolvedValue({ deliveries: [] }),
+        retryDeliveryForOrganization: vi.fn().mockResolvedValue(null)
+      }
+    });
+
+    const response = await app.inject({
+      method: "GET",
+      url: "/v1/logs?incident_id=8cc5e97f-800b-4cfc-8a7ebbb58484",
+      headers: {
+        authorization: "Bearer dbundle_mem_test"
+      }
+    });
+
+    expect(response.statusCode).toBe(400);
+    expect(response.json()).toEqual({ error: "invalid_query" });
+    expect(listIncidentLogsForOrganization).not.toHaveBeenCalled();
+  });
+
   it("should reject logs retrieval for invalid member token", async (): Promise<void> => {
     const app = createServer();
 
     const response = await app.inject({
       method: "GET",
-      url: "/v1/logs?incident_id=inc_123"
+      url: "/v1/logs?incident_id=550e8400-e29b-41d4-a716-446655440123"
     });
 
     expect(response.statusCode).toBe(401);
@@ -2246,13 +2404,15 @@ describe("api retrieval routes", () => {
         resolveProjectByTokenHash: vi.fn()
       },
       memberAuth: {
-        resolveMemberByTokenHash: vi.fn().mockResolvedValue({ member_id: "mem_123", organization_id: "org_123" })
+        resolveMemberByTokenHash: vi
+          .fn()
+          .mockResolvedValue({ member_id: "mem_123", organization_id: "org_123" })
       },
       tokenManagement: createTokenManagementDependency(),
       incidentRetrieval: {
         listIncidentsForOrganization: vi.fn().mockResolvedValue([]),
         getIncidentForOrganization: vi.fn().mockResolvedValue({
-          incident_id: "inc_123",
+          incident_id: "550e8400-e29b-41d4-a716-446655440123",
           project_id: "proj_123",
           service_id: null,
           environment: "production",
@@ -2282,7 +2442,7 @@ describe("api retrieval routes", () => {
 
     const response = await app.inject({
       method: "GET",
-      url: "/v1/incidents/inc_123/bundle",
+      url: "/v1/incidents/550e8400-e29b-41d4-a716-446655440123/bundle",
       headers: {
         authorization: "Bearer dbundle_mem_test"
       }
@@ -2305,13 +2465,15 @@ describe("api retrieval routes", () => {
         resolveProjectByTokenHash: vi.fn()
       },
       memberAuth: {
-        resolveMemberByTokenHash: vi.fn().mockResolvedValue({ member_id: "mem_123", organization_id: "org_123" })
+        resolveMemberByTokenHash: vi
+          .fn()
+          .mockResolvedValue({ member_id: "mem_123", organization_id: "org_123" })
       },
       tokenManagement: createTokenManagementDependency(),
       incidentRetrieval: {
         listIncidentsForOrganization: vi.fn().mockResolvedValue([]),
         getIncidentForOrganization: vi.fn().mockResolvedValue({
-          incident_id: "inc_123",
+          incident_id: "550e8400-e29b-41d4-a716-446655440123",
           project_id: "proj_123",
           service_id: null,
           environment: "production",
@@ -2341,7 +2503,7 @@ describe("api retrieval routes", () => {
 
     const response = await app.inject({
       method: "GET",
-      url: "/v1/incidents/inc_123/reproduction",
+      url: "/v1/incidents/550e8400-e29b-41d4-a716-446655440123/reproduction",
       headers: {
         authorization: "Bearer dbundle_mem_test"
       }
@@ -2357,7 +2519,7 @@ describe("api retrieval routes", () => {
 
     const response = await app.inject({
       method: "GET",
-      url: "/v1/logs?incident_id=inc_123&cursor=invalid-cursor&limit=5",
+      url: "/v1/logs?incident_id=550e8400-e29b-41d4-a716-446655440123&cursor=invalid-cursor&limit=5",
       headers: {
         authorization: "Bearer dbundle_mem_test"
       }

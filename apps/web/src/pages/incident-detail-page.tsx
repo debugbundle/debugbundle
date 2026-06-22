@@ -6,9 +6,16 @@ import { IncidentCaptureRuleSuggestionsDialog } from "../components/system/incid
 import { HighlightedCodeBlock } from "../components/system/highlighted-code-block.js";
 import { Badge } from "../components/ui/badge.js";
 import { Button } from "../components/ui/button.js";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card.js";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle
+} from "../components/ui/card.js";
 import { Skeleton } from "../components/ui/skeleton.js";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../components/ui/tabs.js";
+import { Tooltip, TooltipContent, TooltipTrigger } from "../components/ui/tooltip.js";
 import {
   getIncident,
   getIncidentBundle,
@@ -87,7 +94,9 @@ export function IncidentDetailPage(): JSX.Element {
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <div className="space-y-1">
               <h2 className="text-xl font-semibold">{incident.title}</h2>
-              <p className="text-sm text-muted-foreground">{formatIncidentMatchedFields(incident.matched_fields)}</p>
+              <p className="text-sm text-muted-foreground">
+                {formatIncidentMatchedFields(incident.matched_fields)}
+              </p>
             </div>
             <div className="flex items-center gap-2">
               {incident.status !== "resolved" ? (
@@ -114,7 +123,12 @@ export function IncidentDetailPage(): JSX.Element {
                   {isResolving ? "Resolving..." : "Mark resolved"}
                 </Button>
               ) : null}
-              <Button type="button" variant="outline" size="sm" onClick={() => setIsCaptureRulesOpen(true)}>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setIsCaptureRulesOpen(true)}
+              >
                 Capture rules
               </Button>
               <Badge variant={severityVariantMap[incident.severity]}>{incident.severity}</Badge>
@@ -130,10 +144,25 @@ export function IncidentDetailPage(): JSX.Element {
           </div>
 
           <div className="grid gap-4 sm:grid-cols-2">
-            <DetailRow label="Project" value={incident.project_name} linkTo={`/projects/${incident.project_id}`} />
+            <DetailRow
+              label="Project"
+              value={incident.project_name}
+              linkTo={`/projects/${incident.project_id}`}
+            />
             <DetailRow label="Service" value={incident.service_name ?? "Unknown service"} />
-            <DetailRow label="Fingerprint" value={incident.fingerprint} truncateValue />
-            <DetailRow label="Fingerprint version" value={incident.fingerprint_version} />
+            <DetailRow
+              label="Incident"
+              value={incident.incident_id}
+              truncateValue
+              copyValue={incident.incident_id}
+              copyLabel="Copy incident ID"
+            />
+            <DetailRow
+              label="Fingerprint"
+              value={incident.fingerprint}
+              truncateValue
+              valueSuffix={formatFingerprintVersion(incident.fingerprint_version)}
+            />
             {incident.spike_detected_at !== null ? (
               <DetailRow label="Spike detected" value={formatDate(incident.spike_detected_at)} />
             ) : null}
@@ -174,7 +203,9 @@ export function IncidentDetailPage(): JSX.Element {
 
 function BundleTab({ incidentId }: { incidentId: string }): JSX.Element {
   const [bundleState, setBundleState] = useState<
-    { status: "loading" } | { status: "ready"; bundle: BundleRecord } | { status: "pending" | "failed" | "error" }
+    | { status: "loading" }
+    | { status: "ready"; bundle: BundleRecord }
+    | { status: "pending" | "failed" | "error" }
   >({ status: "loading" });
   const showBundleLoading = useDelayedVisibility(bundleState.status === "loading");
 
@@ -197,7 +228,9 @@ function BundleTab({ incidentId }: { incidentId: string }): JSX.Element {
           </div>
         </CardContent>
       </Card>
-    ) : <></>;
+    ) : (
+      <></>
+    );
   }
 
   if (bundleState.status === "pending") {
@@ -207,7 +240,12 @@ function BundleTab({ incidentId }: { incidentId: string }): JSX.Element {
         title="Bundle is being generated"
         description="The worker is still processing this incident. The debug bundle will appear here once generation completes."
         tone="neutral"
-        titleAccessory={<LoaderCircleIcon className="size-4 animate-spin text-muted-foreground" aria-hidden="true" />}
+        titleAccessory={
+          <LoaderCircleIcon
+            className="size-4 animate-spin text-muted-foreground"
+            aria-hidden="true"
+          />
+        }
       />
     );
   }
@@ -233,11 +271,21 @@ function BundleTab({ incidentId }: { incidentId: string }): JSX.Element {
           <CardDescription>Full bundle artifact for this incident.</CardDescription>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" size="sm" onClick={() => { void copyToClipboard(bundleJson); }}>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              void copyToClipboard(bundleJson);
+            }}
+          >
             <ClipboardCopyIcon className="size-4" />
             Copy
           </Button>
-          <Button variant="outline" size="sm" onClick={() => downloadJson(bundleJson, `bundle-${incidentId}.json`)}>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => downloadJson(bundleJson, `bundle-${incidentId}.json`)}
+          >
             <DownloadIcon className="size-4" />
             Download
           </Button>
@@ -252,7 +300,9 @@ function BundleTab({ incidentId }: { incidentId: string }): JSX.Element {
 
 function ReproductionTab({ incidentId }: { incidentId: string }): JSX.Element {
   const [reproState, setReproState] = useState<
-    { status: "loading" } | { status: "ready"; reproduction: Record<string, unknown> } | { status: "pending" | "failed" | "error" }
+    | { status: "loading" }
+    | { status: "ready"; reproduction: Record<string, unknown> }
+    | { status: "pending" | "failed" | "error" }
   >({ status: "loading" });
   const showReproductionLoading = useDelayedVisibility(reproState.status === "loading");
 
@@ -275,7 +325,9 @@ function ReproductionTab({ incidentId }: { incidentId: string }): JSX.Element {
           </div>
         </CardContent>
       </Card>
-    ) : <></>;
+    ) : (
+      <></>
+    );
   }
 
   if (reproState.status === "pending") {
@@ -285,7 +337,12 @@ function ReproductionTab({ incidentId }: { incidentId: string }): JSX.Element {
         title="Reproduction is being generated"
         description="The reproduction artifact will appear here once the worker finishes processing."
         tone="neutral"
-        titleAccessory={<LoaderCircleIcon className="size-4 animate-spin text-muted-foreground" aria-hidden="true" />}
+        titleAccessory={
+          <LoaderCircleIcon
+            className="size-4 animate-spin text-muted-foreground"
+            aria-hidden="true"
+          />
+        }
       />
     );
   }
@@ -311,11 +368,21 @@ function ReproductionTab({ incidentId }: { incidentId: string }): JSX.Element {
           <CardDescription>Steps and artifacts to reproduce this incident.</CardDescription>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" size="sm" onClick={() => { void copyToClipboard(reproJson); }}>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              void copyToClipboard(reproJson);
+            }}
+          >
             <ClipboardCopyIcon className="size-4" />
             Copy
           </Button>
-          <Button variant="outline" size="sm" onClick={() => downloadJson(reproJson, `reproduction-${incidentId}.json`)}>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => downloadJson(reproJson, `reproduction-${incidentId}.json`)}
+          >
             <DownloadIcon className="size-4" />
             Download
           </Button>
@@ -328,7 +395,10 @@ function ReproductionTab({ incidentId }: { incidentId: string }): JSX.Element {
   );
 }
 
-const severityVariantMap: Record<IncidentRecord["severity"], "secondary" | "warning" | "destructive"> = {
+const severityVariantMap: Record<
+  IncidentRecord["severity"],
+  "secondary" | "warning" | "destructive"
+> = {
   low: "secondary",
   medium: "secondary",
   high: "warning",
@@ -356,32 +426,68 @@ function DetailRow({
   label,
   value,
   linkTo,
-  truncateValue = false
+  truncateValue = false,
+  valueSuffix,
+  copyValue,
+  copyLabel = "Copy value"
 }: {
   label: string;
   value: string;
   linkTo?: string;
   truncateValue?: boolean;
+  valueSuffix?: string;
+  copyValue?: string;
+  copyLabel?: string;
 }): JSX.Element {
-  const valueClassName = cn("min-w-0 w-full font-medium text-right", truncateValue && "truncate");
+  const valueClassName = cn("min-w-0 flex-1 font-medium text-right", truncateValue && "truncate");
 
   return (
     <div className="grid grid-cols-[minmax(0,9rem)_minmax(0,1fr)] items-center gap-4 rounded-lg border p-3 text-sm">
       <span className="text-muted-foreground">{label}</span>
-      {linkTo !== undefined ? (
-        <Link to={linkTo} className={cn(valueClassName, "hover:underline")} title={truncateValue ? value : undefined}>
-          {value}
-        </Link>
-      ) : (
-        <span className={valueClassName} title={truncateValue ? value : undefined}>
-          {value}
-        </span>
-      )}
+      <div className="flex min-w-0 items-center justify-end gap-2">
+        {linkTo !== undefined ? (
+          <Link
+            to={linkTo}
+            className={cn(valueClassName, "hover:underline")}
+            title={truncateValue ? value : undefined}
+          >
+            {value}
+          </Link>
+        ) : (
+          <span className={valueClassName} title={truncateValue ? value : undefined}>
+            {value}
+          </span>
+        )}
+        {valueSuffix !== undefined ? (
+          <span className="shrink-0 text-xs text-muted-foreground">{valueSuffix}</span>
+        ) : null}
+        {copyValue !== undefined ? (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon-xs"
+                aria-label={copyLabel}
+                className="shrink-0"
+                onClick={() => {
+                  void copyToClipboard(copyValue);
+                }}
+              >
+                <ClipboardCopyIcon className="size-3.5" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="top">{copyLabel}</TooltipContent>
+          </Tooltip>
+        ) : null}
+      </div>
     </div>
   );
 }
 
-function startArtifactPolling<TArtifactState extends { status: "ready" | "pending" | "failed" }>(input: {
+function startArtifactPolling<
+  TArtifactState extends { status: "ready" | "pending" | "failed" }
+>(input: {
   load: () => Promise<TArtifactState>;
   setState: (state: TArtifactState | { status: "error" }) => void;
 }): () => void {
@@ -395,7 +501,9 @@ function startArtifactPolling<TArtifactState extends { status: "ready" | "pendin
 
       input.setState(result);
       if (result.status === "pending") {
-        timeout = setTimeout(() => { void loadArtifact(); }, ARTIFACT_POLL_INTERVAL_MS);
+        timeout = setTimeout(() => {
+          void loadArtifact();
+        }, ARTIFACT_POLL_INTERVAL_MS);
       }
     } catch {
       if (!cancelled) {
@@ -419,6 +527,10 @@ function formatDate(value: string): string {
     dateStyle: "medium",
     timeStyle: "short"
   });
+}
+
+function formatFingerprintVersion(value: string): string {
+  return /^v/i.test(value) ? value : `v${value}`;
 }
 
 async function copyToClipboard(text: string): Promise<void> {

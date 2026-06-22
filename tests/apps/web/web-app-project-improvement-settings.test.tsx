@@ -68,7 +68,10 @@ describe("web app — project improvement settings", () => {
         });
       }
 
-      if (url.endsWith("/v1/projects/proj_123/improvement-settings") && init?.method === undefined) {
+      if (
+        url.endsWith("/v1/projects/proj_123/improvement-settings") &&
+        init?.method === undefined
+      ) {
         return jsonResponse(200, {
           access_mode: "manage",
           cloud_automation_available: true,
@@ -104,9 +107,13 @@ describe("web app — project improvement settings", () => {
 
     render(<App initialEntries={["/projects/proj_123/settings"]} />);
 
-    expect(await screen.findByRole("heading", { name: /automated improvement bundles/i, level: 3 })).toBeInTheDocument();
+    expect(
+      await screen.findByRole("heading", { name: /automated improvement bundles/i, level: 3 })
+    ).toBeInTheDocument();
 
-    const enabledSwitch = document.getElementById("project-improvement-bundles-enabled") as HTMLButtonElement | null;
+    const enabledSwitch = document.getElementById(
+      "project-improvement-bundles-enabled"
+    ) as HTMLButtonElement | null;
     await findSelectTrigger(/sensitivity/i);
     const saveButton = await screen.findByRole("button", { name: /save improvement settings/i });
 
@@ -115,7 +122,9 @@ describe("web app — project improvement settings", () => {
 
     expect(improvementEnabledSwitch).toHaveAttribute("aria-checked", "true");
     expect(saveButton).toBeDisabled();
-    expect(screen.getByText(/counts toward the existing bundle allowance/i)).toBeInTheDocument();
+    expect(
+      screen.getByText(/create improvement bundles from recurring project signals/i)
+    ).toBeInTheDocument();
 
     await openSelect(/sensitivity/i);
     await user.click(await screen.findByRole("option", { name: /verbose/i }));
@@ -135,7 +144,8 @@ describe("web app — project improvement settings", () => {
       expect(
         fetchMock.mock.calls.some(
           ([request, requestInit]) =>
-            requestUrl(request).endsWith("/v1/projects/proj_123/improvement-settings") && requestInit?.method === "PATCH"
+            requestUrl(request).endsWith("/v1/projects/proj_123/improvement-settings") &&
+            requestInit?.method === "PATCH"
         )
       ).toBe(true);
     });
@@ -178,7 +188,10 @@ describe("web app — project improvement settings", () => {
         });
       }
 
-      if (url.endsWith("/v1/projects/proj_123/improvement-settings") && init?.method === undefined) {
+      if (
+        url.endsWith("/v1/projects/proj_123/improvement-settings") &&
+        init?.method === undefined
+      ) {
         return jsonResponse(200, {
           access_mode: "manage",
           cloud_automation_available: false,
@@ -196,8 +209,14 @@ describe("web app — project improvement settings", () => {
 
     render(<App initialEntries={["/projects/proj_123/settings"]} />);
 
-    expect(await screen.findByRole("heading", { name: /automated improvement bundles/i, level: 3 })).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: /upgrade to solo or team to unlock hosted improvements/i })).toBeInTheDocument();
+    expect(
+      await screen.findByRole("heading", { name: /automated improvement bundles/i, level: 3 })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", {
+        name: /upgrade to solo or team to unlock hosted improvements/i
+      })
+    ).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /open billing/i })).toHaveAttribute("href", "/billing");
     expect(document.getElementById("project-improvement-bundles-enabled")).toBeNull();
     expect(screen.queryByText(/counts toward the existing bundle allowance/i)).toBeNull();
@@ -242,7 +261,10 @@ describe("web app — project improvement settings", () => {
           });
         }
 
-        if (url.endsWith("/v1/projects/proj_123/improvement-settings") && init?.method === undefined) {
+        if (
+          url.endsWith("/v1/projects/proj_123/improvement-settings") &&
+          init?.method === undefined
+        ) {
           return jsonResponse(200, {
             access_mode: "manage",
             cloud_automation_available: true,
@@ -259,9 +281,18 @@ describe("web app — project improvement settings", () => {
 
     render(<App initialEntries={["/projects/proj_123/settings"]} />);
 
-    const capturePolicyHeading = await screen.findByRole("heading", { name: /capture policy/i, level: 3 });
-    const improvementHeading = await screen.findByRole("heading", { name: /automated improvement bundles/i, level: 3 });
+    const capturePolicyHeading = await screen.findByRole("heading", {
+      name: /capture policy/i,
+      level: 3
+    });
+    const improvementHeading = await screen.findByRole("heading", {
+      name: /automated improvement bundles/i,
+      level: 3
+    });
 
-    expect(capturePolicyHeading.compareDocumentPosition(improvementHeading) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(
+      capturePolicyHeading.compareDocumentPosition(improvementHeading) &
+        Node.DOCUMENT_POSITION_FOLLOWING
+    ).toBeTruthy();
   });
 });

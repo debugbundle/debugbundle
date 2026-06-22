@@ -22,7 +22,9 @@ function createDependencies(): ApiDependencies {
       resolveProjectByTokenHash: vi.fn()
     },
     memberAuth: {
-      resolveMemberByTokenHash: vi.fn().mockResolvedValue({ member_id: "mem_123", organization_id: "org_123" })
+      resolveMemberByTokenHash: vi
+        .fn()
+        .mockResolvedValue({ member_id: "mem_123", organization_id: "org_123" })
     },
     tokenManagement: {
       listProjectTokensForOrganization: vi.fn().mockResolvedValue([]),
@@ -60,7 +62,9 @@ describe("api helpers", () => {
       event_id: "550e8400-e29b-41d4-a716-446655440001"
     });
 
-    const parsedPostgresTimestamp = parseLogsCursor("2026-03-11 00:10:00.000+00|550e8400-e29b-41d4-a716-446655440001");
+    const parsedPostgresTimestamp = parseLogsCursor(
+      "2026-03-11 00:10:00.000+00|550e8400-e29b-41d4-a716-446655440001"
+    );
     expect(parsedPostgresTimestamp).toEqual({
       occurred_at: "2026-03-11T00:10:00.000Z",
       event_id: "550e8400-e29b-41d4-a716-446655440001"
@@ -68,13 +72,15 @@ describe("api helpers", () => {
   });
 
   it("should parse incident and improvement cursors from ISO and Postgres timestamp formats", (): void => {
-    expect(parseIncidentsCursor("2026-03-11T00:09:00.000Z|inc_122")).toEqual({
+    const incidentCursorId = "550e8400-e29b-41d4-a716-446655440122";
+
+    expect(parseIncidentsCursor(`2026-03-11T00:09:00.000Z|${incidentCursorId}`)).toEqual({
       last_seen_at: "2026-03-11T00:09:00.000Z",
-      incident_id: "inc_122"
+      incident_id: incidentCursorId
     });
-    expect(parseIncidentsCursor("2026-03-11 00:09:00.000+00|inc_122")).toEqual({
+    expect(parseIncidentsCursor(`2026-03-11 00:09:00.000+00|${incidentCursorId}`)).toEqual({
       last_seen_at: "2026-03-11T00:09:00.000Z",
-      incident_id: "inc_122"
+      incident_id: incidentCursorId
     });
 
     expect(parseImprovementsCursor("2026-05-18T12:45:00.000Z|imp_cursor")).toEqual({
@@ -104,7 +110,10 @@ describe("api helpers", () => {
     const missing = await requireMemberAuth({}, dependencies);
     expect(missing).toBeNull();
 
-    const resolved = await requireMemberAuth({ authorization: "Bearer dbundle_mem_test" }, dependencies);
+    const resolved = await requireMemberAuth(
+      { authorization: "Bearer dbundle_mem_test" },
+      dependencies
+    );
     expect(resolved).toEqual({ member_id: "mem_123", organization_id: "org_123" });
   });
 
