@@ -6,6 +6,10 @@ The format is based on Keep a Changelog and this project follows Semantic Versio
 
 ## [Unreleased]
 
+### Changed
+
+- Added official MCP Registry availability documentation for `com.debugbundle/mcp` and noted the registry listing milestone for the published `@debugbundle/mcp` package.
+
 ## [1.6.2] - 2026-06-21
 
 ### Added

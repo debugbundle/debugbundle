@@ -4812,10 +4812,12 @@ describe("web app — management routes", () => {
     render(<App initialEntries={["/billing"]} />);
 
     expect(await screen.findByRole("heading", { name: /billing/i, level: 1 })).toBeInTheDocument();
-    expect(screen.getByText(/billing is managed internally/i)).toBeInTheDocument();
+    expect(await screen.findByText(/billing is managed internally/i)).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: /manage capacity/i }));
-    expect(screen.getByText(/internal admin-managed accounts update purchased allowance units immediately/i)).toBeInTheDocument();
+    expect(
+      await screen.findByText(/internal admin-managed accounts update purchased allowance units immediately/i)
+    ).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /keep current units/i })).not.toBeInTheDocument();
 
     const reductionInput = screen.getByLabelText(/purchased extra units after update/i);

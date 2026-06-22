@@ -25,6 +25,7 @@ type PackageJsonLike = {
 
 type McpServerJsonLike = {
   name?: string;
+  description?: string;
   version?: string;
   packages?: Array<{
     registryType?: string;
@@ -85,6 +86,10 @@ describe("mcp workspace package", () => {
 
     expect(serverJson.name).toBe(packageJson.mcpName);
     expect(serverJson.version).toBe(packageJson.version);
+    expect(serverJson.description).toBe(
+      "DebugBundle MCP server for incidents, bundles, reproductions, health checks, probes, and ops."
+    );
+    expect(serverJson.description?.length).toBeLessThanOrEqual(100);
     expect(serverJson.packages).toEqual([
       expect.objectContaining({
         registryType: "npm",
