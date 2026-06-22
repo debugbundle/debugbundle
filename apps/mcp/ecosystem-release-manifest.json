@@ -1,0 +1,62 @@
+{
+  "package": {
+    "name": "@debugbundle/mcp",
+    "sourceDirectory": "apps/mcp",
+    "packageJsonPath": "apps/mcp/package.json",
+    "serverJsonPath": "apps/mcp/server.json"
+  },
+  "mcpb": {
+    "bundleFileName": "debugbundle-mcp.mcpb",
+    "cliPackage": "@anthropic-ai/mcpb",
+    "cliVersion": "2.1.2"
+  },
+  "publishTargets": {
+    "officialRegistry": {
+      "type": "push",
+      "publisherBinary": "mcp-publisher"
+    },
+    "smithery": {
+      "type": "push",
+      "namespace": "debugbundle",
+      "slug": "debugbundle",
+      "cliPackage": "smithery",
+      "cliVersion": "1.2.0"
+    },
+    "smitherySkill": {
+      "type": "push",
+      "namespace": "debugbundle",
+      "slug": "debugbundle",
+      "gitBranch": "main",
+      "skillPath": "apps/mcp/clawhub/debugbundle",
+      "cliPackage": "smithery",
+      "cliVersion": "1.2.0"
+    },
+    "clawhub": {
+      "type": "push",
+      "owner": "debugbundle",
+      "slug": "debugbundle",
+      "displayName": "DebugBundle",
+      "skillPath": "apps/mcp/clawhub/debugbundle",
+      "cliPackage": "clawhub",
+      "cliVersion": "0.22.0"
+    },
+    "glama": {
+      "type": "discovery",
+      "listingUrl": "https://glama.ai/mcp/servers",
+      "searchTerms": [
+        "debugbundle",
+        "@debugbundle/mcp",
+        "com.debugbundle/mcp"
+      ]
+    },
+    "lobehub": {
+      "type": "discovery",
+      "listingUrl": "https://lobehub.com/mcp",
+      "searchTerms": [
+        "debugbundle",
+        "@debugbundle/mcp",
+        "com.debugbundle/mcp"
+      ]
+    }
+  }
+}

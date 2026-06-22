@@ -61,6 +61,11 @@ help:
 	@echo "  make selfhost-smoke  Boot the self-host stack and prove auth + ingest + bundle retrieval"
 	@echo "  make build           Run build via Docker"
 	@echo "  make ci              Run lint + typecheck + test + build via Docker"
+	@echo "  make release-mcp-ecosystem-plan VERSION=x.y.z"
+	@echo "  make release-mcp-ecosystem-prepare VERSION=x.y.z"
+	@echo "  make release-mcp-ecosystem-publish VERSION=x.y.z TARGETS=officialRegistry,smithery,clawhub"
+	@echo "  make release-mcp-ecosystem-verify VERSION=x.y.z TARGETS=officialRegistry,smithery,clawhub,glama,lobehub"
+	@echo "  make release-mcp-ecosystem VERSION=x.y.z"
 	@echo "  make test-integration Run Compose-backed ingestion integration tests"
 	@echo "  make api-check       Run API runtime bootstrap tests"
 	@echo "  make backend-restart Recreate API + worker so they reload current env"
@@ -180,6 +185,26 @@ test-all-quick:
 .PHONY: build
 build:
 	$(NODE_RUN) "corepack enable && corepack pnpm build"
+
+.PHONY: release-mcp-ecosystem-plan
+release-mcp-ecosystem-plan:
+	node scripts/release-mcp-ecosystem.mjs plan $(if $(VERSION),--version $(VERSION),) $(if $(TARGETS),--targets $(TARGETS),)
+
+.PHONY: release-mcp-ecosystem-prepare
+release-mcp-ecosystem-prepare:
+	node scripts/release-mcp-ecosystem.mjs prepare $(if $(VERSION),--version $(VERSION),) $(if $(TARGETS),--targets $(TARGETS),)
+
+.PHONY: release-mcp-ecosystem-publish
+release-mcp-ecosystem-publish:
+	node scripts/release-mcp-ecosystem.mjs publish $(if $(VERSION),--version $(VERSION),) $(if $(TARGETS),--targets $(TARGETS),)
+
+.PHONY: release-mcp-ecosystem-verify
+release-mcp-ecosystem-verify:
+	node scripts/release-mcp-ecosystem.mjs verify $(if $(VERSION),--version $(VERSION),) $(if $(TARGETS),--targets $(TARGETS),)
+
+.PHONY: release-mcp-ecosystem
+release-mcp-ecosystem:
+	node scripts/release-mcp-ecosystem.mjs run $(if $(VERSION),--version $(VERSION),) $(if $(TARGETS),--targets $(TARGETS),)
 
 .PHONY: ci
 ci: lint typecheck test build

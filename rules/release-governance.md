@@ -62,6 +62,19 @@ The public core repository currently uses package-scoped release workflows rathe
 
 Public CI must NEVER contain deployment config, cloud credentials, or infrastructure code.
 
+### MCP Ecosystem Follow-Through
+
+After the GitHub-managed npm publish for `@debugbundle/mcp` succeeds, maintainers must run the repo-owned local MCP ecosystem release pipeline from the exact published npm version rather than rebuilding from workspace sources. The local pipeline is responsible for:
+
+1. Repacking the published `@debugbundle/mcp` artifact into an MCPB bundle and rerunning the stdio smoke test.
+2. Publishing the repo-owned `apps/mcp/server.json` metadata to the official MCP Registry.
+3. Publishing the MCPB bundle to Smithery under the configured namespace/slug.
+4. Publishing the GitHub-backed portable shared skill from `apps/mcp/clawhub/debugbundle/` to the Smithery Skills registry.
+5. Publishing the portable shared skill from `apps/mcp/clawhub/debugbundle/` to ClawHub/OpenClaw.
+6. Emitting the follow-up discovery checklist for pull-based directories such as Glama and LobeHub, which should be treated as verification surfaces unless they later document a first-party publish API.
+
+Because these registry-authenticated workflows depend on local browser login state, host-installed publisher tools, and marketplace-specific credentials, they intentionally run through the host-side `make release-mcp-ecosystem-*` targets instead of the Docker-backed CI lanes. The source-of-truth config for this follow-through lives in `apps/mcp/ecosystem-release-manifest.json`.
+
 ### Package Release Checklist
 
 Any SDK or package published to an external registry must satisfy these minimum artifact checks before release is considered complete:

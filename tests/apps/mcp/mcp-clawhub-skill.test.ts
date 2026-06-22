@@ -5,12 +5,15 @@ import { describe, expect, it } from "vitest";
 
 const repoRoot = process.cwd();
 const skillPath = join(repoRoot, "apps", "mcp", "clawhub", "debugbundle", "SKILL.md");
+const skillLicensePath = join(repoRoot, "apps", "mcp", "clawhub", "debugbundle", "LICENSE");
 
 describe("mcp ClawHub skill", () => {
   it("ships a portable DebugBundle skill for ClawHub publication", () => {
     expect(existsSync(skillPath)).toBe(true);
+    expect(existsSync(skillLicensePath)).toBe(true);
 
     const skill = readFileSync(skillPath, "utf8");
+    const license = readFileSync(skillLicensePath, "utf8");
 
     expect(skill).toContain("name: debugbundle");
     expect(skill).toContain("description: Use DebugBundle MCP and CLI workflows");
@@ -23,7 +26,12 @@ describe("mcp ClawHub skill", () => {
     expect(skill).toContain("should not replace a repository's generated `.agents/skills/debugbundle/SKILL.md`");
     expect(skill).toContain("Hosted Health Checks");
     expect(skill).toContain("test_health_check");
+    expect(skill).toContain("Operations Surfaces");
+    expect(skill).toContain("GitHub dispatch");
+    expect(skill).toContain("improvement-settings tools");
+    expect(skill).toContain("billing, capture-policy, capture-rule");
     expect(skill).toContain("evaluate capture-rule suggestions or path-scoped capture policy");
     expect(skill).toContain("Do not use project tokens for retrieval or management operations");
+    expect(license).toContain("MIT No Attribution");
   });
 });
