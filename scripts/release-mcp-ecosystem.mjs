@@ -211,6 +211,15 @@ function runCommand(command, args, options = {}) {
   };
 }
 
+function parseJsonFromCommandOutput(output) {
+  const jsonStart = output.indexOf("{");
+  if (jsonStart === -1) {
+    throw new Error("missing_json_output");
+  }
+
+  return JSON.parse(output.slice(jsonStart));
+}
+
 function writeReport(context, report) {
   mkdirSync(dirname(context.reportPath), { recursive: true });
   writeFileSync(context.reportPath, `${JSON.stringify(report, null, 2)}\n`);
@@ -686,19 +695,27 @@ async function verify(context) {
       }
 
       if (targetKey === "clawhub") {
-        const qualifiedSlug = `@${target.owner}/${target.slug}`;
         const result = runCommand("npx", [
           "-y",
           `${target.cliPackage}@${target.cliVersion}`,
-          "skill",
-          "verify",
-          qualifiedSlug
+          "inspect",
+          target.slug,
+          "--json"
         ]);
+        const payload = parseJsonFromCommandOutput(result.stdout);
+        const skill = payload.skill;
+        const latestVersion = payload.latestVersion;
+        const owner = payload.owner;
+        const moderation = payload.moderation;
         report.verify.clawhub = {
-          status: "verified",
-          slug: qualifiedSlug,
-          stdout: result.stdout.trim(),
-          stderr: result.stderr.trim()
+          status: skill === undefined ? "missing" : "found",
+          slug: target.slug,
+          pageUrl: `https://clawhub.ai/${target.owner}/${target.slug}`,
+          owner: owner?.handle ?? null,
+          latestVersion: latestVersion?.version ?? null,
+          license: latestVersion?.license ?? null,
+          moderationVerdict: moderation?.verdict ?? null,
+          moderationSummary: moderation?.summary ?? null
         };
         continue;
       }

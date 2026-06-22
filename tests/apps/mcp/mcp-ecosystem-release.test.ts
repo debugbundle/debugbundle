@@ -46,6 +46,8 @@ describe("mcp ecosystem release pipeline", () => {
     expect(script).toContain('"mcp", "publish", context.bundlePath, "-n", qualifiedName');
     expect(script).toContain('https://api.smithery.ai/skills/');
     expect(script).toContain('resources: "skills"');
+    expect(script).toContain('"inspect"');
+    expect(script).toContain("parseJsonFromCommandOutput");
     expect(script).toContain('`${target.cliPackage}@${target.cliVersion}`');
     expect(script).toContain("manual_check_required");
   });
