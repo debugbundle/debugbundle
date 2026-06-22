@@ -444,6 +444,14 @@ describe("web app — project capture rules", () => {
   });
 
   it("updates guided form controls across matcher and sampling fields", async () => {
+    const setInputValue = (label: RegExp, value: string): void => {
+      fireEvent.change(screen.getByLabelText(label), {
+        target: {
+          value
+        }
+      });
+    };
+
     function Harness(): JSX.Element {
       const [draft, setDraft] = useState<CaptureRuleCreateDraft>({
         ...createDefaultCaptureRuleCreateDraft(),
@@ -463,9 +471,8 @@ describe("web app — project capture rules", () => {
     const user = userEvent.setup();
     render(<Harness />);
 
-    await user.clear(screen.getByLabelText(/^rule name$/i));
-    await user.type(screen.getByLabelText(/^rule name$/i), "Bot request sampling");
-    await user.type(screen.getByLabelText(/^description$/i), "Sample recurring bot traffic.");
+    setInputValue(/^rule name$/i, "Bot request sampling");
+    setInputValue(/^description$/i, "Sample recurring bot traffic.");
 
     await openSelect(/^event type$/i);
     await user.click(screen.getByRole("option", { name: /request event/i }));
@@ -473,8 +480,8 @@ describe("web app — project capture rules", () => {
     await openSelect(/^runtime$/i);
     await user.click(screen.getByRole("option", { name: /node\.js/i }));
 
-    await user.type(screen.getByLabelText(/^services$/i), "web, api");
-    await user.type(screen.getByLabelText(/^environments$/i), "production, staging");
+    setInputValue(/^services$/i, "web, api");
+    setInputValue(/^environments$/i, "production, staging");
 
     await openSelect(/^browser event kind$/i);
     await user.click(screen.getByRole("option", { name: /window error/i }));
@@ -485,29 +492,24 @@ describe("web app — project capture rules", () => {
     await openSelect(/^request scope$/i);
     await user.click(screen.getByRole("option", { name: /third-party allowed/i }));
 
-    await user.type(screen.getByLabelText(/^bot family$/i), "Googlebot");
+    setInputValue(/^bot family$/i, "Googlebot");
     await user.click(screen.getByRole("switch", { name: /opaque browser event/i }));
-    await user.type(screen.getByLabelText(/^error name$/i), "NetworkError");
-    await user.type(screen.getByLabelText(/^message equals$/i), "Window error");
-    await user.type(screen.getByLabelText(/^message contains$/i), "chunk");
-    await user.type(screen.getByLabelText(/^resource path equals$/i), "assets/chunk.js");
-    await user.type(screen.getByLabelText(/^request path equals$/i), "api/bootstrap");
-    await user.type(screen.getByLabelText(/^status codes$/i), "429, 500");
-    await user.type(screen.getByLabelText(/^fingerprint version$/i), "v1");
-    await user.type(screen.getByLabelText(/^fingerprint value$/i), "fp_123");
-    await user.clear(screen.getByLabelText(/^sample rate percent$/i));
-    await user.type(screen.getByLabelText(/^sample rate percent$/i), "30");
+    setInputValue(/^error name$/i, "NetworkError");
+    setInputValue(/^message equals$/i, "Window error");
+    setInputValue(/^message contains$/i, "chunk");
+    setInputValue(/^resource path equals$/i, "assets/chunk.js");
+    setInputValue(/^request path equals$/i, "api/bootstrap");
+    setInputValue(/^status codes$/i, "429, 500");
+    setInputValue(/^fingerprint version$/i, "v1");
+    setInputValue(/^fingerprint value$/i, "fp_123");
+    setInputValue(/^sample rate percent$/i, "30");
 
     await openSelect(/^sampled-in class$/i);
     await user.click(screen.getByRole("option", { name: /store as context only/i }));
 
     await user.click(screen.getByRole("switch", { name: /^enabled$/i }));
-    await user.type(screen.getByLabelText(/^expires at$/i), "2026-06-20T09:15");
-    fireEvent.change(screen.getByLabelText(/^additional matcher json$/i), {
-      target: {
-        value: '{"status_ranges":[{"start":500,"end":599}]}'
-      }
-    });
+    setInputValue(/^expires at$/i, "2026-06-20T09:15");
+    setInputValue(/^additional matcher json$/i, '{"status_ranges":[{"start":500,"end":599}]}');
 
     expect(screen.getByTestId("draft-state")).toHaveTextContent('"name":"Bot request sampling"');
     expect(screen.getByTestId("draft-state")).toHaveTextContent('"eventType":"request_event"');
