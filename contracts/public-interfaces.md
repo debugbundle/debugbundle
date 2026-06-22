@@ -2560,6 +2560,24 @@ These tools manage GitHub repository automation. Project-scoped read operations 
 
 ---
 
+## 3a. OpenClaw Plugin Interface
+
+Package: `@debugbundle/openclaw-plugin`
+
+Install surface:
+
+```bash
+openclaw plugins install clawhub:@debugbundle/openclaw-plugin
+```
+
+The OpenClaw plugin is a host-native projection of the MCP tool catalog. It exposes every MCP tool as `debugbundle_<mcp_tool_name>` and delegates execution to the same MCP tool factory used by `@debugbundle/mcp`. The plugin may translate host metadata, TypeBox schemas, tool prefixes, optional-tool declarations, and OpenClaw approval hooks, but it must not add product behavior that is absent from API/CLI/MCP.
+
+OpenClaw auth follows the MCP auth order: explicit per-tool `bearerToken`, `DEBUGBUNDLE_MEMBER_TOKEN`, then CLI auth state from `~/.debugbundle/auth.json`. `DEBUGBUNDLE_API_URL` or plugin config `apiBaseUrl` may point at self-hosted or non-production APIs. Project tokens remain write-only ingestion credentials and are not valid for OpenClaw management tools.
+
+Mutation tools must be marked optional in `openclaw.plugin.json` so operators explicitly allow them before model exposure. Production-impacting mutations must also use OpenClaw per-call approval hooks before public publish.
+
+---
+
 ## 4. SDK Public API
 
 See `/contracts/sdk-interface.md` for the full universal interface contract. Below are language-specific quick-start examples.

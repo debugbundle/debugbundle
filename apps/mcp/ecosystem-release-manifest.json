@@ -40,6 +40,14 @@
       "cliPackage": "clawhub",
       "cliVersion": "0.22.0"
     },
+    "clawhubPlugin": {
+      "type": "push",
+      "packageName": "@debugbundle/openclaw-plugin",
+      "packagePath": "apps/openclaw-plugin",
+      "pluginId": "debugbundle",
+      "cliPackage": "clawhub",
+      "cliVersion": "0.22.0"
+    },
     "glama": {
       "type": "discovery",
       "listingUrl": "https://glama.ai/mcp/servers",

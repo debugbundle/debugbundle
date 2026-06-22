@@ -211,7 +211,7 @@ When the product is in production and a task touches Postgres tables, columns, i
 
 <!-- debugbundle:start -->
 ## DebugBundle
-- For every new `@debugbundle/mcp` release or new public MCP marketplace target, run the local MCP ecosystem release pipeline after npm publish so the official registry, Smithery MCP + skill entries, ClawHub, and discovery checks stay synchronized.
+- For every new `@debugbundle/mcp` release or new public MCP/OpenClaw marketplace target, run the local MCP ecosystem release pipeline after npm publish so the official registry, Smithery MCP + skill entries, ClawHub skill + OpenClaw plugin, and discovery checks stay synchronized.
 - Check DebugBundle for existing incidents before investigating bugs.
 - Read `.agents/skills/debugbundle/SKILL.md` for the full debugging workflow.
 - Use `debugbundle inspect <incident-id>` or MCP `get_bundle` when a user reports an issue.

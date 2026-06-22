@@ -563,6 +563,30 @@ If CLI says something is healthy and MCP says something different, that is a pro
 
 ---
 
+## 9a. OpenClaw Plugin Acceptance
+
+### AC-OPENCLAW-01: MCP Catalog Projection
+- **Given** a DebugBundle MCP tool catalog entry
+- **When** the OpenClaw plugin is built
+- **Then** the plugin exposes an equivalent tool named `debugbundle_<mcp_tool_name>`
+- **And** the OpenClaw tool description and input schema are generated from the MCP catalog
+- **And** the OpenClaw handler delegates to the MCP tool implementation without separate business logic
+
+### AC-OPENCLAW-02: Mutation Safety
+- **Given** a DebugBundle tool that changes incident lifecycle, probes, projects, tokens, billing, members, capture policy/rules, alerts, Slack destinations, webhooks, weekly reports, GitHub automation, or improvement lifecycle state
+- **When** the OpenClaw plugin manifest is generated
+- **Then** the tool is marked optional so operators must explicitly allow it before the model can see it
+- **And** production-impacting mutation tools must add OpenClaw per-call approval gates before public publish
+
+### AC-OPENCLAW-03: Package Validation
+- **Given** the OpenClaw plugin package
+- **When** the release train prepares MCP ecosystem follow-through
+- **Then** the plugin builds to `dist/index.js`
+- **And** `openclaw.plugin.json` declares `contracts.tools`, `configSchema`, activation, and OpenClaw compatibility metadata
+- **And** ClawHub package validation and dry-run publish pass before the package is published
+
+---
+
 ## 10. Auth Acceptance
 
 ### AC-AUTH-01: Agent-Assisted Signup

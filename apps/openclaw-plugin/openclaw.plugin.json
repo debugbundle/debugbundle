@@ -1,0 +1,294 @@
+{
+  "id": "debugbundle",
+  "name": "DebugBundle",
+  "description": "Use DebugBundle tools to inspect incidents, bundles, reproductions, probes, health checks, and operational debugging surfaces.",
+  "version": "1.6.0",
+  "configSchema": {
+    "type": "object",
+    "properties": {
+      "apiBaseUrl": {
+        "type": "string",
+        "description": "Optional DebugBundle API base URL for self-hosted or non-production environments."
+      }
+    },
+    "additionalProperties": false
+  },
+  "activation": {
+    "onStartup": true
+  },
+  "contracts": {
+    "tools": [
+      "debugbundle_doctor",
+      "debugbundle_validate",
+      "debugbundle_verify_local",
+      "debugbundle_verify_cloud",
+      "debugbundle_smoke",
+      "debugbundle_analyze",
+      "debugbundle_list_incidents",
+      "debugbundle_get_incident",
+      "debugbundle_get_incident_context",
+      "debugbundle_resolve_incident",
+      "debugbundle_resolve_incidents",
+      "debugbundle_reopen_incident",
+      "debugbundle_reopen_incidents",
+      "debugbundle_get_bundle",
+      "debugbundle_get_reproduction",
+      "debugbundle_get_logs",
+      "debugbundle_list_improvements",
+      "debugbundle_get_improvement",
+      "debugbundle_get_improvement_bundle",
+      "debugbundle_resolve_improvement",
+      "debugbundle_reopen_improvement",
+      "debugbundle_snooze_improvement",
+      "debugbundle_get_github_status",
+      "debugbundle_list_github_repositories",
+      "debugbundle_list_github_dispatch_rules",
+      "debugbundle_create_github_dispatch_rule",
+      "debugbundle_update_github_dispatch_rule",
+      "debugbundle_delete_github_dispatch_rule",
+      "debugbundle_list_github_deliveries",
+      "debugbundle_retry_github_delivery",
+      "debugbundle_set_project_github_repo",
+      "debugbundle_remove_project_github_repo",
+      "debugbundle_list_project_tokens",
+      "debugbundle_create_project_token",
+      "debugbundle_revoke_project_token",
+      "debugbundle_list_member_tokens",
+      "debugbundle_create_member_token",
+      "debugbundle_revoke_member_token",
+      "debugbundle_list_webhooks",
+      "debugbundle_create_webhook",
+      "debugbundle_update_webhook",
+      "debugbundle_delete_webhook",
+      "debugbundle_test_webhook",
+      "debugbundle_list_webhook_deliveries",
+      "debugbundle_retry_webhook_delivery",
+      "debugbundle_list_slack_destinations",
+      "debugbundle_get_slack_connect_url",
+      "debugbundle_test_slack_destination",
+      "debugbundle_delete_slack_destination",
+      "debugbundle_list_weekly_report_channels",
+      "debugbundle_create_weekly_report_channel",
+      "debugbundle_update_weekly_report_channel",
+      "debugbundle_delete_weekly_report_channel",
+      "debugbundle_list_alerts",
+      "debugbundle_create_alert",
+      "debugbundle_update_alert",
+      "debugbundle_delete_alert",
+      "debugbundle_list_projects",
+      "debugbundle_create_project",
+      "debugbundle_update_project",
+      "debugbundle_delete_project",
+      "debugbundle_list_capture_rules",
+      "debugbundle_create_capture_rule",
+      "debugbundle_update_capture_rule",
+      "debugbundle_delete_capture_rule",
+      "debugbundle_suggest_capture_rules_from_incident",
+      "debugbundle_create_capture_rule_from_incident_suggestion",
+      "debugbundle_get_capture_policy",
+      "debugbundle_update_capture_policy",
+      "debugbundle_get_improvement_settings",
+      "debugbundle_update_improvement_settings",
+      "debugbundle_activate_probe",
+      "debugbundle_list_active_probes",
+      "debugbundle_deactivate_probe",
+      "debugbundle_list_health_checks",
+      "debugbundle_get_health_check",
+      "debugbundle_create_health_check",
+      "debugbundle_update_health_check",
+      "debugbundle_delete_health_check",
+      "debugbundle_test_health_check",
+      "debugbundle_list_health_check_results",
+      "debugbundle_list_health_check_daily_rollups",
+      "debugbundle_get_billing_summary",
+      "debugbundle_start_trial",
+      "debugbundle_increase_capacity",
+      "debugbundle_schedule_capacity_reduction",
+      "debugbundle_cancel_capacity_reduction",
+      "debugbundle_list_project_members",
+      "debugbundle_list_project_member_invites",
+      "debugbundle_invite_project_member",
+      "debugbundle_cancel_project_member_invite",
+      "debugbundle_update_project_member_role",
+      "debugbundle_remove_project_member",
+      "debugbundle_leave_project",
+      "debugbundle_list_services"
+    ]
+  },
+  "toolMetadata": {
+    "debugbundle_validate": {
+      "optional": true
+    },
+    "debugbundle_verify_local": {
+      "optional": true
+    },
+    "debugbundle_verify_cloud": {
+      "optional": true
+    },
+    "debugbundle_smoke": {
+      "optional": true
+    },
+    "debugbundle_analyze": {
+      "optional": true
+    },
+    "debugbundle_resolve_incident": {
+      "optional": true
+    },
+    "debugbundle_resolve_incidents": {
+      "optional": true
+    },
+    "debugbundle_reopen_incident": {
+      "optional": true
+    },
+    "debugbundle_reopen_incidents": {
+      "optional": true
+    },
+    "debugbundle_resolve_improvement": {
+      "optional": true
+    },
+    "debugbundle_reopen_improvement": {
+      "optional": true
+    },
+    "debugbundle_snooze_improvement": {
+      "optional": true
+    },
+    "debugbundle_create_github_dispatch_rule": {
+      "optional": true
+    },
+    "debugbundle_update_github_dispatch_rule": {
+      "optional": true
+    },
+    "debugbundle_delete_github_dispatch_rule": {
+      "optional": true
+    },
+    "debugbundle_retry_github_delivery": {
+      "optional": true
+    },
+    "debugbundle_set_project_github_repo": {
+      "optional": true
+    },
+    "debugbundle_remove_project_github_repo": {
+      "optional": true
+    },
+    "debugbundle_create_project_token": {
+      "optional": true
+    },
+    "debugbundle_revoke_project_token": {
+      "optional": true
+    },
+    "debugbundle_create_member_token": {
+      "optional": true
+    },
+    "debugbundle_revoke_member_token": {
+      "optional": true
+    },
+    "debugbundle_create_webhook": {
+      "optional": true
+    },
+    "debugbundle_update_webhook": {
+      "optional": true
+    },
+    "debugbundle_delete_webhook": {
+      "optional": true
+    },
+    "debugbundle_test_webhook": {
+      "optional": true
+    },
+    "debugbundle_retry_webhook_delivery": {
+      "optional": true
+    },
+    "debugbundle_test_slack_destination": {
+      "optional": true
+    },
+    "debugbundle_delete_slack_destination": {
+      "optional": true
+    },
+    "debugbundle_create_weekly_report_channel": {
+      "optional": true
+    },
+    "debugbundle_update_weekly_report_channel": {
+      "optional": true
+    },
+    "debugbundle_delete_weekly_report_channel": {
+      "optional": true
+    },
+    "debugbundle_create_alert": {
+      "optional": true
+    },
+    "debugbundle_update_alert": {
+      "optional": true
+    },
+    "debugbundle_delete_alert": {
+      "optional": true
+    },
+    "debugbundle_create_project": {
+      "optional": true
+    },
+    "debugbundle_update_project": {
+      "optional": true
+    },
+    "debugbundle_delete_project": {
+      "optional": true
+    },
+    "debugbundle_create_capture_rule": {
+      "optional": true
+    },
+    "debugbundle_update_capture_rule": {
+      "optional": true
+    },
+    "debugbundle_delete_capture_rule": {
+      "optional": true
+    },
+    "debugbundle_create_capture_rule_from_incident_suggestion": {
+      "optional": true
+    },
+    "debugbundle_update_capture_policy": {
+      "optional": true
+    },
+    "debugbundle_update_improvement_settings": {
+      "optional": true
+    },
+    "debugbundle_activate_probe": {
+      "optional": true
+    },
+    "debugbundle_deactivate_probe": {
+      "optional": true
+    },
+    "debugbundle_create_health_check": {
+      "optional": true
+    },
+    "debugbundle_update_health_check": {
+      "optional": true
+    },
+    "debugbundle_delete_health_check": {
+      "optional": true
+    },
+    "debugbundle_start_trial": {
+      "optional": true
+    },
+    "debugbundle_increase_capacity": {
+      "optional": true
+    },
+    "debugbundle_schedule_capacity_reduction": {
+      "optional": true
+    },
+    "debugbundle_cancel_capacity_reduction": {
+      "optional": true
+    },
+    "debugbundle_invite_project_member": {
+      "optional": true
+    },
+    "debugbundle_cancel_project_member_invite": {
+      "optional": true
+    },
+    "debugbundle_update_project_member_role": {
+      "optional": true
+    },
+    "debugbundle_remove_project_member": {
+      "optional": true
+    },
+    "debugbundle_leave_project": {
+      "optional": true
+    }
+  }
+}

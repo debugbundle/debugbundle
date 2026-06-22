@@ -1,0 +1,79 @@
+{
+  "name": "@debugbundle/openclaw-plugin",
+  "version": "1.6.0",
+  "private": false,
+  "description": "OpenClaw tool plugin for DebugBundle incidents, bundles, probes, health checks, and operational debugging.",
+  "license": "AGPL-3.0-only",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/debugbundle/debugbundle",
+    "directory": "apps/openclaw-plugin"
+  },
+  "homepage": "https://debugbundle.com/docs/mcp",
+  "bugs": {
+    "url": "https://github.com/debugbundle/debugbundle/issues"
+  },
+  "keywords": [
+    "debugbundle",
+    "debugging",
+    "ai-agent",
+    "openclaw",
+    "clawhub",
+    "plugin"
+  ],
+  "engines": {
+    "node": ">=22 <27"
+  },
+  "type": "module",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "files": [
+    "dist",
+    "openclaw.plugin.json",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "esbuild src/index.ts --bundle --platform=node --format=esm --target=node22 --external:@node-rs/argon2 --external:openclaw --outfile=dist/index.js && node scripts/write-types.mjs",
+    "plugin:build": "openclaw plugins build --entry ./dist/index.js",
+    "plugin:validate": "openclaw plugins validate --root . --entry ./dist/index.js",
+    "plugin:check": "npm run build && openclaw plugins build --entry ./dist/index.js --check && npm run plugin:validate",
+    "prepack": "npm run plugin:check"
+  },
+  "dependencies": {
+    "@node-rs/argon2": "^2.0.2",
+    "typebox": "^1.3.0",
+    "zod-to-json-schema": "^3.25.2"
+  },
+  "peerDependencies": {
+    "openclaw": ">=2026.5.17"
+  },
+  "devDependencies": {
+    "esbuild": "^0.27.3",
+    "openclaw": "2026.6.9",
+    "typescript": "^6.0.2"
+  },
+  "openclaw": {
+    "extensions": [
+      "./dist/index.js"
+    ],
+    "compat": {
+      "pluginApi": ">=2026.5.17",
+      "minGatewayVersion": "2026.5.17"
+    },
+    "build": {
+      "openclawVersion": "2026.6.9",
+      "pluginSdkVersion": "2026.6.9"
+    },
+    "install": {
+      "clawhubSpec": "@debugbundle/openclaw-plugin",
+      "defaultChoice": "clawhub",
+      "minHostVersion": ">=2026.6.9"
+    }
+  }
+}

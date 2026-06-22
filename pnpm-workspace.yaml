@@ -3,7 +3,11 @@ packages:
   - 'packages/*'
 confirmModulesPurge: false
 allowBuilds:
+  '@google/genai': false
   esbuild: true
   msw: true
+  openclaw: false
+  protobufjs: false
+  tree-sitter-bash: false
 minimumReleaseAgeExclude:
   - '@debugbundle/*'

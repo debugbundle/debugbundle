@@ -19,6 +19,7 @@ site/
 /STATUS.md
 /TODO.md
 bundle-analysis/
+apps/openclaw-plugin/reports/
 spec/local/*
 debugbundle-multirepo.code-workspace
 

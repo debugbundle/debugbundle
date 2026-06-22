@@ -37,6 +37,7 @@ describe("mcp ecosystem release pipeline", () => {
       smithery: { type: "push" },
       smitherySkill: { type: "push" },
       clawhub: { type: "push" },
+      clawhubPlugin: { type: "push" },
       glama: { type: "discovery" },
       lobehub: { type: "discovery" }
     });
@@ -48,6 +49,8 @@ describe("mcp ecosystem release pipeline", () => {
     expect(script).toContain('resources: "skills"');
     expect(script).toContain('"inspect"');
     expect(script).toContain("parseJsonFromCommandOutput");
+    expect(script).toContain('"package",');
+    expect(script).toContain('"plugin:validate"');
     expect(script).toContain('`${target.cliPackage}@${target.cliVersion}`');
     expect(script).toContain("manual_check_required");
   });
@@ -73,7 +76,8 @@ describe("mcp ecosystem release pipeline", () => {
       expect.objectContaining({ key: "officialRegistry", type: "push" }),
       expect.objectContaining({ key: "smithery", type: "push" }),
       expect.objectContaining({ key: "smitherySkill", type: "push" }),
-      expect.objectContaining({ key: "clawhub", type: "push" })
+      expect.objectContaining({ key: "clawhub", type: "push" }),
+      expect.objectContaining({ key: "clawhubPlugin", type: "push" })
     ]);
     expect(plan.discoveryTargets).toEqual([
       expect.objectContaining({ key: "glama", type: "discovery" }),

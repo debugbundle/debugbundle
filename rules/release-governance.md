@@ -71,7 +71,8 @@ After the GitHub-managed npm publish for `@debugbundle/mcp` succeeds, maintainer
 3. Publishing the MCPB bundle to Smithery under the configured namespace/slug.
 4. Publishing the GitHub-backed portable shared skill from `apps/mcp/clawhub/debugbundle/` to the Smithery Skills registry.
 5. Publishing the portable shared skill from `apps/mcp/clawhub/debugbundle/` to ClawHub/OpenClaw.
-6. Emitting the follow-up discovery checklist for pull-based directories such as Glama and LobeHub, which should be treated as verification surfaces unless they later document a first-party publish API.
+6. Building, validating, and publishing the OpenClaw plugin package from `apps/openclaw-plugin/` to ClawHub.
+7. Emitting the follow-up discovery checklist for pull-based directories such as Glama and LobeHub, which should be treated as verification surfaces unless they later document a first-party publish API.
 
 Because these registry-authenticated workflows depend on local browser login state, host-installed publisher tools, and marketplace-specific credentials, they intentionally run through the host-side `make release-mcp-ecosystem-*` targets instead of the Docker-backed CI lanes. The source-of-truth config for this follow-through lives in `apps/mcp/ecosystem-release-manifest.json`.
 

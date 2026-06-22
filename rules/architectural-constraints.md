@@ -45,11 +45,15 @@ Retrieval API/CLI/MCP ───────────────────�
 
 All three interfaces must call the same internal domain services. No interface may have unique hidden behavior.
 
+OpenClaw support is a first-class agent automation surface when shipped. OpenClaw tools must project the same agent capability set as MCP with host-appropriate naming and safety gates, and must delegate to the same MCP/shared tool implementation rather than creating a fourth business-logic path.
+
 ---
 
 ## 4. MCP as Thin Adapter
 
 The MCP server must be a thin adapter over the same domain services used by API and CLI. It must NOT implement separate business logic, separate validation, or have different result shapes.
+
+OpenClaw plugins follow the same adapter rule: plugin code may translate host metadata, tool names, schemas, and approval/allowlist declarations, but product behavior must remain owned by shared domain services and the MCP/CLI/API tool implementation.
 
 ---
 

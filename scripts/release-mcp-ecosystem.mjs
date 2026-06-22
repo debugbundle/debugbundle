@@ -336,6 +336,12 @@ function assertCleanGitPath(path) {
   }
 }
 
+function buildOpenClawPlugin(target) {
+  runCommand("pnpm", ["--filter", target.packageName, "build"], { cwd: repoRoot });
+  runCommand("pnpm", ["--filter", target.packageName, "plugin:build"], { cwd: repoRoot });
+  runCommand("pnpm", ["--filter", target.packageName, "plugin:validate"], { cwd: repoRoot });
+}
+
 function mintSmitheryApiToken(policy) {
   if (typeof process.env.SMITHERY_API_KEY === "string" && process.env.SMITHERY_API_KEY.length > 0) {
     return process.env.SMITHERY_API_KEY;
@@ -593,6 +599,37 @@ async function publishTarget(context, targetKey, target, dryRun) {
     };
   }
 
+  if (targetKey === "clawhubPlugin") {
+    const commandArguments = [
+      "-y",
+      `${target.cliPackage}@${target.cliVersion}`,
+      "package",
+      "publish",
+      join(repoRoot, target.packagePath)
+    ];
+
+    if (dryRun) {
+      return {
+        command: `npx ${commandArguments.join(" ")}`,
+        status: "dry_run",
+        packageName: target.packageName
+      };
+    }
+
+    assertCleanGitPath(target.packagePath);
+    buildOpenClawPlugin(target);
+    assertCleanGitPath(target.packagePath);
+
+    const result = runCommand("npx", commandArguments, { cwd: repoRoot });
+    return {
+      command: `npx ${commandArguments.join(" ")}`,
+      status: "published",
+      packageName: target.packageName,
+      stdout: result.stdout.trim(),
+      stderr: result.stderr.trim()
+    };
+  }
+
   throw new Error(`unsupported_publish_target:${targetKey}`);
 }
 
@@ -716,6 +753,29 @@ async function verify(context) {
           license: latestVersion?.license ?? null,
           moderationVerdict: moderation?.verdict ?? null,
           moderationSummary: moderation?.summary ?? null
+        };
+        continue;
+      }
+
+      if (targetKey === "clawhubPlugin") {
+        const result = runCommand("npx", [
+          "-y",
+          `${target.cliPackage}@${target.cliVersion}`,
+          "package",
+          "inspect",
+          target.packageName,
+          "--files",
+          "--json"
+        ]);
+        const payload = parseJsonFromCommandOutput(result.stdout);
+        const packageRecord = payload.package ?? payload;
+        const latestVersion = payload.latestVersion ?? payload.version;
+        report.verify.clawhubPlugin = {
+          status: packageRecord === undefined ? "missing" : "found",
+          packageName: target.packageName,
+          pluginId: target.pluginId,
+          latestVersion: latestVersion?.version ?? null,
+          files: Array.isArray(payload.version?.files) ? payload.version.files.map((file) => file.path) : null
         };
         continue;
       }

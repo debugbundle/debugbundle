@@ -25,6 +25,8 @@ All npm packages use the `@debugbundle/` scope.
 | Package | npm Name | Description |
 |---------|----------|-------------|
 | CLI | `@debugbundle/cli` | Command-line interface |
+| MCP | `@debugbundle/mcp` | Model Context Protocol server |
+| OpenClaw plugin | `@debugbundle/openclaw-plugin` | OpenClaw tool plugin backed by the MCP tool catalog |
 
 ### PyPI (Python)
 
