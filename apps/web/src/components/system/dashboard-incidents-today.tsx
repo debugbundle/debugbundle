@@ -3,8 +3,9 @@ import { type MouseEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
 
 import { formatIncidentMatchedFields } from "../../lib/incident-copy.js";
-import { listIncidents, type IncidentRecord } from "../../lib/api.js";
-import { getLocalDayWindow, isIncidentAttentionToday } from "../../lib/incidents-today.js";
+import type { IncidentRecord } from "../../lib/api.js";
+import { loadDashboardAttentionIncidentPage } from "../../lib/dashboard-incidents-today-data.js";
+import { getLocalDayWindow } from "../../lib/incidents-today.js";
 import { useCursorPagination } from "../../lib/use-cursor-pagination.js";
 import {
   shouldIgnoreTableRowActivation
@@ -131,104 +132,6 @@ export function DashboardIncidentsToday(): JSX.Element {
   );
 }
 
-const DASHBOARD_INCIDENTS_TODAY_PAGE_SIZE = 10;
-const DASHBOARD_INCIDENTS_TODAY_SCAN_LIMIT = 100;
-
-type DashboardIncidentsTodayCursor = {
-  sourceCursor: string | null;
-  matchOffset: number;
-};
-
-async function loadDashboardAttentionIncidentPage(
-  todayWindow: ReturnType<typeof getLocalDayWindow>,
-  cursor: string | null
-): Promise<{ items: IncidentRecord[]; nextCursor: string | null }> {
-  const items: IncidentRecord[] = [];
-  let currentCursor = decodeDashboardIncidentsTodayCursor(cursor);
-
-  while (items.length < DASHBOARD_INCIDENTS_TODAY_PAGE_SIZE) {
-    const response = await listIncidents({
-      limit: DASHBOARD_INCIDENTS_TODAY_SCAN_LIMIT,
-      ...(currentCursor.sourceCursor === null ? {} : { cursor: currentCursor.sourceCursor })
-    });
-    const matchedIncidents = response.incidents.filter((incident) => isIncidentAttentionToday(incident, todayWindow));
-    const availableIncidents = matchedIncidents.slice(currentCursor.matchOffset);
-    const remainingPageSize = DASHBOARD_INCIDENTS_TODAY_PAGE_SIZE - items.length;
-    const incidentsToTake = availableIncidents.slice(0, remainingPageSize);
-
-    items.push(...incidentsToTake);
-
-    const nextMatchOffset = currentCursor.matchOffset + incidentsToTake.length;
-    if (nextMatchOffset < matchedIncidents.length) {
-      return {
-        items,
-        nextCursor: encodeDashboardIncidentsTodayCursor({
-          sourceCursor: currentCursor.sourceCursor,
-          matchOffset: nextMatchOffset
-        })
-      };
-    }
-
-    const oldestScannedIncident = response.incidents.at(-1);
-    const reachedOlderIncidents =
-      oldestScannedIncident !== undefined && isIncidentLastSeenBeforeWindow(oldestScannedIncident, todayWindow);
-
-    if (response.nextCursor === null || response.nextCursor === currentCursor.sourceCursor || reachedOlderIncidents) {
-      return {
-        items,
-        nextCursor: null
-      };
-    }
-
-    currentCursor = {
-      sourceCursor: response.nextCursor,
-      matchOffset: 0
-    };
-  }
-
-  return {
-    items,
-    nextCursor: encodeDashboardIncidentsTodayCursor(currentCursor)
-  };
-}
-
-function isIncidentLastSeenBeforeWindow(incident: IncidentRecord, todayWindow: ReturnType<typeof getLocalDayWindow>): boolean {
-  const lastSeenAt = new Date(incident.last_seen_at).getTime();
-  return Number.isFinite(lastSeenAt) && lastSeenAt < todayWindow.startsAtMs;
-}
-
-function encodeDashboardIncidentsTodayCursor(cursor: DashboardIncidentsTodayCursor): string {
-  return JSON.stringify(cursor);
-}
-
-function decodeDashboardIncidentsTodayCursor(value: string | null): DashboardIncidentsTodayCursor {
-  if (value === null) {
-    return {
-      sourceCursor: null,
-      matchOffset: 0
-    };
-  }
-
-  try {
-    const parsed = JSON.parse(value) as Partial<DashboardIncidentsTodayCursor>;
-    const sourceCursor = typeof parsed.sourceCursor === "string" ? parsed.sourceCursor : null;
-    const parsedMatchOffset = parsed.matchOffset;
-    const matchOffset = Number.isInteger(parsedMatchOffset) && parsedMatchOffset !== undefined && parsedMatchOffset >= 0
-      ? parsedMatchOffset
-      : 0;
-
-    return {
-      sourceCursor,
-      matchOffset
-    };
-  } catch {
-    return {
-      sourceCursor: value,
-      matchOffset: 0
-    };
-  }
-}
-
 function DashboardIncidentRow(input: {
   incident: IncidentRecord;
   onOpen: (event: MouseEvent<HTMLTableRowElement>, incident: IncidentRecord) => void;
@@ -281,8 +184,8 @@ const severityVariantMap: Record<IncidentRecord["severity"], "secondary" | "warn
   critical: "destructive"
 };
 
-const statusVariantMap: Record<IncidentRecord["status"], "secondary" | "warning" | "success"> = {
+const statusVariantMap: Record<IncidentRecord["status"], "destructive" | "warning" | "success"> = {
   open: "warning",
   resolved: "success",
-  regressed: "secondary"
+  regressed: "destructive"
 };

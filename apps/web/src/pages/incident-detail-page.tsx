@@ -405,10 +405,10 @@ const severityVariantMap: Record<
   critical: "destructive"
 };
 
-const statusVariantMap: Record<IncidentRecord["status"], "secondary" | "warning" | "success"> = {
+const statusVariantMap: Record<IncidentRecord["status"], "destructive" | "warning" | "success"> = {
   open: "warning",
   resolved: "success",
-  regressed: "secondary"
+  regressed: "destructive"
 };
 
 function MetricCard({ label, value }: { label: string; value: string }): JSX.Element {

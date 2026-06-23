@@ -10,6 +10,7 @@ import {
   type AvailabilityCheckDailyRollupRecord,
   type ProjectRecord
 } from "../../lib/api.js";
+import { countDashboardAttentionIncidents } from "../../lib/dashboard-incidents-today-data.js";
 import { summarizeHealthStatusToday, type HealthStatusTodaySummary } from "../../lib/health-status-summary.js";
 import { getActiveIncidentCount } from "../../lib/project-metrics.js";
 import { isSharedProjectAccessSuspended } from "../../lib/project-access.js";
@@ -35,6 +36,9 @@ async function aggregateProjectMetrics(projects: ProjectRecord[]): Promise<Dashb
       regressedIncidents: 0,
       attentionIncidentsToday: 0
     }
+  );
+  const attentionIncidentsToday = await countDashboardAttentionIncidents().catch(
+    () => incidentMetrics.attentionIncidentsToday
   );
   const availabilityResponses = await Promise.all(
     projects
@@ -77,6 +81,7 @@ async function aggregateProjectMetrics(projects: ProjectRecord[]): Promise<Dashb
 
   return {
     ...incidentMetrics,
+    attentionIncidentsToday,
     healthStatusToday: summarizeHealthStatusToday(
       availabilityResponses.flatMap((response) => response.checks),
       rollupsByCheckId,

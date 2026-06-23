@@ -121,6 +121,41 @@ describe("web app — incident and project detail routes", () => {
     expect(container.querySelector('[data-token="string"]')).not.toBeNull();
   });
 
+  it("shows regressed incident detail status with the destructive badge variant", async () => {
+    const incident = createIncident({
+      incident_id: "inc_regressed_detail",
+      status: "regressed"
+    });
+    const fetchMock = vi.fn((input: RequestInfo | URL) => {
+      const url = requestUrl(input);
+
+      if (url.endsWith("/v1/auth/session")) {
+        return jsonResponse(200, { session: createSession() });
+      }
+
+      if (url.endsWith(`/v1/incidents/${incident.incident_id}`)) {
+        return jsonResponse(200, { incident });
+      }
+
+      if (url.endsWith(`/v1/incidents/${incident.incident_id}/bundle`)) {
+        return jsonResponse(200, { status: "pending" });
+      }
+
+      if (url.endsWith(`/v1/incidents/${incident.incident_id}/reproduction`)) {
+        return jsonResponse(200, { status: "pending" });
+      }
+
+      return jsonResponse(404, { error: "not_found" });
+    });
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<App initialEntries={[`/incidents/${incident.incident_id}`]} />);
+
+    expect(await screen.findByText(/typeerror in checkout handler/i)).toBeInTheDocument();
+    expect(screen.getByText(/^regressed$/i)).toHaveAttribute("data-variant", "destructive");
+  });
+
   it("formats request-anomaly grouping copy on the incident detail page", async () => {
     const incident = createIncident({
       title: "Request anomaly: GET /checkout/:orderId returned 404 repeatedly",

@@ -666,6 +666,17 @@ async function fetchJson(url, init) {
   return response.json();
 }
 
+async function fetchOptionalJson(url, init) {
+  const response = await fetch(url, init);
+  if (response.status === 404) {
+    return undefined;
+  }
+  if (!response.ok) {
+    throw new Error(`http_${response.status}:${url}`);
+  }
+  return response.json();
+}
+
 function findOfficialRegistryEntry(payload, serverName) {
   const candidates = Array.isArray(payload?.servers) ? payload.servers : [];
 
@@ -673,6 +684,41 @@ function findOfficialRegistryEntry(payload, serverName) {
     const server = candidate?.server ?? candidate;
     return server?.name === serverName;
   });
+}
+
+function normalizeUrl(value) {
+  if (typeof value !== "string" || value.length === 0) {
+    return null;
+  }
+
+  return value.replace(/\/+$/u, "").toLowerCase();
+}
+
+function findSmitheryQualifiedEntry(payload, qualifiedName) {
+  const candidates = Array.isArray(payload?.servers) ? payload.servers : [];
+
+  return candidates.find((candidate) => candidate?.qualifiedName === qualifiedName);
+}
+
+function findSmitheryQualifiedSkill(payload, qualifiedName) {
+  const candidates = Array.isArray(payload?.skills) ? payload.skills : [];
+
+  return candidates.find((candidate) => `${candidate?.namespace}/${candidate?.slug}` === qualifiedName);
+}
+
+function matchesGlamaServer(candidate, context) {
+  const candidateRepositoryUrl = normalizeUrl(candidate?.repository?.url);
+  const sourceRepositoryUrl = normalizeUrl(context.serverJson?.repository?.url);
+
+  if (candidateRepositoryUrl !== null && sourceRepositoryUrl !== null && candidateRepositoryUrl === sourceRepositoryUrl) {
+    return true;
+  }
+
+  const names = [candidate?.name, candidate?.slug, candidate?.namespace]
+    .filter((value) => typeof value === "string")
+    .map((value) => value.toLowerCase());
+
+  return names.some((value) => value.includes("debugbundle"));
 }
 
 async function verify(context) {
@@ -701,32 +747,55 @@ async function verify(context) {
 
       if (targetKey === "smithery") {
         const qualifiedName = `${target.namespace}/${target.slug}`;
-        const server = await fetchJson(`https://api.smithery.ai/servers/${encodeURIComponent(target.namespace)}/${encodeURIComponent(target.slug)}`);
-        const latestConnection = Array.isArray(server?.connections) ? server.connections.at(0) : undefined;
-        report.verify.smithery = server === undefined
+        const exactServer = await fetchOptionalJson(
+          `https://api.smithery.ai/servers/${encodeURIComponent(target.namespace)}/${encodeURIComponent(target.slug)}`
+        );
+        const namespacePayload = await fetchJson(
+          `https://api.smithery.ai/servers?namespace=${encodeURIComponent(target.namespace)}`
+        );
+        const namespaceEntry = findSmitheryQualifiedEntry(namespacePayload, qualifiedName);
+        const latestConnection = Array.isArray(exactServer?.connections) ? exactServer.connections.at(0) : undefined;
+        const registryIndexed = namespaceEntry !== undefined;
+        report.verify.smithery = exactServer === undefined
           ? {
               status: "missing",
-              qualifiedName
+              qualifiedName,
+              registryIndexed: false
             }
           : {
-              status: "found",
+              status: registryIndexed ? "found" : "partial",
               qualifiedName,
               latestVersion: context.version,
-              deploymentUrl: server.deploymentUrl ?? null,
-              bundleUrl: latestConnection?.bundleUrl ?? null
+              displayName: exactServer.displayName ?? null,
+              description: exactServer.description ?? null,
+              deploymentUrl: exactServer.deploymentUrl ?? null,
+              bundleUrl: latestConnection?.bundleUrl ?? null,
+              registryIndexed,
+              releasePageUrl: `https://smithery.ai/servers/${qualifiedName}/releases`,
+              publicPageUrl: `https://smithery.ai/servers/${qualifiedName}`
             };
         continue;
       }
 
       if (targetKey === "smitherySkill") {
-        const skill = await fetchJson(
+        const qualifiedName = `${target.namespace}/${target.slug}`;
+        const skill = await fetchOptionalJson(
           `https://api.smithery.ai/skills/${encodeURIComponent(target.namespace)}/${encodeURIComponent(target.slug)}`
         );
+        const namespacePayload = await fetchJson(
+          `https://api.smithery.ai/skills?namespace=${encodeURIComponent(target.namespace)}`
+        );
+        const namespaceEntry = findSmitheryQualifiedSkill(namespacePayload, qualifiedName);
+        const registryIndexed = namespaceEntry !== undefined;
         report.verify.smitherySkill = {
-          status: "found",
-          qualifiedName: `${target.namespace}/${target.slug}`,
-          gitUrl: skill.gitUrl ?? null,
-          updatedAt: skill.updatedAt ?? null
+          status: skill === undefined ? "missing" : registryIndexed ? "found" : "partial",
+          qualifiedName,
+          gitUrl: skill?.gitUrl ?? null,
+          updatedAt: skill?.updatedAt ?? null,
+          listed: skill?.listed ?? null,
+          categories: Array.isArray(skill?.categories) ? skill.categories : [],
+          registryIndexed,
+          publicPageUrl: `https://smithery.ai/skills/${qualifiedName}`
         };
         continue;
       }
@@ -780,6 +849,42 @@ async function verify(context) {
         continue;
       }
 
+      if (targetKey === "glama") {
+        const queries = Array.isArray(target.searchTerms) ? target.searchTerms : [];
+        let matchedQuery = null;
+        let matchedServer;
+
+        for (const query of queries) {
+          const payload = await fetchJson(`https://glama.ai/api/mcp/v1/servers?query=${encodeURIComponent(query)}`);
+          const candidates = Array.isArray(payload?.servers) ? payload.servers : [];
+          matchedServer = candidates.find((candidate) => matchesGlamaServer(candidate, context));
+          if (matchedServer !== undefined) {
+            matchedQuery = query;
+            break;
+          }
+        }
+
+        report.verify.glama = matchedServer === undefined
+          ? {
+              status: "missing",
+              listingUrl: target.listingUrl,
+              searchTerms: target.searchTerms,
+              checkedAt: new Date().toISOString()
+            }
+          : {
+              status: "found",
+              listingUrl: target.listingUrl,
+              searchTerms: target.searchTerms,
+              matchedQuery,
+              name: matchedServer.name ?? null,
+              namespace: matchedServer.namespace ?? null,
+              slug: matchedServer.slug ?? null,
+              repositoryUrl: matchedServer.repository?.url ?? null,
+              publicPageUrl: matchedServer.url ?? null
+            };
+        continue;
+      }
+
       if (target.type === "discovery") {
         report.verify[targetKey] = {
           status: "manual_check_required",
@@ -806,6 +911,23 @@ async function verify(context) {
 
   writeReport(context, report);
   return report;
+}
+
+function collectVerificationFailures(context, report) {
+  const failures = [];
+
+  for (const [targetKey, target] of context.targetEntries) {
+    if (target.type !== "push") {
+      continue;
+    }
+
+    const status = report.verify?.[targetKey]?.status;
+    if (status !== "found") {
+      failures.push(`${targetKey}:${status ?? "missing"}`);
+    }
+  }
+
+  return failures;
 }
 
 function printHelp() {
@@ -858,14 +980,24 @@ async function main() {
   }
 
   if (parsed.command === "verify") {
-    outputResult(await verify(context), parsed.json);
+    const report = await verify(context);
+    outputResult(report, parsed.json);
+    const failures = collectVerificationFailures(context, report);
+    if (failures.length > 0) {
+      throw new Error(`verification_failed:${failures.join(",")}`);
+    }
     return;
   }
 
   if (parsed.command === "run") {
     prepare(context, { dryRun: parsed.dryRun });
     await publish(context, { dryRun: parsed.dryRun });
-    outputResult(await verify(context), parsed.json);
+    const report = await verify(context);
+    outputResult(report, parsed.json);
+    const failures = collectVerificationFailures(context, report);
+    if (failures.length > 0) {
+      throw new Error(`verification_failed:${failures.join(",")}`);
+    }
     return;
   }
 

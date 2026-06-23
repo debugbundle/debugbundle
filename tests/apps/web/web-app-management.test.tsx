@@ -4182,7 +4182,7 @@ describe("web app — management routes", () => {
     expect(card.getByRole("columnheader", { name: /environment/i })).toBeInTheDocument();
     expect(card.getByText(/^production$/i)).toBeInTheDocument();
     expect(screen.getByText(/^critical$/i)).toBeInTheDocument();
-    expect(screen.getByText(/^regressed$/i)).toBeInTheDocument();
+    expect(screen.getByText(/^regressed$/i)).toHaveAttribute("data-variant", "destructive");
     expect(screen.getByText(/^11$/)).toBeInTheDocument();
   });
 

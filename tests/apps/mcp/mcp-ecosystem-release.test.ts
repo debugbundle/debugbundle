@@ -45,14 +45,20 @@ describe("mcp ecosystem release pipeline", () => {
     expect(script).toContain('["pack", context.packageIdentifier, "--pack-destination", context.tarballDirectory]');
     expect(script).toContain('process.env.MCP_PUBLISHER_BIN ?? target.publisherBinary');
     expect(script).toContain('"mcp", "publish", context.bundlePath, "-n", qualifiedName');
+    expect(script).toContain('https://api.smithery.ai/servers?namespace=');
     expect(script).toContain('https://api.smithery.ai/skills/');
+    expect(script).toContain('https://api.smithery.ai/skills?namespace=');
+    expect(script).toContain('https://glama.ai/api/mcp/v1/servers?query=');
+    expect(script).toContain("matchesGlamaServer");
     expect(script).toContain('resources: "skills"');
+    expect(script).toContain("registryIndexed");
     expect(script).toContain('"inspect"');
     expect(script).toContain("parseJsonFromCommandOutput");
     expect(script).toContain('"package",');
     expect(script).toContain('"plugin:validate"');
     expect(script).toContain('`${target.cliPackage}@${target.cliVersion}`');
     expect(script).toContain("manual_check_required");
+    expect(script).toContain("verification_failed:");
   });
 
   it("renders a machine-readable ecosystem release plan", () => {
