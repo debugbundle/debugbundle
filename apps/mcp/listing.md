@@ -28,6 +28,7 @@ Current release status for MCP ecosystem distribution.
 - Smithery Skill: published for `debugbundle/debugbundle`.
 - ClawHub Skill: published as `debugbundle/debugbundle`.
 - ClawHub OpenClaw plugin: published as `@debugbundle/openclaw-plugin` version `1.6.0`.
+- MCP.so: listed as of 2026-06-23 via the web submit flow; treat it as a third-party community directory, not an official registry.
 - Glama: not listed yet as of 2026-06-23.
 - LobeHub MCP: not confirmed listed yet as of 2026-06-23.
 - PulseMCP: pending auto-listing check.
@@ -105,6 +106,30 @@ debugbundle-mcp
 - `get_bundle`
 - `resolve_incident`
 - `list_health_checks`
+
+## MCP.so
+
+- Current state on 2026-06-23: submitted and publicly visible on MCP.so through the web submit flow.
+- Positioning note: MCP.so is a third-party community MCP marketplace, not the official MCP Registry.
+- Preferred listing target URL: `https://github.com/debugbundle/debugbundle`
+- Keep the MCP-specific subfolder in the content/body: `https://github.com/debugbundle/debugbundle/tree/main/apps/mcp`
+- Preferred display name: `DebugBundle`
+- Preferred author/org label: `debugbundle`
+- Preferred short description: `Production debugging bundles for AI agents.`
+- Suggested tags:
+  - `debugbundle`
+  - `mcp`
+  - `debugging`
+  - `observability`
+  - `incident-response`
+  - `developer-tools`
+  - `ai-agents`
+  - `production`
+- Submission notes:
+  - Use the repository root as the main GitHub URL so the marketplace `Visit Server` action lands on the stable project homepage, README, license, and repo activity.
+  - Put the `apps/mcp` subfolder URL in the long-form content so users can find the package-specific README and registry metadata quickly.
+  - Use a member-token placeholder in public config examples such as `"<YOUR_OWN_DEBUGBUNDLE_MEMBER_TOKEN>"`.
+  - Do not publish a real member token or any project token in the listing.
 
 ## Glama
 
