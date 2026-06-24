@@ -38,13 +38,10 @@ jobs:
         run: pnpm typecheck
 
       - name: Test
-        run: pnpm test
-
-      - name: Changed-file coverage gate
         env:
           BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
           HEAD_SHA: ${{ github.sha }}
-        run: pnpm coverage:changed
+        run: pnpm test
 
       - name: Build
         run: pnpm build

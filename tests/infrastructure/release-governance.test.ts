@@ -32,7 +32,8 @@ describe("release governance baseline", () => {
     expect(ciWorkflow).toContain("pnpm lint");
     expect(ciWorkflow).toContain("pnpm typecheck");
     expect(ciWorkflow).toContain("pnpm test");
-    expect(ciWorkflow).toContain("pnpm coverage:changed");
+    expect(ciWorkflow).toContain("BASE_SHA:");
+    expect(ciWorkflow).toContain("HEAD_SHA:");
     expect(ciWorkflow).toContain("pnpm build");
     expect(ciWorkflow).not.toContain("configure-aws-credentials");
     expect(ciWorkflow).not.toContain("HOSTED_DEPLOY_ROLE_ARN");

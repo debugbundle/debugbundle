@@ -102,7 +102,7 @@ function runShard(shard, shardNumber, shardCount) {
       "run",
       "--coverage",
       "--reporter=dot",
-      "--pool=threads",
+      "--pool=forks",
       "--maxWorkers=1",
       "--no-file-parallelism",
       ...shard.files
