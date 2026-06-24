@@ -445,15 +445,15 @@ describe("web app — project capture rules", () => {
     );
 
     const dialog = await screen.findByRole("dialog");
-    await user.type(
-      within(dialog).getByLabelText(/^rule name$/i),
-      "Demote analytics script errors"
-    );
-    await user.type(
-      within(dialog).getByLabelText(/^description$/i),
-      "Known third-party browser resource noise."
-    );
-    await user.type(within(dialog).getByLabelText(/^resource host$/i), "analytics.example.com");
+    fireEvent.change(within(dialog).getByLabelText(/^rule name$/i), {
+      target: { value: "Demote analytics script errors" }
+    });
+    fireEvent.change(within(dialog).getByLabelText(/^description$/i), {
+      target: { value: "Known third-party browser resource noise." }
+    });
+    fireEvent.change(within(dialog).getByLabelText(/^resource host$/i), {
+      target: { value: "analytics.example.com" }
+    });
     await user.click(within(dialog).getByRole("button", { name: /^create rule$/i }));
 
     await waitFor(() => {

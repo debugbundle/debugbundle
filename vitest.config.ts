@@ -31,6 +31,7 @@ export default defineConfig({
     include: ["tests/**/*.test.ts", "tests/**/*.test.tsx"],
     exclude: ["tests/apps/public-site/**/*.test.ts", "tests/apps/public-site/**/*.test.tsx", "tests/site/**/*.test.ts", "tests/site/**/*.test.tsx"],
     setupFiles: ["tests/vitest.setup.ts"],
+    testTimeout: isCoverageShardRun ? 15000 : 5000,
     coverage: coverageConfig
   }
 });

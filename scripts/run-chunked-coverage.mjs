@@ -18,6 +18,18 @@ const EXCLUDED_TEST_DIRECTORIES = new Set([
   path.join(TESTS_ROOT, "site")
 ]);
 
+function getMaxFilesPerShard(groupKey) {
+  if (groupKey === "tests/apps/mcp" || groupKey === "tests/apps/web") {
+    return 4;
+  }
+
+  if (groupKey === "tests/apps/public-site" || groupKey === "tests/site") {
+    return 6;
+  }
+
+  return DEFAULT_MAX_FILES_PER_SHARD;
+}
+
 function toPosixPath(value) {
   return value.replaceAll(path.sep, "/");
 }
@@ -71,11 +83,7 @@ function buildShardGroups(files) {
   const shards = [];
   for (const groupKey of [...grouped.keys()].sort()) {
     const groupFiles = grouped.get(groupKey).sort();
-    const maxFilesPerShard = groupKey.startsWith("tests/apps/mcp/") || groupKey.startsWith("tests/apps/web/")
-      ? 4
-      : groupKey.startsWith("tests/apps/public-site/") || groupKey.startsWith("site/")
-        ? 6
-        : DEFAULT_MAX_FILES_PER_SHARD;
+    const maxFilesPerShard = getMaxFilesPerShard(groupKey);
     for (let index = 0; index < groupFiles.length; index += maxFilesPerShard) {
       const shardFiles = groupFiles.slice(index, index + maxFilesPerShard);
       const shardIndex = Math.floor(index / maxFilesPerShard) + 1;
