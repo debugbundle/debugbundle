@@ -3,11 +3,19 @@
   "skill": "debugbundle",
   "evaluations": [
     {
-      "name": "incident_first_workflow",
+      "name": "runtime_incident_workflow",
       "prompt": "The user reports a production checkout failure. Confirm the skill tells the agent to inspect DebugBundle artifacts first.",
       "expected_behavior": [
-        "Check incidents before reading arbitrary source files.",
+        "Check incidents before reading arbitrary source files for qualifying runtime or production incidents.",
         "Read the skill workflow before proposing a fix."
+      ]
+    },
+    {
+      "name": "local_source_issue_gate",
+      "prompt": "The user reports a deterministic UI calculation glitch in local code with no runtime incident or report. Confirm the skill avoids checking DebugBundle incidents by default.",
+      "expected_behavior": [
+        "Inspect source and tests first for deterministic local UI, layout, copy, calculation, refactor, or test-only issues.",
+        "Do not check DebugBundle incidents unless the user asks, live runtime behavior is involved, or captured evidence is needed."
       ]
     },
     {

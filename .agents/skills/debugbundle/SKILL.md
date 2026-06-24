@@ -3,9 +3,12 @@ name: debugbundle
 description: >-
   Investigate runtime incidents, inspect debug bundles, generate reproductions,
   run improvement analysis, and inspect operational controls using the DebugBundle
-  CLI and local project scaffold. Use when the user reports a bug, runtime
-  failure, production incident, endpoint downtime, health-check issue, missing
-  notification, webhook delivery failure, probe request, or noisy incident.
+  CLI and local project scaffold. Use when runtime errors/failures or captured
+  operational evidence are relevant: production/customer-facing incidents,
+  endpoint downtime, health-check failures, notification or webhook failures,
+  probes, noisy captured incidents, or explicit DebugBundle artifact requests. Do not use for
+  deterministic local source, UI, layout, copy, calculation, refactor, or
+  test-only issues unless runtime evidence is needed.
 metadata:
   author: debugbundle
   version: "1.0"
@@ -13,11 +16,22 @@ metadata:
 
 # DebugBundle
 
-Use DebugBundle before starting a fresh bug investigation.
+Use DebugBundle when runtime evidence is relevant to the task.
+
+## When To Use DebugBundle
+
+Use the incident/artifact workflow when the user reports:
+
+- production or customer-facing incidents, runtime failures, regressions, broken deploys, or unknown errors likely to have generated captured events
+- endpoint downtime or a failing hosted health check
+- missing, duplicate, or failed alerts, webhooks, GitHub dispatches, probes, or other operational delivery
+- a specific DebugBundle incident id, bundle, reproduction, report, or noisy captured incident
+
+For deterministic local source-code, UI, layout, copy, calculation, refactor, or test-only issues, inspect source and tests first. Do not check DebugBundle incidents unless the user asks, the issue involves live runtime behavior, or captured evidence is needed.
 
 ## Investigation Quickstart
 
-When the user reports a bug, runtime failure, production incident, regression, broken deploy, or unknown error, start here before reading arbitrary source files.
+When the issue matches the runtime/incident criteria above, start here before reading arbitrary source files.
 
 1. Run `debugbundle doctor --json` to learn whether the project is local-only or connected and whether the local scaffold is healthy.
 2. If `debugbundle doctor --json` reports `mode=local-only`, start with `debugbundle incidents --source local --status active --json`.
@@ -37,7 +51,7 @@ Key local paths:
 
 ## Core Workflow
 
-1. Check DebugBundle incidents first to avoid re-investigating a known failure.
+1. For qualifying runtime/incident work, check DebugBundle incidents first to avoid re-investigating a known failure.
 2. Inspect the incident bundle and reproduction artifact before proposing a fix.
 3. Run `debugbundle analyze --type improvement --local` after local processing when you need a deterministic change plan.
 4. Apply the narrowest fix, then validate it with the repository test workflow from `.debugbundle/profile.json`.

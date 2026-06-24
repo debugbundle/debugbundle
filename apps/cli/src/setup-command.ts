@@ -143,11 +143,9 @@ function buildManagedAgentsSection(): string {
   return [
     MANAGED_AGENTS_START,
     "## DebugBundle",
-    "- Read `.agents/skills/debugbundle/SKILL.md` for the full debugging workflow.",
-    "- Use `debugbundle inspect <incident-id>` or MCP `get_bundle` when a user reports an issue.",
-    "- Run reproduction artifacts from `.debugbundle/bundles/local/reproductions/` before proposing a fix.",
-    "- After a fix is verified, or after an intentional smoke or dogfood incident has served its purpose, resolve it with `debugbundle resolve <incident-id> [incident-id ...]` or MCP `resolve_incident` / `resolve_incidents` so open incidents remain actionable.",
-    "- Use `debugbundle doctor` to validate local DebugBundle setup or connectivity issues.",
+    "- Use DebugBundle for runtime failures, production/customer-facing incidents, endpoint downtime, notification/webhook delivery failures, health-check failures, specific incident reports, or symptoms likely to have generated captured events.",
+    "- For deterministic local code, UI, layout, copy, calculation, refactor, or test-only issues, inspect source and tests first; do not check DebugBundle incidents unless runtime evidence is needed or the user asks.",
+    "- Read `.agents/skills/debugbundle/SKILL.md` for the full DebugBundle workflow.",
     MANAGED_AGENTS_END
   ].join("\n");
 }

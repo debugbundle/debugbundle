@@ -1,6 +1,6 @@
 ---
 name: debugbundle
-description: Use DebugBundle MCP and CLI workflows to investigate incidents, fetch bundles, manage operational debugging surfaces, run verification, and guide fixes.
+description: Use DebugBundle MCP and CLI workflows to investigate runtime errors/failures, fetch bundles, manage operational debugging surfaces, run verification, and guide fixes when captured operational evidence is relevant.
 version: 1.0.0
 metadata:
   openclaw:
@@ -26,7 +26,9 @@ metadata:
 
 # DebugBundle
 
-Use this skill when a user asks you to investigate a bug, production incident, runtime failure, endpoint downtime, DebugBundle bundle, health check, probe, alert, webhook, improvement opportunity, GitHub dispatch automation, project access, billing capacity, or project setup.
+Use this skill when a user asks you to investigate a production/customer-facing incident, runtime failure, endpoint downtime, DebugBundle incident, bundle, report, health check, probe, alert, webhook, improvement opportunity, GitHub dispatch automation, project access, billing capacity, or project setup.
+
+For deterministic local source-code, UI, layout, copy, calculation, refactor, or test-only issues, inspect source and tests first. Do not check DebugBundle incidents unless the user asks, the issue involves live runtime behavior, or captured evidence is needed.
 
 ## Skill Scope
 
@@ -58,7 +60,7 @@ Use `DEBUGBUNDLE_API_URL` only when the user is targeting self-hosted, staging, 
 ## Operating Workflow
 
 1. Run `doctor` first when setup, auth, connectivity, privacy, or local file state is uncertain.
-2. For bug reports, check incidents before inspecting code. Start with `list_incidents`, then fetch `get_incident_context` or `get_bundle`.
+2. For qualifying runtime/incident work, check incidents before inspecting code. Start with `list_incidents`, then fetch `get_incident_context` or `get_bundle`.
 3. Use reproduction artifacts when available before proposing a fix.
 4. For live debugging, use `activate_probe` only when the user asks for additional runtime evidence or the current bundle lacks enough context. Prefer short TTLs and scoped labels.
 5. For endpoint downtime or Health tab issues, start with `list_health_checks`, inspect `list_health_check_results` and `list_health_check_daily_rollups`, and use `test_health_check` before creating or updating saved monitoring.

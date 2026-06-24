@@ -268,6 +268,9 @@ describe("cli validate command", () => {
     });
     expect(await readFile(join(rootDirectory, ".agents", "skills", "debugbundle", "SKILL.md"), "utf8")).toContain("Investigation Quickstart");
     expect(await readFile(join(rootDirectory, ".agents", "skills", "debugbundle", "SKILL.md"), "utf8")).toContain(
+      "For deterministic local source-code, UI, layout, copy, calculation, refactor, or test-only issues, inspect source and tests first."
+    );
+    expect(await readFile(join(rootDirectory, ".agents", "skills", "debugbundle", "SKILL.md"), "utf8")).toContain(
       "For user-reported production incidents, check cloud incidents after local incidents and explicitly report whether each source had matches."
     );
     expect(await readFile(join(rootDirectory, ".agents", "skills", "debugbundle", "SKILL.md"), "utf8")).toContain(
@@ -290,6 +293,9 @@ describe("cli validate command", () => {
     );
     expect(await readFile(join(rootDirectory, ".agents", "skills", "debugbundle", "references", "mcp.md"), "utf8")).toContain(
       "## Probe Tools"
+    );
+    expect(await readFile(join(rootDirectory, ".agents", "skills", "debugbundle", "references", "mcp.md"), "utf8")).toContain(
+      "Use the same runtime-evidence-gated workflow through MCP"
     );
     expect(await readFile(join(rootDirectory, ".agents", "skills", "debugbundle", "references", "mcp.md"), "utf8")).toContain(
       "https://debugbundle.com/docs/api/ingestion"

@@ -1,6 +1,6 @@
 # DebugBundle MCP Reference
 
-Use the same incident-first workflow through MCP when an agent is operating in connected mode.
+Use the same runtime-evidence-gated workflow through MCP when an agent is operating in connected mode.
 
 ## Investigation Tools
 
@@ -14,7 +14,8 @@ Use the same incident-first workflow through MCP when an agent is operating in c
 - `analyze` — run local agent-oriented analysis from local bundles and skill schemas.
 
 - Prefer bundle retrieval tools before reading raw repository files.
-- Use MCP bundle access when the current issue originated in production.
+- Use MCP bundle access when the current issue originated in production or otherwise needs captured runtime evidence.
+- For deterministic local source, UI, layout, copy, calculation, refactor, or test-only issues, inspect source and tests first unless the user asks for DebugBundle evidence.
 - Resolve fixed or intentionally generated incidents with `resolve_incident` or `resolve_incidents` so active incidents stay actionable.
 - Fall back to local CLI processing when the project is local-only.
 

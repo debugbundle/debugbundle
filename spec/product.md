@@ -107,7 +107,7 @@ User gives agent a ready-made prompt (from docs)
 → Agent reads .agents/skills/debugbundle/SKILL.md (learns how to use DebugBundle)
 → Agent optionally enriches profile (critical paths, route ownership)
 → Agent updates AGENTS.md with DebugBundle instructions
-→ Agent is now DebugBundle-aware: auto-checks incidents on bug reports
+→ Agent is now DebugBundle-aware: checks incidents for runtime/production issues and uses source/tests first for deterministic local UI, copy, calculation, refactor, or test-only issues
 ```
 
 ### Manual Installation Flow

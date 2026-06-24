@@ -188,6 +188,9 @@ describe("cli setup command", () => {
 
     const skillContents = await readFile(join(rootDirectory, ".agents", "skills", "debugbundle", "SKILL.md"), "utf8");
     expect(skillContents).toContain("name: debugbundle");
+    expect(skillContents).toContain("## When To Use DebugBundle");
+    expect(skillContents).toContain("Use DebugBundle when runtime evidence is relevant to the task.");
+    expect(skillContents).toContain("For deterministic local source-code, UI, layout, copy, calculation, refactor, or test-only issues, inspect source and tests first.");
     expect(skillContents).toContain("resolve it with `debugbundle resolve <incident-id> [incident-id ...]` or MCP `resolve_incident` / `resolve_incidents`");
     expect(skillContents).toContain("If `debugbundle doctor --json` reports `mode=connected` and the target environment is cloud-enabled, check both");
     expect(skillContents).toContain("For user-reported production incidents, check cloud incidents after local incidents and explicitly report whether each source had matches.");
@@ -248,7 +251,8 @@ describe("cli setup command", () => {
       '"analysis_type": "performance"'
     );
     const skillEvalsContents = await readFile(join(rootDirectory, ".agents", "skills", "debugbundle", "evals", "evals.json"), "utf8");
-    expect(skillEvalsContents).toContain("incident_first_workflow");
+    expect(skillEvalsContents).toContain("runtime_incident_workflow");
+    expect(skillEvalsContents).toContain("local_source_issue_gate");
     expect(skillEvalsContents).toContain("incident_resolution_hygiene");
     expect(skillEvalsContents).toContain("noise_management_guidance");
     expect(skillEvalsContents).toContain("operational_controls_guidance");
@@ -261,7 +265,9 @@ describe("cli setup command", () => {
     const agentsContents = await readFile(join(rootDirectory, "AGENTS.md"), "utf8");
     expect(agentsContents).toContain("<!-- debugbundle:start -->");
     expect(agentsContents).toContain(".agents/skills/debugbundle/SKILL.md");
-    expect(agentsContents).toContain("resolve it with `debugbundle resolve <incident-id> [incident-id ...]` or MCP `resolve_incident` / `resolve_incidents`");
+    expect(agentsContents).toContain("Use DebugBundle for runtime failures, production/customer-facing incidents");
+    expect(agentsContents).toContain("For deterministic local code, UI, layout, copy, calculation, refactor, or test-only issues, inspect source and tests first");
+    expect(agentsContents).not.toContain("resolve it with `debugbundle resolve <incident-id> [incident-id ...]`");
 
     await expect(stat(join(rootDirectory, ".debugbundle", "agent-guide.md"))).rejects.toMatchObject({ code: "ENOENT" });
     await expect(stat(join(rootDirectory, "skills", "debugbundle"))).rejects.toMatchObject({ code: "ENOENT" });

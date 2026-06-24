@@ -957,7 +957,7 @@ If CLI says something is healthy and MCP says something different, that is a pro
 ### AC-ONB-02: Skill Discovery
 - **Given** `debugbundle setup` has run
 - **Then** `.agents/skills/debugbundle/SKILL.md` exists per agentskills.io spec and is structured for agent discovery
-- **And** the skill teaches agents to: check incidents on bug reports, fetch/analyze bundles, validate the profile, evaluate repeated low-value incidents for scoped capture-rule or path-scoped client-error capture-policy handling, and resolve incidents after a fix is verified or after intentional verification incidents have served their purpose
+- **And** the skill teaches agents to: check incidents for qualifying runtime, production, health-check, notification, webhook, or captured-artifact issues; inspect source and tests first for deterministic local UI, layout, copy, calculation, refactor, or test-only issues unless runtime evidence is needed; fetch/analyze bundles; validate the profile; evaluate repeated low-value incidents for scoped capture-rule or path-scoped client-error capture-policy handling; and resolve incidents after a fix is verified or after intentional verification incidents have served their purpose
 
 ### AC-ONB-03: Two-Phase Profile Generation
 - **Given** a repository with `package.json`, `docker-compose.yml`, and `.github/workflows/`
@@ -970,7 +970,7 @@ If CLI says something is healthy and MCP says something different, that is a pro
 ### AC-ONB-04: AGENTS.md Integration
 - **Given** `debugbundle setup` runs in a repo that has an `AGENTS.md`
 - **Then** a DebugBundle section is appended to `AGENTS.md`
-- **And** the section instructs agents to check DebugBundle incidents before investigating bugs, read `.agents/skills/debugbundle/SKILL.md`, use `debugbundle inspect` / `get_bundle`, run reproduction artifacts from `.debugbundle/bundles/local/reproductions/` before proposing fixes, and resolve incidents after a verified fix or completed intentional verification flow
+- **And** the section gives a lightweight trigger rule for when DebugBundle is appropriate, tells agents to inspect source/tests first for deterministic local UI, layout, copy, calculation, refactor, or test-only issues, and points to `.agents/skills/debugbundle/SKILL.md` for the full DebugBundle workflow
 
 ### AC-ONB-05: Local-Only Setup
 - **Given** a developer running `debugbundle setup` and choosing local-only mode

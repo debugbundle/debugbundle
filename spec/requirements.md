@@ -470,7 +470,7 @@ When a collaborator is removed from a project or leaves a shared project, DebugB
 
 **FR-ONB-02:** The agent-driven installation path must result in the agent: installing the SDK package, running `debugbundle setup`, reviewing the generated profile, and optionally validating it — so the agent has full context of what DebugBundle is and how to use it. `debugbundle setup` is the single entrypoint for both humans and agents. `debugbundle init` is an internal function, not a user-facing command.
 
-**FR-ONB-03:** After setup (either path), documentation must include a "Step 2" ready-made prompt that teaches the agent to read `.agents/skills/debugbundle/SKILL.md`, understand the project profile, and activate DebugBundle workflows (auto-check incidents on bug reports, use bundles for debugging).
+**FR-ONB-03:** After setup (either path), documentation must include a "Step 2" ready-made prompt that teaches the agent to read `.agents/skills/debugbundle/SKILL.md`, understand the project profile, and activate DebugBundle workflows when runtime or captured operational evidence is relevant (check incidents for qualifying runtime/production issues, use bundles for debugging, and inspect source/tests first for deterministic local UI, layout, copy, calculation, refactor, or test-only issues).
 
 **FR-ONB-04:** The `.agents/skills/debugbundle/SKILL.md` must follow the agentskills.io specification with YAML frontmatter and progressive disclosure. Must be discoverable by all major AI agent frameworks (GitHub Copilot, Cursor, Cline, Claude Code, custom MCP clients). No protocol coupling — skill files are plain Markdown with structured sections.
 
