@@ -73,9 +73,28 @@ describe("web app — health status", () => {
           });
         }
 
-        if (url.endsWith(`/v1/projects/${project.project_id}/availability-checks/chk_123/daily-rollups?limit=30`)) {
+        if (
+          url.endsWith(
+            `/v1/projects/${project.project_id}/availability-checks/chk_123/daily-rollups?limit=30`
+          )
+        ) {
           return jsonResponse(200, {
             rollups: [
+              {
+                check_id: "chk_123",
+                project_id: project.project_id,
+                day: "2026-06-16",
+                state: "degraded",
+                total_checks: 10,
+                successful_checks: 9,
+                failed_checks: 1,
+                degraded_checks: 1,
+                avg_duration_ms: 120,
+                first_checked_at: "2026-06-16T00:00:00.000Z",
+                last_checked_at: "2026-06-16T12:00:00.000Z",
+                downtime_seconds: 60,
+                incident_ids: []
+              },
               {
                 check_id: "chk_123",
                 project_id: project.project_id,
@@ -101,8 +120,11 @@ describe("web app — health status", () => {
 
     render(<App initialEntries={["/health-status"]} />);
 
-    expect(await screen.findByRole("heading", { name: /health status/i, level: 1 })).toBeInTheDocument();
+    expect(
+      await screen.findByRole("heading", { name: /health status/i, level: 1 })
+    ).toBeInTheDocument();
     expect(await screen.findByText(/main app/i)).toBeInTheDocument();
+    expect(screen.getAllByText("100%").length).toBeGreaterThan(0);
     expect(document.querySelector('[data-project-color-tag="emerald"]')).not.toBeNull();
   });
 
@@ -164,7 +186,11 @@ describe("web app — health status", () => {
           });
         }
 
-        if (url.endsWith(`/v1/projects/${project.project_id}/availability-checks/chk_123/daily-rollups?limit=30`)) {
+        if (
+          url.endsWith(
+            `/v1/projects/${project.project_id}/availability-checks/chk_123/daily-rollups?limit=30`
+          )
+        ) {
           return jsonResponse(200, { rollups: [] });
         }
 
@@ -174,7 +200,9 @@ describe("web app — health status", () => {
 
     render(<App initialEntries={["/health-status"]} />);
 
-    expect(await screen.findByRole("heading", { name: /health status/i, level: 1 })).toBeInTheDocument();
+    expect(
+      await screen.findByRole("heading", { name: /health status/i, level: 1 })
+    ).toBeInTheDocument();
     expect(await screen.findByText("1 health check")).toBeInTheDocument();
     expect(screen.queryByText(/active incident/)).not.toBeInTheDocument();
   });

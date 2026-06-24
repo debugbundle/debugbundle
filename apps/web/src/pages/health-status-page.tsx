@@ -1,8 +1,4 @@
-import {
-  ChevronDownIcon,
-  ChevronRightIcon,
-  HeartPulseIcon
-} from "lucide-react";
+import { ChevronDownIcon, ChevronRightIcon, HeartPulseIcon } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 
@@ -13,7 +9,14 @@ import { TableRefreshButton } from "../components/system/table-refresh-button.js
 import { Badge } from "../components/ui/badge.js";
 import { Button } from "../components/ui/button.js";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card.js";
-import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "../components/ui/empty.js";
+import {
+  Empty,
+  EmptyContent,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle
+} from "../components/ui/empty.js";
 import { Notice } from "../components/ui/notice.js";
 import { Skeleton } from "../components/ui/skeleton.js";
 import { Tooltip, TooltipContent, TooltipTrigger } from "../components/ui/tooltip.js";
@@ -37,6 +40,7 @@ import {
   type HealthStatusProjectSummary,
   type ProjectHealthStatusInput
 } from "./health-status-page-utils.js";
+import { computeLatestAvailabilityUptimePercentage } from "../lib/health-status-metrics.js";
 
 const STATUS_HISTORY_DAYS = 30;
 
@@ -45,7 +49,10 @@ export function HealthStatusPage(): JSX.Element {
   const [loadErrorMessage, setLoadErrorMessage] = useState<string | null>(null);
   const [refreshCount, setRefreshCount] = useState(0);
   const [expandedProjectIds, setExpandedProjectIds] = useState<Set<string>>(new Set());
-  const dayRange = useMemo(() => buildHealthStatusDayRange(new Date(), STATUS_HISTORY_DAYS), [refreshCount]);
+  const dayRange = useMemo(
+    () => buildHealthStatusDayRange(new Date(), STATUS_HISTORY_DAYS),
+    [refreshCount]
+  );
   const isLoading = projects === null;
 
   useEffect(() => {
@@ -106,7 +113,9 @@ export function HealthStatusPage(): JSX.Element {
       <Card className="min-w-0">
         <CardHeader className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <CardTitle>Health status</CardTitle>
-          <p className="text-sm text-muted-foreground">{STATUS_HISTORY_DAYS}-day retained history</p>
+          <p className="text-sm text-muted-foreground">
+            {STATUS_HISTORY_DAYS}-day retained history
+          </p>
         </CardHeader>
         <CardContent>
           <ResourceListState
@@ -126,7 +135,8 @@ export function HealthStatusPage(): JSX.Element {
                   </EmptyMedia>
                   <EmptyTitle>No health checks yet</EmptyTitle>
                   <EmptyDescription>
-                    Create hosted health checks from a project Health tab to populate this status page.
+                    Create hosted health checks from a project Health tab to populate this status
+                    page.
                   </EmptyDescription>
                 </EmptyHeader>
                 <EmptyContent>
@@ -148,7 +158,9 @@ export function HealthStatusPage(): JSX.Element {
                     project={project}
                     expanded={expandedProjectIds.has(project.project.project_id)}
                     onToggle={() => {
-                      setExpandedProjectIds((current) => toggleExpandedProject(current, project.project.project_id));
+                      setExpandedProjectIds((current) =>
+                        toggleExpandedProject(current, project.project.project_id)
+                      );
                     }}
                   />
                 ))}
@@ -200,13 +212,18 @@ function ProjectStatusRow({
         </div>
 
         <div className="min-w-0 flex-1">
-          <StatusHistoryStrip days={project.days} label={`${project.project.name} health history`} />
+          <StatusHistoryStrip
+            days={project.days}
+            label={`${project.project.name} health history`}
+          />
         </div>
 
         <div className="flex items-center justify-between gap-3 lg:shrink-0 lg:justify-end">
           <StatusBadge state={project.current_state} />
           <div className="min-w-24 text-right">
-            <p className="text-sm font-medium text-foreground">{formatStatusUptime(project.uptime_percentage)}</p>
+            <p className="text-sm font-medium text-foreground">
+              {formatStatusUptime(project.uptime_percentage)}
+            </p>
             <p className="text-xs text-muted-foreground">uptime</p>
           </div>
           <Button asChild type="button" variant="ghost" size="sm">
@@ -226,7 +243,11 @@ function ProjectStatusRow({
   );
 }
 
-function CheckStatusRow({ summary }: { summary: HealthStatusProjectSummary["checks"][number] }): JSX.Element {
+function CheckStatusRow({
+  summary
+}: {
+  summary: HealthStatusProjectSummary["checks"][number];
+}): JSX.Element {
   const check = summary.check;
 
   return (
@@ -242,7 +263,9 @@ function CheckStatusRow({ summary }: { summary: HealthStatusProjectSummary["chec
       </div>
       <div className="flex items-center justify-between gap-3 lg:shrink-0 lg:justify-end">
         <StatusBadge state={mapCheckStatusToDayState(check.status)} />
-        <p className="min-w-24 text-right text-sm text-muted-foreground">{formatStatusUptime(summary.uptime_percentage)}</p>
+        <p className="min-w-24 text-right text-sm text-muted-foreground">
+          {formatStatusUptime(summary.uptime_percentage)}
+        </p>
       </div>
     </div>
   );
@@ -299,25 +322,27 @@ function StatusMetric({ label, value }: { label: string; value: string }): JSX.E
 async function loadHealthStatusProjects(dayRange: string[]): Promise<HealthStatusProjectSummary[]> {
   const projects = await listProjects();
   const projectInputs = await Promise.all(
-    projects.filter((project) => !isSharedProjectAccessSuspended(project)).map(async (project): Promise<ProjectHealthStatusInput> => {
-      const { checks } = await listProjectAvailabilityChecks(project.project_id, 100);
-      const rollupEntries = await Promise.all(
-        checks.map(async (check) => {
-          const rollups = await listProjectAvailabilityCheckDailyRollups(
-            project.project_id,
-            check.check_id,
-            STATUS_HISTORY_DAYS
-          );
-          return [check.check_id, rollups] as const;
-        })
-      );
+    projects
+      .filter((project) => !isSharedProjectAccessSuspended(project))
+      .map(async (project): Promise<ProjectHealthStatusInput> => {
+        const { checks } = await listProjectAvailabilityChecks(project.project_id, 100);
+        const rollupEntries = await Promise.all(
+          checks.map(async (check) => {
+            const rollups = await listProjectAvailabilityCheckDailyRollups(
+              project.project_id,
+              check.check_id,
+              STATUS_HISTORY_DAYS
+            );
+            return [check.check_id, rollups] as const;
+          })
+        );
 
-      return {
-        project,
-        checks,
-        rollupsByCheckId: new Map(rollupEntries)
-      };
-    })
+        return {
+          project,
+          checks,
+          rollupsByCheckId: new Map(rollupEntries)
+        };
+      })
   );
 
   return buildHealthStatusProjects(projectInputs, dayRange);
@@ -329,13 +354,11 @@ function buildWorkspaceSummary(projects: HealthStatusProjectSummary[]): {
   uptimePercentage: number | null;
 } {
   const allDays = projects.flatMap((project) => project.days);
-  const totalChecks = allDays.reduce((total, day) => total + day.total_checks, 0);
-  const failedChecks = allDays.reduce((total, day) => total + day.failed_checks, 0);
 
   return {
     projectCount: projects.length,
     checkCount: projects.reduce((total, project) => total + project.checks.length, 0),
-    uptimePercentage: totalChecks === 0 ? null : ((totalChecks - failedChecks) / totalChecks) * 100
+    uptimePercentage: computeLatestAvailabilityUptimePercentage(allDays)
   };
 }
 

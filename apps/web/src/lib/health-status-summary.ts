@@ -1,5 +1,8 @@
 import type { AvailabilityCheckDailyRollupRecord, AvailabilityCheckRecord } from "./api.js";
-import { computeAvailabilityUptimePercentage, formatAvailabilityUptime } from "./health-status-metrics.js";
+import {
+  computeLatestAvailabilityUptimePercentage,
+  formatAvailabilityUptime
+} from "./health-status-metrics.js";
 
 export type HealthStatusTodayState = "not_set" | "down" | "operational" | "paused" | "unknown";
 
@@ -58,7 +61,10 @@ export function summarizeHealthStatusToday(
   };
 }
 
-function countChecks(checks: AvailabilityCheckRecord[], status: AvailabilityCheckRecord["status"]): number {
+function countChecks(
+  checks: AvailabilityCheckRecord[],
+  status: AvailabilityCheckRecord["status"]
+): number {
   return checks.filter((check) => check.status === status).length;
 }
 
@@ -70,7 +76,7 @@ function formatHealthStatusUptime(
   checks: AvailabilityCheckRecord[],
   rollupsByCheckId: Map<string, AvailabilityCheckDailyRollupRecord[]>
 ): string {
-  const uptimePercentage = computeAvailabilityUptimePercentage(
+  const uptimePercentage = computeLatestAvailabilityUptimePercentage(
     checks.flatMap((check) => rollupsByCheckId.get(check.check_id) ?? [])
   );
   return formatAvailabilityUptime(uptimePercentage);

@@ -109,8 +109,8 @@ describe("health status helpers", () => {
       summarizeHealthStatusToday(
         [buildCheck(), buildCheck({ check_id: "chk_2" })],
         new Map([
-          ["chk_1", [buildRollup()]],
-          ["chk_2", [buildRollup({ check_id: "chk_2" })]]
+          ["chk_1", [buildRollup({ day: "2026-06-15" })]],
+          ["chk_2", [buildRollup({ check_id: "chk_2", day: "2026-06-15" })]]
         ]),
         "workspace"
       )
@@ -122,7 +122,9 @@ describe("health status helpers", () => {
     expect(
       summarizeHealthStatusToday(
         [buildCheck({ status: "failing" })],
-        new Map([["chk_1", [buildRollup({ total_checks: 10, successful_checks: 9, failed_checks: 1 })]]]),
+        new Map([
+          ["chk_1", [buildRollup({ total_checks: 10, successful_checks: 9, failed_checks: 1 })]]
+        ]),
         "project"
       )
     ).toEqual({
@@ -134,8 +136,22 @@ describe("health status helpers", () => {
       summarizeHealthStatusToday(
         [buildCheck(), buildCheck({ check_id: "chk_2", status: "failing" })],
         new Map([
-          ["chk_1", [buildRollup({ total_checks: 1250, successful_checks: 1250 })]],
-          ["chk_2", [buildRollup({ check_id: "chk_2", total_checks: 1250, successful_checks: 1249, failed_checks: 1 })]]
+          [
+            "chk_1",
+            [buildRollup({ day: "2026-06-15", total_checks: 1250, successful_checks: 1250 })]
+          ],
+          [
+            "chk_2",
+            [
+              buildRollup({
+                check_id: "chk_2",
+                day: "2026-06-15",
+                total_checks: 1250,
+                successful_checks: 1249,
+                failed_checks: 1
+              })
+            ]
+          ]
         ]),
         "workspace"
       )
@@ -143,6 +159,35 @@ describe("health status helpers", () => {
       state: "down",
       value: "99.96%",
       description: "1 check failing across all projects"
+    });
+    expect(
+      summarizeHealthStatusToday(
+        [buildCheck()],
+        new Map([
+          [
+            "chk_1",
+            [
+              buildRollup({
+                day: "2026-06-14",
+                total_checks: 1250,
+                successful_checks: 1249,
+                failed_checks: 1
+              }),
+              buildRollup({
+                day: "2026-06-15",
+                total_checks: 1250,
+                successful_checks: 1250,
+                failed_checks: 0
+              })
+            ]
+          ]
+        ]),
+        "project"
+      )
+    ).toEqual({
+      state: "operational",
+      value: "100%",
+      description: "1 check passing in this project"
     });
   });
 
@@ -185,10 +230,53 @@ describe("health status helpers", () => {
     expect(summaries).toHaveLength(1);
     expect(summaries[0]?.checks[0]?.days).toEqual([
       expect.objectContaining({ day: "2026-06-14", state: "unknown", total_checks: 0 }),
-      expect.objectContaining({ day: "2026-06-15", state: "degraded", impact: "minor", failed_checks: 1 }),
+      expect.objectContaining({
+        day: "2026-06-15",
+        state: "degraded",
+        impact: "minor",
+        failed_checks: 1
+      }),
       expect.objectContaining({ day: "2026-06-16", state: "unknown", total_checks: 0 })
     ]);
     expect(summaries[0]?.uptime_percentage).toBe(90);
+  });
+
+  it("uses the latest retained day for health-status uptime percentages", () => {
+    const project = buildProject();
+    const check = buildCheck();
+    const summaries = buildHealthStatusProjects(
+      [
+        {
+          project,
+          checks: [check],
+          rollupsByCheckId: new Map([
+            [
+              check.check_id,
+              [
+                buildRollup({
+                  day: "2026-06-14",
+                  total_checks: 1250,
+                  successful_checks: 1249,
+                  failed_checks: 1,
+                  state: "degraded"
+                }),
+                buildRollup({
+                  day: "2026-06-15",
+                  total_checks: 1250,
+                  successful_checks: 1250,
+                  failed_checks: 0,
+                  state: "operational"
+                })
+              ]
+            ]
+          ])
+        }
+      ],
+      ["2026-06-14", "2026-06-15"]
+    );
+
+    expect(summaries[0]?.uptime_percentage).toBe(100);
+    expect(summaries[0]?.checks[0]?.uptime_percentage).toBe(100);
   });
 
   it("uses worst project state and counts active linked availability incidents", () => {
@@ -208,7 +296,10 @@ describe("health status helpers", () => {
           ],
           rollupsByCheckId: new Map([
             ["chk_ok", [buildRollup({ check_id: "chk_ok", state: "operational" })]],
-            ["chk_down", [buildRollup({ check_id: "chk_down", state: "degraded", degraded_checks: 2 })]]
+            [
+              "chk_down",
+              [buildRollup({ check_id: "chk_down", state: "degraded", degraded_checks: 2 })]
+            ]
           ])
         }
       ],
@@ -234,7 +325,9 @@ describe("health status helpers", () => {
               linked_incident_status: "resolved"
             })
           ],
-          rollupsByCheckId: new Map([["chk_down", [buildRollup({ check_id: "chk_down", state: "degraded" })]]])
+          rollupsByCheckId: new Map([
+            ["chk_down", [buildRollup({ check_id: "chk_down", state: "degraded" })]]
+          ])
         }
       ],
       ["2026-06-15"]
@@ -248,18 +341,16 @@ describe("health status helpers", () => {
     expect(formatStatusUptime(100)).toBe("100%");
     expect(formatStatusUptime(99.987)).toBe("99.99%");
     expect(
-      formatStatusDayLabel(
-        {
-          ...buildRollup({
-            day: "2026-06-15",
-            state: "degraded",
-            total_checks: 12,
-            failed_checks: 2,
-            downtime_seconds: 120
-          }),
-          impact: "minor",
-        }
-      )
+      formatStatusDayLabel({
+        ...buildRollup({
+          day: "2026-06-15",
+          state: "degraded",
+          total_checks: 12,
+          failed_checks: 2,
+          downtime_seconds: 120
+        }),
+        impact: "minor"
+      })
     ).toContain("brief interruption, 2 failed of 12 checks, 2m downtime");
   });
 

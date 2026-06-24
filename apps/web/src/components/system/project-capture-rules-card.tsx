@@ -1,4 +1,11 @@
-import { LinkIcon, PlusIcon, RotateCcwIcon, ShieldAlertIcon, ShieldOffIcon, Trash2Icon } from "lucide-react";
+import {
+  LinkIcon,
+  PlusIcon,
+  RotateCcwIcon,
+  ShieldAlertIcon,
+  ShieldOffIcon,
+  Trash2Icon
+} from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 
@@ -11,10 +18,26 @@ import {
   type ProjectCaptureRulesResponse
 } from "../../lib/capture-rules-api.js";
 import { showErrorToast, showSuccessToast } from "../../lib/notify.js";
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "../ui/alert-dialog.js";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle
+} from "../ui/alert-dialog.js";
 import { Badge } from "../ui/badge.js";
 import { Button } from "../ui/button.js";
-import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "../ui/card.js";
+import {
+  Card,
+  CardAction,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle
+} from "../ui/card.js";
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "../ui/empty.js";
 import { Field, FieldDescription, FieldGroup, FieldLabel } from "../ui/field.js";
 import { Input } from "../ui/input.js";
@@ -29,8 +52,11 @@ import {
   getCaptureRuleCreateDraftValidationError,
   type CaptureRuleCreateDraft
 } from "./capture-rule-create-form.js";
+import { CursorPaginationControls } from "./cursor-pagination-controls.js";
 import { Dialog } from "../ui/dialog.js";
 import { DialogFormContent } from "./dialog-form-content.js";
+
+const CAPTURE_RULES_PAGE_SIZE = 6;
 
 interface ProjectCaptureRulesCardProps {
   projectId: string;
@@ -62,7 +88,10 @@ function draftsEqual(left: RuleDraft, right: RuleDraft): boolean {
   );
 }
 
-export function ProjectCaptureRulesCard({ projectId, canEdit }: ProjectCaptureRulesCardProps): JSX.Element {
+export function ProjectCaptureRulesCard({
+  projectId,
+  canEdit
+}: ProjectCaptureRulesCardProps): JSX.Element {
   const [rulesResponse, setRulesResponse] = useState<ProjectCaptureRulesResponse | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -74,9 +103,12 @@ export function ProjectCaptureRulesCard({ projectId, canEdit }: ProjectCaptureRu
   const [isDeletingRuleId, setIsDeletingRuleId] = useState<string | null>(null);
   const [isTogglingRuleId, setIsTogglingRuleId] = useState<string | null>(null);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
-  const [createDraft, setCreateDraft] = useState<CaptureRuleCreateDraft>(createDefaultCaptureRuleCreateDraft());
+  const [createDraft, setCreateDraft] = useState<CaptureRuleCreateDraft>(
+    createDefaultCaptureRuleCreateDraft()
+  );
   const [isCreating, setIsCreating] = useState(false);
   const [hasSubmittedCreate, setHasSubmittedCreate] = useState(false);
+  const [rulesPage, setRulesPage] = useState(1);
 
   async function loadRules(showRefreshing = false): Promise<void> {
     if (showRefreshing) {
@@ -101,6 +133,7 @@ export function ProjectCaptureRulesCard({ projectId, canEdit }: ProjectCaptureRu
   }
 
   useEffect(() => {
+    setRulesPage(1);
     void loadRules();
   }, [projectId]);
 
@@ -118,8 +151,19 @@ export function ProjectCaptureRulesCard({ projectId, canEdit }: ProjectCaptureRu
   );
   const editDraft = draft ?? (editingRule === null ? null : buildDraft(editingRule));
   const isEditDirty =
-    editingRule !== null && editDraft !== null ? !draftsEqual(editDraft, buildDraft(editingRule)) : false;
+    editingRule !== null && editDraft !== null
+      ? !draftsEqual(editDraft, buildDraft(editingRule))
+      : false;
   const createValidationError = getCaptureRuleCreateDraftValidationError(createDraft);
+  const rulesPageCount = Math.max(1, Math.ceil(sortedRules.length / CAPTURE_RULES_PAGE_SIZE));
+  const visibleRules = useMemo(() => {
+    const startIndex = (rulesPage - 1) * CAPTURE_RULES_PAGE_SIZE;
+    return sortedRules.slice(startIndex, startIndex + CAPTURE_RULES_PAGE_SIZE);
+  }, [rulesPage, sortedRules]);
+
+  useEffect(() => {
+    setRulesPage((current) => Math.min(current, rulesPageCount));
+  }, [rulesPageCount]);
 
   async function handleCreateRule(event: React.FormEvent<HTMLFormElement>): Promise<void> {
     event.preventDefault();
@@ -130,7 +174,10 @@ export function ProjectCaptureRulesCard({ projectId, canEdit }: ProjectCaptureRu
 
     setIsCreating(true);
     try {
-      const created = await createProjectCaptureRule(projectId, buildProjectCaptureRuleCreate(createDraft));
+      const created = await createProjectCaptureRule(
+        projectId,
+        buildProjectCaptureRuleCreate(createDraft)
+      );
       setRulesResponse((current) =>
         current === null
           ? current
@@ -139,6 +186,7 @@ export function ProjectCaptureRulesCard({ projectId, canEdit }: ProjectCaptureRu
               rules: [created, ...current.rules.filter((candidate) => candidate.id !== created.id)]
             }
       );
+      setRulesPage(1);
       setCreateDraft(createDefaultCaptureRuleCreateDraft());
       setHasSubmittedCreate(false);
       setIsCreateOpen(false);
@@ -163,10 +211,14 @@ export function ProjectCaptureRulesCard({ projectId, canEdit }: ProjectCaptureRu
           ? current
           : {
               ...current,
-              rules: current.rules.map((candidate) => (candidate.id === updated.id ? updated : candidate))
+              rules: current.rules.map((candidate) =>
+                candidate.id === updated.id ? updated : candidate
+              )
             }
       );
-      showSuccessToast(rule.enabled ? "Capture rule paused successfully." : "Capture rule enabled successfully.");
+      showSuccessToast(
+        rule.enabled ? "Capture rule paused successfully." : "Capture rule enabled successfully."
+      );
     } catch {
       showErrorToast("Could not update capture rule.");
     } finally {
@@ -185,7 +237,8 @@ export function ProjectCaptureRulesCard({ projectId, canEdit }: ProjectCaptureRu
     try {
       const updated = await updateProjectCaptureRule(projectId, editingRule.id, {
         name: editDraft.name.trim(),
-        description: editDraft.description.trim().length === 0 ? null : editDraft.description.trim(),
+        description:
+          editDraft.description.trim().length === 0 ? null : editDraft.description.trim(),
         enabled: editDraft.enabled,
         expires_at: parseDateTimeLocalValue(editDraft.expires_at)
       });
@@ -194,7 +247,9 @@ export function ProjectCaptureRulesCard({ projectId, canEdit }: ProjectCaptureRu
           ? current
           : {
               ...current,
-              rules: current.rules.map((candidate) => (candidate.id === updated.id ? updated : candidate))
+              rules: current.rules.map((candidate) =>
+                candidate.id === updated.id ? updated : candidate
+              )
             }
       );
       setEditingRule(null);
@@ -237,7 +292,10 @@ export function ProjectCaptureRulesCard({ projectId, canEdit }: ProjectCaptureRu
       <Card>
         <CardHeader className="gap-1">
           <CardTitle>Capture rules</CardTitle>
-          <CardDescription>Review which noisy patterns are being demoted, sampled, or dropped before they keep reopening incidents.</CardDescription>
+          <CardDescription>
+            Review which noisy patterns are being demoted, sampled, or dropped before they keep
+            reopening incidents.
+          </CardDescription>
           {showPreviewOnly ? null : (
             <CardAction className="max-sm:col-span-full max-sm:col-start-1 max-sm:row-start-3 max-sm:row-span-1 max-sm:mt-3">
               <Button
@@ -281,7 +339,9 @@ export function ProjectCaptureRulesCard({ projectId, canEdit }: ProjectCaptureRu
           </div>
 
           {errorMessage === null ? null : (
-            <div className="rounded-lg border border-destructive/25 bg-destructive/5 p-3 text-sm text-destructive">{errorMessage}</div>
+            <div className="rounded-lg border border-destructive/25 bg-destructive/5 p-3 text-sm text-destructive">
+              {errorMessage}
+            </div>
           )}
 
           {isLoading ? (
@@ -297,86 +357,110 @@ export function ProjectCaptureRulesCard({ projectId, canEdit }: ProjectCaptureRu
                 </EmptyMedia>
                 <EmptyTitle>No capture rules yet</EmptyTitle>
                 <EmptyDescription>
-                  Create one from a recurring incident or define a manual matcher when the noisy pattern is already known.
+                  Create one from a recurring incident or define a manual matcher when the noisy
+                  pattern is already known.
                 </EmptyDescription>
               </EmptyHeader>
             </Empty>
           ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Rule</TableHead>
-                  <TableHead>Matcher</TableHead>
-                  <TableHead>Action</TableHead>
-                  <TableHead>Matches</TableHead>
-                  <TableHead>Last matched</TableHead>
-                  {showPreviewOnly ? null : <TableHead className="text-right">Actions</TableHead>}
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {sortedRules.map((rule) => (
-                  <TableRow key={rule.id}>
-                    <TableCell className="align-top">
-                      <div className="flex min-w-0 flex-col gap-2">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <span className="font-medium text-foreground">{rule.name}</span>
-                          <Badge variant={rule.enabled ? "success" : "outline"}>{rule.enabled ? "enabled" : "disabled"}</Badge>
-                          {rule.expires_at === null ? null : <Badge variant="outline">expires {formatDate(rule.expires_at)}</Badge>}
-                        </div>
-                        {rule.description === null ? null : (
-                          <p className="max-w-xl whitespace-normal text-sm leading-6 text-muted-foreground">{rule.description}</p>
-                        )}
-                      </div>
-                    </TableCell>
-                    <TableCell className="align-top">
-                      <div className="max-w-sm whitespace-normal text-sm leading-6 text-muted-foreground">
-                        {formatMatcherSummary(rule)}
-                      </div>
-                    </TableCell>
-                    <TableCell className="align-top">
-                      <Badge variant={getActionVariant(rule.action)}>
-                        {rule.action === "sample" ? `sample ${formatSampleRate(rule.sample_rate)}` : rule.action}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="align-top text-muted-foreground">{rule.hit_count.toLocaleString()}</TableCell>
-                    <TableCell className="align-top text-muted-foreground">
-                      {rule.last_matched_at === null ? "Never" : formatDate(rule.last_matched_at)}
-                    </TableCell>
-                    {showPreviewOnly ? null : (
-                      <TableCell className="align-top text-right">
-                        <div className="flex justify-end gap-2">
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="sm"
-                            disabled={isTogglingRuleId === rule.id}
-                            onClick={() => void handleToggleEnabled(rule)}
-                          >
-                            {rule.enabled ? "Pause" : "Enable"}
-                          </Button>
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => {
-                              setEditingRule(rule);
-                              setDraft(buildDraft(rule));
-                            }}
-                          >
-                            Edit
-                          </Button>
-                          <Button type="button" variant="ghost" size="sm" onClick={() => setPendingDeleteRule(rule)}>
-                            Delete
-                          </Button>
+            <div className="space-y-4">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Rule</TableHead>
+                    <TableHead>Matcher</TableHead>
+                    <TableHead>Action</TableHead>
+                    <TableHead>Matches</TableHead>
+                    <TableHead>Last matched</TableHead>
+                    {showPreviewOnly ? null : <TableHead className="text-right">Actions</TableHead>}
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {visibleRules.map((rule) => (
+                    <TableRow key={rule.id}>
+                      <TableCell className="align-top">
+                        <div className="flex min-w-0 flex-col gap-2">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className="font-medium text-foreground">{rule.name}</span>
+                            <Badge variant={rule.enabled ? "success" : "outline"}>
+                              {rule.enabled ? "enabled" : "disabled"}
+                            </Badge>
+                            {rule.expires_at === null ? null : (
+                              <Badge variant="outline">expires {formatDate(rule.expires_at)}</Badge>
+                            )}
+                          </div>
+                          {rule.description === null ? null : (
+                            <p className="max-w-xl whitespace-normal text-sm leading-6 text-muted-foreground">
+                              {rule.description}
+                            </p>
+                          )}
                         </div>
                       </TableCell>
-                    )}
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                      <TableCell className="align-top">
+                        <div className="max-w-sm whitespace-normal text-sm leading-6 text-muted-foreground">
+                          {formatMatcherSummary(rule)}
+                        </div>
+                      </TableCell>
+                      <TableCell className="align-top">
+                        <Badge variant={getActionVariant(rule.action)}>
+                          {rule.action === "sample"
+                            ? `sample ${formatSampleRate(rule.sample_rate)}`
+                            : rule.action}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="align-top text-muted-foreground">
+                        {rule.hit_count.toLocaleString()}
+                      </TableCell>
+                      <TableCell className="align-top text-muted-foreground">
+                        {rule.last_matched_at === null ? "Never" : formatDate(rule.last_matched_at)}
+                      </TableCell>
+                      {showPreviewOnly ? null : (
+                        <TableCell className="align-top text-right">
+                          <div className="flex justify-end gap-2">
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              disabled={isTogglingRuleId === rule.id}
+                              onClick={() => void handleToggleEnabled(rule)}
+                            >
+                              {rule.enabled ? "Pause" : "Enable"}
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => {
+                                setEditingRule(rule);
+                                setDraft(buildDraft(rule));
+                              }}
+                            >
+                              Edit
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => setPendingDeleteRule(rule)}
+                            >
+                              Delete
+                            </Button>
+                          </div>
+                        </TableCell>
+                      )}
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+              <CursorPaginationControls
+                page={rulesPage}
+                hasNextPage={rulesPage < rulesPageCount}
+                isLoading={isLoading || isRefreshing}
+                onPreviousPage={() => setRulesPage((current) => Math.max(1, current - 1))}
+                onNextPage={() => setRulesPage((current) => Math.min(rulesPageCount, current + 1))}
+              />
+            </div>
           )}
-
         </CardContent>
       </Card>
 
@@ -407,7 +491,10 @@ export function ProjectCaptureRulesCard({ projectId, canEdit }: ProjectCaptureRu
                 >
                   Reset
                 </Button>
-                <Button type="submit" disabled={!isEditDirty || isSaving || editDraft.name.trim().length === 0}>
+                <Button
+                  type="submit"
+                  disabled={!isEditDirty || isSaving || editDraft.name.trim().length === 0}
+                >
                   {isSaving ? "Saving..." : "Save capture rule"}
                 </Button>
               </>
@@ -439,13 +526,22 @@ export function ProjectCaptureRulesCard({ projectId, canEdit }: ProjectCaptureRu
                   disabled={isSaving}
                   rows={4}
                 />
-                <FieldDescription>Keep this short and factual so future reviewers know why the rule exists.</FieldDescription>
+                <FieldDescription>
+                  Keep this short and factual so future reviewers know why the rule exists.
+                </FieldDescription>
               </Field>
 
               <Field orientation="horizontal" className="items-center justify-between gap-4">
                 <div className="flex flex-1 flex-col gap-1">
-                  <FieldLabel id="project-capture-rule-enabled-label" htmlFor="project-capture-rule-enabled">Enabled</FieldLabel>
-                  <FieldDescription>Disable a rule temporarily without deleting its definition or match history.</FieldDescription>
+                  <FieldLabel
+                    id="project-capture-rule-enabled-label"
+                    htmlFor="project-capture-rule-enabled"
+                  >
+                    Enabled
+                  </FieldLabel>
+                  <FieldDescription>
+                    Disable a rule temporarily without deleting its definition or match history.
+                  </FieldDescription>
                 </div>
                 <Switch
                   id="project-capture-rule-enabled"
@@ -470,7 +566,9 @@ export function ProjectCaptureRulesCard({ projectId, canEdit }: ProjectCaptureRu
                   }}
                   disabled={isSaving}
                 />
-                <FieldDescription>Leave blank to keep the rule active until it is disabled or deleted.</FieldDescription>
+                <FieldDescription>
+                  Leave blank to keep the rule active until it is disabled or deleted.
+                </FieldDescription>
               </Field>
             </FieldGroup>
           </DialogFormContent>
@@ -516,11 +614,18 @@ export function ProjectCaptureRulesCard({ projectId, canEdit }: ProjectCaptureRu
               {createValidationError}
             </div>
           )}
-          <CaptureRuleCreateForm draft={createDraft} disabled={isCreating} onDraftChange={setCreateDraft} />
+          <CaptureRuleCreateForm
+            draft={createDraft}
+            disabled={isCreating}
+            onDraftChange={setCreateDraft}
+          />
         </DialogFormContent>
       </Dialog>
 
-      <AlertDialog open={pendingDeleteRule !== null} onOpenChange={(open) => (open ? undefined : setPendingDeleteRule(null))}>
+      <AlertDialog
+        open={pendingDeleteRule !== null}
+        onOpenChange={(open) => (open ? undefined : setPendingDeleteRule(null))}
+      >
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Delete capture rule</AlertDialogTitle>
@@ -562,7 +667,9 @@ function formatMatcherSummary(rule: ProjectCaptureRule): string {
     parts.push(`browser: ${rule.matcher.browser_event_kind}`);
   }
   if (rule.matcher.browser_event_opaque !== undefined) {
-    parts.push(rule.matcher.browser_event_opaque ? "opaque browser event" : "non-opaque browser event");
+    parts.push(
+      rule.matcher.browser_event_opaque ? "opaque browser event" : "non-opaque browser event"
+    );
   }
   if (rule.matcher.runtime?.length) {
     parts.push(`runtime: ${rule.matcher.runtime.join(", ")}`);
@@ -601,13 +708,17 @@ function formatMatcherSummary(rule: ProjectCaptureRule): string {
     parts.push(rule.matcher.first_party ? "first-party only" : "third-party allowed");
   }
   if (rule.matcher.fingerprint !== undefined) {
-    parts.push(`fingerprint: ${rule.matcher.fingerprint.version}:${rule.matcher.fingerprint.value}`);
+    parts.push(
+      `fingerprint: ${rule.matcher.fingerprint.version}:${rule.matcher.fingerprint.value}`
+    );
   }
 
   return parts.length === 0 ? "Custom matcher" : parts.join(" • ");
 }
 
-function formatUrlMatcher(matcher: NonNullable<ProjectCaptureRule["matcher"]["resource_url"]>): string {
+function formatUrlMatcher(
+  matcher: NonNullable<ProjectCaptureRule["matcher"]["resource_url"]>
+): string {
   const parts: string[] = [];
   if (matcher.host !== undefined) parts.push(matcher.host);
   if (matcher.host_suffix !== undefined) parts.push(`*.${matcher.host_suffix}`);
@@ -616,7 +727,9 @@ function formatUrlMatcher(matcher: NonNullable<ProjectCaptureRule["matcher"]["re
   return parts.join(" ");
 }
 
-function getActionVariant(action: ProjectCaptureRule["action"]): "secondary" | "warning" | "destructive" {
+function getActionVariant(
+  action: ProjectCaptureRule["action"]
+): "secondary" | "warning" | "destructive" {
   switch (action) {
     case "demote":
       return "secondary";

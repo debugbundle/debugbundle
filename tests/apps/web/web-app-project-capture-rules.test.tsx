@@ -110,7 +110,10 @@ describe("web app — project capture rules", () => {
         });
       }
 
-      if (url.endsWith("/v1/projects/proj_123/improvement-settings") && init?.method === undefined) {
+      if (
+        url.endsWith("/v1/projects/proj_123/improvement-settings") &&
+        init?.method === undefined
+      ) {
         return jsonResponse(200, {
           access_mode: "manage",
           cloud_automation_available: true,
@@ -132,12 +135,27 @@ describe("web app — project capture rules", () => {
 
     render(<App initialEntries={["/projects/proj_123/settings"]} />);
 
-    const capturePolicyHeading = await screen.findByRole("heading", { name: /capture policy/i, level: 3 });
-    const captureRulesHeading = await screen.findByRole("heading", { name: /capture rules/i, level: 3 });
-    const improvementHeading = await screen.findByRole("heading", { name: /automated improvement bundles/i, level: 3 });
+    const capturePolicyHeading = await screen.findByRole("heading", {
+      name: /capture policy/i,
+      level: 3
+    });
+    const captureRulesHeading = await screen.findByRole("heading", {
+      name: /capture rules/i,
+      level: 3
+    });
+    const improvementHeading = await screen.findByRole("heading", {
+      name: /automated improvement bundles/i,
+      level: 3
+    });
 
-    expect(capturePolicyHeading.compareDocumentPosition(captureRulesHeading) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect(captureRulesHeading.compareDocumentPosition(improvementHeading) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(
+      capturePolicyHeading.compareDocumentPosition(captureRulesHeading) &
+        Node.DOCUMENT_POSITION_FOLLOWING
+    ).toBeTruthy();
+    expect(
+      captureRulesHeading.compareDocumentPosition(improvementHeading) &
+        Node.DOCUMENT_POSITION_FOLLOWING
+    ).toBeTruthy();
     expect(screen.getByText(/demote analytics resource errors/i)).toBeInTheDocument();
     expect(screen.getByText(/known third-party browser resource noise/i)).toBeInTheDocument();
 
@@ -147,7 +165,8 @@ describe("web app — project capture rules", () => {
       expect(
         fetchMock.mock.calls.some(
           ([input, init]) =>
-            requestUrl(input).endsWith("/v1/projects/proj_123/capture-rules/rule_1") && init?.method === "PATCH"
+            requestUrl(input).endsWith("/v1/projects/proj_123/capture-rules/rule_1") &&
+            init?.method === "PATCH"
         )
       ).toBe(true);
     });
@@ -166,7 +185,13 @@ describe("web app — project capture rules", () => {
 
       if (url.endsWith("/v1/projects") && init?.method === undefined) {
         return jsonResponse(200, {
-          projects: [createProject({ relationship: "shared", effective_role: "member", organization_plan: "team" })]
+          projects: [
+            createProject({
+              relationship: "shared",
+              effective_role: "member",
+              organization_plan: "team"
+            })
+          ]
         });
       }
 
@@ -198,7 +223,10 @@ describe("web app — project capture rules", () => {
         });
       }
 
-      if (url.endsWith("/v1/projects/proj_123/improvement-settings") && init?.method === undefined) {
+      if (
+        url.endsWith("/v1/projects/proj_123/improvement-settings") &&
+        init?.method === undefined
+      ) {
         return jsonResponse(200, {
           access_mode: "preview",
           cloud_automation_available: true,
@@ -220,12 +248,101 @@ describe("web app — project capture rules", () => {
 
     render(<App initialEntries={["/projects/proj_123/settings"]} />);
 
-    expect(await screen.findByRole("heading", { name: /capture rules/i, level: 3 })).toBeInTheDocument();
+    expect(
+      await screen.findByRole("heading", { name: /capture rules/i, level: 3 })
+    ).toBeInTheDocument();
     expect(screen.getByText(/members can review project capture rules here/i)).toBeInTheDocument();
     expect(await screen.findByText(/demote analytics resource errors/i)).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /^pause$/i })).toBeNull();
     expect(screen.queryByRole("button", { name: /^edit$/i })).toBeNull();
     expect(screen.queryByRole("button", { name: /^delete$/i })).toBeNull();
+  });
+
+  it("paginates project settings capture rules after six rows", async () => {
+    const user = userEvent.setup();
+    const captureRules = Array.from({ length: 7 }, (_, index) => ({
+      ...captureRuleFixture,
+      id: `rule_${index + 1}`,
+      name: `Capture rule ${String(index + 1).padStart(2, "0")}`,
+      matcher: {
+        ...captureRuleFixture.matcher,
+        resource_url: { host: `cdn-${index + 1}.example.com` }
+      }
+    }));
+    const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = requestUrl(input);
+
+      if (url.endsWith("/v1/auth/session")) {
+        return jsonResponse(200, { session: createSession() });
+      }
+
+      if (url.endsWith("/v1/projects") && init?.method === undefined) {
+        return jsonResponse(200, { projects: [createProject({ organization_plan: "solo" })] });
+      }
+
+      if (url.endsWith("/v1/projects/proj_123/capture-policy") && init?.method === undefined) {
+        return jsonResponse(200, {
+          access_mode: "manage",
+          policy: {
+            preset: "balanced",
+            capture_logs: "warning",
+            capture_request_events: "failures_only",
+            capture_breadcrumbs: "exception_only",
+            capture_probe_events: "buffer_only",
+            immediate_client_error_statuses: []
+          },
+          overrides: {
+            capture_logs: null,
+            capture_request_events: null,
+            capture_breadcrumbs: null,
+            capture_probe_events: null,
+            immediate_client_error_statuses: null
+          }
+        });
+      }
+
+      if (url.endsWith("/v1/projects/proj_123/capture-rules") && init?.method === undefined) {
+        return jsonResponse(200, {
+          access_mode: "manage",
+          rules: captureRules
+        });
+      }
+
+      if (
+        url.endsWith("/v1/projects/proj_123/improvement-settings") &&
+        init?.method === undefined
+      ) {
+        return jsonResponse(200, {
+          access_mode: "manage",
+          cloud_automation_available: true,
+          settings: {
+            automated_improvement_bundles_enabled: true,
+            improvement_bundle_sensitivity: "balanced"
+          }
+        });
+      }
+
+      if (url.includes("/v1/weekly-report-channels?")) {
+        return jsonResponse(200, { channels: [] });
+      }
+
+      return jsonResponse(404, { error: "not_found" });
+    });
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<App initialEntries={["/projects/proj_123/settings"]} />);
+
+    expect(await screen.findByText(/capture rule 01/i)).toBeInTheDocument();
+    expect(screen.getByText(/capture rule 06/i)).toBeInTheDocument();
+    expect(screen.queryByText(/capture rule 07/i)).toBeNull();
+    expect(screen.getAllByRole("button", { name: /^pause$/i })).toHaveLength(6);
+
+    await user.click(screen.getByRole("button", { name: /go to next page/i }));
+
+    expect(await screen.findByText(/capture rule 07/i)).toBeInTheDocument();
+    expect(screen.queryByText(/capture rule 01/i)).toBeNull();
+    expect(screen.getByText(/^page 2$/i)).toBeInTheDocument();
   });
 
   it("lets managers create a manual capture rule from project settings", async () => {
@@ -295,7 +412,10 @@ describe("web app — project capture rules", () => {
         return jsonResponse(201, { rule: createdRule });
       }
 
-      if (url.endsWith("/v1/projects/proj_123/improvement-settings") && init?.method === undefined) {
+      if (
+        url.endsWith("/v1/projects/proj_123/improvement-settings") &&
+        init?.method === undefined
+      ) {
         return jsonResponse(200, {
           access_mode: "manage",
           cloud_automation_available: true,
@@ -317,19 +437,31 @@ describe("web app — project capture rules", () => {
 
     render(<App initialEntries={["/projects/proj_123/settings"]} />);
 
-    expect(await screen.findByRole("heading", { name: /capture rules/i, level: 3 })).toBeInTheDocument();
-    await user.click(screen.getAllByRole("button", { name: /^create rule$/i })[0] as HTMLButtonElement);
+    expect(
+      await screen.findByRole("heading", { name: /capture rules/i, level: 3 })
+    ).toBeInTheDocument();
+    await user.click(
+      screen.getAllByRole("button", { name: /^create rule$/i })[0] as HTMLButtonElement
+    );
 
     const dialog = await screen.findByRole("dialog");
-    await user.type(within(dialog).getByLabelText(/^rule name$/i), "Demote analytics script errors");
-    await user.type(within(dialog).getByLabelText(/^description$/i), "Known third-party browser resource noise.");
+    await user.type(
+      within(dialog).getByLabelText(/^rule name$/i),
+      "Demote analytics script errors"
+    );
+    await user.type(
+      within(dialog).getByLabelText(/^description$/i),
+      "Known third-party browser resource noise."
+    );
     await user.type(within(dialog).getByLabelText(/^resource host$/i), "analytics.example.com");
     await user.click(within(dialog).getByRole("button", { name: /^create rule$/i }));
 
     await waitFor(() => {
       expect(
         fetchMock.mock.calls.some(
-          ([input, init]) => requestUrl(input).endsWith("/v1/projects/proj_123/capture-rules") && init?.method === "POST"
+          ([input, init]) =>
+            requestUrl(input).endsWith("/v1/projects/proj_123/capture-rules") &&
+            init?.method === "POST"
         )
       ).toBe(true);
     });
@@ -389,7 +521,9 @@ describe("web app — project capture rules", () => {
   });
 
   it("returns specific validation errors for invalid guided drafts", () => {
-    expect(getCaptureRuleCreateDraftValidationError(createDefaultCaptureRuleCreateDraft())).toBe("Rule name is required.");
+    expect(getCaptureRuleCreateDraftValidationError(createDefaultCaptureRuleCreateDraft())).toBe(
+      "Rule name is required."
+    );
 
     expect(
       getCaptureRuleCreateDraftValidationError({
@@ -517,6 +651,8 @@ describe("web app — project capture rules", () => {
     expect(screen.getByTestId("draft-state")).toHaveTextContent('"clientKind":"bot"');
     expect(screen.getByTestId("draft-state")).toHaveTextContent('"sampleEventClass":"context"');
     expect(screen.getByTestId("draft-state")).toHaveTextContent('"enabled":false');
-    expect(screen.getByTestId("draft-state")).toHaveTextContent('"advancedMatcherJson":"{\\"status_ranges\\"');
+    expect(screen.getByTestId("draft-state")).toHaveTextContent(
+      '"advancedMatcherJson":"{\\"status_ranges\\"'
+    );
   });
 });

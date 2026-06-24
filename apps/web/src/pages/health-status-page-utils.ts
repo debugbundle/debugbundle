@@ -3,7 +3,10 @@ import type {
   AvailabilityCheckRecord,
   ProjectRecord
 } from "../lib/api.js";
-import { computeAvailabilityUptimePercentage, formatAvailabilityUptime } from "../lib/health-status-metrics.js";
+import {
+  computeLatestAvailabilityUptimePercentage,
+  formatAvailabilityUptime
+} from "../lib/health-status-metrics.js";
 
 export type HealthStatusDayState = AvailabilityCheckDailyRollupRecord["state"];
 export type HealthStatusImpact = "none" | "minor" | "elevated" | "outage";
@@ -198,7 +201,9 @@ function mergeProjectDays(
   });
 }
 
-function deriveProjectCurrentState(statuses: AvailabilityCheckRecord["status"][]): HealthStatusDayState {
+function deriveProjectCurrentState(
+  statuses: AvailabilityCheckRecord["status"][]
+): HealthStatusDayState {
   if (statuses.includes("failing")) {
     return "down";
   }
@@ -267,7 +272,7 @@ function countActiveAvailabilityIncidents(checks: HealthStatusCheckSummary[]): n
 }
 
 function computeUptimePercentage(days: HealthStatusDay[]): number | null {
-  return computeAvailabilityUptimePercentage(days);
+  return computeLatestAvailabilityUptimePercentage(days);
 }
 
 function emptyStatusDay(day: string): HealthStatusDay {
