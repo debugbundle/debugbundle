@@ -31,7 +31,7 @@ Current release status for MCP ecosystem distribution.
 - ClawHub OpenClaw plugin: published as `@debugbundle/openclaw-plugin` version `1.6.1`.
 - MCP.so: listed as of 2026-06-23 via the web submit flow; treat it as a third-party community directory, not an official registry.
 - Glama: listed as of 2026-06-25 at `https://glama.ai/mcp/servers/sz3bl40umr`.
-- PulseMCP: auto-listed as official as of 2026-06-25 at `https://www.pulsemcp.com/servers/debugbundle`; command-line verification currently requires manual browser confirmation because the site returns HTTP 403 to the release verifier.
+- PulseMCP: auto-listed as official as of 2026-06-25 at `https://www.pulsemcp.com/servers/debugbundle`; manual browser-style verification passed on 2026-06-25, and command-line verification still requires `manual_check_required` because the site returns HTTP 403 to the release verifier.
 - LobeHub MCP: submitted as a request; no confirmed public listing as of 2026-06-25.
 
 Do not describe a downstream directory as live, official, verified, or indexed until the public listing is searchable or the marketplace has explicitly confirmed it.
@@ -153,9 +153,14 @@ debugbundle-mcp
 
 ## PulseMCP
 
-- Current state on 2026-06-25: auto-listed as the official DebugBundle MCP server at `https://www.pulsemcp.com/servers/debugbundle`.
+- Current state on 2026-06-25: auto-listed as the official DebugBundle MCP server at `https://www.pulsemcp.com/servers/debugbundle`; manual browser-style verification confirmed the page shows official classification and `com.debugbundle/mcp`.
 - Listing source: official MCP Registry metadata for `com.debugbundle/mcp`.
 - Verification check: confirm the page still shows `com.debugbundle/mcp` and links to the DebugBundle repository/server metadata. The automated ecosystem verifier treats PulseMCP as `manual_check_required` when the public page returns HTTP 403 to command-line fetches.
+
+## Docker MCP Catalog
+
+- Current decision on 2026-06-25: do not target Docker MCP Catalog for now.
+- Rationale: DebugBundle's supported public MCP path is the npm-backed local stdio package. A Docker listing should wait until there is a product-owned Docker MCP package with release automation and clean-install smoke coverage.
 
 ## LobeHub
 

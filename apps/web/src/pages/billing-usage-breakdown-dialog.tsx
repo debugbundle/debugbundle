@@ -1,4 +1,4 @@
-import { FolderKanbanIcon } from "lucide-react";
+import { ExternalLinkIcon, FolderKanbanIcon } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 
@@ -33,6 +33,7 @@ import {
   type BillingSummaryRecord,
   type ProjectRecord
 } from "../lib/api.js";
+import { resolveDocumentationUrl } from "../lib/external-links.js";
 import { getProjectRelationship } from "../lib/project-access.js";
 import { formatDate } from "./billing-page-helpers.js";
 
@@ -100,6 +101,7 @@ export function RawIngestedEventsBreakdownDialog({
     0
   );
   const allowance = billing.allowances.monthly_raw_ingested_events;
+  const reduceEventsDocsUrl = `${resolveDocumentationUrl()}/reducing-ingested-events`;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -214,7 +216,14 @@ export function RawIngestedEventsBreakdownDialog({
           )}
         </div>
 
-        <DialogFooter showCloseButton />
+        <DialogFooter showCloseButton className="sm:justify-between">
+          <Button asChild variant="outline">
+            <a href={reduceEventsDocsUrl} target="_blank" rel="noreferrer">
+              Reduce event volume
+              <ExternalLinkIcon data-icon="inline-end" aria-hidden="true" />
+            </a>
+          </Button>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   );

@@ -1,12 +1,14 @@
 # Hosted Remote MCP Connector Proposal
 
-Status: proposal
+Status: scoped future slice; deferred from the current distribution pass
 Owner: developer experience / platform
 Created: 2026-06-25
 
 ## Summary
 
 DebugBundle currently ships a local stdio MCP server through `@debugbundle/mcp` and the official MCP Registry entry `com.debugbundle/mcp`. A hosted Remote MCP connector would let remote-agent environments connect to DebugBundle without running local `npx`, but it is a separate product and infrastructure slice rather than a marketplace metadata update.
+
+Current decision: do not implement or list hosted Remote MCP as part of the current MCP discovery/distribution pass. If this becomes a near-term product slice, use the low-overhead launch shape in this proposal: dedicated `mcp.debugbundle.com` endpoint, member-token auth first, hosted-safe tools only, and no database changes unless the implementation demonstrably needs persistent connector grants, OAuth state, or dedicated rate-limit ledgers.
 
 ## Goals
 
@@ -38,6 +40,8 @@ https://api.debugbundle.com/mcp
 
 The dedicated hostname is easier to document, monitor, and submit to connector marketplaces.
 
+Decision for first hosted slice: use `https://mcp.debugbundle.com` unless deployment constraints make the fallback materially simpler.
+
 ## Auth Model
 
 Initial acceptable path:
@@ -45,6 +49,8 @@ Initial acceptable path:
 - `Authorization: Bearer dbundle_mem_*` member tokens for custom Remote MCP clients.
 - Existing member/project authorization checks for every tool call.
 - No project-token acceptance for retrieval, management, billing, project, incident, bundle, webhook, alert, probe, health-check, or token-management tools.
+
+Decision for first hosted slice: start token-first with member tokens. Defer OAuth until a marketplace-managed multi-user connector requires it.
 
 Preferred later path:
 
@@ -64,6 +70,8 @@ Exclude local-only tools:
 - Local bundle filesystem reads.
 - Repository filesystem access.
 - Any tool that assumes the MCP server process is running inside the user's code checkout.
+
+Decision for first hosted slice: the hosted-safe tool set above is the launch scope. Local-only diagnostics stay stdio-only.
 
 ## Runtime Requirements
 

@@ -65,6 +65,16 @@ DebugBundle does not expose a hosted remote MCP endpoint today; this package is 
 - Run local and hosted verification through tools such as `verify_local`, `verify_cloud`, `doctor`, `smoke`, and `analyze`.
 - Resolve or reopen incidents after verification.
 
+## Troubleshooting
+
+| Symptom | Check |
+| --- | --- |
+| Node.js launch failure | Use Node.js 22.x through 26.x. Configure the client to use a supported `node` or `npx` runtime. |
+| Missing local auth | Run `debugbundle login`, or set `DEBUGBUNDLE_MEMBER_TOKEN` for headless and managed clients. |
+| Invalid token | Use a `dbundle_mem_` member token. Project tokens are SDK ingestion-only credentials. |
+| Wrong API host | Leave `DEBUGBUNDLE_API_URL` unset for DebugBundle Cloud; set it only for self-hosted or non-default API hosts. |
+| Local repo not initialized | Run `debugbundle setup` before local-only diagnostics, local bundle analysis, or generated project-skill workflows. |
+
 ## Links
 
 - Docs: https://debugbundle.com/docs/mcp
