@@ -397,7 +397,7 @@ export function ProjectCaptureRulesCard({
                         </div>
                       </TableCell>
                       <TableCell className="align-top">
-                        <div className="max-w-sm whitespace-normal text-sm leading-6 text-muted-foreground">
+                        <div className="max-w-sm whitespace-normal break-words text-sm leading-6 text-muted-foreground [overflow-wrap:anywhere]">
                           {formatMatcherSummary(rule)}
                         </div>
                       </TableCell>

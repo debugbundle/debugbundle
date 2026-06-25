@@ -20,6 +20,7 @@ import {
 import { showErrorToast, showSuccessToast } from "../lib/notify.js";
 import { useSession } from "../lib/session.js";
 import { useDelayedVisibility } from "../lib/use-delayed-visibility.js";
+import { RawIngestedEventsBreakdownDialog } from "./billing-usage-breakdown-dialog.js";
 import { CapacityDialog, CheckoutReturnDialog, type CheckoutReturnDialogState } from "./billing-page-dialogs.js";
 import {
   billingReflectsCheckout,
@@ -46,6 +47,7 @@ export function BillingPage(): JSX.Element {
   const [activeTrialStartPlan, setActiveTrialStartPlan] = useState<"solo" | "team" | null>(null);
   const [isOpeningPortal, setIsOpeningPortal] = useState(false);
   const [isCapacityDialogOpen, setIsCapacityDialogOpen] = useState(false);
+  const [isRawIngestBreakdownOpen, setIsRawIngestBreakdownOpen] = useState(false);
   const [checkoutReturnDialog, setCheckoutReturnDialog] = useState<CheckoutReturnDialogState | null>(null);
   const showBillingLoading = useDelayedVisibility(billing === null && !isForbidden);
   const checkoutStatus = searchParams.get("checkout");
@@ -514,6 +516,9 @@ export function BillingPage(): JSX.Element {
                 used={billing.allowances.monthly_raw_ingested_events.used}
                 limit={billing.allowances.monthly_raw_ingested_events.limit}
                 description="Accepted event volume counting against the shared allowance."
+                actionLabel="Details"
+                actionAriaLabel="View raw ingested events breakdown"
+                onAction={() => setIsRawIngestBreakdownOpen(true)}
               />
               <UsageMeter
                 label="Retained bundles"
@@ -541,6 +546,12 @@ export function BillingPage(): JSX.Element {
               />
             </CardContent>
           </Card>
+
+          <RawIngestedEventsBreakdownDialog
+            billing={billing}
+            open={isRawIngestBreakdownOpen}
+            onOpenChange={setIsRawIngestBreakdownOpen}
+          />
         </>
       )}
     </div>

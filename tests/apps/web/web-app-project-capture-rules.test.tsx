@@ -258,6 +258,96 @@ describe("web app — project capture rules", () => {
     expect(screen.queryByRole("button", { name: /^delete$/i })).toBeNull();
   });
 
+  it("wraps long fingerprint matcher values inside the matcher column", async () => {
+    const fingerprint = "b599b7819f140bc700f78a580897c3c341cb520bd8867267bb824bdde0dc9eb";
+    const fingerprintRule = {
+      ...captureRuleFixture,
+      id: "rule_fingerprint",
+      name: "Demote exact frontend exception",
+      description: null,
+      matcher: {
+        event_types: ["frontend_exception"],
+        fingerprint: {
+          version: "v1",
+          value: fingerprint
+        }
+      },
+      hit_count: 0,
+      last_matched_at: null
+    };
+    const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = requestUrl(input);
+
+      if (url.endsWith("/v1/auth/session")) {
+        return jsonResponse(200, { session: createSession() });
+      }
+
+      if (url.endsWith("/v1/projects") && init?.method === undefined) {
+        return jsonResponse(200, { projects: [createProject({ organization_plan: "solo" })] });
+      }
+
+      if (url.endsWith("/v1/projects/proj_123/capture-policy") && init?.method === undefined) {
+        return jsonResponse(200, {
+          access_mode: "manage",
+          policy: {
+            preset: "balanced",
+            capture_logs: "warning",
+            capture_request_events: "failures_only",
+            capture_breadcrumbs: "exception_only",
+            capture_probe_events: "buffer_only",
+            immediate_client_error_statuses: []
+          },
+          overrides: {
+            capture_logs: null,
+            capture_request_events: null,
+            capture_breadcrumbs: null,
+            capture_probe_events: null,
+            immediate_client_error_statuses: null
+          }
+        });
+      }
+
+      if (url.endsWith("/v1/projects/proj_123/capture-rules") && init?.method === undefined) {
+        return jsonResponse(200, {
+          access_mode: "manage",
+          rules: [fingerprintRule]
+        });
+      }
+
+      if (
+        url.endsWith("/v1/projects/proj_123/improvement-settings") &&
+        init?.method === undefined
+      ) {
+        return jsonResponse(200, {
+          access_mode: "manage",
+          cloud_automation_available: true,
+          settings: {
+            automated_improvement_bundles_enabled: true,
+            improvement_bundle_sensitivity: "balanced"
+          }
+        });
+      }
+
+      if (url.includes("/v1/weekly-report-channels?")) {
+        return jsonResponse(200, { channels: [] });
+      }
+
+      return jsonResponse(404, { error: "not_found" });
+    });
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<App initialEntries={["/projects/proj_123/settings"]} />);
+
+    const matcherSummary = await screen.findByText(
+      `events: frontend_exception • fingerprint: v1:${fingerprint}`
+    );
+
+    expect(matcherSummary).toHaveClass("whitespace-normal");
+    expect(matcherSummary).toHaveClass("break-words");
+    expect(matcherSummary.className).toContain("[overflow-wrap:anywhere]");
+  });
+
   it("paginates project settings capture rules after six rows", async () => {
     const user = userEvent.setup();
     const captureRules = Array.from({ length: 7 }, (_, index) => ({
