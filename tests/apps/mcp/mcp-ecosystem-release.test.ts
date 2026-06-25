@@ -39,6 +39,8 @@ describe("mcp ecosystem release pipeline", () => {
       clawhub: { type: "push" },
       clawhubPlugin: { type: "push" },
       glama: { type: "discovery" },
+      pulseMcp: { type: "discovery" },
+      mcpSo: { type: "discovery" },
       lobehub: { type: "discovery" }
     });
 
@@ -50,6 +52,9 @@ describe("mcp ecosystem release pipeline", () => {
     expect(script).toContain('https://api.smithery.ai/skills?namespace=');
     expect(script).toContain('https://glama.ai/api/mcp/v1/servers?query=');
     expect(script).toContain("matchesGlamaServer");
+    expect(script).toContain("pulseMcp");
+    expect(script).toContain("mcpSo");
+    expect(script).toContain("fetchText");
     expect(script).toContain('resources: "skills"');
     expect(script).toContain("registryIndexed");
     expect(script).toContain('"inspect"');
@@ -75,9 +80,9 @@ describe("mcp ecosystem release pipeline", () => {
       discoveryTargets?: Array<{ key?: string; type?: string }>;
     };
 
-    expect(plan.version).toBe("1.6.0");
+    expect(plan.version).toBe("1.6.1");
     expect(plan.packageName).toBe("@debugbundle/mcp");
-    expect(plan.mcpb?.bundlePath).toContain(".tmp/mcp-ecosystem/1.6.0/debugbundle-mcp.mcpb");
+    expect(plan.mcpb?.bundlePath).toContain(".tmp/mcp-ecosystem/1.6.1/debugbundle-mcp.mcpb");
     expect(plan.publishTargets).toEqual([
       expect.objectContaining({ key: "officialRegistry", type: "push" }),
       expect.objectContaining({ key: "smithery", type: "push" }),
@@ -87,6 +92,8 @@ describe("mcp ecosystem release pipeline", () => {
     ]);
     expect(plan.discoveryTargets).toEqual([
       expect.objectContaining({ key: "glama", type: "discovery" }),
+      expect.objectContaining({ key: "pulseMcp", type: "discovery" }),
+      expect.objectContaining({ key: "mcpSo", type: "discovery" }),
       expect.objectContaining({ key: "lobehub", type: "discovery" })
     ]);
   });

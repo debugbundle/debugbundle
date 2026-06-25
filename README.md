@@ -259,9 +259,10 @@ Automation can use the HTTP API directly or the MCP server for agent workflows:
 - API reference: <https://debugbundle.com/docs/api>
 - CLI reference: <https://debugbundle.com/docs/cli>
 - MCP docs: <https://debugbundle.com/docs/mcp>
+- MCP distribution channels: <https://debugbundle.com/docs/mcp/distribution>
 - Bundle schema: <https://debugbundle.com/docs/bundles/schema>
 
-Marketplace-managed MCP clients can run `npx @debugbundle/mcp` and provide `DEBUGBUNDLE_MEMBER_TOKEN` in the MCP server environment.
+Marketplace-managed MCP clients can run `npx @debugbundle/mcp` and provide `DEBUGBUNDLE_MEMBER_TOKEN` in the MCP server environment. The official MCP Registry name is `com.debugbundle/mcp`; project tokens are SDK write-only ingestion credentials and must not be used for MCP retrieval or management.
 
 ## Repository Layout
 

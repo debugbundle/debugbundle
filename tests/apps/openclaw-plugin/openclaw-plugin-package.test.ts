@@ -26,7 +26,7 @@ describe("openclaw plugin package", () => {
     };
 
     expect(packageJson.name).toBe("@debugbundle/openclaw-plugin");
-    expect(packageJson.version).toBe("1.6.0");
+    expect(packageJson.version).toBe("1.6.1");
     expect(packageJson.private).toBe(false);
     expect(packageJson.license).toBe("AGPL-3.0-only");
     expect(packageJson.repository).toEqual({

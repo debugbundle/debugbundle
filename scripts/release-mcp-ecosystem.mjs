@@ -666,6 +666,14 @@ async function fetchJson(url, init) {
   return response.json();
 }
 
+async function fetchText(url, init) {
+  const response = await fetch(url, init);
+  if (!response.ok) {
+    throw new Error(`http_${response.status}:${url}`);
+  }
+  return response.text();
+}
+
 async function fetchOptionalJson(url, init) {
   const response = await fetch(url, init);
   if (response.status === 404) {
@@ -881,6 +889,58 @@ async function verify(context) {
               slug: matchedServer.slug ?? null,
               repositoryUrl: matchedServer.repository?.url ?? null,
               publicPageUrl: matchedServer.url ?? null
+            };
+        continue;
+      }
+
+      if (targetKey === "pulseMcp") {
+        let html = null;
+        let fetchError = null;
+        try {
+          html = await fetchText(target.listingUrl);
+        } catch (error) {
+          fetchError = error instanceof Error ? error.message : String(error);
+        }
+        if (fetchError !== null) {
+          report.verify.pulseMcp = {
+            status: "manual_check_required",
+            listingUrl: target.listingUrl,
+            searchTerms: target.searchTerms,
+            reason: fetchError
+          };
+          continue;
+        }
+
+        const found = html.includes(context.serverJson.name) && html.toLowerCase().includes("debugbundle");
+        report.verify.pulseMcp = found
+          ? {
+              status: "found",
+              listingUrl: target.listingUrl,
+              serverName: context.serverJson.name
+            }
+          : {
+              status: "missing",
+              listingUrl: target.listingUrl,
+              searchTerms: target.searchTerms,
+              checkedAt: new Date().toISOString()
+            };
+        continue;
+      }
+
+      if (targetKey === "mcpSo") {
+        const html = await fetchText(target.listingUrl);
+        const found = html.includes(context.packageJson.name) && html.toLowerCase().includes("debugbundle");
+        report.verify.mcpSo = found
+          ? {
+              status: "found",
+              listingUrl: target.listingUrl,
+              packageName: context.packageJson.name
+            }
+          : {
+              status: "missing",
+              listingUrl: target.listingUrl,
+              searchTerms: target.searchTerms,
+              checkedAt: new Date().toISOString()
             };
         continue;
       }

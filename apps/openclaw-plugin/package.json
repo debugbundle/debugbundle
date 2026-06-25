@@ -1,6 +1,6 @@
 {
   "name": "@debugbundle/openclaw-plugin",
-  "version": "1.6.0",
+  "version": "1.6.1",
   "private": false,
   "description": "OpenClaw tool plugin for DebugBundle incidents, bundles, probes, health checks, and operational debugging.",
   "license": "AGPL-3.0-only",

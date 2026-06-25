@@ -57,6 +57,22 @@
         "com.debugbundle/mcp"
       ]
     },
+    "pulseMcp": {
+      "type": "discovery",
+      "listingUrl": "https://www.pulsemcp.com/servers/debugbundle",
+      "searchTerms": [
+        "debugbundle",
+        "com.debugbundle/mcp"
+      ]
+    },
+    "mcpSo": {
+      "type": "discovery",
+      "listingUrl": "https://mcp.so/server/debugbundle/debugbundle",
+      "searchTerms": [
+        "debugbundle",
+        "@debugbundle/mcp"
+      ]
+    },
     "lobehub": {
       "type": "discovery",
       "listingUrl": "https://lobehub.com/mcp",

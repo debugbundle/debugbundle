@@ -1,10 +1,10 @@
 # @debugbundle/mcp
 
-Model Context Protocol server for DebugBundle.
+MCP server for production debugging bundles and incident workflows for AI agents. DebugBundle lets agents inspect incidents, deterministic bundles, reproductions, probes, hosted health checks, alerts, webhooks, projects, and setup state through the same management surface as the API and CLI.
 
 ## Install
 
-Run directly with npm:
+Run the stdio server directly with npm:
 
 ```bash
 npx @debugbundle/mcp
@@ -19,7 +19,7 @@ debugbundle-mcp
 
 Supported Node.js versions: 22.x through 26.x.
 
-## MCP Client Configuration
+## MCP Client Config
 
 ```json
 {
@@ -32,11 +32,55 @@ Supported Node.js versions: 22.x through 26.x.
 }
 ```
 
-The server uses stdio transport and exposes the same DebugBundle incident, incident-context, bundle, hosted health-check, webhook, alert, token, project, member, billing, GitHub, probe, and diagnostic tools documented at https://debugbundle.com/docs/mcp. Hosted verification supports the active V1 proof path through `verify_cloud` with `trigger5xx: true` and the configured-client-error proof path with `trigger4xxStatus: 403`, incident triage can start with the one-call `get_incident_context` tool, hosted health-check triage can start with `list_health_checks`, and `doctor` accepts `privacy: true` to return the same deterministic redaction preview as `debugbundle doctor --privacy`.
+Use `npx -y @debugbundle/mcp` in clients that require noninteractive package execution.
+
+## Install Matrix
+
+| Environment | Recommended path | Notes |
+| --- | --- | --- |
+| Generic local MCP client | `npx @debugbundle/mcp` | stdio transport |
+| Claude Desktop local MCP | local MCP server config | uses local machine auth/config |
+| Cursor | MCP config with `npx @debugbundle/mcp` | stdio transport |
+| VS Code / GitHub MCP Registry | `com.debugbundle/mcp` | official registry metadata |
+| OpenClaw / ClawHub | DebugBundle skill plus MCP config | use the published skill for workflow guidance |
+| CI/headless agents | `DEBUGBUNDLE_MEMBER_TOKEN` | never use a project token |
+| Self-hosted DebugBundle | `DEBUGBUNDLE_API_URL` plus member auth | points the server at your API base URL |
+
+DebugBundle does not expose a hosted remote MCP endpoint today; this package is the local stdio path.
 
 ## Authentication
 
-Local use reuses CLI auth state from `~/.debugbundle/auth.json` when available. Headless or marketplace-managed clients can set `DEBUGBUNDLE_MEMBER_TOKEN` in the MCP server environment. Individual tool calls can still pass `bearerToken` explicitly when needed.
+| Mode | Use | Notes |
+| --- | --- | --- |
+| CLI auth state | Local developer machines | Reuses `~/.debugbundle/auth.json` when available. |
+| `DEBUGBUNDLE_MEMBER_TOKEN` | Headless or marketplace-managed clients | Member tokens are for CLI/API/MCP read and management operations. |
+| Per-tool `bearerToken` | Explicit advanced automation | Overrides default auth for that call only. |
+| Project token | SDK ingestion only | Do not use project tokens for MCP retrieval or management. |
+
+## What Agents Can Do
+
+- List active incidents and fetch full incident context.
+- Fetch deterministic debug bundles and reproduction artifacts.
+- Inspect hosted health checks, probes, alerts, webhooks, projects, members, billing, capture policy, and GitHub automation state.
+- Run local and hosted verification through tools such as `verify_local`, `verify_cloud`, `doctor`, `smoke`, and `analyze`.
+- Resolve or reopen incidents after verification.
+
+## Links
+
+- Docs: https://debugbundle.com/docs/mcp
+- Agent workflows: https://debugbundle.com/docs/agent-workflows
+- LLM index: https://debugbundle.com/llms.txt
+- MCP tool schema: https://debugbundle.com/schemas/mcp-tools.json
+- Official MCP Registry metadata: https://github.com/debugbundle/debugbundle/blob/main/apps/mcp/server.json
+
+## Security And Trust
+
+- Official MCP Registry name: `com.debugbundle/mcp`.
+- Official npm package: `@debugbundle/mcp`.
+- Source repository: https://github.com/debugbundle/debugbundle/tree/main/apps/mcp
+- License: AGPL-3.0-only.
+- The server uses stdio transport and local process credentials. It does not include hidden hosted management auth.
+- Public examples must use placeholders only; never paste real member tokens, project tokens, webhook secrets, or customer configuration into marketplace listings.
 
 ## License
 

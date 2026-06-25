@@ -1,9 +1,9 @@
 {
   "name": "@debugbundle/mcp",
   "mcpName": "com.debugbundle/mcp",
-  "version": "1.6.0",
+  "version": "1.6.1",
   "private": false,
-  "description": "Model Context Protocol server for DebugBundle",
+  "description": "MCP server for production debugging bundles and incident workflows for AI agents",
   "license": "AGPL-3.0-only",
   "repository": {
     "type": "git",
@@ -14,7 +14,18 @@
   "bugs": {
     "url": "https://github.com/debugbundle/debugbundle/issues"
   },
-  "keywords": ["debugbundle", "debugging", "ai-agent", "mcp", "model-context-protocol"],
+  "keywords": [
+    "debugbundle",
+    "debugging",
+    "production-debugging",
+    "incident-management",
+    "debug-bundles",
+    "ai-agent",
+    "ai-agent-debugging",
+    "mcp",
+    "model-context-protocol",
+    "observability"
+  ],
   "engines": {
     "node": ">=22 <27"
   },

@@ -2,7 +2,7 @@
   "id": "debugbundle",
   "name": "DebugBundle",
   "description": "Use DebugBundle tools to inspect incidents, bundles, reproductions, probes, health checks, and operational debugging surfaces.",
-  "version": "1.6.0",
+  "version": "1.6.1",
   "configSchema": {
     "type": "object",
     "properties": {

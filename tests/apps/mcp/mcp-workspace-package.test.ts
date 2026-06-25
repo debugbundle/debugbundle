@@ -50,7 +50,9 @@ describe("mcp workspace package", () => {
     expect(packageJson.name).toBe("@debugbundle/mcp");
     expect(packageJson.mcpName).toBe("com.debugbundle/mcp");
     expect(packageJson.private).toBe(false);
-    expect(packageJson.description).toBe("Model Context Protocol server for DebugBundle");
+    expect(packageJson.description).toBe(
+      "MCP server for production debugging bundles and incident workflows for AI agents"
+    );
     expect(packageJson.license).toBe("AGPL-3.0-only");
     expect(packageJson.repository).toEqual({
       type: "git",
@@ -59,7 +61,18 @@ describe("mcp workspace package", () => {
     });
     expect(packageJson.homepage).toBe("https://debugbundle.com/docs/mcp");
     expect(packageJson.bugs).toEqual({ url: "https://github.com/debugbundle/debugbundle/issues" });
-    expect(packageJson.keywords).toEqual(["debugbundle", "debugging", "ai-agent", "mcp", "model-context-protocol"]);
+    expect(packageJson.keywords).toEqual([
+      "debugbundle",
+      "debugging",
+      "production-debugging",
+      "incident-management",
+      "debug-bundles",
+      "ai-agent",
+      "ai-agent-debugging",
+      "mcp",
+      "model-context-protocol",
+      "observability"
+    ]);
     expect(packageJson.engines).toEqual({ node: ">=22 <27" });
     expect(packageJson.type).toBe("module");
     expect(packageJson.scripts).toMatchObject({
