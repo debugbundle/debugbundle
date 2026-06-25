@@ -685,13 +685,30 @@ async function fetchOptionalJson(url, init) {
   return response.json();
 }
 
-function findOfficialRegistryEntry(payload, serverName) {
+function findOfficialRegistryEntry(payload, serverName, version) {
   const candidates = Array.isArray(payload?.servers) ? payload.servers : [];
-
-  return candidates.find((candidate) => {
+  const matchingCandidates = candidates.filter((candidate) => {
     const server = candidate?.server ?? candidate;
     return server?.name === serverName;
   });
+
+  const latestMatchingCandidate = matchingCandidates.find((candidate) => {
+    const server = candidate?.server ?? candidate;
+    const metadata = candidate?._meta?.["io.modelcontextprotocol.registry/official"];
+    return server?.version === version && metadata?.isLatest === true;
+  });
+
+  if (latestMatchingCandidate !== undefined) {
+    return latestMatchingCandidate;
+  }
+
+  return matchingCandidates.find((candidate) => {
+    const server = candidate?.server ?? candidate;
+    return server?.version === version;
+  }) ?? matchingCandidates.find((candidate) => {
+    const metadata = candidate?._meta?.["io.modelcontextprotocol.registry/official"];
+    return metadata?.isLatest === true;
+  }) ?? matchingCandidates.at(0);
 }
 
 function normalizeUrl(value) {
@@ -740,7 +757,7 @@ async function verify(context) {
         const payload = await fetchJson(
           `https://registry.modelcontextprotocol.io/v0/servers?search=${encodeURIComponent(context.serverJson.name)}&limit=10`
         );
-        const entry = findOfficialRegistryEntry(payload, context.serverJson.name);
+        const entry = findOfficialRegistryEntry(payload, context.serverJson.name, context.version);
         report.verify.officialRegistry = entry === undefined
           ? {
               status: "missing",

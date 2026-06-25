@@ -12,6 +12,10 @@ The format is based on Keep a Changelog and this project follows Semantic Versio
 - Expanded MCP distribution documentation with official package, registry, marketplace, skill, auth-scope, and trust-channel guidance; added PulseMCP and MCP.so discovery checks to the local ecosystem release verifier.
 - Bumped `@debugbundle/mcp` and `@debugbundle/openclaw-plugin` to `1.6.1` for the coordinated MCP distribution discovery release.
 
+### Fixed
+
+- Updated the local MCP ecosystem verifier to prefer the official registry entry matching the release version when registry search returns multiple active versions.
+
 ## [1.6.2] - 2026-06-21
 
 ### Added

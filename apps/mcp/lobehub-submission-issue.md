@@ -37,13 +37,15 @@ Auth guidance:
 
 ## Additional Information
 
-Validation done on 2026-06-23:
+Validation done on 2026-06-25:
 
-- The official MCP Registry entry is active for `com.debugbundle/mcp`.
-- `@debugbundle/mcp` version `1.6.0` is already published.
-- The Smithery MCP release has been accepted, with public indexing still pending.
+- The official MCP Registry entry is active for `com.debugbundle/mcp` version `1.6.1`.
+- `@debugbundle/mcp` version `1.6.1` is already published.
+- The Smithery MCP release has been accepted for version `1.6.1`, with public indexing still pending.
 - The Smithery Skill, ClawHub Skill, and ClawHub OpenClaw plugin entries are already published.
-- A Glama API check still shows no matching `debugbundle` listing, so this is not yet broadly auto-indexed downstream.
+- Glama lists DebugBundle at `https://glama.ai/mcp/servers/sz3bl40umr`.
+- MCP.so lists DebugBundle at `https://mcp.so/server/debugbundle/debugbundle`.
+- PulseMCP auto-lists DebugBundle from the official registry at `https://www.pulsemcp.com/servers/debugbundle`, but command-line release verification requires manual confirmation because the site returns HTTP 403 to the verifier.
 - The current public LobeHub CLI exposes `plugin submit <gitUrl>` for MCP plugins, but self-serve submission failed with: `Repository owner "debugbundle" does not match your GitHub username "owenfar1". You can only submit your own repositories.`
 - That suggests the current CLI path only supports repositories owned by the connected GitHub username, not organization-owned repositories like `debugbundle/debugbundle`.
 
