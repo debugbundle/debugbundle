@@ -9,6 +9,7 @@ The format is based on Keep a Changelog and this project follows Semantic Versio
 ### Changed
 
 - Bumped `@debugbundle/cli` to `1.6.4` for the alert severity lifecycle-scope release.
+- Bumped `@debugbundle/mcp` and `@debugbundle/openclaw-plugin` to `1.6.2` for the coordinated MCP alert lifecycle-scope release.
 - Added official MCP Registry availability documentation for `com.debugbundle/mcp` and noted the registry listing milestone for the published `@debugbundle/mcp` package.
 - Expanded MCP distribution documentation with official package, registry, marketplace, skill, auth-scope, and trust-channel guidance; added PulseMCP and MCP.so discovery checks to the local ecosystem release verifier.
 - Bumped `@debugbundle/mcp` and `@debugbundle/openclaw-plugin` to `1.6.1` for the coordinated MCP distribution discovery release.
