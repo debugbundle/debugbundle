@@ -37,11 +37,11 @@ Auth guidance:
 
 ## Additional Information
 
-Validation done on 2026-06-25:
+Validation done on 2026-06-26:
 
-- The official MCP Registry entry is active for `com.debugbundle/mcp` version `1.6.1`.
-- `@debugbundle/mcp` version `1.6.1` is already published.
-- The Smithery MCP release has been accepted for version `1.6.1`, with public indexing still pending.
+- The official MCP Registry entry is active for `com.debugbundle/mcp` version `1.6.2`.
+- `@debugbundle/mcp` version `1.6.2` is already published.
+- The Smithery MCP release has been accepted for version `1.6.2`, with public indexing still pending.
 - The Smithery Skill, ClawHub Skill, and ClawHub OpenClaw plugin entries are already published.
 - Glama lists DebugBundle at `https://glama.ai/mcp/servers/sz3bl40umr`.
 - MCP.so lists DebugBundle at `https://mcp.so/server/debugbundle/debugbundle`.

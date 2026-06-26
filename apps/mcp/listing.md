@@ -2,7 +2,7 @@
 
 Canonical source-of-truth for MCP marketplace and directory submissions.
 
-Last verified: 2026-06-25
+Last verified: 2026-06-26
 
 ## Primary Listing
 
@@ -23,16 +23,16 @@ Last verified: 2026-06-25
 
 Current release status for MCP ecosystem distribution.
 
-- npm: published as `@debugbundle/mcp` version `1.6.1`.
-- Official MCP Registry: published and verified as `com.debugbundle/mcp` version `1.6.1`; exact latest-version API verification passed on 2026-06-25.
-- Smithery MCP: release accepted for `debugbundle/debugbundle` version `1.6.1`, but public registry indexing is still incomplete; support follow-up is pending, and release verification must treat this as partial until marketplace search/indexing shows it.
+- npm: published as `@debugbundle/mcp` version `1.6.2`.
+- Official MCP Registry: published and verified as `com.debugbundle/mcp` version `1.6.2`; exact latest-version API verification passed on 2026-06-26.
+- Smithery MCP: release accepted for `debugbundle/debugbundle` version `1.6.2`, but public registry indexing is still incomplete; support follow-up is pending, and release verification must treat this as partial until marketplace search/indexing shows it.
 - Smithery Skill: published and publicly indexed for `debugbundle/debugbundle`.
 - ClawHub Skill: published as `debugbundle/debugbundle`.
-- ClawHub OpenClaw plugin: published as `@debugbundle/openclaw-plugin` version `1.6.1`.
+- ClawHub OpenClaw plugin: published as `@debugbundle/openclaw-plugin` version `1.6.2`.
 - MCP.so: listed as of 2026-06-23 via the web submit flow; treat it as a third-party community directory, not an official registry.
-- Glama: listed as of 2026-06-25 at `https://glama.ai/mcp/servers/sz3bl40umr`.
-- PulseMCP: auto-listed as official as of 2026-06-25 at `https://www.pulsemcp.com/servers/debugbundle`; manual browser-style verification passed on 2026-06-25, and command-line verification still requires `manual_check_required` because the site returns HTTP 403 to the release verifier.
-- LobeHub MCP: submitted as a request; no confirmed public listing as of 2026-06-25.
+- Glama: listed as of 2026-06-26 at `https://glama.ai/mcp/servers/sz3bl40umr`.
+- PulseMCP: auto-listed as official as of 2026-06-26 at `https://www.pulsemcp.com/servers/debugbundle`; command-line verification still requires `manual_check_required` because the site returns HTTP 403 to the release verifier.
+- LobeHub MCP: submitted as a request; no confirmed public listing as of 2026-06-26.
 
 Do not describe a downstream directory as live, official, verified, or indexed until the public listing is searchable or the marketplace has explicitly confirmed it.
 
@@ -111,7 +111,7 @@ debugbundle-mcp
 
 ## MCP.so
 
-- Current state on 2026-06-25: listed at `https://mcp.so/server/debugbundle/debugbundle`.
+- Current state on 2026-06-26: listed at `https://mcp.so/server/debugbundle/debugbundle`.
 - Positioning note: MCP.so is a third-party community MCP marketplace, not the official MCP Registry.
 - Verification check: confirm the page still uses the `npx -y @debugbundle/mcp` install path and member-token auth guidance.
 - Preferred listing target URL: `https://github.com/debugbundle/debugbundle`
@@ -136,7 +136,7 @@ debugbundle-mcp
 
 ## Glama
 
-- Current state on 2026-06-25: listed at `https://glama.ai/mcp/servers/sz3bl40umr`.
+- Current state on 2026-06-26: listed at `https://glama.ai/mcp/servers/sz3bl40umr`.
 - Repo metadata: root `glama.json` is present for maintainer verification and repository claim.
 - Submission path:
   - Sign in to Glama with GitHub.
@@ -153,7 +153,7 @@ debugbundle-mcp
 
 ## PulseMCP
 
-- Current state on 2026-06-25: auto-listed as the official DebugBundle MCP server at `https://www.pulsemcp.com/servers/debugbundle`; manual browser-style verification confirmed the page shows official classification and `com.debugbundle/mcp`.
+- Current state on 2026-06-26: auto-listed as the official DebugBundle MCP server at `https://www.pulsemcp.com/servers/debugbundle`; automated ecosystem verification still requires manual confirmation because the page returns HTTP 403 to command-line fetches.
 - Listing source: official MCP Registry metadata for `com.debugbundle/mcp`.
 - Verification check: confirm the page still shows `com.debugbundle/mcp` and links to the DebugBundle repository/server metadata. The automated ecosystem verifier treats PulseMCP as `manual_check_required` when the public page returns HTTP 403 to command-line fetches.
 
@@ -164,7 +164,7 @@ debugbundle-mcp
 
 ## LobeHub
 
-- Current state on 2026-06-25: submitted as a request; no confirmed public `DebugBundle` MCP listing was found.
+- Current state on 2026-06-26: submitted as a request; no confirmed public `DebugBundle` MCP listing was found.
 - Self-service path: authenticate the LobeHub market CLI, then submit the repository:
 
 ```bash
