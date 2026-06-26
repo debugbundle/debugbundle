@@ -34,6 +34,8 @@ import {
   formatAlertCooldown,
   formatAlertChannelWithDestination,
   formatAlertCondition,
+  formatAlertSeverityLifecycleScope,
+  formatSeverityLifecycleScopeForAlert,
   formatSeverity,
   getDestinationDescription,
   getDestinationLabel,
@@ -649,6 +651,9 @@ describe("web page helper coverage", () => {
     expect(formatAlertChannel("discord" as never)).toBe("Discord");
     expect(formatAlertCondition("error_spike")).toBe("Error spike");
     expect(formatAlertCondition("unknown_condition" as never)).toBe("unknown_condition");
+    expect(formatAlertSeverityLifecycleScope("both")).toBe("New incidents and regressions");
+    expect(formatAlertSeverityLifecycleScope("incident_regressed")).toBe("Regressions only");
+    expect(formatAlertSeverityLifecycleScope("unknown_scope" as never)).toBe("unknown_scope");
     expect(formatSeverity("critical")).toBe("Critical");
     expect(formatSeverity("emergency" as never)).toBe("emergency");
 
@@ -673,6 +678,7 @@ describe("web page helper coverage", () => {
           channel: "slack",
           condition_type: "error_spike",
           severity_min: null,
+          severity_lifecycle_scope: null,
           cooldown_seconds: 0,
           config: {
             slack_destination_id: "sd_123"
@@ -707,6 +713,7 @@ describe("web page helper coverage", () => {
           channel: "slack",
           condition_type: "error_spike",
           severity_min: null,
+          severity_lifecycle_scope: null,
           cooldown_seconds: 0,
           config: {
             slack_destination_id: "sd_missing"
@@ -718,6 +725,44 @@ describe("web page helper coverage", () => {
         []
       )
     ).toBe("Slack (channel unavailable)");
+    expect(
+      formatSeverityLifecycleScopeForAlert({
+        alert_id: "alert_3",
+        project_id: "proj_1",
+        created_by_user_id: "usr_1",
+        service_id: null,
+        channel: "email",
+        condition_type: "severity_threshold",
+        severity_min: "high",
+        severity_lifecycle_scope: null,
+        cooldown_seconds: 86400,
+        config: {
+          to: "alerts@example.com"
+        },
+        is_enabled: true,
+        created_at: "2026-05-13T10:00:00.000Z",
+        updated_at: "2026-05-13T10:00:00.000Z"
+      })
+    ).toBe("New incidents and regressions");
+    expect(
+      formatSeverityLifecycleScopeForAlert({
+        alert_id: "alert_4",
+        project_id: "proj_1",
+        created_by_user_id: "usr_1",
+        service_id: null,
+        channel: "email",
+        condition_type: "new_incident",
+        severity_min: null,
+        severity_lifecycle_scope: null,
+        cooldown_seconds: 86400,
+        config: {
+          to: "alerts@example.com"
+        },
+        is_enabled: true,
+        created_at: "2026-05-13T10:00:00.000Z",
+        updated_at: "2026-05-13T10:00:00.000Z"
+      })
+    ).toBe("-");
     expect(formatAlertCooldown(0)).toBe("Off");
     expect(formatAlertCooldown(86_400)).toBe("1 day");
     expect(formatAlertCooldown(172_800)).toBe("2 days");

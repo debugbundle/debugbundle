@@ -120,6 +120,7 @@ export function registerAlertRoutes(app: FastifyInstance, dependencies: ApiDepen
         | "severity_threshold"
         | "regression_after_deploy";
       severity_min?: "low" | "medium" | "high" | "critical";
+      severity_lifecycle_scope?: "new_incident" | "incident_regressed" | "both" | null;
       cooldown_seconds: number;
       config: Record<string, unknown>;
       is_enabled: boolean;
@@ -139,6 +140,11 @@ export function registerAlertRoutes(app: FastifyInstance, dependencies: ApiDepen
     }
     if (parsedBody.data.severity_min !== undefined) {
       alertInput.severity_min = parsedBody.data.severity_min;
+    }
+    if (parsedBody.data.severity_lifecycle_scope !== undefined) {
+      alertInput.severity_lifecycle_scope = parsedBody.data.severity_lifecycle_scope;
+    } else if (parsedBody.data.condition_type === "severity_threshold") {
+      alertInput.severity_lifecycle_scope = "both";
     }
 
     const alert = await dependencies.alertManagement.createAlertForOrganization(alertInput);
@@ -240,6 +246,7 @@ export function registerAlertRoutes(app: FastifyInstance, dependencies: ApiDepen
         | "severity_threshold"
         | "regression_after_deploy";
       severity_min?: "low" | "medium" | "high" | "critical" | null;
+      severity_lifecycle_scope?: "new_incident" | "incident_regressed" | "both" | null;
       cooldown_seconds?: number;
       config?: Record<string, unknown> | null;
       is_enabled?: boolean;
@@ -267,6 +274,12 @@ export function registerAlertRoutes(app: FastifyInstance, dependencies: ApiDepen
       const severityMin = parsedBody.data.severity_min;
       if (severityMin !== undefined) {
         updateInput.severity_min = severityMin;
+      }
+    }
+    if (Object.prototype.hasOwnProperty.call(parsedBody.data, "severity_lifecycle_scope")) {
+      const severityLifecycleScope = parsedBody.data.severity_lifecycle_scope;
+      if (severityLifecycleScope !== undefined) {
+        updateInput.severity_lifecycle_scope = severityLifecycleScope;
       }
     }
     if (parsedBody.data.cooldown_seconds !== undefined) {

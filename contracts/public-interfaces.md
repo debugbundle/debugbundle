@@ -898,6 +898,7 @@ Checkout confirmation returns the standard billing summary response after the AP
   "channel": "email",
   "condition_type": "severity_threshold",
   "severity_min": "high",
+  "severity_lifecycle_scope": "both",
   "cooldown_seconds": 604800,
   "config": {
     "to": "oncall@example.com"
@@ -906,7 +907,8 @@ Checkout confirmation returns the standard billing summary response after the AP
 }
 ```
 
-`service_id` and `severity_min` are optional on create, and `is_enabled` defaults to `true`.
+`service_id`, `severity_min`, and `severity_lifecycle_scope` are optional on create, and `is_enabled` defaults to `true`.
+`severity_lifecycle_scope` applies only to `condition_type: "severity_threshold"` and may be `new_incident`, `incident_regressed`, or `both`; omitted severity-threshold rules default to `both`, while non-threshold rules return `null`.
 `cooldown_seconds` is optional, defaults to `0`, and may be set between `0` and `604800` seconds (7 days).
 For `channel: "email"`, `config.to` is required and must be a single recipient email address. Create additional alert rules if multiple people should receive email notifications.
 For `channel: "slack"`, prefer `config.slack_destination_id` when the workspace/channel was connected through the Slack OAuth flow. Direct `config.webhook_url` remains valid for callers that intentionally want a raw webhook configuration.
@@ -917,6 +919,7 @@ For `channel: "slack"`, prefer `config.slack_destination_id` when the workspace/
   "channel": "webhook",
   "service_id": null,
   "severity_min": null,
+  "severity_lifecycle_scope": "incident_regressed",
   "cooldown_seconds": 3600,
   "config": {
     "target_url": "https://hooks.example.test/alerts"
@@ -925,7 +928,7 @@ For `channel: "slack"`, prefer `config.slack_destination_id` when the workspace/
 }
 ```
 
-Update requests must include at least one field. `service_id`, `severity_min`, and `config` accept `null` to clear the stored value.
+Update requests must include at least one field. `service_id`, `severity_min`, `severity_lifecycle_scope`, and `config` accept `null` to clear or reset the stored value.
 `cooldown_seconds` accepts `0` to disable suppression and positive values up to `604800` to suppress repeated notifications for the same notification key.
 When updating channel-specific `config`, include the `channel` in the same request so validation can apply the correct config schema.
 
@@ -940,6 +943,7 @@ When updating channel-specific `config`, include the `channel` in the same reque
     "channel": "email",
     "condition_type": "severity_threshold",
     "severity_min": "high",
+    "severity_lifecycle_scope": "both",
     "cooldown_seconds": 604800,
     "config": {
       "to": "oncall@example.com"
@@ -963,6 +967,7 @@ When updating channel-specific `config`, include the `channel` in the same reque
       "channel": "slack",
       "condition_type": "error_spike",
       "severity_min": null,
+      "severity_lifecycle_scope": null,
       "cooldown_seconds": 0,
       "config": {
         "slack_destination_id": "uuid"
@@ -983,6 +988,7 @@ Current API implementation scope (Phase 10 alert CRUD slice):
 - Worker-side alert evaluation now enqueues internal `evaluate-alerts` jobs from real incident transitions for `new_incident`, `severity_threshold`, `incident_regressed`, `regression_after_deploy`, and `error_spike` conditions.
 - Matching non-email alerts persist one internal `alert_deliveries` row per `alert_id + incident_id + dedupe_key` before delivery so duplicate worker replays stay idempotent. Email alerts aggregate into a 10-second per-project/per-recipient digest queue backed by `alert_email_digests` plus `alert_email_digest_items`, so bursts send one email while preserving per-incident dedupe.
 - Each alert rule may additionally define a delivery cooldown window via `cooldown_seconds`. This suppresses repeated notifications for the same computed notification key without changing incident grouping. Default `0` preserves existing behavior.
+- Severity-threshold rules use `severity_lifecycle_scope` to match new incidents, incident regressions, or both. The default is `both`; delivery dedupe keys separate new-incident and regression lifecycle events so a new high-severity incident and its later regression can notify independently.
 - Severity is inferred from signal confidence before alert filters run. Backend exceptions, non-opaque frontend exceptions, and immediate request-failure incident signals infer `high`; opaque browser-native `window_error` signals infer `low`; opaque browser-native `resource_error` signals infer `medium`; `error_suppressed` infers `medium`; other events infer `low`.
 - Opaque browser `frontend_exception` alerts may reuse a broader notification key than the incident fingerprint so repeated low-information browser-native `window_error` signals can be suppressed across otherwise separate incidents.
 - Delivery transport is implemented for `channel: "email"`, `channel: "slack"`, `channel: "discord"`, and `channel: "webhook"`. Email requires `config.to` as a single recipient address; Slack accepts either `config.slack_destination_id` (resolved to an encrypted stored webhook URL at delivery time) or `config.webhook_url`; Discord requires `config.webhook_url`; webhook requires `config.target_url`.

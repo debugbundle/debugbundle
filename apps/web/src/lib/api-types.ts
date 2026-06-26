@@ -569,6 +569,8 @@ export type AlertConditionType =
   | "severity_threshold"
   | "regression_after_deploy";
 
+export type AlertSeverityLifecycleScope = "new_incident" | "incident_regressed" | "both";
+
 export interface AlertRecord {
   alert_id: string;
   project_id: string;
@@ -577,6 +579,7 @@ export interface AlertRecord {
   channel: AlertChannel;
   condition_type: AlertConditionType;
   severity_min: "low" | "medium" | "high" | "critical" | null;
+  severity_lifecycle_scope?: AlertSeverityLifecycleScope | null;
   cooldown_seconds: number;
   config: Record<string, unknown>;
   is_enabled: boolean;

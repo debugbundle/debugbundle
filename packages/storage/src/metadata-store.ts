@@ -3,6 +3,10 @@ import { randomUUID } from "node:crypto";
 import { generateProbeTriggerToken } from "../../auth/src/index.js";
 import { getTierCapabilities, type TierName } from "../../shared-types/src/index.js";
 import type { AccountAnalyticsStore } from "./account-analytics-store.js";
+import {
+  defaultSeverityLifecycleScopeForCondition,
+  normalizeSeverityLifecycleScopeForCondition
+} from "./alert-lifecycle.js";
 import { buildBillableIncidentEventsPredicateSql, getRequiredStringField } from "./helpers.js";
 import { deriveIncidentReasonFromSignal } from "./incident-reason.js";
 import { pruneRetainedBundleOwnersForProject } from "./retained-bundle-pruning.js";
@@ -53,6 +57,7 @@ function mapAlertRuleRow(row: {
   channel: AlertRuleRecord["channel"];
   condition_type: AlertRuleRecord["condition_type"];
   severity_min: AlertRuleRecord["severity_min"];
+  severity_lifecycle_scope: AlertRuleRecord["severity_lifecycle_scope"];
   cooldown_seconds: number;
   config: Record<string, unknown>;
   is_enabled: boolean;
@@ -67,6 +72,7 @@ function mapAlertRuleRow(row: {
     channel: row.channel,
     condition_type: row.condition_type,
     severity_min: row.severity_min,
+    severity_lifecycle_scope: row.severity_lifecycle_scope,
     cooldown_seconds: Number(row.cooldown_seconds),
     config: row.config,
     is_enabled: row.is_enabled,
@@ -2674,6 +2680,7 @@ export function createPostgresMetadataStore(
         channel: AlertRuleRecord["channel"];
         condition_type: AlertRuleRecord["condition_type"];
         severity_min: AlertRuleRecord["severity_min"];
+        severity_lifecycle_scope: AlertRuleRecord["severity_lifecycle_scope"];
         cooldown_seconds: number;
         config: Record<string, unknown>;
         is_enabled: boolean;
@@ -2689,6 +2696,7 @@ export function createPostgresMetadataStore(
             channel,
             condition_type,
             severity_min,
+            severity_lifecycle_scope,
             cooldown_seconds,
             config,
             is_enabled,
@@ -2723,6 +2731,11 @@ export function createPostgresMetadataStore(
         return null;
       }
 
+      const severityLifecycleScope = normalizeSeverityLifecycleScopeForCondition({
+        conditionType: input.condition_type,
+        scope: input.severity_lifecycle_scope
+      });
+
       const result = await db.query<{
         alert_id: string;
         project_id: string;
@@ -2731,6 +2744,7 @@ export function createPostgresMetadataStore(
         channel: AlertRuleRecord["channel"];
         condition_type: AlertRuleRecord["condition_type"];
         severity_min: AlertRuleRecord["severity_min"];
+        severity_lifecycle_scope: AlertRuleRecord["severity_lifecycle_scope"];
         cooldown_seconds: number;
         config: Record<string, unknown>;
         is_enabled: boolean;
@@ -2746,13 +2760,14 @@ export function createPostgresMetadataStore(
             channel,
             condition_type,
             severity_min,
+            severity_lifecycle_scope,
             cooldown_seconds,
             config,
             is_enabled,
             created_at,
             updated_at
           )
-          VALUES ($1, $2, $3::uuid, $4::uuid, $5, $6, $7, $8, $9::jsonb, $10, now(), now())
+          VALUES ($1, $2, $3::uuid, $4::uuid, $5, $6, $7, $8, $9, $10::jsonb, $11, now(), now())
           RETURNING
             id AS alert_id,
             project_id,
@@ -2761,6 +2776,7 @@ export function createPostgresMetadataStore(
             channel,
             condition_type,
             severity_min,
+            severity_lifecycle_scope,
             cooldown_seconds,
             config,
             is_enabled,
@@ -2775,6 +2791,7 @@ export function createPostgresMetadataStore(
           input.channel,
           input.condition_type,
           input.severity_min ?? null,
+          severityLifecycleScope,
           input.cooldown_seconds,
           JSON.stringify(input.config),
           input.is_enabled
@@ -2787,8 +2804,14 @@ export function createPostgresMetadataStore(
     async updateAlertForOrganization(input): Promise<AlertRuleRecord | null> {
       const hasServiceId = Object.prototype.hasOwnProperty.call(input, "service_id");
       const hasSeverityMin = Object.prototype.hasOwnProperty.call(input, "severity_min");
+      const hasSeverityLifecycleScope = Object.prototype.hasOwnProperty.call(input, "severity_lifecycle_scope");
       const hasCooldownSeconds = Object.prototype.hasOwnProperty.call(input, "cooldown_seconds");
       const hasConfig = Object.prototype.hasOwnProperty.call(input, "config");
+      const nextSeverityLifecycleScope = hasSeverityLifecycleScope
+        ? input.severity_lifecycle_scope
+        : input.condition_type === undefined
+          ? undefined
+          : defaultSeverityLifecycleScopeForCondition(input.condition_type);
 
       const result = await db.query<{
         alert_id: string;
@@ -2798,6 +2821,7 @@ export function createPostgresMetadataStore(
         channel: AlertRuleRecord["channel"];
         condition_type: AlertRuleRecord["condition_type"];
         severity_min: AlertRuleRecord["severity_min"];
+        severity_lifecycle_scope: AlertRuleRecord["severity_lifecycle_scope"];
         cooldown_seconds: number;
         config: Record<string, unknown>;
         is_enabled: boolean;
@@ -2811,20 +2835,25 @@ export function createPostgresMetadataStore(
             channel = COALESCE($5, ar.channel),
             condition_type = COALESCE($6, ar.condition_type),
             severity_min = CASE WHEN $7::boolean THEN $8 ELSE ar.severity_min END,
-            cooldown_seconds = CASE WHEN $9::boolean THEN $10 ELSE ar.cooldown_seconds END,
-            config = CASE WHEN $11::boolean THEN COALESCE($12::jsonb, '{}'::jsonb) ELSE ar.config END,
-            is_enabled = COALESCE($13::boolean, ar.is_enabled),
+            severity_lifecycle_scope = CASE
+              WHEN COALESCE($6, ar.condition_type) <> 'severity_threshold' THEN NULL
+              WHEN $9::boolean THEN COALESCE($10::text, 'both')
+              ELSE ar.severity_lifecycle_scope
+            END,
+            cooldown_seconds = CASE WHEN $11::boolean THEN $12 ELSE ar.cooldown_seconds END,
+            config = CASE WHEN $13::boolean THEN COALESCE($14::jsonb, '{}'::jsonb) ELSE ar.config END,
+            is_enabled = COALESCE($15::boolean, ar.is_enabled),
             updated_at = now()
           FROM projects p
           LEFT JOIN services s ON s.id = $4::uuid
           WHERE ar.id = $1
             AND p.id = ar.project_id
             AND p.organization_id = $2
-            AND ($14::uuid IS NULL OR ar.project_id = $14::uuid)
+            AND ($16::uuid IS NULL OR ar.project_id = $16::uuid)
             AND (
-              $15::uuid IS NULL
-              OR $16::text IN ('owner', 'admin')
-              OR ar.created_by_user_id = $15::uuid
+              $17::uuid IS NULL
+              OR $18::text IN ('owner', 'admin')
+              OR ar.created_by_user_id = $17::uuid
             )
             AND ($4::uuid IS NULL OR $3::boolean = false OR s.project_id = ar.project_id)
           RETURNING
@@ -2835,6 +2864,7 @@ export function createPostgresMetadataStore(
             ar.channel,
             ar.condition_type,
             ar.severity_min,
+            ar.severity_lifecycle_scope,
             ar.cooldown_seconds,
             ar.config,
             ar.is_enabled,
@@ -2850,6 +2880,8 @@ export function createPostgresMetadataStore(
           input.condition_type ?? null,
           hasSeverityMin,
           optionalFieldValue(hasSeverityMin, input.severity_min),
+          hasSeverityLifecycleScope || input.condition_type !== undefined,
+          nextSeverityLifecycleScope ?? null,
           hasCooldownSeconds,
           input.cooldown_seconds ?? 0,
           hasConfig,

@@ -8,6 +8,7 @@ export const AlertConditionTypeSchema = z.enum([
   "severity_threshold",
   "regression_after_deploy"
 ]);
+export const AlertSeverityLifecycleScopeSchema = z.enum(["new_incident", "incident_regressed", "both"]);
 
 export const AlertSchema = z
   .object({
@@ -18,6 +19,7 @@ export const AlertSchema = z
     channel: AlertChannelSchema,
     condition_type: AlertConditionTypeSchema,
     severity_min: z.enum(["low", "medium", "high", "critical"]).nullable(),
+    severity_lifecycle_scope: AlertSeverityLifecycleScopeSchema.nullable().optional().default(null),
     cooldown_seconds: z.number().int().min(0),
     config: z.record(z.string(), z.unknown()),
     is_enabled: z.boolean(),
@@ -47,6 +49,7 @@ export const ApiErrorResponseSchema = z
 export type AlertRecord = z.infer<typeof AlertSchema>;
 export type AlertChannel = z.infer<typeof AlertChannelSchema>;
 export type AlertConditionType = z.infer<typeof AlertConditionTypeSchema>;
+export type AlertSeverityLifecycleScope = z.infer<typeof AlertSeverityLifecycleScopeSchema>;
 
 export interface HttpRequestInput {
   method: "GET" | "POST" | "PATCH" | "DELETE";
@@ -134,6 +137,7 @@ export function createAlertApi(client: HttpClient): {
     channel: AlertChannel;
     conditionType: AlertConditionType;
     severityMin?: "low" | "medium" | "high" | "critical";
+    severityLifecycleScope?: AlertSeverityLifecycleScope;
     cooldownSeconds?: number;
     config: Record<string, unknown>;
     isEnabled?: boolean;
@@ -146,6 +150,7 @@ export function createAlertApi(client: HttpClient): {
     channel?: AlertChannel;
     conditionType?: AlertConditionType;
     severityMin?: "low" | "medium" | "high" | "critical" | null;
+    severityLifecycleScope?: AlertSeverityLifecycleScope | null;
     cooldownSeconds?: number;
     config?: Record<string, unknown> | null;
     isEnabled?: boolean;
@@ -170,6 +175,7 @@ export function createAlertApi(client: HttpClient): {
         channel: AlertChannel;
         condition_type: AlertConditionType;
         severity_min?: "low" | "medium" | "high" | "critical";
+        severity_lifecycle_scope?: AlertSeverityLifecycleScope;
         cooldown_seconds?: number;
         config: Record<string, unknown>;
         is_enabled?: boolean;
@@ -185,6 +191,9 @@ export function createAlertApi(client: HttpClient): {
       }
       if (input.severityMin !== undefined) {
         body.severity_min = input.severityMin;
+      }
+      if (input.severityLifecycleScope !== undefined) {
+        body.severity_lifecycle_scope = input.severityLifecycleScope;
       }
       if (input.cooldownSeconds !== undefined) {
         body.cooldown_seconds = input.cooldownSeconds;
@@ -209,6 +218,7 @@ export function createAlertApi(client: HttpClient): {
         channel?: AlertChannel;
         condition_type?: AlertConditionType;
         severity_min?: "low" | "medium" | "high" | "critical" | null;
+        severity_lifecycle_scope?: AlertSeverityLifecycleScope | null;
         cooldown_seconds?: number;
         config?: Record<string, unknown> | null;
         is_enabled?: boolean;
@@ -225,6 +235,9 @@ export function createAlertApi(client: HttpClient): {
       }
       if (input.severityMin !== undefined) {
         body.severity_min = input.severityMin;
+      }
+      if (input.severityLifecycleScope !== undefined) {
+        body.severity_lifecycle_scope = input.severityLifecycleScope;
       }
       if (input.cooldownSeconds !== undefined) {
         body.cooldown_seconds = input.cooldownSeconds;

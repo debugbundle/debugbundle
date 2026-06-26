@@ -181,6 +181,8 @@ export type AlertConditionType =
   | "severity_threshold"
   | "regression_after_deploy";
 
+export type AlertSeverityLifecycleScope = "new_incident" | "incident_regressed" | "both";
+
 export interface AlertRecord {
   alert_id: string;
   project_id: string;
@@ -189,6 +191,7 @@ export interface AlertRecord {
   channel: AlertChannel;
   condition_type: AlertConditionType;
   severity_min: "low" | "medium" | "high" | "critical" | null;
+  severity_lifecycle_scope: AlertSeverityLifecycleScope | null;
   cooldown_seconds: number;
   config: Record<string, unknown>;
   is_enabled: boolean;
@@ -509,6 +512,7 @@ export function createAlert(overrides: Partial<AlertRecord> = {}): AlertRecord {
     channel: "email",
     condition_type: "new_incident",
     severity_min: null,
+    severity_lifecycle_scope: null,
     cooldown_seconds: 0,
     config: { to: "owen@example.com" },
     is_enabled: true,

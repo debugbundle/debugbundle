@@ -405,6 +405,14 @@ describe("worker availability checks", () => {
         project_id: claimedCheck.project_id
       })
     );
+    expect(queueEnqueue).toHaveBeenCalledWith(
+      "evaluate-alerts",
+      expect.objectContaining({
+        condition_type: "severity_threshold",
+        dedupe_key: "severity_threshold:high",
+        lifecycle_event: "new_incident"
+      })
+    );
     expect(webhookPublish).toHaveBeenCalledWith(
       expect.objectContaining({
         event_type: "bundle.created",

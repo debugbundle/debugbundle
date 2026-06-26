@@ -2968,7 +2968,7 @@ describe("web app — management routes", () => {
     expect(await screen.findByText(/new incident/i)).toBeInTheDocument();
     expect(await screen.findByText(/error spike/i)).toBeInTheDocument();
     expect(screen.getByText(/high/i)).toBeInTheDocument();
-    expect(screen.getByText(/^-$/)).toBeInTheDocument();
+    expect(screen.getAllByText(/^-$/).length).toBeGreaterThanOrEqual(1);
     expect(
       screen.queryByText(/only the creator or a project admin can delete this rule/i)
     ).not.toBeInTheDocument();
@@ -3116,6 +3116,84 @@ describe("web app — management routes", () => {
     expect(screen.getByText(/critical/i)).toBeInTheDocument();
   });
 
+  it("creates severity threshold alert rules with the default lifecycle scope from the web route", async () => {
+    const user = userEvent.setup();
+    let createdAlertRequestBody: unknown = null;
+    const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = requestUrl(input);
+
+      if (url.endsWith("/v1/auth/session")) {
+        return jsonResponse(200, {
+          session: createSession({ email: "owner@example.com" })
+        });
+      }
+
+      if (url.endsWith("/v1/projects") && init?.method === undefined) {
+        return jsonResponse(200, {
+          projects: [createProject({ organization_plan: "team" })]
+        });
+      }
+
+      if (url.endsWith("/v1/alerts?project_id=proj_123&limit=20") && init?.method === undefined) {
+        return jsonResponse(200, {
+          alerts: []
+        });
+      }
+
+      if (url.endsWith("/v1/alerts") && init?.method === "POST") {
+        expect(init.credentials).toBe("include");
+        if (typeof init.body !== "string") {
+          throw new Error("expected alert create request body");
+        }
+        createdAlertRequestBody = JSON.parse(init.body);
+
+        return jsonResponse(201, {
+          alert: createAlert({
+            alert_id: "alert_threshold_789",
+            condition_type: "severity_threshold",
+            severity_lifecycle_scope: "both",
+            severity_min: "high",
+            cooldown_seconds: 86400,
+            config: { to: "owner@example.com" }
+          })
+        });
+      }
+
+      return jsonResponse(404, { error: "not_found" });
+    });
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<App initialEntries={["/projects/proj_123/alerts"]} />);
+
+    await user.click(await screen.findByRole("button", { name: /create alert rule/i }));
+    const recipientInput = await screen.findByLabelText(/recipient email/i);
+    await user.clear(recipientInput);
+    await user.type(recipientInput, "owner@example.com");
+    await chooseSelectOption(user, /condition/i, /^severity threshold$/i);
+    expect(screen.getByLabelText(/notify on/i)).toHaveTextContent(/new incidents and regressions/i);
+    await chooseSelectOption(user, /minimum severity/i, /^high$/i);
+    await user.click(screen.getByRole("button", { name: /^create alert rule$/i }));
+
+    await waitFor(() => {
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    });
+    expect(createdAlertRequestBody).toEqual({
+      project_id: "proj_123",
+      channel: "email",
+      condition_type: "severity_threshold",
+      severity_lifecycle_scope: "both",
+      severity_min: "high",
+      cooldown_seconds: 86400,
+      config: {
+        to: "owner@example.com"
+      },
+      is_enabled: true
+    });
+    expect(screen.getByText(/new incidents and regressions/i)).toBeInTheDocument();
+    expect(screen.getByText(/^high$/i)).toBeInTheDocument();
+  });
+
   it("edits a project alert rule from the web route using the same modal fields as create", async () => {
     const user = userEvent.setup();
     const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
@@ -3154,6 +3232,7 @@ describe("web app — management routes", () => {
         expect(JSON.parse(requestBody)).toEqual({
           channel: "email",
           condition_type: "severity_threshold",
+          severity_lifecycle_scope: "incident_regressed",
           severity_min: "critical",
           cooldown_seconds: 172800,
           config: {
@@ -3165,6 +3244,7 @@ describe("web app — management routes", () => {
           alert: createAlert({
             alert_id: "alert_123",
             condition_type: "severity_threshold",
+            severity_lifecycle_scope: "incident_regressed",
             severity_min: "critical",
             cooldown_seconds: 172800,
             config: { to: "alerts@example.com" }
@@ -3190,7 +3270,10 @@ describe("web app — management routes", () => {
 
     await user.clear(screen.getByLabelText(/recipient email/i));
     await user.type(screen.getByLabelText(/recipient email/i), "alerts@example.com");
+    expect(screen.queryByLabelText(/notify on/i)).not.toBeInTheDocument();
     await chooseSelectOption(user, /condition/i, /^severity threshold$/i);
+    expect(screen.getByLabelText(/notify on/i)).toHaveTextContent(/new incidents and regressions/i);
+    await chooseSelectOption(user, /notify on/i, /^regressions only$/i);
     await chooseSelectOption(user, /minimum severity/i, /^critical$/i);
     await user.clear(screen.getByLabelText(/cooldown \(days\)/i));
     await user.type(screen.getByLabelText(/cooldown \(days\)/i), "2");

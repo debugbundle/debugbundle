@@ -69,6 +69,9 @@ describe("storage schema migrations", () => {
     expect(query.mock.calls.map((call) => String(call[0]))).toContainEqual(
       expect.stringContaining("ALTER TABLE projects ADD COLUMN IF NOT EXISTS color_tag text")
     );
+    expect(query.mock.calls.map((call) => String(call[0]))).toContainEqual(
+      expect.stringContaining("ALTER TABLE alert_rules ADD COLUMN IF NOT EXISTS severity_lifecycle_scope text")
+    );
   });
 
   it("should skip already-applied migrations with matching checksums", async (): Promise<void> => {
@@ -216,6 +219,7 @@ describe("storage schema migrations", () => {
       { table_name: "agent_webhooks", column_name: "created_by_user_id" },
       { table_name: "alert_rules", column_name: "created_by_user_id" },
       { table_name: "alert_rules", column_name: "cooldown_seconds" },
+      { table_name: "alert_rules", column_name: "severity_lifecycle_scope" },
       { table_name: "capture_policies", column_name: "immediate_client_error_statuses" },
       { table_name: "capture_policies", column_name: "immediate_client_error_path_rules" },
       { table_name: "github_dispatch_rules", column_name: "created_by_user_id" },

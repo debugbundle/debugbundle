@@ -4,6 +4,7 @@ import type { RuntimeLogger } from "../../../packages/runtime-logger/src/index.j
 import { createEventEnvelope, type EventEnvelope } from "../../../packages/shared-types/src/index.js";
 import {
   buildRawEventObjectKey,
+  buildSeverityThresholdDedupeKey,
   executeAvailabilityCheck,
   type AvailabilityCheckStore,
   type ClaimedAvailabilityCheck,
@@ -32,6 +33,7 @@ type AvailabilityAlertQueue = {
       service_name: string;
       environment: string;
       severity: "low" | "medium" | "high" | "critical";
+      lifecycle_event?: "new_incident" | "incident_regressed";
       regression_deploy?: {
         deployment_id: string;
         commit_sha: string | null;
@@ -198,6 +200,7 @@ async function enqueueAvailabilityAlert(
     service_name: string;
     environment: string;
     severity: "low" | "medium" | "high" | "critical";
+    lifecycle_event?: "new_incident" | "incident_regressed";
     regression_deploy?: {
       deployment_id: string;
       commit_sha: string | null;
@@ -455,12 +458,18 @@ async function recordAvailabilityIncident(input: {
       });
     }
 
+    const severityLifecycleEvent = incident.regressed_now ? "incident_regressed" : "new_incident";
+
     await enqueueAvailabilityAlert(input.queue, {
       project_id: input.check.project_id,
       incident_id: incident.incident_id,
       condition_type: "severity_threshold",
-      dedupe_key: `severity_threshold:${severity}`,
+      dedupe_key: buildSeverityThresholdDedupeKey({
+        severity,
+        lifecycleEvent: severityLifecycleEvent
+      }),
       notification_key: fingerprint,
+      lifecycle_event: severityLifecycleEvent,
       occurred_at: input.occurred_at,
       summary: title,
       service_name: serviceName,

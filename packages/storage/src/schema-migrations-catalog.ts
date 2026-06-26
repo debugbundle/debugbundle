@@ -949,5 +949,36 @@ export const STORAGE_SCHEMA_MIGRATIONS = [
         )
       `
     ]
+  }),
+  defineStorageSchemaMigration({
+    id: "202606260001_add_alert_severity_lifecycle_scope",
+    description:
+      "Add lifecycle scope for severity-threshold alert rules so new incidents and regressions can notify independently.",
+    statements: [
+      "ALTER TABLE alert_rules ADD COLUMN IF NOT EXISTS severity_lifecycle_scope text",
+      `
+        UPDATE alert_rules
+        SET severity_lifecycle_scope = 'both'
+        WHERE condition_type = 'severity_threshold'
+          AND severity_lifecycle_scope IS NULL
+      `,
+      `
+        UPDATE alert_rules
+        SET severity_lifecycle_scope = NULL
+        WHERE condition_type <> 'severity_threshold'
+          AND severity_lifecycle_scope IS NOT NULL
+      `,
+      "ALTER TABLE alert_rules DROP CONSTRAINT IF EXISTS alert_rules_severity_lifecycle_scope_check",
+      `
+        ALTER TABLE alert_rules
+        ADD CONSTRAINT alert_rules_severity_lifecycle_scope_check CHECK (
+          severity_lifecycle_scope IS NULL
+          OR (
+            condition_type = 'severity_threshold'
+            AND severity_lifecycle_scope IN ('new_incident', 'incident_regressed', 'both')
+          )
+        )
+      `
+    ]
   })
 ] as const;

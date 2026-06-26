@@ -19,6 +19,7 @@ export function createAlertMcpTools(api: {
     channel: string;
     conditionType: string;
     severityMin?: string;
+    severityLifecycleScope?: string;
     cooldownSeconds?: number;
     config: Record<string, unknown>;
     isEnabled?: boolean;
@@ -31,6 +32,7 @@ export function createAlertMcpTools(api: {
     channel?: string;
     conditionType?: string;
     severityMin?: string | null;
+    severityLifecycleScope?: string | null;
     cooldownSeconds?: number;
     config?: Record<string, unknown> | null;
     isEnabled?: boolean;
@@ -63,6 +65,7 @@ export function createAlertMcpTools(api: {
           channel: string;
           conditionType: string;
           severityMin?: string;
+          severityLifecycleScope?: string;
           cooldownSeconds?: number;
           config: Record<string, unknown>;
           isEnabled?: boolean;
@@ -78,6 +81,9 @@ export function createAlertMcpTools(api: {
         }
         if (typeof input["severityMin"] === "string") {
           requestInput.severityMin = input["severityMin"];
+        }
+        if (typeof input["severityLifecycleScope"] === "string") {
+          requestInput.severityLifecycleScope = input["severityLifecycleScope"];
         }
         if (typeof input["cooldownSeconds"] === "number") {
           requestInput.cooldownSeconds = input["cooldownSeconds"];
@@ -102,6 +108,7 @@ export function createAlertMcpTools(api: {
           channel?: string;
           conditionType?: string;
           severityMin?: string | null;
+          severityLifecycleScope?: string | null;
           cooldownSeconds?: number;
           config?: Record<string, unknown> | null;
           isEnabled?: boolean;
@@ -125,6 +132,11 @@ export function createAlertMcpTools(api: {
           requestInput.severityMin = input["severityMin"];
         } else if (input["severityMin"] === null) {
           requestInput.severityMin = null;
+        }
+        if (typeof input["severityLifecycleScope"] === "string") {
+          requestInput.severityLifecycleScope = input["severityLifecycleScope"];
+        } else if (input["severityLifecycleScope"] === null) {
+          requestInput.severityLifecycleScope = null;
         }
         if (typeof input["cooldownSeconds"] === "number") {
           requestInput.cooldownSeconds = input["cooldownSeconds"];

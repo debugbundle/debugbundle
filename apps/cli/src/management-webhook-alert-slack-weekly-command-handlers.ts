@@ -358,6 +358,7 @@ export async function handleAlertCommand(parsedArgv: ParsedArgv, dependencies: M
       "channel",
       "condition",
       "severity-min",
+      "severity-lifecycle-scope",
       "cooldown",
       "config-json",
       "is-enabled"
@@ -387,6 +388,7 @@ export async function handleAlertCommand(parsedArgv: ParsedArgv, dependencies: M
       channel: string;
       conditionType: string;
       severityMin?: string;
+      severityLifecycleScope?: string;
       cooldownSeconds?: number;
       config?: Record<string, unknown>;
       isEnabled?: boolean;
@@ -401,6 +403,10 @@ export async function handleAlertCommand(parsedArgv: ParsedArgv, dependencies: M
     const severityMin = readStringOption(parsedArgv, "severity-min");
     if (severityMin !== undefined) {
       input.severityMin = severityMin;
+    }
+    const severityLifecycleScope = readStringOption(parsedArgv, "severity-lifecycle-scope");
+    if (severityLifecycleScope !== undefined) {
+      input.severityLifecycleScope = severityLifecycleScope;
     }
     const cooldownSeconds = readIntegerOption(parsedArgv, "cooldown");
     if (cooldownSeconds !== undefined) {
@@ -428,6 +434,7 @@ export async function handleAlertCommand(parsedArgv: ParsedArgv, dependencies: M
       "channel",
       "condition",
       "severity-min",
+      "severity-lifecycle-scope",
       "cooldown",
       "config-json",
       "is-enabled"
@@ -448,6 +455,7 @@ export async function handleAlertCommand(parsedArgv: ParsedArgv, dependencies: M
       channel?: string;
       conditionType?: string;
       severityMin?: string | null;
+      severityLifecycleScope?: string | null;
       cooldownSeconds?: number;
       config?: Record<string, unknown> | null;
       isEnabled?: boolean;
@@ -471,6 +479,10 @@ export async function handleAlertCommand(parsedArgv: ParsedArgv, dependencies: M
     if (severityMin !== undefined) {
       input.severityMin = severityMin === "null" ? null : severityMin;
     }
+    const severityLifecycleScope = readStringOption(parsedArgv, "severity-lifecycle-scope");
+    if (severityLifecycleScope !== undefined) {
+      input.severityLifecycleScope = severityLifecycleScope === "null" ? null : severityLifecycleScope;
+    }
     const cooldownSeconds = readIntegerOption(parsedArgv, "cooldown");
     if (cooldownSeconds !== undefined) {
       input.cooldownSeconds = cooldownSeconds;
@@ -489,6 +501,7 @@ export async function handleAlertCommand(parsedArgv: ParsedArgv, dependencies: M
       input.channel === undefined &&
       input.conditionType === undefined &&
       input.severityMin === undefined &&
+      input.severityLifecycleScope === undefined &&
       input.cooldownSeconds === undefined &&
       input.config === undefined &&
       input.isEnabled === undefined

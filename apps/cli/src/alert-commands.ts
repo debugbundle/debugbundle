@@ -1,5 +1,10 @@
 import { AlertApiError } from "../../../packages/alert-client/src/index.js";
-import type { AlertChannel, AlertConditionType, AlertRecord } from "../../../packages/alert-client/src/index.js";
+import type {
+  AlertChannel,
+  AlertConditionType,
+  AlertRecord,
+  AlertSeverityLifecycleScope
+} from "../../../packages/alert-client/src/index.js";
 import { createAuthenticatedAlertApi, runAuthenticatedCliCommand } from "./auth-context.js";
 import type { CliCommandResult } from "./token-commands.js";
 
@@ -98,6 +103,7 @@ export async function createAlertCommand(
     channel: AlertChannel;
     conditionType: AlertConditionType;
     severityMin?: "low" | "medium" | "high" | "critical";
+    severityLifecycleScope?: AlertSeverityLifecycleScope;
     cooldownSeconds?: number;
     config: Record<string, unknown>;
     isEnabled?: boolean;
@@ -111,6 +117,7 @@ export async function createAlertCommand(
       channel: AlertChannel;
       conditionType: AlertConditionType;
       severityMin?: "low" | "medium" | "high" | "critical";
+      severityLifecycleScope?: AlertSeverityLifecycleScope;
       cooldownSeconds?: number;
       config: Record<string, unknown>;
       isEnabled?: boolean;
@@ -125,6 +132,7 @@ export async function createAlertCommand(
       channel: AlertChannel;
       conditionType: AlertConditionType;
       severityMin?: "low" | "medium" | "high" | "critical";
+      severityLifecycleScope?: AlertSeverityLifecycleScope;
       cooldownSeconds?: number;
       config: Record<string, unknown>;
       isEnabled?: boolean;
@@ -140,6 +148,9 @@ export async function createAlertCommand(
     }
     if (input.severityMin !== undefined) {
       requestInput.severityMin = input.severityMin;
+    }
+    if (input.severityLifecycleScope !== undefined) {
+      requestInput.severityLifecycleScope = input.severityLifecycleScope;
     }
     if (input.cooldownSeconds !== undefined) {
       requestInput.cooldownSeconds = input.cooldownSeconds;
@@ -166,6 +177,7 @@ export async function createAlertWithAuthCommand(
     channel: AlertChannel;
     conditionType: AlertConditionType;
     severityMin?: "low" | "medium" | "high" | "critical";
+    severityLifecycleScope?: AlertSeverityLifecycleScope;
     cooldownSeconds?: number;
     config: Record<string, unknown>;
     isEnabled?: boolean;
@@ -184,6 +196,7 @@ export async function createAlertWithAuthCommand(
         channel: AlertChannel;
         conditionType: AlertConditionType;
         severityMin?: "low" | "medium" | "high" | "critical";
+        severityLifecycleScope?: AlertSeverityLifecycleScope;
         cooldownSeconds?: number;
         config: Record<string, unknown>;
         isEnabled?: boolean;
@@ -200,6 +213,9 @@ export async function createAlertWithAuthCommand(
       }
       if (input.severityMin !== undefined) {
         commandInput.severityMin = input.severityMin;
+      }
+      if (input.severityLifecycleScope !== undefined) {
+        commandInput.severityLifecycleScope = input.severityLifecycleScope;
       }
       if (input.cooldownSeconds !== undefined) {
         commandInput.cooldownSeconds = input.cooldownSeconds;
@@ -227,6 +243,7 @@ export async function updateAlertCommand(
     channel?: AlertChannel;
     conditionType?: AlertConditionType;
     severityMin?: "low" | "medium" | "high" | "critical" | null;
+    severityLifecycleScope?: AlertSeverityLifecycleScope | null;
     cooldownSeconds?: number;
     config?: Record<string, unknown> | null;
     isEnabled?: boolean;
@@ -241,6 +258,7 @@ export async function updateAlertCommand(
       channel?: AlertChannel;
       conditionType?: AlertConditionType;
       severityMin?: "low" | "medium" | "high" | "critical" | null;
+      severityLifecycleScope?: AlertSeverityLifecycleScope | null;
       cooldownSeconds?: number;
       config?: Record<string, unknown> | null;
       isEnabled?: boolean;
@@ -256,6 +274,7 @@ export async function updateAlertCommand(
       channel?: AlertChannel;
       conditionType?: AlertConditionType;
       severityMin?: "low" | "medium" | "high" | "critical" | null;
+      severityLifecycleScope?: AlertSeverityLifecycleScope | null;
       cooldownSeconds?: number;
       config?: Record<string, unknown> | null;
       isEnabled?: boolean;
@@ -275,6 +294,9 @@ export async function updateAlertCommand(
     }
     if (input.severityMin !== undefined) {
       requestInput.severityMin = input.severityMin;
+    }
+    if (input.severityLifecycleScope !== undefined) {
+      requestInput.severityLifecycleScope = input.severityLifecycleScope;
     }
     if (input.cooldownSeconds !== undefined) {
       requestInput.cooldownSeconds = input.cooldownSeconds;
@@ -305,6 +327,7 @@ export async function updateAlertWithAuthCommand(
     channel?: AlertChannel;
     conditionType?: AlertConditionType;
     severityMin?: "low" | "medium" | "high" | "critical" | null;
+    severityLifecycleScope?: AlertSeverityLifecycleScope | null;
     cooldownSeconds?: number;
     config?: Record<string, unknown> | null;
     isEnabled?: boolean;
@@ -324,6 +347,7 @@ export async function updateAlertWithAuthCommand(
         channel?: AlertChannel;
         conditionType?: AlertConditionType;
         severityMin?: "low" | "medium" | "high" | "critical" | null;
+        severityLifecycleScope?: AlertSeverityLifecycleScope | null;
         cooldownSeconds?: number;
         config?: Record<string, unknown> | null;
         isEnabled?: boolean;
@@ -344,6 +368,9 @@ export async function updateAlertWithAuthCommand(
       }
       if (input.severityMin !== undefined) {
         commandInput.severityMin = input.severityMin;
+      }
+      if (input.severityLifecycleScope !== undefined) {
+        commandInput.severityLifecycleScope = input.severityLifecycleScope;
       }
       if (input.cooldownSeconds !== undefined) {
         commandInput.cooldownSeconds = input.cooldownSeconds;

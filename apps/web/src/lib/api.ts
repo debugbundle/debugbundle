@@ -7,6 +7,7 @@ import {
 import type {
   AlertChannel,
   AlertConditionType,
+  AlertSeverityLifecycleScope,
   AdminAnalyticsAccessStatus,
   AdminMalformedRejectionBreakdown,
   AdminAnalyticsSummary,
@@ -563,6 +564,7 @@ export async function createProjectAlert(payload: {
   channel: AlertChannel;
   condition_type: AlertConditionType;
   severity_min?: "low" | "medium" | "high" | "critical";
+  severity_lifecycle_scope?: AlertSeverityLifecycleScope;
   cooldown_seconds?: number;
   config: Record<string, unknown>;
   is_enabled?: boolean;
@@ -578,6 +580,7 @@ export async function createProjectAlert(payload: {
         channel: payload.channel,
         condition_type: payload.condition_type,
         severity_min: payload.severity_min,
+        severity_lifecycle_scope: payload.severity_lifecycle_scope,
         cooldown_seconds: payload.cooldown_seconds ?? 0,
         config: payload.config,
         is_enabled: payload.is_enabled ?? true
@@ -596,6 +599,7 @@ export async function updateProjectAlert(
     channel?: AlertChannel;
     condition_type?: AlertConditionType;
     severity_min?: "low" | "medium" | "high" | "critical" | null;
+    severity_lifecycle_scope?: AlertSeverityLifecycleScope | null;
     cooldown_seconds?: number;
     config?: Record<string, unknown> | null;
     is_enabled?: boolean;

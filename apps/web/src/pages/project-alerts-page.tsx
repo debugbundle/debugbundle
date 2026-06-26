@@ -34,6 +34,7 @@ import {
   updateProjectAlert,
   type AlertChannel,
   type AlertConditionType,
+  type AlertSeverityLifecycleScope,
   type AlertRecord
 } from "../lib/api.js";
 import { showErrorToast, showSuccessToast } from "../lib/notify.js";
@@ -94,7 +95,14 @@ const SEVERITY_OPTIONS: Array<{ value: "" | "low" | "medium" | "high" | "critica
   { value: "critical", label: "Critical" }
 ];
 
+const ALERT_SEVERITY_LIFECYCLE_SCOPE_OPTIONS: Array<{ value: AlertSeverityLifecycleScope; label: string }> = [
+  { value: "both", label: "New incidents and regressions" },
+  { value: "new_incident", label: "New incidents only" },
+  { value: "incident_regressed", label: "Regressions only" }
+];
+
 const ALERT_SEVERITY_ANY_VALUE = "__any_severity__";
+const ALERT_SEVERITY_LIFECYCLE_DEFAULT: AlertSeverityLifecycleScope = "both";
 const ALERT_COOLDOWN_DEFAULT_DAYS = "1";
 const ALERT_COOLDOWN_DISABLED_DAYS = "0";
 const ALERT_COOLDOWN_MAX_DAYS = 7;
@@ -115,6 +123,7 @@ export function ProjectAlertsPage(): JSX.Element {
   const [editingAlertId, setEditingAlertId] = useState<string | null>(null);
   const [channel, setChannel] = useState<AlertChannel>("email");
   const [conditionType, setConditionType] = useState<AlertConditionType>("new_incident");
+  const [severityLifecycleScope, setSeverityLifecycleScope] = useState<AlertSeverityLifecycleScope>(ALERT_SEVERITY_LIFECYCLE_DEFAULT);
   const [severityMin, setSeverityMin] = useState<"" | "low" | "medium" | "high" | "critical">("");
   const [cooldownDays, setCooldownDays] = useState(ALERT_COOLDOWN_DEFAULT_DAYS);
   const [isCooldownPristine, setIsCooldownPristine] = useState(true);
@@ -165,6 +174,7 @@ export function ProjectAlertsPage(): JSX.Element {
   function resetAlertForm(nextChannel: AlertChannel = "email"): void {
     setChannel(nextChannel);
     setConditionType("new_incident");
+    setSeverityLifecycleScope(ALERT_SEVERITY_LIFECYCLE_DEFAULT);
     setSeverityMin("");
     setCooldownDays(getDefaultCooldownDays(nextChannel));
     setIsCooldownPristine(true);
@@ -279,6 +289,7 @@ export function ProjectAlertsPage(): JSX.Element {
   function populateAlertForm(alert: AlertRecord): void {
     setChannel(alert.channel);
     setConditionType(alert.condition_type);
+    setSeverityLifecycleScope(alert.severity_lifecycle_scope ?? ALERT_SEVERITY_LIFECYCLE_DEFAULT);
     setSeverityMin(alert.severity_min ?? "");
     setCooldownDays(String(alert.cooldown_seconds / SECONDS_PER_DAY));
     setIsCooldownPristine(false);
@@ -316,6 +327,7 @@ export function ProjectAlertsPage(): JSX.Element {
     | {
         channel: AlertChannel;
         condition_type: AlertConditionType;
+        severity_lifecycle_scope?: AlertSeverityLifecycleScope;
         severity_min?: "low" | "medium" | "high" | "critical";
         cooldown_seconds: number;
         config: Record<string, unknown>;
@@ -349,6 +361,7 @@ export function ProjectAlertsPage(): JSX.Element {
     const draft: {
       channel: AlertChannel;
       condition_type: AlertConditionType;
+      severity_lifecycle_scope?: AlertSeverityLifecycleScope;
       severity_min?: "low" | "medium" | "high" | "critical";
       cooldown_seconds: number;
       config: Record<string, unknown>;
@@ -361,6 +374,10 @@ export function ProjectAlertsPage(): JSX.Element {
 
     if (severityMin !== "") {
       draft.severity_min = severityMin;
+    }
+
+    if (conditionType === "severity_threshold") {
+      draft.severity_lifecycle_scope = severityLifecycleScope;
     }
 
     return draft;
@@ -377,6 +394,7 @@ export function ProjectAlertsPage(): JSX.Element {
       project_id: string;
       channel: AlertChannel;
       condition_type: AlertConditionType;
+      severity_lifecycle_scope?: AlertSeverityLifecycleScope;
       severity_min?: "low" | "medium" | "high" | "critical";
       cooldown_seconds: number;
       config: Record<string, unknown>;
@@ -527,6 +545,34 @@ export function ProjectAlertsPage(): JSX.Element {
           </SelectContent>
         </Select>
       </Field>
+      {conditionType === "severity_threshold" ? (
+        <Field>
+          <FieldLabel id="project-alert-severity-lifecycle-label" htmlFor="project-alert-severity-lifecycle">
+            Notify on
+          </FieldLabel>
+          <Select
+            value={severityLifecycleScope}
+            onValueChange={(value) => setSeverityLifecycleScope(value as AlertSeverityLifecycleScope)}
+          >
+            <SelectTrigger
+              id="project-alert-severity-lifecycle"
+              aria-labelledby="project-alert-severity-lifecycle-label project-alert-severity-lifecycle"
+              className="w-full"
+            >
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent position="popper">
+              <SelectGroup>
+                {ALERT_SEVERITY_LIFECYCLE_SCOPE_OPTIONS.map((option) => (
+                  <SelectItem key={option.value} value={option.value}>
+                    {option.label}
+                  </SelectItem>
+                ))}
+              </SelectGroup>
+            </SelectContent>
+          </Select>
+        </Field>
+      ) : null}
       <Field>
         <FieldLabel id="project-alert-severity-label" htmlFor="project-alert-severity">Minimum severity</FieldLabel>
         <FieldDescription>Leave unset to deliver for all severities matching the selected condition.</FieldDescription>
@@ -636,6 +682,7 @@ export function ProjectAlertsPage(): JSX.Element {
                   <TableRow>
                     <TableHead>Channel</TableHead>
                     <TableHead>Condition</TableHead>
+                    <TableHead>Notify on</TableHead>
                     <TableHead>Minimum severity</TableHead>
                     <TableHead>Cooldown</TableHead>
                     <TableHead>Status</TableHead>
@@ -649,6 +696,7 @@ export function ProjectAlertsPage(): JSX.Element {
                         {formatAlertChannelWithDestination(alert, slackDestinations)}
                       </TableCell>
                       <TableCell>{formatAlertCondition(alert.condition_type)}</TableCell>
+                      <TableCell>{formatSeverityLifecycleScopeForAlert(alert)}</TableCell>
                       <TableCell>{alert.severity_min === null ? "Any" : formatSeverity(alert.severity_min)}</TableCell>
                       <TableCell>{formatAlertCooldown(alert.cooldown_seconds)}</TableCell>
                       <TableCell>
@@ -802,6 +850,18 @@ function canManageAlertRule(
 
 export function formatAlertCondition(conditionType: AlertConditionType): string {
   return ALERT_CONDITION_OPTIONS.find((option) => option.value === conditionType)?.label ?? conditionType;
+}
+
+export function formatAlertSeverityLifecycleScope(scope: AlertSeverityLifecycleScope): string {
+  return ALERT_SEVERITY_LIFECYCLE_SCOPE_OPTIONS.find((option) => option.value === scope)?.label ?? scope;
+}
+
+export function formatSeverityLifecycleScopeForAlert(alert: AlertRecord): string {
+  if (alert.condition_type !== "severity_threshold") {
+    return "-";
+  }
+
+  return formatAlertSeverityLifecycleScope(alert.severity_lifecycle_scope ?? ALERT_SEVERITY_LIFECYCLE_DEFAULT);
 }
 
 export function formatSeverity(severity: "low" | "medium" | "high" | "critical"): string {

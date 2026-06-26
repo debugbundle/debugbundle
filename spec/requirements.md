@@ -269,7 +269,9 @@ Project list/detail metrics must include `attention_incidents_today`, counting i
 
 **FR-ALT-02:** Alert conditions: new incident, incident regressed, error spike (FR-GRP-03), severity threshold, regression after deploy (FR-GRP-04).
 
-**FR-ALT-03:** Configurable via CLI and API.
+**FR-ALT-03:** Configurable via API, CLI, and MCP.
+
+**FR-ALT-04:** Severity-threshold alert rules must be able to notify for new incidents, incident regressions, or both. New severity-threshold alert rules default to both lifecycle events.
 
 ### 1.9 CLI
 

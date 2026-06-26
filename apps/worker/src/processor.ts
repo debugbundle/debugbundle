@@ -47,6 +47,7 @@ import type {
   NormalizeEventsJob
 } from "../../../packages/storage/src/index.js";
 import {
+  buildSeverityThresholdDedupeKey,
   buildBundleRegenerationLeaseKey,
   buildBundleObjectKey,
   buildImprovementBundleObjectKey,
@@ -536,6 +537,7 @@ async function enqueueAlertEvaluation(
     condition_type: AlertConditionType;
     dedupe_key: string;
     notification_key?: string;
+    lifecycle_event?: "new_incident" | "incident_regressed";
     occurred_at: string;
     summary?: string;
     service_name: string;
@@ -901,12 +903,18 @@ export async function processNextGroupIncidentJob(
       });
     }
 
+    const severityLifecycleEvent = incident.regressed_now ? "incident_regressed" : "new_incident";
+
     await enqueueAlertEvaluation(dependencies.alertEvaluationQueue, {
       project_id: job.project_id,
       incident_id: incident.incident_id,
       condition_type: "severity_threshold",
-      dedupe_key: `severity_threshold:${job.severity}`,
+      dedupe_key: buildSeverityThresholdDedupeKey({
+        severity: job.severity,
+        lifecycleEvent: severityLifecycleEvent
+      }),
       notification_key: job.alert_notification_key ?? job.fingerprint,
+      lifecycle_event: severityLifecycleEvent,
       occurred_at: job.occurred_at,
       summary: incidentTitle,
       service_name: job.service_name,
@@ -1045,13 +1053,25 @@ export async function processNextEvaluateAlertsJob(
     return { processed: false, reason: "no_jobs" };
   }
 
-  const alerts = await dependencies.alertStore.listMatchingAlerts({
+  const matchingAlertInput: {
+    project_id: string;
+    condition_type: AlertConditionType;
+    service_name: string;
+    environment: string;
+    severity: "low" | "medium" | "high" | "critical";
+    lifecycle_event?: "new_incident" | "incident_regressed";
+  } = {
     project_id: job.project_id,
     condition_type: job.condition_type,
     service_name: job.service_name,
     environment: job.environment,
     severity: job.severity
-  });
+  };
+  if (job.lifecycle_event !== undefined) {
+    matchingAlertInput.lifecycle_event = job.lifecycle_event;
+  }
+
+  const alerts = await dependencies.alertStore.listMatchingAlerts(matchingAlertInput);
 
   let remainingAlertDeliveries: number | null = null;
   let alertAllowanceUsed: number | null = null;

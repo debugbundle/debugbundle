@@ -48,6 +48,7 @@ export {
   hashToken
 } from "./helpers.js";
 export type { BuildImprovementBundleJob } from "./improvement-bundle-jobs.js";
+export * from "./alert-lifecycle.js";
 export { createPostgresAlertDeliveryStore } from "./alert-delivery-store.js";
 export { createPostgresAccountStore } from "./account-store.js";
 export { createPostgresAuditLogStore } from "./audit-log-store.js";

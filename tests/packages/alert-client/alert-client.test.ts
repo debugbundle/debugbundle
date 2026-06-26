@@ -15,6 +15,7 @@ describe("alert api client", () => {
             channel: "email",
             condition_type: "severity_threshold",
             severity_min: "high",
+            severity_lifecycle_scope: "both",
             cooldown_seconds: 0,
             config: {
               to: "oncall@example.com"
@@ -43,6 +44,40 @@ describe("alert api client", () => {
     });
   });
 
+  it("defaults missing severity lifecycle scope to null for older alert responses", async () => {
+    const request = vi.fn<HttpClient["request"]>().mockResolvedValue({
+      status: 200,
+      body: {
+        alerts: [
+          {
+            alert_id: "al_legacy",
+            project_id: "proj_1",
+            service_id: null,
+            channel: "email",
+            condition_type: "new_incident",
+            severity_min: null,
+            cooldown_seconds: 0,
+            config: {
+              to: "owner@example.com"
+            },
+            is_enabled: true,
+            created_by_user_id: "usr_1",
+            created_at: "2026-03-15T00:00:00.000Z",
+            updated_at: "2026-03-15T00:00:00.000Z"
+          }
+        ]
+      }
+    });
+
+    const api = createAlertApi({ request });
+    const alerts = await api.listAlerts({
+      bearerToken: "dbundle_mem_x",
+      projectId: "proj_1"
+    });
+
+    expect(alerts[0]?.severity_lifecycle_scope).toBeNull();
+  });
+
   it("calls create alert route and returns the created alert", async () => {
     const request = vi.fn<HttpClient["request"]>().mockResolvedValue({
       status: 201,
@@ -54,6 +89,7 @@ describe("alert api client", () => {
           channel: "email",
           condition_type: "severity_threshold",
           severity_min: "high",
+          severity_lifecycle_scope: "incident_regressed",
           cooldown_seconds: 3600,
           config: {
             to: "oncall@example.com"
@@ -74,6 +110,7 @@ describe("alert api client", () => {
       channel: "email",
       conditionType: "severity_threshold",
       severityMin: "high",
+      severityLifecycleScope: "incident_regressed",
       cooldownSeconds: 3600,
       config: {
         to: "oncall@example.com"
@@ -92,6 +129,7 @@ describe("alert api client", () => {
         channel: "email",
         condition_type: "severity_threshold",
         severity_min: "high",
+        severity_lifecycle_scope: "incident_regressed",
         cooldown_seconds: 3600,
         config: {
           to: "oncall@example.com"
@@ -114,6 +152,7 @@ describe("alert api client", () => {
             channel: "slack",
             condition_type: "error_spike",
             severity_min: null,
+            severity_lifecycle_scope: null,
             cooldown_seconds: 86400,
             config: {
               channel: "eng-alerts"
@@ -139,6 +178,7 @@ describe("alert api client", () => {
       channel: "slack",
       conditionType: "error_spike",
       severityMin: null,
+      severityLifecycleScope: null,
       cooldownSeconds: 86400,
       config: {
         channel: "eng-alerts"
@@ -162,6 +202,7 @@ describe("alert api client", () => {
         channel: "slack",
         condition_type: "error_spike",
         severity_min: null,
+        severity_lifecycle_scope: null,
         cooldown_seconds: 86400,
         config: {
           channel: "eng-alerts"
@@ -236,6 +277,7 @@ describe("alert api client", () => {
             channel: "email",
             condition_type: "new_incident",
             severity_min: null,
+            severity_lifecycle_scope: null,
             cooldown_seconds: 0,
             config: {
               to: "owner@example.com"
@@ -257,6 +299,7 @@ describe("alert api client", () => {
             channel: "email",
             condition_type: "new_incident",
             severity_min: null,
+            severity_lifecycle_scope: null,
             cooldown_seconds: 0,
             config: {
               to: "owner@example.com"

@@ -36,6 +36,7 @@ describe("cli alert commands", () => {
             channel: "email",
             condition_type: "severity_threshold",
             severity_min: "high",
+            severity_lifecycle_scope: "both",
             cooldown_seconds: 0,
             config: { to: "owner@example.com" },
             is_enabled: true,
@@ -64,6 +65,7 @@ describe("cli alert commands", () => {
       channel: "email",
       condition_type: "severity_threshold",
       severity_min: "high",
+      severity_lifecycle_scope: "incident_regressed",
       config: {
         to: "oncall@example.com"
       },
@@ -86,6 +88,7 @@ describe("cli alert commands", () => {
         channel: "email",
         conditionType: "severity_threshold",
         severityMin: "high",
+        severityLifecycleScope: "incident_regressed",
         config: {
           to: "oncall@example.com"
         },
@@ -108,6 +111,7 @@ describe("cli alert commands", () => {
       channel: "email",
       conditionType: "severity_threshold",
       severityMin: "high",
+      severityLifecycleScope: "incident_regressed",
       config: {
         to: "oncall@example.com"
       }
@@ -120,6 +124,7 @@ describe("cli alert commands", () => {
         channel: "email",
         condition_type: "severity_threshold",
         severity_min: "high",
+        severity_lifecycle_scope: "incident_regressed",
         config: {
           to: "oncall@example.com"
         },
@@ -161,6 +166,7 @@ describe("cli alert commands", () => {
           channel: "email",
           condition_type: "new_incident",
           severity_min: null,
+          severity_lifecycle_scope: null,
           config: { to: "owner@example.com" },
           is_enabled: true,
           created_at: "2026-03-15T00:00:00.000Z",
@@ -185,6 +191,7 @@ describe("cli alert commands", () => {
           channel: "email",
           condition_type: "new_incident",
           severity_min: null,
+          severity_lifecycle_scope: null,
           config: { to: "owner@example.com" },
           is_enabled: false,
           created_at: "2026-03-15T00:00:00.000Z",
@@ -213,6 +220,7 @@ describe("cli alert commands", () => {
         channel: "email",
         condition_type: "new_incident",
         severity_min: null,
+        severity_lifecycle_scope: null,
         config: { to: "owner@example.com" },
         is_enabled: false,
         created_at: "2026-03-15T00:00:00.000Z",
@@ -251,6 +259,7 @@ describe("cli alert commands", () => {
         channel: "webhook",
         conditionType: "severity_threshold",
         severityMin: "critical",
+        severityLifecycleScope: "both",
         config: { target_url: "https://hooks.example.test/alerts" },
         isEnabled: false,
         json: true
@@ -263,6 +272,7 @@ describe("cli alert commands", () => {
           channel: "webhook",
           condition_type: "severity_threshold",
           severity_min: "critical",
+          severity_lifecycle_scope: "both",
           config: { target_url: "https://hooks.example.test/alerts" },
           is_enabled: false,
           created_at: "2026-03-15T00:00:00.000Z",
@@ -277,6 +287,7 @@ describe("cli alert commands", () => {
         alertId: "al_2",
         serviceId: null,
         severityMin: null,
+        severityLifecycleScope: "new_incident",
         config: null
       },
       {
@@ -287,6 +298,7 @@ describe("cli alert commands", () => {
           channel: "webhook",
           condition_type: "severity_threshold",
           severity_min: null,
+          severity_lifecycle_scope: "new_incident",
           config: null,
           is_enabled: false,
           created_at: "2026-03-15T00:00:00.000Z",
@@ -395,6 +407,7 @@ describe("cli alert commands", () => {
         channel: "slack",
         condition_type: "error_spike",
         severity_min: null,
+        severity_lifecycle_scope: null,
         config: {},
         is_enabled: false,
         created_at: "2026-03-15T00:00:00.000Z",
@@ -446,6 +459,7 @@ describe("cli alert commands", () => {
       channel: "webhook",
       condition_type: "severity_threshold",
       severity_min: null,
+      severity_lifecycle_scope: "incident_regressed",
       config: null,
       is_enabled: true,
       created_at: "2026-03-15T00:00:00.000Z",
@@ -466,6 +480,7 @@ describe("cli alert commands", () => {
         alertId: "al_2",
         serviceId: null,
         severityMin: null,
+        severityLifecycleScope: "incident_regressed",
         config: null,
         json: true
       },
@@ -492,6 +507,7 @@ describe("cli alert commands", () => {
       alertId: "al_2",
       serviceId: null,
       severityMin: null,
+      severityLifecycleScope: "incident_regressed",
       config: null
     });
     expect(deleteAlert).toHaveBeenCalledWith({

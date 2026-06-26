@@ -642,7 +642,7 @@ export const MCP_TOOL_CATALOG = [
   {
     name: 'create_alert',
     group: 'alerts',
-    description: 'Create an alert rule.',
+    description: 'Create an alert rule, including optional severity-threshold lifecycle scope.',
     inputSchema: z.object({
       bearerToken: z.string(),
       projectId: z.string(),
@@ -650,6 +650,7 @@ export const MCP_TOOL_CATALOG = [
       channel: z.string(),
       conditionType: z.string(),
       severityMin: z.string().optional(),
+      severityLifecycleScope: z.enum(['new_incident', 'incident_regressed', 'both']).optional(),
       cooldownSeconds: z.number().int().min(0).max(604800).optional(),
       config: jsonObjectSchema,
       isEnabled: z.boolean().optional(),
@@ -658,7 +659,7 @@ export const MCP_TOOL_CATALOG = [
   {
     name: 'update_alert',
     group: 'alerts',
-    description: 'Update an alert rule.',
+    description: 'Update an alert rule, including optional severity-threshold lifecycle scope.',
     inputSchema: z.object({
       bearerToken: z.string(),
       projectId: z.string(),
@@ -667,6 +668,7 @@ export const MCP_TOOL_CATALOG = [
       channel: z.string().optional(),
       conditionType: z.string().optional(),
       severityMin: z.string().nullable().optional(),
+      severityLifecycleScope: z.enum(['new_incident', 'incident_regressed', 'both']).nullable().optional(),
       cooldownSeconds: z.number().int().min(0).max(604800).optional(),
       config: jsonObjectSchema.nullable().optional(),
       isEnabled: z.boolean().optional(),

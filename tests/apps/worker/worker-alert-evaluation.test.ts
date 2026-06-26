@@ -111,6 +111,7 @@ describe("worker alert evaluation", () => {
       condition_type: "severity_threshold",
       dedupe_key: "severity_threshold:high",
       notification_key: "fp_123",
+      lifecycle_event: "new_incident",
       occurred_at: "2026-03-15T12:00:00.000Z",
       summary: "boom",
       service_name: "checkout-api",
@@ -179,12 +180,25 @@ describe("worker alert evaluation", () => {
     });
 
     expect(result).toEqual({ processed: true });
-    expect(alertEnqueue).toHaveBeenCalledWith("evaluate-alerts", expect.objectContaining({
+    expect(alertEnqueue).toHaveBeenCalledWith(
+      "evaluate-alerts",
+      expect.objectContaining({
+        incident_id: "inc_456",
+        condition_type: "severity_threshold",
+        dedupe_key: "severity_threshold:critical:incident_regressed",
+        lifecycle_event: "incident_regressed",
+        notification_key: "fp_456"
+      })
+    );
+    expect(alertEnqueue).toHaveBeenCalledWith(
+      "evaluate-alerts",
+      expect.objectContaining({
         incident_id: "inc_456",
         condition_type: "incident_regressed",
         dedupe_key: "incident_regressed",
         notification_key: "fp_456"
-      }));
+      })
+    );
     expect(alertEnqueue).toHaveBeenCalledWith("evaluate-alerts", expect.objectContaining({
       incident_id: "inc_456",
       condition_type: "regression_after_deploy",
@@ -210,6 +224,7 @@ describe("worker alert evaluation", () => {
         channel: "webhook",
         condition_type: "new_incident",
         severity_min: null,
+        severity_lifecycle_scope: null,
         cooldown_seconds: 0,
         config: { target_url: "https://hooks.example.test/alerts" },
         is_enabled: true,
@@ -223,6 +238,7 @@ describe("worker alert evaluation", () => {
         channel: "webhook",
         condition_type: "new_incident",
         severity_min: null,
+        severity_lifecycle_scope: null,
         cooldown_seconds: 0,
         config: { target_url: "https://hooks.example.test/alerts-2" },
         is_enabled: true,
@@ -318,6 +334,7 @@ describe("worker alert evaluation", () => {
             channel: "email",
             condition_type: "error_spike",
             severity_min: "high",
+            severity_lifecycle_scope: null,
             cooldown_seconds: 0,
             config: { to: "alerts@example.com" },
             is_enabled: true,
@@ -386,6 +403,7 @@ describe("worker alert evaluation", () => {
             channel: "webhook",
             condition_type: "new_incident",
             severity_min: null,
+            severity_lifecycle_scope: null,
             cooldown_seconds: 0,
             config: { target_url: "https://hooks.example.test/alerts" },
             is_enabled: true,

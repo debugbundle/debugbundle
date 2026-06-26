@@ -1,8 +1,18 @@
 import { describe, expect, it, vi } from "vitest";
 
+import { buildSeverityThresholdDedupeKey } from "../../../packages/storage/src/alert-lifecycle.js";
 import { createPostgresAlertDeliveryStore } from "../../../packages/storage/src/alert-delivery-store.js";
 
 describe("alert delivery store", () => {
+  it("keeps new-incident severity-threshold dedupe keys compatible while separating regressions", () => {
+    expect(buildSeverityThresholdDedupeKey({ severity: "high", lifecycleEvent: "new_incident" })).toBe(
+      "severity_threshold:high"
+    );
+    expect(buildSeverityThresholdDedupeKey({ severity: "high", lifecycleEvent: "incident_regressed" })).toBe(
+      "severity_threshold:high:incident_regressed"
+    );
+  });
+
   it("lists matching enabled alerts for a project condition with service and severity filtering", async (): Promise<void> => {
     const query = vi.fn().mockResolvedValue({
       rows: [
@@ -14,6 +24,7 @@ describe("alert delivery store", () => {
           channel: "webhook",
           condition_type: "severity_threshold",
           severity_min: "medium",
+          severity_lifecycle_scope: "both",
           cooldown_seconds: 0,
           config: { target_url: "https://hooks.example.test/alerts" },
           is_enabled: true,
@@ -29,7 +40,8 @@ describe("alert delivery store", () => {
       condition_type: "severity_threshold",
       service_name: "checkout-api",
       environment: "production",
-      severity: "high"
+      severity: "high",
+      lifecycle_event: "new_incident"
     });
 
     expect(alerts).toEqual([
@@ -41,6 +53,7 @@ describe("alert delivery store", () => {
         channel: "webhook",
         condition_type: "severity_threshold",
         severity_min: "medium",
+        severity_lifecycle_scope: "both",
         cooldown_seconds: 0,
         config: { target_url: "https://hooks.example.test/alerts" },
         is_enabled: true,
@@ -49,6 +62,73 @@ describe("alert delivery store", () => {
       }
     ]);
     expect(query).toHaveBeenCalledOnce();
+  });
+
+  it("filters severity-threshold alerts by configured lifecycle scope", async (): Promise<void> => {
+    const query = vi.fn().mockResolvedValue({
+      rows: [
+        {
+          alert_id: "alt_new",
+          project_id: "proj_123",
+          created_by_user_id: "usr_123",
+          service_id: null,
+          organization_plan: "team",
+          channel: "email",
+          condition_type: "severity_threshold",
+          severity_min: "high",
+          severity_lifecycle_scope: "new_incident",
+          cooldown_seconds: 0,
+          config: { to: "new@example.com" },
+          is_enabled: true,
+          created_at: "2026-03-15T00:00:00.000Z",
+          updated_at: "2026-03-15T00:00:00.000Z"
+        },
+        {
+          alert_id: "alt_regressed",
+          project_id: "proj_123",
+          created_by_user_id: "usr_123",
+          service_id: null,
+          organization_plan: "team",
+          channel: "email",
+          condition_type: "severity_threshold",
+          severity_min: "high",
+          severity_lifecycle_scope: "incident_regressed",
+          cooldown_seconds: 0,
+          config: { to: "regressed@example.com" },
+          is_enabled: true,
+          created_at: "2026-03-15T00:00:00.000Z",
+          updated_at: "2026-03-15T00:00:00.000Z"
+        },
+        {
+          alert_id: "alt_both",
+          project_id: "proj_123",
+          created_by_user_id: "usr_123",
+          service_id: null,
+          organization_plan: "team",
+          channel: "email",
+          condition_type: "severity_threshold",
+          severity_min: "high",
+          severity_lifecycle_scope: "both",
+          cooldown_seconds: 0,
+          config: { to: "both@example.com" },
+          is_enabled: true,
+          created_at: "2026-03-15T00:00:00.000Z",
+          updated_at: "2026-03-15T00:00:00.000Z"
+        }
+      ]
+    });
+
+    const store = createPostgresAlertDeliveryStore({ query });
+    const alerts = await store.listMatchingAlerts({
+      project_id: "proj_123",
+      condition_type: "severity_threshold",
+      service_name: "checkout-api",
+      environment: "production",
+      severity: "high",
+      lifecycle_event: "incident_regressed"
+    });
+
+    expect(alerts.map((alert) => alert.alert_id)).toEqual(["alt_regressed", "alt_both"]);
   });
 
   it("creates deduplicated alert delivery intents", async (): Promise<void> => {
@@ -101,6 +181,7 @@ describe("alert delivery store", () => {
           channel: "slack",
           condition_type: "severity_threshold",
           severity_min: "medium",
+          severity_lifecycle_scope: "both",
           cooldown_seconds: 0,
           config: { slack_destination_id: "sd_123" },
           is_enabled: true,

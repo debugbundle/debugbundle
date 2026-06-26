@@ -217,6 +217,8 @@ describe("storage bootstrap schema", () => {
     expect(STORAGE_BOOTSTRAP_SQL.includes("CREATE TABLE availability_checks")).toBe(true);
     expect(STORAGE_BOOTSTRAP_SQL.includes("CREATE TABLE availability_check_results")).toBe(true);
     expect(STORAGE_BOOTSTRAP_SQL.includes("CREATE TABLE availability_check_daily_rollups")).toBe(true);
+    expect(STORAGE_BOOTSTRAP_SQL.includes("severity_lifecycle_scope text")).toBe(true);
+    expect(STORAGE_BOOTSTRAP_SQL.includes("alert_rules_severity_lifecycle_scope_check")).toBe(true);
     expect(STORAGE_BOOTSTRAP_SQL.includes("availability_checks_due_idx")).toBe(true);
     expect(STORAGE_BOOTSTRAP_SQL.includes("availability_check_results_check_started_idx")).toBe(true);
   });

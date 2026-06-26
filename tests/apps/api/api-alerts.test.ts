@@ -177,6 +177,7 @@ describe("api alert routes", () => {
           channel: "email",
           condition_type: "new_incident",
           severity_min: null,
+          severity_lifecycle_scope: null,
           cooldown_seconds: 0,
           config: { to: "owner@example.com" },
           is_enabled: true,
@@ -209,6 +210,7 @@ describe("api alert routes", () => {
           channel: "email",
           condition_type: "new_incident",
           severity_min: null,
+          severity_lifecycle_scope: null,
           cooldown_seconds: 0,
           config: { to: "owner@example.com" },
           is_enabled: true,
@@ -301,6 +303,7 @@ describe("api alert routes", () => {
         channel: "email",
         condition_type: "new_incident",
         severity_min: null,
+        severity_lifecycle_scope: null,
         cooldown_seconds: 0,
         config: { to: "owner@example.com" },
         is_enabled: true,
@@ -336,6 +339,7 @@ describe("api alert routes", () => {
         channel: "email",
         condition_type: "new_incident",
         severity_min: null,
+        severity_lifecycle_scope: null,
         cooldown_seconds: 0,
         config: { to: "owner@example.com" },
         is_enabled: true,
@@ -343,6 +347,72 @@ describe("api alert routes", () => {
         updated_at: "2026-03-15T00:00:00.000Z"
       }
     });
+  });
+
+  it("defaults severity-threshold alert lifecycle scope to both on create", async (): Promise<void> => {
+    const alertManagement = {
+      listAlertsForOrganization: vi.fn().mockResolvedValue([]),
+      createAlertForOrganization: vi.fn().mockResolvedValue({
+        alert_id: "22222222-2222-4222-8222-222222222222",
+        project_id: "00000000-0000-4000-8000-000000000001",
+        created_by_user_id: "usr_123",
+        service_id: null,
+        channel: "email",
+        condition_type: "severity_threshold",
+        severity_min: "high",
+        severity_lifecycle_scope: "both",
+        cooldown_seconds: 86400,
+        config: { to: "owner@example.com" },
+        is_enabled: true,
+        created_at: "2026-03-15T00:00:00.000Z",
+        updated_at: "2026-03-15T00:00:00.000Z"
+      }),
+      updateAlertForOrganization: vi.fn().mockResolvedValue(null),
+      deleteAlertForOrganization: vi.fn().mockResolvedValue(null)
+    };
+    const app = createServer({ alertManagement });
+
+    const response = await app.inject({
+      method: "POST",
+      url: "/v1/alerts",
+      headers: {
+        authorization: "Bearer dbundle_mem_test"
+      },
+      payload: {
+        project_id: "00000000-0000-4000-8000-000000000001",
+        channel: "email",
+        condition_type: "severity_threshold",
+        severity_min: "high",
+        cooldown_seconds: 86400,
+        config: { to: "owner@example.com" }
+      }
+    });
+
+    expect(response.statusCode).toBe(201);
+    expect(response.json()).toEqual({
+      alert: {
+        alert_id: "22222222-2222-4222-8222-222222222222",
+        project_id: "00000000-0000-4000-8000-000000000001",
+        created_by_user_id: "usr_123",
+        service_id: null,
+        channel: "email",
+        condition_type: "severity_threshold",
+        severity_min: "high",
+        severity_lifecycle_scope: "both",
+        cooldown_seconds: 86400,
+        config: { to: "owner@example.com" },
+        is_enabled: true,
+        created_at: "2026-03-15T00:00:00.000Z",
+        updated_at: "2026-03-15T00:00:00.000Z"
+      }
+    });
+    expect(alertManagement.createAlertForOrganization).toHaveBeenCalledWith(
+      expect.objectContaining({
+        condition_type: "severity_threshold",
+        severity_min: "high",
+        severity_lifecycle_scope: "both"
+      })
+    );
   });
 
   it("should validate alert creation payload and return project_not_found", async (): Promise<void> => {
@@ -413,6 +483,7 @@ describe("api alert routes", () => {
         channel: "slack",
         condition_type: "error_spike",
         severity_min: "critical",
+        severity_lifecycle_scope: null,
         cooldown_seconds: 0,
         config: { slack_destination_id: "11111111-1111-4111-8111-111111111111" },
         is_enabled: true,
@@ -487,6 +558,7 @@ describe("api alert routes", () => {
         channel: "webhook",
         condition_type: "severity_threshold",
         severity_min: "high",
+        severity_lifecycle_scope: "incident_regressed",
         cooldown_seconds: 0,
         config: { target_url: "https://hooks.example.test/alerts" },
         is_enabled: false,
@@ -508,6 +580,7 @@ describe("api alert routes", () => {
         condition_type: "severity_threshold",
         service_id: "33333333-3333-4333-8333-333333333333",
         severity_min: "high",
+        severity_lifecycle_scope: "incident_regressed",
         config: { target_url: "https://hooks.example.test/alerts" },
         is_enabled: false
       }
@@ -523,6 +596,7 @@ describe("api alert routes", () => {
         channel: "webhook",
         condition_type: "severity_threshold",
         severity_min: "high",
+        severity_lifecycle_scope: "incident_regressed",
         cooldown_seconds: 0,
         config: { target_url: "https://hooks.example.test/alerts" },
         is_enabled: false,
@@ -541,7 +615,15 @@ describe("api alert routes", () => {
         status: "success",
         occurred_at: expect.any(String),
         metadata: expect.objectContaining({
-          update_keys: ["service_id", "condition_type", "severity_min", "is_enabled", "channel", "config"],
+          update_keys: [
+            "service_id",
+            "condition_type",
+            "severity_min",
+            "severity_lifecycle_scope",
+            "is_enabled",
+            "channel",
+            "config"
+          ],
           channel: "webhook",
           condition_type: "severity_threshold",
           is_enabled: false
@@ -608,6 +690,7 @@ describe("api alert routes", () => {
         channel: "email",
         condition_type: "new_incident",
         severity_min: null,
+        severity_lifecycle_scope: null,
         cooldown_seconds: 0,
         config: { to: "owner@example.com" },
         is_enabled: true,

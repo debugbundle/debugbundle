@@ -590,6 +590,8 @@ describe("cli main management routing", () => {
       "severity_threshold",
       "--severity-min",
       "high",
+      "--severity-lifecycle-scope",
+      "both",
       "--config-json",
       '{"to":"oncall@example.com"}',
       "--is-enabled",
@@ -608,6 +610,8 @@ describe("cli main management routing", () => {
       "--service-id",
       "null",
       "--severity-min",
+      "null",
+      "--severity-lifecycle-scope",
       "null",
       "--config-json",
       '{"channel":"eng-alerts"}',
@@ -641,6 +645,7 @@ describe("cli main management routing", () => {
       channel: "email",
       conditionType: "severity_threshold",
       severityMin: "high",
+      severityLifecycleScope: "both",
       config: {
         to: "oncall@example.com"
       },
@@ -652,6 +657,7 @@ describe("cli main management routing", () => {
       projectId: "proj_123",
       serviceId: null,
       severityMin: null,
+      severityLifecycleScope: null,
       config: {
         channel: "eng-alerts"
       },

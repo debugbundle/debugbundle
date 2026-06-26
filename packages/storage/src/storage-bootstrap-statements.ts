@@ -630,11 +630,19 @@ export const STORAGE_BOOTSTRAP_STATEMENTS = [
       channel text NOT NULL,
       condition_type text NOT NULL,
       severity_min text,
+      severity_lifecycle_scope text,
       cooldown_seconds integer NOT NULL DEFAULT 0,
       config jsonb NOT NULL DEFAULT '{}'::jsonb,
       is_enabled boolean NOT NULL DEFAULT true,
       created_at timestamptz NOT NULL DEFAULT now(),
-      updated_at timestamptz NOT NULL DEFAULT now()
+      updated_at timestamptz NOT NULL DEFAULT now(),
+      CONSTRAINT alert_rules_severity_lifecycle_scope_check CHECK (
+        severity_lifecycle_scope IS NULL
+        OR (
+          condition_type = 'severity_threshold'
+          AND severity_lifecycle_scope IN ('new_incident', 'incident_regressed', 'both')
+        )
+      )
     )
   `,
   `

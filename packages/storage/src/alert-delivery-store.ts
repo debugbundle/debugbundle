@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 
 import { getTierCapabilities } from "../../shared-types/src/index.js";
+import { matchesSeverityLifecycleScope } from "./alert-lifecycle.js";
 
 import type {
   AlertChannel,
@@ -25,6 +26,7 @@ function mapAlertRuleRow(row: {
   channel: AlertChannel;
   condition_type: AlertConditionType;
   severity_min: AlertRuleRecord["severity_min"];
+  severity_lifecycle_scope: AlertRuleRecord["severity_lifecycle_scope"];
   cooldown_seconds: number;
   config: Record<string, unknown>;
   is_enabled: boolean;
@@ -39,6 +41,7 @@ function mapAlertRuleRow(row: {
     channel: row.channel,
     condition_type: row.condition_type,
     severity_min: row.severity_min,
+    severity_lifecycle_scope: row.severity_lifecycle_scope,
     cooldown_seconds: Number(row.cooldown_seconds),
     config: row.config,
     is_enabled: row.is_enabled,
@@ -55,6 +58,7 @@ export function createPostgresAlertDeliveryStore(db: Queryable): AlertDeliverySt
       service_name: string;
       environment: string;
       severity: "low" | "medium" | "high" | "critical";
+      lifecycle_event?: "new_incident" | "incident_regressed";
     }): Promise<AlertRuleRecord[]> {
       const result = await db.query<{
         alert_id: string;
@@ -65,6 +69,7 @@ export function createPostgresAlertDeliveryStore(db: Queryable): AlertDeliverySt
         channel: AlertChannel;
         condition_type: AlertConditionType;
         severity_min: AlertRuleRecord["severity_min"];
+        severity_lifecycle_scope: AlertRuleRecord["severity_lifecycle_scope"];
         cooldown_seconds: number;
         config: Record<string, unknown>;
         is_enabled: boolean;
@@ -81,6 +86,7 @@ export function createPostgresAlertDeliveryStore(db: Queryable): AlertDeliverySt
             ar.channel,
             ar.condition_type,
             ar.severity_min,
+            ar.severity_lifecycle_scope,
             ar.cooldown_seconds,
             ar.config,
             ar.is_enabled,
@@ -102,6 +108,13 @@ export function createPostgresAlertDeliveryStore(db: Queryable): AlertDeliverySt
       return result.rows
         .filter((row) => row.channel !== "slack" || getTierCapabilities(row.organization_plan).slack_integration)
         .map(mapAlertRuleRow)
+        .filter((alert) =>
+          alert.condition_type !== "severity_threshold" ||
+          matchesSeverityLifecycleScope({
+            scope: alert.severity_lifecycle_scope,
+            lifecycleEvent: input.lifecycle_event
+          })
+        )
         .filter(
           (alert) =>
             alert.severity_min === null || SEVERITY_RANK[input.severity] >= SEVERITY_RANK[alert.severity_min]

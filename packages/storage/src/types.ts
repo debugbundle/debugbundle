@@ -8,6 +8,10 @@ import type {
   ProjectColorTag,
   TierName
 } from "../../shared-types/src/index.js";
+import type {
+  AlertSeverityLifecycleEvent,
+  AlertSeverityLifecycleScope
+} from "./alert-lifecycle.js";
 import type { IncidentReason } from "./incident-reason.js";
 
 export interface ObjectStorePutInput {
@@ -147,6 +151,7 @@ export interface EvaluateAlertsJob {
   condition_type: AlertConditionType;
   dedupe_key: string;
   notification_key?: string;
+  lifecycle_event?: AlertSeverityLifecycleEvent;
   occurred_at: string;
   summary?: string;
   service_name: string;
@@ -479,6 +484,7 @@ export interface AlertRuleRecord extends Record<string, unknown> {
   channel: AlertChannel;
   condition_type: AlertConditionType;
   severity_min: "low" | "medium" | "high" | "critical" | null;
+  severity_lifecycle_scope: AlertSeverityLifecycleScope | null;
   cooldown_seconds: number;
   config: Record<string, unknown>;
   is_enabled: boolean;
@@ -504,6 +510,7 @@ export interface AlertManagementStore {
     channel: AlertChannel;
     condition_type: AlertConditionType;
     severity_min?: "low" | "medium" | "high" | "critical" | null;
+    severity_lifecycle_scope?: AlertSeverityLifecycleScope | null;
     cooldown_seconds: number;
     config: Record<string, unknown>;
     is_enabled: boolean;
@@ -518,6 +525,7 @@ export interface AlertManagementStore {
     channel?: AlertChannel;
     condition_type?: AlertConditionType;
     severity_min?: "low" | "medium" | "high" | "critical" | null;
+    severity_lifecycle_scope?: AlertSeverityLifecycleScope | null;
     cooldown_seconds?: number;
     config?: Record<string, unknown>;
     is_enabled?: boolean;
@@ -634,6 +642,7 @@ export interface AlertDeliveryStore {
     service_name: string;
     environment: string;
     severity: "low" | "medium" | "high" | "critical";
+    lifecycle_event?: AlertSeverityLifecycleEvent;
   }): Promise<AlertRuleRecord[]>;
   createAlertDeliveryIntent(input: CreateAlertDeliveryIntentInput): Promise<{ delivery_id: string | null; created: boolean }>;
   markAlertDeliveryResult(input: MarkAlertDeliveryResultInput): Promise<{ status: "delivered" | "failed" }>;

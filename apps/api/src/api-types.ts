@@ -679,6 +679,7 @@ export interface ApiDependencies {
         channel: AlertChannel;
         condition_type: AlertConditionType;
         severity_min: "low" | "medium" | "high" | "critical" | null;
+        severity_lifecycle_scope: "new_incident" | "incident_regressed" | "both" | null;
         cooldown_seconds: number;
         config: Record<string, unknown>;
         is_enabled: boolean;
@@ -694,6 +695,7 @@ export interface ApiDependencies {
       channel: AlertChannel;
       condition_type: AlertConditionType;
       severity_min?: "low" | "medium" | "high" | "critical";
+      severity_lifecycle_scope?: "new_incident" | "incident_regressed" | "both" | null;
       cooldown_seconds: number;
       config: Record<string, unknown>;
       is_enabled: boolean;
@@ -705,6 +707,7 @@ export interface ApiDependencies {
       channel: AlertChannel;
       condition_type: AlertConditionType;
       severity_min: "low" | "medium" | "high" | "critical" | null;
+      severity_lifecycle_scope: "new_incident" | "incident_regressed" | "both" | null;
       cooldown_seconds: number;
       config: Record<string, unknown>;
       is_enabled: boolean;
@@ -721,6 +724,7 @@ export interface ApiDependencies {
       channel?: AlertChannel;
       condition_type?: AlertConditionType;
       severity_min?: "low" | "medium" | "high" | "critical" | null;
+      severity_lifecycle_scope?: "new_incident" | "incident_regressed" | "both" | null;
       cooldown_seconds?: number;
       config?: Record<string, unknown> | null;
       is_enabled?: boolean;
@@ -732,6 +736,7 @@ export interface ApiDependencies {
       channel: AlertChannel;
       condition_type: AlertConditionType;
       severity_min: "low" | "medium" | "high" | "critical" | null;
+      severity_lifecycle_scope: "new_incident" | "incident_regressed" | "both" | null;
       cooldown_seconds: number;
       config: Record<string, unknown>;
       is_enabled: boolean;

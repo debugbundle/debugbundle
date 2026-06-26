@@ -316,6 +316,7 @@ export const AlertConditionTypeSchema = z.enum([
   "severity_threshold",
   "regression_after_deploy"
 ]);
+export const AlertSeverityLifecycleScopeSchema = z.enum(["new_incident", "incident_regressed", "both"]);
 
 const AlertEmailConfigSchema = z
   .object({
@@ -469,6 +470,7 @@ const BaseCreateAlertBodySchema = {
   service_id: z.string().uuid().optional(),
   condition_type: AlertConditionTypeSchema,
   severity_min: z.enum(["low", "medium", "high", "critical"]).optional(),
+  severity_lifecycle_scope: AlertSeverityLifecycleScopeSchema.optional(),
   cooldown_seconds: z.coerce.number().int().min(0).max(604800).default(0),
   is_enabled: z.boolean().default(true)
 } as const;
@@ -508,6 +510,7 @@ const BaseUpdateAlertBodySchema = {
   service_id: z.string().uuid().nullable().optional(),
   condition_type: AlertConditionTypeSchema.optional(),
   severity_min: z.enum(["low", "medium", "high", "critical"]).nullable().optional(),
+  severity_lifecycle_scope: AlertSeverityLifecycleScopeSchema.nullable().optional(),
   cooldown_seconds: z.coerce.number().int().min(0).max(604800).optional(),
   is_enabled: z.boolean().optional()
 } as const;

@@ -41,6 +41,8 @@ describe("cli management command handlers", () => {
         "severity_threshold",
         "--severity-min",
         "high",
+        "--severity-lifecycle-scope",
+        "incident_regressed",
         "--cooldown",
         "86400",
         "--config-json",
@@ -65,6 +67,7 @@ describe("cli management command handlers", () => {
       channel: "webhook",
       conditionType: "severity_threshold",
       severityMin: "high",
+      severityLifecycleScope: "incident_regressed",
       cooldownSeconds: 86400,
       json: true,
       config: {

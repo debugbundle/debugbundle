@@ -752,6 +752,13 @@ If CLI says something is healthy and MCP says something different, that is a pro
 - **Then** the request is rejected with a permissions error
 - **And** owner and admin can still manage the same alert rule
 
+### AC-ALT-06: Severity Threshold Lifecycle Scope
+- **Given** a severity-threshold alert rule with `severity_min: high`
+- **When** the rule is created without an explicit lifecycle scope
+- **Then** the rule defaults to notifying for both new incidents and incident regressions
+- **And** API, CLI, and MCP callers can set the scope to `new_incident`, `incident_regressed`, or `both`
+- **And** the worker dedupes severity-threshold alert deliveries separately for the matching lifecycle event
+
 ---
 
 ## 14. Email Acceptance
