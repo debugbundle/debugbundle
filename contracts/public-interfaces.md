@@ -1,7 +1,7 @@
 # Public Interfaces — DebugBundle
 
 Version: v1
-Last updated: 2026-06-12
+Last updated: 2026-07-04
 
 ---
 
@@ -284,7 +284,7 @@ Anonymized aggregate account-usage metrics are preserved after deletion for life
 |--------|------|------|-------------|
 | POST | `/v1/events` | Project Token | Ingest batched events |
 
-`POST /v1/events` is subject to per-project-token ingestion rate limiting using the active tier capability (`ingestion_rate_per_min`). When the limit is exceeded, the API must reject the batch before persistence and return `429 Too Many Requests` with a `Retry-After` header.
+`POST /v1/events` is subject to the shared API request body limit. Requests with a declared `Content-Length` over the limit are rejected before project-token auth, schema validation, persistence, or queueing. The route is also subject to per-project-token ingestion rate limiting using the active tier capability (`ingestion_rate_per_min`). When the limit is exceeded, the API must reject the batch before persistence and return `429 Too Many Requests` with a `Retry-After` header.
 
 **Request:**
 ```json
@@ -339,6 +339,20 @@ Anonymized aggregate account-usage metrics are preserved after deletion for life
     }
   ],
   "retry_after_ms": 12000
+}
+```
+
+**Oversized body response:**
+```json
+{
+  "accepted": 0,
+  "rejected": 0,
+  "errors": [
+    {
+      "index": -1,
+      "reason": "payload_too_large"
+    }
+  ]
 }
 ```
 

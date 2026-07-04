@@ -1,7 +1,7 @@
 # Requirements — DebugBundle
 
 Version: v1
-Last updated: 2026-06-15
+Last updated: 2026-07-04
 
 ---
 
@@ -140,7 +140,7 @@ Last updated: 2026-06-15
 
 **FR-ING-01:** `POST /v1/events` — accept batched event payloads, authenticate project token, validate event envelope, apply schema checks.
 
-**FR-ING-02:** Reject oversized or malformed payloads with explicit error responses.
+**FR-ING-02:** Reject oversized or malformed payloads with explicit error responses. Requests that declare a body larger than the shared API limit must be rejected before project-token authentication, persistence, or queueing.
 
 **FR-ING-03:** Persist raw event payloads to object storage (path: `raw-events/{project_id}/{yyyy}/{mm}/{dd}/{hour}/{event_id}.json.gz`).
 

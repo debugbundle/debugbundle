@@ -226,8 +226,7 @@ The public documentation/marketing/blog site lives in the standalone public repo
 - **Routes:** See `/contracts/public-interfaces.md`
 - **Imports:** `auth`, `shared-types`, `event-normalizer`, `redaction`, `storage`
 - **Does NOT own:** Bundle generation, reproduction, webhook delivery (those are worker)
-- **Key constraint:** Ingestion (`POST /v1/events`) must be lightweight — validate, rate-limit, enforce capture policy and capture rules, persist accepted raw events, and enqueue only
-- **Key constraint:** Ingestion (`POST /v1/events`) must be lightweight — authenticate project token, enforce optional token `allowed_origins` when configured, validate, rate-limit, enforce capture policy, apply project capture rules, persist accepted raw events, enqueue only, increment durable monthly organization/project counters for accepted billable events, and include the resolved capture preset plus resolved `immediate_client_error_statuses` and `immediate_client_error_path_rules` on normalize jobs so request-event classification stays stable in the worker
+- **Key constraint:** Ingestion (`POST /v1/events`) must be lightweight: reject declared oversized bodies before auth/parsing, authenticate project token, enforce optional token `allowed_origins` when configured, validate, rate-limit, enforce capture policy, apply project capture rules, persist accepted raw events, enqueue only, increment durable monthly organization/project counters for accepted billable events, and include the resolved capture preset plus resolved `immediate_client_error_statuses` and `immediate_client_error_path_rules` on normalize jobs so request-event classification stays stable in the worker.
 - **Retrieval note:** `GET /v1/incidents` supports additive time-window filters including `first_seen_after` and `attention_after`; the latter matches incidents first opened or regressed at or after the supplied timestamp and is shared with CLI/MCP/local retrieval.
 - **Dogfooding note:** Dogfooding is now re-enabled against the published `@debugbundle/sdk-node` prerelease. `server.ts` optionally initializes the npm-published SDK during bootstrap when `DEBUGBUNDLE_DOGFOOD_PROJECT_TOKEN` is present, the manual dev-only backend trigger route `GET /__dogfood/backend-error` remains gated by `DEBUGBUNDLE_DOGFOOD_EXPOSE_TRIGGERS=true`, and the hosted owner-authenticated verification route `POST /v1/internal/dogfooding/backend-error` is separately gated by `DEBUGBUNDLE_DOGFOOD_EXPOSE_OWNER_TRIGGER=true`.
 - **Local dev note:** the top-level `docker-compose.yml` `dev` profile now publishes the API on host port `3003`, so the backend dogfood trigger is reachable directly at `http://localhost:3003/__dogfood/backend-error`
@@ -573,7 +572,7 @@ Integration tests run serially (`--no-file-parallelism --maxWorkers=1`) to avoid
 
 `/post-v1` is reserved for deferred planning artifacts and future feature candidates. It is intentionally non-authoritative and must not override the active V1 spec layer in `/spec`, `/contracts`, or `/rules`.
 
-Environment-specific deployment configuration, operations runbooks, and other private infrastructure concerns are intentionally outside this public architecture map.
+Environment-specific deployment configuration, operations runbooks, and other private infrastructure concerns are intentionally outside this public architecture map. The public hosting contract still requires private hosted deploys to run database migrations before new API/worker runtime, use image-based two-slot API rollouts with healthcheck assertions, keep production env rendering owner-only and redacted, enforce an edge ingestion body limit, and attach bounded automated recovery to sustained external API health-check failure.
 
 ---
 

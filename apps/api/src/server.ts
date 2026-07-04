@@ -71,6 +71,7 @@ const ALLOWED_CORS_METHODS = ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"
 const SDK_PROJECT_TOKEN_CORS_PATHS = new Set(["/v1/events", "/v1/sdk/config"]);
 const DEFAULT_API_REQUEST_TIMEOUT_MS = 30_000;
 const API_SEARCH_CRAWLER_POLICY = "noindex, nofollow, noarchive";
+const CONTENT_LENGTH_HEADER = "content-length";
 const apiRequestTimeouts = new WeakMap<object, NodeJS.Timeout>();
 const CSRF_EXEMPT_ROUTE_KEYS = new Set([
   "POST /v1/auth/request-code",
@@ -284,6 +285,57 @@ function registerApiSearchCrawlerControls(app: FastifyInstance): void {
   });
 }
 
+function parseContentLengthHeader(value: unknown): number | null {
+  let rawValue: string;
+  if (typeof value === "string") {
+    rawValue = value;
+  } else if (Array.isArray(value)) {
+    const values = value as readonly unknown[];
+    const firstValue = values[0];
+    if (typeof firstValue !== "string") {
+      return null;
+    }
+    rawValue = firstValue;
+  } else {
+    return null;
+  }
+
+  if (rawValue.trim().length === 0) {
+    return null;
+  }
+
+  const parsed = Number(rawValue);
+  if (!Number.isSafeInteger(parsed) || parsed < 0) {
+    return null;
+  }
+
+  return parsed;
+}
+
+function registerApiContentLengthLimit(app: FastifyInstance, limitBytes: number): void {
+  app.addHook("onRequest", async (request, reply) => {
+    const declaredLength = parseContentLengthHeader(request.headers[CONTENT_LENGTH_HEADER]);
+    if (declaredLength === null || declaredLength <= limitBytes) {
+      return;
+    }
+
+    if (getRequestPath(request.url) === "/v1/events") {
+      return reply.status(413).send({
+        accepted: 0,
+        rejected: 0,
+        errors: [
+          {
+            index: -1,
+            reason: "payload_too_large"
+          }
+        ]
+      });
+    }
+
+    return reply.status(413).send({ error: "payload_too_large" });
+  });
+}
+
 export function createApiServer(
   dependencies: ApiDependencies,
   options: ApiServerOptions = {}
@@ -306,6 +358,7 @@ export function createApiServer(
 
   registerApiCors(app, allowedOrigins);
   registerApiSearchCrawlerControls(app);
+  registerApiContentLengthLimit(app, SMALL_REQUEST_BODY_LIMIT_BYTES);
   registerApiRequestTimeout(app, requestTimeoutMs);
   registerApiCsrfProtection(app);
 

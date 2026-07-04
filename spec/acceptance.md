@@ -1,7 +1,7 @@
 # Acceptance Criteria — DebugBundle
 
 Version: v1
-Last updated: 2026-06-15
+Last updated: 2026-07-04
 
 ---
 
@@ -185,7 +185,8 @@ Last updated: 2026-06-15
 ### AC-ING-02: Invalid Payload Rejection
 - **Given** a malformed or oversized event payload
 - **When** `POST /v1/events` is called
-- **Then** the API returns an explicit error response with rejected count and error details
+- **Then** the API returns an explicit error response with error details
+- **And** a declared oversized body returns `413` before project-token lookup, raw-event persistence, or queueing
 
 ### AC-ING-03: Invalid Token Rejection
 - **Given** an invalid or revoked project token

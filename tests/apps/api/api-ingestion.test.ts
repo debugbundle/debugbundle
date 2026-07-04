@@ -152,14 +152,16 @@ function createIngestionRejectionDiagnosticsDependency(overrides: {
 
 describe("api ingestion route", () => {
   it("should reject oversized ingestion payloads with 413", async (): Promise<void> => {
+    const persistAndEnqueue = vi.fn();
+    const resolveProjectByTokenHash = vi.fn().mockResolvedValue({
+      project_id: "proj_123",
+      organization_id: "org_123",
+      organization_plan: "free"
+    });
     const app = createApiServer({
-      ingestionPersistence: { persistAndEnqueue: vi.fn() },
+      ingestionPersistence: { persistAndEnqueue },
       ingestionMetadata: {
-        resolveProjectByTokenHash: vi.fn().mockResolvedValue({
-          project_id: "proj_123",
-          organization_id: "org_123",
-          organization_plan: "free"
-        })
+        resolveProjectByTokenHash
       },
       memberAuth: createMemberAuthDependency(),
       tokenManagement: createTokenManagementDependency(),
@@ -213,6 +215,18 @@ describe("api ingestion route", () => {
     });
 
     expect(response.statusCode).toBe(413);
+    expect(response.json()).toEqual({
+      accepted: 0,
+      rejected: 0,
+      errors: [
+        {
+          index: -1,
+          reason: "payload_too_large"
+        }
+      ]
+    });
+    expect(resolveProjectByTokenHash).not.toHaveBeenCalled();
+    expect(persistAndEnqueue).not.toHaveBeenCalled();
   });
 
   it("should reject captured incident-signal events when the monthly ingestion allowance is exhausted", async (): Promise<void> => {

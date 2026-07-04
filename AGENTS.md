@@ -46,6 +46,14 @@ If a context-compression file (`SYSTEM_OVERVIEW.md`, `ARCHITECTURE_MAP.md`) conf
 
 If a change affects architecture, module boundaries, major workflows, public interfaces, bundle/profile paths, or project structure — update `SYSTEM_OVERVIEW.md` and `ARCHITECTURE_MAP.md` in the same change.
 
+### Local Companion Repos
+
+This workspace may include ignored companion repositories under `.local-repos/`. Before declaring a companion repo unavailable, agents must check this directory.
+
+- `.local-repos/debugbundle-cloud` — private hosted deployment, monitoring, environment-template, and operator-runbook repo. Hosted runtime deployment automation, image publishing, two-slot rollout, production env rendering, CloudFront invalidation, CloudWatch alarms, and auto-recovery work belongs here, not in the public core repo.
+- `.local-repos/action` — public GitHub Action companion repo.
+- `.local-repos/debugbundle-github-profile` — GitHub organization profile companion repo.
+
 ---
 
 ## 2) Core Operating Principles

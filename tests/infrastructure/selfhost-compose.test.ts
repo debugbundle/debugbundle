@@ -21,6 +21,7 @@ describe("self-host deployment baseline", () => {
     expect(compose).toContain("postgres:");
     expect(compose).toContain("redis:");
     expect(compose).toContain("localstack:");
+    expect(compose).toContain("db-migrate:");
     expect(compose).toContain("SELFHOST_MODE");
     expect(compose).toContain("http://127.0.0.1:3000/ready");
     expect(compose).toContain("http://127.0.0.1:${WEB_PORT:-5291}/");
@@ -28,6 +29,8 @@ describe("self-host deployment baseline", () => {
     expect(compose).toContain("S3_BUCKET");
     expect(compose).toContain("WORKER_HEALTH_PORT");
     expect(compose).toContain("/etc/localstack/init/ready.d");
+    expect(compose).toContain("corepack pnpm db:migrate");
+    expect(compose).toContain("db-migrate:\n        condition: service_completed_successfully");
   });
 
   it("ships a self-host env template with the required runtime configuration", () => {
