@@ -245,6 +245,8 @@ describe("api auth trial signup routes", () => {
   it("preserves GitHub signup trial intent through a signed callback cookie", async (): Promise<void> => {
     const previousSecret = process.env["GITHUB_OAUTH_STATE_SECRET"];
     process.env["GITHUB_OAUTH_STATE_SECRET"] = "test-github-oauth-state-secret";
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-06-04T00:00:00.000Z"));
 
     try {
       const trialSummary = buildBillingSummary({
@@ -333,6 +335,7 @@ describe("api auth trial signup routes", () => {
       } else {
         process.env["GITHUB_OAUTH_STATE_SECRET"] = previousSecret;
       }
+      vi.useRealTimers();
     }
   });
 });
