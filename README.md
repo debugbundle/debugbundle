@@ -89,7 +89,7 @@ All SDKs follow the same universal interface: `init`, `captureException`, `captu
 | Android | `com.debugbundle:debugbundle-android` | Maven or Gradle dependency | [Android SDK](https://debugbundle.com/docs/sdks/android) |
 | iOS | `DebugBundle` | Swift Package Manager or CocoaPods | [iOS SDK](https://debugbundle.com/docs/sdks/swift) |
 | React Native | `@debugbundle/sdk-react-native` | `npm install @debugbundle/sdk-react-native` | [React Native SDK](https://debugbundle.com/docs/sdks/react-native) |
-| WordPress | `debugbundle-wordpress` | GitHub Release ZIP | [WordPress plugin](https://debugbundle.com/docs/integrations/wordpress) |
+| WordPress | `debugbundle-wordpress` | WordPress.org plugin directory | [WordPress plugin](https://debugbundle.com/docs/integrations/wordpress) |
 
 ### Node.js
 
@@ -238,7 +238,7 @@ net/http, Gin, Echo, slog, zap, zerolog, local file transport, remote capture po
 
 ### WordPress
 
-Install the plugin ZIP from the `debugbundle-wordpress` GitHub Release, then open **Settings -> DebugBundle** and save your project token. The plugin bundles backend PHP capture, frontend browser capture, and a WordPress REST relay so the project token stays server-side.
+Install **DebugBundle** from the [WordPress.org plugin directory](https://wordpress.org/plugins/debugbundle/), then open **Settings -> DebugBundle** and save your project token. The plugin bundles backend PHP capture, frontend browser capture, and a WordPress REST relay so the project token stays server-side.
 
 ## CLI, API, and MCP
 
