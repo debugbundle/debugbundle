@@ -4,6 +4,9 @@ import {
   setAnalyticsSettingsWithAuthCommand as defaultSetAnalyticsSettingsCommand
 } from "./analytics-settings-commands.js";
 import {
+  getAnalyticsSummaryWithAuthCommand as defaultGetAnalyticsSummaryCommand
+} from "./analytics-metrics-commands.js";
+import {
   appendCommonAuthOptions,
   CliInputError,
   ensureNoExtraPositionals,
@@ -42,6 +45,28 @@ function readPrivacyMode(parsedArgv: ParsedArgv): AnalyticsSettingsUpdate["priva
   }
 
   throw new CliInputError("Invalid value for --privacy-mode.");
+}
+
+function readAnalyticsGranularity(parsedArgv: ParsedArgv): "hour" | "day" | undefined {
+  const granularity = readStringOption(parsedArgv, "granularity");
+  if (granularity === undefined) {
+    return undefined;
+  }
+  if (granularity === "hour" || granularity === "day") {
+    return granularity;
+  }
+
+  throw new CliInputError("Invalid value for --granularity.");
+}
+
+function readProjectOption(parsedArgv: ParsedArgv): string | undefined {
+  const project = readStringOption(parsedArgv, "project");
+  const projectId = readStringOption(parsedArgv, "project-id");
+  if (project !== undefined && projectId !== undefined) {
+    throw new CliInputError("Use either --project or --project-id.");
+  }
+
+  return project ?? projectId;
 }
 
 function readApprovedCustomDimensions(parsedArgv: ParsedArgv): string[] | undefined {
@@ -117,15 +142,49 @@ export async function handleAnalyticsCommand(
   dependencies: ManagementCommandDependencies
 ): Promise<CliCommandResult> {
   const resource = requirePositional(parsedArgv, 1, "analytics resource");
+  if (resource === "summary") {
+    expectNoUnknownOptions(parsedArgv, [
+      "project",
+      "project-id",
+      "from",
+      "to",
+      "last",
+      "granularity",
+      "service",
+      "environment",
+      "limit",
+      "auth-file",
+      "json"
+    ]);
+    ensureNoExtraPositionals(parsedArgv, 2);
+    const projectId = readProjectOption(parsedArgv);
+    if (projectId === undefined) {
+      throw new CliInputError("Missing required option --project.");
+    }
+
+    return await (dependencies.getAnalyticsSummaryCommand ?? defaultGetAnalyticsSummaryCommand)(
+      appendCommonAuthOptions(parsedArgv, {
+        projectId,
+        from: readStringOption(parsedArgv, "from"),
+        to: readStringOption(parsedArgv, "to"),
+        last: readStringOption(parsedArgv, "last"),
+        granularity: readAnalyticsGranularity(parsedArgv),
+        service: readStringOption(parsedArgv, "service"),
+        environment: readStringOption(parsedArgv, "environment"),
+        limit: readIntegerOption(parsedArgv, "limit")
+      })
+    );
+  }
+
   if (resource !== "settings") {
     throw new CliInputError("Unknown analytics command.");
   }
 
   const action = requirePositional(parsedArgv, 2, "settings action");
   if (action === "get") {
-    expectNoUnknownOptions(parsedArgv, ["project", "auth-file", "json"]);
+    expectNoUnknownOptions(parsedArgv, ["project", "project-id", "auth-file", "json"]);
     ensureNoExtraPositionals(parsedArgv, 3);
-    const projectId = readStringOption(parsedArgv, "project");
+    const projectId = readProjectOption(parsedArgv);
     if (projectId === undefined) {
       throw new CliInputError("Missing required option --project.");
     }
@@ -140,6 +199,7 @@ export async function handleAnalyticsCommand(
   if (action === "set") {
     expectNoUnknownOptions(parsedArgv, [
       "project",
+      "project-id",
       "enabled",
       "privacy-mode",
       "consent-required",
@@ -159,7 +219,7 @@ export async function handleAnalyticsCommand(
       "json"
     ]);
     ensureNoExtraPositionals(parsedArgv, 3);
-    const projectId = readStringOption(parsedArgv, "project");
+    const projectId = readProjectOption(parsedArgv);
     if (projectId === undefined) {
       throw new CliInputError("Missing required option --project.");
     }

@@ -1,0 +1,128 @@
+import { describe, expect, it, vi } from "vitest";
+
+import { CliAuthStateError } from "../../../apps/cli/src/auth-state.js";
+import {
+  AnalyticsMetricsApiError,
+  createAnalyticsMetricsApi,
+  getAnalyticsSummaryCommand,
+  getAnalyticsSummaryWithAuthCommand
+} from "../../../apps/cli/src/analytics-metrics-commands.js";
+
+const PROJECT_ID = "00000000-0000-0000-0000-000000000001";
+const FROM = "2026-03-01T00:00:00.000Z";
+const TO = "2026-03-08T00:00:00.000Z";
+
+const summaryResponse = {
+  summary: {
+    project_id: PROJECT_ID,
+    from: FROM,
+    to: TO,
+    granularity: "day",
+    service: null,
+    environment: "production",
+    sessions: 12,
+    pageviews: 30,
+    active_visitors: 0,
+    new_visitors: 0,
+    returning_visitors: 0,
+    exits: 2,
+    conversions: 5
+  },
+  breakdowns: {
+    device_types: [{ value: "desktop", sessions: 9, pageviews: 20 }],
+    browsers: [],
+    os: [],
+    languages: [],
+    referrers: [],
+    auth_states: []
+  }
+} as const;
+
+describe("cli analytics metrics commands", () => {
+  it("renders analytics summary in human and json mode", async () => {
+    const human = await getAnalyticsSummaryCommand(
+      { bearerToken: "dbundle_mem_x", projectId: PROJECT_ID, from: FROM, to: TO },
+      { getUsageSummary: vi.fn().mockResolvedValue(summaryResponse) }
+    );
+    const json = await getAnalyticsSummaryCommand(
+      { bearerToken: "dbundle_mem_x", projectId: PROJECT_ID, from: FROM, to: TO, json: true },
+      { getUsageSummary: vi.fn().mockResolvedValue(summaryResponse) }
+    );
+
+    expect(human.exitCode).toBe(0);
+    expect(human.output).toContain("sessions: 12");
+    expect(human.output).toContain("pageviews: 30");
+    expect(human.output).toContain("top_device_types: desktop (9 sessions, 20 pageviews)");
+    expect(JSON.parse(json.output)).toEqual(summaryResponse);
+  });
+
+  it("loads auth state and forwards authenticated summary calls", async () => {
+    const readAuthState = vi.fn().mockResolvedValue({
+      bearer_token: "dbundle_mem_saved",
+      base_url: "https://selfhost.debugbundle.test"
+    });
+    const createHttpClient = vi.fn().mockReturnValue({ request: vi.fn() });
+    const getUsageSummary = vi.fn().mockResolvedValue(summaryResponse);
+    const createApi = vi.fn().mockReturnValue({ getUsageSummary });
+
+    const result = await getAnalyticsSummaryWithAuthCommand(
+      { authFilePath: "/tmp/auth.json", projectId: PROJECT_ID, from: FROM, to: TO, json: true },
+      { readAuthState, createHttpClient, createApi }
+    );
+
+    expect(createHttpClient).toHaveBeenCalledWith({ baseUrl: "https://selfhost.debugbundle.test" });
+    expect(getUsageSummary).toHaveBeenCalledWith({
+      bearerToken: "dbundle_mem_saved",
+      projectId: PROJECT_ID,
+      from: FROM,
+      to: TO,
+      granularity: undefined,
+      service: undefined,
+      environment: undefined,
+      last: undefined,
+      limit: undefined
+    });
+    expect(JSON.parse(result.output)).toEqual(summaryResponse);
+  });
+
+  it("maps auth and API failures to stable exit codes", async () => {
+    const authMissing = await getAnalyticsSummaryWithAuthCommand(
+      { projectId: PROJECT_ID },
+      { readAuthState: vi.fn().mockRejectedValue(new CliAuthStateError("auth_state_missing", "Not logged in.")) }
+    );
+    const unauthorized = await getAnalyticsSummaryCommand(
+      { bearerToken: "dbundle_mem_x", projectId: PROJECT_ID },
+      { getUsageSummary: vi.fn().mockRejectedValue(new AnalyticsMetricsApiError(401, "invalid_member_token")) }
+    );
+    const forbidden = await getAnalyticsSummaryCommand(
+      { bearerToken: "dbundle_mem_x", projectId: PROJECT_ID },
+      { getUsageSummary: vi.fn().mockRejectedValue(new AnalyticsMetricsApiError(403, "upgrade_required")) }
+    );
+
+    expect(authMissing).toEqual({ exitCode: 2, output: "Not logged in." });
+    expect(unauthorized).toEqual({ exitCode: 2, output: "invalid_member_token" });
+    expect(forbidden).toEqual({ exitCode: 4, output: "upgrade_required" });
+  });
+
+  it("builds GET requests against the analytics summary API", async () => {
+    const request = vi.fn().mockResolvedValue({ status: 200, body: summaryResponse });
+    const api = createAnalyticsMetricsApi({ request });
+
+    await api.getUsageSummary({
+      bearerToken: "dbundle_mem_x",
+      projectId: PROJECT_ID,
+      from: FROM,
+      to: TO,
+      granularity: "day",
+      service: "web",
+      environment: "production",
+      limit: 5
+    });
+
+    expect(request).toHaveBeenCalledWith({
+      method: "GET",
+      path: `/v1/analytics/summary?project_id=${PROJECT_ID}&from=${encodeURIComponent(FROM)}&to=${encodeURIComponent(TO)}&granularity=day&service=web&environment=production&limit=5`,
+      bearerToken: "dbundle_mem_x"
+    });
+  });
+});

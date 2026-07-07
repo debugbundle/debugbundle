@@ -7,6 +7,7 @@ import type {
   EventEnvelope,
   AnalyticsSettings,
   AnalyticsSettingsUpdate,
+  AnalyticsUsageSummaryResponse,
   ImprovementSettings,
   ImprovementSettingsUpdate,
   ProjectColorTag
@@ -441,6 +442,18 @@ export interface ApiDependencies {
       project_id: string;
       update: AnalyticsSettingsUpdate;
     }): Promise<AnalyticsSettings | null>;
+  } | undefined;
+  analyticsMetrics?: {
+    getUsageSummaryForProject(input: {
+      organization_id: string;
+      project_id: string;
+      from: string;
+      to: string;
+      granularity: "hour" | "day";
+      service?: string | undefined;
+      environment?: string | undefined;
+      limit?: number | undefined;
+    }): Promise<AnalyticsUsageSummaryResponse>;
   } | undefined;
   improvementManagement?: {
     listImprovementsForOrganization(input: {

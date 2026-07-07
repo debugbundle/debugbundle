@@ -70,6 +70,11 @@ export { createPostgresAnalyticsSettingsStore } from "./analytics-settings-store
 export type { AnalyticsRollupStore } from "./analytics-rollup-store.js";
 export { createPostgresAnalyticsRollupStore } from "./analytics-rollup-store.js";
 export type {
+  AnalyticsMetricsStore,
+  AnalyticsUsageSummaryInput
+} from "./analytics-metrics-store.js";
+export { createPostgresAnalyticsMetricsStore } from "./analytics-metrics-store.js";
+export type {
   AggregateAnalyticsEventsJob,
   AnalyticsIngestionPersistenceService,
   AnalyticsQueueClient

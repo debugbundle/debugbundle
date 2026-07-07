@@ -60,6 +60,10 @@ export const AnalyticsBundleGranularityValues = ["hour", "day", "week", "month"]
 export const AnalyticsBundleGranularitySchema = z.enum(AnalyticsBundleGranularityValues);
 export type AnalyticsBundleGranularity = z.infer<typeof AnalyticsBundleGranularitySchema>;
 
+export const AnalyticsMetricsGranularityValues = ["hour", "day"] as const;
+export const AnalyticsMetricsGranularitySchema = z.enum(AnalyticsMetricsGranularityValues);
+export type AnalyticsMetricsGranularity = z.infer<typeof AnalyticsMetricsGranularitySchema>;
+
 const AnalyticsSafeHashSchema = z.string().regex(/^sha256:[a-f0-9]{64}$/i);
 
 const AnalyticsNullableHashSchema = AnalyticsSafeHashSchema.nullable();
@@ -314,6 +318,62 @@ export const AnalyticsEventEnvelopeSchema = z
   .strict();
 
 export type AnalyticsEventEnvelope = z.infer<typeof AnalyticsEventEnvelopeSchema>;
+
+const AnalyticsMetricsSegmentSchema = z
+  .object({
+    value: z.string().trim().min(1).max(255),
+    sessions: z.number().int().nonnegative(),
+    pageviews: z.number().int().nonnegative(),
+  })
+  .strict();
+
+export type AnalyticsMetricsSegment = z.infer<typeof AnalyticsMetricsSegmentSchema>;
+
+const AnalyticsUsageSummarySchema = z
+  .object({
+    project_id: z.string().uuid(),
+    from: z.string().datetime(),
+    to: z.string().datetime(),
+    granularity: AnalyticsMetricsGranularitySchema,
+    service: z.string().trim().min(1).max(120).nullable(),
+    environment: z.string().trim().min(1).max(120).nullable(),
+    sessions: z.number().int().nonnegative(),
+    pageviews: z.number().int().nonnegative(),
+    active_visitors: z.number().int().nonnegative(),
+    new_visitors: z.number().int().nonnegative(),
+    returning_visitors: z.number().int().nonnegative(),
+    exits: z.number().int().nonnegative(),
+    conversions: z.number().int().nonnegative(),
+  })
+  .strict()
+  .refine((value) => Date.parse(value.from) <= Date.parse(value.to), {
+    message: "Analytics summary from must be before or equal to to.",
+    path: ["from"],
+  });
+
+export type AnalyticsUsageSummary = z.infer<typeof AnalyticsUsageSummarySchema>;
+
+const AnalyticsUsageBreakdownsSchema = z
+  .object({
+    device_types: z.array(AnalyticsMetricsSegmentSchema).max(100),
+    browsers: z.array(AnalyticsMetricsSegmentSchema).max(100),
+    os: z.array(AnalyticsMetricsSegmentSchema).max(100),
+    languages: z.array(AnalyticsMetricsSegmentSchema).max(100),
+    referrers: z.array(AnalyticsMetricsSegmentSchema).max(100),
+    auth_states: z.array(AnalyticsMetricsSegmentSchema).max(100),
+  })
+  .strict();
+
+export type AnalyticsUsageBreakdowns = z.infer<typeof AnalyticsUsageBreakdownsSchema>;
+
+export const AnalyticsUsageSummaryResponseSchema = z
+  .object({
+    summary: AnalyticsUsageSummarySchema,
+    breakdowns: AnalyticsUsageBreakdownsSchema,
+  })
+  .strict();
+
+export type AnalyticsUsageSummaryResponse = z.infer<typeof AnalyticsUsageSummaryResponseSchema>;
 
 const AnalyticsBundleProjectSchema = z
   .object({

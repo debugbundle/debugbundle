@@ -13,6 +13,9 @@ import type {
   setAnalyticsSettingsWithAuthCommand as defaultSetAnalyticsSettingsCommand
 } from "./analytics-settings-commands.js";
 import type {
+  getAnalyticsSummaryWithAuthCommand as defaultGetAnalyticsSummaryCommand
+} from "./analytics-metrics-commands.js";
+import type {
   createCaptureRuleWithAuthCommand as defaultCreateCaptureRuleCommand,
   deleteCaptureRuleWithAuthCommand as defaultDeleteCaptureRuleCommand,
   listCaptureRulesWithAuthCommand as defaultListCaptureRulesCommand,
@@ -149,6 +152,7 @@ export type ManagementCommandDependencies = {
   setCapturePolicyCommand?: typeof defaultSetCapturePolicyCommand;
   getAnalyticsSettingsCommand?: typeof defaultGetAnalyticsSettingsCommand;
   setAnalyticsSettingsCommand?: typeof defaultSetAnalyticsSettingsCommand;
+  getAnalyticsSummaryCommand?: typeof defaultGetAnalyticsSummaryCommand;
   listCaptureRulesCommand?: typeof defaultListCaptureRulesCommand;
   createCaptureRuleCommand?: typeof defaultCreateCaptureRuleCommand;
   updateCaptureRuleCommand?: typeof defaultUpdateCaptureRuleCommand;

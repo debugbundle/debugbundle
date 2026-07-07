@@ -16,6 +16,7 @@ const {
   createPostgresAuthStoreMock,
   createPostgresBillingStoreMock,
   createPostgresBillingSyncStoreMock,
+  createPostgresAnalyticsMetricsStoreMock,
   createPostgresAnalyticsSettingsStoreMock,
   createPostgresCapturePolicyStoreMock,
   createPostgresCaptureRuleStoreMock,
@@ -60,6 +61,7 @@ const {
   createPostgresAuthStoreMock: vi.fn(),
   createPostgresBillingStoreMock: vi.fn(),
   createPostgresBillingSyncStoreMock: vi.fn(),
+  createPostgresAnalyticsMetricsStoreMock: vi.fn(),
   createPostgresAnalyticsSettingsStoreMock: vi.fn(),
   createPostgresCapturePolicyStoreMock: vi.fn(),
   createPostgresCaptureRuleStoreMock: vi.fn(),
@@ -134,6 +136,7 @@ vi.mock("../../../packages/storage/src/index.js", () => ({
   createPostgresAccountAnalyticsStore: createPostgresAccountAnalyticsStoreMock,
   createPostgresAuthStore: createPostgresAuthStoreMock,
   createPostgresBillingStore: createPostgresBillingStoreMock,
+  createPostgresAnalyticsMetricsStore: createPostgresAnalyticsMetricsStoreMock,
   createPostgresAnalyticsSettingsStore: createPostgresAnalyticsSettingsStoreMock,
   createPostgresCapturePolicyStore: createPostgresCapturePolicyStoreMock,
   createPostgresAvailabilityCheckStore: createPostgresAvailabilityCheckStoreMock,
@@ -226,6 +229,7 @@ describe("api default dependencies", () => {
     createPostgresAuthStoreMock.mockReset();
     createPostgresBillingStoreMock.mockReset();
     createPostgresBillingSyncStoreMock.mockReset();
+    createPostgresAnalyticsMetricsStoreMock.mockReset();
     createPostgresAnalyticsSettingsStoreMock.mockReset();
     createPostgresCapturePolicyStoreMock.mockReset();
     createPostgresCaptureRuleStoreMock.mockReset();
@@ -304,6 +308,9 @@ describe("api default dependencies", () => {
       linkStripeCustomer: vi.fn(),
       revokeEntitlements: vi.fn(),
       updateBillingState: vi.fn()
+    });
+    createPostgresAnalyticsMetricsStoreMock.mockReturnValue({
+      getUsageSummary: vi.fn()
     });
     createPostgresAnalyticsSettingsStoreMock.mockReturnValue({
       getAnalyticsSettingsByProjectId: vi.fn(),
@@ -763,6 +770,7 @@ describe("api default dependencies", () => {
     expect(typeof deps.captureRuleManagement.recordCaptureRuleMatch).toBe("function");
     expect(typeof deps.analyticsSettingsManagement.getAnalyticsSettingsForProject).toBe("function");
     expect(typeof deps.analyticsSettingsManagement.updateAnalyticsSettingsForProject).toBe("function");
+    expect(typeof deps.analyticsMetrics.getUsageSummaryForProject).toBe("function");
     expect(typeof deps.projectManagement.listProjectsForOrganization).toBe("function");
     expect(typeof deps.projectManagement.createProjectForOrganization).toBe("function");
     expect(typeof deps.projectManagement.updateProjectForOrganization).toBe("function");

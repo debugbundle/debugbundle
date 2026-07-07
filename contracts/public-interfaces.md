@@ -512,15 +512,31 @@ Analytics read/manage APIs require Browser Session or Member Token auth. Project
     "project_id": "uuid",
     "from": "ISO8601",
     "to": "ISO8601",
+    "granularity": "hour | day",
+    "service": "string | null",
+    "environment": "string | null",
     "sessions": 1000,
     "pageviews": 2400,
     "active_visitors": 820,
     "new_visitors": 500,
     "returning_visitors": 320,
+    "exits": 180,
     "conversions": 42
+  },
+  "breakdowns": {
+    "device_types": [
+      { "value": "desktop", "sessions": 700, "pageviews": 1600 }
+    ],
+    "browsers": [],
+    "os": [],
+    "languages": [],
+    "referrers": [],
+    "auth_states": []
   }
 }
 ```
+
+The first implemented metrics read slice is `GET /v1/analytics/summary` plus `debugbundle analytics summary` and MCP `get_usage_summary`. Remaining analytics metrics endpoints keep the same aggregate-only, project-authorized, member-token/browser-session authorization model.
 
 **Analytics opportunity record fields:** `opportunity_id`, `project_id`, `project_name`, `project_color_tag`, `service`, `environment`, `kind`, `status`, `severity`, `confidence`, `title`, `summary`, `evidence`, `related_incident_ids`, `related_deploy_ids`, `first_detected_at`, `last_detected_at`, `resolved_at`, `snoozed_until`, `bundle_generation_id`, `bundle_status`, `bundle_created_at`, `bundle_updated_at`, `bundle_failure_reason`.
 

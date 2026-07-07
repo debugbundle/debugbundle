@@ -3,6 +3,51 @@ import { describe, expect, it, vi } from "vitest";
 import { runCli } from "../../../apps/cli/src/main.js";
 
 describe("cli main analytics routing", () => {
+  it("routes analytics summary arguments into the summary command", async () => {
+    const getAnalyticsSummaryCommand = vi.fn().mockResolvedValue({
+      exitCode: 0,
+      output: "analytics-summary"
+    });
+
+    const result = await runCli(
+      [
+        "analytics",
+        "summary",
+        "--project-id",
+        "proj_123",
+        "--from",
+        "2026-03-01T00:00:00.000Z",
+        "--to",
+        "2026-03-08T00:00:00.000Z",
+        "--granularity",
+        "day",
+        "--service",
+        "web",
+        "--environment",
+        "production",
+        "--limit",
+        "5",
+        "--auth-file",
+        "/tmp/auth.json",
+        "--json"
+      ],
+      { getAnalyticsSummaryCommand }
+    );
+
+    expect(getAnalyticsSummaryCommand).toHaveBeenCalledWith({
+      projectId: "proj_123",
+      from: "2026-03-01T00:00:00.000Z",
+      to: "2026-03-08T00:00:00.000Z",
+      granularity: "day",
+      service: "web",
+      environment: "production",
+      limit: 5,
+      authFilePath: "/tmp/auth.json",
+      json: true
+    });
+    expect(result).toEqual({ exitCode: 0, output: "analytics-summary" });
+  });
+
   it("routes analytics settings get arguments into the get command", async () => {
     const getAnalyticsSettingsCommand = vi.fn().mockResolvedValue({
       exitCode: 0,

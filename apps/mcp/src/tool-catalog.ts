@@ -4,6 +4,8 @@ import { ProjectColorTagSchema } from '../../../packages/shared-types/src/index.
 
 import { ALERT_MCP_TOOL_NAMES } from './alert-tools.js';
 import { ANALYZE_MCP_TOOL_NAMES } from './analyze-tools.js';
+import { ANALYTICS_METRICS_MCP_TOOL_CATALOG } from './analytics-metrics-tool-catalog.js';
+import { ANALYTICS_METRICS_MCP_TOOL_NAMES } from './analytics-metrics-tools.js';
 import { ANALYTICS_SETTINGS_MCP_TOOL_CATALOG } from './analytics-settings-tool-catalog.js';
 import { ANALYTICS_SETTINGS_MCP_TOOL_NAMES } from './analytics-settings-tools.js';
 import { BILLING_MCP_TOOL_NAMES } from './billing-tools.js';
@@ -29,6 +31,7 @@ import { WEEKLY_REPORT_MCP_TOOL_NAMES } from './weekly-report-tools.js';
 type McpToolName =
   | (typeof ALERT_MCP_TOOL_NAMES)[number]
   | (typeof ANALYZE_MCP_TOOL_NAMES)[number]
+  | (typeof ANALYTICS_METRICS_MCP_TOOL_NAMES)[number]
   | (typeof ANALYTICS_SETTINGS_MCP_TOOL_NAMES)[number]
   | (typeof BILLING_MCP_TOOL_NAMES)[number]
   | (typeof CAPTURE_RULE_MCP_TOOL_NAMES)[number]
@@ -51,6 +54,7 @@ type McpToolName =
 type McpToolGroup =
   | 'alerts'
   | 'analyze'
+  | 'analytics_metrics'
   | 'analytics_settings'
   | 'billing'
   | 'capture_rules'
@@ -790,6 +794,7 @@ export const MCP_TOOL_CATALOG = [
       create: jsonObjectSchema,
     }),
   },
+  ...ANALYTICS_METRICS_MCP_TOOL_CATALOG,
   ...ANALYTICS_SETTINGS_MCP_TOOL_CATALOG,
   {
     name: 'get_capture_policy',

@@ -10,6 +10,7 @@ import { createWeeklyReportApi } from "../../../packages/weekly-report-client/sr
 import { analyzeCommand } from "../../cli/src/analyze-command.js";
 import { createCliHttpClient } from "../../cli/src/auth-context.js";
 import { readCliAuthState } from "../../cli/src/auth-state.js";
+import { createAnalyticsMetricsApi } from "../../cli/src/analytics-metrics-commands.js";
 import { createAnalyticsSettingsApi } from "../../cli/src/analytics-settings-commands.js";
 import { createCaptureRuleApi } from "../../cli/src/capture-rule-commands.js";
 import { createCapturePolicyApi } from "../../cli/src/capture-policy-commands.js";
@@ -23,6 +24,7 @@ import { validateCommand } from "../../cli/src/validate-command.js";
 import { verifyCloudCommand, verifyLocalCommand } from "../../cli/src/verify-command.js";
 import { createAlertMcpTools } from "./alert-tools.js";
 import { createAnalyzeMcpTools } from "./analyze-tools.js";
+import { createAnalyticsMetricsMcpTools } from "./analytics-metrics-tools.js";
 import { createAnalyticsSettingsMcpTools } from "./analytics-settings-tools.js";
 import { createBillingMcpTools } from "./billing-tools.js";
 import { createCaptureRuleMcpTools } from "./capture-rule-tools.js";
@@ -110,6 +112,7 @@ export async function createDefaultMcpTools(input: { apiBaseUrl?: string } = {})
       ...createWeeklyReportMcpTools(createWeeklyReportApi(httpClient)),
       ...createAlertMcpTools(createAlertApi(httpClient)),
       ...createProjectMcpTools(createProjectManagementApi(httpClient)),
+      ...createAnalyticsMetricsMcpTools(createAnalyticsMetricsApi(httpClient)),
       ...createAnalyticsSettingsMcpTools(createAnalyticsSettingsApi(httpClient)),
       ...createCaptureRuleMcpTools(createCaptureRuleApi(httpClient)),
       ...createCapturePolicyMcpTools(createCapturePolicyApi(httpClient)),
