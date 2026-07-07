@@ -20,7 +20,6 @@ import {
   CapturePolicyResponseSchema as SharedCapturePolicyResponseSchema,
   CapturePolicyUpdateSchema,
   AnalyticsEventEnvelopeSchema,
-  AnalyticsUsageSummaryResponseSchema,
   AnalyticsSettingsResponseSchema,
   AnalyticsSettingsUpdateSchema,
   EventEnvelopeSchema,
@@ -123,6 +122,7 @@ import {
   WeeklyReportChannelParamsSchema,
   WeeklyReportChannelsQuerySchema,
 } from "./schemas.js";
+import { createAnalyticsMetricOpenApiOperations } from "./openapi-analytics.js";
 
 type JsonSchemaDocument = Record<string, unknown>;
 type SecurityRequirement = Record<string, []>;
@@ -170,18 +170,6 @@ const ApiErrorSchema = z.object({ error: z.string() }).strict();
 const SuccessResponseSchema = z.object({ success: z.boolean() }).strict();
 const BillingLinkResponseSchema = z.object({ url: z.string().url() }).strict();
 const BundleFailureStatusSchema = z.object({ status: z.literal("failed"), reason: z.string() }).strict();
-const AnalyticsSummaryQuerySchema = z
-  .object({
-    project_id: z.string().uuid(),
-    from: z.string().datetime().optional(),
-    to: z.string().datetime().optional(),
-    last: z.string().optional(),
-    granularity: z.enum(["hour", "day"]).optional(),
-    service: z.string().optional(),
-    environment: z.string().optional(),
-    limit: z.number().int().min(1).max(100).optional()
-  })
-  .strict();
 const ProjectInviteMembershipSchema = z
   .object({
     project_id: z.string(),
@@ -697,7 +685,6 @@ function buildPublicApiOperations(): OperationSpec[] {
   const captureRuleSuggestionsResponse = component("CaptureRuleSuggestionsResponse", SharedCaptureRuleSuggestionsResponseSchema);
   const capturePolicyUpdate = component("CapturePolicyUpdate", CapturePolicyUpdateSchema);
   const capturePolicyResponse = component("CapturePolicyResponse", CapturePolicyResponseSchema);
-  const analyticsUsageSummaryResponse = component("AnalyticsUsageSummaryResponse", AnalyticsUsageSummaryResponseSchema);
   const analyticsSettingsUpdate = component("AnalyticsSettingsUpdate", AnalyticsSettingsUpdateSchema);
   const analyticsSettingsResponse = component("AnalyticsSettingsResponse", AnalyticsSettingsResponseSchema);
   const improvementSettingsUpdate = component("ImprovementSettingsUpdate", ImprovementSettingsUpdateSchema);
@@ -2350,22 +2337,7 @@ function buildPublicApiOperations(): OperationSpec[] {
         "404": { description: "Project was not found or improvement settings are unavailable.", schema: apiError },
       },
     },
-    {
-      method: "get",
-      path: "/v1/analytics/summary",
-      operationId: "getAnalyticsSummary",
-      summary: "Get aggregate AnalyticsBundle usage summary metrics for a project",
-      tags: ["Analytics"],
-      security: anyMemberAuth,
-      query: AnalyticsSummaryQuerySchema,
-      responses: {
-        "200": { description: "Analytics usage summary metrics.", schema: analyticsUsageSummaryResponse },
-        "400": { description: "Invalid query parameters.", schema: apiError },
-        "401": { description: "Authentication is invalid.", schema: apiError },
-        "403": { description: "An eligible tier is required.", schema: apiError },
-        "404": { description: "Project was not found or analytics metrics are unavailable.", schema: apiError },
-      },
-    },
+    ...createAnalyticsMetricOpenApiOperations({ apiError, anyMemberAuth }),
     {
       method: "get",
       path: "/v1/projects/{id}/analytics-settings",

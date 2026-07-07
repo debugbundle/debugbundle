@@ -16,5 +16,55 @@ export const ANALYTICS_METRICS_MCP_TOOL_CATALOG = [
       environment: z.string().optional(),
       limit: z.number().optional()
     })
+  },
+  {
+    name: "get_route_metrics",
+    group: "analytics_metrics",
+    description: "Get aggregate AnalyticsBundle route metrics for a project.",
+    inputSchema: analyticsMetricsInputSchema()
+  },
+  {
+    name: "get_device_breakdown",
+    group: "analytics_metrics",
+    description: "Get aggregate AnalyticsBundle device, browser, OS, and language breakdowns.",
+    inputSchema: analyticsMetricsInputSchema()
+  },
+  {
+    name: "get_referrer_metrics",
+    group: "analytics_metrics",
+    description: "Get aggregate AnalyticsBundle referrer and UTM metrics.",
+    inputSchema: analyticsMetricsInputSchema()
+  },
+  {
+    name: "get_funnel_analysis",
+    group: "analytics_metrics",
+    description: "Get aggregate AnalyticsBundle funnel conversion and dropoff analysis.",
+    inputSchema: analyticsMetricsInputSchema().extend({
+      funnelKey: z.string()
+    })
   }
 ] as const;
+
+function analyticsMetricsInputSchema(): z.ZodObject<{
+  bearerToken: z.ZodString;
+  projectId: z.ZodString;
+  from: z.ZodOptional<z.ZodString>;
+  to: z.ZodOptional<z.ZodString>;
+  last: z.ZodOptional<z.ZodString>;
+  granularity: z.ZodOptional<z.ZodEnum<["hour", "day"]>>;
+  service: z.ZodOptional<z.ZodString>;
+  environment: z.ZodOptional<z.ZodString>;
+  limit: z.ZodOptional<z.ZodNumber>;
+}> {
+  return z.object({
+    bearerToken: z.string(),
+    projectId: z.string(),
+    from: z.string().optional(),
+    to: z.string().optional(),
+    last: z.string().optional(),
+    granularity: z.enum(["hour", "day"]).optional(),
+    service: z.string().optional(),
+    environment: z.string().optional(),
+    limit: z.number().optional()
+  });
+}

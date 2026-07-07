@@ -69,7 +69,8 @@ function createTransactionalDb(query: Queryable["query"]): Queryable {
 
 describe("analytics rollup store", () => {
   it("records accepted analytics events into hourly and daily rollups", async (): Promise<void> => {
-    const queryMock = vi.fn(async (sqlText: string, _params: unknown[]) => {
+    const queryMock = vi.fn(async (sqlText: string, params: unknown[]) => {
+      void params;
       if (sqlText.includes("INSERT INTO analytics_ingestion_ledger")) {
         return { rows: [{ event_id: "550e8400-e29b-41d4-a716-446655440000" }] };
       }
@@ -105,7 +106,8 @@ describe("analytics rollup store", () => {
   });
 
   it("does not update rollups when the event is already in the ingestion ledger", async (): Promise<void> => {
-    const queryMock = vi.fn(async (sqlText: string, _params: unknown[]) => {
+    const queryMock = vi.fn(async (sqlText: string, params: unknown[]) => {
+      void params;
       if (sqlText.includes("INSERT INTO analytics_ingestion_ledger")) {
         return { rows: [] };
       }

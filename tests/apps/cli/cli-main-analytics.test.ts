@@ -48,6 +48,35 @@ describe("cli main analytics routing", () => {
     expect(result).toEqual({ exitCode: 0, output: "analytics-summary" });
   });
 
+  it("routes detailed analytics metric commands", async () => {
+    const getAnalyticsRoutesCommand = vi.fn().mockResolvedValue({ exitCode: 0, output: "routes" });
+    const getAnalyticsDevicesCommand = vi.fn().mockResolvedValue({ exitCode: 0, output: "devices" });
+    const getAnalyticsReferrersCommand = vi.fn().mockResolvedValue({ exitCode: 0, output: "referrers" });
+    const getAnalyticsFunnelCommand = vi.fn().mockResolvedValue({ exitCode: 0, output: "funnel" });
+
+    await expect(runCli(["analytics", "routes", "--project", "proj_123"], { getAnalyticsRoutesCommand })).resolves.toEqual({
+      exitCode: 0,
+      output: "routes"
+    });
+    await expect(runCli(["analytics", "devices", "--project", "proj_123"], { getAnalyticsDevicesCommand })).resolves.toEqual({
+      exitCode: 0,
+      output: "devices"
+    });
+    await expect(runCli(["analytics", "referrers", "--project", "proj_123"], { getAnalyticsReferrersCommand })).resolves.toEqual({
+      exitCode: 0,
+      output: "referrers"
+    });
+    await expect(runCli(["analytics", "funnel", "checkout", "--project", "proj_123"], { getAnalyticsFunnelCommand })).resolves.toEqual({
+      exitCode: 0,
+      output: "funnel"
+    });
+
+    expect(getAnalyticsRoutesCommand).toHaveBeenCalledWith({ projectId: "proj_123" });
+    expect(getAnalyticsDevicesCommand).toHaveBeenCalledWith({ projectId: "proj_123" });
+    expect(getAnalyticsReferrersCommand).toHaveBeenCalledWith({ projectId: "proj_123" });
+    expect(getAnalyticsFunnelCommand).toHaveBeenCalledWith({ projectId: "proj_123", funnelKey: "checkout" });
+  });
+
   it("routes analytics settings get arguments into the get command", async () => {
     const getAnalyticsSettingsCommand = vi.fn().mockResolvedValue({
       exitCode: 0,

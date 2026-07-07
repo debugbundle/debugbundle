@@ -7,6 +7,14 @@ import type { AnalyticsUsageSummaryResponse } from "../../../packages/shared-typ
 const PROJECT_ID = "00000000-0000-0000-0000-000000000001";
 const FROM = "2026-03-01T00:00:00.000Z";
 const TO = "2026-03-08T00:00:00.000Z";
+const metricsWindow = {
+  project_id: PROJECT_ID,
+  from: FROM,
+  to: TO,
+  granularity: "day",
+  service: null,
+  environment: null
+} as const;
 
 function createProjectAccess(overrides: Partial<{
   effective_role: "owner" | "admin" | "member";
@@ -49,6 +57,41 @@ function createSummary(): AnalyticsUsageSummaryResponse {
       referrers: [],
       auth_states: []
     }
+  };
+}
+
+function createAnalyticsMetricsDependency(
+  overrides: Partial<NonNullable<ApiDependencies["analyticsMetrics"]>> = {}
+): NonNullable<ApiDependencies["analyticsMetrics"]> {
+  return {
+    getUsageSummaryForProject: vi.fn().mockResolvedValue(createSummary()),
+    getRouteMetricsForProject: vi.fn().mockResolvedValue({ window: metricsWindow, routes: [] }),
+    getDeviceBreakdownForProject: vi.fn().mockResolvedValue({
+      window: metricsWindow,
+      device_types: [],
+      browsers: [],
+      os: [],
+      languages: []
+    }),
+    getReferrerMetricsForProject: vi.fn().mockResolvedValue({
+      window: metricsWindow,
+      referrers: [],
+      utm_sources: [],
+      utm_mediums: [],
+      utm_campaigns: []
+    }),
+    getFunnelAnalysisForProject: vi.fn().mockResolvedValue({
+      funnel: {
+        ...metricsWindow,
+        funnel_key: "checkout",
+        sessions_entered: 0,
+        sessions_completed: 0,
+        dropoffs: 0,
+        conversion_rate: 0
+      },
+      steps: []
+    }),
+    ...overrides
   };
 }
 
@@ -100,7 +143,7 @@ describe("analytics metrics routes", () => {
   it("returns project analytics summary through member-token project access", async () => {
     const getUsageSummaryForProject = vi.fn().mockResolvedValue(createSummary());
     const app = createDependencies({
-      analyticsMetrics: { getUsageSummaryForProject }
+      analyticsMetrics: createAnalyticsMetricsDependency({ getUsageSummaryForProject })
     });
 
     const response = await app.inject({
@@ -125,7 +168,7 @@ describe("analytics metrics routes", () => {
 
   it("rejects invalid queries, Free projects, and unavailable metrics storage", async () => {
     const invalidQuery = await createDependencies({
-      analyticsMetrics: { getUsageSummaryForProject: vi.fn() }
+      analyticsMetrics: createAnalyticsMetricsDependency({ getUsageSummaryForProject: vi.fn() })
     }).inject({
       method: "GET",
       url: "/v1/analytics/summary?project_id=not-a-uuid",
@@ -133,7 +176,7 @@ describe("analytics metrics routes", () => {
     });
     const freeProject = await createDependencies({
       projectAccess: createProjectAccess({ organization_plan: "free" }),
-      analyticsMetrics: { getUsageSummaryForProject: vi.fn() }
+      analyticsMetrics: createAnalyticsMetricsDependency({ getUsageSummaryForProject: vi.fn() })
     }).inject({
       method: "GET",
       url: `/v1/analytics/summary?project_id=${PROJECT_ID}&from=${encodeURIComponent(FROM)}&to=${encodeURIComponent(TO)}`,
@@ -151,5 +194,59 @@ describe("analytics metrics routes", () => {
     expect(freeProject.json()).toEqual({ error: "upgrade_required" });
     expect(unavailable.statusCode).toBe(404);
     expect(unavailable.json()).toEqual({ error: "analytics_metrics_not_available" });
+  });
+
+  it("returns detailed aggregate metrics through the analytics API routes", async () => {
+    const analyticsMetrics = {
+      getUsageSummaryForProject: vi.fn(),
+      getRouteMetricsForProject: vi.fn().mockResolvedValue({ window: metricsWindow, routes: [] }),
+      getDeviceBreakdownForProject: vi.fn().mockResolvedValue({
+        window: metricsWindow,
+        device_types: [],
+        browsers: [],
+        os: [],
+        languages: []
+      }),
+      getReferrerMetricsForProject: vi.fn().mockResolvedValue({
+        window: metricsWindow,
+        referrers: [],
+        utm_sources: [],
+        utm_mediums: [],
+        utm_campaigns: []
+      }),
+      getFunnelAnalysisForProject: vi.fn().mockResolvedValue({
+        funnel: {
+          ...metricsWindow,
+          funnel_key: "checkout",
+          sessions_entered: 0,
+          sessions_completed: 0,
+          dropoffs: 0,
+          conversion_rate: 0
+        },
+        steps: []
+      })
+    };
+    const app = createDependencies({ analyticsMetrics });
+    const authHeaders = { authorization: "Bearer dbundle_mem_test_token" };
+    const query = `project_id=${PROJECT_ID}&from=${encodeURIComponent(FROM)}&to=${encodeURIComponent(TO)}`;
+
+    await expect(app.inject({ method: "GET", url: `/v1/analytics/routes?${query}`, headers: authHeaders })).resolves.toMatchObject({
+      statusCode: 200
+    });
+    await expect(app.inject({ method: "GET", url: `/v1/analytics/devices?${query}`, headers: authHeaders })).resolves.toMatchObject({
+      statusCode: 200
+    });
+    await expect(app.inject({ method: "GET", url: `/v1/analytics/referrers?${query}`, headers: authHeaders })).resolves.toMatchObject({
+      statusCode: 200
+    });
+    await expect(app.inject({ method: "GET", url: `/v1/analytics/funnels/checkout?${query}`, headers: authHeaders })).resolves.toMatchObject({
+      statusCode: 200
+    });
+
+    expect(analyticsMetrics.getRouteMetricsForProject).toHaveBeenCalledWith(expect.objectContaining({ project_id: PROJECT_ID }));
+    expect(analyticsMetrics.getFunnelAnalysisForProject).toHaveBeenCalledWith(expect.objectContaining({
+      project_id: PROJECT_ID,
+      funnel_key: "checkout"
+    }));
   });
 });

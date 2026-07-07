@@ -68,7 +68,7 @@ const AnalyticsSafeHashSchema = z.string().regex(/^sha256:[a-f0-9]{64}$/i);
 
 const AnalyticsNullableHashSchema = AnalyticsSafeHashSchema.nullable();
 
-const AnalyticsNullableTextSchema = (max: number) => z.string().trim().min(1).max(max).nullable();
+const AnalyticsNullableTextSchema = (max: number): z.ZodNullable<z.ZodString> => z.string().trim().min(1).max(max).nullable();
 
 const AnalyticsRoutePathSchema = z
   .string()
@@ -374,6 +374,106 @@ export const AnalyticsUsageSummaryResponseSchema = z
   .strict();
 
 export type AnalyticsUsageSummaryResponse = z.infer<typeof AnalyticsUsageSummaryResponseSchema>;
+
+const AnalyticsMetricsWindowSchema = z
+  .object({
+    project_id: z.string().uuid(),
+    from: z.string().datetime(),
+    to: z.string().datetime(),
+    granularity: AnalyticsMetricsGranularitySchema,
+    service: z.string().trim().min(1).max(120).nullable(),
+    environment: z.string().trim().min(1).max(120).nullable(),
+  })
+  .strict();
+
+export type AnalyticsMetricsWindow = z.infer<typeof AnalyticsMetricsWindowSchema>;
+
+const AnalyticsRouteMetricSchema = z
+  .object({
+    route_key: z.string().trim().min(1).max(2048),
+    pageviews: z.number().int().nonnegative(),
+    unique_sessions: z.number().int().nonnegative(),
+    entrances: z.number().int().nonnegative(),
+    exits: z.number().int().nonnegative(),
+    bounces: z.number().int().nonnegative(),
+    linked_incident_sessions: z.number().int().nonnegative(),
+  })
+  .strict();
+
+export type AnalyticsRouteMetric = z.infer<typeof AnalyticsRouteMetricSchema>;
+
+export const AnalyticsRouteMetricsResponseSchema = z
+  .object({
+    window: AnalyticsMetricsWindowSchema,
+    routes: z.array(AnalyticsRouteMetricSchema).max(100),
+  })
+  .strict();
+
+export type AnalyticsRouteMetricsResponse = z.infer<typeof AnalyticsRouteMetricsResponseSchema>;
+
+export const AnalyticsDeviceBreakdownResponseSchema = z
+  .object({
+    window: AnalyticsMetricsWindowSchema,
+    device_types: z.array(AnalyticsMetricsSegmentSchema).max(100),
+    browsers: z.array(AnalyticsMetricsSegmentSchema).max(100),
+    os: z.array(AnalyticsMetricsSegmentSchema).max(100),
+    languages: z.array(AnalyticsMetricsSegmentSchema).max(100),
+  })
+  .strict();
+
+export type AnalyticsDeviceBreakdownResponse = z.infer<typeof AnalyticsDeviceBreakdownResponseSchema>;
+
+export const AnalyticsReferrerMetricsResponseSchema = z
+  .object({
+    window: AnalyticsMetricsWindowSchema,
+    referrers: z.array(AnalyticsMetricsSegmentSchema).max(100),
+    utm_sources: z.array(AnalyticsMetricsSegmentSchema).max(100),
+    utm_mediums: z.array(AnalyticsMetricsSegmentSchema).max(100),
+    utm_campaigns: z.array(AnalyticsMetricsSegmentSchema).max(100),
+  })
+  .strict();
+
+export type AnalyticsReferrerMetricsResponse = z.infer<typeof AnalyticsReferrerMetricsResponseSchema>;
+
+const AnalyticsFunnelStepMetricSchema = z
+  .object({
+    step_key: z.string().trim().min(1).max(120),
+    step_order: z.number().int().nonnegative(),
+    sessions_entered: z.number().int().nonnegative(),
+    sessions_completed: z.number().int().nonnegative(),
+    dropoffs: z.number().int().nonnegative(),
+    conversion_rate: z.number().min(0).max(1),
+  })
+  .strict();
+
+export type AnalyticsFunnelStepMetric = z.infer<typeof AnalyticsFunnelStepMetricSchema>;
+
+const AnalyticsFunnelSummarySchema = z
+  .object({
+    project_id: z.string().uuid(),
+    funnel_key: z.string().trim().min(1).max(120),
+    from: z.string().datetime(),
+    to: z.string().datetime(),
+    granularity: AnalyticsMetricsGranularitySchema,
+    service: z.string().trim().min(1).max(120).nullable(),
+    environment: z.string().trim().min(1).max(120).nullable(),
+    sessions_entered: z.number().int().nonnegative(),
+    sessions_completed: z.number().int().nonnegative(),
+    dropoffs: z.number().int().nonnegative(),
+    conversion_rate: z.number().min(0).max(1),
+  })
+  .strict();
+
+export type AnalyticsFunnelSummary = z.infer<typeof AnalyticsFunnelSummarySchema>;
+
+export const AnalyticsFunnelAnalysisResponseSchema = z
+  .object({
+    funnel: AnalyticsFunnelSummarySchema,
+    steps: z.array(AnalyticsFunnelStepMetricSchema).max(100),
+  })
+  .strict();
+
+export type AnalyticsFunnelAnalysisResponse = z.infer<typeof AnalyticsFunnelAnalysisResponseSchema>;
 
 const AnalyticsBundleProjectSchema = z
   .object({

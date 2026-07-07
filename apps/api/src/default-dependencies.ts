@@ -647,6 +647,22 @@ export function createApiDependencies(input: CreateApiDependenciesInput): Defaul
       getUsageSummaryForProject: (input) => {
         void input.organization_id;
         return analyticsMetricsStore.getUsageSummary(input);
+      },
+      getRouteMetricsForProject: (input) => {
+        void input.organization_id;
+        return analyticsMetricsStore.getRouteMetrics(input);
+      },
+      getDeviceBreakdownForProject: (input) => {
+        void input.organization_id;
+        return analyticsMetricsStore.getDeviceBreakdown(input);
+      },
+      getReferrerMetricsForProject: (input) => {
+        void input.organization_id;
+        return analyticsMetricsStore.getReferrerMetrics(input);
+      },
+      getFunnelAnalysisForProject: (input) => {
+        void input.organization_id;
+        return analyticsMetricsStore.getFunnelAnalysis(input);
       }
     },
     improvementSettingsManagement: {

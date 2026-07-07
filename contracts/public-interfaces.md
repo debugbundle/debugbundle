@@ -536,7 +536,63 @@ Analytics read/manage APIs require Browser Session or Member Token auth. Project
 }
 ```
 
-The first implemented metrics read slice is `GET /v1/analytics/summary` plus `debugbundle analytics summary` and MCP `get_usage_summary`. Remaining analytics metrics endpoints keep the same aggregate-only, project-authorized, member-token/browser-session authorization model.
+The implemented aggregate metrics read surface includes `GET /v1/analytics/summary`, `/routes`, `/devices`, `/referrers`, and `/funnels/{key}` plus matching `debugbundle analytics summary|routes|devices|referrers|funnel` commands and MCP `get_usage_summary`, `get_route_metrics`, `get_device_breakdown`, `get_referrer_metrics`, and `get_funnel_analysis` tools. These endpoints are aggregate-only, project-authorized, and browser-session/member-token read surfaces; project tokens remain write-only for analytics ingestion.
+
+**Analytics route metrics response shape:**
+```json
+{
+  "window": {
+    "project_id": "uuid",
+    "from": "ISO8601",
+    "to": "ISO8601",
+    "granularity": "hour | day",
+    "service": "string | null",
+    "environment": "string | null"
+  },
+  "routes": [
+    {
+      "route_key": "/pricing",
+      "pageviews": 240,
+      "unique_sessions": 120,
+      "entrances": 80,
+      "exits": 30,
+      "bounces": 12,
+      "linked_incident_sessions": 3
+    }
+  ]
+}
+```
+
+**Analytics device/referrer metrics response shapes:** `/devices` returns the same `window` plus `device_types`, `browsers`, `os`, and `languages` segment arrays. `/referrers` returns the same `window` plus `referrers`, `utm_sources`, `utm_mediums`, and `utm_campaigns` segment arrays. Segment rows use `{ "value": "string", "sessions": 0, "pageviews": 0 }`.
+
+**Analytics funnel analysis response shape:**
+```json
+{
+  "funnel": {
+    "project_id": "uuid",
+    "from": "ISO8601",
+    "to": "ISO8601",
+    "granularity": "hour | day",
+    "service": "string | null",
+    "environment": "string | null",
+    "funnel_key": "checkout",
+    "sessions_entered": 100,
+    "sessions_completed": 60,
+    "dropoffs": 40,
+    "conversion_rate": 0.6
+  },
+  "steps": [
+    {
+      "step_key": "payment",
+      "step_order": 2,
+      "sessions_entered": 80,
+      "sessions_completed": 60,
+      "dropoffs": 20,
+      "conversion_rate": 0.75
+    }
+  ]
+}
+```
 
 **Analytics opportunity record fields:** `opportunity_id`, `project_id`, `project_name`, `project_color_tag`, `service`, `environment`, `kind`, `status`, `severity`, `confidence`, `title`, `summary`, `evidence`, `related_incident_ids`, `related_deploy_ids`, `first_detected_at`, `last_detected_at`, `resolved_at`, `snoozed_until`, `bundle_generation_id`, `bundle_status`, `bundle_created_at`, `bundle_updated_at`, `bundle_failure_reason`.
 

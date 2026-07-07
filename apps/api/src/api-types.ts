@@ -7,6 +7,10 @@ import type {
   EventEnvelope,
   AnalyticsSettings,
   AnalyticsSettingsUpdate,
+  AnalyticsDeviceBreakdownResponse,
+  AnalyticsFunnelAnalysisResponse,
+  AnalyticsReferrerMetricsResponse,
+  AnalyticsRouteMetricsResponse,
   AnalyticsUsageSummaryResponse,
   ImprovementSettings,
   ImprovementSettingsUpdate,
@@ -454,6 +458,47 @@ export interface ApiDependencies {
       environment?: string | undefined;
       limit?: number | undefined;
     }): Promise<AnalyticsUsageSummaryResponse>;
+    getRouteMetricsForProject(input: {
+      organization_id: string;
+      project_id: string;
+      from: string;
+      to: string;
+      granularity: "hour" | "day";
+      service?: string | undefined;
+      environment?: string | undefined;
+      limit?: number | undefined;
+    }): Promise<AnalyticsRouteMetricsResponse>;
+    getDeviceBreakdownForProject(input: {
+      organization_id: string;
+      project_id: string;
+      from: string;
+      to: string;
+      granularity: "hour" | "day";
+      service?: string | undefined;
+      environment?: string | undefined;
+      limit?: number | undefined;
+    }): Promise<AnalyticsDeviceBreakdownResponse>;
+    getReferrerMetricsForProject(input: {
+      organization_id: string;
+      project_id: string;
+      from: string;
+      to: string;
+      granularity: "hour" | "day";
+      service?: string | undefined;
+      environment?: string | undefined;
+      limit?: number | undefined;
+    }): Promise<AnalyticsReferrerMetricsResponse>;
+    getFunnelAnalysisForProject(input: {
+      organization_id: string;
+      project_id: string;
+      funnel_key: string;
+      from: string;
+      to: string;
+      granularity: "hour" | "day";
+      service?: string | undefined;
+      environment?: string | undefined;
+      limit?: number | undefined;
+    }): Promise<AnalyticsFunnelAnalysisResponse>;
   } | undefined;
   improvementManagement?: {
     listImprovementsForOrganization(input: {

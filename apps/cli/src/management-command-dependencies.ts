@@ -13,6 +13,10 @@ import type {
   setAnalyticsSettingsWithAuthCommand as defaultSetAnalyticsSettingsCommand
 } from "./analytics-settings-commands.js";
 import type {
+  getAnalyticsDevicesWithAuthCommand as defaultGetAnalyticsDevicesCommand,
+  getAnalyticsFunnelWithAuthCommand as defaultGetAnalyticsFunnelCommand,
+  getAnalyticsReferrersWithAuthCommand as defaultGetAnalyticsReferrersCommand,
+  getAnalyticsRoutesWithAuthCommand as defaultGetAnalyticsRoutesCommand,
   getAnalyticsSummaryWithAuthCommand as defaultGetAnalyticsSummaryCommand
 } from "./analytics-metrics-commands.js";
 import type {
@@ -153,6 +157,10 @@ export type ManagementCommandDependencies = {
   getAnalyticsSettingsCommand?: typeof defaultGetAnalyticsSettingsCommand;
   setAnalyticsSettingsCommand?: typeof defaultSetAnalyticsSettingsCommand;
   getAnalyticsSummaryCommand?: typeof defaultGetAnalyticsSummaryCommand;
+  getAnalyticsRoutesCommand?: typeof defaultGetAnalyticsRoutesCommand;
+  getAnalyticsDevicesCommand?: typeof defaultGetAnalyticsDevicesCommand;
+  getAnalyticsReferrersCommand?: typeof defaultGetAnalyticsReferrersCommand;
+  getAnalyticsFunnelCommand?: typeof defaultGetAnalyticsFunnelCommand;
   listCaptureRulesCommand?: typeof defaultListCaptureRulesCommand;
   createCaptureRuleCommand?: typeof defaultCreateCaptureRuleCommand;
   updateCaptureRuleCommand?: typeof defaultUpdateCaptureRuleCommand;

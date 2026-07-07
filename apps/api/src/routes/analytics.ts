@@ -1,8 +1,12 @@
-import type { FastifyInstance } from "fastify";
+import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { z } from "zod";
 
 import {
+  AnalyticsDeviceBreakdownResponseSchema,
+  AnalyticsFunnelAnalysisResponseSchema,
   AnalyticsMetricsGranularitySchema,
+  AnalyticsReferrerMetricsResponseSchema,
+  AnalyticsRouteMetricsResponseSchema,
   AnalyticsUsageSummaryResponseSchema,
   getTierCapabilities
 } from "../../../../packages/shared-types/src/index.js";
@@ -25,47 +29,141 @@ const AnalyticsSummaryQuerySchema = z
   })
   .strict();
 
+const AnalyticsFunnelParamsSchema = z.object({
+  key: z.string().trim().min(1).max(120)
+}).strict();
+
+type AnalyticsQuery = z.infer<typeof AnalyticsSummaryQuerySchema>;
+type AuthorizedAnalyticsQuery = AnalyticsQuery & { from: string; to: string; organization_id: string };
+
 export function registerAnalyticsRoutes(app: FastifyInstance, dependencies: ApiDependencies): void {
   app.get("/v1/analytics/summary", async (request, reply) => {
-    const parsedQuery = AnalyticsSummaryQuerySchema.safeParse(request.query);
-    if (!parsedQuery.success) {
-      return reply.status(400).send({ error: "invalid_query" });
-    }
-
-    const range = resolveAnalyticsTimeRange(parsedQuery.data);
-    if (range === null) {
-      return reply.status(400).send({ error: "invalid_query" });
-    }
-
-    const auth = await requireRateLimitedProjectAccess(request, reply, dependencies, {
-      bucket: "retrieval-read",
-      projectId: parsedQuery.data.project_id
-    });
-    if (auth === null) {
+    const input = await requireAnalyticsMetricsQuery(request, reply, dependencies);
+    if (input === null) {
       return;
     }
 
-    if (!getTierCapabilities(auth.access.organization_plan).analytics_bundle) {
-      return reply.status(403).send({ error: "upgrade_required" });
-    }
-
-    if (dependencies.analyticsMetrics === undefined) {
-      return reply.status(404).send({ error: "analytics_metrics_not_available" });
-    }
-
-    const summary = await dependencies.analyticsMetrics.getUsageSummaryForProject({
-      organization_id: auth.access.organization_id,
-      project_id: parsedQuery.data.project_id,
-      from: range.from,
-      to: range.to,
-      granularity: parsedQuery.data.granularity,
-      service: parsedQuery.data.service,
-      environment: parsedQuery.data.environment,
-      limit: parsedQuery.data.limit
-    });
+    const summary = await dependencies.analyticsMetrics!.getUsageSummaryForProject(toMetricsInput(input));
 
     return reply.status(200).send(AnalyticsUsageSummaryResponseSchema.parse(summary));
   });
+
+  app.get("/v1/analytics/routes", async (request, reply) => {
+    const input = await requireAnalyticsMetricsQuery(request, reply, dependencies);
+    if (input === null) {
+      return;
+    }
+
+    const routes = await dependencies.analyticsMetrics!.getRouteMetricsForProject(toMetricsInput(input));
+
+    return reply.status(200).send(AnalyticsRouteMetricsResponseSchema.parse(routes));
+  });
+
+  app.get("/v1/analytics/devices", async (request, reply) => {
+    const input = await requireAnalyticsMetricsQuery(request, reply, dependencies);
+    if (input === null) {
+      return;
+    }
+
+    const devices = await dependencies.analyticsMetrics!.getDeviceBreakdownForProject(toMetricsInput(input));
+
+    return reply.status(200).send(AnalyticsDeviceBreakdownResponseSchema.parse(devices));
+  });
+
+  app.get("/v1/analytics/referrers", async (request, reply) => {
+    const input = await requireAnalyticsMetricsQuery(request, reply, dependencies);
+    if (input === null) {
+      return;
+    }
+
+    const referrers = await dependencies.analyticsMetrics!.getReferrerMetricsForProject(toMetricsInput(input));
+
+    return reply.status(200).send(AnalyticsReferrerMetricsResponseSchema.parse(referrers));
+  });
+
+  app.get("/v1/analytics/funnels/:key", async (request, reply) => {
+    const parsedParams = AnalyticsFunnelParamsSchema.safeParse(request.params);
+    if (!parsedParams.success) {
+      return reply.status(400).send({ error: "invalid_funnel_key" });
+    }
+
+    const input = await requireAnalyticsMetricsQuery(request, reply, dependencies);
+    if (input === null) {
+      return;
+    }
+
+    const funnel = await dependencies.analyticsMetrics!.getFunnelAnalysisForProject({
+      ...toMetricsInput(input),
+      funnel_key: parsedParams.data.key
+    });
+
+    return reply.status(200).send(AnalyticsFunnelAnalysisResponseSchema.parse(funnel));
+  });
+}
+
+async function requireAnalyticsMetricsQuery(
+  request: FastifyRequest,
+  reply: FastifyReply,
+  dependencies: ApiDependencies
+): Promise<AuthorizedAnalyticsQuery | null> {
+  const parsedQuery = AnalyticsSummaryQuerySchema.safeParse(request.query);
+  if (!parsedQuery.success) {
+    await reply.status(400).send({ error: "invalid_query" });
+    return null;
+  }
+
+  const range = resolveAnalyticsTimeRange(parsedQuery.data);
+  if (range === null) {
+    await reply.status(400).send({ error: "invalid_query" });
+    return null;
+  }
+
+  const auth = await requireRateLimitedProjectAccess(request, reply, dependencies, {
+    bucket: "retrieval-read",
+    projectId: parsedQuery.data.project_id
+  });
+  if (auth === null) {
+    return null;
+  }
+
+  if (!getTierCapabilities(auth.access.organization_plan).analytics_bundle) {
+    await reply.status(403).send({ error: "upgrade_required" });
+    return null;
+  }
+
+  if (dependencies.analyticsMetrics === undefined) {
+    await reply.status(404).send({ error: "analytics_metrics_not_available" });
+    return null;
+  }
+
+  return {
+    ...parsedQuery.data,
+    from: range.from,
+    to: range.to,
+    organization_id: auth.access.organization_id
+  };
+}
+
+function toMetricsInput(input: AuthorizedAnalyticsQuery): {
+  organization_id: string;
+  project_id: string;
+  from: string;
+  to: string;
+  granularity: "hour" | "day";
+  service?: string | undefined;
+  environment?: string | undefined;
+  limit?: number | undefined;
+} {
+  return {
+    organization_id: input.organization_id,
+    project_id: input.project_id,
+    from: input.from,
+    to: input.to,
+    granularity: input.granularity,
+    service: input.service,
+    environment: input.environment,
+    limit: input.limit
+  };
 }
 
 function resolveAnalyticsTimeRange(input: {

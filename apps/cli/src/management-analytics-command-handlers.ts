@@ -4,6 +4,10 @@ import {
   setAnalyticsSettingsWithAuthCommand as defaultSetAnalyticsSettingsCommand
 } from "./analytics-settings-commands.js";
 import {
+  getAnalyticsDevicesWithAuthCommand as defaultGetAnalyticsDevicesCommand,
+  getAnalyticsFunnelWithAuthCommand as defaultGetAnalyticsFunnelCommand,
+  getAnalyticsReferrersWithAuthCommand as defaultGetAnalyticsReferrersCommand,
+  getAnalyticsRoutesWithAuthCommand as defaultGetAnalyticsRoutesCommand,
   getAnalyticsSummaryWithAuthCommand as defaultGetAnalyticsSummaryCommand
 } from "./analytics-metrics-commands.js";
 import {
@@ -142,7 +146,7 @@ export async function handleAnalyticsCommand(
   dependencies: ManagementCommandDependencies
 ): Promise<CliCommandResult> {
   const resource = requirePositional(parsedArgv, 1, "analytics resource");
-  if (resource === "summary") {
+  if (resource === "summary" || resource === "routes" || resource === "devices" || resource === "referrers") {
     expectNoUnknownOptions(parsedArgv, [
       "project",
       "project-id",
@@ -162,9 +166,53 @@ export async function handleAnalyticsCommand(
       throw new CliInputError("Missing required option --project.");
     }
 
-    return await (dependencies.getAnalyticsSummaryCommand ?? defaultGetAnalyticsSummaryCommand)(
+    const input = appendCommonAuthOptions(parsedArgv, {
+      projectId,
+      from: readStringOption(parsedArgv, "from"),
+      to: readStringOption(parsedArgv, "to"),
+      last: readStringOption(parsedArgv, "last"),
+      granularity: readAnalyticsGranularity(parsedArgv),
+      service: readStringOption(parsedArgv, "service"),
+      environment: readStringOption(parsedArgv, "environment"),
+      limit: readIntegerOption(parsedArgv, "limit")
+    });
+    const command =
+      resource === "summary"
+        ? dependencies.getAnalyticsSummaryCommand ?? defaultGetAnalyticsSummaryCommand
+        : resource === "routes"
+          ? dependencies.getAnalyticsRoutesCommand ?? defaultGetAnalyticsRoutesCommand
+          : resource === "devices"
+            ? dependencies.getAnalyticsDevicesCommand ?? defaultGetAnalyticsDevicesCommand
+            : dependencies.getAnalyticsReferrersCommand ?? defaultGetAnalyticsReferrersCommand;
+
+    return await command(input);
+  }
+
+  if (resource === "funnel") {
+    expectNoUnknownOptions(parsedArgv, [
+      "project",
+      "project-id",
+      "from",
+      "to",
+      "last",
+      "granularity",
+      "service",
+      "environment",
+      "limit",
+      "auth-file",
+      "json"
+    ]);
+    ensureNoExtraPositionals(parsedArgv, 3);
+    const funnelKey = requirePositional(parsedArgv, 2, "funnel key");
+    const projectId = readProjectOption(parsedArgv);
+    if (projectId === undefined) {
+      throw new CliInputError("Missing required option --project.");
+    }
+
+    return await (dependencies.getAnalyticsFunnelCommand ?? defaultGetAnalyticsFunnelCommand)(
       appendCommonAuthOptions(parsedArgv, {
         projectId,
+        funnelKey,
         from: readStringOption(parsedArgv, "from"),
         to: readStringOption(parsedArgv, "to"),
         last: readStringOption(parsedArgv, "last"),

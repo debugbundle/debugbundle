@@ -11,6 +11,14 @@ import {
 const PROJECT_ID = "00000000-0000-0000-0000-000000000001";
 const FROM = "2026-03-01T00:00:00.000Z";
 const TO = "2026-03-08T00:00:00.000Z";
+const metricsWindow = {
+  project_id: PROJECT_ID,
+  from: FROM,
+  to: TO,
+  granularity: "day",
+  service: null,
+  environment: null
+} as const;
 
 const summaryResponse = {
   summary: {
@@ -105,7 +113,31 @@ describe("cli analytics metrics commands", () => {
   });
 
   it("builds GET requests against the analytics summary API", async () => {
-    const request = vi.fn().mockResolvedValue({ status: 200, body: summaryResponse });
+    const request = vi.fn()
+      .mockResolvedValueOnce({ status: 200, body: summaryResponse })
+      .mockResolvedValueOnce({ status: 200, body: { window: metricsWindow, routes: [] } })
+      .mockResolvedValueOnce({
+        status: 200,
+        body: { window: metricsWindow, device_types: [], browsers: [], os: [], languages: [] }
+      })
+      .mockResolvedValueOnce({
+        status: 200,
+        body: { window: metricsWindow, referrers: [], utm_sources: [], utm_mediums: [], utm_campaigns: [] }
+      })
+      .mockResolvedValueOnce({
+        status: 200,
+        body: {
+          funnel: {
+            ...metricsWindow,
+            funnel_key: "checkout",
+            sessions_entered: 0,
+            sessions_completed: 0,
+            dropoffs: 0,
+            conversion_rate: 0
+          },
+          steps: []
+        }
+      });
     const api = createAnalyticsMetricsApi({ request });
 
     await api.getUsageSummary({
@@ -118,10 +150,34 @@ describe("cli analytics metrics commands", () => {
       environment: "production",
       limit: 5
     });
+    await api.getRouteMetrics({ bearerToken: "dbundle_mem_x", projectId: PROJECT_ID });
+    await api.getDeviceBreakdown({ bearerToken: "dbundle_mem_x", projectId: PROJECT_ID });
+    await api.getReferrerMetrics({ bearerToken: "dbundle_mem_x", projectId: PROJECT_ID });
+    await api.getFunnelAnalysis({ bearerToken: "dbundle_mem_x", projectId: PROJECT_ID, funnelKey: "checkout" });
 
     expect(request).toHaveBeenCalledWith({
       method: "GET",
       path: `/v1/analytics/summary?project_id=${PROJECT_ID}&from=${encodeURIComponent(FROM)}&to=${encodeURIComponent(TO)}&granularity=day&service=web&environment=production&limit=5`,
+      bearerToken: "dbundle_mem_x"
+    });
+    expect(request).toHaveBeenCalledWith({
+      method: "GET",
+      path: `/v1/analytics/routes?project_id=${PROJECT_ID}`,
+      bearerToken: "dbundle_mem_x"
+    });
+    expect(request).toHaveBeenCalledWith({
+      method: "GET",
+      path: `/v1/analytics/devices?project_id=${PROJECT_ID}`,
+      bearerToken: "dbundle_mem_x"
+    });
+    expect(request).toHaveBeenCalledWith({
+      method: "GET",
+      path: `/v1/analytics/referrers?project_id=${PROJECT_ID}`,
+      bearerToken: "dbundle_mem_x"
+    });
+    expect(request).toHaveBeenCalledWith({
+      method: "GET",
+      path: `/v1/analytics/funnels/checkout?project_id=${PROJECT_ID}`,
       bearerToken: "dbundle_mem_x"
     });
   });

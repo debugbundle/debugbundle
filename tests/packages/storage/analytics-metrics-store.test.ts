@@ -89,4 +89,96 @@ describe("analytics metrics store", () => {
       }
     });
   });
+
+  it("reads route, referrer, device, and funnel aggregates from rollups", async (): Promise<void> => {
+    const queryMock = vi.fn(async (sqlText: string, params: unknown[]) => {
+      if (sqlText.includes("FROM analytics_route_rollups")) {
+        return {
+          rows: [{
+            route_key: "/pricing",
+            pageviews: "40",
+            unique_sessions: "22",
+            entrances: "15",
+            exits: "6",
+            bounces: "3",
+            linked_incident_sessions: "2"
+          }]
+        };
+      }
+
+      if (sqlText.includes("FROM analytics_funnel_rollups")) {
+        expect(params).toContain("checkout");
+        return {
+          rows: [{
+            step_key: "payment",
+            step_order: 2,
+            sessions_entered: "20",
+            sessions_completed: "12",
+            dropoffs: "8"
+          }]
+        };
+      }
+
+      if (sqlText.includes("FROM analytics_session_rollups") && sqlText.includes("GROUP BY value")) {
+        if (sqlText.includes("device_type")) {
+          return { rows: [{ value: "mobile", sessions: "8", pageviews: "17" }] };
+        }
+        if (sqlText.includes("referrer_domain")) {
+          return { rows: [{ value: "google.com", sessions: "5", pageviews: "12" }] };
+        }
+        if (sqlText.includes("utm_source")) {
+          return { rows: [{ value: "google", sessions: "4", pageviews: "10" }] };
+        }
+        return { rows: [] };
+      }
+
+      throw new Error(`Unhandled analytics metrics SQL: ${sqlText}`);
+    });
+
+    const store = createPostgresAnalyticsMetricsStore({ query: queryMock as Queryable["query"] });
+    const input = {
+      project_id: PROJECT_ID,
+      from: "2026-03-01T00:00:00.000Z",
+      to: "2026-03-08T00:00:00.000Z",
+      granularity: "day" as const
+    };
+
+    await expect(store.getRouteMetrics(input)).resolves.toEqual({
+      window: expect.objectContaining({ project_id: PROJECT_ID }),
+      routes: [{
+        route_key: "/pricing",
+        pageviews: 40,
+        unique_sessions: 22,
+        entrances: 15,
+        exits: 6,
+        bounces: 3,
+        linked_incident_sessions: 2
+      }]
+    });
+    await expect(store.getDeviceBreakdown(input)).resolves.toMatchObject({
+      device_types: [{ value: "mobile", sessions: 8, pageviews: 17 }]
+    });
+    await expect(store.getReferrerMetrics(input)).resolves.toMatchObject({
+      referrers: [{ value: "google.com", sessions: 5, pageviews: 12 }],
+      utm_sources: [{ value: "google", sessions: 4, pageviews: 10 }]
+    });
+    await expect(store.getFunnelAnalysis({ ...input, funnel_key: "checkout" })).resolves.toEqual({
+      funnel: expect.objectContaining({
+        project_id: PROJECT_ID,
+        funnel_key: "checkout",
+        sessions_entered: 20,
+        sessions_completed: 12,
+        dropoffs: 8,
+        conversion_rate: 0.6
+      }),
+      steps: [{
+        step_key: "payment",
+        step_order: 2,
+        sessions_entered: 20,
+        sessions_completed: 12,
+        dropoffs: 8,
+        conversion_rate: 0.6
+      }]
+    });
+  });
 });

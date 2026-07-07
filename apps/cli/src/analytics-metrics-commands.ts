@@ -1,6 +1,14 @@
 import {
+  AnalyticsDeviceBreakdownResponseSchema,
+  AnalyticsFunnelAnalysisResponseSchema,
+  AnalyticsReferrerMetricsResponseSchema,
+  AnalyticsRouteMetricsResponseSchema,
   AnalyticsUsageSummaryResponseSchema,
+  type AnalyticsDeviceBreakdownResponse,
+  type AnalyticsFunnelAnalysisResponse,
   type AnalyticsMetricsGranularity,
+  type AnalyticsReferrerMetricsResponse,
+  type AnalyticsRouteMetricsResponse,
   type AnalyticsUsageSummaryResponse
 } from "../../../packages/shared-types/src/index.js";
 import { createCliHttpClient, runAuthenticatedCliCommand } from "./auth-context.js";
@@ -42,6 +50,12 @@ export interface AnalyticsSummaryCommandInput {
   json?: boolean | undefined;
 }
 
+type AnalyticsMetricQueryInput = Omit<AnalyticsSummaryCommandInput, "json">;
+
+export interface AnalyticsFunnelCommandInput extends AnalyticsSummaryCommandInput {
+  funnelKey: string;
+}
+
 function toApiError(status: number, body: unknown, fallback: string): AnalyticsMetricsApiError {
   if (typeof body === "object" && body !== null && "error" in body && typeof body.error === "string") {
     return new AnalyticsMetricsApiError(status, body.error);
@@ -53,24 +67,17 @@ function toApiError(status: number, body: unknown, fallback: string): AnalyticsM
 export function createAnalyticsMetricsApi(httpClient: {
   request(request: AnalyticsMetricsHttpRequest): Promise<AnalyticsMetricsHttpResponse>;
 }): {
-  getUsageSummary(input: Omit<AnalyticsSummaryCommandInput, "json">): Promise<AnalyticsUsageSummaryResponse>;
+  getUsageSummary(input: AnalyticsMetricQueryInput): Promise<AnalyticsUsageSummaryResponse>;
+  getRouteMetrics(input: AnalyticsMetricQueryInput): Promise<AnalyticsRouteMetricsResponse>;
+  getDeviceBreakdown(input: AnalyticsMetricQueryInput): Promise<AnalyticsDeviceBreakdownResponse>;
+  getReferrerMetrics(input: AnalyticsMetricQueryInput): Promise<AnalyticsReferrerMetricsResponse>;
+  getFunnelAnalysis(input: Omit<AnalyticsFunnelCommandInput, "json">): Promise<AnalyticsFunnelAnalysisResponse>;
 } {
   return {
     async getUsageSummary(input): Promise<AnalyticsUsageSummaryResponse> {
-      const params = new URLSearchParams({ project_id: input.projectId });
-      appendOptionalParam(params, "from", input.from);
-      appendOptionalParam(params, "to", input.to);
-      appendOptionalParam(params, "last", input.last);
-      appendOptionalParam(params, "granularity", input.granularity);
-      appendOptionalParam(params, "service", input.service);
-      appendOptionalParam(params, "environment", input.environment);
-      if (input.limit !== undefined) {
-        params.set("limit", String(input.limit));
-      }
-
       const response = await httpClient.request({
         method: "GET",
-        path: `/v1/analytics/summary?${params.toString()}`,
+        path: `/v1/analytics/summary?${buildMetricsQueryString(input)}`,
         bearerToken: input.bearerToken
       });
 
@@ -84,8 +91,87 @@ export function createAnalyticsMetricsApi(httpClient: {
       }
 
       return parsed.data;
+    },
+
+    async getRouteMetrics(input): Promise<AnalyticsRouteMetricsResponse> {
+      const response = await httpClient.request({
+        method: "GET",
+        path: `/v1/analytics/routes?${buildMetricsQueryString(input)}`,
+        bearerToken: input.bearerToken
+      });
+      if (response.status !== 200) {
+        throw toApiError(response.status, response.body, "Failed to get analytics route metrics.");
+      }
+      const parsed = AnalyticsRouteMetricsResponseSchema.safeParse(response.body);
+      if (!parsed.success) {
+        throw new AnalyticsMetricsApiError(500, "Invalid analytics route metrics response.");
+      }
+      return parsed.data;
+    },
+
+    async getDeviceBreakdown(input): Promise<AnalyticsDeviceBreakdownResponse> {
+      const response = await httpClient.request({
+        method: "GET",
+        path: `/v1/analytics/devices?${buildMetricsQueryString(input)}`,
+        bearerToken: input.bearerToken
+      });
+      if (response.status !== 200) {
+        throw toApiError(response.status, response.body, "Failed to get analytics device breakdown.");
+      }
+      const parsed = AnalyticsDeviceBreakdownResponseSchema.safeParse(response.body);
+      if (!parsed.success) {
+        throw new AnalyticsMetricsApiError(500, "Invalid analytics device breakdown response.");
+      }
+      return parsed.data;
+    },
+
+    async getReferrerMetrics(input): Promise<AnalyticsReferrerMetricsResponse> {
+      const response = await httpClient.request({
+        method: "GET",
+        path: `/v1/analytics/referrers?${buildMetricsQueryString(input)}`,
+        bearerToken: input.bearerToken
+      });
+      if (response.status !== 200) {
+        throw toApiError(response.status, response.body, "Failed to get analytics referrer metrics.");
+      }
+      const parsed = AnalyticsReferrerMetricsResponseSchema.safeParse(response.body);
+      if (!parsed.success) {
+        throw new AnalyticsMetricsApiError(500, "Invalid analytics referrer metrics response.");
+      }
+      return parsed.data;
+    },
+
+    async getFunnelAnalysis(input): Promise<AnalyticsFunnelAnalysisResponse> {
+      const response = await httpClient.request({
+        method: "GET",
+        path: `/v1/analytics/funnels/${encodeURIComponent(input.funnelKey)}?${buildMetricsQueryString(input)}`,
+        bearerToken: input.bearerToken
+      });
+      if (response.status !== 200) {
+        throw toApiError(response.status, response.body, "Failed to get analytics funnel analysis.");
+      }
+      const parsed = AnalyticsFunnelAnalysisResponseSchema.safeParse(response.body);
+      if (!parsed.success) {
+        throw new AnalyticsMetricsApiError(500, "Invalid analytics funnel analysis response.");
+      }
+      return parsed.data;
     }
   };
+}
+
+function buildMetricsQueryString(input: AnalyticsMetricQueryInput): string {
+  const params = new URLSearchParams({ project_id: input.projectId });
+  appendOptionalParam(params, "from", input.from);
+  appendOptionalParam(params, "to", input.to);
+  appendOptionalParam(params, "last", input.last);
+  appendOptionalParam(params, "granularity", input.granularity);
+  appendOptionalParam(params, "service", input.service);
+  appendOptionalParam(params, "environment", input.environment);
+  if (input.limit !== undefined) {
+    params.set("limit", String(input.limit));
+  }
+
+  return params.toString();
 }
 
 function appendOptionalParam(params: URLSearchParams, key: string, value: string | undefined): void {
@@ -147,7 +233,7 @@ function formatSummary(response: AnalyticsUsageSummaryResponse): string {
 export async function getAnalyticsSummaryCommand(
   input: AnalyticsSummaryCommandInput,
   api: {
-    getUsageSummary(input: Omit<AnalyticsSummaryCommandInput, "json">): Promise<AnalyticsUsageSummaryResponse>;
+    getUsageSummary(input: AnalyticsMetricQueryInput): Promise<AnalyticsUsageSummaryResponse>;
   }
 ): Promise<CliCommandResult> {
   try {
@@ -166,6 +252,135 @@ export async function getAnalyticsSummaryCommand(
     return {
       exitCode: 0,
       output: input.json ? JSON.stringify(response) : formatSummary(response)
+    };
+  } catch (error) {
+    return {
+      exitCode: mapErrorToExitCode(error),
+      output: error instanceof Error ? error.message : String(error)
+    };
+  }
+}
+
+function formatRoutes(response: AnalyticsRouteMetricsResponse): string {
+  if (response.routes.length === 0) {
+    return "No route metrics found.";
+  }
+
+  return response.routes
+    .map((route) => `${route.route_key}: ${route.pageviews} pageviews, ${route.unique_sessions} sessions, ${route.exits} exits`)
+    .join("\n");
+}
+
+function formatSegmentList(
+  label: string,
+  segments: Array<{ value: string; sessions: number; pageviews: number }>
+): string {
+  return formatTopSegments(label, segments);
+}
+
+function formatDeviceBreakdown(response: AnalyticsDeviceBreakdownResponse): string {
+  return [
+    formatSegmentList("device_types", response.device_types),
+    formatSegmentList("browsers", response.browsers),
+    formatSegmentList("os", response.os),
+    formatSegmentList("languages", response.languages)
+  ].join("\n");
+}
+
+function formatReferrerMetrics(response: AnalyticsReferrerMetricsResponse): string {
+  return [
+    formatSegmentList("referrers", response.referrers),
+    formatSegmentList("utm_sources", response.utm_sources),
+    formatSegmentList("utm_mediums", response.utm_mediums),
+    formatSegmentList("utm_campaigns", response.utm_campaigns)
+  ].join("\n");
+}
+
+function formatFunnelAnalysis(response: AnalyticsFunnelAnalysisResponse): string {
+  return [
+    `funnel_key: ${response.funnel.funnel_key}`,
+    `sessions_entered: ${response.funnel.sessions_entered}`,
+    `sessions_completed: ${response.funnel.sessions_completed}`,
+    `dropoffs: ${response.funnel.dropoffs}`,
+    `conversion_rate: ${response.funnel.conversion_rate}`,
+    ...response.steps.map((step) =>
+      `${step.step_key}: ${step.sessions_entered} entered, ${step.sessions_completed} completed, ${step.dropoffs} dropoffs`
+    )
+  ].join("\n");
+}
+
+async function runAnalyticsMetricCommand<Response>(
+  input: AnalyticsSummaryCommandInput,
+  apiCall: (request: AnalyticsMetricQueryInput) => Promise<Response>,
+  format: (response: Response) => string
+): Promise<CliCommandResult> {
+  try {
+    const response = await apiCall({
+      bearerToken: input.bearerToken,
+      projectId: input.projectId,
+      from: input.from,
+      to: input.to,
+      last: input.last,
+      granularity: input.granularity,
+      service: input.service,
+      environment: input.environment,
+      limit: input.limit
+    });
+
+    return {
+      exitCode: 0,
+      output: input.json ? JSON.stringify(response) : format(response)
+    };
+  } catch (error) {
+    return {
+      exitCode: mapErrorToExitCode(error),
+      output: error instanceof Error ? error.message : String(error)
+    };
+  }
+}
+
+export async function getAnalyticsRoutesCommand(
+  input: AnalyticsSummaryCommandInput,
+  api: { getRouteMetrics(input: AnalyticsMetricQueryInput): Promise<AnalyticsRouteMetricsResponse> }
+): Promise<CliCommandResult> {
+  return runAnalyticsMetricCommand(input, (request) => api.getRouteMetrics(request), formatRoutes);
+}
+
+export async function getAnalyticsDevicesCommand(
+  input: AnalyticsSummaryCommandInput,
+  api: { getDeviceBreakdown(input: AnalyticsMetricQueryInput): Promise<AnalyticsDeviceBreakdownResponse> }
+): Promise<CliCommandResult> {
+  return runAnalyticsMetricCommand(input, (request) => api.getDeviceBreakdown(request), formatDeviceBreakdown);
+}
+
+export async function getAnalyticsReferrersCommand(
+  input: AnalyticsSummaryCommandInput,
+  api: { getReferrerMetrics(input: AnalyticsMetricQueryInput): Promise<AnalyticsReferrerMetricsResponse> }
+): Promise<CliCommandResult> {
+  return runAnalyticsMetricCommand(input, (request) => api.getReferrerMetrics(request), formatReferrerMetrics);
+}
+
+export async function getAnalyticsFunnelCommand(
+  input: AnalyticsFunnelCommandInput,
+  api: { getFunnelAnalysis(input: Omit<AnalyticsFunnelCommandInput, "json">): Promise<AnalyticsFunnelAnalysisResponse> }
+): Promise<CliCommandResult> {
+  try {
+    const response = await api.getFunnelAnalysis({
+      bearerToken: input.bearerToken,
+      projectId: input.projectId,
+      funnelKey: input.funnelKey,
+      from: input.from,
+      to: input.to,
+      last: input.last,
+      granularity: input.granularity,
+      service: input.service,
+      environment: input.environment,
+      limit: input.limit
+    });
+
+    return {
+      exitCode: 0,
+      output: input.json ? JSON.stringify(response) : formatFunnelAnalysis(response)
     };
   } catch (error) {
     return {
@@ -235,4 +450,79 @@ export async function getAnalyticsSummaryWithAuthCommand(
       );
     }
   });
+}
+
+type AnalyticsMetricWithAuthInput = Omit<AnalyticsSummaryCommandInput, "bearerToken"> & { authFilePath?: string };
+type AnalyticsFunnelWithAuthInput = Omit<AnalyticsFunnelCommandInput, "bearerToken"> & { authFilePath?: string };
+
+async function runAnalyticsMetricWithAuthCommand(
+  input: AnalyticsMetricWithAuthInput,
+  dependencies: Parameters<typeof createAuthenticatedAnalyticsMetricsApi>[1] | undefined,
+  run: (authState: CliAuthState, api: ReturnType<typeof createAnalyticsMetricsApi>) => Promise<CliCommandResult>
+): Promise<CliCommandResult> {
+  return runAuthenticatedCliCommand(input, {
+    createApi: createAuthenticatedAnalyticsMetricsApi,
+    dependencies,
+    runCommand: run
+  });
+}
+
+function withBearerToken(
+  authState: CliAuthState,
+  input: AnalyticsMetricWithAuthInput
+): AnalyticsSummaryCommandInput {
+  return {
+    bearerToken: authState.bearer_token,
+    projectId: input.projectId,
+    from: input.from,
+    to: input.to,
+    last: input.last,
+    granularity: input.granularity,
+    service: input.service,
+    environment: input.environment,
+    limit: input.limit,
+    json: input.json
+  };
+}
+
+export async function getAnalyticsRoutesWithAuthCommand(
+  input: AnalyticsMetricWithAuthInput,
+  dependencies?: Parameters<typeof createAuthenticatedAnalyticsMetricsApi>[1]
+): Promise<CliCommandResult> {
+  return runAnalyticsMetricWithAuthCommand(input, dependencies, (authState, api) =>
+    getAnalyticsRoutesCommand(withBearerToken(authState, input), api)
+  );
+}
+
+export async function getAnalyticsDevicesWithAuthCommand(
+  input: AnalyticsMetricWithAuthInput,
+  dependencies?: Parameters<typeof createAuthenticatedAnalyticsMetricsApi>[1]
+): Promise<CliCommandResult> {
+  return runAnalyticsMetricWithAuthCommand(input, dependencies, (authState, api) =>
+    getAnalyticsDevicesCommand(withBearerToken(authState, input), api)
+  );
+}
+
+export async function getAnalyticsReferrersWithAuthCommand(
+  input: AnalyticsMetricWithAuthInput,
+  dependencies?: Parameters<typeof createAuthenticatedAnalyticsMetricsApi>[1]
+): Promise<CliCommandResult> {
+  return runAnalyticsMetricWithAuthCommand(input, dependencies, (authState, api) =>
+    getAnalyticsReferrersCommand(withBearerToken(authState, input), api)
+  );
+}
+
+export async function getAnalyticsFunnelWithAuthCommand(
+  input: AnalyticsFunnelWithAuthInput,
+  dependencies?: Parameters<typeof createAuthenticatedAnalyticsMetricsApi>[1]
+): Promise<CliCommandResult> {
+  return runAnalyticsMetricWithAuthCommand(input, dependencies, (authState, api) =>
+    getAnalyticsFunnelCommand(
+      {
+        ...withBearerToken(authState, input),
+        funnelKey: input.funnelKey
+      },
+      api
+    )
+  );
 }

@@ -1,7 +1,15 @@
 import {
+  AnalyticsDeviceBreakdownResponseSchema,
+  AnalyticsFunnelAnalysisResponseSchema,
+  AnalyticsReferrerMetricsResponseSchema,
+  AnalyticsRouteMetricsResponseSchema,
   AnalyticsUsageSummaryResponseSchema,
+  type AnalyticsDeviceBreakdownResponse,
+  type AnalyticsFunnelAnalysisResponse,
   type AnalyticsMetricsGranularity,
   type AnalyticsMetricsSegment,
+  type AnalyticsReferrerMetricsResponse,
+  type AnalyticsRouteMetricsResponse,
   type AnalyticsUsageSummaryResponse
 } from "../../shared-types/src/index.js";
 import type { Queryable } from "./types.js";
@@ -16,8 +24,16 @@ export interface AnalyticsUsageSummaryInput {
   limit?: number | undefined;
 }
 
+export interface AnalyticsFunnelAnalysisInput extends AnalyticsUsageSummaryInput {
+  funnel_key: string;
+}
+
 export interface AnalyticsMetricsStore {
   getUsageSummary(input: AnalyticsUsageSummaryInput): Promise<AnalyticsUsageSummaryResponse>;
+  getRouteMetrics(input: AnalyticsUsageSummaryInput): Promise<AnalyticsRouteMetricsResponse>;
+  getDeviceBreakdown(input: AnalyticsUsageSummaryInput): Promise<AnalyticsDeviceBreakdownResponse>;
+  getReferrerMetrics(input: AnalyticsUsageSummaryInput): Promise<AnalyticsReferrerMetricsResponse>;
+  getFunnelAnalysis(input: AnalyticsFunnelAnalysisInput): Promise<AnalyticsFunnelAnalysisResponse>;
 }
 
 type AnalyticsSummaryTotalsRow = {
@@ -44,7 +60,28 @@ type AnalyticsSegmentKey =
   | "os"
   | "languages"
   | "referrers"
+  | "utm_sources"
+  | "utm_mediums"
+  | "utm_campaigns"
   | "auth_states";
+
+type AnalyticsRouteMetricRow = {
+  route_key: unknown;
+  pageviews: unknown;
+  unique_sessions: unknown;
+  entrances: unknown;
+  exits: unknown;
+  bounces: unknown;
+  linked_incident_sessions: unknown;
+};
+
+type AnalyticsFunnelStepMetricRow = {
+  step_key: unknown;
+  step_order: unknown;
+  sessions_entered: unknown;
+  sessions_completed: unknown;
+  dropoffs: unknown;
+};
 
 const DEFAULT_SEGMENT_LIMIT = 10;
 
@@ -54,6 +91,9 @@ const SEGMENT_EXPRESSIONS: Record<AnalyticsSegmentKey, string> = {
   os: "COALESCE(NULLIF(os_family, ''), 'unknown')",
   languages: "COALESCE(NULLIF(language, ''), 'unknown')",
   referrers: "COALESCE(NULLIF(dimensions->>'referrer_domain', ''), 'direct')",
+  utm_sources: "COALESCE(NULLIF(dimensions->>'utm_source', ''), 'none')",
+  utm_mediums: "COALESCE(NULLIF(dimensions->>'utm_medium', ''), 'none')",
+  utm_campaigns: "COALESCE(NULLIF(dimensions->>'utm_campaign', ''), 'none')",
   auth_states: "COALESCE(NULLIF(auth_state, ''), 'unknown')"
 };
 
@@ -104,6 +144,133 @@ export function createPostgresAnalyticsMetricsStore(db: Queryable): AnalyticsMet
           referrers,
           auth_states: authStates
         }
+      });
+    },
+
+    async getRouteMetrics(input) {
+      const limit = normalizeLimit(input.limit);
+      const where = buildAnalyticsRollupWhere(input);
+      const result = await db.query<AnalyticsRouteMetricRow>(
+        `
+          SELECT
+            route_key,
+            COALESCE(SUM(pageviews), 0)::bigint AS pageviews,
+            COALESCE(SUM(unique_sessions), 0)::bigint AS unique_sessions,
+            COALESCE(SUM(entrances), 0)::bigint AS entrances,
+            COALESCE(SUM(exits), 0)::bigint AS exits,
+            COALESCE(SUM(bounces), 0)::bigint AS bounces,
+            COALESCE(SUM(linked_incident_sessions), 0)::bigint AS linked_incident_sessions
+          FROM analytics_route_rollups
+          ${where.sql}
+          GROUP BY route_key
+          ORDER BY pageviews DESC, route_key ASC
+          LIMIT $${where.params.length + 1}
+        `,
+        [...where.params, limit]
+      );
+
+      return AnalyticsRouteMetricsResponseSchema.parse({
+        window: buildWindow(input),
+        routes: result.rows.map((row) => ({
+          route_key: toNonEmptyString(row.route_key, "unknown"),
+          pageviews: toNonNegativeInteger(row.pageviews),
+          unique_sessions: toNonNegativeInteger(row.unique_sessions),
+          entrances: toNonNegativeInteger(row.entrances),
+          exits: toNonNegativeInteger(row.exits),
+          bounces: toNonNegativeInteger(row.bounces),
+          linked_incident_sessions: toNonNegativeInteger(row.linked_incident_sessions)
+        }))
+      });
+    },
+
+    async getDeviceBreakdown(input) {
+      const limit = normalizeLimit(input.limit);
+      const [deviceTypes, browsers, os, languages] = await Promise.all([
+        readSegments(db, input, "device_types", limit),
+        readSegments(db, input, "browsers", limit),
+        readSegments(db, input, "os", limit),
+        readSegments(db, input, "languages", limit)
+      ]);
+
+      return AnalyticsDeviceBreakdownResponseSchema.parse({
+        window: buildWindow(input),
+        device_types: deviceTypes,
+        browsers,
+        os,
+        languages
+      });
+    },
+
+    async getReferrerMetrics(input) {
+      const limit = normalizeLimit(input.limit);
+      const [referrers, utmSources, utmMediums, utmCampaigns] = await Promise.all([
+        readSegments(db, input, "referrers", limit),
+        readSegments(db, input, "utm_sources", limit),
+        readSegments(db, input, "utm_mediums", limit),
+        readSegments(db, input, "utm_campaigns", limit)
+      ]);
+
+      return AnalyticsReferrerMetricsResponseSchema.parse({
+        window: buildWindow(input),
+        referrers,
+        utm_sources: utmSources,
+        utm_mediums: utmMediums,
+        utm_campaigns: utmCampaigns
+      });
+    },
+
+    async getFunnelAnalysis(input) {
+      const baseWhere = buildAnalyticsRollupWhere(input);
+      const where = {
+        sql: `${baseWhere.sql}\n        AND funnel_key = $${baseWhere.params.length + 1}`,
+        params: [...baseWhere.params, input.funnel_key]
+      };
+      const result = await db.query<AnalyticsFunnelStepMetricRow>(
+        `
+          SELECT
+            step_key,
+            MIN(step_order)::integer AS step_order,
+            COALESCE(SUM(sessions_entered), 0)::bigint AS sessions_entered,
+            COALESCE(SUM(sessions_completed), 0)::bigint AS sessions_completed,
+            COALESCE(SUM(dropoffs), 0)::bigint AS dropoffs
+          FROM analytics_funnel_rollups
+          ${where.sql}
+          GROUP BY step_key
+          ORDER BY step_order ASC, step_key ASC
+        `,
+        where.params
+      );
+      const steps = result.rows.map((row) => {
+        const sessionsEntered = toNonNegativeInteger(row.sessions_entered);
+        const sessionsCompleted = toNonNegativeInteger(row.sessions_completed);
+        return {
+          step_key: toNonEmptyString(row.step_key, "unknown"),
+          step_order: toNonNegativeInteger(row.step_order),
+          sessions_entered: sessionsEntered,
+          sessions_completed: sessionsCompleted,
+          dropoffs: toNonNegativeInteger(row.dropoffs),
+          conversion_rate: toConversionRate(sessionsCompleted, sessionsEntered)
+        };
+      });
+      const totals = steps.reduce(
+        (sum, step) => ({
+          sessions_entered: sum.sessions_entered + step.sessions_entered,
+          sessions_completed: sum.sessions_completed + step.sessions_completed,
+          dropoffs: sum.dropoffs + step.dropoffs
+        }),
+        { sessions_entered: 0, sessions_completed: 0, dropoffs: 0 }
+      );
+
+      return AnalyticsFunnelAnalysisResponseSchema.parse({
+        funnel: {
+          ...buildWindow(input),
+          funnel_key: input.funnel_key,
+          sessions_entered: totals.sessions_entered,
+          sessions_completed: totals.sessions_completed,
+          dropoffs: totals.dropoffs,
+          conversion_rate: toConversionRate(totals.sessions_completed, totals.sessions_entered)
+        },
+        steps
       });
     }
   };
@@ -193,7 +360,7 @@ async function readSegments(
 
 function buildAnalyticsRollupWhere(
   input: AnalyticsUsageSummaryInput,
-  options: { extraConditions?: string[] } = {}
+  options: { extraConditions?: string[]; extraParams?: unknown[] } = {}
 ): { sql: string; params: unknown[] } {
   const conditions = [
     "project_id = $1",
@@ -213,6 +380,10 @@ function buildAnalyticsRollupWhere(
     conditions.push(`environment = $${params.length}`);
   }
 
+  for (const extraParam of options.extraParams ?? []) {
+    params.push(extraParam);
+  }
+
   for (const condition of options.extraConditions ?? []) {
     conditions.push(condition);
   }
@@ -220,6 +391,24 @@ function buildAnalyticsRollupWhere(
   return {
     sql: `WHERE ${conditions.join("\n        AND ")}`,
     params
+  };
+}
+
+function buildWindow(input: AnalyticsUsageSummaryInput): {
+  project_id: string;
+  from: string;
+  to: string;
+  granularity: AnalyticsMetricsGranularity;
+  service: string | null;
+  environment: string | null;
+} {
+  return {
+    project_id: input.project_id,
+    from: input.from,
+    to: input.to,
+    granularity: input.granularity,
+    service: input.service ?? null,
+    environment: input.environment ?? null
   };
 }
 
@@ -244,4 +433,12 @@ function toNonNegativeInteger(value: unknown): number {
   }
 
   return 0;
+}
+
+function toNonEmptyString(value: unknown, fallback: string): string {
+  return typeof value === "string" && value.trim().length > 0 ? value : fallback;
+}
+
+function toConversionRate(completed: number, entered: number): number {
+  return entered > 0 ? Math.min(1, Math.max(0, completed / entered)) : 0;
 }
