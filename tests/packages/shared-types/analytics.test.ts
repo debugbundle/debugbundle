@@ -197,6 +197,46 @@ describe("analytics event envelope schema", () => {
     expect(AnalyticsEventEnvelopeSchema.safeParse(event).success).toBe(false);
   });
 
+  it("accepts bounded previous route context for route-change analytics", () => {
+    const validRouteChange = createAnalyticsEvent({
+      payload: {
+        kind: "route_change",
+        route: {
+          path: "/checkout",
+          normalized_path: "/checkout",
+          title: "Checkout",
+        },
+        previous_route: {
+          path: "/pricing",
+          normalized_path: "/pricing",
+          title: "Pricing",
+        },
+        dimensions: createDimensions(),
+        custom_dimensions: {},
+      },
+    });
+    const invalidPreviousRoute = createAnalyticsEvent({
+      payload: {
+        kind: "route_change",
+        route: {
+          path: "/checkout",
+          normalized_path: "/checkout",
+          title: "Checkout",
+        },
+        previous_route: {
+          path: "/pricing?token=secret",
+          normalized_path: "/pricing",
+          title: "Pricing",
+        },
+        dimensions: createDimensions(),
+        custom_dimensions: {},
+      },
+    });
+
+    expect(AnalyticsEventEnvelopeSchema.safeParse(validRouteChange).success).toBe(true);
+    expect(AnalyticsEventEnvelopeSchema.safeParse(invalidPreviousRoute).success).toBe(false);
+  });
+
   it("requires bounded signal keys for action, funnel, conversion, and marker events", () => {
     const actionWithoutKey = createAnalyticsEvent({
       payload: {

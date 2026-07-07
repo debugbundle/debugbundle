@@ -59,6 +59,46 @@ function createPageViewEvent(overrides: Partial<AnalyticsEventEnvelope> = {}): A
   };
 }
 
+function createRouteChangeEvent(overrides: Partial<AnalyticsEventEnvelope> = {}): AnalyticsEventEnvelope {
+  return createPageViewEvent({
+    event_id: "550e8400-e29b-41d4-a716-446655440001",
+    payload: {
+      kind: "route_change",
+      route: {
+        path: "/checkout",
+        normalized_path: "/checkout",
+        title: "Checkout"
+      },
+      previous_route: {
+        path: "/pricing",
+        normalized_path: "/pricing",
+        title: "Pricing"
+      },
+      dimensions: {
+        auth_state: "anonymous",
+        device_type: "desktop",
+        browser_family: "Chrome",
+        browser_major: 125,
+        os_family: "macOS",
+        os_major: 14,
+        language: "en",
+        locale: "en-US",
+        viewport_bucket: "large",
+        referrer_domain: "google.com",
+        utm_source: "google",
+        utm_medium: "cpc",
+        utm_campaign: "summer",
+        country_code: null,
+        region_code: null
+      },
+      custom_dimensions: {
+        account_tier: "team"
+      }
+    },
+    ...overrides
+  } as Partial<AnalyticsEventEnvelope>);
+}
+
 function createTransactionalDb(query: Queryable["query"]): Queryable {
   return {
     query,
@@ -103,6 +143,45 @@ describe("analytics rollup store", () => {
     expect(sqlCalls.filter((sql) => sql.includes("INSERT INTO analytics_route_rollups"))).toHaveLength(2);
     expect(queryMock.mock.calls.some(([, params]) => JSON.stringify(params).includes("account_tier"))).toBe(true);
     expect(queryMock.mock.calls.some(([, params]) => JSON.stringify(params).includes("google.com"))).toBe(true);
+  });
+
+  it("records route-change transitions into hourly and daily rollups", async (): Promise<void> => {
+    const queryMock = vi.fn(async (sqlText: string, params: unknown[]) => {
+      void params;
+      if (sqlText.includes("INSERT INTO analytics_ingestion_ledger")) {
+        return { rows: [{ event_id: "550e8400-e29b-41d4-a716-446655440001" }] };
+      }
+      if (sqlText.includes("INSERT INTO analytics_rollup_uniques")) {
+        return { rows: [{ subject_hash: "subject_hash" }] };
+      }
+      if (
+        sqlText.includes("INSERT INTO analytics_session_rollups") ||
+        sqlText.includes("INSERT INTO analytics_route_rollups") ||
+        sqlText.includes("INSERT INTO analytics_transition_rollups")
+      ) {
+        return { rows: [] };
+      }
+
+      throw new Error(`Unhandled analytics rollup SQL: ${sqlText}`);
+    });
+
+    const store = createPostgresAnalyticsRollupStore(
+      createTransactionalDb(queryMock as Queryable["query"])
+    );
+
+    await expect(
+      store.recordAnalyticsEvent({
+        project_id: "11111111-1111-4111-8111-111111111111",
+        event: createRouteChangeEvent()
+      })
+    ).resolves.toEqual({ recorded: true });
+
+    const transitionCalls = queryMock.mock.calls.filter(([sql]) =>
+      String(sql).includes("INSERT INTO analytics_transition_rollups")
+    );
+    expect(transitionCalls).toHaveLength(2);
+    expect(transitionCalls.every(([, params]) => JSON.stringify(params).includes("/pricing"))).toBe(true);
+    expect(transitionCalls.every(([, params]) => JSON.stringify(params).includes("/checkout"))).toBe(true);
   });
 
   it("does not update rollups when the event is already in the ingestion ledger", async (): Promise<void> => {

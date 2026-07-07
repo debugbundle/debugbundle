@@ -53,6 +53,7 @@ export const ANALYTICS_BOOTSTRAP_STATEMENTS = [
           rollup_kind IN (
             'session',
             'route_session',
+            'transition_session',
             'action_session',
             'funnel_step_session',
             'funnel_completion_session'

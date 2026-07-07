@@ -6,6 +6,7 @@ import {
   REQUIRED_WORKER_TABLES,
   STORAGE_BOOTSTRAP_SQL
 } from "../../../packages/storage/src/migrations.js";
+import { STORAGE_SCHEMA_MIGRATIONS } from "../../../packages/storage/src/schema-migrations.js";
 
 const ALL_REQUIRED_TABLES = Array.from(new Set([...REQUIRED_API_TABLES, ...REQUIRED_WORKER_TABLES]));
 
@@ -169,6 +170,15 @@ describe("storage bootstrap schema", () => {
     expect(REQUIRED_WORKER_TABLES).toContain("analytics_bundle_generations");
   });
 
+  it("should include the analytics transition unique-subject migration", (): void => {
+    const migration = STORAGE_SCHEMA_MIGRATIONS.find((entry) =>
+      entry.id === "202607080001_add_analytics_transition_unique_subjects"
+    );
+
+    expect(migration).toBeDefined();
+    expect(migration?.statements.join("\n")).toContain("transition_session");
+  });
+
   it("should describe the final schema directly without schema evolution sql", (): void => {
     expect(STORAGE_BOOTSTRAP_SQL.includes("schema_migrations")).toBe(false);
     expect(STORAGE_BOOTSTRAP_SQL.includes("ALTER TABLE")).toBe(false);
@@ -201,6 +211,7 @@ describe("storage bootstrap schema", () => {
     expect(STORAGE_BOOTSTRAP_SQL.includes("CREATE TABLE account_metric_events")).toBe(true);
     expect(STORAGE_BOOTSTRAP_SQL.includes("CREATE TABLE account_payment_retention_records")).toBe(true);
     expect(STORAGE_BOOTSTRAP_SQL.includes("CREATE TABLE account_payment_provider_events")).toBe(true);
+    expect(STORAGE_BOOTSTRAP_SQL.includes("'transition_session'")).toBe(true);
     expect(STORAGE_BOOTSTRAP_SQL.includes("UNIQUE (organization_id, slack_team_id, slack_channel_id)")).toBe(true);
   });
 

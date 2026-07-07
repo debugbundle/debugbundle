@@ -13,6 +13,7 @@ type AnalyticsBucketGranularity = "hour" | "day";
 type AnalyticsRollupKind =
   | "session"
   | "route_session"
+  | "transition_session"
   | "action_session"
   | "funnel_step_session"
   | "funnel_completion_session";
@@ -48,6 +49,11 @@ interface AnalyticsRouteDeltas {
 
 interface AnalyticsActionDeltas {
   eventCount: number;
+  uniqueSessions: number;
+}
+
+interface AnalyticsTransitionDeltas {
+  transitionCount: number;
   uniqueSessions: number;
 }
 
@@ -98,6 +104,7 @@ export function createPostgresAnalyticsRollupStore(db: Queryable): AnalyticsRoll
           session_id: input.event.correlation.session_id
         });
         const routeKey = getRouteKey(input.event);
+        const transitionKey = getTransitionKey(input.event);
         const actionKey = getActionKey(input.event);
         const funnelSignal = getFunnelSignal(input.event);
 
@@ -142,6 +149,20 @@ export function createPostgresAnalyticsRollupStore(db: Queryable): AnalyticsRoll
               uniqueSessions: countedRouteSession ? 1 : 0,
               entrances: input.event.payload.kind === "page_view" ? 1 : 0,
               exits: 0
+            });
+          }
+
+          if (transitionKey !== null) {
+            const transitionRollupKey = `${transitionKey.fromRouteKey}|${transitionKey.toRouteKey}`;
+            const countedTransitionSession = await insertUniqueRollupSubject(tx, {
+              ...scope,
+              rollupKind: "transition_session",
+              rollupKey: transitionRollupKey,
+              subjectHash: sessionSubjectHash
+            });
+            await upsertTransitionRollup(tx, scope, transitionKey, {
+              transitionCount: 1,
+              uniqueSessions: countedTransitionSession ? 1 : 0
             });
           }
 
@@ -253,6 +274,29 @@ function getRouteKey(event: AnalyticsEventEnvelope): string | null {
   const route = event.payload.route;
   const key = route?.normalized_path ?? route?.path ?? null;
   return key === null || key.length === 0 ? null : key;
+}
+
+function getPreviousRouteKey(event: AnalyticsEventEnvelope): string | null {
+  const route = event.payload.previous_route;
+  const key = route?.normalized_path ?? route?.path ?? null;
+  return key === null || key.length === 0 ? null : key;
+}
+
+function getTransitionKey(event: AnalyticsEventEnvelope): {
+  fromRouteKey: string;
+  toRouteKey: string;
+} | null {
+  if (event.payload.kind !== "route_change") {
+    return null;
+  }
+
+  const fromRouteKey = getPreviousRouteKey(event);
+  const toRouteKey = getRouteKey(event);
+  if (fromRouteKey === null || toRouteKey === null) {
+    return null;
+  }
+
+  return { fromRouteKey, toRouteKey };
 }
 
 function isPageViewLike(event: AnalyticsEventEnvelope): boolean {
@@ -536,6 +580,70 @@ async function upsertActionRollup(
       scope.countryCode,
       scope.authState,
       deltas.eventCount,
+      deltas.uniqueSessions
+    ]
+  );
+}
+
+async function upsertTransitionRollup(
+  db: Queryable,
+  scope: AnalyticsRollupScope,
+  transition: { fromRouteKey: string; toRouteKey: string },
+  deltas: AnalyticsTransitionDeltas
+): Promise<void> {
+  await db.query(
+    `
+      INSERT INTO analytics_transition_rollups (
+        project_id,
+        service,
+        environment,
+        bucket_start,
+        bucket_granularity,
+        from_route_key,
+        to_route_key,
+        dimension_hash,
+        dimensions,
+        device_type,
+        browser_family,
+        os_family,
+        language,
+        country_code,
+        auth_state,
+        transition_count,
+        unique_sessions
+      )
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9::jsonb, $10, $11, $12, $13, $14, $15, $16, $17)
+      ON CONFLICT (
+        project_id,
+        service,
+        environment,
+        bucket_start,
+        bucket_granularity,
+        from_route_key,
+        to_route_key,
+        dimension_hash
+      ) DO UPDATE SET
+        transition_count = analytics_transition_rollups.transition_count + EXCLUDED.transition_count,
+        unique_sessions = analytics_transition_rollups.unique_sessions + EXCLUDED.unique_sessions,
+        updated_at = now()
+    `,
+    [
+      scope.projectId,
+      scope.service,
+      scope.environment,
+      scope.bucketStart,
+      scope.bucketGranularity,
+      transition.fromRouteKey,
+      transition.toRouteKey,
+      scope.dimensionHash,
+      JSON.stringify(scope.dimensions),
+      scope.deviceType,
+      scope.browserFamily,
+      scope.osFamily,
+      scope.language,
+      scope.countryCode,
+      scope.authState,
+      deltas.transitionCount,
       deltas.uniqueSessions
     ]
   );

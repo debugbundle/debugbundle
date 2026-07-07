@@ -244,6 +244,7 @@ export const AnalyticsPayloadSchema = z
     kind: AnalyticsEventKindSchema,
     signal: AnalyticsSignalSchema.optional(),
     route: AnalyticsRouteSchema.nullable().optional(),
+    previous_route: AnalyticsRouteSchema.nullable().optional(),
     dimensions: AnalyticsDimensionsSchema,
     custom_dimensions: AnalyticsCustomDimensionsSchema.optional().default({}),
   })
@@ -254,6 +255,14 @@ export const AnalyticsPayloadSchema = z
         code: z.ZodIssueCode.custom,
         path: ["route"],
         message: "Page view and route change analytics events require route context.",
+      });
+    }
+
+    if (value.previous_route != null && value.kind !== "route_change") {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["previous_route"],
+        message: "Analytics previous_route is only valid for route_change events.",
       });
     }
 

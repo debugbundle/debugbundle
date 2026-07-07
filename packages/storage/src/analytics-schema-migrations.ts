@@ -417,5 +417,30 @@ export const ANALYTICS_STORAGE_SCHEMA_MIGRATIONS = [
         ON analytics_bundle_generations (project_id, created_at DESC)
       `
     ]
+  }),
+  defineAnalyticsStorageSchemaMigration({
+    id: "202607080001_add_analytics_transition_unique_subjects",
+    description:
+      "Allow analytics transition rollups to track exact unique sessions in the aggregate unique-subject ledger.",
+    statements: [
+      `
+        ALTER TABLE analytics_rollup_uniques
+        DROP CONSTRAINT IF EXISTS analytics_rollup_uniques_rollup_kind_check
+      `,
+      `
+        ALTER TABLE analytics_rollup_uniques
+        ADD CONSTRAINT analytics_rollup_uniques_rollup_kind_check
+        CHECK (
+          rollup_kind IN (
+            'session',
+            'route_session',
+            'transition_session',
+            'action_session',
+            'funnel_step_session',
+            'funnel_completion_session'
+          )
+        )
+      `
+    ]
   })
 ] as const;
