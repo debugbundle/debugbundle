@@ -63,7 +63,7 @@ vi.mock("@aws-sdk/client-s3", () => ({
   }
 }));
 
-vi.mock("../../../apps/api/src/default-dependencies.ts", () => ({
+vi.mock("../../../apps/api/src/default-dependencies-env.js", () => ({
   createApiDependenciesFromEnv: createApiDependenciesFromEnvMock
 }));
 
@@ -124,6 +124,18 @@ function buildMigratedRuntimeSchemaRows(sql: string): { rows: Record<string, unk
         { table_name: "slack_destinations" },
         { table_name: "capture_policies" },
         { table_name: "capture_rules" },
+        { table_name: "project_analytics_settings" },
+        { table_name: "analytics_ingestion_ledger" },
+        { table_name: "analytics_rollup_uniques" },
+        { table_name: "analytics_session_rollups" },
+        { table_name: "analytics_route_rollups" },
+        { table_name: "analytics_action_rollups" },
+        { table_name: "analytics_funnel_definitions" },
+        { table_name: "analytics_funnel_rollups" },
+        { table_name: "analytics_transition_rollups" },
+        { table_name: "analytics_journey_samples" },
+        { table_name: "analytics_opportunities" },
+        { table_name: "analytics_bundle_generations" },
         { table_name: "audit_logs" },
         { table_name: "processed_billing_events" },
         { table_name: "account_analytics_accounts" },

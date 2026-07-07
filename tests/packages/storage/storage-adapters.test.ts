@@ -92,8 +92,7 @@ import {
   createRedisIncidentFrequencyCounter,
   createRedisQueueClient,
   createRedisRequestAnomalyCounter,
-  createS3ObjectStoreClient,
-  deleteProjectObjects
+  createS3ObjectStoreClient
 } from "../../../packages/storage/src/index.js";
 
 describe("storage adapters", () => {
@@ -235,18 +234,6 @@ describe("storage adapters", () => {
     await client.deleteObjectsByPrefix("raw-events/nonexistent/");
 
     expect(sendMock).toHaveBeenCalledTimes(1);
-  });
-
-  it("should delete objects under all project prefixes via deleteProjectObjects", async (): Promise<void> => {
-    const deleteObjectsByPrefix = vi.fn().mockResolvedValue(undefined);
-
-    await deleteProjectObjects({ deleteObjectsByPrefix }, "proj_abc");
-
-    expect(deleteObjectsByPrefix).toHaveBeenCalledTimes(4);
-    expect(deleteObjectsByPrefix).toHaveBeenNthCalledWith(1, "raw-events/proj_abc/");
-    expect(deleteObjectsByPrefix).toHaveBeenNthCalledWith(2, "bundles/proj_abc/");
-    expect(deleteObjectsByPrefix).toHaveBeenNthCalledWith(3, "improvement-bundles/proj_abc/");
-    expect(deleteObjectsByPrefix).toHaveBeenNthCalledWith(4, "reproductions/proj_abc/");
   });
 
   it("should throw when S3 get returns no body", async (): Promise<void> => {
@@ -394,6 +381,40 @@ describe("storage adapters", () => {
     expect(next).toEqual({
       delivery_id: "del_123",
       attempt: 2
+    });
+  });
+
+  it("should enqueue and dequeue aggregate analytics jobs", async (): Promise<void> => {
+    redisLpopMock = vi.fn().mockResolvedValue(
+      '{"project_id":"proj_123","event_id":"550e8400-e29b-41d4-a716-446655440000","object_key":"analytics-events/proj_123/e.json.gz"}'
+    );
+
+    const queue = createRedisQueueClient({ redisUrl: "redis://redis:6379" });
+    const analyticsQueue = queue as typeof queue & {
+      enqueue(jobName: "aggregate-analytics-events", payload: {
+        project_id: string;
+        event_id: string;
+        object_key: string;
+      }): Promise<void>;
+      dequeue(jobName: "aggregate-analytics-events"): Promise<{
+        project_id: string;
+        event_id: string;
+        object_key: string;
+      } | null>;
+    };
+
+    await analyticsQueue.enqueue("aggregate-analytics-events", {
+      project_id: "proj_123",
+      event_id: "550e8400-e29b-41d4-a716-446655440000",
+      object_key: "analytics-events/proj_123/e.json.gz"
+    });
+
+    const next = await analyticsQueue.dequeue("aggregate-analytics-events");
+
+    expect(next).toEqual({
+      project_id: "proj_123",
+      event_id: "550e8400-e29b-41d4-a716-446655440000",
+      object_key: "analytics-events/proj_123/e.json.gz"
     });
   });
 

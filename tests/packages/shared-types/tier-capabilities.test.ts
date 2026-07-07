@@ -61,6 +61,12 @@ describe("tier capabilities", () => {
     expect(getTierCapabilities("team").cloud_improvement_bundles).toBe(true);
   });
 
+  it("should gate AnalyticsBundle for Solo and Team tiers", (): void => {
+    expect(getTierCapabilities("free").analytics_bundle).toBe(false);
+    expect(getTierCapabilities("solo").analytics_bundle).toBe(true);
+    expect(getTierCapabilities("team").analytics_bundle).toBe(true);
+  });
+
   it("should expose health-check limits per tier", (): void => {
     expect(getTierCapabilities("free").availability_checks_per_project).toBe(1);
     expect(getTierCapabilities("free").availability_check_min_interval_seconds).toBe(300);

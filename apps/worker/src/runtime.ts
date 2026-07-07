@@ -23,6 +23,7 @@ import { REQUIRED_WORKER_TABLES } from "../../../packages/storage/src/migrations
 import {
   createPostgresAlertDeliveryStore,
   createPostgresAccountAnalyticsStore,
+  createPostgresAnalyticsRollupStore,
   createPostgresAvailabilityCheckStore,
   createPostgresBillingStore,
   createIncidentLifecycleService,
@@ -79,6 +80,10 @@ import {
   type WorkerQueue,
   type WeeklyReportTransport
 } from "./processor.js";
+import {
+  processNextAggregateAnalyticsEventsJob,
+  type AggregateAnalyticsWorkerQueue
+} from "./analytics-aggregation.js";
 import { processAvailabilityCheckBatch } from "./availability-checks.js";
 import { processNextDeliverOperationalEmailJob } from "./operational-email-processor.js";
 import { processNextBuildImprovementBundleJob, type ImprovementBundleJobQueue } from "./improvement-bundle-processor.js";
@@ -1802,6 +1807,7 @@ export async function runWorkerFromEnv(envInput: Record<string, string | undefin
   const processedEventStore = createProcessedEventStore(queryable);
   const incidentStore = createPostgresMetadataStore(queryable);
   const billingStore = createPostgresBillingStore(queryable);
+  const analyticsRollupStore = createPostgresAnalyticsRollupStore(queryable);
   const accountAnalyticsStore = createPostgresAccountAnalyticsStore({
     db: queryable,
     analyticsHashSecret: env.ANALYTICS_HASH_SECRET
@@ -2027,147 +2033,156 @@ export async function runWorkerFromEnv(envInput: Record<string, string | undefin
       );
 
       if (!normalizeResult.processed) {
-        const groupResult = await runClaimedProcessStep("group-incident", async () =>
-          processNextGroupIncidentJob({
-            queue,
-            alertEvaluationQueue: queue,
-            logger,
-            incidentStore,
-            frequencyCounter,
-            lifecycleWebhookPublisher,
-            githubDispatchPublisher,
+        const analyticsAggregateResult = await runClaimedProcessStep("aggregate-analytics-events", async () =>
+          processNextAggregateAnalyticsEventsJob({
+            queue: queue as unknown as AggregateAnalyticsWorkerQueue,
             objectStore,
-            improvementBundleWorker: {
-              improvementOpportunityStore,
-              billingStore,
-              webhookDeliveryStore,
-              operationalEmailDeliveryStore,
-              accountAnalyticsStore,
-              resolveOrganizationIdForProject,
-              fallbackTargetUrl: env.LIFECYCLE_WEBHOOK_TARGET_URL ?? null,
-              fallbackSigningSecret: env.LIFECYCLE_WEBHOOK_SECRET ?? null,
-              objectStore,
-              apiBaseUrl: normalizeWorkerBaseUrl(envInput["DEBUGBUNDLE_API_URL"] ?? envInput["API_BASE_URL"] ?? envInput["VITE_API_URL"]),
-              appBaseUrl: normalizeWorkerBaseUrl(envInput["APP_BASE_URL"]),
-              docsBaseUrl
-            }
+            analyticsRollupStore
           })
         );
 
-        if (!groupResult.processed) {
-          const buildBundleResult = await runClaimedProcessStep("build-bundle", async () =>
-            processNextBuildBundleJob({
+        if (!analyticsAggregateResult.processed) {
+          const groupResult = await runClaimedProcessStep("group-incident", async () =>
+            processNextGroupIncidentJob({
               queue,
+              alertEvaluationQueue: queue,
               logger,
-              env: envInput,
               incidentStore,
+              frequencyCounter,
+              lifecycleWebhookPublisher,
+              githubDispatchPublisher,
               objectStore,
-              billingStore,
-              operationalEmailDeliveryStore,
-              accountAnalyticsStore,
-              resolveOrganizationIdForProject
+              improvementBundleWorker: {
+                improvementOpportunityStore,
+                billingStore,
+                webhookDeliveryStore,
+                operationalEmailDeliveryStore,
+                accountAnalyticsStore,
+                resolveOrganizationIdForProject,
+                fallbackTargetUrl: env.LIFECYCLE_WEBHOOK_TARGET_URL ?? null,
+                fallbackSigningSecret: env.LIFECYCLE_WEBHOOK_SECRET ?? null,
+                objectStore,
+                apiBaseUrl: normalizeWorkerBaseUrl(envInput["DEBUGBUNDLE_API_URL"] ?? envInput["API_BASE_URL"] ?? envInput["VITE_API_URL"]),
+                appBaseUrl: normalizeWorkerBaseUrl(envInput["APP_BASE_URL"]),
+                docsBaseUrl
+              }
             })
           );
 
-          if (!buildBundleResult.processed) {
-            const buildImprovementBundleResult = await runClaimedProcessStep("build-improvement-bundle", async () =>
-              processNextBuildImprovementBundleJob({
-                queue: queue as unknown as ImprovementBundleJobQueue,
+          if (!groupResult.processed) {
+            const buildBundleResult = await runClaimedProcessStep("build-bundle", async () =>
+              processNextBuildBundleJob({
+                queue,
                 logger,
-                dependencies: {
-                  improvementOpportunityStore,
-                  billingStore,
-                  webhookDeliveryStore,
-                  operationalEmailDeliveryStore,
-                  accountAnalyticsStore,
-                  resolveOrganizationIdForProject,
-                  fallbackTargetUrl: env.LIFECYCLE_WEBHOOK_TARGET_URL ?? null,
-                  fallbackSigningSecret: env.LIFECYCLE_WEBHOOK_SECRET ?? null,
-                  objectStore,
-                  apiBaseUrl: normalizeWorkerBaseUrl(envInput["DEBUGBUNDLE_API_URL"] ?? envInput["API_BASE_URL"] ?? envInput["VITE_API_URL"]),
-                  appBaseUrl: normalizeWorkerBaseUrl(envInput["APP_BASE_URL"]),
-                  docsBaseUrl
-                }
+                env: envInput,
+                incidentStore,
+                objectStore,
+                billingStore,
+                operationalEmailDeliveryStore,
+                accountAnalyticsStore,
+                resolveOrganizationIdForProject
               })
             );
 
-            if (!buildImprovementBundleResult.processed) {
-              const buildReproductionResult = await runClaimedProcessStep("build-reproduction", async () =>
-                processNextBuildReproductionJob({
-                  queue,
-                  objectStore,
-                  accountAnalyticsStore,
-                  resolveOrganizationIdForProject
+            if (!buildBundleResult.processed) {
+              const buildImprovementBundleResult = await runClaimedProcessStep("build-improvement-bundle", async () =>
+                processNextBuildImprovementBundleJob({
+                  queue: queue as unknown as ImprovementBundleJobQueue,
+                  logger,
+                  dependencies: {
+                    improvementOpportunityStore,
+                    billingStore,
+                    webhookDeliveryStore,
+                    operationalEmailDeliveryStore,
+                    accountAnalyticsStore,
+                    resolveOrganizationIdForProject,
+                    fallbackTargetUrl: env.LIFECYCLE_WEBHOOK_TARGET_URL ?? null,
+                    fallbackSigningSecret: env.LIFECYCLE_WEBHOOK_SECRET ?? null,
+                    objectStore,
+                    apiBaseUrl: normalizeWorkerBaseUrl(envInput["DEBUGBUNDLE_API_URL"] ?? envInput["API_BASE_URL"] ?? envInput["VITE_API_URL"]),
+                    appBaseUrl: normalizeWorkerBaseUrl(envInput["APP_BASE_URL"]),
+                    docsBaseUrl
+                  }
                 })
               );
 
-              if (!buildReproductionResult.processed) {
-                const evaluateAlertsResult = await runClaimedProcessStep("evaluate-alerts", async () =>
-                  processNextEvaluateAlertsJob({
+              if (!buildImprovementBundleResult.processed) {
+                const buildReproductionResult = await runClaimedProcessStep("build-reproduction", async () =>
+                  processNextBuildReproductionJob({
                     queue,
-                    alertStore: alertDeliveryStore,
-                    alertTransport,
-                    billingStore,
-                    operationalEmailDeliveryStore,
                     accountAnalyticsStore,
+                    objectStore,
                     resolveOrganizationIdForProject
                   })
                 );
 
-                if (!evaluateAlertsResult.processed) {
-                  await runWorkerStep(logger, "schedule-alert-email-digests", async () => {
-                    await scheduleDueAlertEmailDigests({
+                if (!buildReproductionResult.processed) {
+                  const evaluateAlertsResult = await runClaimedProcessStep("evaluate-alerts", async () =>
+                    processNextEvaluateAlertsJob({
                       queue,
                       alertStore: alertDeliveryStore,
-                      batchSize: env.WEBHOOK_DELIVERY_SCHEDULER_BATCH_SIZE
-                    });
-                  });
-                  await runWorkerStep(logger, "schedule-webhook-deliveries", async () => {
-                    await scheduleDueWebhookDeliveries({
-                      queue,
-                      webhookDeliveryStore,
-                      batchSize: env.WEBHOOK_DELIVERY_SCHEDULER_BATCH_SIZE
-                    });
-                  });
-                  await runWorkerStep(logger, "schedule-github-dispatches", async () => {
-                    await scheduleDueGitHubDispatches({
-                      queue,
-                      githubStore,
-                      batchSize: env.WEBHOOK_DELIVERY_SCHEDULER_BATCH_SIZE
-                    });
-                  });
-                  await runWorkerStep(logger, "schedule-weekly-reports", async () => {
-                    await scheduleWeeklyReports({
-                      queue,
-                      weeklyReportingStore: incidentStore,
-                      weeklyReportChannelStore,
-                      weeklyReportDeliveryStore,
-                      batchSize: env.WEEKLY_REPORT_SCHEDULER_BATCH_SIZE
-                    });
-                  });
-                  await runWorkerStep(logger, "schedule-retention-cleanup", async () => {
-                    await scheduleRetentionCleanup({
-                      queue,
-                      intervalMs: env.RETENTION_CLEANUP_INTERVAL_MS
-                    });
-                  });
-                  await runWorkerStep(logger, "schedule-trial-lifecycle-emails", async () => {
-                    await scheduleTrialLifecycleEmails({
-                      batchSize: env.WEEKLY_REPORT_SCHEDULER_BATCH_SIZE,
+                      alertTransport,
                       billingStore,
-                      operationalEmailDeliveryStore
-                    });
-                  });
-
-                  await runClaimedProcessStep("deliver-alert-email-digest", async () =>
-                    processNextDeliverAlertEmailDigestJob({
-                      queue,
-                      alertStore: alertDeliveryStore,
-                      alertEmailDigestTransport,
+                      operationalEmailDeliveryStore,
                       accountAnalyticsStore,
                       resolveOrganizationIdForProject
                     })
                   );
+
+                  if (!evaluateAlertsResult.processed) {
+                    await runWorkerStep(logger, "schedule-alert-email-digests", async () => {
+                      await scheduleDueAlertEmailDigests({
+                        queue,
+                        alertStore: alertDeliveryStore,
+                        batchSize: env.WEBHOOK_DELIVERY_SCHEDULER_BATCH_SIZE
+                      });
+                    });
+                    await runWorkerStep(logger, "schedule-webhook-deliveries", async () => {
+                      await scheduleDueWebhookDeliveries({
+                        queue,
+                        webhookDeliveryStore,
+                        batchSize: env.WEBHOOK_DELIVERY_SCHEDULER_BATCH_SIZE
+                      });
+                    });
+                    await runWorkerStep(logger, "schedule-github-dispatches", async () => {
+                      await scheduleDueGitHubDispatches({
+                        queue,
+                        githubStore,
+                        batchSize: env.WEBHOOK_DELIVERY_SCHEDULER_BATCH_SIZE
+                      });
+                    });
+                    await runWorkerStep(logger, "schedule-weekly-reports", async () => {
+                      await scheduleWeeklyReports({
+                        queue,
+                        weeklyReportingStore: incidentStore,
+                        weeklyReportChannelStore,
+                        weeklyReportDeliveryStore,
+                        batchSize: env.WEEKLY_REPORT_SCHEDULER_BATCH_SIZE
+                      });
+                    });
+                    await runWorkerStep(logger, "schedule-retention-cleanup", async () => {
+                      await scheduleRetentionCleanup({
+                        queue,
+                        intervalMs: env.RETENTION_CLEANUP_INTERVAL_MS
+                      });
+                    });
+                    await runWorkerStep(logger, "schedule-trial-lifecycle-emails", async () => {
+                      await scheduleTrialLifecycleEmails({
+                        batchSize: env.WEEKLY_REPORT_SCHEDULER_BATCH_SIZE,
+                        billingStore,
+                        operationalEmailDeliveryStore
+                      });
+                    });
+
+                    await runClaimedProcessStep("deliver-alert-email-digest", async () =>
+                      processNextDeliverAlertEmailDigestJob({
+                        queue,
+                        alertStore: alertDeliveryStore,
+                        alertEmailDigestTransport,
+                        accountAnalyticsStore,
+                        resolveOrganizationIdForProject
+                      })
+                    );
 
                   if (emailTransport !== null) {
                     await runWorkerStep(logger, "deliver-operational-email", async () => {
@@ -2252,6 +2267,7 @@ export async function runWorkerFromEnv(envInput: Record<string, string | undefin
             }
           }
         }
+      }
       }
 
       if (env.WORKER_RUN_ONCE === "1") {

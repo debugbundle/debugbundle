@@ -817,6 +817,8 @@ export {
   type ImprovementSettingsUpdate
 } from "./improvement-settings.js";
 
+export * from "./analytics.js";
+
 export {
   PROJECT_COLOR_TAG_VALUES,
   ProjectColorTagSchema,

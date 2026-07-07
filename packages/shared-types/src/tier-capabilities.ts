@@ -17,6 +17,7 @@ export const TIER_CAPABILITIES = {
     github_automation: false,
     slack_integration: false,
     cloud_improvement_bundles: false,
+    analytics_bundle: false,
     shared_dashboards: false,
     member_invites: false,
     included_capacity_units: 1,
@@ -40,6 +41,7 @@ export const TIER_CAPABILITIES = {
     github_automation: true,
     slack_integration: false,
     cloud_improvement_bundles: true,
+    analytics_bundle: true,
     shared_dashboards: false,
     member_invites: false,
     included_capacity_units: 3,
@@ -63,6 +65,7 @@ export const TIER_CAPABILITIES = {
     github_automation: true,
     slack_integration: true,
     cloud_improvement_bundles: true,
+    analytics_bundle: true,
     shared_dashboards: true,
     member_invites: true,
     included_capacity_units: 15,
@@ -91,6 +94,7 @@ export interface TierCapabilities {
   readonly github_automation: boolean;
   readonly slack_integration: boolean;
   readonly cloud_improvement_bundles: boolean;
+  readonly analytics_bundle: boolean;
   readonly shared_dashboards: boolean;
   readonly member_invites: boolean;
   readonly included_capacity_units: number;
@@ -119,6 +123,7 @@ const SELFHOST_CAPABILITIES: TierCapabilities = {
   github_automation: true,
   slack_integration: true,
   cloud_improvement_bundles: true,
+  analytics_bundle: true,
   shared_dashboards: true,
   member_invites: true,
   included_capacity_units: 1_000_000,

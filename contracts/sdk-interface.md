@@ -456,6 +456,7 @@ Required behavior:
 - Analytics API failures never throw into host pages.
 - Analytics batching, retry, unload flushing, and backoff must not block debug event capture or host page behavior.
 - Analytics events must use `event_type: "analytics_event"` with a `payload.kind` rather than adding many top-level event types.
+- Semantic analytics keys are stored in `payload.signal`: `track(name)` emits `kind: "action"` plus `signal.action_key`, `funnel(name, step)` emits `kind: "funnel_step"` plus `signal.funnel_key` and `signal.step_key`, `convert(name)` emits `kind: "conversion"` plus `signal.conversion_key`, and journey friction markers emit `kind: "journey_marker"` plus `signal.marker_key`.
 - Analytics events do not receive `event_class` and cannot create incidents.
 - `setContext()` accepts only bounded low-cardinality values. Sensitive, overlong, unapproved, or high-cardinality values must be dropped or redacted locally where possible and rejected/dropped server-side as a backstop.
 - `setUserHash()` accepts a customer-supplied privacy-safe hash only. The SDK must not derive raw identity.

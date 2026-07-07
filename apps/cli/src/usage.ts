@@ -36,6 +36,8 @@ export const CLI_USAGE_LINES = [
   '  debugbundle billing capacity increase --target-additional-capacity-units <n> [--auth-file <path>] [--json]',
   '  debugbundle billing capacity schedule-reduction --target-additional-capacity-units <n> [--auth-file <path>] [--json]',
   '  debugbundle billing capacity cancel-reduction [--auth-file <path>] [--json]',
+  '  debugbundle analytics settings get --project <id> [--auth-file <path>] [--json]',
+  '  debugbundle analytics settings set --project <id> [--enabled <true|false>] [--privacy-mode <strict|standard|custom>] [--consent-required <true|false>] [--capture-page-views <true|false>] [--capture-route-changes <true|false>] [--capture-actions <true|false>] [--capture-friction-signals <true|false>] [--journey-sample-rate <0-1>] [--raw-retention-days <n>] [--sample-retention-days <n>] [--aggregate-retention-months <n>] [--max-saved-funnels <n>] [--max-custom-dimensions <n>] [--approved-custom-dimensions <key[,key]> | --approved-custom-dimensions-json <json>] [--auth-file <path>] [--json]',
   '  debugbundle github status [--project-id <id>] [--auth-file <path>] [--json]',
   '  debugbundle github repos [--project-id <id>] [--auth-file <path>] [--json]',
   '  debugbundle github repo set <owner/repo> --project-id <id> [--auth-file <path>] [--json]',

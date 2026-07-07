@@ -557,6 +557,8 @@ Analytics events are opt-in browser product-usage events. They share the ingesti
   "schema_version": "2026-07-analytics-01",
   "event_id": "uuid",
   "event_type": "analytics_event",
+  "project_token": "string (optional)",
+  "project_id": "uuid | null (server-assigned optional)",
   "occurred_at": "ISO8601",
   "sdk_name": "@debugbundle/sdk-browser",
   "sdk_version": "semver",
@@ -575,6 +577,13 @@ Analytics events are opt-in browser product-usage events. They share the ingesti
   },
   "payload": {
     "kind": "session_start | page_view | route_change | action | funnel_step | conversion | journey_marker | session_summary",
+    "signal": {
+      "action_key": "string | null",
+      "funnel_key": "string | null",
+      "step_key": "string | null",
+      "conversion_key": "string | null",
+      "marker_key": "string | null"
+    },
     "route": {
       "path": "string | null",
       "normalized_path": "string | null",
@@ -608,6 +617,7 @@ Analytics events are opt-in browser product-usage events. They share the ingesti
 
 - `event_type` is always `analytics_event`; specific analytics behavior is represented by `payload.kind`.
 - `event_class` is not present on analytics events and must not be inferred later.
+- `payload.signal` contains bounded aggregation keys only. `action` requires `action_key`; `funnel_step` requires `funnel_key` and `step_key`; `conversion` requires `conversion_key`; `journey_marker` requires `marker_key`.
 - `session_id` is required for analytics correlation.
 - `visitor_id_hash` is nullable and allowed only for privacy modes that support returning-visitor metrics.
 - `user_id_hash` is customer-supplied and must be a privacy-safe hash; SDKs must not derive raw identity.
@@ -1403,6 +1413,7 @@ Required table concepts for the AnalyticsBundle implementation:
 |---|---|
 | `project_analytics_settings` | Project-scoped analytics enablement, privacy mode, consent requirement, sampling, retention, saved-funnel/custom-dimension limits, and capture toggles |
 | `analytics_ingestion_ledger` | Idempotency ledger keyed by project/event id so reprocessing does not double-count rollups |
+| `analytics_rollup_uniques` | Idempotency ledger for unique session counts per rollup bucket, dimension hash, route/action/funnel key, and hashed session subject |
 | `analytics_session_rollups` | Hourly/daily session, active-user, new/returning visitor, bounce, exit, duration, and pageview aggregates by bounded dimensions |
 | `analytics_route_rollups` | Hourly/daily route/page aggregates including pageviews, unique sessions, entrances, exits, bounces, duration buckets, and linked incident sessions |
 | `analytics_action_rollups` | Semantic action and feature-usage aggregates by route and bounded dimensions |
@@ -1414,6 +1425,8 @@ Required table concepts for the AnalyticsBundle implementation:
 | `analytics_bundle_generations` | On-demand or scheduled AnalyticsBundle generation metadata, input fingerprint, status, object key, and failure reason |
 
 Dimension storage must remain bounded. Built-in dimensions include route, device type, browser family/major, OS family/major, language/locale, viewport bucket, referrer domain, UTM fields, auth state, country/region when enabled, deploy, and approved Team custom dimensions. Arbitrary raw JSON payloads must not be used as the long-term analytics query model.
+
+`project_analytics_settings.approved_custom_dimensions` must remain a JSON array whose length is less than or equal to `max_custom_dimensions`; API, storage, and database constraints all preserve that invariant for full and partial settings updates.
 
 ---
 

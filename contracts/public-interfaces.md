@@ -54,6 +54,8 @@ Every capability must be available through all applicable interfaces. Operations
 | Get analytics referrers | `GET /v1/analytics/referrers` | `analytics referrers` | `get_referrer_metrics` | Browser Session or Member Token |
 | Get analytics funnel | `GET /v1/analytics/funnels/{key}` | `analytics funnel` | `get_funnel_analysis` | Browser Session or Member Token |
 | Get journey patterns | `GET /v1/analytics/journey-patterns` | `analytics journeys` | `get_journey_patterns` | Browser Session or Member Token, aggregate/sample-safe data |
+| Get analytics settings | `GET /v1/projects/{id}/analytics-settings` | `analytics settings get` | `get_analytics_settings` | Browser Session or Member Token; members receive preview-only payload and all tiers can inspect availability |
+| Update analytics settings | `PATCH /v1/projects/{id}/analytics-settings` | `analytics settings set` | `update_analytics_settings` | Browser Session or Member Token, owner/admin only, Solo+ for analytics enablement, Team for custom dimensions |
 | List analytics opportunities | `GET /v1/analytics/opportunities` | `analytics opportunities` | `list_analytics_opportunities` | Browser Session or Member Token |
 | Get analytics opportunity | `GET /v1/analytics/opportunities/{id}` | `analytics opportunity get` | `get_analytics_opportunity` | Browser Session or Member Token |
 | Generate AnalyticsBundle | `POST /v1/analytics/bundles` | `analytics bundle create` | `generate_analytics_bundle` | Browser Session or Member Token, tier-gated |
@@ -296,7 +298,7 @@ Anonymized aggregate account-usage metrics are preserved after deletion for life
 
 `POST /v1/events` is subject to the shared API request body limit. Requests with a declared `Content-Length` over the limit are rejected before project-token auth, schema validation, persistence, or queueing. The route is also subject to per-project-token ingestion rate limiting using the active tier capability (`ingestion_rate_per_min`). When the limit is exceeded, the API must reject the batch before persistence and return `429 Too Many Requests` with a `Retry-After` header.
 
-The endpoint accepts the existing debug event family plus opt-in `analytics_event` envelopes when project analytics is enabled. Mixed debug/analytics batches are split after validation: debug events follow existing capture-policy/event-class/incident paths, while analytics events follow analytics enablement/quota/short-lived persistence/rollup queue paths and never create incidents directly.
+The endpoint accepts the existing debug event family plus opt-in `analytics_event` envelopes when project analytics is enabled. Mixed debug/analytics batches are split after validation: debug events follow existing capture-policy/event-class/incident paths, while analytics events follow analytics enablement, controlled custom-dimension validation, short-lived persistence, and analytics rollup queue paths without creating incidents directly. Dedicated analytics allowance checks are added separately from debug billing once analytics tier quantities are finalized.
 
 **Request:**
 ```json
@@ -389,7 +391,7 @@ The endpoint accepts the existing debug event family plus opt-in `analytics_even
 
 When the shared `monthly_raw_ingested_events` allowance is exhausted, new hosted events are rejected before persistence with `monthly_quota_exceeded`. Already stored data remains retrievable.
 
-Analytics events use separate analytics allowances. Analytics-specific rejection reasons include `analytics_disabled`, `analytics_consent_required`, `analytics_invalid_dimension`, and `analytics_quota_exceeded`. These rejections must not reject otherwise-valid debug events in the same batch unless a shared request-level limit is exceeded.
+Analytics events use separate analytics allowances. Currently implemented analytics-specific rejection reasons include `analytics_disabled`, `analytics_invalid_event`, and `analytics_invalid_dimension`; planned allowance/consent-specific reasons include `analytics_consent_required` and `analytics_quota_exceeded`. These rejections must not reject otherwise-valid debug events in the same batch unless a shared request-level limit is exceeded.
 
 Rate-limited responses also include `Retry-After: <seconds>` so SDKs can back off without guessing.
 
@@ -1863,6 +1865,74 @@ Response `200`: same shape as GET response with updated values.
 - `improvement_bundle_sensitivity` must be one of `high_confidence`, `balanced`, or `verbose`
 - request body must include at least one mutable field
 - plain members receive `403 { "error": "forbidden" }` on update attempts
+
+### 1.10a Analytics Settings
+
+Per-project AnalyticsBundle settings control opt-in browser product analytics capture, privacy mode, consent behavior, sampling, retention, saved-funnel limits, and Team controlled custom dimensions.
+
+**Get analytics settings:**
+
+```
+GET /v1/projects/{id}/analytics-settings
+Authorization: Bearer dbundle_member_...  (or browser session)
+```
+
+Response `200`:
+```json
+{
+  "access_mode": "manage | preview",
+  "analytics_available": true,
+  "settings": {
+    "enabled": false,
+    "privacy_mode": "strict",
+    "consent_required": false,
+    "capture_page_views": true,
+    "capture_route_changes": true,
+    "capture_actions": false,
+    "capture_friction_signals": true,
+    "journey_sample_rate": 0,
+    "raw_retention_days": 1,
+    "sample_retention_days": 7,
+    "aggregate_retention_months": 12,
+    "max_saved_funnels": 3,
+    "max_custom_dimensions": 0,
+    "approved_custom_dimensions": []
+  }
+}
+```
+
+`analytics_available` is capability-derived from the caller's effective plan (`false` on Free, `true` on Solo/Team/self-host). The stored settings object is project-backed and remains readable to authorized viewers even when analytics is unavailable for the current tier.
+
+**Update analytics settings:**
+
+```
+PATCH /v1/projects/{id}/analytics-settings
+Authorization: Bearer dbundle_member_...  (or browser session, owner/admin only)
+Content-Type: application/json
+```
+
+Request body (all fields optional, but at least one is required):
+```json
+{
+  "enabled": true,
+  "privacy_mode": "standard",
+  "consent_required": true,
+  "journey_sample_rate": 0.25,
+  "max_custom_dimensions": 2,
+  "approved_custom_dimensions": ["auth_state", "plan"]
+}
+```
+
+Response `200`: same shape as GET response with updated values.
+
+**Validation rules:**
+- analytics capture remains disabled by default
+- `privacy_mode` must be one of `strict`, `standard`, or `custom`
+- `journey_sample_rate` must be between `0` and `1`
+- retention and limit fields must stay within the shared analytics settings schema bounds
+- Team custom dimensions must use approved low-cardinality keys and are rejected on non-Team tiers
+- `approved_custom_dimensions.length` must be less than or equal to `max_custom_dimensions`, including partial updates after merging with current settings
+- plain members receive `403 { "error": "forbidden" }` on update attempts
 - Free-tier projects receive `403 { "error": "upgrade_required" }` on update attempts because hosted cloud automation is not available
 
 **Error responses:**
@@ -2499,6 +2569,8 @@ debugbundle_get_device_breakdown → same result as GET /v1/analytics/devices
 debugbundle_get_referrer_metrics → same result as GET /v1/analytics/referrers
 debugbundle_get_funnel_analysis → same result as GET /v1/analytics/funnels/{key}
 debugbundle_get_journey_patterns → same result as GET /v1/analytics/journey-patterns
+debugbundle_get_analytics_settings → same result as GET /v1/projects/{id}/analytics-settings
+debugbundle_update_analytics_settings → same result as PATCH /v1/projects/{id}/analytics-settings
 debugbundle_list_analytics_opportunities → same result as GET /v1/analytics/opportunities
 debugbundle_get_analytics_opportunity → same result as GET /v1/analytics/opportunities/{id}
 debugbundle_generate_analytics_bundle → same result as POST /v1/analytics/bundles
@@ -2611,9 +2683,11 @@ reopen_improvement           → same result as POST /v1/improvements/{id}/reope
 snooze_improvement           → same result as POST /v1/improvements/{id}/snooze
 get_improvement_settings      → same result as GET /v1/projects/{id}/improvement-settings
 update_improvement_settings   → same result as PATCH /v1/projects/{id}/improvement-settings
+get_analytics_settings        → same result as GET /v1/projects/{id}/analytics-settings
+update_analytics_settings     → same result as PATCH /v1/projects/{id}/analytics-settings
 ```
 
-These tools manage hosted improvement opportunities plus hosted improvement automation settings. `get_improvement_settings` returns the effective project-backed settings plus a capability-derived availability flag. `update_improvement_settings` requires owner/admin authorization and a Solo+ or self-host capable project.
+These tools manage hosted improvement opportunities, hosted improvement automation settings, and AnalyticsBundle project settings. `get_improvement_settings` and `get_analytics_settings` return project-backed settings plus capability-derived availability flags. Update tools require owner/admin authorization; analytics custom dimensions additionally require Team tier.
 
 ### 3.7 Billing Tools
 ```

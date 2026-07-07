@@ -1,5 +1,3 @@
-import { Pool } from "pg";
-
 import {
   createAccountDeletionChallengeService,
   createGitHubCliAuthService,
@@ -8,16 +6,12 @@ import {
 } from "../../../packages/auth/src/index.js";
 import {
   getDefaultPreset,
+  type AnalyticsSettingsUpdate,
   type CaptureRuleCreate,
   type CaptureRuleUpdate,
   type CapturePolicyUpdate,
   type ImprovementSettingsUpdate
 } from "../../../packages/shared-types/src/index.js";
-import {
-  createSesEmailTransport,
-  formatProductFromEmail
-} from "../../../packages/email/src/index.js";
-import { buildPostgresSslConfig } from "../../../packages/storage/src/postgres-ssl.js";
 import {
   buildBundleRegenerationLeaseKey,
   buildImprovementBundleRegenerationLeaseKey,
@@ -32,6 +26,7 @@ import {
   createPostgresAuthStore,
   createPostgresCapturePolicyStore,
   createPostgresCaptureRuleStore,
+  createPostgresAnalyticsSettingsStore,
   createPostgresImprovementOpportunityStore,
   createPostgresImprovementSettingsStore,
   createPostgresGitHubMarketplaceStore,
@@ -41,21 +36,15 @@ import {
   createMemberAuthService,
   createIngestionMetadataService,
   createIngestionPersistenceService,
-  createRedisAuthRateLimiter,
-  createRedisIngestionRateLimiter,
   createPostgresMetadataStore,
   createPostgresSlackDestinationStore,
   createPostgresWeeklyReportChannelStore,
   createPostgresWebhookDeliveryStore,
-  createRedisIncidentFrequencyCounter,
-  createRedisQueueClient,
   runInTransaction,
-  createS3ObjectStoreClient,
   deleteProjectObjects,
   executeAvailabilityCheck,
   validateAvailabilityCheckDefinition,
   type ObjectStoreClient,
-  type Queryable,
   type QueueClient,
   type RedisQueueClient,
   type WebhookEventType
@@ -64,20 +53,12 @@ import {
   createBillingManagement
 } from "./billing-management.js";
 import { createEnvBillingLinkProvider } from "./billing-links.js";
+import { createDefaultGitHubManagement } from "./default-github-management.js";
 import type { CreateApiDependenciesInput, DefaultApiDependencies } from "./default-dependency-types.js";
 import {
   buildAccountExportArtifacts,
-  createAuthEmailSender,
-  createBillingEmailService,
-  createGithubOAuthConfigFromEnv,
-  normalizeEmailForConfig,
-  readAdminAnalyticsEmailsFromEnv,
-  readBillingAdminEmailsFromEnv,
-  readNonEmptyEnv,
-  resolveEmailAssetBaseUrl
+  normalizeEmailForConfig
 } from "./default-dependency-helpers.js";
-import { createGitHubAppClientFromEnv } from "./github-app.js";
-import { createStripeConfig } from "./stripe-config.js";
 export {
   normalizeBillingPlan,
   readSubscriptionInvoiceLinePeriod,
@@ -96,32 +77,6 @@ export {
 export type { BillingEmailContact, BillingEmailService } from "./default-dependency-helpers.js";
 
 const BUNDLE_REGENERATION_LEASE_TTL_SECONDS = 30;
-
-function createPoolQueryable(pool: Pool): Queryable {
-  return {
-    query: async <Row extends Record<string, unknown>>(sql: string, params: unknown[]) =>
-      pool.query<Row>(sql, params),
-    transaction: async <Result>(callback: (db: Queryable) => Promise<Result>) => {
-      const client = await pool.connect();
-      const tx: Queryable = {
-        query: async <Row extends Record<string, unknown>>(sql: string, params: unknown[]) =>
-          client.query<Row>(sql, params)
-      };
-
-      try {
-        await client.query("BEGIN", []);
-        const result = await callback(tx);
-        await client.query("COMMIT", []);
-        return result;
-      } catch (error) {
-        await client.query("ROLLBACK", []).catch(() => undefined);
-        throw error;
-      } finally {
-        client.release();
-      }
-    }
-  };
-}
 
 export function createApiDependencies(input: CreateApiDependenciesInput): DefaultApiDependencies {
   const rootDb = input.db;
@@ -158,6 +113,7 @@ export function createApiDependencies(input: CreateApiDependenciesInput): Defaul
   });
   const capturePolicyStore = createPostgresCapturePolicyStore(input.db);
   const captureRuleStore = createPostgresCaptureRuleStore(input.db);
+  const analyticsSettingsStore = createPostgresAnalyticsSettingsStore(input.db);
   const improvementOpportunityStore = createPostgresImprovementOpportunityStore(input.db, {
     ...(accountAnalyticsStore === undefined ? {} : { accountAnalyticsStore })
   });
@@ -432,316 +388,15 @@ export function createApiDependencies(input: CreateApiDependenciesInput): Defaul
     ...(githubAppClient === undefined
       ? {}
       : {
-          githubManagement: {
-            getInstallUrl: () => githubAppClient.getInstallUrl(),
-            getInstallationForOrganization: (input) => githubStore.getGitHubInstallationForOrganization(input),
-            disconnectInstallationForOrganization: (input) => githubStore.deleteGitHubInstallationForOrganization(input),
-            async listRepositoriesForOrganization(requestInput) {
-              const installation = await githubStore.getGitHubInstallationForOrganization({
-                organization_id: requestInput.organization_id
-              });
-              if (installation === null) {
-                return "installation_not_found";
-              }
-              if (installation.status === "suspended") {
-                return "installation_suspended";
-              }
-              if (installation.status === "removed") {
-                return "installation_removed";
-              }
-
-              return githubAppClient.listRepositories({ installationId: installation.installation_id });
-            },
-            getProjectRepoForOrganization: (input) => githubStore.getProjectGitHubRepoForOrganization(input),
-            async listProjectDeliveriesForOrganization(requestInput: {
-              organization_id: string;
-              project_id: string;
-              status?: "pending" | "retrying" | "delivered" | "failed" | "skipped";
-              limit: number;
-            }) {
-              return githubStore.listProjectGitHubDeliveriesForOrganization(requestInput);
-            },
-            async retryProjectDeliveryForOrganization(requestInput: {
-              organization_id: string;
-              project_id: string;
-              delivery_id: string;
-              actor_user_id?: string;
-              actor_role?: "owner" | "admin" | "member";
-            }) {
-              const installation = await githubStore.getGitHubInstallationForOrganization({
-                organization_id: requestInput.organization_id
-              });
-              if (installation === null) {
-                return "installation_not_found";
-              }
-              if (installation.status === "suspended") {
-                return "installation_suspended";
-              }
-              if (installation.status === "removed") {
-                return "installation_removed";
-              }
-
-              const repo = await githubStore.getProjectGitHubRepoForOrganization({
-                organization_id: requestInput.organization_id,
-                project_id: requestInput.project_id
-              });
-              if (repo === null) {
-                return "repo_not_found";
-              }
-
-              const retried = await githubStore.retryProjectGitHubDeliveryForOrganization(requestInput);
-              return retried ?? "delivery_not_found";
-            },
-            listProjectRulesForOrganization: (requestInput: { organization_id: string; project_id: string }) =>
-              githubStore.listProjectGitHubRulesForOrganization(requestInput),
-            getProjectRuleForOrganization: (requestInput: {
-              organization_id: string;
-              project_id: string;
-              rule_id: string;
-            }) => githubStore.getProjectGitHubRuleForOrganization(requestInput),
-            async createProjectRuleForOrganization(requestInput: {
-              organization_id: string;
-              project_id: string;
-              created_by_user_id: string;
-              name: string;
-              enabled: boolean;
-              event_types: string[];
-              environments: string[];
-              services: string[];
-              severity_min: "low" | "medium" | "high" | "critical";
-              bundle_type: "failure" | "improvement";
-              incident_status: "new_only" | "reopened_only" | "new_or_reopened";
-              cooldown_seconds: number;
-            }) {
-              const repo = await githubStore.getProjectGitHubRepoForOrganization({
-                organization_id: requestInput.organization_id,
-                project_id: requestInput.project_id
-              });
-              if (repo === null) {
-                const scopedProject = await metadataStore.listProjectsForOrganization({
-                  organization_id: requestInput.organization_id,
-                  now: new Date().toISOString(),
-                  limit: 1_000
-                });
-
-                return scopedProject.some((project) => project.project_id === requestInput.project_id)
-                  ? "repo_not_found"
-                  : "project_not_found";
-              }
-
-              const billingSummary = await billingManagementServices.getProjectedBillingSummary({
-                organization_id: requestInput.organization_id,
-                now: new Date().toISOString()
-              });
-              const ruleLimit = billingSummary?.plan === "team" ? 20 : 3;
-              const existingRules =
-                (await githubStore.listProjectGitHubRulesForOrganization({
-                  organization_id: requestInput.organization_id,
-                  project_id: requestInput.project_id
-                })) ?? [];
-              if (existingRules.length >= ruleLimit) {
-                return "rule_limit_reached";
-              }
-
-              const created = await runInTransaction(input.db, async (tx) => {
-                const txGitHubStore = createPostgresGitHubStore(tx);
-                const createdRule = await txGitHubStore.createProjectGitHubRuleForOrganization(requestInput);
-
-                if (createdRule !== null && accountAnalyticsStore !== undefined) {
-                  await accountAnalyticsStore.withDb(tx).recordMetricDeltas({
-                    organization_id: requestInput.organization_id,
-                    occurred_at: createdRule.created_at,
-                    source: "github_dispatch_rule_created",
-                    dedupe_key: `github_dispatch_rule_created:${createdRule.rule_id}`,
-                    deltas: {
-                      github_dispatch_rules_created: 1
-                    }
-                  });
-                }
-
-                return createdRule;
-              });
-              return created ?? "project_not_found";
-            },
-            async updateProjectRuleForOrganization(requestInput: {
-              organization_id: string;
-              project_id: string;
-              rule_id: string;
-              actor_user_id?: string;
-              actor_role?: "owner" | "admin" | "member";
-              name?: string;
-              enabled?: boolean;
-              event_types?: string[];
-              environments?: string[];
-              services?: string[];
-              severity_min?: "low" | "medium" | "high" | "critical";
-              bundle_type?: "failure" | "improvement";
-              incident_status?: "new_only" | "reopened_only" | "new_or_reopened";
-              cooldown_seconds?: number;
-            }) {
-              const updated = await githubStore.updateProjectGitHubRuleForOrganization(requestInput);
-              return updated ?? "rule_not_found";
-            },
-            deleteProjectRuleForOrganization: async (requestInput: {
-              organization_id: string;
-              project_id: string;
-              rule_id: string;
-              actor_user_id?: string;
-              actor_role?: "owner" | "admin" | "member";
-            }) =>
-              runInTransaction(input.db, async (tx) => {
-                const txGitHubStore = createPostgresGitHubStore(tx);
-                const deleted = await txGitHubStore.deleteProjectGitHubRuleForOrganization(requestInput);
-
-                if (deleted && accountAnalyticsStore !== undefined) {
-                  await accountAnalyticsStore.withDb(tx).recordMetricDeltas({
-                    organization_id: requestInput.organization_id,
-                    occurred_at: new Date().toISOString(),
-                    source: "github_dispatch_rule_deleted",
-                    dedupe_key: `github_dispatch_rule_deleted:${requestInput.rule_id}`,
-                    deltas: {
-                      github_dispatch_rules_deleted: 1
-                    }
-                  });
-                }
-
-                return deleted;
-              }),
-            async setProjectRepoForOrganization(requestInput) {
-              const installation = await githubStore.getGitHubInstallationForOrganization({
-                organization_id: requestInput.organization_id
-              });
-              if (installation === null) {
-                return "installation_not_found";
-              }
-              if (installation.status === "suspended") {
-                return "installation_suspended";
-              }
-              if (installation.status === "removed") {
-                return "installation_removed";
-              }
-
-              const repositories = await githubAppClient.listRepositories({ installationId: installation.installation_id });
-              const repository = repositories.find(
-                (candidate) => candidate.owner === requestInput.owner && candidate.name === requestInput.repo
-              );
-              if (repository === undefined) {
-                return "repo_not_found";
-              }
-
-              const stored = await githubStore.upsertProjectGitHubRepoForOrganization({
-                organization_id: requestInput.organization_id,
-                project_id: requestInput.project_id,
-                installation_id: installation.id,
-                repo_owner: repository.owner,
-                repo_name: repository.name,
-                default_branch: repository.default_branch
-              });
-
-              if (stored === null) {
-                return "project_not_found";
-              }
-
-              const existingRules = await githubStore.listProjectGitHubRulesForOrganization({
-                organization_id: requestInput.organization_id,
-                project_id: requestInput.project_id
-              });
-              if (existingRules === null || existingRules.length === 0) {
-                await runInTransaction(input.db, async (tx) => {
-                  const txGitHubStore = createPostgresGitHubStore(tx);
-                  const defaultRule = await txGitHubStore.createProjectGitHubRuleForOrganization({
-                    organization_id: requestInput.organization_id,
-                    project_id: requestInput.project_id,
-                    created_by_user_id: requestInput.created_by_user_id,
-                    name: "Default triage rule",
-                    enabled: true,
-                    event_types: ["bundle.created", "bundle.reopened"],
-                    environments: [],
-                    services: [],
-                    severity_min: "high",
-                    bundle_type: null,
-                    incident_status: "new_or_reopened",
-                    cooldown_seconds: 300
-                  });
-
-                  if (defaultRule !== null && accountAnalyticsStore !== undefined) {
-                    await accountAnalyticsStore.withDb(tx).recordMetricDeltas({
-                      organization_id: requestInput.organization_id,
-                      occurred_at: defaultRule.created_at,
-                      source: "github_dispatch_rule_created",
-                      dedupe_key: `github_dispatch_rule_created:${defaultRule.rule_id}`,
-                      deltas: {
-                        github_dispatch_rules_created: 1
-                      }
-                    });
-                  }
-                });
-              }
-
-              return stored;
-            },
-            removeProjectRepoForOrganization: (input) => githubStore.deleteProjectGitHubRepoForOrganization(input),
-            async completeGithubInstallationForOrganization(requestInput) {
-              const installation = await githubAppClient.getInstallation({ installationId: requestInput.installation_id });
-
-              const storedInstallation = await githubStore.upsertGitHubInstallationForOrganization({
-                organization_id: requestInput.organization_id,
-                installation_id: installation.installation_id,
-                account_login: installation.account_login,
-                account_type: installation.account_type,
-                status: "active"
-              });
-
-              await githubMarketplaceStore.linkOrganizationToMarketplaceAccountByInstallationId({
-                organization_id: requestInput.organization_id,
-                installation_id: installation.installation_id
-              });
-
-              return storedInstallation;
-            },
-            verifyWebhookSignature: (input) => githubAppClient.verifyWebhookSignature(input),
-            async processWebhook(input) {
-              if (input.eventName !== "installation") {
-                return;
-              }
-
-              const installation =
-                typeof input.payload["installation"] === "object" && input.payload["installation"] !== null
-                  ? (input.payload["installation"] as Record<string, unknown>)
-                  : null;
-              const installationId = installation?.["id"];
-              if (typeof installationId !== "number") {
-                return;
-              }
-
-              const action = input.payload["action"];
-              const nextStatus =
-                action === "deleted"
-                  ? "removed"
-                  : action === "suspend"
-                    ? "suspended"
-                    : action === "unsuspend" || action === "created"
-                      ? "active"
-                      : null;
-              if (nextStatus === null) {
-                return;
-              }
-
-              const account =
-                typeof installation?.["account"] === "object" && installation["account"] !== null
-                  ? (installation["account"] as Record<string, unknown>)
-                  : null;
-
-              await githubStore.updateGitHubInstallationStatus({
-                installation_id: installationId,
-                status: nextStatus,
-                ...(typeof account?.["login"] === "string" ? { account_login: account["login"] } : {}),
-                ...(account?.["type"] === "Organization" || account?.["type"] === "User"
-                  ? { account_type: account["type"] }
-                  : {})
-              });
-            }
-          }
+          githubManagement: createDefaultGitHubManagement({
+            db: input.db,
+            githubAppClient,
+            githubStore,
+            githubMarketplaceStore,
+            metadataStore,
+            billingManagementServices,
+            ...(accountAnalyticsStore === undefined ? {} : { accountAnalyticsStore })
+          })
         }),
     probeManagement: {
       listActiveProbesForProject: (input) => metadataStore.listActiveProbesForProject(input),
@@ -968,6 +623,23 @@ export function createApiDependencies(input: CreateApiDependenciesInput): Defaul
           project_id: input.project_id,
           matched_at: input.matched_at
         })
+    },
+    analyticsSettingsManagement: {
+      getAnalyticsSettingsForProject: (input: { organization_id: string; project_id: string }) => {
+        void input.organization_id;
+        return analyticsSettingsStore.getAnalyticsSettingsByProjectId(input.project_id);
+      },
+      updateAnalyticsSettingsForProject: (input: {
+        organization_id: string;
+        project_id: string;
+        update: AnalyticsSettingsUpdate;
+      }) => {
+        void input.organization_id;
+        return analyticsSettingsStore.updateAnalyticsSettings({
+          project_id: input.project_id,
+          update: input.update
+        });
+      }
     },
     improvementSettingsManagement: {
       getImprovementSettingsForProject: (input: { organization_id: string; project_id: string }) => {
@@ -1199,126 +871,5 @@ export function createApiDependencies(input: CreateApiDependenciesInput): Defaul
       stripeConfig: input.stripeConfig,
       billingSyncStore
     } : {})
-  };
-}
-
-export function createApiDependenciesFromEnv(
-  env: Record<string, string | undefined>
-): DefaultApiDependencies & { close(): Promise<void> } {
-  const githubOAuth = createGithubOAuthConfigFromEnv(env);
-  const dbSsl = buildPostgresSslConfig(env["DB_SSL_MODE"]);
-  const dbPool = new Pool({
-    host: env["DB_HOST"] ?? "localhost",
-    port: Number(env["DB_PORT"] ?? "5432"),
-    user: env["DB_USER"] ?? "debugbundle",
-    password: env["DB_PASSWORD"] ?? "debugbundle",
-    database: env["DB_NAME"] ?? "debugbundle",
-    ...(dbSsl === undefined ? {} : { ssl: dbSsl })
-  });
-  const db = createPoolQueryable(dbPool);
-
-  const queue = createRedisQueueClient({
-    redisUrl: env["REDIS_URL"] ?? "redis://localhost:6379"
-  });
-
-  const frequencyCounter = createRedisIncidentFrequencyCounter({
-    redisUrl: env["REDIS_URL"] ?? "redis://localhost:6379",
-    snapshotStore: {
-      query: async <Row extends Record<string, unknown>>(sql: string, params: unknown[]) => dbPool.query<Row>(sql, params)
-    }
-  });
-
-  const objectStore = createS3ObjectStoreClient({
-    endpoint: env["S3_ENDPOINT"] ?? "http://localhost:4566",
-    region: env["S3_REGION"] ?? "us-east-1",
-    bucket: env["S3_BUCKET"] ?? "debugbundle-raw-events",
-    accessKeyId: env["AWS_ACCESS_KEY_ID"] ?? "test",
-    secretAccessKey: env["AWS_SECRET_ACCESS_KEY"] ?? "test",
-    forcePathStyle: true
-  });
-  const authEmails =
-    env["SES_FROM_EMAIL"] !== undefined
-      ? createSesEmailTransport({
-          region: env["SES_REGION"] ?? env["S3_REGION"] ?? "us-east-1",
-          fromEmail: formatProductFromEmail(env["SES_FROM_EMAIL"]),
-          ...(env["AWS_ACCESS_KEY_ID"] === undefined || env["AWS_SECRET_ACCESS_KEY"] === undefined
-            ? {}
-            : {
-                accessKeyId: env["AWS_ACCESS_KEY_ID"],
-                secretAccessKey: env["AWS_SECRET_ACCESS_KEY"]
-              }),
-          timeoutMs: Number(env["AUTH_EMAIL_TIMEOUT_MS"] ?? env["WEEKLY_REPORT_EMAIL_TIMEOUT_MS"] ?? "10000")
-        })
-      : undefined;
-
-  const appBaseUrl = env["APP_BASE_URL"] ?? "http://localhost:3000";
-  const emailAssetBaseUrl = resolveEmailAssetBaseUrl(env);
-  const authEmailSender =
-    authEmails === undefined
-      ? undefined
-      : createAuthEmailSender({
-          emailTransport: authEmails,
-          appBaseUrl,
-          ...(emailAssetBaseUrl === undefined ? {} : { emailAssetBaseUrl })
-        });
-  const billingEmails =
-    authEmails === undefined
-      ? undefined
-      : createBillingEmailService({
-          db: {
-            query: async <Row extends Record<string, unknown>>(sql: string, params: unknown[]) => dbPool.query<Row>(sql, params)
-          },
-          emailTransport: authEmails,
-          appBaseUrl
-        });
-
-  const stripeConfig = createStripeConfig(env) ?? undefined;
-  const githubAppClient = createGitHubAppClientFromEnv(env);
-  const lifecycleWebhookFallbackTargetUrl = readNonEmptyEnv(env, "LIFECYCLE_WEBHOOK_TARGET_URL");
-  const lifecycleWebhookFallbackSigningSecret = readNonEmptyEnv(env, "LIFECYCLE_WEBHOOK_SECRET");
-  const adminAnalyticsAccessEmails = readAdminAnalyticsEmailsFromEnv(env);
-  const billingAdminEmails = readBillingAdminEmailsFromEnv(env);
-  const reviewAccessSecret = readNonEmptyEnv(env, "REVIEW_ACCESS_SECRET");
-
-  const authRateLimiter = createRedisAuthRateLimiter({
-    redisUrl: env["REDIS_URL"] ?? "redis://localhost:6379"
-  });
-  const ingestionRateLimiter = createRedisIngestionRateLimiter({
-    redisUrl: env["REDIS_URL"] ?? "redis://localhost:6379"
-  });
-
-  const dependencies = createApiDependencies({
-    db,
-    queue,
-    objectStore,
-    frequencyCounter,
-    ...(env["ANALYTICS_HASH_SECRET"] === undefined
-      ? {}
-      : { analyticsHashSecret: env["ANALYTICS_HASH_SECRET"] }),
-    appBaseUrl,
-    ...(adminAnalyticsAccessEmails === undefined ? {} : { adminAnalyticsAccessEmails }),
-    ...(authEmailSender === undefined ? {} : { authEmails: authEmailSender }),
-    ...(billingEmails === undefined ? {} : { billingEmails }),
-    ...(githubOAuth === undefined ? {} : { githubOAuth }),
-    ...(githubAppClient === undefined ? {} : { githubAppClient }),
-    ...(billingAdminEmails === undefined && reviewAccessSecret === undefined
-      ? {}
-      : { billingAdminEmails: billingAdminEmails ?? [] }),
-    ...(stripeConfig === undefined ? {} : { stripeConfig }),
-    ...(lifecycleWebhookFallbackTargetUrl === undefined ? {} : { lifecycleWebhookFallbackTargetUrl }),
-    ...(lifecycleWebhookFallbackSigningSecret === undefined ? {} : { lifecycleWebhookFallbackSigningSecret }),
-    authRateLimiter,
-    ingestionRateLimiter
-  });
-
-  return {
-    ...dependencies,
-    async close(): Promise<void> {
-      await authRateLimiter.close();
-      await ingestionRateLimiter.close();
-      await frequencyCounter.close();
-      await queue.close();
-      await dbPool.end();
-    }
   };
 }

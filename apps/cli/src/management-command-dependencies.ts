@@ -9,6 +9,10 @@ import type {
   setCapturePolicyWithAuthCommand as defaultSetCapturePolicyCommand
 } from "./capture-policy-commands.js";
 import type {
+  getAnalyticsSettingsWithAuthCommand as defaultGetAnalyticsSettingsCommand,
+  setAnalyticsSettingsWithAuthCommand as defaultSetAnalyticsSettingsCommand
+} from "./analytics-settings-commands.js";
+import type {
   createCaptureRuleWithAuthCommand as defaultCreateCaptureRuleCommand,
   deleteCaptureRuleWithAuthCommand as defaultDeleteCaptureRuleCommand,
   listCaptureRulesWithAuthCommand as defaultListCaptureRulesCommand,
@@ -143,6 +147,8 @@ export type ManagementCommandDependencies = {
   deleteSlackDestinationCommand?: typeof defaultDeleteSlackDestinationCommand;
   getCapturePolicyCommand?: typeof defaultGetCapturePolicyCommand;
   setCapturePolicyCommand?: typeof defaultSetCapturePolicyCommand;
+  getAnalyticsSettingsCommand?: typeof defaultGetAnalyticsSettingsCommand;
+  setAnalyticsSettingsCommand?: typeof defaultSetAnalyticsSettingsCommand;
   listCaptureRulesCommand?: typeof defaultListCaptureRulesCommand;
   createCaptureRuleCommand?: typeof defaultCreateCaptureRuleCommand;
   updateCaptureRuleCommand?: typeof defaultUpdateCaptureRuleCommand;

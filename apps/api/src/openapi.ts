@@ -19,6 +19,9 @@ import {
   CaptureRuleUpdateSchema as SharedCaptureRuleUpdateSchema,
   CapturePolicyResponseSchema as SharedCapturePolicyResponseSchema,
   CapturePolicyUpdateSchema,
+  AnalyticsEventEnvelopeSchema,
+  AnalyticsSettingsResponseSchema,
+  AnalyticsSettingsUpdateSchema,
   EventEnvelopeSchema,
   ImprovementSettingsResponseSchema,
   ImprovementSettingsUpdateSchema,
@@ -428,7 +431,9 @@ const IngestionAcceptedResponseSchema = z
       .optional(),
   })
   .strict();
-const OpenApiIngestionRequestSchema = z.object({ events: z.array(EventEnvelopeSchema) }).strict();
+const OpenApiIngestionRequestSchema = z.object({
+  events: z.array(z.union([EventEnvelopeSchema, AnalyticsEventEnvelopeSchema]))
+}).strict();
 const HealthResponseSchema = z.object({ status: z.literal("ok"), version: z.string(), uptime: z.number() }).strict();
 const ReadyResponseSchema = z.object({ status: z.literal("ready") }).strict();
 const NotReadyResponseSchema = z.object({ status: z.literal("not_ready"), reason: z.string() }).strict();
@@ -679,6 +684,8 @@ function buildPublicApiOperations(): OperationSpec[] {
   const captureRuleSuggestionsResponse = component("CaptureRuleSuggestionsResponse", SharedCaptureRuleSuggestionsResponseSchema);
   const capturePolicyUpdate = component("CapturePolicyUpdate", CapturePolicyUpdateSchema);
   const capturePolicyResponse = component("CapturePolicyResponse", CapturePolicyResponseSchema);
+  const analyticsSettingsUpdate = component("AnalyticsSettingsUpdate", AnalyticsSettingsUpdateSchema);
+  const analyticsSettingsResponse = component("AnalyticsSettingsResponse", AnalyticsSettingsResponseSchema);
   const improvementSettingsUpdate = component("ImprovementSettingsUpdate", ImprovementSettingsUpdateSchema);
   const improvementSettingsResponse = component("ImprovementSettingsResponse", ImprovementSettingsResponseSchema);
   const sdkConfigResponse = component("SdkConfigResponse", SdkConfigResponseSchema);
@@ -2327,6 +2334,38 @@ function buildPublicApiOperations(): OperationSpec[] {
         "401": { description: "Authentication is invalid.", schema: apiError },
         "403": { description: "Owner/admin access or an eligible paid tier is required.", schema: apiError },
         "404": { description: "Project was not found or improvement settings are unavailable.", schema: apiError },
+      },
+    },
+    {
+      method: "get",
+      path: "/v1/projects/{id}/analytics-settings",
+      operationId: "getAnalyticsSettings",
+      summary: "Get AnalyticsBundle settings for a project",
+      tags: ["Analytics"],
+      security: anyMemberAuth,
+      params: ProjectParamsSchema,
+      responses: {
+        "200": { description: "AnalyticsBundle settings.", schema: analyticsSettingsResponse },
+        "400": { description: "Invalid project id.", schema: apiError },
+        "401": { description: "Authentication is invalid.", schema: apiError },
+        "404": { description: "Project was not found.", schema: apiError },
+      },
+    },
+    {
+      method: "patch",
+      path: "/v1/projects/{id}/analytics-settings",
+      operationId: "updateAnalyticsSettings",
+      summary: "Update AnalyticsBundle settings for a project",
+      tags: ["Analytics"],
+      security: anyMemberAuth,
+      params: ProjectParamsSchema,
+      requestBody: analyticsSettingsUpdate,
+      responses: {
+        "200": { description: "Updated AnalyticsBundle settings.", schema: analyticsSettingsResponse },
+        "400": { description: "Invalid project id or request body.", schema: apiError },
+        "401": { description: "Authentication is invalid.", schema: apiError },
+        "403": { description: "Owner/admin access or an eligible tier is required.", schema: apiError },
+        "404": { description: "Project was not found or analytics settings are unavailable.", schema: apiError },
       },
     },
     {

@@ -16,6 +16,7 @@ const {
   createPostgresAuthStoreMock,
   createPostgresBillingStoreMock,
   createPostgresBillingSyncStoreMock,
+  createPostgresAnalyticsSettingsStoreMock,
   createPostgresCapturePolicyStoreMock,
   createPostgresCaptureRuleStoreMock,
   createPostgresAvailabilityCheckStoreMock,
@@ -59,6 +60,7 @@ const {
   createPostgresAuthStoreMock: vi.fn(),
   createPostgresBillingStoreMock: vi.fn(),
   createPostgresBillingSyncStoreMock: vi.fn(),
+  createPostgresAnalyticsSettingsStoreMock: vi.fn(),
   createPostgresCapturePolicyStoreMock: vi.fn(),
   createPostgresCaptureRuleStoreMock: vi.fn(),
   createPostgresAvailabilityCheckStoreMock: vi.fn(),
@@ -132,6 +134,7 @@ vi.mock("../../../packages/storage/src/index.js", () => ({
   createPostgresAccountAnalyticsStore: createPostgresAccountAnalyticsStoreMock,
   createPostgresAuthStore: createPostgresAuthStoreMock,
   createPostgresBillingStore: createPostgresBillingStoreMock,
+  createPostgresAnalyticsSettingsStore: createPostgresAnalyticsSettingsStoreMock,
   createPostgresCapturePolicyStore: createPostgresCapturePolicyStoreMock,
   createPostgresAvailabilityCheckStore: createPostgresAvailabilityCheckStoreMock,
   createMemberAuthService: createMemberAuthServiceMock,
@@ -197,7 +200,6 @@ vi.mock("../../../packages/email/src/index.js", () => ({
 
 import {
   createApiDependencies,
-  createApiDependenciesFromEnv,
   getBooleanField,
   getStringField,
   normalizeEmailForConfig,
@@ -207,6 +209,7 @@ import {
   readUnixTimestampField,
   resolveStripeSubscriptionBillingPeriod
 } from "../../../apps/api/src/default-dependencies.ts";
+import { createApiDependenciesFromEnv } from "../../../apps/api/src/default-dependencies-env.js";
 import { createBillingManagement } from "../../../apps/api/src/billing-management.ts";
 
 describe("api default dependencies", () => {
@@ -223,6 +226,7 @@ describe("api default dependencies", () => {
     createPostgresAuthStoreMock.mockReset();
     createPostgresBillingStoreMock.mockReset();
     createPostgresBillingSyncStoreMock.mockReset();
+    createPostgresAnalyticsSettingsStoreMock.mockReset();
     createPostgresCapturePolicyStoreMock.mockReset();
     createPostgresCaptureRuleStoreMock.mockReset();
     createPostgresAvailabilityCheckStoreMock.mockReset();
@@ -300,6 +304,10 @@ describe("api default dependencies", () => {
       linkStripeCustomer: vi.fn(),
       revokeEntitlements: vi.fn(),
       updateBillingState: vi.fn()
+    });
+    createPostgresAnalyticsSettingsStoreMock.mockReturnValue({
+      getAnalyticsSettingsByProjectId: vi.fn(),
+      updateAnalyticsSettings: vi.fn()
     });
     createPostgresCapturePolicyStoreMock.mockReturnValue({
       getCapturePolicyByProjectId: vi.fn(),
@@ -753,6 +761,8 @@ describe("api default dependencies", () => {
     expect(typeof deps.captureRuleManagement.updateCaptureRuleForProject).toBe("function");
     expect(typeof deps.captureRuleManagement.deleteCaptureRuleForProject).toBe("function");
     expect(typeof deps.captureRuleManagement.recordCaptureRuleMatch).toBe("function");
+    expect(typeof deps.analyticsSettingsManagement.getAnalyticsSettingsForProject).toBe("function");
+    expect(typeof deps.analyticsSettingsManagement.updateAnalyticsSettingsForProject).toBe("function");
     expect(typeof deps.projectManagement.listProjectsForOrganization).toBe("function");
     expect(typeof deps.projectManagement.createProjectForOrganization).toBe("function");
     expect(typeof deps.projectManagement.updateProjectForOrganization).toBe("function");

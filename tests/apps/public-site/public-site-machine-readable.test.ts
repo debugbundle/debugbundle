@@ -119,6 +119,7 @@ describe('public site machine-readable artifacts', () => {
       expect.objectContaining({
         '/v1/events': expect.any(Object),
         '/v1/incidents': expect.any(Object),
+        '/v1/projects/{id}/analytics-settings': expect.any(Object),
         '/v1/projects/{id}/capture-policy': expect.any(Object),
         '/v1/webhooks/{id}/test': expect.any(Object),
         '/v1/sdk/config': expect.any(Object),
@@ -134,6 +135,9 @@ describe('public site machine-readable artifacts', () => {
     expect(document.paths?.['/v1/projects/{id}/capture-policy']?.['patch']?.requestBody?.content?.['application/json']?.schema?.$ref).toBe(
       '#/components/schemas/CapturePolicyUpdate',
     );
+    expect(document.paths?.['/v1/projects/{id}/analytics-settings']?.['patch']?.requestBody?.content?.['application/json']?.schema?.$ref).toBe(
+      '#/components/schemas/AnalyticsSettingsUpdate',
+    );
     expect(document.paths?.['/v1/webhooks/{id}/test']?.['post']?.responses?.['200']?.content?.['application/json']?.schema?.$ref).toBe(
       '#/components/schemas/WebhookTestResponse',
     );
@@ -145,6 +149,7 @@ describe('public site machine-readable artifacts', () => {
         IngestionRequest: expect.any(Object),
         IncidentListResponse: expect.any(Object),
         WebhookTestResponse: expect.any(Object),
+        AnalyticsSettingsResponse: expect.any(Object),
         CapturePolicyResponse: expect.any(Object),
       }),
     );

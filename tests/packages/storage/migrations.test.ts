@@ -152,6 +152,21 @@ describe("storage bootstrap schema", () => {
     expect(REQUIRED_API_TABLES).toContain("availability_checks");
     expect(REQUIRED_API_TABLES).toContain("availability_check_results");
     expect(REQUIRED_WORKER_TABLES).toContain("availability_check_daily_rollups");
+    expect(REQUIRED_API_TABLES).toContain("project_analytics_settings");
+    expect(REQUIRED_API_TABLES).toContain("analytics_rollup_uniques");
+    expect(REQUIRED_API_TABLES).toContain("analytics_session_rollups");
+    expect(REQUIRED_API_TABLES).toContain("analytics_route_rollups");
+    expect(REQUIRED_API_TABLES).toContain("analytics_action_rollups");
+    expect(REQUIRED_API_TABLES).toContain("analytics_funnel_definitions");
+    expect(REQUIRED_API_TABLES).toContain("analytics_funnel_rollups");
+    expect(REQUIRED_API_TABLES).toContain("analytics_transition_rollups");
+    expect(REQUIRED_API_TABLES).toContain("analytics_journey_samples");
+    expect(REQUIRED_API_TABLES).toContain("analytics_opportunities");
+    expect(REQUIRED_API_TABLES).toContain("analytics_bundle_generations");
+    expect(REQUIRED_WORKER_TABLES).toContain("analytics_ingestion_ledger");
+    expect(REQUIRED_WORKER_TABLES).toContain("analytics_rollup_uniques");
+    expect(REQUIRED_WORKER_TABLES).toContain("analytics_session_rollups");
+    expect(REQUIRED_WORKER_TABLES).toContain("analytics_bundle_generations");
   });
 
   it("should describe the final schema directly without schema evolution sql", (): void => {
@@ -217,9 +232,15 @@ describe("storage bootstrap schema", () => {
     expect(STORAGE_BOOTSTRAP_SQL.includes("CREATE TABLE availability_checks")).toBe(true);
     expect(STORAGE_BOOTSTRAP_SQL.includes("CREATE TABLE availability_check_results")).toBe(true);
     expect(STORAGE_BOOTSTRAP_SQL.includes("CREATE TABLE availability_check_daily_rollups")).toBe(true);
+    expect(STORAGE_BOOTSTRAP_SQL.includes("CREATE TABLE project_analytics_settings")).toBe(true);
+    expect(STORAGE_BOOTSTRAP_SQL.includes("CREATE TABLE analytics_ingestion_ledger")).toBe(true);
+    expect(STORAGE_BOOTSTRAP_SQL.includes("CREATE TABLE analytics_bundle_generations")).toBe(true);
     expect(STORAGE_BOOTSTRAP_SQL.includes("severity_lifecycle_scope text")).toBe(true);
     expect(STORAGE_BOOTSTRAP_SQL.includes("alert_rules_severity_lifecycle_scope_check")).toBe(true);
     expect(STORAGE_BOOTSTRAP_SQL.includes("availability_checks_due_idx")).toBe(true);
     expect(STORAGE_BOOTSTRAP_SQL.includes("availability_check_results_check_started_idx")).toBe(true);
+    expect(STORAGE_BOOTSTRAP_SQL.includes("analytics_session_rollups_project_bucket_idx")).toBe(true);
+    expect(STORAGE_BOOTSTRAP_SQL.includes("analytics_opportunities_project_status_detected_idx")).toBe(true);
+    expect(STORAGE_BOOTSTRAP_SQL.includes("analytics_bundle_generations_status_created_idx")).toBe(true);
   });
 });

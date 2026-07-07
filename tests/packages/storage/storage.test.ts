@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
 import {
+  buildAnalyticsRawEventObjectKey,
   buildBundleObjectKey,
   buildRawEventObjectKey,
   buildReproductionObjectKey,
@@ -18,6 +19,16 @@ describe("storage wiring", () => {
     });
 
     expect(key).toBe("raw-events/proj_123/2026/03/10/13/550e8400-e29b-41d4-a716-446655440000.json.gz");
+  });
+
+  it("should build raw analytics event object key matching contract path", (): void => {
+    const key = buildAnalyticsRawEventObjectKey({
+      projectId: "proj_123",
+      eventId: "550e8400-e29b-41d4-a716-446655440000",
+      occurredAt: new Date("2026-03-10T13:45:27.000Z")
+    });
+
+    expect(key).toBe("analytics-events/proj_123/2026/03/10/13/550e8400-e29b-41d4-a716-446655440000.json.gz");
   });
 
   it("should build bundle and reproduction keys", (): void => {
@@ -61,6 +72,74 @@ describe("storage wiring", () => {
       object_key: enqueued.object_key
     });
     expect(enqueued.object_key).toContain(`raw-events/proj_123/`);
+  });
+
+  it("should persist raw analytics events and enqueue analytics aggregation jobs", async (): Promise<void> => {
+    const putObject = vi.fn().mockResolvedValue(undefined);
+    const enqueue = vi.fn().mockResolvedValue(undefined);
+
+    const service = createIngestionPersistenceService({
+      objectStore: { putObject },
+      queue: { enqueue }
+    });
+    const event = {
+      schema_version: "2026-07-analytics-01",
+      event_id: "550e8400-e29b-41d4-a716-446655440000",
+      event_type: "analytics_event",
+      occurred_at: "2026-03-10T13:45:27.000Z",
+      sdk_name: "@debugbundle/sdk-browser",
+      sdk_version: "1.0.0",
+      service: {
+        name: "web",
+        runtime: "browser",
+        framework: "react",
+        environment: "production"
+      },
+      correlation: {
+        session_id: "sess_123",
+        visitor_id_hash: null,
+        user_id_hash: null,
+        trace_id: null,
+        deploy_id: null
+      },
+      payload: {
+        kind: "page_view",
+        route: {
+          path: "/pricing",
+          normalized_path: "/pricing",
+          title: "Pricing"
+        },
+        dimensions: {
+          auth_state: "anonymous",
+          device_type: "desktop",
+          browser_family: "Chrome",
+          browser_major: 125,
+          os_family: "macOS",
+          os_major: 14,
+          language: "en",
+          locale: "en-US",
+          viewport_bucket: "large",
+          referrer_domain: null,
+          utm_source: null,
+          utm_medium: null,
+          utm_campaign: null,
+          country_code: null,
+          region_code: null
+        },
+        custom_dimensions: {}
+      }
+    } as const;
+
+    await service.persistAnalyticsAndEnqueue(event, "proj_123");
+
+    expect(putObject).toHaveBeenCalledOnce();
+    const enqueued = enqueue.mock.calls[0]?.[1] as { object_key: string };
+    expect(enqueue).toHaveBeenCalledWith("aggregate-analytics-events", {
+      project_id: "proj_123",
+      event_id: event.event_id,
+      object_key: enqueued.object_key
+    });
+    expect(enqueued.object_key).toContain("analytics-events/proj_123/");
   });
 
   it("should resolve member token through hashed lookup", async (): Promise<void> => {

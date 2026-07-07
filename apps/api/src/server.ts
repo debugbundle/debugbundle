@@ -20,6 +20,7 @@ import { registerAlertRoutes } from "./routes/alerts.js";
 import { registerAccountRoutes } from "./routes/account.js";
 import { registerAdminAnalyticsRoutes } from "./routes/admin-analytics.js";
 import { registerAdminBillingRoutes } from "./routes/admin-billing.js";
+import { registerAnalyticsSettingsRoutes } from "./routes/analytics-settings.js";
 import { registerAvailabilityCheckRoutes } from "./routes/availability-checks.js";
 import { registerBillingRoutes } from "./routes/billing.js";
 import { registerCapturePolicyRoutes } from "./routes/capture-policy.js";
@@ -395,6 +396,7 @@ export function createApiServer(
   registerSlackRoutes(app, dependencies);
   registerTokenRoutes(app, dependencies);
   registerAlertRoutes(app, dependencies);
+  registerAnalyticsSettingsRoutes(app, dependencies);
   registerCapturePolicyRoutes(app, dependencies);
   registerCaptureRuleRoutes(app, dependencies);
   registerImprovementSettingsRoutes(app, dependencies);

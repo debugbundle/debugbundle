@@ -16,10 +16,12 @@ import type {
   NormalizeEventsJob,
   RedisQueueClient,
 } from "./types.js";
+import type { AggregateAnalyticsEventsJob } from "./analytics-ingestion-jobs.js";
 import type { BuildImprovementBundleJob } from "./improvement-bundle-jobs.js";
 
 type RedisJobName =
   | "normalize-events"
+  | "aggregate-analytics-events"
   | "group-incident"
   | "build-bundle"
   | "build-improvement-bundle"
@@ -33,6 +35,7 @@ type RedisJobName =
 
 type RedisJobPayload =
   | NormalizeEventsJob
+  | AggregateAnalyticsEventsJob
   | GroupIncidentJob
   | BuildBundleJob
   | BuildImprovementBundleJob
@@ -63,6 +66,7 @@ export function createRedisQueueClient(input: CreateRedisQueueClientInput): Redi
   }
 
   async function enqueue(jobName: "normalize-events", payload: NormalizeEventsJob): Promise<void>;
+  async function enqueue(jobName: "aggregate-analytics-events", payload: AggregateAnalyticsEventsJob): Promise<void>;
   async function enqueue(jobName: "group-incident", payload: GroupIncidentJob): Promise<void>;
   async function enqueue(jobName: "build-bundle", payload: BuildBundleJob): Promise<void>;
   async function enqueue(jobName: "build-improvement-bundle", payload: BuildImprovementBundleJob): Promise<void>;
@@ -74,13 +78,14 @@ export function createRedisQueueClient(input: CreateRedisQueueClientInput): Redi
   async function enqueue(jobName: "generate-weekly-report", payload: GenerateWeeklyReportJob): Promise<void>;
   async function enqueue(jobName: "cleanup-retention", payload: CleanupRetentionJob): Promise<void>;
   async function enqueue(
-    jobName: "normalize-events" | "group-incident" | "build-bundle" | "build-improvement-bundle" | "build-reproduction" | "evaluate-alerts" | "deliver-alert-email-digest" | "deliver-webhook" | "deliver-github-dispatch" | "generate-weekly-report" | "cleanup-retention",
-    payload: NormalizeEventsJob | GroupIncidentJob | BuildBundleJob | BuildImprovementBundleJob | BuildReproductionJob | EvaluateAlertsJob | DeliverAlertEmailDigestJob | DeliverWebhookJob | DeliverGitHubDispatchJob | GenerateWeeklyReportJob | CleanupRetentionJob
+    jobName: RedisJobName,
+    payload: RedisJobPayload
   ): Promise<void> {
     await redis.rpush(pendingQueueKey(jobName), JSON.stringify(payload));
   }
 
   async function dequeue(jobName: "normalize-events"): Promise<NormalizeEventsJob | null>;
+  async function dequeue(jobName: "aggregate-analytics-events"): Promise<AggregateAnalyticsEventsJob | null>;
   async function dequeue(jobName: "group-incident"): Promise<GroupIncidentJob | null>;
   async function dequeue(jobName: "build-bundle"): Promise<BuildBundleJob | null>;
   async function dequeue(jobName: "build-improvement-bundle"): Promise<BuildImprovementBundleJob | null>;
@@ -92,14 +97,14 @@ export function createRedisQueueClient(input: CreateRedisQueueClientInput): Redi
   async function dequeue(jobName: "generate-weekly-report"): Promise<GenerateWeeklyReportJob | null>;
   async function dequeue(jobName: "cleanup-retention"): Promise<CleanupRetentionJob | null>;
   async function dequeue(
-    jobName: "normalize-events" | "group-incident" | "build-bundle" | "build-improvement-bundle" | "build-reproduction" | "evaluate-alerts" | "deliver-alert-email-digest" | "deliver-webhook" | "deliver-github-dispatch" | "generate-weekly-report" | "cleanup-retention"
-  ): Promise<NormalizeEventsJob | GroupIncidentJob | BuildBundleJob | BuildImprovementBundleJob | BuildReproductionJob | EvaluateAlertsJob | DeliverAlertEmailDigestJob | DeliverWebhookJob | DeliverGitHubDispatchJob | GenerateWeeklyReportJob | CleanupRetentionJob | null> {
+    jobName: RedisJobName
+  ): Promise<RedisJobPayload | null> {
     const raw = await redis.lpop(pendingQueueKey(jobName));
     if (raw === null) {
       return null;
     }
 
-    return JSON.parse(raw) as NormalizeEventsJob | GroupIncidentJob | BuildBundleJob | BuildImprovementBundleJob | BuildReproductionJob | EvaluateAlertsJob | DeliverAlertEmailDigestJob | DeliverWebhookJob | DeliverGitHubDispatchJob | GenerateWeeklyReportJob | CleanupRetentionJob;
+    return JSON.parse(raw) as RedisJobPayload;
   }
 
   async function reclaimStaleProcessingJobs(jobName: RedisJobName, olderThanMs: number): Promise<number> {
@@ -125,6 +130,7 @@ export function createRedisQueueClient(input: CreateRedisQueueClientInput): Redi
   }
 
   async function claim(jobName: "normalize-events"): Promise<ClaimedRedisJob<NormalizeEventsJob> | null>;
+  async function claim(jobName: "aggregate-analytics-events"): Promise<ClaimedRedisJob<AggregateAnalyticsEventsJob> | null>;
   async function claim(jobName: "group-incident"): Promise<ClaimedRedisJob<GroupIncidentJob> | null>;
   async function claim(jobName: "build-bundle"): Promise<ClaimedRedisJob<BuildBundleJob> | null>;
   async function claim(jobName: "build-improvement-bundle"): Promise<ClaimedRedisJob<BuildImprovementBundleJob> | null>;
@@ -172,14 +178,14 @@ export function createRedisQueueClient(input: CreateRedisQueueClientInput): Redi
     enqueue,
 
     async readJobQueue(
-      jobName: "normalize-events" | "group-incident" | "build-bundle" | "build-improvement-bundle" | "build-reproduction" | "evaluate-alerts" | "deliver-alert-email-digest" | "deliver-webhook" | "deliver-github-dispatch" | "generate-weekly-report" | "cleanup-retention"
+      jobName: RedisJobName
     ): Promise<string[]> {
       const values = await redis.lrange(pendingQueueKey(jobName), 0, -1);
       return values;
     },
 
     async clearJobQueue(
-      jobName: "normalize-events" | "group-incident" | "build-bundle" | "build-improvement-bundle" | "build-reproduction" | "evaluate-alerts" | "deliver-alert-email-digest" | "deliver-webhook" | "deliver-github-dispatch" | "generate-weekly-report" | "cleanup-retention"
+      jobName: RedisJobName
     ): Promise<void> {
       await redis.del(pendingQueueKey(jobName), processingQueueKey(jobName));
     },

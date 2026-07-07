@@ -5,6 +5,8 @@ import type {
   CapturePolicyUpdate,
   CaptureRuleUpdate,
   EventEnvelope,
+  AnalyticsSettings,
+  AnalyticsSettingsUpdate,
   ImprovementSettings,
   ImprovementSettingsUpdate,
   ProjectColorTag
@@ -45,6 +47,7 @@ import type {
   UpdateProjectMemberRoleResult,
   IngestionMetadataService,
   IngestionPersistenceService,
+  AnalyticsIngestionPersistenceService,
   ObjectStoreClient,
   ObjectStoreReader,
   MemberAuthService,
@@ -68,7 +71,8 @@ import type {
 } from "../../../packages/storage/src/index.js";
 
 export interface ApiDependencies {
-  ingestionPersistence: Pick<IngestionPersistenceService, "persistAndEnqueue">;
+  ingestionPersistence: Pick<IngestionPersistenceService, "persistAndEnqueue"> &
+    Partial<AnalyticsIngestionPersistenceService>;
   ingestionMetadata: Pick<IngestionMetadataService, "resolveProjectByTokenHash">;
   accountAnalytics?: Pick<AccountAnalyticsStore, "recordMetricDeltas"> | undefined;
   ingestionRejectionDiagnostics?: Pick<
@@ -426,6 +430,17 @@ export interface ApiDependencies {
       project_id: string;
       update: ImprovementSettingsUpdate;
     }): Promise<ImprovementSettings | null>;
+  } | undefined;
+  analyticsSettingsManagement?: {
+    getAnalyticsSettingsForProject(input: {
+      organization_id: string;
+      project_id: string;
+    }): Promise<AnalyticsSettings | null>;
+    updateAnalyticsSettingsForProject(input: {
+      organization_id: string;
+      project_id: string;
+      update: AnalyticsSettingsUpdate;
+    }): Promise<AnalyticsSettings | null>;
   } | undefined;
   improvementManagement?: {
     listImprovementsForOrganization(input: {

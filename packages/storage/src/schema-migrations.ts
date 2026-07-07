@@ -5,6 +5,7 @@ import {
   repairKnownCompatibleMigrationChecksums
 } from "./schema-migration-compatibility.js";
 import { AVAILABILITY_CHECK_STORAGE_SCHEMA_MIGRATIONS } from "./availability-check-schema-migrations.js";
+import { ANALYTICS_STORAGE_SCHEMA_MIGRATIONS } from "./analytics-schema-migrations.js";
 import {
   STORAGE_SCHEMA_MIGRATIONS as BASE_STORAGE_SCHEMA_MIGRATIONS,
   type StorageSchemaMigration
@@ -24,7 +25,8 @@ const STORAGE_MIGRATION_LEDGER_TABLE = "storage_migration_ledger";
 
 export const STORAGE_SCHEMA_MIGRATIONS: readonly StorageSchemaMigration[] = [
   ...BASE_STORAGE_SCHEMA_MIGRATIONS,
-  ...AVAILABILITY_CHECK_STORAGE_SCHEMA_MIGRATIONS
+  ...AVAILABILITY_CHECK_STORAGE_SCHEMA_MIGRATIONS,
+  ...ANALYTICS_STORAGE_SCHEMA_MIGRATIONS
 ].sort((left, right) => left.id.localeCompare(right.id));
 
 function validateStorageSchemaMigrations(migrations: readonly StorageSchemaMigration[]): void {

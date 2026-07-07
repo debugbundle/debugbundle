@@ -25,6 +25,7 @@ const {
   redisFactoryMock,
   s3FactoryMock,
   processNextNormalizeEventsJobMock,
+  processNextAggregateAnalyticsEventsJobMock,
   processNextGroupIncidentJobMock,
   processNextBuildBundleJobMock,
   processNextBuildReproductionJobMock,
@@ -38,6 +39,7 @@ const {
   frequencyCounterCloseMock,
   requestAnomalyCounterCloseMock,
   createPostgresAccountAnalyticsStoreMock,
+  createPostgresAnalyticsRollupStoreMock,
   createPostgresBillingStoreMock,
   createPostgresMetadataStoreMock,
   createPostgresImprovementOpportunityStoreMock,
@@ -62,6 +64,7 @@ const {
   redisFactoryMock: vi.fn(),
   s3FactoryMock: vi.fn(),
   processNextNormalizeEventsJobMock: vi.fn(),
+  processNextAggregateAnalyticsEventsJobMock: vi.fn(),
   processNextGroupIncidentJobMock: vi.fn(),
   processNextBuildBundleJobMock: vi.fn(),
   processNextBuildReproductionJobMock: vi.fn(),
@@ -76,6 +79,9 @@ const {
   requestAnomalyCounterCloseMock: vi.fn().mockResolvedValue(undefined),
   createPostgresAccountAnalyticsStoreMock: vi.fn().mockReturnValue({
     recordMetricDeltas: vi.fn().mockResolvedValue("recorded")
+  }),
+  createPostgresAnalyticsRollupStoreMock: vi.fn().mockReturnValue({
+    recordAnalyticsEvent: vi.fn().mockResolvedValue({ recorded: true })
   }),
   createPostgresBillingStoreMock: vi.fn().mockReturnValue({
     getBillingSummaryForProject: vi.fn().mockResolvedValue(null)
@@ -243,6 +249,7 @@ vi.mock("../../../packages/storage/src/index.js", async (importOriginal) => {
     close: requestAnomalyCounterCloseMock
   }),
   createPostgresAccountAnalyticsStore: createPostgresAccountAnalyticsStoreMock,
+  createPostgresAnalyticsRollupStore: createPostgresAnalyticsRollupStoreMock,
   createPostgresBillingStore: createPostgresBillingStoreMock,
   createPostgresMetadataStore: createPostgresMetadataStoreMock,
   createPostgresImprovementOpportunityStore: createPostgresImprovementOpportunityStoreMock,
@@ -278,7 +285,19 @@ vi.mock("../../../packages/storage/src/migrations.js", () => ({
     "weekly_report_deliveries",
     "account_analytics_accounts",
     "account_metric_periods",
-    "account_metric_events"
+    "account_metric_events",
+    "project_analytics_settings",
+    "analytics_ingestion_ledger",
+    "analytics_rollup_uniques",
+    "analytics_session_rollups",
+    "analytics_route_rollups",
+    "analytics_action_rollups",
+    "analytics_funnel_definitions",
+    "analytics_funnel_rollups",
+    "analytics_transition_rollups",
+    "analytics_journey_samples",
+    "analytics_opportunities",
+    "analytics_bundle_generations"
   ]
 }));
 
@@ -313,6 +332,10 @@ vi.mock("../../../apps/worker/src/processor.js", () => ({
       this.responseCode = responseCode;
     }
   }
+}));
+
+vi.mock("../../../apps/worker/src/analytics-aggregation.js", () => ({
+  processNextAggregateAnalyticsEventsJob: processNextAggregateAnalyticsEventsJobMock
 }));
 
 import {
@@ -362,7 +385,19 @@ const WORKER_TABLE_ROWS = [
   { table_name: "weekly_report_deliveries" },
   { table_name: "account_analytics_accounts" },
   { table_name: "account_metric_periods" },
-  { table_name: "account_metric_events" }
+  { table_name: "account_metric_events" },
+  { table_name: "project_analytics_settings" },
+  { table_name: "analytics_ingestion_ledger" },
+  { table_name: "analytics_rollup_uniques" },
+  { table_name: "analytics_session_rollups" },
+  { table_name: "analytics_route_rollups" },
+  { table_name: "analytics_action_rollups" },
+  { table_name: "analytics_funnel_definitions" },
+  { table_name: "analytics_funnel_rollups" },
+  { table_name: "analytics_transition_rollups" },
+  { table_name: "analytics_journey_samples" },
+  { table_name: "analytics_opportunities" },
+  { table_name: "analytics_bundle_generations" }
 ];
 
 function buildMigratedWorkerSchemaRows(sql: string): { rows: Record<string, unknown>[] } {
@@ -399,6 +434,7 @@ describe("worker runtime", () => {
     redisFactoryMock.mockReset();
     s3FactoryMock.mockReset();
     processNextNormalizeEventsJobMock.mockReset();
+    processNextAggregateAnalyticsEventsJobMock.mockReset();
     processNextGroupIncidentJobMock.mockReset();
     processNextBuildBundleJobMock.mockReset();
     processNextBuildReproductionJobMock.mockReset();
@@ -410,6 +446,7 @@ describe("worker runtime", () => {
     processNextDeliverGitHubDispatchJobMock.mockReset();
     processNextGenerateWeeklyReportJobMock.mockReset();
     processNextNormalizeEventsJobMock.mockResolvedValue({ processed: false, reason: "no_jobs" });
+    processNextAggregateAnalyticsEventsJobMock.mockResolvedValue({ processed: false, reason: "no_jobs" });
     processNextGroupIncidentJobMock.mockResolvedValue({ processed: false, reason: "no_jobs" });
     processNextBuildBundleJobMock.mockResolvedValue({ processed: false, reason: "no_jobs" });
     processNextBuildReproductionJobMock.mockResolvedValue({ processed: false, reason: "no_jobs" });
@@ -423,6 +460,7 @@ describe("worker runtime", () => {
     frequencyCounterCloseMock.mockClear();
     requestAnomalyCounterCloseMock.mockClear();
     createPostgresAccountAnalyticsStoreMock.mockClear();
+    createPostgresAnalyticsRollupStoreMock.mockClear();
     createPostgresBillingStoreMock.mockClear();
     createPostgresMetadataStoreMock.mockClear();
     createPostgresImprovementOpportunityStoreMock.mockClear();

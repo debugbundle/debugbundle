@@ -1,4 +1,5 @@
 export type { ManagementCommandDependencies, CliCommandResult } from "./management-command-dependencies.js";
+export { handleAnalyticsCommand } from "./management-analytics-command-handlers.js";
 export { handleGithubCommand, handleImprovementsCommand } from "./management-github-improvements-command-handlers.js";
 export { handleBillingCommand, handleProjectCommand, handleTokenCommand } from "./management-billing-project-token-command-handlers.js";
 export { handleHealthCommand } from "./management-health-command-handlers.js";

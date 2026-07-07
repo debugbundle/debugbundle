@@ -38,8 +38,11 @@ export type {
 } from "./billing-store.js";
 export {
   buildRawEventObjectKey,
+  buildAnalyticsRawEventObjectKey,
   buildBundleObjectKey,
   buildImprovementBundleObjectKey,
+  buildAnalyticsJourneyObjectKey,
+  buildAnalyticsBundleObjectKey,
   buildReproductionObjectKey,
   buildUserAvatarObjectKey,
   buildBundleRegenerationLeaseKey,
@@ -62,6 +65,15 @@ export type { CaptureRuleStore } from "./capture-rule-store.js";
 export { createPostgresCaptureRuleStore } from "./capture-rule-store.js";
 export type { ImprovementSettingsStore } from "./improvement-settings-store.js";
 export { createPostgresImprovementSettingsStore } from "./improvement-settings-store.js";
+export type { AnalyticsSettingsStore } from "./analytics-settings-store.js";
+export { createPostgresAnalyticsSettingsStore } from "./analytics-settings-store.js";
+export type { AnalyticsRollupStore } from "./analytics-rollup-store.js";
+export { createPostgresAnalyticsRollupStore } from "./analytics-rollup-store.js";
+export type {
+  AggregateAnalyticsEventsJob,
+  AnalyticsIngestionPersistenceService,
+  AnalyticsQueueClient
+} from "./analytics-ingestion-jobs.js";
 export type {
   ImprovementOpportunityKind,
   ImprovementOpportunityStatus,

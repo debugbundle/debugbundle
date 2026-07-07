@@ -156,6 +156,7 @@ export interface NormalizeWorkerDependencies {
   improvementBundleWorker?: ImprovementBundleWorkerDependencies;
 }
 
+
 export interface IncidentLifecycleWebhookPublisher {
   publish(input: {
     event_type: WebhookEventType;
