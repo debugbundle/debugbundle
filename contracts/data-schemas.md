@@ -498,9 +498,9 @@ Not every improvement opportunity has a standalone improvement bundle artifact. 
 
 ---
 
-## 2. Event Envelope Schema
+## 2. Debug Event Envelope Schema
 
-Common wrapper for all SDK events:
+Common wrapper for the canonical debug SDK event family:
 
 ```json
 {
@@ -545,6 +545,133 @@ Common wrapper for all SDK events:
 | `probe_event` | `context_signal` or `operational_signal` | `context_signal` when flushed with an error (always-on); `operational_signal` when standalone remote-activated |
 
 `event_class` is immutable after normalization (INV-15). It drives billing (Free meters only `incident_signal`), incident eligibility (only `incident_signal` creates incidents), and surfacing rules.
+
+---
+
+## 2a. Analytics Event Envelope Schema
+
+Analytics events are opt-in browser product-usage events. They share the ingestion transport with debug events, but they use a separate processing lane and must never participate in debug event classification, incident grouping, incident alerting, lifecycle webhooks, or GitHub incident automation.
+
+```json
+{
+  "schema_version": "2026-07-analytics-01",
+  "event_id": "uuid",
+  "event_type": "analytics_event",
+  "occurred_at": "ISO8601",
+  "sdk_name": "@debugbundle/sdk-browser",
+  "sdk_version": "semver",
+  "service": {
+    "name": "string (required)",
+    "runtime": "browser",
+    "framework": "string | null",
+    "environment": "string (required)"
+  },
+  "correlation": {
+    "session_id": "string (required)",
+    "visitor_id_hash": "string | null",
+    "user_id_hash": "string | null",
+    "trace_id": "string | null",
+    "deploy_id": "string | null"
+  },
+  "payload": {
+    "kind": "session_start | page_view | route_change | action | funnel_step | conversion | journey_marker | session_summary",
+    "route": {
+      "path": "string | null",
+      "normalized_path": "string | null",
+      "title": "string | null"
+    },
+    "dimensions": {
+      "auth_state": "anonymous | authenticated | unknown",
+      "device_type": "desktop | mobile | tablet | unknown",
+      "browser_family": "string | null",
+      "browser_major": "number | null",
+      "os_family": "string | null",
+      "os_major": "number | null",
+      "language": "string | null",
+      "locale": "string | null",
+      "viewport_bucket": "small | medium | large | unknown",
+      "referrer_domain": "string | null",
+      "utm_source": "string | null",
+      "utm_medium": "string | null",
+      "utm_campaign": "string | null",
+      "country_code": "string | null",
+      "region_code": "string | null"
+    },
+    "custom_dimensions": {}
+  }
+}
+```
+
+**Required envelope fields:** `schema_version`, `event_id`, `event_type`, `occurred_at`, `sdk_name`, `sdk_version`, `service.name`, `service.environment`, `correlation.session_id`, `payload.kind`, `payload.dimensions`.
+
+**Privacy rules:**
+
+- `event_type` is always `analytics_event`; specific analytics behavior is represented by `payload.kind`.
+- `event_class` is not present on analytics events and must not be inferred later.
+- `session_id` is required for analytics correlation.
+- `visitor_id_hash` is nullable and allowed only for privacy modes that support returning-visitor metrics.
+- `user_id_hash` is customer-supplied and must be a privacy-safe hash; SDKs must not derive raw identity.
+- Route `path` and `normalized_path` must strip query strings by default before long-term storage.
+- Raw user-agent strings, raw IP addresses, form values, raw click text, screenshots, DOM snapshots, precise coordinates, precise location, tokens, secrets, names, emails, phone numbers, and payment data are not analytics fields.
+- `custom_dimensions` accepts only bounded low-cardinality values that pass project/tier allowlists and redaction.
+
+---
+
+## 2b. AnalyticsBundleV1 Schema
+
+AnalyticsBundle artifacts summarize an analysis unit such as a funnel dropoff, route-health issue, journey-friction pattern, feature-usage analysis, incident impact, deploy comparison, or conversion path. They are not generated per visit.
+
+```json
+{
+  "schema_version": "analytics_bundle.v1",
+  "bundle_type": "analytics",
+  "analysis_kind": "usage_summary | route_health | funnel_dropoff | journey_friction | feature_usage | incident_impact | deploy_comparison | conversion_path",
+  "project": {
+    "project_id": "uuid",
+    "service": "string | null",
+    "environment": "string | null"
+  },
+  "analysis_window": {
+    "from": "ISO8601",
+    "to": "ISO8601",
+    "granularity": "hour | day | week | month"
+  },
+  "summary": {
+    "title": "string",
+    "description": "string",
+    "confidence": "low | medium | high",
+    "severity": "low | medium | high"
+  },
+  "metrics": {
+    "sessions_analyzed": "number",
+    "affected_sessions": "number | null",
+    "baseline": {},
+    "current": {}
+  },
+  "segments": [],
+  "journey_patterns": [],
+  "representative_journeys": [],
+  "linked_incidents": [],
+  "linked_deploys": [],
+  "recommendations": [],
+  "redaction": {
+    "rules_applied": [],
+    "omitted_fields": []
+  },
+  "metadata": {
+    "input_fingerprint": "sha256:<hex>"
+  }
+}
+```
+
+**Determinism rules:**
+
+- Same analysis specification plus same rollup/sample/incident/deploy inputs must produce byte-identical deterministic evidence after stable serialization.
+- Arrays must be sorted deterministically.
+- Representative journeys must be selected through deterministic scoring and tie-breaking.
+- Wall-clock generation timing belongs in bundle-generation metadata rows, not in deterministic bundle evidence.
+
+**Relationship to `BundleV1`:** `AnalyticsBundleV1` is a separate artifact schema. It does not replace failure or improvement `BundleV1` artifacts and must not be returned from incident failure bundle endpoints.
 
 ---
 
@@ -1266,6 +1393,28 @@ Exactly one of `incident_id` or `improvement_opportunity_id` must be present. In
 
 Delivery statuses: `pending` → `delivered` or `retrying` → `delivered` or `failed`. `skipped` records are non-retryable history rows for dispatches suppressed by DebugBundle-side hourly rate limits. Retry strategy: 1s → 5s → 30s → 2min → 10min (5 attempts). Rules are NOT auto-disabled after failures.
 
+### 5.21 AnalyticsBundle Tables
+
+Analytics storage is aggregate-first. Raw analytics events are short-lived object-storage inputs, not long-term Postgres event rows.
+
+Required table concepts for the AnalyticsBundle implementation:
+
+| Table | Purpose |
+|---|---|
+| `project_analytics_settings` | Project-scoped analytics enablement, privacy mode, consent requirement, sampling, retention, saved-funnel/custom-dimension limits, and capture toggles |
+| `analytics_ingestion_ledger` | Idempotency ledger keyed by project/event id so reprocessing does not double-count rollups |
+| `analytics_session_rollups` | Hourly/daily session, active-user, new/returning visitor, bounce, exit, duration, and pageview aggregates by bounded dimensions |
+| `analytics_route_rollups` | Hourly/daily route/page aggregates including pageviews, unique sessions, entrances, exits, bounces, duration buckets, and linked incident sessions |
+| `analytics_action_rollups` | Semantic action and feature-usage aggregates by route and bounded dimensions |
+| `analytics_funnel_definitions` | Optional saved funnel definitions for named project funnels |
+| `analytics_funnel_rollups` | Funnel-step conversion/dropoff/time aggregates by bounded dimensions |
+| `analytics_transition_rollups` | Route-to-route transition aggregates for journey/path analysis |
+| `analytics_journey_samples` | Short-lived retained representative journey sample index pointing to redacted object-storage artifacts |
+| `analytics_opportunities` | Deterministic usage/friction/incident-impact/deploy-comparison opportunities with status, severity, confidence, evidence summary, related incident/deploy ids, and bundle state |
+| `analytics_bundle_generations` | On-demand or scheduled AnalyticsBundle generation metadata, input fingerprint, status, object key, and failure reason |
+
+Dimension storage must remain bounded. Built-in dimensions include route, device type, browser family/major, OS family/major, language/locale, viewport bucket, referrer domain, UTM fields, auth state, country/region when enabled, deploy, and approved Team custom dimensions. Arbitrary raw JSON payloads must not be used as the long-term analytics query model.
+
 ---
 
 ## 6. Object Storage Path Conventions
@@ -1275,6 +1424,9 @@ Delivery statuses: `pending` → `delivered` or `retrying` → `delivered` or `f
 | Raw events | `raw-events/{project_id}/{yyyy}/{mm}/{dd}/{hour}/{event_id}.json.gz` |
 | Bundles | `bundles/{project_id}/{incident_id}/bundle.json.gz` |
 | Reproductions | `reproductions/{project_id}/{incident_id}/reproduction.json.gz` |
+| Raw analytics events | `analytics-events/{project_id}/{yyyy}/{mm}/{dd}/{hour}/{event_id}.json.gz` |
+| Analytics journey samples | `analytics-journeys/{project_id}/{sample_id}.json.gz` |
+| AnalyticsBundle artifacts | `analytics-bundles/{project_id}/{bundle_generation_id}/analytics-bundle.json.gz` |
 
 ---
 

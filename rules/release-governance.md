@@ -188,6 +188,8 @@ Each example must include:
 
 - DebugBundle SDKs do NOT collect anonymous usage data in V1.
 - If telemetry is added post-V1, it must be opt-in only.
+- AnalyticsBundle product analytics is customer-owned telemetry for the customer's own project. It must still be disabled by default, consent-aware where configured, privacy-documented, and separate from DebugBundle's own product telemetry.
+- AnalyticsBundle releases must document collected fields, retained fields, retention windows, custom dimension limits, identity/hash behavior, self-host behavior, and how analytics differs from incident/debug capture.
 - Telemetry decisions must be documented in `PRIVACY.md`.
 - Self-hosted instances never phone home.
 

@@ -103,6 +103,22 @@ These behaviors are mandatory across all SDKs. A new language SDK is non-complia
 | `sessionSampleRate` | number (0.0–1.0) | `1.0` | Session-level sampling. Decision made once per session — entire journey captured or nothing. Independent of `sampleRate`. |
 | `maxEventsPerSession` | number | `100` | Hard cap on events per session. After cap, only `frontend_exception` events are captured. |
 | `beforeSend` | `(event) → event \| null` | — | Browser-supported synchronous final hook before buffering. Returning `null` drops the event locally. |
+| `analytics` | object | `{ enabled: false }` | Opt-in AnalyticsBundle product-usage capture. Analytics events use the analytics lane and are not debug incident events. |
+
+**Browser analytics config fields (sdk-browser only, opt-in):**
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `analytics.enabled` | boolean | `false` | Enables AnalyticsBundle product-usage capture. Existing installs remain analytics-off after upgrade unless this is explicitly true. |
+| `analytics.privacyMode` | `strict \| standard \| custom` | `strict` | `strict` uses session-only analytics; `standard` allows a project-scoped anonymous returning-visitor hash; `custom` uses customer-owned consent/identity callbacks while preserving schema/redaction limits. |
+| `analytics.consentRequired` | boolean | `false` | When true, analytics capture is disabled until `debugbundle.analytics.setConsent(true)` is called. |
+| `analytics.trackPageViews` | boolean | `true` | Captures initial page views when analytics is enabled. |
+| `analytics.trackRouteChanges` | boolean | `true` | Captures SPA route changes when analytics is enabled. |
+| `analytics.trackSessions` | boolean | `true` | Captures session-start/session-summary signals when analytics is enabled. |
+| `analytics.trackReferrers` | boolean | `true` | Captures referrer domain and bounded UTM fields. |
+| `analytics.trackActions` | boolean | `false` | Enables structural action/click capture. Must not capture raw text or form values. Semantic `track()` calls are preferred. |
+| `analytics.trackFrictionSignals` | boolean | `true` | Captures bounded dead-click/repeated-click/backtrack journey markers without raw user text. |
+| `analytics.sampleRate` | number (0.0–1.0) | `1.0` | Analytics event sampling, separate from debug event sampling. |
+| `analytics.journeySampleRate` | number (0.0–1.0) | tier/project default | Controls retained representative journey samples. |
 
 Browser `fetch()` calls may include an optional `debugbundle` metadata object in the init bag:
 
@@ -399,6 +415,51 @@ Browser `unhandledrejection` captures may include `frontend_exception.payload.re
 - Browser SDKs must apply the same duplicate suppression and loop-protection guarantees defined in Required Volume-Control Behavior above.
 - `frontend_exception` and `error_suppressed` events remain capturable even when non-exception session caps are exhausted.
 - Browser SDKs must retain buffered events across failed or throttled flush attempts and retry after the backoff window instead of discarding them.
+
+### AnalyticsBundle Browser API
+
+Analytics APIs live under `debugbundle.analytics` so product-usage capture remains distinct from debug/error capture.
+
+```ts
+debugbundle.analytics.setConsent(true);
+debugbundle.analytics.setConsent(false);
+
+debugbundle.analytics.pageView({
+  path: "/pricing",
+  title: "Pricing"
+});
+
+debugbundle.analytics.track("feature.used", {
+  feature: "billing_portal"
+});
+
+debugbundle.analytics.funnel("checkout", "payment_submitted", {
+  plan_selected: "team"
+});
+
+debugbundle.analytics.convert("subscription_started", {
+  plan_selected: "team"
+});
+
+debugbundle.analytics.setContext({
+  auth_state: "authenticated",
+  account_tier: "pro",
+  onboarding_state: "invited"
+});
+
+debugbundle.analytics.setUserHash("sha256:...");
+```
+
+Required behavior:
+
+- Analytics APIs are no-ops unless analytics is enabled and consent rules allow capture.
+- Analytics API failures never throw into host pages.
+- Analytics batching, retry, unload flushing, and backoff must not block debug event capture or host page behavior.
+- Analytics events must use `event_type: "analytics_event"` with a `payload.kind` rather than adding many top-level event types.
+- Analytics events do not receive `event_class` and cannot create incidents.
+- `setContext()` accepts only bounded low-cardinality values. Sensitive, overlong, unapproved, or high-cardinality values must be dropped or redacted locally where possible and rejected/dropped server-side as a backstop.
+- `setUserHash()` accepts a customer-supplied privacy-safe hash only. The SDK must not derive raw identity.
+- Auto-captured analytics must not include form values, raw click text, screenshots, DOM snapshots, precise coordinates, precise location, raw query strings, tokens, secrets, names, emails, phone numbers, or payment data.
 
 ---
 

@@ -15,6 +15,8 @@ Signal → Normalized events → Grouped context → Deterministic debug bundle 
 
 Everything in the system must serve this loop. Do not build features that optimize for arbitrary log search, dashboard analytics, or generic observability in V1.
 
+AnalyticsBundle is the narrow exception to the old "no dashboard analytics" wording: it is permitted only as an opt-in, bundle-oriented product analytics lane that serves agent-native usage/friction/impact analysis. It must remain aggregate-first, privacy-aware, and tied to AnalyticsBundle artifacts, opportunities, incident impact, funnels, routes, journeys, and API/CLI/MCP/web parity. It must not become arbitrary event search, generic observability, or a long-term raw telemetry warehouse.
+
 ---
 
 ## 2. Layer Separation

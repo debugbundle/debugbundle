@@ -1463,7 +1463,132 @@ If CLI says something is healthy and MCP says something different, that is a pro
 
 ---
 
-## 24. Browser Relay Acceptance
+## 24. AnalyticsBundle & Product Analytics Acceptance
+
+### AC-ANL-01: Analytics Disabled By Default
+- **Given** an existing browser SDK install that upgrades to a version with analytics support
+- **When** the SDK initializes without `analytics.enabled: true`
+- **Then** no analytics events are captured or shipped
+- **And** existing debug capture behavior is unchanged
+
+### AC-ANL-02: Browser Analytics Capture
+- **Given** a browser SDK initialized with analytics enabled
+- **When** a user starts a session, views pages, changes routes, triggers semantic actions, advances funnel steps, and converts
+- **Then** the SDK emits analytics events for session, page, route, action, funnel, and conversion signals
+- **And** each analytics event includes session correlation, service/environment, device type, browser, OS, language/locale, viewport bucket, referrer/UTM context when available, and configured privacy-safe identity fields
+
+### AC-ANL-03: Consent Gating
+- **Given** analytics is enabled with consent required
+- **When** consent is absent or explicitly false
+- **Then** the browser SDK does not capture or ship analytics events
+- **And** `frontend_exception`, `request_event`, probe, breadcrumb, and other debug capture behavior remains governed by existing debug capture settings
+
+### AC-ANL-04: Analytics Events Do Not Create Incidents
+- **Given** a valid analytics event batch is accepted
+- **When** ingestion and worker processing complete
+- **Then** no incident is created, reopened, regressed, alerted, webhooked, or GitHub-dispatched solely from those analytics events
+- **And** the events are not assigned `incident_signal`, `context_signal`, or `operational_signal` debug event classes
+
+### AC-ANL-05: Mixed Batch Split
+- **Given** a `/v1/events` request contains both debug events and analytics events
+- **When** ingestion accepts the batch
+- **Then** debug events follow the existing debug validation, capture-policy, persistence, queue, classification, and incident paths
+- **And** analytics events follow analytics enablement, analytics quota, short-lived analytics persistence, and analytics aggregation queue paths
+- **And** analytics quota failure does not reject otherwise-valid debug events unless a shared request-level limit is exceeded
+
+### AC-ANL-06: Privacy Defaults
+- **Given** analytics capture is enabled with default privacy settings
+- **When** the SDK captures route, action, funnel, and session signals
+- **Then** form values, raw click text, raw DOM snapshots, screenshots, video replay, precise coordinates, precise location, raw query strings, emails, names, tokens, payment fields, and secrets are not captured
+- **And** server-side processing does not store raw IP addresses in analytics rollups or AnalyticsBundle artifacts
+
+### AC-ANL-07: Controlled Custom Dimensions
+- **Given** a Team project has approved custom dimensions `account_tier`, `workspace_size`, and `onboarding_state`
+- **When** the browser SDK sends analytics events with those fields plus unapproved or sensitive fields
+- **Then** approved low-cardinality fields are retained for aggregation
+- **And** unapproved, sensitive, overlong, or high-cardinality fields are rejected, dropped, or redacted before aggregation
+
+### AC-ANL-08: Aggregate Metrics
+- **Given** accepted analytics events across sessions, routes, devices, referrers, funnels, and conversions
+- **When** the analytics worker processes them
+- **Then** hourly/daily rollups are updated for usage summary, routes, transitions, actions, funnels, conversions, devices, browsers, OS, language/locale, referrers, UTM, auth state, and approved custom dimensions
+- **And** reprocessing the same analytics events does not double-count
+
+### AC-ANL-09: Direct Metrics Interface Parity
+- **Given** an authorized member requests project analytics summary, route metrics, device breakdown, referrer metrics, funnel analysis, or journey patterns
+- **When** the request is made through API, CLI, or MCP
+- **Then** all three interfaces return equivalent data from the same domain services
+- **And** a project token cannot read analytics metrics
+
+### AC-ANL-10: Journey Replay Is Structured
+- **Given** a retained representative analytics journey sample
+- **When** a human or agent views it
+- **Then** the journey is represented as a privacy-safe structured timeline of routes, semantic actions, funnel steps, conversions, friction markers, timing, and linked debug incidents
+- **And** it does not include video, screenshots, raw DOM snapshots, form values, or raw user text
+
+### AC-ANL-11: AnalyticsBundle Generation Unit
+- **Given** analytics data exists for many visits
+- **When** AnalyticsBundle generation runs
+- **Then** bundles are generated for analysis units such as funnel dropoff, route health, incident impact, deploy comparison, feature usage, or journey friction
+- **And** no AnalyticsBundle is generated per visit/session by default
+
+### AC-ANL-12: AnalyticsBundle Determinism
+- **Given** the same analysis specification, rollups, representative journey samples, linked incidents, and deploy inputs
+- **When** AnalyticsBundle generation runs twice
+- **Then** both generated artifact evidence sections are byte-identical after stable serialization
+- **And** representative journey selection and array ordering are deterministic
+
+### AC-ANL-13: Incident Impact Analytics
+- **Given** a DebugBundle incident and analytics rollups with matching session, route, device, deploy, or time-window correlation
+- **When** incident impact is requested
+- **Then** the response includes affected sessions, affected route/funnel, conversion delta where available, top device/browser segments, linked journey patterns, and a generated or pending incident-impact AnalyticsBundle state
+
+### AC-ANL-14: Analytics Opportunities
+- **Given** analytics rollups cross deterministic thresholds for funnel dropoff, route exit/backtrack increase, repeated-click friction, conversion decrease after deploy, or incident impact
+- **When** the evaluator runs
+- **Then** an analytics opportunity is created or updated with kind, status, severity, confidence, title, summary, evidence, related incidents/deploys, and bundle state
+- **And** tiny-sample opportunities are suppressed or marked low confidence
+
+### AC-ANL-15: Web Main Analytics Surface
+- **Given** a signed-in member with access to projects that have analytics opportunities or generated AnalyticsBundles
+- **When** the member opens the main sidebar Analytics view
+- **Then** the page shows a cross-project table/list similar to Incidents and Improvements
+- **And** it includes filters for project, environment, service, status, kind, severity, date range, and bundle state
+- **And** pending, ready, and failed bundle states are visible
+
+### AC-ANL-16: Project Analytics Tab
+- **Given** a signed-in member opens a project
+- **When** the member selects the project Analytics tab
+- **Then** the tab shows project-scoped summary, routes, funnels, devices, referrers, opportunities, and generated AnalyticsBundles as internal sub-tabs or same-page sections
+- **And** no additional top-level project tabs are created for routes, funnels, devices, referrers, opportunities, or bundles
+
+### AC-ANL-17: Analytics Settings
+- **Given** a project owner or admin opens project analytics settings
+- **When** they configure analytics
+- **Then** they can enable/disable analytics, choose privacy mode, require consent, configure sampling/retention, define saved funnels, and manage Team custom dimensions where the tier allows it
+- **And** plain project members can view permitted analytics state but cannot mutate analytics settings
+
+### AC-ANL-18: Analytics Retention
+- **Given** analytics raw inputs, journey samples, hourly rollups, daily rollups, and generated AnalyticsBundles exist beyond their configured retention windows
+- **When** retention cleanup runs
+- **Then** expired raw inputs and samples are deleted
+- **And** configured aggregate metrics and retained bundle metadata remain available for their longer retention windows
+
+### AC-ANL-19: Separate Allowance Accounting
+- **Given** a project exhausts its analytics event/session or AnalyticsBundle generation allowance
+- **When** new analytics events or bundle-generation requests arrive
+- **Then** analytics-specific quota errors are returned
+- **And** existing debug incident ingestion and failure bundle retrieval remain governed by their own allowances
+
+### AC-ANL-20: Self-Host Parity
+- **Given** a self-hosted DebugBundle deployment with analytics enabled
+- **When** browser analytics events are ingested and processed
+- **Then** analytics capture, aggregation, retrieval, retention, and AnalyticsBundle behavior match hosted core behavior except for hosted-only billing/provider integrations
+- **And** the self-hosted instance never phones home for analytics
+
+---
+
+## 25. Browser Relay Acceptance
 
 ### AC-REL-01: Local-Only Relay End-to-End
 - **Given** a full-stack app with `@debugbundle/sdk-browser` configured in relay mode with `endpoint: '/debugbundle/browser'` and any V1 full relay handler mounted at `POST /debugbundle/browser` in local-only mode
@@ -1552,7 +1677,7 @@ If CLI says something is healthy and MCP says something different, that is a pro
 
 ---
 
-## 25. GitHub Repository Automation Acceptance
+## 26. GitHub Repository Automation Acceptance
 
 ### AC-GHA-01: GitHub App Installation
 - **Given** a Solo or Team organization owner in the project's GitHub tab
