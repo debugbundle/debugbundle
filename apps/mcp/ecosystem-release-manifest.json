@@ -27,6 +27,20 @@
       "namespace": "debugbundle",
       "slug": "debugbundle",
       "gitBranch": "main",
+      "catalog": {
+        "categories": [
+          "Operations",
+          "Development",
+          "Agents"
+        ],
+        "topics": [
+          "debugging",
+          "incident-response",
+          "observability",
+          "developer-tools",
+          "health-checks"
+        ]
+      },
       "skillPath": "apps/mcp/clawhub/debugbundle",
       "cliPackage": "smithery",
       "cliVersion": "1.2.0"
@@ -36,6 +50,20 @@
       "owner": "debugbundle",
       "slug": "debugbundle",
       "displayName": "DebugBundle",
+      "catalog": {
+        "categories": [
+          "Operations",
+          "Development",
+          "Agents"
+        ],
+        "topics": [
+          "debugging",
+          "incident-response",
+          "observability",
+          "developer-tools",
+          "health-checks"
+        ]
+      },
       "skillPath": "apps/mcp/clawhub/debugbundle",
       "cliPackage": "clawhub",
       "cliVersion": "0.22.0"

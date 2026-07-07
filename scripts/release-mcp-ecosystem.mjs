@@ -140,7 +140,8 @@ function buildPlan(context) {
     if (target.type === "push") {
       publishTargets.push({
         key,
-        type: target.type
+        type: target.type,
+        ...(target.catalog ? { catalog: target.catalog } : {})
       });
     } else {
       discoveryTargets.push({
@@ -819,6 +820,7 @@ async function verify(context) {
           updatedAt: skill?.updatedAt ?? null,
           listed: skill?.listed ?? null,
           categories: Array.isArray(skill?.categories) ? skill.categories : [],
+          expectedCatalog: target.catalog ?? null,
           registryIndexed,
           publicPageUrl: `https://smithery.ai/skills/${qualifiedName}`
         };
@@ -845,6 +847,7 @@ async function verify(context) {
           owner: owner?.handle ?? null,
           latestVersion: latestVersion?.version ?? null,
           license: latestVersion?.license ?? null,
+          expectedCatalog: target.catalog ?? null,
           moderationVerdict: moderation?.verdict ?? null,
           moderationSummary: moderation?.summary ?? null
         };
