@@ -1,7 +1,7 @@
 {
   "$schema": "https://json.schemastore.org/claude-code-marketplace.json",
   "name": "debugbundle",
-  "description": "DebugBundle Claude Code plugins for production incident debugging and MCP workflows.",
+  "description": "Claude Code marketplace for DebugBundle production debugging, incident response, and MCP workflows.",
   "owner": {
     "name": "DebugBundle",
     "url": "https://debugbundle.com"
@@ -10,7 +10,7 @@
     {
       "name": "debugbundle",
       "displayName": "DebugBundle",
-      "description": "Connect Claude Code to DebugBundle incidents, bundles, reproductions, health checks, probes, alerts, and operational debugging workflows.",
+      "description": "Production debugging bundles for AI agents. Connect Claude Code to DebugBundle incidents, deterministic bundles, reproductions, health checks, probes, alerts, webhooks, projects, and verification workflows.",
       "version": "1.6.2",
       "author": {
         "name": "DebugBundle",
@@ -22,9 +22,23 @@
       "keywords": [
         "debugbundle",
         "mcp",
+        "mcp-server",
+        "model-context-protocol",
+        "claude-code",
+        "ai-agent",
+        "ai-agent-debugging",
         "debugging",
+        "production-debugging",
+        "runtime-errors",
+        "error-monitoring",
         "incident-response",
+        "incident-management",
         "observability",
+        "debug-bundles",
+        "reproductions",
+        "alerts",
+        "webhooks",
+        "verification",
         "developer-tools",
         "health-checks"
       ],
@@ -32,8 +46,12 @@
       "category": "monitoring",
       "tags": [
         "debugging",
+        "production-debugging",
         "incident-response",
         "observability",
+        "debug-bundles",
+        "runtime-errors",
+        "ai-agent",
         "developer-tools",
         "health-checks"
       ]

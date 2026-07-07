@@ -12,6 +12,42 @@ const pluginReadmePath = join(pluginRoot, "README.md");
 const pluginSkillPath = join(pluginRoot, "skills", "debugbundle", "SKILL.md");
 const mcpPackagePath = join(repoRoot, "apps", "mcp", "package.json");
 
+const expectedClaudeKeywords = [
+  "debugbundle",
+  "mcp",
+  "mcp-server",
+  "model-context-protocol",
+  "claude-code",
+  "ai-agent",
+  "ai-agent-debugging",
+  "debugging",
+  "production-debugging",
+  "runtime-errors",
+  "error-monitoring",
+  "incident-response",
+  "incident-management",
+  "observability",
+  "debug-bundles",
+  "reproductions",
+  "alerts",
+  "webhooks",
+  "verification",
+  "developer-tools",
+  "health-checks"
+];
+
+const expectedClaudeTags = [
+  "debugging",
+  "production-debugging",
+  "incident-response",
+  "observability",
+  "debug-bundles",
+  "runtime-errors",
+  "ai-agent",
+  "developer-tools",
+  "health-checks"
+];
+
 describe("mcp Claude Code plugin marketplace package", () => {
   it("ships a first-party Claude Code marketplace catalog", () => {
     expect(existsSync(marketplacePath)).toBe(true);
@@ -23,6 +59,7 @@ describe("mcp Claude Code plugin marketplace package", () => {
     const marketplace = JSON.parse(readFileSync(marketplacePath, "utf8")) as {
       $schema?: string;
       name?: string;
+      description?: string;
       owner?: { name?: string; url?: string };
       plugins?: Array<{
         name?: string;
@@ -31,6 +68,7 @@ describe("mcp Claude Code plugin marketplace package", () => {
         version?: string;
         source?: string;
         category?: string;
+        keywords?: string[];
         tags?: string[];
       }>;
     };
@@ -38,6 +76,9 @@ describe("mcp Claude Code plugin marketplace package", () => {
 
     expect(marketplace.$schema).toBe("https://json.schemastore.org/claude-code-marketplace.json");
     expect(marketplace.name).toBe("debugbundle");
+    expect(marketplace.description).toBe(
+      "Claude Code marketplace for DebugBundle production debugging, incident response, and MCP workflows."
+    );
     expect(marketplace.owner).toEqual({
       name: "DebugBundle",
       url: "https://debugbundle.com"
@@ -46,10 +87,13 @@ describe("mcp Claude Code plugin marketplace package", () => {
       expect.objectContaining({
         name: "debugbundle",
         displayName: "DebugBundle",
+        description:
+          "Production debugging bundles for AI agents. Connect Claude Code to DebugBundle incidents, deterministic bundles, reproductions, health checks, probes, alerts, webhooks, projects, and verification workflows.",
         version: mcpPackage.version,
         source: "./apps/mcp/claude-code/debugbundle",
         category: "monitoring",
-        tags: ["debugging", "incident-response", "observability", "developer-tools", "health-checks"]
+        keywords: expectedClaudeKeywords,
+        tags: expectedClaudeTags
       })
     ]);
   });
@@ -58,7 +102,9 @@ describe("mcp Claude Code plugin marketplace package", () => {
     const pluginManifest = JSON.parse(readFileSync(pluginManifestPath, "utf8")) as {
       name?: string;
       displayName?: string;
+      description?: string;
       version?: string;
+      keywords?: string[];
       userConfig?: Record<string, { type?: string; title?: string; sensitive?: boolean; default?: string }>;
     };
     const pluginMcp = JSON.parse(readFileSync(pluginMcpPath, "utf8")) as {
@@ -69,8 +115,11 @@ describe("mcp Claude Code plugin marketplace package", () => {
     expect(pluginManifest).toMatchObject({
       name: "debugbundle",
       displayName: "DebugBundle",
+      description:
+        "Production debugging bundles for AI agents. Connect Claude Code to DebugBundle incidents, deterministic bundles, reproductions, health checks, probes, alerts, webhooks, projects, and verification workflows.",
       version: mcpPackage.version,
-      license: "AGPL-3.0-only"
+      license: "AGPL-3.0-only",
+      keywords: expectedClaudeKeywords
     });
     expect(pluginManifest.userConfig?.["member_token"]).toMatchObject({
       type: "string",
@@ -99,6 +148,10 @@ describe("mcp Claude Code plugin marketplace package", () => {
 
     expect(readme).toContain("/plugin marketplace add debugbundle/debugbundle");
     expect(readme).toContain("/plugin install debugbundle@debugbundle");
+    expect(readme).toContain("Production debugging bundles for AI agents");
+    expect(readme).toContain("deterministic bundles");
+    expect(readme).toContain("webhooks");
+    expect(readme).toContain("verification workflows");
     expect(readme).toContain("debugbundle login");
     expect(readme).toContain("Project tokens are SDK write-only ingestion credentials");
     expect(readme).toContain("community marketplace review");
@@ -107,6 +160,8 @@ describe("mcp Claude Code plugin marketplace package", () => {
 
     expect(skill).toContain("name: debugbundle");
     expect(skill).toContain("description: Use DebugBundle MCP tools in Claude Code");
+    expect(skill).toContain("deterministic debug bundles");
+    expect(skill).toContain("verification evidence");
     expect(skill).toContain("list_incidents");
     expect(skill).toContain("get_bundle");
     expect(skill).toContain("verify_cloud");

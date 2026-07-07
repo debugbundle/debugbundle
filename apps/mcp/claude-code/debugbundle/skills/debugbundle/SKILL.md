@@ -1,6 +1,6 @@
 ---
 name: debugbundle
-description: Use DebugBundle MCP tools in Claude Code when runtime incidents, production failures, health-check failures, debug bundles, reproductions, probes, alerts, webhooks, or operational evidence are relevant.
+description: Use DebugBundle MCP tools in Claude Code when production incidents, runtime failures, deterministic debug bundles, reproductions, health checks, probes, alerts, webhooks, or verification evidence are relevant.
 ---
 
 # DebugBundle

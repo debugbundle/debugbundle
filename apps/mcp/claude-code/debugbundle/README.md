@@ -1,6 +1,6 @@
 # DebugBundle Claude Code Plugin
 
-Connect Claude Code to DebugBundle MCP tools for production incident debugging, deterministic bundles, reproductions, hosted health checks, probes, alerts, webhooks, projects, and verification workflows.
+Production debugging bundles for AI agents. Connect Claude Code to DebugBundle MCP tools for incidents, deterministic bundles, reproductions, hosted health checks, probes, alerts, webhooks, projects, and verification workflows.
 
 ## Install
 
