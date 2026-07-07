@@ -1,0 +1,38 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
+  "name": "debugbundle",
+  "displayName": "DebugBundle",
+  "version": "1.6.2",
+  "description": "Connect Claude Code to DebugBundle MCP tools for production incident debugging, bundles, reproductions, health checks, probes, alerts, and verification.",
+  "author": {
+    "name": "DebugBundle",
+    "url": "https://debugbundle.com"
+  },
+  "homepage": "https://debugbundle.com/docs/mcp",
+  "repository": "https://github.com/debugbundle/debugbundle",
+  "license": "AGPL-3.0-only",
+  "keywords": [
+    "debugbundle",
+    "mcp",
+    "debugging",
+    "incident-response",
+    "observability",
+    "developer-tools",
+    "health-checks"
+  ],
+  "userConfig": {
+    "member_token": {
+      "type": "string",
+      "title": "DebugBundle member token",
+      "description": "Optional. Use a DebugBundle member token for Claude Code MCP read and management tools. Leave blank to use local DebugBundle CLI auth state.",
+      "sensitive": true,
+      "default": ""
+    },
+    "api_url": {
+      "type": "string",
+      "title": "DebugBundle API URL",
+      "description": "Optional. Leave blank for DebugBundle Cloud. Set only for self-hosted or non-default API hosts.",
+      "default": ""
+    }
+  }
+}

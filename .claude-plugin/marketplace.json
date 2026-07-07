@@ -1,0 +1,42 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-marketplace.json",
+  "name": "debugbundle",
+  "description": "DebugBundle Claude Code plugins for production incident debugging and MCP workflows.",
+  "owner": {
+    "name": "DebugBundle",
+    "url": "https://debugbundle.com"
+  },
+  "plugins": [
+    {
+      "name": "debugbundle",
+      "displayName": "DebugBundle",
+      "description": "Connect Claude Code to DebugBundle incidents, bundles, reproductions, health checks, probes, alerts, and operational debugging workflows.",
+      "version": "1.6.2",
+      "author": {
+        "name": "DebugBundle",
+        "url": "https://debugbundle.com"
+      },
+      "homepage": "https://debugbundle.com/docs/mcp",
+      "repository": "https://github.com/debugbundle/debugbundle",
+      "license": "AGPL-3.0-only",
+      "keywords": [
+        "debugbundle",
+        "mcp",
+        "debugging",
+        "incident-response",
+        "observability",
+        "developer-tools",
+        "health-checks"
+      ],
+      "source": "./apps/mcp/claude-code/debugbundle",
+      "category": "monitoring",
+      "tags": [
+        "debugging",
+        "incident-response",
+        "observability",
+        "developer-tools",
+        "health-checks"
+      ]
+    }
+  ]
+}

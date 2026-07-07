@@ -75,4 +75,52 @@ describe("mcp default tools", () => {
       fetchMock.mockRestore();
     }
   });
+
+  it("ignores blank DEBUGBUNDLE_API_URL values from optional marketplace config", async () => {
+    const previousMemberToken = process.env["DEBUGBUNDLE_MEMBER_TOKEN"];
+    const previousApiUrl = process.env["DEBUGBUNDLE_API_URL"];
+    process.env["DEBUGBUNDLE_MEMBER_TOKEN"] = " dbundle_mem_env ";
+    process.env["DEBUGBUNDLE_API_URL"] = "   ";
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(JSON.stringify({ projects: [projectRecord] }), {
+        status: 200,
+        headers: {
+          "content-type": "application/json"
+        }
+      })
+    );
+
+    try {
+      const tools = await createDefaultMcpTools();
+      const listProjects = tools["list_projects"];
+      expect(listProjects).toBeDefined();
+
+      await expect(listProjects!({ limit: 5 })).resolves.toEqual({
+        projects: [projectRecord]
+      });
+
+      const calledUrl = String(fetchMock.mock.calls[0]?.[0]);
+      expect(calledUrl).toMatch(/\/v1\/projects\?limit=5$/);
+      expect(calledUrl).not.toBe("   /v1/projects?limit=5");
+      expect(fetchMock.mock.calls[0]?.[1]).toMatchObject({
+        method: "GET",
+        headers: {
+          accept: "application/json",
+          authorization: "Bearer dbundle_mem_env"
+        }
+      });
+    } finally {
+      if (previousMemberToken === undefined) {
+        delete process.env["DEBUGBUNDLE_MEMBER_TOKEN"];
+      } else {
+        process.env["DEBUGBUNDLE_MEMBER_TOKEN"] = previousMemberToken;
+      }
+      if (previousApiUrl === undefined) {
+        delete process.env["DEBUGBUNDLE_API_URL"];
+      } else {
+        process.env["DEBUGBUNDLE_API_URL"] = previousApiUrl;
+      }
+      fetchMock.mockRestore();
+    }
+  });
 });

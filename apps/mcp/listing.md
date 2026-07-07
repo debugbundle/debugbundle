@@ -16,6 +16,8 @@ Last verified: 2026-06-26
 - Docs: `https://debugbundle.com/docs/mcp`
 - README: `https://github.com/debugbundle/debugbundle/tree/main/apps/mcp`
 - Registry metadata: `https://github.com/debugbundle/debugbundle/blob/main/apps/mcp/server.json`
+- Claude Code marketplace metadata: `https://github.com/debugbundle/debugbundle/blob/main/.claude-plugin/marketplace.json`
+- Claude Code plugin package: `https://github.com/debugbundle/debugbundle/tree/main/apps/mcp/claude-code/debugbundle`
 - License: `AGPL-3.0-only`
 - Security reporting: `https://github.com/debugbundle/debugbundle/security/policy`
 
@@ -29,6 +31,8 @@ Current release status for MCP ecosystem distribution.
 - Smithery Skill: published and publicly indexed for `debugbundle/debugbundle`.
 - ClawHub Skill: published as `debugbundle/debugbundle`.
 - ClawHub OpenClaw plugin: published as `@debugbundle/openclaw-plugin` version `1.6.2`.
+- Claude Code first-party marketplace: packaged in this repository as `debugbundle@debugbundle`; users can add it with `/plugin marketplace add debugbundle/debugbundle`.
+- Claude community marketplace: package is ready for review, but not listed until Anthropic accepts it into `anthropics/claude-plugins-community`.
 - MCP.so: listed as of 2026-06-23 via the web submit flow; treat it as a third-party community directory, not an official registry.
 - Glama: listed as of 2026-06-26 at `https://glama.ai/mcp/servers/sz3bl40umr`.
 - PulseMCP: auto-listed as official as of 2026-06-26 at `https://www.pulsemcp.com/servers/debugbundle`; command-line verification still requires `manual_check_required` because the site returns HTTP 403 to the release verifier.
@@ -64,6 +68,13 @@ debugbundle-mcp
 }
 ```
 
+- Claude Code first-party marketplace:
+
+```text
+/plugin marketplace add debugbundle/debugbundle
+/plugin install debugbundle@debugbundle
+```
+
 - Auth guidance:
   - Prefer existing CLI auth state at `~/.debugbundle/auth.json` for local users.
   - Use `DEBUGBUNDLE_MEMBER_TOKEN` for headless or marketplace-managed clients.
@@ -92,6 +103,7 @@ debugbundle-mcp
 - Member tokens are for CLI, API, and MCP read/manage operations.
 - The MCP package uses stdio transport and does not expose a hosted remote MCP endpoint today.
 - Hosted and local management tools use the same underlying DebugBundle services as API and CLI.
+- The Claude Code plugin bundles local stdio MCP config and a workflow skill; it does not grant hosted account access by itself.
 - Report suspicious listings, leaked examples, or security concerns through `https://github.com/debugbundle/debugbundle/security/policy`.
 
 ## Suggested Categories
@@ -108,6 +120,27 @@ debugbundle-mcp
 - `get_bundle`
 - `resolve_incident`
 - `list_health_checks`
+
+## Claude Code
+
+- Current first-party marketplace state: repository-hosted marketplace catalog at `.claude-plugin/marketplace.json`, plugin package at `apps/mcp/claude-code/debugbundle`.
+- User install path:
+
+```text
+/plugin marketplace add debugbundle/debugbundle
+/plugin install debugbundle@debugbundle
+```
+
+- Plugin contents:
+  - `.claude-plugin/plugin.json` metadata pinned to the current `@debugbundle/mcp` package version.
+  - `.mcp.json` local stdio server config using `npx -y @debugbundle/mcp@<version>`.
+  - `skills/debugbundle/SKILL.md` for Claude Code workflow routing.
+  - `README.md` with install, auth, and community marketplace status.
+- Claude community marketplace path:
+  - Validate locally with `claude plugin validate apps/mcp/claude-code/debugbundle`.
+  - Submit through Anthropic's plugin submission form.
+  - After acceptance, users add `/plugin marketplace add anthropics/claude-plugins-community` and install `debugbundle@claude-community`.
+- Do not claim `claude-community` availability until the plugin appears in the public community catalog.
 
 ## MCP.so
 
