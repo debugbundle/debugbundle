@@ -418,6 +418,46 @@ describe("storage adapters", () => {
     });
   });
 
+  it("should enqueue, inspect, dequeue, and claim analytics bundle jobs", async (): Promise<void> => {
+    const payload = {
+      project_id: "proj_123",
+      generation_id: "550e8400-e29b-41d4-a716-446655440001",
+      requested_at: "2026-07-08T12:00:00.000Z",
+      trigger: "opportunity" as const
+    };
+    const serializedPayload = JSON.stringify(payload);
+    const envelope = JSON.stringify({ claim_id: "claim_analytics_bundle", payload: serializedPayload });
+    redisLrangeMock = vi.fn().mockResolvedValue([serializedPayload]);
+    redisLpopMock = vi.fn().mockResolvedValue(serializedPayload);
+    redisEvalMock = vi.fn().mockResolvedValue([serializedPayload, envelope]);
+
+    const queue = createRedisQueueClient({ redisUrl: "redis://redis:6379" });
+
+    await queue.enqueue("build-analytics-bundle", payload);
+    const jobs = await queue.readJobQueue("build-analytics-bundle");
+    const next = await queue.dequeue("build-analytics-bundle");
+    const claimed = await queue.claim("build-analytics-bundle");
+    await claimed?.ack();
+    await queue.clearJobQueue("build-analytics-bundle");
+
+    expect(jobs).toEqual([serializedPayload]);
+    expect(next).toEqual(payload);
+    expect(claimed?.payload).toEqual(payload);
+    expect(redisRpushMock).toHaveBeenCalledWith("jobs:build-analytics-bundle", serializedPayload);
+    expect(redisLrangeMock).toHaveBeenCalledWith("jobs:build-analytics-bundle", 0, -1);
+    expect(redisLpopMock).toHaveBeenCalledWith("jobs:build-analytics-bundle");
+    expect(redisEvalMock).toHaveBeenCalledWith(
+      expect.stringContaining("LPOP"),
+      2,
+      "jobs:build-analytics-bundle",
+      "jobs:build-analytics-bundle:processing",
+      expect.any(String),
+      expect.any(String)
+    );
+    expect(redisZremMock).toHaveBeenCalledWith("jobs:build-analytics-bundle:processing", envelope);
+    expect(redisDelMock).toHaveBeenCalledWith("jobs:build-analytics-bundle", "jobs:build-analytics-bundle:processing");
+  });
+
   it("should enqueue and dequeue evaluate-alerts jobs", async (): Promise<void> => {
     redisLpopMock = vi.fn().mockResolvedValue(
       '{"project_id":"proj_123","incident_id":"inc_123","condition_type":"new_incident","dedupe_key":"new_incident","occurred_at":"2026-03-15T12:00:00.000Z","service_name":"checkout-api","environment":"production","severity":"high"}'
