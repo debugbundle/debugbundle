@@ -625,6 +625,8 @@ Analytics events are opt-in browser product-usage events. They share the ingesti
 - Raw user-agent strings, raw IP addresses, form values, raw click text, screenshots, DOM snapshots, precise coordinates, precise location, tokens, secrets, names, emails, phone numbers, and payment data are not analytics fields.
 - `custom_dimensions` accepts only bounded low-cardinality values that pass project/tier allowlists and redaction.
 
+Analytics event fields may be derived from the same browser SDK primitives that produce debug breadcrumbs, such as normalized route keys, sanitized action selectors, session ids, and device context. The stored schemas remain separate: debug breadcrumbs and frontend exceptions stay in the debug event family and may feed failure bundles, while `analytics_event` envelopes feed analytics rollups, journey samples, opportunities, and AnalyticsBundle artifacts. Disabling, rejecting, or failing analytics processing must not remove or mutate debug event fields.
+
 ---
 
 ## 2b. AnalyticsBundleV1 Schema
@@ -1405,7 +1407,7 @@ Delivery statuses: `pending` → `delivered` or `retrying` → `delivered` or `f
 
 ### 5.21 AnalyticsBundle Tables
 
-Analytics storage is aggregate-first. Raw analytics events are short-lived object-storage inputs, not long-term Postgres event rows.
+Analytics storage is aggregate-first. Raw analytics events are short-lived object-storage inputs, not long-term Postgres event rows. Rollups are precomputed counters and summaries keyed by project, time bucket, granularity, route/action/funnel keys, and bounded dimensions; they are the query model for normal analytics reads and must not preserve per-visit raw payloads.
 
 Required table concepts for the AnalyticsBundle implementation:
 

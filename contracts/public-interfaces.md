@@ -489,6 +489,8 @@ Current API implementation scope:
 
 Analytics read/manage APIs require Browser Session or Member Token auth. Project tokens are write-only and may submit analytics events only through `/v1/events` ingestion.
 
+Analytics shares browser SDK capture primitives with debug capture where that reduces duplication and improves correlation: normalized route keys, session ids, sanitized action/click descriptors, device/browser context, referrer/UTM parsing, and structured journey entries. The public interfaces remain separate. Debug events and debug bundles do not require analytics to be enabled, and analytics settings, consent, quotas, sampling, retention, or failures must not suppress existing incident/debug capture. When both lanes capture the same browser signal, API/CLI/MCP consumers see separate debug and analytics records linked by common correlation fields rather than a merged raw telemetry store.
+
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
 | GET | `/v1/analytics/summary` | Browser Session or Member Token | Project usage summary for a time range |

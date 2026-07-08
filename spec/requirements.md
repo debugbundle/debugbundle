@@ -586,6 +586,10 @@ This ensures Free behaves as **failure-first, not telemetry-first**.
 
 **FR-ANL-04:** The existing `/v1/events` ingestion endpoint may accept mixed debug and analytics batches for transport simplicity, but ingestion must split the batch by event family. Debug events continue through capture-policy enforcement, debug raw-event persistence, normalization, event classification, and incident processing. Analytics events continue through analytics enablement checks, analytics quota checks, short-lived raw analytics persistence, analytics queueing, and aggregate rollup processing.
 
+**FR-ANL-04a:** Browser debug capture and AnalyticsBundle capture should share privacy-safe frontend primitives where possible, including session identity, route normalization, device/browser context collection, referrer parsing, action/click sanitization, and structured journey formatting. Sharing implementation primitives must not merge the debug and analytics event lanes: a browser signal may produce a debug breadcrumb, an analytics event, or both depending on independent debug and analytics settings, consent, sampling, and caps.
+
+**FR-ANL-04b:** DebugBundle incident/debug capture must not depend on AnalyticsBundle being enabled. Existing frontend exceptions, breadcrumbs, route changes, request events, and debug bundles must continue to work when analytics is disabled, unavailable on the current tier, blocked by consent, sampled out, or failing internally.
+
 **FR-ANL-05:** Analytics events must have separate usage accounting from debug incident ingestion. Analytics event/session allowances, retained journey samples, saved funnels, custom dimensions, and AnalyticsBundle generations must be meterable independently from existing incident event and failure bundle allowances.
 
 **FR-ANL-06:** Analytics ingestion must remain lightweight: authenticate, validate, apply analytics enablement/quota checks, persist short-lived raw input when accepted, enqueue analytics processing, and return. No aggregation, bundle generation, or heavy analysis may run synchronously in the API request path.
@@ -611,7 +615,7 @@ This ensures Free behaves as **failure-first, not telemetry-first**.
 
 #### Metrics And Rollups
 
-**FR-ANL-14:** The analytics worker must write aggregate rollups for sessions, page views, active users, routes, route transitions, actions, funnels, conversions, devices, browsers, OS, language/locale, referrer/UTM, auth state, approved custom dimensions, and incident/deploy correlation.
+**FR-ANL-14:** The analytics worker must write aggregate rollups for sessions, page views, active users, routes, route transitions, actions, funnels, conversions, devices, browsers, OS, language/locale, referrer/UTM, auth state, approved custom dimensions, and incident/deploy correlation. Rollups are precomputed bounded aggregate rows keyed by time bucket and dimensions; they are not raw event logs, arbitrary event search indexes, or long-term per-visit timelines.
 
 **FR-ANL-15:** Analytics rollups must support direct metrics retrieval for humans and agents. Required metric families include usage summary, route/page metrics, device/browser/OS/language breakdown, referrer/UTM metrics, funnel conversion/dropoff, journey patterns, feature/custom-event usage, deploy comparison inputs, and incident impact inputs.
 

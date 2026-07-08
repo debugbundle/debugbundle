@@ -1496,6 +1496,13 @@ If CLI says something is healthy and MCP says something different, that is a pro
 - **And** analytics events follow analytics enablement, analytics quota, short-lived analytics persistence, and analytics aggregation queue paths
 - **And** analytics quota failure does not reject otherwise-valid debug events unless a shared request-level limit is exceeded
 
+### AC-ANL-05a: Shared Frontend Primitives Without Coupled Capture
+- **Given** the browser SDK captures route changes, clicks/actions, device context, and session context for debug breadcrumbs and optional analytics events
+- **When** analytics is disabled, unavailable for the project tier, missing consent, sampled out, or internally failing
+- **Then** existing debug capture still records eligible frontend exceptions, breadcrumbs, route-change context, and request events according to debug settings
+- **And** no analytics event, quota path, rollup write, or analytics failure is required for DebugBundle incident bundles to include frontend context
+- **And** when both debug and analytics capture are enabled, shared SDK helpers may normalize the same route/action/session/device primitives, but emitted debug and analytics envelopes remain separate and follow their own retention, quota, consent, and processing rules
+
 ### AC-ANL-06: Privacy Defaults
 - **Given** analytics capture is enabled with default privacy settings
 - **When** the SDK captures route, action, funnel, and session signals
@@ -1513,6 +1520,7 @@ If CLI says something is healthy and MCP says something different, that is a pro
 - **When** the analytics worker processes them
 - **Then** hourly/daily rollups are updated for usage summary, routes, transitions, actions, funnels, conversions, devices, browsers, OS, language/locale, referrers, UTM, auth state, and approved custom dimensions
 - **And** reprocessing the same analytics events does not double-count
+- **And** metric reads use aggregate rollup rows rather than long-term raw analytics event scans
 
 ### AC-ANL-09: Direct Metrics Interface Parity
 - **Given** an authorized member requests project analytics summary, route metrics, device breakdown, referrer metrics, funnel analysis, or journey patterns

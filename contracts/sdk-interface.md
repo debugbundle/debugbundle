@@ -120,6 +120,8 @@ These behaviors are mandatory across all SDKs. A new language SDK is non-complia
 | `analytics.sampleRate` | number (0.0–1.0) | `1.0` | Analytics event sampling, separate from debug event sampling. |
 | `analytics.journeySampleRate` | number (0.0–1.0) | tier/project default | Controls retained representative journey samples. |
 
+Browser debug breadcrumbs and AnalyticsBundle events should reuse shared frontend primitives where possible: session id management, route/path normalization, device/browser context collection, referrer/UTM parsing, action/click sanitization, and structured journey timeline formatting. Reuse is an SDK implementation concern only. Debug and analytics capture remain independently configured and emitted as separate envelopes with separate consent, sampling, quota, retention, and processing behavior.
+
 Browser `fetch()` calls may include an optional `debugbundle` metadata object in the init bag:
 
 ```ts
@@ -455,7 +457,9 @@ Required behavior:
 - Analytics APIs are no-ops unless analytics is enabled and consent rules allow capture.
 - Analytics API failures never throw into host pages.
 - Analytics batching, retry, unload flushing, and backoff must not block debug event capture or host page behavior.
+- Existing debug capture must continue to work when analytics is disabled, tier-unavailable, missing consent, sampled out, quota-blocked, or internally failing.
 - Analytics events must use `event_type: "analytics_event"` with a `payload.kind` rather than adding many top-level event types.
+- SDKs may derive debug breadcrumbs and analytics events from the same sanitized browser signal, but they must decide independently whether to emit a debug breadcrumb, an analytics event, or both.
 - Semantic analytics keys are stored in `payload.signal`: `track(name)` emits `kind: "action"` plus `signal.action_key`, `funnel(name, step)` emits `kind: "funnel_step"` plus `signal.funnel_key` and `signal.step_key`, `convert(name)` emits `kind: "conversion"` plus `signal.conversion_key`, and journey friction markers emit `kind: "journey_marker"` plus `signal.marker_key`.
 - Browser `route_change` analytics events may include `payload.previous_route` with the same privacy-safe route shape as `payload.route`; both routes must strip query strings and fragments so workers can aggregate route transitions without retaining raw URLs.
 - Analytics events do not receive `event_class` and cannot create incidents.
