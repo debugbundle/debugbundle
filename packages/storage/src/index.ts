@@ -86,7 +86,8 @@ export type {
 } from "./analytics-opportunity-evaluator.js";
 export {
   createPostgresAnalyticsOpportunityEvaluator,
-  evaluateAnalyticsFunnelDropoffOpportunities
+  evaluateAnalyticsFunnelDropoffOpportunities,
+  evaluateAnalyticsJourneyFrictionOpportunities
 } from "./analytics-opportunity-evaluator.js";
 export type {
   AggregateAnalyticsEventsJob,
@@ -162,7 +163,7 @@ export { createRedisRequestAnomalyCounter } from "./frequency-counter.js";
 export { createRedisIngestionRateLimiter } from "./ingestion-rate-limiter.js";
 export {
   buildIngestionMetricBatch,
-  countsTowardMonthlyIngestAllowance,
+  countsTowardMonthlyIngestAllowance
 } from "./ingestion-analytics.js";
 export {
   createIngestionMetadataService,

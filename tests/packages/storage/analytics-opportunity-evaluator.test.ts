@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   createPostgresAnalyticsOpportunityEvaluator,
   evaluateAnalyticsFunnelDropoffOpportunities,
+  evaluateAnalyticsJourneyFrictionOpportunities,
   type Queryable
 } from "../../../packages/storage/src/index.js";
 
@@ -24,17 +25,34 @@ describe("analytics opportunity evaluator", () => {
           5
         ]);
         return {
-          rows: [{
-            service: "web",
-            environment: "production",
-            funnel_key: "checkout",
-            step_key: "payment",
-            step_order: 2,
-            sessions_entered: "100",
-            sessions_completed: "35",
-            dropoffs: "65"
-          }]
+          rows: [
+            {
+              service: "web",
+              environment: "production",
+              funnel_key: "checkout",
+              step_key: "payment",
+              step_order: 2,
+              sessions_entered: "100",
+              sessions_completed: "35",
+              dropoffs: "65"
+            }
+          ]
         };
+      }
+
+      if (sqlText.includes("FROM analytics_transition_rollups")) {
+        expect(params).toEqual([
+          PROJECT_ID,
+          "2026-03-04T00:00:00.000Z",
+          "2026-03-11T00:00:00.000Z",
+          "web",
+          "production",
+          20,
+          10,
+          5,
+          5
+        ]);
+        return { rows: [] };
       }
 
       if (sqlText.includes("INSERT INTO analytics_opportunities")) {
@@ -42,10 +60,13 @@ describe("analytics opportunity evaluator", () => {
         expect(params[1]).toBe(PROJECT_ID);
         expect(params[2]).toBe("web");
         expect(params[3]).toBe("production");
-        expect(params[4]).toBe("high");
-        expect(params[6]).toBe("analytics-opportunity.v1:funnel_dropoff:11111111-1111-4111-8111-111111111111:web:production:checkout:payment");
-        expect(params[10]).toBe("2026-03-11T00:00:00.000Z");
-        expect(JSON.parse(String(params[9]))).toMatchObject({
+        expect(params[4]).toBe("funnel_dropoff");
+        expect(params[5]).toBe("high");
+        expect(params[7]).toBe(
+          "analytics-opportunity.v1:funnel_dropoff:11111111-1111-4111-8111-111111111111:web:production:checkout:payment"
+        );
+        expect(params[11]).toBe("2026-03-11T00:00:00.000Z");
+        expect(JSON.parse(String(params[10]))).toMatchObject({
           funnel_key: "checkout",
           step_key: "payment",
           sessions_entered: 100,
@@ -59,7 +80,9 @@ describe("analytics opportunity evaluator", () => {
       throw new Error(`Unhandled evaluator SQL: ${sqlText}`);
     });
 
-    const evaluator = createPostgresAnalyticsOpportunityEvaluator({ query: queryMock as Queryable["query"] });
+    const evaluator = createPostgresAnalyticsOpportunityEvaluator({
+      query: queryMock as Queryable["query"]
+    });
 
     await expect(
       evaluator.evaluateProjectOpportunities({
@@ -68,6 +91,78 @@ describe("analytics opportunity evaluator", () => {
         service: "web",
         environment: "production"
       })
+    ).resolves.toEqual({ opportunities_created_or_updated: 1 });
+
+    expect(queryMock).toHaveBeenCalledTimes(3);
+  });
+
+  it("creates or updates journey-friction opportunities from aggregate transition loops", async (): Promise<void> => {
+    const queryMock = vi.fn(async (sqlText: string, params: unknown[]) => {
+      if (sqlText.includes("FROM analytics_transition_rollups")) {
+        expect(sqlText).toContain("WITH transitions AS");
+        expect(sqlText).toContain("forward.from_route_key < forward.to_route_key");
+        expect(params).toEqual([
+          PROJECT_ID,
+          "2026-03-04T00:00:00.000Z",
+          "2026-03-11T00:00:00.000Z",
+          "web",
+          "production",
+          20,
+          10,
+          5,
+          5
+        ]);
+        return {
+          rows: [
+            {
+              service: "web",
+              environment: "production",
+              from_route_key: "/checkout",
+              to_route_key: "/pricing",
+              forward_transition_count: "45",
+              reverse_transition_count: "40",
+              total_loop_transitions: "85",
+              unique_sessions: "31"
+            }
+          ]
+        };
+      }
+
+      if (sqlText.includes("INSERT INTO analytics_opportunities")) {
+        expect(sqlText).toContain("ON CONFLICT (project_id, fingerprint)");
+        expect(params[1]).toBe(PROJECT_ID);
+        expect(params[2]).toBe("web");
+        expect(params[3]).toBe("production");
+        expect(params[4]).toBe("journey_friction");
+        expect(params[5]).toBe("high");
+        expect(params[7]).toBe(
+          "analytics-opportunity.v1:journey_friction:11111111-1111-4111-8111-111111111111:web:production:/checkout:/pricing"
+        );
+        expect(params[11]).toBe("2026-03-11T00:00:00.000Z");
+        expect(JSON.parse(String(params[10]))).toMatchObject({
+          from_route_key: "/checkout",
+          to_route_key: "/pricing",
+          forward_transition_count: 45,
+          reverse_transition_count: 40,
+          total_loop_transitions: 85,
+          unique_sessions: 31
+        });
+        return { rows: [{ id: "44444444-4444-4444-8444-444444444444" }] };
+      }
+
+      throw new Error(`Unhandled evaluator SQL: ${sqlText}`);
+    });
+
+    await expect(
+      evaluateAnalyticsJourneyFrictionOpportunities(
+        { query: queryMock as Queryable["query"] },
+        {
+          project_id: PROJECT_ID,
+          occurred_at: "2026-03-10T13:45:27.000Z",
+          service: "web",
+          environment: "production"
+        }
+      )
     ).resolves.toEqual({ opportunities_created_or_updated: 1 });
 
     expect(queryMock).toHaveBeenCalledTimes(2);

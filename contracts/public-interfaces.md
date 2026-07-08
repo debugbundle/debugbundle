@@ -602,6 +602,8 @@ The implemented aggregate metrics read surface includes `GET /v1/analytics/summa
 
 **Analytics opportunity record fields:** `opportunity_id`, `project_id`, `project_name`, `project_color_tag`, `service`, `environment`, `kind`, `status`, `severity`, `confidence`, `title`, `summary`, `evidence`, `related_incident_ids`, `related_deploy_ids`, `first_detected_at`, `last_detected_at`, `resolved_at`, `snoozed_until`, `bundle_generation_id`, `bundle_status`, `bundle_created_at`, `bundle_updated_at`, `bundle_failure_reason`.
 
+Initial stored opportunity kinds are generated from aggregate rollups only: `funnel_dropoff` from funnel rollups and `journey_friction` from bidirectional route-transition loops. Evidence must remain aggregate-only, and a listed opportunity does not imply an AnalyticsBundle artifact has been generated.
+
 **AnalyticsBundle generation request:**
 ```json
 {

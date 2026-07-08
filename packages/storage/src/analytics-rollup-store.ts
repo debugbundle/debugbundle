@@ -5,7 +5,10 @@ import type {
   AnalyticsDimensions,
   AnalyticsEventEnvelope
 } from "../../shared-types/src/index.js";
-import { evaluateAnalyticsFunnelDropoffOpportunities } from "./analytics-opportunity-evaluator.js";
+import {
+  evaluateAnalyticsFunnelDropoffOpportunities,
+  evaluateAnalyticsJourneyFrictionOpportunities
+} from "./analytics-opportunity-evaluator.js";
 import { runInTransaction } from "./transaction.js";
 import type { Queryable } from "./types.js";
 
@@ -98,7 +101,10 @@ export function createPostgresAnalyticsRollupStore(db: Queryable): AnalyticsRoll
           return { recorded: false };
         }
 
-        const dimensions = buildAnalyticsDimensions(input.event.payload.dimensions, input.event.payload.custom_dimensions ?? {});
+        const dimensions = buildAnalyticsDimensions(
+          input.event.payload.dimensions,
+          input.event.payload.custom_dimensions ?? {}
+        );
         const dimensionHash = hashStableJson(dimensions);
         const sessionSubjectHash = hashStableJson({
           project_id: input.project_id,
@@ -185,19 +191,30 @@ export function createPostgresAnalyticsRollupStore(db: Queryable): AnalyticsRoll
             const funnelRollupKey = `${funnelSignal.funnelKey}|${funnelSignal.stepKey}`;
             const countedFunnelSession = await insertUniqueRollupSubject(tx, {
               ...scope,
-              rollupKind: funnelSignal.isCompletion ? "funnel_completion_session" : "funnel_step_session",
+              rollupKind: funnelSignal.isCompletion
+                ? "funnel_completion_session"
+                : "funnel_step_session",
               rollupKey: funnelRollupKey,
               subjectHash: sessionSubjectHash
             });
             await upsertFunnelRollup(tx, scope, funnelSignal, {
               sessionsEntered: funnelSignal.isCompletion ? 0 : countedFunnelSession ? 1 : 0,
-              sessionsCompleted: funnelSignal.isCompletion ? countedFunnelSession ? 1 : 0 : 0
+              sessionsCompleted: funnelSignal.isCompletion ? (countedFunnelSession ? 1 : 0) : 0
             });
           }
         }
 
         if (funnelSignal !== null) {
           await evaluateAnalyticsFunnelDropoffOpportunities(tx, {
+            project_id: input.project_id,
+            occurred_at: input.event.occurred_at,
+            service: input.event.service.name,
+            environment: input.event.service.environment
+          });
+        }
+
+        if (transitionKey !== null) {
+          await evaluateAnalyticsJourneyFrictionOpportunities(tx, {
             project_id: input.project_id,
             occurred_at: input.event.occurred_at,
             service: input.event.service.name,
@@ -245,7 +262,9 @@ function buildAnalyticsDimensions(
 }
 
 function sortRecord(record: Record<string, unknown>): Record<string, unknown> {
-  return Object.fromEntries(Object.entries(record).sort(([left], [right]) => left.localeCompare(right)));
+  return Object.fromEntries(
+    Object.entries(record).sort(([left], [right]) => left.localeCompare(right))
+  );
 }
 
 function hashStableJson(value: unknown): string {
@@ -269,15 +288,14 @@ function stableJson(value: unknown): string {
 function getBucketStart(occurredAt: string, granularity: AnalyticsBucketGranularity): string {
   const date = new Date(occurredAt);
   if (granularity === "hour") {
-    return new Date(Date.UTC(
-      date.getUTCFullYear(),
-      date.getUTCMonth(),
-      date.getUTCDate(),
-      date.getUTCHours()
-    )).toISOString();
+    return new Date(
+      Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate(), date.getUTCHours())
+    ).toISOString();
   }
 
-  return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate())).toISOString();
+  return new Date(
+    Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate())
+  ).toISOString();
 }
 
 function getRouteKey(event: AnalyticsEventEnvelope): string | null {
@@ -313,15 +331,23 @@ function isPageViewLike(event: AnalyticsEventEnvelope): boolean {
   return event.payload.kind === "page_view" || event.payload.kind === "route_change";
 }
 
-function getActionKey(event: AnalyticsEventEnvelope): { actionKey: string; routeKey: string } | null {
+function getActionKey(
+  event: AnalyticsEventEnvelope
+): { actionKey: string; routeKey: string } | null {
   const routeKey = getRouteKey(event) ?? "";
   if (event.payload.kind === "action" && typeof event.payload.signal?.action_key === "string") {
     return { actionKey: event.payload.signal.action_key, routeKey };
   }
-  if (event.payload.kind === "conversion" && typeof event.payload.signal?.conversion_key === "string") {
+  if (
+    event.payload.kind === "conversion" &&
+    typeof event.payload.signal?.conversion_key === "string"
+  ) {
     return { actionKey: `conversion:${event.payload.signal.conversion_key}`, routeKey };
   }
-  if (event.payload.kind === "journey_marker" && typeof event.payload.signal?.marker_key === "string") {
+  if (
+    event.payload.kind === "journey_marker" &&
+    typeof event.payload.signal?.marker_key === "string"
+  ) {
     return { actionKey: `marker:${event.payload.signal.marker_key}`, routeKey };
   }
 
