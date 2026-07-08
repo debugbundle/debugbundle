@@ -99,6 +99,45 @@ function createRouteChangeEvent(overrides: Partial<AnalyticsEventEnvelope> = {})
   } as Partial<AnalyticsEventEnvelope>);
 }
 
+function createFunnelStepEvent(overrides: Partial<AnalyticsEventEnvelope> = {}): AnalyticsEventEnvelope {
+  return createPageViewEvent({
+    event_id: "550e8400-e29b-41d4-a716-446655440002",
+    payload: {
+      kind: "funnel_step",
+      signal: {
+        funnel_key: "checkout",
+        step_key: "payment"
+      },
+      route: {
+        path: "/checkout/payment",
+        normalized_path: "/checkout/payment",
+        title: "Payment"
+      },
+      dimensions: {
+        auth_state: "anonymous",
+        device_type: "desktop",
+        browser_family: "Chrome",
+        browser_major: 125,
+        os_family: "macOS",
+        os_major: 14,
+        language: "en",
+        locale: "en-US",
+        viewport_bucket: "large",
+        referrer_domain: "google.com",
+        utm_source: "google",
+        utm_medium: "cpc",
+        utm_campaign: "summer",
+        country_code: null,
+        region_code: null
+      },
+      custom_dimensions: {
+        account_tier: "team"
+      }
+    },
+    ...overrides
+  } as Partial<AnalyticsEventEnvelope>);
+}
+
 function createTransactionalDb(query: Queryable["query"]): Queryable {
   return {
     query,
@@ -206,5 +245,57 @@ describe("analytics rollup store", () => {
     ).resolves.toEqual({ recorded: false });
 
     expect(queryMock).toHaveBeenCalledOnce();
+  });
+
+  it("evaluates funnel-dropoff opportunities after recording funnel rollups", async (): Promise<void> => {
+    const queryMock = vi.fn(async (sqlText: string, params: unknown[]) => {
+      void params;
+      if (sqlText.includes("INSERT INTO analytics_ingestion_ledger")) {
+        return { rows: [{ event_id: "550e8400-e29b-41d4-a716-446655440002" }] };
+      }
+      if (sqlText.includes("INSERT INTO analytics_rollup_uniques")) {
+        return { rows: [{ subject_hash: "subject_hash" }] };
+      }
+      if (
+        sqlText.includes("INSERT INTO analytics_session_rollups") ||
+        sqlText.includes("INSERT INTO analytics_route_rollups") ||
+        sqlText.includes("INSERT INTO analytics_funnel_rollups")
+      ) {
+        return { rows: [] };
+      }
+      if (sqlText.includes("FROM analytics_funnel_rollups")) {
+        return {
+          rows: [{
+            service: "web",
+            environment: "production",
+            funnel_key: "checkout",
+            step_key: "payment",
+            step_order: 0,
+            sessions_entered: "100",
+            sessions_completed: "40",
+            dropoffs: "60"
+          }]
+        };
+      }
+      if (sqlText.includes("INSERT INTO analytics_opportunities")) {
+        return { rows: [{ id: "33333333-3333-4333-8333-333333333333" }] };
+      }
+
+      throw new Error(`Unhandled analytics rollup SQL: ${sqlText}`);
+    });
+
+    const store = createPostgresAnalyticsRollupStore(
+      createTransactionalDb(queryMock as Queryable["query"])
+    );
+
+    await expect(
+      store.recordAnalyticsEvent({
+        project_id: "11111111-1111-4111-8111-111111111111",
+        event: createFunnelStepEvent()
+      })
+    ).resolves.toEqual({ recorded: true });
+
+    expect(queryMock.mock.calls.filter(([sql]) => String(sql).includes("INSERT INTO analytics_funnel_rollups"))).toHaveLength(2);
+    expect(queryMock.mock.calls.some(([sql]) => String(sql).includes("INSERT INTO analytics_opportunities"))).toBe(true);
   });
 });

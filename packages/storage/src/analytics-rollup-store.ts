@@ -5,6 +5,7 @@ import type {
   AnalyticsDimensions,
   AnalyticsEventEnvelope
 } from "../../shared-types/src/index.js";
+import { evaluateAnalyticsFunnelDropoffOpportunities } from "./analytics-opportunity-evaluator.js";
 import { runInTransaction } from "./transaction.js";
 import type { Queryable } from "./types.js";
 
@@ -193,6 +194,15 @@ export function createPostgresAnalyticsRollupStore(db: Queryable): AnalyticsRoll
               sessionsCompleted: funnelSignal.isCompletion ? countedFunnelSession ? 1 : 0 : 0
             });
           }
+        }
+
+        if (funnelSignal !== null) {
+          await evaluateAnalyticsFunnelDropoffOpportunities(tx, {
+            project_id: input.project_id,
+            occurred_at: input.event.occurred_at,
+            service: input.event.service.name,
+            environment: input.event.service.environment
+          });
         }
 
         return { recorded: true };

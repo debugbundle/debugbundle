@@ -80,6 +80,15 @@ export type {
 } from "./analytics-opportunity-store.js";
 export { createPostgresAnalyticsOpportunityStore } from "./analytics-opportunity-store.js";
 export type {
+  AnalyticsOpportunityEvaluationInput,
+  AnalyticsOpportunityEvaluationResult,
+  AnalyticsOpportunityEvaluator
+} from "./analytics-opportunity-evaluator.js";
+export {
+  createPostgresAnalyticsOpportunityEvaluator,
+  evaluateAnalyticsFunnelDropoffOpportunities
+} from "./analytics-opportunity-evaluator.js";
+export type {
   AggregateAnalyticsEventsJob,
   AnalyticsIngestionPersistenceService,
   AnalyticsQueueClient
