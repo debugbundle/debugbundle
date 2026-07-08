@@ -505,6 +505,62 @@ export const AnalyticsFunnelAnalysisResponseSchema = z
 
 export type AnalyticsFunnelAnalysisResponse = z.infer<typeof AnalyticsFunnelAnalysisResponseSchema>;
 
+export const AnalyticsOpportunityStatusValues = ["open", "resolved", "snoozed"] as const;
+export const AnalyticsOpportunityStatusSchema = z.enum(AnalyticsOpportunityStatusValues);
+export type AnalyticsOpportunityStatus = z.infer<typeof AnalyticsOpportunityStatusSchema>;
+
+export const AnalyticsOpportunityBundleStatusValues = ["not_requested", "pending", "running", "completed", "failed"] as const;
+export const AnalyticsOpportunityBundleStatusSchema = z.enum(AnalyticsOpportunityBundleStatusValues);
+export type AnalyticsOpportunityBundleStatus = z.infer<typeof AnalyticsOpportunityBundleStatusSchema>;
+
+const AnalyticsOpportunityRecordSchema = z
+  .object({
+    opportunity_id: z.string().uuid(),
+    project_id: z.string().uuid(),
+    project_name: z.string().trim().min(1).max(200),
+    project_color_tag: z.string().trim().min(1).max(32).nullable(),
+    service: z.string().trim().min(1).max(120).nullable(),
+    environment: z.string().trim().min(1).max(120).nullable(),
+    kind: AnalyticsBundleAnalysisKindSchema,
+    status: AnalyticsOpportunityStatusSchema,
+    severity: AnalyticsBundleSeveritySchema,
+    confidence: z.number().min(0).max(1),
+    title: z.string().trim().min(1).max(240),
+    summary: z.string().trim().min(1).max(2000),
+    evidence: z.record(z.string(), z.unknown()),
+    related_incident_ids: z.array(z.string().uuid()).max(100),
+    related_deploy_ids: z.array(z.string().trim().min(1).max(128)).max(100),
+    first_detected_at: z.string().datetime(),
+    last_detected_at: z.string().datetime(),
+    resolved_at: z.string().datetime().nullable(),
+    snoozed_until: z.string().datetime().nullable(),
+    bundle_generation_id: z.string().uuid().nullable(),
+    bundle_status: AnalyticsOpportunityBundleStatusSchema,
+    bundle_created_at: z.string().datetime().nullable(),
+    bundle_updated_at: z.string().datetime().nullable(),
+    bundle_failure_reason: z.string().trim().min(1).max(240).nullable(),
+  })
+  .strict();
+
+export type AnalyticsOpportunityRecord = z.infer<typeof AnalyticsOpportunityRecordSchema>;
+
+export const AnalyticsOpportunitiesListResponseSchema = z
+  .object({
+    opportunities: z.array(AnalyticsOpportunityRecordSchema).max(100),
+    next_cursor: z.string().trim().min(1).nullable(),
+  })
+  .strict();
+
+export type AnalyticsOpportunitiesListResponse = z.infer<typeof AnalyticsOpportunitiesListResponseSchema>;
+
+export const AnalyticsOpportunityResponseSchema = z
+  .object({
+    opportunity: AnalyticsOpportunityRecordSchema,
+  })
+  .strict();
+
+export type AnalyticsOpportunityResponse = z.infer<typeof AnalyticsOpportunityResponseSchema>;
+
 const AnalyticsBundleProjectSchema = z
   .object({
     project_id: z.string().uuid(),

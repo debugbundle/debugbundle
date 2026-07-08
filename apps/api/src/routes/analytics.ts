@@ -2,10 +2,14 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { z } from "zod";
 
 import {
+  AnalyticsBundleAnalysisKindSchema,
   AnalyticsDeviceBreakdownResponseSchema,
   AnalyticsFunnelAnalysisResponseSchema,
   AnalyticsJourneyPatternsResponseSchema,
   AnalyticsMetricsGranularitySchema,
+  AnalyticsOpportunitiesListResponseSchema,
+  AnalyticsOpportunityResponseSchema,
+  AnalyticsOpportunityStatusSchema,
   AnalyticsReferrerMetricsResponseSchema,
   AnalyticsRouteMetricsResponseSchema,
   AnalyticsUsageSummaryResponseSchema,
@@ -34,10 +38,88 @@ const AnalyticsFunnelParamsSchema = z.object({
   key: z.string().trim().min(1).max(120)
 }).strict();
 
+const AnalyticsOpportunitiesQuerySchema = z
+  .object({
+    project_id: z.string().uuid(),
+    status: z.union([AnalyticsOpportunityStatusSchema, z.literal("all")]).optional().default("open"),
+    kind: AnalyticsBundleAnalysisKindSchema.optional(),
+    cursor: z.string().trim().min(1).optional(),
+    limit: z.coerce.number().int().min(1).max(100).optional().default(20)
+  })
+  .strict();
+
+const AnalyticsOpportunityParamsSchema = z.object({
+  id: z.string().uuid()
+}).strict();
+
 type AnalyticsQuery = z.infer<typeof AnalyticsSummaryQuerySchema>;
 type AuthorizedAnalyticsQuery = AnalyticsQuery & { from: string; to: string; organization_id: string };
 
 export function registerAnalyticsRoutes(app: FastifyInstance, dependencies: ApiDependencies): void {
+  app.get("/v1/analytics/opportunities", async (request, reply) => {
+    const parsedQuery = AnalyticsOpportunitiesQuerySchema.safeParse(request.query);
+    if (!parsedQuery.success) {
+      return reply.status(400).send({ error: "invalid_query" });
+    }
+
+    const parsedCursor = parseAnalyticsOpportunitiesCursor(parsedQuery.data.cursor);
+    if (parsedQuery.data.cursor !== undefined && parsedCursor === null) {
+      return reply.status(400).send({ error: "invalid_query" });
+    }
+
+    const access = await requireAnalyticsProjectReadAccess(request, reply, dependencies, parsedQuery.data.project_id);
+    if (access === null) {
+      return;
+    }
+
+    if (dependencies.analyticsOpportunities === undefined) {
+      return reply.status(404).send({ error: "analytics_opportunities_not_available" });
+    }
+
+    const opportunities = await dependencies.analyticsOpportunities.listAnalyticsOpportunitiesForProject({
+      organization_id: access.organization_id,
+      project_id: parsedQuery.data.project_id,
+      ...(parsedQuery.data.status === "all" ? {} : { status: parsedQuery.data.status }),
+      ...(parsedQuery.data.kind === undefined ? {} : { kind: parsedQuery.data.kind }),
+      ...(parsedCursor === null ? {} : { cursor: parsedCursor }),
+      limit: parsedQuery.data.limit
+    });
+
+    return reply.status(200).send(AnalyticsOpportunitiesListResponseSchema.parse(opportunities));
+  });
+
+  app.get("/v1/analytics/opportunities/:id", async (request, reply) => {
+    const parsedParams = AnalyticsOpportunityParamsSchema.safeParse(request.params);
+    if (!parsedParams.success) {
+      return reply.status(400).send({ error: "invalid_opportunity_id" });
+    }
+
+    const parsedQuery = z.object({ project_id: z.string().uuid() }).strict().safeParse(request.query);
+    if (!parsedQuery.success) {
+      return reply.status(400).send({ error: "invalid_query" });
+    }
+
+    const access = await requireAnalyticsProjectReadAccess(request, reply, dependencies, parsedQuery.data.project_id);
+    if (access === null) {
+      return;
+    }
+
+    if (dependencies.analyticsOpportunities === undefined) {
+      return reply.status(404).send({ error: "analytics_opportunities_not_available" });
+    }
+
+    const opportunity = await dependencies.analyticsOpportunities.getAnalyticsOpportunityForProject({
+      organization_id: access.organization_id,
+      project_id: parsedQuery.data.project_id,
+      opportunity_id: parsedParams.data.id
+    });
+    if (opportunity === null) {
+      return reply.status(404).send({ error: "analytics_opportunity_not_found" });
+    }
+
+    return reply.status(200).send(AnalyticsOpportunityResponseSchema.parse(opportunity));
+  });
+
   app.get("/v1/analytics/summary", async (request, reply) => {
     const input = await requireAnalyticsMetricsQuery(request, reply, dependencies);
     if (input === null) {
@@ -230,4 +312,58 @@ function parseLastDurationMs(value: string): number | null {
   const durationMs = amount * multiplier;
 
   return durationMs <= MAX_LAST_MS ? durationMs : null;
+}
+
+async function requireAnalyticsProjectReadAccess(
+  request: FastifyRequest,
+  reply: FastifyReply,
+  dependencies: ApiDependencies,
+  projectId: string
+): Promise<{ organization_id: string } | null> {
+  const auth = await requireRateLimitedProjectAccess(request, reply, dependencies, {
+    bucket: "retrieval-read",
+    projectId
+  });
+  if (auth === null) {
+    return null;
+  }
+
+  if (!getTierCapabilities(auth.access.organization_plan).analytics_bundle) {
+    await reply.status(403).send({ error: "upgrade_required" });
+    return null;
+  }
+
+  return {
+    organization_id: auth.access.organization_id
+  };
+}
+
+function parseAnalyticsOpportunitiesCursor(
+  rawCursor: string | undefined
+): { last_detected_at: string; opportunity_id: string } | null {
+  if (rawCursor === undefined) {
+    return null;
+  }
+
+  const separatorIndex = rawCursor.lastIndexOf("|");
+  if (separatorIndex <= 0 || separatorIndex >= rawCursor.length - 1) {
+    return null;
+  }
+
+  const lastDetectedAt = rawCursor.slice(0, separatorIndex);
+  const opportunityId = rawCursor.slice(separatorIndex + 1);
+  const parsedTimestamp = Date.parse(lastDetectedAt);
+  if (Number.isNaN(parsedTimestamp)) {
+    return null;
+  }
+
+  const parsed = z.object({
+    last_detected_at: z.string().datetime(),
+    opportunity_id: z.string().uuid()
+  }).safeParse({
+    last_detected_at: new Date(parsedTimestamp).toISOString(),
+    opportunity_id: opportunityId
+  });
+
+  return parsed.success ? parsed.data : null;
 }

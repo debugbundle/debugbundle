@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import { AnalyticsBundleAnalysisKindSchema } from "../../../packages/shared-types/src/index.js";
+
 export const ANALYTICS_METRICS_MCP_TOOL_CATALOG = [
   {
     name: "get_usage_summary",
@@ -47,6 +49,29 @@ export const ANALYTICS_METRICS_MCP_TOOL_CATALOG = [
     description: "Get aggregate AnalyticsBundle funnel conversion and dropoff analysis.",
     inputSchema: analyticsMetricsInputSchema().extend({
       funnelKey: z.string()
+    })
+  },
+  {
+    name: "list_analytics_opportunities",
+    group: "analytics_metrics",
+    description: "List AnalyticsBundle opportunities for a project.",
+    inputSchema: z.object({
+      bearerToken: z.string(),
+      projectId: z.string(),
+      status: z.enum(["open", "resolved", "snoozed", "all"]).optional(),
+      kind: AnalyticsBundleAnalysisKindSchema.optional(),
+      cursor: z.string().optional(),
+      limit: z.number().optional()
+    })
+  },
+  {
+    name: "get_analytics_opportunity",
+    group: "analytics_metrics",
+    description: "Get an AnalyticsBundle opportunity for a project.",
+    inputSchema: z.object({
+      bearerToken: z.string(),
+      projectId: z.string(),
+      opportunityId: z.string()
     })
   }
 ] as const;

@@ -4,10 +4,14 @@ import { CliAuthStateError } from "../../../apps/cli/src/auth-state.js";
 import {
   AnalyticsMetricsApiError,
   createAnalyticsMetricsApi,
+  getAnalyticsOpportunityCommand,
+  getAnalyticsOpportunityWithAuthCommand,
   getAnalyticsJourneysCommand,
   getAnalyticsJourneysWithAuthCommand,
   getAnalyticsSummaryCommand,
-  getAnalyticsSummaryWithAuthCommand
+  getAnalyticsSummaryWithAuthCommand,
+  listAnalyticsOpportunitiesCommand,
+  listAnalyticsOpportunitiesWithAuthCommand
 } from "../../../apps/cli/src/analytics-metrics-commands.js";
 
 const PROJECT_ID = "00000000-0000-0000-0000-000000000001";
@@ -61,6 +65,38 @@ const journeyPatternsResponse = {
   ]
 } as const;
 
+const opportunity = {
+  opportunity_id: "00000000-0000-4000-8000-000000000101",
+  project_id: PROJECT_ID,
+  project_name: "Marketing site",
+  project_color_tag: "blue",
+  service: "web",
+  environment: "production",
+  kind: "funnel_dropoff",
+  status: "open",
+  severity: "medium",
+  confidence: 0.82,
+  title: "Checkout dropoff increased",
+  summary: "Payment-step exits increased for mobile sessions.",
+  evidence: { sessions: 120 },
+  related_incident_ids: [],
+  related_deploy_ids: ["deploy-123"],
+  first_detected_at: FROM,
+  last_detected_at: TO,
+  resolved_at: null,
+  snoozed_until: null,
+  bundle_generation_id: null,
+  bundle_status: "not_requested",
+  bundle_created_at: null,
+  bundle_updated_at: null,
+  bundle_failure_reason: null
+} as const;
+
+const opportunitiesResponse = {
+  opportunities: [opportunity],
+  next_cursor: null
+} as const;
+
 describe("cli analytics metrics commands", () => {
   it("renders analytics summary in human and json mode", async () => {
     const human = await getAnalyticsSummaryCommand(
@@ -92,6 +128,29 @@ describe("cli analytics metrics commands", () => {
     expect(human.exitCode).toBe(0);
     expect(human.output).toContain("/pricing -> /checkout: 30 transitions, 18 sessions, 0.6 share");
     expect(JSON.parse(json.output)).toEqual(journeyPatternsResponse);
+  });
+
+  it("renders analytics opportunities in human and json mode", async () => {
+    const human = await listAnalyticsOpportunitiesCommand(
+      { bearerToken: "dbundle_mem_x", projectId: PROJECT_ID },
+      { listOpportunities: vi.fn().mockResolvedValue(opportunitiesResponse) }
+    );
+    const humanDetail = await getAnalyticsOpportunityCommand(
+      { bearerToken: "dbundle_mem_x", projectId: PROJECT_ID, opportunityId: opportunity.opportunity_id },
+      { getOpportunity: vi.fn().mockResolvedValue({ opportunity }) }
+    );
+    const json = await getAnalyticsOpportunityCommand(
+      { bearerToken: "dbundle_mem_x", projectId: PROJECT_ID, opportunityId: opportunity.opportunity_id, json: true },
+      { getOpportunity: vi.fn().mockResolvedValue({ opportunity }) }
+    );
+
+    expect(human.exitCode).toBe(0);
+    expect(human.output).toContain(`${opportunity.opportunity_id} | medium | open | funnel_dropoff | Checkout dropoff increased`);
+    expect(humanDetail.exitCode).toBe(0);
+    expect(humanDetail.output).toContain(`Opportunity: ${opportunity.opportunity_id}`);
+    expect(humanDetail.output).toContain("Related deploys: deploy-123");
+    expect(humanDetail.output).toContain("Bundle status: not_requested");
+    expect(JSON.parse(json.output)).toEqual({ opportunity });
   });
 
   it("loads auth state and forwards authenticated summary calls", async () => {
@@ -152,6 +211,68 @@ describe("cli analytics metrics commands", () => {
     expect(JSON.parse(result.output)).toEqual(journeyPatternsResponse);
   });
 
+  it("loads auth state and forwards authenticated opportunity list calls", async () => {
+    const readAuthState = vi.fn().mockResolvedValue({
+      bearer_token: "dbundle_mem_saved",
+      base_url: "https://selfhost.debugbundle.test"
+    });
+    const createHttpClient = vi.fn().mockReturnValue({ request: vi.fn() });
+    const listOpportunities = vi.fn().mockResolvedValue(opportunitiesResponse);
+    const createApi = vi.fn().mockReturnValue({ listOpportunities });
+
+    const result = await listAnalyticsOpportunitiesWithAuthCommand(
+      {
+        authFilePath: "/tmp/auth.json",
+        projectId: PROJECT_ID,
+        status: "all",
+        kind: "funnel_dropoff",
+        cursor: "cursor-1",
+        limit: 5,
+        json: true
+      },
+      { readAuthState, createHttpClient, createApi }
+    );
+
+    expect(createHttpClient).toHaveBeenCalledWith({ baseUrl: "https://selfhost.debugbundle.test" });
+    expect(listOpportunities).toHaveBeenCalledWith({
+      bearerToken: "dbundle_mem_saved",
+      projectId: PROJECT_ID,
+      status: "all",
+      kind: "funnel_dropoff",
+      cursor: "cursor-1",
+      limit: 5
+    });
+    expect(JSON.parse(result.output)).toEqual(opportunitiesResponse);
+  });
+
+  it("loads auth state and forwards authenticated opportunity detail calls", async () => {
+    const readAuthState = vi.fn().mockResolvedValue({
+      bearer_token: "dbundle_mem_saved",
+      base_url: "https://selfhost.debugbundle.test"
+    });
+    const createHttpClient = vi.fn().mockReturnValue({ request: vi.fn() });
+    const getOpportunity = vi.fn().mockResolvedValue({ opportunity });
+    const createApi = vi.fn().mockReturnValue({ getOpportunity });
+
+    const result = await getAnalyticsOpportunityWithAuthCommand(
+      {
+        authFilePath: "/tmp/auth.json",
+        projectId: PROJECT_ID,
+        opportunityId: opportunity.opportunity_id,
+        json: true
+      },
+      { readAuthState, createHttpClient, createApi }
+    );
+
+    expect(createHttpClient).toHaveBeenCalledWith({ baseUrl: "https://selfhost.debugbundle.test" });
+    expect(getOpportunity).toHaveBeenCalledWith({
+      bearerToken: "dbundle_mem_saved",
+      projectId: PROJECT_ID,
+      opportunityId: opportunity.opportunity_id
+    });
+    expect(JSON.parse(result.output)).toEqual({ opportunity });
+  });
+
   it("maps auth and API failures to stable exit codes", async () => {
     const authMissing = await getAnalyticsSummaryWithAuthCommand(
       { projectId: PROJECT_ID },
@@ -197,7 +318,9 @@ describe("cli analytics metrics commands", () => {
           },
           steps: []
         }
-      });
+      })
+      .mockResolvedValueOnce({ status: 200, body: opportunitiesResponse })
+      .mockResolvedValueOnce({ status: 200, body: { opportunity } });
     const api = createAnalyticsMetricsApi({ request });
 
     await api.getUsageSummary({
@@ -215,6 +338,19 @@ describe("cli analytics metrics commands", () => {
     await api.getDeviceBreakdown({ bearerToken: "dbundle_mem_x", projectId: PROJECT_ID });
     await api.getReferrerMetrics({ bearerToken: "dbundle_mem_x", projectId: PROJECT_ID });
     await api.getFunnelAnalysis({ bearerToken: "dbundle_mem_x", projectId: PROJECT_ID, funnelKey: "checkout" });
+    await api.listOpportunities({
+      bearerToken: "dbundle_mem_x",
+      projectId: PROJECT_ID,
+      status: "all",
+      kind: "funnel_dropoff",
+      cursor: "cursor-1",
+      limit: 5
+    });
+    await api.getOpportunity({
+      bearerToken: "dbundle_mem_x",
+      projectId: PROJECT_ID,
+      opportunityId: opportunity.opportunity_id
+    });
 
     expect(request).toHaveBeenCalledWith({
       method: "GET",
@@ -244,6 +380,16 @@ describe("cli analytics metrics commands", () => {
     expect(request).toHaveBeenCalledWith({
       method: "GET",
       path: `/v1/analytics/funnels/checkout?project_id=${PROJECT_ID}`,
+      bearerToken: "dbundle_mem_x"
+    });
+    expect(request).toHaveBeenCalledWith({
+      method: "GET",
+      path: `/v1/analytics/opportunities?project_id=${PROJECT_ID}&status=all&kind=funnel_dropoff&cursor=cursor-1&limit=5`,
+      bearerToken: "dbundle_mem_x"
+    });
+    expect(request).toHaveBeenCalledWith({
+      method: "GET",
+      path: `/v1/analytics/opportunities/${opportunity.opportunity_id}?project_id=${PROJECT_ID}`,
       bearerToken: "dbundle_mem_x"
     });
   });

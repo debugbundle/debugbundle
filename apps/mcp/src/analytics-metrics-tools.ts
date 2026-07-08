@@ -1,4 +1,8 @@
 import { AnalyticsMetricsApiError } from "../../cli/src/analytics-metrics-commands.js";
+import {
+  AnalyticsBundleAnalysisKindSchema,
+  type AnalyticsBundleAnalysisKind
+} from "../../../packages/shared-types/src/index.js";
 
 export const ANALYTICS_METRICS_MCP_TOOL_NAMES = [
   "get_usage_summary",
@@ -6,7 +10,9 @@ export const ANALYTICS_METRICS_MCP_TOOL_NAMES = [
   "get_journey_patterns",
   "get_device_breakdown",
   "get_referrer_metrics",
-  "get_funnel_analysis"
+  "get_funnel_analysis",
+  "list_analytics_opportunities",
+  "get_analytics_opportunity"
 ] as const;
 
 function mapMcpError(error: unknown): never {
@@ -37,6 +43,8 @@ export function createAnalyticsMetricsMcpTools(api: {
   getDeviceBreakdown(input: AnalyticsMetricsToolInput): Promise<unknown>;
   getReferrerMetrics(input: AnalyticsMetricsToolInput): Promise<unknown>;
   getFunnelAnalysis(input: AnalyticsMetricsToolInput & { funnelKey: string }): Promise<unknown>;
+  listOpportunities(input: AnalyticsOpportunitiesToolInput): Promise<unknown>;
+  getOpportunity(input: AnalyticsOpportunityToolInput): Promise<unknown>;
 }): Record<(typeof ANALYTICS_METRICS_MCP_TOOL_NAMES)[number], (input: Record<string, unknown>) => Promise<unknown>> {
   return {
     async get_usage_summary(input) {
@@ -88,6 +96,26 @@ export function createAnalyticsMetricsMcpTools(api: {
       } catch (error) {
         mapMcpError(error);
       }
+    },
+
+    async list_analytics_opportunities(input) {
+      try {
+        return await api.listOpportunities(readOpportunitiesInput(input));
+      } catch (error) {
+        mapMcpError(error);
+      }
+    },
+
+    async get_analytics_opportunity(input) {
+      try {
+        return await api.getOpportunity({
+          bearerToken: String(input["bearerToken"]),
+          projectId: String(input["projectId"]),
+          opportunityId: String(input["opportunityId"])
+        });
+      } catch (error) {
+        mapMcpError(error);
+      }
     }
   };
 }
@@ -104,6 +132,21 @@ type AnalyticsMetricsToolInput = {
     limit?: number | undefined;
 };
 
+type AnalyticsOpportunitiesToolInput = {
+  bearerToken: string;
+  projectId: string;
+  status?: "open" | "resolved" | "snoozed" | "all" | undefined;
+  kind?: AnalyticsBundleAnalysisKind | undefined;
+  cursor?: string | undefined;
+  limit?: number | undefined;
+};
+
+type AnalyticsOpportunityToolInput = {
+  bearerToken: string;
+  projectId: string;
+  opportunityId: string;
+};
+
 function readMetricsInput(input: Record<string, unknown>): AnalyticsMetricsToolInput {
   return {
     bearerToken: String(input["bearerToken"]),
@@ -114,6 +157,19 @@ function readMetricsInput(input: Record<string, unknown>): AnalyticsMetricsToolI
     granularity: readGranularity(input),
     service: readOptionalString(input, "service"),
     environment: readOptionalString(input, "environment"),
+    limit: readOptionalNumber(input, "limit")
+  };
+}
+
+function readOpportunitiesInput(input: Record<string, unknown>): AnalyticsOpportunitiesToolInput {
+  const status = input["status"];
+  const kind = AnalyticsBundleAnalysisKindSchema.safeParse(input["kind"]);
+  return {
+    bearerToken: String(input["bearerToken"]),
+    projectId: String(input["projectId"]),
+    status: status === "open" || status === "resolved" || status === "snoozed" || status === "all" ? status : undefined,
+    kind: kind.success ? kind.data : undefined,
+    cursor: readOptionalString(input, "cursor"),
     limit: readOptionalNumber(input, "limit")
   };
 }

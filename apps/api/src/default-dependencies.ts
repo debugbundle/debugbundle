@@ -27,6 +27,7 @@ import {
   createPostgresCapturePolicyStore,
   createPostgresCaptureRuleStore,
   createPostgresAnalyticsMetricsStore,
+  createPostgresAnalyticsOpportunityStore,
   createPostgresAnalyticsSettingsStore,
   createPostgresImprovementOpportunityStore,
   createPostgresImprovementSettingsStore,
@@ -115,6 +116,7 @@ export function createApiDependencies(input: CreateApiDependenciesInput): Defaul
   const capturePolicyStore = createPostgresCapturePolicyStore(input.db);
   const captureRuleStore = createPostgresCaptureRuleStore(input.db);
   const analyticsMetricsStore = createPostgresAnalyticsMetricsStore(input.db);
+  const analyticsOpportunityStore = createPostgresAnalyticsOpportunityStore(input.db);
   const analyticsSettingsStore = createPostgresAnalyticsSettingsStore(input.db);
   const improvementOpportunityStore = createPostgresImprovementOpportunityStore(input.db, {
     ...(accountAnalyticsStore === undefined ? {} : { accountAnalyticsStore })
@@ -668,6 +670,12 @@ export function createApiDependencies(input: CreateApiDependenciesInput): Defaul
         void input.organization_id;
         return analyticsMetricsStore.getFunnelAnalysis(input);
       }
+    },
+    analyticsOpportunities: {
+      listAnalyticsOpportunitiesForProject: (input) =>
+        analyticsOpportunityStore.listAnalyticsOpportunitiesForProject(input),
+      getAnalyticsOpportunityForProject: (input) =>
+        analyticsOpportunityStore.getAnalyticsOpportunityForProject(input)
     },
     improvementSettingsManagement: {
       getImprovementSettingsForProject: (input: { organization_id: string; project_id: string }) => {

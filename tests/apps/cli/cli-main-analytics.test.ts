@@ -54,6 +54,8 @@ describe("cli main analytics routing", () => {
     const getAnalyticsDevicesCommand = vi.fn().mockResolvedValue({ exitCode: 0, output: "devices" });
     const getAnalyticsReferrersCommand = vi.fn().mockResolvedValue({ exitCode: 0, output: "referrers" });
     const getAnalyticsFunnelCommand = vi.fn().mockResolvedValue({ exitCode: 0, output: "funnel" });
+    const listAnalyticsOpportunitiesCommand = vi.fn().mockResolvedValue({ exitCode: 0, output: "opportunities" });
+    const getAnalyticsOpportunityCommand = vi.fn().mockResolvedValue({ exitCode: 0, output: "opportunity" });
 
     await expect(runCli(["analytics", "routes", "--project", "proj_123"], { getAnalyticsRoutesCommand })).resolves.toEqual({
       exitCode: 0,
@@ -75,12 +77,41 @@ describe("cli main analytics routing", () => {
       exitCode: 0,
       output: "funnel"
     });
+    await expect(
+      runCli(
+        ["analytics", "opportunities", "--project", "proj_123", "--status", "all", "--kind", "funnel_dropoff", "--cursor", "cursor-1", "--limit", "5"],
+        { listAnalyticsOpportunitiesCommand }
+      )
+    ).resolves.toEqual({
+      exitCode: 0,
+      output: "opportunities"
+    });
+    await expect(
+      runCli(
+        ["analytics", "opportunity", "get", "opp_123", "--project", "proj_123"],
+        { getAnalyticsOpportunityCommand }
+      )
+    ).resolves.toEqual({
+      exitCode: 0,
+      output: "opportunity"
+    });
 
     expect(getAnalyticsRoutesCommand).toHaveBeenCalledWith({ projectId: "proj_123" });
     expect(getAnalyticsJourneysCommand).toHaveBeenCalledWith({ projectId: "proj_123" });
     expect(getAnalyticsDevicesCommand).toHaveBeenCalledWith({ projectId: "proj_123" });
     expect(getAnalyticsReferrersCommand).toHaveBeenCalledWith({ projectId: "proj_123" });
     expect(getAnalyticsFunnelCommand).toHaveBeenCalledWith({ projectId: "proj_123", funnelKey: "checkout" });
+    expect(listAnalyticsOpportunitiesCommand).toHaveBeenCalledWith({
+      projectId: "proj_123",
+      status: "all",
+      kind: "funnel_dropoff",
+      cursor: "cursor-1",
+      limit: 5
+    });
+    expect(getAnalyticsOpportunityCommand).toHaveBeenCalledWith({
+      projectId: "proj_123",
+      opportunityId: "opp_123"
+    });
   });
 
   it("routes analytics settings get arguments into the get command", async () => {

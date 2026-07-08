@@ -75,6 +75,11 @@ export type {
 } from "./analytics-metrics-store.js";
 export { createPostgresAnalyticsMetricsStore } from "./analytics-metrics-store.js";
 export type {
+  AnalyticsOpportunitiesCursor,
+  AnalyticsOpportunityStore
+} from "./analytics-opportunity-store.js";
+export { createPostgresAnalyticsOpportunityStore } from "./analytics-opportunity-store.js";
+export type {
   AggregateAnalyticsEventsJob,
   AnalyticsIngestionPersistenceService,
   AnalyticsQueueClient

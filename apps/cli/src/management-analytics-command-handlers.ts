@@ -1,4 +1,8 @@
-import type { AnalyticsSettingsUpdate } from "../../../packages/shared-types/src/index.js";
+import {
+  AnalyticsBundleAnalysisKindSchema,
+  type AnalyticsBundleAnalysisKind,
+  type AnalyticsSettingsUpdate
+} from "../../../packages/shared-types/src/index.js";
 import {
   getAnalyticsSettingsWithAuthCommand as defaultGetAnalyticsSettingsCommand,
   setAnalyticsSettingsWithAuthCommand as defaultSetAnalyticsSettingsCommand
@@ -7,9 +11,11 @@ import {
   getAnalyticsDevicesWithAuthCommand as defaultGetAnalyticsDevicesCommand,
   getAnalyticsFunnelWithAuthCommand as defaultGetAnalyticsFunnelCommand,
   getAnalyticsJourneysWithAuthCommand as defaultGetAnalyticsJourneysCommand,
+  getAnalyticsOpportunityWithAuthCommand as defaultGetAnalyticsOpportunityCommand,
   getAnalyticsReferrersWithAuthCommand as defaultGetAnalyticsReferrersCommand,
   getAnalyticsRoutesWithAuthCommand as defaultGetAnalyticsRoutesCommand,
-  getAnalyticsSummaryWithAuthCommand as defaultGetAnalyticsSummaryCommand
+  getAnalyticsSummaryWithAuthCommand as defaultGetAnalyticsSummaryCommand,
+  listAnalyticsOpportunitiesWithAuthCommand as defaultListAnalyticsOpportunitiesCommand
 } from "./analytics-metrics-commands.js";
 import {
   appendCommonAuthOptions,
@@ -62,6 +68,31 @@ function readAnalyticsGranularity(parsedArgv: ParsedArgv): "hour" | "day" | unde
   }
 
   throw new CliInputError("Invalid value for --granularity.");
+}
+
+function readAnalyticsOpportunityStatus(parsedArgv: ParsedArgv): "open" | "resolved" | "snoozed" | "all" | undefined {
+  const status = readStringOption(parsedArgv, "status");
+  if (status === undefined) {
+    return undefined;
+  }
+  if (status === "open" || status === "resolved" || status === "snoozed" || status === "all") {
+    return status;
+  }
+
+  throw new CliInputError("Invalid value for --status.");
+}
+
+function readAnalyticsOpportunityKind(parsedArgv: ParsedArgv): AnalyticsBundleAnalysisKind | undefined {
+  const kind = readStringOption(parsedArgv, "kind");
+  if (kind === undefined) {
+    return undefined;
+  }
+  const parsed = AnalyticsBundleAnalysisKindSchema.safeParse(kind);
+  if (parsed.success) {
+    return parsed.data;
+  }
+
+  throw new CliInputError("Invalid value for --kind.");
 }
 
 function readProjectOption(parsedArgv: ParsedArgv): string | undefined {
@@ -229,6 +260,56 @@ export async function handleAnalyticsCommand(
         service: readStringOption(parsedArgv, "service"),
         environment: readStringOption(parsedArgv, "environment"),
         limit: readIntegerOption(parsedArgv, "limit")
+      })
+    );
+  }
+
+  if (resource === "opportunities") {
+    expectNoUnknownOptions(parsedArgv, [
+      "project",
+      "project-id",
+      "status",
+      "kind",
+      "cursor",
+      "limit",
+      "auth-file",
+      "json"
+    ]);
+    ensureNoExtraPositionals(parsedArgv, 2);
+    const projectId = readProjectOption(parsedArgv);
+    if (projectId === undefined) {
+      throw new CliInputError("Missing required option --project.");
+    }
+
+    return await (dependencies.listAnalyticsOpportunitiesCommand ?? defaultListAnalyticsOpportunitiesCommand)(
+      appendCommonAuthOptions(parsedArgv, {
+        projectId,
+        status: readAnalyticsOpportunityStatus(parsedArgv),
+        kind: readAnalyticsOpportunityKind(parsedArgv),
+        cursor: readStringOption(parsedArgv, "cursor"),
+        limit: readIntegerOption(parsedArgv, "limit")
+      })
+    );
+  }
+
+  if (resource === "opportunity") {
+    const action = requirePositional(parsedArgv, 2, "opportunity action");
+    if (action !== "get") {
+      throw new CliInputError("Unknown analytics opportunity command.");
+    }
+
+    expectNoUnknownOptions(parsedArgv, ["project", "project-id", "auth-file", "json"]);
+    ensureNoExtraPositionals(parsedArgv, 4);
+    const opportunityId = requirePositional(parsedArgv, 3, "opportunity id");
+    const projectId = readProjectOption(parsedArgv);
+    if (projectId === undefined) {
+      throw new CliInputError("Missing required option --project.");
+    }
+
+    return await (dependencies.getAnalyticsOpportunityCommand ?? defaultGetAnalyticsOpportunityCommand)(
+      appendCommonAuthOptions(parsedArgv, {
+        projectId,
+        opportunityId
       })
     );
   }

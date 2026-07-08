@@ -2,7 +2,11 @@ import { describe, expect, it, vi } from "vitest";
 
 import type { ApiDependencies } from "../../../apps/api/src/api-types.js";
 import { createApiServer } from "../../../apps/api/src/server.js";
-import type { AnalyticsUsageSummaryResponse } from "../../../packages/shared-types/src/index.js";
+import type {
+  AnalyticsOpportunitiesListResponse,
+  AnalyticsOpportunityResponse,
+  AnalyticsUsageSummaryResponse
+} from "../../../packages/shared-types/src/index.js";
 
 const PROJECT_ID = "00000000-0000-0000-0000-000000000001";
 const FROM = "2026-03-01T00:00:00.000Z";
@@ -96,8 +100,52 @@ function createAnalyticsMetricsDependency(
   };
 }
 
+function createOpportunity(): AnalyticsOpportunityResponse["opportunity"] {
+  return {
+    opportunity_id: "00000000-0000-4000-8000-000000000101",
+    project_id: PROJECT_ID,
+    project_name: "Marketing site",
+    project_color_tag: "blue",
+    service: "web",
+    environment: "production",
+    kind: "funnel_dropoff",
+    status: "open",
+    severity: "medium",
+    confidence: 0.82,
+    title: "Checkout dropoff increased",
+    summary: "Payment-step exits increased for mobile sessions.",
+    evidence: { sessions: 120 },
+    related_incident_ids: [],
+    related_deploy_ids: ["deploy-123"],
+    first_detected_at: FROM,
+    last_detected_at: TO,
+    resolved_at: null,
+    snoozed_until: null,
+    bundle_generation_id: null,
+    bundle_status: "not_requested",
+    bundle_created_at: null,
+    bundle_updated_at: null,
+    bundle_failure_reason: null
+  };
+}
+
+function createAnalyticsOpportunitiesDependency(
+  overrides: Partial<NonNullable<ApiDependencies["analyticsOpportunities"]>> = {}
+): NonNullable<ApiDependencies["analyticsOpportunities"]> {
+  const listResponse: AnalyticsOpportunitiesListResponse = {
+    opportunities: [createOpportunity()],
+    next_cursor: null
+  };
+  return {
+    listAnalyticsOpportunitiesForProject: vi.fn().mockResolvedValue(listResponse),
+    getAnalyticsOpportunityForProject: vi.fn().mockResolvedValue({ opportunity: createOpportunity() }),
+    ...overrides
+  };
+}
+
 function createDependencies(overrides: {
   analyticsMetrics?: ApiDependencies["analyticsMetrics"];
+  analyticsOpportunities?: ApiDependencies["analyticsOpportunities"];
   projectAccess?: ReturnType<typeof createProjectAccess> | null;
 } = {}): ReturnType<typeof createApiServer> {
   return createApiServer({
@@ -136,7 +184,8 @@ function createDependencies(overrides: {
       updateProjectForOrganization: vi.fn(),
       deleteProjectForOrganization: vi.fn()
     },
-    analyticsMetrics: overrides.analyticsMetrics
+    analyticsMetrics: overrides.analyticsMetrics,
+    analyticsOpportunities: overrides.analyticsOpportunities
   });
 }
 
@@ -254,5 +303,75 @@ describe("analytics metrics routes", () => {
       project_id: PROJECT_ID,
       funnel_key: "checkout"
     }));
+  });
+
+  it("lists and gets analytics opportunities through project access", async () => {
+    const analyticsOpportunities = createAnalyticsOpportunitiesDependency();
+    const app = createDependencies({ analyticsOpportunities });
+    const authHeaders = { authorization: "Bearer dbundle_mem_test_token" };
+    const opportunityId = createOpportunity().opportunity_id;
+
+    const cursor = `${TO}|${opportunityId}`;
+    const list = await app.inject({
+      method: "GET",
+      url: `/v1/analytics/opportunities?project_id=${PROJECT_ID}&status=all&kind=funnel_dropoff&cursor=${encodeURIComponent(cursor)}&limit=5`,
+      headers: authHeaders
+    });
+    const detail = await app.inject({
+      method: "GET",
+      url: `/v1/analytics/opportunities/${opportunityId}?project_id=${PROJECT_ID}`,
+      headers: authHeaders
+    });
+
+    expect(list.statusCode).toBe(200);
+    expect(list.json()).toEqual({ opportunities: [createOpportunity()], next_cursor: null });
+    expect(detail.statusCode).toBe(200);
+    expect(detail.json()).toEqual({ opportunity: createOpportunity() });
+    expect(analyticsOpportunities.listAnalyticsOpportunitiesForProject).toHaveBeenCalledWith({
+      organization_id: "org_123",
+      project_id: PROJECT_ID,
+      kind: "funnel_dropoff",
+      cursor: {
+        last_detected_at: TO,
+        opportunity_id: opportunityId
+      },
+      limit: 5
+    });
+    expect(analyticsOpportunities.getAnalyticsOpportunityForProject).toHaveBeenCalledWith({
+      organization_id: "org_123",
+      project_id: PROJECT_ID,
+      opportunity_id: opportunityId
+    });
+  });
+
+  it("rejects invalid analytics opportunity reads and unavailable storage", async () => {
+    const invalidCursor = await createDependencies({
+      analyticsOpportunities: createAnalyticsOpportunitiesDependency()
+    }).inject({
+      method: "GET",
+      url: `/v1/analytics/opportunities?project_id=${PROJECT_ID}&cursor=not-a-cursor`,
+      headers: { authorization: "Bearer dbundle_mem_test_token" }
+    });
+    const unavailable = await createDependencies().inject({
+      method: "GET",
+      url: `/v1/analytics/opportunities?project_id=${PROJECT_ID}`,
+      headers: { authorization: "Bearer dbundle_mem_test_token" }
+    });
+    const notFound = await createDependencies({
+      analyticsOpportunities: createAnalyticsOpportunitiesDependency({
+        getAnalyticsOpportunityForProject: vi.fn().mockResolvedValue(null)
+      })
+    }).inject({
+      method: "GET",
+      url: `/v1/analytics/opportunities/${createOpportunity().opportunity_id}?project_id=${PROJECT_ID}`,
+      headers: { authorization: "Bearer dbundle_mem_test_token" }
+    });
+
+    expect(invalidCursor.statusCode).toBe(400);
+    expect(invalidCursor.json()).toEqual({ error: "invalid_query" });
+    expect(unavailable.statusCode).toBe(404);
+    expect(unavailable.json()).toEqual({ error: "analytics_opportunities_not_available" });
+    expect(notFound.statusCode).toBe(404);
+    expect(notFound.json()).toEqual({ error: "analytics_opportunity_not_found" });
   });
 });

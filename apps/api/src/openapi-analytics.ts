@@ -1,8 +1,11 @@
 import { z } from "zod";
 
 import {
+  AnalyticsOpportunitiesListResponseSchema,
+  AnalyticsOpportunityResponseSchema,
   AnalyticsDeviceBreakdownResponseSchema,
   AnalyticsFunnelAnalysisResponseSchema,
+  AnalyticsBundleAnalysisKindSchema,
   AnalyticsJourneyPatternsResponseSchema,
   AnalyticsReferrerMetricsResponseSchema,
   AnalyticsRouteMetricsResponseSchema,
@@ -47,6 +50,17 @@ const AnalyticsSummaryQuerySchema = z
   .strict();
 
 const AnalyticsFunnelParamsSchema = z.object({ key: z.string().min(1).max(120) }).strict();
+const AnalyticsOpportunityParamsSchema = z.object({ id: z.string().uuid() }).strict();
+const AnalyticsOpportunitiesQuerySchema = z
+  .object({
+    project_id: z.string().uuid(),
+    status: z.enum(["open", "resolved", "snoozed", "all"]).optional(),
+    kind: AnalyticsBundleAnalysisKindSchema.optional(),
+    cursor: z.string().optional(),
+    limit: z.number().int().min(1).max(100).optional()
+  })
+  .strict();
+const AnalyticsOpportunityQuerySchema = z.object({ project_id: z.string().uuid() }).strict();
 
 function component(name: string, schema: unknown): SchemaComponent {
   return { name, schema };
@@ -57,6 +71,11 @@ export function createAnalyticsMetricOpenApiOperations(options: {
   anyMemberAuth: SecurityRequirement[];
 }): OperationSpec[] {
   const analyticsUsageSummaryResponse = component("AnalyticsUsageSummaryResponse", AnalyticsUsageSummaryResponseSchema);
+  const analyticsOpportunitiesListResponse = component(
+    "AnalyticsOpportunitiesListResponse",
+    AnalyticsOpportunitiesListResponseSchema
+  );
+  const analyticsOpportunityResponse = component("AnalyticsOpportunityResponse", AnalyticsOpportunityResponseSchema);
   const analyticsRouteMetricsResponse = component("AnalyticsRouteMetricsResponse", AnalyticsRouteMetricsResponseSchema);
   const analyticsJourneyPatternsResponse = component(
     "AnalyticsJourneyPatternsResponse",
@@ -82,6 +101,33 @@ export function createAnalyticsMetricOpenApiOperations(options: {
   };
 
   return [
+    {
+      method: "get",
+      path: "/v1/analytics/opportunities",
+      operationId: "listAnalyticsOpportunities",
+      summary: "List AnalyticsBundle opportunities for a project",
+      tags: ["Analytics"],
+      security: options.anyMemberAuth,
+      query: AnalyticsOpportunitiesQuerySchema,
+      responses: {
+        "200": { description: "Analytics opportunities.", schema: analyticsOpportunitiesListResponse },
+        ...responses
+      }
+    },
+    {
+      method: "get",
+      path: "/v1/analytics/opportunities/{id}",
+      operationId: "getAnalyticsOpportunity",
+      summary: "Get an AnalyticsBundle opportunity for a project",
+      tags: ["Analytics"],
+      security: options.anyMemberAuth,
+      params: AnalyticsOpportunityParamsSchema,
+      query: AnalyticsOpportunityQuerySchema,
+      responses: {
+        "200": { description: "Analytics opportunity.", schema: analyticsOpportunityResponse },
+        ...responses
+      }
+    },
     {
       method: "get",
       path: "/v1/analytics/summary",

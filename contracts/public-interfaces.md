@@ -538,7 +538,7 @@ Analytics shares browser SDK capture primitives with debug capture where that re
 }
 ```
 
-The implemented aggregate metrics read surface includes `GET /v1/analytics/summary`, `/routes`, `/journey-patterns`, `/devices`, `/referrers`, and `/funnels/{key}` plus matching `debugbundle analytics summary|routes|journeys|devices|referrers|funnel` commands and MCP `get_usage_summary`, `get_route_metrics`, `get_journey_patterns`, `get_device_breakdown`, `get_referrer_metrics`, and `get_funnel_analysis` tools. These endpoints are aggregate-only, project-authorized, and browser-session/member-token read surfaces; project tokens remain write-only for analytics ingestion.
+The implemented aggregate metrics read surface includes `GET /v1/analytics/summary`, `/routes`, `/journey-patterns`, `/devices`, `/referrers`, and `/funnels/{key}` plus matching `debugbundle analytics summary|routes|journeys|devices|referrers|funnel` commands and MCP `get_usage_summary`, `get_route_metrics`, `get_journey_patterns`, `get_device_breakdown`, `get_referrer_metrics`, and `get_funnel_analysis` tools. Stored analytics opportunities are also readable through `GET /v1/analytics/opportunities` and `/opportunities/{id}`, matching `debugbundle analytics opportunities`, `debugbundle analytics opportunity get`, and MCP `list_analytics_opportunities` / `get_analytics_opportunity`. These endpoints are project-authorized browser-session/member-token read surfaces; project tokens remain write-only for analytics ingestion.
 
 **Analytics route metrics response shape:**
 ```json
@@ -595,6 +595,10 @@ The implemented aggregate metrics read surface includes `GET /v1/analytics/summa
   ]
 }
 ```
+
+**Analytics opportunity list response:** `{ "opportunities": AnalyticsOpportunityRecord[], "next_cursor": "string | null" }`.
+
+**Analytics opportunity detail response:** `{ "opportunity": AnalyticsOpportunityRecord }`.
 
 **Analytics opportunity record fields:** `opportunity_id`, `project_id`, `project_name`, `project_color_tag`, `service`, `environment`, `kind`, `status`, `severity`, `confidence`, `title`, `summary`, `evidence`, `related_incident_ids`, `related_deploy_ids`, `first_detected_at`, `last_detected_at`, `resolved_at`, `snoozed_until`, `bundle_generation_id`, `bundle_status`, `bundle_created_at`, `bundle_updated_at`, `bundle_failure_reason`.
 

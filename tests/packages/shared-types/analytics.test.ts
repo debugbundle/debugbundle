@@ -6,6 +6,8 @@ import {
   AnalyticsBundleV1Schema,
   AnalyticsEventEnvelopeSchema,
   AnalyticsJourneyPatternsResponseSchema,
+  AnalyticsOpportunitiesListResponseSchema,
+  AnalyticsOpportunityResponseSchema,
   EventEnvelopeSchema,
   EventTypeValues,
   MAX_ANALYTICS_CUSTOM_DIMENSIONS_PER_EVENT,
@@ -349,5 +351,45 @@ describe("analytics journey pattern metrics schema", () => {
     });
 
     expect(parsed.patterns[0]?.from_route_key).toBe("/pricing");
+  });
+});
+
+describe("analytics opportunity response schemas", () => {
+  const opportunity = {
+    opportunity_id: "00000000-0000-4000-8000-000000000601",
+    project_id: "00000000-0000-4000-8000-000000000602",
+    project_name: "Marketing site",
+    project_color_tag: "blue",
+    service: "web",
+    environment: "production",
+    kind: "funnel_dropoff",
+    status: "open",
+    severity: "medium",
+    confidence: 0.82,
+    title: "Checkout dropoff increased",
+    summary: "Payment-step exits increased for mobile sessions.",
+    evidence: {
+      sessions: 120,
+    },
+    related_incident_ids: ["00000000-0000-4000-8000-000000000603"],
+    related_deploy_ids: ["deploy-123"],
+    first_detected_at: "2026-07-01T00:00:00.000Z",
+    last_detected_at: "2026-07-07T00:00:00.000Z",
+    resolved_at: null,
+    snoozed_until: null,
+    bundle_generation_id: null,
+    bundle_status: "not_requested",
+    bundle_created_at: null,
+    bundle_updated_at: null,
+    bundle_failure_reason: null,
+  };
+
+  it("parses opportunity list and detail responses", () => {
+    expect(AnalyticsOpportunitiesListResponseSchema.parse({
+      opportunities: [opportunity],
+      next_cursor: "2026-07-07T00:00:00.000Z|00000000-0000-4000-8000-000000000601",
+    }).opportunities[0]?.kind).toBe("funnel_dropoff");
+
+    expect(AnalyticsOpportunityResponseSchema.parse({ opportunity }).opportunity.bundle_status).toBe("not_requested");
   });
 });

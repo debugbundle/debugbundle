@@ -7,9 +7,13 @@ import type {
   EventEnvelope,
   AnalyticsSettings,
   AnalyticsSettingsUpdate,
+  AnalyticsBundleAnalysisKind,
   AnalyticsDeviceBreakdownResponse,
   AnalyticsFunnelAnalysisResponse,
   AnalyticsJourneyPatternsResponse,
+  AnalyticsOpportunitiesListResponse,
+  AnalyticsOpportunityResponse,
+  AnalyticsOpportunityStatus,
   AnalyticsReferrerMetricsResponse,
   AnalyticsRouteMetricsResponse,
   AnalyticsUsageSummaryResponse,
@@ -510,6 +514,21 @@ export interface ApiDependencies {
       environment?: string | undefined;
       limit?: number | undefined;
     }): Promise<AnalyticsFunnelAnalysisResponse>;
+  } | undefined;
+  analyticsOpportunities?: {
+    listAnalyticsOpportunitiesForProject(input: {
+      organization_id: string;
+      project_id: string;
+      status?: AnalyticsOpportunityStatus | undefined;
+      kind?: AnalyticsBundleAnalysisKind | undefined;
+      cursor?: { last_detected_at: string; opportunity_id: string } | undefined;
+      limit: number;
+    }): Promise<AnalyticsOpportunitiesListResponse>;
+    getAnalyticsOpportunityForProject(input: {
+      organization_id: string;
+      project_id: string;
+      opportunity_id: string;
+    }): Promise<AnalyticsOpportunityResponse | null>;
   } | undefined;
   improvementManagement?: {
     listImprovementsForOrganization(input: {

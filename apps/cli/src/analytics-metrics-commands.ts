@@ -2,13 +2,20 @@ import {
   AnalyticsDeviceBreakdownResponseSchema,
   AnalyticsFunnelAnalysisResponseSchema,
   AnalyticsJourneyPatternsResponseSchema,
+  AnalyticsOpportunitiesListResponseSchema,
+  AnalyticsOpportunityResponseSchema,
+  AnalyticsOpportunityStatusSchema,
   AnalyticsReferrerMetricsResponseSchema,
   AnalyticsRouteMetricsResponseSchema,
   AnalyticsUsageSummaryResponseSchema,
+  type AnalyticsBundleAnalysisKind,
   type AnalyticsDeviceBreakdownResponse,
   type AnalyticsFunnelAnalysisResponse,
   type AnalyticsJourneyPatternsResponse,
   type AnalyticsMetricsGranularity,
+  type AnalyticsOpportunitiesListResponse,
+  type AnalyticsOpportunityResponse,
+  type AnalyticsOpportunityStatus,
   type AnalyticsReferrerMetricsResponse,
   type AnalyticsRouteMetricsResponse,
   type AnalyticsUsageSummaryResponse
@@ -58,6 +65,23 @@ export interface AnalyticsFunnelCommandInput extends AnalyticsSummaryCommandInpu
   funnelKey: string;
 }
 
+export interface AnalyticsOpportunitiesCommandInput {
+  bearerToken: string;
+  projectId: string;
+  status?: AnalyticsOpportunityStatus | "all" | undefined;
+  kind?: AnalyticsBundleAnalysisKind | undefined;
+  cursor?: string | undefined;
+  limit?: number | undefined;
+  json?: boolean | undefined;
+}
+
+export interface AnalyticsOpportunityGetCommandInput {
+  bearerToken: string;
+  projectId: string;
+  opportunityId: string;
+  json?: boolean | undefined;
+}
+
 function toApiError(status: number, body: unknown, fallback: string): AnalyticsMetricsApiError {
   if (typeof body === "object" && body !== null && "error" in body && typeof body.error === "string") {
     return new AnalyticsMetricsApiError(status, body.error);
@@ -75,6 +99,8 @@ export function createAnalyticsMetricsApi(httpClient: {
   getDeviceBreakdown(input: AnalyticsMetricQueryInput): Promise<AnalyticsDeviceBreakdownResponse>;
   getReferrerMetrics(input: AnalyticsMetricQueryInput): Promise<AnalyticsReferrerMetricsResponse>;
   getFunnelAnalysis(input: Omit<AnalyticsFunnelCommandInput, "json">): Promise<AnalyticsFunnelAnalysisResponse>;
+  listOpportunities(input: Omit<AnalyticsOpportunitiesCommandInput, "json">): Promise<AnalyticsOpportunitiesListResponse>;
+  getOpportunity(input: Omit<AnalyticsOpportunityGetCommandInput, "json">): Promise<AnalyticsOpportunityResponse>;
 } {
   return {
     async getUsageSummary(input): Promise<AnalyticsUsageSummaryResponse> {
@@ -174,6 +200,39 @@ export function createAnalyticsMetricsApi(httpClient: {
         throw new AnalyticsMetricsApiError(500, "Invalid analytics funnel analysis response.");
       }
       return parsed.data;
+    },
+
+    async listOpportunities(input): Promise<AnalyticsOpportunitiesListResponse> {
+      const response = await httpClient.request({
+        method: "GET",
+        path: `/v1/analytics/opportunities?${buildOpportunitiesQueryString(input)}`,
+        bearerToken: input.bearerToken
+      });
+      if (response.status !== 200) {
+        throw toApiError(response.status, response.body, "Failed to list analytics opportunities.");
+      }
+      const parsed = AnalyticsOpportunitiesListResponseSchema.safeParse(response.body);
+      if (!parsed.success) {
+        throw new AnalyticsMetricsApiError(500, "Invalid analytics opportunities response.");
+      }
+      return parsed.data;
+    },
+
+    async getOpportunity(input): Promise<AnalyticsOpportunityResponse> {
+      const params = new URLSearchParams({ project_id: input.projectId });
+      const response = await httpClient.request({
+        method: "GET",
+        path: `/v1/analytics/opportunities/${encodeURIComponent(input.opportunityId)}?${params.toString()}`,
+        bearerToken: input.bearerToken
+      });
+      if (response.status !== 200) {
+        throw toApiError(response.status, response.body, "Failed to get analytics opportunity.");
+      }
+      const parsed = AnalyticsOpportunityResponseSchema.safeParse(response.body);
+      if (!parsed.success) {
+        throw new AnalyticsMetricsApiError(500, "Invalid analytics opportunity response.");
+      }
+      return parsed.data;
     }
   };
 }
@@ -197,6 +256,18 @@ function appendOptionalParam(params: URLSearchParams, key: string, value: string
   if (value !== undefined) {
     params.set(key, value);
   }
+}
+
+function buildOpportunitiesQueryString(input: Omit<AnalyticsOpportunitiesCommandInput, "json">): string {
+  const params = new URLSearchParams({ project_id: input.projectId });
+  appendOptionalParam(params, "status", input.status);
+  appendOptionalParam(params, "kind", input.kind);
+  appendOptionalParam(params, "cursor", input.cursor);
+  if (input.limit !== undefined) {
+    params.set("limit", String(input.limit));
+  }
+
+  return params.toString();
 }
 
 function mapErrorToExitCode(error: unknown): number {
@@ -340,6 +411,42 @@ function formatFunnelAnalysis(response: AnalyticsFunnelAnalysisResponse): string
   ].join("\n");
 }
 
+function formatOpportunities(response: AnalyticsOpportunitiesListResponse): string {
+  if (response.opportunities.length === 0) {
+    return "No analytics opportunities found.";
+  }
+
+  const rows = response.opportunities.map((opportunity) =>
+    `${opportunity.opportunity_id} | ${opportunity.severity} | ${opportunity.status} | ${opportunity.kind} | ${opportunity.title}`
+  );
+
+  return `${rows.join("\n")}${response.next_cursor === null ? "" : `\nnext_cursor: ${response.next_cursor}`}`;
+}
+
+function formatOpportunity(response: AnalyticsOpportunityResponse): string {
+  const opportunity = response.opportunity;
+  return [
+    `Opportunity: ${opportunity.opportunity_id}`,
+    `Project: ${opportunity.project_name}`,
+    `Title: ${opportunity.title}`,
+    `Kind: ${opportunity.kind}`,
+    `Severity: ${opportunity.severity}`,
+    `Status: ${opportunity.status}`,
+    `Service: ${opportunity.service ?? ""}`,
+    `Environment: ${opportunity.environment ?? ""}`,
+    `Confidence: ${opportunity.confidence}`,
+    `Last detected: ${opportunity.last_detected_at}`,
+    ...(opportunity.related_incident_ids.length === 0
+      ? []
+      : [`Related incidents: ${opportunity.related_incident_ids.join(", ")}`]),
+    ...(opportunity.related_deploy_ids.length === 0
+      ? []
+      : [`Related deploys: ${opportunity.related_deploy_ids.join(", ")}`]),
+    `Bundle status: ${opportunity.bundle_status}`,
+    `Summary: ${opportunity.summary}`
+  ].join("\n");
+}
+
 async function runAnalyticsMetricCommand<Response>(
   input: AnalyticsSummaryCommandInput,
   apiCall: (request: AnalyticsMetricQueryInput) => Promise<Response>,
@@ -428,6 +535,59 @@ export async function getAnalyticsFunnelCommand(
   }
 }
 
+export async function listAnalyticsOpportunitiesCommand(
+  input: AnalyticsOpportunitiesCommandInput,
+  api: { listOpportunities(input: Omit<AnalyticsOpportunitiesCommandInput, "json">): Promise<AnalyticsOpportunitiesListResponse> }
+): Promise<CliCommandResult> {
+  try {
+    if (input.status !== undefined && input.status !== "all" && !AnalyticsOpportunityStatusSchema.safeParse(input.status).success) {
+      return { exitCode: 4, output: "Invalid value for --status." };
+    }
+
+    const response = await api.listOpportunities({
+      bearerToken: input.bearerToken,
+      projectId: input.projectId,
+      status: input.status,
+      kind: input.kind,
+      cursor: input.cursor,
+      limit: input.limit
+    });
+
+    return {
+      exitCode: 0,
+      output: input.json ? JSON.stringify(response) : formatOpportunities(response)
+    };
+  } catch (error) {
+    return {
+      exitCode: mapErrorToExitCode(error),
+      output: error instanceof Error ? error.message : String(error)
+    };
+  }
+}
+
+export async function getAnalyticsOpportunityCommand(
+  input: AnalyticsOpportunityGetCommandInput,
+  api: { getOpportunity(input: Omit<AnalyticsOpportunityGetCommandInput, "json">): Promise<AnalyticsOpportunityResponse> }
+): Promise<CliCommandResult> {
+  try {
+    const response = await api.getOpportunity({
+      bearerToken: input.bearerToken,
+      projectId: input.projectId,
+      opportunityId: input.opportunityId
+    });
+
+    return {
+      exitCode: 0,
+      output: input.json ? JSON.stringify(response) : formatOpportunity(response)
+    };
+  } catch (error) {
+    return {
+      exitCode: mapErrorToExitCode(error),
+      output: error instanceof Error ? error.message : String(error)
+    };
+  }
+}
+
 async function createAuthenticatedAnalyticsMetricsApi(
   input: { authFilePath?: string },
   dependencies?: {
@@ -492,6 +652,8 @@ export async function getAnalyticsSummaryWithAuthCommand(
 
 type AnalyticsMetricWithAuthInput = Omit<AnalyticsSummaryCommandInput, "bearerToken"> & { authFilePath?: string };
 type AnalyticsFunnelWithAuthInput = Omit<AnalyticsFunnelCommandInput, "bearerToken"> & { authFilePath?: string };
+type AnalyticsOpportunitiesWithAuthInput = Omit<AnalyticsOpportunitiesCommandInput, "bearerToken"> & { authFilePath?: string };
+type AnalyticsOpportunityGetWithAuthInput = Omit<AnalyticsOpportunityGetCommandInput, "bearerToken"> & { authFilePath?: string };
 
 async function runAnalyticsMetricWithAuthCommand(
   input: AnalyticsMetricWithAuthInput,
@@ -568,6 +730,43 @@ export async function getAnalyticsFunnelWithAuthCommand(
       {
         ...withBearerToken(authState, input),
         funnelKey: input.funnelKey
+      },
+      api
+    )
+  );
+}
+
+export async function listAnalyticsOpportunitiesWithAuthCommand(
+  input: AnalyticsOpportunitiesWithAuthInput,
+  dependencies?: Parameters<typeof createAuthenticatedAnalyticsMetricsApi>[1]
+): Promise<CliCommandResult> {
+  return runAnalyticsMetricWithAuthCommand(input, dependencies, (authState, api) =>
+    listAnalyticsOpportunitiesCommand(
+      {
+        bearerToken: authState.bearer_token,
+        projectId: input.projectId,
+        status: input.status,
+        kind: input.kind,
+        cursor: input.cursor,
+        limit: input.limit,
+        json: input.json
+      },
+      api
+    )
+  );
+}
+
+export async function getAnalyticsOpportunityWithAuthCommand(
+  input: AnalyticsOpportunityGetWithAuthInput,
+  dependencies?: Parameters<typeof createAuthenticatedAnalyticsMetricsApi>[1]
+): Promise<CliCommandResult> {
+  return runAnalyticsMetricWithAuthCommand(input, dependencies, (authState, api) =>
+    getAnalyticsOpportunityCommand(
+      {
+        bearerToken: authState.bearer_token,
+        projectId: input.projectId,
+        opportunityId: input.opportunityId,
+        json: input.json
       },
       api
     )
