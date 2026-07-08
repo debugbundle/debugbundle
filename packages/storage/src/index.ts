@@ -75,6 +75,16 @@ export type {
 } from "./analytics-metrics-store.js";
 export { createPostgresAnalyticsMetricsStore } from "./analytics-metrics-store.js";
 export type {
+  AnalyticsBundleGenerationRecord,
+  AnalyticsBundleGenerationStatus,
+  AnalyticsBundleGenerationStore,
+  ReserveAnalyticsBundleGenerationInput
+} from "./analytics-bundle-generation-store.js";
+export {
+  buildAnalyticsBundleInputFingerprint,
+  createPostgresAnalyticsBundleGenerationStore
+} from "./analytics-bundle-generation-store.js";
+export type {
   AnalyticsOpportunitiesCursor,
   AnalyticsOpportunityStore
 } from "./analytics-opportunity-store.js";

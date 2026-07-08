@@ -1,0 +1,290 @@
+import { describe, expect, it, vi } from "vitest";
+
+import {
+  buildAnalyticsBundleInputFingerprint,
+  createPostgresAnalyticsBundleGenerationStore,
+  type Queryable
+} from "../../../packages/storage/src/index.js";
+
+const PROJECT_ID = "11111111-1111-4111-8111-111111111111";
+const OPPORTUNITY_ID = "22222222-2222-4222-8222-222222222222";
+const GENERATION_ID = "33333333-3333-4333-8333-333333333333";
+const USER_ID = "44444444-4444-4444-8444-444444444444";
+
+const generationRow = {
+  generation_id: GENERATION_ID,
+  project_id: PROJECT_ID,
+  opportunity_id: OPPORTUNITY_ID,
+  requested_by_user_id: USER_ID,
+  analysis_kind: "funnel_dropoff",
+  analysis_spec: { funnel_key: "checkout", step_key: "payment" },
+  input_fingerprint: "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  status: "pending",
+  object_key: null,
+  failure_reason: null,
+  created_at: "2026-07-08T10:00:00.000Z",
+  claimed_at: null,
+  completed_at: null,
+  updated_at: "2026-07-08T10:00:00.000Z"
+};
+
+describe("analytics bundle generation store", () => {
+  it("builds deterministic input fingerprints independent of object key order", (): void => {
+    const left = buildAnalyticsBundleInputFingerprint({
+      opportunity_id: OPPORTUNITY_ID,
+      analysis_kind: "funnel_dropoff",
+      analysis_spec: {
+        step_key: "payment",
+        funnel_key: "checkout",
+        window: { end: "2026-07-08T00:00:00.000Z", start: "2026-07-01T00:00:00.000Z" }
+      }
+    });
+    const right = buildAnalyticsBundleInputFingerprint({
+      opportunity_id: OPPORTUNITY_ID,
+      analysis_kind: "funnel_dropoff",
+      analysis_spec: {
+        window: { start: "2026-07-01T00:00:00.000Z", end: "2026-07-08T00:00:00.000Z" },
+        funnel_key: "checkout",
+        step_key: "payment"
+      }
+    });
+
+    expect(left).toBe(right);
+    expect(left).toMatch(/^sha256:[a-f0-9]{64}$/);
+  });
+
+  it("reserves a pending generation and mirrors pending state to the linked opportunity", async (): Promise<void> => {
+    const queryMock = vi.fn(async (sqlText: string, params: unknown[]) => {
+      if (sqlText.includes("INSERT INTO analytics_bundle_generations")) {
+        expect(sqlText).toContain("ON CONFLICT (project_id, input_fingerprint) DO NOTHING");
+        expect(params[1]).toBe(PROJECT_ID);
+        expect(params[2]).toBe(OPPORTUNITY_ID);
+        expect(params[3]).toBe(USER_ID);
+        expect(params[4]).toBe("funnel_dropoff");
+        expect(params[5]).toBe(JSON.stringify({ funnel_key: "checkout", step_key: "payment" }));
+        expect(String(params[6])).toMatch(/^sha256:[a-f0-9]{64}$/);
+        return { rows: [generationRow] };
+      }
+
+      if (sqlText.includes("UPDATE analytics_opportunities")) {
+        expect(params).toEqual([OPPORTUNITY_ID, "pending", null, null]);
+        return { rows: [] };
+      }
+
+      throw new Error(`Unhandled reserve SQL: ${sqlText}`);
+    });
+    const store = createPostgresAnalyticsBundleGenerationStore(createTransactionalDb(queryMock));
+
+    await expect(
+      store.reserveAnalyticsBundleGeneration({
+        project_id: PROJECT_ID,
+        opportunity_id: OPPORTUNITY_ID,
+        requested_by_user_id: USER_ID,
+        analysis_kind: "funnel_dropoff",
+        analysis_spec: { funnel_key: "checkout", step_key: "payment" }
+      })
+    ).resolves.toMatchObject({
+      generation_id: GENERATION_ID,
+      project_id: PROJECT_ID,
+      opportunity_id: OPPORTUNITY_ID,
+      status: "pending",
+      analysis_spec: { funnel_key: "checkout", step_key: "payment" }
+    });
+    expect(queryMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("returns the existing generation for duplicate reservation fingerprints", async (): Promise<void> => {
+    const queryMock = vi.fn(async (sqlText: string, params: unknown[]) => {
+      if (sqlText.includes("INSERT INTO analytics_bundle_generations")) {
+        return { rows: [] };
+      }
+
+      if (sqlText.includes("WHERE project_id = $1::uuid") && sqlText.includes("input_fingerprint = $2")) {
+        expect(params[0]).toBe(PROJECT_ID);
+        expect(String(params[1])).toMatch(/^sha256:[a-f0-9]{64}$/);
+        return { rows: [generationRow] };
+      }
+
+      throw new Error(`Unhandled duplicate reservation SQL: ${sqlText}`);
+    });
+    const store = createPostgresAnalyticsBundleGenerationStore(createTransactionalDb(queryMock));
+
+    await expect(
+      store.reserveAnalyticsBundleGeneration({
+        project_id: PROJECT_ID,
+        opportunity_id: OPPORTUNITY_ID,
+        analysis_kind: "funnel_dropoff",
+        analysis_spec: { step_key: "payment", funnel_key: "checkout" }
+      })
+    ).resolves.toMatchObject({
+      generation_id: GENERATION_ID,
+      status: "pending"
+    });
+    expect(queryMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("gets a project-scoped generation by id", async (): Promise<void> => {
+    const queryMock = vi.fn(async (sqlText: string, params: unknown[]) => {
+      expect(sqlText).toContain("FROM analytics_bundle_generations");
+      expect(sqlText).toContain("WHERE project_id = $1::uuid");
+      expect(sqlText).toContain("AND id = $2::uuid");
+      expect(params).toEqual([PROJECT_ID, GENERATION_ID]);
+      return { rows: [generationRow] };
+    });
+    const store = createPostgresAnalyticsBundleGenerationStore(createTransactionalDb(queryMock));
+
+    await expect(
+      store.getAnalyticsBundleGenerationForProject({
+        project_id: PROJECT_ID,
+        generation_id: GENERATION_ID
+      })
+    ).resolves.toMatchObject({
+      generation_id: GENERATION_ID,
+      project_id: PROJECT_ID,
+      status: "pending"
+    });
+    expect(queryMock).toHaveBeenCalledOnce();
+  });
+
+  it("claims the oldest pending generation with a skip-locked update", async (): Promise<void> => {
+    const queryMock = vi.fn(async (sqlText: string, params: unknown[]) => {
+      if (sqlText.includes("WITH next_generation AS")) {
+        expect(sqlText).toContain("FOR UPDATE SKIP LOCKED");
+        expect(sqlText).toContain("ORDER BY created_at ASC, id ASC");
+        expect(sqlText).toContain("status = 'running'");
+        expect(params).toEqual(["2026-07-08T10:05:00.000Z"]);
+        return {
+          rows: [{
+            ...generationRow,
+            status: "running",
+            claimed_at: "2026-07-08T10:05:00.000Z",
+            updated_at: "2026-07-08T10:05:00.000Z"
+          }]
+        };
+      }
+
+      if (sqlText.includes("UPDATE analytics_opportunities")) {
+        expect(params).toEqual([OPPORTUNITY_ID, "running", null, null]);
+        return { rows: [] };
+      }
+
+      throw new Error(`Unhandled claim SQL: ${sqlText}`);
+    });
+    const store = createPostgresAnalyticsBundleGenerationStore(createTransactionalDb(queryMock));
+
+    await expect(
+      store.claimPendingAnalyticsBundleGeneration({
+        claimed_at: "2026-07-08T10:05:00.000Z"
+      })
+    ).resolves.toMatchObject({
+      generation_id: GENERATION_ID,
+      status: "running",
+      claimed_at: "2026-07-08T10:05:00.000Z"
+    });
+    expect(queryMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("marks a generation completed and records the deterministic artifact key", async (): Promise<void> => {
+    const queryMock = vi.fn(async (sqlText: string, params: unknown[]) => {
+      if (sqlText.includes("UPDATE analytics_bundle_generations")) {
+        expect(sqlText).toContain("status = 'completed'");
+        expect(params).toEqual([
+          PROJECT_ID,
+          GENERATION_ID,
+          `analytics-bundles/${PROJECT_ID}/${GENERATION_ID}/analytics-bundle.json.gz`,
+          "2026-07-08T10:10:00.000Z"
+        ]);
+        return {
+          rows: [{
+            ...generationRow,
+            status: "completed",
+            object_key: `analytics-bundles/${PROJECT_ID}/${GENERATION_ID}/analytics-bundle.json.gz`,
+            completed_at: "2026-07-08T10:10:00.000Z",
+            updated_at: "2026-07-08T10:10:00.000Z"
+          }]
+        };
+      }
+
+      if (sqlText.includes("UPDATE analytics_opportunities")) {
+        expect(params).toEqual([
+          OPPORTUNITY_ID,
+          "completed",
+          `analytics-bundles/${PROJECT_ID}/${GENERATION_ID}/analytics-bundle.json.gz`,
+          null
+        ]);
+        return { rows: [] };
+      }
+
+      throw new Error(`Unhandled complete SQL: ${sqlText}`);
+    });
+    const store = createPostgresAnalyticsBundleGenerationStore(createTransactionalDb(queryMock));
+
+    await expect(
+      store.markAnalyticsBundleGenerationCompleted({
+        project_id: PROJECT_ID,
+        generation_id: GENERATION_ID,
+        completed_at: "2026-07-08T10:10:00.000Z"
+      })
+    ).resolves.toMatchObject({
+      generation_id: GENERATION_ID,
+      status: "completed",
+      object_key: `analytics-bundles/${PROJECT_ID}/${GENERATION_ID}/analytics-bundle.json.gz`
+    });
+    expect(queryMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("marks a generation failed and stores the failure reason on the linked opportunity", async (): Promise<void> => {
+    const queryMock = vi.fn(async (sqlText: string, params: unknown[]) => {
+      if (sqlText.includes("UPDATE analytics_bundle_generations")) {
+        expect(sqlText).toContain("status = 'failed'");
+        expect(params).toEqual([
+          PROJECT_ID,
+          GENERATION_ID,
+          "insufficient aggregate inputs",
+          "2026-07-08T10:15:00.000Z"
+        ]);
+        return {
+          rows: [{
+            ...generationRow,
+            status: "failed",
+            failure_reason: "insufficient aggregate inputs",
+            updated_at: "2026-07-08T10:15:00.000Z"
+          }]
+        };
+      }
+
+      if (sqlText.includes("UPDATE analytics_opportunities")) {
+        expect(params).toEqual([OPPORTUNITY_ID, "failed", null, "insufficient aggregate inputs"]);
+        return { rows: [] };
+      }
+
+      throw new Error(`Unhandled fail SQL: ${sqlText}`);
+    });
+    const store = createPostgresAnalyticsBundleGenerationStore(createTransactionalDb(queryMock));
+
+    await expect(
+      store.markAnalyticsBundleGenerationFailed({
+        project_id: PROJECT_ID,
+        generation_id: GENERATION_ID,
+        failed_at: "2026-07-08T10:15:00.000Z",
+        reason: "insufficient aggregate inputs"
+      })
+    ).resolves.toMatchObject({
+      generation_id: GENERATION_ID,
+      status: "failed",
+      failure_reason: "insufficient aggregate inputs"
+    });
+    expect(queryMock).toHaveBeenCalledTimes(2);
+  });
+});
+
+function createTransactionalDb(queryMock: unknown): Queryable {
+  const query = queryMock as Queryable["query"];
+
+  return {
+    query,
+    async transaction(callback) {
+      return callback({ query });
+    }
+  };
+}
