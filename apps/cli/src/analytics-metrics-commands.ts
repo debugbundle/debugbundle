@@ -1,11 +1,13 @@
 import {
   AnalyticsDeviceBreakdownResponseSchema,
   AnalyticsFunnelAnalysisResponseSchema,
+  AnalyticsJourneyPatternsResponseSchema,
   AnalyticsReferrerMetricsResponseSchema,
   AnalyticsRouteMetricsResponseSchema,
   AnalyticsUsageSummaryResponseSchema,
   type AnalyticsDeviceBreakdownResponse,
   type AnalyticsFunnelAnalysisResponse,
+  type AnalyticsJourneyPatternsResponse,
   type AnalyticsMetricsGranularity,
   type AnalyticsReferrerMetricsResponse,
   type AnalyticsRouteMetricsResponse,
@@ -69,6 +71,7 @@ export function createAnalyticsMetricsApi(httpClient: {
 }): {
   getUsageSummary(input: AnalyticsMetricQueryInput): Promise<AnalyticsUsageSummaryResponse>;
   getRouteMetrics(input: AnalyticsMetricQueryInput): Promise<AnalyticsRouteMetricsResponse>;
+  getJourneyPatterns(input: AnalyticsMetricQueryInput): Promise<AnalyticsJourneyPatternsResponse>;
   getDeviceBreakdown(input: AnalyticsMetricQueryInput): Promise<AnalyticsDeviceBreakdownResponse>;
   getReferrerMetrics(input: AnalyticsMetricQueryInput): Promise<AnalyticsReferrerMetricsResponse>;
   getFunnelAnalysis(input: Omit<AnalyticsFunnelCommandInput, "json">): Promise<AnalyticsFunnelAnalysisResponse>;
@@ -105,6 +108,22 @@ export function createAnalyticsMetricsApi(httpClient: {
       const parsed = AnalyticsRouteMetricsResponseSchema.safeParse(response.body);
       if (!parsed.success) {
         throw new AnalyticsMetricsApiError(500, "Invalid analytics route metrics response.");
+      }
+      return parsed.data;
+    },
+
+    async getJourneyPatterns(input): Promise<AnalyticsJourneyPatternsResponse> {
+      const response = await httpClient.request({
+        method: "GET",
+        path: `/v1/analytics/journey-patterns?${buildMetricsQueryString(input)}`,
+        bearerToken: input.bearerToken
+      });
+      if (response.status !== 200) {
+        throw toApiError(response.status, response.body, "Failed to get analytics journey patterns.");
+      }
+      const parsed = AnalyticsJourneyPatternsResponseSchema.safeParse(response.body);
+      if (!parsed.success) {
+        throw new AnalyticsMetricsApiError(500, "Invalid analytics journey patterns response.");
       }
       return parsed.data;
     },
@@ -271,6 +290,18 @@ function formatRoutes(response: AnalyticsRouteMetricsResponse): string {
     .join("\n");
 }
 
+function formatJourneyPatterns(response: AnalyticsJourneyPatternsResponse): string {
+  if (response.patterns.length === 0) {
+    return "No journey patterns found.";
+  }
+
+  return response.patterns
+    .map((pattern) =>
+      `${pattern.from_route_key} -> ${pattern.to_route_key}: ${pattern.transition_count} transitions, ${pattern.unique_sessions} sessions, ${pattern.transition_share} share`
+    )
+    .join("\n");
+}
+
 function formatSegmentList(
   label: string,
   segments: Array<{ value: string; sessions: number; pageviews: number }>
@@ -344,6 +375,13 @@ export async function getAnalyticsRoutesCommand(
   api: { getRouteMetrics(input: AnalyticsMetricQueryInput): Promise<AnalyticsRouteMetricsResponse> }
 ): Promise<CliCommandResult> {
   return runAnalyticsMetricCommand(input, (request) => api.getRouteMetrics(request), formatRoutes);
+}
+
+export async function getAnalyticsJourneysCommand(
+  input: AnalyticsSummaryCommandInput,
+  api: { getJourneyPatterns(input: AnalyticsMetricQueryInput): Promise<AnalyticsJourneyPatternsResponse> }
+): Promise<CliCommandResult> {
+  return runAnalyticsMetricCommand(input, (request) => api.getJourneyPatterns(request), formatJourneyPatterns);
 }
 
 export async function getAnalyticsDevicesCommand(
@@ -491,6 +529,15 @@ export async function getAnalyticsRoutesWithAuthCommand(
 ): Promise<CliCommandResult> {
   return runAnalyticsMetricWithAuthCommand(input, dependencies, (authState, api) =>
     getAnalyticsRoutesCommand(withBearerToken(authState, input), api)
+  );
+}
+
+export async function getAnalyticsJourneysWithAuthCommand(
+  input: AnalyticsMetricWithAuthInput,
+  dependencies?: Parameters<typeof createAuthenticatedAnalyticsMetricsApi>[1]
+): Promise<CliCommandResult> {
+  return runAnalyticsMetricWithAuthCommand(input, dependencies, (authState, api) =>
+    getAnalyticsJourneysCommand(withBearerToken(authState, input), api)
   );
 }
 

@@ -181,4 +181,71 @@ describe("analytics metrics store", () => {
       }]
     });
   });
+
+  it("reads aggregate journey patterns from transition rollups", async (): Promise<void> => {
+    const queryMock = vi.fn(async (sqlText: string, params: unknown[]) => {
+      if (sqlText.includes("FROM analytics_transition_rollups")) {
+        expect(params.at(-1)).toBe(2);
+        return {
+          rows: [
+            {
+              from_route_key: "/pricing",
+              to_route_key: "/checkout",
+              transition_count: "30",
+              unique_sessions: "18",
+              total_transitions: "50"
+            },
+            {
+              from_route_key: "/docs",
+              to_route_key: "/signup",
+              transition_count: "20",
+              unique_sessions: "12",
+              total_transitions: "50"
+            }
+          ]
+        };
+      }
+
+      throw new Error(`Unhandled analytics metrics SQL: ${sqlText}`);
+    });
+
+    const store = createPostgresAnalyticsMetricsStore({ query: queryMock as Queryable["query"] });
+
+    await expect(
+      store.getJourneyPatterns({
+        project_id: PROJECT_ID,
+        from: "2026-03-01T00:00:00.000Z",
+        to: "2026-03-08T00:00:00.000Z",
+        granularity: "day",
+        service: "web",
+        environment: "production",
+        limit: 2
+      })
+    ).resolves.toEqual({
+      window: {
+        project_id: PROJECT_ID,
+        from: "2026-03-01T00:00:00.000Z",
+        to: "2026-03-08T00:00:00.000Z",
+        granularity: "day",
+        service: "web",
+        environment: "production"
+      },
+      patterns: [
+        {
+          from_route_key: "/pricing",
+          to_route_key: "/checkout",
+          transition_count: 30,
+          unique_sessions: 18,
+          transition_share: 0.6
+        },
+        {
+          from_route_key: "/docs",
+          to_route_key: "/signup",
+          transition_count: 20,
+          unique_sessions: 12,
+          transition_share: 0.4
+        }
+      ]
+    });
+  });
 });

@@ -312,6 +312,7 @@ describe("api default dependencies", () => {
     createPostgresAnalyticsMetricsStoreMock.mockReturnValue({
       getUsageSummary: vi.fn(),
       getRouteMetrics: vi.fn(),
+      getJourneyPatterns: vi.fn(),
       getDeviceBreakdown: vi.fn(),
       getReferrerMetrics: vi.fn(),
       getFunnelAnalysis: vi.fn()
@@ -776,6 +777,7 @@ describe("api default dependencies", () => {
     expect(typeof deps.analyticsSettingsManagement.updateAnalyticsSettingsForProject).toBe("function");
     expect(typeof deps.analyticsMetrics.getUsageSummaryForProject).toBe("function");
     expect(typeof deps.analyticsMetrics.getRouteMetricsForProject).toBe("function");
+    expect(typeof deps.analyticsMetrics.getJourneyPatternsForProject).toBe("function");
     expect(typeof deps.analyticsMetrics.getDeviceBreakdownForProject).toBe("function");
     expect(typeof deps.analyticsMetrics.getReferrerMetricsForProject).toBe("function");
     expect(typeof deps.analyticsMetrics.getFunnelAnalysisForProject).toBe("function");

@@ -536,7 +536,7 @@ Analytics read/manage APIs require Browser Session or Member Token auth. Project
 }
 ```
 
-The implemented aggregate metrics read surface includes `GET /v1/analytics/summary`, `/routes`, `/devices`, `/referrers`, and `/funnels/{key}` plus matching `debugbundle analytics summary|routes|devices|referrers|funnel` commands and MCP `get_usage_summary`, `get_route_metrics`, `get_device_breakdown`, `get_referrer_metrics`, and `get_funnel_analysis` tools. These endpoints are aggregate-only, project-authorized, and browser-session/member-token read surfaces; project tokens remain write-only for analytics ingestion.
+The implemented aggregate metrics read surface includes `GET /v1/analytics/summary`, `/routes`, `/journey-patterns`, `/devices`, `/referrers`, and `/funnels/{key}` plus matching `debugbundle analytics summary|routes|journeys|devices|referrers|funnel` commands and MCP `get_usage_summary`, `get_route_metrics`, `get_journey_patterns`, `get_device_breakdown`, `get_referrer_metrics`, and `get_funnel_analysis` tools. These endpoints are aggregate-only, project-authorized, and browser-session/member-token read surfaces; project tokens remain write-only for analytics ingestion.
 
 **Analytics route metrics response shape:**
 ```json

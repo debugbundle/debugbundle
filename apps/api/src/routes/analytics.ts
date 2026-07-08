@@ -4,6 +4,7 @@ import { z } from "zod";
 import {
   AnalyticsDeviceBreakdownResponseSchema,
   AnalyticsFunnelAnalysisResponseSchema,
+  AnalyticsJourneyPatternsResponseSchema,
   AnalyticsMetricsGranularitySchema,
   AnalyticsReferrerMetricsResponseSchema,
   AnalyticsRouteMetricsResponseSchema,
@@ -57,6 +58,17 @@ export function registerAnalyticsRoutes(app: FastifyInstance, dependencies: ApiD
     const routes = await dependencies.analyticsMetrics!.getRouteMetricsForProject(toMetricsInput(input));
 
     return reply.status(200).send(AnalyticsRouteMetricsResponseSchema.parse(routes));
+  });
+
+  app.get("/v1/analytics/journey-patterns", async (request, reply) => {
+    const input = await requireAnalyticsMetricsQuery(request, reply, dependencies);
+    if (input === null) {
+      return;
+    }
+
+    const journeys = await dependencies.analyticsMetrics!.getJourneyPatternsForProject(toMetricsInput(input));
+
+    return reply.status(200).send(AnalyticsJourneyPatternsResponseSchema.parse(journeys));
   });
 
   app.get("/v1/analytics/devices", async (request, reply) => {

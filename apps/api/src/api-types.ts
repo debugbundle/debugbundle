@@ -9,6 +9,7 @@ import type {
   AnalyticsSettingsUpdate,
   AnalyticsDeviceBreakdownResponse,
   AnalyticsFunnelAnalysisResponse,
+  AnalyticsJourneyPatternsResponse,
   AnalyticsReferrerMetricsResponse,
   AnalyticsRouteMetricsResponse,
   AnalyticsUsageSummaryResponse,
@@ -468,6 +469,16 @@ export interface ApiDependencies {
       environment?: string | undefined;
       limit?: number | undefined;
     }): Promise<AnalyticsRouteMetricsResponse>;
+    getJourneyPatternsForProject(input: {
+      organization_id: string;
+      project_id: string;
+      from: string;
+      to: string;
+      granularity: "hour" | "day";
+      service?: string | undefined;
+      environment?: string | undefined;
+      limit?: number | undefined;
+    }): Promise<AnalyticsJourneyPatternsResponse>;
     getDeviceBreakdownForProject(input: {
       organization_id: string;
       project_id: string;

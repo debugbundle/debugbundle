@@ -66,6 +66,7 @@ function createAnalyticsMetricsDependency(
   return {
     getUsageSummaryForProject: vi.fn().mockResolvedValue(createSummary()),
     getRouteMetricsForProject: vi.fn().mockResolvedValue({ window: metricsWindow, routes: [] }),
+    getJourneyPatternsForProject: vi.fn().mockResolvedValue({ window: metricsWindow, patterns: [] }),
     getDeviceBreakdownForProject: vi.fn().mockResolvedValue({
       window: metricsWindow,
       device_types: [],
@@ -200,6 +201,7 @@ describe("analytics metrics routes", () => {
     const analyticsMetrics = {
       getUsageSummaryForProject: vi.fn(),
       getRouteMetricsForProject: vi.fn().mockResolvedValue({ window: metricsWindow, routes: [] }),
+      getJourneyPatternsForProject: vi.fn().mockResolvedValue({ window: metricsWindow, patterns: [] }),
       getDeviceBreakdownForProject: vi.fn().mockResolvedValue({
         window: metricsWindow,
         device_types: [],
@@ -233,6 +235,9 @@ describe("analytics metrics routes", () => {
     await expect(app.inject({ method: "GET", url: `/v1/analytics/routes?${query}`, headers: authHeaders })).resolves.toMatchObject({
       statusCode: 200
     });
+    await expect(app.inject({ method: "GET", url: `/v1/analytics/journey-patterns?${query}`, headers: authHeaders })).resolves.toMatchObject({
+      statusCode: 200
+    });
     await expect(app.inject({ method: "GET", url: `/v1/analytics/devices?${query}`, headers: authHeaders })).resolves.toMatchObject({
       statusCode: 200
     });
@@ -244,6 +249,7 @@ describe("analytics metrics routes", () => {
     });
 
     expect(analyticsMetrics.getRouteMetricsForProject).toHaveBeenCalledWith(expect.objectContaining({ project_id: PROJECT_ID }));
+    expect(analyticsMetrics.getJourneyPatternsForProject).toHaveBeenCalledWith(expect.objectContaining({ project_id: PROJECT_ID }));
     expect(analyticsMetrics.getFunnelAnalysisForProject).toHaveBeenCalledWith(expect.objectContaining({
       project_id: PROJECT_ID,
       funnel_key: "checkout"

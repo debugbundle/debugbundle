@@ -24,6 +24,12 @@ export const ANALYTICS_METRICS_MCP_TOOL_CATALOG = [
     inputSchema: analyticsMetricsInputSchema()
   },
   {
+    name: "get_journey_patterns",
+    group: "analytics_metrics",
+    description: "Get aggregate AnalyticsBundle journey transition patterns for a project.",
+    inputSchema: analyticsMetricsInputSchema()
+  },
+  {
     name: "get_device_breakdown",
     group: "analytics_metrics",
     description: "Get aggregate AnalyticsBundle device, browser, OS, and language breakdowns.",

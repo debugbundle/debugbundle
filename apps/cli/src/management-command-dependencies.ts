@@ -15,6 +15,7 @@ import type {
 import type {
   getAnalyticsDevicesWithAuthCommand as defaultGetAnalyticsDevicesCommand,
   getAnalyticsFunnelWithAuthCommand as defaultGetAnalyticsFunnelCommand,
+  getAnalyticsJourneysWithAuthCommand as defaultGetAnalyticsJourneysCommand,
   getAnalyticsReferrersWithAuthCommand as defaultGetAnalyticsReferrersCommand,
   getAnalyticsRoutesWithAuthCommand as defaultGetAnalyticsRoutesCommand,
   getAnalyticsSummaryWithAuthCommand as defaultGetAnalyticsSummaryCommand
@@ -158,6 +159,7 @@ export type ManagementCommandDependencies = {
   setAnalyticsSettingsCommand?: typeof defaultSetAnalyticsSettingsCommand;
   getAnalyticsSummaryCommand?: typeof defaultGetAnalyticsSummaryCommand;
   getAnalyticsRoutesCommand?: typeof defaultGetAnalyticsRoutesCommand;
+  getAnalyticsJourneysCommand?: typeof defaultGetAnalyticsJourneysCommand;
   getAnalyticsDevicesCommand?: typeof defaultGetAnalyticsDevicesCommand;
   getAnalyticsReferrersCommand?: typeof defaultGetAnalyticsReferrersCommand;
   getAnalyticsFunnelCommand?: typeof defaultGetAnalyticsFunnelCommand;

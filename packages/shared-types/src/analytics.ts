@@ -420,6 +420,27 @@ export const AnalyticsRouteMetricsResponseSchema = z
 
 export type AnalyticsRouteMetricsResponse = z.infer<typeof AnalyticsRouteMetricsResponseSchema>;
 
+const AnalyticsJourneyPatternSchema = z
+  .object({
+    from_route_key: z.string().trim().min(1).max(2048),
+    to_route_key: z.string().trim().min(1).max(2048),
+    transition_count: z.number().int().nonnegative(),
+    unique_sessions: z.number().int().nonnegative(),
+    transition_share: z.number().min(0).max(1),
+  })
+  .strict();
+
+export type AnalyticsJourneyPattern = z.infer<typeof AnalyticsJourneyPatternSchema>;
+
+export const AnalyticsJourneyPatternsResponseSchema = z
+  .object({
+    window: AnalyticsMetricsWindowSchema,
+    patterns: z.array(AnalyticsJourneyPatternSchema).max(100),
+  })
+  .strict();
+
+export type AnalyticsJourneyPatternsResponse = z.infer<typeof AnalyticsJourneyPatternsResponseSchema>;
+
 export const AnalyticsDeviceBreakdownResponseSchema = z
   .object({
     window: AnalyticsMetricsWindowSchema,

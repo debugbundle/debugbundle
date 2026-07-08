@@ -3,6 +3,7 @@ import { AnalyticsMetricsApiError } from "../../cli/src/analytics-metrics-comman
 export const ANALYTICS_METRICS_MCP_TOOL_NAMES = [
   "get_usage_summary",
   "get_route_metrics",
+  "get_journey_patterns",
   "get_device_breakdown",
   "get_referrer_metrics",
   "get_funnel_analysis"
@@ -32,6 +33,7 @@ function readGranularity(input: Record<string, unknown>): "hour" | "day" | undef
 export function createAnalyticsMetricsMcpTools(api: {
   getUsageSummary(input: AnalyticsMetricsToolInput): Promise<unknown>;
   getRouteMetrics(input: AnalyticsMetricsToolInput): Promise<unknown>;
+  getJourneyPatterns(input: AnalyticsMetricsToolInput): Promise<unknown>;
   getDeviceBreakdown(input: AnalyticsMetricsToolInput): Promise<unknown>;
   getReferrerMetrics(input: AnalyticsMetricsToolInput): Promise<unknown>;
   getFunnelAnalysis(input: AnalyticsMetricsToolInput & { funnelKey: string }): Promise<unknown>;
@@ -48,6 +50,14 @@ export function createAnalyticsMetricsMcpTools(api: {
     async get_route_metrics(input) {
       try {
         return await api.getRouteMetrics(readMetricsInput(input));
+      } catch (error) {
+        mapMcpError(error);
+      }
+    },
+
+    async get_journey_patterns(input) {
+      try {
+        return await api.getJourneyPatterns(readMetricsInput(input));
       } catch (error) {
         mapMcpError(error);
       }

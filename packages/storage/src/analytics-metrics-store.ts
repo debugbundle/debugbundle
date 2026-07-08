@@ -1,11 +1,13 @@
 import {
   AnalyticsDeviceBreakdownResponseSchema,
   AnalyticsFunnelAnalysisResponseSchema,
+  AnalyticsJourneyPatternsResponseSchema,
   AnalyticsReferrerMetricsResponseSchema,
   AnalyticsRouteMetricsResponseSchema,
   AnalyticsUsageSummaryResponseSchema,
   type AnalyticsDeviceBreakdownResponse,
   type AnalyticsFunnelAnalysisResponse,
+  type AnalyticsJourneyPatternsResponse,
   type AnalyticsMetricsGranularity,
   type AnalyticsMetricsSegment,
   type AnalyticsReferrerMetricsResponse,
@@ -31,6 +33,7 @@ export interface AnalyticsFunnelAnalysisInput extends AnalyticsUsageSummaryInput
 export interface AnalyticsMetricsStore {
   getUsageSummary(input: AnalyticsUsageSummaryInput): Promise<AnalyticsUsageSummaryResponse>;
   getRouteMetrics(input: AnalyticsUsageSummaryInput): Promise<AnalyticsRouteMetricsResponse>;
+  getJourneyPatterns(input: AnalyticsUsageSummaryInput): Promise<AnalyticsJourneyPatternsResponse>;
   getDeviceBreakdown(input: AnalyticsUsageSummaryInput): Promise<AnalyticsDeviceBreakdownResponse>;
   getReferrerMetrics(input: AnalyticsUsageSummaryInput): Promise<AnalyticsReferrerMetricsResponse>;
   getFunnelAnalysis(input: AnalyticsFunnelAnalysisInput): Promise<AnalyticsFunnelAnalysisResponse>;
@@ -73,6 +76,14 @@ type AnalyticsRouteMetricRow = {
   exits: unknown;
   bounces: unknown;
   linked_incident_sessions: unknown;
+};
+
+type AnalyticsJourneyPatternRow = {
+  from_route_key: unknown;
+  to_route_key: unknown;
+  transition_count: unknown;
+  unique_sessions: unknown;
+  total_transitions: unknown;
 };
 
 type AnalyticsFunnelStepMetricRow = {
@@ -180,6 +191,44 @@ export function createPostgresAnalyticsMetricsStore(db: Queryable): AnalyticsMet
           bounces: toNonNegativeInteger(row.bounces),
           linked_incident_sessions: toNonNegativeInteger(row.linked_incident_sessions)
         }))
+      });
+    },
+
+    async getJourneyPatterns(input) {
+      const limit = normalizeLimit(input.limit);
+      const where = buildAnalyticsRollupWhere(input);
+      const result = await db.query<AnalyticsJourneyPatternRow>(
+        `
+          SELECT
+            from_route_key,
+            to_route_key,
+            COALESCE(SUM(transition_count), 0)::bigint AS transition_count,
+            COALESCE(SUM(unique_sessions), 0)::bigint AS unique_sessions,
+            COALESCE(SUM(SUM(transition_count)) OVER (), 0)::bigint AS total_transitions
+          FROM analytics_transition_rollups
+          ${where.sql}
+          GROUP BY from_route_key, to_route_key
+          HAVING COALESCE(SUM(transition_count), 0) > 0
+          ORDER BY transition_count DESC, unique_sessions DESC, from_route_key ASC, to_route_key ASC
+          LIMIT $${where.params.length + 1}
+        `,
+        [...where.params, limit]
+      );
+      const patterns = result.rows.map((row) => {
+        const transitionCount = toNonNegativeInteger(row.transition_count);
+        const totalTransitions = toNonNegativeInteger(row.total_transitions);
+        return {
+          from_route_key: toNonEmptyString(row.from_route_key, "unknown"),
+          to_route_key: toNonEmptyString(row.to_route_key, "unknown"),
+          transition_count: transitionCount,
+          unique_sessions: toNonNegativeInteger(row.unique_sessions),
+          transition_share: totalTransitions > 0 ? Math.min(1, transitionCount / totalTransitions) : 0
+        };
+      });
+
+      return AnalyticsJourneyPatternsResponseSchema.parse({
+        window: buildWindow(input),
+        patterns
       });
     },
 

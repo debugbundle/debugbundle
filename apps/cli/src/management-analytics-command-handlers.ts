@@ -6,6 +6,7 @@ import {
 import {
   getAnalyticsDevicesWithAuthCommand as defaultGetAnalyticsDevicesCommand,
   getAnalyticsFunnelWithAuthCommand as defaultGetAnalyticsFunnelCommand,
+  getAnalyticsJourneysWithAuthCommand as defaultGetAnalyticsJourneysCommand,
   getAnalyticsReferrersWithAuthCommand as defaultGetAnalyticsReferrersCommand,
   getAnalyticsRoutesWithAuthCommand as defaultGetAnalyticsRoutesCommand,
   getAnalyticsSummaryWithAuthCommand as defaultGetAnalyticsSummaryCommand
@@ -146,7 +147,13 @@ export async function handleAnalyticsCommand(
   dependencies: ManagementCommandDependencies
 ): Promise<CliCommandResult> {
   const resource = requirePositional(parsedArgv, 1, "analytics resource");
-  if (resource === "summary" || resource === "routes" || resource === "devices" || resource === "referrers") {
+  if (
+    resource === "summary" ||
+    resource === "routes" ||
+    resource === "journeys" ||
+    resource === "devices" ||
+    resource === "referrers"
+  ) {
     expectNoUnknownOptions(parsedArgv, [
       "project",
       "project-id",
@@ -181,9 +188,11 @@ export async function handleAnalyticsCommand(
         ? dependencies.getAnalyticsSummaryCommand ?? defaultGetAnalyticsSummaryCommand
         : resource === "routes"
           ? dependencies.getAnalyticsRoutesCommand ?? defaultGetAnalyticsRoutesCommand
-          : resource === "devices"
-            ? dependencies.getAnalyticsDevicesCommand ?? defaultGetAnalyticsDevicesCommand
-            : dependencies.getAnalyticsReferrersCommand ?? defaultGetAnalyticsReferrersCommand;
+          : resource === "journeys"
+            ? dependencies.getAnalyticsJourneysCommand ?? defaultGetAnalyticsJourneysCommand
+            : resource === "devices"
+              ? dependencies.getAnalyticsDevicesCommand ?? defaultGetAnalyticsDevicesCommand
+              : dependencies.getAnalyticsReferrersCommand ?? defaultGetAnalyticsReferrersCommand;
 
     return await command(input);
   }

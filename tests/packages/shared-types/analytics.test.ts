@@ -5,6 +5,7 @@ import {
   ANALYTICS_EVENT_SCHEMA_VERSION,
   AnalyticsBundleV1Schema,
   AnalyticsEventEnvelopeSchema,
+  AnalyticsJourneyPatternsResponseSchema,
   EventEnvelopeSchema,
   EventTypeValues,
   MAX_ANALYTICS_CUSTOM_DIMENSIONS_PER_EVENT,
@@ -322,5 +323,31 @@ describe("AnalyticsBundleV1 schema", () => {
         created_at: "2026-07-07T10:00:00.000Z",
       },
     })).success).toBe(false);
+  });
+});
+
+describe("analytics journey pattern metrics schema", () => {
+  it("parses bounded aggregate journey transition patterns", () => {
+    const parsed = AnalyticsJourneyPatternsResponseSchema.parse({
+      window: {
+        project_id: "00000000-0000-4000-8000-000000000501",
+        from: "2026-07-01T00:00:00.000Z",
+        to: "2026-07-07T00:00:00.000Z",
+        granularity: "day",
+        service: null,
+        environment: "production",
+      },
+      patterns: [
+        {
+          from_route_key: "/pricing",
+          to_route_key: "/checkout",
+          transition_count: 30,
+          unique_sessions: 18,
+          transition_share: 0.6,
+        },
+      ],
+    });
+
+    expect(parsed.patterns[0]?.from_route_key).toBe("/pricing");
   });
 });

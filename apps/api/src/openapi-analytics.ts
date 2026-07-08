@@ -3,6 +3,7 @@ import { z } from "zod";
 import {
   AnalyticsDeviceBreakdownResponseSchema,
   AnalyticsFunnelAnalysisResponseSchema,
+  AnalyticsJourneyPatternsResponseSchema,
   AnalyticsReferrerMetricsResponseSchema,
   AnalyticsRouteMetricsResponseSchema,
   AnalyticsUsageSummaryResponseSchema
@@ -57,6 +58,10 @@ export function createAnalyticsMetricOpenApiOperations(options: {
 }): OperationSpec[] {
   const analyticsUsageSummaryResponse = component("AnalyticsUsageSummaryResponse", AnalyticsUsageSummaryResponseSchema);
   const analyticsRouteMetricsResponse = component("AnalyticsRouteMetricsResponse", AnalyticsRouteMetricsResponseSchema);
+  const analyticsJourneyPatternsResponse = component(
+    "AnalyticsJourneyPatternsResponse",
+    AnalyticsJourneyPatternsResponseSchema
+  );
   const analyticsDeviceBreakdownResponse = component(
     "AnalyticsDeviceBreakdownResponse",
     AnalyticsDeviceBreakdownResponseSchema
@@ -115,6 +120,22 @@ export function createAnalyticsMetricOpenApiOperations(options: {
         "200": {
           description: "Analytics device, browser, OS, and language metrics.",
           schema: analyticsDeviceBreakdownResponse
+        },
+        ...responses
+      }
+    },
+    {
+      method: "get",
+      path: "/v1/analytics/journey-patterns",
+      operationId: "getAnalyticsJourneyPatterns",
+      summary: "Get aggregate AnalyticsBundle journey transition patterns for a project",
+      tags: ["Analytics"],
+      security: options.anyMemberAuth,
+      query: AnalyticsSummaryQuerySchema,
+      responses: {
+        "200": {
+          description: "Analytics journey transition patterns.",
+          schema: analyticsJourneyPatternsResponse
         },
         ...responses
       }

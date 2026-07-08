@@ -652,6 +652,10 @@ export function createApiDependencies(input: CreateApiDependenciesInput): Defaul
         void input.organization_id;
         return analyticsMetricsStore.getRouteMetrics(input);
       },
+      getJourneyPatternsForProject: (input) => {
+        void input.organization_id;
+        return analyticsMetricsStore.getJourneyPatterns(input);
+      },
       getDeviceBreakdownForProject: (input) => {
         void input.organization_id;
         return analyticsMetricsStore.getDeviceBreakdown(input);

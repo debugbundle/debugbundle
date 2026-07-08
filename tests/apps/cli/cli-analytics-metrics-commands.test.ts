@@ -4,6 +4,8 @@ import { CliAuthStateError } from "../../../apps/cli/src/auth-state.js";
 import {
   AnalyticsMetricsApiError,
   createAnalyticsMetricsApi,
+  getAnalyticsJourneysCommand,
+  getAnalyticsJourneysWithAuthCommand,
   getAnalyticsSummaryCommand,
   getAnalyticsSummaryWithAuthCommand
 } from "../../../apps/cli/src/analytics-metrics-commands.js";
@@ -46,6 +48,19 @@ const summaryResponse = {
   }
 } as const;
 
+const journeyPatternsResponse = {
+  window: metricsWindow,
+  patterns: [
+    {
+      from_route_key: "/pricing",
+      to_route_key: "/checkout",
+      transition_count: 30,
+      unique_sessions: 18,
+      transition_share: 0.6
+    }
+  ]
+} as const;
+
 describe("cli analytics metrics commands", () => {
   it("renders analytics summary in human and json mode", async () => {
     const human = await getAnalyticsSummaryCommand(
@@ -62,6 +77,21 @@ describe("cli analytics metrics commands", () => {
     expect(human.output).toContain("pageviews: 30");
     expect(human.output).toContain("top_device_types: desktop (9 sessions, 20 pageviews)");
     expect(JSON.parse(json.output)).toEqual(summaryResponse);
+  });
+
+  it("renders analytics journey patterns in human and json mode", async () => {
+    const human = await getAnalyticsJourneysCommand(
+      { bearerToken: "dbundle_mem_x", projectId: PROJECT_ID, from: FROM, to: TO },
+      { getJourneyPatterns: vi.fn().mockResolvedValue(journeyPatternsResponse) }
+    );
+    const json = await getAnalyticsJourneysCommand(
+      { bearerToken: "dbundle_mem_x", projectId: PROJECT_ID, from: FROM, to: TO, json: true },
+      { getJourneyPatterns: vi.fn().mockResolvedValue(journeyPatternsResponse) }
+    );
+
+    expect(human.exitCode).toBe(0);
+    expect(human.output).toContain("/pricing -> /checkout: 30 transitions, 18 sessions, 0.6 share");
+    expect(JSON.parse(json.output)).toEqual(journeyPatternsResponse);
   });
 
   it("loads auth state and forwards authenticated summary calls", async () => {
@@ -93,6 +123,35 @@ describe("cli analytics metrics commands", () => {
     expect(JSON.parse(result.output)).toEqual(summaryResponse);
   });
 
+  it("loads auth state and forwards authenticated journey pattern calls", async () => {
+    const readAuthState = vi.fn().mockResolvedValue({
+      bearer_token: "dbundle_mem_saved",
+      base_url: "https://selfhost.debugbundle.test"
+    });
+    const createHttpClient = vi.fn().mockReturnValue({ request: vi.fn() });
+    const getJourneyPatterns = vi.fn().mockResolvedValue(journeyPatternsResponse);
+    const createApi = vi.fn().mockReturnValue({ getJourneyPatterns });
+
+    const result = await getAnalyticsJourneysWithAuthCommand(
+      { authFilePath: "/tmp/auth.json", projectId: PROJECT_ID, from: FROM, to: TO, json: true },
+      { readAuthState, createHttpClient, createApi }
+    );
+
+    expect(createHttpClient).toHaveBeenCalledWith({ baseUrl: "https://selfhost.debugbundle.test" });
+    expect(getJourneyPatterns).toHaveBeenCalledWith({
+      bearerToken: "dbundle_mem_saved",
+      projectId: PROJECT_ID,
+      from: FROM,
+      to: TO,
+      granularity: undefined,
+      service: undefined,
+      environment: undefined,
+      last: undefined,
+      limit: undefined
+    });
+    expect(JSON.parse(result.output)).toEqual(journeyPatternsResponse);
+  });
+
   it("maps auth and API failures to stable exit codes", async () => {
     const authMissing = await getAnalyticsSummaryWithAuthCommand(
       { projectId: PROJECT_ID },
@@ -116,6 +175,7 @@ describe("cli analytics metrics commands", () => {
     const request = vi.fn()
       .mockResolvedValueOnce({ status: 200, body: summaryResponse })
       .mockResolvedValueOnce({ status: 200, body: { window: metricsWindow, routes: [] } })
+      .mockResolvedValueOnce({ status: 200, body: journeyPatternsResponse })
       .mockResolvedValueOnce({
         status: 200,
         body: { window: metricsWindow, device_types: [], browsers: [], os: [], languages: [] }
@@ -151,6 +211,7 @@ describe("cli analytics metrics commands", () => {
       limit: 5
     });
     await api.getRouteMetrics({ bearerToken: "dbundle_mem_x", projectId: PROJECT_ID });
+    await api.getJourneyPatterns({ bearerToken: "dbundle_mem_x", projectId: PROJECT_ID });
     await api.getDeviceBreakdown({ bearerToken: "dbundle_mem_x", projectId: PROJECT_ID });
     await api.getReferrerMetrics({ bearerToken: "dbundle_mem_x", projectId: PROJECT_ID });
     await api.getFunnelAnalysis({ bearerToken: "dbundle_mem_x", projectId: PROJECT_ID, funnelKey: "checkout" });
@@ -163,6 +224,11 @@ describe("cli analytics metrics commands", () => {
     expect(request).toHaveBeenCalledWith({
       method: "GET",
       path: `/v1/analytics/routes?project_id=${PROJECT_ID}`,
+      bearerToken: "dbundle_mem_x"
+    });
+    expect(request).toHaveBeenCalledWith({
+      method: "GET",
+      path: `/v1/analytics/journey-patterns?project_id=${PROJECT_ID}`,
       bearerToken: "dbundle_mem_x"
     });
     expect(request).toHaveBeenCalledWith({
