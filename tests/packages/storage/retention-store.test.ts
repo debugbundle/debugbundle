@@ -1,18 +1,58 @@
 import { describe, expect, it, vi } from "vitest";
 
 import {
+  buildAnalyticsRawEventObjectKey,
   buildBundleObjectKey,
   buildReproductionObjectKey,
   createPostgresRetentionStore,
-  createRetentionCleanupService
+  createRetentionCleanupService,
+  type RetentionStore
 } from "../../../packages/storage/src/index.js";
+
+function createMockRetentionStore(overrides: Partial<RetentionStore> = {}): RetentionStore {
+  return {
+    listExpiredSampledRawEvents: vi.fn().mockResolvedValue([]),
+    markRawEventsExpired: vi.fn().mockResolvedValue(undefined),
+    listExpiredAnalyticsRawEvents: vi.fn().mockResolvedValue([]),
+    deleteExpiredAnalyticsRawEvents: vi.fn().mockResolvedValue(undefined),
+    listExpiredAnalyticsJourneySamples: vi.fn().mockResolvedValue([]),
+    deleteExpiredAnalyticsJourneySamples: vi.fn().mockResolvedValue(undefined),
+    listExpiredIncidents: vi.fn().mockResolvedValue([]),
+    deleteExpiredIncidents: vi.fn().mockResolvedValue(undefined),
+    ...overrides
+  };
+}
 
 describe("retention cleanup service", () => {
   it("queries and updates retention records through the postgres store", async (): Promise<void> => {
     const query = vi
       .fn()
       .mockResolvedValueOnce({
-        rows: [{ project_id: "proj_123", event_id: "evt_123", occurred_at: "2026-04-01T00:00:00.000Z" }]
+        rows: [
+          { project_id: "proj_123", event_id: "evt_123", occurred_at: "2026-04-01T00:00:00.000Z" }
+        ]
+      })
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            project_id: "proj_123",
+            event_id: "550e8400-e29b-41d4-a716-446655440000",
+            occurred_at: "2026-04-01T00:00:00.000Z"
+          }
+        ]
+      })
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            project_id: "proj_123",
+            sample_id: "22222222-2222-4222-8222-222222222222",
+            s3_object_key:
+              "analytics-journeys/proj_123/22222222-2222-4222-8222-222222222222.json.gz",
+            expires_at: "2026-04-01T00:00:00.000Z"
+          }
+        ]
       })
       .mockResolvedValueOnce({ rows: [] })
       .mockResolvedValueOnce({
@@ -24,10 +64,56 @@ describe("retention cleanup service", () => {
 
     await expect(
       store.listExpiredSampledRawEvents({ now: "2026-04-04T12:00:00.000Z", limit: 25 })
-    ).resolves.toEqual([{ project_id: "proj_123", event_id: "evt_123", occurred_at: "2026-04-01T00:00:00.000Z" }]);
+    ).resolves.toEqual([
+      { project_id: "proj_123", event_id: "evt_123", occurred_at: "2026-04-01T00:00:00.000Z" }
+    ]);
 
     await store.markRawEventsExpired({
-      references: [{ project_id: "proj_123", event_id: "evt_123", occurred_at: "2026-04-01T00:00:00.000Z" }]
+      references: [
+        { project_id: "proj_123", event_id: "evt_123", occurred_at: "2026-04-01T00:00:00.000Z" }
+      ]
+    });
+
+    await expect(
+      store.listExpiredAnalyticsRawEvents({ now: "2026-04-04T12:00:00.000Z", limit: 25 })
+    ).resolves.toEqual([
+      {
+        project_id: "proj_123",
+        event_id: "550e8400-e29b-41d4-a716-446655440000",
+        occurred_at: "2026-04-01T00:00:00.000Z"
+      }
+    ]);
+
+    await store.deleteExpiredAnalyticsRawEvents({
+      references: [
+        {
+          project_id: "proj_123",
+          event_id: "550e8400-e29b-41d4-a716-446655440000",
+          occurred_at: "2026-04-01T00:00:00.000Z"
+        }
+      ]
+    });
+
+    await expect(
+      store.listExpiredAnalyticsJourneySamples({ now: "2026-04-04T12:00:00.000Z", limit: 25 })
+    ).resolves.toEqual([
+      {
+        project_id: "proj_123",
+        sample_id: "22222222-2222-4222-8222-222222222222",
+        s3_object_key: "analytics-journeys/proj_123/22222222-2222-4222-8222-222222222222.json.gz",
+        expires_at: "2026-04-01T00:00:00.000Z"
+      }
+    ]);
+
+    await store.deleteExpiredAnalyticsJourneySamples({
+      references: [
+        {
+          project_id: "proj_123",
+          sample_id: "22222222-2222-4222-8222-222222222222",
+          s3_object_key: "analytics-journeys/proj_123/22222222-2222-4222-8222-222222222222.json.gz",
+          expires_at: "2026-04-01T00:00:00.000Z"
+        }
+      ]
     });
 
     await expect(
@@ -43,21 +129,37 @@ describe("retention cleanup service", () => {
       expect.stringContaining("SELECT\n            i.project_id::text AS project_id"),
       ["2026-04-04T12:00:00.000Z", 14, 30, 7, 25]
     );
-    expect(query).toHaveBeenNthCalledWith(
-      2,
-      expect.stringContaining("UPDATE incident_events ie"),
-      ["evt_123"]
-    );
+    expect(query).toHaveBeenNthCalledWith(2, expect.stringContaining("UPDATE incident_events ie"), [
+      "evt_123"
+    ]);
     expect(query).toHaveBeenNthCalledWith(
       3,
-      expect.stringContaining("SELECT\n            i.project_id::text AS project_id"),
-      ["2026-04-04T12:00:00.000Z", 30, 90, 7, 25]
+      expect.stringContaining("FROM analytics_ingestion_ledger ail"),
+      ["2026-04-04T12:00:00.000Z", 25]
     );
     expect(query).toHaveBeenNthCalledWith(
       4,
-      expect.stringContaining("DELETE FROM incidents i"),
-      ["inc_123"]
+      expect.stringContaining("DELETE FROM analytics_ingestion_ledger ail"),
+      ["proj_123", "550e8400-e29b-41d4-a716-446655440000"]
     );
+    expect(query).toHaveBeenNthCalledWith(
+      5,
+      expect.stringContaining("FROM analytics_journey_samples"),
+      ["2026-04-04T12:00:00.000Z", 25]
+    );
+    expect(query).toHaveBeenNthCalledWith(
+      6,
+      expect.stringContaining("DELETE FROM analytics_journey_samples samples"),
+      ["22222222-2222-4222-8222-222222222222"]
+    );
+    expect(query).toHaveBeenNthCalledWith(
+      7,
+      expect.stringContaining("SELECT\n            i.project_id::text AS project_id"),
+      ["2026-04-04T12:00:00.000Z", 30, 90, 7, 25]
+    );
+    expect(query).toHaveBeenNthCalledWith(8, expect.stringContaining("DELETE FROM incidents i"), [
+      "inc_123"
+    ]);
   });
 
   it("skips postgres retention updates when the reference lists are empty", async (): Promise<void> => {
@@ -65,6 +167,8 @@ describe("retention cleanup service", () => {
     const store = createPostgresRetentionStore({ query });
 
     await store.markRawEventsExpired({ references: [] });
+    await store.deleteExpiredAnalyticsRawEvents({ references: [] });
+    await store.deleteExpiredAnalyticsJourneySamples({ references: [] });
     await store.deleteExpiredIncidents({ references: [] });
 
     expect(query).not.toHaveBeenCalled();
@@ -75,12 +179,10 @@ describe("retention cleanup service", () => {
     const listExpiredIncidents = vi.fn();
 
     const retentionCleanup = createRetentionCleanupService({
-      retentionStore: {
+      retentionStore: createMockRetentionStore({
         listExpiredSampledRawEvents,
-        markRawEventsExpired: vi.fn(),
-        listExpiredIncidents,
-        deleteExpiredIncidents: vi.fn()
-      },
+        listExpiredIncidents
+      }),
       objectStore: {}
     });
 
@@ -96,7 +198,7 @@ describe("retention cleanup service", () => {
     const markRawEventsExpired = vi.fn().mockResolvedValue(undefined);
 
     const retentionCleanup = createRetentionCleanupService({
-      retentionStore: {
+      retentionStore: createMockRetentionStore({
         listExpiredSampledRawEvents: vi.fn().mockResolvedValue([
           {
             project_id: "proj_123",
@@ -104,10 +206,8 @@ describe("retention cleanup service", () => {
             occurred_at: "2026-04-04T10:00:00.000Z"
           }
         ]),
-        markRawEventsExpired,
-        listExpiredIncidents: vi.fn().mockResolvedValue([]),
-        deleteExpiredIncidents: vi.fn().mockResolvedValue(undefined)
-      },
+        markRawEventsExpired
+      }),
       objectStore: {
         deleteObject: vi.fn().mockResolvedValue(undefined)
       },
@@ -130,17 +230,126 @@ describe("retention cleanup service", () => {
     });
   });
 
+  it("deletes analytics raw metadata after successful raw-object cleanup", async (): Promise<void> => {
+    const deleteExpiredAnalyticsRawEvents = vi.fn().mockResolvedValue(undefined);
+    const deleteObject = vi.fn().mockResolvedValue(undefined);
+    const reference = {
+      project_id: "proj_123",
+      event_id: "550e8400-e29b-41d4-a716-446655440000",
+      occurred_at: "2026-04-04T10:00:00.000Z"
+    };
+
+    const retentionCleanup = createRetentionCleanupService({
+      retentionStore: createMockRetentionStore({
+        listExpiredAnalyticsRawEvents: vi.fn().mockResolvedValue([reference]),
+        deleteExpiredAnalyticsRawEvents
+      }),
+      objectStore: {
+        deleteObject
+      },
+      batchSize: 10,
+      maxBatches: 1
+    });
+
+    await retentionCleanup.runCleanup({
+      scheduled_at: "2026-04-04T12:00:00.000Z"
+    });
+
+    expect(deleteObject).toHaveBeenCalledWith({
+      key: buildAnalyticsRawEventObjectKey({
+        projectId: reference.project_id,
+        occurredAt: new Date(reference.occurred_at),
+        eventId: reference.event_id
+      })
+    });
+    expect(deleteExpiredAnalyticsRawEvents).toHaveBeenCalledWith({
+      references: [reference]
+    });
+  });
+
+  it("deletes journey sample metadata after successful sample-object cleanup", async (): Promise<void> => {
+    const deleteExpiredAnalyticsJourneySamples = vi.fn().mockResolvedValue(undefined);
+    const deleteObject = vi.fn().mockResolvedValue(undefined);
+    const reference = {
+      project_id: "proj_123",
+      sample_id: "22222222-2222-4222-8222-222222222222",
+      s3_object_key: "analytics-journeys/proj_123/22222222-2222-4222-8222-222222222222.json.gz",
+      expires_at: "2026-04-04T10:00:00.000Z"
+    };
+
+    const retentionCleanup = createRetentionCleanupService({
+      retentionStore: createMockRetentionStore({
+        listExpiredAnalyticsJourneySamples: vi.fn().mockResolvedValue([reference]),
+        deleteExpiredAnalyticsJourneySamples
+      }),
+      objectStore: {
+        deleteObject
+      },
+      batchSize: 10,
+      maxBatches: 1
+    });
+
+    await retentionCleanup.runCleanup({
+      scheduled_at: "2026-04-04T12:00:00.000Z"
+    });
+
+    expect(deleteObject).toHaveBeenCalledWith({
+      key: reference.s3_object_key
+    });
+    expect(deleteExpiredAnalyticsJourneySamples).toHaveBeenCalledWith({
+      references: [reference]
+    });
+  });
+
+  it("does not delete analytics metadata when object cleanup fails", async (): Promise<void> => {
+    const deleteExpiredAnalyticsRawEvents = vi.fn().mockResolvedValue(undefined);
+    const deleteExpiredAnalyticsJourneySamples = vi.fn().mockResolvedValue(undefined);
+
+    const retentionCleanup = createRetentionCleanupService({
+      retentionStore: createMockRetentionStore({
+        listExpiredAnalyticsRawEvents: vi.fn().mockResolvedValue([
+          {
+            project_id: "proj_123",
+            event_id: "550e8400-e29b-41d4-a716-446655440000",
+            occurred_at: "2026-04-04T10:00:00.000Z"
+          }
+        ]),
+        deleteExpiredAnalyticsRawEvents,
+        listExpiredAnalyticsJourneySamples: vi.fn().mockResolvedValue([
+          {
+            project_id: "proj_123",
+            sample_id: "22222222-2222-4222-8222-222222222222",
+            s3_object_key:
+              "analytics-journeys/proj_123/22222222-2222-4222-8222-222222222222.json.gz",
+            expires_at: "2026-04-04T10:00:00.000Z"
+          }
+        ]),
+        deleteExpiredAnalyticsJourneySamples
+      }),
+      objectStore: {
+        deleteObject: vi.fn().mockRejectedValue(new Error("delete_failed"))
+      },
+      batchSize: 10,
+      maxBatches: 1
+    });
+
+    await retentionCleanup.runCleanup({
+      scheduled_at: "2026-04-04T12:00:00.000Z"
+    });
+
+    expect(deleteExpiredAnalyticsRawEvents).not.toHaveBeenCalled();
+    expect(deleteExpiredAnalyticsJourneySamples).not.toHaveBeenCalled();
+  });
+
   it("stops after an empty retention cleanup batch", async (): Promise<void> => {
     const listExpiredSampledRawEvents = vi.fn().mockResolvedValue([]);
     const listExpiredIncidents = vi.fn().mockResolvedValue([]);
 
     const retentionCleanup = createRetentionCleanupService({
-      retentionStore: {
+      retentionStore: createMockRetentionStore({
         listExpiredSampledRawEvents,
-        markRawEventsExpired: vi.fn().mockResolvedValue(undefined),
-        listExpiredIncidents,
-        deleteExpiredIncidents: vi.fn().mockResolvedValue(undefined)
-      },
+        listExpiredIncidents
+      }),
       objectStore: {
         deleteObject: vi.fn().mockResolvedValue(undefined)
       },
@@ -157,18 +366,19 @@ describe("retention cleanup service", () => {
   });
 
   it("does not delete expired incident metadata when artifact cleanup only partially succeeds", async (): Promise<void> => {
-    const deleteObject = vi.fn()
+    const deleteObject = vi
+      .fn()
       .mockResolvedValueOnce(undefined)
       .mockRejectedValueOnce(new Error("delete_failed"));
     const deleteExpiredIncidents = vi.fn().mockResolvedValue(undefined);
 
     const retentionCleanup = createRetentionCleanupService({
-      retentionStore: {
-        listExpiredSampledRawEvents: vi.fn().mockResolvedValue([]),
-        markRawEventsExpired: vi.fn().mockResolvedValue(undefined),
-        listExpiredIncidents: vi.fn().mockResolvedValue([{ project_id: "proj_123", incident_id: "inc_123" }]),
+      retentionStore: createMockRetentionStore({
+        listExpiredIncidents: vi
+          .fn()
+          .mockResolvedValue([{ project_id: "proj_123", incident_id: "inc_123" }]),
         deleteExpiredIncidents
-      },
+      }),
       objectStore: {
         deleteObject
       },
@@ -193,12 +403,12 @@ describe("retention cleanup service", () => {
     const deleteExpiredIncidents = vi.fn().mockResolvedValue(undefined);
 
     const retentionCleanup = createRetentionCleanupService({
-      retentionStore: {
-        listExpiredSampledRawEvents: vi.fn().mockResolvedValue([]),
-        markRawEventsExpired: vi.fn().mockResolvedValue(undefined),
-        listExpiredIncidents: vi.fn().mockResolvedValue([{ project_id: "proj_123", incident_id: "inc_123" }]),
+      retentionStore: createMockRetentionStore({
+        listExpiredIncidents: vi
+          .fn()
+          .mockResolvedValue([{ project_id: "proj_123", incident_id: "inc_123" }]),
         deleteExpiredIncidents
-      },
+      }),
       objectStore: {
         deleteObject: vi.fn().mockResolvedValue(undefined)
       },

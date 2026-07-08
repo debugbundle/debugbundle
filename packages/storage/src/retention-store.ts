@@ -1,10 +1,17 @@
 import { TIER_CAPABILITIES } from "../../shared-types/src/index.js";
 
-import { buildBundleObjectKey, buildRawEventObjectKey, buildReproductionObjectKey } from "./helpers.js";
+import {
+  buildAnalyticsRawEventObjectKey,
+  buildBundleObjectKey,
+  buildRawEventObjectKey,
+  buildReproductionObjectKey
+} from "./helpers.js";
 import type {
   CleanupRetentionJob,
   ObjectStoreClient,
   Queryable,
+  RetentionAnalyticsJourneySampleReference,
+  RetentionAnalyticsRawEventReference,
   RetentionExpiredIncidentReference,
   RetentionRawEventReference,
   RetentionStore
@@ -15,6 +22,13 @@ const DEFAULT_RETENTION_CLEANUP_MAX_BATCHES = 10;
 
 function buildUuidValuesPlaceholders(count: number): string {
   return Array.from({ length: count }, (_, index) => `($${index + 1}::uuid)`).join(", ");
+}
+
+function buildUuidPairValuesPlaceholders(count: number): string {
+  return Array.from(
+    { length: count },
+    (_, index) => `($${index * 2 + 1}::uuid, $${index * 2 + 2}::uuid)`
+  ).join(", ");
 }
 
 export function createPostgresRetentionStore(db: Queryable): RetentionStore {
@@ -78,6 +92,96 @@ export function createPostgresRetentionStore(db: Queryable): RetentionStore {
           WHERE ie.event_id = expired.event_id
         `,
         eventIds
+      );
+    },
+
+    async listExpiredAnalyticsRawEvents(input): Promise<RetentionAnalyticsRawEventReference[]> {
+      const result = await db.query<RetentionAnalyticsRawEventReference & Record<string, unknown>>(
+        `
+          SELECT
+            ail.project_id::text AS project_id,
+            ail.event_id::text AS event_id,
+            ail.occurred_at::text AS occurred_at
+          FROM analytics_ingestion_ledger ail
+          LEFT JOIN project_analytics_settings settings ON settings.project_id = ail.project_id
+          WHERE ail.occurred_at < (
+            $1::timestamptz - make_interval(days => COALESCE(settings.raw_retention_days, 1)::int)
+          )
+          ORDER BY ail.occurred_at ASC, ail.event_id ASC
+          LIMIT $2
+        `,
+        [input.now, input.limit]
+      );
+
+      return result.rows;
+    },
+
+    async deleteExpiredAnalyticsRawEvents(input): Promise<void> {
+      if (input.references.length === 0) {
+        return;
+      }
+
+      const params = input.references.flatMap((reference) => [
+        reference.project_id,
+        reference.event_id
+      ]);
+      const valuesClause = buildUuidPairValuesPlaceholders(input.references.length);
+
+      await db.query(
+        `
+          WITH expired(project_id, event_id) AS (
+            VALUES ${valuesClause}
+          )
+          DELETE FROM analytics_ingestion_ledger ail
+          USING expired
+          WHERE ail.project_id = expired.project_id
+            AND ail.event_id = expired.event_id
+        `,
+        params
+      );
+    },
+
+    async listExpiredAnalyticsJourneySamples(
+      input
+    ): Promise<RetentionAnalyticsJourneySampleReference[]> {
+      const result = await db.query<
+        RetentionAnalyticsJourneySampleReference & Record<string, unknown>
+      >(
+        `
+          SELECT
+            project_id::text AS project_id,
+            id::text AS sample_id,
+            s3_object_key,
+            expires_at::text AS expires_at
+          FROM analytics_journey_samples
+          WHERE expires_at < $1::timestamptz
+          ORDER BY expires_at ASC, id ASC
+          LIMIT $2
+        `,
+        [input.now, input.limit]
+      );
+
+      return result.rows;
+    },
+
+    async deleteExpiredAnalyticsJourneySamples(input): Promise<void> {
+      if (input.references.length === 0) {
+        return;
+      }
+
+      const sampleIds = input.references.map((reference) => reference.sample_id);
+      const valuesClause = buildUuidValuesPlaceholders(sampleIds.length);
+
+      await db.query(
+        `
+          WITH expired(sample_id) AS (
+            VALUES ${valuesClause}
+          )
+          DELETE FROM analytics_journey_samples samples
+          USING expired
+          WHERE samples.id = expired.sample_id
+        `,
+        sampleIds
       );
     },
 
@@ -158,12 +262,26 @@ export function createRetentionCleanupService(input: {
           now: job.scheduled_at,
           limit: batchSize
         });
+        const expiredAnalyticsRawEvents = await input.retentionStore.listExpiredAnalyticsRawEvents({
+          now: job.scheduled_at,
+          limit: batchSize
+        });
+        const expiredAnalyticsJourneySamples =
+          await input.retentionStore.listExpiredAnalyticsJourneySamples({
+            now: job.scheduled_at,
+            limit: batchSize
+          });
         const expiredIncidents = await input.retentionStore.listExpiredIncidents({
           now: job.scheduled_at,
           limit: batchSize
         });
 
-        if (expiredReferences.length === 0 && expiredIncidents.length === 0) {
+        if (
+          expiredReferences.length === 0 &&
+          expiredAnalyticsRawEvents.length === 0 &&
+          expiredAnalyticsJourneySamples.length === 0 &&
+          expiredIncidents.length === 0
+        ) {
           return;
         }
 
@@ -186,6 +304,46 @@ export function createRetentionCleanupService(input: {
         if (deletedReferences.length > 0) {
           await input.retentionStore.markRawEventsExpired({
             references: deletedReferences
+          });
+        }
+
+        const deletedAnalyticsRawEvents: RetentionAnalyticsRawEventReference[] = [];
+        for (const reference of expiredAnalyticsRawEvents) {
+          try {
+            await input.objectStore.deleteObject({
+              key: buildAnalyticsRawEventObjectKey({
+                projectId: reference.project_id,
+                occurredAt: new Date(reference.occurred_at),
+                eventId: reference.event_id
+              })
+            });
+            deletedAnalyticsRawEvents.push(reference);
+          } catch {
+            // Leave metadata untouched so the next cleanup run can retry safely.
+          }
+        }
+
+        if (deletedAnalyticsRawEvents.length > 0) {
+          await input.retentionStore.deleteExpiredAnalyticsRawEvents({
+            references: deletedAnalyticsRawEvents
+          });
+        }
+
+        const deletedAnalyticsJourneySamples: RetentionAnalyticsJourneySampleReference[] = [];
+        for (const reference of expiredAnalyticsJourneySamples) {
+          try {
+            await input.objectStore.deleteObject({
+              key: reference.s3_object_key
+            });
+            deletedAnalyticsJourneySamples.push(reference);
+          } catch {
+            // Leave metadata untouched so the next cleanup run can retry safely.
+          }
+        }
+
+        if (deletedAnalyticsJourneySamples.length > 0) {
+          await input.retentionStore.deleteExpiredAnalyticsJourneySamples({
+            references: deletedAnalyticsJourneySamples
           });
         }
 
@@ -212,14 +370,23 @@ export function createRetentionCleanupService(input: {
 
         if (
           deletedReferences.length === 0 &&
+          deletedAnalyticsRawEvents.length === 0 &&
+          deletedAnalyticsJourneySamples.length === 0 &&
           deletedIncidents.length === 0 &&
           expiredReferences.length < batchSize &&
+          expiredAnalyticsRawEvents.length < batchSize &&
+          expiredAnalyticsJourneySamples.length < batchSize &&
           expiredIncidents.length < batchSize
         ) {
           return;
         }
 
-        if (expiredReferences.length < batchSize && expiredIncidents.length < batchSize) {
+        if (
+          expiredReferences.length < batchSize &&
+          expiredAnalyticsRawEvents.length < batchSize &&
+          expiredAnalyticsJourneySamples.length < batchSize &&
+          expiredIncidents.length < batchSize
+        ) {
           return;
         }
       }
