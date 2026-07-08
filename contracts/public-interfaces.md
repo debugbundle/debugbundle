@@ -2432,7 +2432,7 @@ When cloud retrieval returns `retrieval_api_error: 200:invalid_response_shape`, 
 
 Current local CLI retrieval limitation: `debugbundle logs` still requires the authenticated cloud path in the current implementation; local log projection is not part of this slice.
 
-Analytics CLI commands are hosted/self-host API-backed commands. They require member-token auth, return the same JSON shapes as the analytics API, and must not read local raw analytics files directly in V1. Raw analytics objects and retained journey samples are removed by the shared retention cleanup path according to project analytics retention settings; aggregate rollups remain the normal query source. Human output should prioritize compact tables and summaries; `--json` returns the raw machine-readable API payload for agents.
+Analytics CLI commands are hosted/self-host API-backed commands. They require member-token auth, return the same JSON shapes as the analytics API, and must not read local raw analytics files directly in V1. Raw analytics objects, retained journey samples, and expired aggregate rollup rows are removed by the shared retention cleanup path according to project analytics retention settings; in-window aggregate rollups remain the normal query source. Human output should prioritize compact tables and summaries; `--json` returns the raw machine-readable API payload for agents.
 
 ### 2.5 Alert Commands
 ```

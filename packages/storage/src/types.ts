@@ -208,6 +208,11 @@ export interface RetentionAnalyticsJourneySampleReference {
   expires_at: string;
 }
 
+export interface RetentionAnalyticsRollupPruneResult {
+  deleted_rows: number;
+  reached_batch_limit: boolean;
+}
+
 export interface RetentionExpiredIncidentReference {
   project_id: string;
   incident_id: string;
@@ -1070,6 +1075,7 @@ export interface RetentionStore {
   deleteExpiredAnalyticsRawEvents(input: { references: RetentionAnalyticsRawEventReference[] }): Promise<void>;
   listExpiredAnalyticsJourneySamples(input: { now: string; limit: number }): Promise<RetentionAnalyticsJourneySampleReference[]>;
   deleteExpiredAnalyticsJourneySamples(input: { references: RetentionAnalyticsJourneySampleReference[] }): Promise<void>;
+  pruneExpiredAnalyticsRollups(input: { now: string; limit: number }): Promise<RetentionAnalyticsRollupPruneResult>;
   listExpiredIncidents(input: { now: string; limit: number }): Promise<RetentionExpiredIncidentReference[]>;
   deleteExpiredIncidents(input: { references: RetentionExpiredIncidentReference[] }): Promise<void>;
 }

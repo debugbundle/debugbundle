@@ -1409,6 +1409,8 @@ Delivery statuses: `pending` → `delivered` or `retrying` → `delivered` or `f
 
 Analytics storage is aggregate-first. Raw analytics events are short-lived object-storage inputs, not long-term Postgres event rows. Rollups are precomputed counters and summaries keyed by project, time bucket, granularity, route/action/funnel keys, and bounded dimensions; they are the query model for normal analytics reads and must not preserve per-visit raw payloads.
 
+Retention cleanup removes raw analytics objects according to `raw_retention_days`, retained journey samples according to `sample_retention_days`/`expires_at`, and aggregate rollup rows older than `aggregate_retention_months`. In-window rollups remain the normal query model for analytics metrics.
+
 Required table concepts for the AnalyticsBundle implementation:
 
 | Table | Purpose |

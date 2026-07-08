@@ -17,6 +17,9 @@ function createMockRetentionStore(overrides: Partial<RetentionStore> = {}): Rete
     deleteExpiredAnalyticsRawEvents: vi.fn().mockResolvedValue(undefined),
     listExpiredAnalyticsJourneySamples: vi.fn().mockResolvedValue([]),
     deleteExpiredAnalyticsJourneySamples: vi.fn().mockResolvedValue(undefined),
+    pruneExpiredAnalyticsRollups: vi
+      .fn()
+      .mockResolvedValue({ deleted_rows: 0, reached_batch_limit: false }),
     listExpiredIncidents: vi.fn().mockResolvedValue([]),
     deleteExpiredIncidents: vi.fn().mockResolvedValue(undefined),
     ...overrides
@@ -174,13 +177,70 @@ describe("retention cleanup service", () => {
     expect(query).not.toHaveBeenCalled();
   });
 
+  it("prunes expired analytics aggregate rollups using project aggregate retention settings", async (): Promise<void> => {
+    const query = vi
+      .fn()
+      .mockResolvedValueOnce({ rows: [{ deleted: 1 }, { deleted: 1 }] })
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [{ deleted: 1 }] })
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [{ deleted: 1 }, { deleted: 1 }] })
+      .mockResolvedValueOnce({ rows: [] });
+    const store = createPostgresRetentionStore({ query });
+
+    await expect(
+      store.pruneExpiredAnalyticsRollups({ now: "2026-07-08T12:00:00.000Z", limit: 2 })
+    ).resolves.toEqual({
+      deleted_rows: 5,
+      reached_batch_limit: true
+    });
+
+    expect(query).toHaveBeenCalledTimes(6);
+    expect(query).toHaveBeenNthCalledWith(
+      1,
+      expect.stringContaining("DELETE FROM analytics_rollup_uniques target"),
+      ["2026-07-08T12:00:00.000Z", 2]
+    );
+    expect(query).toHaveBeenNthCalledWith(
+      2,
+      expect.stringContaining("DELETE FROM analytics_session_rollups target"),
+      ["2026-07-08T12:00:00.000Z", 2]
+    );
+    expect(query).toHaveBeenNthCalledWith(
+      3,
+      expect.stringContaining("DELETE FROM analytics_route_rollups target"),
+      ["2026-07-08T12:00:00.000Z", 2]
+    );
+    expect(query).toHaveBeenNthCalledWith(
+      4,
+      expect.stringContaining("DELETE FROM analytics_action_rollups target"),
+      ["2026-07-08T12:00:00.000Z", 2]
+    );
+    expect(query).toHaveBeenNthCalledWith(
+      5,
+      expect.stringContaining("DELETE FROM analytics_funnel_rollups target"),
+      ["2026-07-08T12:00:00.000Z", 2]
+    );
+    expect(query).toHaveBeenNthCalledWith(
+      6,
+      expect.stringContaining("DELETE FROM analytics_transition_rollups target"),
+      ["2026-07-08T12:00:00.000Z", 2]
+    );
+    for (const call of query.mock.calls) {
+      expect(String(call[0])).toContain("settings.aggregate_retention_months");
+      expect(String(call[0])).toContain("candidate.bucket_start");
+    }
+  });
+
   it("returns early when the retention cleanup object store is unavailable", async (): Promise<void> => {
     const listExpiredSampledRawEvents = vi.fn();
+    const pruneExpiredAnalyticsRollups = vi.fn();
     const listExpiredIncidents = vi.fn();
 
     const retentionCleanup = createRetentionCleanupService({
       retentionStore: createMockRetentionStore({
         listExpiredSampledRawEvents,
+        pruneExpiredAnalyticsRollups,
         listExpiredIncidents
       }),
       objectStore: {}
@@ -191,6 +251,7 @@ describe("retention cleanup service", () => {
     });
 
     expect(listExpiredSampledRawEvents).not.toHaveBeenCalled();
+    expect(pruneExpiredAnalyticsRollups).not.toHaveBeenCalled();
     expect(listExpiredIncidents).not.toHaveBeenCalled();
   });
 
@@ -343,11 +404,15 @@ describe("retention cleanup service", () => {
 
   it("stops after an empty retention cleanup batch", async (): Promise<void> => {
     const listExpiredSampledRawEvents = vi.fn().mockResolvedValue([]);
+    const pruneExpiredAnalyticsRollups = vi
+      .fn()
+      .mockResolvedValue({ deleted_rows: 0, reached_batch_limit: false });
     const listExpiredIncidents = vi.fn().mockResolvedValue([]);
 
     const retentionCleanup = createRetentionCleanupService({
       retentionStore: createMockRetentionStore({
         listExpiredSampledRawEvents,
+        pruneExpiredAnalyticsRollups,
         listExpiredIncidents
       }),
       objectStore: {
@@ -362,7 +427,32 @@ describe("retention cleanup service", () => {
     });
 
     expect(listExpiredSampledRawEvents).toHaveBeenCalledTimes(1);
+    expect(pruneExpiredAnalyticsRollups).toHaveBeenCalledTimes(1);
     expect(listExpiredIncidents).toHaveBeenCalledTimes(1);
+  });
+
+  it("continues cleanup batches while analytics aggregate pruning reaches the batch limit", async (): Promise<void> => {
+    const pruneExpiredAnalyticsRollups = vi
+      .fn()
+      .mockResolvedValueOnce({ deleted_rows: 10, reached_batch_limit: true })
+      .mockResolvedValueOnce({ deleted_rows: 1, reached_batch_limit: false });
+
+    const retentionCleanup = createRetentionCleanupService({
+      retentionStore: createMockRetentionStore({
+        pruneExpiredAnalyticsRollups
+      }),
+      objectStore: {
+        deleteObject: vi.fn().mockResolvedValue(undefined)
+      },
+      batchSize: 10,
+      maxBatches: 3
+    });
+
+    await retentionCleanup.runCleanup({
+      scheduled_at: "2026-04-04T12:00:00.000Z"
+    });
+
+    expect(pruneExpiredAnalyticsRollups).toHaveBeenCalledTimes(2);
   });
 
   it("does not delete expired incident metadata when artifact cleanup only partially succeeds", async (): Promise<void> => {

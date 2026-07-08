@@ -12,6 +12,7 @@ import type {
   Queryable,
   RetentionAnalyticsJourneySampleReference,
   RetentionAnalyticsRawEventReference,
+  RetentionAnalyticsRollupPruneResult,
   RetentionExpiredIncidentReference,
   RetentionRawEventReference,
   RetentionStore
@@ -19,6 +20,15 @@ import type {
 
 const DEFAULT_RETENTION_CLEANUP_BATCH_SIZE = 100;
 const DEFAULT_RETENTION_CLEANUP_MAX_BATCHES = 10;
+
+const ANALYTICS_ROLLUP_TABLES = [
+  "analytics_rollup_uniques",
+  "analytics_session_rollups",
+  "analytics_route_rollups",
+  "analytics_action_rollups",
+  "analytics_funnel_rollups",
+  "analytics_transition_rollups"
+] as const;
 
 function buildUuidValuesPlaceholders(count: number): string {
   return Array.from({ length: count }, (_, index) => `($${index + 1}::uuid)`).join(", ");
@@ -29,6 +39,33 @@ function buildUuidPairValuesPlaceholders(count: number): string {
     { length: count },
     (_, index) => `($${index * 2 + 1}::uuid, $${index * 2 + 2}::uuid)`
   ).join(", ");
+}
+
+async function pruneExpiredAnalyticsRollupTable(input: {
+  db: Queryable;
+  tableName: (typeof ANALYTICS_ROLLUP_TABLES)[number];
+  now: string;
+  limit: number;
+}): Promise<number> {
+  const result = await input.db.query<{ deleted: number }>(
+    `
+      DELETE FROM ${input.tableName} target
+      WHERE target.ctid IN (
+        SELECT candidate.ctid
+        FROM ${input.tableName} candidate
+        LEFT JOIN project_analytics_settings settings ON settings.project_id = candidate.project_id
+        WHERE candidate.bucket_start < (
+          $1::timestamptz - make_interval(months => COALESCE(settings.aggregate_retention_months, 12)::int)
+        )
+        ORDER BY candidate.bucket_start ASC, candidate.project_id ASC
+        LIMIT $2
+      )
+      RETURNING 1 AS deleted
+    `,
+    [input.now, input.limit]
+  );
+
+  return result.rows.length;
 }
 
 export function createPostgresRetentionStore(db: Queryable): RetentionStore {
@@ -185,6 +222,27 @@ export function createPostgresRetentionStore(db: Queryable): RetentionStore {
       );
     },
 
+    async pruneExpiredAnalyticsRollups(input): Promise<RetentionAnalyticsRollupPruneResult> {
+      let deletedRows = 0;
+      let reachedBatchLimit = false;
+
+      for (const tableName of ANALYTICS_ROLLUP_TABLES) {
+        const deletedFromTable = await pruneExpiredAnalyticsRollupTable({
+          db,
+          tableName,
+          now: input.now,
+          limit: input.limit
+        });
+        deletedRows += deletedFromTable;
+        reachedBatchLimit = reachedBatchLimit || deletedFromTable >= input.limit;
+      }
+
+      return {
+        deleted_rows: deletedRows,
+        reached_batch_limit: reachedBatchLimit
+      };
+    },
+
     async listExpiredIncidents(input): Promise<RetentionExpiredIncidentReference[]> {
       const result = await db.query<RetentionExpiredIncidentReference & Record<string, unknown>>(
         `
@@ -271,6 +329,10 @@ export function createRetentionCleanupService(input: {
             now: job.scheduled_at,
             limit: batchSize
           });
+        const prunedAnalyticsRollups = await input.retentionStore.pruneExpiredAnalyticsRollups({
+          now: job.scheduled_at,
+          limit: batchSize
+        });
         const expiredIncidents = await input.retentionStore.listExpiredIncidents({
           now: job.scheduled_at,
           limit: batchSize
@@ -280,6 +342,7 @@ export function createRetentionCleanupService(input: {
           expiredReferences.length === 0 &&
           expiredAnalyticsRawEvents.length === 0 &&
           expiredAnalyticsJourneySamples.length === 0 &&
+          prunedAnalyticsRollups.deleted_rows === 0 &&
           expiredIncidents.length === 0
         ) {
           return;
@@ -372,10 +435,12 @@ export function createRetentionCleanupService(input: {
           deletedReferences.length === 0 &&
           deletedAnalyticsRawEvents.length === 0 &&
           deletedAnalyticsJourneySamples.length === 0 &&
+          prunedAnalyticsRollups.deleted_rows === 0 &&
           deletedIncidents.length === 0 &&
           expiredReferences.length < batchSize &&
           expiredAnalyticsRawEvents.length < batchSize &&
           expiredAnalyticsJourneySamples.length < batchSize &&
+          !prunedAnalyticsRollups.reached_batch_limit &&
           expiredIncidents.length < batchSize
         ) {
           return;
@@ -385,6 +450,7 @@ export function createRetentionCleanupService(input: {
           expiredReferences.length < batchSize &&
           expiredAnalyticsRawEvents.length < batchSize &&
           expiredAnalyticsJourneySamples.length < batchSize &&
+          !prunedAnalyticsRollups.reached_batch_limit &&
           expiredIncidents.length < batchSize
         ) {
           return;
