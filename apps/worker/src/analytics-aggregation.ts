@@ -10,6 +10,10 @@ import type {
   AnalyticsRollupStore
 } from "../../../packages/storage/src/index.js";
 import type { WorkerProcessResult } from "./processor.js";
+import {
+  maybeCaptureAnalyticsJourneySample,
+  type AnalyticsJourneySampleCaptureDependencies
+} from "./analytics-journey-samples.js";
 
 export interface AggregateAnalyticsWorkerQueue {
   dequeue(jobName: "aggregate-analytics-events"): Promise<AggregateAnalyticsEventsJob | null>;
@@ -19,6 +23,7 @@ export interface AggregateAnalyticsWorkerDependencies {
   queue: AggregateAnalyticsWorkerQueue;
   objectStore: ObjectStoreReader;
   analyticsRollupStore: AnalyticsRollupStore;
+  analyticsJourneySamples?: AnalyticsJourneySampleCaptureDependencies | undefined;
 }
 
 function analyticsEventMatchesJob(input: {
@@ -54,6 +59,11 @@ export async function processNextAggregateAnalyticsEventsJob(
   await dependencies.analyticsRollupStore.recordAnalyticsEvent({
     project_id: job.project_id,
     event: validated.data
+  });
+  await maybeCaptureAnalyticsJourneySample({
+    project_id: job.project_id,
+    event: validated.data,
+    dependencies: dependencies.analyticsJourneySamples
   });
 
   return { processed: true };

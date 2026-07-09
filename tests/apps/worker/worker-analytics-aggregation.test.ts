@@ -1,4 +1,4 @@
-import { gzipSync } from "node:zlib";
+import { gunzipSync, gzipSync } from "node:zlib";
 
 import { describe, expect, it, vi } from "vitest";
 
@@ -85,6 +85,136 @@ describe("worker processor - aggregate-analytics-events", () => {
       project_id: "11111111-1111-4111-8111-111111111111",
       event
     });
+  });
+
+  it("captures a bounded retained journey sample after a new rollup event is recorded", async (): Promise<void> => {
+    const event = createAnalyticsEvent({
+      payload: {
+        ...createAnalyticsEvent().payload,
+        kind: "route_change",
+        previous_route: {
+          path: "/",
+          normalized_path: "/",
+          title: "Home"
+        }
+      }
+    });
+    const putObject = vi.fn().mockResolvedValue(undefined);
+    const recordAnalyticsJourneySample = vi.fn().mockResolvedValue({
+      sample_id: "22222222-2222-5222-8222-222222222222"
+    });
+    const objectStore = {
+      getObject: vi
+        .fn()
+        .mockResolvedValueOnce(gzipSync(Buffer.from(JSON.stringify(event), "utf8")))
+        .mockRejectedValueOnce(new Error("s3_object_not_found")),
+      putObject
+    };
+
+    await expect(
+      processNextAggregateAnalyticsEventsJob({
+        queue: {
+          dequeue: vi.fn().mockResolvedValue({
+            project_id: "11111111-1111-4111-8111-111111111111",
+            event_id: event.event_id,
+            object_key: "analytics-events/11111111-1111-4111-8111-111111111111/event.json.gz"
+          })
+        },
+        objectStore,
+        analyticsRollupStore: {
+          recordAnalyticsEvent: vi.fn().mockResolvedValue({ recorded: true })
+        },
+        analyticsJourneySamples: {
+          analyticsSettingsStore: {
+            getAnalyticsSettingsByProjectId: vi.fn().mockResolvedValue({
+              enabled: true,
+              journey_sample_rate: 1,
+              sample_retention_days: 7
+            })
+          },
+          analyticsJourneySampleStore: { recordAnalyticsJourneySample },
+          objectStore
+        }
+      })
+    ).resolves.toEqual({ processed: true });
+
+    expect(putObject).toHaveBeenCalledWith(expect.objectContaining({
+      key: expect.stringMatching(
+        /^analytics-journeys\/11111111-1111-4111-8111-111111111111\/[0-9a-f-]+\.json\.gz$/
+      ),
+      contentType: "application/json",
+      contentEncoding: "gzip"
+    }));
+    const payload = putObject.mock.calls[0]?.[0] as { body: Buffer };
+    const artifact = JSON.parse(gunzipSync(payload.body).toString("utf8")) as Record<string, unknown>;
+    expect(artifact).toMatchObject({
+      schema_version: "analytics_journey_sample.v1",
+      project_id: "11111111-1111-4111-8111-111111111111",
+      service: "web",
+      environment: "production"
+    });
+    expect(artifact["events"]).toEqual([
+      expect.objectContaining({
+        event_id: event.event_id,
+        kind: "route_change",
+        route: event.payload.route,
+        previous_route: event.payload.previous_route
+      })
+    ]);
+    expect(recordAnalyticsJourneySample).toHaveBeenCalledWith(expect.objectContaining({
+      project_id: "11111111-1111-4111-8111-111111111111",
+      service: "web",
+      environment: "production",
+      analysis_tags: expect.arrayContaining([
+        "route_change",
+        "transition:/->/pricing"
+      ]),
+      object_key: expect.stringMatching(/^analytics-journeys\//),
+      expires_at: "2026-03-17T13:45:27.000Z"
+    }));
+  });
+
+  it("runs journey sample capture on duplicate rollup events so replay can repair sample metadata", async (): Promise<void> => {
+    const event = createAnalyticsEvent();
+    const putObject = vi.fn().mockResolvedValue(undefined);
+    const recordAnalyticsJourneySample = vi.fn().mockResolvedValue({});
+    const objectStore = {
+      getObject: vi
+        .fn()
+        .mockResolvedValueOnce(gzipSync(Buffer.from(JSON.stringify(event), "utf8")))
+        .mockRejectedValueOnce(new Error("s3_object_not_found")),
+      putObject
+    };
+
+    await expect(
+      processNextAggregateAnalyticsEventsJob({
+        queue: {
+          dequeue: vi.fn().mockResolvedValue({
+            project_id: "11111111-1111-4111-8111-111111111111",
+            event_id: event.event_id,
+            object_key: "analytics-events/11111111-1111-4111-8111-111111111111/event.json.gz"
+          })
+        },
+        objectStore,
+        analyticsRollupStore: {
+          recordAnalyticsEvent: vi.fn().mockResolvedValue({ recorded: false })
+        },
+        analyticsJourneySamples: {
+          analyticsSettingsStore: {
+            getAnalyticsSettingsByProjectId: vi.fn().mockResolvedValue({
+              enabled: true,
+              journey_sample_rate: 1,
+              sample_retention_days: 7
+            })
+          },
+          analyticsJourneySampleStore: { recordAnalyticsJourneySample },
+          objectStore
+        }
+      })
+    ).resolves.toEqual({ processed: true });
+
+    expect(putObject).toHaveBeenCalledTimes(1);
+    expect(recordAnalyticsJourneySample).toHaveBeenCalledTimes(1);
   });
 
   it("returns no_jobs when the analytics aggregation queue is empty", async (): Promise<void> => {

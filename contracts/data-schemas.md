@@ -1432,6 +1432,27 @@ Dimension storage must remain bounded. Built-in dimensions include route, device
 
 `project_analytics_settings.approved_custom_dimensions` must remain a JSON array whose length is less than or equal to `max_custom_dimensions`; API, storage, and database constraints all preserve that invariant for full and partial settings updates.
 
+Retained journey sample artifacts use object storage path `analytics-journeys/{project_id}/{sample_id}.json.gz` and are indexed by `analytics_journey_samples`. The worker writes at most one deterministic sample per project/session/UTC day when `journey_sample_rate` includes that session. The artifact schema is intentionally small and redacted:
+
+```json
+{
+  "schema_version": "analytics_journey_sample.v1",
+  "sample_id": "uuid",
+  "project_id": "uuid",
+  "service": "web",
+  "environment": "production",
+  "session_id_hash": "sha256:...",
+  "visitor_id_hash": "sha256:...",
+  "first_seen_at": "ISO8601",
+  "last_seen_at": "ISO8601",
+  "analysis_tags": ["route_change", "transition:/->/pricing"],
+  "dimensions_summary": {},
+  "events": []
+}
+```
+
+`events` is capped at 100 safe journey steps, preserving the first and last portions when a session-day exceeds the cap. Each step may include event id, timestamp, analytics kind, safe route/previous-route objects, semantic action/funnel/marker keys, trace/deploy ids, bounded built-in dimensions, and approved custom dimensions. It must not include raw session IDs, raw user IDs, raw visitor IDs, form values, raw text content, DOM snapshots, screenshots, request/response bodies, raw URLs with query strings/fragments, tokens, emails, names, payment data, or arbitrary application payloads.
+
 ---
 
 ## 6. Object Storage Path Conventions

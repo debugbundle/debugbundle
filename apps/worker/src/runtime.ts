@@ -14,8 +14,10 @@ import {
   createPostgresAlertDeliveryStore,
   createPostgresAccountAnalyticsStore,
   createPostgresAnalyticsBundleGenerationStore,
+  createPostgresAnalyticsJourneySampleStore,
   createPostgresAnalyticsMetricsStore,
   createPostgresAnalyticsRollupStore,
+  createPostgresAnalyticsSettingsStore,
   createPostgresAvailabilityCheckStore,
   createPostgresBillingStore,
   createIncidentLifecycleService,
@@ -245,6 +247,8 @@ export async function runWorkerFromEnv(
   const incidentStore = createPostgresMetadataStore(queryable);
   const billingStore = createPostgresBillingStore(queryable);
   const analyticsRollupStore = createPostgresAnalyticsRollupStore(queryable);
+  const analyticsSettingsStore = createPostgresAnalyticsSettingsStore(queryable);
+  const analyticsJourneySampleStore = createPostgresAnalyticsJourneySampleStore(queryable);
   const analyticsMetricsStore = createPostgresAnalyticsMetricsStore(queryable);
   const analyticsBundleGenerationStore = createPostgresAnalyticsBundleGenerationStore(queryable);
   const accountAnalyticsStore = createPostgresAccountAnalyticsStore({
@@ -493,7 +497,12 @@ export async function runWorkerFromEnv(
             processNextAggregateAnalyticsEventsJob({
               queue: queue as unknown as AggregateAnalyticsWorkerQueue,
               objectStore,
-              analyticsRollupStore
+              analyticsRollupStore,
+              analyticsJourneySamples: {
+                analyticsSettingsStore,
+                analyticsJourneySampleStore,
+                objectStore
+              }
             })
         );
 

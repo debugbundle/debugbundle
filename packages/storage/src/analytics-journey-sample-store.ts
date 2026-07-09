@@ -11,6 +11,7 @@ export interface AnalyticsJourneySamplesCursor {
 }
 
 export interface AnalyticsJourneySampleStore {
+  recordAnalyticsJourneySample(input: AnalyticsJourneySampleRecord): Promise<AnalyticsJourneySampleRecord>;
   listAnalyticsJourneySamplesForProject(input: {
     project_id: string;
     service?: string | undefined;
@@ -141,6 +142,96 @@ export function createPostgresAnalyticsJourneySampleStore(db: Queryable): Analyt
   }
 
   return {
+    async recordAnalyticsJourneySample(input) {
+      const result = await db.query<AnalyticsJourneySampleRow>(
+        `
+          INSERT INTO analytics_journey_samples (
+            id,
+            project_id,
+            service,
+            environment,
+            session_id_hash,
+            visitor_id_hash,
+            analysis_tags,
+            first_seen_at,
+            last_seen_at,
+            dimensions_summary,
+            s3_object_key,
+            expires_at,
+            created_at
+          )
+          VALUES (
+            $1::uuid,
+            $2::uuid,
+            $3,
+            $4,
+            $5,
+            $6,
+            $7::text[],
+            $8::timestamptz,
+            $9::timestamptz,
+            $10::jsonb,
+            $11,
+            $12::timestamptz,
+            $13::timestamptz
+          )
+          ON CONFLICT (id) DO UPDATE
+          SET
+            service = EXCLUDED.service,
+            environment = EXCLUDED.environment,
+            visitor_id_hash = COALESCE(analytics_journey_samples.visitor_id_hash, EXCLUDED.visitor_id_hash),
+            analysis_tags = (
+              SELECT ARRAY(
+                SELECT DISTINCT tag
+                FROM unnest(analytics_journey_samples.analysis_tags || EXCLUDED.analysis_tags) AS tag
+                ORDER BY tag
+              )
+            ),
+            first_seen_at = LEAST(analytics_journey_samples.first_seen_at, EXCLUDED.first_seen_at),
+            last_seen_at = GREATEST(analytics_journey_samples.last_seen_at, EXCLUDED.last_seen_at),
+            dimensions_summary = analytics_journey_samples.dimensions_summary || EXCLUDED.dimensions_summary,
+            s3_object_key = EXCLUDED.s3_object_key,
+            expires_at = GREATEST(analytics_journey_samples.expires_at, EXCLUDED.expires_at)
+          RETURNING
+            id::text AS sample_id,
+            project_id::text AS project_id,
+            service,
+            environment,
+            session_id_hash,
+            visitor_id_hash,
+            analysis_tags,
+            first_seen_at::text AS first_seen_at,
+            last_seen_at::text AS last_seen_at,
+            dimensions_summary,
+            s3_object_key AS object_key,
+            expires_at::text AS expires_at,
+            created_at::text AS created_at
+        `,
+        [
+          input.sample_id,
+          input.project_id,
+          input.service ?? "",
+          input.environment ?? "",
+          input.session_id_hash,
+          input.visitor_id_hash,
+          input.analysis_tags,
+          input.first_seen_at,
+          input.last_seen_at,
+          JSON.stringify(input.dimensions_summary),
+          input.object_key,
+          input.expires_at,
+          input.created_at
+        ]
+      );
+
+      const row = result.rows[0];
+      if (row === undefined) {
+        throw new Error("analytics_journey_sample_record_failed");
+      }
+
+      return toRecord(row);
+    },
+
     listAnalyticsJourneySamplesForProject,
 
     async getAnalyticsJourneySampleForProject(input) {

@@ -28,6 +28,57 @@ const sampleRow = {
 };
 
 describe("analytics journey sample store", () => {
+  it("records retained sample metadata with idempotent merge semantics", async (): Promise<void> => {
+    const queryMock = vi.fn(async (sqlText: string, params: unknown[]) => {
+      expect(sqlText).toContain("INSERT INTO analytics_journey_samples");
+      expect(sqlText).toContain("ON CONFLICT (id) DO UPDATE");
+      expect(sqlText).toContain("first_seen_at = LEAST");
+      expect(sqlText).toContain("last_seen_at = GREATEST");
+      expect(sqlText).toContain("analytics_journey_samples.analysis_tags || EXCLUDED.analysis_tags");
+      expect(params).toEqual([
+        SAMPLE_ID,
+        PROJECT_ID,
+        "web",
+        "production",
+        "sha256:session",
+        "sha256:visitor",
+        ["page_view", "route:/pricing"],
+        "2026-07-09T10:00:00.000Z",
+        "2026-07-09T10:00:00.000Z",
+        JSON.stringify({ device_type: "desktop" }),
+        sampleRow.object_key,
+        "2026-07-16T10:00:00.000Z",
+        "2026-07-09T10:00:00.000Z"
+      ]);
+      return { rows: [{ ...sampleRow, analysis_tags: ["page_view", "route:/pricing"] }] };
+    });
+    const store = createPostgresAnalyticsJourneySampleStore(createDb(queryMock));
+
+    await expect(
+      store.recordAnalyticsJourneySample({
+        sample_id: SAMPLE_ID,
+        project_id: PROJECT_ID,
+        service: "web",
+        environment: "production",
+        session_id_hash: "sha256:session",
+        visitor_id_hash: "sha256:visitor",
+        analysis_tags: ["page_view", "route:/pricing"],
+        first_seen_at: "2026-07-09T10:00:00.000Z",
+        last_seen_at: "2026-07-09T10:00:00.000Z",
+        dimensions_summary: { device_type: "desktop" },
+        has_artifact: true,
+        object_key: sampleRow.object_key,
+        expires_at: "2026-07-16T10:00:00.000Z",
+        created_at: "2026-07-09T10:00:00.000Z"
+      })
+    ).resolves.toMatchObject({
+      sample_id: SAMPLE_ID,
+      project_id: PROJECT_ID,
+      object_key: sampleRow.object_key,
+      analysis_tags: ["page_view", "route:/pricing"]
+    });
+  });
+
   it("lists retained project samples with filters and cursor pagination", async (): Promise<void> => {
     const queryMock = vi.fn(async (sqlText: string, params: unknown[]) => {
       expect(sqlText).toContain("FROM analytics_journey_samples");
