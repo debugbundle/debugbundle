@@ -7,7 +7,8 @@ import {
   getTierCapabilities,
   type AnalyticsSettings,
   type AnalyticsSettingsResponse,
-  type AnalyticsSettingsUpdate
+  type AnalyticsSettingsUpdate,
+  type TierCapabilities
 } from "../../../../packages/shared-types/src/index.js";
 import type { ApiDependencies } from "../api-types.js";
 import { requireRateLimitedProjectAccess } from "../api-helpers.js";
@@ -64,6 +65,21 @@ function requiresCurrentCustomDimensionSettings(update: AnalyticsSettingsUpdate)
   return (
     (update.max_custom_dimensions !== undefined) !==
     (update.approved_custom_dimensions !== undefined)
+  );
+}
+
+function exceedsTierAnalyticsSettingsLimits(input: {
+  capabilities: TierCapabilities;
+  update: AnalyticsSettingsUpdate;
+}): boolean {
+  const { capabilities, update } = input;
+  return (
+    (update.max_saved_funnels !== undefined &&
+      update.max_saved_funnels > capabilities.max_analytics_saved_funnels) ||
+    (update.max_custom_dimensions !== undefined &&
+      update.max_custom_dimensions > capabilities.max_analytics_custom_dimensions) ||
+    (update.approved_custom_dimensions !== undefined &&
+      update.approved_custom_dimensions.length > capabilities.max_analytics_custom_dimensions)
   );
 }
 
@@ -135,12 +151,17 @@ export function registerAnalyticsSettingsRoutes(app: FastifyInstance, dependenci
       return reply.status(400).send({ error: "invalid_payload" });
     }
 
-    const analyticsAvailable = getTierCapabilities(auth.access.organization_plan).analytics_bundle;
+    const capabilities = getTierCapabilities(auth.access.organization_plan);
+    const analyticsAvailable = capabilities.analytics_bundle;
     if (!analyticsAvailable) {
       return reply.status(403).send({ error: "upgrade_required" });
     }
 
     if (hasCustomDimensionUpdate(parsedBody.data) && auth.access.organization_plan !== "team") {
+      return reply.status(403).send({ error: "upgrade_required" });
+    }
+
+    if (exceedsTierAnalyticsSettingsLimits({ capabilities, update: parsedBody.data })) {
       return reply.status(403).send({ error: "upgrade_required" });
     }
 

@@ -308,6 +308,68 @@ describe("analytics settings routes", () => {
       expect(teamResponse.statusCode).toBe(200);
     });
 
+    it("enforces saved-funnel and custom-dimension tier limits", async () => {
+      const soloUpdate = vi.fn();
+      const soloApp = createDependencies({
+        analyticsSettingsManagement: {
+          getAnalyticsSettingsForProject: vi.fn(),
+          updateAnalyticsSettingsForProject: soloUpdate
+        }
+      });
+      const teamUpdate = vi.fn();
+      const teamApp = createDependencies({
+        projectAccess: createProjectAccess({ organization_plan: "team" }),
+        analyticsSettingsManagement: {
+          getAnalyticsSettingsForProject: vi.fn(),
+          updateAnalyticsSettingsForProject: teamUpdate
+        }
+      });
+
+      const soloResponse = await soloApp.inject({
+        method: "PATCH",
+        url: `/v1/projects/${PROJECT_ID}/analytics-settings`,
+        headers: { authorization: "Bearer dbundle_mem_test_token" },
+        payload: {
+          max_saved_funnels: 11
+        }
+      });
+      const teamCustomDimensionResponse = await teamApp.inject({
+        method: "PATCH",
+        url: `/v1/projects/${PROJECT_ID}/analytics-settings`,
+        headers: { authorization: "Bearer dbundle_mem_test_token" },
+        payload: {
+          max_custom_dimensions: 9
+        }
+      });
+      const teamApprovedDimensionsResponse = await teamApp.inject({
+        method: "PATCH",
+        url: `/v1/projects/${PROJECT_ID}/analytics-settings`,
+        headers: { authorization: "Bearer dbundle_mem_test_token" },
+        payload: {
+          approved_custom_dimensions: [
+            "dimension_1",
+            "dimension_2",
+            "dimension_3",
+            "dimension_4",
+            "dimension_5",
+            "dimension_6",
+            "dimension_7",
+            "dimension_8",
+            "dimension_9"
+          ]
+        }
+      });
+
+      expect(soloResponse.statusCode).toBe(403);
+      expect(soloResponse.json()).toEqual({ error: "upgrade_required" });
+      expect(teamCustomDimensionResponse.statusCode).toBe(403);
+      expect(teamCustomDimensionResponse.json()).toEqual({ error: "upgrade_required" });
+      expect(teamApprovedDimensionsResponse.statusCode).toBe(403);
+      expect(teamApprovedDimensionsResponse.json()).toEqual({ error: "upgrade_required" });
+      expect(soloUpdate).not.toHaveBeenCalled();
+      expect(teamUpdate).not.toHaveBeenCalled();
+    });
+
     it("rejects partial custom-dimension updates that would violate the existing limit", async () => {
       const updateAnalyticsSettingsForProject = vi.fn();
       const app = createDependencies({

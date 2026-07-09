@@ -37,6 +37,8 @@ export const TIER_CAPABILITIES = {
     monthly_analytics_sessions: 0,
     monthly_analytics_journey_samples: 0,
     monthly_analytics_bundle_generations: 0,
+    max_analytics_saved_funnels: 0,
+    max_analytics_custom_dimensions: 0,
     availability_checks_per_project: 1,
     availability_check_min_interval_seconds: 300,
   },
@@ -65,6 +67,8 @@ export const TIER_CAPABILITIES = {
     monthly_analytics_sessions: 10_000,
     monthly_analytics_journey_samples: 1_000,
     monthly_analytics_bundle_generations: 25,
+    max_analytics_saved_funnels: 10,
+    max_analytics_custom_dimensions: 0,
     availability_checks_per_project: 5,
     availability_check_min_interval_seconds: 60,
   },
@@ -93,6 +97,8 @@ export const TIER_CAPABILITIES = {
     monthly_analytics_sessions: 50_000,
     monthly_analytics_journey_samples: 10_000,
     monthly_analytics_bundle_generations: 100,
+    max_analytics_saved_funnels: 50,
+    max_analytics_custom_dimensions: 8,
     availability_checks_per_project: 25,
     availability_check_min_interval_seconds: 30,
   },
@@ -125,6 +131,8 @@ export interface TierCapabilities {
   readonly monthly_analytics_sessions: number;
   readonly monthly_analytics_journey_samples: number;
   readonly monthly_analytics_bundle_generations: number;
+  readonly max_analytics_saved_funnels: number;
+  readonly max_analytics_custom_dimensions: number;
   readonly availability_checks_per_project: number;
   readonly availability_check_min_interval_seconds: number;
 }
@@ -158,6 +166,8 @@ const SELFHOST_CAPABILITIES: TierCapabilities = {
   monthly_analytics_sessions: 1_000_000_000,
   monthly_analytics_journey_samples: 1_000_000_000,
   monthly_analytics_bundle_generations: 1_000_000_000,
+  max_analytics_saved_funnels: 100,
+  max_analytics_custom_dimensions: 20,
   availability_checks_per_project: 1_000_000,
   availability_check_min_interval_seconds: 30,
 };

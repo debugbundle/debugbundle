@@ -2124,6 +2124,7 @@ Response `200`: same shape as GET response with updated values.
 - `privacy_mode` must be one of `strict`, `standard`, or `custom`
 - `journey_sample_rate` must be between `0` and `1`
 - retention and limit fields must stay within the shared analytics settings schema bounds
+- saved-funnel and custom-dimension limits must not exceed the caller's effective tier capabilities
 - Team custom dimensions must use approved low-cardinality keys and are rejected on non-Team tiers
 - `approved_custom_dimensions.length` must be less than or equal to `max_custom_dimensions`, including partial updates after merging with current settings
 - plain members receive `403 { "error": "forbidden" }` on update attempts

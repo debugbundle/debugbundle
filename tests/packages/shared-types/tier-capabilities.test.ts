@@ -135,6 +135,8 @@ describe("tier capabilities", () => {
       expect(typeof caps.monthly_analytics_sessions).toBe("number");
       expect(typeof caps.monthly_analytics_journey_samples).toBe("number");
       expect(typeof caps.monthly_analytics_bundle_generations).toBe("number");
+      expect(typeof caps.max_analytics_saved_funnels).toBe("number");
+      expect(typeof caps.max_analytics_custom_dimensions).toBe("number");
     }
   });
 
@@ -150,6 +152,8 @@ describe("tier capabilities", () => {
     expect(TIER_CAPABILITIES.free.monthly_analytics_sessions).toBe(0);
     expect(TIER_CAPABILITIES.free.monthly_analytics_journey_samples).toBe(0);
     expect(TIER_CAPABILITIES.free.monthly_analytics_bundle_generations).toBe(0);
+    expect(TIER_CAPABILITIES.free.max_analytics_saved_funnels).toBe(0);
+    expect(TIER_CAPABILITIES.free.max_analytics_custom_dimensions).toBe(0);
     // Solo per-slot
     expect(TIER_CAPABILITIES.solo.monthly_bundle_requests).toBe(250);
     expect(TIER_CAPABILITIES.solo.monthly_raw_ingested_events).toBe(3_500);
@@ -161,6 +165,8 @@ describe("tier capabilities", () => {
     expect(TIER_CAPABILITIES.solo.monthly_analytics_sessions).toBe(10_000);
     expect(TIER_CAPABILITIES.solo.monthly_analytics_journey_samples).toBe(1_000);
     expect(TIER_CAPABILITIES.solo.monthly_analytics_bundle_generations).toBe(25);
+    expect(TIER_CAPABILITIES.solo.max_analytics_saved_funnels).toBe(10);
+    expect(TIER_CAPABILITIES.solo.max_analytics_custom_dimensions).toBe(0);
     // Team per-slot
     expect(TIER_CAPABILITIES.team.monthly_bundle_requests).toBe(1_000);
     expect(TIER_CAPABILITIES.team.monthly_raw_ingested_events).toBe(10_000);
@@ -172,6 +178,8 @@ describe("tier capabilities", () => {
     expect(TIER_CAPABILITIES.team.monthly_analytics_sessions).toBe(50_000);
     expect(TIER_CAPABILITIES.team.monthly_analytics_journey_samples).toBe(10_000);
     expect(TIER_CAPABILITIES.team.monthly_analytics_bundle_generations).toBe(100);
+    expect(TIER_CAPABILITIES.team.max_analytics_saved_funnels).toBe(50);
+    expect(TIER_CAPABILITIES.team.max_analytics_custom_dimensions).toBe(8);
   });
 
   it("should satisfy type constraint for TierCapabilities", (): void => {
@@ -233,6 +241,8 @@ describe("self-host mode", () => {
       expect(caps.monthly_analytics_sessions).toBeGreaterThanOrEqual(1_000_000_000);
       expect(caps.monthly_analytics_journey_samples).toBeGreaterThanOrEqual(1_000_000_000);
       expect(caps.monthly_analytics_bundle_generations).toBeGreaterThanOrEqual(1_000_000_000);
+      expect(caps.max_analytics_saved_funnels).toBe(100);
+      expect(caps.max_analytics_custom_dimensions).toBe(20);
     }
   });
 
