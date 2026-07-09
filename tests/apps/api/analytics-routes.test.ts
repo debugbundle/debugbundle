@@ -5,6 +5,8 @@ import type { ApiDependencies } from "../../../apps/api/src/api-types.js";
 import { createApiServer } from "../../../apps/api/src/server.js";
 import { buildAnalyticsBundle } from "../../../packages/analytics-bundle-engine/src/index.js";
 import type {
+  AnalyticsJourneySampleResponse,
+  AnalyticsJourneySamplesListResponse,
   AnalyticsOpportunitiesListResponse,
   AnalyticsOpportunityResponse,
   AnalyticsUsageSummaryResponse
@@ -12,6 +14,7 @@ import type {
 
 const PROJECT_ID = "00000000-0000-0000-0000-000000000001";
 const BUNDLE_GENERATION_ID = "00000000-0000-4000-8000-000000000222";
+const JOURNEY_SAMPLE_ID = "00000000-0000-4000-8000-000000000333";
 const FROM = "2026-03-01T00:00:00.000Z";
 const TO = "2026-03-08T00:00:00.000Z";
 const metricsWindow = {
@@ -183,6 +186,38 @@ function createAnalyticsBundlesDependency(
   };
 }
 
+function createJourneySample(): AnalyticsJourneySamplesListResponse["samples"][number] & { object_key: string } {
+  return {
+    sample_id: JOURNEY_SAMPLE_ID,
+    project_id: PROJECT_ID,
+    service: "web",
+    environment: "production",
+    session_id_hash: "sha256:session",
+    visitor_id_hash: "sha256:visitor",
+    analysis_tags: ["checkout", "loop"],
+    first_seen_at: FROM,
+    last_seen_at: TO,
+    dimensions_summary: { device_type: "mobile" },
+    has_artifact: true,
+    object_key: `analytics-journeys/${PROJECT_ID}/${JOURNEY_SAMPLE_ID}.json.gz`,
+    expires_at: "2026-03-15T00:00:00.000Z",
+    created_at: TO
+  };
+}
+
+function createAnalyticsJourneySamplesDependency(
+  overrides: Partial<NonNullable<ApiDependencies["analyticsJourneySamples"]>> = {}
+): NonNullable<ApiDependencies["analyticsJourneySamples"]> {
+  return {
+    listAnalyticsJourneySamplesForProject: vi.fn().mockResolvedValue({
+      samples: [createJourneySample()],
+      next_cursor: null
+    }),
+    getAnalyticsJourneySampleForProject: vi.fn().mockResolvedValue(createJourneySample()),
+    ...overrides
+  };
+}
+
 function createAnalyticsSettingsManagementDependency(
   overrides: Partial<NonNullable<ApiDependencies["analyticsSettingsManagement"]>> = {}
 ): NonNullable<ApiDependencies["analyticsSettingsManagement"]> {
@@ -212,6 +247,7 @@ function createAnalyticsSettingsManagementDependency(
 
 function createDependencies(overrides: {
   analyticsMetrics?: ApiDependencies["analyticsMetrics"];
+  analyticsJourneySamples?: ApiDependencies["analyticsJourneySamples"];
   analyticsOpportunities?: ApiDependencies["analyticsOpportunities"];
   analyticsBundles?: ApiDependencies["analyticsBundles"];
   analyticsSettingsManagement?: ApiDependencies["analyticsSettingsManagement"];
@@ -257,6 +293,7 @@ function createDependencies(overrides: {
       deleteProjectForOrganization: vi.fn()
     },
     analyticsMetrics: overrides.analyticsMetrics,
+    analyticsJourneySamples: overrides.analyticsJourneySamples,
     analyticsOpportunities: overrides.analyticsOpportunities,
     analyticsBundles: overrides.analyticsBundles,
     analyticsSettingsManagement: overrides.analyticsSettingsManagement,
@@ -564,6 +601,137 @@ describe("analytics metrics routes", () => {
     expect(invalidCursor.json()).toEqual({ error: "invalid_query" });
     expect(unavailable.statusCode).toBe(404);
     expect(unavailable.json()).toEqual({ error: "analytics_bundles_not_available" });
+  });
+
+  it("lists retained analytics journey sample metadata through project access", async () => {
+    const cursor = `${TO}|${JOURNEY_SAMPLE_ID}`;
+    const listAnalyticsJourneySamplesForProject = vi.fn().mockResolvedValue({
+      samples: [createJourneySample()],
+      next_cursor: null
+    });
+    const analyticsJourneySamples = createAnalyticsJourneySamplesDependency({ listAnalyticsJourneySamplesForProject });
+    const app = createDependencies({ analyticsJourneySamples });
+
+    const response = await app.inject({
+      method: "GET",
+      url: `/v1/analytics/journey-samples?project_id=${PROJECT_ID}&service=web&environment=production&tag=checkout&cursor=${encodeURIComponent(cursor)}&limit=5`,
+      headers: { authorization: "Bearer dbundle_mem_test_token" }
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toEqual({
+      samples: [{
+        sample_id: JOURNEY_SAMPLE_ID,
+        project_id: PROJECT_ID,
+        service: "web",
+        environment: "production",
+        session_id_hash: "sha256:session",
+        visitor_id_hash: "sha256:visitor",
+        analysis_tags: ["checkout", "loop"],
+        first_seen_at: FROM,
+        last_seen_at: TO,
+        dimensions_summary: { device_type: "mobile" },
+        has_artifact: true,
+        expires_at: "2026-03-15T00:00:00.000Z",
+        created_at: TO
+      }],
+      next_cursor: null
+    });
+    expect(listAnalyticsJourneySamplesForProject).toHaveBeenCalledWith({
+      organization_id: "org_123",
+      project_id: PROJECT_ID,
+      service: "web",
+      environment: "production",
+      tag: "checkout",
+      cursor: {
+        last_seen_at: TO,
+        sample_id: JOURNEY_SAMPLE_ID
+      },
+      limit: 5,
+      now: expect.any(String)
+    });
+  });
+
+  it("returns retained analytics journey sample artifacts through project access", async () => {
+    const journey: AnalyticsJourneySampleResponse["journey"] = {
+      schema_version: "analytics_journey_sample.v1",
+      timeline: [
+        { kind: "page_view", route: "/pricing" },
+        { kind: "route_change", route: "/checkout" }
+      ]
+    };
+    const sample = createJourneySample();
+    const objectStoreReader = {
+      getObject: vi.fn().mockResolvedValue(gzipSync(Buffer.from(JSON.stringify(journey), "utf8")))
+    };
+    const analyticsJourneySamples = createAnalyticsJourneySamplesDependency({
+      getAnalyticsJourneySampleForProject: vi.fn().mockResolvedValue(sample)
+    });
+    const app = createDependencies({ analyticsJourneySamples, objectStoreReader });
+
+    const response = await app.inject({
+      method: "GET",
+      url: `/v1/analytics/journey-samples/${JOURNEY_SAMPLE_ID}?project_id=${PROJECT_ID}`,
+      headers: { authorization: "Bearer dbundle_mem_test_token" }
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toEqual({
+      sample: {
+        sample_id: JOURNEY_SAMPLE_ID,
+        project_id: PROJECT_ID,
+        service: "web",
+        environment: "production",
+        session_id_hash: "sha256:session",
+        visitor_id_hash: "sha256:visitor",
+        analysis_tags: ["checkout", "loop"],
+        first_seen_at: FROM,
+        last_seen_at: TO,
+        dimensions_summary: { device_type: "mobile" },
+        has_artifact: true,
+        expires_at: "2026-03-15T00:00:00.000Z",
+        created_at: TO
+      },
+      journey
+    });
+    expect(analyticsJourneySamples.getAnalyticsJourneySampleForProject).toHaveBeenCalledWith({
+      organization_id: "org_123",
+      project_id: PROJECT_ID,
+      sample_id: JOURNEY_SAMPLE_ID,
+      now: expect.any(String)
+    });
+    expect(objectStoreReader.getObject).toHaveBeenCalledWith({ key: sample.object_key });
+  });
+
+  it("rejects invalid analytics journey sample reads and unavailable storage", async () => {
+    const invalidCursor = await createDependencies({
+      analyticsJourneySamples: createAnalyticsJourneySamplesDependency()
+    }).inject({
+      method: "GET",
+      url: `/v1/analytics/journey-samples?project_id=${PROJECT_ID}&cursor=not-a-cursor`,
+      headers: { authorization: "Bearer dbundle_mem_test_token" }
+    });
+    const unavailable = await createDependencies().inject({
+      method: "GET",
+      url: `/v1/analytics/journey-samples?project_id=${PROJECT_ID}`,
+      headers: { authorization: "Bearer dbundle_mem_test_token" }
+    });
+    const notFound = await createDependencies({
+      analyticsJourneySamples: createAnalyticsJourneySamplesDependency({
+        getAnalyticsJourneySampleForProject: vi.fn().mockResolvedValue(null)
+      })
+    }).inject({
+      method: "GET",
+      url: `/v1/analytics/journey-samples/${JOURNEY_SAMPLE_ID}?project_id=${PROJECT_ID}`,
+      headers: { authorization: "Bearer dbundle_mem_test_token" }
+    });
+
+    expect(invalidCursor.statusCode).toBe(400);
+    expect(invalidCursor.json()).toEqual({ error: "invalid_query" });
+    expect(unavailable.statusCode).toBe(404);
+    expect(unavailable.json()).toEqual({ error: "analytics_journey_samples_not_available" });
+    expect(notFound.statusCode).toBe(404);
+    expect(notFound.json()).toEqual({ error: "analytics_journey_sample_not_found" });
   });
 
   it("requests AnalyticsBundle generation through project access", async () => {

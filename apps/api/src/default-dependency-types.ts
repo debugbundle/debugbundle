@@ -67,6 +67,7 @@ export interface DefaultApiDependencies
     | "alertManagement"
     | "analyticsSettingsManagement"
     | "analyticsBundles"
+    | "analyticsJourneySamples"
     | "analyticsMetrics"
     | "analyticsUsage"
     | "availabilityCheckManagement"
@@ -161,6 +162,7 @@ export interface DefaultApiDependencies
   captureRuleManagement: NonNullable<ApiDependencies["captureRuleManagement"]>;
   analyticsSettingsManagement: NonNullable<ApiDependencies["analyticsSettingsManagement"]>;
   analyticsBundles: NonNullable<ApiDependencies["analyticsBundles"]>;
+  analyticsJourneySamples: NonNullable<ApiDependencies["analyticsJourneySamples"]>;
   analyticsMetrics: NonNullable<ApiDependencies["analyticsMetrics"]>;
   analyticsUsage: NonNullable<ApiDependencies["analyticsUsage"]>;
   improvementSettingsManagement: NonNullable<ApiDependencies["improvementSettingsManagement"]>;

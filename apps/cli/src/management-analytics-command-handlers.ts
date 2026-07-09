@@ -13,6 +13,10 @@ import {
   listAnalyticsBundlesWithAuthCommand as defaultListAnalyticsBundlesCommand
 } from "./analytics-bundle-commands.js";
 import {
+  getAnalyticsJourneySampleWithAuthCommand as defaultGetAnalyticsJourneySampleCommand,
+  listAnalyticsJourneySamplesWithAuthCommand as defaultListAnalyticsJourneySamplesCommand
+} from "./analytics-journey-sample-commands.js";
+import {
   getAnalyticsDevicesWithAuthCommand as defaultGetAnalyticsDevicesCommand,
   getAnalyticsFunnelWithAuthCommand as defaultGetAnalyticsFunnelCommand,
   getAnalyticsJourneysWithAuthCommand as defaultGetAnalyticsJourneysCommand,
@@ -435,6 +439,58 @@ export async function handleAnalyticsCommand(
       appendCommonAuthOptions(parsedArgv, {
         projectId,
         bundleGenerationId
+      })
+    );
+  }
+
+  if (resource === "journey-samples") {
+    const action = requirePositional(parsedArgv, 2, "journey-samples action");
+    if (action === "list") {
+      expectNoUnknownOptions(parsedArgv, [
+        "project",
+        "project-id",
+        "service",
+        "environment",
+        "tag",
+        "cursor",
+        "limit",
+        "auth-file",
+        "json"
+      ]);
+      ensureNoExtraPositionals(parsedArgv, 3);
+      const projectId = readProjectOption(parsedArgv);
+      if (projectId === undefined) {
+        throw new CliInputError("Missing required option --project.");
+      }
+
+      return await (dependencies.listAnalyticsJourneySamplesCommand ?? defaultListAnalyticsJourneySamplesCommand)(
+        appendCommonAuthOptions(parsedArgv, {
+          projectId,
+          service: readStringOption(parsedArgv, "service"),
+          environment: readStringOption(parsedArgv, "environment"),
+          tag: readStringOption(parsedArgv, "tag"),
+          cursor: readStringOption(parsedArgv, "cursor"),
+          limit: readIntegerOption(parsedArgv, "limit")
+        })
+      );
+    }
+
+    if (action !== "get") {
+      throw new CliInputError("Unknown analytics journey-samples command.");
+    }
+
+    expectNoUnknownOptions(parsedArgv, ["project", "project-id", "auth-file", "json"]);
+    ensureNoExtraPositionals(parsedArgv, 4);
+    const sampleId = requirePositional(parsedArgv, 3, "journey sample id");
+    const projectId = readProjectOption(parsedArgv);
+    if (projectId === undefined) {
+      throw new CliInputError("Missing required option --project.");
+    }
+
+    return await (dependencies.getAnalyticsJourneySampleCommand ?? defaultGetAnalyticsJourneySampleCommand)(
+      appendCommonAuthOptions(parsedArgv, {
+        projectId,
+        sampleId
       })
     );
   }

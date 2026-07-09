@@ -17,6 +17,7 @@ const {
   createPostgresBillingStoreMock,
   createPostgresBillingSyncStoreMock,
   createPostgresAnalyticsBundleGenerationStoreMock,
+  createPostgresAnalyticsJourneySampleStoreMock,
   createPostgresAnalyticsMetricsStoreMock,
   createPostgresAnalyticsOpportunityStoreMock,
   createPostgresAnalyticsSettingsStoreMock,
@@ -65,6 +66,7 @@ const {
   createPostgresBillingStoreMock: vi.fn(),
   createPostgresBillingSyncStoreMock: vi.fn(),
   createPostgresAnalyticsBundleGenerationStoreMock: vi.fn(),
+  createPostgresAnalyticsJourneySampleStoreMock: vi.fn(),
   createPostgresAnalyticsMetricsStoreMock: vi.fn(),
   createPostgresAnalyticsOpportunityStoreMock: vi.fn(),
   createPostgresAnalyticsSettingsStoreMock: vi.fn(),
@@ -143,6 +145,7 @@ vi.mock("../../../packages/storage/src/index.js", () => ({
   createPostgresAuthStore: createPostgresAuthStoreMock,
   createPostgresBillingStore: createPostgresBillingStoreMock,
   createPostgresAnalyticsBundleGenerationStore: createPostgresAnalyticsBundleGenerationStoreMock,
+  createPostgresAnalyticsJourneySampleStore: createPostgresAnalyticsJourneySampleStoreMock,
   createPostgresAnalyticsMetricsStore: createPostgresAnalyticsMetricsStoreMock,
   createPostgresAnalyticsOpportunityStore: createPostgresAnalyticsOpportunityStoreMock,
   createPostgresAnalyticsSettingsStore: createPostgresAnalyticsSettingsStoreMock,
@@ -239,6 +242,7 @@ describe("api default dependencies", () => {
     createPostgresBillingStoreMock.mockReset();
     createPostgresBillingSyncStoreMock.mockReset();
     createPostgresAnalyticsBundleGenerationStoreMock.mockReset();
+    createPostgresAnalyticsJourneySampleStoreMock.mockReset();
     createPostgresAnalyticsMetricsStoreMock.mockReset();
     createPostgresAnalyticsOpportunityStoreMock.mockReset();
     createPostgresAnalyticsSettingsStoreMock.mockReset();
@@ -325,6 +329,10 @@ describe("api default dependencies", () => {
       listAnalyticsBundleGenerationsForProject: vi.fn(),
       reserveAnalyticsBundleGeneration: vi.fn(),
       getAnalyticsBundleGenerationForProject: vi.fn()
+    });
+    createPostgresAnalyticsJourneySampleStoreMock.mockReturnValue({
+      listAnalyticsJourneySamplesForProject: vi.fn(),
+      getAnalyticsJourneySampleForProject: vi.fn()
     });
     createPostgresAnalyticsMetricsStoreMock.mockReturnValue({
       getUsageSummary: vi.fn(),
@@ -807,6 +815,8 @@ describe("api default dependencies", () => {
     expect(typeof deps.analyticsMetrics.getDeviceBreakdownForProject).toBe("function");
     expect(typeof deps.analyticsMetrics.getReferrerMetricsForProject).toBe("function");
     expect(typeof deps.analyticsMetrics.getFunnelAnalysisForProject).toBe("function");
+    expect(typeof deps.analyticsJourneySamples.listAnalyticsJourneySamplesForProject).toBe("function");
+    expect(typeof deps.analyticsJourneySamples.getAnalyticsJourneySampleForProject).toBe("function");
     expect(typeof deps.analyticsBundles.requestAnalyticsBundleGenerationForProject).toBe("function");
     expect(typeof deps.analyticsBundles.listAnalyticsBundleGenerationsForProject).toBe("function");
     expect(typeof deps.analyticsBundles.getAnalyticsBundleGenerationForProject).toBe("function");

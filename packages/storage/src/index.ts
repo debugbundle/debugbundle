@@ -84,6 +84,15 @@ export type {
 } from "./analytics-usage-store.js";
 export { createPostgresAnalyticsUsageStore } from "./analytics-usage-store.js";
 export type {
+  AnalyticsJourneySampleRecord,
+  AnalyticsJourneySamplesCursor,
+  AnalyticsJourneySampleStore
+} from "./analytics-journey-sample-store.js";
+export {
+  buildAnalyticsJourneySamplesCursor,
+  createPostgresAnalyticsJourneySampleStore
+} from "./analytics-journey-sample-store.js";
+export type {
   BuildAnalyticsBundleJob,
   BuildAnalyticsBundleTrigger
 } from "./analytics-bundle-jobs.js";

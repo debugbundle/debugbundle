@@ -32,6 +32,30 @@ export const ANALYTICS_METRICS_MCP_TOOL_CATALOG = [
     inputSchema: analyticsMetricsInputSchema()
   },
   {
+    name: "list_analytics_journey_samples",
+    group: "analytics_metrics",
+    description: "List retained redacted AnalyticsBundle journey sample metadata for a project.",
+    inputSchema: z.object({
+      bearerToken: z.string(),
+      projectId: z.string(),
+      service: z.string().optional(),
+      environment: z.string().optional(),
+      tag: z.string().optional(),
+      cursor: z.string().optional(),
+      limit: z.number().optional()
+    })
+  },
+  {
+    name: "get_analytics_journey_sample",
+    group: "analytics_metrics",
+    description: "Get one retained redacted AnalyticsBundle journey sample artifact for a project.",
+    inputSchema: z.object({
+      bearerToken: z.string(),
+      projectId: z.string(),
+      sampleId: z.string()
+    })
+  },
+  {
     name: "get_device_breakdown",
     group: "analytics_metrics",
     description: "Get aggregate AnalyticsBundle device, browser, OS, and language breakdowns.",

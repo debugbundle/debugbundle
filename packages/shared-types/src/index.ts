@@ -818,6 +818,7 @@ export {
 } from "./improvement-settings.js";
 
 export * from "./analytics.js";
+export * from "./analytics-journey-samples.js";
 
 export {
   PROJECT_COLOR_TAG_VALUES,

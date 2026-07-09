@@ -27,6 +27,7 @@ import {
   createPostgresCapturePolicyStore,
   createPostgresCaptureRuleStore,
   createPostgresAnalyticsBundleGenerationStore,
+  createPostgresAnalyticsJourneySampleStore,
   createPostgresAnalyticsMetricsStore,
   createPostgresAnalyticsOpportunityStore,
   createPostgresAnalyticsSettingsStore,
@@ -118,6 +119,7 @@ export function createApiDependencies(input: CreateApiDependenciesInput): Defaul
   const capturePolicyStore = createPostgresCapturePolicyStore(input.db);
   const captureRuleStore = createPostgresCaptureRuleStore(input.db);
   const analyticsBundleGenerationStore = createPostgresAnalyticsBundleGenerationStore(input.db);
+  const analyticsJourneySampleStore = createPostgresAnalyticsJourneySampleStore(input.db);
   const analyticsMetricsStore = createPostgresAnalyticsMetricsStore(input.db);
   const analyticsOpportunityStore = createPostgresAnalyticsOpportunityStore(input.db);
   const analyticsSettingsStore = createPostgresAnalyticsSettingsStore(input.db);
@@ -674,6 +676,16 @@ export function createApiDependencies(input: CreateApiDependenciesInput): Defaul
       getFunnelAnalysisForProject: (input) => {
         void input.organization_id;
         return analyticsMetricsStore.getFunnelAnalysis(input);
+      }
+    },
+    analyticsJourneySamples: {
+      listAnalyticsJourneySamplesForProject: (request) => {
+        void request.organization_id;
+        return analyticsJourneySampleStore.listAnalyticsJourneySamplesForProject(request);
+      },
+      getAnalyticsJourneySampleForProject: (request) => {
+        void request.organization_id;
+        return analyticsJourneySampleStore.getAnalyticsJourneySampleForProject(request);
       }
     },
     analyticsBundles: {

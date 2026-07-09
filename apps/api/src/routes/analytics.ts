@@ -26,6 +26,7 @@ import {
   toRetryAfterSeconds
 } from "../analytics-quota.js";
 import { isObjectNotFoundError, requireRateLimitedProjectAccess } from "../api-helpers.js";
+import { registerAnalyticsJourneySampleRoutes } from "./analytics-journey-samples.js";
 
 const DEFAULT_LAST_MS = 7 * 24 * 60 * 60 * 1000;
 const MAX_LAST_MS = 370 * 24 * 60 * 60 * 1000;
@@ -110,6 +111,8 @@ type AnalyticsBundleGeneration = NonNullable<
 >;
 
 export function registerAnalyticsRoutes(app: FastifyInstance, dependencies: ApiDependencies): void {
+  registerAnalyticsJourneySampleRoutes(app, dependencies);
+
   app.get("/v1/analytics/opportunities", async (request, reply) => {
     const parsedQuery = AnalyticsOpportunitiesQuerySchema.safeParse(request.query);
     if (!parsedQuery.success) {

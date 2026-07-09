@@ -11,6 +11,7 @@ import { analyzeCommand } from "../../cli/src/analyze-command.js";
 import { createCliHttpClient } from "../../cli/src/auth-context.js";
 import { readCliAuthState } from "../../cli/src/auth-state.js";
 import { createAnalyticsBundleApi } from "../../cli/src/analytics-bundle-commands.js";
+import { createAnalyticsJourneySampleApi } from "../../cli/src/analytics-journey-sample-commands.js";
 import { createAnalyticsMetricsApi } from "../../cli/src/analytics-metrics-commands.js";
 import { createAnalyticsSettingsApi } from "../../cli/src/analytics-settings-commands.js";
 import { createCaptureRuleApi } from "../../cli/src/capture-rule-commands.js";
@@ -115,7 +116,8 @@ export async function createDefaultMcpTools(input: { apiBaseUrl?: string } = {})
       ...createProjectMcpTools(createProjectManagementApi(httpClient)),
       ...createAnalyticsMetricsMcpTools({
         ...createAnalyticsMetricsApi(httpClient),
-        ...createAnalyticsBundleApi(httpClient)
+        ...createAnalyticsBundleApi(httpClient),
+        ...createAnalyticsJourneySampleApi(httpClient)
       }),
       ...createAnalyticsSettingsMcpTools(createAnalyticsSettingsApi(httpClient)),
       ...createCaptureRuleMcpTools(createCaptureRuleApi(httpClient)),

@@ -59,6 +59,8 @@ describe("cli main analytics routing", () => {
     const listAnalyticsBundlesCommand = vi.fn().mockResolvedValue({ exitCode: 0, output: "bundle-list" });
     const createAnalyticsBundleCommand = vi.fn().mockResolvedValue({ exitCode: 0, output: "bundle-create" });
     const getAnalyticsBundleCommand = vi.fn().mockResolvedValue({ exitCode: 0, output: "bundle" });
+    const listAnalyticsJourneySamplesCommand = vi.fn().mockResolvedValue({ exitCode: 0, output: "sample-list" });
+    const getAnalyticsJourneySampleCommand = vi.fn().mockResolvedValue({ exitCode: 0, output: "sample" });
 
     await expect(runCli(["analytics", "routes", "--project", "proj_123"], { getAnalyticsRoutesCommand })).resolves.toEqual({
       exitCode: 0,
@@ -155,6 +157,41 @@ describe("cli main analytics routing", () => {
       exitCode: 0,
       output: "bundle"
     });
+    await expect(
+      runCli(
+        [
+          "analytics",
+          "journey-samples",
+          "list",
+          "--project",
+          "proj_123",
+          "--service",
+          "web",
+          "--environment",
+          "production",
+          "--tag",
+          "checkout",
+          "--cursor",
+          "cursor-1",
+          "--limit",
+          "5",
+          "--json"
+        ],
+        { listAnalyticsJourneySamplesCommand }
+      )
+    ).resolves.toEqual({
+      exitCode: 0,
+      output: "sample-list"
+    });
+    await expect(
+      runCli(
+        ["analytics", "journey-samples", "get", "sample_123", "--project", "proj_123", "--json"],
+        { getAnalyticsJourneySampleCommand }
+      )
+    ).resolves.toEqual({
+      exitCode: 0,
+      output: "sample"
+    });
 
     expect(getAnalyticsRoutesCommand).toHaveBeenCalledWith({ projectId: "proj_123" });
     expect(getAnalyticsJourneysCommand).toHaveBeenCalledWith({ projectId: "proj_123" });
@@ -196,6 +233,20 @@ describe("cli main analytics routing", () => {
     expect(getAnalyticsBundleCommand).toHaveBeenCalledWith({
       projectId: "proj_123",
       bundleGenerationId: "gen_123",
+      json: true
+    });
+    expect(listAnalyticsJourneySamplesCommand).toHaveBeenCalledWith({
+      projectId: "proj_123",
+      service: "web",
+      environment: "production",
+      tag: "checkout",
+      cursor: "cursor-1",
+      limit: 5,
+      json: true
+    });
+    expect(getAnalyticsJourneySampleCommand).toHaveBeenCalledWith({
+      projectId: "proj_123",
+      sampleId: "sample_123",
       json: true
     });
   });

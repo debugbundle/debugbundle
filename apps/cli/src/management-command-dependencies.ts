@@ -18,6 +18,10 @@ import type {
   listAnalyticsBundlesWithAuthCommand as defaultListAnalyticsBundlesCommand
 } from "./analytics-bundle-commands.js";
 import type {
+  getAnalyticsJourneySampleWithAuthCommand as defaultGetAnalyticsJourneySampleCommand,
+  listAnalyticsJourneySamplesWithAuthCommand as defaultListAnalyticsJourneySamplesCommand
+} from "./analytics-journey-sample-commands.js";
+import type {
   getAnalyticsDevicesWithAuthCommand as defaultGetAnalyticsDevicesCommand,
   getAnalyticsFunnelWithAuthCommand as defaultGetAnalyticsFunnelCommand,
   getAnalyticsJourneysWithAuthCommand as defaultGetAnalyticsJourneysCommand,
@@ -173,6 +177,8 @@ export type ManagementCommandDependencies = {
   createAnalyticsBundleCommand?: typeof defaultCreateAnalyticsBundleCommand;
   getAnalyticsBundleCommand?: typeof defaultGetAnalyticsBundleCommand;
   listAnalyticsBundlesCommand?: typeof defaultListAnalyticsBundlesCommand;
+  listAnalyticsJourneySamplesCommand?: typeof defaultListAnalyticsJourneySamplesCommand;
+  getAnalyticsJourneySampleCommand?: typeof defaultGetAnalyticsJourneySampleCommand;
   listAnalyticsOpportunitiesCommand?: typeof defaultListAnalyticsOpportunitiesCommand;
   getAnalyticsOpportunityCommand?: typeof defaultGetAnalyticsOpportunityCommand;
   listCaptureRulesCommand?: typeof defaultListCaptureRulesCommand;
