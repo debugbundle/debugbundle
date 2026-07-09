@@ -1523,7 +1523,7 @@ If CLI says something is healthy and MCP says something different, that is a pro
 - **And** metric reads use aggregate rollup rows rather than long-term raw analytics event scans
 
 ### AC-ANL-09: Direct Metrics Interface Parity
-- **Given** an authorized member requests project analytics summary, route metrics, device breakdown, referrer metrics, funnel summaries, funnel analysis, or journey patterns
+- **Given** an authorized member requests project analytics summary, route metrics, device breakdown, referrer metrics, action metrics, funnel summaries, funnel analysis, or journey patterns
 - **When** the request is made through API, CLI, or MCP
 - **Then** all three interfaces return equivalent data from the same domain services
 - **And** a project token cannot read analytics metrics

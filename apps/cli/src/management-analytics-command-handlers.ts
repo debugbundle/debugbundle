@@ -17,6 +17,7 @@ import {
   listAnalyticsJourneySamplesWithAuthCommand as defaultListAnalyticsJourneySamplesCommand
 } from "./analytics-journey-sample-commands.js";
 import {
+  getAnalyticsActionsWithAuthCommand as defaultGetAnalyticsActionsCommand,
   getAnalyticsDevicesWithAuthCommand as defaultGetAnalyticsDevicesCommand,
   getAnalyticsFunnelWithAuthCommand as defaultGetAnalyticsFunnelCommand,
   getAnalyticsJourneysWithAuthCommand as defaultGetAnalyticsJourneysCommand,
@@ -215,6 +216,7 @@ export async function handleAnalyticsCommand(
     resource === "journeys" ||
     resource === "devices" ||
     resource === "referrers" ||
+    resource === "actions" ||
     resource === "funnels"
   ) {
     expectNoUnknownOptions(parsedArgv, [
@@ -257,7 +259,9 @@ export async function handleAnalyticsCommand(
               ? dependencies.getAnalyticsDevicesCommand ?? defaultGetAnalyticsDevicesCommand
               : resource === "referrers"
                 ? dependencies.getAnalyticsReferrersCommand ?? defaultGetAnalyticsReferrersCommand
-                : dependencies.listAnalyticsFunnelsCommand ?? defaultListAnalyticsFunnelsCommand;
+                : resource === "actions"
+                  ? dependencies.getAnalyticsActionsCommand ?? defaultGetAnalyticsActionsCommand
+                  : dependencies.listAnalyticsFunnelsCommand ?? defaultListAnalyticsFunnelsCommand;
 
     return await command(input);
   }

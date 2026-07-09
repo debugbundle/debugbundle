@@ -91,6 +91,7 @@ function createAnalyticsMetricsDependency(
       utm_mediums: [],
       utm_campaigns: []
     }),
+    getActionMetricsForProject: vi.fn().mockResolvedValue({ window: metricsWindow, actions: [] }),
     listFunnelsForProject: vi.fn().mockResolvedValue({ window: metricsWindow, funnels: [] }),
     getFunnelAnalysisForProject: vi.fn().mockResolvedValue({
       funnel: { ...metricsWindow, funnel_key: "checkout", sessions_entered: 0, sessions_completed: 0, dropoffs: 0, conversion_rate: 0 },
@@ -414,6 +415,7 @@ describe("analytics metrics routes", () => {
         utm_mediums: [],
         utm_campaigns: []
       }),
+      getActionMetricsForProject: vi.fn().mockResolvedValue({ window: metricsWindow, actions: [] }),
       listFunnelsForProject: vi.fn().mockResolvedValue({ window: metricsWindow, funnels: [] }),
       getFunnelAnalysisForProject: vi.fn().mockResolvedValue({
         funnel: { ...metricsWindow, funnel_key: "checkout", sessions_entered: 0, sessions_completed: 0, dropoffs: 0, conversion_rate: 0 },
@@ -436,6 +438,9 @@ describe("analytics metrics routes", () => {
     await expect(app.inject({ method: "GET", url: `/v1/analytics/referrers?${query}`, headers: authHeaders })).resolves.toMatchObject({
       statusCode: 200
     });
+    await expect(app.inject({ method: "GET", url: `/v1/analytics/actions?${query}`, headers: authHeaders })).resolves.toMatchObject({
+      statusCode: 200
+    });
     await expect(app.inject({ method: "GET", url: `/v1/analytics/funnels?${query}`, headers: authHeaders })).resolves.toMatchObject({
       statusCode: 200
     });
@@ -445,6 +450,7 @@ describe("analytics metrics routes", () => {
 
     expect(analyticsMetrics.getRouteMetricsForProject).toHaveBeenCalledWith(expect.objectContaining({ project_id: PROJECT_ID }));
     expect(analyticsMetrics.getJourneyPatternsForProject).toHaveBeenCalledWith(expect.objectContaining({ project_id: PROJECT_ID }));
+    expect(analyticsMetrics.getActionMetricsForProject).toHaveBeenCalledWith(expect.objectContaining({ project_id: PROJECT_ID }));
     expect(analyticsMetrics.listFunnelsForProject).toHaveBeenCalledWith(expect.objectContaining({ project_id: PROJECT_ID }));
     expect(analyticsMetrics.getFunnelAnalysisForProject).toHaveBeenCalledWith(expect.objectContaining({
       project_id: PROJECT_ID,

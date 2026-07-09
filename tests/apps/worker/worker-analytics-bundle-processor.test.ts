@@ -529,6 +529,10 @@ function createMetricsStore(overrides: MetricsStoreOverrides = {}): AnalyticsMet
       utm_mediums: [{ value: "email", sessions: 20, pageviews: 80 }],
       utm_campaigns: [{ value: "summer", sessions: 20, pageviews: 80 }]
     }),
+    getActionMetrics: vi.fn().mockResolvedValue({
+      window: metricWindow(),
+      actions: []
+    }),
     listFunnels: vi.fn().mockResolvedValue({
       window: metricWindow(),
       funnels: []

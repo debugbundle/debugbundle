@@ -22,6 +22,7 @@ import type {
   listAnalyticsJourneySamplesWithAuthCommand as defaultListAnalyticsJourneySamplesCommand
 } from "./analytics-journey-sample-commands.js";
 import type {
+  getAnalyticsActionsWithAuthCommand as defaultGetAnalyticsActionsCommand,
   getAnalyticsDevicesWithAuthCommand as defaultGetAnalyticsDevicesCommand,
   getAnalyticsFunnelWithAuthCommand as defaultGetAnalyticsFunnelCommand,
   getAnalyticsJourneysWithAuthCommand as defaultGetAnalyticsJourneysCommand,
@@ -174,6 +175,7 @@ export type ManagementCommandDependencies = {
   getAnalyticsJourneysCommand?: typeof defaultGetAnalyticsJourneysCommand;
   getAnalyticsDevicesCommand?: typeof defaultGetAnalyticsDevicesCommand;
   getAnalyticsReferrersCommand?: typeof defaultGetAnalyticsReferrersCommand;
+  getAnalyticsActionsCommand?: typeof defaultGetAnalyticsActionsCommand;
   listAnalyticsFunnelsCommand?: typeof defaultListAnalyticsFunnelsCommand;
   getAnalyticsFunnelCommand?: typeof defaultGetAnalyticsFunnelCommand;
   createAnalyticsBundleCommand?: typeof defaultCreateAnalyticsBundleCommand;

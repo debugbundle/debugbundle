@@ -8,6 +8,8 @@ import {
   getAnalyticsOpportunityWithAuthCommand,
   getAnalyticsJourneysCommand,
   getAnalyticsJourneysWithAuthCommand,
+  getAnalyticsActionsCommand,
+  getAnalyticsActionsWithAuthCommand,
   getAnalyticsSummaryCommand,
   getAnalyticsSummaryWithAuthCommand,
   listAnalyticsFunnelsCommand,
@@ -78,6 +80,14 @@ const funnelsResponse = {
       dropoffs: 12,
       conversion_rate: 0.6
     }
+  ]
+} as const;
+
+const actionsResponse = {
+  window: metricsWindow,
+  actions: [
+    { action_key: "signup_click", kind: "action", event_count: 14, unique_sessions: 9 },
+    { action_key: "conversion:trial_started", kind: "conversion", event_count: 5, unique_sessions: 5 }
   ]
 } as const;
 
@@ -159,6 +169,22 @@ describe("cli analytics metrics commands", () => {
     expect(human.exitCode).toBe(0);
     expect(human.output).toContain("checkout: 30 entered, 18 completed, 12 dropoffs, 0.6 conversion");
     expect(JSON.parse(json.output)).toEqual(funnelsResponse);
+  });
+
+  it("renders analytics action metrics in human and json mode", async () => {
+    const human = await getAnalyticsActionsCommand(
+      { bearerToken: "dbundle_mem_x", projectId: PROJECT_ID, from: FROM, to: TO },
+      { getActionMetrics: vi.fn().mockResolvedValue(actionsResponse) }
+    );
+    const json = await getAnalyticsActionsCommand(
+      { bearerToken: "dbundle_mem_x", projectId: PROJECT_ID, from: FROM, to: TO, json: true },
+      { getActionMetrics: vi.fn().mockResolvedValue(actionsResponse) }
+    );
+
+    expect(human.exitCode).toBe(0);
+    expect(human.output).toContain("signup_click: 14 events, 9 sessions, action");
+    expect(human.output).toContain("conversion:trial_started: 5 events, 5 sessions, conversion");
+    expect(JSON.parse(json.output)).toEqual(actionsResponse);
   });
 
   it("renders analytics opportunities in human and json mode", async () => {
@@ -271,6 +297,35 @@ describe("cli analytics metrics commands", () => {
     expect(JSON.parse(result.output)).toEqual(funnelsResponse);
   });
 
+  it("loads auth state and forwards authenticated action metric calls", async () => {
+    const readAuthState = vi.fn().mockResolvedValue({
+      bearer_token: "dbundle_mem_saved",
+      base_url: "https://selfhost.debugbundle.test"
+    });
+    const createHttpClient = vi.fn().mockReturnValue({ request: vi.fn() });
+    const getActionMetrics = vi.fn().mockResolvedValue(actionsResponse);
+    const createApi = vi.fn().mockReturnValue({ getActionMetrics });
+
+    const result = await getAnalyticsActionsWithAuthCommand(
+      { authFilePath: "/tmp/auth.json", projectId: PROJECT_ID, from: FROM, to: TO, json: true },
+      { readAuthState, createHttpClient, createApi }
+    );
+
+    expect(createHttpClient).toHaveBeenCalledWith({ baseUrl: "https://selfhost.debugbundle.test" });
+    expect(getActionMetrics).toHaveBeenCalledWith({
+      bearerToken: "dbundle_mem_saved",
+      projectId: PROJECT_ID,
+      from: FROM,
+      to: TO,
+      granularity: undefined,
+      service: undefined,
+      environment: undefined,
+      last: undefined,
+      limit: undefined
+    });
+    expect(JSON.parse(result.output)).toEqual(actionsResponse);
+  });
+
   it("loads auth state and forwards authenticated opportunity list calls", async () => {
     const readAuthState = vi.fn().mockResolvedValue({
       bearer_token: "dbundle_mem_saved",
@@ -365,6 +420,7 @@ describe("cli analytics metrics commands", () => {
         status: 200,
         body: { window: metricsWindow, referrers: [], utm_sources: [], utm_mediums: [], utm_campaigns: [] }
       })
+      .mockResolvedValueOnce({ status: 200, body: actionsResponse })
       .mockResolvedValueOnce({ status: 200, body: funnelsResponse })
       .mockResolvedValueOnce({
         status: 200,
@@ -398,6 +454,7 @@ describe("cli analytics metrics commands", () => {
     await api.getJourneyPatterns({ bearerToken: "dbundle_mem_x", projectId: PROJECT_ID });
     await api.getDeviceBreakdown({ bearerToken: "dbundle_mem_x", projectId: PROJECT_ID });
     await api.getReferrerMetrics({ bearerToken: "dbundle_mem_x", projectId: PROJECT_ID });
+    await api.getActionMetrics({ bearerToken: "dbundle_mem_x", projectId: PROJECT_ID });
     await api.listFunnels({ bearerToken: "dbundle_mem_x", projectId: PROJECT_ID });
     await api.getFunnelAnalysis({ bearerToken: "dbundle_mem_x", projectId: PROJECT_ID, funnelKey: "checkout" });
     await api.listOpportunities({
@@ -437,6 +494,11 @@ describe("cli analytics metrics commands", () => {
     expect(request).toHaveBeenCalledWith({
       method: "GET",
       path: `/v1/analytics/referrers?project_id=${PROJECT_ID}`,
+      bearerToken: "dbundle_mem_x"
+    });
+    expect(request).toHaveBeenCalledWith({
+      method: "GET",
+      path: `/v1/analytics/actions?project_id=${PROJECT_ID}`,
       bearerToken: "dbundle_mem_x"
     });
     expect(request).toHaveBeenCalledWith({

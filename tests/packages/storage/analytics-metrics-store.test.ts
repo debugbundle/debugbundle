@@ -22,6 +22,21 @@ describe("analytics metrics store", () => {
         };
       }
 
+      if (sqlText.includes("FROM analytics_action_rollups") && sqlText.includes("GROUP BY action_key")) {
+        expect(params.at(-1)).toBe(3);
+        return {
+          rows: [{
+            action_key: "signup_click",
+            event_count: "14",
+            unique_sessions: "9"
+          }, {
+            action_key: "conversion:trial_started",
+            event_count: "5",
+            unique_sessions: "5"
+          }]
+        };
+      }
+
       if (sqlText.includes("FROM analytics_action_rollups")) {
         return { rows: [{ conversions: "5" }] };
       }
@@ -87,6 +102,31 @@ describe("analytics metrics store", () => {
         referrers: [{ value: "google.com", sessions: 5, pageviews: 12 }],
         auth_states: [{ value: "authenticated", sessions: 8, pageviews: 19 }]
       }
+    });
+
+    await expect(
+      store.getActionMetrics({
+        project_id: PROJECT_ID,
+        from: "2026-03-01T00:00:00.000Z",
+        to: "2026-03-08T00:00:00.000Z",
+        granularity: "day",
+        service: "web",
+        environment: "production",
+        limit: 3
+      })
+    ).resolves.toEqual({
+      window: {
+        project_id: PROJECT_ID,
+        from: "2026-03-01T00:00:00.000Z",
+        to: "2026-03-08T00:00:00.000Z",
+        granularity: "day",
+        service: "web",
+        environment: "production"
+      },
+      actions: [
+        { action_key: "signup_click", kind: "action", event_count: 14, unique_sessions: 9 },
+        { action_key: "conversion:trial_started", kind: "conversion", event_count: 5, unique_sessions: 5 }
+      ]
     });
   });
 

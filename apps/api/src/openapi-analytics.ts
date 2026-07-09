@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import {
+  AnalyticsActionMetricsResponseSchema,
   AnalyticsOpportunitiesListResponseSchema,
   AnalyticsOpportunityResponseSchema,
   AnalyticsDeviceBreakdownResponseSchema,
@@ -90,6 +91,7 @@ export function createAnalyticsMetricOpenApiOperations(options: {
     "AnalyticsReferrerMetricsResponse",
     AnalyticsReferrerMetricsResponseSchema
   );
+  const analyticsActionMetricsResponse = component("AnalyticsActionMetricsResponse", AnalyticsActionMetricsResponseSchema);
   const analyticsFunnelAnalysisResponse = component(
     "AnalyticsFunnelAnalysisResponse",
     AnalyticsFunnelAnalysisResponseSchema
@@ -198,6 +200,22 @@ export function createAnalyticsMetricOpenApiOperations(options: {
       query: AnalyticsSummaryQuerySchema,
       responses: {
         "200": { description: "Analytics referrer and UTM metrics.", schema: analyticsReferrerMetricsResponse },
+        ...responses
+      }
+    },
+    {
+      method: "get",
+      path: "/v1/analytics/actions",
+      operationId: "getAnalyticsActions",
+      summary: "Get aggregate AnalyticsBundle action and conversion metrics for a project",
+      tags: ["Analytics"],
+      security: options.anyMemberAuth,
+      query: AnalyticsSummaryQuerySchema,
+      responses: {
+        "200": {
+          description: "Analytics action, marker, and conversion metrics.",
+          schema: analyticsActionMetricsResponse
+        },
         ...responses
       }
     },

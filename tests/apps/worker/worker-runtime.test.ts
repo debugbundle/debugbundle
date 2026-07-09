@@ -91,6 +91,7 @@ const {
     getJourneyPatterns: vi.fn(),
     getDeviceBreakdown: vi.fn(),
     getReferrerMetrics: vi.fn(),
+    getActionMetrics: vi.fn(),
     listFunnels: vi.fn(),
     getFunnelAnalysis: vi.fn()
   }),

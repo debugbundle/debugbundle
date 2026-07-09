@@ -12,6 +12,7 @@ export const ANALYTICS_METRICS_MCP_TOOL_NAMES = [
   "get_analytics_journey_sample",
   "get_device_breakdown",
   "get_referrer_metrics",
+  "get_action_metrics",
   "list_funnel_metrics",
   "get_funnel_analysis",
   "list_analytics_opportunities",
@@ -50,6 +51,7 @@ export function createAnalyticsMetricsMcpTools(api: {
   getJourneySample(input: AnalyticsJourneySampleToolInput): Promise<unknown>;
   getDeviceBreakdown(input: AnalyticsMetricsToolInput): Promise<unknown>;
   getReferrerMetrics(input: AnalyticsMetricsToolInput): Promise<unknown>;
+  getActionMetrics(input: AnalyticsMetricsToolInput): Promise<unknown>;
   listFunnels(input: AnalyticsMetricsToolInput): Promise<unknown>;
   getFunnelAnalysis(input: AnalyticsMetricsToolInput & { funnelKey: string }): Promise<unknown>;
   listOpportunities(input: AnalyticsOpportunitiesToolInput): Promise<unknown>;
@@ -114,6 +116,14 @@ export function createAnalyticsMetricsMcpTools(api: {
     async get_referrer_metrics(input) {
       try {
         return await api.getReferrerMetrics(readMetricsInput(input));
+      } catch (error) {
+        mapMcpError(error);
+      }
+    },
+
+    async get_action_metrics(input) {
+      try {
+        return await api.getActionMetrics(readMetricsInput(input));
       } catch (error) {
         mapMcpError(error);
       }

@@ -3,6 +3,7 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { z } from "zod";
 
 import {
+  AnalyticsActionMetricsResponseSchema,
   AnalyticsBundleAnalysisKindSchema,
   AnalyticsBundleGenerationsListResponseSchema,
   AnalyticsBundleGenerationStatusSchema,
@@ -377,6 +378,17 @@ export function registerAnalyticsRoutes(app: FastifyInstance, dependencies: ApiD
     const referrers = await dependencies.analyticsMetrics!.getReferrerMetricsForProject(toMetricsInput(input));
 
     return reply.status(200).send(AnalyticsReferrerMetricsResponseSchema.parse(referrers));
+  });
+
+  app.get("/v1/analytics/actions", async (request, reply) => {
+    const input = await requireAnalyticsMetricsQuery(request, reply, dependencies);
+    if (input === null) {
+      return;
+    }
+
+    const actions = await dependencies.analyticsMetrics!.getActionMetricsForProject(toMetricsInput(input));
+
+    return reply.status(200).send(AnalyticsActionMetricsResponseSchema.parse(actions));
   });
 
   app.get("/v1/analytics/funnels", async (request, reply) => {

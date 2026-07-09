@@ -1,4 +1,5 @@
 import {
+  AnalyticsActionMetricsResponseSchema,
   AnalyticsDeviceBreakdownResponseSchema,
   AnalyticsFunnelAnalysisResponseSchema,
   AnalyticsFunnelsResponseSchema,
@@ -6,6 +7,7 @@ import {
   AnalyticsReferrerMetricsResponseSchema,
   AnalyticsRouteMetricsResponseSchema,
   AnalyticsUsageSummaryResponseSchema,
+  type AnalyticsActionMetricsResponse,
   type AnalyticsDeviceBreakdownResponse,
   type AnalyticsFunnelAnalysisResponse,
   type AnalyticsFunnelsResponse,
@@ -38,6 +40,7 @@ export interface AnalyticsMetricsStore {
   getJourneyPatterns(input: AnalyticsUsageSummaryInput): Promise<AnalyticsJourneyPatternsResponse>;
   getDeviceBreakdown(input: AnalyticsUsageSummaryInput): Promise<AnalyticsDeviceBreakdownResponse>;
   getReferrerMetrics(input: AnalyticsUsageSummaryInput): Promise<AnalyticsReferrerMetricsResponse>;
+  getActionMetrics(input: AnalyticsUsageSummaryInput): Promise<AnalyticsActionMetricsResponse>;
   listFunnels(input: AnalyticsUsageSummaryInput): Promise<AnalyticsFunnelsResponse>;
   getFunnelAnalysis(input: AnalyticsFunnelAnalysisInput): Promise<AnalyticsFunnelAnalysisResponse>;
 }
@@ -52,6 +55,12 @@ type AnalyticsSummaryTotalsRow = {
 
 type AnalyticsConversionTotalsRow = {
   conversions: unknown;
+};
+
+type AnalyticsActionMetricRow = {
+  action_key: unknown;
+  event_count: unknown;
+  unique_sessions: unknown;
 };
 
 type AnalyticsSegmentRow = {
@@ -285,6 +294,39 @@ export function createPostgresAnalyticsMetricsStore(db: Queryable): AnalyticsMet
         utm_sources: utmSources,
         utm_mediums: utmMediums,
         utm_campaigns: utmCampaigns
+      });
+    },
+
+    async getActionMetrics(input) {
+      const limit = normalizeLimit(input.limit);
+      const where = buildAnalyticsRollupWhere(input);
+      const result = await db.query<AnalyticsActionMetricRow>(
+        `
+          SELECT
+            action_key,
+            COALESCE(SUM(event_count), 0)::bigint AS event_count,
+            COALESCE(SUM(unique_sessions), 0)::bigint AS unique_sessions
+          FROM analytics_action_rollups
+          ${where.sql}
+          GROUP BY action_key
+          HAVING COALESCE(SUM(event_count), 0) > 0 OR COALESCE(SUM(unique_sessions), 0) > 0
+          ORDER BY event_count DESC, unique_sessions DESC, action_key ASC
+          LIMIT $${where.params.length + 1}
+        `,
+        [...where.params, limit]
+      );
+
+      return AnalyticsActionMetricsResponseSchema.parse({
+        window: buildWindow(input),
+        actions: result.rows.map((row) => {
+          const actionKey = toNonEmptyString(row.action_key, "unknown");
+          return {
+            action_key: actionKey,
+            kind: toActionMetricKind(actionKey),
+            event_count: toNonNegativeInteger(row.event_count),
+            unique_sessions: toNonNegativeInteger(row.unique_sessions)
+          };
+        })
       });
     },
 
@@ -613,6 +655,16 @@ function toNonEmptyString(value: unknown, fallback: string): string {
 
 function toConversionRate(completed: number, entered: number): number {
   return entered > 0 ? Math.min(1, Math.max(0, completed / entered)) : 0;
+}
+
+function toActionMetricKind(actionKey: string): "action" | "conversion" | "marker" {
+  if (actionKey.startsWith("conversion:")) {
+    return "conversion";
+  }
+  if (actionKey.startsWith("marker:")) {
+    return "marker";
+  }
+  return "action";
 }
 
 function toTransitionTag(fromRouteKey: string, toRouteKey: string): string {
