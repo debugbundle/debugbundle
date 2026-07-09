@@ -340,6 +340,7 @@ describe("api default dependencies", () => {
       getJourneyPatterns: vi.fn(),
       getDeviceBreakdown: vi.fn(),
       getReferrerMetrics: vi.fn(),
+      listFunnels: vi.fn(),
       getFunnelAnalysis: vi.fn()
     });
     createPostgresAnalyticsOpportunityStoreMock.mockReturnValue({
@@ -814,6 +815,7 @@ describe("api default dependencies", () => {
     expect(typeof deps.analyticsMetrics.getJourneyPatternsForProject).toBe("function");
     expect(typeof deps.analyticsMetrics.getDeviceBreakdownForProject).toBe("function");
     expect(typeof deps.analyticsMetrics.getReferrerMetricsForProject).toBe("function");
+    expect(typeof deps.analyticsMetrics.listFunnelsForProject).toBe("function");
     expect(typeof deps.analyticsMetrics.getFunnelAnalysisForProject).toBe("function");
     expect(typeof deps.analyticsJourneySamples.listAnalyticsJourneySamplesForProject).toBe("function");
     expect(typeof deps.analyticsJourneySamples.getAnalyticsJourneySampleForProject).toBe("function");

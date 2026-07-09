@@ -1,12 +1,14 @@
 import {
   AnalyticsDeviceBreakdownResponseSchema,
   AnalyticsFunnelAnalysisResponseSchema,
+  AnalyticsFunnelsResponseSchema,
   AnalyticsJourneyPatternsResponseSchema,
   AnalyticsReferrerMetricsResponseSchema,
   AnalyticsRouteMetricsResponseSchema,
   AnalyticsUsageSummaryResponseSchema,
   type AnalyticsDeviceBreakdownResponse,
   type AnalyticsFunnelAnalysisResponse,
+  type AnalyticsFunnelsResponse,
   type AnalyticsJourneyPatternsResponse,
   type AnalyticsMetricsGranularity,
   type AnalyticsMetricsSegment,
@@ -36,6 +38,7 @@ export interface AnalyticsMetricsStore {
   getJourneyPatterns(input: AnalyticsUsageSummaryInput): Promise<AnalyticsJourneyPatternsResponse>;
   getDeviceBreakdown(input: AnalyticsUsageSummaryInput): Promise<AnalyticsDeviceBreakdownResponse>;
   getReferrerMetrics(input: AnalyticsUsageSummaryInput): Promise<AnalyticsReferrerMetricsResponse>;
+  listFunnels(input: AnalyticsUsageSummaryInput): Promise<AnalyticsFunnelsResponse>;
   getFunnelAnalysis(input: AnalyticsFunnelAnalysisInput): Promise<AnalyticsFunnelAnalysisResponse>;
 }
 
@@ -94,6 +97,13 @@ type AnalyticsJourneyPatternSampleRow = {
 type AnalyticsFunnelStepMetricRow = {
   step_key: unknown;
   step_order: unknown;
+  sessions_entered: unknown;
+  sessions_completed: unknown;
+  dropoffs: unknown;
+};
+
+type AnalyticsFunnelListRow = {
+  funnel_key: unknown;
   sessions_entered: unknown;
   sessions_completed: unknown;
   dropoffs: unknown;
@@ -275,6 +285,44 @@ export function createPostgresAnalyticsMetricsStore(db: Queryable): AnalyticsMet
         utm_sources: utmSources,
         utm_mediums: utmMediums,
         utm_campaigns: utmCampaigns
+      });
+    },
+
+    async listFunnels(input) {
+      const limit = normalizeLimit(input.limit);
+      const where = buildAnalyticsRollupWhere(input);
+      const result = await db.query<AnalyticsFunnelListRow>(
+        `
+          SELECT
+            funnel_key,
+            COALESCE(SUM(sessions_entered), 0)::bigint AS sessions_entered,
+            COALESCE(SUM(sessions_completed), 0)::bigint AS sessions_completed,
+            COALESCE(SUM(dropoffs), 0)::bigint AS dropoffs
+          FROM analytics_funnel_rollups
+          ${where.sql}
+          GROUP BY funnel_key
+          HAVING COALESCE(SUM(sessions_entered), 0) > 0
+            OR COALESCE(SUM(sessions_completed), 0) > 0
+            OR COALESCE(SUM(dropoffs), 0) > 0
+          ORDER BY sessions_entered DESC, funnel_key ASC
+          LIMIT $${where.params.length + 1}
+        `,
+        [...where.params, limit]
+      );
+
+      return AnalyticsFunnelsResponseSchema.parse({
+        window: buildWindow(input),
+        funnels: result.rows.map((row) => {
+          const sessionsEntered = toNonNegativeInteger(row.sessions_entered);
+          const sessionsCompleted = toNonNegativeInteger(row.sessions_completed);
+          return {
+            funnel_key: toNonEmptyString(row.funnel_key, "unknown"),
+            sessions_entered: sessionsEntered,
+            sessions_completed: sessionsCompleted,
+            dropoffs: toNonNegativeInteger(row.dropoffs),
+            conversion_rate: toConversionRate(sessionsCompleted, sessionsEntered)
+          };
+        })
       });
     },
 

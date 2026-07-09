@@ -91,6 +91,7 @@ const {
     getJourneyPatterns: vi.fn(),
     getDeviceBreakdown: vi.fn(),
     getReferrerMetrics: vi.fn(),
+    listFunnels: vi.fn(),
     getFunnelAnalysis: vi.fn()
   }),
   createPostgresAnalyticsBundleGenerationStoreMock: vi.fn().mockReturnValue({

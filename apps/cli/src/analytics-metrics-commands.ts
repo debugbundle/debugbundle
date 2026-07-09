@@ -1,6 +1,7 @@
 import {
   AnalyticsDeviceBreakdownResponseSchema,
   AnalyticsFunnelAnalysisResponseSchema,
+  AnalyticsFunnelsResponseSchema,
   AnalyticsJourneyPatternsResponseSchema,
   AnalyticsOpportunitiesListResponseSchema,
   AnalyticsOpportunityResponseSchema,
@@ -11,6 +12,7 @@ import {
   type AnalyticsBundleAnalysisKind,
   type AnalyticsDeviceBreakdownResponse,
   type AnalyticsFunnelAnalysisResponse,
+  type AnalyticsFunnelsResponse,
   type AnalyticsJourneyPatternsResponse,
   type AnalyticsMetricsGranularity,
   type AnalyticsOpportunitiesListResponse,
@@ -98,6 +100,7 @@ export function createAnalyticsMetricsApi(httpClient: {
   getJourneyPatterns(input: AnalyticsMetricQueryInput): Promise<AnalyticsJourneyPatternsResponse>;
   getDeviceBreakdown(input: AnalyticsMetricQueryInput): Promise<AnalyticsDeviceBreakdownResponse>;
   getReferrerMetrics(input: AnalyticsMetricQueryInput): Promise<AnalyticsReferrerMetricsResponse>;
+  listFunnels(input: AnalyticsMetricQueryInput): Promise<AnalyticsFunnelsResponse>;
   getFunnelAnalysis(input: Omit<AnalyticsFunnelCommandInput, "json">): Promise<AnalyticsFunnelAnalysisResponse>;
   listOpportunities(input: Omit<AnalyticsOpportunitiesCommandInput, "json">): Promise<AnalyticsOpportunitiesListResponse>;
   getOpportunity(input: Omit<AnalyticsOpportunityGetCommandInput, "json">): Promise<AnalyticsOpportunityResponse>;
@@ -182,6 +185,22 @@ export function createAnalyticsMetricsApi(httpClient: {
       const parsed = AnalyticsReferrerMetricsResponseSchema.safeParse(response.body);
       if (!parsed.success) {
         throw new AnalyticsMetricsApiError(500, "Invalid analytics referrer metrics response.");
+      }
+      return parsed.data;
+    },
+
+    async listFunnels(input): Promise<AnalyticsFunnelsResponse> {
+      const response = await httpClient.request({
+        method: "GET",
+        path: `/v1/analytics/funnels?${buildMetricsQueryString(input)}`,
+        bearerToken: input.bearerToken
+      });
+      if (response.status !== 200) {
+        throw toApiError(response.status, response.body, "Failed to list analytics funnels.");
+      }
+      const parsed = AnalyticsFunnelsResponseSchema.safeParse(response.body);
+      if (!parsed.success) {
+        throw new AnalyticsMetricsApiError(500, "Invalid analytics funnels response.");
       }
       return parsed.data;
     },
@@ -413,6 +432,18 @@ function formatFunnelAnalysis(response: AnalyticsFunnelAnalysisResponse): string
   ].join("\n");
 }
 
+function formatFunnels(response: AnalyticsFunnelsResponse): string {
+  if (response.funnels.length === 0) {
+    return "No funnel metrics found.";
+  }
+
+  return response.funnels
+    .map((funnel) =>
+      `${funnel.funnel_key}: ${funnel.sessions_entered} entered, ${funnel.sessions_completed} completed, ${funnel.dropoffs} dropoffs, ${funnel.conversion_rate} conversion`
+    )
+    .join("\n");
+}
+
 function formatOpportunities(response: AnalyticsOpportunitiesListResponse): string {
   if (response.opportunities.length === 0) {
     return "No analytics opportunities found.";
@@ -505,6 +536,13 @@ export async function getAnalyticsReferrersCommand(
   api: { getReferrerMetrics(input: AnalyticsMetricQueryInput): Promise<AnalyticsReferrerMetricsResponse> }
 ): Promise<CliCommandResult> {
   return runAnalyticsMetricCommand(input, (request) => api.getReferrerMetrics(request), formatReferrerMetrics);
+}
+
+export async function listAnalyticsFunnelsCommand(
+  input: AnalyticsSummaryCommandInput,
+  api: { listFunnels(input: AnalyticsMetricQueryInput): Promise<AnalyticsFunnelsResponse> }
+): Promise<CliCommandResult> {
+  return runAnalyticsMetricCommand(input, (request) => api.listFunnels(request), formatFunnels);
 }
 
 export async function getAnalyticsFunnelCommand(
@@ -720,6 +758,15 @@ export async function getAnalyticsReferrersWithAuthCommand(
 ): Promise<CliCommandResult> {
   return runAnalyticsMetricWithAuthCommand(input, dependencies, (authState, api) =>
     getAnalyticsReferrersCommand(withBearerToken(authState, input), api)
+  );
+}
+
+export async function listAnalyticsFunnelsWithAuthCommand(
+  input: AnalyticsMetricWithAuthInput,
+  dependencies?: Parameters<typeof createAuthenticatedAnalyticsMetricsApi>[1]
+): Promise<CliCommandResult> {
+  return runAnalyticsMetricWithAuthCommand(input, dependencies, (authState, api) =>
+    listAnalyticsFunnelsCommand(withBearerToken(authState, input), api)
   );
 }
 

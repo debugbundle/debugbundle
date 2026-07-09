@@ -52,6 +52,7 @@ Every capability must be available through all applicable interfaces. Operations
 | Get analytics routes | `GET /v1/analytics/routes` | `analytics routes` | `get_route_metrics` | Browser Session or Member Token |
 | Get analytics devices | `GET /v1/analytics/devices` | `analytics devices` | `get_device_breakdown` | Browser Session or Member Token |
 | Get analytics referrers | `GET /v1/analytics/referrers` | `analytics referrers` | `get_referrer_metrics` | Browser Session or Member Token |
+| List analytics funnels | `GET /v1/analytics/funnels` | `analytics funnels` | `list_funnel_metrics` | Browser Session or Member Token |
 | Get analytics funnel | `GET /v1/analytics/funnels/{key}` | `analytics funnel` | `get_funnel_analysis` | Browser Session or Member Token |
 | Get journey patterns | `GET /v1/analytics/journey-patterns` | `analytics journeys` | `get_journey_patterns` | Browser Session or Member Token, aggregate/sample-safe data |
 | List analytics journey samples | `GET /v1/analytics/journey-samples` | `analytics journey-samples list` | `list_analytics_journey_samples` | Browser Session or Member Token, retained redacted sample metadata |
@@ -544,7 +545,7 @@ Analytics shares browser SDK capture primitives with debug capture where that re
 }
 ```
 
-The implemented aggregate metrics read surface includes `GET /v1/analytics/summary`, `/routes`, `/journey-patterns`, `/devices`, `/referrers`, and `/funnels/{key}` plus matching `debugbundle analytics summary|routes|journeys|devices|referrers|funnel` commands and MCP `get_usage_summary`, `get_route_metrics`, `get_journey_patterns`, `get_device_breakdown`, `get_referrer_metrics`, and `get_funnel_analysis` tools. Journey-pattern rows remain aggregate transition metrics but may include up to three retained redacted `sample_ids` that match the transition tag and requested time window so agents can fetch representative journeys through the journey-sample detail route. Retained redacted journey samples are readable through `GET /v1/analytics/journey-samples` and `/journey-samples/{id}`, matching `debugbundle analytics journey-samples list|get` and MCP `list_analytics_journey_samples` / `get_analytics_journey_sample`; list responses expose metadata only and detail reads fetch the compressed redacted sample artifact from object storage without exposing its object key. Stored analytics opportunities are also readable through `GET /v1/analytics/opportunities` and `/opportunities/{id}`, matching `debugbundle analytics opportunities`, `debugbundle analytics opportunity get`, and MCP `list_analytics_opportunities` / `get_analytics_opportunity`. AnalyticsBundle generation can be requested through `POST /v1/analytics/bundles`, `debugbundle analytics bundle create`, and MCP `generate_analytics_bundle`; successful requests reserve a deterministic generation record and enqueue `build-analytics-bundle`, returning pending state until the worker completes it. AnalyticsBundle generation records can be inventoried through `GET /v1/analytics/bundles`, `debugbundle analytics bundle list`, and MCP `list_analytics_bundles`, returning lightweight metadata including analysis kind, status, timestamps, failure reason, input fingerprint, and whether an artifact exists. Existing AnalyticsBundle generation records are readable through `GET /v1/analytics/bundles/{id}`, `debugbundle analytics bundle get`, and MCP `get_analytics_bundle`; completed generations return the validated `AnalyticsBundleV1` artifact, while pending/running and failed generations return explicit state payloads. Initial stored opportunities are created by a background aggregate-rollup evaluator for `funnel_dropoff` candidates with bounded sample/dropoff thresholds; evidence is aggregate-only and no opportunity implies an AnalyticsBundle artifact exists yet. These endpoints are project-authorized browser-session/member-token read surfaces; project tokens remain write-only for analytics ingestion.
+The implemented aggregate metrics read surface includes `GET /v1/analytics/summary`, `/routes`, `/journey-patterns`, `/devices`, `/referrers`, `/funnels`, and `/funnels/{key}` plus matching `debugbundle analytics summary|routes|journeys|devices|referrers|funnels|funnel` commands and MCP `get_usage_summary`, `get_route_metrics`, `get_journey_patterns`, `get_device_breakdown`, `get_referrer_metrics`, `list_funnel_metrics`, and `get_funnel_analysis` tools. Journey-pattern rows remain aggregate transition metrics but may include up to three retained redacted `sample_ids` that match the transition tag and requested time window so agents can fetch representative journeys through the journey-sample detail route. Retained redacted journey samples are readable through `GET /v1/analytics/journey-samples` and `/journey-samples/{id}`, matching `debugbundle analytics journey-samples list|get` and MCP `list_analytics_journey_samples` / `get_analytics_journey_sample`; list responses expose metadata only and detail reads fetch the compressed redacted sample artifact from object storage without exposing its object key. Stored analytics opportunities are also readable through `GET /v1/analytics/opportunities` and `/opportunities/{id}`, matching `debugbundle analytics opportunities`, `debugbundle analytics opportunity get`, and MCP `list_analytics_opportunities` / `get_analytics_opportunity`. AnalyticsBundle generation can be requested through `POST /v1/analytics/bundles`, `debugbundle analytics bundle create`, and MCP `generate_analytics_bundle`; successful requests reserve a deterministic generation record and enqueue `build-analytics-bundle`, returning pending state until the worker completes it. AnalyticsBundle generation records can be inventoried through `GET /v1/analytics/bundles`, `debugbundle analytics bundle list`, and MCP `list_analytics_bundles`, returning lightweight metadata including analysis kind, status, timestamps, failure reason, input fingerprint, and whether an artifact exists. Existing AnalyticsBundle generation records are readable through `GET /v1/analytics/bundles/{id}`, `debugbundle analytics bundle get`, and MCP `get_analytics_bundle`; completed generations return the validated `AnalyticsBundleV1` artifact, while pending/running and failed generations return explicit state payloads. Initial stored opportunities are created by a background aggregate-rollup evaluator for `funnel_dropoff` candidates with bounded sample/dropoff thresholds; evidence is aggregate-only and no opportunity implies an AnalyticsBundle artifact exists yet. These endpoints are project-authorized browser-session/member-token read surfaces; project tokens remain write-only for analytics ingestion.
 
 **Analytics route metrics response shape:**
 ```json
@@ -598,6 +599,29 @@ The implemented aggregate metrics read surface includes `GET /v1/analytics/summa
 `sample_ids` is bounded to three retained journey sample IDs per transition pattern and overlaps the requested metrics window. Missing or expired samples are omitted; clients can fetch available samples through `GET /v1/analytics/journey-samples/{id}` with the same project authorization.
 
 **Analytics device/referrer metrics response shapes:** `/devices` returns the same `window` plus `device_types`, `browsers`, `os`, and `languages` segment arrays. `/referrers` returns the same `window` plus `referrers`, `utm_sources`, `utm_mediums`, and `utm_campaigns` segment arrays. Segment rows use `{ "value": "string", "sessions": 0, "pageviews": 0 }`.
+
+**Analytics funnel summaries response shape:**
+```json
+{
+  "window": {
+    "project_id": "uuid",
+    "from": "ISO8601",
+    "to": "ISO8601",
+    "granularity": "hour | day",
+    "service": "string | null",
+    "environment": "string | null"
+  },
+  "funnels": [
+    {
+      "funnel_key": "checkout",
+      "sessions_entered": 100,
+      "sessions_completed": 60,
+      "dropoffs": 40,
+      "conversion_rate": 0.6
+    }
+  ]
+}
+```
 
 **Analytics funnel analysis response shape:**
 ```json
@@ -2530,6 +2554,7 @@ debugbundle analytics summary --project-id <id> [--from <ISO8601>] [--to <ISO860
 debugbundle analytics routes --project-id <id> [--from <ISO8601>] [--to <ISO8601>] [--last <duration>] [--json]
 debugbundle analytics devices --project-id <id> [--from <ISO8601>] [--to <ISO8601>] [--last <duration>] [--json]
 debugbundle analytics referrers --project-id <id> [--from <ISO8601>] [--to <ISO8601>] [--last <duration>] [--json]
+debugbundle analytics funnels --project-id <id> [--from <ISO8601>] [--to <ISO8601>] [--last <duration>] [--json]
 debugbundle analytics funnel <funnel-key> --project-id <id> [--from <ISO8601>] [--to <ISO8601>] [--last <duration>] [--json]
 debugbundle analytics journeys --project-id <id> [--route <path>] [--funnel <key>] [--from <ISO8601>] [--to <ISO8601>] [--last <duration>] [--json]
 debugbundle analytics journey-samples list --project-id <id> [--service <name>] [--environment <name>] [--tag <tag>] [--cursor <cursor>] [--limit <n>] [--json]
@@ -2765,6 +2790,7 @@ debugbundle_get_usage_summary → same result as GET /v1/analytics/summary
 debugbundle_get_route_metrics → same result as GET /v1/analytics/routes
 debugbundle_get_device_breakdown → same result as GET /v1/analytics/devices
 debugbundle_get_referrer_metrics → same result as GET /v1/analytics/referrers
+debugbundle_list_funnel_metrics → same result as GET /v1/analytics/funnels
 debugbundle_get_funnel_analysis → same result as GET /v1/analytics/funnels/{key}
 debugbundle_get_journey_patterns → same result as GET /v1/analytics/journey-patterns
 debugbundle_list_analytics_journey_samples → same result as GET /v1/analytics/journey-samples

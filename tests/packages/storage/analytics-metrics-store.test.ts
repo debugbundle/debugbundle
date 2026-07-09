@@ -106,6 +106,18 @@ describe("analytics metrics store", () => {
         };
       }
 
+      if (sqlText.includes("FROM analytics_funnel_rollups") && sqlText.includes("GROUP BY funnel_key")) {
+        expect(params.at(-1)).toBe(10);
+        return {
+          rows: [{
+            funnel_key: "checkout",
+            sessions_entered: "30",
+            sessions_completed: "18",
+            dropoffs: "12"
+          }]
+        };
+      }
+
       if (sqlText.includes("FROM analytics_funnel_rollups")) {
         expect(params).toContain("checkout");
         return {
@@ -161,6 +173,16 @@ describe("analytics metrics store", () => {
     await expect(store.getReferrerMetrics(input)).resolves.toMatchObject({
       referrers: [{ value: "google.com", sessions: 5, pageviews: 12 }],
       utm_sources: [{ value: "google", sessions: 4, pageviews: 10 }]
+    });
+    await expect(store.listFunnels(input)).resolves.toEqual({
+      window: expect.objectContaining({ project_id: PROJECT_ID }),
+      funnels: [{
+        funnel_key: "checkout",
+        sessions_entered: 30,
+        sessions_completed: 18,
+        dropoffs: 12,
+        conversion_rate: 0.6
+      }]
     });
     await expect(store.getFunnelAnalysis({ ...input, funnel_key: "checkout" })).resolves.toEqual({
       funnel: expect.objectContaining({

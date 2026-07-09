@@ -459,6 +459,27 @@ export const AnalyticsReferrerMetricsResponseSchema = z
 
 export type AnalyticsReferrerMetricsResponse = z.infer<typeof AnalyticsReferrerMetricsResponseSchema>;
 
+const AnalyticsFunnelListItemSchema = z
+  .object({
+    funnel_key: z.string().trim().min(1).max(120),
+    sessions_entered: z.number().int().nonnegative(),
+    sessions_completed: z.number().int().nonnegative(),
+    dropoffs: z.number().int().nonnegative(),
+    conversion_rate: z.number().min(0).max(1)
+  })
+  .strict();
+
+export type AnalyticsFunnelListItem = z.infer<typeof AnalyticsFunnelListItemSchema>;
+
+export const AnalyticsFunnelsResponseSchema = z
+  .object({
+    window: AnalyticsMetricsWindowSchema,
+    funnels: z.array(AnalyticsFunnelListItemSchema).max(100)
+  })
+  .strict();
+
+export type AnalyticsFunnelsResponse = z.infer<typeof AnalyticsFunnelsResponseSchema>;
+
 const AnalyticsFunnelStepMetricSchema = z
   .object({
     step_key: z.string().trim().min(1).max(120),

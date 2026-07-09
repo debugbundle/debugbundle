@@ -5,6 +5,7 @@ import {
   AnalyticsOpportunityResponseSchema,
   AnalyticsDeviceBreakdownResponseSchema,
   AnalyticsFunnelAnalysisResponseSchema,
+  AnalyticsFunnelsResponseSchema,
   AnalyticsBundleAnalysisKindSchema,
   AnalyticsJourneyPatternsResponseSchema,
   AnalyticsReferrerMetricsResponseSchema,
@@ -93,6 +94,7 @@ export function createAnalyticsMetricOpenApiOperations(options: {
     "AnalyticsFunnelAnalysisResponse",
     AnalyticsFunnelAnalysisResponseSchema
   );
+  const analyticsFunnelsResponse = component("AnalyticsFunnelsResponse", AnalyticsFunnelsResponseSchema);
   const responses = {
     "400": { description: "Invalid query parameters.", schema: options.apiError },
     "401": { description: "Authentication is invalid.", schema: options.apiError },
@@ -196,6 +198,22 @@ export function createAnalyticsMetricOpenApiOperations(options: {
       query: AnalyticsSummaryQuerySchema,
       responses: {
         "200": { description: "Analytics referrer and UTM metrics.", schema: analyticsReferrerMetricsResponse },
+        ...responses
+      }
+    },
+    {
+      method: "get",
+      path: "/v1/analytics/funnels",
+      operationId: "listAnalyticsFunnels",
+      summary: "List aggregate AnalyticsBundle funnel conversion summaries for a project",
+      tags: ["Analytics"],
+      security: options.anyMemberAuth,
+      query: AnalyticsSummaryQuerySchema,
+      responses: {
+        "200": {
+          description: "Analytics funnel conversion summaries.",
+          schema: analyticsFunnelsResponse
+        },
         ...responses
       }
     },

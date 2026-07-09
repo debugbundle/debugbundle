@@ -24,6 +24,7 @@ import {
   getAnalyticsReferrersWithAuthCommand as defaultGetAnalyticsReferrersCommand,
   getAnalyticsRoutesWithAuthCommand as defaultGetAnalyticsRoutesCommand,
   getAnalyticsSummaryWithAuthCommand as defaultGetAnalyticsSummaryCommand,
+  listAnalyticsFunnelsWithAuthCommand as defaultListAnalyticsFunnelsCommand,
   listAnalyticsOpportunitiesWithAuthCommand as defaultListAnalyticsOpportunitiesCommand
 } from "./analytics-metrics-commands.js";
 import {
@@ -213,7 +214,8 @@ export async function handleAnalyticsCommand(
     resource === "routes" ||
     resource === "journeys" ||
     resource === "devices" ||
-    resource === "referrers"
+    resource === "referrers" ||
+    resource === "funnels"
   ) {
     expectNoUnknownOptions(parsedArgv, [
       "project",
@@ -253,7 +255,9 @@ export async function handleAnalyticsCommand(
             ? dependencies.getAnalyticsJourneysCommand ?? defaultGetAnalyticsJourneysCommand
             : resource === "devices"
               ? dependencies.getAnalyticsDevicesCommand ?? defaultGetAnalyticsDevicesCommand
-              : dependencies.getAnalyticsReferrersCommand ?? defaultGetAnalyticsReferrersCommand;
+              : resource === "referrers"
+                ? dependencies.getAnalyticsReferrersCommand ?? defaultGetAnalyticsReferrersCommand
+                : dependencies.listAnalyticsFunnelsCommand ?? defaultListAnalyticsFunnelsCommand;
 
     return await command(input);
   }

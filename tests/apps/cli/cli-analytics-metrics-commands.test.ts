@@ -10,6 +10,8 @@ import {
   getAnalyticsJourneysWithAuthCommand,
   getAnalyticsSummaryCommand,
   getAnalyticsSummaryWithAuthCommand,
+  listAnalyticsFunnelsCommand,
+  listAnalyticsFunnelsWithAuthCommand,
   listAnalyticsOpportunitiesCommand,
   listAnalyticsOpportunitiesWithAuthCommand
 } from "../../../apps/cli/src/analytics-metrics-commands.js";
@@ -62,6 +64,19 @@ const journeyPatternsResponse = {
       unique_sessions: 18,
       transition_share: 0.6,
       sample_ids: ["00000000-0000-4000-8000-000000000301"]
+    }
+  ]
+} as const;
+
+const funnelsResponse = {
+  window: metricsWindow,
+  funnels: [
+    {
+      funnel_key: "checkout",
+      sessions_entered: 30,
+      sessions_completed: 18,
+      dropoffs: 12,
+      conversion_rate: 0.6
     }
   ]
 } as const;
@@ -129,6 +144,21 @@ describe("cli analytics metrics commands", () => {
     expect(human.exitCode).toBe(0);
     expect(human.output).toContain("/pricing -> /checkout: 30 transitions, 18 sessions, 0.6 share, 1 samples");
     expect(JSON.parse(json.output)).toEqual(journeyPatternsResponse);
+  });
+
+  it("renders analytics funnel summaries in human and json mode", async () => {
+    const human = await listAnalyticsFunnelsCommand(
+      { bearerToken: "dbundle_mem_x", projectId: PROJECT_ID, from: FROM, to: TO },
+      { listFunnels: vi.fn().mockResolvedValue(funnelsResponse) }
+    );
+    const json = await listAnalyticsFunnelsCommand(
+      { bearerToken: "dbundle_mem_x", projectId: PROJECT_ID, from: FROM, to: TO, json: true },
+      { listFunnels: vi.fn().mockResolvedValue(funnelsResponse) }
+    );
+
+    expect(human.exitCode).toBe(0);
+    expect(human.output).toContain("checkout: 30 entered, 18 completed, 12 dropoffs, 0.6 conversion");
+    expect(JSON.parse(json.output)).toEqual(funnelsResponse);
   });
 
   it("renders analytics opportunities in human and json mode", async () => {
@@ -210,6 +240,35 @@ describe("cli analytics metrics commands", () => {
       limit: undefined
     });
     expect(JSON.parse(result.output)).toEqual(journeyPatternsResponse);
+  });
+
+  it("loads auth state and forwards authenticated funnel summary calls", async () => {
+    const readAuthState = vi.fn().mockResolvedValue({
+      bearer_token: "dbundle_mem_saved",
+      base_url: "https://selfhost.debugbundle.test"
+    });
+    const createHttpClient = vi.fn().mockReturnValue({ request: vi.fn() });
+    const listFunnels = vi.fn().mockResolvedValue(funnelsResponse);
+    const createApi = vi.fn().mockReturnValue({ listFunnels });
+
+    const result = await listAnalyticsFunnelsWithAuthCommand(
+      { authFilePath: "/tmp/auth.json", projectId: PROJECT_ID, from: FROM, to: TO, json: true },
+      { readAuthState, createHttpClient, createApi }
+    );
+
+    expect(createHttpClient).toHaveBeenCalledWith({ baseUrl: "https://selfhost.debugbundle.test" });
+    expect(listFunnels).toHaveBeenCalledWith({
+      bearerToken: "dbundle_mem_saved",
+      projectId: PROJECT_ID,
+      from: FROM,
+      to: TO,
+      granularity: undefined,
+      service: undefined,
+      environment: undefined,
+      last: undefined,
+      limit: undefined
+    });
+    expect(JSON.parse(result.output)).toEqual(funnelsResponse);
   });
 
   it("loads auth state and forwards authenticated opportunity list calls", async () => {
@@ -306,6 +365,7 @@ describe("cli analytics metrics commands", () => {
         status: 200,
         body: { window: metricsWindow, referrers: [], utm_sources: [], utm_mediums: [], utm_campaigns: [] }
       })
+      .mockResolvedValueOnce({ status: 200, body: funnelsResponse })
       .mockResolvedValueOnce({
         status: 200,
         body: {
@@ -338,6 +398,7 @@ describe("cli analytics metrics commands", () => {
     await api.getJourneyPatterns({ bearerToken: "dbundle_mem_x", projectId: PROJECT_ID });
     await api.getDeviceBreakdown({ bearerToken: "dbundle_mem_x", projectId: PROJECT_ID });
     await api.getReferrerMetrics({ bearerToken: "dbundle_mem_x", projectId: PROJECT_ID });
+    await api.listFunnels({ bearerToken: "dbundle_mem_x", projectId: PROJECT_ID });
     await api.getFunnelAnalysis({ bearerToken: "dbundle_mem_x", projectId: PROJECT_ID, funnelKey: "checkout" });
     await api.listOpportunities({
       bearerToken: "dbundle_mem_x",
@@ -376,6 +437,11 @@ describe("cli analytics metrics commands", () => {
     expect(request).toHaveBeenCalledWith({
       method: "GET",
       path: `/v1/analytics/referrers?project_id=${PROJECT_ID}`,
+      bearerToken: "dbundle_mem_x"
+    });
+    expect(request).toHaveBeenCalledWith({
+      method: "GET",
+      path: `/v1/analytics/funnels?project_id=${PROJECT_ID}`,
       bearerToken: "dbundle_mem_x"
     });
     expect(request).toHaveBeenCalledWith({

@@ -9,6 +9,7 @@ import {
   AnalyticsBundleV1Schema,
   AnalyticsDeviceBreakdownResponseSchema,
   AnalyticsFunnelAnalysisResponseSchema,
+  AnalyticsFunnelsResponseSchema,
   AnalyticsJourneyPatternsResponseSchema,
   AnalyticsMetricsGranularitySchema,
   AnalyticsOpportunitiesListResponseSchema,
@@ -376,6 +377,17 @@ export function registerAnalyticsRoutes(app: FastifyInstance, dependencies: ApiD
     const referrers = await dependencies.analyticsMetrics!.getReferrerMetricsForProject(toMetricsInput(input));
 
     return reply.status(200).send(AnalyticsReferrerMetricsResponseSchema.parse(referrers));
+  });
+
+  app.get("/v1/analytics/funnels", async (request, reply) => {
+    const input = await requireAnalyticsMetricsQuery(request, reply, dependencies);
+    if (input === null) {
+      return;
+    }
+
+    const funnels = await dependencies.analyticsMetrics!.listFunnelsForProject(toMetricsInput(input));
+
+    return reply.status(200).send(AnalyticsFunnelsResponseSchema.parse(funnels));
   });
 
   app.get("/v1/analytics/funnels/:key", async (request, reply) => {

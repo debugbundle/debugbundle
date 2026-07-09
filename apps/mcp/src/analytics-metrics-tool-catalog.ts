@@ -68,6 +68,12 @@ export const ANALYTICS_METRICS_MCP_TOOL_CATALOG = [
     inputSchema: analyticsMetricsInputSchema()
   },
   {
+    name: "list_funnel_metrics",
+    group: "analytics_metrics",
+    description: "List aggregate AnalyticsBundle funnel conversion summaries for a project.",
+    inputSchema: analyticsMetricsInputSchema()
+  },
+  {
     name: "get_funnel_analysis",
     group: "analytics_metrics",
     description: "Get aggregate AnalyticsBundle funnel conversion and dropoff analysis.",

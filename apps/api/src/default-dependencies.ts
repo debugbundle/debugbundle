@@ -673,6 +673,10 @@ export function createApiDependencies(input: CreateApiDependenciesInput): Defaul
         void input.organization_id;
         return analyticsMetricsStore.getReferrerMetrics(input);
       },
+      listFunnelsForProject: (input) => {
+        void input.organization_id;
+        return analyticsMetricsStore.listFunnels(input);
+      },
       getFunnelAnalysisForProject: (input) => {
         void input.organization_id;
         return analyticsMetricsStore.getFunnelAnalysis(input);

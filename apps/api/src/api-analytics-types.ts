@@ -4,6 +4,7 @@ import type {
   AnalyticsBundleAnalysisKind,
   AnalyticsDeviceBreakdownResponse,
   AnalyticsFunnelAnalysisResponse,
+  AnalyticsFunnelsResponse,
   AnalyticsJourneySampleMetadata,
   AnalyticsJourneyPatternsResponse,
   AnalyticsOpportunitiesListResponse,
@@ -40,6 +41,7 @@ export interface ApiAnalyticsDependencies {
     getJourneyPatternsForProject(input: AnalyticsMetricsQueryInput): Promise<AnalyticsJourneyPatternsResponse>;
     getDeviceBreakdownForProject(input: AnalyticsMetricsQueryInput): Promise<AnalyticsDeviceBreakdownResponse>;
     getReferrerMetricsForProject(input: AnalyticsMetricsQueryInput): Promise<AnalyticsReferrerMetricsResponse>;
+    listFunnelsForProject(input: AnalyticsMetricsQueryInput): Promise<AnalyticsFunnelsResponse>;
     getFunnelAnalysisForProject(input: AnalyticsFunnelQueryInput): Promise<AnalyticsFunnelAnalysisResponse>;
   } | undefined;
   analyticsJourneySamples?: {

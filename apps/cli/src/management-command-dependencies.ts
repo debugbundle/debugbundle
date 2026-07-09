@@ -29,6 +29,7 @@ import type {
   getAnalyticsReferrersWithAuthCommand as defaultGetAnalyticsReferrersCommand,
   getAnalyticsRoutesWithAuthCommand as defaultGetAnalyticsRoutesCommand,
   getAnalyticsSummaryWithAuthCommand as defaultGetAnalyticsSummaryCommand,
+  listAnalyticsFunnelsWithAuthCommand as defaultListAnalyticsFunnelsCommand,
   listAnalyticsOpportunitiesWithAuthCommand as defaultListAnalyticsOpportunitiesCommand
 } from "./analytics-metrics-commands.js";
 import type {
@@ -173,6 +174,7 @@ export type ManagementCommandDependencies = {
   getAnalyticsJourneysCommand?: typeof defaultGetAnalyticsJourneysCommand;
   getAnalyticsDevicesCommand?: typeof defaultGetAnalyticsDevicesCommand;
   getAnalyticsReferrersCommand?: typeof defaultGetAnalyticsReferrersCommand;
+  listAnalyticsFunnelsCommand?: typeof defaultListAnalyticsFunnelsCommand;
   getAnalyticsFunnelCommand?: typeof defaultGetAnalyticsFunnelCommand;
   createAnalyticsBundleCommand?: typeof defaultCreateAnalyticsBundleCommand;
   getAnalyticsBundleCommand?: typeof defaultGetAnalyticsBundleCommand;
