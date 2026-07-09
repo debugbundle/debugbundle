@@ -99,10 +99,22 @@ describe("mcp default tools", () => {
         projects: [projectRecord]
       });
 
-      const calledUrl = String(fetchMock.mock.calls[0]?.[0]);
+      const firstCall = fetchMock.mock.calls[0];
+      if (firstCall === undefined) {
+        throw new Error("expected fetch to be called");
+      }
+
+      const [requestInfo, requestInit] = firstCall;
+      const calledUrl =
+        typeof requestInfo === "string"
+          ? requestInfo
+          : requestInfo instanceof URL
+            ? requestInfo.href
+            : requestInfo.url;
+
       expect(calledUrl).toMatch(/\/v1\/projects\?limit=5$/);
       expect(calledUrl).not.toBe("   /v1/projects?limit=5");
-      expect(fetchMock.mock.calls[0]?.[1]).toMatchObject({
+      expect(requestInit).toMatchObject({
         method: "GET",
         headers: {
           accept: "application/json",
