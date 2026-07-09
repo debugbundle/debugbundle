@@ -795,6 +795,7 @@ describe("analytics metrics routes", () => {
           usage: {
             monthly_analytics_events: 0,
             monthly_analytics_sessions: 0,
+            monthly_analytics_journey_samples: 0,
             monthly_analytics_bundle_generations: 25
           }
         }),

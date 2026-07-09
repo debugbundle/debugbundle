@@ -6,9 +6,16 @@ import type {
   AnalyticsSettings
 } from "../../../packages/shared-types/src/index.js";
 import {
+  getTierCapabilities,
+  isSelfHostMode
+} from "../../../packages/shared-types/src/index.js";
+import {
   buildAnalyticsJourneyObjectKey,
+  type AnalyticsJourneySampleRecord,
+  type AnalyticsUsageStore,
   type AnalyticsJourneySampleStore,
   type AnalyticsSettingsStore,
+  type BillingStore,
   type ObjectStoreClient,
   type ObjectStoreReader
 } from "../../../packages/storage/src/index.js";
@@ -19,8 +26,17 @@ const EDGE_EVENT_COUNT = 50;
 
 export interface AnalyticsJourneySampleCaptureDependencies {
   analyticsSettingsStore: Pick<AnalyticsSettingsStore, "getAnalyticsSettingsByProjectId">;
-  analyticsJourneySampleStore: Pick<AnalyticsJourneySampleStore, "recordAnalyticsJourneySample">;
-  objectStore: Pick<ObjectStoreReader, "getObject"> & Pick<ObjectStoreClient, "putObject">;
+  analyticsJourneySampleStore: Pick<
+    AnalyticsJourneySampleStore,
+    "reserveAnalyticsJourneySample" | "recordAnalyticsJourneySample" | "deleteAnalyticsJourneySampleForProject"
+  >;
+  analyticsUsageStore?: Pick<
+    AnalyticsUsageStore,
+    "claimAnalyticsUsageForOrganization" | "releaseAnalyticsUsageForOrganization"
+  > | undefined;
+  billingStore?: Pick<BillingStore, "getBillingSummaryForOrganization"> | undefined;
+  resolveOrganizationIdForProject?: ((projectId: string) => Promise<string | null>) | undefined;
+  objectStore: Pick<ObjectStoreReader, "getObject"> & Pick<ObjectStoreClient, "putObject" | "deleteObject">;
 }
 
 export interface AnalyticsJourneySampleArtifact {
@@ -83,32 +99,151 @@ export async function maybeCaptureAnalyticsJourneySample(input: {
     event: input.event,
     eventSample
   });
-
-  await input.dependencies.objectStore.putObject({
-    key: objectKey,
-    body: gzipSync(Buffer.from(JSON.stringify(artifact), "utf8")),
-    contentType: "application/json",
-    contentEncoding: "gzip"
+  const sampleRecord = toJourneySampleRecord({
+    project_id: input.project_id,
+    event: input.event,
+    artifact,
+    objectKey,
+    settings
   });
+  const reservation = await input.dependencies.analyticsJourneySampleStore.reserveAnalyticsJourneySample(sampleRecord);
+  const quotaClaim = reservation === "created"
+    ? await claimRetainedJourneySampleQuota({
+        project_id: input.project_id,
+        dependencies: input.dependencies
+      })
+    : { allowed: true as const };
+  if (!quotaClaim.allowed) {
+    await input.dependencies.analyticsJourneySampleStore.deleteAnalyticsJourneySampleForProject({
+      project_id: input.project_id,
+      sample_id: sampleId
+    });
+    return { captured: false, reason: "journey_sample_quota_exceeded" };
+  }
 
-  await input.dependencies.analyticsJourneySampleStore.recordAnalyticsJourneySample({
-    sample_id: sampleId,
+  try {
+    await input.dependencies.objectStore.putObject({
+      key: objectKey,
+      body: gzipSync(Buffer.from(JSON.stringify(artifact), "utf8")),
+      contentType: "application/json",
+      contentEncoding: "gzip"
+    });
+
+    await input.dependencies.analyticsJourneySampleStore.recordAnalyticsJourneySample(sampleRecord);
+  } catch (error) {
+    if (reservation === "created") {
+      await releaseRetainedJourneySampleQuotaBestEffort({
+        dependencies: input.dependencies,
+        release: quotaClaim.release
+      });
+      await input.dependencies.analyticsJourneySampleStore.deleteAnalyticsJourneySampleForProject({
+        project_id: input.project_id,
+        sample_id: sampleId
+      }).catch(() => undefined);
+      await input.dependencies.objectStore.deleteObject?.({ key: objectKey }).catch(() => undefined);
+    }
+    throw error;
+  }
+
+  return { captured: true };
+}
+
+function toJourneySampleRecord(input: {
+  project_id: string;
+  event: AnalyticsEventEnvelope;
+  artifact: AnalyticsJourneySampleArtifact;
+  objectKey: string;
+  settings: Pick<AnalyticsSettings, "sample_retention_days">;
+}): AnalyticsJourneySampleRecord {
+  return {
+    sample_id: input.artifact.sample_id,
     project_id: input.project_id,
     service: input.event.service.name,
     environment: input.event.service.environment,
     session_id_hash: hashAnalyticsIdentifier(input.event.correlation.session_id),
     visitor_id_hash: input.event.correlation.visitor_id_hash,
-    analysis_tags: artifact.analysis_tags,
-    first_seen_at: artifact.first_seen_at,
-    last_seen_at: artifact.last_seen_at,
-    dimensions_summary: artifact.dimensions_summary,
+    analysis_tags: input.artifact.analysis_tags,
+    first_seen_at: input.artifact.first_seen_at,
+    last_seen_at: input.artifact.last_seen_at,
+    dimensions_summary: input.artifact.dimensions_summary,
     has_artifact: true,
-    object_key: objectKey,
-    expires_at: addDays(input.event.occurred_at, settings.sample_retention_days),
+    object_key: input.objectKey,
+    expires_at: addDays(input.event.occurred_at, input.settings.sample_retention_days),
     created_at: input.event.occurred_at
+  };
+}
+
+type RetainedJourneySampleQuotaRelease = {
+  organization_id: string;
+  period_starts_at: string;
+  analytics_events: number;
+  analytics_sessions: number;
+  analytics_journey_samples: number;
+  analytics_bundle_generations: number;
+};
+
+type RetainedJourneySampleQuotaClaim =
+  | { allowed: true; release?: RetainedJourneySampleQuotaRelease }
+  | { allowed: false };
+
+async function claimRetainedJourneySampleQuota(input: {
+  project_id: string;
+  dependencies: AnalyticsJourneySampleCaptureDependencies;
+}): Promise<RetainedJourneySampleQuotaClaim> {
+  if (
+    isSelfHostMode() ||
+    input.dependencies.analyticsUsageStore === undefined ||
+    input.dependencies.billingStore === undefined ||
+    input.dependencies.resolveOrganizationIdForProject === undefined
+  ) {
+    return { allowed: true };
+  }
+
+  const organizationId = await input.dependencies.resolveOrganizationIdForProject(input.project_id);
+  if (organizationId === null) {
+    return { allowed: true };
+  }
+
+  const billingSummary = await input.dependencies.billingStore.getBillingSummaryForOrganization({
+    organization_id: organizationId,
+    now: new Date().toISOString()
+  });
+  if (billingSummary === null) {
+    return { allowed: true };
+  }
+
+  const release: RetainedJourneySampleQuotaRelease = {
+    organization_id: organizationId,
+    period_starts_at: billingSummary.usage_window.starts_at,
+    analytics_events: 0,
+    analytics_sessions: 0,
+    analytics_journey_samples: 1,
+    analytics_bundle_generations: 0
+  };
+  const capacityUnits = Math.max(1, billingSummary.capacity_units.total);
+  const caps = getTierCapabilities(billingSummary.plan);
+  const claim = await input.dependencies.analyticsUsageStore.claimAnalyticsUsageForOrganization({
+    ...release,
+    limits: {
+      monthly_analytics_events: caps.monthly_analytics_events * capacityUnits,
+      monthly_analytics_sessions: caps.monthly_analytics_sessions * capacityUnits,
+      monthly_analytics_journey_samples: caps.monthly_analytics_journey_samples * capacityUnits,
+      monthly_analytics_bundle_generations: caps.monthly_analytics_bundle_generations * capacityUnits
+    }
   });
 
-  return { captured: true };
+  return claim.allowed ? { allowed: true, release } : { allowed: false };
+}
+
+async function releaseRetainedJourneySampleQuotaBestEffort(input: {
+  dependencies: AnalyticsJourneySampleCaptureDependencies;
+  release: RetainedJourneySampleQuotaRelease | undefined;
+}): Promise<void> {
+  if (input.release === undefined || input.dependencies.analyticsUsageStore === undefined) {
+    return;
+  }
+
+  await input.dependencies.analyticsUsageStore.releaseAnalyticsUsageForOrganization(input.release).catch(() => undefined);
 }
 
 export function buildAnalyticsJourneySampleId(projectId: string, event: AnalyticsEventEnvelope): string {

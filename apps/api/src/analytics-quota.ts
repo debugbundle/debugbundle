@@ -11,6 +11,7 @@ import type { ApiDependencies } from "./api-types.js";
 export type AnalyticsQuotaMetric =
   | "monthly_analytics_events"
   | "monthly_analytics_sessions"
+  | "monthly_analytics_journey_samples"
   | "monthly_analytics_bundle_generations";
 
 export type AnalyticsQuotaClaim =
@@ -66,6 +67,7 @@ function buildAnalyticsLimits(input: {
 }): {
   monthly_analytics_events: number;
   monthly_analytics_sessions: number;
+  monthly_analytics_journey_samples: number;
   monthly_analytics_bundle_generations: number;
 } {
   const caps = getTierCapabilities(input.organization_plan);
@@ -74,6 +76,7 @@ function buildAnalyticsLimits(input: {
   return {
     monthly_analytics_events: caps.monthly_analytics_events * capacityUnits,
     monthly_analytics_sessions: caps.monthly_analytics_sessions * capacityUnits,
+    monthly_analytics_journey_samples: caps.monthly_analytics_journey_samples * capacityUnits,
     monthly_analytics_bundle_generations: caps.monthly_analytics_bundle_generations * capacityUnits
   };
 }
@@ -104,6 +107,7 @@ async function claimAnalyticsUsage(input: {
   now: Date;
   analytics_events: number;
   analytics_sessions: number;
+  analytics_journey_samples: number;
   analytics_bundle_generations: number;
 }): Promise<AnalyticsQuotaClaim> {
   const billingSummary = await readBillingSummary({
@@ -121,6 +125,7 @@ async function claimAnalyticsUsage(input: {
     period_starts_at: billingSummary.usage_window.starts_at,
     analytics_events: input.analytics_events,
     analytics_sessions: input.analytics_sessions,
+    analytics_journey_samples: input.analytics_journey_samples,
     analytics_bundle_generations: input.analytics_bundle_generations
   };
   const claim = await analyticsUsage.claimAnalyticsUsageForOrganization({
@@ -162,6 +167,7 @@ export async function claimAnalyticsIngestionQuota(input: {
     now: input.now,
     analytics_events: input.events.length,
     analytics_sessions: countIncomingSessionStarts(input.events),
+    analytics_journey_samples: 0,
     analytics_bundle_generations: 0
   });
 }
@@ -179,6 +185,7 @@ export async function claimAnalyticsBundleGenerationQuota(input: {
     now: input.now,
     analytics_events: 0,
     analytics_sessions: 0,
+    analytics_journey_samples: 0,
     analytics_bundle_generations: 1
   });
 }

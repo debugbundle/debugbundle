@@ -212,6 +212,8 @@ describe("storage bootstrap schema", () => {
     expect(STORAGE_BOOTSTRAP_SQL.includes("CREATE TABLE account_payment_retention_records")).toBe(true);
     expect(STORAGE_BOOTSTRAP_SQL.includes("CREATE TABLE account_payment_provider_events")).toBe(true);
     expect(STORAGE_BOOTSTRAP_SQL.includes("'transition_session'")).toBe(true);
+    expect(STORAGE_BOOTSTRAP_SQL.includes("analytics_journey_samples integer NOT NULL DEFAULT 0")).toBe(true);
+    expect(STORAGE_BOOTSTRAP_SQL.includes("has_artifact boolean NOT NULL DEFAULT false")).toBe(true);
     expect(STORAGE_BOOTSTRAP_SQL.includes("UNIQUE (organization_id, slack_team_id, slack_channel_id)")).toBe(true);
   });
 

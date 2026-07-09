@@ -1417,6 +1417,7 @@ Required table concepts for the AnalyticsBundle implementation:
 | Table | Purpose |
 |---|---|
 | `project_analytics_settings` | Project-scoped analytics enablement, privacy mode, consent requirement, sampling, retention, saved-funnel/custom-dimension limits, and capture toggles |
+| `analytics_usage_counters` | Durable internal monthly analytics allowance counters for events, sessions, retained journey samples, and AnalyticsBundle generations |
 | `analytics_ingestion_ledger` | Idempotency ledger keyed by project/event id so reprocessing does not double-count rollups |
 | `analytics_rollup_uniques` | Idempotency ledger for unique session counts per rollup bucket, dimension hash, route/action/funnel key, and hashed session subject |
 | `analytics_session_rollups` | Hourly/daily session, active-user, new/returning visitor, bounce, exit, duration, and pageview aggregates by bounded dimensions |
@@ -1425,7 +1426,7 @@ Required table concepts for the AnalyticsBundle implementation:
 | `analytics_funnel_definitions` | Optional saved funnel definitions for named project funnels |
 | `analytics_funnel_rollups` | Funnel-step conversion/dropoff/time aggregates by bounded dimensions |
 | `analytics_transition_rollups` | Route-to-route transition aggregates for journey/path analysis |
-| `analytics_journey_samples` | Short-lived retained representative journey sample index pointing to redacted object-storage artifacts |
+| `analytics_journey_samples` | Short-lived retained representative journey sample index pointing to redacted object-storage artifacts; public reads expose only rows with completed artifacts |
 | `analytics_opportunities` | Deterministic usage/friction/incident-impact/deploy-comparison opportunities with status, severity, confidence, evidence summary, related incident/deploy ids, and bundle state |
 | `analytics_bundle_generations` | On-demand or scheduled AnalyticsBundle generation metadata, input fingerprint, status, object key, and failure reason |
 

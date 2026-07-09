@@ -51,6 +51,7 @@ export const ANALYTICS_BOOTSTRAP_STATEMENTS = [
       period_starts_at timestamptz NOT NULL,
       analytics_events integer NOT NULL DEFAULT 0,
       analytics_sessions integer NOT NULL DEFAULT 0,
+      analytics_journey_samples integer NOT NULL DEFAULT 0,
       analytics_bundle_generations integer NOT NULL DEFAULT 0,
       updated_at timestamptz NOT NULL DEFAULT now(),
       PRIMARY KEY (organization_id, period_starts_at)
@@ -325,6 +326,7 @@ export const ANALYTICS_BOOTSTRAP_STATEMENTS = [
       dimensions_summary jsonb NOT NULL DEFAULT '{}'::jsonb
         CHECK (jsonb_typeof(dimensions_summary) = 'object'),
       s3_object_key text NOT NULL,
+      has_artifact boolean NOT NULL DEFAULT false,
       expires_at timestamptz NOT NULL,
       created_at timestamptz NOT NULL DEFAULT now(),
       UNIQUE (project_id, s3_object_key)

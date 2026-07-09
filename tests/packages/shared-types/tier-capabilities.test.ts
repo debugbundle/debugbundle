@@ -133,6 +133,7 @@ describe("tier capabilities", () => {
       expect(typeof caps.monthly_webhook_deliveries).toBe("number");
       expect(typeof caps.monthly_analytics_events).toBe("number");
       expect(typeof caps.monthly_analytics_sessions).toBe("number");
+      expect(typeof caps.monthly_analytics_journey_samples).toBe("number");
       expect(typeof caps.monthly_analytics_bundle_generations).toBe("number");
     }
   });
@@ -147,6 +148,7 @@ describe("tier capabilities", () => {
     expect(TIER_CAPABILITIES.free.monthly_webhook_deliveries).toBe(100);
     expect(TIER_CAPABILITIES.free.monthly_analytics_events).toBe(0);
     expect(TIER_CAPABILITIES.free.monthly_analytics_sessions).toBe(0);
+    expect(TIER_CAPABILITIES.free.monthly_analytics_journey_samples).toBe(0);
     expect(TIER_CAPABILITIES.free.monthly_analytics_bundle_generations).toBe(0);
     // Solo per-slot
     expect(TIER_CAPABILITIES.solo.monthly_bundle_requests).toBe(250);
@@ -157,6 +159,7 @@ describe("tier capabilities", () => {
     expect(TIER_CAPABILITIES.solo.monthly_webhook_deliveries).toBe(250);
     expect(TIER_CAPABILITIES.solo.monthly_analytics_events).toBe(50_000);
     expect(TIER_CAPABILITIES.solo.monthly_analytics_sessions).toBe(10_000);
+    expect(TIER_CAPABILITIES.solo.monthly_analytics_journey_samples).toBe(1_000);
     expect(TIER_CAPABILITIES.solo.monthly_analytics_bundle_generations).toBe(25);
     // Team per-slot
     expect(TIER_CAPABILITIES.team.monthly_bundle_requests).toBe(1_000);
@@ -167,6 +170,7 @@ describe("tier capabilities", () => {
     expect(TIER_CAPABILITIES.team.monthly_webhook_deliveries).toBe(1_000);
     expect(TIER_CAPABILITIES.team.monthly_analytics_events).toBe(250_000);
     expect(TIER_CAPABILITIES.team.monthly_analytics_sessions).toBe(50_000);
+    expect(TIER_CAPABILITIES.team.monthly_analytics_journey_samples).toBe(10_000);
     expect(TIER_CAPABILITIES.team.monthly_analytics_bundle_generations).toBe(100);
   });
 
@@ -227,6 +231,7 @@ describe("self-host mode", () => {
       expect(caps.monthly_bundle_requests).toBeGreaterThanOrEqual(1_000_000_000);
       expect(caps.monthly_analytics_events).toBeGreaterThanOrEqual(1_000_000_000);
       expect(caps.monthly_analytics_sessions).toBeGreaterThanOrEqual(1_000_000_000);
+      expect(caps.monthly_analytics_journey_samples).toBeGreaterThanOrEqual(1_000_000_000);
       expect(caps.monthly_analytics_bundle_generations).toBeGreaterThanOrEqual(1_000_000_000);
     }
   });

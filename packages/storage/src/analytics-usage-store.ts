@@ -3,6 +3,7 @@ import type { Queryable } from "./types.js";
 export interface AnalyticsAllowanceUsageSummary {
   monthly_analytics_events: number;
   monthly_analytics_sessions: number;
+  monthly_analytics_journey_samples: number;
   monthly_analytics_bundle_generations: number;
 }
 
@@ -11,6 +12,7 @@ export interface AnalyticsAllowanceClaimInput {
   period_starts_at: string;
   analytics_events: number;
   analytics_sessions: number;
+  analytics_journey_samples: number;
   analytics_bundle_generations: number;
   limits: AnalyticsAllowanceUsageSummary;
 }
@@ -20,12 +22,14 @@ export interface AnalyticsAllowanceReleaseInput {
   period_starts_at: string;
   analytics_events: number;
   analytics_sessions: number;
+  analytics_journey_samples: number;
   analytics_bundle_generations: number;
 }
 
 export type AnalyticsAllowanceMetric =
   | "monthly_analytics_events"
   | "monthly_analytics_sessions"
+  | "monthly_analytics_journey_samples"
   | "monthly_analytics_bundle_generations";
 
 export type AnalyticsAllowanceClaimResult =
@@ -53,6 +57,7 @@ export interface AnalyticsUsageStore {
 type AnalyticsUsageCounterRow = {
   analytics_events: number | string;
   analytics_sessions: number | string;
+  analytics_journey_samples: number | string;
   analytics_bundle_generations: number | string;
 };
 
@@ -71,6 +76,7 @@ function toUsageSummary(row: AnalyticsUsageCounterRow | undefined): AnalyticsAll
   return {
     monthly_analytics_events: readCount(row?.analytics_events),
     monthly_analytics_sessions: readCount(row?.analytics_sessions),
+    monthly_analytics_journey_samples: readCount(row?.analytics_journey_samples),
     monthly_analytics_bundle_generations: readCount(row?.analytics_bundle_generations)
   };
 }
@@ -98,6 +104,18 @@ function findExceededMetric(input: {
     };
   }
   if (
+    input.usage.monthly_analytics_journey_samples >
+    input.limits.monthly_analytics_journey_samples
+  ) {
+    return {
+      allowed: false,
+      metric: "monthly_analytics_journey_samples",
+      used: input.usage.monthly_analytics_journey_samples,
+      limit: input.limits.monthly_analytics_journey_samples,
+      usage: input.usage
+    };
+  }
+  if (
     input.usage.monthly_analytics_bundle_generations >
     input.limits.monthly_analytics_bundle_generations
   ) {
@@ -117,6 +135,7 @@ function buildRequestedUsage(input: AnalyticsAllowanceClaimInput): AnalyticsAllo
   return {
     monthly_analytics_events: Math.max(0, input.analytics_events),
     monthly_analytics_sessions: Math.max(0, input.analytics_sessions),
+    monthly_analytics_journey_samples: Math.max(0, input.analytics_journey_samples),
     monthly_analytics_bundle_generations: Math.max(0, input.analytics_bundle_generations)
   };
 }
@@ -131,6 +150,7 @@ export function createPostgresAnalyticsUsageStore(db: Queryable): AnalyticsUsage
         SELECT
           analytics_events,
           analytics_sessions,
+          analytics_journey_samples,
           analytics_bundle_generations
         FROM analytics_usage_counters
         WHERE organization_id = $1::uuid
@@ -158,6 +178,7 @@ export function createPostgresAnalyticsUsageStore(db: Queryable): AnalyticsUsage
       if (
         requested.monthly_analytics_events === 0 &&
         requested.monthly_analytics_sessions === 0 &&
+        requested.monthly_analytics_journey_samples === 0 &&
         requested.monthly_analytics_bundle_generations === 0
       ) {
         return {
@@ -173,30 +194,36 @@ export function createPostgresAnalyticsUsageStore(db: Queryable): AnalyticsUsage
             period_starts_at,
             analytics_events,
             analytics_sessions,
+            analytics_journey_samples,
             analytics_bundle_generations,
             updated_at
           )
-          VALUES ($1::uuid, $2::timestamptz, $3, $4, $5, now())
+          VALUES ($1::uuid, $2::timestamptz, $3, $4, $5, $6, now())
           ON CONFLICT (organization_id, period_starts_at)
           DO UPDATE SET
             analytics_events = analytics_usage_counters.analytics_events + EXCLUDED.analytics_events,
             analytics_sessions = analytics_usage_counters.analytics_sessions + EXCLUDED.analytics_sessions,
+            analytics_journey_samples =
+              analytics_usage_counters.analytics_journey_samples + EXCLUDED.analytics_journey_samples,
             analytics_bundle_generations =
               analytics_usage_counters.analytics_bundle_generations + EXCLUDED.analytics_bundle_generations,
             updated_at = now()
-          WHERE analytics_usage_counters.analytics_events + EXCLUDED.analytics_events <= $6
-            AND analytics_usage_counters.analytics_sessions + EXCLUDED.analytics_sessions <= $7
-            AND analytics_usage_counters.analytics_bundle_generations + EXCLUDED.analytics_bundle_generations <= $8
-          RETURNING analytics_events, analytics_sessions, analytics_bundle_generations
+          WHERE analytics_usage_counters.analytics_events + EXCLUDED.analytics_events <= $7
+            AND analytics_usage_counters.analytics_sessions + EXCLUDED.analytics_sessions <= $8
+            AND analytics_usage_counters.analytics_journey_samples + EXCLUDED.analytics_journey_samples <= $9
+            AND analytics_usage_counters.analytics_bundle_generations + EXCLUDED.analytics_bundle_generations <= $10
+          RETURNING analytics_events, analytics_sessions, analytics_journey_samples, analytics_bundle_generations
         `,
         [
           input.organization_id,
           input.period_starts_at,
           requested.monthly_analytics_events,
           requested.monthly_analytics_sessions,
+          requested.monthly_analytics_journey_samples,
           requested.monthly_analytics_bundle_generations,
           input.limits.monthly_analytics_events,
           input.limits.monthly_analytics_sessions,
+          input.limits.monthly_analytics_journey_samples,
           input.limits.monthly_analytics_bundle_generations
         ]
       );
@@ -212,6 +239,8 @@ export function createPostgresAnalyticsUsageStore(db: Queryable): AnalyticsUsage
         usage: {
           monthly_analytics_events: currentUsage.monthly_analytics_events + requested.monthly_analytics_events,
           monthly_analytics_sessions: currentUsage.monthly_analytics_sessions + requested.monthly_analytics_sessions,
+          monthly_analytics_journey_samples:
+            currentUsage.monthly_analytics_journey_samples + requested.monthly_analytics_journey_samples,
           monthly_analytics_bundle_generations:
             currentUsage.monthly_analytics_bundle_generations + requested.monthly_analytics_bundle_generations
         },
@@ -233,7 +262,8 @@ export function createPostgresAnalyticsUsageStore(db: Queryable): AnalyticsUsage
           SET
             analytics_events = GREATEST(0, analytics_events - $3),
             analytics_sessions = GREATEST(0, analytics_sessions - $4),
-            analytics_bundle_generations = GREATEST(0, analytics_bundle_generations - $5),
+            analytics_journey_samples = GREATEST(0, analytics_journey_samples - $5),
+            analytics_bundle_generations = GREATEST(0, analytics_bundle_generations - $6),
             updated_at = now()
           WHERE organization_id = $1::uuid
             AND period_starts_at = $2::timestamptz
@@ -243,6 +273,7 @@ export function createPostgresAnalyticsUsageStore(db: Queryable): AnalyticsUsage
           input.period_starts_at,
           Math.max(0, input.analytics_events),
           Math.max(0, input.analytics_sessions),
+          Math.max(0, input.analytics_journey_samples),
           Math.max(0, input.analytics_bundle_generations)
         ]
       );

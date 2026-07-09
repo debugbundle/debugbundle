@@ -11,7 +11,12 @@ export interface AnalyticsJourneySamplesCursor {
 }
 
 export interface AnalyticsJourneySampleStore {
+  reserveAnalyticsJourneySample(input: AnalyticsJourneySampleRecord): Promise<"created" | "exists">;
   recordAnalyticsJourneySample(input: AnalyticsJourneySampleRecord): Promise<AnalyticsJourneySampleRecord>;
+  deleteAnalyticsJourneySampleForProject(input: {
+    project_id: string;
+    sample_id: string;
+  }): Promise<void>;
   listAnalyticsJourneySamplesForProject(input: {
     project_id: string;
     service?: string | undefined;
@@ -40,6 +45,7 @@ type AnalyticsJourneySampleRow = {
   last_seen_at: string;
   dimensions_summary: Record<string, unknown>;
   object_key: string;
+  has_artifact: boolean;
   expires_at: string;
   created_at: string;
 };
@@ -64,7 +70,7 @@ export function createPostgresAnalyticsJourneySampleStore(db: Queryable): Analyt
       first_seen_at: row.first_seen_at,
       last_seen_at: row.last_seen_at,
       dimensions_summary: row.dimensions_summary,
-      has_artifact: true,
+      has_artifact: row.has_artifact,
       object_key: row.object_key,
       expires_at: row.expires_at,
       created_at: row.created_at
@@ -81,7 +87,7 @@ export function createPostgresAnalyticsJourneySampleStore(db: Queryable): Analyt
     now: string;
   }): Promise<{ samples: AnalyticsJourneySampleRecord[]; next_cursor: string | null }> {
     const params: unknown[] = [input.project_id, input.now];
-    const where = ["project_id = $1::uuid", "expires_at > $2::timestamptz"];
+    const where = ["project_id = $1::uuid", "expires_at > $2::timestamptz", "has_artifact = true"];
 
     if (input.service !== undefined) {
       params.push(input.service);
@@ -115,6 +121,7 @@ export function createPostgresAnalyticsJourneySampleStore(db: Queryable): Analyt
           last_seen_at::text AS last_seen_at,
           dimensions_summary,
           s3_object_key AS object_key,
+          has_artifact,
           expires_at::text AS expires_at,
           created_at::text AS created_at
         FROM analytics_journey_samples
@@ -142,8 +149,8 @@ export function createPostgresAnalyticsJourneySampleStore(db: Queryable): Analyt
   }
 
   return {
-    async recordAnalyticsJourneySample(input) {
-      const result = await db.query<AnalyticsJourneySampleRow>(
+    async reserveAnalyticsJourneySample(input) {
+      const result = await db.query<{ sample_id: string }>(
         `
           INSERT INTO analytics_journey_samples (
             id,
@@ -157,6 +164,7 @@ export function createPostgresAnalyticsJourneySampleStore(db: Queryable): Analyt
             last_seen_at,
             dimensions_summary,
             s3_object_key,
+            has_artifact,
             expires_at,
             created_at
           )
@@ -172,6 +180,65 @@ export function createPostgresAnalyticsJourneySampleStore(db: Queryable): Analyt
             $9::timestamptz,
             $10::jsonb,
             $11,
+            false,
+            $12::timestamptz,
+            $13::timestamptz
+          )
+          ON CONFLICT (id) DO NOTHING
+          RETURNING id::text AS sample_id
+        `,
+        [
+          input.sample_id,
+          input.project_id,
+          input.service ?? "",
+          input.environment ?? "",
+          input.session_id_hash,
+          input.visitor_id_hash,
+          input.analysis_tags,
+          input.first_seen_at,
+          input.last_seen_at,
+          JSON.stringify(input.dimensions_summary),
+          input.object_key,
+          input.expires_at,
+          input.created_at
+        ]
+      );
+
+      return result.rows.length === 0 ? "exists" : "created";
+    },
+
+    async recordAnalyticsJourneySample(input) {
+      const result = await db.query<AnalyticsJourneySampleRow>(
+        `
+          INSERT INTO analytics_journey_samples (
+            id,
+            project_id,
+            service,
+            environment,
+            session_id_hash,
+            visitor_id_hash,
+            analysis_tags,
+            first_seen_at,
+            last_seen_at,
+            dimensions_summary,
+            s3_object_key,
+            has_artifact,
+            expires_at,
+            created_at
+          )
+          VALUES (
+            $1::uuid,
+            $2::uuid,
+            $3,
+            $4,
+            $5,
+            $6,
+            $7::text[],
+            $8::timestamptz,
+            $9::timestamptz,
+            $10::jsonb,
+            $11,
+            true,
             $12::timestamptz,
             $13::timestamptz
           )
@@ -191,6 +258,7 @@ export function createPostgresAnalyticsJourneySampleStore(db: Queryable): Analyt
             last_seen_at = GREATEST(analytics_journey_samples.last_seen_at, EXCLUDED.last_seen_at),
             dimensions_summary = analytics_journey_samples.dimensions_summary || EXCLUDED.dimensions_summary,
             s3_object_key = EXCLUDED.s3_object_key,
+            has_artifact = true,
             expires_at = GREATEST(analytics_journey_samples.expires_at, EXCLUDED.expires_at)
           RETURNING
             id::text AS sample_id,
@@ -204,6 +272,7 @@ export function createPostgresAnalyticsJourneySampleStore(db: Queryable): Analyt
             last_seen_at::text AS last_seen_at,
             dimensions_summary,
             s3_object_key AS object_key,
+            has_artifact,
             expires_at::text AS expires_at,
             created_at::text AS created_at
         `,
@@ -232,6 +301,17 @@ export function createPostgresAnalyticsJourneySampleStore(db: Queryable): Analyt
       return toRecord(row);
     },
 
+    async deleteAnalyticsJourneySampleForProject(input) {
+      await db.query(
+        `
+          DELETE FROM analytics_journey_samples
+          WHERE project_id = $1::uuid
+            AND id = $2::uuid
+        `,
+        [input.project_id, input.sample_id]
+      );
+    },
+
     listAnalyticsJourneySamplesForProject,
 
     async getAnalyticsJourneySampleForProject(input) {
@@ -249,12 +329,14 @@ export function createPostgresAnalyticsJourneySampleStore(db: Queryable): Analyt
             last_seen_at::text AS last_seen_at,
             dimensions_summary,
             s3_object_key AS object_key,
+            has_artifact,
             expires_at::text AS expires_at,
             created_at::text AS created_at
           FROM analytics_journey_samples
           WHERE project_id = $1::uuid
             AND id = $2::uuid
             AND expires_at > $3::timestamptz
+            AND has_artifact = true
         `,
         [input.project_id, input.sample_id, input.now]
       );

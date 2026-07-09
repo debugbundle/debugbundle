@@ -132,7 +132,11 @@ describe("worker processor - aggregate-analytics-events", () => {
               sample_retention_days: 7
             })
           },
-          analyticsJourneySampleStore: { recordAnalyticsJourneySample },
+          analyticsJourneySampleStore: {
+            reserveAnalyticsJourneySample: vi.fn().mockResolvedValue("exists"),
+            recordAnalyticsJourneySample,
+            deleteAnalyticsJourneySampleForProject: vi.fn()
+          },
           objectStore
         }
       })
@@ -207,7 +211,11 @@ describe("worker processor - aggregate-analytics-events", () => {
               sample_retention_days: 7
             })
           },
-          analyticsJourneySampleStore: { recordAnalyticsJourneySample },
+          analyticsJourneySampleStore: {
+            reserveAnalyticsJourneySample: vi.fn().mockResolvedValue("exists"),
+            recordAnalyticsJourneySample,
+            deleteAnalyticsJourneySampleForProject: vi.fn()
+          },
           objectStore
         }
       })

@@ -18,6 +18,7 @@ import {
   createPostgresAnalyticsMetricsStore,
   createPostgresAnalyticsRollupStore,
   createPostgresAnalyticsSettingsStore,
+  createPostgresAnalyticsUsageStore,
   createPostgresAvailabilityCheckStore,
   createPostgresBillingStore,
   createIncidentLifecycleService,
@@ -249,6 +250,7 @@ export async function runWorkerFromEnv(
   const analyticsRollupStore = createPostgresAnalyticsRollupStore(queryable);
   const analyticsSettingsStore = createPostgresAnalyticsSettingsStore(queryable);
   const analyticsJourneySampleStore = createPostgresAnalyticsJourneySampleStore(queryable);
+  const analyticsUsageStore = createPostgresAnalyticsUsageStore(queryable);
   const analyticsMetricsStore = createPostgresAnalyticsMetricsStore(queryable);
   const analyticsBundleGenerationStore = createPostgresAnalyticsBundleGenerationStore(queryable);
   const accountAnalyticsStore = createPostgresAccountAnalyticsStore({
@@ -501,6 +503,9 @@ export async function runWorkerFromEnv(
               analyticsJourneySamples: {
                 analyticsSettingsStore,
                 analyticsJourneySampleStore,
+                analyticsUsageStore,
+                billingStore,
+                resolveOrganizationIdForProject,
                 objectStore
               }
             })

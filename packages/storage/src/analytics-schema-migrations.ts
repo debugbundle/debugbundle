@@ -460,5 +460,31 @@ export const ANALYTICS_STORAGE_SCHEMA_MIGRATIONS = [
         )
       `
     ]
+  }),
+  defineAnalyticsStorageSchemaMigration({
+    id: "202607090002_add_analytics_journey_sample_usage_counter",
+    description:
+      "Add durable retained journey sample allowance accounting to analytics usage counters.",
+    statements: [
+      `
+        ALTER TABLE analytics_usage_counters
+        ADD COLUMN IF NOT EXISTS analytics_journey_samples integer NOT NULL DEFAULT 0
+      `
+    ]
+  }),
+  defineAnalyticsStorageSchemaMigration({
+    id: "202607090003_add_analytics_journey_sample_artifact_visibility",
+    description:
+      "Track whether retained journey sample metadata has a completed artifact before public reads expose it.",
+    statements: [
+      `
+        ALTER TABLE analytics_journey_samples
+        ADD COLUMN IF NOT EXISTS has_artifact boolean NOT NULL DEFAULT true
+      `,
+      `
+        ALTER TABLE analytics_journey_samples
+        ALTER COLUMN has_artifact SET DEFAULT false
+      `
+    ]
   })
 ] as const;

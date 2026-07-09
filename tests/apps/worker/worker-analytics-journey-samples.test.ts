@@ -9,6 +9,7 @@ import {
 import type { AnalyticsEventEnvelope } from "../../../packages/shared-types/src/index.js";
 
 const PROJECT_ID = "11111111-1111-4111-8111-111111111111";
+const ORGANIZATION_ID = "99999999-9999-4999-8999-999999999999";
 
 function createAnalyticsEvent(overrides: Partial<AnalyticsEventEnvelope> = {}): AnalyticsEventEnvelope {
   return {
@@ -120,6 +121,7 @@ describe("analytics journey sample capture", () => {
       }]
     };
     const putObject = vi.fn().mockResolvedValue(undefined);
+    const reserveAnalyticsJourneySample = vi.fn().mockResolvedValue("exists");
     const recordAnalyticsJourneySample = vi.fn().mockResolvedValue({});
 
     await expect(
@@ -134,7 +136,11 @@ describe("analytics journey sample capture", () => {
               sample_retention_days: 30
             })
           },
-          analyticsJourneySampleStore: { recordAnalyticsJourneySample },
+          analyticsJourneySampleStore: {
+            reserveAnalyticsJourneySample,
+            recordAnalyticsJourneySample,
+            deleteAnalyticsJourneySampleForProject: vi.fn()
+          },
           objectStore: {
             getObject: vi.fn().mockResolvedValue(gzipSync(Buffer.from(JSON.stringify(existingArtifact), "utf8"))),
             putObject
@@ -159,6 +165,170 @@ describe("analytics journey sample capture", () => {
       sample_id: sampleId,
       expires_at: "2026-04-09T13:47:00.000Z"
     }));
+    expect(reserveAnalyticsJourneySample).toHaveBeenCalledWith(expect.objectContaining({
+      sample_id: sampleId
+    }));
+  });
+
+  it("claims retained sample allowance only when a sample reservation is new", async (): Promise<void> => {
+    const event = createAnalyticsEvent();
+    const sampleId = buildAnalyticsJourneySampleId(PROJECT_ID, event);
+    const claimAnalyticsUsageForOrganization = vi.fn().mockResolvedValue({ allowed: true });
+    const recordAnalyticsJourneySample = vi.fn().mockResolvedValue({});
+
+    await expect(
+      maybeCaptureAnalyticsJourneySample({
+        project_id: PROJECT_ID,
+        event,
+        dependencies: {
+          analyticsSettingsStore: {
+            getAnalyticsSettingsByProjectId: vi.fn().mockResolvedValue({
+              enabled: true,
+              journey_sample_rate: 1,
+              sample_retention_days: 7
+            })
+          },
+          analyticsJourneySampleStore: {
+            reserveAnalyticsJourneySample: vi.fn().mockResolvedValue("created"),
+            recordAnalyticsJourneySample,
+            deleteAnalyticsJourneySampleForProject: vi.fn()
+          },
+          analyticsUsageStore: {
+            claimAnalyticsUsageForOrganization,
+            releaseAnalyticsUsageForOrganization: vi.fn()
+          },
+          billingStore: {
+            getBillingSummaryForOrganization: vi.fn().mockResolvedValue(createBillingSummary())
+          },
+          resolveOrganizationIdForProject: vi.fn().mockResolvedValue(ORGANIZATION_ID),
+          objectStore: {
+            getObject: vi.fn().mockRejectedValue(new Error("s3_object_not_found")),
+            putObject: vi.fn().mockResolvedValue(undefined)
+          }
+        }
+      })
+    ).resolves.toEqual({ captured: true });
+
+    expect(claimAnalyticsUsageForOrganization).toHaveBeenCalledWith({
+      organization_id: ORGANIZATION_ID,
+      period_starts_at: "2026-03-01T00:00:00.000Z",
+      analytics_events: 0,
+      analytics_sessions: 0,
+      analytics_journey_samples: 1,
+      analytics_bundle_generations: 0,
+      limits: {
+        monthly_analytics_events: 150_000,
+        monthly_analytics_sessions: 30_000,
+        monthly_analytics_journey_samples: 3_000,
+        monthly_analytics_bundle_generations: 75
+      }
+    });
+    expect(recordAnalyticsJourneySample).toHaveBeenCalledWith(expect.objectContaining({
+      sample_id: sampleId
+    }));
+  });
+
+  it("skips new retained samples when the retained sample allowance is exhausted", async (): Promise<void> => {
+    const deleteAnalyticsJourneySampleForProject = vi.fn().mockResolvedValue(undefined);
+    const putObject = vi.fn();
+
+    await expect(
+      maybeCaptureAnalyticsJourneySample({
+        project_id: PROJECT_ID,
+        event: createAnalyticsEvent(),
+        dependencies: {
+          analyticsSettingsStore: {
+            getAnalyticsSettingsByProjectId: vi.fn().mockResolvedValue({
+              enabled: true,
+              journey_sample_rate: 1,
+              sample_retention_days: 7
+            })
+          },
+          analyticsJourneySampleStore: {
+            reserveAnalyticsJourneySample: vi.fn().mockResolvedValue("created"),
+            recordAnalyticsJourneySample: vi.fn(),
+            deleteAnalyticsJourneySampleForProject
+          },
+          analyticsUsageStore: {
+            claimAnalyticsUsageForOrganization: vi.fn().mockResolvedValue({
+              allowed: false,
+              metric: "monthly_analytics_journey_samples",
+              used: 3_001,
+              limit: 3_000,
+              usage: {
+                monthly_analytics_events: 0,
+                monthly_analytics_sessions: 0,
+                monthly_analytics_journey_samples: 3_001,
+                monthly_analytics_bundle_generations: 0
+              }
+            }),
+            releaseAnalyticsUsageForOrganization: vi.fn()
+          },
+          billingStore: {
+            getBillingSummaryForOrganization: vi.fn().mockResolvedValue(createBillingSummary())
+          },
+          resolveOrganizationIdForProject: vi.fn().mockResolvedValue(ORGANIZATION_ID),
+          objectStore: {
+            getObject: vi.fn().mockRejectedValue(new Error("s3_object_not_found")),
+            putObject
+          }
+        }
+      })
+    ).resolves.toEqual({ captured: false, reason: "journey_sample_quota_exceeded" });
+
+    expect(putObject).not.toHaveBeenCalled();
+    expect(deleteAnalyticsJourneySampleForProject).toHaveBeenCalledOnce();
+  });
+
+  it("releases a newly claimed retained sample allowance when artifact persistence fails", async (): Promise<void> => {
+    const releaseAnalyticsUsageForOrganization = vi.fn().mockResolvedValue(undefined);
+    const deleteAnalyticsJourneySampleForProject = vi.fn().mockResolvedValue(undefined);
+    const deleteObject = vi.fn().mockResolvedValue(undefined);
+
+    await expect(
+      maybeCaptureAnalyticsJourneySample({
+        project_id: PROJECT_ID,
+        event: createAnalyticsEvent(),
+        dependencies: {
+          analyticsSettingsStore: {
+            getAnalyticsSettingsByProjectId: vi.fn().mockResolvedValue({
+              enabled: true,
+              journey_sample_rate: 1,
+              sample_retention_days: 7
+            })
+          },
+          analyticsJourneySampleStore: {
+            reserveAnalyticsJourneySample: vi.fn().mockResolvedValue("created"),
+            recordAnalyticsJourneySample: vi.fn(),
+            deleteAnalyticsJourneySampleForProject
+          },
+          analyticsUsageStore: {
+            claimAnalyticsUsageForOrganization: vi.fn().mockResolvedValue({ allowed: true }),
+            releaseAnalyticsUsageForOrganization
+          },
+          billingStore: {
+            getBillingSummaryForOrganization: vi.fn().mockResolvedValue(createBillingSummary())
+          },
+          resolveOrganizationIdForProject: vi.fn().mockResolvedValue(ORGANIZATION_ID),
+          objectStore: {
+            getObject: vi.fn().mockRejectedValue(new Error("s3_object_not_found")),
+            putObject: vi.fn().mockRejectedValue(new Error("s3_write_failed")),
+            deleteObject
+          }
+        }
+      })
+    ).rejects.toThrow("s3_write_failed");
+
+    expect(releaseAnalyticsUsageForOrganization).toHaveBeenCalledWith({
+      organization_id: ORGANIZATION_ID,
+      period_starts_at: "2026-03-01T00:00:00.000Z",
+      analytics_events: 0,
+      analytics_sessions: 0,
+      analytics_journey_samples: 1,
+      analytics_bundle_generations: 0
+    });
+    expect(deleteAnalyticsJourneySampleForProject).toHaveBeenCalledOnce();
+    expect(deleteObject).toHaveBeenCalledOnce();
   });
 
   it("skips capture when project sample settings disable retained samples", async (): Promise<void> => {
@@ -176,7 +346,11 @@ describe("analytics journey sample capture", () => {
               sample_retention_days: 7
             })
           },
-          analyticsJourneySampleStore: { recordAnalyticsJourneySample: vi.fn() },
+          analyticsJourneySampleStore: {
+            reserveAnalyticsJourneySample: vi.fn(),
+            recordAnalyticsJourneySample: vi.fn(),
+            deleteAnalyticsJourneySampleForProject: vi.fn()
+          },
           objectStore: { getObject: vi.fn(), putObject }
         }
       })
@@ -185,3 +359,39 @@ describe("analytics journey sample capture", () => {
     expect(putObject).not.toHaveBeenCalled();
   });
 });
+
+function createBillingSummary() {
+  return {
+    plan: "solo",
+    billing_state: "active",
+    stripe_customer_id: null,
+    active_projects: 1,
+    capacity_units: {
+      total: 3,
+      included: 3,
+      additional_purchased: 0,
+      pending_reduction: null
+    },
+    usage_window: {
+      starts_at: "2026-03-01T00:00:00.000Z",
+      ends_at: "2026-04-01T00:00:00.000Z"
+    },
+    allowances: {
+      monthly_bundle_requests: { used: 0, limit: 750 },
+      monthly_raw_ingested_events: { used: 0, limit: 10_500 },
+      retained_bundle_cap: { used: 0, limit: 450 },
+      monthly_remote_activations: { used: 0, limit: 75 },
+      monthly_alert_deliveries: { used: 0, limit: 225 },
+      monthly_webhook_deliveries: { used: 0, limit: 750 }
+    },
+    trial: {
+      available: false,
+      active: false,
+      plan: null,
+      started_at: null,
+      ends_at: null,
+      converted_at: null,
+      expired_at: null
+    }
+  };
+}

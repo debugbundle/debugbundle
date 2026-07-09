@@ -371,6 +371,7 @@ describe("api analytics ingestion split", () => {
           usage: {
             monthly_analytics_events: 50_000,
             monthly_analytics_sessions: 0,
+            monthly_analytics_journey_samples: 0,
             monthly_analytics_bundle_generations: 0
           }
         }),
@@ -417,6 +418,7 @@ describe("api analytics ingestion split", () => {
           usage: {
             monthly_analytics_events: 50_000,
             monthly_analytics_sessions: 0,
+            monthly_analytics_journey_samples: 0,
             monthly_analytics_bundle_generations: 0
           }
         }),
@@ -462,6 +464,7 @@ describe("api analytics ingestion split", () => {
           usage: {
             monthly_analytics_events: 0,
             monthly_analytics_sessions: 10_000,
+            monthly_analytics_journey_samples: 0,
             monthly_analytics_bundle_generations: 0
           }
         }),
