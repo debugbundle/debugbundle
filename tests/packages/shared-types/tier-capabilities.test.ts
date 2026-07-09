@@ -131,6 +131,9 @@ describe("tier capabilities", () => {
       expect(typeof caps.monthly_remote_activations).toBe("number");
       expect(typeof caps.monthly_alert_deliveries).toBe("number");
       expect(typeof caps.monthly_webhook_deliveries).toBe("number");
+      expect(typeof caps.monthly_analytics_events).toBe("number");
+      expect(typeof caps.monthly_analytics_sessions).toBe("number");
+      expect(typeof caps.monthly_analytics_bundle_generations).toBe("number");
     }
   });
 
@@ -142,6 +145,9 @@ describe("tier capabilities", () => {
     expect(TIER_CAPABILITIES.free.monthly_remote_activations).toBe(0);
     expect(TIER_CAPABILITIES.free.monthly_alert_deliveries).toBe(25);
     expect(TIER_CAPABILITIES.free.monthly_webhook_deliveries).toBe(100);
+    expect(TIER_CAPABILITIES.free.monthly_analytics_events).toBe(0);
+    expect(TIER_CAPABILITIES.free.monthly_analytics_sessions).toBe(0);
+    expect(TIER_CAPABILITIES.free.monthly_analytics_bundle_generations).toBe(0);
     // Solo per-slot
     expect(TIER_CAPABILITIES.solo.monthly_bundle_requests).toBe(250);
     expect(TIER_CAPABILITIES.solo.monthly_raw_ingested_events).toBe(3_500);
@@ -149,6 +155,9 @@ describe("tier capabilities", () => {
     expect(TIER_CAPABILITIES.solo.monthly_remote_activations).toBe(25);
     expect(TIER_CAPABILITIES.solo.monthly_alert_deliveries).toBe(75);
     expect(TIER_CAPABILITIES.solo.monthly_webhook_deliveries).toBe(250);
+    expect(TIER_CAPABILITIES.solo.monthly_analytics_events).toBe(50_000);
+    expect(TIER_CAPABILITIES.solo.monthly_analytics_sessions).toBe(10_000);
+    expect(TIER_CAPABILITIES.solo.monthly_analytics_bundle_generations).toBe(25);
     // Team per-slot
     expect(TIER_CAPABILITIES.team.monthly_bundle_requests).toBe(1_000);
     expect(TIER_CAPABILITIES.team.monthly_raw_ingested_events).toBe(10_000);
@@ -156,6 +165,9 @@ describe("tier capabilities", () => {
     expect(TIER_CAPABILITIES.team.monthly_remote_activations).toBe(50);
     expect(TIER_CAPABILITIES.team.monthly_alert_deliveries).toBe(300);
     expect(TIER_CAPABILITIES.team.monthly_webhook_deliveries).toBe(1_000);
+    expect(TIER_CAPABILITIES.team.monthly_analytics_events).toBe(250_000);
+    expect(TIER_CAPABILITIES.team.monthly_analytics_sessions).toBe(50_000);
+    expect(TIER_CAPABILITIES.team.monthly_analytics_bundle_generations).toBe(100);
   });
 
   it("should satisfy type constraint for TierCapabilities", (): void => {
@@ -213,6 +225,9 @@ describe("self-host mode", () => {
       expect(caps.ingestion_rate_per_min).toBeGreaterThanOrEqual(1_000_000);
       expect(caps.monthly_raw_ingested_events).toBeGreaterThanOrEqual(1_000_000_000);
       expect(caps.monthly_bundle_requests).toBeGreaterThanOrEqual(1_000_000_000);
+      expect(caps.monthly_analytics_events).toBeGreaterThanOrEqual(1_000_000_000);
+      expect(caps.monthly_analytics_sessions).toBeGreaterThanOrEqual(1_000_000_000);
+      expect(caps.monthly_analytics_bundle_generations).toBeGreaterThanOrEqual(1_000_000_000);
     }
   });
 

@@ -26,9 +26,11 @@ import {
   createPostgresAuthStore,
   createPostgresCapturePolicyStore,
   createPostgresCaptureRuleStore,
+  createPostgresAnalyticsBundleGenerationStore,
   createPostgresAnalyticsMetricsStore,
   createPostgresAnalyticsOpportunityStore,
   createPostgresAnalyticsSettingsStore,
+  createPostgresAnalyticsUsageStore,
   createPostgresImprovementOpportunityStore,
   createPostgresImprovementSettingsStore,
   createPostgresGitHubMarketplaceStore,
@@ -115,9 +117,11 @@ export function createApiDependencies(input: CreateApiDependenciesInput): Defaul
   });
   const capturePolicyStore = createPostgresCapturePolicyStore(input.db);
   const captureRuleStore = createPostgresCaptureRuleStore(input.db);
+  const analyticsBundleGenerationStore = createPostgresAnalyticsBundleGenerationStore(input.db);
   const analyticsMetricsStore = createPostgresAnalyticsMetricsStore(input.db);
   const analyticsOpportunityStore = createPostgresAnalyticsOpportunityStore(input.db);
   const analyticsSettingsStore = createPostgresAnalyticsSettingsStore(input.db);
+  const analyticsUsageStore = createPostgresAnalyticsUsageStore(input.db);
   const improvementOpportunityStore = createPostgresImprovementOpportunityStore(input.db, {
     ...(accountAnalyticsStore === undefined ? {} : { accountAnalyticsStore })
   });
@@ -371,6 +375,7 @@ export function createApiDependencies(input: CreateApiDependenciesInput): Defaul
       saveUserAvatar: (request) => accountStore.saveUserAvatar(request),
     },
     billingManagement,
+    analyticsUsage: analyticsUsageStore,
     ...(billingAdminEmails === null
       ? {}
       : {
@@ -669,6 +674,36 @@ export function createApiDependencies(input: CreateApiDependenciesInput): Defaul
       getFunnelAnalysisForProject: (input) => {
         void input.organization_id;
         return analyticsMetricsStore.getFunnelAnalysis(input);
+      }
+    },
+    analyticsBundles: {
+      listAnalyticsBundleGenerationsForProject: (request) => {
+        void request.organization_id;
+        return analyticsBundleGenerationStore.listAnalyticsBundleGenerationsForProject(request);
+      },
+      requestAnalyticsBundleGenerationForProject: async (request) => {
+        void request.organization_id;
+        const generation = await analyticsBundleGenerationStore.reserveAnalyticsBundleGeneration({
+          project_id: request.project_id,
+          requested_by_user_id: request.requested_by_user_id,
+          analysis_kind: request.analysis_kind,
+          analysis_spec: request.analysis_spec
+        });
+
+        if (generation.status === "pending" || generation.status === "running") {
+          await input.queue.enqueue("build-analytics-bundle", {
+            project_id: generation.project_id,
+            generation_id: generation.generation_id,
+            requested_at: new Date().toISOString(),
+            trigger: "manual"
+          });
+        }
+
+        return generation;
+      },
+      getAnalyticsBundleGenerationForProject: (input) => {
+        void input.organization_id;
+        return analyticsBundleGenerationStore.getAnalyticsBundleGenerationForProject(input);
       }
     },
     analyticsOpportunities: {

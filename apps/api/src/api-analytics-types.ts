@@ -1,0 +1,104 @@
+import type {
+  AnalyticsSettings,
+  AnalyticsSettingsUpdate,
+  AnalyticsBundleAnalysisKind,
+  AnalyticsDeviceBreakdownResponse,
+  AnalyticsFunnelAnalysisResponse,
+  AnalyticsJourneyPatternsResponse,
+  AnalyticsOpportunitiesListResponse,
+  AnalyticsOpportunityResponse,
+  AnalyticsOpportunityStatus,
+  AnalyticsReferrerMetricsResponse,
+  AnalyticsRouteMetricsResponse,
+  AnalyticsUsageSummaryResponse
+} from "../../../packages/shared-types/src/index.js";
+import type {
+  AnalyticsAllowanceClaimInput,
+  AnalyticsAllowanceClaimResult,
+  AnalyticsAllowanceReleaseInput,
+  AnalyticsAllowanceUsageSummary,
+  AnalyticsBundleGenerationRecord,
+  AnalyticsBundleGenerationStatus
+} from "../../../packages/storage/src/index.js";
+
+export interface ApiAnalyticsDependencies {
+  analyticsSettingsManagement?: {
+    getAnalyticsSettingsForProject(input: {
+      organization_id: string;
+      project_id: string;
+    }): Promise<AnalyticsSettings | null>;
+    updateAnalyticsSettingsForProject(input: {
+      organization_id: string;
+      project_id: string;
+      update: AnalyticsSettingsUpdate;
+    }): Promise<AnalyticsSettings | null>;
+  } | undefined;
+  analyticsMetrics?: {
+    getUsageSummaryForProject(input: AnalyticsMetricsQueryInput): Promise<AnalyticsUsageSummaryResponse>;
+    getRouteMetricsForProject(input: AnalyticsMetricsQueryInput): Promise<AnalyticsRouteMetricsResponse>;
+    getJourneyPatternsForProject(input: AnalyticsMetricsQueryInput): Promise<AnalyticsJourneyPatternsResponse>;
+    getDeviceBreakdownForProject(input: AnalyticsMetricsQueryInput): Promise<AnalyticsDeviceBreakdownResponse>;
+    getReferrerMetricsForProject(input: AnalyticsMetricsQueryInput): Promise<AnalyticsReferrerMetricsResponse>;
+    getFunnelAnalysisForProject(input: AnalyticsFunnelQueryInput): Promise<AnalyticsFunnelAnalysisResponse>;
+  } | undefined;
+  analyticsOpportunities?: {
+    listAnalyticsOpportunitiesForProject(input: {
+      organization_id: string;
+      project_id: string;
+      status?: AnalyticsOpportunityStatus | undefined;
+      kind?: AnalyticsBundleAnalysisKind | undefined;
+      cursor?: { last_detected_at: string; opportunity_id: string } | undefined;
+      limit: number;
+    }): Promise<AnalyticsOpportunitiesListResponse>;
+    getAnalyticsOpportunityForProject(input: {
+      organization_id: string;
+      project_id: string;
+      opportunity_id: string;
+    }): Promise<AnalyticsOpportunityResponse | null>;
+  } | undefined;
+  analyticsUsage?: {
+    getAnalyticsUsageForOrganization(input: {
+      organization_id: string;
+      period_starts_at: string;
+    }): Promise<AnalyticsAllowanceUsageSummary>;
+    claimAnalyticsUsageForOrganization(input: AnalyticsAllowanceClaimInput): Promise<AnalyticsAllowanceClaimResult>;
+    releaseAnalyticsUsageForOrganization(input: AnalyticsAllowanceReleaseInput): Promise<void>;
+  } | undefined;
+  analyticsBundles?: {
+    listAnalyticsBundleGenerationsForProject(input: {
+      organization_id: string;
+      project_id: string;
+      status?: AnalyticsBundleGenerationStatus | undefined;
+      analysis_kind?: AnalyticsBundleAnalysisKind | undefined;
+      cursor?: { created_at: string; generation_id: string } | undefined;
+      limit: number;
+    }): Promise<{ bundles: AnalyticsBundleGenerationRecord[]; next_cursor: string | null }>;
+    requestAnalyticsBundleGenerationForProject(input: {
+      organization_id: string;
+      project_id: string;
+      requested_by_user_id: string | null;
+      analysis_kind: AnalyticsBundleAnalysisKind;
+      analysis_spec: Record<string, unknown>;
+    }): Promise<AnalyticsBundleGenerationRecord>;
+    getAnalyticsBundleGenerationForProject(input: {
+      organization_id: string;
+      project_id: string;
+      generation_id: string;
+    }): Promise<AnalyticsBundleGenerationRecord | null>;
+  } | undefined;
+}
+
+type AnalyticsMetricsQueryInput = {
+  organization_id: string;
+  project_id: string;
+  from: string;
+  to: string;
+  granularity: "hour" | "day";
+  service?: string | undefined;
+  environment?: string | undefined;
+  limit?: number | undefined;
+};
+
+type AnalyticsFunnelQueryInput = AnalyticsMetricsQueryInput & {
+  funnel_key: string;
+};

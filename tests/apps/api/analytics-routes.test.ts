@@ -1,7 +1,9 @@
+import { gzipSync } from "node:zlib";
 import { describe, expect, it, vi } from "vitest";
 
 import type { ApiDependencies } from "../../../apps/api/src/api-types.js";
 import { createApiServer } from "../../../apps/api/src/server.js";
+import { buildAnalyticsBundle } from "../../../packages/analytics-bundle-engine/src/index.js";
 import type {
   AnalyticsOpportunitiesListResponse,
   AnalyticsOpportunityResponse,
@@ -9,6 +11,7 @@ import type {
 } from "../../../packages/shared-types/src/index.js";
 
 const PROJECT_ID = "00000000-0000-0000-0000-000000000001";
+const BUNDLE_GENERATION_ID = "00000000-0000-4000-8000-000000000222";
 const FROM = "2026-03-01T00:00:00.000Z";
 const TO = "2026-03-08T00:00:00.000Z";
 const metricsWindow = {
@@ -143,9 +146,78 @@ function createAnalyticsOpportunitiesDependency(
   };
 }
 
+function createAnalyticsBundleGeneration(overrides: Partial<Awaited<ReturnType<NonNullable<ApiDependencies["analyticsBundles"]>["getAnalyticsBundleGenerationForProject"]>>> = {}) {
+  return {
+    generation_id: BUNDLE_GENERATION_ID,
+    project_id: PROJECT_ID,
+    opportunity_id: null,
+    requested_by_user_id: null,
+    analysis_kind: "usage_summary",
+    analysis_spec: {},
+    input_fingerprint: "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    status: "completed",
+    object_key: "analytics-bundles/00000000-0000-0000-0000-000000000001/00000000-0000-4000-8000-000000000222/bundle.json.gz",
+    failure_reason: null,
+    created_at: FROM,
+    claimed_at: FROM,
+    completed_at: TO,
+    updated_at: TO,
+    ...overrides
+  } as const;
+}
+
+function createAnalyticsBundlesDependency(
+  overrides: Partial<NonNullable<ApiDependencies["analyticsBundles"]>> = {}
+): NonNullable<ApiDependencies["analyticsBundles"]> {
+  return {
+    listAnalyticsBundleGenerationsForProject: vi.fn().mockResolvedValue({
+      bundles: [createAnalyticsBundleGeneration()],
+      next_cursor: null
+    }),
+    requestAnalyticsBundleGenerationForProject: vi.fn().mockResolvedValue(createAnalyticsBundleGeneration({
+      status: "pending",
+      object_key: null
+    })),
+    getAnalyticsBundleGenerationForProject: vi.fn().mockResolvedValue(createAnalyticsBundleGeneration()),
+    ...overrides
+  };
+}
+
+function createAnalyticsSettingsManagementDependency(
+  overrides: Partial<NonNullable<ApiDependencies["analyticsSettingsManagement"]>> = {}
+): NonNullable<ApiDependencies["analyticsSettingsManagement"]> {
+  return {
+    getAnalyticsSettingsForProject: vi.fn().mockResolvedValue({
+      project_id: PROJECT_ID,
+      enabled: true,
+      privacy_mode: "standard",
+      consent_required: false,
+      capture_page_views: true,
+      capture_route_changes: true,
+      capture_actions: true,
+      capture_friction_signals: true,
+      journey_sample_rate: 1,
+      raw_retention_days: 30,
+      sample_retention_days: 14,
+      aggregate_retention_months: 24,
+      max_saved_funnels: 10,
+      max_custom_dimensions: 0,
+      approved_custom_dimensions: [],
+      updated_at: TO
+    }),
+    updateAnalyticsSettingsForProject: vi.fn(),
+    ...overrides
+  };
+}
+
 function createDependencies(overrides: {
   analyticsMetrics?: ApiDependencies["analyticsMetrics"];
   analyticsOpportunities?: ApiDependencies["analyticsOpportunities"];
+  analyticsBundles?: ApiDependencies["analyticsBundles"];
+  analyticsSettingsManagement?: ApiDependencies["analyticsSettingsManagement"];
+  analyticsUsage?: ApiDependencies["analyticsUsage"];
+  billingManagement?: ApiDependencies["billingManagement"];
+  objectStoreReader?: ApiDependencies["objectStoreReader"];
   projectAccess?: ReturnType<typeof createProjectAccess> | null;
 } = {}): ReturnType<typeof createApiServer> {
   return createApiServer({
@@ -173,7 +245,7 @@ function createDependencies(overrides: {
       getIncidentForOrganization: vi.fn().mockResolvedValue(null),
       listIncidentLogsForOrganization: vi.fn().mockResolvedValue([])
     },
-    objectStoreReader: { getObject: vi.fn() },
+    objectStoreReader: overrides.objectStoreReader ?? { getObject: vi.fn() },
     webhookDelivery: {
       listDeliveriesForWebhookInOrganization: vi.fn().mockResolvedValue(null)
     },
@@ -185,8 +257,54 @@ function createDependencies(overrides: {
       deleteProjectForOrganization: vi.fn()
     },
     analyticsMetrics: overrides.analyticsMetrics,
-    analyticsOpportunities: overrides.analyticsOpportunities
+    analyticsOpportunities: overrides.analyticsOpportunities,
+    analyticsBundles: overrides.analyticsBundles,
+    analyticsSettingsManagement: overrides.analyticsSettingsManagement,
+    analyticsUsage: overrides.analyticsUsage,
+    billingManagement: overrides.billingManagement
   });
+}
+
+function createBillingManagementForAnalyticsQuota(): NonNullable<ApiDependencies["billingManagement"]> {
+  return {
+    getBillingSummaryForOrganization: vi.fn().mockResolvedValue({
+      plan: "solo",
+      billing_state: "active",
+      stripe_customer_id: null,
+      active_projects: 1,
+      capacity_units: {
+        total: 1,
+        included: 1,
+        additional_purchased: 0,
+        pending_reduction: null
+      },
+      usage_window: {
+        starts_at: "2026-03-01T00:00:00.000Z",
+        ends_at: "2026-04-01T00:00:00.000Z"
+      },
+      allowances: {
+        monthly_bundle_requests: { used: 0, limit: 25 },
+        monthly_raw_ingested_events: { used: 0, limit: 10_000 },
+        retained_bundle_cap: { used: 0, limit: 5 },
+        monthly_remote_activations: { used: 0, limit: 5 },
+        monthly_alert_deliveries: { used: 0, limit: 100 },
+        monthly_webhook_deliveries: { used: 0, limit: 100 }
+      },
+      trial: {
+        available: false,
+        active: false,
+        plan: null,
+        started_at: null,
+        ends_at: null,
+        used_at: null,
+        converted_at: null,
+        expired_at: null,
+        days_remaining: null
+      }
+    }),
+    createCheckoutLink: vi.fn().mockResolvedValue(null),
+    createPortalLink: vi.fn().mockResolvedValue(null)
+  };
 }
 
 describe("analytics metrics routes", () => {
@@ -373,5 +491,331 @@ describe("analytics metrics routes", () => {
     expect(unavailable.json()).toEqual({ error: "analytics_opportunities_not_available" });
     expect(notFound.statusCode).toBe(404);
     expect(notFound.json()).toEqual({ error: "analytics_opportunity_not_found" });
+  });
+
+  it("lists AnalyticsBundle generation records through project access", async () => {
+    const cursor = `${FROM}|${BUNDLE_GENERATION_ID}`;
+    const generation = createAnalyticsBundleGeneration({
+      analysis_kind: "funnel_dropoff",
+      status: "completed",
+      analysis_spec: { funnel: "checkout" }
+    });
+    const listAnalyticsBundleGenerationsForProject = vi.fn().mockResolvedValue({
+      bundles: [generation],
+      next_cursor: null
+    });
+    const analyticsBundles = createAnalyticsBundlesDependency({ listAnalyticsBundleGenerationsForProject });
+    const app = createDependencies({ analyticsBundles });
+
+    const response = await app.inject({
+      method: "GET",
+      url: `/v1/analytics/bundles?project_id=${PROJECT_ID}&status=completed&kind=funnel_dropoff&cursor=${encodeURIComponent(cursor)}&limit=5`,
+      headers: { authorization: "Bearer dbundle_mem_test_token" }
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toEqual({
+      bundles: [{
+        generation_id: BUNDLE_GENERATION_ID,
+        project_id: PROJECT_ID,
+        opportunity_id: null,
+        requested_by_user_id: null,
+        analysis_kind: "funnel_dropoff",
+        analysis_spec: { funnel: "checkout" },
+        input_fingerprint: "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        status: "completed",
+        has_artifact: true,
+        failure_reason: null,
+        created_at: FROM,
+        claimed_at: FROM,
+        completed_at: TO,
+        updated_at: TO
+      }],
+      next_cursor: null
+    });
+    expect(listAnalyticsBundleGenerationsForProject).toHaveBeenCalledWith({
+      organization_id: "org_123",
+      project_id: PROJECT_ID,
+      status: "completed",
+      analysis_kind: "funnel_dropoff",
+      cursor: {
+        created_at: FROM,
+        generation_id: BUNDLE_GENERATION_ID
+      },
+      limit: 5
+    });
+  });
+
+  it("rejects invalid AnalyticsBundle list cursors and unavailable storage", async () => {
+    const invalidCursor = await createDependencies({
+      analyticsBundles: createAnalyticsBundlesDependency()
+    }).inject({
+      method: "GET",
+      url: `/v1/analytics/bundles?project_id=${PROJECT_ID}&cursor=not-a-cursor`,
+      headers: { authorization: "Bearer dbundle_mem_test_token" }
+    });
+    const unavailable = await createDependencies().inject({
+      method: "GET",
+      url: `/v1/analytics/bundles?project_id=${PROJECT_ID}`,
+      headers: { authorization: "Bearer dbundle_mem_test_token" }
+    });
+
+    expect(invalidCursor.statusCode).toBe(400);
+    expect(invalidCursor.json()).toEqual({ error: "invalid_query" });
+    expect(unavailable.statusCode).toBe(404);
+    expect(unavailable.json()).toEqual({ error: "analytics_bundles_not_available" });
+  });
+
+  it("requests AnalyticsBundle generation through project access", async () => {
+    const requestAnalyticsBundleGenerationForProject = vi.fn().mockResolvedValue(createAnalyticsBundleGeneration({
+      status: "pending",
+      object_key: null
+    }));
+    const analyticsBundles = createAnalyticsBundlesDependency({ requestAnalyticsBundleGenerationForProject });
+    const analyticsSettingsManagement = createAnalyticsSettingsManagementDependency();
+    const app = createDependencies({ analyticsBundles, analyticsSettingsManagement });
+
+    const response = await app.inject({
+      method: "POST",
+      url: "/v1/analytics/bundles",
+      headers: { authorization: "Bearer dbundle_mem_test_token" },
+      payload: {
+        project_id: PROJECT_ID,
+        analysis_kind: "funnel_dropoff",
+        from: FROM,
+        to: TO,
+        funnel: "checkout",
+        filters: { auth_state: "logged_in" }
+      }
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toEqual({ status: "pending", bundle_generation_id: BUNDLE_GENERATION_ID });
+    expect(analyticsSettingsManagement.getAnalyticsSettingsForProject).toHaveBeenCalledWith({
+      organization_id: "org_123",
+      project_id: PROJECT_ID
+    });
+    expect(requestAnalyticsBundleGenerationForProject).toHaveBeenCalledWith({
+      organization_id: "org_123",
+      project_id: PROJECT_ID,
+      requested_by_user_id: "usr_owner",
+      analysis_kind: "funnel_dropoff",
+      analysis_spec: {
+        from: FROM,
+        to: TO,
+        funnel: "checkout",
+        route: null,
+        incident_id: null,
+        deploy_id: null,
+        filters: { auth_state: "logged_in" }
+      }
+    });
+  });
+
+  it("rejects AnalyticsBundle generation when the analytics bundle allowance is exhausted", async () => {
+    const requestAnalyticsBundleGenerationForProject = vi.fn();
+    const app = createDependencies({
+      analyticsBundles: createAnalyticsBundlesDependency({ requestAnalyticsBundleGenerationForProject }),
+      analyticsSettingsManagement: createAnalyticsSettingsManagementDependency(),
+      analyticsUsage: {
+        getAnalyticsUsageForOrganization: vi.fn(),
+        claimAnalyticsUsageForOrganization: vi.fn().mockResolvedValue({
+          allowed: false,
+          metric: "monthly_analytics_bundle_generations",
+          used: 26,
+          limit: 25,
+          usage: {
+            monthly_analytics_events: 0,
+            monthly_analytics_sessions: 0,
+            monthly_analytics_bundle_generations: 25
+          }
+        }),
+        releaseAnalyticsUsageForOrganization: vi.fn()
+      },
+      billingManagement: createBillingManagementForAnalyticsQuota()
+    });
+
+    const response = await app.inject({
+      method: "POST",
+      url: "/v1/analytics/bundles",
+      headers: { authorization: "Bearer dbundle_mem_test_token" },
+      payload: {
+        project_id: PROJECT_ID,
+        analysis_kind: "usage_summary",
+        last: "7d"
+      }
+    });
+
+    expect(response.statusCode).toBe(429);
+    expect(response.headers["retry-after"]).toBeDefined();
+    expect(response.json()).toMatchObject({
+      error: "analytics_quota_exceeded"
+    });
+    expect(requestAnalyticsBundleGenerationForProject).not.toHaveBeenCalled();
+  });
+
+  it("rejects AnalyticsBundle create requests when analytics is disabled or invalid", async () => {
+    const requestAnalyticsBundleGenerationForProject = vi.fn();
+    const disabled = await createDependencies({
+      analyticsBundles: createAnalyticsBundlesDependency({ requestAnalyticsBundleGenerationForProject }),
+      analyticsSettingsManagement: createAnalyticsSettingsManagementDependency({
+        getAnalyticsSettingsForProject: vi.fn().mockResolvedValue(null)
+      })
+    }).inject({
+      method: "POST",
+      url: "/v1/analytics/bundles",
+      headers: { authorization: "Bearer dbundle_mem_test_token" },
+      payload: {
+        project_id: PROJECT_ID,
+        analysis_kind: "usage_summary",
+        last: "7d"
+      }
+    });
+    const invalid = await createDependencies({
+      analyticsBundles: createAnalyticsBundlesDependency(),
+      analyticsSettingsManagement: createAnalyticsSettingsManagementDependency()
+    }).inject({
+      method: "POST",
+      url: "/v1/analytics/bundles",
+      headers: { authorization: "Bearer dbundle_mem_test_token" },
+      payload: {
+        project_id: PROJECT_ID,
+        analysis_kind: "usage_summary",
+        route: "/checkout?step=payment",
+        last: "7d"
+      }
+    });
+
+    expect(disabled.statusCode).toBe(403);
+    expect(disabled.json()).toEqual({ error: "analytics_disabled" });
+    expect(requestAnalyticsBundleGenerationForProject).not.toHaveBeenCalled();
+    expect(invalid.statusCode).toBe(400);
+    expect(invalid.json()).toEqual({ error: "invalid_body" });
+  });
+
+  it("returns completed AnalyticsBundle artifacts through project access", async () => {
+    const bundle = buildAnalyticsBundle({
+      analysis_kind: "usage_summary",
+      input_fingerprint: "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      project: {
+        project_id: PROJECT_ID,
+        service: "web",
+        environment: "production"
+      },
+      analysis_window: {
+        from: FROM,
+        to: TO,
+        granularity: "day"
+      },
+      summary: {
+        title: "Usage summary",
+        description: "Important usage evidence for agents.",
+        confidence: "high",
+        severity: "low"
+      },
+      metrics: {
+        sessions_analyzed: 12,
+        affected_sessions: 0
+      },
+      segments: [],
+      journey_patterns: [],
+      representative_journeys: [],
+      linked_incidents: [],
+      linked_deploys: [],
+      recommendations: [],
+      redaction: {
+        rules_applied: ["analytics-aggregate-only"],
+        omitted_fields: ["raw_click_text"]
+      }
+    });
+    const generation = createAnalyticsBundleGeneration();
+    const objectStoreReader = {
+      getObject: vi.fn().mockResolvedValue(gzipSync(Buffer.from(JSON.stringify(bundle), "utf8")))
+    };
+    const analyticsBundles = createAnalyticsBundlesDependency({
+      getAnalyticsBundleGenerationForProject: vi.fn().mockResolvedValue(generation)
+    });
+    const app = createDependencies({ analyticsBundles, objectStoreReader });
+
+    const response = await app.inject({
+      method: "GET",
+      url: `/v1/analytics/bundles/${BUNDLE_GENERATION_ID}?project_id=${PROJECT_ID}`,
+      headers: { authorization: "Bearer dbundle_mem_test_token" }
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toEqual(bundle);
+    expect(analyticsBundles.getAnalyticsBundleGenerationForProject).toHaveBeenCalledWith({
+      organization_id: "org_123",
+      project_id: PROJECT_ID,
+      generation_id: BUNDLE_GENERATION_ID
+    });
+    expect(objectStoreReader.getObject).toHaveBeenCalledWith({ key: generation.object_key });
+  });
+
+  it("returns AnalyticsBundle generation state when bundles are pending or failed", async () => {
+    const pending = await createDependencies({
+      analyticsBundles: createAnalyticsBundlesDependency({
+        getAnalyticsBundleGenerationForProject: vi.fn().mockResolvedValue(createAnalyticsBundleGeneration({
+          status: "running",
+          object_key: null
+        }))
+      })
+    }).inject({
+      method: "GET",
+      url: `/v1/analytics/bundles/${BUNDLE_GENERATION_ID}?project_id=${PROJECT_ID}`,
+      headers: { authorization: "Bearer dbundle_mem_test_token" }
+    });
+    const failed = await createDependencies({
+      analyticsBundles: createAnalyticsBundlesDependency({
+        getAnalyticsBundleGenerationForProject: vi.fn().mockResolvedValue(createAnalyticsBundleGeneration({
+          status: "failed",
+          object_key: null,
+          failure_reason: "monthly_quota_exceeded"
+        }))
+      })
+    }).inject({
+      method: "GET",
+      url: `/v1/analytics/bundles/${BUNDLE_GENERATION_ID}?project_id=${PROJECT_ID}`,
+      headers: { authorization: "Bearer dbundle_mem_test_token" }
+    });
+
+    expect(pending.statusCode).toBe(200);
+    expect(pending.json()).toEqual({ status: "pending", bundle_generation_id: BUNDLE_GENERATION_ID });
+    expect(failed.statusCode).toBe(200);
+    expect(failed.json()).toEqual({ status: "failed", reason: "monthly_quota_exceeded" });
+  });
+
+  it("rejects invalid AnalyticsBundle reads and unavailable storage", async () => {
+    const invalidId = await createDependencies({
+      analyticsBundles: createAnalyticsBundlesDependency({
+        getAnalyticsBundleGenerationForProject: vi.fn()
+      })
+    }).inject({
+      method: "GET",
+      url: `/v1/analytics/bundles/not-a-uuid?project_id=${PROJECT_ID}`,
+      headers: { authorization: "Bearer dbundle_mem_test_token" }
+    });
+    const unavailable = await createDependencies().inject({
+      method: "GET",
+      url: `/v1/analytics/bundles/${BUNDLE_GENERATION_ID}?project_id=${PROJECT_ID}`,
+      headers: { authorization: "Bearer dbundle_mem_test_token" }
+    });
+    const notFound = await createDependencies({
+      analyticsBundles: createAnalyticsBundlesDependency({
+        getAnalyticsBundleGenerationForProject: vi.fn().mockResolvedValue(null)
+      })
+    }).inject({
+      method: "GET",
+      url: `/v1/analytics/bundles/${BUNDLE_GENERATION_ID}?project_id=${PROJECT_ID}`,
+      headers: { authorization: "Bearer dbundle_mem_test_token" }
+    });
+
+    expect(invalidId.statusCode).toBe(400);
+    expect(invalidId.json()).toEqual({ error: "invalid_bundle_generation_id" });
+    expect(unavailable.statusCode).toBe(404);
+    expect(unavailable.json()).toEqual({ error: "analytics_bundles_not_available" });
+    expect(notFound.statusCode).toBe(404);
+    expect(notFound.json()).toEqual({ error: "analytics_bundle_not_found" });
   });
 });

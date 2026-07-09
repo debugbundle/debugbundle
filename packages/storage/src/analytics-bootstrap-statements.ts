@@ -46,6 +46,17 @@ export const ANALYTICS_BOOTSTRAP_STATEMENTS = [
     ON analytics_ingestion_ledger (project_id, occurred_at DESC)
   `,
   `
+    CREATE TABLE analytics_usage_counters (
+      organization_id uuid NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+      period_starts_at timestamptz NOT NULL,
+      analytics_events integer NOT NULL DEFAULT 0,
+      analytics_sessions integer NOT NULL DEFAULT 0,
+      analytics_bundle_generations integer NOT NULL DEFAULT 0,
+      updated_at timestamptz NOT NULL DEFAULT now(),
+      PRIMARY KEY (organization_id, period_starts_at)
+    )
+  `,
+  `
     CREATE TABLE analytics_rollup_uniques (
       project_id uuid NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
       rollup_kind text NOT NULL

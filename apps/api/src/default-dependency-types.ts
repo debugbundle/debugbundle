@@ -66,7 +66,9 @@ export interface DefaultApiDependencies
     | "accountDeletionAuth"
     | "alertManagement"
     | "analyticsSettingsManagement"
+    | "analyticsBundles"
     | "analyticsMetrics"
+    | "analyticsUsage"
     | "availabilityCheckManagement"
     | "auditLogging"
     | "billingEmails"
@@ -158,7 +160,9 @@ export interface DefaultApiDependencies
   capturePolicyManagement: NonNullable<ApiDependencies["capturePolicyManagement"]>;
   captureRuleManagement: NonNullable<ApiDependencies["captureRuleManagement"]>;
   analyticsSettingsManagement: NonNullable<ApiDependencies["analyticsSettingsManagement"]>;
+  analyticsBundles: NonNullable<ApiDependencies["analyticsBundles"]>;
   analyticsMetrics: NonNullable<ApiDependencies["analyticsMetrics"]>;
+  analyticsUsage: NonNullable<ApiDependencies["analyticsUsage"]>;
   improvementSettingsManagement: NonNullable<ApiDependencies["improvementSettingsManagement"]>;
   improvementManagement: Pick<
     ReturnType<typeof createPostgresImprovementOpportunityStore>,

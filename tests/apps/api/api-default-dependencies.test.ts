@@ -16,9 +16,11 @@ const {
   createPostgresAuthStoreMock,
   createPostgresBillingStoreMock,
   createPostgresBillingSyncStoreMock,
+  createPostgresAnalyticsBundleGenerationStoreMock,
   createPostgresAnalyticsMetricsStoreMock,
   createPostgresAnalyticsOpportunityStoreMock,
   createPostgresAnalyticsSettingsStoreMock,
+  createPostgresAnalyticsUsageStoreMock,
   createPostgresCapturePolicyStoreMock,
   createPostgresCaptureRuleStoreMock,
   createPostgresAvailabilityCheckStoreMock,
@@ -62,9 +64,11 @@ const {
   createPostgresAuthStoreMock: vi.fn(),
   createPostgresBillingStoreMock: vi.fn(),
   createPostgresBillingSyncStoreMock: vi.fn(),
+  createPostgresAnalyticsBundleGenerationStoreMock: vi.fn(),
   createPostgresAnalyticsMetricsStoreMock: vi.fn(),
   createPostgresAnalyticsOpportunityStoreMock: vi.fn(),
   createPostgresAnalyticsSettingsStoreMock: vi.fn(),
+  createPostgresAnalyticsUsageStoreMock: vi.fn(),
   createPostgresCapturePolicyStoreMock: vi.fn(),
   createPostgresCaptureRuleStoreMock: vi.fn(),
   createPostgresAvailabilityCheckStoreMock: vi.fn(),
@@ -138,9 +142,11 @@ vi.mock("../../../packages/storage/src/index.js", () => ({
   createPostgresAccountAnalyticsStore: createPostgresAccountAnalyticsStoreMock,
   createPostgresAuthStore: createPostgresAuthStoreMock,
   createPostgresBillingStore: createPostgresBillingStoreMock,
+  createPostgresAnalyticsBundleGenerationStore: createPostgresAnalyticsBundleGenerationStoreMock,
   createPostgresAnalyticsMetricsStore: createPostgresAnalyticsMetricsStoreMock,
   createPostgresAnalyticsOpportunityStore: createPostgresAnalyticsOpportunityStoreMock,
   createPostgresAnalyticsSettingsStore: createPostgresAnalyticsSettingsStoreMock,
+  createPostgresAnalyticsUsageStore: createPostgresAnalyticsUsageStoreMock,
   createPostgresCapturePolicyStore: createPostgresCapturePolicyStoreMock,
   createPostgresAvailabilityCheckStore: createPostgresAvailabilityCheckStoreMock,
   createMemberAuthService: createMemberAuthServiceMock,
@@ -232,9 +238,11 @@ describe("api default dependencies", () => {
     createPostgresAuthStoreMock.mockReset();
     createPostgresBillingStoreMock.mockReset();
     createPostgresBillingSyncStoreMock.mockReset();
+    createPostgresAnalyticsBundleGenerationStoreMock.mockReset();
     createPostgresAnalyticsMetricsStoreMock.mockReset();
     createPostgresAnalyticsOpportunityStoreMock.mockReset();
     createPostgresAnalyticsSettingsStoreMock.mockReset();
+    createPostgresAnalyticsUsageStoreMock.mockReset();
     createPostgresCapturePolicyStoreMock.mockReset();
     createPostgresCaptureRuleStoreMock.mockReset();
     createPostgresAvailabilityCheckStoreMock.mockReset();
@@ -313,6 +321,11 @@ describe("api default dependencies", () => {
       revokeEntitlements: vi.fn(),
       updateBillingState: vi.fn()
     });
+    createPostgresAnalyticsBundleGenerationStoreMock.mockReturnValue({
+      listAnalyticsBundleGenerationsForProject: vi.fn(),
+      reserveAnalyticsBundleGeneration: vi.fn(),
+      getAnalyticsBundleGenerationForProject: vi.fn()
+    });
     createPostgresAnalyticsMetricsStoreMock.mockReturnValue({
       getUsageSummary: vi.fn(),
       getRouteMetrics: vi.fn(),
@@ -328,6 +341,11 @@ describe("api default dependencies", () => {
     createPostgresAnalyticsSettingsStoreMock.mockReturnValue({
       getAnalyticsSettingsByProjectId: vi.fn(),
       updateAnalyticsSettings: vi.fn()
+    });
+    createPostgresAnalyticsUsageStoreMock.mockReturnValue({
+      getAnalyticsUsageForOrganization: vi.fn(),
+      claimAnalyticsUsageForOrganization: vi.fn(),
+      releaseAnalyticsUsageForOrganization: vi.fn()
     });
     createPostgresCapturePolicyStoreMock.mockReturnValue({
       getCapturePolicyByProjectId: vi.fn(),
@@ -789,6 +807,9 @@ describe("api default dependencies", () => {
     expect(typeof deps.analyticsMetrics.getDeviceBreakdownForProject).toBe("function");
     expect(typeof deps.analyticsMetrics.getReferrerMetricsForProject).toBe("function");
     expect(typeof deps.analyticsMetrics.getFunnelAnalysisForProject).toBe("function");
+    expect(typeof deps.analyticsBundles.requestAnalyticsBundleGenerationForProject).toBe("function");
+    expect(typeof deps.analyticsBundles.listAnalyticsBundleGenerationsForProject).toBe("function");
+    expect(typeof deps.analyticsBundles.getAnalyticsBundleGenerationForProject).toBe("function");
     expect(typeof deps.analyticsOpportunities?.listAnalyticsOpportunitiesForProject).toBe("function");
     expect(typeof deps.analyticsOpportunities?.getAnalyticsOpportunityForProject).toBe("function");
     expect(typeof deps.projectManagement.listProjectsForOrganization).toBe("function");
@@ -1226,6 +1247,64 @@ describe("api default dependencies", () => {
     expect(queue.enqueue).toHaveBeenCalledWith("deliver-webhook", {
       delivery_id: "del_123",
       attempt: 1
+    });
+  });
+
+  it("should reserve and enqueue manual AnalyticsBundle generations through default dependencies", async (): Promise<void> => {
+    const generation = {
+      generation_id: "00000000-0000-4000-8000-000000000222",
+      project_id: "00000000-0000-0000-0000-000000000001",
+      opportunity_id: null,
+      requested_by_user_id: "usr_123",
+      analysis_kind: "funnel_dropoff",
+      analysis_spec: { from: "2026-03-01T00:00:00.000Z", to: "2026-03-08T00:00:00.000Z" },
+      input_fingerprint: "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      status: "pending",
+      object_key: null,
+      failure_reason: null,
+      created_at: "2026-03-08T00:00:00.000Z",
+      claimed_at: null,
+      completed_at: null,
+      updated_at: "2026-03-08T00:00:00.000Z"
+    } as const;
+    const reserveAnalyticsBundleGeneration = vi.fn().mockResolvedValue(generation);
+    createPostgresAnalyticsBundleGenerationStoreMock.mockReturnValue({
+      listAnalyticsBundleGenerationsForProject: vi.fn(),
+      reserveAnalyticsBundleGeneration,
+      getAnalyticsBundleGenerationForProject: vi.fn()
+    });
+    const queue = { enqueue: vi.fn() };
+    const deps = createApiDependencies({
+      objectStore: {
+        putObject: vi.fn(),
+        getObject: vi.fn(),
+        deleteObjectsByPrefix: vi.fn()
+      },
+      queue,
+      db: { query: vi.fn() }
+    });
+
+    await expect(
+      deps.analyticsBundles.requestAnalyticsBundleGenerationForProject({
+        organization_id: "org_123",
+        project_id: generation.project_id,
+        requested_by_user_id: "usr_123",
+        analysis_kind: "funnel_dropoff",
+        analysis_spec: generation.analysis_spec
+      })
+    ).resolves.toEqual(generation);
+
+    expect(reserveAnalyticsBundleGeneration).toHaveBeenCalledWith({
+      project_id: generation.project_id,
+      requested_by_user_id: "usr_123",
+      analysis_kind: "funnel_dropoff",
+      analysis_spec: generation.analysis_spec
+    });
+    expect(queue.enqueue).toHaveBeenCalledWith("build-analytics-bundle", {
+      project_id: generation.project_id,
+      generation_id: generation.generation_id,
+      requested_at: expect.any(String),
+      trigger: "manual"
     });
   });
 

@@ -5,18 +5,6 @@ import type {
   CapturePolicyUpdate,
   CaptureRuleUpdate,
   EventEnvelope,
-  AnalyticsSettings,
-  AnalyticsSettingsUpdate,
-  AnalyticsBundleAnalysisKind,
-  AnalyticsDeviceBreakdownResponse,
-  AnalyticsFunnelAnalysisResponse,
-  AnalyticsJourneyPatternsResponse,
-  AnalyticsOpportunitiesListResponse,
-  AnalyticsOpportunityResponse,
-  AnalyticsOpportunityStatus,
-  AnalyticsReferrerMetricsResponse,
-  AnalyticsRouteMetricsResponse,
-  AnalyticsUsageSummaryResponse,
   ImprovementSettings,
   ImprovementSettingsUpdate,
   ProjectColorTag
@@ -79,8 +67,9 @@ import type {
   WebhookEventType,
   WebhookDeliveryStore
 } from "../../../packages/storage/src/index.js";
+import type { ApiAnalyticsDependencies } from "./api-analytics-types.js";
 
-export interface ApiDependencies {
+export interface ApiDependencies extends ApiAnalyticsDependencies {
   ingestionPersistence: Pick<IngestionPersistenceService, "persistAndEnqueue"> &
     Partial<AnalyticsIngestionPersistenceService>;
   ingestionMetadata: Pick<IngestionMetadataService, "resolveProjectByTokenHash">;
@@ -440,95 +429,6 @@ export interface ApiDependencies {
       project_id: string;
       update: ImprovementSettingsUpdate;
     }): Promise<ImprovementSettings | null>;
-  } | undefined;
-  analyticsSettingsManagement?: {
-    getAnalyticsSettingsForProject(input: {
-      organization_id: string;
-      project_id: string;
-    }): Promise<AnalyticsSettings | null>;
-    updateAnalyticsSettingsForProject(input: {
-      organization_id: string;
-      project_id: string;
-      update: AnalyticsSettingsUpdate;
-    }): Promise<AnalyticsSettings | null>;
-  } | undefined;
-  analyticsMetrics?: {
-    getUsageSummaryForProject(input: {
-      organization_id: string;
-      project_id: string;
-      from: string;
-      to: string;
-      granularity: "hour" | "day";
-      service?: string | undefined;
-      environment?: string | undefined;
-      limit?: number | undefined;
-    }): Promise<AnalyticsUsageSummaryResponse>;
-    getRouteMetricsForProject(input: {
-      organization_id: string;
-      project_id: string;
-      from: string;
-      to: string;
-      granularity: "hour" | "day";
-      service?: string | undefined;
-      environment?: string | undefined;
-      limit?: number | undefined;
-    }): Promise<AnalyticsRouteMetricsResponse>;
-    getJourneyPatternsForProject(input: {
-      organization_id: string;
-      project_id: string;
-      from: string;
-      to: string;
-      granularity: "hour" | "day";
-      service?: string | undefined;
-      environment?: string | undefined;
-      limit?: number | undefined;
-    }): Promise<AnalyticsJourneyPatternsResponse>;
-    getDeviceBreakdownForProject(input: {
-      organization_id: string;
-      project_id: string;
-      from: string;
-      to: string;
-      granularity: "hour" | "day";
-      service?: string | undefined;
-      environment?: string | undefined;
-      limit?: number | undefined;
-    }): Promise<AnalyticsDeviceBreakdownResponse>;
-    getReferrerMetricsForProject(input: {
-      organization_id: string;
-      project_id: string;
-      from: string;
-      to: string;
-      granularity: "hour" | "day";
-      service?: string | undefined;
-      environment?: string | undefined;
-      limit?: number | undefined;
-    }): Promise<AnalyticsReferrerMetricsResponse>;
-    getFunnelAnalysisForProject(input: {
-      organization_id: string;
-      project_id: string;
-      funnel_key: string;
-      from: string;
-      to: string;
-      granularity: "hour" | "day";
-      service?: string | undefined;
-      environment?: string | undefined;
-      limit?: number | undefined;
-    }): Promise<AnalyticsFunnelAnalysisResponse>;
-  } | undefined;
-  analyticsOpportunities?: {
-    listAnalyticsOpportunitiesForProject(input: {
-      organization_id: string;
-      project_id: string;
-      status?: AnalyticsOpportunityStatus | undefined;
-      kind?: AnalyticsBundleAnalysisKind | undefined;
-      cursor?: { last_detected_at: string; opportunity_id: string } | undefined;
-      limit: number;
-    }): Promise<AnalyticsOpportunitiesListResponse>;
-    getAnalyticsOpportunityForProject(input: {
-      organization_id: string;
-      project_id: string;
-      opportunity_id: string;
-    }): Promise<AnalyticsOpportunityResponse | null>;
   } | undefined;
   improvementManagement?: {
     listImprovementsForOrganization(input: {

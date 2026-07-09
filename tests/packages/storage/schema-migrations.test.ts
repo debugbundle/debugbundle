@@ -242,6 +242,7 @@ describe("storage schema migrations", () => {
       { table_name: "account_analytics_accounts", column_name: "metrics_collection_started_at" },
       { table_name: "account_payment_retention_records", column_name: "provider" },
       { table_name: "analytics_bundle_generations", column_name: "input_fingerprint" },
+      { table_name: "analytics_usage_counters", column_name: "analytics_events" },
       { table_name: "plan_cleanup_tasks", column_name: "cleanup_type" },
       { table_name: "project_analytics_settings", column_name: "enabled" },
       { table_name: "project_usage_counters", column_name: "updated_at" },

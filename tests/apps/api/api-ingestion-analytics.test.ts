@@ -33,6 +33,8 @@ function createSettings(overrides: Partial<AnalyticsSettings> = {}): AnalyticsSe
 
 function createAnalyticsEvent(input: {
   eventId: string;
+  kind?: AnalyticsEventEnvelope["payload"]["kind"];
+  sessionId?: string;
   customDimensions?: Record<string, string>;
 }): AnalyticsEventEnvelope {
   return {
@@ -49,14 +51,14 @@ function createAnalyticsEvent(input: {
       environment: "production"
     },
     correlation: {
-      session_id: "sess_123",
+      session_id: input.sessionId ?? "sess_123",
       visitor_id_hash: null,
       user_id_hash: null,
       trace_id: null,
       deploy_id: null
     },
     payload: {
-      kind: "page_view",
+      kind: input.kind ?? "page_view",
       route: {
         path: "/pricing",
         normalized_path: "/pricing",
@@ -109,6 +111,7 @@ function createDependencies(overrides: {
   persistAnalyticsAndEnqueue?: NonNullable<ApiServerDependencies["ingestionPersistence"]["persistAnalyticsAndEnqueue"]>;
   claimEvents?: NonNullable<ApiServerDependencies["ingestionRateLimiter"]>["claimEvents"];
   billingManagement?: ApiServerDependencies["billingManagement"];
+  analyticsUsage?: ApiServerDependencies["analyticsUsage"];
 } = {}): ReturnType<typeof createApiServer> {
   return createApiServer({
     ingestionPersistence: {
@@ -131,6 +134,7 @@ function createDependencies(overrides: {
             claimEvents: overrides.claimEvents
           },
     ...(overrides.billingManagement === undefined ? {} : { billingManagement: overrides.billingManagement }),
+    ...(overrides.analyticsUsage === undefined ? {} : { analyticsUsage: overrides.analyticsUsage }),
     analyticsSettingsManagement: {
       getAnalyticsSettingsForProject: vi.fn().mockResolvedValue(
         overrides.analyticsSettings === undefined ? createSettings() : overrides.analyticsSettings
@@ -350,4 +354,186 @@ describe("api analytics ingestion split", () => {
     expect(persistAndEnqueue).not.toHaveBeenCalled();
     expect(persistAnalyticsAndEnqueue).toHaveBeenCalledOnce();
   });
+
+  it("rejects analytics-only ingestion when the analytics event allowance is exhausted", async () => {
+    const persistAnalyticsAndEnqueue = vi.fn();
+    const app = createDependencies({
+      organizationPlan: "solo",
+      persistAnalyticsAndEnqueue,
+      billingManagement: createBillingManagementForAnalyticsQuota(),
+      analyticsUsage: {
+        getAnalyticsUsageForOrganization: vi.fn(),
+        claimAnalyticsUsageForOrganization: vi.fn().mockResolvedValue({
+          allowed: false,
+          metric: "monthly_analytics_events",
+          used: 50_001,
+          limit: 50_000,
+          usage: {
+            monthly_analytics_events: 50_000,
+            monthly_analytics_sessions: 0,
+            monthly_analytics_bundle_generations: 0
+          }
+        }),
+        releaseAnalyticsUsageForOrganization: vi.fn()
+      }
+    });
+
+    const response = await app.inject({
+      method: "POST",
+      url: "/v1/events",
+      headers: { authorization: "Bearer dbundle_proj_test" },
+      payload: {
+        events: [
+          createAnalyticsEvent({ eventId: "10000000-0000-4000-8000-000000000006" })
+        ]
+      }
+    });
+
+    expect(response.statusCode).toBe(429);
+    expect(response.headers["retry-after"]).toBeDefined();
+    expect(response.json()).toMatchObject({
+      accepted: 0,
+      rejected: 1,
+      errors: [{ index: 0, reason: "analytics_quota_exceeded" }]
+    });
+    expect(persistAnalyticsAndEnqueue).not.toHaveBeenCalled();
+  });
+
+  it("keeps debug events accepted when analytics ingestion quota is exhausted in a mixed batch", async () => {
+    const persistAndEnqueue = vi.fn().mockResolvedValue({ object_key: "raw-events/p/k.json.gz" });
+    const persistAnalyticsAndEnqueue = vi.fn();
+    const app = createDependencies({
+      organizationPlan: "solo",
+      persistAndEnqueue,
+      persistAnalyticsAndEnqueue,
+      billingManagement: createBillingManagementForAnalyticsQuota(),
+      analyticsUsage: {
+        getAnalyticsUsageForOrganization: vi.fn(),
+        claimAnalyticsUsageForOrganization: vi.fn().mockResolvedValue({
+          allowed: false,
+          metric: "monthly_analytics_events",
+          used: 50_001,
+          limit: 50_000,
+          usage: {
+            monthly_analytics_events: 50_000,
+            monthly_analytics_sessions: 0,
+            monthly_analytics_bundle_generations: 0
+          }
+        }),
+        releaseAnalyticsUsageForOrganization: vi.fn()
+      }
+    });
+
+    const response = await app.inject({
+      method: "POST",
+      url: "/v1/events",
+      headers: { authorization: "Bearer dbundle_proj_test" },
+      payload: {
+        events: [
+          createDebugEvent(),
+          createAnalyticsEvent({ eventId: "10000000-0000-4000-8000-000000000007" })
+        ]
+      }
+    });
+
+    expect(response.statusCode).toBe(202);
+    expect(response.json()).toEqual({
+      accepted: 1,
+      rejected: 1,
+      errors: [{ index: 1, reason: "analytics_quota_exceeded" }]
+    });
+    expect(persistAndEnqueue).toHaveBeenCalledOnce();
+    expect(persistAnalyticsAndEnqueue).not.toHaveBeenCalled();
+  });
+
+  it("rejects new analytics sessions when the analytics session allowance is exhausted", async () => {
+    const persistAnalyticsAndEnqueue = vi.fn();
+    const app = createDependencies({
+      organizationPlan: "solo",
+      persistAnalyticsAndEnqueue,
+      billingManagement: createBillingManagementForAnalyticsQuota(),
+      analyticsUsage: {
+        getAnalyticsUsageForOrganization: vi.fn(),
+        claimAnalyticsUsageForOrganization: vi.fn().mockResolvedValue({
+          allowed: false,
+          metric: "monthly_analytics_sessions",
+          used: 10_001,
+          limit: 10_000,
+          usage: {
+            monthly_analytics_events: 0,
+            monthly_analytics_sessions: 10_000,
+            monthly_analytics_bundle_generations: 0
+          }
+        }),
+        releaseAnalyticsUsageForOrganization: vi.fn()
+      }
+    });
+
+    const response = await app.inject({
+      method: "POST",
+      url: "/v1/events",
+      headers: { authorization: "Bearer dbundle_proj_test" },
+      payload: {
+        events: [
+          createAnalyticsEvent({
+            eventId: "10000000-0000-4000-8000-000000000008",
+            kind: "session_start",
+            sessionId: "sess_new"
+          })
+        ]
+      }
+    });
+
+    expect(response.statusCode).toBe(429);
+    expect(response.json()).toMatchObject({
+      accepted: 0,
+      rejected: 1,
+      errors: [{ index: 0, reason: "analytics_quota_exceeded" }]
+    });
+    expect(persistAnalyticsAndEnqueue).not.toHaveBeenCalled();
+  });
 });
+
+function createBillingManagementForAnalyticsQuota(): NonNullable<ApiServerDependencies["billingManagement"]> {
+  return {
+    getBillingSummaryForOrganization: vi.fn().mockResolvedValue({
+      plan: "solo",
+      billing_state: "active",
+      stripe_customer_id: null,
+      active_projects: 1,
+      capacity_units: {
+        total: 1,
+        included: 1,
+        additional_purchased: 0,
+        pending_reduction: null
+      },
+      usage_window: {
+        starts_at: "2026-03-01T00:00:00.000Z",
+        ends_at: "2026-04-01T00:00:00.000Z"
+      },
+      allowances: {
+        monthly_bundle_requests: { used: 0, limit: 25 },
+        monthly_raw_ingested_events: { used: 0, limit: 10_000 },
+        retained_bundle_cap: { used: 0, limit: 5 },
+        monthly_remote_activations: { used: 0, limit: 5 },
+        monthly_alert_deliveries: { used: 0, limit: 100 },
+        monthly_webhook_deliveries: { used: 0, limit: 100 }
+      },
+      trial: {
+        available: false,
+        active: false,
+        plan: null,
+        started_at: null,
+        ends_at: null,
+        used_at: null,
+        converted_at: null,
+        expired_at: null,
+        days_remaining: null
+      }
+    }),
+    incrementOrgUsageCounter: vi.fn(),
+    incrementProjectUsageCounter: vi.fn(),
+    createCheckoutLink: vi.fn().mockResolvedValue(null),
+    createPortalLink: vi.fn().mockResolvedValue(null)
+  };
+}

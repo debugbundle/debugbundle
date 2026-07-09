@@ -34,9 +34,21 @@ export interface ReserveAnalyticsBundleGenerationInput {
 
 export interface AnalyticsBundleGenerationStore {
   reserveAnalyticsBundleGeneration(input: ReserveAnalyticsBundleGenerationInput): Promise<AnalyticsBundleGenerationRecord>;
+  listAnalyticsBundleGenerationsForProject(input: {
+    project_id: string;
+    status?: AnalyticsBundleGenerationStatus | undefined;
+    analysis_kind?: AnalyticsBundleAnalysisKind | undefined;
+    cursor?: { created_at: string; generation_id: string } | undefined;
+    limit: number;
+  }): Promise<{ bundles: AnalyticsBundleGenerationRecord[]; next_cursor: string | null }>;
   getAnalyticsBundleGenerationForProject(input: {
     project_id: string;
     generation_id: string;
+  }): Promise<AnalyticsBundleGenerationRecord | null>;
+  claimAnalyticsBundleGenerationForProject(input: {
+    project_id: string;
+    generation_id: string;
+    claimed_at: string;
   }): Promise<AnalyticsBundleGenerationRecord | null>;
   claimPendingAnalyticsBundleGeneration(input: {
     claimed_at: string;
@@ -149,6 +161,52 @@ export function createPostgresAnalyticsBundleGenerationStore(db: Queryable): Ana
       });
     },
 
+    async listAnalyticsBundleGenerationsForProject(input) {
+      const limit = Math.min(Math.max(input.limit, 1), 100);
+      const params: unknown[] = [input.project_id];
+      const where = ["project_id = $1::uuid"];
+
+      if (input.status !== undefined) {
+        params.push(input.status);
+        where.push(`status = $${params.length}`);
+      }
+
+      if (input.analysis_kind !== undefined) {
+        params.push(input.analysis_kind);
+        where.push(`analysis_kind = $${params.length}`);
+      }
+
+      if (input.cursor !== undefined) {
+        params.push(input.cursor.created_at, input.cursor.generation_id);
+        const createdAtIndex = params.length - 1;
+        const idIndex = params.length;
+        where.push(`(created_at, id) < ($${createdAtIndex}::timestamptz, $${idIndex}::uuid)`);
+      }
+
+      params.push(limit + 1);
+      const result = await db.query<AnalyticsBundleGenerationRow>(
+        `
+          SELECT ${analyticsBundleGenerationSelectColumns()}
+          FROM analytics_bundle_generations
+          WHERE ${where.join("\n            AND ")}
+          ORDER BY created_at DESC, id DESC
+          LIMIT $${params.length}
+        `,
+        params
+      );
+
+      const rows = result.rows.slice(0, limit).map(mapAnalyticsBundleGenerationRow);
+      const overflow = result.rows[limit];
+      const next_cursor = overflow === undefined
+        ? null
+        : buildAnalyticsBundleGenerationCursor(mapAnalyticsBundleGenerationRow(overflow));
+
+      return {
+        bundles: rows,
+        next_cursor
+      };
+    },
+
     async getAnalyticsBundleGenerationForProject(input) {
       const result = await db.query<AnalyticsBundleGenerationRow>(
         `
@@ -162,6 +220,39 @@ export function createPostgresAnalyticsBundleGenerationStore(db: Queryable): Ana
       );
       const row = result.rows[0];
       return row === undefined ? null : mapAnalyticsBundleGenerationRow(row);
+    },
+
+    async claimAnalyticsBundleGenerationForProject(input) {
+      return runInTransaction(db, async (tx) => {
+        const claimed = await tx.query<AnalyticsBundleGenerationRow>(
+          `
+            UPDATE analytics_bundle_generations
+            SET
+              status = 'running',
+              claimed_at = $3::timestamptz,
+              updated_at = $3::timestamptz,
+              failure_reason = NULL
+            WHERE project_id = $1::uuid
+              AND id = $2::uuid
+              AND status IN ('pending', 'running')
+            RETURNING ${analyticsBundleGenerationSelectColumns()}
+          `,
+          [input.project_id, input.generation_id, input.claimed_at]
+        );
+        const row = claimed.rows[0];
+        if (row === undefined) {
+          return null;
+        }
+
+        const record = mapAnalyticsBundleGenerationRow(row);
+        await syncOpportunityBundleState(tx, {
+          opportunity_id: record.opportunity_id,
+          status: "running",
+          object_key: record.object_key,
+          failure_reason: null
+        });
+        return record;
+      });
     },
 
     async claimPendingAnalyticsBundleGeneration(input) {
@@ -287,6 +378,13 @@ export function buildAnalyticsBundleInputFingerprint(input: {
     .digest("hex");
 
   return `sha256:${digest}`;
+}
+
+export function buildAnalyticsBundleGenerationCursor(record: {
+  generation_id: string;
+  created_at: string;
+}): string {
+  return `${record.created_at}|${record.generation_id}`;
 }
 
 function analyticsBundleGenerationSelectColumns(tableAlias?: string): string {

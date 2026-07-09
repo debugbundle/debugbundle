@@ -58,6 +58,7 @@ Every capability must be available through all applicable interfaces. Operations
 | Update analytics settings | `PATCH /v1/projects/{id}/analytics-settings` | `analytics settings set` | `update_analytics_settings` | Browser Session or Member Token, owner/admin only, Solo+ for analytics enablement, Team for custom dimensions |
 | List analytics opportunities | `GET /v1/analytics/opportunities` | `analytics opportunities` | `list_analytics_opportunities` | Browser Session or Member Token |
 | Get analytics opportunity | `GET /v1/analytics/opportunities/{id}` | `analytics opportunity get` | `get_analytics_opportunity` | Browser Session or Member Token |
+| List AnalyticsBundles | `GET /v1/analytics/bundles` | `analytics bundle list` | `list_analytics_bundles` | Browser Session or Member Token |
 | Generate AnalyticsBundle | `POST /v1/analytics/bundles` | `analytics bundle create` | `generate_analytics_bundle` | Browser Session or Member Token, tier-gated |
 | Get AnalyticsBundle | `GET /v1/analytics/bundles/{id}` | `analytics bundle get` | `get_analytics_bundle` | Browser Session or Member Token |
 | List project members | `GET /v1/projects/{id}/members` | `project members list` | `list_project_members` | Browser Session or Member Token, any authorized project member |
@@ -298,7 +299,7 @@ Anonymized aggregate account-usage metrics are preserved after deletion for life
 
 `POST /v1/events` is subject to the shared API request body limit. Requests with a declared `Content-Length` over the limit are rejected before project-token auth, schema validation, persistence, or queueing. The route is also subject to per-project-token ingestion rate limiting using the active tier capability (`ingestion_rate_per_min`). When the limit is exceeded, the API must reject the batch before persistence and return `429 Too Many Requests` with a `Retry-After` header.
 
-The endpoint accepts the existing debug event family plus opt-in `analytics_event` envelopes when project analytics is enabled. Mixed debug/analytics batches are split after validation: debug events follow existing capture-policy/event-class/incident paths, while analytics events follow analytics enablement, controlled custom-dimension validation, short-lived persistence, and analytics rollup queue paths without creating incidents directly. Dedicated analytics allowance checks are added separately from debug billing once analytics tier quantities are finalized.
+The endpoint accepts the existing debug event family plus opt-in `analytics_event` envelopes when project analytics is enabled. Mixed debug/analytics batches are split after validation: debug events follow existing capture-policy/event-class/incident paths, while analytics events follow analytics enablement, controlled custom-dimension validation, analytics-specific event/session allowance checks, short-lived persistence, and analytics rollup queue paths without creating incidents directly. Analytics allowance checks use durable internal analytics counters and do not add analytics keys to the public billing summary `allowances` object.
 
 **Request:**
 ```json
@@ -391,7 +392,7 @@ The endpoint accepts the existing debug event family plus opt-in `analytics_even
 
 When the shared `monthly_raw_ingested_events` allowance is exhausted, new hosted events are rejected before persistence with `monthly_quota_exceeded`. Already stored data remains retrievable.
 
-Analytics events use separate analytics allowances. Currently implemented analytics-specific rejection reasons include `analytics_disabled`, `analytics_invalid_event`, and `analytics_invalid_dimension`; planned allowance/consent-specific reasons include `analytics_consent_required` and `analytics_quota_exceeded`. These rejections must not reject otherwise-valid debug events in the same batch unless a shared request-level limit is exceeded.
+Analytics events use separate analytics allowances. Currently implemented analytics-specific rejection reasons include `analytics_disabled`, `analytics_invalid_event`, `analytics_invalid_dimension`, and `analytics_quota_exceeded`; planned consent-specific reasons include `analytics_consent_required`. Analytics-only quota exhaustion returns `429` with `Retry-After`; mixed batches can return `202` with only analytics events rejected. These rejections must not reject otherwise-valid debug events in the same batch unless a shared request-level limit is exceeded.
 
 Rate-limited responses also include `Retry-After: <seconds>` so SDKs can back off without guessing.
 
@@ -502,6 +503,7 @@ Analytics shares browser SDK capture primitives with debug capture where that re
 | GET | `/v1/analytics/journey-patterns` | Browser Session or Member Token | Aggregate path and friction patterns plus retained representative sample references |
 | GET | `/v1/analytics/opportunities` | Browser Session or Member Token | Analytics opportunities |
 | GET | `/v1/analytics/opportunities/{id}` | Browser Session or Member Token | Analytics opportunity detail |
+| GET | `/v1/analytics/bundles` | Browser Session or Member Token | List AnalyticsBundle generation records and pending/failed/completed states |
 | POST | `/v1/analytics/bundles` | Browser Session or Member Token | Request AnalyticsBundle generation |
 | GET | `/v1/analytics/bundles/{id}` | Browser Session or Member Token | Fetch generated AnalyticsBundle or status |
 
@@ -538,7 +540,7 @@ Analytics shares browser SDK capture primitives with debug capture where that re
 }
 ```
 
-The implemented aggregate metrics read surface includes `GET /v1/analytics/summary`, `/routes`, `/journey-patterns`, `/devices`, `/referrers`, and `/funnels/{key}` plus matching `debugbundle analytics summary|routes|journeys|devices|referrers|funnel` commands and MCP `get_usage_summary`, `get_route_metrics`, `get_journey_patterns`, `get_device_breakdown`, `get_referrer_metrics`, and `get_funnel_analysis` tools. Stored analytics opportunities are also readable through `GET /v1/analytics/opportunities` and `/opportunities/{id}`, matching `debugbundle analytics opportunities`, `debugbundle analytics opportunity get`, and MCP `list_analytics_opportunities` / `get_analytics_opportunity`. Initial stored opportunities are created by a background aggregate-rollup evaluator for `funnel_dropoff` candidates with bounded sample/dropoff thresholds; evidence is aggregate-only and no opportunity implies an AnalyticsBundle artifact exists yet. These endpoints are project-authorized browser-session/member-token read surfaces; project tokens remain write-only for analytics ingestion.
+The implemented aggregate metrics read surface includes `GET /v1/analytics/summary`, `/routes`, `/journey-patterns`, `/devices`, `/referrers`, and `/funnels/{key}` plus matching `debugbundle analytics summary|routes|journeys|devices|referrers|funnel` commands and MCP `get_usage_summary`, `get_route_metrics`, `get_journey_patterns`, `get_device_breakdown`, `get_referrer_metrics`, and `get_funnel_analysis` tools. Stored analytics opportunities are also readable through `GET /v1/analytics/opportunities` and `/opportunities/{id}`, matching `debugbundle analytics opportunities`, `debugbundle analytics opportunity get`, and MCP `list_analytics_opportunities` / `get_analytics_opportunity`. AnalyticsBundle generation can be requested through `POST /v1/analytics/bundles`, `debugbundle analytics bundle create`, and MCP `generate_analytics_bundle`; successful requests reserve a deterministic generation record and enqueue `build-analytics-bundle`, returning pending state until the worker completes it. AnalyticsBundle generation records can be inventoried through `GET /v1/analytics/bundles`, `debugbundle analytics bundle list`, and MCP `list_analytics_bundles`, returning lightweight metadata including analysis kind, status, timestamps, failure reason, input fingerprint, and whether an artifact exists. Existing AnalyticsBundle generation records are readable through `GET /v1/analytics/bundles/{id}`, `debugbundle analytics bundle get`, and MCP `get_analytics_bundle`; completed generations return the validated `AnalyticsBundleV1` artifact, while pending/running and failed generations return explicit state payloads. Initial stored opportunities are created by a background aggregate-rollup evaluator for `funnel_dropoff` candidates with bounded sample/dropoff thresholds; evidence is aggregate-only and no opportunity implies an AnalyticsBundle artifact exists yet. These endpoints are project-authorized browser-session/member-token read surfaces; project tokens remain write-only for analytics ingestion.
 
 **Analytics route metrics response shape:**
 ```json
@@ -619,12 +621,40 @@ Initial stored opportunity kinds are generated from aggregate rollups only: `fun
 }
 ```
 
+`last` may be supplied instead of `from` for relative windows such as `"7d"`; `to` may still be supplied with `last` to anchor the window.
+
+**AnalyticsBundle generation list response:** `GET /v1/analytics/bundles?project_id=<uuid>&status=all|pending|running|completed|failed&kind=<kind>&cursor=<cursor>&limit=<n>` returns:
+
+```json
+{
+  "bundles": [
+    {
+      "generation_id": "uuid",
+      "project_id": "uuid",
+      "opportunity_id": "uuid | null",
+      "requested_by_user_id": "uuid | null",
+      "analysis_kind": "usage_summary",
+      "analysis_spec": {},
+      "input_fingerprint": "sha256:...",
+      "status": "pending | running | completed | failed",
+      "has_artifact": true,
+      "failure_reason": null,
+      "created_at": "ISO8601",
+      "claimed_at": "ISO8601 | null",
+      "completed_at": "ISO8601 | null",
+      "updated_at": "ISO8601"
+    }
+  ],
+  "next_cursor": "string | null"
+}
+```
+
 **AnalyticsBundle response:** full `AnalyticsBundleV1` JSON when ready; `{ "status": "pending", "bundle_generation_id": "uuid" }` while queued/running; `{ "status": "failed", "reason": "..." }` when generation failed or allowance is exhausted.
 
 Authorization failure: `401 { "error": "invalid_member_token" }` or `401 { "error": "invalid_session" }`.
 Out-of-scope or missing project/opportunity/bundle: `404`.
 Analytics disabled: `403 { "error": "analytics_disabled" }`.
-Quota exhausted: `429 { "error": "analytics_quota_exceeded" }` or `200 { "status": "failed", "reason": "analytics_quota_exceeded" }` for artifact fetches whose generation cannot proceed.
+Quota exhausted: `429 { "error": "analytics_quota_exceeded", "retry_after_ms": <ms> }` with `Retry-After`, or `200 { "status": "failed", "reason": "analytics_quota_exceeded" }` for artifact fetches whose generation cannot proceed.
 
 ### 1.3 Services
 
@@ -2419,7 +2449,8 @@ debugbundle analytics funnel <funnel-key> --project-id <id> [--from <ISO8601>] [
 debugbundle analytics journeys --project-id <id> [--route <path>] [--funnel <key>] [--from <ISO8601>] [--to <ISO8601>] [--last <duration>] [--json]
 debugbundle analytics opportunities --project-id <id> [--status <open|resolved|snoozed|all>] [--kind <kind>] [--cursor <cursor>] [--limit <n>] [--json]
 debugbundle analytics opportunity get <opportunity-id> --project-id <id> [--json]
-debugbundle analytics bundle create --project-id <id> --kind <kind> [--funnel <key>] [--route <path>] [--incident-id <id>] [--deploy-id <id>] [--from <ISO8601>] [--to <ISO8601>] [--last <duration>] [--json]
+debugbundle analytics bundle list --project-id <id> [--status <all|pending|running|completed|failed>] [--kind <kind>] [--cursor <cursor>] [--limit <n>] [--json]
+debugbundle analytics bundle create --project-id <id> --kind <kind> [--funnel <key>] [--route <path>] [--incident-id <id>] [--deploy-id <id>] [--from <ISO8601>] [--to <ISO8601>] [--last <duration>] [--filters-json <json>] [--json]
 debugbundle analytics bundle get <bundle-generation-id> --project-id <id> [--json]
 ```
 `debugbundle incidents` defaults to `--status active` so the CLI shows incidents that need attention (`open` or `regressed`). Use `--status all` to omit the status filter and include resolved incidents.
@@ -2653,6 +2684,7 @@ debugbundle_get_analytics_settings → same result as GET /v1/projects/{id}/anal
 debugbundle_update_analytics_settings → same result as PATCH /v1/projects/{id}/analytics-settings
 debugbundle_list_analytics_opportunities → same result as GET /v1/analytics/opportunities
 debugbundle_get_analytics_opportunity → same result as GET /v1/analytics/opportunities/{id}
+debugbundle_list_analytics_bundles → same result as GET /v1/analytics/bundles
 debugbundle_generate_analytics_bundle → same result as POST /v1/analytics/bundles
 debugbundle_get_analytics_bundle → same result as GET /v1/analytics/bundles/{id}
 debugbundle_list_alerts          → same result as `GET /v1/alerts`
@@ -2677,7 +2709,7 @@ debugbundle_list_webhook_deliveries → same result as `GET /v1/webhooks/{id}/de
 
 Alert MCP tools use camelCase request fields (`projectId`, `serviceId`, `conditionType`, `severityMin`, `cooldownSeconds`, `isEnabled`) over the same HTTP alert API. `cooldownSeconds` is optional on `create_alert` and `update_alert`, uses seconds, defaults to API `0` on create when omitted, accepts `0` to disable suppression, and is capped at `604800`.
 
-Current MCP analytics, alert, Slack-destination, weekly-report, and webhook behavior is a thin adapter over the same shared HTTP clients used by CLI, returning the same machine-readable payloads for lifecycle operations without adding business logic. Analytics MCP tools require member-token or CLI-auth-derived member auth; project tokens are never valid for analytics reads or bundle generation.
+Current MCP analytics, alert, Slack-destination, weekly-report, and webhook behavior is a thin adapter over the same shared HTTP clients used by CLI, returning the same machine-readable payloads for lifecycle operations without adding business logic. Analytics MCP tools require member-token or CLI-auth-derived member auth; project tokens are never valid for analytics reads or bundle generation. `generate_analytics_bundle` requests a generation record and `get_analytics_bundle` reads existing generation records or completed artifacts.
 
 Current MCP local retrieval behavior: when no `bearerToken` is supplied and the project is configured as local-only, `debugbundle_list_incidents`, `debugbundle_get_incident`, `debugbundle_resolve_incident`, `debugbundle_resolve_incidents`, `debugbundle_reopen_incident`, `debugbundle_reopen_incidents`, `debugbundle_get_bundle`, and `debugbundle_get_reproduction` read the same local store used by the CLI (`.debugbundle/local/state.json`, `.debugbundle/bundles/local/`, `.debugbundle/bundles/local/reproductions/`) and return the same machine-readable payloads without cloud auth.
 

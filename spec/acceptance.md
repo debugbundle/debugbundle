@@ -1585,7 +1585,8 @@ If CLI says something is healthy and MCP says something different, that is a pro
 ### AC-ANL-19: Separate Allowance Accounting
 - **Given** a project exhausts its analytics event/session or AnalyticsBundle generation allowance
 - **When** new analytics events or bundle-generation requests arrive
-- **Then** analytics-specific quota errors are returned
+- **Then** analytics-specific quota errors are returned with `Retry-After` when the API rejects the request synchronously
+- **And** otherwise-valid debug events in the same ingestion batch are still accepted unless the shared request-level ingestion rate limit is exceeded
 - **And** existing debug incident ingestion and failure bundle retrieval remain governed by their own allowances
 
 ### AC-ANL-20: Self-Host Parity

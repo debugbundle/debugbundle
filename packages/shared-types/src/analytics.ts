@@ -65,9 +65,7 @@ export const AnalyticsMetricsGranularitySchema = z.enum(AnalyticsMetricsGranular
 export type AnalyticsMetricsGranularity = z.infer<typeof AnalyticsMetricsGranularitySchema>;
 
 const AnalyticsSafeHashSchema = z.string().regex(/^sha256:[a-f0-9]{64}$/i);
-
 const AnalyticsNullableHashSchema = AnalyticsSafeHashSchema.nullable();
-
 const AnalyticsNullableTextSchema = (max: number): z.ZodNullable<z.ZodString> => z.string().trim().min(1).max(max).nullable();
 
 const AnalyticsRoutePathSchema = z
@@ -129,7 +127,6 @@ export const AnalyticsSignalSchema = z
     conversion_key: value.conversion_key ?? null,
     marker_key: value.marker_key ?? null,
   }));
-
 export type AnalyticsSignal = z.infer<typeof AnalyticsSignalSchema>;
 
 export const AnalyticsRouteSchema = z
@@ -148,7 +145,6 @@ export const AnalyticsRouteSchema = z
       });
     }
   });
-
 export type AnalyticsRoute = z.infer<typeof AnalyticsRouteSchema>;
 
 export const AnalyticsDimensionsSchema = z
@@ -170,7 +166,6 @@ export const AnalyticsDimensionsSchema = z
     region_code: AnalyticsRegionCodeSchema,
   })
   .strict();
-
 export type AnalyticsDimensions = z.infer<typeof AnalyticsDimensionsSchema>;
 
 export const AnalyticsCustomDimensionKeySchema = z
@@ -182,7 +177,6 @@ export const AnalyticsCustomDimensionKeySchema = z
   .refine((value) => !isSensitiveCustomDimensionKey(value), {
     message: "Analytics custom dimension key is reserved for sensitive or high-cardinality data.",
   });
-
 export type AnalyticsCustomDimensionKey = z.infer<typeof AnalyticsCustomDimensionKeySchema>;
 
 const AnalyticsCustomDimensionStringValueSchema = z
@@ -200,7 +194,6 @@ export const AnalyticsCustomDimensionValueSchema = z.union([
   z.boolean(),
   z.null(),
 ]);
-
 export type AnalyticsCustomDimensionValue = z.infer<typeof AnalyticsCustomDimensionValueSchema>;
 
 export const AnalyticsCustomDimensionsSchema = z
@@ -513,6 +506,10 @@ export const AnalyticsOpportunityBundleStatusValues = ["not_requested", "pending
 export const AnalyticsOpportunityBundleStatusSchema = z.enum(AnalyticsOpportunityBundleStatusValues);
 export type AnalyticsOpportunityBundleStatus = z.infer<typeof AnalyticsOpportunityBundleStatusSchema>;
 
+export const AnalyticsBundleGenerationStatusValues = ["pending", "running", "completed", "failed"] as const;
+export const AnalyticsBundleGenerationStatusSchema = z.enum(AnalyticsBundleGenerationStatusValues);
+export type AnalyticsBundleGenerationStatus = z.infer<typeof AnalyticsBundleGenerationStatusSchema>;
+
 const AnalyticsOpportunityRecordSchema = z
   .object({
     opportunity_id: z.string().uuid(),
@@ -560,6 +557,36 @@ export const AnalyticsOpportunityResponseSchema = z
   .strict();
 
 export type AnalyticsOpportunityResponse = z.infer<typeof AnalyticsOpportunityResponseSchema>;
+
+export const AnalyticsBundleGenerationRecordSchema = z
+  .object({
+    generation_id: z.string().uuid(),
+    project_id: z.string().uuid(),
+    opportunity_id: z.string().uuid().nullable(),
+    requested_by_user_id: z.string().uuid().nullable(),
+    analysis_kind: AnalyticsBundleAnalysisKindSchema,
+    analysis_spec: z.record(z.string(), z.unknown()),
+    input_fingerprint: AnalyticsSafeHashSchema,
+    status: AnalyticsBundleGenerationStatusSchema,
+    has_artifact: z.boolean(),
+    failure_reason: z.string().trim().min(1).max(240).nullable(),
+    created_at: z.string().datetime(),
+    claimed_at: z.string().datetime().nullable(),
+    completed_at: z.string().datetime().nullable(),
+    updated_at: z.string().datetime(),
+  })
+  .strict();
+
+export type AnalyticsBundleGenerationRecord = z.infer<typeof AnalyticsBundleGenerationRecordSchema>;
+
+export const AnalyticsBundleGenerationsListResponseSchema = z
+  .object({
+    bundles: z.array(AnalyticsBundleGenerationRecordSchema).max(100),
+    next_cursor: z.string().trim().min(1).nullable(),
+  })
+  .strict();
+
+export type AnalyticsBundleGenerationsListResponse = z.infer<typeof AnalyticsBundleGenerationsListResponseSchema>;
 
 const AnalyticsBundleProjectSchema = z
   .object({

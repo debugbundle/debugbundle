@@ -1,8 +1,12 @@
+import { gunzipSync } from "node:zlib";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { z } from "zod";
 
 import {
   AnalyticsBundleAnalysisKindSchema,
+  AnalyticsBundleGenerationsListResponseSchema,
+  AnalyticsBundleGenerationStatusSchema,
+  AnalyticsBundleV1Schema,
   AnalyticsDeviceBreakdownResponseSchema,
   AnalyticsFunnelAnalysisResponseSchema,
   AnalyticsJourneyPatternsResponseSchema,
@@ -16,7 +20,12 @@ import {
   getTierCapabilities
 } from "../../../../packages/shared-types/src/index.js";
 import type { ApiDependencies } from "../api-types.js";
-import { requireRateLimitedProjectAccess } from "../api-helpers.js";
+import {
+  claimAnalyticsBundleGenerationQuota,
+  releaseAnalyticsQuotaClaimBestEffort,
+  toRetryAfterSeconds
+} from "../analytics-quota.js";
+import { isObjectNotFoundError, requireRateLimitedProjectAccess } from "../api-helpers.js";
 
 const DEFAULT_LAST_MS = 7 * 24 * 60 * 60 * 1000;
 const MAX_LAST_MS = 370 * 24 * 60 * 60 * 1000;
@@ -52,8 +61,53 @@ const AnalyticsOpportunityParamsSchema = z.object({
   id: z.string().uuid()
 }).strict();
 
+const AnalyticsBundleParamsSchema = z.object({
+  id: z.string().uuid()
+}).strict();
+
+const AnalyticsBundlesListQuerySchema = z
+  .object({
+    project_id: z.string().uuid(),
+    status: z.union([AnalyticsBundleGenerationStatusSchema, z.literal("all")]).optional().default("all"),
+    kind: AnalyticsBundleAnalysisKindSchema.optional(),
+    cursor: z.string().trim().min(1).optional(),
+    limit: z.coerce.number().int().min(1).max(100).optional().default(20)
+  })
+  .strict();
+
+const AnalyticsBundleQuerySchema = z
+  .object({
+    project_id: z.string().uuid()
+  })
+  .strict();
+
+const AnalyticsBundleCreateBodySchema = z
+  .object({
+    project_id: z.string().uuid(),
+    analysis_kind: AnalyticsBundleAnalysisKindSchema,
+    from: z.string().datetime().optional(),
+    to: z.string().datetime().optional(),
+    last: z.string().trim().min(2).max(16).optional(),
+    funnel: z.string().trim().min(1).max(120).nullable().optional(),
+    route: z
+      .string()
+      .trim()
+      .min(1)
+      .max(2048)
+      .refine((value) => !value.includes("?") && !value.includes("#"))
+      .nullable()
+      .optional(),
+    incident_id: z.string().uuid().nullable().optional(),
+    deploy_id: z.string().trim().min(1).max(120).nullable().optional(),
+    filters: z.record(z.string(), z.unknown()).optional().default({})
+  })
+  .strict();
+
 type AnalyticsQuery = z.infer<typeof AnalyticsSummaryQuerySchema>;
 type AuthorizedAnalyticsQuery = AnalyticsQuery & { from: string; to: string; organization_id: string };
+type AnalyticsBundleGeneration = NonNullable<
+  Awaited<ReturnType<NonNullable<ApiDependencies["analyticsBundles"]>["getAnalyticsBundleGenerationForProject"]>>
+>;
 
 export function registerAnalyticsRoutes(app: FastifyInstance, dependencies: ApiDependencies): void {
   app.get("/v1/analytics/opportunities", async (request, reply) => {
@@ -118,6 +172,152 @@ export function registerAnalyticsRoutes(app: FastifyInstance, dependencies: ApiD
     }
 
     return reply.status(200).send(AnalyticsOpportunityResponseSchema.parse(opportunity));
+  });
+
+  app.post("/v1/analytics/bundles", async (request, reply) => {
+    const parsedBody = AnalyticsBundleCreateBodySchema.safeParse(request.body);
+    if (!parsedBody.success) {
+      return reply.status(400).send({ error: "invalid_body" });
+    }
+
+    const range = resolveAnalyticsTimeRange(parsedBody.data);
+    if (range === null) {
+      return reply.status(400).send({ error: "invalid_body" });
+    }
+
+    const auth = await requireRateLimitedProjectAccess(request, reply, dependencies, {
+      bucket: "retrieval-write",
+      projectId: parsedBody.data.project_id
+    });
+    if (auth === null) {
+      return;
+    }
+
+    if (!getTierCapabilities(auth.access.organization_plan).analytics_bundle) {
+      return reply.status(403).send({ error: "upgrade_required" });
+    }
+
+    if (dependencies.analyticsSettingsManagement === undefined) {
+      return reply.status(404).send({ error: "analytics_settings_not_available" });
+    }
+
+    const settings = await dependencies.analyticsSettingsManagement.getAnalyticsSettingsForProject({
+      organization_id: auth.access.organization_id,
+      project_id: parsedBody.data.project_id
+    });
+    if (settings === null || !settings.enabled) {
+      return reply.status(403).send({ error: "analytics_disabled" });
+    }
+
+    if (dependencies.analyticsBundles === undefined) {
+      return reply.status(404).send({ error: "analytics_bundles_not_available" });
+    }
+
+    const quota = await claimAnalyticsBundleGenerationQuota({
+      dependencies,
+      organization_id: auth.access.organization_id,
+      organization_plan: auth.access.organization_plan,
+      now: new Date()
+    });
+    if (!quota.allowed) {
+      return reply
+        .header("Retry-After", toRetryAfterSeconds(quota.retry_after_ms))
+        .status(429)
+        .send({
+          error: "analytics_quota_exceeded",
+          retry_after_ms: quota.retry_after_ms
+        });
+    }
+
+    let generation: AnalyticsBundleGeneration;
+    try {
+      generation = await dependencies.analyticsBundles.requestAnalyticsBundleGenerationForProject({
+        organization_id: auth.access.organization_id,
+        project_id: parsedBody.data.project_id,
+        requested_by_user_id: auth.member.member_id,
+        analysis_kind: parsedBody.data.analysis_kind,
+        analysis_spec: buildAnalyticsBundleAnalysisSpec({
+          ...parsedBody.data,
+          from: range.from,
+          to: range.to
+        })
+      });
+    } catch (error) {
+      await releaseAnalyticsQuotaClaimBestEffort({
+        dependencies,
+        release: quota.allowed ? quota.release : undefined
+      });
+      throw error;
+    }
+
+    return sendAnalyticsBundleGenerationResponse(reply, dependencies, generation);
+  });
+
+  app.get("/v1/analytics/bundles", async (request, reply) => {
+    const parsedQuery = AnalyticsBundlesListQuerySchema.safeParse(request.query);
+    if (!parsedQuery.success) {
+      return reply.status(400).send({ error: "invalid_query" });
+    }
+
+    const parsedCursor = parseAnalyticsBundleGenerationsCursor(parsedQuery.data.cursor);
+    if (parsedQuery.data.cursor !== undefined && parsedCursor === null) {
+      return reply.status(400).send({ error: "invalid_query" });
+    }
+
+    const access = await requireAnalyticsProjectReadAccess(request, reply, dependencies, parsedQuery.data.project_id);
+    if (access === null) {
+      return;
+    }
+
+    if (dependencies.analyticsBundles === undefined) {
+      return reply.status(404).send({ error: "analytics_bundles_not_available" });
+    }
+
+    const generations = await dependencies.analyticsBundles.listAnalyticsBundleGenerationsForProject({
+      organization_id: access.organization_id,
+      project_id: parsedQuery.data.project_id,
+      ...(parsedQuery.data.status === "all" ? {} : { status: parsedQuery.data.status }),
+      ...(parsedQuery.data.kind === undefined ? {} : { analysis_kind: parsedQuery.data.kind }),
+      ...(parsedCursor === null ? {} : { cursor: parsedCursor }),
+      limit: parsedQuery.data.limit
+    });
+
+    return reply.status(200).send(AnalyticsBundleGenerationsListResponseSchema.parse({
+      bundles: generations.bundles.map(toAnalyticsBundleGenerationListRecord),
+      next_cursor: generations.next_cursor
+    }));
+  });
+
+  app.get("/v1/analytics/bundles/:id", async (request, reply) => {
+    const parsedParams = AnalyticsBundleParamsSchema.safeParse(request.params);
+    if (!parsedParams.success) {
+      return reply.status(400).send({ error: "invalid_bundle_generation_id" });
+    }
+
+    const parsedQuery = AnalyticsBundleQuerySchema.safeParse(request.query);
+    if (!parsedQuery.success) {
+      return reply.status(400).send({ error: "invalid_query" });
+    }
+
+    const access = await requireAnalyticsProjectReadAccess(request, reply, dependencies, parsedQuery.data.project_id);
+    if (access === null) {
+      return;
+    }
+
+    if (dependencies.analyticsBundles === undefined) {
+      return reply.status(404).send({ error: "analytics_bundles_not_available" });
+    }
+
+    const generation = await dependencies.analyticsBundles.getAnalyticsBundleGenerationForProject({
+      organization_id: access.organization_id,
+      project_id: parsedQuery.data.project_id,
+      generation_id: parsedParams.data.id
+    });
+    if (generation === null) {
+      return reply.status(404).send({ error: "analytics_bundle_not_found" });
+    }
+
+    return sendAnalyticsBundleGenerationResponse(reply, dependencies, generation);
   });
 
   app.get("/v1/analytics/summary", async (request, reply) => {
@@ -193,6 +393,83 @@ export function registerAnalyticsRoutes(app: FastifyInstance, dependencies: ApiD
 
     return reply.status(200).send(AnalyticsFunnelAnalysisResponseSchema.parse(funnel));
   });
+}
+
+function toAnalyticsBundleGenerationListRecord(generation: AnalyticsBundleGeneration): unknown {
+  return {
+    generation_id: generation.generation_id,
+    project_id: generation.project_id,
+    opportunity_id: generation.opportunity_id,
+    requested_by_user_id: generation.requested_by_user_id,
+    analysis_kind: generation.analysis_kind,
+    analysis_spec: generation.analysis_spec,
+    input_fingerprint: generation.input_fingerprint,
+    status: generation.status,
+    has_artifact: generation.object_key !== null,
+    failure_reason: generation.failure_reason,
+    created_at: generation.created_at,
+    claimed_at: generation.claimed_at,
+    completed_at: generation.completed_at,
+    updated_at: generation.updated_at
+  };
+}
+
+function buildAnalyticsBundleAnalysisSpec(input: z.infer<typeof AnalyticsBundleCreateBodySchema> & {
+  from: string;
+  to: string;
+}): Record<string, unknown> {
+  return {
+    from: input.from,
+    to: input.to,
+    funnel: input.funnel ?? null,
+    route: input.route ?? null,
+    incident_id: input.incident_id ?? null,
+    deploy_id: input.deploy_id ?? null,
+    filters: input.filters
+  };
+}
+
+async function sendAnalyticsBundleGenerationResponse(
+  reply: FastifyReply,
+  dependencies: ApiDependencies,
+  generation: AnalyticsBundleGeneration
+): Promise<FastifyReply> {
+  if (generation.status === "pending" || generation.status === "running") {
+    return reply.status(200).send({
+      status: "pending",
+      bundle_generation_id: generation.generation_id
+    });
+  }
+
+  if (generation.status === "failed") {
+    return reply.status(200).send({
+      status: "failed",
+      reason: generation.failure_reason ?? "analytics_bundle_generation_failed"
+    });
+  }
+
+  if (generation.object_key === null) {
+    return reply.status(404).send({ error: "analytics_bundle_artifact_not_found" });
+  }
+
+  let bundleArtifact: unknown;
+  try {
+    const compressed = await dependencies.objectStoreReader.getObject({ key: generation.object_key });
+    bundleArtifact = JSON.parse(gunzipSync(compressed).toString("utf8"));
+  } catch (error) {
+    if (isObjectNotFoundError(error)) {
+      return reply.status(404).send({ error: "analytics_bundle_artifact_not_found" });
+    }
+
+    return reply.status(500).send({ error: "analytics_bundle_artifact_unavailable" });
+  }
+
+  const parsedBundle = AnalyticsBundleV1Schema.safeParse(bundleArtifact);
+  if (!parsedBundle.success) {
+    return reply.status(500).send({ error: "analytics_bundle_artifact_invalid" });
+  }
+
+  return reply.status(200).send(parsedBundle.data);
 }
 
 async function requireAnalyticsMetricsQuery(
@@ -363,6 +640,36 @@ function parseAnalyticsOpportunitiesCursor(
   }).safeParse({
     last_detected_at: new Date(parsedTimestamp).toISOString(),
     opportunity_id: opportunityId
+  });
+
+  return parsed.success ? parsed.data : null;
+}
+
+function parseAnalyticsBundleGenerationsCursor(
+  rawCursor: string | undefined
+): { created_at: string; generation_id: string } | null {
+  if (rawCursor === undefined) {
+    return null;
+  }
+
+  const separatorIndex = rawCursor.lastIndexOf("|");
+  if (separatorIndex <= 0 || separatorIndex >= rawCursor.length - 1) {
+    return null;
+  }
+
+  const createdAt = rawCursor.slice(0, separatorIndex);
+  const generationId = rawCursor.slice(separatorIndex + 1);
+  const parsedTimestamp = Date.parse(createdAt);
+  if (Number.isNaN(parsedTimestamp)) {
+    return null;
+  }
+
+  const parsed = z.object({
+    created_at: z.string().datetime(),
+    generation_id: z.string().uuid()
+  }).safeParse({
+    created_at: new Date(parsedTimestamp).toISOString(),
+    generation_id: generationId
   });
 
   return parsed.success ? parsed.data : null;

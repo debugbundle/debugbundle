@@ -8,6 +8,11 @@ import {
   setAnalyticsSettingsWithAuthCommand as defaultSetAnalyticsSettingsCommand
 } from "./analytics-settings-commands.js";
 import {
+  createAnalyticsBundleWithAuthCommand as defaultCreateAnalyticsBundleCommand,
+  getAnalyticsBundleWithAuthCommand as defaultGetAnalyticsBundleCommand,
+  listAnalyticsBundlesWithAuthCommand as defaultListAnalyticsBundlesCommand
+} from "./analytics-bundle-commands.js";
+import {
   getAnalyticsDevicesWithAuthCommand as defaultGetAnalyticsDevicesCommand,
   getAnalyticsFunnelWithAuthCommand as defaultGetAnalyticsFunnelCommand,
   getAnalyticsJourneysWithAuthCommand as defaultGetAnalyticsJourneysCommand,
@@ -93,6 +98,27 @@ function readAnalyticsOpportunityKind(parsedArgv: ParsedArgv): AnalyticsBundleAn
   }
 
   throw new CliInputError("Invalid value for --kind.");
+}
+
+function readRequiredAnalyticsBundleKind(parsedArgv: ParsedArgv): AnalyticsBundleAnalysisKind {
+  const kind = readAnalyticsOpportunityKind(parsedArgv);
+  if (kind === undefined) {
+    throw new CliInputError("Missing required option --kind.");
+  }
+
+  return kind;
+}
+
+function readAnalyticsBundleFilters(parsedArgv: ParsedArgv): Record<string, unknown> | undefined {
+  const filters = readJsonOption(parsedArgv, "filters-json");
+  if (filters === undefined) {
+    return undefined;
+  }
+  if (typeof filters === "object" && filters !== null && !Array.isArray(filters)) {
+    return filters as Record<string, unknown>;
+  }
+
+  throw new CliInputError("Invalid value for --filters-json.");
 }
 
 function readProjectOption(parsedArgv: ParsedArgv): string | undefined {
@@ -310,6 +336,105 @@ export async function handleAnalyticsCommand(
       appendCommonAuthOptions(parsedArgv, {
         projectId,
         opportunityId
+      })
+    );
+  }
+
+  if (resource === "bundle") {
+    const action = requirePositional(parsedArgv, 2, "bundle action");
+    if (action === "list") {
+      expectNoUnknownOptions(parsedArgv, [
+        "project",
+        "project-id",
+        "status",
+        "kind",
+        "cursor",
+        "limit",
+        "auth-file",
+        "json"
+      ]);
+      ensureNoExtraPositionals(parsedArgv, 3);
+      const projectId = readProjectOption(parsedArgv);
+      if (projectId === undefined) {
+        throw new CliInputError("Missing required option --project.");
+      }
+      const status = readStringOption(parsedArgv, "status");
+      if (
+        status !== undefined &&
+        status !== "all" &&
+        status !== "pending" &&
+        status !== "running" &&
+        status !== "completed" &&
+        status !== "failed"
+      ) {
+        throw new CliInputError("Invalid value for --status.");
+      }
+
+      return await (dependencies.listAnalyticsBundlesCommand ?? defaultListAnalyticsBundlesCommand)(
+        appendCommonAuthOptions(parsedArgv, {
+          projectId,
+          status,
+          kind: readAnalyticsOpportunityKind(parsedArgv),
+          cursor: readStringOption(parsedArgv, "cursor"),
+          limit: readIntegerOption(parsedArgv, "limit")
+        })
+      );
+    }
+
+    if (action === "create") {
+      expectNoUnknownOptions(parsedArgv, [
+        "project",
+        "project-id",
+        "kind",
+        "from",
+        "to",
+        "last",
+        "funnel",
+        "route",
+        "incident-id",
+        "deploy-id",
+        "filters-json",
+        "auth-file",
+        "json"
+      ]);
+      ensureNoExtraPositionals(parsedArgv, 3);
+      const projectId = readProjectOption(parsedArgv);
+      if (projectId === undefined) {
+        throw new CliInputError("Missing required option --project.");
+      }
+
+      return await (dependencies.createAnalyticsBundleCommand ?? defaultCreateAnalyticsBundleCommand)(
+        appendCommonAuthOptions(parsedArgv, {
+          projectId,
+          analysisKind: readRequiredAnalyticsBundleKind(parsedArgv),
+          from: readStringOption(parsedArgv, "from"),
+          to: readStringOption(parsedArgv, "to"),
+          last: readStringOption(parsedArgv, "last"),
+          funnel: readStringOption(parsedArgv, "funnel"),
+          route: readStringOption(parsedArgv, "route"),
+          incidentId: readStringOption(parsedArgv, "incident-id"),
+          deployId: readStringOption(parsedArgv, "deploy-id"),
+          filters: readAnalyticsBundleFilters(parsedArgv)
+        })
+      );
+    }
+
+    if (action !== "get") {
+      throw new CliInputError("Unknown analytics bundle command.");
+    }
+
+    expectNoUnknownOptions(parsedArgv, ["project", "project-id", "auth-file", "json"]);
+    ensureNoExtraPositionals(parsedArgv, 4);
+    const bundleGenerationId = requirePositional(parsedArgv, 3, "bundle generation id");
+    const projectId = readProjectOption(parsedArgv);
+    if (projectId === undefined) {
+      throw new CliInputError("Missing required option --project.");
+    }
+
+    return await (dependencies.getAnalyticsBundleCommand ?? defaultGetAnalyticsBundleCommand)(
+      appendCommonAuthOptions(parsedArgv, {
+        projectId,
+        bundleGenerationId
       })
     );
   }

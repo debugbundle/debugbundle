@@ -5,11 +5,7 @@ import { encryptIntegrationSecret } from "../../../packages/storage/src/index.ts
 
 const TEST_GITHUB_PRIVATE_KEY = "test-only-github-app-private-key-not-used";
 
-const {
-  redisPingMock,
-  redisQuitMock,
-  s3SendMock
-} = vi.hoisted(() => ({
+const { redisPingMock, redisQuitMock, s3SendMock } = vi.hoisted(() => ({
   redisPingMock: vi.fn().mockResolvedValue("PONG"),
   redisQuitMock: vi.fn().mockResolvedValue("OK"),
   s3SendMock: vi.fn().mockResolvedValue({})
@@ -20,6 +16,7 @@ const {
   poolQueryMock,
   poolEndMock,
   queueEnqueueMock,
+  queueClaimMock,
   queueAcquireLeaseMock,
   queueCloseMock,
   redisFactoryMock,
@@ -28,6 +25,7 @@ const {
   processNextAggregateAnalyticsEventsJobMock,
   processNextGroupIncidentJobMock,
   processNextBuildBundleJobMock,
+  processNextBuildAnalyticsBundleJobMock,
   processNextBuildReproductionJobMock,
   processNextEvaluateAlertsJobMock,
   processNextDeliverAlertEmailDigestJobMock,
@@ -40,6 +38,8 @@ const {
   requestAnomalyCounterCloseMock,
   createPostgresAccountAnalyticsStoreMock,
   createPostgresAnalyticsRollupStoreMock,
+  createPostgresAnalyticsMetricsStoreMock,
+  createPostgresAnalyticsBundleGenerationStoreMock,
   createPostgresBillingStoreMock,
   createPostgresMetadataStoreMock,
   createPostgresImprovementOpportunityStoreMock,
@@ -59,6 +59,7 @@ const {
   poolQueryMock: vi.fn(),
   poolEndMock: vi.fn().mockResolvedValue(undefined),
   queueEnqueueMock: vi.fn().mockResolvedValue(undefined),
+  queueClaimMock: vi.fn().mockResolvedValue(null),
   queueAcquireLeaseMock: vi.fn().mockResolvedValue(true),
   queueCloseMock: vi.fn().mockResolvedValue(undefined),
   redisFactoryMock: vi.fn(),
@@ -67,6 +68,7 @@ const {
   processNextAggregateAnalyticsEventsJobMock: vi.fn(),
   processNextGroupIncidentJobMock: vi.fn(),
   processNextBuildBundleJobMock: vi.fn(),
+  processNextBuildAnalyticsBundleJobMock: vi.fn(),
   processNextBuildReproductionJobMock: vi.fn(),
   processNextEvaluateAlertsJobMock: vi.fn(),
   processNextDeliverAlertEmailDigestJobMock: vi.fn(),
@@ -82,6 +84,23 @@ const {
   }),
   createPostgresAnalyticsRollupStoreMock: vi.fn().mockReturnValue({
     recordAnalyticsEvent: vi.fn().mockResolvedValue({ recorded: true })
+  }),
+  createPostgresAnalyticsMetricsStoreMock: vi.fn().mockReturnValue({
+    getUsageSummary: vi.fn(),
+    getRouteMetrics: vi.fn(),
+    getJourneyPatterns: vi.fn(),
+    getDeviceBreakdown: vi.fn(),
+    getReferrerMetrics: vi.fn(),
+    getFunnelAnalysis: vi.fn()
+  }),
+  createPostgresAnalyticsBundleGenerationStoreMock: vi.fn().mockReturnValue({
+    reserveAnalyticsBundleGeneration: vi.fn(),
+    listAnalyticsBundleGenerationsForProject: vi.fn(),
+    getAnalyticsBundleGenerationForProject: vi.fn(),
+    claimAnalyticsBundleGenerationForProject: vi.fn(),
+    claimPendingAnalyticsBundleGeneration: vi.fn(),
+    markAnalyticsBundleGenerationCompleted: vi.fn(),
+    markAnalyticsBundleGenerationFailed: vi.fn()
   }),
   createPostgresBillingStoreMock: vi.fn().mockReturnValue({
     getBillingSummaryForProject: vi.fn().mockResolvedValue(null)
@@ -223,46 +242,50 @@ vi.mock("../../../packages/storage/src/index.js", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../../../packages/storage/src/index.js")>();
 
   return {
-  ...actual,
-  createRedisQueueClient: vi.fn().mockImplementation((input: unknown) => {
-    redisFactoryMock(input);
-    return {
-      enqueue: queueEnqueueMock,
-      acquireLease: queueAcquireLeaseMock,
-      dequeue: vi.fn(),
-      close: queueCloseMock
-    };
-  }),
-  createS3ObjectStoreClient: vi.fn().mockImplementation((input: unknown) => {
-    s3FactoryMock(input);
-    return {
-      getObject: vi.fn(),
-      deleteObjectsByPrefix: vi.fn()
-    };
-  }),
-  createRedisIncidentFrequencyCounter: vi.fn().mockReturnValue({
-    recordOccurrence: vi.fn(),
-    close: frequencyCounterCloseMock
-  }),
-  createRedisRequestAnomalyCounter: vi.fn().mockReturnValue({
-    recordObservation: vi.fn(),
-    close: requestAnomalyCounterCloseMock
-  }),
-  createPostgresAccountAnalyticsStore: createPostgresAccountAnalyticsStoreMock,
-  createPostgresAnalyticsRollupStore: createPostgresAnalyticsRollupStoreMock,
-  createPostgresBillingStore: createPostgresBillingStoreMock,
-  createPostgresMetadataStore: createPostgresMetadataStoreMock,
-  createPostgresImprovementOpportunityStore: createPostgresImprovementOpportunityStoreMock,
-  createPostgresRetentionStore: createPostgresRetentionStoreMock,
-  createRetentionCleanupService: createRetentionCleanupServiceMock,
-  createPostgresWebhookDeliveryStore: createPostgresWebhookDeliveryStoreMock,
-  createPostgresGitHubStore: createPostgresGitHubStoreMock,
-  createPostgresAlertDeliveryStore: createPostgresAlertDeliveryStoreMock,
-  createPostgresOperationalEmailDeliveryStore: createPostgresOperationalEmailDeliveryStoreMock,
-  createPostgresSlackDestinationStore: createPostgresSlackDestinationStoreMock,
-  createPostgresWeeklyReportDeliveryStore: createPostgresWeeklyReportDeliveryStoreMock,
-  createPostgresWeeklyReportChannelStore: createPostgresWeeklyReportChannelStoreMock
-}});
+    ...actual,
+    createRedisQueueClient: vi.fn().mockImplementation((input: unknown) => {
+      redisFactoryMock(input);
+      return {
+        enqueue: queueEnqueueMock,
+        claim: queueClaimMock,
+        acquireLease: queueAcquireLeaseMock,
+        dequeue: vi.fn(),
+        close: queueCloseMock
+      };
+    }),
+    createS3ObjectStoreClient: vi.fn().mockImplementation((input: unknown) => {
+      s3FactoryMock(input);
+      return {
+        getObject: vi.fn(),
+        deleteObjectsByPrefix: vi.fn()
+      };
+    }),
+    createRedisIncidentFrequencyCounter: vi.fn().mockReturnValue({
+      recordOccurrence: vi.fn(),
+      close: frequencyCounterCloseMock
+    }),
+    createRedisRequestAnomalyCounter: vi.fn().mockReturnValue({
+      recordObservation: vi.fn(),
+      close: requestAnomalyCounterCloseMock
+    }),
+    createPostgresAccountAnalyticsStore: createPostgresAccountAnalyticsStoreMock,
+    createPostgresAnalyticsRollupStore: createPostgresAnalyticsRollupStoreMock,
+    createPostgresAnalyticsMetricsStore: createPostgresAnalyticsMetricsStoreMock,
+    createPostgresAnalyticsBundleGenerationStore: createPostgresAnalyticsBundleGenerationStoreMock,
+    createPostgresBillingStore: createPostgresBillingStoreMock,
+    createPostgresMetadataStore: createPostgresMetadataStoreMock,
+    createPostgresImprovementOpportunityStore: createPostgresImprovementOpportunityStoreMock,
+    createPostgresRetentionStore: createPostgresRetentionStoreMock,
+    createRetentionCleanupService: createRetentionCleanupServiceMock,
+    createPostgresWebhookDeliveryStore: createPostgresWebhookDeliveryStoreMock,
+    createPostgresGitHubStore: createPostgresGitHubStoreMock,
+    createPostgresAlertDeliveryStore: createPostgresAlertDeliveryStoreMock,
+    createPostgresOperationalEmailDeliveryStore: createPostgresOperationalEmailDeliveryStoreMock,
+    createPostgresSlackDestinationStore: createPostgresSlackDestinationStoreMock,
+    createPostgresWeeklyReportDeliveryStore: createPostgresWeeklyReportDeliveryStoreMock,
+    createPostgresWeeklyReportChannelStore: createPostgresWeeklyReportChannelStoreMock
+  };
+});
 
 vi.mock("../../../packages/storage/src/migrations.js", () => ({
   REQUIRED_WORKER_TABLES: [
@@ -318,7 +341,11 @@ vi.mock("../../../apps/worker/src/processor.js", () => ({
     statusCode: number | null;
     retryAfterSeconds: number | null;
 
-    constructor(message: string, statusCode: number | null = null, retryAfterSeconds: number | null = null) {
+    constructor(
+      message: string,
+      statusCode: number | null = null,
+      retryAfterSeconds: number | null = null
+    ) {
       super(message);
       this.statusCode = statusCode;
       this.retryAfterSeconds = retryAfterSeconds;
@@ -336,6 +363,10 @@ vi.mock("../../../apps/worker/src/processor.js", () => ({
 
 vi.mock("../../../apps/worker/src/analytics-aggregation.js", () => ({
   processNextAggregateAnalyticsEventsJob: processNextAggregateAnalyticsEventsJobMock
+}));
+
+vi.mock("../../../apps/worker/src/analytics-bundle-processor.js", () => ({
+  processNextBuildAnalyticsBundleJob: processNextBuildAnalyticsBundleJobMock
 }));
 
 import {
@@ -428,6 +459,8 @@ describe("worker runtime", () => {
     emailTransportSendMock.mockClear();
     poolEndMock.mockClear();
     queueEnqueueMock.mockClear();
+    queueClaimMock.mockReset();
+    queueClaimMock.mockResolvedValue(null);
     queueAcquireLeaseMock.mockClear();
     queueAcquireLeaseMock.mockResolvedValue(true);
     queueCloseMock.mockClear();
@@ -437,6 +470,7 @@ describe("worker runtime", () => {
     processNextAggregateAnalyticsEventsJobMock.mockReset();
     processNextGroupIncidentJobMock.mockReset();
     processNextBuildBundleJobMock.mockReset();
+    processNextBuildAnalyticsBundleJobMock.mockReset();
     processNextBuildReproductionJobMock.mockReset();
     processNextEvaluateAlertsJobMock.mockReset();
     processNextDeliverAlertEmailDigestJobMock.mockReset();
@@ -446,21 +480,42 @@ describe("worker runtime", () => {
     processNextDeliverGitHubDispatchJobMock.mockReset();
     processNextGenerateWeeklyReportJobMock.mockReset();
     processNextNormalizeEventsJobMock.mockResolvedValue({ processed: false, reason: "no_jobs" });
-    processNextAggregateAnalyticsEventsJobMock.mockResolvedValue({ processed: false, reason: "no_jobs" });
+    processNextAggregateAnalyticsEventsJobMock.mockResolvedValue({
+      processed: false,
+      reason: "no_jobs"
+    });
     processNextGroupIncidentJobMock.mockResolvedValue({ processed: false, reason: "no_jobs" });
     processNextBuildBundleJobMock.mockResolvedValue({ processed: false, reason: "no_jobs" });
+    processNextBuildAnalyticsBundleJobMock.mockResolvedValue({
+      processed: false,
+      reason: "no_jobs"
+    });
     processNextBuildReproductionJobMock.mockResolvedValue({ processed: false, reason: "no_jobs" });
     processNextEvaluateAlertsJobMock.mockResolvedValue({ processed: false, reason: "no_jobs" });
-    processNextDeliverAlertEmailDigestJobMock.mockResolvedValue({ processed: false, reason: "no_jobs" });
-    processNextDeliverOperationalEmailJobMock.mockResolvedValue({ processed: false, reason: "no_jobs" });
+    processNextDeliverAlertEmailDigestJobMock.mockResolvedValue({
+      processed: false,
+      reason: "no_jobs"
+    });
+    processNextDeliverOperationalEmailJobMock.mockResolvedValue({
+      processed: false,
+      reason: "no_jobs"
+    });
     processNextDeliverWebhookJobMock.mockResolvedValue({ processed: false, reason: "no_jobs" });
-    processNextDeliverGitHubDispatchJobMock.mockResolvedValue({ processed: false, reason: "no_jobs" });
-    processNextGenerateWeeklyReportJobMock.mockResolvedValue({ processed: false, reason: "no_jobs" });
+    processNextDeliverGitHubDispatchJobMock.mockResolvedValue({
+      processed: false,
+      reason: "no_jobs"
+    });
+    processNextGenerateWeeklyReportJobMock.mockResolvedValue({
+      processed: false,
+      reason: "no_jobs"
+    });
     processNextCleanupRetentionJobMock.mockResolvedValue({ processed: false, reason: "no_jobs" });
     frequencyCounterCloseMock.mockClear();
     requestAnomalyCounterCloseMock.mockClear();
     createPostgresAccountAnalyticsStoreMock.mockClear();
     createPostgresAnalyticsRollupStoreMock.mockClear();
+    createPostgresAnalyticsMetricsStoreMock.mockClear();
+    createPostgresAnalyticsBundleGenerationStoreMock.mockClear();
     createPostgresBillingStoreMock.mockClear();
     createPostgresMetadataStoreMock.mockClear();
     createPostgresImprovementOpportunityStoreMock.mockClear();
@@ -497,7 +552,10 @@ describe("worker runtime", () => {
   });
 
   it("registers worker dogfooding during startup", async (): Promise<void> => {
-    await runWorkerFromEnv({ WORKER_RUN_ONCE: "1", ANALYTICS_HASH_SECRET: "test-analytics-secret" });
+    await runWorkerFromEnv({
+      WORKER_RUN_ONCE: "1",
+      ANALYTICS_HASH_SECRET: "test-analytics-secret"
+    });
 
     expect(registerWorkerDogfoodingMock).toHaveBeenCalledWith({
       WORKER_RUN_ONCE: "1",
@@ -506,7 +564,10 @@ describe("worker runtime", () => {
   });
 
   it("should parse require DB SSL mode", (): void => {
-    const env = parseWorkerEnv({ DB_SSL_MODE: "require", ANALYTICS_HASH_SECRET: "test-analytics-secret" });
+    const env = parseWorkerEnv({
+      DB_SSL_MODE: "require",
+      ANALYTICS_HASH_SECRET: "test-analytics-secret"
+    });
 
     expect(env.DB_SSL_MODE).toBe("require");
   });
@@ -521,23 +582,33 @@ describe("worker runtime", () => {
   });
 
   it("should throw clear error for invalid poll interval", (): void => {
-    expect(() => parseWorkerEnv({ WORKER_POLL_INTERVAL_MS: "5", ANALYTICS_HASH_SECRET: "test-analytics-secret" })).toThrow("worker_env_invalid");
+    expect(() =>
+      parseWorkerEnv({
+        WORKER_POLL_INTERVAL_MS: "5",
+        ANALYTICS_HASH_SECRET: "test-analytics-secret"
+      })
+    ).toThrow("worker_env_invalid");
   });
 
   it("should reject retention cleanup intervals longer than 24 hours", (): void => {
-    expect(() => parseWorkerEnv({ RETENTION_CLEANUP_INTERVAL_MS: String(24 * 60 * 60 * 1000 + 1), ANALYTICS_HASH_SECRET: "test-analytics-secret" })).toThrow(
-      "worker_env_invalid"
-    );
+    expect(() =>
+      parseWorkerEnv({
+        RETENTION_CLEANUP_INTERVAL_MS: String(24 * 60 * 60 * 1000 + 1),
+        ANALYTICS_HASH_SECRET: "test-analytics-secret"
+      })
+    ).toThrow("worker_env_invalid");
   });
 
   it("should reject invalid run-once env values", (): void => {
-    expect(() => parseWorkerEnv({ WORKER_RUN_ONCE: "2", ANALYTICS_HASH_SECRET: "test-analytics-secret" })).toThrow("worker_env_invalid");
+    expect(() =>
+      parseWorkerEnv({ WORKER_RUN_ONCE: "2", ANALYTICS_HASH_SECRET: "test-analytics-secret" })
+    ).toThrow("worker_env_invalid");
   });
 
   it("should reject invalid DB SSL mode values with a targeted error", (): void => {
-    expect(() => parseWorkerEnv({ DB_SSL_MODE: "broken", ANALYTICS_HASH_SECRET: "test-analytics-secret" })).toThrow(
-      "worker_env_invalid: DB_SSL_MODE: expected disable or require"
-    );
+    expect(() =>
+      parseWorkerEnv({ DB_SSL_MODE: "broken", ANALYTICS_HASH_SECRET: "test-analytics-secret" })
+    ).toThrow("worker_env_invalid: DB_SSL_MODE: expected disable or require");
   });
 
   it("should treat empty optional GitHub app env vars as unset", (): void => {
@@ -593,7 +664,10 @@ describe("worker runtime", () => {
     poolQueryMock.mockResolvedValueOnce({ rows: WORKER_TABLE_ROWS });
     processNextNormalizeEventsJobMock.mockResolvedValueOnce({ processed: true });
 
-    await runWorkerFromEnv({ WORKER_RUN_ONCE: "1", ANALYTICS_HASH_SECRET: "test-analytics-secret" });
+    await runWorkerFromEnv({
+      WORKER_RUN_ONCE: "1",
+      ANALYTICS_HASH_SECRET: "test-analytics-secret"
+    });
 
     expect(redisPingMock).toHaveBeenCalledOnce();
     expect(redisQuitMock).toHaveBeenCalledOnce();
@@ -610,6 +684,7 @@ describe("worker runtime", () => {
     expect(processNextNormalizeEventsJobMock).toHaveBeenCalledOnce();
     expect(processNextGroupIncidentJobMock).not.toHaveBeenCalled();
     expect(processNextBuildBundleJobMock).not.toHaveBeenCalled();
+    expect(processNextBuildAnalyticsBundleJobMock).not.toHaveBeenCalled();
     expect(processNextBuildReproductionJobMock).not.toHaveBeenCalled();
     expect(processNextDeliverWebhookJobMock).not.toHaveBeenCalled();
     expect(frequencyCounterCloseMock).toHaveBeenCalledOnce();
@@ -639,7 +714,9 @@ describe("worker runtime", () => {
     poolQueryMock.mockResolvedValueOnce({ rows: WORKER_TABLE_ROWS });
     redisPingMock.mockResolvedValueOnce("NOPE");
 
-    await expect(runWorkerFromEnv({ WORKER_RUN_ONCE: "1", ANALYTICS_HASH_SECRET: "test-analytics-secret" })).rejects.toThrow("worker_redis_not_ready");
+    await expect(
+      runWorkerFromEnv({ WORKER_RUN_ONCE: "1", ANALYTICS_HASH_SECRET: "test-analytics-secret" })
+    ).rejects.toThrow("worker_redis_not_ready");
     expect(queueEnqueueMock).not.toHaveBeenCalled();
   });
 
@@ -647,7 +724,9 @@ describe("worker runtime", () => {
     poolQueryMock.mockResolvedValueOnce({ rows: WORKER_TABLE_ROWS });
     redisPingMock.mockRejectedValueOnce(new Error("redis_down"));
 
-    await expect(runWorkerFromEnv({ WORKER_RUN_ONCE: "1", ANALYTICS_HASH_SECRET: "test-analytics-secret" })).rejects.toThrow("worker_redis_unreachable: redis_down");
+    await expect(
+      runWorkerFromEnv({ WORKER_RUN_ONCE: "1", ANALYTICS_HASH_SECRET: "test-analytics-secret" })
+    ).rejects.toThrow("worker_redis_unreachable: redis_down");
     expect(queueEnqueueMock).not.toHaveBeenCalled();
   });
 
@@ -655,19 +734,30 @@ describe("worker runtime", () => {
     poolQueryMock.mockResolvedValueOnce({ rows: WORKER_TABLE_ROWS });
     s3SendMock.mockRejectedValueOnce(new Error("bucket_missing"));
 
-    await expect(runWorkerFromEnv({ WORKER_RUN_ONCE: "1", ANALYTICS_HASH_SECRET: "test-analytics-secret" })).rejects.toThrow("worker_s3_bucket_unreachable: bucket_missing");
+    await expect(
+      runWorkerFromEnv({ WORKER_RUN_ONCE: "1", ANALYTICS_HASH_SECRET: "test-analytics-secret" })
+    ).rejects.toThrow("worker_s3_bucket_unreachable: bucket_missing");
     expect(queueEnqueueMock).not.toHaveBeenCalled();
   });
 
   it("should initialize and close the github token cache when github app credentials are configured", async (): Promise<void> => {
     poolQueryMock.mockResolvedValueOnce({ rows: WORKER_TABLE_ROWS });
-    processNextNormalizeEventsJobMock.mockResolvedValueOnce({ processed: false, reason: "no_jobs" });
+    processNextNormalizeEventsJobMock.mockResolvedValueOnce({
+      processed: false,
+      reason: "no_jobs"
+    });
     processNextGroupIncidentJobMock.mockResolvedValueOnce({ processed: false, reason: "no_jobs" });
     processNextBuildBundleJobMock.mockResolvedValueOnce({ processed: false, reason: "no_jobs" });
-    processNextBuildReproductionJobMock.mockResolvedValueOnce({ processed: false, reason: "no_jobs" });
+    processNextBuildReproductionJobMock.mockResolvedValueOnce({
+      processed: false,
+      reason: "no_jobs"
+    });
     processNextEvaluateAlertsJobMock.mockResolvedValueOnce({ processed: false, reason: "no_jobs" });
     processNextDeliverWebhookJobMock.mockResolvedValueOnce({ processed: false, reason: "no_jobs" });
-    processNextDeliverGitHubDispatchJobMock.mockResolvedValueOnce({ processed: false, reason: "no_jobs" });
+    processNextDeliverGitHubDispatchJobMock.mockResolvedValueOnce({
+      processed: false,
+      reason: "no_jobs"
+    });
 
     await runWorkerFromEnv({
       WORKER_RUN_ONCE: "1",
@@ -739,7 +829,9 @@ describe("worker runtime", () => {
     const privateKeyPem = privateKey.export({ type: "pkcs1", format: "pem" }).toString();
     const now = new Date("2026-03-11T00:00:00.000Z");
 
-    expect(encodeBase64Url("debugbundle")).toBe(Buffer.from("debugbundle", "utf8").toString("base64url"));
+    expect(encodeBase64Url("debugbundle")).toBe(
+      Buffer.from("debugbundle", "utf8").toString("base64url")
+    );
     expect(normalizeGitHubPrivateKey(privateKeyPem.replace(/\n/g, "\\n"))).toBe(privateKeyPem);
 
     const jwt = buildGitHubAppJwt("123", privateKeyPem, now);
@@ -749,7 +841,10 @@ describe("worker runtime", () => {
       throw new Error("github_app_jwt_segments_missing");
     }
     expect(signature.length).toBeGreaterThan(0);
-    expect(JSON.parse(Buffer.from(encodedHeader, "base64url").toString("utf8"))).toEqual({ alg: "RS256", typ: "JWT" });
+    expect(JSON.parse(Buffer.from(encodedHeader, "base64url").toString("utf8"))).toEqual({
+      alg: "RS256",
+      typ: "JWT"
+    });
     expect(JSON.parse(Buffer.from(encodedPayload, "base64url").toString("utf8"))).toEqual({
       iat: Math.floor(now.getTime() / 1000) - 30,
       exp: Math.floor(now.getTime() / 1000) + 9 * 60,
@@ -797,14 +892,21 @@ describe("worker runtime", () => {
 
   it("should run group-incident processor when normalize queue has no work", async (): Promise<void> => {
     poolQueryMock.mockResolvedValueOnce({ rows: WORKER_TABLE_ROWS });
-    processNextNormalizeEventsJobMock.mockResolvedValueOnce({ processed: false, reason: "no_jobs" });
+    processNextNormalizeEventsJobMock.mockResolvedValueOnce({
+      processed: false,
+      reason: "no_jobs"
+    });
     processNextGroupIncidentJobMock.mockResolvedValueOnce({ processed: true });
 
-    await runWorkerFromEnv({ WORKER_RUN_ONCE: "1", ANALYTICS_HASH_SECRET: "test-analytics-secret" });
+    await runWorkerFromEnv({
+      WORKER_RUN_ONCE: "1",
+      ANALYTICS_HASH_SECRET: "test-analytics-secret"
+    });
 
     expect(processNextNormalizeEventsJobMock).toHaveBeenCalledOnce();
     expect(processNextGroupIncidentJobMock).toHaveBeenCalledOnce();
     expect(processNextBuildBundleJobMock).not.toHaveBeenCalled();
+    expect(processNextBuildAnalyticsBundleJobMock).not.toHaveBeenCalled();
     expect(processNextBuildReproductionJobMock).not.toHaveBeenCalled();
     expect(processNextDeliverWebhookJobMock).not.toHaveBeenCalled();
   });
@@ -827,16 +929,18 @@ describe("worker runtime", () => {
       return buildMigratedWorkerSchemaRows(sql);
     });
 
-    processNextDeliverWebhookJobMock.mockImplementationOnce(async (input: {
-      onWebhookDisabled?: (payload: { webhook_id: string; target_url: string }) => Promise<void>;
-    }) => {
-      await input.onWebhookDisabled?.({
-        webhook_id: "wh_123",
-        target_url: "https://hooks.example.test/debugbundle"
-      });
+    processNextDeliverWebhookJobMock.mockImplementationOnce(
+      async (input: {
+        onWebhookDisabled?: (payload: { webhook_id: string; target_url: string }) => Promise<void>;
+      }) => {
+        await input.onWebhookDisabled?.({
+          webhook_id: "wh_123",
+          target_url: "https://hooks.example.test/debugbundle"
+        });
 
-      return { processed: true };
-    });
+        return { processed: true };
+      }
+    );
 
     await runWorkerFromEnv({
       WORKER_RUN_ONCE: "1",
@@ -845,8 +949,9 @@ describe("worker runtime", () => {
     });
 
     expect(processNextDeliverWebhookJobMock).toHaveBeenCalledOnce();
-    const queuedOperationalEmails = createPostgresOperationalEmailDeliveryStoreMock.mock.results[0]?.value
-      .queueProjectOperationalEmailDelivery;
+    const queuedOperationalEmails =
+      createPostgresOperationalEmailDeliveryStoreMock.mock.results[0]?.value
+        .queueProjectOperationalEmailDelivery;
     expect(queuedOperationalEmails).toHaveBeenCalledWith(
       expect.objectContaining({
         project_id: "proj_123",
@@ -862,7 +967,10 @@ describe("worker runtime", () => {
 
   it("should run build-bundle processor when normalize/group queues are empty", async (): Promise<void> => {
     poolQueryMock.mockResolvedValueOnce({ rows: WORKER_TABLE_ROWS });
-    processNextNormalizeEventsJobMock.mockResolvedValueOnce({ processed: false, reason: "no_jobs" });
+    processNextNormalizeEventsJobMock.mockResolvedValueOnce({
+      processed: false,
+      reason: "no_jobs"
+    });
     processNextGroupIncidentJobMock.mockResolvedValueOnce({ processed: false, reason: "no_jobs" });
     processNextBuildBundleJobMock.mockResolvedValueOnce({ processed: true });
 
@@ -884,35 +992,85 @@ describe("worker runtime", () => {
         })
       })
     );
+    expect(processNextBuildAnalyticsBundleJobMock).not.toHaveBeenCalled();
     expect(processNextBuildReproductionJobMock).not.toHaveBeenCalled();
     expect(processNextDeliverWebhookJobMock).not.toHaveBeenCalled();
   });
 
+  it("should run build-analytics-bundle processor before reproduction when earlier queues are empty", async (): Promise<void> => {
+    poolQueryMock.mockResolvedValueOnce({ rows: WORKER_TABLE_ROWS });
+    processNextNormalizeEventsJobMock.mockResolvedValueOnce({
+      processed: false,
+      reason: "no_jobs"
+    });
+    processNextGroupIncidentJobMock.mockResolvedValueOnce({ processed: false, reason: "no_jobs" });
+    processNextBuildBundleJobMock.mockResolvedValueOnce({ processed: false, reason: "no_jobs" });
+    processNextBuildAnalyticsBundleJobMock.mockResolvedValueOnce({ processed: true });
+
+    await runWorkerFromEnv({
+      WORKER_RUN_ONCE: "1",
+      ANALYTICS_HASH_SECRET: "test-analytics-secret"
+    });
+
+    expect(createPostgresAnalyticsMetricsStoreMock).toHaveBeenCalledOnce();
+    expect(createPostgresAnalyticsBundleGenerationStoreMock).toHaveBeenCalledOnce();
+    expect(processNextBuildAnalyticsBundleJobMock).toHaveBeenCalledOnce();
+    expect(processNextBuildAnalyticsBundleJobMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        analyticsBundleGenerationStore:
+          createPostgresAnalyticsBundleGenerationStoreMock.mock.results[0]?.value,
+        analyticsMetricsStore: createPostgresAnalyticsMetricsStoreMock.mock.results[0]?.value,
+        objectStore: expect.objectContaining({
+          getObject: expect.any(Function)
+        })
+      })
+    );
+    expect(processNextBuildReproductionJobMock).not.toHaveBeenCalled();
+    expect(processNextEvaluateAlertsJobMock).not.toHaveBeenCalled();
+  });
+
   it("should run build-reproduction processor when normalize/group/build queues are empty", async (): Promise<void> => {
     poolQueryMock.mockResolvedValueOnce({ rows: WORKER_TABLE_ROWS });
-    processNextNormalizeEventsJobMock.mockResolvedValueOnce({ processed: false, reason: "no_jobs" });
+    processNextNormalizeEventsJobMock.mockResolvedValueOnce({
+      processed: false,
+      reason: "no_jobs"
+    });
     processNextGroupIncidentJobMock.mockResolvedValueOnce({ processed: false, reason: "no_jobs" });
     processNextBuildBundleJobMock.mockResolvedValueOnce({ processed: false, reason: "no_jobs" });
     processNextBuildReproductionJobMock.mockResolvedValueOnce({ processed: true });
 
-    await runWorkerFromEnv({ WORKER_RUN_ONCE: "1", ANALYTICS_HASH_SECRET: "test-analytics-secret" });
+    await runWorkerFromEnv({
+      WORKER_RUN_ONCE: "1",
+      ANALYTICS_HASH_SECRET: "test-analytics-secret"
+    });
 
     expect(processNextBuildBundleJobMock).toHaveBeenCalledOnce();
+    expect(processNextBuildAnalyticsBundleJobMock).toHaveBeenCalledOnce();
     expect(processNextBuildReproductionJobMock).toHaveBeenCalledOnce();
     expect(processNextDeliverWebhookJobMock).not.toHaveBeenCalled();
   });
 
   it("should run evaluate-alerts processor when normalize/group/build/reproduction queues are empty", async (): Promise<void> => {
     poolQueryMock.mockResolvedValueOnce({ rows: WORKER_TABLE_ROWS });
-    processNextNormalizeEventsJobMock.mockResolvedValueOnce({ processed: false, reason: "no_jobs" });
+    processNextNormalizeEventsJobMock.mockResolvedValueOnce({
+      processed: false,
+      reason: "no_jobs"
+    });
     processNextGroupIncidentJobMock.mockResolvedValueOnce({ processed: false, reason: "no_jobs" });
     processNextBuildBundleJobMock.mockResolvedValueOnce({ processed: false, reason: "no_jobs" });
-    processNextBuildReproductionJobMock.mockResolvedValueOnce({ processed: false, reason: "no_jobs" });
+    processNextBuildReproductionJobMock.mockResolvedValueOnce({
+      processed: false,
+      reason: "no_jobs"
+    });
     processNextEvaluateAlertsJobMock.mockResolvedValueOnce({ processed: true });
 
-    await runWorkerFromEnv({ WORKER_RUN_ONCE: "1", ANALYTICS_HASH_SECRET: "test-analytics-secret" });
+    await runWorkerFromEnv({
+      WORKER_RUN_ONCE: "1",
+      ANALYTICS_HASH_SECRET: "test-analytics-secret"
+    });
 
     expect(processNextBuildBundleJobMock).toHaveBeenCalledOnce();
+    expect(processNextBuildAnalyticsBundleJobMock).toHaveBeenCalledOnce();
     expect(processNextBuildReproductionJobMock).toHaveBeenCalledOnce();
     expect(processNextEvaluateAlertsJobMock).toHaveBeenCalledOnce();
     expect(processNextDeliverWebhookJobMock).not.toHaveBeenCalled();
@@ -920,16 +1078,26 @@ describe("worker runtime", () => {
 
   it("should run deliver-webhook processor when normalize/group/build/reproduction queues are empty", async (): Promise<void> => {
     poolQueryMock.mockResolvedValueOnce({ rows: WORKER_TABLE_ROWS });
-    processNextNormalizeEventsJobMock.mockResolvedValueOnce({ processed: false, reason: "no_jobs" });
+    processNextNormalizeEventsJobMock.mockResolvedValueOnce({
+      processed: false,
+      reason: "no_jobs"
+    });
     processNextGroupIncidentJobMock.mockResolvedValueOnce({ processed: false, reason: "no_jobs" });
     processNextBuildBundleJobMock.mockResolvedValueOnce({ processed: false, reason: "no_jobs" });
-    processNextBuildReproductionJobMock.mockResolvedValueOnce({ processed: false, reason: "no_jobs" });
+    processNextBuildReproductionJobMock.mockResolvedValueOnce({
+      processed: false,
+      reason: "no_jobs"
+    });
     processNextEvaluateAlertsJobMock.mockResolvedValueOnce({ processed: false, reason: "no_jobs" });
     processNextDeliverWebhookJobMock.mockResolvedValueOnce({ processed: true });
 
-    await runWorkerFromEnv({ WORKER_RUN_ONCE: "1", ANALYTICS_HASH_SECRET: "test-analytics-secret" });
+    await runWorkerFromEnv({
+      WORKER_RUN_ONCE: "1",
+      ANALYTICS_HASH_SECRET: "test-analytics-secret"
+    });
 
     expect(processNextBuildBundleJobMock).toHaveBeenCalledOnce();
+    expect(processNextBuildAnalyticsBundleJobMock).toHaveBeenCalledOnce();
     expect(processNextBuildReproductionJobMock).toHaveBeenCalledOnce();
     expect(processNextEvaluateAlertsJobMock).toHaveBeenCalledOnce();
     expect(processNextDeliverWebhookJobMock).toHaveBeenCalledOnce();
@@ -940,10 +1108,16 @@ describe("worker runtime", () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-03-16T12:00:00.000Z"));
     poolQueryMock.mockResolvedValueOnce({ rows: WORKER_TABLE_ROWS });
-    processNextNormalizeEventsJobMock.mockResolvedValueOnce({ processed: false, reason: "no_jobs" });
+    processNextNormalizeEventsJobMock.mockResolvedValueOnce({
+      processed: false,
+      reason: "no_jobs"
+    });
     processNextGroupIncidentJobMock.mockResolvedValueOnce({ processed: false, reason: "no_jobs" });
     processNextBuildBundleJobMock.mockResolvedValueOnce({ processed: false, reason: "no_jobs" });
-    processNextBuildReproductionJobMock.mockResolvedValueOnce({ processed: false, reason: "no_jobs" });
+    processNextBuildReproductionJobMock.mockResolvedValueOnce({
+      processed: false,
+      reason: "no_jobs"
+    });
     processNextEvaluateAlertsJobMock.mockResolvedValueOnce({ processed: false, reason: "no_jobs" });
     processNextDeliverWebhookJobMock.mockResolvedValueOnce({ processed: false, reason: "no_jobs" });
     processNextGenerateWeeklyReportJobMock.mockResolvedValueOnce({ processed: true });
@@ -967,7 +1141,9 @@ describe("worker runtime", () => {
       deleteWeeklyReportChannelForOrganization: vi.fn().mockResolvedValue(null)
     });
     createPostgresWeeklyReportDeliveryStoreMock.mockReturnValueOnce({
-      claimWeeklyReportDelivery: vi.fn().mockResolvedValue({ delivery_id: "wrd_123", created: true }),
+      claimWeeklyReportDelivery: vi
+        .fn()
+        .mockResolvedValue({ delivery_id: "wrd_123", created: true }),
       markWeeklyReportDeliveryResult: vi.fn()
     });
     createPostgresMetadataStoreMock.mockReturnValueOnce({
@@ -978,7 +1154,10 @@ describe("worker runtime", () => {
       getWeeklyProjectReport: vi.fn().mockResolvedValue(null)
     });
 
-    await runWorkerFromEnv({ WORKER_RUN_ONCE: "1", ANALYTICS_HASH_SECRET: "test-analytics-secret" });
+    await runWorkerFromEnv({
+      WORKER_RUN_ONCE: "1",
+      ANALYTICS_HASH_SECRET: "test-analytics-secret"
+    });
 
     expect(queueEnqueueMock).toHaveBeenCalledWith("generate-weekly-report", {
       delivery_id: "wrd_123",
@@ -1005,7 +1184,10 @@ describe("worker runtime", () => {
       deleteWeeklyReportChannelForOrganization: vi.fn().mockResolvedValue(null)
     });
 
-    await runWorkerFromEnv({ WORKER_RUN_ONCE: "1", ANALYTICS_HASH_SECRET: "test-analytics-secret" });
+    await runWorkerFromEnv({
+      WORKER_RUN_ONCE: "1",
+      ANALYTICS_HASH_SECRET: "test-analytics-secret"
+    });
 
     expect(processNextDeliverAlertEmailDigestJobMock).toHaveBeenCalledOnce();
     expect(captureWorkerDogfoodingStepFailureMock).toHaveBeenCalledWith(
@@ -1018,16 +1200,28 @@ describe("worker runtime", () => {
 
   it("should run cleanup-retention when other worker lanes are idle", async (): Promise<void> => {
     poolQueryMock.mockResolvedValueOnce({ rows: WORKER_TABLE_ROWS });
-    processNextNormalizeEventsJobMock.mockResolvedValueOnce({ processed: false, reason: "no_jobs" });
+    processNextNormalizeEventsJobMock.mockResolvedValueOnce({
+      processed: false,
+      reason: "no_jobs"
+    });
     processNextGroupIncidentJobMock.mockResolvedValueOnce({ processed: false, reason: "no_jobs" });
     processNextBuildBundleJobMock.mockResolvedValueOnce({ processed: false, reason: "no_jobs" });
-    processNextBuildReproductionJobMock.mockResolvedValueOnce({ processed: false, reason: "no_jobs" });
+    processNextBuildReproductionJobMock.mockResolvedValueOnce({
+      processed: false,
+      reason: "no_jobs"
+    });
     processNextEvaluateAlertsJobMock.mockResolvedValueOnce({ processed: false, reason: "no_jobs" });
     processNextDeliverWebhookJobMock.mockResolvedValueOnce({ processed: false, reason: "no_jobs" });
-    processNextGenerateWeeklyReportJobMock.mockResolvedValueOnce({ processed: false, reason: "no_jobs" });
+    processNextGenerateWeeklyReportJobMock.mockResolvedValueOnce({
+      processed: false,
+      reason: "no_jobs"
+    });
     processNextCleanupRetentionJobMock.mockResolvedValueOnce({ processed: true });
 
-    await runWorkerFromEnv({ WORKER_RUN_ONCE: "1", ANALYTICS_HASH_SECRET: "test-analytics-secret" });
+    await runWorkerFromEnv({
+      WORKER_RUN_ONCE: "1",
+      ANALYTICS_HASH_SECRET: "test-analytics-secret"
+    });
 
     expect(queueAcquireLeaseMock).toHaveBeenCalledWith("leases:cleanup-retention:schedule", 21600);
     expect(queueEnqueueMock).toHaveBeenCalledWith("cleanup-retention", {
@@ -1042,7 +1236,10 @@ describe("worker runtime", () => {
 
     // The worker loop catches processor errors so the worker stays alive.
     // With WORKER_RUN_ONCE it completes normally after the failed iteration.
-    await runWorkerFromEnv({ WORKER_RUN_ONCE: "1", ANALYTICS_HASH_SECRET: "test-analytics-secret" });
+    await runWorkerFromEnv({
+      WORKER_RUN_ONCE: "1",
+      ANALYTICS_HASH_SECRET: "test-analytics-secret"
+    });
     expect(frequencyCounterCloseMock).toHaveBeenCalledOnce();
     expect(requestAnomalyCounterCloseMock).toHaveBeenCalledOnce();
     expect(queueCloseMock).toHaveBeenCalledOnce();
@@ -1132,7 +1329,9 @@ describe("worker runtime", () => {
       }
     ]);
     const createDeliveryIntent = vi.fn();
-    const queueProjectOperationalEmailDelivery = vi.fn().mockResolvedValue({ delivery_id: "op_123", created: true });
+    const queueProjectOperationalEmailDelivery = vi
+      .fn()
+      .mockResolvedValue({ delivery_id: "op_123", created: true });
 
     const publisher = createLifecycleWebhookPublisher({
       fallbackTargetUrl: null,
@@ -1180,7 +1379,9 @@ describe("worker runtime", () => {
       }
     ]);
     const createDeliveryIntent = vi.fn().mockResolvedValue({ delivery_id: "del_123" });
-    const queueProjectOperationalEmailDelivery = vi.fn().mockResolvedValue({ delivery_id: "op_123", created: true });
+    const queueProjectOperationalEmailDelivery = vi
+      .fn()
+      .mockResolvedValue({ delivery_id: "op_123", created: true });
 
     const publisher = createLifecycleWebhookPublisher({
       fallbackTargetUrl: null,
@@ -1234,7 +1435,9 @@ describe("worker runtime", () => {
     const hasRecentGitHubDispatch = vi.fn().mockResolvedValue(false);
     const countProjectGitHubDispatchesSince = vi.fn().mockResolvedValue(1);
     const countInstallationGitHubDispatchesSince = vi.fn().mockResolvedValue(25);
-    const createGitHubDispatchDeliveryIntent = vi.fn().mockResolvedValue({ delivery_id: "gdd_123", created: true });
+    const createGitHubDispatchDeliveryIntent = vi
+      .fn()
+      .mockResolvedValue({ delivery_id: "gdd_123", created: true });
     const createSkippedGitHubDispatchDelivery = vi.fn();
     const recordMetricDeltas = vi.fn().mockResolvedValue("recorded");
 
@@ -1337,7 +1540,9 @@ describe("worker runtime", () => {
       cooldown_seconds: 300
     };
     const createGitHubDispatchDeliveryIntent = vi.fn();
-    const createSkippedGitHubDispatchDelivery = vi.fn().mockResolvedValue({ delivery_id: "gdd_skipped", created: true });
+    const createSkippedGitHubDispatchDelivery = vi
+      .fn()
+      .mockResolvedValue({ delivery_id: "gdd_skipped", created: true });
     const listMatchingGitHubDispatchRules = vi.fn().mockResolvedValue([baseRule]);
 
     const cooldownPublisher = createGitHubDispatchPublisher({
@@ -1433,7 +1638,9 @@ describe("worker runtime", () => {
     const hasRecentGitHubDispatch = vi.fn().mockResolvedValue(false);
     const countProjectGitHubDispatchesSince = vi.fn().mockResolvedValue(1);
     const countInstallationGitHubDispatchesSince = vi.fn().mockResolvedValue(25);
-    const createGitHubDispatchDeliveryIntent = vi.fn().mockResolvedValue({ delivery_id: "gdd_123", created: true });
+    const createGitHubDispatchDeliveryIntent = vi
+      .fn()
+      .mockResolvedValue({ delivery_id: "gdd_123", created: true });
     const createSkippedGitHubDispatchDelivery = vi.fn();
 
     const publisher = createGitHubDispatchPublisher({
@@ -1521,7 +1728,9 @@ describe("worker runtime", () => {
     const hasRecentGitHubDispatch = vi.fn().mockResolvedValue(false);
     const countProjectGitHubDispatchesSince = vi.fn().mockResolvedValue(1);
     const countInstallationGitHubDispatchesSince = vi.fn().mockResolvedValue(25);
-    const createGitHubDispatchDeliveryIntent = vi.fn().mockResolvedValue({ delivery_id: "gdd_123", created: true });
+    const createGitHubDispatchDeliveryIntent = vi
+      .fn()
+      .mockResolvedValue({ delivery_id: "gdd_123", created: true });
     const createSkippedGitHubDispatchDelivery = vi.fn();
 
     const publisher = createGitHubDispatchPublisher({
@@ -1668,9 +1877,10 @@ describe("worker runtime", () => {
   });
 
   it("should enqueue only due webhook deliveries during scheduler pass", async (): Promise<void> => {
-    const claimDueDeliveries = vi
-      .fn()
-      .mockResolvedValue([{ delivery_id: "del_1", attempt: 2 }, { delivery_id: "del_2", attempt: 1 }]);
+    const claimDueDeliveries = vi.fn().mockResolvedValue([
+      { delivery_id: "del_1", attempt: 2 },
+      { delivery_id: "del_2", attempt: 1 }
+    ]);
     const enqueue = vi.fn().mockResolvedValue(undefined);
 
     const count = await scheduleDueWebhookDeliveries({
@@ -1701,9 +1911,10 @@ describe("worker runtime", () => {
   });
 
   it("should enqueue only due github dispatch deliveries during scheduler pass", async (): Promise<void> => {
-    const claimDueGitHubDispatchDeliveries = vi
-      .fn()
-      .mockResolvedValue([{ delivery_id: "gdd_1", attempt: 2 }, { delivery_id: "gdd_2", attempt: 1 }]);
+    const claimDueGitHubDispatchDeliveries = vi.fn().mockResolvedValue([
+      { delivery_id: "gdd_1", attempt: 2 },
+      { delivery_id: "gdd_2", attempt: 1 }
+    ]);
     const enqueue = vi.fn().mockResolvedValue(undefined);
 
     const count = await scheduleDueGitHubDispatches({
@@ -1713,8 +1924,14 @@ describe("worker runtime", () => {
     });
 
     expect(count).toBe(2);
-    expect(enqueue).toHaveBeenCalledWith("deliver-github-dispatch", { delivery_id: "gdd_1", attempt: 2 });
-    expect(enqueue).toHaveBeenCalledWith("deliver-github-dispatch", { delivery_id: "gdd_2", attempt: 1 });
+    expect(enqueue).toHaveBeenCalledWith("deliver-github-dispatch", {
+      delivery_id: "gdd_1",
+      attempt: 2
+    });
+    expect(enqueue).toHaveBeenCalledWith("deliver-github-dispatch", {
+      delivery_id: "gdd_2",
+      attempt: 1
+    });
   });
 
   it("should enqueue cleanup-retention work when the scheduler lease is acquired", async (): Promise<void> => {
@@ -1772,10 +1989,7 @@ describe("worker runtime", () => {
       })
       .mockResolvedValueOnce({ ok: true })
       .mockResolvedValueOnce({ ok: true });
-    const get = vi
-      .fn()
-      .mockResolvedValueOnce(null)
-      .mockResolvedValueOnce("ghs_cached");
+    const get = vi.fn().mockResolvedValueOnce(null).mockResolvedValueOnce("ghs_cached");
     const set = vi.fn().mockResolvedValue(undefined);
 
     const transport = createGitHubDispatchTransport({
@@ -1885,7 +2099,11 @@ describe("worker runtime", () => {
         ok: false,
         status: 429,
         headers: {
-          get: vi.fn().mockImplementation((name: string) => (name.toLowerCase() === "retry-after" ? "17" : null))
+          get: vi
+            .fn()
+            .mockImplementation((name: string) =>
+              name.toLowerCase() === "retry-after" ? "17" : null
+            )
         }
       });
 
@@ -1984,7 +2202,10 @@ describe("worker runtime", () => {
     ).rejects.toMatchObject({ message: "alert_email_not_configured" });
 
     const emailSend = vi.fn().mockRejectedValue(new Error("smtp_down"));
-    const transport = createAlertTransport({ timeoutMs: 1000, emailTransport: { send: emailSend } });
+    const transport = createAlertTransport({
+      timeoutMs: 1000,
+      emailTransport: { send: emailSend }
+    });
 
     await expect(
       transport.deliver({
@@ -2004,7 +2225,10 @@ describe("worker runtime", () => {
 
     const abortError = new Error("timed out");
     abortError.name = "AbortError";
-    vi.stubGlobal("fetch", vi.fn().mockRejectedValueOnce(new Error("offline")).mockRejectedValueOnce(abortError));
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockRejectedValueOnce(new Error("offline")).mockRejectedValueOnce(abortError)
+    );
 
     await expect(
       transport.deliver({
@@ -2059,9 +2283,9 @@ describe("worker runtime", () => {
       }
     };
 
-    await expect(createWeeklyReportTransport({ emailTransport: null }).deliver(reportEvent as never)).rejects.toThrow(
-      "weekly_report_email_not_configured"
-    );
+    await expect(
+      createWeeklyReportTransport({ emailTransport: null }).deliver(reportEvent as never)
+    ).rejects.toThrow("weekly_report_email_not_configured");
 
     await expect(
       createWeeklyReportTransport({ emailTransport: { send: vi.fn() } }).deliver({
@@ -2085,7 +2309,13 @@ describe("worker runtime", () => {
 
     vi.stubGlobal(
       "fetch",
-      vi.fn().mockResolvedValue({ ok: false, status: 503, headers: { get: vi.fn().mockReturnValue(null) } })
+      vi
+        .fn()
+        .mockResolvedValue({
+          ok: false,
+          status: 503,
+          headers: { get: vi.fn().mockReturnValue(null) }
+        })
     );
 
     await expect(
@@ -2102,10 +2332,7 @@ describe("worker runtime", () => {
       "https://hooks.slack.test/weekly",
       "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
     );
-    vi.stubGlobal(
-      "fetch",
-      vi.fn().mockResolvedValue({ ok: true })
-    );
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: true }));
 
     await expect(
       createWeeklyReportTransport({
@@ -2129,7 +2356,9 @@ describe("worker runtime", () => {
   it("should enqueue one generate-weekly-report job per active project during scheduler pass", async (): Promise<void> => {
     const enqueue = vi.fn().mockResolvedValue(undefined);
     const listProjectsWithWeeklyActivity = vi.fn().mockResolvedValue(["proj_123", "proj_456"]);
-    const claimWeeklyReportDelivery = vi.fn().mockResolvedValue({ delivery_id: "wrd_123", created: true });
+    const claimWeeklyReportDelivery = vi
+      .fn()
+      .mockResolvedValue({ delivery_id: "wrd_123", created: true });
 
     const count = await scheduleWeeklyReports({
       queue: { enqueue },
@@ -2168,9 +2397,9 @@ describe("worker runtime", () => {
       timeoutMs: 100
     });
 
-    const fetchSpy = vi.spyOn(globalThis, "fetch").mockRejectedValueOnce(
-      Object.assign(new Error("aborted"), { name: "AbortError" })
-    );
+    const fetchSpy = vi
+      .spyOn(globalThis, "fetch")
+      .mockRejectedValueOnce(Object.assign(new Error("aborted"), { name: "AbortError" }));
 
     await expect(
       transport.deliver({

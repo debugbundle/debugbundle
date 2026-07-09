@@ -26,6 +26,11 @@ import {
   type ResolvedCapturePolicy
 } from "../../../../packages/shared-types/src/index.js";
 import type { ApiDependencies } from "../api-types.js";
+import {
+  claimAnalyticsIngestionQuota,
+  releaseAnalyticsQuotaClaimBestEffort,
+  toRetryAfterSeconds as toAnalyticsRetryAfterSeconds
+} from "../analytics-quota.js";
 import { redactEvent } from "../api-helpers.js";
 import { SMALL_REQUEST_BODY_LIMIT_BYTES } from "../http-limits.js";
 import { isProjectTokenOriginAllowed } from "../project-token-origins.js";
@@ -37,7 +42,7 @@ import {
   type ValidAnalyticsEvent
 } from "./analytics-ingestion.js";
 
-function toRetryAfterSeconds(retryAfterMs: number): string {
+function toIngestionRetryAfterSeconds(retryAfterMs: number): string {
   return String(Math.max(1, Math.ceil(retryAfterMs / 1_000)));
 }
 
@@ -410,7 +415,7 @@ export function registerIngestionRoutes(app: FastifyInstance, dependencies: ApiD
             });
           }
 
-          return reply.header("Retry-After", toRetryAfterSeconds(rateLimit.retry_after_ms)).status(429).send({
+          return reply.header("Retry-After", toIngestionRetryAfterSeconds(rateLimit.retry_after_ms)).status(429).send({
             accepted: 0,
             rejected: errors.length,
             errors,
@@ -430,7 +435,7 @@ export function registerIngestionRoutes(app: FastifyInstance, dependencies: ApiD
       analyticsAvailable: caps.analytics_bundle
     });
     errors.push(...analyticsSelection.errors);
-    const acceptedAnalyticsEvents = analyticsSelection.acceptedEvents;
+    let acceptedAnalyticsEvents = analyticsSelection.acceptedEvents;
 
     const defaultPreset = getDefaultPreset(project.organization_plan);
     let capturePolicy: ResolvedCapturePolicy = { preset: defaultPreset, ...PRESET_DEFAULTS[defaultPreset] };
@@ -657,7 +662,7 @@ export function registerIngestionRoutes(app: FastifyInstance, dependencies: ApiD
               });
             }
 
-            return reply.header("Retry-After", toRetryAfterSeconds(retryAfterMs)).status(429).send({
+            return reply.header("Retry-After", toIngestionRetryAfterSeconds(retryAfterMs)).status(429).send({
               accepted: 0,
               rejected: errors.length,
               errors,
@@ -693,9 +698,45 @@ export function registerIngestionRoutes(app: FastifyInstance, dependencies: ApiD
     }
     const persistAnalyticsAndEnqueue = dependencies.ingestionPersistence.persistAnalyticsAndEnqueue;
     if (persistAnalyticsAndEnqueue !== undefined) {
-      for (const { event } of acceptedAnalyticsEvents) {
-        await persistAnalyticsAndEnqueue(event, project.project_id);
-        accepted += 1;
+      const analyticsQuota = await claimAnalyticsIngestionQuota({
+        dependencies,
+        organization_id: project.organization_id,
+        organization_plan: project.organization_plan,
+        events: acceptedAnalyticsEvents,
+        now
+      });
+      if (!analyticsQuota.allowed) {
+        errors.push(
+          ...acceptedAnalyticsEvents.map(({ index }) => ({
+            index,
+            reason: "analytics_quota_exceeded"
+          }))
+        );
+        acceptedAnalyticsEvents = [];
+        if (accepted === 0) {
+          return reply
+            .header("Retry-After", toAnalyticsRetryAfterSeconds(analyticsQuota.retry_after_ms))
+            .status(429)
+            .send({
+              accepted: 0,
+              rejected: errors.length,
+              errors,
+              retry_after_ms: analyticsQuota.retry_after_ms
+            });
+        }
+      }
+
+      try {
+        for (const { event } of acceptedAnalyticsEvents) {
+          await persistAnalyticsAndEnqueue(event, project.project_id);
+          accepted += 1;
+        }
+      } catch (error) {
+        await releaseAnalyticsQuotaClaimBestEffort({
+          dependencies,
+          release: analyticsQuota.allowed ? analyticsQuota.release : undefined
+        });
+        throw error;
       }
     }
 

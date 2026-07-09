@@ -73,6 +73,47 @@ export const ANALYTICS_METRICS_MCP_TOOL_CATALOG = [
       projectId: z.string(),
       opportunityId: z.string()
     })
+  },
+  {
+    name: "list_analytics_bundles",
+    group: "analytics_metrics",
+    description: "List AnalyticsBundle generation records for a project, including pending, completed, and failed states.",
+    inputSchema: z.object({
+      bearerToken: z.string(),
+      projectId: z.string(),
+      status: z.enum(["all", "pending", "running", "completed", "failed"]).optional(),
+      kind: AnalyticsBundleAnalysisKindSchema.optional(),
+      cursor: z.string().optional(),
+      limit: z.number().optional()
+    })
+  },
+  {
+    name: "generate_analytics_bundle",
+    group: "analytics_metrics",
+    description: "Request an AnalyticsBundle generation for a project analysis window and focus.",
+    inputSchema: z.object({
+      bearerToken: z.string(),
+      projectId: z.string(),
+      analysisKind: AnalyticsBundleAnalysisKindSchema,
+      from: z.string().optional(),
+      to: z.string().optional(),
+      last: z.string().optional(),
+      funnel: z.string().optional(),
+      route: z.string().optional(),
+      incidentId: z.string().optional(),
+      deployId: z.string().optional(),
+      filters: z.record(z.string(), z.unknown()).optional()
+    })
+  },
+  {
+    name: "get_analytics_bundle",
+    group: "analytics_metrics",
+    description: "Get a generated AnalyticsBundle artifact or its pending/failed generation state.",
+    inputSchema: z.object({
+      bearerToken: z.string(),
+      projectId: z.string(),
+      bundleGenerationId: z.string()
+    })
   }
 ] as const;
 

@@ -12,7 +12,10 @@ export const ANALYTICS_METRICS_MCP_TOOL_NAMES = [
   "get_referrer_metrics",
   "get_funnel_analysis",
   "list_analytics_opportunities",
-  "get_analytics_opportunity"
+  "get_analytics_opportunity",
+  "list_analytics_bundles",
+  "generate_analytics_bundle",
+  "get_analytics_bundle"
 ] as const;
 
 function mapMcpError(error: unknown): never {
@@ -45,6 +48,9 @@ export function createAnalyticsMetricsMcpTools(api: {
   getFunnelAnalysis(input: AnalyticsMetricsToolInput & { funnelKey: string }): Promise<unknown>;
   listOpportunities(input: AnalyticsOpportunitiesToolInput): Promise<unknown>;
   getOpportunity(input: AnalyticsOpportunityToolInput): Promise<unknown>;
+  listBundles(input: AnalyticsBundleListToolInput): Promise<unknown>;
+  createBundle(input: AnalyticsBundleCreateToolInput): Promise<unknown>;
+  getBundle(input: AnalyticsBundleToolInput): Promise<unknown>;
 }): Record<(typeof ANALYTICS_METRICS_MCP_TOOL_NAMES)[number], (input: Record<string, unknown>) => Promise<unknown>> {
   return {
     async get_usage_summary(input) {
@@ -116,6 +122,34 @@ export function createAnalyticsMetricsMcpTools(api: {
       } catch (error) {
         mapMcpError(error);
       }
+    },
+
+    async list_analytics_bundles(input) {
+      try {
+        return await api.listBundles(readBundleListInput(input));
+      } catch (error) {
+        mapMcpError(error);
+      }
+    },
+
+    async generate_analytics_bundle(input) {
+      try {
+        return await api.createBundle(readBundleCreateInput(input));
+      } catch (error) {
+        mapMcpError(error);
+      }
+    },
+
+    async get_analytics_bundle(input) {
+      try {
+        return await api.getBundle({
+          bearerToken: String(input["bearerToken"]),
+          projectId: String(input["projectId"]),
+          bundleGenerationId: String(input["bundleGenerationId"])
+        });
+      } catch (error) {
+        mapMcpError(error);
+      }
     }
   };
 }
@@ -147,6 +181,35 @@ type AnalyticsOpportunityToolInput = {
   opportunityId: string;
 };
 
+type AnalyticsBundleToolInput = {
+  bearerToken: string;
+  projectId: string;
+  bundleGenerationId: string;
+};
+
+type AnalyticsBundleListToolInput = {
+  bearerToken: string;
+  projectId: string;
+  status?: "all" | "pending" | "running" | "completed" | "failed" | undefined;
+  kind?: AnalyticsBundleAnalysisKind | undefined;
+  cursor?: string | undefined;
+  limit?: number | undefined;
+};
+
+type AnalyticsBundleCreateToolInput = {
+  bearerToken: string;
+  projectId: string;
+  analysisKind: AnalyticsBundleAnalysisKind;
+  from?: string | undefined;
+  to?: string | undefined;
+  last?: string | undefined;
+  funnel?: string | undefined;
+  route?: string | undefined;
+  incidentId?: string | undefined;
+  deployId?: string | undefined;
+  filters?: Record<string, unknown> | undefined;
+};
+
 function readMetricsInput(input: Record<string, unknown>): AnalyticsMetricsToolInput {
   return {
     bearerToken: String(input["bearerToken"]),
@@ -172,4 +235,53 @@ function readOpportunitiesInput(input: Record<string, unknown>): AnalyticsOpport
     cursor: readOptionalString(input, "cursor"),
     limit: readOptionalNumber(input, "limit")
   };
+}
+
+function readBundleListInput(input: Record<string, unknown>): AnalyticsBundleListToolInput {
+  const status = input["status"];
+  const kind = AnalyticsBundleAnalysisKindSchema.safeParse(input["kind"]);
+  return {
+    bearerToken: String(input["bearerToken"]),
+    projectId: String(input["projectId"]),
+    status: status === "all" ||
+      status === "pending" ||
+      status === "running" ||
+      status === "completed" ||
+      status === "failed"
+        ? status
+        : undefined,
+    kind: kind.success ? kind.data : undefined,
+    cursor: readOptionalString(input, "cursor"),
+    limit: readOptionalNumber(input, "limit")
+  };
+}
+
+function readBundleCreateInput(input: Record<string, unknown>): AnalyticsBundleCreateToolInput {
+  const analysisKind = AnalyticsBundleAnalysisKindSchema.safeParse(input["analysisKind"]);
+  if (!analysisKind.success) {
+    throw new AnalyticsMetricsApiError(400, "Invalid analytics bundle analysis kind.");
+  }
+
+  return {
+    bearerToken: String(input["bearerToken"]),
+    projectId: String(input["projectId"]),
+    analysisKind: analysisKind.data,
+    from: readOptionalString(input, "from"),
+    to: readOptionalString(input, "to"),
+    last: readOptionalString(input, "last"),
+    funnel: readOptionalString(input, "funnel"),
+    route: readOptionalString(input, "route"),
+    incidentId: readOptionalString(input, "incidentId"),
+    deployId: readOptionalString(input, "deployId"),
+    filters: readOptionalRecord(input, "filters")
+  };
+}
+
+function readOptionalRecord(input: Record<string, unknown>, key: string): Record<string, unknown> | undefined {
+  const value = input[key];
+  if (typeof value === "object" && value !== null && !Array.isArray(value)) {
+    return value as Record<string, unknown>;
+  }
+
+  return undefined;
 }

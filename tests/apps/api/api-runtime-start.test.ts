@@ -126,6 +126,7 @@ function buildMigratedRuntimeSchemaRows(sql: string): { rows: Record<string, unk
         { table_name: "capture_rules" },
         { table_name: "project_analytics_settings" },
         { table_name: "analytics_ingestion_ledger" },
+        { table_name: "analytics_usage_counters" },
         { table_name: "analytics_rollup_uniques" },
         { table_name: "analytics_session_rollups" },
         { table_name: "analytics_route_rollups" },

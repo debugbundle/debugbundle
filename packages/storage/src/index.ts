@@ -75,6 +75,15 @@ export type {
 } from "./analytics-metrics-store.js";
 export { createPostgresAnalyticsMetricsStore } from "./analytics-metrics-store.js";
 export type {
+  AnalyticsAllowanceClaimInput,
+  AnalyticsAllowanceClaimResult,
+  AnalyticsAllowanceMetric,
+  AnalyticsAllowanceReleaseInput,
+  AnalyticsAllowanceUsageSummary,
+  AnalyticsUsageStore
+} from "./analytics-usage-store.js";
+export { createPostgresAnalyticsUsageStore } from "./analytics-usage-store.js";
+export type {
   BuildAnalyticsBundleJob,
   BuildAnalyticsBundleTrigger
 } from "./analytics-bundle-jobs.js";
@@ -85,6 +94,7 @@ export type {
   ReserveAnalyticsBundleGenerationInput
 } from "./analytics-bundle-generation-store.js";
 export {
+  buildAnalyticsBundleGenerationCursor,
   buildAnalyticsBundleInputFingerprint,
   createPostgresAnalyticsBundleGenerationStore
 } from "./analytics-bundle-generation-store.js";

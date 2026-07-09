@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
 import {
+  buildAnalyticsBundleGenerationCursor,
   buildAnalyticsBundleInputFingerprint,
   createPostgresAnalyticsBundleGenerationStore,
   type Queryable
@@ -146,6 +147,65 @@ describe("analytics bundle generation store", () => {
     expect(queryMock).toHaveBeenCalledOnce();
   });
 
+  it("lists project-scoped generations with filters and cursor pagination", async (): Promise<void> => {
+    const overflowGenerationId = "55555555-5555-4555-8555-555555555555";
+    const queryMock = vi.fn(async (sqlText: string, params: unknown[]) => {
+      expect(sqlText).toContain("FROM analytics_bundle_generations");
+      expect(sqlText).toContain("project_id = $1::uuid");
+      expect(sqlText).toContain("status = $2");
+      expect(sqlText).toContain("analysis_kind = $3");
+      expect(sqlText).toContain("(created_at, id) < ($4::timestamptz, $5::uuid)");
+      expect(sqlText).toContain("ORDER BY created_at DESC, id DESC");
+      expect(sqlText).toContain("LIMIT $6");
+      expect(params).toEqual([
+        PROJECT_ID,
+        "completed",
+        "funnel_dropoff",
+        "2026-07-09T00:00:00.000Z",
+        GENERATION_ID,
+        2
+      ]);
+      return {
+        rows: [
+          { ...generationRow, status: "completed" },
+          {
+            ...generationRow,
+            generation_id: overflowGenerationId,
+            created_at: "2026-07-07T09:00:00.000Z"
+          }
+        ]
+      };
+    });
+    const store = createPostgresAnalyticsBundleGenerationStore(createTransactionalDb(queryMock));
+
+    await expect(
+      store.listAnalyticsBundleGenerationsForProject({
+        project_id: PROJECT_ID,
+        status: "completed",
+        analysis_kind: "funnel_dropoff",
+        cursor: {
+          created_at: "2026-07-09T00:00:00.000Z",
+          generation_id: GENERATION_ID
+        },
+        limit: 1
+      })
+    ).resolves.toMatchObject({
+      bundles: [{
+        generation_id: GENERATION_ID,
+        status: "completed"
+      }],
+      next_cursor: `2026-07-07T09:00:00.000Z|${overflowGenerationId}`
+    });
+    expect(queryMock).toHaveBeenCalledOnce();
+  });
+
+  it("builds stable AnalyticsBundle generation cursors", (): void => {
+    expect(buildAnalyticsBundleGenerationCursor({
+      generation_id: GENERATION_ID,
+      created_at: "2026-07-08T10:00:00.000Z"
+    })).toBe(`2026-07-08T10:00:00.000Z|${GENERATION_ID}`);
+  });
+
   it("claims the oldest pending generation with a skip-locked update", async (): Promise<void> => {
     const queryMock = vi.fn(async (sqlText: string, params: unknown[]) => {
       if (sqlText.includes("WITH next_generation AS")) {
@@ -174,6 +234,45 @@ describe("analytics bundle generation store", () => {
 
     await expect(
       store.claimPendingAnalyticsBundleGeneration({
+        claimed_at: "2026-07-08T10:05:00.000Z"
+      })
+    ).resolves.toMatchObject({
+      generation_id: GENERATION_ID,
+      status: "running",
+      claimed_at: "2026-07-08T10:05:00.000Z"
+    });
+    expect(queryMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("claims a specific queued generation without selecting another pending generation", async (): Promise<void> => {
+    const queryMock = vi.fn(async (sqlText: string, params: unknown[]) => {
+      if (sqlText.includes("UPDATE analytics_bundle_generations")) {
+        expect(sqlText).toContain("AND id = $2::uuid");
+        expect(sqlText).toContain("status IN ('pending', 'running')");
+        expect(params).toEqual([PROJECT_ID, GENERATION_ID, "2026-07-08T10:05:00.000Z"]);
+        return {
+          rows: [{
+            ...generationRow,
+            status: "running",
+            claimed_at: "2026-07-08T10:05:00.000Z",
+            updated_at: "2026-07-08T10:05:00.000Z"
+          }]
+        };
+      }
+
+      if (sqlText.includes("UPDATE analytics_opportunities")) {
+        expect(params).toEqual([OPPORTUNITY_ID, "running", null, null]);
+        return { rows: [] };
+      }
+
+      throw new Error(`Unhandled specific claim SQL: ${sqlText}`);
+    });
+    const store = createPostgresAnalyticsBundleGenerationStore(createTransactionalDb(queryMock));
+
+    await expect(
+      store.claimAnalyticsBundleGenerationForProject({
+        project_id: PROJECT_ID,
+        generation_id: GENERATION_ID,
         claimed_at: "2026-07-08T10:05:00.000Z"
       })
     ).resolves.toMatchObject({

@@ -590,7 +590,7 @@ This ensures Free behaves as **failure-first, not telemetry-first**.
 
 **FR-ANL-04b:** DebugBundle incident/debug capture must not depend on AnalyticsBundle being enabled. Existing frontend exceptions, breadcrumbs, route changes, request events, and debug bundles must continue to work when analytics is disabled, unavailable on the current tier, blocked by consent, sampled out, or failing internally.
 
-**FR-ANL-05:** Analytics events must have separate usage accounting from debug incident ingestion. Analytics event/session allowances, retained journey samples, saved funnels, custom dimensions, and AnalyticsBundle generations must be meterable independently from existing incident event and failure bundle allowances.
+**FR-ANL-05:** Analytics events must have separate usage accounting from debug incident ingestion. Analytics event/session allowances, retained journey samples, saved funnels, custom dimensions, and AnalyticsBundle generations must be meterable independently from existing incident event and failure bundle allowances. Hosted analytics event/session ingestion and on-demand AnalyticsBundle generation quota checks use durable analytics-specific internal counters and must not require adding analytics keys to the public billing summary `allowances` response until public billing clients are migrated to a compatible shape.
 
 **FR-ANL-06:** Analytics ingestion must remain lightweight: authenticate, validate, apply analytics enablement/quota checks, persist short-lived raw input when accepted, enqueue analytics processing, and return. No aggregation, bundle generation, or heavy analysis may run synchronously in the API request path.
 
