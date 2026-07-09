@@ -420,6 +420,7 @@ const AnalyticsJourneyPatternSchema = z
     transition_count: z.number().int().nonnegative(),
     unique_sessions: z.number().int().nonnegative(),
     transition_share: z.number().min(0).max(1),
+    sample_ids: z.array(z.string().uuid()).max(3).default([]),
   })
   .strict();
 

@@ -1453,6 +1453,8 @@ Retained journey sample artifacts use object storage path `analytics-journeys/{p
 
 `events` is capped at 100 safe journey steps, preserving the first and last portions when a session-day exceeds the cap. Each step may include event id, timestamp, analytics kind, safe route/previous-route objects, semantic action/funnel/marker keys, trace/deploy ids, bounded built-in dimensions, and approved custom dimensions. It must not include raw session IDs, raw user IDs, raw visitor IDs, form values, raw text content, DOM snapshots, screenshots, request/response bodies, raw URLs with query strings/fragments, tokens, emails, names, payment data, or arbitrary application payloads.
 
+Aggregate journey-pattern metric responses may expose up to three retained `sample_ids` for each transition pattern and requested metrics window. These IDs are references into `analytics_journey_samples`; they do not expose object-storage keys, raw session IDs, or unredacted journey payloads, and expired samples must be omitted from responses.
+
 ---
 
 ## 6. Object Storage Path Conventions

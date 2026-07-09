@@ -86,6 +86,11 @@ type AnalyticsJourneyPatternRow = {
   total_transitions: unknown;
 };
 
+type AnalyticsJourneyPatternSampleRow = {
+  transition_tag: unknown;
+  sample_id: unknown;
+};
+
 type AnalyticsFunnelStepMetricRow = {
   step_key: unknown;
   step_order: unknown;
@@ -95,6 +100,7 @@ type AnalyticsFunnelStepMetricRow = {
 };
 
 const DEFAULT_SEGMENT_LIMIT = 10;
+const MAX_JOURNEY_PATTERN_SAMPLE_IDS = 3;
 
 const SEGMENT_EXPRESSIONS: Record<AnalyticsSegmentKey, string> = {
   device_types: "COALESCE(NULLIF(device_type, ''), 'unknown')",
@@ -225,10 +231,14 @@ export function createPostgresAnalyticsMetricsStore(db: Queryable): AnalyticsMet
           transition_share: totalTransitions > 0 ? Math.min(1, transitionCount / totalTransitions) : 0
         };
       });
+      const sampleIdsByTransition = await readJourneyPatternSampleIds(db, input, patterns);
 
       return AnalyticsJourneyPatternsResponseSchema.parse({
         window: buildWindow(input),
-        patterns
+        patterns: patterns.map((pattern) => ({
+          ...pattern,
+          sample_ids: sampleIdsByTransition.get(toTransitionTag(pattern.from_route_key, pattern.to_route_key)) ?? []
+        }))
       });
     },
 
@@ -407,6 +417,71 @@ async function readSegments(
   }));
 }
 
+async function readJourneyPatternSampleIds(
+  db: Queryable,
+  input: AnalyticsUsageSummaryInput,
+  patterns: Array<{ from_route_key: string; to_route_key: string }>
+): Promise<Map<string, string[]>> {
+  if (patterns.length === 0) {
+    return new Map();
+  }
+
+  const transitionTags = [...new Set(patterns.map((pattern) => toTransitionTag(pattern.from_route_key, pattern.to_route_key)))];
+  const params: unknown[] = [input.project_id, new Date().toISOString(), transitionTags, input.from, input.to];
+  const filters = [
+    "samples.project_id = $1::uuid",
+    "samples.expires_at > $2::timestamptz",
+    "samples.last_seen_at >= $4::timestamptz",
+    "samples.first_seen_at < $5::timestamptz",
+    "samples.analysis_tags @> ARRAY[wanted.transition_tag]::text[]"
+  ];
+
+  if (input.service !== undefined) {
+    params.push(input.service);
+    filters.push(`samples.service = $${params.length}`);
+  }
+
+  if (input.environment !== undefined) {
+    params.push(input.environment);
+    filters.push(`samples.environment = $${params.length}`);
+  }
+
+  params.push(MAX_JOURNEY_PATTERN_SAMPLE_IDS);
+  const result = await db.query<AnalyticsJourneyPatternSampleRow>(
+    `
+      WITH wanted_tags AS (
+        SELECT unnest($3::text[]) AS transition_tag
+      )
+      SELECT transition_tag, sample_id
+      FROM (
+        SELECT
+          wanted.transition_tag,
+          samples.sample_id,
+          row_number() OVER (
+            PARTITION BY wanted.transition_tag
+            ORDER BY samples.last_seen_at DESC, samples.sample_id DESC
+          ) AS sample_rank
+        FROM wanted_tags wanted
+        JOIN analytics_journey_samples samples
+          ON ${filters.join("\n          AND ")}
+      ) ranked
+      WHERE sample_rank <= $${params.length}
+      ORDER BY transition_tag ASC, sample_rank ASC
+    `,
+    params
+  );
+
+  const sampleIdsByTransition = new Map<string, string[]>();
+  for (const row of result.rows) {
+    if (typeof row.transition_tag !== "string" || typeof row.sample_id !== "string") {
+      continue;
+    }
+    sampleIdsByTransition.set(row.transition_tag, [...(sampleIdsByTransition.get(row.transition_tag) ?? []), row.sample_id]);
+  }
+
+  return sampleIdsByTransition;
+}
+
 function buildAnalyticsRollupWhere(
   input: AnalyticsUsageSummaryInput,
   options: { extraConditions?: string[]; extraParams?: unknown[] } = {}
@@ -490,4 +565,8 @@ function toNonEmptyString(value: unknown, fallback: string): string {
 
 function toConversionRate(completed: number, entered: number): number {
   return entered > 0 ? Math.min(1, Math.max(0, completed / entered)) : 0;
+}
+
+function toTransitionTag(fromRouteKey: string, toRouteKey: string): string {
+  return `transition:${fromRouteKey}->${toRouteKey}`.slice(0, 120);
 }

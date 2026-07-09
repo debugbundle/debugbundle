@@ -367,9 +367,11 @@ function formatJourneyPatterns(response: AnalyticsJourneyPatternsResponse): stri
   }
 
   return response.patterns
-    .map((pattern) =>
-      `${pattern.from_route_key} -> ${pattern.to_route_key}: ${pattern.transition_count} transitions, ${pattern.unique_sessions} sessions, ${pattern.transition_share} share`
-    )
+    .map((pattern) => {
+      const sampleCount = pattern.sample_ids?.length ?? 0;
+      const samples = sampleCount > 0 ? `, ${sampleCount} samples` : "";
+      return `${pattern.from_route_key} -> ${pattern.to_route_key}: ${pattern.transition_count} transitions, ${pattern.unique_sessions} sessions, ${pattern.transition_share} share${samples}`;
+    })
     .join("\n");
 }
 

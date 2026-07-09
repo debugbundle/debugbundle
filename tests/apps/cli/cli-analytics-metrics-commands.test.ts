@@ -60,7 +60,8 @@ const journeyPatternsResponse = {
       to_route_key: "/checkout",
       transition_count: 30,
       unique_sessions: 18,
-      transition_share: 0.6
+      transition_share: 0.6,
+      sample_ids: ["00000000-0000-4000-8000-000000000301"]
     }
   ]
 } as const;
@@ -126,7 +127,7 @@ describe("cli analytics metrics commands", () => {
     );
 
     expect(human.exitCode).toBe(0);
-    expect(human.output).toContain("/pricing -> /checkout: 30 transitions, 18 sessions, 0.6 share");
+    expect(human.output).toContain("/pricing -> /checkout: 30 transitions, 18 sessions, 0.6 share, 1 samples");
     expect(JSON.parse(json.output)).toEqual(journeyPatternsResponse);
   });
 

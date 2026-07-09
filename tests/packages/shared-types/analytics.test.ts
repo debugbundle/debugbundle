@@ -346,11 +346,13 @@ describe("analytics journey pattern metrics schema", () => {
           transition_count: 30,
           unique_sessions: 18,
           transition_share: 0.6,
+          sample_ids: ["00000000-0000-4000-8000-000000000701"],
         },
       ],
     });
 
     expect(parsed.patterns[0]?.from_route_key).toBe("/pricing");
+    expect(parsed.patterns[0]?.sample_ids).toEqual(["00000000-0000-4000-8000-000000000701"]);
   });
 });
 

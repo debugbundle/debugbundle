@@ -99,7 +99,8 @@ describe("worker processor - build-analytics-bundle", () => {
         to_route_key: "/checkout",
         transition_count: 70,
         unique_sessions: 60,
-        transition_share: 1
+        transition_share: 1,
+        sample_ids: ["00000000-0000-4000-8000-000000000901"]
       }
     ]);
     expect(markAnalyticsBundleGenerationCompleted).toHaveBeenCalledWith({
@@ -403,7 +404,8 @@ function createMetricsStore(overrides: MetricsStoreOverrides = {}): AnalyticsMet
           to_route_key: "/checkout",
           transition_count: 70,
           unique_sessions: journeySessions,
-          transition_share: 1
+          transition_share: 1,
+          sample_ids: ["00000000-0000-4000-8000-000000000901"]
         }
       ]
     }),

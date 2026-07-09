@@ -206,6 +206,31 @@ describe("analytics metrics store", () => {
         };
       }
 
+      if (sqlText.includes("JOIN analytics_journey_samples")) {
+        expect(params[0]).toBe(PROJECT_ID);
+        expect(params[2]).toEqual([
+          "transition:/pricing->/checkout",
+          "transition:/docs->/signup"
+        ]);
+        expect(params[3]).toBe("2026-03-01T00:00:00.000Z");
+        expect(params[4]).toBe("2026-03-08T00:00:00.000Z");
+        expect(params.at(-3)).toBe("web");
+        expect(params.at(-2)).toBe("production");
+        expect(params.at(-1)).toBe(3);
+        return {
+          rows: [
+            {
+              transition_tag: "transition:/pricing->/checkout",
+              sample_id: "00000000-0000-4000-8000-000000000201"
+            },
+            {
+              transition_tag: "transition:/pricing->/checkout",
+              sample_id: "00000000-0000-4000-8000-000000000202"
+            }
+          ]
+        };
+      }
+
       throw new Error(`Unhandled analytics metrics SQL: ${sqlText}`);
     });
 
@@ -236,14 +261,19 @@ describe("analytics metrics store", () => {
           to_route_key: "/checkout",
           transition_count: 30,
           unique_sessions: 18,
-          transition_share: 0.6
+          transition_share: 0.6,
+          sample_ids: [
+            "00000000-0000-4000-8000-000000000201",
+            "00000000-0000-4000-8000-000000000202"
+          ]
         },
         {
           from_route_key: "/docs",
           to_route_key: "/signup",
           transition_count: 20,
           unique_sessions: 12,
-          transition_share: 0.4
+          transition_share: 0.4,
+          sample_ids: []
         }
       ]
     });
