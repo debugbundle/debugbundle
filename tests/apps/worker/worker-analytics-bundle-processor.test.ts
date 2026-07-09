@@ -209,6 +209,33 @@ describe("worker processor - build-analytics-bundle", () => {
     expect(bundle.metrics.affected_sessions).toBe(12);
   });
 
+  it("links incident-impact bundles from scalar and related analysis spec IDs", async (): Promise<void> => {
+    const bundle = await buildBundleForGeneration({
+      analysis_kind: "incident_impact",
+      analysis_spec: {
+        from: "2026-07-01T00:00:00.000Z",
+        to: "2026-07-08T00:00:00.000Z",
+        incident_id: "44444444-4444-4444-8444-444444444444",
+        related_incident_ids: [
+          "55555555-5555-4555-8555-555555555555",
+          "44444444-4444-4444-8444-444444444444"
+        ],
+        deploy_id: "deploy_123",
+        related_deploy_ids: ["deploy_456", "deploy_123"]
+      }
+    });
+
+    expect(bundle.analysis_kind).toBe("incident_impact");
+    expect(bundle.linked_incidents).toEqual([
+      { incident_id: "44444444-4444-4444-8444-444444444444" },
+      { incident_id: "55555555-5555-4555-8555-555555555555" }
+    ]);
+    expect(bundle.linked_deploys).toEqual([
+      { deploy_id: "deploy_123" },
+      { deploy_id: "deploy_456" }
+    ]);
+  });
+
   it("keeps usage-summary bundles aggregate-only while preserving linked context", async (): Promise<void> => {
     const bundle = await buildBundleForGeneration({
       analysis_kind: "usage_summary",

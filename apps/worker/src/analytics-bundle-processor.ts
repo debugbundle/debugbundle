@@ -226,8 +226,16 @@ async function buildAnalyticsBundleInput(input: {
     ],
     journey_patterns: journeys.patterns,
     representative_journeys: representativeJourneys,
-    linked_incidents: readLinkedRecords(input.generation.analysis_spec, "related_incident_ids", "incident_id"),
-    linked_deploys: readLinkedRecords(input.generation.analysis_spec, "related_deploy_ids", "deploy_id"),
+    linked_incidents: readLinkedRecords(input.generation.analysis_spec, {
+      arrayKey: "related_incident_ids",
+      scalarKey: "incident_id",
+      outputKey: "incident_id"
+    }),
+    linked_deploys: readLinkedRecords(input.generation.analysis_spec, {
+      arrayKey: "related_deploy_ids",
+      scalarKey: "deploy_id",
+      outputKey: "deploy_id"
+    }),
     recommendations: buildRecommendations(input.generation.analysis_kind)
   };
 }
@@ -511,17 +519,19 @@ function toSegments(
 
 function readLinkedRecords(
   spec: Record<string, unknown>,
-  sourceKey: string,
-  outputKey: string
-): Array<Record<string, unknown>> {
-  const value = spec[sourceKey];
-  if (!Array.isArray(value)) {
-    return [];
+  keys: {
+    arrayKey: string;
+    scalarKey: string;
+    outputKey: string;
   }
+): Array<Record<string, unknown>> {
+  const arrayValue = spec[keys.arrayKey];
+  const scalarValue = spec[keys.scalarKey];
+  const arrayItems: unknown[] = Array.isArray(arrayValue) ? arrayValue : [];
+  const values = [...arrayItems, scalarValue];
 
-  return value
-    .filter((item): item is string => typeof item === "string" && item.trim().length > 0)
-    .map((item) => ({ [outputKey]: item }));
+  return [...new Set(values.map(readNullableString).filter((item): item is string => item !== null))]
+    .map((item) => ({ [keys.outputKey]: item }));
 }
 
 function readRecordArray(value: unknown): Array<Record<string, unknown>> {

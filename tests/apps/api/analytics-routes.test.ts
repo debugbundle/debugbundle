@@ -753,6 +753,8 @@ describe("analytics metrics routes", () => {
         from: FROM,
         to: TO,
         funnel: "checkout",
+        incident_id: "44444444-4444-4444-8444-444444444444",
+        deploy_id: "deploy_123",
         filters: { auth_state: "logged_in" }
       }
     });
@@ -773,8 +775,10 @@ describe("analytics metrics routes", () => {
         to: TO,
         funnel: "checkout",
         route: null,
-        incident_id: null,
-        deploy_id: null,
+        incident_id: "44444444-4444-4444-8444-444444444444",
+        deploy_id: "deploy_123",
+        related_incident_ids: ["44444444-4444-4444-8444-444444444444"],
+        related_deploy_ids: ["deploy_123"],
         filters: { auth_state: "logged_in" }
       }
     });

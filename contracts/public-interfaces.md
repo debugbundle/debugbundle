@@ -705,6 +705,7 @@ Journey sample responses must not expose the internal object-storage key. Expire
 ```
 
 `last` may be supplied instead of `from` for relative windows such as `"7d"`; `to` may still be supplied with `last` to anchor the window.
+When `incident_id` or `deploy_id` is supplied, the generation stores those values as linked incident/deploy evidence for the AnalyticsBundle artifact while preserving the scalar request fields for compatibility.
 
 **AnalyticsBundle generation list response:** `GET /v1/analytics/bundles?project_id=<uuid>&status=all|pending|running|completed|failed&kind=<kind>&cursor=<cursor>&limit=<n>` returns:
 

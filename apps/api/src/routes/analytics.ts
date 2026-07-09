@@ -421,13 +421,17 @@ function buildAnalyticsBundleAnalysisSpec(input: z.infer<typeof AnalyticsBundleC
   from: string;
   to: string;
 }): Record<string, unknown> {
+  const incidentId = input.incident_id ?? null;
+  const deployId = input.deploy_id ?? null;
   return {
     from: input.from,
     to: input.to,
     funnel: input.funnel ?? null,
     route: input.route ?? null,
-    incident_id: input.incident_id ?? null,
-    deploy_id: input.deploy_id ?? null,
+    incident_id: incidentId,
+    deploy_id: deployId,
+    related_incident_ids: incidentId === null ? [] : [incidentId],
+    related_deploy_ids: deployId === null ? [] : [deployId],
     filters: input.filters
   };
 }
