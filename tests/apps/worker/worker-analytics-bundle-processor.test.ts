@@ -1,4 +1,4 @@
-import { gunzipSync } from "node:zlib";
+import { gunzipSync, gzipSync } from "node:zlib";
 
 import { describe, expect, it, vi } from "vitest";
 
@@ -7,18 +7,21 @@ import { AnalyticsBundleV1Schema } from "../../../packages/shared-types/src/inde
 import {
   buildAnalyticsBundleObjectKey,
   type AnalyticsBundleGenerationRecord,
+  type AnalyticsJourneySampleStore,
   type AnalyticsMetricsStore
 } from "../../../packages/storage/src/index.js";
 import type { RuntimeLogger } from "../../../packages/runtime-logger/src/index.js";
 
 const PROJECT_ID = "11111111-1111-4111-8111-111111111111";
 const GENERATION_ID = "33333333-3333-4333-8333-333333333333";
+const SAMPLE_ID = "00000000-0000-4000-8000-000000000901";
 const INPUT_FINGERPRINT = "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
 
 describe("worker processor - build-analytics-bundle", () => {
   it("builds and stores a deterministic AnalyticsBundle artifact from aggregate metrics", async (): Promise<void> => {
     const ack = vi.fn().mockResolvedValue(undefined);
     const putObject = vi.fn().mockResolvedValue(undefined);
+    const getObject = vi.fn(async () => compressedJourneySampleArtifact());
     const markAnalyticsBundleGenerationCompleted = vi.fn().mockResolvedValue({
       ...createGenerationRecord(),
       status: "completed",
@@ -53,7 +56,8 @@ describe("worker processor - build-analytics-bundle", () => {
         },
         analyticsBundleGenerationStore: generationStore,
         analyticsMetricsStore: createMetricsStore(),
-        objectStore: { putObject }
+        analyticsJourneySampleStore: createJourneySampleStore(),
+        objectStore: { putObject, getObject }
       })
     ).resolves.toEqual({ processed: true });
 
@@ -100,8 +104,18 @@ describe("worker processor - build-analytics-bundle", () => {
         transition_count: 70,
         unique_sessions: 60,
         transition_share: 1,
-        sample_ids: ["00000000-0000-4000-8000-000000000901"]
+        sample_ids: [SAMPLE_ID]
       }
+    ]);
+    expect(bundle.representative_journeys).toEqual([
+      expect.objectContaining({
+        sample_id: SAMPLE_ID,
+        event_count: 2,
+        timeline: expect.objectContaining({
+          "001": expect.objectContaining({ kind: "page_view", route: "/pricing" }),
+          "002": expect.objectContaining({ kind: "route_change", previous_route: "/pricing", route: "/checkout" })
+        })
+      })
     ]);
     expect(markAnalyticsBundleGenerationCompleted).toHaveBeenCalledWith({
       project_id: PROJECT_ID,
@@ -114,6 +128,7 @@ describe("worker processor - build-analytics-bundle", () => {
   it("acks completed generations without rebuilding the artifact", async (): Promise<void> => {
     const ack = vi.fn().mockResolvedValue(undefined);
     const putObject = vi.fn();
+    const getObject = vi.fn();
 
     await expect(
       processNextBuildAnalyticsBundleJob({
@@ -141,7 +156,8 @@ describe("worker processor - build-analytics-bundle", () => {
           markAnalyticsBundleGenerationFailed: vi.fn()
         },
         analyticsMetricsStore: createMetricsStore(),
-        objectStore: { putObject }
+        analyticsJourneySampleStore: createJourneySampleStore(),
+        objectStore: { putObject, getObject }
       })
     ).resolves.toEqual({ processed: true, reason: "analytics_bundle_generation_completed" });
 
@@ -220,6 +236,57 @@ describe("worker processor - build-analytics-bundle", () => {
     ]);
   });
 
+  it("skips unavailable representative journey samples without failing generation", async (): Promise<void> => {
+    const logger = { warn: vi.fn() };
+    const bundle = await buildBundleForGeneration(
+      {
+        analysis_kind: "journey_friction",
+        analysis_spec: {
+          from: "2026-07-01T00:00:00.000Z",
+          to: "2026-07-08T00:00:00.000Z",
+          service: "web",
+          environment: "production"
+        }
+      },
+      {},
+      {
+        journeySampleStore: createJourneySampleStore({
+          getAnalyticsJourneySampleForProject: vi.fn(async () => null)
+        }),
+        logger
+      }
+    );
+
+    expect(bundle.representative_journeys).toEqual([]);
+    expect(logger.warn).not.toHaveBeenCalled();
+  });
+
+  it("skips invalid representative journey sample artifacts without failing generation", async (): Promise<void> => {
+    const logger = { warn: vi.fn() };
+    const bundle = await buildBundleForGeneration(
+      {
+        analysis_kind: "journey_friction",
+        analysis_spec: {
+          from: "2026-07-01T00:00:00.000Z",
+          to: "2026-07-08T00:00:00.000Z",
+          service: "web",
+          environment: "production"
+        }
+      },
+      {},
+      {
+        getObject: vi.fn(async () => gzipSync(Buffer.from(JSON.stringify({ schema_version: "wrong" }), "utf8"))),
+        logger
+      }
+    );
+
+    expect(bundle.representative_journeys).toEqual([]);
+    expect(logger.warn).toHaveBeenCalledWith(
+      { project_id: PROJECT_ID, sample_id: SAMPLE_ID },
+      "worker_analytics_bundle_journey_sample_invalid"
+    );
+  });
+
   it("marks the generation failed when artifact persistence throws", async (): Promise<void> => {
     const ack = vi.fn().mockResolvedValue(undefined);
     const logger = { error: vi.fn() };
@@ -255,8 +322,10 @@ describe("worker processor - build-analytics-bundle", () => {
           markAnalyticsBundleGenerationFailed
         },
         analyticsMetricsStore: createMetricsStore(),
+        analyticsJourneySampleStore: createJourneySampleStore(),
         objectStore: {
-          putObject: vi.fn().mockRejectedValue(new Error("s3_write_failed"))
+          putObject: vi.fn().mockRejectedValue(new Error("s3_write_failed")),
+          getObject: vi.fn(async () => compressedJourneySampleArtifact())
         },
         logger: logger as unknown as RuntimeLogger
       })
@@ -307,7 +376,12 @@ function createGenerationRecord(
 
 async function buildBundleForGeneration(
   generationOverrides: Partial<AnalyticsBundleGenerationRecord>,
-  metricsOverrides: MetricsStoreOverrides = {}
+  metricsOverrides: MetricsStoreOverrides = {},
+  dependencyOverrides: {
+    journeySampleStore?: ReturnType<typeof createJourneySampleStore>;
+    getObject?: (input: { key: string }) => Promise<Buffer>;
+    logger?: Pick<RuntimeLogger, "warn">;
+  } = {}
 ) {
   const putObject = vi.fn().mockResolvedValue(undefined);
   await processNextBuildAnalyticsBundleJob({
@@ -338,7 +412,12 @@ async function buildBundleForGeneration(
       markAnalyticsBundleGenerationFailed: vi.fn()
     },
     analyticsMetricsStore: createMetricsStore(metricsOverrides),
-    objectStore: { putObject }
+    analyticsJourneySampleStore: dependencyOverrides.journeySampleStore ?? createJourneySampleStore(),
+    objectStore: {
+      putObject,
+      getObject: dependencyOverrides.getObject ?? vi.fn(async () => compressedJourneySampleArtifact())
+    },
+    ...(dependencyOverrides.logger === undefined ? {} : { logger: dependencyOverrides.logger as RuntimeLogger })
   });
 
   const body = putObject.mock.calls[0]?.[0]?.body as Buffer;
@@ -405,7 +484,7 @@ function createMetricsStore(overrides: MetricsStoreOverrides = {}): AnalyticsMet
           transition_count: 70,
           unique_sessions: journeySessions,
           transition_share: 1,
-          sample_ids: ["00000000-0000-4000-8000-000000000901"]
+          sample_ids: [SAMPLE_ID]
         }
       ]
     }),
@@ -444,6 +523,72 @@ function createMetricsStore(overrides: MetricsStoreOverrides = {}): AnalyticsMet
       ]
     })
   };
+}
+
+function createJourneySampleStore(
+  overrides: Partial<Pick<AnalyticsJourneySampleStore, "getAnalyticsJourneySampleForProject">> = {}
+): Pick<AnalyticsJourneySampleStore, "getAnalyticsJourneySampleForProject"> {
+  return {
+    getAnalyticsJourneySampleForProject: vi.fn(async () => ({
+      sample_id: SAMPLE_ID,
+      project_id: PROJECT_ID,
+      service: "web",
+      environment: "production",
+      session_id_hash: "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      visitor_id_hash: null,
+      analysis_tags: ["route:/pricing", "transition:/pricing->/checkout"],
+      first_seen_at: "2026-07-02T10:00:00.000Z",
+      last_seen_at: "2026-07-02T10:05:00.000Z",
+      dimensions_summary: { device_type: "desktop" },
+      has_artifact: true,
+      object_key: `analytics-journeys/${PROJECT_ID}/${SAMPLE_ID}.json.gz`,
+      expires_at: "2026-07-16T10:05:00.000Z",
+      created_at: "2026-07-02T10:00:00.000Z"
+    })),
+    ...overrides
+  };
+}
+
+function compressedJourneySampleArtifact(): Buffer {
+  return gzipSync(Buffer.from(JSON.stringify({
+    schema_version: "analytics_journey_sample.v1",
+    sample_id: SAMPLE_ID,
+    project_id: PROJECT_ID,
+    service: "web",
+    environment: "production",
+    session_id_hash: "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    visitor_id_hash: null,
+    first_seen_at: "2026-07-02T10:00:00.000Z",
+    last_seen_at: "2026-07-02T10:05:00.000Z",
+    analysis_tags: ["route:/pricing", "transition:/pricing->/checkout"],
+    dimensions_summary: { device_type: "desktop" },
+    events: [
+      {
+        event_id: "event_1",
+        occurred_at: "2026-07-02T10:00:00.000Z",
+        kind: "page_view",
+        route: { normalized_path: "/pricing", path: "/pricing" },
+        previous_route: null,
+        signal: null,
+        trace_id: null,
+        deploy_id: "deploy_1",
+        dimensions: { device_type: "desktop" },
+        custom_dimensions: {}
+      },
+      {
+        event_id: "event_2",
+        occurred_at: "2026-07-02T10:05:00.000Z",
+        kind: "route_change",
+        route: { normalized_path: "/checkout", path: "/checkout" },
+        previous_route: { normalized_path: "/pricing", path: "/pricing" },
+        signal: { funnel_key: "checkout", step_key: "payment" },
+        trace_id: "trace_1",
+        deploy_id: "deploy_1",
+        dimensions: { device_type: "desktop" },
+        custom_dimensions: {}
+      }
+    ]
+  }), "utf8"));
 }
 
 function metricWindow() {

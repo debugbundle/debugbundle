@@ -681,6 +681,7 @@ AnalyticsBundle artifacts summarize an analysis unit such as a funnel dropoff, r
 - Same analysis specification plus same rollup/sample/incident/deploy inputs must produce byte-identical deterministic evidence after stable serialization.
 - Arrays must be sorted deterministically.
 - Representative journeys must be selected through deterministic scoring and tie-breaking.
+- Generated representative journeys may be hydrated from retained redacted journey samples referenced by aggregate journey patterns. Hydrated records must remain bounded, use a keyed timeline object for ordered steps, and must not add raw session IDs, raw user identifiers, raw text, URLs with query strings, object-storage keys, or unredacted analytics payloads.
 - Wall-clock generation timing belongs in bundle-generation metadata rows, not in deterministic bundle evidence.
 
 **Relationship to `BundleV1`:** `AnalyticsBundleV1` is a separate artifact schema. It does not replace failure or improvement `BundleV1` artifacts and must not be returned from incident failure bundle endpoints.

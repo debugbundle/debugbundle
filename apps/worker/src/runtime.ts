@@ -590,6 +590,7 @@ export async function runWorkerFromEnv(
                       queue: queue as unknown as BuildAnalyticsBundleWorkerQueue,
                       analyticsBundleGenerationStore,
                       analyticsMetricsStore,
+                      analyticsJourneySampleStore,
                       objectStore,
                       logger
                     })

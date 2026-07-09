@@ -1,4 +1,4 @@
-import { gzipSync } from "node:zlib";
+import { gunzipSync, gzipSync } from "node:zlib";
 
 import {
   buildAnalyticsBundle,
@@ -16,10 +16,12 @@ import {
   buildAnalyticsBundleObjectKey,
   type AnalyticsBundleGenerationRecord,
   type AnalyticsBundleGenerationStore,
+  type AnalyticsJourneySampleStore,
   type AnalyticsMetricsStore,
   type BuildAnalyticsBundleJob,
   type ClaimedRedisJob,
-  type ObjectStoreClient
+  type ObjectStoreClient,
+  type ObjectStoreReader
 } from "../../../packages/storage/src/index.js";
 import type { WorkerProcessResult } from "./processor.js";
 
@@ -31,7 +33,8 @@ export interface BuildAnalyticsBundleWorkerDependencies {
   queue: BuildAnalyticsBundleWorkerQueue;
   analyticsBundleGenerationStore: AnalyticsBundleGenerationStore;
   analyticsMetricsStore: AnalyticsMetricsStore;
-  objectStore: ObjectStoreClient;
+  analyticsJourneySampleStore: Pick<AnalyticsJourneySampleStore, "getAnalyticsJourneySampleForProject">;
+  objectStore: ObjectStoreClient & ObjectStoreReader;
   logger?: RuntimeLogger;
 }
 
@@ -47,6 +50,7 @@ type NormalizedBundleAnalysisSpec = {
 
 const DEFAULT_ANALYSIS_WINDOW_DAYS = 7;
 const DEFAULT_METRIC_LIMIT = 25;
+const MAX_REPRESENTATIVE_JOURNEYS = 5;
 
 export async function processNextBuildAnalyticsBundleJob(
   dependencies: BuildAnalyticsBundleWorkerDependencies
@@ -88,7 +92,10 @@ export async function processNextBuildAnalyticsBundleJob(
   try {
     const buildInput = await buildAnalyticsBundleInput({
       generation: claimedGeneration,
-      metricsStore: dependencies.analyticsMetricsStore
+      metricsStore: dependencies.analyticsMetricsStore,
+      analyticsJourneySampleStore: dependencies.analyticsJourneySampleStore,
+      objectStore: dependencies.objectStore,
+      logger: dependencies.logger
     });
     const bundle = buildAnalyticsBundle(buildInput);
     const objectKey = buildAnalyticsBundleObjectKey(job.project_id, job.generation_id);
@@ -136,6 +143,9 @@ export async function processNextBuildAnalyticsBundleJob(
 async function buildAnalyticsBundleInput(input: {
   generation: AnalyticsBundleGenerationRecord;
   metricsStore: AnalyticsMetricsStore;
+  analyticsJourneySampleStore: Pick<AnalyticsJourneySampleStore, "getAnalyticsJourneySampleForProject">;
+  objectStore: ObjectStoreReader;
+  logger?: RuntimeLogger | undefined;
 }): Promise<AnalyticsBundleBuildInput> {
   const spec = normalizeBundleAnalysisSpec(input.generation);
   const metricsInput = {
@@ -164,6 +174,17 @@ async function buildAnalyticsBundleInput(input: {
     routes: routes.routes,
     journeys: journeys.patterns
   });
+  const representativeJourneys = [
+    ...readRecordArray(input.generation.analysis_spec["representative_journeys"]),
+    ...await readRepresentativeJourneySamples({
+      project_id: input.generation.project_id,
+      analysis_kind: input.generation.analysis_kind,
+      journeys: journeys.patterns,
+      analyticsJourneySampleStore: input.analyticsJourneySampleStore,
+      objectStore: input.objectStore,
+      logger: input.logger
+    })
+  ];
 
   return {
     analysis_kind: input.generation.analysis_kind,
@@ -204,11 +225,177 @@ async function buildAnalyticsBundleInput(input: {
       ...toSegments("utm_campaign", referrers.utm_campaigns)
     ],
     journey_patterns: journeys.patterns,
-    representative_journeys: readRecordArray(input.generation.analysis_spec["representative_journeys"]),
+    representative_journeys: representativeJourneys,
     linked_incidents: readLinkedRecords(input.generation.analysis_spec, "related_incident_ids", "incident_id"),
     linked_deploys: readLinkedRecords(input.generation.analysis_spec, "related_deploy_ids", "deploy_id"),
     recommendations: buildRecommendations(input.generation.analysis_kind)
   };
+}
+
+async function readRepresentativeJourneySamples(input: {
+  project_id: string;
+  analysis_kind: AnalyticsBundleGenerationRecord["analysis_kind"];
+  journeys: Awaited<ReturnType<AnalyticsMetricsStore["getJourneyPatterns"]>>["patterns"];
+  analyticsJourneySampleStore: Pick<AnalyticsJourneySampleStore, "getAnalyticsJourneySampleForProject">;
+  objectStore: ObjectStoreReader;
+  logger?: RuntimeLogger | undefined;
+}): Promise<Array<Record<string, unknown>>> {
+  if (input.analysis_kind === "usage_summary") {
+    return [];
+  }
+
+  const sampleIds = collectJourneySampleIds(input.journeys).slice(0, MAX_REPRESENTATIVE_JOURNEYS);
+  const records: Array<Record<string, unknown>> = [];
+  const now = new Date().toISOString();
+
+  for (const sampleId of sampleIds) {
+    try {
+      const sample = await input.analyticsJourneySampleStore.getAnalyticsJourneySampleForProject({
+        project_id: input.project_id,
+        sample_id: sampleId,
+        now
+      });
+      if (sample === null) {
+        continue;
+      }
+
+      const artifact = parseJourneySampleArtifact(await input.objectStore.getObject({ key: sample.object_key }));
+      if (artifact === null || artifact.project_id !== input.project_id || artifact.sample_id !== sample.sample_id) {
+        input.logger?.warn?.(
+          { project_id: input.project_id, sample_id: sampleId },
+          "worker_analytics_bundle_journey_sample_invalid"
+        );
+        continue;
+      }
+
+      records.push(toRepresentativeJourneyRecord(artifact));
+    } catch (error) {
+      input.logger?.warn?.(
+        {
+          error_message: getAnalyticsBundleWorkerErrorMessage(error),
+          project_id: input.project_id,
+          sample_id: sampleId
+        },
+        "worker_analytics_bundle_journey_sample_unavailable"
+      );
+    }
+  }
+
+  return records;
+}
+
+function collectJourneySampleIds(
+  journeys: Awaited<ReturnType<AnalyticsMetricsStore["getJourneyPatterns"]>>["patterns"]
+): string[] {
+  const ids = new Set<string>();
+  for (const journey of journeys) {
+    for (const sampleId of journey.sample_ids ?? []) {
+      ids.add(sampleId);
+    }
+  }
+
+  return [...ids];
+}
+
+function parseJourneySampleArtifact(body: Buffer): RepresentativeJourneySampleArtifact | null {
+  try {
+    const parsed = JSON.parse(gunzipSync(body).toString("utf8")) as unknown;
+    return isRepresentativeJourneySampleArtifact(parsed) ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+type RepresentativeJourneySampleArtifact = {
+  schema_version: "analytics_journey_sample.v1";
+  sample_id: string;
+  project_id: string;
+  service: string;
+  environment: string;
+  first_seen_at: string;
+  last_seen_at: string;
+  analysis_tags: string[];
+  dimensions_summary: Record<string, unknown>;
+  events: RepresentativeJourneySampleEvent[];
+};
+
+type RepresentativeJourneySampleEvent = {
+  event_id?: unknown;
+  occurred_at?: unknown;
+  kind?: unknown;
+  route?: { normalized_path?: unknown; path?: unknown } | null;
+  previous_route?: { normalized_path?: unknown; path?: unknown } | null;
+  signal?: {
+    action_key?: unknown;
+    funnel_key?: unknown;
+    step_key?: unknown;
+    conversion_key?: unknown;
+    marker_key?: unknown;
+  } | null;
+  trace_id?: unknown;
+  deploy_id?: unknown;
+  dimensions?: unknown;
+  custom_dimensions?: unknown;
+};
+
+function isRepresentativeJourneySampleArtifact(value: unknown): value is RepresentativeJourneySampleArtifact {
+  if (typeof value !== "object" || value === null) {
+    return false;
+  }
+  const candidate = value as Partial<RepresentativeJourneySampleArtifact>;
+  return candidate.schema_version === "analytics_journey_sample.v1" &&
+    typeof candidate.sample_id === "string" &&
+    typeof candidate.project_id === "string" &&
+    typeof candidate.service === "string" &&
+    typeof candidate.environment === "string" &&
+    typeof candidate.first_seen_at === "string" &&
+    typeof candidate.last_seen_at === "string" &&
+    Array.isArray(candidate.analysis_tags) &&
+    isRecord(candidate.dimensions_summary) &&
+    Array.isArray(candidate.events);
+}
+
+function toRepresentativeJourneyRecord(artifact: RepresentativeJourneySampleArtifact): Record<string, unknown> {
+  return {
+    sample_id: artifact.sample_id,
+    service: artifact.service,
+    environment: artifact.environment,
+    first_seen_at: artifact.first_seen_at,
+    last_seen_at: artifact.last_seen_at,
+    analysis_tags: artifact.analysis_tags,
+    dimensions_summary: artifact.dimensions_summary,
+    event_count: artifact.events.length,
+    timeline: Object.fromEntries(
+      artifact.events.map((event, index) => [String(index + 1).padStart(3, "0"), toRepresentativeJourneyEvent(event)])
+    )
+  };
+}
+
+function toRepresentativeJourneyEvent(event: RepresentativeJourneySampleEvent): Record<string, unknown> {
+  return {
+    event_id: readNullableString(event.event_id),
+    occurred_at: readNullableString(event.occurred_at),
+    kind: readNullableString(event.kind) ?? "unknown",
+    route: toRouteKey(event.route),
+    previous_route: toRouteKey(event.previous_route),
+    action_key: readNullableString(event.signal?.action_key),
+    funnel_key: readNullableString(event.signal?.funnel_key),
+    step_key: readNullableString(event.signal?.step_key),
+    conversion_key: readNullableString(event.signal?.conversion_key),
+    marker_key: readNullableString(event.signal?.marker_key),
+    trace_id: readNullableString(event.trace_id),
+    deploy_id: readNullableString(event.deploy_id),
+    dimensions: isRecord(event.dimensions) ? event.dimensions : {},
+    custom_dimensions: isRecord(event.custom_dimensions) ? event.custom_dimensions : {}
+  };
+}
+
+function toRouteKey(route: RepresentativeJourneySampleEvent["route"]): string | null {
+  if (route === null || route === undefined) {
+    return null;
+  }
+
+  return readNullableString(route.normalized_path);
 }
 
 function normalizeBundleAnalysisSpec(generation: AnalyticsBundleGenerationRecord): NormalizedBundleAnalysisSpec {
@@ -356,6 +543,10 @@ function readIsoString(value: unknown): string | undefined {
 
 function readNonEmptyString(value: unknown): string | undefined {
   return typeof value === "string" && value.trim().length > 0 ? value.trim() : undefined;
+}
+
+function readNullableString(value: unknown): string | null {
+  return typeof value === "string" && value.trim().length > 0 ? value.trim() : null;
 }
 
 function readPositiveInteger(value: unknown): number | undefined {
