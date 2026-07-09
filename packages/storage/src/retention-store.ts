@@ -10,6 +10,7 @@ import type {
   CleanupRetentionJob,
   ObjectStoreClient,
   Queryable,
+  RetentionAnalyticsBundleGenerationReference,
   RetentionAnalyticsJourneySampleReference,
   RetentionAnalyticsRawEventReference,
   RetentionAnalyticsRollupPruneResult,
@@ -38,6 +39,14 @@ function buildUuidPairValuesPlaceholders(count: number): string {
   return Array.from(
     { length: count },
     (_, index) => `($${index * 2 + 1}::uuid, $${index * 2 + 2}::uuid)`
+  ).join(", ");
+}
+
+function buildAnalyticsBundleGenerationValuesPlaceholders(count: number): string {
+  return Array.from(
+    { length: count },
+    (_, index) =>
+      `($${index * 4 + 1}::uuid, $${index * 4 + 2}::uuid, $${index * 4 + 3}, $${index * 4 + 4})`
   ).join(", ");
 }
 
@@ -243,6 +252,94 @@ export function createPostgresRetentionStore(db: Queryable): RetentionStore {
       };
     },
 
+    async listExpiredAnalyticsBundleGenerations(
+      input
+    ): Promise<RetentionAnalyticsBundleGenerationReference[]> {
+      const result = await db.query<
+        RetentionAnalyticsBundleGenerationReference & Record<string, unknown>
+      >(
+        `
+          SELECT
+            abg.project_id::text AS project_id,
+            abg.id::text AS generation_id,
+            abg.opportunity_id::text AS opportunity_id,
+            abg.status,
+            abg.object_key,
+            abg.completed_at::text AS completed_at,
+            abg.updated_at::text AS updated_at
+          FROM analytics_bundle_generations abg
+          LEFT JOIN project_analytics_settings settings ON settings.project_id = abg.project_id
+          WHERE abg.status IN ('completed', 'failed')
+            AND COALESCE(abg.completed_at, abg.updated_at, abg.created_at) < (
+              $1::timestamptz - make_interval(months => COALESCE(settings.aggregate_retention_months, 12)::int)
+            )
+          ORDER BY COALESCE(abg.completed_at, abg.updated_at, abg.created_at) ASC, abg.id ASC
+          LIMIT $2
+        `,
+        [input.now, input.limit]
+      );
+
+      return result.rows;
+    },
+
+    async deleteExpiredAnalyticsBundleGenerations(input): Promise<void> {
+      if (input.references.length === 0) {
+        return;
+      }
+
+      const params = input.references.flatMap((reference) => [
+        reference.generation_id,
+        reference.opportunity_id,
+        reference.status,
+        reference.object_key
+      ]);
+      const valuesClause = buildAnalyticsBundleGenerationValuesPlaceholders(
+        input.references.length
+      );
+
+      await db.query(
+        `
+          WITH expired(generation_id, opportunity_id, status, object_key) AS (
+            VALUES ${valuesClause}
+          ),
+          target_generations AS (
+            SELECT
+              abg.id,
+              abg.opportunity_id,
+              abg.status,
+              abg.object_key,
+              abg.created_at
+            FROM analytics_bundle_generations abg
+            JOIN expired ON expired.generation_id = abg.id
+          ),
+          cleared_opportunities AS (
+            UPDATE analytics_opportunities ao
+            SET
+              bundle_status = 'not_requested',
+              bundle_object_key = NULL,
+              bundle_failure_reason = NULL,
+              updated_at = now()
+            FROM target_generations target
+            WHERE ao.id = target.opportunity_id
+              AND ao.bundle_status = target.status
+              AND ao.bundle_object_key IS NOT DISTINCT FROM target.object_key
+              AND NOT EXISTS (
+                SELECT 1
+                FROM analytics_bundle_generations newer
+                WHERE newer.opportunity_id = target.opportunity_id
+                  AND newer.id <> target.id
+                  AND (newer.created_at, newer.id) > (target.created_at, target.id)
+              )
+            RETURNING 1
+          )
+          DELETE FROM analytics_bundle_generations abg
+          USING expired
+          WHERE abg.id = expired.generation_id
+        `,
+        params
+      );
+    },
+
     async listExpiredIncidents(input): Promise<RetentionExpiredIncidentReference[]> {
       const result = await db.query<RetentionExpiredIncidentReference & Record<string, unknown>>(
         `
@@ -333,6 +430,11 @@ export function createRetentionCleanupService(input: {
           now: job.scheduled_at,
           limit: batchSize
         });
+        const expiredAnalyticsBundleGenerations =
+          await input.retentionStore.listExpiredAnalyticsBundleGenerations({
+            now: job.scheduled_at,
+            limit: batchSize
+          });
         const expiredIncidents = await input.retentionStore.listExpiredIncidents({
           now: job.scheduled_at,
           limit: batchSize
@@ -343,6 +445,7 @@ export function createRetentionCleanupService(input: {
           expiredAnalyticsRawEvents.length === 0 &&
           expiredAnalyticsJourneySamples.length === 0 &&
           prunedAnalyticsRollups.deleted_rows === 0 &&
+          expiredAnalyticsBundleGenerations.length === 0 &&
           expiredIncidents.length === 0
         ) {
           return;
@@ -410,6 +513,29 @@ export function createRetentionCleanupService(input: {
           });
         }
 
+        const deletedAnalyticsBundleGenerations: RetentionAnalyticsBundleGenerationReference[] = [];
+        for (const reference of expiredAnalyticsBundleGenerations) {
+          if (reference.object_key === null) {
+            deletedAnalyticsBundleGenerations.push(reference);
+            continue;
+          }
+
+          try {
+            await input.objectStore.deleteObject({
+              key: reference.object_key
+            });
+            deletedAnalyticsBundleGenerations.push(reference);
+          } catch {
+            // Leave metadata untouched so the next cleanup run can retry safely.
+          }
+        }
+
+        if (deletedAnalyticsBundleGenerations.length > 0) {
+          await input.retentionStore.deleteExpiredAnalyticsBundleGenerations({
+            references: deletedAnalyticsBundleGenerations
+          });
+        }
+
         const deletedIncidents: RetentionExpiredIncidentReference[] = [];
         for (const reference of expiredIncidents) {
           try {
@@ -436,11 +562,13 @@ export function createRetentionCleanupService(input: {
           deletedAnalyticsRawEvents.length === 0 &&
           deletedAnalyticsJourneySamples.length === 0 &&
           prunedAnalyticsRollups.deleted_rows === 0 &&
+          deletedAnalyticsBundleGenerations.length === 0 &&
           deletedIncidents.length === 0 &&
           expiredReferences.length < batchSize &&
           expiredAnalyticsRawEvents.length < batchSize &&
           expiredAnalyticsJourneySamples.length < batchSize &&
           !prunedAnalyticsRollups.reached_batch_limit &&
+          expiredAnalyticsBundleGenerations.length < batchSize &&
           expiredIncidents.length < batchSize
         ) {
           return;
@@ -451,6 +579,7 @@ export function createRetentionCleanupService(input: {
           expiredAnalyticsRawEvents.length < batchSize &&
           expiredAnalyticsJourneySamples.length < batchSize &&
           !prunedAnalyticsRollups.reached_batch_limit &&
+          expiredAnalyticsBundleGenerations.length < batchSize &&
           expiredIncidents.length < batchSize
         ) {
           return;

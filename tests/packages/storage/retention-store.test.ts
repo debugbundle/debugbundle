@@ -20,6 +20,8 @@ function createMockRetentionStore(overrides: Partial<RetentionStore> = {}): Rete
     pruneExpiredAnalyticsRollups: vi
       .fn()
       .mockResolvedValue({ deleted_rows: 0, reached_batch_limit: false }),
+    listExpiredAnalyticsBundleGenerations: vi.fn().mockResolvedValue([]),
+    deleteExpiredAnalyticsBundleGenerations: vi.fn().mockResolvedValue(undefined),
     listExpiredIncidents: vi.fn().mockResolvedValue([]),
     deleteExpiredIncidents: vi.fn().mockResolvedValue(undefined),
     ...overrides
@@ -54,6 +56,21 @@ describe("retention cleanup service", () => {
             s3_object_key:
               "analytics-journeys/proj_123/22222222-2222-4222-8222-222222222222.json.gz",
             expires_at: "2026-04-01T00:00:00.000Z"
+          }
+        ]
+      })
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            project_id: "proj_123",
+            generation_id: "33333333-3333-4333-8333-333333333333",
+            opportunity_id: "44444444-4444-4444-8444-444444444444",
+            status: "completed",
+            object_key:
+              "analytics-bundles/proj_123/33333333-3333-4333-8333-333333333333/analytics-bundle.json.gz",
+            completed_at: "2026-04-01T00:00:00.000Z",
+            updated_at: "2026-04-01T00:00:00.000Z"
           }
         ]
       })
@@ -120,6 +137,39 @@ describe("retention cleanup service", () => {
     });
 
     await expect(
+      store.listExpiredAnalyticsBundleGenerations({
+        now: "2026-04-04T12:00:00.000Z",
+        limit: 25
+      })
+    ).resolves.toEqual([
+      {
+        project_id: "proj_123",
+        generation_id: "33333333-3333-4333-8333-333333333333",
+        opportunity_id: "44444444-4444-4444-8444-444444444444",
+        status: "completed",
+        object_key:
+          "analytics-bundles/proj_123/33333333-3333-4333-8333-333333333333/analytics-bundle.json.gz",
+        completed_at: "2026-04-01T00:00:00.000Z",
+        updated_at: "2026-04-01T00:00:00.000Z"
+      }
+    ]);
+
+    await store.deleteExpiredAnalyticsBundleGenerations({
+      references: [
+        {
+          project_id: "proj_123",
+          generation_id: "33333333-3333-4333-8333-333333333333",
+          opportunity_id: "44444444-4444-4444-8444-444444444444",
+          status: "completed",
+          object_key:
+            "analytics-bundles/proj_123/33333333-3333-4333-8333-333333333333/analytics-bundle.json.gz",
+          completed_at: "2026-04-01T00:00:00.000Z",
+          updated_at: "2026-04-01T00:00:00.000Z"
+        }
+      ]
+    });
+
+    await expect(
       store.listExpiredIncidents({ now: "2026-04-04T12:00:00.000Z", limit: 25 })
     ).resolves.toEqual([{ project_id: "proj_123", incident_id: "inc_123" }]);
 
@@ -157,10 +207,27 @@ describe("retention cleanup service", () => {
     );
     expect(query).toHaveBeenNthCalledWith(
       7,
+      expect.stringContaining("FROM analytics_bundle_generations abg"),
+      ["2026-04-04T12:00:00.000Z", 25]
+    );
+    expect(query).toHaveBeenNthCalledWith(
+      8,
+      expect.stringContaining("DELETE FROM analytics_bundle_generations abg"),
+      [
+        "33333333-3333-4333-8333-333333333333",
+        "44444444-4444-4444-8444-444444444444",
+        "completed",
+        "analytics-bundles/proj_123/33333333-3333-4333-8333-333333333333/analytics-bundle.json.gz"
+      ]
+    );
+    expect(String(query.mock.calls[7]?.[0])).toContain("UPDATE analytics_opportunities ao");
+    expect(String(query.mock.calls[7]?.[0])).toContain("NOT EXISTS");
+    expect(query).toHaveBeenNthCalledWith(
+      9,
       expect.stringContaining("SELECT\n            i.project_id::text AS project_id"),
       ["2026-04-04T12:00:00.000Z", 30, 90, 7, 25]
     );
-    expect(query).toHaveBeenNthCalledWith(8, expect.stringContaining("DELETE FROM incidents i"), [
+    expect(query).toHaveBeenNthCalledWith(10, expect.stringContaining("DELETE FROM incidents i"), [
       "inc_123"
     ]);
   });
@@ -172,6 +239,7 @@ describe("retention cleanup service", () => {
     await store.markRawEventsExpired({ references: [] });
     await store.deleteExpiredAnalyticsRawEvents({ references: [] });
     await store.deleteExpiredAnalyticsJourneySamples({ references: [] });
+    await store.deleteExpiredAnalyticsBundleGenerations({ references: [] });
     await store.deleteExpiredIncidents({ references: [] });
 
     expect(query).not.toHaveBeenCalled();
@@ -362,9 +430,83 @@ describe("retention cleanup service", () => {
     });
   });
 
+  it("deletes AnalyticsBundle generation metadata after successful artifact cleanup", async (): Promise<void> => {
+    const deleteExpiredAnalyticsBundleGenerations = vi.fn().mockResolvedValue(undefined);
+    const deleteObject = vi.fn().mockResolvedValue(undefined);
+    const reference = {
+      project_id: "proj_123",
+      generation_id: "33333333-3333-4333-8333-333333333333",
+      opportunity_id: "44444444-4444-4444-8444-444444444444",
+      status: "completed" as const,
+      object_key:
+        "analytics-bundles/proj_123/33333333-3333-4333-8333-333333333333/analytics-bundle.json.gz",
+      completed_at: "2026-04-04T10:00:00.000Z",
+      updated_at: "2026-04-04T10:00:00.000Z"
+    };
+
+    const retentionCleanup = createRetentionCleanupService({
+      retentionStore: createMockRetentionStore({
+        listExpiredAnalyticsBundleGenerations: vi.fn().mockResolvedValue([reference]),
+        deleteExpiredAnalyticsBundleGenerations
+      }),
+      objectStore: {
+        deleteObject
+      },
+      batchSize: 10,
+      maxBatches: 1
+    });
+
+    await retentionCleanup.runCleanup({
+      scheduled_at: "2026-04-04T12:00:00.000Z"
+    });
+
+    expect(deleteObject).toHaveBeenCalledWith({
+      key: reference.object_key
+    });
+    expect(deleteExpiredAnalyticsBundleGenerations).toHaveBeenCalledWith({
+      references: [reference]
+    });
+  });
+
+  it("deletes failed AnalyticsBundle generation metadata without artifact cleanup", async (): Promise<void> => {
+    const deleteExpiredAnalyticsBundleGenerations = vi.fn().mockResolvedValue(undefined);
+    const deleteObject = vi.fn().mockResolvedValue(undefined);
+    const reference = {
+      project_id: "proj_123",
+      generation_id: "33333333-3333-4333-8333-333333333333",
+      opportunity_id: "44444444-4444-4444-8444-444444444444",
+      status: "failed" as const,
+      object_key: null,
+      completed_at: null,
+      updated_at: "2026-04-04T10:00:00.000Z"
+    };
+
+    const retentionCleanup = createRetentionCleanupService({
+      retentionStore: createMockRetentionStore({
+        listExpiredAnalyticsBundleGenerations: vi.fn().mockResolvedValue([reference]),
+        deleteExpiredAnalyticsBundleGenerations
+      }),
+      objectStore: {
+        deleteObject
+      },
+      batchSize: 10,
+      maxBatches: 1
+    });
+
+    await retentionCleanup.runCleanup({
+      scheduled_at: "2026-04-04T12:00:00.000Z"
+    });
+
+    expect(deleteObject).not.toHaveBeenCalled();
+    expect(deleteExpiredAnalyticsBundleGenerations).toHaveBeenCalledWith({
+      references: [reference]
+    });
+  });
+
   it("does not delete analytics metadata when object cleanup fails", async (): Promise<void> => {
     const deleteExpiredAnalyticsRawEvents = vi.fn().mockResolvedValue(undefined);
     const deleteExpiredAnalyticsJourneySamples = vi.fn().mockResolvedValue(undefined);
+    const deleteExpiredAnalyticsBundleGenerations = vi.fn().mockResolvedValue(undefined);
 
     const retentionCleanup = createRetentionCleanupService({
       retentionStore: createMockRetentionStore({
@@ -385,7 +527,20 @@ describe("retention cleanup service", () => {
             expires_at: "2026-04-04T10:00:00.000Z"
           }
         ]),
-        deleteExpiredAnalyticsJourneySamples
+        deleteExpiredAnalyticsJourneySamples,
+        listExpiredAnalyticsBundleGenerations: vi.fn().mockResolvedValue([
+          {
+            project_id: "proj_123",
+            generation_id: "33333333-3333-4333-8333-333333333333",
+            opportunity_id: "44444444-4444-4444-8444-444444444444",
+            status: "completed",
+            object_key:
+              "analytics-bundles/proj_123/33333333-3333-4333-8333-333333333333/analytics-bundle.json.gz",
+            completed_at: "2026-04-04T10:00:00.000Z",
+            updated_at: "2026-04-04T10:00:00.000Z"
+          }
+        ]),
+        deleteExpiredAnalyticsBundleGenerations
       }),
       objectStore: {
         deleteObject: vi.fn().mockRejectedValue(new Error("delete_failed"))
@@ -400,6 +555,7 @@ describe("retention cleanup service", () => {
 
     expect(deleteExpiredAnalyticsRawEvents).not.toHaveBeenCalled();
     expect(deleteExpiredAnalyticsJourneySamples).not.toHaveBeenCalled();
+    expect(deleteExpiredAnalyticsBundleGenerations).not.toHaveBeenCalled();
   });
 
   it("stops after an empty retention cleanup batch", async (): Promise<void> => {
