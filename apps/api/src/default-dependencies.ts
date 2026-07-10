@@ -705,6 +705,8 @@ export function createApiDependencies(input: CreateApiDependenciesInput): Defaul
         void request.organization_id;
         return analyticsBundleGenerationStore.listAnalyticsBundleGenerationsForProject(request);
       },
+      listAnalyticsBundleGenerationsForOrganization: (request) =>
+        analyticsBundleGenerationStore.listAnalyticsBundleGenerationsForOrganization!(request),
       requestAnalyticsBundleGenerationForProject: async (request) => {
         void request.organization_id;
         const generation = await analyticsBundleGenerationStore.reserveAnalyticsBundleGeneration({
@@ -733,6 +735,8 @@ export function createApiDependencies(input: CreateApiDependenciesInput): Defaul
     analyticsOpportunities: {
       listAnalyticsOpportunitiesForProject: (input) =>
         analyticsOpportunityStore.listAnalyticsOpportunitiesForProject(input),
+      listAnalyticsOpportunitiesForOrganization: (input) =>
+        analyticsOpportunityStore.listAnalyticsOpportunitiesForOrganization(input),
       getAnalyticsOpportunityForProject: (input) =>
         analyticsOpportunityStore.getAnalyticsOpportunityForProject(input)
     },

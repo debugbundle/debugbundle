@@ -21,6 +21,7 @@ import type {
   AnalyticsAllowanceClaimResult,
   AnalyticsAllowanceReleaseInput,
   AnalyticsAllowanceUsageSummary,
+  AnalyticsBundleGenerationInventoryRecord,
   AnalyticsBundleGenerationRecord,
   AnalyticsBundleGenerationStatus
 } from "../../../packages/storage/src/index.js";
@@ -75,6 +76,13 @@ export interface ApiAnalyticsDependencies {
       cursor?: { last_detected_at: string; opportunity_id: string } | undefined;
       limit: number;
     }): Promise<AnalyticsOpportunitiesListResponse>;
+    listAnalyticsOpportunitiesForOrganization(input: {
+      organization_id: string;
+      status?: AnalyticsOpportunityStatus | undefined;
+      kind?: AnalyticsBundleAnalysisKind | undefined;
+      cursor?: { last_detected_at: string; opportunity_id: string } | undefined;
+      limit: number;
+    }): Promise<AnalyticsOpportunitiesListResponse>;
     getAnalyticsOpportunityForProject(input: {
       organization_id: string;
       project_id: string;
@@ -98,6 +106,13 @@ export interface ApiAnalyticsDependencies {
       cursor?: { created_at: string; generation_id: string } | undefined;
       limit: number;
     }): Promise<{ bundles: AnalyticsBundleGenerationRecord[]; next_cursor: string | null }>;
+    listAnalyticsBundleGenerationsForOrganization(input: {
+      organization_id: string;
+      status?: AnalyticsBundleGenerationStatus | undefined;
+      analysis_kind?: AnalyticsBundleAnalysisKind | undefined;
+      cursor?: { created_at: string; generation_id: string } | undefined;
+      limit: number;
+    }): Promise<{ bundles: AnalyticsBundleGenerationInventoryRecord[]; next_cursor: string | null }>;
     requestAnalyticsBundleGenerationForProject(input: {
       organization_id: string;
       project_id: string;

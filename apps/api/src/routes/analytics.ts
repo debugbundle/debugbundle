@@ -28,7 +28,11 @@ import {
   releaseAnalyticsQuotaClaimBestEffort,
   toRetryAfterSeconds
 } from "../analytics-quota.js";
-import { isObjectNotFoundError, requireRateLimitedProjectAccess } from "../api-helpers.js";
+import {
+  isObjectNotFoundError,
+  requireRateLimitedMemberAuth,
+  requireRateLimitedProjectAccess
+} from "../api-helpers.js";
 import { registerAnalyticsJourneySampleRoutes } from "./analytics-journey-samples.js";
 
 const DEFAULT_LAST_MS = 7 * 24 * 60 * 60 * 1000;
@@ -57,7 +61,7 @@ const AnalyticsIncidentImpactParamsSchema = z.object({
 
 const AnalyticsOpportunitiesQuerySchema = z
   .object({
-    project_id: z.string().uuid(),
+    project_id: z.string().uuid().optional(),
     status: z.union([AnalyticsOpportunityStatusSchema, z.literal("all")]).optional().default("open"),
     kind: AnalyticsBundleAnalysisKindSchema.optional(),
     cursor: z.string().trim().min(1).optional(),
@@ -75,7 +79,7 @@ const AnalyticsBundleParamsSchema = z.object({
 
 const AnalyticsBundlesListQuerySchema = z
   .object({
-    project_id: z.string().uuid(),
+    project_id: z.string().uuid().optional(),
     status: z.union([AnalyticsBundleGenerationStatusSchema, z.literal("all")]).optional().default("all"),
     kind: AnalyticsBundleAnalysisKindSchema.optional(),
     cursor: z.string().trim().min(1).optional(),
@@ -116,6 +120,10 @@ type AuthorizedAnalyticsQuery = AnalyticsQuery & { from: string; to: string; org
 type AnalyticsBundleGeneration = NonNullable<
   Awaited<ReturnType<NonNullable<ApiDependencies["analyticsBundles"]>["getAnalyticsBundleGenerationForProject"]>>
 >;
+type AnalyticsBundleGenerationListRecord = AnalyticsBundleGeneration & {
+  project_name?: string | undefined;
+  project_color_tag?: string | null | undefined;
+};
 
 export function registerAnalyticsRoutes(app: FastifyInstance, dependencies: ApiDependencies): void {
   registerAnalyticsJourneySampleRoutes(app, dependencies);
@@ -131,23 +139,18 @@ export function registerAnalyticsRoutes(app: FastifyInstance, dependencies: ApiD
       return reply.status(400).send({ error: "invalid_query" });
     }
 
-    const access = await requireAnalyticsProjectReadAccess(request, reply, dependencies, parsedQuery.data.project_id);
-    if (access === null) {
-      return;
-    }
-
-    if (dependencies.analyticsOpportunities === undefined) {
-      return reply.status(404).send({ error: "analytics_opportunities_not_available" });
-    }
-
-    const opportunities = await dependencies.analyticsOpportunities.listAnalyticsOpportunitiesForProject({
-      organization_id: access.organization_id,
-      project_id: parsedQuery.data.project_id,
+    const filters = {
       ...(parsedQuery.data.status === "all" ? {} : { status: parsedQuery.data.status }),
       ...(parsedQuery.data.kind === undefined ? {} : { kind: parsedQuery.data.kind }),
       ...(parsedCursor === null ? {} : { cursor: parsedCursor }),
       limit: parsedQuery.data.limit
-    });
+    };
+    const opportunities = parsedQuery.data.project_id === undefined
+      ? await listOrganizationAnalyticsOpportunities(request, reply, dependencies, filters)
+      : await listProjectAnalyticsOpportunities(request, reply, dependencies, parsedQuery.data.project_id, filters);
+    if (opportunities === null) {
+      return;
+    }
 
     return reply.status(200).send(AnalyticsOpportunitiesListResponseSchema.parse(opportunities));
   });
@@ -295,23 +298,18 @@ export function registerAnalyticsRoutes(app: FastifyInstance, dependencies: ApiD
       return reply.status(400).send({ error: "invalid_query" });
     }
 
-    const access = await requireAnalyticsProjectReadAccess(request, reply, dependencies, parsedQuery.data.project_id);
-    if (access === null) {
-      return;
-    }
-
-    if (dependencies.analyticsBundles === undefined) {
-      return reply.status(404).send({ error: "analytics_bundles_not_available" });
-    }
-
-    const generations = await dependencies.analyticsBundles.listAnalyticsBundleGenerationsForProject({
-      organization_id: access.organization_id,
-      project_id: parsedQuery.data.project_id,
+    const filters = {
       ...(parsedQuery.data.status === "all" ? {} : { status: parsedQuery.data.status }),
       ...(parsedQuery.data.kind === undefined ? {} : { analysis_kind: parsedQuery.data.kind }),
       ...(parsedCursor === null ? {} : { cursor: parsedCursor }),
       limit: parsedQuery.data.limit
-    });
+    };
+    const generations = parsedQuery.data.project_id === undefined
+      ? await listOrganizationAnalyticsBundles(request, reply, dependencies, filters)
+      : await listProjectAnalyticsBundles(request, reply, dependencies, parsedQuery.data.project_id, filters);
+    if (generations === null) {
+      return;
+    }
 
     return reply.status(200).send(AnalyticsBundleGenerationsListResponseSchema.parse({
       bundles: generations.bundles.map(toAnalyticsBundleGenerationListRecord),
@@ -463,7 +461,7 @@ export function registerAnalyticsRoutes(app: FastifyInstance, dependencies: ApiD
   });
 }
 
-function toAnalyticsBundleGenerationListRecord(generation: AnalyticsBundleGeneration): unknown {
+function toAnalyticsBundleGenerationListRecord(generation: AnalyticsBundleGenerationListRecord): unknown {
   return {
     generation_id: generation.generation_id,
     project_id: generation.project_id,
@@ -478,8 +476,118 @@ function toAnalyticsBundleGenerationListRecord(generation: AnalyticsBundleGenera
     created_at: generation.created_at,
     claimed_at: generation.claimed_at,
     completed_at: generation.completed_at,
-    updated_at: generation.updated_at
+    updated_at: generation.updated_at,
+    ...(generation.project_name === undefined ? {} : { project_name: generation.project_name }),
+    ...(generation.project_color_tag === undefined ? {} : { project_color_tag: generation.project_color_tag })
   };
+}
+
+async function listProjectAnalyticsOpportunities(
+  request: FastifyRequest,
+  reply: FastifyReply,
+  dependencies: ApiDependencies,
+  projectId: string,
+  filters: {
+    status?: z.infer<typeof AnalyticsOpportunityStatusSchema> | undefined;
+    kind?: z.infer<typeof AnalyticsBundleAnalysisKindSchema> | undefined;
+    cursor?: { last_detected_at: string; opportunity_id: string } | undefined;
+    limit: number;
+  }
+) {
+  const access = await requireAnalyticsProjectReadAccess(request, reply, dependencies, projectId);
+  if (access === null) {
+    return null;
+  }
+  if (dependencies.analyticsOpportunities === undefined) {
+    await reply.status(404).send({ error: "analytics_opportunities_not_available" });
+    return null;
+  }
+
+  return dependencies.analyticsOpportunities.listAnalyticsOpportunitiesForProject({
+    organization_id: access.organization_id,
+    project_id: projectId,
+    ...filters
+  });
+}
+
+async function listOrganizationAnalyticsOpportunities(
+  request: FastifyRequest,
+  reply: FastifyReply,
+  dependencies: ApiDependencies,
+  filters: {
+    status?: z.infer<typeof AnalyticsOpportunityStatusSchema> | undefined;
+    kind?: z.infer<typeof AnalyticsBundleAnalysisKindSchema> | undefined;
+    cursor?: { last_detected_at: string; opportunity_id: string } | undefined;
+    limit: number;
+  }
+) {
+  const organizationId = await requireAnalyticsOrganizationReadAccess(request, reply, dependencies);
+  if (organizationId === null) {
+    return null;
+  }
+  if (dependencies.analyticsOpportunities === undefined) {
+    await reply.status(404).send({ error: "analytics_opportunities_not_available" });
+    return null;
+  }
+
+  return dependencies.analyticsOpportunities.listAnalyticsOpportunitiesForOrganization({
+    organization_id: organizationId,
+    ...filters
+  });
+}
+
+async function listProjectAnalyticsBundles(
+  request: FastifyRequest,
+  reply: FastifyReply,
+  dependencies: ApiDependencies,
+  projectId: string,
+  filters: {
+    status?: z.infer<typeof AnalyticsBundleGenerationStatusSchema> | undefined;
+    analysis_kind?: z.infer<typeof AnalyticsBundleAnalysisKindSchema> | undefined;
+    cursor?: { created_at: string; generation_id: string } | undefined;
+    limit: number;
+  }
+) {
+  const access = await requireAnalyticsProjectReadAccess(request, reply, dependencies, projectId);
+  if (access === null) {
+    return null;
+  }
+  if (dependencies.analyticsBundles === undefined) {
+    await reply.status(404).send({ error: "analytics_bundles_not_available" });
+    return null;
+  }
+
+  return dependencies.analyticsBundles.listAnalyticsBundleGenerationsForProject({
+    organization_id: access.organization_id,
+    project_id: projectId,
+    ...filters
+  });
+}
+
+async function listOrganizationAnalyticsBundles(
+  request: FastifyRequest,
+  reply: FastifyReply,
+  dependencies: ApiDependencies,
+  filters: {
+    status?: z.infer<typeof AnalyticsBundleGenerationStatusSchema> | undefined;
+    analysis_kind?: z.infer<typeof AnalyticsBundleAnalysisKindSchema> | undefined;
+    cursor?: { created_at: string; generation_id: string } | undefined;
+    limit: number;
+  }
+) {
+  const organizationId = await requireAnalyticsOrganizationReadAccess(request, reply, dependencies);
+  if (organizationId === null) {
+    return null;
+  }
+  if (dependencies.analyticsBundles === undefined) {
+    await reply.status(404).send({ error: "analytics_bundles_not_available" });
+    return null;
+  }
+
+  return dependencies.analyticsBundles.listAnalyticsBundleGenerationsForOrganization({
+    organization_id: organizationId,
+    ...filters
+  });
 }
 
 function buildAnalyticsBundleAnalysisSpec(input: z.infer<typeof AnalyticsBundleCreateBodySchema> & {
@@ -770,6 +878,15 @@ async function requireAnalyticsProjectReadAccess(
   return {
     organization_id: auth.access.organization_id
   };
+}
+
+async function requireAnalyticsOrganizationReadAccess(
+  request: FastifyRequest,
+  reply: FastifyReply,
+  dependencies: ApiDependencies
+): Promise<string | null> {
+  const member = await requireRateLimitedMemberAuth(request, reply, dependencies, "retrieval-read");
+  return member?.organization_id ?? null;
 }
 
 function parseAnalyticsOpportunitiesCursor(

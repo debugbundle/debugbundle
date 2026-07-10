@@ -44,8 +44,10 @@ debugbundle analytics summary --project <project-id> --last 7d
 debugbundle analytics devices --project <project-id> --last 7d
 debugbundle analytics journeys --project <project-id> --last 7d
 debugbundle analytics opportunities --project <project-id>
+debugbundle analytics opportunities --all-projects
 debugbundle analytics bundle create --project <project-id> --kind journey_friction --last 7d
 debugbundle analytics bundle list --project <project-id>
+debugbundle analytics bundle list --all-projects
 ```
 
 Use `debugbundle analytics settings get --project <project-id>` to inspect availability and capture/retention settings. Owners and admins can enable it with `debugbundle analytics settings set --project <project-id> --enabled true`; Team projects can additionally manage approved custom dimensions. Project tokens remain SDK-ingestion-only and cannot read analytics.

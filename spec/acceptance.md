@@ -1581,6 +1581,14 @@ If CLI says something is healthy and MCP says something different, that is a pro
 - **And** it includes filters for project, environment, service, status, kind, severity, date range, and bundle state
 - **And** pending, ready, and failed bundle states are visible
 
+### AC-ANL-15a: Cross-Project Analytics Inventory Parity
+- **Given** an authorized browser session or member token
+- **When** it lists analytics opportunities or AnalyticsBundle generations without `project_id`
+- **Then** it receives only records from projects in the caller's organization with cursor pagination stable across projects
+- **And** bundle rows include project identity metadata for workspace inventory rendering
+- **And** CLI callers must use `--all-projects`, while only the matching MCP list tools may omit `projectId`
+- **And** existing project-scoped list, detail, metrics, journey-sample, settings, and generation behavior remains unchanged
+
 ### AC-ANL-16: Project Analytics Tab
 - **Given** a signed-in member opens a project
 - **When** the member selects the project Analytics tab

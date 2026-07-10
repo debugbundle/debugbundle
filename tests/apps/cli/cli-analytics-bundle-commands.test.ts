@@ -102,6 +102,24 @@ describe("cli analytics bundle commands", () => {
     expect(JSON.parse(json.output)).toEqual(bundleListResponse);
   });
 
+  it("omits project_id for an explicit organization-wide bundle list request", async () => {
+    const request = vi.fn().mockResolvedValue({
+      status: 200,
+      body: bundleListResponse
+    });
+    const api = createAnalyticsBundleApi({ request });
+
+    await expect(
+      api.listBundles({ bearerToken: "dbundle_mem_x", status: "completed", limit: 5 })
+    ).resolves.toEqual(bundleListResponse);
+
+    expect(request).toHaveBeenCalledWith({
+      method: "GET",
+      path: "/v1/analytics/bundles?status=completed&limit=5",
+      bearerToken: "dbundle_mem_x"
+    });
+  });
+
   it("renders analytics bundle create and get states in human and json mode", async () => {
     const created = await createAnalyticsBundleCommand(
       {

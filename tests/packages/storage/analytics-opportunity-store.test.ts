@@ -127,6 +127,37 @@ describe("analytics opportunity store", () => {
     ).resolves.toEqual({ opportunities: [], next_cursor: null });
   });
 
+  it("lists organization opportunities with a globally stable cursor", async (): Promise<void> => {
+    const queryMock = vi.fn(async (sqlText: string, params: unknown[]) => {
+      expect(sqlText).toContain("p.organization_id = $1::uuid");
+      expect(sqlText).not.toContain("ao.project_id = $2::uuid");
+      expect(sqlText).toContain("ao.last_detected_at < $2::timestamptz");
+      expect(sqlText).toContain("ORDER BY ao.last_detected_at DESC, ao.id::text DESC");
+      expect(params).toEqual([
+        ORGANIZATION_ID,
+        "2026-07-07T00:00:00.000Z",
+        OPPORTUNITY_ID,
+        1
+      ]);
+      return { rows: [opportunityRow] };
+    });
+    const store = createPostgresAnalyticsOpportunityStore({ query: queryMock as Queryable["query"] });
+
+    await expect(
+      store.listAnalyticsOpportunitiesForOrganization({
+        organization_id: ORGANIZATION_ID,
+        cursor: {
+          last_detected_at: "2026-07-07T00:00:00.000Z",
+          opportunity_id: OPPORTUNITY_ID
+        },
+        limit: 1
+      })
+    ).resolves.toMatchObject({
+      opportunities: [{ opportunity_id: OPPORTUNITY_ID, project_name: "Marketing site" }],
+      next_cursor: `2026-07-07T00:00:00.000Z|${OPPORTUNITY_ID}`
+    });
+  });
+
   it("gets one project analytics opportunity or null", async (): Promise<void> => {
     const queryMock = vi.fn()
       .mockResolvedValueOnce({ rows: [opportunityRow] })

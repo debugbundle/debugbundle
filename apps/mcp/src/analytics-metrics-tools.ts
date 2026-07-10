@@ -225,7 +225,7 @@ type AnalyticsMetricsToolInput = {
 
 type AnalyticsOpportunitiesToolInput = {
   bearerToken: string;
-  projectId: string;
+  projectId?: string | undefined;
   status?: "open" | "resolved" | "snoozed" | "all" | undefined;
   kind?: AnalyticsBundleAnalysisKind | undefined;
   cursor?: string | undefined;
@@ -262,7 +262,7 @@ type AnalyticsBundleToolInput = {
 
 type AnalyticsBundleListToolInput = {
   bearerToken: string;
-  projectId: string;
+  projectId?: string | undefined;
   status?: "all" | "pending" | "running" | "completed" | "failed" | undefined;
   kind?: AnalyticsBundleAnalysisKind | undefined;
   cursor?: string | undefined;
@@ -302,7 +302,7 @@ function readOpportunitiesInput(input: Record<string, unknown>): AnalyticsOpport
   const kind = AnalyticsBundleAnalysisKindSchema.safeParse(input["kind"]);
   return {
     bearerToken: String(input["bearerToken"]),
-    projectId: String(input["projectId"]),
+    projectId: readOptionalString(input, "projectId"),
     status: status === "open" || status === "resolved" || status === "snoozed" || status === "all" ? status : undefined,
     kind: kind.success ? kind.data : undefined,
     cursor: readOptionalString(input, "cursor"),
@@ -327,7 +327,7 @@ function readBundleListInput(input: Record<string, unknown>): AnalyticsBundleLis
   const kind = AnalyticsBundleAnalysisKindSchema.safeParse(input["kind"]);
   return {
     bearerToken: String(input["bearerToken"]),
-    projectId: String(input["projectId"]),
+    projectId: readOptionalString(input, "projectId"),
     status: status === "all" ||
       status === "pending" ||
       status === "running" ||

@@ -199,6 +199,48 @@ describe("analytics bundle generation store", () => {
     expect(queryMock).toHaveBeenCalledOnce();
   });
 
+  it("lists organization generations with project metadata and a globally stable cursor", async (): Promise<void> => {
+    const queryMock = vi.fn(async (sqlText: string, params: unknown[]) => {
+      expect(sqlText).toContain("JOIN projects p ON p.id = abg.project_id");
+      expect(sqlText).toContain("p.organization_id = $1::uuid");
+      expect(sqlText).toContain("(abg.created_at, abg.id) < ($2::timestamptz, $3::uuid)");
+      expect(sqlText).toContain("ORDER BY abg.created_at DESC, abg.id DESC");
+      expect(params).toEqual([
+        "55555555-5555-4555-8555-555555555555",
+        "2026-07-09T00:00:00.000Z",
+        GENERATION_ID,
+        2
+      ]);
+      return {
+        rows: [{
+          ...generationRow,
+          status: "completed",
+          project_name: "Marketing site",
+          project_color_tag: "blue"
+        }]
+      };
+    });
+    const store = createPostgresAnalyticsBundleGenerationStore(createTransactionalDb(queryMock));
+
+    await expect(
+      store.listAnalyticsBundleGenerationsForOrganization!({
+        organization_id: "55555555-5555-4555-8555-555555555555",
+        cursor: {
+          created_at: "2026-07-09T00:00:00.000Z",
+          generation_id: GENERATION_ID
+        },
+        limit: 1
+      })
+    ).resolves.toMatchObject({
+      bundles: [{
+        generation_id: GENERATION_ID,
+        project_name: "Marketing site",
+        project_color_tag: "blue"
+      }],
+      next_cursor: null
+    });
+  });
+
   it("builds stable AnalyticsBundle generation cursors", (): void => {
     expect(buildAnalyticsBundleGenerationCursor({
       generation_id: GENERATION_ID,

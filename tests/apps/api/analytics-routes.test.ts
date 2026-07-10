@@ -162,12 +162,18 @@ function createAnalyticsOpportunitiesDependency(
   };
   return {
     listAnalyticsOpportunitiesForProject: vi.fn().mockResolvedValue(listResponse),
+    listAnalyticsOpportunitiesForOrganization: vi.fn().mockResolvedValue(listResponse),
     getAnalyticsOpportunityForProject: vi.fn().mockResolvedValue({ opportunity: createOpportunity() }),
     ...overrides
   };
 }
 
-function createAnalyticsBundleGeneration(overrides: Partial<Awaited<ReturnType<NonNullable<ApiDependencies["analyticsBundles"]>["getAnalyticsBundleGenerationForProject"]>>> = {}) {
+function createAnalyticsBundleGeneration(overrides: Partial<
+  Awaited<ReturnType<NonNullable<ApiDependencies["analyticsBundles"]>["getAnalyticsBundleGenerationForProject"]>> & {
+    project_name: string;
+    project_color_tag: string | null;
+  }
+> = {}) {
   return {
     generation_id: BUNDLE_GENERATION_ID,
     project_id: PROJECT_ID,
@@ -193,6 +199,13 @@ function createAnalyticsBundlesDependency(
   return {
     listAnalyticsBundleGenerationsForProject: vi.fn().mockResolvedValue({
       bundles: [createAnalyticsBundleGeneration()],
+      next_cursor: null
+    }),
+    listAnalyticsBundleGenerationsForOrganization: vi.fn().mockResolvedValue({
+      bundles: [createAnalyticsBundleGeneration({
+        project_name: "Marketing site",
+        project_color_tag: "blue"
+      })],
       next_cursor: null
     }),
     requestAnalyticsBundleGenerationForProject: vi.fn().mockResolvedValue(createAnalyticsBundleGeneration({
@@ -576,6 +589,46 @@ describe("analytics metrics routes", () => {
     });
   });
 
+  it("lists analytics opportunities across the caller organization without a project id", async () => {
+    const listAnalyticsOpportunitiesForOrganization = vi.fn().mockResolvedValue({
+      opportunities: [createOpportunity()],
+      next_cursor: null
+    });
+    const analyticsOpportunities = createAnalyticsOpportunitiesDependency({
+      listAnalyticsOpportunitiesForOrganization
+    });
+    const app = createDependencies({ analyticsOpportunities });
+
+    const response = await app.inject({
+      method: "GET",
+      url: "/v1/analytics/opportunities?status=all&kind=funnel_dropoff&cursor=2026-03-08T00%3A00%3A00.000Z%7C00000000-0000-4000-8000-000000000101&limit=5",
+      headers: { authorization: "Bearer dbundle_mem_test_token" }
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toEqual({ opportunities: [createOpportunity()], next_cursor: null });
+    expect(listAnalyticsOpportunitiesForOrganization).toHaveBeenCalledWith({
+      organization_id: "org_123",
+      status: undefined,
+      kind: "funnel_dropoff",
+      cursor: {
+        last_detected_at: TO,
+        opportunity_id: createOpportunity().opportunity_id
+      },
+      limit: 5
+    });
+  });
+
+  it("authenticates organization-wide inventory reads before checking availability", async () => {
+    const response = await createDependencies().inject({
+      method: "GET",
+      url: "/v1/analytics/opportunities"
+    });
+
+    expect(response.statusCode).toBe(401);
+    expect(response.json()).toEqual({ error: "invalid_member_token" });
+  });
+
   it("rejects invalid analytics opportunity reads and unavailable storage", async () => {
     const invalidCursor = await createDependencies({
       analyticsOpportunities: createAnalyticsOpportunitiesDependency()
@@ -652,6 +705,47 @@ describe("analytics metrics routes", () => {
       project_id: PROJECT_ID,
       status: "completed",
       analysis_kind: "funnel_dropoff",
+      cursor: {
+        created_at: FROM,
+        generation_id: BUNDLE_GENERATION_ID
+      },
+      limit: 5
+    });
+  });
+
+  it("lists AnalyticsBundle generations across the caller organization with project metadata", async () => {
+    const generation = createAnalyticsBundleGeneration({
+      project_name: "Marketing site",
+      project_color_tag: "blue"
+    });
+    const listAnalyticsBundleGenerationsForOrganization = vi.fn().mockResolvedValue({
+      bundles: [generation],
+      next_cursor: null
+    });
+    const analyticsBundles = createAnalyticsBundlesDependency({
+      listAnalyticsBundleGenerationsForOrganization
+    });
+    const app = createDependencies({ analyticsBundles });
+
+    const response = await app.inject({
+      method: "GET",
+      url: `/v1/analytics/bundles?status=completed&cursor=${encodeURIComponent(`${FROM}|${BUNDLE_GENERATION_ID}`)}&limit=5`,
+      headers: { authorization: "Bearer dbundle_mem_test_token" }
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toMatchObject({
+      bundles: [{
+        generation_id: BUNDLE_GENERATION_ID,
+        project_id: PROJECT_ID,
+        project_name: "Marketing site",
+        project_color_tag: "blue"
+      }],
+      next_cursor: null
+    });
+    expect(listAnalyticsBundleGenerationsForOrganization).toHaveBeenCalledWith({
+      organization_id: "org_123",
+      status: "completed",
       cursor: {
         created_at: FROM,
         generation_id: BUNDLE_GENERATION_ID

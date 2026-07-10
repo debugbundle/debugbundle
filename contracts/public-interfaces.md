@@ -783,6 +783,10 @@ Journey sample responses must not expose the internal object-storage key. Expire
 `last` may be supplied instead of `from` for relative windows such as `"7d"`; `to` may still be supplied with `last` to anchor the window.
 When `incident_id` or `deploy_id` is supplied, the generation stores those values as linked incident/deploy evidence for the AnalyticsBundle artifact while preserving the scalar request fields for compatibility.
 
+**Analytics inventory list scope:** `GET /v1/analytics/opportunities` and `GET /v1/analytics/bundles` retain their existing project-scoped behavior when `project_id=<uuid>` is supplied. An authorized browser session or member token may omit `project_id` only for these list endpoints to return records across projects in the caller's organization. Cross-project pagination remains ordered by the record timestamp and unique record ID, and bundle rows include `project_name` and `project_color_tag` metadata. Detail, metric, journey-sample, settings, and generation endpoints remain project-scoped.
+
+CLI callers must opt into this inventory scope with `--all-projects`; the default list command continues to require `--project-id`. MCP callers may omit `projectId` only for `list_analytics_opportunities` and `list_analytics_bundles`.
+
 **AnalyticsBundle generation list response:** `GET /v1/analytics/bundles?project_id=<uuid>&status=all|pending|running|completed|failed&kind=<kind>&cursor=<cursor>&limit=<n>` returns:
 
 ```json
@@ -791,6 +795,8 @@ When `incident_id` or `deploy_id` is supplied, the generation stores those value
     {
       "generation_id": "uuid",
       "project_id": "uuid",
+      "project_name": "Checkout web",
+      "project_color_tag": "blue",
       "opportunity_id": "uuid | null",
       "requested_by_user_id": "uuid | null",
       "analysis_kind": "usage_summary",
@@ -2634,9 +2640,9 @@ debugbundle analytics funnel <funnel-key> --project-id <id> [--from <ISO8601>] [
 debugbundle analytics journeys --project-id <id> [--route <path>] [--funnel <key>] [--from <ISO8601>] [--to <ISO8601>] [--last <duration>] [--json]
 debugbundle analytics journey-samples list --project-id <id> [--service <name>] [--environment <name>] [--tag <tag>] [--cursor <cursor>] [--limit <n>] [--json]
 debugbundle analytics journey-samples get <sample-id> --project-id <id> [--json]
-debugbundle analytics opportunities --project-id <id> [--status <open|resolved|snoozed|all>] [--kind <kind>] [--cursor <cursor>] [--limit <n>] [--json]
+debugbundle analytics opportunities (--project-id <id> | --all-projects) [--status <open|resolved|snoozed|all>] [--kind <kind>] [--cursor <cursor>] [--limit <n>] [--json]
 debugbundle analytics opportunity get <opportunity-id> --project-id <id> [--json]
-debugbundle analytics bundle list --project-id <id> [--status <all|pending|running|completed|failed>] [--kind <kind>] [--cursor <cursor>] [--limit <n>] [--json]
+debugbundle analytics bundle list (--project-id <id> | --all-projects) [--status <all|pending|running|completed|failed>] [--kind <kind>] [--cursor <cursor>] [--limit <n>] [--json]
 debugbundle analytics bundle create --project-id <id> --kind <kind> [--funnel <key>] [--route <path>] [--incident-id <id>] [--deploy-id <id>] [--from <ISO8601>] [--to <ISO8601>] [--last <duration>] [--filters-json <json>] [--json]
 debugbundle analytics bundle get <bundle-generation-id> --project-id <id> [--json]
 ```

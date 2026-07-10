@@ -55,7 +55,7 @@ const AnalyticsFunnelParamsSchema = z.object({ key: z.string().min(1).max(120) }
 const AnalyticsOpportunityParamsSchema = z.object({ id: z.string().uuid() }).strict();
 const AnalyticsOpportunitiesQuerySchema = z
   .object({
-    project_id: z.string().uuid(),
+    project_id: z.string().uuid().optional(),
     status: z.enum(["open", "resolved", "snoozed", "all"]).optional(),
     kind: AnalyticsBundleAnalysisKindSchema.optional(),
     cursor: z.string().optional(),
@@ -109,7 +109,7 @@ export function createAnalyticsMetricOpenApiOperations(options: {
       method: "get",
       path: "/v1/analytics/opportunities",
       operationId: "listAnalyticsOpportunities",
-      summary: "List AnalyticsBundle opportunities for a project",
+      summary: "List AnalyticsBundle opportunities for a project or across the caller organization",
       tags: ["Analytics"],
       security: options.anyMemberAuth,
       query: AnalyticsOpportunitiesQuerySchema,

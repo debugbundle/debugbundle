@@ -245,6 +245,24 @@ describe("cli analytics metrics commands", () => {
     expect(JSON.parse(json.output)).toEqual({ opportunity });
   });
 
+  it("omits project_id for an explicit organization-wide opportunities request", async () => {
+    const request = vi.fn().mockResolvedValue({
+      status: 200,
+      body: opportunitiesResponse
+    });
+    const api = createAnalyticsMetricsApi({ request });
+
+    await expect(
+      api.listOpportunities({ bearerToken: "dbundle_mem_x", status: "all", limit: 5 })
+    ).resolves.toEqual(opportunitiesResponse);
+
+    expect(request).toHaveBeenCalledWith({
+      method: "GET",
+      path: "/v1/analytics/opportunities?status=all&limit=5",
+      bearerToken: "dbundle_mem_x"
+    });
+  });
+
   it("loads auth state and forwards authenticated summary calls", async () => {
     const readAuthState = vi.fn().mockResolvedValue({
       bearer_token: "dbundle_mem_saved",

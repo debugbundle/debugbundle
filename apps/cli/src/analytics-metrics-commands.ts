@@ -77,7 +77,7 @@ export interface AnalyticsIncidentImpactCommandInput extends AnalyticsSummaryCom
 
 export interface AnalyticsOpportunitiesCommandInput {
   bearerToken: string;
-  projectId: string;
+  projectId?: string | undefined;
   status?: AnalyticsOpportunityStatus | "all" | undefined;
   kind?: AnalyticsBundleAnalysisKind | undefined;
   cursor?: string | undefined;
@@ -320,7 +320,8 @@ function appendOptionalParam(params: URLSearchParams, key: string, value: string
 }
 
 function buildOpportunitiesQueryString(input: Omit<AnalyticsOpportunitiesCommandInput, "json">): string {
-  const params = new URLSearchParams({ project_id: input.projectId });
+  const params = new URLSearchParams();
+  appendOptionalParam(params, "project_id", input.projectId);
   appendOptionalParam(params, "status", input.status);
   appendOptionalParam(params, "kind", input.kind);
   appendOptionalParam(params, "cursor", input.cursor);
@@ -898,20 +899,23 @@ export async function listAnalyticsOpportunitiesWithAuthCommand(
   input: AnalyticsOpportunitiesWithAuthInput,
   dependencies?: Parameters<typeof createAuthenticatedAnalyticsMetricsApi>[1]
 ): Promise<CliCommandResult> {
-  return runAnalyticsMetricWithAuthCommand(input, dependencies, (authState, api) =>
-    listAnalyticsOpportunitiesCommand(
-      {
-        bearerToken: authState.bearer_token,
-        projectId: input.projectId,
-        status: input.status,
-        kind: input.kind,
-        cursor: input.cursor,
-        limit: input.limit,
-        json: input.json
-      },
-      api
-    )
-  );
+  return runAuthenticatedCliCommand(input, {
+    createApi: createAuthenticatedAnalyticsMetricsApi,
+    dependencies,
+    runCommand: (authState, api) =>
+      listAnalyticsOpportunitiesCommand(
+        {
+          bearerToken: authState.bearer_token,
+          projectId: input.projectId,
+          status: input.status,
+          kind: input.kind,
+          cursor: input.cursor,
+          limit: input.limit,
+          json: input.json
+        },
+        api
+      )
+  });
 }
 
 export async function getAnalyticsOpportunityWithAuthCommand(

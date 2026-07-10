@@ -380,4 +380,31 @@ describe("cli main analytics routing", () => {
     expect(result.exitCode).toBe(4);
     expect(result.output).toContain("Unknown option --unknown.");
   });
+
+  it("requires explicit all-projects scope for organization analytics inventories", async () => {
+    const listAnalyticsOpportunitiesCommand = vi.fn().mockResolvedValue({ exitCode: 0, output: "opportunities" });
+    const listAnalyticsBundlesCommand = vi.fn().mockResolvedValue({ exitCode: 0, output: "bundles" });
+
+    await expect(
+      runCli(["analytics", "opportunities", "--all-projects"], { listAnalyticsOpportunitiesCommand })
+    ).resolves.toEqual({ exitCode: 0, output: "opportunities" });
+    await expect(
+      runCli(["analytics", "bundle", "list", "--all-projects"], { listAnalyticsBundlesCommand })
+    ).resolves.toEqual({ exitCode: 0, output: "bundles" });
+    await expect(
+      runCli(["analytics", "opportunities"], { listAnalyticsOpportunitiesCommand })
+    ).resolves.toMatchObject({
+      exitCode: 4,
+      output: expect.stringContaining("Missing required option --project or --all-projects.")
+    });
+    await expect(
+      runCli(["analytics", "bundle", "list", "--project", "proj_123", "--all-projects"], { listAnalyticsBundlesCommand })
+    ).resolves.toMatchObject({
+      exitCode: 4,
+      output: expect.stringContaining("Use either --project or --all-projects.")
+    });
+
+    expect(listAnalyticsOpportunitiesCommand).toHaveBeenCalledWith({ projectId: undefined });
+    expect(listAnalyticsBundlesCommand).toHaveBeenCalledWith({ projectId: undefined });
+  });
 });

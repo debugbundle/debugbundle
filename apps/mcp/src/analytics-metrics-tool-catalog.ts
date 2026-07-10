@@ -98,10 +98,10 @@ export const ANALYTICS_METRICS_MCP_TOOL_CATALOG = [
   {
     name: "list_analytics_opportunities",
     group: "analytics_metrics",
-    description: "List AnalyticsBundle opportunities for a project.",
+    description: "List AnalyticsBundle opportunities for a project, or across accessible projects when projectId is omitted.",
     inputSchema: z.object({
       bearerToken: z.string(),
-      projectId: z.string(),
+      projectId: z.string().optional(),
       status: z.enum(["open", "resolved", "snoozed", "all"]).optional(),
       kind: AnalyticsBundleAnalysisKindSchema.optional(),
       cursor: z.string().optional(),
@@ -121,10 +121,10 @@ export const ANALYTICS_METRICS_MCP_TOOL_CATALOG = [
   {
     name: "list_analytics_bundles",
     group: "analytics_metrics",
-    description: "List AnalyticsBundle generation records for a project, including pending, completed, and failed states.",
+    description: "List AnalyticsBundle generation records for a project, or across accessible projects when projectId is omitted.",
     inputSchema: z.object({
       bearerToken: z.string(),
-      projectId: z.string(),
+      projectId: z.string().optional(),
       status: z.enum(["all", "pending", "running", "completed", "failed"]).optional(),
       kind: AnalyticsBundleAnalysisKindSchema.optional(),
       cursor: z.string().optional(),

@@ -24,6 +24,11 @@ export interface AnalyticsBundleGenerationRecord {
   updated_at: string;
 }
 
+export interface AnalyticsBundleGenerationInventoryRecord extends AnalyticsBundleGenerationRecord {
+  project_name: string;
+  project_color_tag: string | null;
+}
+
 export interface ReserveAnalyticsBundleGenerationInput {
   project_id: string;
   opportunity_id?: string | null;
@@ -41,6 +46,13 @@ export interface AnalyticsBundleGenerationStore {
     cursor?: { created_at: string; generation_id: string } | undefined;
     limit: number;
   }): Promise<{ bundles: AnalyticsBundleGenerationRecord[]; next_cursor: string | null }>;
+  listAnalyticsBundleGenerationsForOrganization?(input: {
+    organization_id: string;
+    status?: AnalyticsBundleGenerationStatus | undefined;
+    analysis_kind?: AnalyticsBundleAnalysisKind | undefined;
+    cursor?: { created_at: string; generation_id: string } | undefined;
+    limit: number;
+  }): Promise<{ bundles: AnalyticsBundleGenerationInventoryRecord[]; next_cursor: string | null }>;
   getAnalyticsBundleGenerationForProject(input: {
     project_id: string;
     generation_id: string;
@@ -81,6 +93,11 @@ type AnalyticsBundleGenerationRow = {
   claimed_at: unknown;
   completed_at: unknown;
   updated_at: unknown;
+};
+
+type AnalyticsBundleGenerationInventoryRow = AnalyticsBundleGenerationRow & {
+  project_name: unknown;
+  project_color_tag: unknown;
 };
 
 export function createPostgresAnalyticsBundleGenerationStore(db: Queryable): AnalyticsBundleGenerationStore {
@@ -196,6 +213,56 @@ export function createPostgresAnalyticsBundleGenerationStore(db: Queryable): Ana
       );
 
       const rows = result.rows.slice(0, limit).map(mapAnalyticsBundleGenerationRow);
+      const overflow = result.rows[limit];
+      const next_cursor = overflow === undefined
+        ? null
+        : buildAnalyticsBundleGenerationCursor(mapAnalyticsBundleGenerationRow(overflow));
+
+      return {
+        bundles: rows,
+        next_cursor
+      };
+    },
+
+    async listAnalyticsBundleGenerationsForOrganization(input) {
+      const limit = Math.min(Math.max(input.limit, 1), 100);
+      const params: unknown[] = [input.organization_id];
+      const where = ["p.organization_id = $1::uuid"];
+
+      if (input.status !== undefined) {
+        params.push(input.status);
+        where.push(`abg.status = $${params.length}`);
+      }
+
+      if (input.analysis_kind !== undefined) {
+        params.push(input.analysis_kind);
+        where.push(`abg.analysis_kind = $${params.length}`);
+      }
+
+      if (input.cursor !== undefined) {
+        params.push(input.cursor.created_at, input.cursor.generation_id);
+        const createdAtIndex = params.length - 1;
+        const idIndex = params.length;
+        where.push(`(abg.created_at, abg.id) < ($${createdAtIndex}::timestamptz, $${idIndex}::uuid)`);
+      }
+
+      params.push(limit + 1);
+      const result = await db.query<AnalyticsBundleGenerationInventoryRow>(
+        `
+          SELECT
+            ${analyticsBundleGenerationSelectColumns("abg")},
+            p.name AS project_name,
+            p.color_tag AS project_color_tag
+          FROM analytics_bundle_generations abg
+          JOIN projects p ON p.id = abg.project_id
+          WHERE ${where.join("\n            AND ")}
+          ORDER BY abg.created_at DESC, abg.id DESC
+          LIMIT $${params.length}
+        `,
+        params
+      );
+
+      const rows = result.rows.slice(0, limit).map(mapAnalyticsBundleGenerationInventoryRow);
       const overflow = result.rows[limit];
       const next_cursor = overflow === undefined
         ? null
@@ -453,6 +520,16 @@ function mapAnalyticsBundleGenerationRow(row: AnalyticsBundleGenerationRow): Ana
     claimed_at: toNullableIsoString(row.claimed_at),
     completed_at: toNullableIsoString(row.completed_at),
     updated_at: toIsoString(row.updated_at)
+  };
+}
+
+function mapAnalyticsBundleGenerationInventoryRow(
+  row: AnalyticsBundleGenerationInventoryRow
+): AnalyticsBundleGenerationInventoryRecord {
+  return {
+    ...mapAnalyticsBundleGenerationRow(row),
+    project_name: toNonEmptyString(row.project_name, "Unknown project"),
+    project_color_tag: toNullableString(row.project_color_tag)
   };
 }
 

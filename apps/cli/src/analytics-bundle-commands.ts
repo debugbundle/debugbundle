@@ -37,7 +37,7 @@ export interface AnalyticsBundleGetCommandInput {
 
 export interface AnalyticsBundleListCommandInput {
   bearerToken: string;
-  projectId: string;
+  projectId?: string | undefined;
   status?: AnalyticsBundleGenerationStatus | "all" | undefined;
   kind?: AnalyticsBundleAnalysisKind | undefined;
   cursor?: string | undefined;
@@ -102,7 +102,10 @@ export function createAnalyticsBundleApi(httpClient: {
 } {
   return {
     async listBundles(input): Promise<AnalyticsBundleGenerationsListResponse> {
-      const params = new URLSearchParams({ project_id: input.projectId });
+      const params = new URLSearchParams();
+      if (input.projectId !== undefined) {
+        params.set("project_id", input.projectId);
+      }
       if (input.status !== undefined) {
         params.set("status", input.status);
       }
@@ -234,6 +237,7 @@ function formatAnalyticsBundleList(response: AnalyticsBundleGenerationsListRespo
       bundle.generation_id,
       bundle.analysis_kind,
       bundle.status,
+      bundle.project_name ?? bundle.project_id,
       bundle.created_at,
       bundle.has_artifact ? "artifact" : "no artifact"
     ].join("  "))

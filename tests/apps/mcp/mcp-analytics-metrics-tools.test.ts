@@ -137,6 +137,9 @@ describe("mcp analytics metrics tools", () => {
       })
     ).resolves.toEqual({ opportunities: [], next_cursor: null });
     await expect(
+      tools.list_analytics_opportunities({ bearerToken: "token", status: "all" })
+    ).resolves.toEqual({ opportunities: [], next_cursor: null });
+    await expect(
       tools.get_analytics_opportunity({
         bearerToken: "token",
         projectId: "proj_1",
@@ -152,6 +155,9 @@ describe("mcp analytics metrics tools", () => {
         cursor: "cursor-1",
         limit: 5
       })
+    ).resolves.toEqual({ bundles: [], next_cursor: null });
+    await expect(
+      tools.list_analytics_bundles({ bearerToken: "token", status: "completed" })
     ).resolves.toEqual({ bundles: [], next_cursor: null });
     await expect(
       tools.generate_analytics_bundle({
@@ -223,6 +229,14 @@ describe("mcp analytics metrics tools", () => {
       cursor: "cursor-1",
       limit: 5
     });
+    expect(api.listOpportunities).toHaveBeenCalledWith({
+      bearerToken: "token",
+      projectId: undefined,
+      status: "all",
+      kind: undefined,
+      cursor: undefined,
+      limit: undefined
+    });
     expect(api.getOpportunity).toHaveBeenCalledWith({
       bearerToken: "token",
       projectId: "proj_1",
@@ -235,6 +249,14 @@ describe("mcp analytics metrics tools", () => {
       kind: "usage_summary",
       cursor: "cursor-1",
       limit: 5
+    });
+    expect(api.listBundles).toHaveBeenCalledWith({
+      bearerToken: "token",
+      projectId: undefined,
+      status: "completed",
+      kind: undefined,
+      cursor: undefined,
+      limit: undefined
     });
     expect(api.createBundle).toHaveBeenNthCalledWith(1, {
       bearerToken: "token",

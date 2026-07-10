@@ -676,6 +676,8 @@ export const AnalyticsBundleGenerationRecordSchema = z
   .object({
     generation_id: z.string().uuid(),
     project_id: z.string().uuid(),
+    project_name: z.string().trim().min(1).max(200).optional(),
+    project_color_tag: z.string().trim().min(1).max(32).nullable().optional(),
     opportunity_id: z.string().uuid().nullable(),
     requested_by_user_id: z.string().uuid().nullable(),
     analysis_kind: AnalyticsBundleAnalysisKindSchema,

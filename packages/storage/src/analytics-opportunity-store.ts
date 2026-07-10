@@ -23,6 +23,13 @@ export interface AnalyticsOpportunityStore {
     cursor?: AnalyticsOpportunitiesCursor | undefined;
     limit: number;
   }): Promise<AnalyticsOpportunitiesListResponse>;
+  listAnalyticsOpportunitiesForOrganization(input: {
+    organization_id: string;
+    status?: AnalyticsOpportunityStatus | undefined;
+    kind?: AnalyticsBundleAnalysisKind | undefined;
+    cursor?: AnalyticsOpportunitiesCursor | undefined;
+    limit: number;
+  }): Promise<AnalyticsOpportunitiesListResponse>;
   getAnalyticsOpportunityForProject(input: {
     organization_id: string;
     project_id: string;
@@ -60,6 +67,27 @@ type AnalyticsOpportunityRow = {
 export function createPostgresAnalyticsOpportunityStore(db: Queryable): AnalyticsOpportunityStore {
   return {
     async listAnalyticsOpportunitiesForProject(input) {
+      const limit = normalizeLimit(input.limit);
+      const where = buildAnalyticsOpportunityWhere(input);
+      const result = await db.query<AnalyticsOpportunityRow>(
+        `
+          ${buildAnalyticsOpportunitySelect()}
+          ${where.sql}
+          ORDER BY ao.last_detected_at DESC, ao.id::text DESC
+          LIMIT $${where.params.length + 1}
+        `,
+        [...where.params, limit]
+      );
+      const opportunities = result.rows.map(mapAnalyticsOpportunityRow);
+      const nextRecord = opportunities.length >= limit ? opportunities.at(-1) : undefined;
+
+      return AnalyticsOpportunitiesListResponseSchema.parse({
+        opportunities,
+        next_cursor: nextRecord === undefined ? null : `${nextRecord.last_detected_at}|${nextRecord.opportunity_id}`
+      });
+    },
+
+    async listAnalyticsOpportunitiesForOrganization(input) {
       const limit = normalizeLimit(input.limit);
       const where = buildAnalyticsOpportunityWhere(input);
       const result = await db.query<AnalyticsOpportunityRow>(
@@ -161,16 +189,18 @@ function buildAnalyticsOpportunitySelect(): string {
 
 function buildAnalyticsOpportunityWhere(input: {
   organization_id: string;
-  project_id: string;
+  project_id?: string | undefined;
   status?: AnalyticsOpportunityStatus | undefined;
   kind?: AnalyticsBundleAnalysisKind | undefined;
   cursor?: AnalyticsOpportunitiesCursor | undefined;
 }): { sql: string; params: unknown[] } {
-  const conditions = [
-    "p.organization_id = $1::uuid",
-    "ao.project_id = $2::uuid"
-  ];
-  const params: unknown[] = [input.organization_id, input.project_id];
+  const conditions = ["p.organization_id = $1::uuid"];
+  const params: unknown[] = [input.organization_id];
+
+  if (input.project_id !== undefined) {
+    params.push(input.project_id);
+    conditions.push(`ao.project_id = $${params.length}::uuid`);
+  }
 
   if (input.status !== undefined) {
     if (input.status === "open") {

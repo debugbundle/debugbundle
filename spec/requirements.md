@@ -649,7 +649,7 @@ This ensures Free behaves as **failure-first, not telemetry-first**.
 
 **FR-ANL-24:** Analytics read/manage routes must require browser session or member token authorization. Project tokens remain write-only and may only submit analytics events through SDK/relay/direct ingestion paths.
 
-**FR-ANL-25:** The web app must include a main sidebar Analytics surface similar to Incidents and Improvements. It must show cross-project analytics opportunities and generated AnalyticsBundles for accessible projects, including pending/failed bundle states.
+**FR-ANL-25:** The web app must include a main sidebar Analytics surface similar to Incidents and Improvements. It must show cross-project analytics opportunities and generated AnalyticsBundles for accessible projects, including pending/failed bundle states. Its two cross-project inventory reads must be backed by additive organization-scoped API/domain reads rather than browser fanout; CLI must require explicit `--all-projects`, and only the matching MCP list tools may omit `projectId`.
 
 **FR-ANL-26:** Each project must have one Analytics tab. Routes, funnels, devices, referrers, opportunities, and generated AnalyticsBundles must live as internal sub-tabs or sections inside that single project Analytics tab rather than adding more top-level project tabs.
 

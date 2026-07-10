@@ -108,6 +108,7 @@ export type {
 } from "./analytics-bundle-jobs.js";
 export type {
   AnalyticsBundleGenerationRecord,
+  AnalyticsBundleGenerationInventoryRecord,
   AnalyticsBundleGenerationStatus,
   AnalyticsBundleGenerationStore,
   ReserveAnalyticsBundleGenerationInput

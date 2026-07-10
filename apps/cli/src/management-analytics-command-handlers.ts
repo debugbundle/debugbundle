@@ -343,6 +343,7 @@ export async function handleAnalyticsCommand(
     expectNoUnknownOptions(parsedArgv, [
       "project",
       "project-id",
+      "all-projects",
       "status",
       "kind",
       "cursor",
@@ -352,8 +353,12 @@ export async function handleAnalyticsCommand(
     ]);
     ensureNoExtraPositionals(parsedArgv, 2);
     const projectId = readProjectOption(parsedArgv);
-    if (projectId === undefined) {
-      throw new CliInputError("Missing required option --project.");
+    const allProjects = parsedArgv.options.get("all-projects") === true;
+    if (projectId !== undefined && allProjects) {
+      throw new CliInputError("Use either --project or --all-projects.");
+    }
+    if (projectId === undefined && !allProjects) {
+      throw new CliInputError("Missing required option --project or --all-projects.");
     }
 
     return await (dependencies.listAnalyticsOpportunitiesCommand ?? defaultListAnalyticsOpportunitiesCommand)(
@@ -395,6 +400,7 @@ export async function handleAnalyticsCommand(
       expectNoUnknownOptions(parsedArgv, [
         "project",
         "project-id",
+        "all-projects",
         "status",
         "kind",
         "cursor",
@@ -404,8 +410,12 @@ export async function handleAnalyticsCommand(
       ]);
       ensureNoExtraPositionals(parsedArgv, 3);
       const projectId = readProjectOption(parsedArgv);
-      if (projectId === undefined) {
-        throw new CliInputError("Missing required option --project.");
+      const allProjects = parsedArgv.options.get("all-projects") === true;
+      if (projectId !== undefined && allProjects) {
+        throw new CliInputError("Use either --project or --all-projects.");
+      }
+      if (projectId === undefined && !allProjects) {
+        throw new CliInputError("Missing required option --project or --all-projects.");
       }
       const status = readStringOption(parsedArgv, "status");
       if (
