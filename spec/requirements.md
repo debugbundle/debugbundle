@@ -611,6 +611,8 @@ This ensures Free behaves as **failure-first, not telemetry-first**.
 
 **FR-ANL-10a:** When `analytics.trackActions` is enabled, browser auto-capture may emit only fixed, privacy-safe structural action keys for a bounded allowlist of interactive element or ARIA-role categories. It must not retain DOM selectors, element IDs, URLs, raw attributes, input values, or user-visible text, and it must remain independently configurable from debug click breadcrumbs.
 
+**FR-ANL-10b:** When `analytics.trackFrictionSignals` is enabled, browser auto-capture may emit only fixed `journey_marker` keys for bounded local heuristics: rapid repeated clicks on the same in-memory interactive target, rapid repeated clicks on the same eligible non-interactive target, and a quick safe route reversal. The SDK must use only ephemeral in-memory target identity and timing to make that decision; it must not emit selectors, IDs, text, URLs, attributes, input values, or any target-derived dimensions. Project settings may disable friction capture through the restrictive analytics SDK-config block.
+
 **FR-ANL-11:** Analytics paths and routes must strip query strings by default before long-term aggregation. Raw URLs with query strings may not be stored in long-term analytics tables.
 
 **FR-ANL-12:** Coarse geography is optional. When enabled, geography must be derived server-side and retained only as coarse country/region fields. Raw IP addresses must not be stored in analytics rollups or AnalyticsBundle artifacts.

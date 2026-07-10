@@ -1477,6 +1477,7 @@ If CLI says something is healthy and MCP says something different, that is a pro
 - **Then** the SDK emits analytics events for session, page, route, action, funnel, and conversion signals
 - **And** each analytics event includes session correlation, service/environment, device type, browser, OS, language/locale, viewport bucket, referrer/UTM context when available, and configured privacy-safe identity fields
 - **And** direct-browser `standard` privacy mode reuses a project-scoped anonymous visitor hash across SDK instances without persisting or emitting the project token or raw visitor value; `strict` remains session-only and consent withdrawal removes the stored anonymous visitor value
+- **And** when friction capture is enabled, three rapid clicks on the same in-memory interactive or eligible non-interactive target emit only `friction.repeated_click` or `friction.dead_click`, and a quick safe `A -> B -> A` route reversal emits only `friction.backtrack`; no target-derived data is retained or shipped
 
 ### AC-ANL-03: Consent Gating
 - **Given** analytics is enabled with consent required
@@ -1487,7 +1488,7 @@ If CLI says something is healthy and MCP says something different, that is a pro
 ### AC-ANL-03a: Remote Capture Settings Are Restrictive
 - **Given** a direct browser SDK initializes with a valid project token and local analytics opt-in
 - **When** the SDK explicitly opts into the analytics block and `GET /v1/sdk/config` returns project analytics settings
-- **Then** remote settings can disable or narrow page, route, action, consent, and strict-privacy capture without changing debug capture
+- **Then** remote settings can disable or narrow page, route, action, friction, consent, and strict-privacy capture without changing debug capture
 - **And** remote settings cannot enable analytics for a locally analytics-disabled SDK or widen a local capture setting
 - **And** a remote consent requirement blocks capture until `analytics.setConsent(true)` is explicitly called
 - **And** relay-mode browser SDKs do not fetch SDK config with browser credentials
