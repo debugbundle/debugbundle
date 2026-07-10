@@ -70,6 +70,16 @@ export { createPostgresAnalyticsSettingsStore } from "./analytics-settings-store
 export type { AnalyticsRollupStore } from "./analytics-rollup-store.js";
 export { createPostgresAnalyticsRollupStore } from "./analytics-rollup-store.js";
 export type {
+  AnalyticsCorrelationStore,
+  AnalyticsIncidentCorrelationInput,
+  AnalyticsRouteSessionCorrelationInput
+} from "./analytics-correlation-store.js";
+export {
+  createPostgresAnalyticsCorrelationStore,
+  hashAnalyticsCorrelationValue,
+  hashAnalyticsSessionSubject
+} from "./analytics-correlation-store.js";
+export type {
   AnalyticsMetricsStore,
   AnalyticsUsageSummaryInput
 } from "./analytics-metrics-store.js";

@@ -151,7 +151,7 @@ git pull
 docker compose up -d --force-recreate workspace-init db-bootstrap db-migrate api worker web
 ```
 
-No manual schema command is required on clean startup. The one-shot `db-bootstrap` service bootstraps an empty database before the API starts, and the one-shot `db-migrate` service applies ordered forward migrations before runtime services consume the schema. This is required for additive runtime-dependent changes such as the no-card trial lifecycle worker, which now depends on both `trial_lifecycle_events` and the expanded `operational_email_deliveries` shape before the worker can report ready. Destructive schema cleanup should be shipped in a later deploy after additive migrations and compatible application code are already live.
+No manual schema command is required on clean startup. The one-shot `db-bootstrap` service bootstraps an empty database before the API starts, and the one-shot `db-migrate` service applies ordered forward migrations before runtime services consume the schema. This is required for additive runtime-dependent changes such as the no-card trial lifecycle worker and AnalyticsBundle incident-correlation storage; API and worker readiness fail closed until their required migrations are recorded. Destructive schema cleanup should be shipped in a later deploy after additive migrations and compatible application code are already live.
 
 ## GitHub App Setup (Optional)
 

@@ -486,5 +486,101 @@ export const ANALYTICS_STORAGE_SCHEMA_MIGRATIONS = [
         ALTER COLUMN has_artifact SET DEFAULT false
       `
     ]
+  }),
+  defineAnalyticsStorageSchemaMigration({
+    id: "202607100001_add_analytics_incident_correlation",
+    description:
+      "Add privacy-safe, idempotent analytics session correlation for incident impact and deploy-aware rollups.",
+    statements: [
+      `
+        ALTER TABLE analytics_rollup_uniques
+        ADD COLUMN IF NOT EXISTS trace_id_hash text
+      `,
+      `
+        ALTER TABLE analytics_rollup_uniques
+        ADD COLUMN IF NOT EXISTS deploy_id text
+      `,
+      `
+        CREATE INDEX IF NOT EXISTS analytics_rollup_uniques_project_trace_bucket_idx
+        ON analytics_rollup_uniques (project_id, trace_id_hash, bucket_start DESC)
+        WHERE trace_id_hash IS NOT NULL
+      `,
+      `
+        ALTER TABLE analytics_rollup_uniques
+        DROP CONSTRAINT IF EXISTS analytics_rollup_uniques_rollup_kind_check
+      `,
+      `
+        ALTER TABLE analytics_rollup_uniques
+        ADD CONSTRAINT analytics_rollup_uniques_rollup_kind_check
+        CHECK (
+          rollup_kind IN (
+            'session',
+            'route_session',
+            'incident_route_session',
+            'transition_session',
+            'action_session',
+            'funnel_step_session',
+            'funnel_completion_session'
+          )
+        ) NOT VALID
+      `,
+      `
+        ALTER TABLE analytics_rollup_uniques
+        VALIDATE CONSTRAINT analytics_rollup_uniques_rollup_kind_check
+      `,
+      `
+        CREATE TABLE IF NOT EXISTS analytics_incident_correlations (
+          project_id uuid NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+          incident_id uuid NOT NULL REFERENCES incidents(id) ON DELETE CASCADE,
+          event_id uuid NOT NULL,
+          service text NOT NULL DEFAULT '',
+          environment text NOT NULL DEFAULT 'production',
+          occurred_at timestamptz NOT NULL,
+          session_id_hash text,
+          trace_id_hash text,
+          created_at timestamptz NOT NULL DEFAULT now(),
+          PRIMARY KEY (incident_id, event_id),
+          CHECK (session_id_hash IS NOT NULL OR trace_id_hash IS NOT NULL)
+        )
+      `,
+      `
+        CREATE INDEX IF NOT EXISTS analytics_incident_correlations_project_session_idx
+        ON analytics_incident_correlations (project_id, session_id_hash, occurred_at DESC)
+        WHERE session_id_hash IS NOT NULL
+      `,
+      `
+        CREATE INDEX IF NOT EXISTS analytics_incident_correlations_project_trace_idx
+        ON analytics_incident_correlations (project_id, trace_id_hash, occurred_at DESC)
+        WHERE trace_id_hash IS NOT NULL
+      `,
+      `
+        CREATE TABLE IF NOT EXISTS analytics_incident_session_links (
+          project_id uuid NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+          incident_id uuid NOT NULL REFERENCES incidents(id) ON DELETE CASCADE,
+          service text NOT NULL DEFAULT '',
+          environment text NOT NULL DEFAULT 'production',
+          bucket_start timestamptz NOT NULL,
+          bucket_granularity text NOT NULL CHECK (bucket_granularity IN ('hour', 'day')),
+          route_key text NOT NULL,
+          dimension_hash text NOT NULL,
+          subject_hash text NOT NULL,
+          created_at timestamptz NOT NULL DEFAULT now(),
+          PRIMARY KEY (
+            incident_id,
+            service,
+            environment,
+            bucket_start,
+            bucket_granularity,
+            route_key,
+            dimension_hash,
+            subject_hash
+          )
+        )
+      `,
+      `
+        CREATE INDEX IF NOT EXISTS analytics_incident_session_links_incident_bucket_idx
+        ON analytics_incident_session_links (incident_id, bucket_granularity, bucket_start DESC)
+      `
+    ]
   })
 ] as const;

@@ -627,6 +627,16 @@ Analytics events are opt-in browser product-usage events. They share the ingesti
 
 Analytics event fields may be derived from the same browser SDK primitives that produce debug breadcrumbs, such as normalized route keys, sanitized action selectors, session ids, and device context. The stored schemas remain separate: debug breadcrumbs and frontend exceptions stay in the debug event family and may feed failure bundles, while `analytics_event` envelopes feed analytics rollups, journey samples, opportunities, and AnalyticsBundle artifacts. Disabling, rejecting, or failing analytics processing must not remove or mutate debug event fields.
 
+### Incident And Deploy Correlation Metadata
+
+- `deploy_id` is retained as a bounded aggregate dimension and on the unique-rollup ledger so deploy comparison inputs do not require raw analytics scans.
+- Analytics route-session subjects and debug-event `session_id` values use the same project-scoped SHA-256 subject hash. Optional `trace_id` values are also SHA-256 hashed before correlation metadata is persisted.
+- `analytics_incident_correlations` stores only project/incident/event scope, service/environment, occurrence time, and nullable hashed session/trace identifiers. It does not retain raw session ids, raw trace ids, analytics payloads, URLs, or user identity.
+- `analytics_incident_session_links` records idempotent incident-to-aggregate-route-session links. A separate `incident_route_session` unique-ledger kind ensures `analytics_route_rollups.linked_incident_sessions` counts each affected route session once even when several incident events or incidents match it.
+- Correlation reconciles in either arrival order: a newly grouped incident links existing aggregate route sessions, while a newly inserted or correlation-enriched route session links existing incident correlations.
+- Correlation metadata expires with the project aggregate-retention window. Project and incident deletion continue to cascade through the correlation tables.
+- Debug incident grouping treats analytics correlation as fail-open enrichment. Correlation storage failures must not prevent incident persistence, bundle generation, alerts, or other existing debug behavior.
+
 ---
 
 ## 2b. AnalyticsBundleV1 Schema

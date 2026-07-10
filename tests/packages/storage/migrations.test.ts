@@ -164,10 +164,14 @@ describe("storage bootstrap schema", () => {
     expect(REQUIRED_API_TABLES).toContain("analytics_journey_samples");
     expect(REQUIRED_API_TABLES).toContain("analytics_opportunities");
     expect(REQUIRED_API_TABLES).toContain("analytics_bundle_generations");
+    expect(REQUIRED_API_TABLES).toContain("analytics_incident_correlations");
+    expect(REQUIRED_API_TABLES).toContain("analytics_incident_session_links");
     expect(REQUIRED_WORKER_TABLES).toContain("analytics_ingestion_ledger");
     expect(REQUIRED_WORKER_TABLES).toContain("analytics_rollup_uniques");
     expect(REQUIRED_WORKER_TABLES).toContain("analytics_session_rollups");
     expect(REQUIRED_WORKER_TABLES).toContain("analytics_bundle_generations");
+    expect(REQUIRED_WORKER_TABLES).toContain("analytics_incident_correlations");
+    expect(REQUIRED_WORKER_TABLES).toContain("analytics_incident_session_links");
   });
 
   it("should include the analytics transition unique-subject migration", (): void => {
@@ -177,6 +181,19 @@ describe("storage bootstrap schema", () => {
 
     expect(migration).toBeDefined();
     expect(migration?.statements.join("\n")).toContain("transition_session");
+  });
+
+  it("should include the analytics incident correlation migration", (): void => {
+    const migration = STORAGE_SCHEMA_MIGRATIONS.find((entry) =>
+      entry.id === "202607100001_add_analytics_incident_correlation"
+    );
+
+    expect(migration).toBeDefined();
+    const sql = migration?.statements.join("\n") ?? "";
+    expect(sql).toContain("trace_id_hash");
+    expect(sql).toContain("analytics_incident_correlations");
+    expect(sql).toContain("analytics_incident_session_links");
+    expect(sql).toContain("incident_route_session");
   });
 
   it("should describe the final schema directly without schema evolution sql", (): void => {
@@ -248,6 +265,8 @@ describe("storage bootstrap schema", () => {
     expect(STORAGE_BOOTSTRAP_SQL.includes("CREATE TABLE project_analytics_settings")).toBe(true);
     expect(STORAGE_BOOTSTRAP_SQL.includes("CREATE TABLE analytics_ingestion_ledger")).toBe(true);
     expect(STORAGE_BOOTSTRAP_SQL.includes("CREATE TABLE analytics_bundle_generations")).toBe(true);
+    expect(STORAGE_BOOTSTRAP_SQL.includes("CREATE TABLE analytics_incident_correlations")).toBe(true);
+    expect(STORAGE_BOOTSTRAP_SQL.includes("CREATE TABLE analytics_incident_session_links")).toBe(true);
     expect(STORAGE_BOOTSTRAP_SQL.includes("severity_lifecycle_scope text")).toBe(true);
     expect(STORAGE_BOOTSTRAP_SQL.includes("alert_rules_severity_lifecycle_scope_check")).toBe(true);
     expect(STORAGE_BOOTSTRAP_SQL.includes("availability_checks_due_idx")).toBe(true);

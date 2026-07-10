@@ -78,6 +78,11 @@ export type {
   DeliverOperationalEmailWorkerDependencies
 } from "./operational-email-processor.js";
 import { recordProjectMetricDeltas, type WorkerAccountAnalyticsDependencies } from "./account-analytics.js";
+import {
+  buildAnalyticsIncidentCorrelationJobFields,
+  recordAnalyticsIncidentCorrelationBestEffort,
+  type AnalyticsIncidentCorrelationRecorder
+} from "./analytics-incident-correlation.js";
 
 type BundleLinkBaseUrls = NonNullable<BuildBundleInput["linkBaseUrls"]>;
 
@@ -202,6 +207,7 @@ export interface GroupIncidentWorkerDependencies {
   githubDispatchPublisher?: IncidentLifecycleGitHubDispatchPublisher;
   objectStore?: Pick<ObjectStoreClient, "deleteObject">;
   improvementBundleWorker?: ImprovementBundleWorkerDependencies;
+  analyticsCorrelationStore?: AnalyticsIncidentCorrelationRecorder;
 }
 
 export interface BuildBundleWorkerDependencies {
@@ -640,6 +646,7 @@ export async function processNextNormalizeEventsJob(
     matched_fields: matchedFields,
     occurred_at: validated.data.occurred_at,
     severity,
+    ...buildAnalyticsIncidentCorrelationJobFields(job.project_id, validated.data.correlation),
     ...(validated.data.event_type === "deploy_metadata"
       ? {
           deploy_metadata: {
@@ -779,6 +786,13 @@ export async function processNextGroupIncidentJob(
       }
     }
   }
+
+  await recordAnalyticsIncidentCorrelationBestEffort({
+    recorder: dependencies.analyticsCorrelationStore,
+    logger: dependencies.logger,
+    job,
+    incidentId: incident.incident_id
+  });
 
   if (incident.duplicate_event !== true && dependencies.improvementBundleWorker !== undefined) {
     await maybeGenerateHostedIncidentImprovementBundle({

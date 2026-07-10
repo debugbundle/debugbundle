@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import {
   createPostgresAnalyticsRollupStore,
+  hashAnalyticsCorrelationValue,
   type Queryable
 } from "../../../packages/storage/src/index.js";
 import type { AnalyticsEventEnvelope } from "../../../packages/shared-types/src/index.js";
@@ -26,8 +27,8 @@ function createPageViewEvent(
       session_id: "sess_123",
       visitor_id_hash: null,
       user_id_hash: null,
-      trace_id: null,
-      deploy_id: null
+      trace_id: "trace_123",
+      deploy_id: "deploy_123"
     },
     payload: {
       kind: "page_view",
@@ -160,13 +161,16 @@ describe("analytics rollup store", () => {
         return { rows: [{ event_id: "550e8400-e29b-41d4-a716-446655440000" }] };
       }
       if (sqlText.includes("INSERT INTO analytics_rollup_uniques")) {
-        return { rows: [{ subject_hash: "subject_hash" }] };
+        return { rows: [{ inserted: true, correlation_enriched: false }] };
       }
       if (
         sqlText.includes("INSERT INTO analytics_session_rollups") ||
         sqlText.includes("INSERT INTO analytics_route_rollups")
       ) {
         return { rows: [] };
+      }
+      if (sqlText.includes("INSERT INTO analytics_incident_session_links")) {
+        return { rows: [{ linked_sessions: "0" }] };
       }
 
       throw new Error(`Unhandled analytics rollup SQL: ${sqlText}`);
@@ -196,6 +200,15 @@ describe("analytics rollup store", () => {
     expect(
       queryMock.mock.calls.some(([, params]) => JSON.stringify(params).includes("google.com"))
     ).toBe(true);
+    expect(
+      queryMock.mock.calls.some(([, params]) => JSON.stringify(params).includes("deploy_123"))
+    ).toBe(true);
+    expect(
+      queryMock.mock.calls.some(([sql, params]) =>
+        String(sql).includes("INSERT INTO analytics_rollup_uniques") &&
+        JSON.stringify(params).includes(hashAnalyticsCorrelationValue("trace_123") ?? "")
+      )
+    ).toBe(true);
   });
 
   it("records route-change transitions into hourly and daily rollups", async (): Promise<void> => {
@@ -205,7 +218,7 @@ describe("analytics rollup store", () => {
         return { rows: [{ event_id: "550e8400-e29b-41d4-a716-446655440001" }] };
       }
       if (sqlText.includes("INSERT INTO analytics_rollup_uniques")) {
-        return { rows: [{ subject_hash: "subject_hash" }] };
+        return { rows: [{ inserted: true, correlation_enriched: false }] };
       }
       if (
         sqlText.includes("INSERT INTO analytics_session_rollups") ||
@@ -213,6 +226,9 @@ describe("analytics rollup store", () => {
         sqlText.includes("INSERT INTO analytics_transition_rollups")
       ) {
         return { rows: [] };
+      }
+      if (sqlText.includes("INSERT INTO analytics_incident_session_links")) {
+        return { rows: [{ linked_sessions: "0" }] };
       }
       if (sqlText.includes("FROM analytics_transition_rollups")) {
         return { rows: [] };
@@ -249,6 +265,44 @@ describe("analytics rollup store", () => {
     ).toBe(true);
   });
 
+  it("reconciles incident links when an existing route session gains trace correlation", async (): Promise<void> => {
+    const queryMock = vi.fn(async (sqlText: string) => {
+      if (sqlText.includes("INSERT INTO analytics_ingestion_ledger")) {
+        return { rows: [{ event_id: "550e8400-e29b-41d4-a716-446655440000" }] };
+      }
+      if (sqlText.includes("INSERT INTO analytics_rollup_uniques")) {
+        return { rows: [{ inserted: false, correlation_enriched: true }] };
+      }
+      if (
+        sqlText.includes("INSERT INTO analytics_session_rollups") ||
+        sqlText.includes("INSERT INTO analytics_route_rollups")
+      ) {
+        return { rows: [] };
+      }
+      if (sqlText.includes("INSERT INTO analytics_incident_session_links")) {
+        return { rows: [{ linked_sessions: "1" }] };
+      }
+
+      throw new Error(`Unhandled analytics rollup SQL: ${sqlText}`);
+    });
+    const store = createPostgresAnalyticsRollupStore(
+      createTransactionalDb(queryMock as Queryable["query"])
+    );
+
+    await expect(
+      store.recordAnalyticsEvent({
+        project_id: "11111111-1111-4111-8111-111111111111",
+        event: createPageViewEvent()
+      })
+    ).resolves.toEqual({ recorded: true });
+
+    expect(
+      queryMock.mock.calls.filter(([sql]) =>
+        String(sql).includes("INSERT INTO analytics_incident_session_links")
+      )
+    ).toHaveLength(2);
+  });
+
   it("does not update rollups when the event is already in the ingestion ledger", async (): Promise<void> => {
     const queryMock = vi.fn(async (sqlText: string, params: unknown[]) => {
       void params;
@@ -280,7 +334,7 @@ describe("analytics rollup store", () => {
         return { rows: [{ event_id: "550e8400-e29b-41d4-a716-446655440002" }] };
       }
       if (sqlText.includes("INSERT INTO analytics_rollup_uniques")) {
-        return { rows: [{ subject_hash: "subject_hash" }] };
+        return { rows: [{ inserted: true, correlation_enriched: false }] };
       }
       if (
         sqlText.includes("INSERT INTO analytics_session_rollups") ||
@@ -288,6 +342,9 @@ describe("analytics rollup store", () => {
         sqlText.includes("INSERT INTO analytics_funnel_rollups")
       ) {
         return { rows: [] };
+      }
+      if (sqlText.includes("INSERT INTO analytics_incident_session_links")) {
+        return { rows: [{ linked_sessions: "0" }] };
       }
       if (sqlText.includes("FROM analytics_funnel_rollups")) {
         return {
@@ -342,7 +399,7 @@ describe("analytics rollup store", () => {
         return { rows: [{ event_id: "550e8400-e29b-41d4-a716-446655440001" }] };
       }
       if (sqlText.includes("INSERT INTO analytics_rollup_uniques")) {
-        return { rows: [{ subject_hash: "subject_hash" }] };
+        return { rows: [{ inserted: true, correlation_enriched: false }] };
       }
       if (
         sqlText.includes("INSERT INTO analytics_session_rollups") ||
@@ -350,6 +407,9 @@ describe("analytics rollup store", () => {
         sqlText.includes("INSERT INTO analytics_transition_rollups")
       ) {
         return { rows: [] };
+      }
+      if (sqlText.includes("INSERT INTO analytics_incident_session_links")) {
+        return { rows: [{ linked_sessions: "0" }] };
       }
       if (sqlText.includes("FROM analytics_transition_rollups")) {
         return {

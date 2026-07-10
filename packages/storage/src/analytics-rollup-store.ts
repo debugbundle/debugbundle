@@ -9,18 +9,16 @@ import {
   evaluateAnalyticsFunnelDropoffOpportunities,
   evaluateAnalyticsJourneyFrictionOpportunities
 } from "./analytics-opportunity-evaluator.js";
+import {
+  createPostgresAnalyticsCorrelationStore,
+  hashAnalyticsCorrelationValue,
+  hashAnalyticsSessionSubject
+} from "./analytics-correlation-store.js";
+import { recordAnalyticsUniqueRollupSubject } from "./analytics-rollup-uniques.js";
 import { runInTransaction } from "./transaction.js";
 import type { Queryable } from "./types.js";
 
 type AnalyticsBucketGranularity = "hour" | "day";
-
-type AnalyticsRollupKind =
-  | "session"
-  | "route_session"
-  | "transition_session"
-  | "action_session"
-  | "funnel_step_session"
-  | "funnel_completion_session";
 
 interface AnalyticsRollupScope {
   projectId: string;
@@ -36,6 +34,8 @@ interface AnalyticsRollupScope {
   language: string | null;
   countryCode: string | null;
   authState: string;
+  traceIdHash: string | null;
+  deployId: string | null;
 }
 
 interface AnalyticsSessionDeltas {
@@ -103,13 +103,14 @@ export function createPostgresAnalyticsRollupStore(db: Queryable): AnalyticsRoll
 
         const dimensions = buildAnalyticsDimensions(
           input.event.payload.dimensions,
-          input.event.payload.custom_dimensions ?? {}
+          input.event.payload.custom_dimensions ?? {},
+          input.event.correlation.deploy_id
         );
         const dimensionHash = hashStableJson(dimensions);
-        const sessionSubjectHash = hashStableJson({
-          project_id: input.project_id,
-          session_id: input.event.correlation.session_id
-        });
+        const sessionSubjectHash = hashAnalyticsSessionSubject(
+          input.project_id,
+          input.event.correlation.session_id
+        );
         const routeKey = getRouteKey(input.event);
         const transitionKey = getTransitionKey(input.event);
         const actionKey = getActionKey(input.event);
@@ -129,23 +130,25 @@ export function createPostgresAnalyticsRollupStore(db: Queryable): AnalyticsRoll
             osFamily: input.event.payload.dimensions.os_family,
             language: input.event.payload.dimensions.language,
             countryCode: input.event.payload.dimensions.country_code,
-            authState: input.event.payload.dimensions.auth_state
+            authState: input.event.payload.dimensions.auth_state,
+            traceIdHash: hashAnalyticsCorrelationValue(input.event.correlation.trace_id),
+            deployId: input.event.correlation.deploy_id
           };
 
-          const countedSession = await insertUniqueRollupSubject(tx, {
+          const sessionSubject = await recordAnalyticsUniqueRollupSubject(tx, {
             ...scope,
             rollupKind: "session",
             rollupKey: "active",
             subjectHash: sessionSubjectHash
           });
           await upsertSessionRollup(tx, scope, {
-            sessions: countedSession ? 1 : 0,
+            sessions: sessionSubject.inserted ? 1 : 0,
             exits: input.event.payload.kind === "session_summary" ? 1 : 0,
             totalPageviews: isPageViewLike(input.event) ? 1 : 0
           });
 
           if (routeKey !== null && isPageViewLike(input.event)) {
-            const countedRouteSession = await insertUniqueRollupSubject(tx, {
+            const routeSessionSubject = await recordAnalyticsUniqueRollupSubject(tx, {
               ...scope,
               rollupKind: "route_session",
               rollupKey: routeKey,
@@ -153,15 +156,28 @@ export function createPostgresAnalyticsRollupStore(db: Queryable): AnalyticsRoll
             });
             await upsertRouteRollup(tx, scope, routeKey, {
               pageviews: 1,
-              uniqueSessions: countedRouteSession ? 1 : 0,
+              uniqueSessions: routeSessionSubject.inserted ? 1 : 0,
               entrances: input.event.payload.kind === "page_view" ? 1 : 0,
               exits: 0
             });
+            if (routeSessionSubject.inserted || routeSessionSubject.correlation_enriched) {
+              await createPostgresAnalyticsCorrelationStore(tx).linkAnalyticsRouteSession({
+                project_id: scope.projectId,
+                service: scope.service,
+                environment: scope.environment,
+                bucket_start: scope.bucketStart,
+                bucket_granularity: scope.bucketGranularity,
+                route_key: routeKey,
+                dimension_hash: scope.dimensionHash,
+                subject_hash: sessionSubjectHash,
+                trace_id_hash: scope.traceIdHash
+              });
+            }
           }
 
           if (transitionKey !== null) {
             const transitionRollupKey = `${transitionKey.fromRouteKey}|${transitionKey.toRouteKey}`;
-            const countedTransitionSession = await insertUniqueRollupSubject(tx, {
+            const transitionSessionSubject = await recordAnalyticsUniqueRollupSubject(tx, {
               ...scope,
               rollupKind: "transition_session",
               rollupKey: transitionRollupKey,
@@ -169,13 +185,13 @@ export function createPostgresAnalyticsRollupStore(db: Queryable): AnalyticsRoll
             });
             await upsertTransitionRollup(tx, scope, transitionKey, {
               transitionCount: 1,
-              uniqueSessions: countedTransitionSession ? 1 : 0
+              uniqueSessions: transitionSessionSubject.inserted ? 1 : 0
             });
           }
 
           if (actionKey !== null) {
             const actionRollupKey = `${actionKey.routeKey}|${actionKey.actionKey}`;
-            const countedActionSession = await insertUniqueRollupSubject(tx, {
+            const actionSessionSubject = await recordAnalyticsUniqueRollupSubject(tx, {
               ...scope,
               rollupKind: "action_session",
               rollupKey: actionRollupKey,
@@ -183,13 +199,13 @@ export function createPostgresAnalyticsRollupStore(db: Queryable): AnalyticsRoll
             });
             await upsertActionRollup(tx, scope, actionKey, {
               eventCount: 1,
-              uniqueSessions: countedActionSession ? 1 : 0
+              uniqueSessions: actionSessionSubject.inserted ? 1 : 0
             });
           }
 
           if (funnelSignal !== null) {
             const funnelRollupKey = `${funnelSignal.funnelKey}|${funnelSignal.stepKey}`;
-            const countedFunnelSession = await insertUniqueRollupSubject(tx, {
+            const funnelSessionSubject = await recordAnalyticsUniqueRollupSubject(tx, {
               ...scope,
               rollupKind: funnelSignal.isCompletion
                 ? "funnel_completion_session"
@@ -198,8 +214,8 @@ export function createPostgresAnalyticsRollupStore(db: Queryable): AnalyticsRoll
               subjectHash: sessionSubjectHash
             });
             await upsertFunnelRollup(tx, scope, funnelSignal, {
-              sessionsEntered: funnelSignal.isCompletion ? 0 : countedFunnelSession ? 1 : 0,
-              sessionsCompleted: funnelSignal.isCompletion ? (countedFunnelSession ? 1 : 0) : 0
+              sessionsEntered: funnelSignal.isCompletion ? 0 : funnelSessionSubject.inserted ? 1 : 0,
+              sessionsCompleted: funnelSignal.isCompletion ? (funnelSessionSubject.inserted ? 1 : 0) : 0
             });
           }
         }
@@ -239,7 +255,8 @@ function buildAnalyticsEventDedupeKey(projectId: string, event: AnalyticsEventEn
 
 function buildAnalyticsDimensions(
   dimensions: AnalyticsDimensions,
-  customDimensions: AnalyticsCustomDimensions
+  customDimensions: AnalyticsCustomDimensions,
+  deployId: string | null
 ): Record<string, unknown> {
   return {
     auth_state: dimensions.auth_state,
@@ -257,6 +274,7 @@ function buildAnalyticsDimensions(
     utm_campaign: dimensions.utm_campaign,
     country_code: dimensions.country_code,
     region_code: dimensions.region_code,
+    ...(deployId === null ? {} : { deploy_id: deployId }),
     custom_dimensions: sortRecord(customDimensions)
   };
 }
@@ -387,47 +405,6 @@ function getFunnelSignal(event: AnalyticsEventEnvelope): {
   }
 
   return null;
-}
-
-async function insertUniqueRollupSubject(
-  db: Queryable,
-  input: AnalyticsRollupScope & {
-    rollupKind: AnalyticsRollupKind;
-    rollupKey: string;
-    subjectHash: string;
-  }
-): Promise<boolean> {
-  const result = await db.query<{ subject_hash: string }>(
-    `
-      INSERT INTO analytics_rollup_uniques (
-        project_id,
-        rollup_kind,
-        service,
-        environment,
-        bucket_start,
-        bucket_granularity,
-        rollup_key,
-        dimension_hash,
-        subject_hash
-      )
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-      ON CONFLICT DO NOTHING
-      RETURNING subject_hash
-    `,
-    [
-      input.projectId,
-      input.rollupKind,
-      input.service,
-      input.environment,
-      input.bucketStart,
-      input.bucketGranularity,
-      input.rollupKey,
-      input.dimensionHash,
-      input.subjectHash
-    ]
-  );
-
-  return result.rows.length > 0;
 }
 
 async function upsertSessionRollup(

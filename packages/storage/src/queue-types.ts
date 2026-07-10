@@ -101,6 +101,8 @@ export interface GroupIncidentJob {
   matched_fields?: string[];
   occurred_at: string;
   severity: "low" | "medium" | "high" | "critical";
+  session_id_hash?: string | null;
+  trace_id_hash?: string | null;
   deploy_metadata?: {
     commit_sha: string;
     version: string;

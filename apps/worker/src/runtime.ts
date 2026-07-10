@@ -14,6 +14,7 @@ import {
   createPostgresAlertDeliveryStore,
   createPostgresAccountAnalyticsStore,
   createPostgresAnalyticsBundleGenerationStore,
+  createPostgresAnalyticsCorrelationStore,
   createPostgresAnalyticsJourneySampleStore,
   createPostgresAnalyticsMetricsStore,
   createPostgresAnalyticsRollupStore,
@@ -248,6 +249,7 @@ export async function runWorkerFromEnv(
   const incidentStore = createPostgresMetadataStore(queryable);
   const billingStore = createPostgresBillingStore(queryable);
   const analyticsRollupStore = createPostgresAnalyticsRollupStore(queryable);
+  const analyticsCorrelationStore = createPostgresAnalyticsCorrelationStore(queryable);
   const analyticsSettingsStore = createPostgresAnalyticsSettingsStore(queryable);
   const analyticsJourneySampleStore = createPostgresAnalyticsJourneySampleStore(queryable);
   const analyticsUsageStore = createPostgresAnalyticsUsageStore(queryable);
@@ -518,6 +520,7 @@ export async function runWorkerFromEnv(
               alertEvaluationQueue: queue,
               logger,
               incidentStore,
+              analyticsCorrelationStore,
               frequencyCounter,
               lifecycleWebhookPublisher,
               githubDispatchPublisher,

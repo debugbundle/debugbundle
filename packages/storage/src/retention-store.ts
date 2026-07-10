@@ -28,8 +28,13 @@ const ANALYTICS_ROLLUP_TABLES = [
   "analytics_route_rollups",
   "analytics_action_rollups",
   "analytics_funnel_rollups",
-  "analytics_transition_rollups"
+  "analytics_transition_rollups",
+  "analytics_incident_session_links"
 ] as const;
+
+type AnalyticsRetentionTable =
+  | (typeof ANALYTICS_ROLLUP_TABLES)[number]
+  | "analytics_incident_correlations";
 
 function buildUuidValuesPlaceholders(count: number): string {
   return Array.from({ length: count }, (_, index) => `($${index + 1}::uuid)`).join(", ");
@@ -52,7 +57,8 @@ function buildAnalyticsBundleGenerationValuesPlaceholders(count: number): string
 
 async function pruneExpiredAnalyticsRollupTable(input: {
   db: Queryable;
-  tableName: (typeof ANALYTICS_ROLLUP_TABLES)[number];
+  tableName: AnalyticsRetentionTable;
+  dateColumn?: "bucket_start" | "occurred_at";
   now: string;
   limit: number;
 }): Promise<number> {
@@ -63,10 +69,10 @@ async function pruneExpiredAnalyticsRollupTable(input: {
         SELECT candidate.ctid
         FROM ${input.tableName} candidate
         LEFT JOIN project_analytics_settings settings ON settings.project_id = candidate.project_id
-        WHERE candidate.bucket_start < (
+        WHERE candidate.${input.dateColumn ?? "bucket_start"} < (
           $1::timestamptz - make_interval(months => COALESCE(settings.aggregate_retention_months, 12)::int)
         )
-        ORDER BY candidate.bucket_start ASC, candidate.project_id ASC
+        ORDER BY candidate.${input.dateColumn ?? "bucket_start"} ASC, candidate.project_id ASC
         LIMIT $2
       )
       RETURNING 1 AS deleted
@@ -245,6 +251,16 @@ export function createPostgresRetentionStore(db: Queryable): RetentionStore {
         deletedRows += deletedFromTable;
         reachedBatchLimit = reachedBatchLimit || deletedFromTable >= input.limit;
       }
+
+      const deletedCorrelations = await pruneExpiredAnalyticsRollupTable({
+        db,
+        tableName: "analytics_incident_correlations",
+        dateColumn: "occurred_at",
+        now: input.now,
+        limit: input.limit
+      });
+      deletedRows += deletedCorrelations;
+      reachedBatchLimit = reachedBatchLimit || deletedCorrelations >= input.limit;
 
       return {
         deleted_rows: deletedRows,

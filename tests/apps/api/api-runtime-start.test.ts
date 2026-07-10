@@ -137,6 +137,8 @@ function buildMigratedRuntimeSchemaRows(sql: string): { rows: Record<string, unk
         { table_name: "analytics_journey_samples" },
         { table_name: "analytics_opportunities" },
         { table_name: "analytics_bundle_generations" },
+        { table_name: "analytics_incident_correlations" },
+        { table_name: "analytics_incident_session_links" },
         { table_name: "audit_logs" },
         { table_name: "processed_billing_events" },
         { table_name: "account_analytics_accounts" },

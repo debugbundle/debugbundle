@@ -253,17 +253,19 @@ describe("retention cleanup service", () => {
       .mockResolvedValueOnce({ rows: [{ deleted: 1 }] })
       .mockResolvedValueOnce({ rows: [] })
       .mockResolvedValueOnce({ rows: [{ deleted: 1 }, { deleted: 1 }] })
+      .mockResolvedValueOnce({ rows: [{ deleted: 1 }] })
+      .mockResolvedValueOnce({ rows: [] })
       .mockResolvedValueOnce({ rows: [] });
     const store = createPostgresRetentionStore({ query });
 
     await expect(
       store.pruneExpiredAnalyticsRollups({ now: "2026-07-08T12:00:00.000Z", limit: 2 })
     ).resolves.toEqual({
-      deleted_rows: 5,
+      deleted_rows: 6,
       reached_batch_limit: true
     });
 
-    expect(query).toHaveBeenCalledTimes(6);
+    expect(query).toHaveBeenCalledTimes(8);
     expect(query).toHaveBeenNthCalledWith(
       1,
       expect.stringContaining("DELETE FROM analytics_rollup_uniques target"),
@@ -294,10 +296,21 @@ describe("retention cleanup service", () => {
       expect.stringContaining("DELETE FROM analytics_transition_rollups target"),
       ["2026-07-08T12:00:00.000Z", 2]
     );
-    for (const call of query.mock.calls) {
+    expect(query).toHaveBeenNthCalledWith(
+      7,
+      expect.stringContaining("DELETE FROM analytics_incident_session_links target"),
+      ["2026-07-08T12:00:00.000Z", 2]
+    );
+    expect(query).toHaveBeenNthCalledWith(
+      8,
+      expect.stringContaining("DELETE FROM analytics_incident_correlations target"),
+      ["2026-07-08T12:00:00.000Z", 2]
+    );
+    for (const call of query.mock.calls.slice(0, 7)) {
       expect(String(call[0])).toContain("settings.aggregate_retention_months");
       expect(String(call[0])).toContain("candidate.bucket_start");
     }
+    expect(String(query.mock.calls[7]?.[0])).toContain("candidate.occurred_at");
   });
 
   it("returns early when the retention cleanup object store is unavailable", async (): Promise<void> => {
