@@ -11,6 +11,7 @@ import {
 } from "../../../packages/shared-types/src/index.js";
 import {
   buildAnalyticsJourneyObjectKey,
+  hashAnalyticsSessionSubject,
   type AnalyticsJourneySampleRecord,
   type AnalyticsUsageStore,
   type AnalyticsJourneySampleStore,
@@ -161,6 +162,10 @@ function toJourneySampleRecord(input: {
     service: input.event.service.name,
     environment: input.event.service.environment,
     session_id_hash: hashAnalyticsIdentifier(input.event.correlation.session_id),
+    correlation_session_hash: hashAnalyticsSessionSubject(
+      input.project_id,
+      input.event.correlation.session_id
+    ),
     visitor_id_hash: input.event.correlation.visitor_id_hash,
     analysis_tags: input.artifact.analysis_tags,
     first_seen_at: input.artifact.first_seen_at,

@@ -377,7 +377,8 @@ describe("analytics incident impact metrics schema", () => {
       journey_patterns: [{
         from_route_key: "/pricing",
         to_route_key: "/checkout",
-        affected_sessions: 2
+        affected_sessions: 2,
+        sample_ids: ["00000000-0000-4000-8000-000000000703"]
       }],
       conversion_delta: {
         availability: "unavailable",

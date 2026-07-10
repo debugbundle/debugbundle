@@ -25,9 +25,11 @@ type JourneyPatternRow = {
   to_route_key: unknown;
   affected_sessions: unknown;
 };
+type JourneyPatternSampleRow = { transition_tag: unknown; sample_id: unknown };
 type BundleStateRow = { generation_id: unknown; status: unknown; failure_reason: unknown };
 
 const DEFAULT_LIMIT = 10;
+const MAX_INCIDENT_IMPACT_JOURNEY_SAMPLE_IDS = 3;
 
 export async function readAnalyticsIncidentImpact(
   db: Queryable,
@@ -43,6 +45,7 @@ export async function readAnalyticsIncidentImpact(
     readAffectedJourneyPatterns(db, input, limit),
     readIncidentImpactBundleState(db, input)
   ]);
+  const sampleIdsByTransition = await readAffectedJourneySampleIds(db, input, journeys.rows);
 
   return AnalyticsIncidentImpactResponseSchema.parse({
     incident_id: input.incident_id,
@@ -68,7 +71,11 @@ export async function readAnalyticsIncidentImpact(
     journey_patterns: journeys.rows.map((row) => ({
       from_route_key: toNonEmptyString(row.from_route_key, "unknown"),
       to_route_key: toNonEmptyString(row.to_route_key, "unknown"),
-      affected_sessions: toNonNegativeInteger(row.affected_sessions)
+      affected_sessions: toNonNegativeInteger(row.affected_sessions),
+      sample_ids: sampleIdsByTransition.get(toTransitionTag(
+        toNonEmptyString(row.from_route_key, "unknown"),
+        toNonEmptyString(row.to_route_key, "unknown")
+      )) ?? []
     })),
     conversion_delta: {
       availability: "unavailable",
@@ -226,6 +233,96 @@ async function readAffectedJourneyPatterns(
   );
 }
 
+async function readAffectedJourneySampleIds(
+  db: Queryable,
+  input: AnalyticsIncidentImpactInput,
+  patterns: JourneyPatternRow[]
+): Promise<Map<string, string[]>> {
+  const transitionTags = [...new Set(patterns.map((pattern) => toTransitionTag(
+    toNonEmptyString(pattern.from_route_key, "unknown"),
+    toNonEmptyString(pattern.to_route_key, "unknown")
+  )))];
+  if (transitionTags.length === 0) {
+    return new Map();
+  }
+
+  const where = buildLinkWhere(input);
+  const params: unknown[] = [
+    ...where.params,
+    transitionTags,
+    new Date().toISOString(),
+    input.from,
+    input.to,
+    MAX_INCIDENT_IMPACT_JOURNEY_SAMPLE_IDS
+  ];
+  const transitionTagsIndex = where.params.length + 1;
+  const nowIndex = transitionTagsIndex + 1;
+  const fromIndex = nowIndex + 1;
+  const toIndex = fromIndex + 1;
+  const limitIndex = toIndex + 1;
+  const result = await db.query<JourneyPatternSampleRow>(
+    `
+      WITH linked_subjects AS (
+        SELECT DISTINCT
+          links.project_id,
+          links.service,
+          links.environment,
+          links.subject_hash
+        FROM analytics_incident_session_links links
+        ${where.sql}
+      ),
+      wanted_tags AS (
+        SELECT unnest($${transitionTagsIndex}::text[]) AS transition_tag
+      ),
+      matching_samples AS (
+        SELECT DISTINCT
+          wanted.transition_tag,
+          samples.id::text AS sample_id,
+          samples.last_seen_at
+        FROM wanted_tags wanted
+        JOIN linked_subjects links ON true
+        JOIN analytics_journey_samples samples
+          ON samples.project_id = links.project_id
+          AND samples.correlation_session_hash = links.subject_hash
+          AND samples.service = links.service
+          AND samples.environment = links.environment
+          AND samples.has_artifact = true
+          AND samples.expires_at > $${nowIndex}::timestamptz
+          AND samples.last_seen_at >= $${fromIndex}::timestamptz
+          AND samples.first_seen_at < $${toIndex}::timestamptz
+          AND samples.analysis_tags @> ARRAY[wanted.transition_tag]::text[]
+      )
+      SELECT transition_tag, sample_id
+      FROM (
+        SELECT
+          transition_tag,
+          sample_id,
+          row_number() OVER (
+            PARTITION BY transition_tag
+            ORDER BY last_seen_at DESC, sample_id DESC
+          ) AS sample_rank
+        FROM matching_samples
+      ) ranked
+      WHERE sample_rank <= $${limitIndex}
+      ORDER BY transition_tag ASC, sample_rank ASC
+    `,
+    params
+  );
+
+  const sampleIdsByTransition = new Map<string, string[]>();
+  for (const row of result.rows) {
+    if (typeof row.transition_tag !== "string" || typeof row.sample_id !== "string") {
+      continue;
+    }
+    sampleIdsByTransition.set(row.transition_tag, [
+      ...(sampleIdsByTransition.get(row.transition_tag) ?? []),
+      row.sample_id
+    ]);
+  }
+
+  return sampleIdsByTransition;
+}
+
 async function readIncidentImpactBundleState(
   db: Queryable,
   input: AnalyticsIncidentImpactInput
@@ -297,6 +394,10 @@ function toImpactSegment(row: SegmentRow): { value: string; affected_sessions: n
 
 function toNonEmptyString(value: unknown, fallback: string): string {
   return typeof value === "string" && value.trim().length > 0 ? value : fallback;
+}
+
+function toTransitionTag(fromRouteKey: string, toRouteKey: string): string {
+  return `transition:${fromRouteKey}->${toRouteKey}`;
 }
 
 function toNonNegativeInteger(value: unknown): number {

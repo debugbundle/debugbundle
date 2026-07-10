@@ -691,7 +691,7 @@ AnalyticsBundle artifacts summarize an analysis unit such as a funnel dropoff, r
 - Same analysis specification plus same rollup/sample/incident/deploy inputs must produce byte-identical deterministic evidence after stable serialization.
 - Arrays must be sorted deterministically.
 - Representative journeys must be selected through deterministic scoring and tie-breaking.
-- Generated representative journeys may be hydrated from retained redacted journey samples referenced by aggregate journey patterns. Hydrated records must remain bounded, use a keyed timeline object for ordered steps, and must not add raw session IDs, raw user identifiers, raw text, URLs with query strings, object-storage keys, or unredacted analytics payloads.
+- Generated representative journeys may be hydrated from retained redacted journey samples referenced by aggregate journey patterns. Incident-impact hydration additionally requires the sample's internal project-scoped correlation session hash to match an affected incident-session link, together with the service/environment, transition tag, bounded window, and completed unexpired artifact. Hydrated records must remain bounded, use a keyed timeline object for ordered steps, and must not add raw session IDs, raw user identifiers, raw text, URLs with query strings, object-storage keys, or unredacted analytics payloads.
 - Wall-clock generation timing belongs in bundle-generation metadata rows, not in deterministic bundle evidence.
 
 **Relationship to `BundleV1`:** `AnalyticsBundleV1` is a separate artifact schema. It does not replace failure or improvement `BundleV1` artifacts and must not be returned from incident failure bundle endpoints.
@@ -1438,7 +1438,7 @@ Required table concepts for the AnalyticsBundle implementation:
 | `analytics_transition_rollups` | Route-to-route transition aggregates for journey/path analysis |
 | `analytics_incident_correlations` | Short-lived hashed debug incident session/trace correlation records used only to reconcile aggregate analytics evidence |
 | `analytics_incident_session_links` | Idempotent incident-to-route-session links that support incident impact metrics without raw event scans |
-| `analytics_journey_samples` | Short-lived retained representative journey sample index pointing to redacted object-storage artifacts; public reads expose only rows with completed artifacts |
+| `analytics_journey_samples` | Short-lived retained representative journey sample index pointing to redacted object-storage artifacts; public reads expose only rows with completed artifacts, while an internal project-scoped correlation session hash supports exact incident-impact replay selection |
 | `analytics_opportunities` | Deterministic usage/friction/incident-impact/deploy-comparison opportunities with status, severity, confidence, evidence summary, related incident/deploy ids, and bundle state |
 | `analytics_bundle_generations` | On-demand or scheduled AnalyticsBundle generation metadata, input fingerprint, status, object key, and failure reason |
 
@@ -1446,7 +1446,7 @@ Dimension storage must remain bounded. Built-in dimensions include route, device
 
 `project_analytics_settings.approved_custom_dimensions` must remain a JSON array whose length is less than or equal to `max_custom_dimensions`; API, storage, and database constraints all preserve that invariant for full and partial settings updates.
 
-Retained journey sample artifacts use object storage path `analytics-journeys/{project_id}/{sample_id}.json.gz` and are indexed by `analytics_journey_samples`. The worker writes at most one deterministic sample per project/session/UTC day when `journey_sample_rate` includes that session. The artifact schema is intentionally small and redacted:
+Retained journey sample artifacts use object storage path `analytics-journeys/{project_id}/{sample_id}.json.gz` and are indexed by `analytics_journey_samples`. The worker writes at most one deterministic sample per project/session/UTC day when `journey_sample_rate` includes that session. Metadata also stores an internal nullable project-scoped `correlation_session_hash` for samples captured after the correlation migration. It is never returned by API, CLI, MCP, or the artifact; old rows remain readable but cannot be selected for incident-impact replay. The artifact schema is intentionally small and redacted:
 
 ```json
 {
@@ -1468,6 +1468,8 @@ Retained journey sample artifacts use object storage path `analytics-journeys/{p
 `events` is capped at 100 safe journey steps, preserving the first and last portions when a session-day exceeds the cap. Each step may include event id, timestamp, analytics kind, safe route/previous-route objects, semantic action/funnel/marker keys, trace/deploy ids, bounded built-in dimensions, and approved custom dimensions. It must not include raw session IDs, raw user IDs, raw visitor IDs, form values, raw text content, DOM snapshots, screenshots, request/response bodies, raw URLs with query strings/fragments, tokens, emails, names, payment data, or arbitrary application payloads.
 
 Aggregate journey-pattern metric responses may expose up to three retained `sample_ids` for each transition pattern and requested metrics window. These IDs are references into `analytics_journey_samples`; they do not expose object-storage keys, raw session IDs, or unredacted journey payloads, and expired samples must be omitted from responses.
+
+Incident-impact journey-pattern rows use the same bounded `sample_ids` shape, but each ID must also be joined through `analytics_incident_session_links` on the internal project-scoped session subject and matched service/environment. This is deliberately not a raw session-ID join or an object-storage scan.
 
 ---
 

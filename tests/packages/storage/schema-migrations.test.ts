@@ -87,6 +87,9 @@ describe("storage schema migrations", () => {
     expect(query.mock.calls.map((call) => String(call[0]))).toContainEqual(
       expect.stringContaining("ADD COLUMN IF NOT EXISTS has_artifact")
     );
+    expect(query.mock.calls.map((call) => String(call[0]))).toContainEqual(
+      expect.stringContaining("ADD COLUMN IF NOT EXISTS correlation_session_hash")
+    );
   });
 
   it("should skip already-applied migrations with matching checksums", async (): Promise<void> => {
@@ -248,6 +251,7 @@ describe("storage schema migrations", () => {
       { table_name: "account_analytics_accounts", column_name: "metrics_collection_started_at" },
       { table_name: "account_payment_retention_records", column_name: "provider" },
       { table_name: "analytics_bundle_generations", column_name: "input_fingerprint" },
+      { table_name: "analytics_journey_samples", column_name: "correlation_session_hash" },
       { table_name: "analytics_journey_samples", column_name: "has_artifact" },
       { table_name: "analytics_usage_counters", column_name: "analytics_events" },
       { table_name: "analytics_usage_counters", column_name: "analytics_journey_samples" },

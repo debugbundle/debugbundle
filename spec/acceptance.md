@@ -1550,6 +1550,8 @@ If CLI says something is healthy and MCP says something different, that is a pro
 - **Given** a DebugBundle incident and analytics rollups with matching session, route, device, deploy, or time-window correlation
 - **When** incident impact is requested
 - **Then** the response includes affected sessions, affected route/funnel, conversion delta where available, top device/browser segments, linked journey patterns, and a generated or pending incident-impact AnalyticsBundle state
+- **And** any returned retained journey sample ID and hydrated representative journey matches the affected project-scoped session subject, service/environment, transition tag, and analysis window, with an unexpired completed artifact
+- **And** no replay is selected from route or time overlap alone, and samples without the internal correlation subject remain unavailable for incident-impact replay
 
 ### AC-ANL-14: Analytics Opportunities
 - **Given** analytics rollups cross deterministic thresholds for funnel dropoff, route exit/backtrack increase, repeated-click friction, conversion decrease after deploy, or incident impact

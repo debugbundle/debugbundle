@@ -113,7 +113,12 @@ function createIncidentImpact(): AnalyticsIncidentImpactResponse {
     affected_funnels: [{ funnel_key: "checkout", affected_sessions: 3 }],
     top_device_types: [{ value: "mobile", affected_sessions: 3 }],
     top_browsers: [{ value: "Chrome", affected_sessions: 2 }],
-    journey_patterns: [{ from_route_key: "/pricing", to_route_key: "/checkout", affected_sessions: 2 }],
+    journey_patterns: [{
+      from_route_key: "/pricing",
+      to_route_key: "/checkout",
+      affected_sessions: 2,
+      sample_ids: []
+    }],
     conversion_delta: { availability: "unavailable", value: null, unit: "percentage_points" },
     analytics_bundle: { status: "not_requested", generation_id: null, failure_reason: null }
   };

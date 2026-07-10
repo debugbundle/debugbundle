@@ -461,6 +461,7 @@ const AnalyticsIncidentImpactJourneyPatternSchema = z
     from_route_key: z.string().trim().min(1).max(2048),
     to_route_key: z.string().trim().min(1).max(2048),
     affected_sessions: z.number().int().nonnegative(),
+    sample_ids: z.array(z.string().uuid()).max(3),
   })
   .strict();
 

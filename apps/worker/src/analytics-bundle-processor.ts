@@ -153,6 +153,9 @@ async function buildAnalyticsBundleInput(input: {
     return await buildIncidentImpactAnalyticsBundleInput({
       generation: input.generation,
       metricsStore: input.metricsStore,
+      analyticsJourneySampleStore: input.analyticsJourneySampleStore,
+      objectStore: input.objectStore,
+      logger: input.logger,
       spec: { ...spec, incident_id: spec.incident_id }
     });
   }
@@ -251,6 +254,9 @@ async function buildAnalyticsBundleInput(input: {
 async function buildIncidentImpactAnalyticsBundleInput(input: {
   generation: AnalyticsBundleGenerationRecord;
   metricsStore: AnalyticsMetricsStore;
+  analyticsJourneySampleStore: Pick<AnalyticsJourneySampleStore, "getAnalyticsJourneySampleForProject">;
+  objectStore: ObjectStoreReader;
+  logger?: RuntimeLogger | undefined;
   spec: NormalizedBundleAnalysisSpec & { incident_id: string };
 }): Promise<AnalyticsBundleBuildInput> {
   const metricsInput = {
@@ -308,7 +314,14 @@ async function buildIncidentImpactAnalyticsBundleInput(input: {
       ...toImpactSegments("browser", impact.top_browsers)
     ],
     journey_patterns: impact.journey_patterns,
-    representative_journeys: [],
+    representative_journeys: await readRepresentativeJourneySamples({
+      project_id: input.generation.project_id,
+      analysis_kind: input.generation.analysis_kind,
+      journeys: impact.journey_patterns,
+      analyticsJourneySampleStore: input.analyticsJourneySampleStore,
+      objectStore: input.objectStore,
+      logger: input.logger
+    }),
     linked_incidents: readLinkedRecords(input.generation.analysis_spec, {
       arrayKey: "related_incident_ids",
       scalarKey: "incident_id",
@@ -326,7 +339,7 @@ async function buildIncidentImpactAnalyticsBundleInput(input: {
 async function readRepresentativeJourneySamples(input: {
   project_id: string;
   analysis_kind: AnalyticsBundleGenerationRecord["analysis_kind"];
-  journeys: Awaited<ReturnType<AnalyticsMetricsStore["getJourneyPatterns"]>>["patterns"];
+  journeys: Array<{ sample_ids?: string[] | undefined }>;
   analyticsJourneySampleStore: Pick<AnalyticsJourneySampleStore, "getAnalyticsJourneySampleForProject">;
   objectStore: ObjectStoreReader;
   logger?: RuntimeLogger | undefined;
@@ -376,7 +389,7 @@ async function readRepresentativeJourneySamples(input: {
 }
 
 function collectJourneySampleIds(
-  journeys: Awaited<ReturnType<AnalyticsMetricsStore["getJourneyPatterns"]>>["patterns"]
+  journeys: Array<{ sample_ids?: string[] | undefined }>
 ): string[] {
   const ids = new Set<string>();
   for (const journey of journeys) {

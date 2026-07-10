@@ -29,6 +29,7 @@ runIntegration("analytics incident impact integration", () => {
     const organizationId = randomUUID();
     const incidentId = randomUUID();
     const generationId = randomUUID();
+    const sampleId = randomUUID();
     const bucketStart = "2026-07-10T00:00:00.000Z";
     const subjectHash = "session-subject-hash";
     const dimensionHash = "dimension-hash";
@@ -82,6 +83,27 @@ runIntegration("analytics incident impact integration", () => {
     );
     await pool.query(
       `
+        INSERT INTO analytics_journey_samples (
+          id, project_id, service, environment, session_id_hash, correlation_session_hash,
+          analysis_tags, first_seen_at, last_seen_at, dimensions_summary, s3_object_key,
+          has_artifact, expires_at
+        )
+        VALUES (
+          $1, $2, 'web', 'production', 'sha256:retained-session', $3,
+          ARRAY['transition:/pricing->/checkout']::text[], $4, $4, '{}'::jsonb,
+          $5, true, '2099-01-01T00:00:00.000Z'
+        )
+      `,
+      [
+        sampleId,
+        projectId,
+        subjectHash,
+        bucketStart,
+        `analytics-journeys/${projectId}/${sampleId}.json.gz`
+      ]
+    );
+    await pool.query(
+      `
         INSERT INTO analytics_bundle_generations (
           id, project_id, analysis_kind, analysis_spec, input_fingerprint, status, updated_at
         )
@@ -113,7 +135,12 @@ runIntegration("analytics incident impact integration", () => {
       affected_funnels: [{ funnel_key: "checkout", affected_sessions: 1 }],
       top_device_types: [{ value: "mobile", affected_sessions: 1 }],
       top_browsers: [{ value: "Chrome", affected_sessions: 1 }],
-      journey_patterns: [{ from_route_key: "/pricing", to_route_key: "/checkout", affected_sessions: 1 }],
+      journey_patterns: [{
+        from_route_key: "/pricing",
+        to_route_key: "/checkout",
+        affected_sessions: 1,
+        sample_ids: [sampleId]
+      }],
       conversion_delta: { availability: "unavailable", value: null },
       analytics_bundle: { status: "pending", generation_id: generationId, failure_reason: null }
     });

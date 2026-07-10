@@ -3,6 +3,8 @@ import type { Queryable } from "./types.js";
 
 export type AnalyticsJourneySampleRecord = AnalyticsJourneySampleMetadata & {
   object_key: string;
+  /** Internal project-scoped subject hash used only for correlation-safe sample selection. */
+  correlation_session_hash: string | null;
 };
 
 export interface AnalyticsJourneySamplesCursor {
@@ -39,6 +41,7 @@ type AnalyticsJourneySampleRow = {
   service: string;
   environment: string;
   session_id_hash: string;
+  correlation_session_hash: string | null;
   visitor_id_hash: string | null;
   analysis_tags: string[];
   first_seen_at: string;
@@ -65,6 +68,7 @@ export function createPostgresAnalyticsJourneySampleStore(db: Queryable): Analyt
       service: row.service === "" ? null : row.service,
       environment: row.environment === "" ? null : row.environment,
       session_id_hash: row.session_id_hash,
+      correlation_session_hash: row.correlation_session_hash,
       visitor_id_hash: row.visitor_id_hash,
       analysis_tags: row.analysis_tags,
       first_seen_at: row.first_seen_at,
@@ -115,6 +119,7 @@ export function createPostgresAnalyticsJourneySampleStore(db: Queryable): Analyt
           service,
           environment,
           session_id_hash,
+          correlation_session_hash,
           visitor_id_hash,
           analysis_tags,
           first_seen_at::text AS first_seen_at,
@@ -158,6 +163,7 @@ export function createPostgresAnalyticsJourneySampleStore(db: Queryable): Analyt
             service,
             environment,
             session_id_hash,
+            correlation_session_hash,
             visitor_id_hash,
             analysis_tags,
             first_seen_at,
@@ -175,14 +181,15 @@ export function createPostgresAnalyticsJourneySampleStore(db: Queryable): Analyt
             $4,
             $5,
             $6,
-            $7::text[],
-            $8::timestamptz,
+            $7,
+            $8::text[],
             $9::timestamptz,
-            $10::jsonb,
-            $11,
+            $10::timestamptz,
+            $11::jsonb,
+            $12,
             false,
-            $12::timestamptz,
-            $13::timestamptz
+            $13::timestamptz,
+            $14::timestamptz
           )
           ON CONFLICT (id) DO NOTHING
           RETURNING id::text AS sample_id
@@ -193,6 +200,7 @@ export function createPostgresAnalyticsJourneySampleStore(db: Queryable): Analyt
           input.service ?? "",
           input.environment ?? "",
           input.session_id_hash,
+          input.correlation_session_hash,
           input.visitor_id_hash,
           input.analysis_tags,
           input.first_seen_at,
@@ -216,6 +224,7 @@ export function createPostgresAnalyticsJourneySampleStore(db: Queryable): Analyt
             service,
             environment,
             session_id_hash,
+            correlation_session_hash,
             visitor_id_hash,
             analysis_tags,
             first_seen_at,
@@ -233,19 +242,24 @@ export function createPostgresAnalyticsJourneySampleStore(db: Queryable): Analyt
             $4,
             $5,
             $6,
-            $7::text[],
-            $8::timestamptz,
+            $7,
+            $8::text[],
             $9::timestamptz,
-            $10::jsonb,
-            $11,
+            $10::timestamptz,
+            $11::jsonb,
+            $12,
             true,
-            $12::timestamptz,
-            $13::timestamptz
+            $13::timestamptz,
+            $14::timestamptz
           )
           ON CONFLICT (id) DO UPDATE
           SET
             service = EXCLUDED.service,
             environment = EXCLUDED.environment,
+            correlation_session_hash = COALESCE(
+              analytics_journey_samples.correlation_session_hash,
+              EXCLUDED.correlation_session_hash
+            ),
             visitor_id_hash = COALESCE(analytics_journey_samples.visitor_id_hash, EXCLUDED.visitor_id_hash),
             analysis_tags = (
               SELECT ARRAY(
@@ -266,6 +280,7 @@ export function createPostgresAnalyticsJourneySampleStore(db: Queryable): Analyt
             service,
             environment,
             session_id_hash,
+            correlation_session_hash,
             visitor_id_hash,
             analysis_tags,
             first_seen_at::text AS first_seen_at,
@@ -282,6 +297,7 @@ export function createPostgresAnalyticsJourneySampleStore(db: Queryable): Analyt
           input.service ?? "",
           input.environment ?? "",
           input.session_id_hash,
+          input.correlation_session_hash,
           input.visitor_id_hash,
           input.analysis_tags,
           input.first_seen_at,
@@ -323,6 +339,7 @@ export function createPostgresAnalyticsJourneySampleStore(db: Queryable): Analyt
             service,
             environment,
             session_id_hash,
+            correlation_session_hash,
             visitor_id_hash,
             analysis_tags,
             first_seen_at::text AS first_seen_at,

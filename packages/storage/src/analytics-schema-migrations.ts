@@ -582,5 +582,28 @@ export const ANALYTICS_STORAGE_SCHEMA_MIGRATIONS = [
         ON analytics_incident_session_links (incident_id, bucket_granularity, bucket_start DESC)
       `
     ]
+  }),
+  defineAnalyticsStorageSchemaMigration({
+    id: "202607100002_add_analytics_journey_sample_correlation_hash",
+    description:
+      "Store a project-scoped session subject hash on retained journey samples so incident-impact replay selection can require an exact affected-session match.",
+    statements: [
+      `
+        ALTER TABLE analytics_journey_samples
+        ADD COLUMN IF NOT EXISTS correlation_session_hash text
+      `,
+      `
+        CREATE INDEX IF NOT EXISTS analytics_journey_samples_project_correlation_seen_idx
+        ON analytics_journey_samples (
+          project_id,
+          correlation_session_hash,
+          service,
+          environment,
+          last_seen_at DESC,
+          id DESC
+        )
+        WHERE correlation_session_hash IS NOT NULL AND has_artifact = true
+      `
+    ]
   })
 ] as const;

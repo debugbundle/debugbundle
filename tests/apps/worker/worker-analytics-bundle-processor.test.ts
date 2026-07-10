@@ -265,9 +265,16 @@ describe("worker processor - build-analytics-bundle", () => {
       { dimension: "device_type", value: "mobile", affected_sessions: 3 }
     ]);
     expect(bundle.journey_patterns).toEqual([
-      { from_route_key: "/pricing", to_route_key: "/checkout", affected_sessions: 2 }
+      {
+        from_route_key: "/pricing",
+        to_route_key: "/checkout",
+        affected_sessions: 2,
+        sample_ids: [SAMPLE_ID]
+      }
     ]);
-    expect(bundle.representative_journeys).toEqual([]);
+    expect(bundle.representative_journeys).toEqual([
+      expect.objectContaining({ sample_id: SAMPLE_ID, event_count: 2 })
+    ]);
   });
 
   it("keeps usage-summary bundles aggregate-only while preserving linked context", async (): Promise<void> => {
@@ -505,7 +512,12 @@ function createMetricsStore(overrides: MetricsStoreOverrides = {}): AnalyticsMet
       affected_funnels: [{ funnel_key: "checkout", affected_sessions: 3 }],
       top_device_types: [{ value: "mobile", affected_sessions: 3 }],
       top_browsers: [{ value: "Chrome", affected_sessions: 2 }],
-      journey_patterns: [{ from_route_key: "/pricing", to_route_key: "/checkout", affected_sessions: 2 }],
+      journey_patterns: [{
+        from_route_key: "/pricing",
+        to_route_key: "/checkout",
+        affected_sessions: 2,
+        sample_ids: [SAMPLE_ID]
+      }],
       conversion_delta: { availability: "unavailable", value: null, unit: "percentage_points" },
       analytics_bundle: { status: "pending", generation_id: GENERATION_ID, failure_reason: null }
     }),
@@ -616,6 +628,7 @@ function createJourneySampleStore(
       service: "web",
       environment: "production",
       session_id_hash: "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      correlation_session_hash: "project-scoped-session",
       visitor_id_hash: null,
       analysis_tags: ["route:/pricing", "transition:/pricing->/checkout"],
       first_seen_at: "2026-07-02T10:00:00.000Z",

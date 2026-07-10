@@ -623,6 +623,8 @@ This ensures Free behaves as **failure-first, not telemetry-first**.
 
 **FR-ANL-17:** Journey replay for AnalyticsBundle must be structured timeline replay, not video replay. Representative journeys may include route changes, semantic actions, funnel steps, conversion markers, friction markers, linked debug incidents, and timing/click counts, but must exclude raw user text and sensitive payload data.
 
+**FR-ANL-17a:** Incident-impact journey replay selection must require an exact match between a retained sample's internal project-scoped session subject and an affected incident-session link, plus the affected route-transition tag and bounded analysis window. Route, service, environment, or time overlap alone must never qualify a retained journey sample for an incident-impact response or artifact. Internal correlation hashes must not be exposed through public journey-sample interfaces; samples captured before this correlation field exists remain ineligible rather than being backfilled from raw session identifiers.
+
 #### AnalyticsBundle Artifacts
 
 **FR-ANL-18:** AnalyticsBundle must be a first-class generated artifact type with its own versioned schema (`AnalyticsBundleV1`). It must not be represented as a failure bundle and must not require one bundle per visit.

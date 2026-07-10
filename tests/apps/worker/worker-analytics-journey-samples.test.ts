@@ -7,6 +7,7 @@ import {
   maybeCaptureAnalyticsJourneySample
 } from "../../../apps/worker/src/analytics-journey-samples.js";
 import type { AnalyticsEventEnvelope } from "../../../packages/shared-types/src/index.js";
+import { hashAnalyticsSessionSubject } from "../../../packages/storage/src/index.js";
 
 const PROJECT_ID = "11111111-1111-4111-8111-111111111111";
 const ORGANIZATION_ID = "99999999-9999-4999-8999-999999999999";
@@ -163,6 +164,7 @@ describe("analytics journey sample capture", () => {
     expect(artifact.last_seen_at).toBe(secondEvent.occurred_at);
     expect(recordAnalyticsJourneySample).toHaveBeenCalledWith(expect.objectContaining({
       sample_id: sampleId,
+      correlation_session_hash: hashAnalyticsSessionSubject(PROJECT_ID, secondEvent.correlation.session_id),
       expires_at: "2026-04-09T13:47:00.000Z"
     }));
     expect(reserveAnalyticsJourneySample).toHaveBeenCalledWith(expect.objectContaining({

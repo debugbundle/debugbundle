@@ -343,7 +343,7 @@ describe("analytics metrics store", () => {
 
   it("reads incident impact only from correlation links, aggregate ledgers, and generation metadata", async (): Promise<void> => {
     const incidentId = "00000000-0000-4000-8000-000000000701";
-    const queryMock = vi.fn(async (sqlText: string) => {
+    const queryMock = vi.fn(async (sqlText: string, params: unknown[]) => {
       if (sqlText.includes("GROUP BY links.route_key")) {
         return { rows: [{ route_key: "/checkout", affected_sessions: "4" }] };
       }
@@ -363,6 +363,18 @@ describe("analytics metrics store", () => {
             to_route_key: "/checkout",
             affected_sessions: "2",
             transition_count: "2"
+          }]
+        };
+      }
+      if (sqlText.includes("samples.correlation_session_hash = links.subject_hash")) {
+        expect(params[7]).toEqual(["transition:/pricing->/checkout"]);
+        expect(params[9]).toBe("2026-03-01T00:00:00.000Z");
+        expect(params[10]).toBe("2026-03-08T00:00:00.000Z");
+        expect(params[11]).toBe(3);
+        return {
+          rows: [{
+            transition_tag: "transition:/pricing->/checkout",
+            sample_id: "00000000-0000-4000-8000-000000000703"
           }]
         };
       }
@@ -409,7 +421,8 @@ describe("analytics metrics store", () => {
       journey_patterns: [{
         from_route_key: "/pricing",
         to_route_key: "/checkout",
-        affected_sessions: 2
+        affected_sessions: 2,
+        sample_ids: ["00000000-0000-4000-8000-000000000703"]
       }],
       conversion_delta: {
         availability: "unavailable",

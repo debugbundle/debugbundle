@@ -380,6 +380,7 @@ export const ANALYTICS_BOOTSTRAP_STATEMENTS = [
       service text NOT NULL DEFAULT '',
       environment text NOT NULL DEFAULT 'production',
       session_id_hash text NOT NULL,
+      correlation_session_hash text,
       visitor_id_hash text,
       analysis_tags text[] NOT NULL DEFAULT '{}'::text[],
       first_seen_at timestamptz NOT NULL,
@@ -396,6 +397,18 @@ export const ANALYTICS_BOOTSTRAP_STATEMENTS = [
   `
     CREATE INDEX analytics_journey_samples_project_expires_idx
     ON analytics_journey_samples (project_id, expires_at)
+  `,
+  `
+    CREATE INDEX analytics_journey_samples_project_correlation_seen_idx
+    ON analytics_journey_samples (
+      project_id,
+      correlation_session_hash,
+      service,
+      environment,
+      last_seen_at DESC,
+      id DESC
+    )
+    WHERE correlation_session_hash IS NOT NULL AND has_artifact = true
   `,
   `
     CREATE INDEX analytics_journey_samples_project_seen_idx
