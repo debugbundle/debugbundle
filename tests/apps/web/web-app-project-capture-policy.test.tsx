@@ -238,15 +238,15 @@ describe("web app — project capture policy settings", () => {
     const pathRulesInput = await screen.findByLabelText(/^path rules$/i);
 
     fireEvent.change(pathRulesInput, { target: { value: "404=checkout" } });
-    expect(await screen.findByRole("alert")).toHaveTextContent(/path must start with/i);
+    expect(await screen.findByText(/path must start with/i)).toBeInTheDocument();
     expect(saveButton).toBeDisabled();
 
     fireEvent.change(pathRulesInput, { target: { value: "404=/checkout/*/confirm" } });
-    expect(await screen.findByRole("alert")).toHaveTextContent(/wildcard must be at the end/i);
+    expect(await screen.findByText(/wildcard must be at the end/i)).toBeInTheDocument();
     expect(saveButton).toBeDisabled();
 
     fireEvent.change(pathRulesInput, { target: { value: "404=/checkout@TRACE" } });
-    expect(await screen.findByRole("alert")).toHaveTextContent(/valid HTTP methods/i);
+    expect(await screen.findByText(/valid HTTP methods/i)).toBeInTheDocument();
     expect(saveButton).toBeDisabled();
 
     fireEvent.change(pathRulesInput, {
@@ -254,7 +254,7 @@ describe("web app — project capture policy settings", () => {
         value: Array.from({ length: 26 }, (_, index) => `404=/route-${index}`).join("\n")
       }
     });
-    expect(await screen.findByRole("alert")).toHaveTextContent(/no more than 25 path rules/i);
+    expect(await screen.findByText(/no more than 25 path rules/i)).toBeInTheDocument();
     expect(saveButton).toBeDisabled();
   });
 

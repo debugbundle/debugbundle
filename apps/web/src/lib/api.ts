@@ -30,6 +30,8 @@ import type {
   CreatedProbeActivation,
   ProjectCapturePolicyResponse,
   ProjectCapturePolicyUpdate,
+  ProjectAnalyticsSettingsResponse,
+  ProjectAnalyticsSettingsUpdate,
   ProjectImprovementSettingsResponse,
   ProjectImprovementSettingsUpdate,
   ProjectRecord,
@@ -449,6 +451,30 @@ export async function updateProjectImprovementSettings(
 ): Promise<ProjectImprovementSettingsResponse> {
   return readJson<ProjectImprovementSettingsResponse>(
     await fetch(`${API_BASE}/v1/projects/${projectId}/improvement-settings`, {
+      method: "PATCH",
+      credentials: "include",
+      headers: buildBrowserSessionHeaders(true),
+      body: JSON.stringify(payload)
+    })
+  );
+}
+
+export async function getProjectAnalyticsSettings(
+  projectId: string
+): Promise<ProjectAnalyticsSettingsResponse> {
+  return readJson<ProjectAnalyticsSettingsResponse>(
+    await fetch(`${API_BASE}/v1/projects/${projectId}/analytics-settings`, {
+      credentials: "include"
+    })
+  );
+}
+
+export async function updateProjectAnalyticsSettings(
+  projectId: string,
+  payload: ProjectAnalyticsSettingsUpdate
+): Promise<ProjectAnalyticsSettingsResponse> {
+  return readJson<ProjectAnalyticsSettingsResponse>(
+    await fetch(`${API_BASE}/v1/projects/${projectId}/analytics-settings`, {
       method: "PATCH",
       credentials: "include",
       headers: buildBrowserSessionHeaders(true),

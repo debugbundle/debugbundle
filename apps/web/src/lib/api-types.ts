@@ -430,6 +430,33 @@ export interface ProjectImprovementSettingsUpdate {
   improvement_bundle_sensitivity?: ImprovementBundleSensitivity;
 }
 
+export type AnalyticsPrivacyMode = "strict" | "standard" | "custom";
+
+export interface ProjectAnalyticsSettings {
+  enabled: boolean;
+  privacy_mode: AnalyticsPrivacyMode;
+  consent_required: boolean;
+  capture_page_views: boolean;
+  capture_route_changes: boolean;
+  capture_actions: boolean;
+  capture_friction_signals: boolean;
+  journey_sample_rate: number;
+  raw_retention_days: number;
+  sample_retention_days: number;
+  aggregate_retention_months: number;
+  max_saved_funnels: number;
+  max_custom_dimensions: number;
+  approved_custom_dimensions: string[];
+}
+
+export interface ProjectAnalyticsSettingsResponse {
+  access_mode: "manage" | "preview";
+  analytics_available: boolean;
+  settings: ProjectAnalyticsSettings;
+}
+
+export type ProjectAnalyticsSettingsUpdate = Partial<ProjectAnalyticsSettings>;
+
 export interface IncidentRecord {
   incident_id: string;
   project_id: string;
