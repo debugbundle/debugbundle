@@ -8,6 +8,8 @@ import type {
   AlertChannel,
   AlertConditionType,
   AlertSeverityLifecycleScope,
+  AnalyticsMetricsQuery,
+  AnalyticsOpportunitiesListResponse,
   AdminAnalyticsAccessStatus,
   AdminMalformedRejectionBreakdown,
   AdminAnalyticsSummary,
@@ -32,6 +34,8 @@ import type {
   ProjectCapturePolicyUpdate,
   ProjectAnalyticsSettingsResponse,
   ProjectAnalyticsSettingsUpdate,
+  ProjectAnalyticsRouteMetricsResponse,
+  ProjectAnalyticsUsageSummaryResponse,
   ProjectImprovementSettingsResponse,
   ProjectImprovementSettingsUpdate,
   ProjectRecord,
@@ -479,6 +483,59 @@ export async function updateProjectAnalyticsSettings(
       credentials: "include",
       headers: buildBrowserSessionHeaders(true),
       body: JSON.stringify(payload)
+    })
+  );
+}
+
+function buildProjectAnalyticsSearchParams(
+  projectId: string,
+  query: AnalyticsMetricsQuery
+): URLSearchParams {
+  const searchParams = new URLSearchParams({ project_id: projectId });
+  if (query.last !== undefined) searchParams.set("last", query.last);
+  if (query.granularity !== undefined) searchParams.set("granularity", query.granularity);
+  if (query.service !== undefined) searchParams.set("service", query.service);
+  if (query.environment !== undefined) searchParams.set("environment", query.environment);
+  if (query.limit !== undefined) searchParams.set("limit", String(query.limit));
+  return searchParams;
+}
+
+export async function getProjectAnalyticsSummary(
+  projectId: string,
+  query: AnalyticsMetricsQuery
+): Promise<ProjectAnalyticsUsageSummaryResponse> {
+  const searchParams = buildProjectAnalyticsSearchParams(projectId, query);
+  return readJson<ProjectAnalyticsUsageSummaryResponse>(
+    await fetch(`${API_BASE}/v1/analytics/summary?${searchParams.toString()}`, {
+      credentials: "include"
+    })
+  );
+}
+
+export async function getProjectAnalyticsRoutes(
+  projectId: string,
+  query: AnalyticsMetricsQuery
+): Promise<ProjectAnalyticsRouteMetricsResponse> {
+  const searchParams = buildProjectAnalyticsSearchParams(projectId, query);
+  return readJson<ProjectAnalyticsRouteMetricsResponse>(
+    await fetch(`${API_BASE}/v1/analytics/routes?${searchParams.toString()}`, {
+      credentials: "include"
+    })
+  );
+}
+
+export async function listProjectAnalyticsOpportunities(
+  projectId: string,
+  limit = 20
+): Promise<AnalyticsOpportunitiesListResponse> {
+  const searchParams = new URLSearchParams({
+    project_id: projectId,
+    status: "open",
+    limit: String(limit)
+  });
+  return readJson<AnalyticsOpportunitiesListResponse>(
+    await fetch(`${API_BASE}/v1/analytics/opportunities?${searchParams.toString()}`, {
+      credentials: "include"
     })
   );
 }

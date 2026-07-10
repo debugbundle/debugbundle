@@ -19,6 +19,7 @@ const PROJECT_TABS = [
   { value: "overview", label: "Overview", suffix: "" },
   { value: "incidents", label: "Incidents", suffix: "/incidents" },
   { value: "improvements", label: "Improvements", suffix: "/improvements" },
+  { value: "analytics", label: "Analytics", suffix: "/analytics" },
   { value: "bundles", label: "Bundles", suffix: "/bundles" },
   { value: "health", label: "Health", suffix: "/health" },
   { value: "probes", label: "Probes", suffix: "/probes" },
