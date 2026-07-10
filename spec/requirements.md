@@ -605,6 +605,8 @@ This ensures Free behaves as **failure-first, not telemetry-first**.
 
 **FR-ANL-09:** Browser analytics must expose consent controls. If a project or SDK config requires consent and consent is absent or false, analytics capture must be disabled locally without affecting debug incident capture.
 
+**FR-ANL-09a:** Direct browser SDKs using a project token must explicitly opt into and hydrate the bounded project analytics capture block from `GET /v1/sdk/config` on initialization. The existing SDK-config response must remain unchanged for clients that do not opt in. Project settings may disable or narrow locally opted-in analytics capture, require explicit consent, or force `strict` privacy, but may never opt an SDK into analytics or widen its local capture configuration. Relay-mode browser SDKs must remain credential-free and rely on their local configuration plus server-side ingestion enforcement.
+
 **FR-ANL-10:** Analytics must not collect form values, raw click text, raw DOM snapshots, screenshots, video replay, precise coordinates, precise location, raw IP addresses, emails, names, phone numbers, addresses, tokens, payment data, or customer secrets by default.
 
 **FR-ANL-10a:** When `analytics.trackActions` is enabled, browser auto-capture may emit only fixed, privacy-safe structural action keys for a bounded allowlist of interactive element or ARIA-role categories. It must not retain DOM selectors, element IDs, URLs, raw attributes, input values, or user-visible text, and it must remain independently configurable from debug click breadcrumbs.

@@ -1483,6 +1483,15 @@ If CLI says something is healthy and MCP says something different, that is a pro
 - **Then** the browser SDK does not capture or ship analytics events
 - **And** `frontend_exception`, `request_event`, probe, breadcrumb, and other debug capture behavior remains governed by existing debug capture settings
 
+### AC-ANL-03a: Remote Capture Settings Are Restrictive
+- **Given** a direct browser SDK initializes with a valid project token and local analytics opt-in
+- **When** the SDK explicitly opts into the analytics block and `GET /v1/sdk/config` returns project analytics settings
+- **Then** remote settings can disable or narrow page, route, action, consent, and strict-privacy capture without changing debug capture
+- **And** remote settings cannot enable analytics for a locally analytics-disabled SDK or widen a local capture setting
+- **And** a remote consent requirement blocks capture until `analytics.setConsent(true)` is explicitly called
+- **And** relay-mode browser SDKs do not fetch SDK config with browser credentials
+- **And** SDK-config responses remain unchanged for legacy clients that do not request the analytics block
+
 ### AC-ANL-04: Analytics Events Do Not Create Incidents
 - **Given** a valid analytics event batch is accepted
 - **When** ingestion and worker processing complete

@@ -807,6 +807,20 @@ export const AnalyticsSettingsSchema = z
 
 export type AnalyticsSettings = z.infer<typeof AnalyticsSettingsSchema>;
 
+export const AnalyticsSdkConfigSchema = z
+  .object({
+    enabled: z.boolean(),
+    privacy_mode: AnalyticsPrivacyModeSchema,
+    consent_required: z.boolean(),
+    capture_page_views: z.boolean(),
+    capture_route_changes: z.boolean(),
+    capture_actions: z.boolean(),
+    capture_friction_signals: z.boolean(),
+  })
+  .strict();
+
+export type AnalyticsSdkConfig = z.infer<typeof AnalyticsSdkConfigSchema>;
+
 export const AnalyticsSettingsResponseSchema = z
   .object({
     access_mode: z.enum(["manage", "preview"]),

@@ -16,6 +16,7 @@ const originalProbeTriggerSecret = process.env["DEBUGBUNDLE_PROBE_TRIGGER_SECRET
 function createServer(overrides: {
   ingestionMetadata?: IngestionMetadataDependency;
   capturePolicyManagement?: CapturePolicyManagementDependency;
+  analyticsSettingsManagement?: ApiServerDependencies["analyticsSettingsManagement"];
   billingManagement?: Partial<BillingManagementDependency>;
   probeManagement?: ProbeManagementDependency;
   projectManagement?: Partial<ProjectManagementDependency>;
@@ -116,6 +117,7 @@ function createServer(overrides: {
     },
     operationalEmailDelivery: overrides.operationalEmailDelivery,
     capturePolicyManagement: overrides.capturePolicyManagement,
+    analyticsSettingsManagement: overrides.analyticsSettingsManagement,
     billingManagement
   });
 }
@@ -224,6 +226,7 @@ describe("api probe routes", () => {
 
     expect(response.statusCode).toBe(200);
     expect(response.headers["cache-control"]).toBe("public, s-maxage=30");
+    expect(response.headers["vary"]).toBe("X-DebugBundle-Analytics-Config");
     expect(response.json()).toEqual({
       probes_enabled: true,
       remote_probes_enabled: false,
@@ -238,6 +241,86 @@ describe("api probe routes", () => {
         capture_probe_events: "buffer_only",
         immediate_client_error_statuses: [],
         immediate_client_error_path_rules: []
+      }
+    });
+  });
+
+  it("should return restrictive project analytics capture settings to eligible browser SDKs", async (): Promise<void> => {
+    const analyticsSettingsManagement = {
+      getAnalyticsSettingsForProject: vi.fn().mockResolvedValue({
+        enabled: true,
+        privacy_mode: "strict",
+        consent_required: true,
+        capture_page_views: false,
+        capture_route_changes: true,
+        capture_actions: false,
+        capture_friction_signals: false,
+        journey_sample_rate: 0.5,
+        raw_retention_days: 1,
+        sample_retention_days: 7,
+        aggregate_retention_months: 12,
+        max_saved_funnels: 3,
+        max_custom_dimensions: 0,
+        approved_custom_dimensions: []
+      }),
+      updateAnalyticsSettingsForProject: vi.fn()
+    };
+    const app = createServer({
+      ingestionMetadata: {
+        resolveProjectByTokenHash: vi.fn().mockResolvedValue({ project_id: "proj_123", organization_plan: "solo" })
+      },
+      analyticsSettingsManagement
+    });
+
+    const response = await app.inject({
+      method: "GET",
+      url: "/v1/sdk/config",
+      headers: {
+        authorization: "Bearer dbundle_proj_test",
+        "x-debugbundle-analytics-config": "1"
+      }
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toMatchObject({
+      analytics: {
+        enabled: true,
+        privacy_mode: "strict",
+        consent_required: true,
+        capture_page_views: false,
+        capture_route_changes: true,
+        capture_actions: false,
+        capture_friction_signals: false
+      }
+    });
+    expect(analyticsSettingsManagement.getAnalyticsSettingsForProject).toHaveBeenCalledWith({
+      organization_id: "",
+      project_id: "proj_123"
+    });
+  });
+
+  it("should return disabled analytics config to an opted-in free-tier SDK", async (): Promise<void> => {
+    const app = createServer();
+
+    const response = await app.inject({
+      method: "GET",
+      url: "/v1/sdk/config",
+      headers: {
+        authorization: "Bearer dbundle_proj_test",
+        "x-debugbundle-analytics-config": "1"
+      }
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toMatchObject({
+      analytics: {
+        enabled: false,
+        privacy_mode: "strict",
+        consent_required: false,
+        capture_page_views: true,
+        capture_route_changes: true,
+        capture_actions: false,
+        capture_friction_signals: true
       }
     });
   });

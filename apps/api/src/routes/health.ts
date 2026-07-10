@@ -11,7 +11,11 @@ import {
   PRESET_DEFAULTS,
   getDefaultPreset
 } from "../../../../packages/shared-types/src/index.js";
-import type { ResolvedCapturePolicy } from "../../../../packages/shared-types/src/index.js";
+import type {
+  AnalyticsSdkConfig,
+  AnalyticsSettings,
+  ResolvedCapturePolicy
+} from "../../../../packages/shared-types/src/index.js";
 import type { ApiDependencies, ApiServerContext } from "../api-types.js";
 import { isProjectTokenOriginAllowed } from "../project-token-origins.js";
 
@@ -24,6 +28,15 @@ const API_SECURITY_TXT = [
 ].join("\n");
 
 const API_ROBOTS_TXT = ["User-agent: *", "Disallow: /"].join("\n");
+const DISABLED_ANALYTICS_SDK_CONFIG: AnalyticsSdkConfig = {
+  enabled: false,
+  privacy_mode: "strict",
+  consent_required: false,
+  capture_page_views: true,
+  capture_route_changes: true,
+  capture_actions: false,
+  capture_friction_signals: true
+};
 
 export function registerHealthRoutes(
   app: FastifyInstance,
@@ -124,11 +137,28 @@ export function registerHealthRoutes(
             now: nowIso
           });
 
+    const includesAnalyticsConfig = request.headers["x-debugbundle-analytics-config"] === "1";
+    let analyticsConfig = DISABLED_ANALYTICS_SDK_CONFIG;
+    if (includesAnalyticsConfig && caps.analytics_bundle && dependencies.analyticsSettingsManagement !== undefined) {
+      try {
+        const analyticsSettings = await dependencies.analyticsSettingsManagement.getAnalyticsSettingsForProject({
+          organization_id: "",
+          project_id: projectAuth.context.project_id
+        });
+        if (analyticsSettings !== null) {
+          analyticsConfig = toAnalyticsSdkConfig(analyticsSettings);
+        }
+      } catch {
+        analyticsConfig = DISABLED_ANALYTICS_SDK_CONFIG;
+      }
+    }
+
     const responseBody = {
       probes_enabled: true,
       remote_probes_enabled: caps.remote_probes,
       active_probes: caps.remote_probes ? activations : [],
       poll_interval_ms: 60000,
+      ...(includesAnalyticsConfig ? { analytics: analyticsConfig } : {}),
       capture_policy: capturePolicy,
       capture_rules: captureRules,
       ...(caps.remote_probes
@@ -138,6 +168,7 @@ export function registerHealthRoutes(
 
     const etag = `"${createHash("sha256").update(JSON.stringify(responseBody), "utf8").digest("hex").slice(0, 16)}"`;
     reply.header("Cache-Control", "public, s-maxage=30");
+    reply.header("Vary", "X-DebugBundle-Analytics-Config");
     reply.header("ETag", etag);
 
     const ifNoneMatch = request.headers["if-none-match"];
@@ -147,4 +178,16 @@ export function registerHealthRoutes(
 
     return reply.status(200).send(responseBody);
   });
+}
+
+function toAnalyticsSdkConfig(settings: AnalyticsSettings): AnalyticsSdkConfig {
+  return {
+    enabled: settings.enabled,
+    privacy_mode: settings.privacy_mode,
+    consent_required: settings.consent_required,
+    capture_page_views: settings.capture_page_views,
+    capture_route_changes: settings.capture_route_changes,
+    capture_actions: settings.capture_actions,
+    capture_friction_signals: settings.capture_friction_signals
+  };
 }

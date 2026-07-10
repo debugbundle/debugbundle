@@ -148,7 +148,7 @@ describe("retrieval parity mapping contract", () => {
       "| Deactivate probes (remote) | `POST /v1/projects/{id}/probes/deactivate` | `probe deactivate` | `deactivate_probe` | Browser Session or Member Token cleanup action; allowed after downgrade |"
     );
     expect(contract).toContain(
-      "| SDK config | `GET /v1/sdk/config` | — | — | SDK-only (project token, includes resolved capture policy) |"
+      "| SDK config | `GET /v1/sdk/config` | — | — | SDK-only (project token, includes resolved capture policy; callers may opt into bounded restrictive analytics capture settings with `X-DebugBundle-Analytics-Config: 1`) |"
     );
   });
 

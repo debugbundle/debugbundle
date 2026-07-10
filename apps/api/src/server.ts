@@ -67,6 +67,7 @@ const ALLOWED_CORS_HEADERS = [
   "Authorization",
   "Content-Type",
   "X-CSRF-Token",
+  "X-DebugBundle-Analytics-Config",
   "X-Debugbundle-Trace-Id"
 ];
 const ALLOWED_CORS_METHODS = ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"];

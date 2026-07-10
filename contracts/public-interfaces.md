@@ -138,7 +138,7 @@ Every capability must be available through all applicable interfaces. Operations
 | Delete capture rule | `DELETE /v1/projects/{id}/capture-rules/{ruleId}` | `capture-rule delete` | `delete_capture_rule` | Browser Session or Member Token, owner/admin only |
 | Get improvement settings | `GET /v1/projects/{id}/improvement-settings` | `improvements settings get` | `get_improvement_settings` | Browser Session or Member Token; members receive preview-only payload and all tiers can inspect availability |
 | Update improvement settings | `PATCH /v1/projects/{id}/improvement-settings` | `improvements settings set` | `update_improvement_settings` | Browser Session or Member Token, owner/admin only, paid Solo+ or self-host |
-| SDK config | `GET /v1/sdk/config` | — | — | SDK-only (project token, includes resolved capture policy) |
+| SDK config | `GET /v1/sdk/config` | — | — | SDK-only (project token, includes resolved capture policy; callers may opt into bounded restrictive analytics capture settings with `X-DebugBundle-Analytics-Config: 1`) |
 | Get GitHub App install URL | `GET /v1/github/app/install-url` | — | — | Browser Session or Member Token, owner/admin only on eligible Solo+ project; web convenience route for the install/reconnect CTA, optionally signed with a return path |
 | Get GitHub installation | `GET /v1/github/installation` | `github status` | `get_github_status` | Browser Session or Member Token; read remains available when preserved GitHub setup is paused on Free |
 | Disconnect GitHub installation | `DELETE /v1/github/installation` | — | — | Web/API cleanup action; owner/admin only and allowed after downgrade |
@@ -1682,7 +1682,7 @@ Always-on probes (ring buffer + error-flush) require no API endpoints — they a
 | POST | `/v1/projects/{id}/probes/activate` | Browser Session or Member Token (Solo+) | Remotely activate probes matching a label pattern |
 | GET | `/v1/projects/{id}/probes` | Browser Session or Member Token | List active remote probe activations; preserved activations remain readable while paused on Free |
 | POST | `/v1/projects/{id}/probes/deactivate` | Browser Session or Member Token | Deactivate a remote probe activation; cleanup remains available after downgrade |
-| GET | `/v1/sdk/config` | Project Token | SDK config (remote probes, poll interval). Solo+: includes active_probes. Free: `remote_probes_enabled: false`. |
+| GET | `/v1/sdk/config` | Project Token | SDK config (remote probes and capture policy). Callers may opt into bounded restrictive analytics settings with `X-DebugBundle-Analytics-Config: 1`; Solo+ then includes eligible project settings and Free returns analytics disabled. |
 
 **Activate request:**
 ```json
@@ -1746,7 +1746,9 @@ If the shared `monthly_remote_activations` allowance is exhausted, activation re
 
 **SDK config response (GET /v1/sdk/config):**
 
-Response header: `Cache-Control: public, s-maxage=30` (CDN-edge-cacheable). Purged on probe activate/deactivate.
+Response headers: `Cache-Control: public, s-maxage=30` and `Vary: X-DebugBundle-Analytics-Config` (CDN-edge-cacheable). Purged on probe activate/deactivate.
+
+Send `X-DebugBundle-Analytics-Config: 1` to opt into the optional `analytics` block. Requests without that header retain the legacy response shape.
 
 ```json
 {
@@ -1762,13 +1764,22 @@ Response header: `Cache-Control: public, s-maxage=30` (CDN-edge-cacheable). Purg
     }
   ],
   "poll_interval_ms": 60000,
+  "analytics": {
+    "enabled": true,
+    "privacy_mode": "strict",
+    "consent_required": false,
+    "capture_page_views": true,
+    "capture_route_changes": true,
+    "capture_actions": false,
+    "capture_friction_signals": true
+  },
   "trigger_token_key": "project-scoped signing key for trigger-token validation"
 }
 ```
 
 `trigger_token_key` is present only when remote probes are enabled for the project. SDKs use it to validate `dbundle_probe_...` trigger tokens locally without an API call.
 
-Free-tier projects receive: `{ "probes_enabled": true, "remote_probes_enabled": false, "active_probes": [], "poll_interval_ms": 0 }` — probes are enabled (always-on ring buffer works) but remote activation is not available.
+Free-tier projects receive an analytics block with `enabled: false`; probes remain enabled for always-on ring buffers but remote activation is not available.
 
 **Guardrails:**
 
@@ -2211,13 +2222,22 @@ Response `200`: same shape as GET response with updated values.
 
 **SDK config integration:**
 
-`GET /v1/sdk/config` response now includes the resolved capture policy:
+`GET /v1/sdk/config` response includes the resolved capture policy. When the caller sends `X-DebugBundle-Analytics-Config: 1`, it also includes bounded analytics capture settings:
 ```json
 {
   "probes_enabled": true,
   "remote_probes_enabled": false,
   "active_probes": [],
   "poll_interval_ms": 60000,
+  "analytics": {
+    "enabled": false,
+    "privacy_mode": "strict",
+    "consent_required": false,
+    "capture_page_views": true,
+    "capture_route_changes": true,
+    "capture_actions": false,
+    "capture_friction_signals": true
+  },
   "capture_policy": {
     "preset": "minimal",
     "capture_logs": "error",
@@ -2231,6 +2251,8 @@ Response `200`: same shape as GET response with updated values.
 ```
 
 SDKs must respect the server-side capture policy. Events that violate the policy are rejected by the ingestion API with reason `capture_policy_rejected`.
+
+Direct browser SDKs may use the opted-in analytics block only to narrow a local analytics opt-in. It cannot enable analytics or widen local capture, and relay-mode browser SDKs do not fetch it because they do not possess project tokens.
 
 ### 1.10 GitHub Repository Automation (Solo+ Only)
 
