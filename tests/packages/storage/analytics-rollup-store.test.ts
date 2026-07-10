@@ -145,6 +145,46 @@ function createFunnelStepEvent(
   } as Partial<AnalyticsEventEnvelope>);
 }
 
+function createFrictionMarkerEvent(
+  overrides: Partial<AnalyticsEventEnvelope> = {}
+): AnalyticsEventEnvelope {
+  return createPageViewEvent({
+    event_id: "550e8400-e29b-41d4-a716-446655440003",
+    payload: {
+      kind: "journey_marker",
+      signal: {
+        marker_key: "friction.dead_click"
+      },
+      route: {
+        path: "/checkout",
+        normalized_path: "/checkout",
+        title: "Checkout"
+      },
+      dimensions: {
+        auth_state: "anonymous",
+        device_type: "desktop",
+        browser_family: "Chrome",
+        browser_major: 125,
+        os_family: "macOS",
+        os_major: 14,
+        language: "en",
+        locale: "en-US",
+        viewport_bucket: "large",
+        referrer_domain: "google.com",
+        utm_source: "google",
+        utm_medium: "cpc",
+        utm_campaign: "summer",
+        country_code: null,
+        region_code: null
+      },
+      custom_dimensions: {
+        account_tier: "team"
+      }
+    },
+    ...overrides
+  } as Partial<AnalyticsEventEnvelope>);
+}
+
 function createTransactionalDb(query: Queryable["query"]): Queryable {
   return {
     query,
@@ -455,6 +495,73 @@ describe("analytics rollup store", () => {
       queryMock.mock.calls.some(([sql]) =>
         String(sql).includes("FROM analytics_transition_rollups")
       )
+    ).toBe(true);
+    expect(
+      queryMock.mock.calls.some(([sql]) =>
+        String(sql).includes("INSERT INTO analytics_opportunities")
+      )
+    ).toBe(true);
+  });
+
+  it("evaluates aggregate browser friction markers after recording marker action rollups", async (): Promise<void> => {
+    const queryMock = vi.fn(async (sqlText: string, params: unknown[]) => {
+      void params;
+      if (sqlText.includes("INSERT INTO analytics_ingestion_ledger")) {
+        return { rows: [{ event_id: "550e8400-e29b-41d4-a716-446655440003" }] };
+      }
+      if (sqlText.includes("INSERT INTO analytics_rollup_uniques")) {
+        return { rows: [{ inserted: true, correlation_enriched: false }] };
+      }
+      if (
+        sqlText.includes("INSERT INTO analytics_session_rollups") ||
+        sqlText.includes("INSERT INTO analytics_action_rollups")
+      ) {
+        return { rows: [] };
+      }
+      if (sqlText.includes("INSERT INTO analytics_incident_session_links")) {
+        return { rows: [{ linked_sessions: "0" }] };
+      }
+      if (sqlText.includes("FROM analytics_action_rollups")) {
+        return {
+          rows: [
+            {
+              service: "web",
+              environment: "production",
+              action_key: "marker:friction.dead_click",
+              route_key: "/checkout",
+              event_count: "45",
+              unique_sessions: "22"
+            }
+          ]
+        };
+      }
+      if (sqlText.includes("INSERT INTO analytics_opportunities")) {
+        expect(params[4]).toBe("journey_friction");
+        expect(JSON.stringify(params)).not.toContain("selector");
+        return { rows: [{ id: "55555555-5555-4555-8555-555555555555" }] };
+      }
+
+      throw new Error(`Unhandled analytics rollup SQL: ${sqlText}`);
+    });
+
+    const store = createPostgresAnalyticsRollupStore(
+      createTransactionalDb(queryMock as Queryable["query"])
+    );
+
+    await expect(
+      store.recordAnalyticsEvent({
+        project_id: "11111111-1111-4111-8111-111111111111",
+        event: createFrictionMarkerEvent()
+      })
+    ).resolves.toEqual({ recorded: true });
+
+    expect(
+      queryMock.mock.calls.filter(([sql]) =>
+        String(sql).includes("INSERT INTO analytics_action_rollups")
+      )
+    ).toHaveLength(2);
+    expect(
+      queryMock.mock.calls.some(([sql]) => String(sql).includes("FROM analytics_action_rollups"))
     ).toBe(true);
     expect(
       queryMock.mock.calls.some(([sql]) =>

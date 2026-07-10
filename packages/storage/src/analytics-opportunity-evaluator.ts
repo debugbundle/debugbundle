@@ -15,6 +15,14 @@ const JOURNEY_FRICTION_MIN_LOOP_TRANSITIONS = 20;
 const JOURNEY_FRICTION_MIN_UNIQUE_SESSIONS = 10;
 const JOURNEY_FRICTION_MIN_REVERSE_TRANSITIONS = 5;
 const JOURNEY_FRICTION_LIMIT = 5;
+const MARKER_FRICTION_ACTION_KEYS = [
+  "marker:friction.repeated_click",
+  "marker:friction.dead_click",
+  "marker:friction.backtrack"
+] as const;
+const MARKER_FRICTION_MIN_EVENTS = 20;
+const MARKER_FRICTION_MIN_UNIQUE_SESSIONS = 10;
+const MARKER_FRICTION_LIMIT = 5;
 
 export interface AnalyticsOpportunityEvaluationInput {
   project_id: string;
@@ -78,6 +86,24 @@ interface JourneyFrictionCandidate {
   unique_sessions: number;
 }
 
+type MarkerFrictionCandidateRow = {
+  service: unknown;
+  environment: unknown;
+  action_key: unknown;
+  route_key: unknown;
+  event_count: unknown;
+  unique_sessions: unknown;
+};
+
+interface MarkerFrictionCandidate {
+  service: string;
+  environment: string;
+  marker_key: (typeof MARKER_FRICTION_ACTION_KEYS)[number];
+  route_key: string;
+  event_count: number;
+  unique_sessions: number;
+}
+
 type AnalyticsOpportunityKind = "funnel_dropoff" | "journey_friction";
 
 export function createPostgresAnalyticsOpportunityEvaluator(
@@ -87,11 +113,13 @@ export function createPostgresAnalyticsOpportunityEvaluator(
     async evaluateProjectOpportunities(input) {
       const funnelDropoffResult = await evaluateAnalyticsFunnelDropoffOpportunities(db, input);
       const journeyFrictionResult = await evaluateAnalyticsJourneyFrictionOpportunities(db, input);
+      const markerFrictionResult = await evaluateAnalyticsMarkerFrictionOpportunities(db, input);
 
       return {
         opportunities_created_or_updated:
           funnelDropoffResult.opportunities_created_or_updated +
-          journeyFrictionResult.opportunities_created_or_updated
+          journeyFrictionResult.opportunities_created_or_updated +
+          markerFrictionResult.opportunities_created_or_updated
       };
     }
   };
@@ -129,6 +157,25 @@ export async function evaluateAnalyticsJourneyFrictionOpportunities(
   let recorded = 0;
   for (const candidate of candidates) {
     await upsertJourneyFrictionOpportunity(db, input.project_id, window, candidate);
+    recorded += 1;
+  }
+
+  return { opportunities_created_or_updated: recorded };
+}
+
+export async function evaluateAnalyticsMarkerFrictionOpportunities(
+  db: Queryable,
+  input: AnalyticsOpportunityEvaluationInput
+): Promise<AnalyticsOpportunityEvaluationResult> {
+  const window = buildEvaluationWindow(input.occurred_at);
+  if (window === null) {
+    return { opportunities_created_or_updated: 0 };
+  }
+
+  const candidates = await readMarkerFrictionCandidates(db, input, window);
+  let recorded = 0;
+  for (const candidate of candidates) {
+    await upsertMarkerFrictionOpportunity(db, input.project_id, window, candidate);
     recorded += 1;
   }
 
@@ -261,6 +308,51 @@ async function readJourneyFrictionCandidates(
   return result.rows.map(mapJourneyFrictionCandidate);
 }
 
+async function readMarkerFrictionCandidates(
+  db: Queryable,
+  input: AnalyticsOpportunityEvaluationInput,
+  window: { from: string; to: string }
+): Promise<MarkerFrictionCandidate[]> {
+  const result = await db.query<MarkerFrictionCandidateRow>(
+    `
+      SELECT
+        service,
+        environment,
+        action_key,
+        route_key,
+        COALESCE(SUM(event_count), 0)::bigint AS event_count,
+        COALESCE(SUM(unique_sessions), 0)::bigint AS unique_sessions
+      FROM analytics_action_rollups
+      WHERE project_id = $1::uuid
+        AND bucket_granularity = 'day'
+        AND bucket_start >= $2::timestamptz
+        AND bucket_start < $3::timestamptz
+        AND ($4::text IS NULL OR service = $4)
+        AND ($5::text IS NULL OR environment = $5)
+        AND action_key = ANY($6::text[])
+        AND route_key <> ''
+      GROUP BY service, environment, action_key, route_key
+      HAVING COALESCE(SUM(event_count), 0) >= $7
+        AND COALESCE(SUM(unique_sessions), 0) >= $8
+      ORDER BY event_count DESC, unique_sessions DESC, action_key ASC, route_key ASC
+      LIMIT $9
+    `,
+    [
+      input.project_id,
+      window.from,
+      window.to,
+      input.service ?? null,
+      input.environment ?? null,
+      [...MARKER_FRICTION_ACTION_KEYS],
+      MARKER_FRICTION_MIN_EVENTS,
+      MARKER_FRICTION_MIN_UNIQUE_SESSIONS,
+      MARKER_FRICTION_LIMIT
+    ]
+  );
+
+  return result.rows.flatMap(mapMarkerFrictionCandidate);
+}
+
 async function upsertFunnelDropoffOpportunity(
   db: Queryable,
   projectId: string,
@@ -313,6 +405,33 @@ async function upsertJourneyFrictionOpportunity(
     title,
     summary,
     evidence,
+    detectedAt: window.to
+  });
+}
+
+async function upsertMarkerFrictionOpportunity(
+  db: Queryable,
+  projectId: string,
+  window: { from: string; to: string },
+  candidate: MarkerFrictionCandidate
+): Promise<void> {
+  const fingerprint = buildMarkerFrictionFingerprint(projectId, candidate);
+  const title = `Repeated ${candidate.marker_key.slice("marker:friction.".length).replaceAll("_", " ")} on ${candidate.route_key}`;
+  const summary =
+    `${candidate.event_count} ${candidate.marker_key.slice("marker:".length)} markers occurred ` +
+    `on ${candidate.route_key} across ${candidate.unique_sessions} sessions.`;
+
+  await upsertAnalyticsOpportunity(db, {
+    projectId,
+    service: candidate.service,
+    environment: candidate.environment,
+    kind: "journey_friction",
+    severity: getMarkerFrictionSeverity(candidate),
+    confidence: getMarkerFrictionConfidence(candidate),
+    fingerprint,
+    title,
+    summary,
+    evidence: buildMarkerFrictionEvidence(window, candidate),
     detectedAt: window.to
   });
 }
@@ -477,6 +596,27 @@ function mapJourneyFrictionCandidate(row: JourneyFrictionCandidateRow): JourneyF
   };
 }
 
+function mapMarkerFrictionCandidate(row: MarkerFrictionCandidateRow): MarkerFrictionCandidate[] {
+  const markerKey = typeof row.action_key === "string" ? row.action_key : null;
+  if (!MARKER_FRICTION_ACTION_KEYS.includes(markerKey as (typeof MARKER_FRICTION_ACTION_KEYS)[number])) {
+    return [];
+  }
+
+  const routeKey = toNonEmptyString(row.route_key, "");
+  if (routeKey.length === 0) {
+    return [];
+  }
+
+  return [{
+    service: toNonEmptyString(row.service, "unknown"),
+    environment: toNonEmptyString(row.environment, "production"),
+    marker_key: markerKey as (typeof MARKER_FRICTION_ACTION_KEYS)[number],
+    route_key: routeKey,
+    event_count: toNonNegativeInteger(row.event_count),
+    unique_sessions: toNonNegativeInteger(row.unique_sessions)
+  }];
+}
+
 function buildFunnelDropoffFingerprint(
   projectId: string,
   candidate: FunnelDropoffCandidate
@@ -504,6 +644,21 @@ function buildJourneyFrictionFingerprint(
     candidate.environment,
     candidate.from_route_key,
     candidate.to_route_key
+  ].join(":");
+}
+
+function buildMarkerFrictionFingerprint(
+  projectId: string,
+  candidate: MarkerFrictionCandidate
+): string {
+  return [
+    "analytics-opportunity.v1",
+    "journey_friction_marker",
+    projectId,
+    candidate.service,
+    candidate.environment,
+    candidate.marker_key.slice("marker:".length),
+    candidate.route_key
   ].join(":");
 }
 
@@ -548,6 +703,24 @@ function buildJourneyFrictionEvidence(
   };
 }
 
+function buildMarkerFrictionEvidence(
+  window: { from: string; to: string },
+  candidate: MarkerFrictionCandidate
+): Record<string, unknown> {
+  return {
+    source: "browser_friction_marker",
+    analysis_window: window,
+    thresholds: {
+      min_events: MARKER_FRICTION_MIN_EVENTS,
+      min_unique_sessions: MARKER_FRICTION_MIN_UNIQUE_SESSIONS
+    },
+    marker_key: candidate.marker_key.slice("marker:".length),
+    route_key: candidate.route_key,
+    event_count: candidate.event_count,
+    unique_sessions: candidate.unique_sessions
+  };
+}
+
 function getFunnelDropoffSeverity(candidate: FunnelDropoffCandidate): AnalyticsBundleSeverity {
   if (candidate.dropoff_rate >= 0.65 && candidate.dropoffs >= 30) {
     return "high";
@@ -572,6 +745,18 @@ function getJourneyFrictionSeverity(candidate: JourneyFrictionCandidate): Analyt
   return "low";
 }
 
+function getMarkerFrictionSeverity(candidate: MarkerFrictionCandidate): AnalyticsBundleSeverity {
+  if (candidate.event_count >= 80 && candidate.unique_sessions >= 30) {
+    return "high";
+  }
+
+  if (candidate.event_count >= 40 || candidate.unique_sessions >= 20) {
+    return "medium";
+  }
+
+  return "low";
+}
+
 function getFunnelDropoffConfidence(
   candidate: FunnelDropoffCandidate
 ): AnalyticsOpportunityRecord["confidence"] {
@@ -586,6 +771,14 @@ function getJourneyFrictionConfidence(
   const sessionWeight = Math.min(0.2, candidate.unique_sessions / 100);
   const loopWeight = Math.min(0.25, candidate.total_loop_transitions / 200);
   return roundRatio(0.5 + sessionWeight + loopWeight);
+}
+
+function getMarkerFrictionConfidence(
+  candidate: MarkerFrictionCandidate
+): AnalyticsOpportunityRecord["confidence"] {
+  const sessionWeight = Math.min(0.2, candidate.unique_sessions / 100);
+  const eventWeight = Math.min(0.25, candidate.event_count / 200);
+  return roundRatio(0.5 + sessionWeight + eventWeight);
 }
 
 function stableUuidFromFingerprint(fingerprint: string): string {

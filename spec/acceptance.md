@@ -1567,9 +1567,10 @@ If CLI says something is healthy and MCP says something different, that is a pro
 - **And** no replay is selected from route or time overlap alone, and samples without the internal correlation subject remain unavailable for incident-impact replay
 
 ### AC-ANL-14: Analytics Opportunities
-- **Given** analytics rollups cross deterministic thresholds for funnel dropoff, route exit/backtrack increase, repeated-click friction, conversion decrease after deploy, or incident impact
+- **Given** analytics rollups cross deterministic thresholds for funnel dropoff, route exit/backtrack increase, fixed repeated-click/dead-click/backtrack marker counts, conversion decrease after deploy, or incident impact
 - **When** the evaluator runs
 - **Then** an analytics opportunity is created or updated with kind, status, severity, confidence, title, summary, evidence, related incidents/deploys, and bundle state
+- **And** friction-marker evidence contains only the fixed marker key, normalized route, analysis window, and aggregate event/session counts, never target-derived data
 - **And** tiny-sample opportunities are suppressed or marked low confidence
 
 ### AC-ANL-15: Web Main Analytics Surface

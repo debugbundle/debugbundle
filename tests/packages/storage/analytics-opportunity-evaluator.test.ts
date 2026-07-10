@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   createPostgresAnalyticsOpportunityEvaluator,
   evaluateAnalyticsFunnelDropoffOpportunities,
+  evaluateAnalyticsMarkerFrictionOpportunities,
   evaluateAnalyticsJourneyFrictionOpportunities,
   type Queryable
 } from "../../../packages/storage/src/index.js";
@@ -55,6 +56,21 @@ describe("analytics opportunity evaluator", () => {
         return { rows: [] };
       }
 
+      if (sqlText.includes("FROM analytics_action_rollups")) {
+        expect(params).toEqual([
+          PROJECT_ID,
+          "2026-03-04T00:00:00.000Z",
+          "2026-03-11T00:00:00.000Z",
+          "web",
+          "production",
+          ["marker:friction.repeated_click", "marker:friction.dead_click", "marker:friction.backtrack"],
+          20,
+          10,
+          5
+        ]);
+        return { rows: [] };
+      }
+
       if (sqlText.includes("INSERT INTO analytics_opportunities")) {
         expect(sqlText).toContain("ON CONFLICT (project_id, fingerprint)");
         expect(params[1]).toBe(PROJECT_ID);
@@ -93,7 +109,7 @@ describe("analytics opportunity evaluator", () => {
       })
     ).resolves.toEqual({ opportunities_created_or_updated: 1 });
 
-    expect(queryMock).toHaveBeenCalledTimes(3);
+    expect(queryMock).toHaveBeenCalledTimes(4);
   });
 
   it("creates or updates journey-friction opportunities from aggregate transition loops", async (): Promise<void> => {
@@ -155,6 +171,68 @@ describe("analytics opportunity evaluator", () => {
 
     await expect(
       evaluateAnalyticsJourneyFrictionOpportunities(
+        { query: queryMock as Queryable["query"] },
+        {
+          project_id: PROJECT_ID,
+          occurred_at: "2026-03-10T13:45:27.000Z",
+          service: "web",
+          environment: "production"
+        }
+      )
+    ).resolves.toEqual({ opportunities_created_or_updated: 1 });
+
+    expect(queryMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("creates or updates journey-friction opportunities from aggregate browser friction markers", async (): Promise<void> => {
+    const queryMock = vi.fn(async (sqlText: string, params: unknown[]) => {
+      if (sqlText.includes("FROM analytics_action_rollups")) {
+        expect(params).toEqual([
+          PROJECT_ID,
+          "2026-03-04T00:00:00.000Z",
+          "2026-03-11T00:00:00.000Z",
+          "web",
+          "production",
+          ["marker:friction.repeated_click", "marker:friction.dead_click", "marker:friction.backtrack"],
+          20,
+          10,
+          5
+        ]);
+        return {
+          rows: [
+            {
+              service: "web",
+              environment: "production",
+              action_key: "marker:friction.dead_click",
+              route_key: "/checkout",
+              event_count: "45",
+              unique_sessions: "22"
+            }
+          ]
+        };
+      }
+
+      if (sqlText.includes("INSERT INTO analytics_opportunities")) {
+        expect(params[4]).toBe("journey_friction");
+        expect(params[5]).toBe("medium");
+        expect(params[7]).toBe(
+          "analytics-opportunity.v1:journey_friction_marker:11111111-1111-4111-8111-111111111111:web:production:friction.dead_click:/checkout"
+        );
+        expect(JSON.parse(String(params[10]))).toMatchObject({
+          source: "browser_friction_marker",
+          marker_key: "friction.dead_click",
+          route_key: "/checkout",
+          event_count: 45,
+          unique_sessions: 22
+        });
+        return { rows: [{ id: "55555555-5555-4555-8555-555555555555" }] };
+      }
+
+      throw new Error(`Unhandled evaluator SQL: ${sqlText}`);
+    });
+
+    await expect(
+      evaluateAnalyticsMarkerFrictionOpportunities(
         { query: queryMock as Queryable["query"] },
         {
           project_id: PROJECT_ID,

@@ -131,6 +131,7 @@ export type {
 export {
   createPostgresAnalyticsOpportunityEvaluator,
   evaluateAnalyticsFunnelDropoffOpportunities,
+  evaluateAnalyticsMarkerFrictionOpportunities,
   evaluateAnalyticsJourneyFrictionOpportunities
 } from "./analytics-opportunity-evaluator.js";
 export type {

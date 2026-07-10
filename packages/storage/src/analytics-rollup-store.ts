@@ -7,6 +7,7 @@ import type {
 } from "../../shared-types/src/index.js";
 import {
   evaluateAnalyticsFunnelDropoffOpportunities,
+  evaluateAnalyticsMarkerFrictionOpportunities,
   evaluateAnalyticsJourneyFrictionOpportunities
 } from "./analytics-opportunity-evaluator.js";
 import {
@@ -238,6 +239,15 @@ export function createPostgresAnalyticsRollupStore(db: Queryable): AnalyticsRoll
           });
         }
 
+        if (isBrowserFrictionMarker(input.event)) {
+          await evaluateAnalyticsMarkerFrictionOpportunities(tx, {
+            project_id: input.project_id,
+            occurred_at: input.event.occurred_at,
+            service: input.event.service.name,
+            environment: input.event.service.environment
+          });
+        }
+
         return { recorded: true };
       });
     }
@@ -347,6 +357,19 @@ function getTransitionKey(event: AnalyticsEventEnvelope): {
 
 function isPageViewLike(event: AnalyticsEventEnvelope): boolean {
   return event.payload.kind === "page_view" || event.payload.kind === "route_change";
+}
+
+function isBrowserFrictionMarker(event: AnalyticsEventEnvelope): boolean {
+  if (event.payload.kind !== "journey_marker") {
+    return false;
+  }
+
+  const markerKey = event.payload.signal?.marker_key;
+  return (
+    markerKey === "friction.repeated_click" ||
+    markerKey === "friction.dead_click" ||
+    markerKey === "friction.backtrack"
+  );
 }
 
 function getActionKey(
