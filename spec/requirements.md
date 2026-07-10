@@ -580,7 +580,7 @@ This ensures Free behaves as **failure-first, not telemetry-first**.
 
 **FR-ANL-01:** Analytics capture must be disabled by default. Existing SDK installs must not begin collecting analytics after upgrade unless the project/browser SDK explicitly enables analytics.
 
-**FR-ANL-02:** The first supported analytics capture surface is the browser SDK. Browser analytics must support sessions, page views, route changes, semantic actions, funnel steps, conversions, journey markers, session summaries, device/browser/OS/language context, referrer/UTM context, auth state, and controlled custom dimensions.
+**FR-ANL-02:** The first supported analytics capture surface is the browser SDK. Browser analytics must support sessions, page views, route changes, semantic actions, opt-in structural actions, funnel steps, conversions, journey markers, session summaries, device/browser/OS/language context, referrer/UTM context, auth state, and controlled custom dimensions.
 
 **FR-ANL-03:** Analytics events are a separate ingestion lane from the eight debug event types in FR-SDK-05. Analytics events must never create, reopen, regress, or materially update incidents; must never dispatch incident alerts/webhooks/GitHub automation; and must not be assigned `event_class` values used by debug event billing and incident eligibility.
 
@@ -606,6 +606,8 @@ This ensures Free behaves as **failure-first, not telemetry-first**.
 **FR-ANL-09:** Browser analytics must expose consent controls. If a project or SDK config requires consent and consent is absent or false, analytics capture must be disabled locally without affecting debug incident capture.
 
 **FR-ANL-10:** Analytics must not collect form values, raw click text, raw DOM snapshots, screenshots, video replay, precise coordinates, precise location, raw IP addresses, emails, names, phone numbers, addresses, tokens, payment data, or customer secrets by default.
+
+**FR-ANL-10a:** When `analytics.trackActions` is enabled, browser auto-capture may emit only fixed, privacy-safe structural action keys for a bounded allowlist of interactive element or ARIA-role categories. It must not retain DOM selectors, element IDs, URLs, raw attributes, input values, or user-visible text, and it must remain independently configurable from debug click breadcrumbs.
 
 **FR-ANL-11:** Analytics paths and routes must strip query strings by default before long-term aggregation. Raw URLs with query strings may not be stored in long-term analytics tables.
 
