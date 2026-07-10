@@ -1476,6 +1476,7 @@ If CLI says something is healthy and MCP says something different, that is a pro
 - **When** a user starts a session, views pages, changes routes, triggers semantic actions, advances funnel steps, and converts
 - **Then** the SDK emits analytics events for session, page, route, action, funnel, and conversion signals
 - **And** each analytics event includes session correlation, service/environment, device type, browser, OS, language/locale, viewport bucket, referrer/UTM context when available, and configured privacy-safe identity fields
+- **And** direct-browser `standard` privacy mode reuses a project-scoped anonymous visitor hash across SDK instances without persisting or emitting the project token or raw visitor value; `strict` remains session-only and consent withdrawal removes the stored anonymous visitor value
 
 ### AC-ANL-03: Consent Gating
 - **Given** analytics is enabled with consent required
