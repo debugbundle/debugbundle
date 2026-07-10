@@ -6,6 +6,10 @@ The format is based on Keep a Changelog and this project follows Semantic Versio
 
 ## [Unreleased]
 
+### Added
+
+- Documented the AnalyticsBundle release surface across the repository README, CLI and MCP package READMEs, public interface contract, self-host operating guide, and documentation source tree. The release guidance covers aggregate metrics, bounded structured journey evidence, privacy/retention controls, exact incident-impact correlation, migration order, and the idle aggregate-only evaluator.
+
 ### Changed
 
 - Bumped `@debugbundle/cli` to `1.6.4` for the alert severity lifecycle-scope release.

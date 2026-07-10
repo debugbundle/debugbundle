@@ -809,7 +809,7 @@ When `incident_id` or `deploy_id` is supplied, the generation stores those value
 }
 ```
 
-**AnalyticsBundle response:** full `AnalyticsBundleV1` JSON when ready; `{ "status": "pending", "bundle_generation_id": "uuid" }` while queued/running; `{ "status": "failed", "reason": "..." }` when generation failed or allowance is exhausted.
+**AnalyticsBundle response:** full `AnalyticsBundleV1` JSON when ready; `{ "status": "pending", "bundle_generation_id": "uuid" }` while queued/running; `{ "status": "failed", "reason": "..." }` when generation failed or allowance is exhausted. Hydrated representative journeys are capped at five and expose deterministic `selection_rank`, `selection_basis`, and aggregate selection counts. Incident-impact journeys remain eligible only through the exact internal correlation/session, transition, service/environment, bounded-window, completed-artifact constraint; those internal hashes are never exposed.
 
 Authorization failure: `401 { "error": "invalid_member_token" }` or `401 { "error": "invalid_session" }`.
 Out-of-scope or missing project/opportunity/bundle: `404`.

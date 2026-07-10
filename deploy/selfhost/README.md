@@ -102,6 +102,24 @@ Default local endpoints after `docker compose up -d`:
 - Redis: `localhost:6380`
 - LocalStack S3: `http://localhost:4567`
 
+## AnalyticsBundle Operations
+
+AnalyticsBundle is disabled per project until an owner or admin enables it through the authenticated API, CLI, MCP, or web settings surface. Self-host mode removes tier and allowance enforcement, but it does not bypass consent, privacy, validation, redaction, or retention controls.
+
+Analytics data uses three independent project settings:
+
+| Setting | Range | What expires |
+| --- | --- | --- |
+| `raw_retention_days` | 1-30 days | Short-lived raw analytics input objects and ingestion-ledger entries. |
+| `sample_retention_days` | 1-365 days | Retained redacted representative journey samples and their object-storage artifacts. |
+| `aggregate_retention_months` | 1-120 months | Aggregate rollups, completed/failed AnalyticsBundle generations, and their artifacts. |
+
+The worker cleanup lane deletes expired objects and metadata automatically. Aggregate metrics remain the normal query model; no analytics raw-event search surface exists. Generated journey timelines contain only redacted safe fields, and incident-impact replay remains restricted to correlation-backed retained samples.
+
+`ANALYTICS_OPPORTUNITY_EVALUATION_INTERVAL_MS` controls the additional idle, aggregate-only opportunity scan. It is six hours by default, uses a distributed lease and cursor-bounded batches, and never scans raw analytics objects. Event-triggered aggregation remains the low-latency evaluation path.
+
+For an existing installation, deploy the current `db-migrate` service before API or Worker containers that use AnalyticsBundle tables. Do not run `db-bootstrap` as an upgrade mechanism: it is only for empty databases. Preserve `ANALYTICS_HASH_SECRET` across deploys because it protects deletion-safe account analytics identifiers and their deduplication continuity; it is not the incident-impact correlation hash.
+
 ## Health Checks
 
 Every long-running service has a health check:

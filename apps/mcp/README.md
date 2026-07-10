@@ -1,6 +1,6 @@
 # @debugbundle/mcp
 
-MCP server for production debugging bundles and incident workflows for AI agents. DebugBundle lets agents inspect incidents, deterministic bundles, reproductions, probes, hosted health checks, alerts, webhooks, projects, and setup state through the same management surface as the API and CLI.
+MCP server for production debugging bundles, AnalyticsBundles, and incident workflows for AI agents. DebugBundle lets agents inspect incidents, deterministic bundles, product-usage evidence, reproductions, probes, hosted health checks, alerts, webhooks, projects, and setup state through the same management surface as the API and CLI.
 
 ## Install
 
@@ -61,6 +61,8 @@ DebugBundle does not expose a hosted remote MCP endpoint today; this package is 
 
 - List active incidents and fetch full incident context.
 - Fetch deterministic debug bundles and reproduction artifacts.
+- Query aggregate usage, routes, device/browser/OS/language segments, referrers, actions, funnels, and journey patterns without waiting for an analysis artifact.
+- Inspect retained redacted journey samples, analytics opportunities, and generated AnalyticsBundles; request a bounded analysis artifact when aggregate metrics alone are insufficient.
 - Inspect hosted health checks, probes, alerts, webhooks, projects, members, billing, capture policy, and GitHub automation state.
 - Run local and hosted verification through tools such as `verify_local`, `verify_cloud`, `doctor`, `smoke`, and `analyze`.
 - Resolve or reopen incidents after verification.
