@@ -56,6 +56,7 @@ describe("cli main analytics routing", () => {
     const getAnalyticsActionsCommand = vi.fn().mockResolvedValue({ exitCode: 0, output: "actions" });
     const listAnalyticsFunnelsCommand = vi.fn().mockResolvedValue({ exitCode: 0, output: "funnels" });
     const getAnalyticsFunnelCommand = vi.fn().mockResolvedValue({ exitCode: 0, output: "funnel" });
+    const getAnalyticsIncidentImpactCommand = vi.fn().mockResolvedValue({ exitCode: 0, output: "impact" });
     const listAnalyticsOpportunitiesCommand = vi.fn().mockResolvedValue({ exitCode: 0, output: "opportunities" });
     const getAnalyticsOpportunityCommand = vi.fn().mockResolvedValue({ exitCode: 0, output: "opportunity" });
     const listAnalyticsBundlesCommand = vi.fn().mockResolvedValue({ exitCode: 0, output: "bundle-list" });
@@ -91,6 +92,15 @@ describe("cli main analytics routing", () => {
     await expect(runCli(["analytics", "funnel", "checkout", "--project", "proj_123"], { getAnalyticsFunnelCommand })).resolves.toEqual({
       exitCode: 0,
       output: "funnel"
+    });
+    await expect(
+      runCli(
+        ["analytics", "incident-impact", "incident_123", "--project", "proj_123", "--environment", "production"],
+        { getAnalyticsIncidentImpactCommand }
+      )
+    ).resolves.toEqual({
+      exitCode: 0,
+      output: "impact"
     });
     await expect(
       runCli(
@@ -210,6 +220,11 @@ describe("cli main analytics routing", () => {
     expect(getAnalyticsActionsCommand).toHaveBeenCalledWith({ projectId: "proj_123" });
     expect(listAnalyticsFunnelsCommand).toHaveBeenCalledWith({ projectId: "proj_123" });
     expect(getAnalyticsFunnelCommand).toHaveBeenCalledWith({ projectId: "proj_123", funnelKey: "checkout" });
+    expect(getAnalyticsIncidentImpactCommand).toHaveBeenCalledWith({
+      projectId: "proj_123",
+      incidentId: "incident_123",
+      environment: "production"
+    });
     expect(listAnalyticsOpportunitiesCommand).toHaveBeenCalledWith({
       projectId: "proj_123",
       status: "all",

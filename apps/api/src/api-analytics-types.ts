@@ -6,6 +6,7 @@ import type {
   AnalyticsDeviceBreakdownResponse,
   AnalyticsFunnelAnalysisResponse,
   AnalyticsFunnelsResponse,
+  AnalyticsIncidentImpactResponse,
   AnalyticsJourneySampleMetadata,
   AnalyticsJourneyPatternsResponse,
   AnalyticsOpportunitiesListResponse,
@@ -45,6 +46,7 @@ export interface ApiAnalyticsDependencies {
     getActionMetricsForProject(input: AnalyticsMetricsQueryInput): Promise<AnalyticsActionMetricsResponse>;
     listFunnelsForProject(input: AnalyticsMetricsQueryInput): Promise<AnalyticsFunnelsResponse>;
     getFunnelAnalysisForProject(input: AnalyticsFunnelQueryInput): Promise<AnalyticsFunnelAnalysisResponse>;
+    getIncidentImpactForProject(input: AnalyticsIncidentImpactQueryInput): Promise<AnalyticsIncidentImpactResponse>;
   } | undefined;
   analyticsJourneySamples?: {
     listAnalyticsJourneySamplesForProject(input: {
@@ -124,4 +126,8 @@ type AnalyticsMetricsQueryInput = {
 
 type AnalyticsFunnelQueryInput = AnalyticsMetricsQueryInput & {
   funnel_key: string;
+};
+
+type AnalyticsIncidentImpactQueryInput = AnalyticsMetricsQueryInput & {
+  incident_id: string;
 };

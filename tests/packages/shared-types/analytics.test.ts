@@ -5,6 +5,7 @@ import {
   ANALYTICS_EVENT_SCHEMA_VERSION,
   AnalyticsBundleV1Schema,
   AnalyticsEventEnvelopeSchema,
+  AnalyticsIncidentImpactResponseSchema,
   AnalyticsJourneyPatternsResponseSchema,
   AnalyticsOpportunitiesListResponseSchema,
   AnalyticsOpportunityResponseSchema,
@@ -353,6 +354,42 @@ describe("analytics journey pattern metrics schema", () => {
 
     expect(parsed.patterns[0]?.from_route_key).toBe("/pricing");
     expect(parsed.patterns[0]?.sample_ids).toEqual(["00000000-0000-4000-8000-000000000701"]);
+  });
+});
+
+describe("analytics incident impact metrics schema", () => {
+  it("parses bounded aggregate incident impact without claiming an unavailable conversion delta", () => {
+    expect(AnalyticsIncidentImpactResponseSchema.parse({
+      incident_id: "00000000-0000-4000-8000-000000000701",
+      window: {
+        project_id: "00000000-0000-4000-8000-000000000501",
+        from: "2026-07-01T00:00:00.000Z",
+        to: "2026-07-02T00:00:00.000Z",
+        granularity: "day",
+        service: "web",
+        environment: "production"
+      },
+      affected_sessions: 4,
+      affected_routes: [{ route_key: "/checkout", affected_sessions: 4 }],
+      affected_funnels: [{ funnel_key: "checkout", affected_sessions: 3 }],
+      top_device_types: [{ value: "mobile", affected_sessions: 3 }],
+      top_browsers: [{ value: "Chrome", affected_sessions: 2 }],
+      journey_patterns: [{
+        from_route_key: "/pricing",
+        to_route_key: "/checkout",
+        affected_sessions: 2
+      }],
+      conversion_delta: {
+        availability: "unavailable",
+        value: null,
+        unit: "percentage_points"
+      },
+      analytics_bundle: {
+        status: "pending",
+        generation_id: "00000000-0000-4000-8000-000000000702",
+        failure_reason: null
+      }
+    })).toMatchObject({ affected_sessions: 4 });
   });
 });
 

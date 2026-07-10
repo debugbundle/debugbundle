@@ -1436,6 +1436,8 @@ Required table concepts for the AnalyticsBundle implementation:
 | `analytics_funnel_definitions` | Optional saved funnel definitions for named project funnels |
 | `analytics_funnel_rollups` | Funnel-step conversion/dropoff/time aggregates by bounded dimensions |
 | `analytics_transition_rollups` | Route-to-route transition aggregates for journey/path analysis |
+| `analytics_incident_correlations` | Short-lived hashed debug incident session/trace correlation records used only to reconcile aggregate analytics evidence |
+| `analytics_incident_session_links` | Idempotent incident-to-route-session links that support incident impact metrics without raw event scans |
 | `analytics_journey_samples` | Short-lived retained representative journey sample index pointing to redacted object-storage artifacts; public reads expose only rows with completed artifacts |
 | `analytics_opportunities` | Deterministic usage/friction/incident-impact/deploy-comparison opportunities with status, severity, confidence, evidence summary, related incident/deploy ids, and bundle state |
 | `analytics_bundle_generations` | On-demand or scheduled AnalyticsBundle generation metadata, input fingerprint, status, object key, and failure reason |

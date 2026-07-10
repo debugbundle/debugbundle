@@ -684,6 +684,10 @@ export function createApiDependencies(input: CreateApiDependenciesInput): Defaul
       getFunnelAnalysisForProject: (input) => {
         void input.organization_id;
         return analyticsMetricsStore.getFunnelAnalysis(input);
+      },
+      getIncidentImpactForProject: (input) => {
+        void input.organization_id;
+        return analyticsMetricsStore.getIncidentImpact(input);
       }
     },
     analyticsJourneySamples: {

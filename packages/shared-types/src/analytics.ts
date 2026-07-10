@@ -435,6 +435,77 @@ export const AnalyticsJourneyPatternsResponseSchema = z
 
 export type AnalyticsJourneyPatternsResponse = z.infer<typeof AnalyticsJourneyPatternsResponseSchema>;
 
+const AnalyticsIncidentImpactSegmentSchema = z
+  .object({
+    value: z.string().trim().min(1).max(255),
+    affected_sessions: z.number().int().nonnegative(),
+  })
+  .strict();
+
+const AnalyticsIncidentImpactRouteSchema = z
+  .object({
+    route_key: z.string().trim().min(1).max(2048),
+    affected_sessions: z.number().int().nonnegative(),
+  })
+  .strict();
+
+const AnalyticsIncidentImpactFunnelSchema = z
+  .object({
+    funnel_key: z.string().trim().min(1).max(120),
+    affected_sessions: z.number().int().nonnegative(),
+  })
+  .strict();
+
+const AnalyticsIncidentImpactJourneyPatternSchema = z
+  .object({
+    from_route_key: z.string().trim().min(1).max(2048),
+    to_route_key: z.string().trim().min(1).max(2048),
+    affected_sessions: z.number().int().nonnegative(),
+  })
+  .strict();
+
+const AnalyticsIncidentImpactConversionDeltaSchema = z
+  .object({
+    availability: z.enum(["available", "unavailable"]),
+    value: z.number().finite().nullable(),
+    unit: z.literal("percentage_points"),
+  })
+  .strict()
+  .superRefine((value, context) => {
+    if (value.availability === "unavailable" && value.value !== null) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["value"],
+        message: "Unavailable conversion deltas must not include a value.",
+      });
+    }
+  });
+
+const AnalyticsIncidentImpactBundleStateSchema = z
+  .object({
+    status: z.enum(["not_requested", "pending", "running", "completed", "failed"]),
+    generation_id: z.string().uuid().nullable(),
+    failure_reason: z.string().trim().min(1).max(240).nullable(),
+  })
+  .strict();
+
+export const AnalyticsIncidentImpactResponseSchema = z
+  .object({
+    incident_id: z.string().uuid(),
+    window: AnalyticsMetricsWindowSchema,
+    affected_sessions: z.number().int().nonnegative(),
+    affected_routes: z.array(AnalyticsIncidentImpactRouteSchema).max(100),
+    affected_funnels: z.array(AnalyticsIncidentImpactFunnelSchema).max(100),
+    top_device_types: z.array(AnalyticsIncidentImpactSegmentSchema).max(100),
+    top_browsers: z.array(AnalyticsIncidentImpactSegmentSchema).max(100),
+    journey_patterns: z.array(AnalyticsIncidentImpactJourneyPatternSchema).max(100),
+    conversion_delta: AnalyticsIncidentImpactConversionDeltaSchema,
+    analytics_bundle: AnalyticsIncidentImpactBundleStateSchema,
+  })
+  .strict();
+
+export type AnalyticsIncidentImpactResponse = z.infer<typeof AnalyticsIncidentImpactResponseSchema>;
+
 export const AnalyticsDeviceBreakdownResponseSchema = z
   .object({
     window: AnalyticsMetricsWindowSchema,

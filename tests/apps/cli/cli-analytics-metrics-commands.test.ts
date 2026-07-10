@@ -10,6 +10,7 @@ import {
   getAnalyticsJourneysWithAuthCommand,
   getAnalyticsActionsCommand,
   getAnalyticsActionsWithAuthCommand,
+  getAnalyticsIncidentImpactCommand,
   getAnalyticsSummaryCommand,
   getAnalyticsSummaryWithAuthCommand,
   listAnalyticsFunnelsCommand,
@@ -123,6 +124,19 @@ const opportunitiesResponse = {
   next_cursor: null
 } as const;
 
+const incidentImpactResponse = {
+  incident_id: "00000000-0000-4000-8000-000000000444",
+  window: metricsWindow,
+  affected_sessions: 4,
+  affected_routes: [{ route_key: "/checkout", affected_sessions: 4 }],
+  affected_funnels: [{ funnel_key: "checkout", affected_sessions: 3 }],
+  top_device_types: [{ value: "mobile", affected_sessions: 3 }],
+  top_browsers: [{ value: "Chrome", affected_sessions: 2 }],
+  journey_patterns: [{ from_route_key: "/pricing", to_route_key: "/checkout", affected_sessions: 2 }],
+  conversion_delta: { availability: "unavailable", value: null, unit: "percentage_points" },
+  analytics_bundle: { status: "not_requested", generation_id: null, failure_reason: null }
+} as const;
+
 describe("cli analytics metrics commands", () => {
   it("renders analytics summary in human and json mode", async () => {
     const human = await getAnalyticsSummaryCommand(
@@ -185,6 +199,22 @@ describe("cli analytics metrics commands", () => {
     expect(human.output).toContain("signup_click: 14 events, 9 sessions, action");
     expect(human.output).toContain("conversion:trial_started: 5 events, 5 sessions, conversion");
     expect(JSON.parse(json.output)).toEqual(actionsResponse);
+  });
+
+  it("renders incident impact in human and json mode", async () => {
+    const human = await getAnalyticsIncidentImpactCommand(
+      { bearerToken: "dbundle_mem_x", projectId: PROJECT_ID, incidentId: incidentImpactResponse.incident_id, from: FROM, to: TO },
+      { getIncidentImpact: vi.fn().mockResolvedValue(incidentImpactResponse) }
+    );
+    const json = await getAnalyticsIncidentImpactCommand(
+      { bearerToken: "dbundle_mem_x", projectId: PROJECT_ID, incidentId: incidentImpactResponse.incident_id, from: FROM, to: TO, json: true },
+      { getIncidentImpact: vi.fn().mockResolvedValue(incidentImpactResponse) }
+    );
+
+    expect(human.exitCode).toBe(0);
+    expect(human.output).toContain("affected_sessions: 4");
+    expect(human.output).toContain("conversion_delta: unavailable");
+    expect(JSON.parse(json.output)).toEqual(incidentImpactResponse);
   });
 
   it("renders analytics opportunities in human and json mode", async () => {
@@ -437,7 +467,8 @@ describe("cli analytics metrics commands", () => {
         }
       })
       .mockResolvedValueOnce({ status: 200, body: opportunitiesResponse })
-      .mockResolvedValueOnce({ status: 200, body: { opportunity } });
+      .mockResolvedValueOnce({ status: 200, body: { opportunity } })
+      .mockResolvedValueOnce({ status: 200, body: incidentImpactResponse });
     const api = createAnalyticsMetricsApi({ request });
 
     await api.getUsageSummary({
@@ -469,6 +500,11 @@ describe("cli analytics metrics commands", () => {
       bearerToken: "dbundle_mem_x",
       projectId: PROJECT_ID,
       opportunityId: opportunity.opportunity_id
+    });
+    await api.getIncidentImpact({
+      bearerToken: "dbundle_mem_x",
+      projectId: PROJECT_ID,
+      incidentId: incidentImpactResponse.incident_id
     });
 
     expect(request).toHaveBeenCalledWith({
@@ -519,6 +555,11 @@ describe("cli analytics metrics commands", () => {
     expect(request).toHaveBeenCalledWith({
       method: "GET",
       path: `/v1/analytics/opportunities/${opportunity.opportunity_id}?project_id=${PROJECT_ID}`,
+      bearerToken: "dbundle_mem_x"
+    });
+    expect(request).toHaveBeenCalledWith({
+      method: "GET",
+      path: `/v1/analytics/incidents/${incidentImpactResponse.incident_id}/impact?project_id=${PROJECT_ID}`,
       bearerToken: "dbundle_mem_x"
     });
   });

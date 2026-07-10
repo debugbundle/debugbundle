@@ -335,6 +335,7 @@ describe("api default dependencies", () => {
       getAnalyticsJourneySampleForProject: vi.fn()
     });
     createPostgresAnalyticsMetricsStoreMock.mockReturnValue({
+      getIncidentImpact: vi.fn(),
       getUsageSummary: vi.fn(),
       getRouteMetrics: vi.fn(),
       getJourneyPatterns: vi.fn(),

@@ -463,6 +463,7 @@ function createMetricsStore(overrides: MetricsStoreOverrides = {}): AnalyticsMet
   const journeySessions = overrides.journeySessions ?? 60;
 
   return {
+    getIncidentImpact: vi.fn(),
     getUsageSummary: vi.fn().mockResolvedValue({
       summary: {
         project_id: PROJECT_ID,

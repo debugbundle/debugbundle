@@ -47,6 +47,7 @@ export const CLI_USAGE_LINES = [
   '  debugbundle analytics referrers --project <id> [--from <ISO8601>] [--to <ISO8601>] [--last <duration>] [--granularity <hour|day>] [--service <name>] [--environment <name>] [--limit <n>] [--auth-file <path>] [--json]',
   '  debugbundle analytics actions --project <id> [--from <ISO8601>] [--to <ISO8601>] [--last <duration>] [--granularity <hour|day>] [--service <name>] [--environment <name>] [--limit <n>] [--auth-file <path>] [--json]',
   '  debugbundle analytics funnels --project <id> [--from <ISO8601>] [--to <ISO8601>] [--last <duration>] [--granularity <hour|day>] [--service <name>] [--environment <name>] [--limit <n>] [--auth-file <path>] [--json]',
+  '  debugbundle analytics incident-impact <incident-id> --project <id> [--from <ISO8601>] [--to <ISO8601>] [--last <duration>] [--granularity <hour|day>] [--service <name>] [--environment <name>] [--limit <n>] [--auth-file <path>] [--json]',
   '  debugbundle analytics funnel <funnel-key> --project <id> [--from <ISO8601>] [--to <ISO8601>] [--last <duration>] [--granularity <hour|day>] [--service <name>] [--environment <name>] [--limit <n>] [--auth-file <path>] [--json]',
   '  debugbundle analytics opportunities --project <id> [--status <open|resolved|snoozed|all>] [--kind <kind>] [--cursor <cursor>] [--limit <n>] [--auth-file <path>] [--json]',
   '  debugbundle analytics opportunity get <opportunity-id> --project <id> [--auth-file <path>] [--json]',

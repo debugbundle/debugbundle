@@ -340,4 +340,87 @@ describe("analytics metrics store", () => {
       ]
     });
   });
+
+  it("reads incident impact only from correlation links, aggregate ledgers, and generation metadata", async (): Promise<void> => {
+    const incidentId = "00000000-0000-4000-8000-000000000701";
+    const queryMock = vi.fn(async (sqlText: string) => {
+      if (sqlText.includes("GROUP BY links.route_key")) {
+        return { rows: [{ route_key: "/checkout", affected_sessions: "4" }] };
+      }
+      if (sqlText.includes("rollup_kind = 'funnel_step_session'")) {
+        return { rows: [{ funnel_key: "checkout", affected_sessions: "3" }] };
+      }
+      if (sqlText.includes("route_rollups.device_type")) {
+        return { rows: [{ value: "mobile", affected_sessions: "3" }] };
+      }
+      if (sqlText.includes("route_rollups.browser_family")) {
+        return { rows: [{ value: "Chrome", affected_sessions: "2" }] };
+      }
+      if (sqlText.includes("rollup_kind = 'transition_session'")) {
+        return {
+          rows: [{
+            from_route_key: "/pricing",
+            to_route_key: "/checkout",
+            affected_sessions: "2",
+            transition_count: "2"
+          }]
+        };
+      }
+      if (sqlText.includes("analysis_kind = 'incident_impact'")) {
+        return {
+          rows: [{
+            generation_id: "00000000-0000-4000-8000-000000000702",
+            status: "pending",
+            failure_reason: null
+          }]
+        };
+      }
+      if (sqlText.includes("COUNT(DISTINCT links.subject_hash)") && sqlText.includes("analytics_incident_session_links")) {
+        return { rows: [{ affected_sessions: "4" }] };
+      }
+      throw new Error(`Unhandled incident impact SQL: ${sqlText}`);
+    });
+    const store = createPostgresAnalyticsMetricsStore({ query: queryMock as Queryable["query"] });
+
+    await expect(store.getIncidentImpact({
+      project_id: PROJECT_ID,
+      incident_id: incidentId,
+      from: "2026-03-01T00:00:00.000Z",
+      to: "2026-03-08T00:00:00.000Z",
+      granularity: "day",
+      service: "web",
+      environment: "production",
+      limit: 10
+    })).resolves.toEqual({
+      incident_id: incidentId,
+      window: {
+        project_id: PROJECT_ID,
+        from: "2026-03-01T00:00:00.000Z",
+        to: "2026-03-08T00:00:00.000Z",
+        granularity: "day",
+        service: "web",
+        environment: "production"
+      },
+      affected_sessions: 4,
+      affected_routes: [{ route_key: "/checkout", affected_sessions: 4 }],
+      affected_funnels: [{ funnel_key: "checkout", affected_sessions: 3 }],
+      top_device_types: [{ value: "mobile", affected_sessions: 3 }],
+      top_browsers: [{ value: "Chrome", affected_sessions: 2 }],
+      journey_patterns: [{
+        from_route_key: "/pricing",
+        to_route_key: "/checkout",
+        affected_sessions: 2
+      }],
+      conversion_delta: {
+        availability: "unavailable",
+        value: null,
+        unit: "percentage_points"
+      },
+      analytics_bundle: {
+        status: "pending",
+        generation_id: "00000000-0000-4000-8000-000000000702",
+        failure_reason: null
+      }
+    });
+  });
 });

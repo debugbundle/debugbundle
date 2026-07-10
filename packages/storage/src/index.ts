@@ -112,6 +112,7 @@ export type {
   AnalyticsBundleGenerationStore,
   ReserveAnalyticsBundleGenerationInput
 } from "./analytics-bundle-generation-store.js";
+export type { AnalyticsIncidentImpactInput } from "./analytics-incident-impact-metrics.js";
 export {
   buildAnalyticsBundleGenerationCursor,
   buildAnalyticsBundleInputFingerprint,

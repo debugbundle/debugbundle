@@ -7,6 +7,7 @@ import { buildAnalyticsBundle } from "../../../packages/analytics-bundle-engine/
 import type {
   AnalyticsJourneySampleResponse,
   AnalyticsJourneySamplesListResponse,
+  AnalyticsIncidentImpactResponse,
   AnalyticsOpportunitiesListResponse,
   AnalyticsOpportunityResponse,
   AnalyticsUsageSummaryResponse
@@ -15,6 +16,7 @@ import type {
 const PROJECT_ID = "00000000-0000-0000-0000-000000000001";
 const BUNDLE_GENERATION_ID = "00000000-0000-4000-8000-000000000222";
 const JOURNEY_SAMPLE_ID = "00000000-0000-4000-8000-000000000333";
+const INCIDENT_ID = "00000000-0000-4000-8000-000000000444";
 const FROM = "2026-03-01T00:00:00.000Z";
 const TO = "2026-03-08T00:00:00.000Z";
 const metricsWindow = {
@@ -97,7 +99,23 @@ function createAnalyticsMetricsDependency(
       funnel: { ...metricsWindow, funnel_key: "checkout", sessions_entered: 0, sessions_completed: 0, dropoffs: 0, conversion_rate: 0 },
       steps: []
     }),
+    getIncidentImpactForProject: vi.fn(),
     ...overrides
+  };
+}
+
+function createIncidentImpact(): AnalyticsIncidentImpactResponse {
+  return {
+    incident_id: INCIDENT_ID,
+    window: metricsWindow,
+    affected_sessions: 4,
+    affected_routes: [{ route_key: "/checkout", affected_sessions: 4 }],
+    affected_funnels: [{ funnel_key: "checkout", affected_sessions: 3 }],
+    top_device_types: [{ value: "mobile", affected_sessions: 3 }],
+    top_browsers: [{ value: "Chrome", affected_sessions: 2 }],
+    journey_patterns: [{ from_route_key: "/pricing", to_route_key: "/checkout", affected_sessions: 2 }],
+    conversion_delta: { availability: "unavailable", value: null, unit: "percentage_points" },
+    analytics_bundle: { status: "not_requested", generation_id: null, failure_reason: null }
   };
 }
 
@@ -250,6 +268,7 @@ function createDependencies(overrides: {
   billingManagement?: ApiDependencies["billingManagement"];
   objectStoreReader?: ApiDependencies["objectStoreReader"];
   projectAccess?: ReturnType<typeof createProjectAccess> | null;
+  incident?: { project_id: string; first_seen_at: string; last_seen_at: string } | null;
 } = {}): ReturnType<typeof createApiServer> {
   return createApiServer({
     ingestionPersistence: { persistAndEnqueue: vi.fn() },
@@ -273,7 +292,7 @@ function createDependencies(overrides: {
     },
     incidentRetrieval: {
       listIncidentsForOrganization: vi.fn().mockResolvedValue([]),
-      getIncidentForOrganization: vi.fn().mockResolvedValue(null),
+      getIncidentForOrganization: vi.fn().mockResolvedValue(overrides.incident ?? null),
       listIncidentLogsForOrganization: vi.fn().mockResolvedValue([])
     },
     objectStoreReader: overrides.objectStoreReader ?? { getObject: vi.fn() },
@@ -420,7 +439,8 @@ describe("analytics metrics routes", () => {
       getFunnelAnalysisForProject: vi.fn().mockResolvedValue({
         funnel: { ...metricsWindow, funnel_key: "checkout", sessions_entered: 0, sessions_completed: 0, dropoffs: 0, conversion_rate: 0 },
         steps: []
-      })
+      }),
+      getIncidentImpactForProject: vi.fn()
     };
     const app = createDependencies({ analyticsMetrics });
     const authHeaders = { authorization: "Bearer dbundle_mem_test_token" };
@@ -456,6 +476,60 @@ describe("analytics metrics routes", () => {
       project_id: PROJECT_ID,
       funnel_key: "checkout"
     }));
+  });
+
+  it("returns incident impact through authorized aggregate correlation metrics", async () => {
+    const getIncidentImpactForProject = vi.fn().mockResolvedValue(createIncidentImpact());
+    const app = createDependencies({
+      incident: {
+        project_id: PROJECT_ID,
+        first_seen_at: FROM,
+        last_seen_at: TO
+      },
+      analyticsMetrics: createAnalyticsMetricsDependency({ getIncidentImpactForProject })
+    });
+
+    const response = await app.inject({
+      method: "GET",
+      url: `/v1/analytics/incidents/${INCIDENT_ID}/impact?project_id=${PROJECT_ID}&from=${encodeURIComponent(FROM)}&to=${encodeURIComponent(TO)}&environment=production`,
+      headers: { authorization: "Bearer dbundle_mem_test_token" }
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toEqual(createIncidentImpact());
+    expect(getIncidentImpactForProject).toHaveBeenCalledWith({
+      organization_id: "org_123",
+      project_id: PROJECT_ID,
+      incident_id: INCIDENT_ID,
+      from: FROM,
+      to: TO,
+      granularity: "day",
+      service: undefined,
+      environment: "production",
+      limit: 10
+    });
+  });
+
+  it("does not expose impact for an incident outside the requested project", async () => {
+    const getIncidentImpactForProject = vi.fn();
+    const app = createDependencies({
+      incident: {
+        project_id: "00000000-0000-0000-0000-000000000099",
+        first_seen_at: FROM,
+        last_seen_at: TO
+      },
+      analyticsMetrics: createAnalyticsMetricsDependency({ getIncidentImpactForProject })
+    });
+
+    const response = await app.inject({
+      method: "GET",
+      url: `/v1/analytics/incidents/${INCIDENT_ID}/impact?project_id=${PROJECT_ID}`,
+      headers: { authorization: "Bearer dbundle_mem_test_token" }
+    });
+
+    expect(response.statusCode).toBe(404);
+    expect(response.json()).toEqual({ error: "incident_not_found" });
+    expect(getIncidentImpactForProject).not.toHaveBeenCalled();
   });
 
   it("lists and gets analytics opportunities through project access", async () => {

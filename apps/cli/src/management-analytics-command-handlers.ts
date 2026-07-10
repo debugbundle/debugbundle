@@ -20,6 +20,7 @@ import {
   getAnalyticsActionsWithAuthCommand as defaultGetAnalyticsActionsCommand,
   getAnalyticsDevicesWithAuthCommand as defaultGetAnalyticsDevicesCommand,
   getAnalyticsFunnelWithAuthCommand as defaultGetAnalyticsFunnelCommand,
+  getAnalyticsIncidentImpactWithAuthCommand as defaultGetAnalyticsIncidentImpactCommand,
   getAnalyticsJourneysWithAuthCommand as defaultGetAnalyticsJourneysCommand,
   getAnalyticsOpportunityWithAuthCommand as defaultGetAnalyticsOpportunityCommand,
   getAnalyticsReferrersWithAuthCommand as defaultGetAnalyticsReferrersCommand,
@@ -291,6 +292,42 @@ export async function handleAnalyticsCommand(
       appendCommonAuthOptions(parsedArgv, {
         projectId,
         funnelKey,
+        from: readStringOption(parsedArgv, "from"),
+        to: readStringOption(parsedArgv, "to"),
+        last: readStringOption(parsedArgv, "last"),
+        granularity: readAnalyticsGranularity(parsedArgv),
+        service: readStringOption(parsedArgv, "service"),
+        environment: readStringOption(parsedArgv, "environment"),
+        limit: readIntegerOption(parsedArgv, "limit")
+      })
+    );
+  }
+
+  if (resource === "incident-impact") {
+    expectNoUnknownOptions(parsedArgv, [
+      "project",
+      "project-id",
+      "from",
+      "to",
+      "last",
+      "granularity",
+      "service",
+      "environment",
+      "limit",
+      "auth-file",
+      "json"
+    ]);
+    ensureNoExtraPositionals(parsedArgv, 3);
+    const incidentId = requirePositional(parsedArgv, 2, "incident id");
+    const projectId = readProjectOption(parsedArgv);
+    if (projectId === undefined) {
+      throw new CliInputError("Missing required option --project.");
+    }
+
+    return await (dependencies.getAnalyticsIncidentImpactCommand ?? defaultGetAnalyticsIncidentImpactCommand)(
+      appendCommonAuthOptions(parsedArgv, {
+        projectId,
+        incidentId,
         from: readStringOption(parsedArgv, "from"),
         to: readStringOption(parsedArgv, "to"),
         last: readStringOption(parsedArgv, "last"),

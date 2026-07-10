@@ -3,6 +3,7 @@ import {
   AnalyticsDeviceBreakdownResponseSchema,
   AnalyticsFunnelAnalysisResponseSchema,
   AnalyticsFunnelsResponseSchema,
+  AnalyticsIncidentImpactResponseSchema,
   AnalyticsJourneyPatternsResponseSchema,
   AnalyticsOpportunitiesListResponseSchema,
   AnalyticsOpportunityResponseSchema,
@@ -15,6 +16,7 @@ import {
   type AnalyticsDeviceBreakdownResponse,
   type AnalyticsFunnelAnalysisResponse,
   type AnalyticsFunnelsResponse,
+  type AnalyticsIncidentImpactResponse,
   type AnalyticsJourneyPatternsResponse,
   type AnalyticsMetricsGranularity,
   type AnalyticsOpportunitiesListResponse,
@@ -69,6 +71,10 @@ export interface AnalyticsFunnelCommandInput extends AnalyticsSummaryCommandInpu
   funnelKey: string;
 }
 
+export interface AnalyticsIncidentImpactCommandInput extends AnalyticsSummaryCommandInput {
+  incidentId: string;
+}
+
 export interface AnalyticsOpportunitiesCommandInput {
   bearerToken: string;
   projectId: string;
@@ -105,6 +111,7 @@ export function createAnalyticsMetricsApi(httpClient: {
   getActionMetrics(input: AnalyticsMetricQueryInput): Promise<AnalyticsActionMetricsResponse>;
   listFunnels(input: AnalyticsMetricQueryInput): Promise<AnalyticsFunnelsResponse>;
   getFunnelAnalysis(input: Omit<AnalyticsFunnelCommandInput, "json">): Promise<AnalyticsFunnelAnalysisResponse>;
+  getIncidentImpact(input: Omit<AnalyticsIncidentImpactCommandInput, "json">): Promise<AnalyticsIncidentImpactResponse>;
   listOpportunities(input: Omit<AnalyticsOpportunitiesCommandInput, "json">): Promise<AnalyticsOpportunitiesListResponse>;
   getOpportunity(input: Omit<AnalyticsOpportunityGetCommandInput, "json">): Promise<AnalyticsOpportunityResponse>;
 } {
@@ -236,6 +243,22 @@ export function createAnalyticsMetricsApi(httpClient: {
       const parsed = AnalyticsFunnelAnalysisResponseSchema.safeParse(response.body);
       if (!parsed.success) {
         throw new AnalyticsMetricsApiError(500, "Invalid analytics funnel analysis response.");
+      }
+      return parsed.data;
+    },
+
+    async getIncidentImpact(input): Promise<AnalyticsIncidentImpactResponse> {
+      const response = await httpClient.request({
+        method: "GET",
+        path: `/v1/analytics/incidents/${encodeURIComponent(input.incidentId)}/impact?${buildMetricsQueryString(input)}`,
+        bearerToken: input.bearerToken
+      });
+      if (response.status !== 200) {
+        throw toApiError(response.status, response.body, "Failed to get analytics incident impact.");
+      }
+      const parsed = AnalyticsIncidentImpactResponseSchema.safeParse(response.body);
+      if (!parsed.success) {
+        throw new AnalyticsMetricsApiError(500, "Invalid analytics incident impact response.");
       }
       return parsed.data;
     },
@@ -473,6 +496,20 @@ function formatFunnels(response: AnalyticsFunnelsResponse): string {
     .join("\n");
 }
 
+function formatIncidentImpact(response: AnalyticsIncidentImpactResponse): string {
+  return [
+    `incident_id: ${response.incident_id}`,
+    `affected_sessions: ${response.affected_sessions}`,
+    `affected_routes: ${response.affected_routes.map((route) => `${route.route_key} (${route.affected_sessions})`).join(", ") || "none"}`,
+    `affected_funnels: ${response.affected_funnels.map((funnel) => `${funnel.funnel_key} (${funnel.affected_sessions})`).join(", ") || "none"}`,
+    `top_device_types: ${response.top_device_types.map((segment) => `${segment.value} (${segment.affected_sessions})`).join(", ") || "none"}`,
+    `top_browsers: ${response.top_browsers.map((segment) => `${segment.value} (${segment.affected_sessions})`).join(", ") || "none"}`,
+    `journey_patterns: ${response.journey_patterns.map((pattern) => `${pattern.from_route_key} -> ${pattern.to_route_key} (${pattern.affected_sessions})`).join(", ") || "none"}`,
+    `conversion_delta: ${response.conversion_delta.availability === "available" ? response.conversion_delta.value : "unavailable"}`,
+    `analytics_bundle_status: ${response.analytics_bundle.status}`
+  ].join("\n");
+}
+
 function formatOpportunities(response: AnalyticsOpportunitiesListResponse): string {
   if (response.opportunities.length === 0) {
     return "No analytics opportunities found.";
@@ -611,6 +648,17 @@ export async function getAnalyticsFunnelCommand(
   }
 }
 
+export async function getAnalyticsIncidentImpactCommand(
+  input: AnalyticsIncidentImpactCommandInput,
+  api: { getIncidentImpact(input: Omit<AnalyticsIncidentImpactCommandInput, "json">): Promise<AnalyticsIncidentImpactResponse> }
+): Promise<CliCommandResult> {
+  return runAnalyticsMetricCommand(
+    input,
+    (request) => api.getIncidentImpact({ ...request, incidentId: input.incidentId }),
+    formatIncidentImpact
+  );
+}
+
 export async function listAnalyticsOpportunitiesCommand(
   input: AnalyticsOpportunitiesCommandInput,
   api: { listOpportunities(input: Omit<AnalyticsOpportunitiesCommandInput, "json">): Promise<AnalyticsOpportunitiesListResponse> }
@@ -728,6 +776,7 @@ export async function getAnalyticsSummaryWithAuthCommand(
 
 type AnalyticsMetricWithAuthInput = Omit<AnalyticsSummaryCommandInput, "bearerToken"> & { authFilePath?: string };
 type AnalyticsFunnelWithAuthInput = Omit<AnalyticsFunnelCommandInput, "bearerToken"> & { authFilePath?: string };
+type AnalyticsIncidentImpactWithAuthInput = Omit<AnalyticsIncidentImpactCommandInput, "bearerToken"> & { authFilePath?: string };
 type AnalyticsOpportunitiesWithAuthInput = Omit<AnalyticsOpportunitiesCommandInput, "bearerToken"> & { authFilePath?: string };
 type AnalyticsOpportunityGetWithAuthInput = Omit<AnalyticsOpportunityGetCommandInput, "bearerToken"> & { authFilePath?: string };
 
@@ -824,6 +873,21 @@ export async function getAnalyticsFunnelWithAuthCommand(
       {
         ...withBearerToken(authState, input),
         funnelKey: input.funnelKey
+      },
+      api
+    )
+  );
+}
+
+export async function getAnalyticsIncidentImpactWithAuthCommand(
+  input: AnalyticsIncidentImpactWithAuthInput,
+  dependencies?: Parameters<typeof createAuthenticatedAnalyticsMetricsApi>[1]
+): Promise<CliCommandResult> {
+  return runAnalyticsMetricWithAuthCommand(input, dependencies, (authState, api) =>
+    getAnalyticsIncidentImpactCommand(
+      {
+        ...withBearerToken(authState, input),
+        incidentId: input.incidentId
       },
       api
     )

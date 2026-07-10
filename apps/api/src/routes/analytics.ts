@@ -11,6 +11,7 @@ import {
   AnalyticsDeviceBreakdownResponseSchema,
   AnalyticsFunnelAnalysisResponseSchema,
   AnalyticsFunnelsResponseSchema,
+  AnalyticsIncidentImpactResponseSchema,
   AnalyticsJourneyPatternsResponseSchema,
   AnalyticsMetricsGranularitySchema,
   AnalyticsOpportunitiesListResponseSchema,
@@ -48,6 +49,10 @@ const AnalyticsSummaryQuerySchema = z
 
 const AnalyticsFunnelParamsSchema = z.object({
   key: z.string().trim().min(1).max(120)
+}).strict();
+
+const AnalyticsIncidentImpactParamsSchema = z.object({
+  id: z.string().uuid()
 }).strict();
 
 const AnalyticsOpportunitiesQuerySchema = z
@@ -420,6 +425,21 @@ export function registerAnalyticsRoutes(app: FastifyInstance, dependencies: ApiD
 
     return reply.status(200).send(AnalyticsFunnelAnalysisResponseSchema.parse(funnel));
   });
+
+  app.get("/v1/analytics/incidents/:id/impact", async (request, reply) => {
+    const parsedParams = AnalyticsIncidentImpactParamsSchema.safeParse(request.params);
+    if (!parsedParams.success) {
+      return reply.status(400).send({ error: "invalid_incident_id" });
+    }
+
+    const input = await requireAnalyticsIncidentImpactQuery(request, reply, dependencies, parsedParams.data.id);
+    if (input === null) {
+      return;
+    }
+
+    const impact = await dependencies.analyticsMetrics!.getIncidentImpactForProject(input);
+    return reply.status(200).send(AnalyticsIncidentImpactResponseSchema.parse(impact));
+  });
 }
 
 function toAnalyticsBundleGenerationListRecord(generation: AnalyticsBundleGeneration): unknown {
@@ -546,6 +566,65 @@ async function requireAnalyticsMetricsQuery(
   };
 }
 
+async function requireAnalyticsIncidentImpactQuery(
+  request: FastifyRequest,
+  reply: FastifyReply,
+  dependencies: ApiDependencies,
+  incidentId: string
+): Promise<(ReturnType<typeof toMetricsInput> & { incident_id: string }) | null> {
+  const parsedQuery = AnalyticsSummaryQuerySchema.safeParse(request.query);
+  if (!parsedQuery.success) {
+    await reply.status(400).send({ error: "invalid_query" });
+    return null;
+  }
+
+  const auth = await requireRateLimitedProjectAccess(request, reply, dependencies, {
+    bucket: "retrieval-read",
+    projectId: parsedQuery.data.project_id
+  });
+  if (auth === null) {
+    return null;
+  }
+
+  if (!getTierCapabilities(auth.access.organization_plan).analytics_bundle) {
+    await reply.status(403).send({ error: "upgrade_required" });
+    return null;
+  }
+
+  if (dependencies.analyticsMetrics === undefined) {
+    await reply.status(404).send({ error: "analytics_metrics_not_available" });
+    return null;
+  }
+
+  const incident = await dependencies.incidentRetrieval.getIncidentForOrganization({
+    organization_id: auth.access.organization_id,
+    incident_id: incidentId,
+    user_id: auth.member.member_id
+  });
+  if (incident === null || incident.project_id !== parsedQuery.data.project_id) {
+    await reply.status(404).send({ error: "incident_not_found" });
+    return null;
+  }
+
+  const range = resolveIncidentImpactTimeRange(parsedQuery.data, incident);
+  if (range === null) {
+    await reply.status(400).send({ error: "invalid_query" });
+    return null;
+  }
+
+  return {
+    organization_id: auth.access.organization_id,
+    project_id: parsedQuery.data.project_id,
+    incident_id: incidentId,
+    from: range.from,
+    to: range.to,
+    granularity: parsedQuery.data.granularity,
+    service: parsedQuery.data.service,
+    environment: parsedQuery.data.environment,
+    limit: parsedQuery.data.limit
+  };
+}
+
 function toMetricsInput(input: AuthorizedAnalyticsQuery): {
   organization_id: string;
   project_id: string;
@@ -600,6 +679,28 @@ function resolveAnalyticsTimeRange(input: {
   return {
     from: new Date(fromMs).toISOString(),
     to: new Date(toMs).toISOString()
+  };
+}
+
+function resolveIncidentImpactTimeRange(
+  input: z.infer<typeof AnalyticsSummaryQuerySchema>,
+  incident: { first_seen_at: string; last_seen_at: string }
+): { from: string; to: string } | null {
+  if (input.from !== undefined || input.last !== undefined || input.to !== undefined) {
+    return resolveAnalyticsTimeRange(input);
+  }
+
+  const firstSeenAt = Date.parse(incident.first_seen_at);
+  const lastSeenAt = Date.parse(incident.last_seen_at);
+  if (Number.isNaN(firstSeenAt) || Number.isNaN(lastSeenAt) || firstSeenAt > lastSeenAt) {
+    return null;
+  }
+
+  // Keep the implicit read bounded while including complete affected rollup buckets.
+  const boundedFirstSeenAt = Math.max(firstSeenAt, lastSeenAt - DEFAULT_LAST_MS);
+  return {
+    from: new Date(boundedFirstSeenAt - 24 * 60 * 60 * 1000).toISOString(),
+    to: new Date(lastSeenAt + 24 * 60 * 60 * 1000).toISOString()
   };
 }
 

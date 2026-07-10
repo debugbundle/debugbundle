@@ -88,6 +88,14 @@ export const ANALYTICS_METRICS_MCP_TOOL_CATALOG = [
     })
   },
   {
+    name: "get_incident_impact",
+    group: "analytics_metrics",
+    description: "Get aggregate AnalyticsBundle impact metrics for one incident, including linked routes, funnels, segments, journeys, and bundle state.",
+    inputSchema: analyticsMetricsInputSchema().extend({
+      incidentId: z.string()
+    })
+  },
+  {
     name: "list_analytics_opportunities",
     group: "analytics_metrics",
     description: "List AnalyticsBundle opportunities for a project.",

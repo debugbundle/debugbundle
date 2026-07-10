@@ -19,6 +19,7 @@ describe("mcp analytics metrics tools", () => {
       "get_action_metrics",
       "list_funnel_metrics",
       "get_funnel_analysis",
+      "get_incident_impact",
       "list_analytics_opportunities",
       "get_analytics_opportunity",
       "list_analytics_bundles",
@@ -41,6 +42,7 @@ describe("mcp analytics metrics tools", () => {
       getActionMetrics: vi.fn(),
       listFunnels: vi.fn(),
       getFunnelAnalysis: vi.fn(),
+      getIncidentImpact: vi.fn(),
       listOpportunities: vi.fn(),
       getOpportunity: vi.fn(),
       listBundles: vi.fn(),
@@ -83,6 +85,7 @@ describe("mcp analytics metrics tools", () => {
       getActionMetrics: vi.fn().mockResolvedValue({ actions: [] }),
       listFunnels: vi.fn().mockResolvedValue({ funnels: [] }),
       getFunnelAnalysis: vi.fn().mockResolvedValue({ funnel: { funnel_key: "checkout" }, steps: [] }),
+      getIncidentImpact: vi.fn().mockResolvedValue({ incident_id: "incident_1", affected_sessions: 2 }),
       listOpportunities: vi.fn().mockResolvedValue({ opportunities: [], next_cursor: null }),
       getOpportunity: vi.fn().mockResolvedValue({ opportunity: { opportunity_id: "opp_1" } }),
       listBundles: vi.fn().mockResolvedValue({ bundles: [], next_cursor: null }),
@@ -118,6 +121,10 @@ describe("mcp analytics metrics tools", () => {
     await expect(tools.get_funnel_analysis({ bearerToken: "token", projectId: "proj_1", funnelKey: "checkout" })).resolves.toEqual({
       funnel: { funnel_key: "checkout" },
       steps: []
+    });
+    await expect(tools.get_incident_impact({ bearerToken: "token", projectId: "proj_1", incidentId: "incident_1" })).resolves.toEqual({
+      incident_id: "incident_1",
+      affected_sessions: 2
     });
     await expect(
       tools.list_analytics_opportunities({
@@ -176,6 +183,11 @@ describe("mcp analytics metrics tools", () => {
       bearerToken: "token",
       projectId: "proj_1",
       funnelKey: "checkout"
+    }));
+    expect(api.getIncidentImpact).toHaveBeenCalledWith(expect.objectContaining({
+      bearerToken: "token",
+      projectId: "proj_1",
+      incidentId: "incident_1"
     }));
     expect(api.listFunnels).toHaveBeenCalledWith(expect.objectContaining({
       bearerToken: "token",
@@ -269,6 +281,7 @@ describe("mcp analytics metrics tools", () => {
       getActionMetrics: vi.fn(),
       listFunnels: vi.fn(),
       getFunnelAnalysis: vi.fn(),
+      getIncidentImpact: vi.fn(),
       listOpportunities: vi.fn(),
       getOpportunity: vi.fn(),
       listBundles: vi.fn(),
@@ -286,6 +299,7 @@ describe("mcp analytics metrics tools", () => {
       getActionMetrics: vi.fn(),
       listFunnels: vi.fn(),
       getFunnelAnalysis: vi.fn(),
+      getIncidentImpact: vi.fn(),
       listOpportunities: vi.fn(),
       getOpportunity: vi.fn(),
       listBundles: vi.fn(),

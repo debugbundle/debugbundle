@@ -86,6 +86,7 @@ const {
     recordAnalyticsEvent: vi.fn().mockResolvedValue({ recorded: true })
   }),
   createPostgresAnalyticsMetricsStoreMock: vi.fn().mockReturnValue({
+    getIncidentImpact: vi.fn(),
     getUsageSummary: vi.fn(),
     getRouteMetrics: vi.fn(),
     getJourneyPatterns: vi.fn(),

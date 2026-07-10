@@ -4,6 +4,7 @@ import {
   AnalyticsFunnelAnalysisResponseSchema,
   AnalyticsFunnelsResponseSchema,
   AnalyticsJourneyPatternsResponseSchema,
+  type AnalyticsIncidentImpactResponse,
   AnalyticsReferrerMetricsResponseSchema,
   AnalyticsRouteMetricsResponseSchema,
   AnalyticsUsageSummaryResponseSchema,
@@ -18,6 +19,10 @@ import {
   type AnalyticsRouteMetricsResponse,
   type AnalyticsUsageSummaryResponse
 } from "../../shared-types/src/index.js";
+import {
+  readAnalyticsIncidentImpact,
+  type AnalyticsIncidentImpactInput
+} from "./analytics-incident-impact-metrics.js";
 import type { Queryable } from "./types.js";
 
 export interface AnalyticsUsageSummaryInput {
@@ -43,6 +48,7 @@ export interface AnalyticsMetricsStore {
   getActionMetrics(input: AnalyticsUsageSummaryInput): Promise<AnalyticsActionMetricsResponse>;
   listFunnels(input: AnalyticsUsageSummaryInput): Promise<AnalyticsFunnelsResponse>;
   getFunnelAnalysis(input: AnalyticsFunnelAnalysisInput): Promise<AnalyticsFunnelAnalysisResponse>;
+  getIncidentImpact(input: AnalyticsIncidentImpactInput): Promise<AnalyticsIncidentImpactResponse>;
 }
 
 type AnalyticsSummaryTotalsRow = {
@@ -421,6 +427,10 @@ export function createPostgresAnalyticsMetricsStore(db: Queryable): AnalyticsMet
         },
         steps
       });
+    },
+
+    async getIncidentImpact(input) {
+      return await readAnalyticsIncidentImpact(db, input);
     }
   };
 }

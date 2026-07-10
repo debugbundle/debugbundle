@@ -15,6 +15,7 @@ export const ANALYTICS_METRICS_MCP_TOOL_NAMES = [
   "get_action_metrics",
   "list_funnel_metrics",
   "get_funnel_analysis",
+  "get_incident_impact",
   "list_analytics_opportunities",
   "get_analytics_opportunity",
   "list_analytics_bundles",
@@ -54,6 +55,7 @@ export function createAnalyticsMetricsMcpTools(api: {
   getActionMetrics(input: AnalyticsMetricsToolInput): Promise<unknown>;
   listFunnels(input: AnalyticsMetricsToolInput): Promise<unknown>;
   getFunnelAnalysis(input: AnalyticsMetricsToolInput & { funnelKey: string }): Promise<unknown>;
+  getIncidentImpact(input: AnalyticsMetricsToolInput & { incidentId: string }): Promise<unknown>;
   listOpportunities(input: AnalyticsOpportunitiesToolInput): Promise<unknown>;
   getOpportunity(input: AnalyticsOpportunityToolInput): Promise<unknown>;
   listBundles(input: AnalyticsBundleListToolInput): Promise<unknown>;
@@ -142,6 +144,17 @@ export function createAnalyticsMetricsMcpTools(api: {
         return await api.getFunnelAnalysis({
           ...readMetricsInput(input),
           funnelKey: String(input["funnelKey"])
+        });
+      } catch (error) {
+        mapMcpError(error);
+      }
+    },
+
+    async get_incident_impact(input) {
+      try {
+        return await api.getIncidentImpact({
+          ...readMetricsInput(input),
+          incidentId: String(input["incidentId"])
         });
       } catch (error) {
         mapMcpError(error);
