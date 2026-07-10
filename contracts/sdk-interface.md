@@ -443,6 +443,10 @@ debugbundle.analytics.convert("subscription_started", {
   plan_selected: "team"
 });
 
+debugbundle.analytics.marker("checkout.validation_failed", {
+  attempt_bucket: 3
+});
+
 debugbundle.analytics.setContext({
   auth_state: "authenticated",
   account_tier: "pro",
@@ -461,6 +465,8 @@ Required behavior:
 - Analytics events must use `event_type: "analytics_event"` with a `payload.kind` rather than adding many top-level event types.
 - SDKs may derive debug breadcrumbs and analytics events from the same sanitized browser signal, but they must decide independently whether to emit a debug breadcrumb, an analytics event, or both.
 - Semantic analytics keys are stored in `payload.signal`: `track(name)` emits `kind: "action"` plus `signal.action_key`, `funnel(name, step)` emits `kind: "funnel_step"` plus `signal.funnel_key` and `signal.step_key`, `convert(name)` emits `kind: "conversion"` plus `signal.conversion_key`, and journey friction markers emit `kind: "journey_marker"` plus `signal.marker_key`.
+- `marker(name, dimensions?)` is an explicit bounded semantic journey marker. It uses the last safe route when available and must apply the same custom-dimension sanitization as other analytics methods.
+- When session tracking is enabled, the browser SDK emits one `session_summary` before a non-persisted `pagehide` and uses the existing unload-safe beacon/keepalive transport. It must not emit a summary for a page entering the back-forward cache.
 - Browser `route_change` analytics events may include `payload.previous_route` with the same privacy-safe route shape as `payload.route`; both routes must strip query strings and fragments so workers can aggregate route transitions without retaining raw URLs.
 - Analytics events do not receive `event_class` and cannot create incidents.
 - `setContext()` accepts only bounded low-cardinality values. Sensitive, overlong, unapproved, or high-cardinality values must be dropped or redacted locally where possible and rejected/dropped server-side as a backstop.

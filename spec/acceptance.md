@@ -1533,6 +1533,7 @@ If CLI says something is healthy and MCP says something different, that is a pro
 - **When** a human or agent views it
 - **Then** the journey is represented as a privacy-safe structured timeline of routes, semantic actions, funnel steps, conversions, friction markers, timing, and linked debug incidents
 - **And** it does not include video, screenshots, raw DOM snapshots, form values, or raw user text
+- **And** explicit browser journey markers use bounded semantic marker keys and sanitized low-cardinality dimensions, while a session summary is emitted once on a non-persisted page exit without treating a back-forward-cache transition as an exit
 
 ### AC-ANL-11: AnalyticsBundle Generation Unit
 - **Given** analytics data exists for many visits
