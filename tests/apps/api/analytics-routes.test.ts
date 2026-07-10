@@ -938,6 +938,75 @@ describe("analytics metrics routes", () => {
     expect(invalid.json()).toEqual({ error: "invalid_body" });
   });
 
+  it("requires an accessible incident for incident-impact bundle generation", async () => {
+    const requestAnalyticsBundleGenerationForProject = vi.fn().mockResolvedValue(createAnalyticsBundleGeneration({
+      analysis_kind: "incident_impact",
+      status: "pending",
+      object_key: null
+    }));
+    const missingIncident = await createDependencies({
+      analyticsBundles: createAnalyticsBundlesDependency({ requestAnalyticsBundleGenerationForProject }),
+      analyticsSettingsManagement: createAnalyticsSettingsManagementDependency()
+    }).inject({
+      method: "POST",
+      url: "/v1/analytics/bundles",
+      headers: { authorization: "Bearer dbundle_mem_test_token" },
+      payload: { project_id: PROJECT_ID, analysis_kind: "incident_impact" }
+    });
+    const unrelatedIncident = await createDependencies({
+      incident: {
+        project_id: "00000000-0000-0000-0000-000000000099",
+        first_seen_at: FROM,
+        last_seen_at: TO
+      },
+      analyticsBundles: createAnalyticsBundlesDependency({ requestAnalyticsBundleGenerationForProject }),
+      analyticsSettingsManagement: createAnalyticsSettingsManagementDependency()
+    }).inject({
+      method: "POST",
+      url: "/v1/analytics/bundles",
+      headers: { authorization: "Bearer dbundle_mem_test_token" },
+      payload: {
+        project_id: PROJECT_ID,
+        analysis_kind: "incident_impact",
+        incident_id: INCIDENT_ID
+      }
+    });
+    const validIncident = await createDependencies({
+      incident: {
+        project_id: PROJECT_ID,
+        first_seen_at: FROM,
+        last_seen_at: TO
+      },
+      analyticsBundles: createAnalyticsBundlesDependency({ requestAnalyticsBundleGenerationForProject }),
+      analyticsSettingsManagement: createAnalyticsSettingsManagementDependency()
+    }).inject({
+      method: "POST",
+      url: "/v1/analytics/bundles",
+      headers: { authorization: "Bearer dbundle_mem_test_token" },
+      payload: {
+        project_id: PROJECT_ID,
+        analysis_kind: "incident_impact",
+        incident_id: INCIDENT_ID
+      }
+    });
+
+    expect(missingIncident.statusCode).toBe(400);
+    expect(missingIncident.json()).toEqual({ error: "invalid_body" });
+    expect(unrelatedIncident.statusCode).toBe(404);
+    expect(unrelatedIncident.json()).toEqual({ error: "incident_not_found" });
+    expect(validIncident.statusCode).toBe(200);
+    expect(validIncident.json()).toEqual({ status: "pending", bundle_generation_id: BUNDLE_GENERATION_ID });
+    expect(requestAnalyticsBundleGenerationForProject).toHaveBeenCalledOnce();
+    expect(requestAnalyticsBundleGenerationForProject).toHaveBeenCalledWith(expect.objectContaining({
+      analysis_kind: "incident_impact",
+      analysis_spec: expect.objectContaining({
+        incident_id: INCIDENT_ID,
+        from: "2026-02-28T00:00:00.000Z",
+        to: "2026-03-09T00:00:00.000Z"
+      })
+    }));
+  });
+
   it("returns completed AnalyticsBundle artifacts through project access", async () => {
     const bundle = buildAnalyticsBundle({
       analysis_kind: "usage_summary",

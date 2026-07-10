@@ -236,6 +236,40 @@ describe("worker processor - build-analytics-bundle", () => {
     ]);
   });
 
+  it("builds incident-impact bundles from correlation-backed impact evidence", async (): Promise<void> => {
+    const bundle = await buildBundleForGeneration({
+      analysis_kind: "incident_impact",
+      analysis_spec: {
+        from: "2026-07-01T00:00:00.000Z",
+        to: "2026-07-08T00:00:00.000Z",
+        service: "web",
+        environment: "production",
+        incident_id: "44444444-4444-4444-8444-444444444444"
+      }
+    });
+
+    expect(bundle.metrics).toMatchObject({
+      sessions_analyzed: 120,
+      affected_sessions: 4,
+      current: {
+        incident_impact: {
+          affected_sessions: 4,
+          affected_routes: [{ route_key: "/checkout", affected_sessions: 4 }],
+          affected_funnels: [{ funnel_key: "checkout", affected_sessions: 3 }],
+          conversion_delta: { availability: "unavailable", value: null }
+        }
+      }
+    });
+    expect(bundle.segments).toEqual([
+      { dimension: "browser", value: "Chrome", affected_sessions: 2 },
+      { dimension: "device_type", value: "mobile", affected_sessions: 3 }
+    ]);
+    expect(bundle.journey_patterns).toEqual([
+      { from_route_key: "/pricing", to_route_key: "/checkout", affected_sessions: 2 }
+    ]);
+    expect(bundle.representative_journeys).toEqual([]);
+  });
+
   it("keeps usage-summary bundles aggregate-only while preserving linked context", async (): Promise<void> => {
     const bundle = await buildBundleForGeneration({
       analysis_kind: "usage_summary",
@@ -463,7 +497,18 @@ function createMetricsStore(overrides: MetricsStoreOverrides = {}): AnalyticsMet
   const journeySessions = overrides.journeySessions ?? 60;
 
   return {
-    getIncidentImpact: vi.fn(),
+    getIncidentImpact: vi.fn().mockResolvedValue({
+      incident_id: "44444444-4444-4444-8444-444444444444",
+      window: metricWindow(),
+      affected_sessions: 4,
+      affected_routes: [{ route_key: "/checkout", affected_sessions: 4 }],
+      affected_funnels: [{ funnel_key: "checkout", affected_sessions: 3 }],
+      top_device_types: [{ value: "mobile", affected_sessions: 3 }],
+      top_browsers: [{ value: "Chrome", affected_sessions: 2 }],
+      journey_patterns: [{ from_route_key: "/pricing", to_route_key: "/checkout", affected_sessions: 2 }],
+      conversion_delta: { availability: "unavailable", value: null, unit: "percentage_points" },
+      analytics_bundle: { status: "pending", generation_id: GENERATION_ID, failure_reason: null }
+    }),
     getUsageSummary: vi.fn().mockResolvedValue({
       summary: {
         project_id: PROJECT_ID,

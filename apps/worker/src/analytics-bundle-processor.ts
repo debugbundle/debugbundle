@@ -46,6 +46,7 @@ type NormalizedBundleAnalysisSpec = {
   environment?: string | undefined;
   limit: number;
   funnel_key?: string | undefined;
+  incident_id?: string | undefined;
 };
 
 const DEFAULT_ANALYSIS_WINDOW_DAYS = 7;
@@ -148,6 +149,13 @@ async function buildAnalyticsBundleInput(input: {
   logger?: RuntimeLogger | undefined;
 }): Promise<AnalyticsBundleBuildInput> {
   const spec = normalizeBundleAnalysisSpec(input.generation);
+  if (input.generation.analysis_kind === "incident_impact" && spec.incident_id !== undefined) {
+    return await buildIncidentImpactAnalyticsBundleInput({
+      generation: input.generation,
+      metricsStore: input.metricsStore,
+      spec: { ...spec, incident_id: spec.incident_id }
+    });
+  }
   const metricsInput = {
     project_id: input.generation.project_id,
     from: spec.from,
@@ -226,6 +234,81 @@ async function buildAnalyticsBundleInput(input: {
     ],
     journey_patterns: journeys.patterns,
     representative_journeys: representativeJourneys,
+    linked_incidents: readLinkedRecords(input.generation.analysis_spec, {
+      arrayKey: "related_incident_ids",
+      scalarKey: "incident_id",
+      outputKey: "incident_id"
+    }),
+    linked_deploys: readLinkedRecords(input.generation.analysis_spec, {
+      arrayKey: "related_deploy_ids",
+      scalarKey: "deploy_id",
+      outputKey: "deploy_id"
+    }),
+    recommendations: buildRecommendations(input.generation.analysis_kind)
+  };
+}
+
+async function buildIncidentImpactAnalyticsBundleInput(input: {
+  generation: AnalyticsBundleGenerationRecord;
+  metricsStore: AnalyticsMetricsStore;
+  spec: NormalizedBundleAnalysisSpec & { incident_id: string };
+}): Promise<AnalyticsBundleBuildInput> {
+  const metricsInput = {
+    project_id: input.generation.project_id,
+    from: input.spec.from,
+    to: input.spec.to,
+    granularity: input.spec.granularity,
+    service: input.spec.service,
+    environment: input.spec.environment,
+    limit: input.spec.limit
+  };
+  const [usage, impact] = await Promise.all([
+    input.metricsStore.getUsageSummary(metricsInput),
+    input.metricsStore.getIncidentImpact({
+      ...metricsInput,
+      incident_id: input.spec.incident_id
+    })
+  ]);
+  const affectedSessions = impact.affected_sessions;
+
+  return {
+    analysis_kind: input.generation.analysis_kind,
+    input_fingerprint: input.generation.input_fingerprint,
+    project: {
+      project_id: input.generation.project_id,
+      service: impact.window.service,
+      environment: impact.window.environment
+    },
+    analysis_window: {
+      from: input.spec.from,
+      to: input.spec.to,
+      granularity: input.spec.granularity as AnalyticsBundleGranularity
+    },
+    summary: {
+      title: buildBundleTitle(input.generation.analysis_kind, undefined),
+      description: buildBundleDescription(input.generation.analysis_kind, usage.summary.sessions, affectedSessions),
+      confidence: inferConfidence(affectedSessions),
+      severity: inferSeverity(usage.summary.sessions, affectedSessions)
+    },
+    metrics: {
+      sessions_analyzed: usage.summary.sessions,
+      affected_sessions: affectedSessions,
+      current: {
+        usage: usage.summary,
+        incident_impact: {
+          affected_sessions: impact.affected_sessions,
+          affected_routes: impact.affected_routes,
+          affected_funnels: impact.affected_funnels,
+          conversion_delta: impact.conversion_delta
+        }
+      }
+    },
+    segments: [
+      ...toImpactSegments("device_type", impact.top_device_types),
+      ...toImpactSegments("browser", impact.top_browsers)
+    ],
+    journey_patterns: impact.journey_patterns,
+    representative_journeys: [],
     linked_incidents: readLinkedRecords(input.generation.analysis_spec, {
       arrayKey: "related_incident_ids",
       scalarKey: "incident_id",
@@ -421,7 +504,8 @@ function normalizeBundleAnalysisSpec(generation: AnalyticsBundleGenerationRecord
     service: readNonEmptyString(spec["service"]),
     environment: readNonEmptyString(spec["environment"]),
     limit: readPositiveInteger(spec["limit"]) ?? DEFAULT_METRIC_LIMIT,
-    funnel_key: readNonEmptyString(spec["funnel_key"]) ?? readNonEmptyString(spec["funnel"])
+    funnel_key: readNonEmptyString(spec["funnel_key"]) ?? readNonEmptyString(spec["funnel"]),
+    incident_id: readUuid(spec["incident_id"])
   };
 }
 
@@ -517,6 +601,17 @@ function toSegments(
   }));
 }
 
+function toImpactSegments(
+  dimension: string,
+  values: Array<{ value: string; affected_sessions: number }>
+): Array<Record<string, unknown>> {
+  return values.map((value) => ({
+    dimension,
+    value: value.value,
+    affected_sessions: value.affected_sessions
+  }));
+}
+
 function readLinkedRecords(
   spec: Record<string, unknown>,
   keys: {
@@ -553,6 +648,13 @@ function readIsoString(value: unknown): string | undefined {
 
 function readNonEmptyString(value: unknown): string | undefined {
   return typeof value === "string" && value.trim().length > 0 ? value.trim() : undefined;
+}
+
+function readUuid(value: unknown): string | undefined {
+  const parsed = readNonEmptyString(value);
+  return parsed !== undefined && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(parsed)
+    ? parsed
+    : undefined;
 }
 
 function readNullableString(value: unknown): string | null {

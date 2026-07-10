@@ -189,8 +189,14 @@ export function registerAnalyticsRoutes(app: FastifyInstance, dependencies: ApiD
     if (!parsedBody.success) {
       return reply.status(400).send({ error: "invalid_body" });
     }
+    if (
+      parsedBody.data.analysis_kind === "incident_impact" &&
+      (parsedBody.data.incident_id === null || parsedBody.data.incident_id === undefined)
+    ) {
+      return reply.status(400).send({ error: "invalid_body" });
+    }
 
-    const range = resolveAnalyticsTimeRange(parsedBody.data);
+    let range = resolveAnalyticsTimeRange(parsedBody.data);
     if (range === null) {
       return reply.status(400).send({ error: "invalid_body" });
     }
@@ -205,6 +211,21 @@ export function registerAnalyticsRoutes(app: FastifyInstance, dependencies: ApiD
 
     if (!getTierCapabilities(auth.access.organization_plan).analytics_bundle) {
       return reply.status(403).send({ error: "upgrade_required" });
+    }
+
+    if (parsedBody.data.analysis_kind === "incident_impact") {
+      const incident = await dependencies.incidentRetrieval.getIncidentForOrganization({
+        organization_id: auth.access.organization_id,
+        incident_id: parsedBody.data.incident_id!,
+        user_id: auth.member.member_id
+      });
+      if (incident === null || incident.project_id !== parsedBody.data.project_id) {
+        return reply.status(404).send({ error: "incident_not_found" });
+      }
+      range = resolveIncidentImpactTimeRange(parsedBody.data, incident);
+      if (range === null) {
+        return reply.status(400).send({ error: "invalid_body" });
+      }
     }
 
     if (dependencies.analyticsSettingsManagement === undefined) {
@@ -683,7 +704,11 @@ function resolveAnalyticsTimeRange(input: {
 }
 
 function resolveIncidentImpactTimeRange(
-  input: z.infer<typeof AnalyticsSummaryQuerySchema>,
+  input: {
+    from?: string | undefined;
+    to?: string | undefined;
+    last?: string | undefined;
+  },
   incident: { first_seen_at: string; last_seen_at: string }
 ): { from: string; to: string } | null {
   if (input.from !== undefined || input.last !== undefined || input.to !== undefined) {

@@ -64,7 +64,7 @@ Every capability must be available through all applicable interfaces. Operations
 | List analytics opportunities | `GET /v1/analytics/opportunities` | `analytics opportunities` | `list_analytics_opportunities` | Browser Session or Member Token |
 | Get analytics opportunity | `GET /v1/analytics/opportunities/{id}` | `analytics opportunity get` | `get_analytics_opportunity` | Browser Session or Member Token |
 | List AnalyticsBundles | `GET /v1/analytics/bundles` | `analytics bundle list` | `list_analytics_bundles` | Browser Session or Member Token |
-| Generate AnalyticsBundle | `POST /v1/analytics/bundles` | `analytics bundle create` | `generate_analytics_bundle` | Browser Session or Member Token, tier-gated |
+| Generate AnalyticsBundle | `POST /v1/analytics/bundles` | `analytics bundle create` | `generate_analytics_bundle` | Browser Session or Member Token, tier-gated; `incident_impact` requires an accessible `incident_id` from the target project |
 | Get AnalyticsBundle | `GET /v1/analytics/bundles/{id}` | `analytics bundle get` | `get_analytics_bundle` | Browser Session or Member Token |
 | List project members | `GET /v1/projects/{id}/members` | `project members list` | `list_project_members` | Browser Session or Member Token, any authorized project member |
 | Get project member avatar | `GET /v1/projects/{id}/members/{userId}/avatar` | — | — | Browser session or member token, authorized project viewers only |
