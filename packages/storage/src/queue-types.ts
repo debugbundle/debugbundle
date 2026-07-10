@@ -7,17 +7,24 @@ import type {
 } from "../../shared-types/src/index.js";
 import type { AlertSeverityLifecycleEvent } from "./alert-lifecycle.js";
 import type { BuildAnalyticsBundleJob } from "./analytics-bundle-jobs.js";
+import type { EvaluateAnalyticsOpportunitiesJob } from "./analytics-opportunity-jobs.js";
 import type {
   AlertConditionType,
   Queryable,
   RegressionDeployCorrelation
 } from "./types.js";
 
+export type { EvaluateAnalyticsOpportunitiesJob } from "./analytics-opportunity-jobs.js";
+
 export interface QueueClient {
   enqueue(jobName: "normalize-events", payload: NormalizeEventsJob): Promise<void>;
   enqueue(jobName: "group-incident", payload: GroupIncidentJob): Promise<void>;
   enqueue(jobName: "build-bundle", payload: BuildBundleJob): Promise<void>;
   enqueue(jobName: "build-analytics-bundle", payload: BuildAnalyticsBundleJob): Promise<void>;
+  enqueue(
+    jobName: "evaluate-analytics-opportunities",
+    payload: EvaluateAnalyticsOpportunitiesJob
+  ): Promise<void>;
   enqueue(jobName: "build-reproduction", payload: BuildReproductionJob): Promise<void>;
   enqueue(jobName: "evaluate-alerts", payload: EvaluateAlertsJob): Promise<void>;
   enqueue(jobName: "deliver-alert-email-digest", payload: DeliverAlertEmailDigestJob): Promise<void>;
@@ -36,6 +43,9 @@ export interface RedisQueueClient extends QueueClient {
   dequeue(jobName: "group-incident"): Promise<GroupIncidentJob | null>;
   dequeue(jobName: "build-bundle"): Promise<BuildBundleJob | null>;
   dequeue(jobName: "build-analytics-bundle"): Promise<BuildAnalyticsBundleJob | null>;
+  dequeue(
+    jobName: "evaluate-analytics-opportunities"
+  ): Promise<EvaluateAnalyticsOpportunitiesJob | null>;
   dequeue(jobName: "build-reproduction"): Promise<BuildReproductionJob | null>;
   dequeue(jobName: "evaluate-alerts"): Promise<EvaluateAlertsJob | null>;
   dequeue(jobName: "deliver-alert-email-digest"): Promise<DeliverAlertEmailDigestJob | null>;
@@ -47,6 +57,9 @@ export interface RedisQueueClient extends QueueClient {
   claim(jobName: "group-incident"): Promise<ClaimedRedisJob<GroupIncidentJob> | null>;
   claim(jobName: "build-bundle"): Promise<ClaimedRedisJob<BuildBundleJob> | null>;
   claim(jobName: "build-analytics-bundle"): Promise<ClaimedRedisJob<BuildAnalyticsBundleJob> | null>;
+  claim(
+    jobName: "evaluate-analytics-opportunities"
+  ): Promise<ClaimedRedisJob<EvaluateAnalyticsOpportunitiesJob> | null>;
   claim(jobName: "build-reproduction"): Promise<ClaimedRedisJob<BuildReproductionJob> | null>;
   claim(jobName: "evaluate-alerts"): Promise<ClaimedRedisJob<EvaluateAlertsJob> | null>;
   claim(jobName: "deliver-alert-email-digest"): Promise<ClaimedRedisJob<DeliverAlertEmailDigestJob> | null>;
@@ -63,6 +76,7 @@ export type RedisQueueJobName =
   | "group-incident"
   | "build-bundle"
   | "build-analytics-bundle"
+  | "evaluate-analytics-opportunities"
   | "build-reproduction"
   | "evaluate-alerts"
   | "deliver-alert-email-digest"

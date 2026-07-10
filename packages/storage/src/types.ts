@@ -96,6 +96,7 @@ export type {
   DeliverAlertEmailDigestJob,
   DeliverGitHubDispatchJob,
   DeliverWebhookJob,
+  EvaluateAnalyticsOpportunitiesJob,
   EvaluateAlertsJob,
   GenerateWeeklyReportJob,
   GroupIncidentJob,

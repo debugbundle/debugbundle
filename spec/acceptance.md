@@ -1568,7 +1568,7 @@ If CLI says something is healthy and MCP says something different, that is a pro
 
 ### AC-ANL-14: Analytics Opportunities
 - **Given** analytics rollups cross deterministic thresholds for funnel dropoff, route exit/backtrack increase, fixed repeated-click/dead-click/backtrack marker counts, conversion decrease after deploy, or incident impact
-- **When** the evaluator runs
+- **When** the evaluator runs from a relevant aggregate write or its leased, bounded scheduled pass
 - **Then** an analytics opportunity is created or updated with kind, status, severity, confidence, title, summary, evidence, related incidents/deploys, and bundle state
 - **And** friction-marker evidence contains only the fixed marker key, normalized route, analysis window, and aggregate event/session counts, never target-derived data
 - **And** tiny-sample opportunities are suppressed or marked low confidence

@@ -128,6 +128,11 @@ export type {
   AnalyticsOpportunityEvaluationResult,
   AnalyticsOpportunityEvaluator
 } from "./analytics-opportunity-evaluator.js";
+export type { EvaluateAnalyticsOpportunitiesJob } from "./analytics-opportunity-jobs.js";
+export type { AnalyticsOpportunitySchedulerStore } from "./analytics-opportunity-scheduler-store.js";
+export {
+  createPostgresAnalyticsOpportunitySchedulerStore
+} from "./analytics-opportunity-scheduler-store.js";
 export {
   createPostgresAnalyticsOpportunityEvaluator,
   evaluateAnalyticsFunnelDropoffOpportunities,

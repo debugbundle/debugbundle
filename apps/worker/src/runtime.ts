@@ -17,6 +17,8 @@ import {
   createPostgresAnalyticsCorrelationStore,
   createPostgresAnalyticsJourneySampleStore,
   createPostgresAnalyticsMetricsStore,
+  createPostgresAnalyticsOpportunityEvaluator,
+  createPostgresAnalyticsOpportunitySchedulerStore,
   createPostgresAnalyticsRollupStore,
   createPostgresAnalyticsSettingsStore,
   createPostgresAnalyticsUsageStore,
@@ -56,6 +58,11 @@ import {
   processNextAggregateAnalyticsEventsJob,
   type AggregateAnalyticsWorkerQueue
 } from "./analytics-aggregation.js";
+import {
+  processNextEvaluateAnalyticsOpportunitiesJob,
+  scheduleAnalyticsOpportunityEvaluation,
+  type AnalyticsOpportunityEvaluationQueue
+} from "./analytics-opportunity-evaluation.js";
 import { processAvailabilityCheckBatch } from "./availability-checks.js";
 import { processNextDeliverOperationalEmailJob } from "./operational-email-processor.js";
 import {
@@ -254,6 +261,9 @@ export async function runWorkerFromEnv(
   const analyticsJourneySampleStore = createPostgresAnalyticsJourneySampleStore(queryable);
   const analyticsUsageStore = createPostgresAnalyticsUsageStore(queryable);
   const analyticsMetricsStore = createPostgresAnalyticsMetricsStore(queryable);
+  const analyticsOpportunityEvaluator = createPostgresAnalyticsOpportunityEvaluator(queryable);
+  const analyticsOpportunitySchedulerStore =
+    createPostgresAnalyticsOpportunitySchedulerStore(queryable);
   const analyticsBundleGenerationStore = createPostgresAnalyticsBundleGenerationStore(queryable);
   const accountAnalyticsStore = createPostgresAccountAnalyticsStore({
     db: queryable,
@@ -389,6 +399,8 @@ export async function runWorkerFromEnv(
       availability_check_loop_interval_ms: env.AVAILABILITY_CHECK_LOOP_INTERVAL_MS,
       availability_check_claim_batch_size: env.AVAILABILITY_CHECK_CLAIM_BATCH_SIZE,
       availability_check_concurrency: env.AVAILABILITY_CHECK_CONCURRENCY,
+      analytics_opportunity_evaluation_interval_ms:
+        env.ANALYTICS_OPPORTUNITY_EVALUATION_INTERVAL_MS,
       run_once: env.WORKER_RUN_ONCE === "1"
     },
     "worker_started"
@@ -605,171 +617,193 @@ export async function runWorkerFromEnv(
                 );
 
                 if (!buildAnalyticsBundleResult.processed) {
-                  const buildReproductionResult = await runClaimedProcessStep(
-                    "build-reproduction",
+                  const evaluateAnalyticsOpportunitiesResult = await runClaimedProcessStep(
+                    "evaluate-analytics-opportunities",
                     async () =>
-                      processNextBuildReproductionJob({
-                        queue,
-                        accountAnalyticsStore,
-                        objectStore,
-                        resolveOrganizationIdForProject
+                      processNextEvaluateAnalyticsOpportunitiesJob({
+                        queue: queue as unknown as AnalyticsOpportunityEvaluationQueue,
+                        projectStore: analyticsOpportunitySchedulerStore,
+                        opportunityEvaluator: analyticsOpportunityEvaluator
                       })
                   );
 
-                  if (!buildReproductionResult.processed) {
-                    const evaluateAlertsResult = await runClaimedProcessStep(
-                      "evaluate-alerts",
+                  if (!evaluateAnalyticsOpportunitiesResult.processed) {
+                    const buildReproductionResult = await runClaimedProcessStep(
+                      "build-reproduction",
                       async () =>
-                        processNextEvaluateAlertsJob({
+                        processNextBuildReproductionJob({
                           queue,
-                          alertStore: alertDeliveryStore,
-                          alertTransport,
-                          billingStore,
-                          operationalEmailDeliveryStore,
                           accountAnalyticsStore,
+                          objectStore,
                           resolveOrganizationIdForProject
                         })
                     );
 
-                    if (!evaluateAlertsResult.processed) {
-                      await runWorkerStep(logger, "schedule-alert-email-digests", async () => {
-                        await scheduleDueAlertEmailDigests({
-                          queue,
-                          alertStore: alertDeliveryStore,
-                          batchSize: env.WEBHOOK_DELIVERY_SCHEDULER_BATCH_SIZE
-                        });
-                      });
-                      await runWorkerStep(logger, "schedule-webhook-deliveries", async () => {
-                        await scheduleDueWebhookDeliveries({
-                          queue,
-                          webhookDeliveryStore,
-                          batchSize: env.WEBHOOK_DELIVERY_SCHEDULER_BATCH_SIZE
-                        });
-                      });
-                      await runWorkerStep(logger, "schedule-github-dispatches", async () => {
-                        await scheduleDueGitHubDispatches({
-                          queue,
-                          githubStore,
-                          batchSize: env.WEBHOOK_DELIVERY_SCHEDULER_BATCH_SIZE
-                        });
-                      });
-                      await runWorkerStep(logger, "schedule-weekly-reports", async () => {
-                        await scheduleWeeklyReports({
-                          queue,
-                          weeklyReportingStore: incidentStore,
-                          weeklyReportChannelStore,
-                          weeklyReportDeliveryStore,
-                          batchSize: env.WEEKLY_REPORT_SCHEDULER_BATCH_SIZE
-                        });
-                      });
-                      await runWorkerStep(logger, "schedule-retention-cleanup", async () => {
-                        await scheduleRetentionCleanup({
-                          queue,
-                          intervalMs: env.RETENTION_CLEANUP_INTERVAL_MS
-                        });
-                      });
-                      await runWorkerStep(logger, "schedule-trial-lifecycle-emails", async () => {
-                        await scheduleTrialLifecycleEmails({
-                          batchSize: env.WEEKLY_REPORT_SCHEDULER_BATCH_SIZE,
-                          billingStore,
-                          operationalEmailDeliveryStore
-                        });
-                      });
-
-                      await runClaimedProcessStep("deliver-alert-email-digest", async () =>
-                        processNextDeliverAlertEmailDigestJob({
-                          queue,
-                          alertStore: alertDeliveryStore,
-                          alertEmailDigestTransport,
-                          accountAnalyticsStore,
-                          resolveOrganizationIdForProject
-                        })
-                      );
-
-                      if (emailTransport !== null) {
-                        await runWorkerStep(logger, "deliver-operational-email", async () => {
-                          await processNextDeliverOperationalEmailJob({
-                            logger,
-                            appBaseUrl,
-                            emailAssetBaseUrl,
-                            operationalEmailDeliveryStore,
-                            emailTransport,
-                            accountAnalyticsStore,
-                            resolveOrganizationIdForProject
-                          });
-                        });
-                      }
-
-                      await runClaimedProcessStep("deliver-webhook", async () =>
-                        processNextDeliverWebhookJob({
-                          queue,
-                          logger,
-                          webhookDeliveryStore,
-                          lifecycleWebhookTransport,
-                          accountAnalyticsStore,
-                          resolveOrganizationIdForProject,
-                          async onWebhookDisabled({ webhook_id, target_url }) {
-                            try {
-                              const webhook = await getWebhookOwnerNotificationRecipient(
-                                queryable,
-                                webhook_id
-                              );
-                              if (webhook === null) {
-                                return;
-                              }
-                              await operationalEmailDeliveryStore.queueProjectOperationalEmailDelivery(
-                                {
-                                  project_id: webhook.projectId,
-                                  kind: "webhook_auto_disabled",
-                                  dedupe_key: `webhook_auto_disabled:${webhook_id}:${new Date().toISOString().slice(0, 10)}`,
-                                  payload: {
-                                    webhook_id,
-                                    target_url
-                                  }
-                                }
-                              );
-                            } catch {
-                              // Notification enqueue failure must not block delivery processing.
-                            }
-                          }
-                        })
-                      );
-
-                      if (githubDispatchTransport !== null) {
-                        await runClaimedProcessStep("deliver-github-dispatch", async () =>
-                          processNextDeliverGitHubDispatchJob({
+                    if (!buildReproductionResult.processed) {
+                      const evaluateAlertsResult = await runClaimedProcessStep(
+                        "evaluate-alerts",
+                        async () =>
+                          processNextEvaluateAlertsJob({
                             queue,
-                            logger,
-                            githubStore,
-                            githubDispatchTransport,
+                            alertStore: alertDeliveryStore,
+                            alertTransport,
+                            billingStore,
+                            operationalEmailDeliveryStore,
                             accountAnalyticsStore,
                             resolveOrganizationIdForProject
                           })
-                        );
-                      }
+                      );
 
-                      const weeklyReportResult = await runClaimedProcessStep(
-                        "generate-weekly-report",
-                        async () =>
-                          processNextGenerateWeeklyReportJob({
+                      if (!evaluateAlertsResult.processed) {
+                        await runWorkerStep(logger, "schedule-alert-email-digests", async () => {
+                          await scheduleDueAlertEmailDigests({
                             queue,
-                            logger,
+                            alertStore: alertDeliveryStore,
+                            batchSize: env.WEBHOOK_DELIVERY_SCHEDULER_BATCH_SIZE
+                          });
+                        });
+                        await runWorkerStep(logger, "schedule-webhook-deliveries", async () => {
+                          await scheduleDueWebhookDeliveries({
+                            queue,
+                            webhookDeliveryStore,
+                            batchSize: env.WEBHOOK_DELIVERY_SCHEDULER_BATCH_SIZE
+                          });
+                        });
+                        await runWorkerStep(logger, "schedule-github-dispatches", async () => {
+                          await scheduleDueGitHubDispatches({
+                            queue,
+                            githubStore,
+                            batchSize: env.WEBHOOK_DELIVERY_SCHEDULER_BATCH_SIZE
+                          });
+                        });
+                        await runWorkerStep(logger, "schedule-weekly-reports", async () => {
+                          await scheduleWeeklyReports({
+                            queue,
                             weeklyReportingStore: incidentStore,
                             weeklyReportChannelStore,
                             weeklyReportDeliveryStore,
-                            weeklyReportTransport,
+                            batchSize: env.WEEKLY_REPORT_SCHEDULER_BATCH_SIZE
+                          });
+                        });
+                        await runWorkerStep(logger, "schedule-retention-cleanup", async () => {
+                          await scheduleRetentionCleanup({
+                            queue,
+                            intervalMs: env.RETENTION_CLEANUP_INTERVAL_MS
+                          });
+                        });
+                        await runWorkerStep(
+                          logger,
+                          "schedule-analytics-opportunities",
+                          async () => {
+                            await scheduleAnalyticsOpportunityEvaluation({
+                              queue: queue as unknown as AnalyticsOpportunityEvaluationQueue,
+                              intervalMs: env.ANALYTICS_OPPORTUNITY_EVALUATION_INTERVAL_MS
+                            });
+                          }
+                        );
+                        await runWorkerStep(logger, "schedule-trial-lifecycle-emails", async () => {
+                          await scheduleTrialLifecycleEmails({
+                            batchSize: env.WEEKLY_REPORT_SCHEDULER_BATCH_SIZE,
+                            billingStore,
+                            operationalEmailDeliveryStore
+                          });
+                        });
+
+                        await runClaimedProcessStep("deliver-alert-email-digest", async () =>
+                          processNextDeliverAlertEmailDigestJob({
+                            queue,
+                            alertStore: alertDeliveryStore,
+                            alertEmailDigestTransport,
                             accountAnalyticsStore,
                             resolveOrganizationIdForProject
                           })
-                      );
+                        );
 
-                      if (!weeklyReportResult.processed) {
-                        await runClaimedProcessStep("cleanup-retention", async () =>
-                          processNextCleanupRetentionJob({
+                        if (emailTransport !== null) {
+                          await runWorkerStep(logger, "deliver-operational-email", async () => {
+                            await processNextDeliverOperationalEmailJob({
+                              logger,
+                              appBaseUrl,
+                              emailAssetBaseUrl,
+                              operationalEmailDeliveryStore,
+                              emailTransport,
+                              accountAnalyticsStore,
+                              resolveOrganizationIdForProject
+                            });
+                          });
+                        }
+
+                        await runClaimedProcessStep("deliver-webhook", async () =>
+                          processNextDeliverWebhookJob({
                             queue,
-                            retentionCleanupRunner
+                            logger,
+                            webhookDeliveryStore,
+                            lifecycleWebhookTransport,
+                            accountAnalyticsStore,
+                            resolveOrganizationIdForProject,
+                            async onWebhookDisabled({ webhook_id, target_url }) {
+                              try {
+                                const webhook = await getWebhookOwnerNotificationRecipient(
+                                  queryable,
+                                  webhook_id
+                                );
+                                if (webhook === null) {
+                                  return;
+                                }
+                                await operationalEmailDeliveryStore.queueProjectOperationalEmailDelivery(
+                                  {
+                                    project_id: webhook.projectId,
+                                    kind: "webhook_auto_disabled",
+                                    dedupe_key: `webhook_auto_disabled:${webhook_id}:${new Date().toISOString().slice(0, 10)}`,
+                                    payload: {
+                                      webhook_id,
+                                      target_url
+                                    }
+                                  }
+                                );
+                              } catch {
+                                // Notification enqueue failure must not block delivery processing.
+                              }
+                            }
                           })
                         );
+
+                        if (githubDispatchTransport !== null) {
+                          await runClaimedProcessStep("deliver-github-dispatch", async () =>
+                            processNextDeliverGitHubDispatchJob({
+                              queue,
+                              logger,
+                              githubStore,
+                              githubDispatchTransport,
+                              accountAnalyticsStore,
+                              resolveOrganizationIdForProject
+                            })
+                          );
+                        }
+
+                        const weeklyReportResult = await runClaimedProcessStep(
+                          "generate-weekly-report",
+                          async () =>
+                            processNextGenerateWeeklyReportJob({
+                              queue,
+                              logger,
+                              weeklyReportingStore: incidentStore,
+                              weeklyReportChannelStore,
+                              weeklyReportDeliveryStore,
+                              weeklyReportTransport,
+                              accountAnalyticsStore,
+                              resolveOrganizationIdForProject
+                            })
+                        );
+
+                        if (!weeklyReportResult.processed) {
+                          await runClaimedProcessStep("cleanup-retention", async () =>
+                            processNextCleanupRetentionJob({
+                              queue,
+                              retentionCleanupRunner
+                            })
+                          );
+                        }
                       }
                     }
                   }

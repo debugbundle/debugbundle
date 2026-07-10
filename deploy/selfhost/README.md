@@ -91,6 +91,7 @@ The checked-in `.env.example` includes the baseline configuration needed to boot
 - `POSTGRES_*`, `REDIS_PORT`, `LOCALSTACK_PORT`, `S3_REGION`, and `S3_BUCKET` define the stateful services
 - `DEBUGBUNDLE_PROBE_TRIGGER_SECRET` is mandatory
 - `ANALYTICS_HASH_SECRET` is mandatory
+- `ANALYTICS_OPPORTUNITY_EVALUATION_INTERVAL_MS` controls the bounded aggregate-only opportunity scan; it defaults to six hours
 - `AUTH_COOKIE_SECURE=false` is the local default; set it to `true` behind HTTPS
 - GitHub OAuth, GitHub App, and GitHub Marketplace webhook variables remain optional until those features are enabled
 

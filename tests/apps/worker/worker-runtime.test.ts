@@ -556,6 +556,7 @@ describe("worker runtime", () => {
     expect(env.AVAILABILITY_CHECK_CLAIM_BATCH_SIZE).toBe(20);
     expect(env.AVAILABILITY_CHECK_CONCURRENCY).toBe(8);
     expect(env.RETENTION_CLEANUP_INTERVAL_MS).toBe(6 * 60 * 60 * 1000);
+    expect(env.ANALYTICS_OPPORTUNITY_EVALUATION_INTERVAL_MS).toBe(6 * 60 * 60 * 1000);
   });
 
   it("registers worker dogfooding during startup", async (): Promise<void> => {
@@ -1233,6 +1234,14 @@ describe("worker runtime", () => {
     expect(queueAcquireLeaseMock).toHaveBeenCalledWith("leases:cleanup-retention:schedule", 21600);
     expect(queueEnqueueMock).toHaveBeenCalledWith("cleanup-retention", {
       scheduled_at: expect.any(String)
+    });
+    expect(queueAcquireLeaseMock).toHaveBeenCalledWith(
+      "leases:analytics-opportunities:schedule",
+      21600
+    );
+    expect(queueEnqueueMock).toHaveBeenCalledWith("evaluate-analytics-opportunities", {
+      scheduled_at: expect.any(String),
+      cursor: null
     });
     expect(processNextCleanupRetentionJobMock).toHaveBeenCalledOnce();
   });

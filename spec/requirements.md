@@ -641,7 +641,7 @@ This ensures Free behaves as **failure-first, not telemetry-first**.
 
 **FR-ANL-21:** AnalyticsBundles must include summary, confidence, severity, analysis window, aggregate metrics, affected segments, journey patterns, representative redacted journeys, linked incidents, linked deploys, recommendations, redaction metadata, and input fingerprint where applicable.
 
-**FR-ANL-22:** Analytics opportunities must be created from deterministic aggregate thresholds such as funnel dropoff, route exit/backtrack increases, fixed browser friction-marker counts for repeated/dead clicks and backtracks, conversion decreases after deploy, and incidents affecting a material share of sessions. Friction evidence must retain only the fixed marker key, safe route, and aggregate counts. Tiny-sample opportunities must either be suppressed or clearly marked low confidence.
+**FR-ANL-22:** Analytics opportunities must be created from deterministic aggregate thresholds such as funnel dropoff, route exit/backtrack increases, fixed browser friction-marker counts for repeated/dead clicks and backtracks, conversion decreases after deploy, and incidents affecting a material share of sessions. Event-triggered evaluation may be supplemented by a leased, bounded scheduled pass over enabled projects with recent aggregate activity. Friction evidence must retain only the fixed marker key, safe route, and aggregate counts. Tiny-sample opportunities must either be suppressed or clearly marked low confidence.
 
 #### Public Interfaces And UI
 

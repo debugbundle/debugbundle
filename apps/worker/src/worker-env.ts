@@ -38,6 +38,12 @@ const WorkerEnvSchema = z.object({
     .min(60_000)
     .max(24 * 60 * 60 * 1000)
     .default(6 * 60 * 60 * 1000),
+  ANALYTICS_OPPORTUNITY_EVALUATION_INTERVAL_MS: z.coerce
+    .number()
+    .int()
+    .min(60_000)
+    .max(24 * 60 * 60 * 1000)
+    .default(6 * 60 * 60 * 1000),
   WEBHOOK_DELIVERY_SCHEDULER_BATCH_SIZE: z.coerce.number().int().min(1).max(500).default(25),
   WEBHOOK_DELIVERY_TIMEOUT_MS: z.coerce.number().int().min(100).max(30000).default(5000),
   GITHUB_APP_ID: z.string().min(1).optional(),
@@ -266,6 +272,8 @@ export function parseWorkerEnv(env: Record<string, string | undefined>): WorkerE
     AVAILABILITY_CHECK_CLAIM_BATCH_SIZE: env["AVAILABILITY_CHECK_CLAIM_BATCH_SIZE"],
     AVAILABILITY_CHECK_CONCURRENCY: env["AVAILABILITY_CHECK_CONCURRENCY"],
     RETENTION_CLEANUP_INTERVAL_MS: env["RETENTION_CLEANUP_INTERVAL_MS"],
+    ANALYTICS_OPPORTUNITY_EVALUATION_INTERVAL_MS:
+      env["ANALYTICS_OPPORTUNITY_EVALUATION_INTERVAL_MS"],
     WEBHOOK_DELIVERY_SCHEDULER_BATCH_SIZE: env["WEBHOOK_DELIVERY_SCHEDULER_BATCH_SIZE"],
     WEBHOOK_DELIVERY_TIMEOUT_MS: env["WEBHOOK_DELIVERY_TIMEOUT_MS"],
     GITHUB_APP_ID: readOptionalEnv(env["GITHUB_APP_ID"]),

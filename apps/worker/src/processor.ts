@@ -25,6 +25,7 @@ import type {
   CleanupRetentionJob,
   DeliverAlertEmailDigestJob,
   DeliverGitHubDispatchJob,
+  EvaluateAnalyticsOpportunitiesJob,
   EvaluateAlertsJob,
   GenerateWeeklyReportJob,
   GitHubDispatchDeliveryIntent,
@@ -124,6 +125,9 @@ export interface WorkerQueue {
   dequeue(jobName: "group-incident"): Promise<GroupIncidentJob | null>;
   dequeue(jobName: "build-bundle"): Promise<BuildBundleJob | null>;
   dequeue(jobName: "build-reproduction"): Promise<BuildReproductionJob | null>;
+  dequeue(
+    jobName: "evaluate-analytics-opportunities"
+  ): Promise<EvaluateAnalyticsOpportunitiesJob | null>;
   dequeue(jobName: "evaluate-alerts"): Promise<EvaluateAlertsJob | null>;
   dequeue(jobName: "deliver-alert-email-digest"): Promise<DeliverAlertEmailDigestJob | null>;
   dequeue(jobName: "generate-weekly-report"): Promise<GenerateWeeklyReportJob | null>;
@@ -131,6 +135,10 @@ export interface WorkerQueue {
   enqueue(jobName: "group-incident", payload: GroupIncidentJob): Promise<void>;
   enqueue(jobName: "build-bundle", payload: BuildBundleJob): Promise<void>;
   enqueue(jobName: "build-reproduction", payload: BuildReproductionJob): Promise<void>;
+  enqueue(
+    jobName: "evaluate-analytics-opportunities",
+    payload: EvaluateAnalyticsOpportunitiesJob
+  ): Promise<void>;
   enqueue(jobName: "evaluate-alerts", payload: EvaluateAlertsJob): Promise<void>;
   enqueue(jobName: "deliver-alert-email-digest", payload: DeliverAlertEmailDigestJob): Promise<void>;
   dequeue(jobName: "deliver-webhook"): Promise<{ delivery_id: string; attempt: number } | null>;
