@@ -73,6 +73,22 @@ describe("analytics-bundle-engine", () => {
     expect(bundle.recommendations.at(-1)).toEqual({ action: "action_50", priority: 50 });
   });
 
+  it("preserves explicit deterministic representative-journey ranking", (): void => {
+    const bundle = buildAnalyticsBundle(createBuildInput({
+      representative_journeys: [
+        { sample_id: "sample-low", selection_rank: 2 },
+        { sample_id: "sample-high", selection_rank: 1 },
+        { sample_id: "sample-unranked" }
+      ]
+    }));
+
+    expect(bundle.representative_journeys).toEqual([
+      { sample_id: "sample-high", selection_rank: 1 },
+      { sample_id: "sample-low", selection_rank: 2 },
+      { sample_id: "sample-unranked" }
+    ]);
+  });
+
   it("keeps wall-clock generation timestamps out of metadata", (): void => {
     const bundle = buildAnalyticsBundle(createBuildInput());
 

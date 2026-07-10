@@ -1558,6 +1558,7 @@ If CLI says something is healthy and MCP says something different, that is a pro
 - **When** AnalyticsBundle generation runs twice
 - **Then** both generated artifact evidence sections are byte-identical after stable serialization
 - **And** representative journey selection and array ordering are deterministic
+- **And** incident-impact replay remains correlation-gated and ranks by affected-session reach, while other replay ranks by unique-session reach, transition count/share, and stable route/sample ties before at most five retained samples are hydrated
 
 ### AC-ANL-13: Incident Impact Analytics
 - **Given** a DebugBundle incident and analytics rollups with matching session, route, device, deploy, or time-window correlation

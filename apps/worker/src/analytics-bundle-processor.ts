@@ -339,7 +339,7 @@ async function buildIncidentImpactAnalyticsBundleInput(input: {
 async function readRepresentativeJourneySamples(input: {
   project_id: string;
   analysis_kind: AnalyticsBundleGenerationRecord["analysis_kind"];
-  journeys: Array<{ sample_ids?: string[] | undefined }>;
+  journeys: JourneyPatternEvidence[];
   analyticsJourneySampleStore: Pick<AnalyticsJourneySampleStore, "getAnalyticsJourneySampleForProject">;
   objectStore: ObjectStoreReader;
   logger?: RuntimeLogger | undefined;
@@ -348,15 +348,16 @@ async function readRepresentativeJourneySamples(input: {
     return [];
   }
 
-  const sampleIds = collectJourneySampleIds(input.journeys).slice(0, MAX_REPRESENTATIVE_JOURNEYS);
+  const candidates = rankRepresentativeJourneyCandidates(input.analysis_kind, input.journeys)
+    .slice(0, MAX_REPRESENTATIVE_JOURNEYS);
   const records: Array<Record<string, unknown>> = [];
   const now = new Date().toISOString();
 
-  for (const sampleId of sampleIds) {
+  for (const candidate of candidates) {
     try {
       const sample = await input.analyticsJourneySampleStore.getAnalyticsJourneySampleForProject({
         project_id: input.project_id,
-        sample_id: sampleId,
+        sample_id: candidate.sample_id,
         now
       });
       if (sample === null) {
@@ -366,19 +367,19 @@ async function readRepresentativeJourneySamples(input: {
       const artifact = parseJourneySampleArtifact(await input.objectStore.getObject({ key: sample.object_key }));
       if (artifact === null || artifact.project_id !== input.project_id || artifact.sample_id !== sample.sample_id) {
         input.logger?.warn?.(
-          { project_id: input.project_id, sample_id: sampleId },
+          { project_id: input.project_id, sample_id: candidate.sample_id },
           "worker_analytics_bundle_journey_sample_invalid"
         );
         continue;
       }
 
-      records.push(toRepresentativeJourneyRecord(artifact));
+      records.push(toRepresentativeJourneyRecord(artifact, candidate));
     } catch (error) {
       input.logger?.warn?.(
         {
           error_message: getAnalyticsBundleWorkerErrorMessage(error),
           project_id: input.project_id,
-          sample_id: sampleId
+          sample_id: candidate.sample_id
         },
         "worker_analytics_bundle_journey_sample_unavailable"
       );
@@ -388,17 +389,89 @@ async function readRepresentativeJourneySamples(input: {
   return records;
 }
 
-function collectJourneySampleIds(
-  journeys: Array<{ sample_ids?: string[] | undefined }>
-): string[] {
-  const ids = new Set<string>();
+type JourneyPatternEvidence = {
+  sample_ids?: string[] | undefined;
+  from_route_key?: string | undefined;
+  to_route_key?: string | undefined;
+  affected_sessions?: number | undefined;
+  unique_sessions?: number | undefined;
+  transition_count?: number | undefined;
+  transition_share?: number | undefined;
+};
+
+type RepresentativeJourneyCandidate = {
+  sample_id: string;
+  selection_rank: number;
+  selection_basis: "affected_sessions" | "unique_sessions";
+  primary_count: number;
+  secondary_count: number;
+  transition_share: number;
+  transition_key: string;
+};
+
+type RepresentativeJourneyScore = Omit<RepresentativeJourneyCandidate, "sample_id" | "selection_rank">;
+
+function rankRepresentativeJourneyCandidates(
+  analysisKind: AnalyticsBundleGenerationRecord["analysis_kind"],
+  journeys: JourneyPatternEvidence[]
+): RepresentativeJourneyCandidate[] {
+  const candidates = new Map<string, RepresentativeJourneyScore>();
+
   for (const journey of journeys) {
+    const candidate = toRepresentativeJourneyCandidate(analysisKind, journey);
     for (const sampleId of journey.sample_ids ?? []) {
-      ids.add(sampleId);
+      const normalizedSampleId = readNonEmptyString(sampleId);
+      if (normalizedSampleId === undefined) {
+        continue;
+      }
+
+      const existing = candidates.get(normalizedSampleId);
+      if (existing === undefined || compareRepresentativeJourneyScores(candidate, existing) < 0) {
+        candidates.set(normalizedSampleId, candidate);
+      }
     }
   }
 
-  return [...ids];
+  return [...candidates.entries()]
+    .map(([sample_id, candidate]) => ({ ...candidate, sample_id }))
+    .sort(compareRepresentativeJourneyCandidates)
+    .map((candidate, index) => ({ ...candidate, selection_rank: index + 1 }));
+}
+
+function toRepresentativeJourneyCandidate(
+  analysisKind: AnalyticsBundleGenerationRecord["analysis_kind"],
+  journey: JourneyPatternEvidence
+): Omit<RepresentativeJourneyCandidate, "sample_id" | "selection_rank"> {
+  const isIncidentImpact = analysisKind === "incident_impact";
+  const fromRoute = readNonEmptyString(journey.from_route_key) ?? "unknown";
+  const toRoute = readNonEmptyString(journey.to_route_key) ?? "unknown";
+
+  return {
+    selection_basis: isIncidentImpact ? "affected_sessions" : "unique_sessions",
+    primary_count: isIncidentImpact
+      ? readNonNegativeInteger(journey.affected_sessions)
+      : readNonNegativeInteger(journey.unique_sessions),
+    secondary_count: isIncidentImpact ? 0 : readNonNegativeInteger(journey.transition_count),
+    transition_share: isIncidentImpact ? 0 : readNonNegativeNumber(journey.transition_share),
+    transition_key: `${fromRoute}\u0000${toRoute}`
+  };
+}
+
+function compareRepresentativeJourneyCandidates(
+  left: Omit<RepresentativeJourneyCandidate, "selection_rank">,
+  right: Omit<RepresentativeJourneyCandidate, "selection_rank">
+): number {
+  return compareRepresentativeJourneyScores(left, right) || left.sample_id.localeCompare(right.sample_id);
+}
+
+function compareRepresentativeJourneyScores(
+  left: RepresentativeJourneyScore,
+  right: RepresentativeJourneyScore
+): number {
+  return right.primary_count - left.primary_count ||
+    right.secondary_count - left.secondary_count ||
+    right.transition_share - left.transition_share ||
+    left.transition_key.localeCompare(right.transition_key);
 }
 
 function parseJourneySampleArtifact(body: Buffer): RepresentativeJourneySampleArtifact | null {
@@ -459,9 +532,17 @@ function isRepresentativeJourneySampleArtifact(value: unknown): value is Represe
     Array.isArray(candidate.events);
 }
 
-function toRepresentativeJourneyRecord(artifact: RepresentativeJourneySampleArtifact): Record<string, unknown> {
+function toRepresentativeJourneyRecord(
+  artifact: RepresentativeJourneySampleArtifact,
+  candidate: RepresentativeJourneyCandidate
+): Record<string, unknown> {
   return {
     sample_id: artifact.sample_id,
+    selection_rank: candidate.selection_rank,
+    selection_basis: candidate.selection_basis,
+    selection_primary_count: candidate.primary_count,
+    selection_secondary_count: candidate.secondary_count,
+    selection_transition_share: candidate.transition_share,
     service: artifact.service,
     environment: artifact.environment,
     first_seen_at: artifact.first_seen_at,
@@ -676,6 +757,14 @@ function readNullableString(value: unknown): string | null {
 
 function readPositiveInteger(value: unknown): number | undefined {
   return typeof value === "number" && Number.isInteger(value) && value > 0 ? Math.min(value, 100) : undefined;
+}
+
+function readNonNegativeInteger(value: unknown): number {
+  return typeof value === "number" && Number.isSafeInteger(value) && value >= 0 ? value : 0;
+}
+
+function readNonNegativeNumber(value: unknown): number {
+  return typeof value === "number" && Number.isFinite(value) && value >= 0 ? value : 0;
 }
 
 function getAnalyticsBundleWorkerErrorMessage(error: unknown): string {

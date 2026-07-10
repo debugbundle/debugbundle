@@ -95,7 +95,7 @@ export function buildAnalyticsBundle(input: AnalyticsBundleBuildInput): Analytic
     },
     segments: normalizeRecordArray(input.segments ?? [], RECORD_LIMITS.segments),
     journey_patterns: normalizeRecordArray(input.journey_patterns ?? [], RECORD_LIMITS.journey_patterns),
-    representative_journeys: normalizeRecordArray(
+    representative_journeys: normalizeRepresentativeJourneyArray(
       input.representative_journeys ?? [],
       RECORD_LIMITS.representative_journeys
     ),
@@ -166,6 +166,23 @@ function normalizeRecordArray(records: Array<Record<string, unknown>>, limit: nu
     .map((record) => normalizeRecord(record))
     .sort((left, right) => stableSerialize(left).localeCompare(stableSerialize(right)))
     .slice(0, limit);
+}
+
+function normalizeRepresentativeJourneyArray(records: Array<Record<string, unknown>>, limit: number): JsonLikeRecord[] {
+  return records
+    .map((record) => normalizeRecord(record))
+    .sort((left, right) => {
+      const rankDifference = readRepresentativeJourneySelectionRank(left) - readRepresentativeJourneySelectionRank(right);
+      return rankDifference !== 0 ? rankDifference : stableSerialize(left).localeCompare(stableSerialize(right));
+    })
+    .slice(0, limit);
+}
+
+function readRepresentativeJourneySelectionRank(record: JsonLikeRecord): number {
+  const rank = record["selection_rank"];
+  return typeof rank === "number" && Number.isSafeInteger(rank) && rank > 0
+    ? rank
+    : Number.MAX_SAFE_INTEGER;
 }
 
 function normalizeRecord(record: Record<string, unknown>): JsonLikeRecord {

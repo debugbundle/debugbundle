@@ -637,7 +637,7 @@ This ensures Free behaves as **failure-first, not telemetry-first**.
 
 **FR-ANL-19:** AnalyticsBundles are generated for analysis units such as usage summary, route health, funnel dropoff, journey friction, feature usage, incident impact, deploy comparison, and conversion path analysis.
 
-**FR-ANL-20:** AnalyticsBundle generation must be deterministic for the same analysis specification and same aggregate/sample inputs. Arrays must be sorted deterministically, representative journey selection must be deterministic, and wall-clock generation time must not appear in deterministic evidence sections.
+**FR-ANL-20:** AnalyticsBundle generation must be deterministic for the same analysis specification and same aggregate/sample inputs. Arrays must be sorted deterministically. Representative journeys must rank incident-impact evidence by correlation-backed affected-session reach and other evidence by unique-session reach, transition count, transition share, route transition, and sample ID; the artifact must expose the resulting rank and aggregate selection basis. Wall-clock generation time must not appear in deterministic evidence sections.
 
 **FR-ANL-21:** AnalyticsBundles must include summary, confidence, severity, analysis window, aggregate metrics, affected segments, journey patterns, representative redacted journeys, linked incidents, linked deploys, recommendations, redaction metadata, and input fingerprint where applicable.
 

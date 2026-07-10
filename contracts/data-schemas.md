@@ -690,7 +690,7 @@ AnalyticsBundle artifacts summarize an analysis unit such as a funnel dropoff, r
 
 - Same analysis specification plus same rollup/sample/incident/deploy inputs must produce byte-identical deterministic evidence after stable serialization.
 - Arrays must be sorted deterministically.
-- Representative journeys must be selected through deterministic scoring and tie-breaking.
+- Representative journeys must be selected through deterministic scoring and tie-breaking. Incident-impact candidates rank by correlation-backed affected-session reach; other candidates rank by unique-session reach, transition count, transition share, route transition, and sample ID. Hydrated records expose `selection_rank`, `selection_basis`, and aggregate-only selection counts so agents can interpret the evidence order.
 - Generated representative journeys may be hydrated from retained redacted journey samples referenced by aggregate journey patterns. Incident-impact hydration additionally requires the sample's internal project-scoped correlation session hash to match an affected incident-session link, together with the service/environment, transition tag, bounded window, and completed unexpired artifact. Hydrated records must remain bounded, use a keyed timeline object for ordered steps, and must not add raw session IDs, raw user identifiers, raw text, URLs with query strings, object-storage keys, or unredacted analytics payloads.
 - Wall-clock generation timing belongs in bundle-generation metadata rows, not in deterministic bundle evidence.
 

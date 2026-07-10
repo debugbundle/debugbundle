@@ -15,6 +15,8 @@ import type { RuntimeLogger } from "../../../packages/runtime-logger/src/index.j
 const PROJECT_ID = "11111111-1111-4111-8111-111111111111";
 const GENERATION_ID = "33333333-3333-4333-8333-333333333333";
 const SAMPLE_ID = "00000000-0000-4000-8000-000000000901";
+const HIGH_REACH_SAMPLE_ID = "00000000-0000-4000-8000-000000000902";
+const LOW_REACH_SAMPLE_ID = "00000000-0000-4000-8000-000000000903";
 const INPUT_FINGERPRINT = "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
 
 describe("worker processor - build-analytics-bundle", () => {
@@ -209,6 +211,60 @@ describe("worker processor - build-analytics-bundle", () => {
     expect(bundle.metrics.affected_sessions).toBe(12);
   });
 
+  it("ranks representative journeys by aggregate reach before hydrating bounded samples", async (): Promise<void> => {
+    const getAnalyticsJourneySampleForProject = vi.fn(async (input: { sample_id: string }) => journeySampleRecord(input.sample_id));
+    const bundle = await buildBundleForGeneration(
+      {
+        analysis_kind: "journey_friction",
+        analysis_spec: {
+          from: "2026-07-01T00:00:00.000Z",
+          to: "2026-07-08T00:00:00.000Z",
+          service: "web",
+          environment: "production"
+        }
+      },
+      {
+        journeyPatterns: [
+          {
+            from_route_key: "/low-reach",
+            to_route_key: "/retry",
+            transition_count: 500,
+            unique_sessions: 3,
+            transition_share: 0.9,
+            sample_ids: [LOW_REACH_SAMPLE_ID]
+          },
+          {
+            from_route_key: "/checkout",
+            to_route_key: "/payment",
+            transition_count: 20,
+            unique_sessions: 40,
+            transition_share: 0.2,
+            sample_ids: [HIGH_REACH_SAMPLE_ID]
+          }
+        ]
+      },
+      {
+        journeySampleStore: createJourneySampleStore({ getAnalyticsJourneySampleForProject }),
+        getObject: vi.fn(async (input: { key: string }) => compressedJourneySampleArtifact(sampleIdFromObjectKey(input.key)))
+      }
+    );
+
+    expect(getAnalyticsJourneySampleForProject.mock.calls.map(([input]) => input.sample_id)).toEqual([
+      HIGH_REACH_SAMPLE_ID,
+      LOW_REACH_SAMPLE_ID
+    ]);
+    expect(bundle.representative_journeys.map((journey) => journey["sample_id"])).toEqual([
+      HIGH_REACH_SAMPLE_ID,
+      LOW_REACH_SAMPLE_ID
+    ]);
+    expect(bundle.representative_journeys.map((journey) => journey["selection_rank"])).toEqual([1, 2]);
+    expect(bundle.representative_journeys[0]).toMatchObject({
+      selection_basis: "unique_sessions",
+      selection_primary_count: 40,
+      selection_secondary_count: 20
+    });
+  });
+
   it("links incident-impact bundles from scalar and related analysis spec IDs", async (): Promise<void> => {
     const bundle = await buildBundleForGeneration({
       analysis_kind: "incident_impact",
@@ -275,6 +331,54 @@ describe("worker processor - build-analytics-bundle", () => {
     expect(bundle.representative_journeys).toEqual([
       expect.objectContaining({ sample_id: SAMPLE_ID, event_count: 2 })
     ]);
+  });
+
+  it("ranks correlation-backed incident journeys by affected-session reach", async (): Promise<void> => {
+    const getAnalyticsJourneySampleForProject = vi.fn(async (input: { sample_id: string }) => journeySampleRecord(input.sample_id));
+    const bundle = await buildBundleForGeneration(
+      {
+        analysis_kind: "incident_impact",
+        analysis_spec: {
+          from: "2026-07-01T00:00:00.000Z",
+          to: "2026-07-08T00:00:00.000Z",
+          service: "web",
+          environment: "production",
+          incident_id: "44444444-4444-4444-8444-444444444444"
+        }
+      },
+      {
+        incidentJourneyPatterns: [
+          {
+            from_route_key: "/pricing",
+            to_route_key: "/checkout",
+            affected_sessions: 2,
+            sample_ids: [LOW_REACH_SAMPLE_ID]
+          },
+          {
+            from_route_key: "/checkout",
+            to_route_key: "/payment",
+            affected_sessions: 8,
+            sample_ids: [HIGH_REACH_SAMPLE_ID]
+          }
+        ]
+      },
+      {
+        journeySampleStore: createJourneySampleStore({ getAnalyticsJourneySampleForProject }),
+        getObject: vi.fn(async (input: { key: string }) => compressedJourneySampleArtifact(sampleIdFromObjectKey(input.key)))
+      }
+    );
+
+    expect(getAnalyticsJourneySampleForProject.mock.calls.map(([input]) => input.sample_id)).toEqual([
+      HIGH_REACH_SAMPLE_ID,
+      LOW_REACH_SAMPLE_ID
+    ]);
+    expect(bundle.representative_journeys[0]).toMatchObject({
+      sample_id: HIGH_REACH_SAMPLE_ID,
+      selection_rank: 1,
+      selection_basis: "affected_sessions",
+      selection_primary_count: 8,
+      selection_secondary_count: 0
+    });
   });
 
   it("keeps usage-summary bundles aggregate-only while preserving linked context", async (): Promise<void> => {
@@ -496,6 +600,8 @@ type MetricsStoreOverrides = {
   sessions?: number;
   routeIncidentSessions?: number;
   journeySessions?: number;
+  journeyPatterns?: Awaited<ReturnType<AnalyticsMetricsStore["getJourneyPatterns"]>>["patterns"];
+  incidentJourneyPatterns?: Awaited<ReturnType<AnalyticsMetricsStore["getIncidentImpact"]>>["journey_patterns"];
 };
 
 function createMetricsStore(overrides: MetricsStoreOverrides = {}): AnalyticsMetricsStore {
@@ -512,7 +618,7 @@ function createMetricsStore(overrides: MetricsStoreOverrides = {}): AnalyticsMet
       affected_funnels: [{ funnel_key: "checkout", affected_sessions: 3 }],
       top_device_types: [{ value: "mobile", affected_sessions: 3 }],
       top_browsers: [{ value: "Chrome", affected_sessions: 2 }],
-      journey_patterns: [{
+      journey_patterns: overrides.incidentJourneyPatterns ?? [{
         from_route_key: "/pricing",
         to_route_key: "/checkout",
         affected_sessions: 2,
@@ -562,7 +668,7 @@ function createMetricsStore(overrides: MetricsStoreOverrides = {}): AnalyticsMet
     }),
     getJourneyPatterns: vi.fn().mockResolvedValue({
       window: metricWindow(),
-      patterns: [
+      patterns: overrides.journeyPatterns ?? [
         {
           from_route_key: "/pricing",
           to_route_key: "/checkout",
@@ -622,31 +728,39 @@ function createJourneySampleStore(
   overrides: Partial<Pick<AnalyticsJourneySampleStore, "getAnalyticsJourneySampleForProject">> = {}
 ): Pick<AnalyticsJourneySampleStore, "getAnalyticsJourneySampleForProject"> {
   return {
-    getAnalyticsJourneySampleForProject: vi.fn(async () => ({
-      sample_id: SAMPLE_ID,
-      project_id: PROJECT_ID,
-      service: "web",
-      environment: "production",
-      session_id_hash: "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
-      correlation_session_hash: "project-scoped-session",
-      visitor_id_hash: null,
-      analysis_tags: ["route:/pricing", "transition:/pricing->/checkout"],
-      first_seen_at: "2026-07-02T10:00:00.000Z",
-      last_seen_at: "2026-07-02T10:05:00.000Z",
-      dimensions_summary: { device_type: "desktop" },
-      has_artifact: true,
-      object_key: `analytics-journeys/${PROJECT_ID}/${SAMPLE_ID}.json.gz`,
-      expires_at: "2026-07-16T10:05:00.000Z",
-      created_at: "2026-07-02T10:00:00.000Z"
-    })),
+    getAnalyticsJourneySampleForProject: vi.fn(async () => journeySampleRecord(SAMPLE_ID)),
     ...overrides
   };
 }
 
-function compressedJourneySampleArtifact(): Buffer {
+function journeySampleRecord(sampleId: string) {
+  return {
+    sample_id: sampleId,
+    project_id: PROJECT_ID,
+    service: "web",
+    environment: "production",
+    session_id_hash: "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    correlation_session_hash: "project-scoped-session",
+    visitor_id_hash: null,
+    analysis_tags: ["route:/pricing", "transition:/pricing->/checkout"],
+    first_seen_at: "2026-07-02T10:00:00.000Z",
+    last_seen_at: "2026-07-02T10:05:00.000Z",
+    dimensions_summary: { device_type: "desktop" },
+    has_artifact: true,
+    object_key: `analytics-journeys/${PROJECT_ID}/${sampleId}.json.gz`,
+    expires_at: "2026-07-16T10:05:00.000Z",
+    created_at: "2026-07-02T10:00:00.000Z"
+  };
+}
+
+function sampleIdFromObjectKey(objectKey: string): string {
+  return objectKey.split("/").at(-1)?.replace(".json.gz", "") ?? SAMPLE_ID;
+}
+
+function compressedJourneySampleArtifact(sampleId = SAMPLE_ID): Buffer {
   return gzipSync(Buffer.from(JSON.stringify({
     schema_version: "analytics_journey_sample.v1",
-    sample_id: SAMPLE_ID,
+    sample_id: sampleId,
     project_id: PROJECT_ID,
     service: "web",
     environment: "production",
