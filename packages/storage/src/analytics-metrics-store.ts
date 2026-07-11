@@ -562,10 +562,10 @@ async function readJourneyPatternSampleIds(
       FROM (
         SELECT
           wanted.transition_tag,
-          samples.sample_id,
+          samples.id::text AS sample_id,
           row_number() OVER (
             PARTITION BY wanted.transition_tag
-            ORDER BY samples.last_seen_at DESC, samples.sample_id DESC
+            ORDER BY samples.last_seen_at DESC, samples.id DESC
           ) AS sample_rank
         FROM wanted_tags wanted
         JOIN analytics_journey_samples samples

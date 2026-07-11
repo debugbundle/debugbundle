@@ -269,6 +269,8 @@ describe("analytics metrics store", () => {
       }
 
       if (sqlText.includes("JOIN analytics_journey_samples")) {
+        expect(sqlText).toContain("samples.id::text AS sample_id");
+        expect(sqlText).not.toContain("samples.sample_id");
         expect(params[0]).toBe(PROJECT_ID);
         expect(params[2]).toEqual([
           "transition:/pricing->/checkout",

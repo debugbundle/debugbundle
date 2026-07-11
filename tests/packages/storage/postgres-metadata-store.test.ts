@@ -3077,6 +3077,8 @@ describe("postgres metadata store", () => {
     ]);
     expect(String(query.mock.calls[0]?.[0] ?? "")).toContain("DELETE FROM incidents");
     expect(String(query.mock.calls[0]?.[0] ?? "")).toContain("DELETE FROM improvement_opportunities");
+    expect(String(query.mock.calls[0]?.[0] ?? "")).toContain("bundle_rank > $2::bigint");
+    expect(String(query.mock.calls[0]?.[0] ?? "")).not.toContain("bundle_rank > $2::int");
   });
 
   it("should aggregate weekly project report summary from bundle history and incident activity", async (): Promise<void> => {

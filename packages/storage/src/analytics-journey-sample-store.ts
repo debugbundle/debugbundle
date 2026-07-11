@@ -61,6 +61,14 @@ export function buildAnalyticsJourneySamplesCursor(input: {
 }
 
 export function createPostgresAnalyticsJourneySampleStore(db: Queryable): AnalyticsJourneySampleStore {
+  function toIsoString(value: string): string {
+    const timestamp = new Date(value);
+    if (Number.isNaN(timestamp.getTime())) {
+      throw new Error("analytics_journey_sample_invalid_timestamp");
+    }
+    return timestamp.toISOString();
+  }
+
   function toRecord(row: AnalyticsJourneySampleRow): AnalyticsJourneySampleRecord {
     return {
       sample_id: row.sample_id,
@@ -71,13 +79,13 @@ export function createPostgresAnalyticsJourneySampleStore(db: Queryable): Analyt
       correlation_session_hash: row.correlation_session_hash,
       visitor_id_hash: row.visitor_id_hash,
       analysis_tags: row.analysis_tags,
-      first_seen_at: row.first_seen_at,
-      last_seen_at: row.last_seen_at,
+      first_seen_at: toIsoString(row.first_seen_at),
+      last_seen_at: toIsoString(row.last_seen_at),
       dimensions_summary: row.dimensions_summary,
       has_artifact: row.has_artifact,
       object_key: row.object_key,
-      expires_at: row.expires_at,
-      created_at: row.created_at
+      expires_at: toIsoString(row.expires_at),
+      created_at: toIsoString(row.created_at)
     };
   }
 

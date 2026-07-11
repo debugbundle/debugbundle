@@ -252,6 +252,29 @@ describe("analytics journey sample store", () => {
     });
   });
 
+  it("normalizes Postgres timestamptz text before returning public sample metadata", async (): Promise<void> => {
+    const store = createPostgresAnalyticsJourneySampleStore(createDb(vi.fn().mockResolvedValue({
+      rows: [{
+        ...sampleRow,
+        first_seen_at: "2026-07-09 10:00:00+00",
+        last_seen_at: "2026-07-09 10:05:00+00",
+        expires_at: "2026-07-16 10:05:00+00",
+        created_at: "2026-07-09 10:05:01+00"
+      }]
+    })));
+
+    await expect(store.getAnalyticsJourneySampleForProject({
+      project_id: PROJECT_ID,
+      sample_id: SAMPLE_ID,
+      now: NOW
+    })).resolves.toMatchObject({
+      first_seen_at: "2026-07-09T10:00:00.000Z",
+      last_seen_at: "2026-07-09T10:05:00.000Z",
+      expires_at: "2026-07-16T10:05:00.000Z",
+      created_at: "2026-07-09T10:05:01.000Z"
+    });
+  });
+
   it("deletes one project sample reservation by id", async (): Promise<void> => {
     const queryMock = vi.fn().mockResolvedValue({ rows: [] });
     const store = createPostgresAnalyticsJourneySampleStore(createDb(queryMock));

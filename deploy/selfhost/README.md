@@ -45,7 +45,7 @@ Local convenience must not introduce a different auth model than hosted deployme
 	docker compose ps
 	```
 
-4. Run the shipped smoke flow to prove browser-session auth, project-token ingestion, worker processing, and bundle retrieval:
+4. Run the shipped smoke flow to prove member bootstrap, project-token ingestion, worker processing, browser analytics rollups, retained journeys, and both bundle families:
 
 	```sh
 	make selfhost-smoke
@@ -153,13 +153,16 @@ Typical failure reasons now surface explicitly in container logs, for example:
 `make selfhost-smoke` boots the full self-host stack in an isolated Compose project, waits for API and web readiness, then runs the checked-in smoke runner at `scripts/selfhost-smoke.ts`.
 
 That smoke flow proves the core hosted-parity path end to end:
-- browser-session signup/login against the API
-- project creation and project-token minting through the session-authenticated management API
+- dev-only GitHub bootstrap to a write-once member token inside the isolated smoke environment
+- project creation and project-token minting through the member-authenticated management API
 - `POST /v1/events` ingestion with the minted project token
 - worker-owned incident creation and bundle generation
-- session-authenticated incident and bundle retrieval
+- member-authenticated incident and bundle retrieval
+- three realistic browser analytics sessions spanning desktop/mobile, browser, OS, language, route, action, funnel, conversion, and journey-marker signals
+- asynchronous analytics rollups, device breakdowns, funnel visibility, and retained representative journey metadata
+- on-demand `analytics_bundle.v1` generation and retrieval
 
-Use it after changing self-host compose config, auth wiring, worker startup behavior, or object-store/bootstrap behavior.
+Use it after changing self-host compose config, auth wiring, ingestion, analytics storage/processing, worker startup behavior, or object-store/bootstrap behavior. The GitHub mock provider is enabled only for this isolated acceptance target; normal self-host deployments keep it disabled unless explicitly configured.
 
 ## Updating
 
