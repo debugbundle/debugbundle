@@ -97,6 +97,7 @@ export {
   getProjectAnalyticsFunnels,
   getProjectAnalyticsJourneyPatterns,
   getProjectAnalyticsJourneySample,
+  getProjectAnalyticsBundle,
   getProjectAnalyticsOpportunity,
   getProjectAnalyticsReferrers,
   getProjectAnalyticsRoutes,
@@ -160,7 +161,9 @@ export async function deleteAccount(payload: {
   return body.account;
 }
 
-export async function sendSystemEmailPreview(previewId: string): Promise<SentSystemEmailPreviewRecord> {
+export async function sendSystemEmailPreview(
+  previewId: string
+): Promise<SentSystemEmailPreviewRecord> {
   const body = await readJson<SentSystemEmailPreviewRecord>(
     await fetch(`${API_BASE}/v1/internal/system-email-previews/send`, {
       method: "POST",

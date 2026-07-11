@@ -1,4 +1,7 @@
-import type { ProjectColorTag } from "../../../../packages/shared-types/src/index.js";
+import type {
+  AnalyticsBundleV1,
+  ProjectColorTag
+} from "../../../../packages/shared-types/src/index.js";
 
 export type AnalyticsPrivacyMode = "strict" | "standard" | "custom";
 
@@ -260,3 +263,8 @@ export interface AnalyticsBundleInventoryQuery {
   cursor?: string;
   limit?: number;
 }
+
+export type ProjectAnalyticsBundleResponse =
+  | AnalyticsBundleV1
+  | { status: "pending"; bundle_generation_id: string }
+  | { status: "failed"; reason: string };

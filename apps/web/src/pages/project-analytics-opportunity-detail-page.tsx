@@ -13,10 +13,7 @@ import { Badge } from "../components/ui/badge.js";
 import { Button } from "../components/ui/button.js";
 import { Notice } from "../components/ui/notice.js";
 import { Skeleton } from "../components/ui/skeleton.js";
-import {
-  getProjectAnalyticsOpportunity,
-  type AnalyticsOpportunityRecord
-} from "../lib/api.js";
+import { getProjectAnalyticsOpportunity, type AnalyticsOpportunityRecord } from "../lib/api.js";
 
 const INTEGER_FORMAT = new Intl.NumberFormat();
 const PERCENT_FORMAT = new Intl.NumberFormat(undefined, {
@@ -127,17 +124,23 @@ function OpportunityDetailContent({
         <dl className="grid gap-x-6 gap-y-4 sm:grid-cols-2 lg:grid-cols-4">
           <DetailValue label="Confidence" value={PERCENT_FORMAT.format(opportunity.confidence)} />
           <DetailValue label="Service" value={opportunity.service ?? "All services"} />
+          <DetailValue label="Environment" value={opportunity.environment ?? "All environments"} />
           <DetailValue
-            label="Environment"
-            value={opportunity.environment ?? "All environments"}
+            label="First detected"
+            value={formatAnalyticsDate(opportunity.first_detected_at)}
           />
-          <DetailValue label="First detected" value={formatAnalyticsDate(opportunity.first_detected_at)} />
-          <DetailValue label="Last detected" value={formatAnalyticsDate(opportunity.last_detected_at)} />
+          <DetailValue
+            label="Last detected"
+            value={formatAnalyticsDate(opportunity.last_detected_at)}
+          />
           {opportunity.resolved_at === null ? null : (
             <DetailValue label="Resolved" value={formatAnalyticsDate(opportunity.resolved_at)} />
           )}
           {opportunity.snoozed_until === null ? null : (
-            <DetailValue label="Snoozed until" value={formatAnalyticsDate(opportunity.snoozed_until)} />
+            <DetailValue
+              label="Snoozed until"
+              value={formatAnalyticsDate(opportunity.snoozed_until)}
+            />
           )}
         </dl>
       </section>
@@ -192,6 +195,17 @@ function OpportunityDetailContent({
             </span>
           )}
         </div>
+        {opportunity.bundle_generation_id === null ? null : (
+          <div>
+            <Button asChild variant="outline" size="sm">
+              <Link
+                to={`/projects/${projectId}/analytics/bundles/${opportunity.bundle_generation_id}`}
+              >
+                View AnalyticsBundle
+              </Link>
+            </Button>
+          </div>
+        )}
         {opportunity.bundle_failure_reason === null ? null : (
           <Notice title="AnalyticsBundle generation failed" tone="destructive">
             {opportunity.bundle_failure_reason}
@@ -276,10 +290,7 @@ function readEvidenceItems(evidence: Record<string, unknown>): EvidenceItem[] {
       integerEvidence("Reverse transitions", readNumber(evidence["reverse_transition_count"])),
       integerEvidence("Loop transitions", readNumber(evidence["total_loop_transitions"])),
       integerEvidence("Unique sessions", readNumber(evidence["unique_sessions"])),
-      integerEvidence(
-        "Minimum loop transitions",
-        readNumber(thresholds?.["min_loop_transitions"])
-      ),
+      integerEvidence("Minimum loop transitions", readNumber(thresholds?.["min_loop_transitions"])),
       integerEvidence("Minimum unique sessions", readNumber(thresholds?.["min_unique_sessions"])),
       integerEvidence(
         "Minimum reverse transitions",

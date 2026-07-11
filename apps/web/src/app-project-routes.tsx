@@ -6,6 +6,8 @@ import { IncidentDetailPage } from "./pages/incident-detail-page.js";
 import { ProjectTokensPage } from "./pages/management-pages.js";
 import { ProjectAlertsPage } from "./pages/project-alerts-page.js";
 import { ProjectAnalyticsAudiencesPage } from "./pages/project-analytics-audiences-page.js";
+import { ProjectAnalyticsBundleDetailPage } from "./pages/project-analytics-bundle-detail-page.js";
+import { ProjectAnalyticsBundlesPage } from "./pages/project-analytics-bundles-page.js";
 import { ProjectAnalyticsFunnelsPage } from "./pages/project-analytics-funnels-page.js";
 import { ProjectAnalyticsJourneySamplePage } from "./pages/project-analytics-journey-sample-page.js";
 import { ProjectAnalyticsJourneysPage } from "./pages/project-analytics-journeys-page.js";
@@ -35,13 +37,14 @@ export function createProjectRoutes(): JSX.Element {
       <Route path="incidents/:incidentId" element={<IncidentDetailPage />} />
       <Route path="improvements" element={<ProjectImprovementsPage />} />
       <Route path="improvements/:improvementId" element={<ImprovementDetailPage />} />
-      <Route
-        path="analytics/journeys/:sampleId"
-        element={<ProjectAnalyticsJourneySamplePage />}
-      />
+      <Route path="analytics/journeys/:sampleId" element={<ProjectAnalyticsJourneySamplePage />} />
       <Route
         path="analytics/opportunities/:opportunityId"
         element={<ProjectAnalyticsOpportunityDetailPage />}
+      />
+      <Route
+        path="analytics/bundles/:generationId"
+        element={<ProjectAnalyticsBundleDetailPage />}
       />
       <Route path="analytics" element={<ProjectAnalyticsLayout />}>
         <Route index element={<ProjectAnalyticsPage />} />
@@ -50,6 +53,7 @@ export function createProjectRoutes(): JSX.Element {
         <Route path="audiences" element={<ProjectAnalyticsAudiencesPage />} />
         <Route path="journeys" element={<ProjectAnalyticsJourneysPage />} />
         <Route path="opportunities" element={<ProjectAnalyticsOpportunitiesPage />} />
+        <Route path="bundles" element={<ProjectAnalyticsBundlesPage />} />
       </Route>
       <Route path="bundles" element={<ProjectBundlesPage />} />
       <Route path="bundles/:incidentId" element={<IncidentDetailPage />} />

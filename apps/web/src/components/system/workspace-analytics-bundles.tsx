@@ -1,36 +1,19 @@
 import { PackageIcon } from "lucide-react";
 import { useState } from "react";
-import { Link } from "react-router-dom";
 
 import {
   listAnalyticsBundles,
-  type AnalyticsBundleGenerationRecord,
   type AnalyticsBundleInventoryQuery,
   type ProjectRecord
 } from "../../lib/api.js";
 import { useCursorPagination } from "../../lib/use-cursor-pagination.js";
-import { Badge } from "../ui/badge.js";
 import { Button } from "../ui/button.js";
 import { Card, CardContent, CardHeader, CardTitle } from "../ui/card.js";
-import {
-  Empty,
-  EmptyDescription,
-  EmptyHeader,
-  EmptyMedia,
-  EmptyTitle
-} from "../ui/empty.js";
+import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "../ui/empty.js";
 import { Notice } from "../ui/notice.js";
 import { Skeleton } from "../ui/skeleton.js";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow
-} from "../ui/table.js";
+import { AnalyticsBundlesTable } from "./analytics-bundles-table.js";
 import { CursorPaginationControls } from "./cursor-pagination-controls.js";
-import { ProjectColorTagDot } from "./project-color-tag-dot.js";
 import { ResourceListState } from "./resource-list-state.js";
 import { TableRefreshButton } from "./table-refresh-button.js";
 import {
@@ -41,12 +24,11 @@ import {
   type WorkspaceAnalyticsFilterValues
 } from "./workspace-analytics-filters.js";
 
-const DATE_FORMAT = new Intl.DateTimeFormat(undefined, {
-  dateStyle: "medium",
-  timeStyle: "short"
-});
-
-export function WorkspaceAnalyticsBundles({ projects }: { projects: ProjectRecord[] }): JSX.Element {
+export function WorkspaceAnalyticsBundles({
+  projects
+}: {
+  projects: ProjectRecord[];
+}): JSX.Element {
   const [draftFilters, setDraftFilters] = useState(() =>
     createWorkspaceAnalyticsFilters("bundles")
   );
@@ -120,7 +102,7 @@ export function WorkspaceAnalyticsBundles({ projects }: { projects: ProjectRecor
           >
             {(bundles) => (
               <div className="flex flex-col gap-4">
-                <BundlesTable bundles={bundles} />
+                <AnalyticsBundlesTable bundles={bundles} />
                 <CursorPaginationControls
                   page={pagination.page}
                   hasNextPage={pagination.hasNextPage}
@@ -134,74 +116,6 @@ export function WorkspaceAnalyticsBundles({ projects }: { projects: ProjectRecor
         )}
       </CardContent>
     </Card>
-  );
-}
-
-function BundlesTable({ bundles }: { bundles: AnalyticsBundleGenerationRecord[] }): JSX.Element {
-  return (
-    <Table aria-label="AnalyticsBundles" className="min-w-[1050px]">
-      <TableHeader>
-        <TableRow>
-          <TableHead>Analysis</TableHead>
-          <TableHead>Project</TableHead>
-          <TableHead>Service</TableHead>
-          <TableHead>Environment</TableHead>
-          <TableHead>State</TableHead>
-          <TableHead>Related opportunity</TableHead>
-          <TableHead>Created</TableHead>
-          <TableHead>Completed</TableHead>
-        </TableRow>
-      </TableHeader>
-      <TableBody>
-        {bundles.map((bundle) => {
-          const scope = readBundleScope(bundle.analysis_spec);
-          return (
-            <TableRow key={bundle.generation_id}>
-              <TableCell>
-                <Link
-                  to={`/projects/${bundle.project_id}/analytics`}
-                  className="font-medium text-foreground hover:underline"
-                >
-                  {formatLabel(bundle.analysis_kind)}
-                </Link>
-                {bundle.failure_reason === null ? null : (
-                  <p className="mt-1 max-w-72 text-xs text-muted-foreground whitespace-normal">
-                    {bundle.failure_reason}
-                  </p>
-                )}
-              </TableCell>
-              <TableCell>
-                <Link
-                  to={`/projects/${bundle.project_id}/analytics`}
-                  className="inline-flex items-center gap-2 hover:underline"
-                >
-                  <ProjectColorTagDot colorTag={bundle.project_color_tag ?? null} />
-                  {bundle.project_name ?? bundle.project_id}
-                </Link>
-              </TableCell>
-              <TableCell>{scope.service ?? "All"}</TableCell>
-              <TableCell>{scope.environment ?? "All"}</TableCell>
-              <TableCell>
-                <Badge variant={bundleStateVariant(bundle.status)}>
-                  {bundle.status === "completed" ? "Ready" : formatLabel(bundle.status)}
-                </Badge>
-              </TableCell>
-              <TableCell>
-                {bundle.opportunity_id === null ? "None" : shortIdentifier(bundle.opportunity_id)}
-              </TableCell>
-              <TableCell className="whitespace-nowrap">
-                {DATE_FORMAT.format(new Date(bundle.created_at))}
-              </TableCell>
-              <TableCell className="whitespace-nowrap">
-                {bundle.completed_at === null
-                  ? "Not completed"
-                  : DATE_FORMAT.format(new Date(bundle.completed_at))}
-              </TableCell>
-            </TableRow>
-          );
-        })}
-      </TableBody>
-    </Table>
   );
 }
 
@@ -226,21 +140,6 @@ function buildBundleQuery(
   };
 }
 
-function readBundleScope(analysisSpec: Record<string, unknown>): {
-  service: string | null;
-  environment: string | null;
-} {
-  const filters = analysisSpec["filters"];
-  if (typeof filters !== "object" || filters === null || Array.isArray(filters)) {
-    return { service: null, environment: null };
-  }
-  const record = filters as Record<string, unknown>;
-  return {
-    service: typeof record["service"] === "string" ? record["service"] : null,
-    environment: typeof record["environment"] === "string" ? record["environment"] : null
-  };
-}
-
 function normalizeFilters(filters: WorkspaceAnalyticsFilterValues): WorkspaceAnalyticsFilterValues {
   return {
     ...filters,
@@ -257,23 +156,4 @@ function InventorySkeleton(): JSX.Element {
       <Skeleton className="h-12 w-full" />
     </div>
   );
-}
-
-function bundleStateVariant(
-  value: AnalyticsBundleGenerationRecord["status"]
-): "default" | "destructive" | "secondary" {
-  if (value === "completed") return "default";
-  if (value === "failed") return "destructive";
-  return "secondary";
-}
-
-function shortIdentifier(value: string): string {
-  return value.length <= 12 ? value : `${value.slice(0, 8)}...`;
-}
-
-function formatLabel(value: string): string {
-  return value
-    .split("_")
-    .map((part) => (part.length === 0 ? part : `${part[0]!.toUpperCase()}${part.slice(1)}`))
-    .join(" ");
 }

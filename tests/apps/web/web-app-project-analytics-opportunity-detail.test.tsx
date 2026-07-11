@@ -104,14 +104,12 @@ describe("web app - project analytics opportunity detail", () => {
     const state = installOpportunityDetailFetch();
 
     render(
-      <App
-        initialEntries={[
-          `/projects/${PROJECT_ID}/analytics/opportunities/${OPPORTUNITY_ID}`
-        ]}
-      />
+      <App initialEntries={[`/projects/${PROJECT_ID}/analytics/opportunities/${OPPORTUNITY_ID}`]} />
     );
 
-    expect(await screen.findByRole("heading", { name: "Checkout dropoff increased" })).toBeInTheDocument();
+    expect(
+      await screen.findByRole("heading", { name: "Checkout dropoff increased" })
+    ).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Back to opportunities" })).toHaveAttribute(
       "href",
       `/projects/${PROJECT_ID}/analytics/opportunities`
@@ -128,14 +126,20 @@ describe("web app - project analytics opportunity detail", () => {
     );
     expect(screen.getByText("deploy-42")).toBeInTheDocument();
     expect(screen.getByText("Ready")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "View AnalyticsBundle" })).toHaveAttribute(
+      "href",
+      `/projects/${PROJECT_ID}/analytics/bundles/77777777-7777-4777-8777-777777777777`
+    );
     expect(screen.queryByText("must-not-render")).not.toBeInTheDocument();
     expect(screen.queryByText("secret_payload")).not.toBeInTheDocument();
     expect(
-      state.requestedUrls().some(
-        (url) =>
-          url.includes(`/v1/analytics/opportunities/${OPPORTUNITY_ID}?`) &&
-          url.includes(`project_id=${PROJECT_ID}`)
-      )
+      state
+        .requestedUrls()
+        .some(
+          (url) =>
+            url.includes(`/v1/analytics/opportunities/${OPPORTUNITY_ID}?`) &&
+            url.includes(`project_id=${PROJECT_ID}`)
+        )
     ).toBe(true);
   });
 
@@ -144,11 +148,7 @@ describe("web app - project analytics opportunity detail", () => {
     installOpportunityDetailFetch(true);
 
     render(
-      <App
-        initialEntries={[
-          `/projects/${PROJECT_ID}/analytics/opportunities/${OPPORTUNITY_ID}`
-        ]}
-      />
+      <App initialEntries={[`/projects/${PROJECT_ID}/analytics/opportunities/${OPPORTUNITY_ID}`]} />
     );
 
     expect(await screen.findByText(/could not load analytics opportunity/i)).toBeInTheDocument();
@@ -172,11 +172,7 @@ describe("web app - project analytics opportunity detail", () => {
     });
 
     render(
-      <App
-        initialEntries={[
-          `/projects/${PROJECT_ID}/analytics/opportunities/${OPPORTUNITY_ID}`
-        ]}
-      />
+      <App initialEntries={[`/projects/${PROJECT_ID}/analytics/opportunities/${OPPORTUNITY_ID}`]} />
     );
 
     const evidence = await screen.findByRole("region", { name: "Aggregate evidence" });
@@ -197,11 +193,7 @@ describe("web app - project analytics opportunity detail", () => {
     });
 
     render(
-      <App
-        initialEntries={[
-          `/projects/${PROJECT_ID}/analytics/opportunities/${OPPORTUNITY_ID}`
-        ]}
-      />
+      <App initialEntries={[`/projects/${PROJECT_ID}/analytics/opportunities/${OPPORTUNITY_ID}`]} />
     );
 
     const evidence = await screen.findByRole("region", { name: "Aggregate evidence" });

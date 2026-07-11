@@ -11,6 +11,7 @@ import type {
   ProjectAnalyticsFunnelsResponse,
   ProjectAnalyticsJourneyPatternsResponse,
   ProjectAnalyticsJourneySampleResponse,
+  ProjectAnalyticsBundleResponse,
   ProjectAnalyticsReferrerMetricsResponse,
   ProjectAnalyticsRouteMetricsResponse,
   ProjectAnalyticsSettingsResponse,
@@ -201,5 +202,18 @@ export async function listAnalyticsBundles(
     await fetch(`${API_BASE}/v1/analytics/bundles?${searchParams.toString()}`, {
       credentials: "include"
     })
+  );
+}
+
+export async function getProjectAnalyticsBundle(
+  projectId: string,
+  generationId: string
+): Promise<ProjectAnalyticsBundleResponse> {
+  const searchParams = new URLSearchParams({ project_id: projectId });
+  return readJson<ProjectAnalyticsBundleResponse>(
+    await fetch(
+      `${API_BASE}/v1/analytics/bundles/${encodeURIComponent(generationId)}?${searchParams.toString()}`,
+      { credentials: "include" }
+    )
   );
 }

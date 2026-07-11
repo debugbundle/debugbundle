@@ -43,6 +43,7 @@ function installMetricsFetch(
   input: {
     empty?: boolean;
     enabled?: boolean;
+    failBundlesOnce?: boolean;
     failDevices?: boolean;
     failFunnelDetailOnce?: boolean;
     failFunnelsOnce?: boolean;
@@ -57,6 +58,7 @@ function installMetricsFetch(
   const requestedUrls: string[] = [];
   let routeRequests = 0;
   let funnelRequests = 0;
+  let bundleRequests = 0;
   let funnelDetailRequests = 0;
   let journeyRequests = 0;
   let opportunityRequests = 0;
@@ -117,16 +119,10 @@ function installMetricsFetch(
         if (input.failDevices) return jsonResponse(503, { error: "unavailable" });
         return jsonResponse(200, {
           window: metricsWindow,
-          device_types: input.empty
-            ? []
-            : [{ value: "mobile", sessions: 720, pageviews: 2910 }],
-          browsers: input.empty
-            ? []
-            : [{ value: "chrome", sessions: 610, pageviews: 2500 }],
+          device_types: input.empty ? [] : [{ value: "mobile", sessions: 720, pageviews: 2910 }],
+          browsers: input.empty ? [] : [{ value: "chrome", sessions: 610, pageviews: 2500 }],
           os: input.empty ? [] : [{ value: "ios", sessions: 440, pageviews: 1810 }],
-          languages: input.empty
-            ? []
-            : [{ value: "en-us", sessions: 810, pageviews: 3200 }]
+          languages: input.empty ? [] : [{ value: "en-us", sessions: 810, pageviews: 3200 }]
         });
       }
 
@@ -136,12 +132,8 @@ function installMetricsFetch(
           referrers: input.empty
             ? []
             : [{ value: "search.example", sessions: 350, pageviews: 1200 }],
-          utm_sources: input.empty
-            ? []
-            : [{ value: "newsletter", sessions: 140, pageviews: 510 }],
-          utm_mediums: input.empty
-            ? []
-            : [{ value: "email", sessions: 130, pageviews: 480 }],
+          utm_sources: input.empty ? [] : [{ value: "newsletter", sessions: 140, pageviews: 510 }],
+          utm_mediums: input.empty ? [] : [{ value: "email", sessions: 130, pageviews: 480 }],
           utm_campaigns: input.empty
             ? []
             : [{ value: "summer_launch", sessions: 90, pageviews: 330 }]
@@ -268,6 +260,41 @@ function installMetricsFetch(
         });
       }
 
+      if (url.includes("/v1/analytics/bundles?")) {
+        bundleRequests += 1;
+        if (input.failBundlesOnce && bundleRequests === 1) {
+          return jsonResponse(503, { error: "unavailable" });
+        }
+        return jsonResponse(200, {
+          bundles: input.empty
+            ? []
+            : [
+                {
+                  generation_id: "77777777-7777-4777-8777-777777777777",
+                  project_id: "proj_123",
+                  project_name: "Project",
+                  project_color_tag: null,
+                  opportunity_id: "55555555-5555-4555-8555-555555555555",
+                  requested_by_user_id: null,
+                  analysis_kind: "funnel_dropoff",
+                  analysis_spec: {
+                    filters: { service: "web", environment: "production" }
+                  },
+                  input_fingerprint:
+                    "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                  status: "completed",
+                  has_artifact: true,
+                  failure_reason: null,
+                  created_at: "2026-07-10T00:01:00.000Z",
+                  claimed_at: "2026-07-10T00:01:10.000Z",
+                  completed_at: "2026-07-10T00:02:00.000Z",
+                  updated_at: "2026-07-10T00:02:00.000Z"
+                }
+              ],
+          next_cursor: null
+        });
+      }
+
       return jsonResponse(404, { error: "not_found" });
     })
   );
@@ -284,13 +311,18 @@ describe("web app - project analytics metrics", () => {
 
     expect(await screen.findByRole("heading", { name: "Route analytics" })).toBeInTheDocument();
     const sectionTabs = screen.getByRole("tablist", { name: "Analytics sections" });
-    expect(within(sectionTabs).getAllByRole("tab").map((tab) => tab.textContent)).toEqual([
+    expect(
+      within(sectionTabs)
+        .getAllByRole("tab")
+        .map((tab) => tab.textContent)
+    ).toEqual([
       "Overview",
       "Routes",
       "Funnels",
       "Audiences",
       "Journeys",
-      "Opportunities"
+      "Opportunities",
+      "Bundles"
     ]);
 
     await user.click(within(sectionTabs).getByRole("tab", { name: "Audiences" }));
@@ -308,13 +340,7 @@ describe("web app - project analytics metrics", () => {
     render(<App initialEntries={["/projects/proj_123/analytics/funnels"]} />);
 
     const summaryTable = await screen.findByRole("table", { name: "Funnel metrics" });
-    for (const heading of [
-      "Funnel",
-      "Entered",
-      "Completed",
-      "Dropoffs",
-      "Conversion rate"
-    ]) {
+    for (const heading of ["Funnel", "Entered", "Completed", "Dropoffs", "Conversion rate"]) {
       expect(within(summaryTable).getByRole("columnheader", { name: heading })).toBeInTheDocument();
     }
     expect(within(summaryTable).getByText("checkout")).toBeInTheDocument();
@@ -326,12 +352,14 @@ describe("web app - project analytics metrics", () => {
     expect(within(stepsTable).getAllByRole("row")[1]).toHaveTextContent("shipping");
     expect(within(stepsTable).getAllByRole("row")[2]).toHaveTextContent("payment");
     expect(
-      state.requestedUrls().some(
-        (url) =>
-          url.includes("/v1/analytics/funnels/checkout?") &&
-          url.includes("project_id=proj_123") &&
-          url.includes("last=30d")
-      )
+      state
+        .requestedUrls()
+        .some(
+          (url) =>
+            url.includes("/v1/analytics/funnels/checkout?") &&
+            url.includes("project_id=proj_123") &&
+            url.includes("last=30d")
+        )
     ).toBe(true);
   });
 
@@ -407,13 +435,15 @@ describe("web app - project analytics metrics", () => {
       "/projects/proj_123/analytics/opportunities/55555555-5555-4555-8555-555555555555"
     );
     expect(
-      state.requestedUrls().some(
-        (url) =>
-          url.includes("/v1/analytics/opportunities?") &&
-          url.includes("project_id=proj_123") &&
-          url.includes("status=all") &&
-          url.includes("limit=20")
-      )
+      state
+        .requestedUrls()
+        .some(
+          (url) =>
+            url.includes("/v1/analytics/opportunities?") &&
+            url.includes("project_id=proj_123") &&
+            url.includes("status=all") &&
+            url.includes("limit=20")
+        )
     ).toBe(true);
   });
 
@@ -423,9 +453,52 @@ describe("web app - project analytics metrics", () => {
 
     render(<App initialEntries={["/projects/proj_123/analytics/opportunities"]} />);
 
-    expect(await screen.findByText(/could not load project analytics opportunities/i)).toBeInTheDocument();
+    expect(
+      await screen.findByText(/could not load project analytics opportunities/i)
+    ).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Retry project analytics opportunities" }));
-    expect(await screen.findByText(/no analytics opportunities in this project/i)).toBeInTheDocument();
+    expect(
+      await screen.findByText(/no analytics opportunities in this project/i)
+    ).toBeInTheDocument();
+  });
+
+  it("shows project-scoped AnalyticsBundles and opens their detail route", async () => {
+    const state = installMetricsFetch();
+
+    render(<App initialEntries={["/projects/proj_123/analytics/bundles"]} />);
+
+    const table = await screen.findByRole("table", { name: "Project AnalyticsBundles" });
+    expect(within(table).queryByRole("columnheader", { name: "Project" })).not.toBeInTheDocument();
+    expect(within(table).getByRole("link", { name: "Funnel Dropoff" })).toHaveAttribute(
+      "href",
+      "/projects/proj_123/analytics/bundles/77777777-7777-4777-8777-777777777777"
+    );
+    expect(within(table).getByRole("link", { name: "View opportunity" })).toHaveAttribute(
+      "href",
+      "/projects/proj_123/analytics/opportunities/55555555-5555-4555-8555-555555555555"
+    );
+    expect(
+      state
+        .requestedUrls()
+        .some(
+          (url) =>
+            url.includes("/v1/analytics/bundles?") &&
+            url.includes("project_id=proj_123") &&
+            url.includes("status=all") &&
+            url.includes("limit=20")
+        )
+    ).toBe(true);
+  });
+
+  it("retries failed project AnalyticsBundle reads and renders an empty state", async () => {
+    const user = userEvent.setup();
+    installMetricsFetch({ failBundlesOnce: true, empty: true });
+
+    render(<App initialEntries={["/projects/proj_123/analytics/bundles"]} />);
+
+    expect(await screen.findByText(/could not load project AnalyticsBundles/i)).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Retry project AnalyticsBundles" }));
+    expect(await screen.findByText(/no AnalyticsBundles in this project/i)).toBeInTheDocument();
   });
 
   it("shows complete route metrics and applies shared filters", async () => {
@@ -456,13 +529,15 @@ describe("web app - project analytics metrics", () => {
 
     await waitFor(() => {
       expect(
-        state.requestedUrls().some(
-          (url) =>
-            url.includes("/v1/analytics/routes?") &&
-            url.includes("service=storefront") &&
-            url.includes("environment=staging") &&
-            url.includes("last=30d")
-        )
+        state
+          .requestedUrls()
+          .some(
+            (url) =>
+              url.includes("/v1/analytics/routes?") &&
+              url.includes("service=storefront") &&
+              url.includes("environment=staging") &&
+              url.includes("last=30d")
+          )
       ).toBe(true);
     });
   });
@@ -521,9 +596,7 @@ describe("web app - project analytics metrics", () => {
     render(<App initialEntries={["/projects/proj_123/analytics/routes"]} />);
 
     expect(await screen.findByText(/analytics settings unavailable/i)).toBeInTheDocument();
-    expect(
-      state.requestedUrls().some((url) => url.includes("/v1/analytics/routes?"))
-    ).toBe(false);
+    expect(state.requestedUrls().some((url) => url.includes("/v1/analytics/routes?"))).toBe(false);
 
     await user.click(screen.getByRole("button", { name: "Retry" }));
     expect(await screen.findByText("/checkout")).toBeInTheDocument();

@@ -34,10 +34,12 @@ if (typeof HTMLElement !== "undefined") {
   HTMLElement.prototype.releasePointerCapture ??= () => {};
 }
 
-function installWorkspaceAnalyticsFetch(input: {
-  empty?: boolean;
-  failOpportunitiesOnce?: boolean;
-} = {}): { requestedUrls: () => string[] } {
+function installWorkspaceAnalyticsFetch(
+  input: {
+    empty?: boolean;
+    failOpportunitiesOnce?: boolean;
+  } = {}
+): { requestedUrls: () => string[] } {
   const requestedUrls: string[] = [];
   let opportunityRequests = 0;
 
@@ -167,10 +169,7 @@ describe("web app - workspace analytics", () => {
     ).toBeInTheDocument();
     expect(
       screen.getByRole("link", { name: "Checkout completion drops after shipping" })
-    ).toHaveAttribute(
-      "href",
-      `/projects/${PROJECT_ID}/analytics/opportunities/${OPPORTUNITY_ID}`
-    );
+    ).toHaveAttribute("href", `/projects/${PROJECT_ID}/analytics/opportunities/${OPPORTUNITY_ID}`);
   });
 
   it("applies complete opportunity filters and paginates through server cursors", async () => {
@@ -191,16 +190,18 @@ describe("web app - workspace analytics", () => {
 
     await waitFor(() => {
       expect(
-        state.requestedUrls().some(
-          (url) =>
-            url.includes(`/v1/analytics/opportunities?project_id=${PROJECT_ID}`) &&
-            url.includes("service=web") &&
-            url.includes("environment=production") &&
-            url.includes("severity=high") &&
-            url.includes("bundle_status=completed") &&
-            url.includes("from=2026-07-01T00%3A00%3A00.000Z") &&
-            url.includes("to=2026-07-31T23%3A59%3A59.999Z")
-        )
+        state
+          .requestedUrls()
+          .some(
+            (url) =>
+              url.includes(`/v1/analytics/opportunities?project_id=${PROJECT_ID}`) &&
+              url.includes("service=web") &&
+              url.includes("environment=production") &&
+              url.includes("severity=high") &&
+              url.includes("bundle_status=completed") &&
+              url.includes("from=2026-07-01T00%3A00%3A00.000Z") &&
+              url.includes("to=2026-07-31T23%3A59%3A59.999Z")
+          )
       ).toBe(true);
     });
 
@@ -235,6 +236,14 @@ describe("web app - workspace analytics", () => {
     }
     expect(within(table).getByText("Ready")).toBeInTheDocument();
     expect(within(table).getByText("Main App")).toBeInTheDocument();
+    expect(within(table).getByRole("link", { name: "Funnel Dropoff" })).toHaveAttribute(
+      "href",
+      `/projects/${PROJECT_ID}/analytics/bundles/${GENERATION_ID}`
+    );
+    expect(within(table).getByRole("link", { name: "View opportunity" })).toHaveAttribute(
+      "href",
+      `/projects/${PROJECT_ID}/analytics/opportunities/${OPPORTUNITY_ID}`
+    );
   });
 
   it("retries failed opportunity reads and renders an explicit empty state", async () => {
@@ -245,6 +254,8 @@ describe("web app - workspace analytics", () => {
 
     expect(await screen.findByText(/could not load analytics opportunities/i)).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Retry analytics opportunities" }));
-    expect(await screen.findByText(/no analytics opportunities match these filters/i)).toBeInTheDocument();
+    expect(
+      await screen.findByText(/no analytics opportunities match these filters/i)
+    ).toBeInTheDocument();
   });
 });

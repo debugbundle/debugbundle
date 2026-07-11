@@ -42,7 +42,8 @@ const analyticsSections = [
   { value: "funnels", label: "Funnels", suffix: "/funnels" },
   { value: "audiences", label: "Audiences", suffix: "/audiences" },
   { value: "journeys", label: "Journeys", suffix: "/journeys" },
-  { value: "opportunities", label: "Opportunities", suffix: "/opportunities" }
+  { value: "opportunities", label: "Opportunities", suffix: "/opportunities" },
+  { value: "bundles", label: "Bundles", suffix: "/bundles" }
 ] as const;
 type AnalyticsSection = (typeof analyticsSections)[number]["value"];
 
@@ -249,6 +250,7 @@ function resolveAnalyticsSection(pathname: string): AnalyticsSection {
   if (pathname.endsWith("/audiences")) return "audiences";
   if (pathname.endsWith("/journeys")) return "journeys";
   if (pathname.endsWith("/opportunities")) return "opportunities";
+  if (pathname.endsWith("/bundles")) return "bundles";
   return "overview";
 }
 
