@@ -35,6 +35,14 @@ describe("api openapi spec", () => {
     expect(document.paths?.["/v1/projects/{id}/availability-checks/test"]?.["post"]?.responses).toHaveProperty("200");
     expect(document.paths?.["/v1/analytics/bundles"]?.["get"]?.operationId).toBe("listAnalyticsBundles");
     expect(
+      document.paths?.["/v1/projects/{id}/analytics/saved-funnels"]?.["post"]?.operationId
+    ).toBe("createSavedAnalyticsFunnel");
+    expect(
+      document.paths?.["/v1/projects/{id}/analytics/saved-funnels/{funnelKey}"]?.[
+        "delete"
+      ]?.operationId
+    ).toBe("archiveSavedAnalyticsFunnel");
+    expect(
       document.paths?.["/v1/analytics/opportunities"]?.["get"]?.parameters?.map(
         (parameter) => parameter.name
       )

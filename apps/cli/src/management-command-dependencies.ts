@@ -13,6 +13,12 @@ import type {
   setAnalyticsSettingsWithAuthCommand as defaultSetAnalyticsSettingsCommand
 } from "./analytics-settings-commands.js";
 import type {
+  archiveAnalyticsSavedFunnelWithAuthCommand as defaultArchiveAnalyticsSavedFunnelCommand,
+  createAnalyticsSavedFunnelWithAuthCommand as defaultCreateAnalyticsSavedFunnelCommand,
+  listAnalyticsSavedFunnelsWithAuthCommand as defaultListAnalyticsSavedFunnelsCommand,
+  updateAnalyticsSavedFunnelWithAuthCommand as defaultUpdateAnalyticsSavedFunnelCommand
+} from "./analytics-saved-funnel-commands.js";
+import type {
   createAnalyticsBundleWithAuthCommand as defaultCreateAnalyticsBundleCommand,
   getAnalyticsBundleWithAuthCommand as defaultGetAnalyticsBundleCommand,
   listAnalyticsBundlesWithAuthCommand as defaultListAnalyticsBundlesCommand
@@ -171,6 +177,10 @@ export type ManagementCommandDependencies = {
   setCapturePolicyCommand?: typeof defaultSetCapturePolicyCommand;
   getAnalyticsSettingsCommand?: typeof defaultGetAnalyticsSettingsCommand;
   setAnalyticsSettingsCommand?: typeof defaultSetAnalyticsSettingsCommand;
+  listAnalyticsSavedFunnelsCommand?: typeof defaultListAnalyticsSavedFunnelsCommand;
+  createAnalyticsSavedFunnelCommand?: typeof defaultCreateAnalyticsSavedFunnelCommand;
+  updateAnalyticsSavedFunnelCommand?: typeof defaultUpdateAnalyticsSavedFunnelCommand;
+  archiveAnalyticsSavedFunnelCommand?: typeof defaultArchiveAnalyticsSavedFunnelCommand;
   getAnalyticsSummaryCommand?: typeof defaultGetAnalyticsSummaryCommand;
   getAnalyticsRoutesCommand?: typeof defaultGetAnalyticsRoutesCommand;
   getAnalyticsJourneysCommand?: typeof defaultGetAnalyticsJourneysCommand;

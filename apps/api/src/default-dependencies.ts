@@ -6,7 +6,6 @@ import {
 } from "../../../packages/auth/src/index.js";
 import {
   getDefaultPreset,
-  type AnalyticsSettingsUpdate,
   type CaptureRuleCreate,
   type CaptureRuleUpdate,
   type CapturePolicyUpdate,
@@ -26,12 +25,6 @@ import {
   createPostgresAuthStore,
   createPostgresCapturePolicyStore,
   createPostgresCaptureRuleStore,
-  createPostgresAnalyticsBundleGenerationStore,
-  createPostgresAnalyticsJourneySampleStore,
-  createPostgresAnalyticsMetricsStore,
-  createPostgresAnalyticsOpportunityStore,
-  createPostgresAnalyticsSettingsStore,
-  createPostgresAnalyticsUsageStore,
   createPostgresImprovementOpportunityStore,
   createPostgresImprovementSettingsStore,
   createPostgresGitHubMarketplaceStore,
@@ -57,6 +50,7 @@ import {
 import {
   createBillingManagement
 } from "./billing-management.js";
+import { createDefaultAnalyticsDependencies } from "./default-analytics-dependencies.js";
 import { createEnvBillingLinkProvider } from "./billing-links.js";
 import { createDefaultGitHubManagement } from "./default-github-management.js";
 import type { CreateApiDependenciesInput, DefaultApiDependencies } from "./default-dependency-types.js";
@@ -118,12 +112,6 @@ export function createApiDependencies(input: CreateApiDependenciesInput): Defaul
   });
   const capturePolicyStore = createPostgresCapturePolicyStore(input.db);
   const captureRuleStore = createPostgresCaptureRuleStore(input.db);
-  const analyticsBundleGenerationStore = createPostgresAnalyticsBundleGenerationStore(input.db);
-  const analyticsJourneySampleStore = createPostgresAnalyticsJourneySampleStore(input.db);
-  const analyticsMetricsStore = createPostgresAnalyticsMetricsStore(input.db);
-  const analyticsOpportunityStore = createPostgresAnalyticsOpportunityStore(input.db);
-  const analyticsSettingsStore = createPostgresAnalyticsSettingsStore(input.db);
-  const analyticsUsageStore = createPostgresAnalyticsUsageStore(input.db);
   const improvementOpportunityStore = createPostgresImprovementOpportunityStore(input.db, {
     ...(accountAnalyticsStore === undefined ? {} : { accountAnalyticsStore })
   });
@@ -377,7 +365,7 @@ export function createApiDependencies(input: CreateApiDependenciesInput): Defaul
       saveUserAvatar: (request) => accountStore.saveUserAvatar(request),
     },
     billingManagement,
-    analyticsUsage: analyticsUsageStore,
+    ...createDefaultAnalyticsDependencies({ db: input.db, queue: input.queue }),
     ...(billingAdminEmails === null
       ? {}
       : {
@@ -634,111 +622,6 @@ export function createApiDependencies(input: CreateApiDependenciesInput): Defaul
           project_id: input.project_id,
           matched_at: input.matched_at
         })
-    },
-    analyticsSettingsManagement: {
-      getAnalyticsSettingsForProject: (input: { organization_id: string; project_id: string }) => {
-        void input.organization_id;
-        return analyticsSettingsStore.getAnalyticsSettingsByProjectId(input.project_id);
-      },
-      updateAnalyticsSettingsForProject: (input: {
-        organization_id: string;
-        project_id: string;
-        update: AnalyticsSettingsUpdate;
-      }) => {
-        void input.organization_id;
-        return analyticsSettingsStore.updateAnalyticsSettings({
-          project_id: input.project_id,
-          update: input.update
-        });
-      }
-    },
-    analyticsMetrics: {
-      getUsageSummaryForProject: (input) => {
-        void input.organization_id;
-        return analyticsMetricsStore.getUsageSummary(input);
-      },
-      getRouteMetricsForProject: (input) => {
-        void input.organization_id;
-        return analyticsMetricsStore.getRouteMetrics(input);
-      },
-      getJourneyPatternsForProject: (input) => {
-        void input.organization_id;
-        return analyticsMetricsStore.getJourneyPatterns(input);
-      },
-      getDeviceBreakdownForProject: (input) => {
-        void input.organization_id;
-        return analyticsMetricsStore.getDeviceBreakdown(input);
-      },
-      getReferrerMetricsForProject: (input) => {
-        void input.organization_id;
-        return analyticsMetricsStore.getReferrerMetrics(input);
-      },
-      getActionMetricsForProject: (input) => {
-        void input.organization_id;
-        return analyticsMetricsStore.getActionMetrics(input);
-      },
-      listFunnelsForProject: (input) => {
-        void input.organization_id;
-        return analyticsMetricsStore.listFunnels(input);
-      },
-      getFunnelAnalysisForProject: (input) => {
-        void input.organization_id;
-        return analyticsMetricsStore.getFunnelAnalysis(input);
-      },
-      getIncidentImpactForProject: (input) => {
-        void input.organization_id;
-        return analyticsMetricsStore.getIncidentImpact(input);
-      }
-    },
-    analyticsJourneySamples: {
-      listAnalyticsJourneySamplesForProject: (request) => {
-        void request.organization_id;
-        return analyticsJourneySampleStore.listAnalyticsJourneySamplesForProject(request);
-      },
-      getAnalyticsJourneySampleForProject: (request) => {
-        void request.organization_id;
-        return analyticsJourneySampleStore.getAnalyticsJourneySampleForProject(request);
-      }
-    },
-    analyticsBundles: {
-      listAnalyticsBundleGenerationsForProject: (request) => {
-        void request.organization_id;
-        return analyticsBundleGenerationStore.listAnalyticsBundleGenerationsForProject(request);
-      },
-      listAnalyticsBundleGenerationsForOrganization: (request) =>
-        analyticsBundleGenerationStore.listAnalyticsBundleGenerationsForOrganization!(request),
-      requestAnalyticsBundleGenerationForProject: async (request) => {
-        void request.organization_id;
-        const generation = await analyticsBundleGenerationStore.reserveAnalyticsBundleGeneration({
-          project_id: request.project_id,
-          requested_by_user_id: request.requested_by_user_id,
-          analysis_kind: request.analysis_kind,
-          analysis_spec: request.analysis_spec
-        });
-
-        if (generation.status === "pending" || generation.status === "running") {
-          await input.queue.enqueue("build-analytics-bundle", {
-            project_id: generation.project_id,
-            generation_id: generation.generation_id,
-            requested_at: new Date().toISOString(),
-            trigger: "manual"
-          });
-        }
-
-        return generation;
-      },
-      getAnalyticsBundleGenerationForProject: (input) => {
-        void input.organization_id;
-        return analyticsBundleGenerationStore.getAnalyticsBundleGenerationForProject(input);
-      }
-    },
-    analyticsOpportunities: {
-      listAnalyticsOpportunitiesForProject: (input) =>
-        analyticsOpportunityStore.listAnalyticsOpportunitiesForProject(input),
-      listAnalyticsOpportunitiesForOrganization: (input) =>
-        analyticsOpportunityStore.listAnalyticsOpportunitiesForOrganization(input),
-      getAnalyticsOpportunityForProject: (input) =>
-        analyticsOpportunityStore.getAnalyticsOpportunityForProject(input)
     },
     improvementSettingsManagement: {
       getImprovementSettingsForProject: (input: { organization_id: string; project_id: string }) => {

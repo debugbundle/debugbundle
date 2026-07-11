@@ -8,6 +8,8 @@ import { ANALYTICS_METRICS_MCP_TOOL_CATALOG } from './analytics-metrics-tool-cat
 import { ANALYTICS_METRICS_MCP_TOOL_NAMES } from './analytics-metrics-tools.js';
 import { ANALYTICS_SETTINGS_MCP_TOOL_CATALOG } from './analytics-settings-tool-catalog.js';
 import { ANALYTICS_SETTINGS_MCP_TOOL_NAMES } from './analytics-settings-tools.js';
+import { ANALYTICS_SAVED_FUNNEL_MCP_TOOL_CATALOG } from './analytics-saved-funnel-tool-catalog.js';
+import { ANALYTICS_SAVED_FUNNEL_MCP_TOOL_NAMES } from './analytics-saved-funnel-tools.js';
 import { BILLING_MCP_TOOL_NAMES } from './billing-tools.js';
 import { CAPTURE_RULE_MCP_TOOL_NAMES } from './capture-rule-tools.js';
 import { CAPTURE_POLICY_MCP_TOOL_NAMES } from './capture-policy-tools.js';
@@ -17,6 +19,7 @@ import { HEALTH_CHECK_MCP_TOOL_CATALOG } from './health-check-tool-catalog.js';
 import { IMPROVEMENT_MCP_TOOL_NAMES } from './improvement-tools.js';
 import { IMPROVEMENT_SETTINGS_MCP_TOOL_NAMES } from './improvement-settings-tools.js';
 import { MEMBER_MCP_TOOL_NAMES } from './member-tools.js';
+import { MEMBER_MCP_TOOL_CATALOG } from './member-tool-catalog.js';
 import { PROBE_MCP_TOOL_CATALOG } from './probe-tool-catalog.js';
 import { PROBE_MCP_TOOL_NAMES } from './probe-tools.js';
 import { PROJECT_MCP_TOOL_NAMES } from './project-tools.js';
@@ -33,6 +36,7 @@ type McpToolName =
   | (typeof ANALYZE_MCP_TOOL_NAMES)[number]
   | (typeof ANALYTICS_METRICS_MCP_TOOL_NAMES)[number]
   | (typeof ANALYTICS_SETTINGS_MCP_TOOL_NAMES)[number]
+  | (typeof ANALYTICS_SAVED_FUNNEL_MCP_TOOL_NAMES)[number]
   | (typeof BILLING_MCP_TOOL_NAMES)[number]
   | (typeof CAPTURE_RULE_MCP_TOOL_NAMES)[number]
   | (typeof CAPTURE_POLICY_MCP_TOOL_NAMES)[number]
@@ -56,6 +60,7 @@ type McpToolGroup =
   | 'analyze'
   | 'analytics_metrics'
   | 'analytics_settings'
+  | 'analytics_saved_funnels'
   | 'billing'
   | 'capture_rules'
   | 'capture_policy'
@@ -796,6 +801,7 @@ export const MCP_TOOL_CATALOG = [
   },
   ...ANALYTICS_METRICS_MCP_TOOL_CATALOG,
   ...ANALYTICS_SETTINGS_MCP_TOOL_CATALOG,
+  ...ANALYTICS_SAVED_FUNNEL_MCP_TOOL_CATALOG,
   {
     name: 'get_capture_policy',
     group: 'capture_policy',
@@ -894,75 +900,7 @@ export const MCP_TOOL_CATALOG = [
       bearerToken: z.string(),
     }),
   },
-  {
-    name: 'list_project_members',
-    group: 'members',
-    description: 'List members for a project.',
-    inputSchema: z.object({
-      bearerToken: z.string(),
-      projectId: z.string(),
-    }),
-  },
-  {
-    name: 'list_project_member_invites',
-    group: 'members',
-    description: 'List pending invites for a project.',
-    inputSchema: z.object({
-      bearerToken: z.string(),
-      projectId: z.string(),
-    }),
-  },
-  {
-    name: 'invite_project_member',
-    group: 'members',
-    description: 'Invite a collaborator to a project.',
-    inputSchema: z.object({
-      bearerToken: z.string(),
-      projectId: z.string(),
-      email: z.string(),
-      role: z.string(),
-    }),
-  },
-  {
-    name: 'cancel_project_member_invite',
-    group: 'members',
-    description: 'Cancel a pending project invite.',
-    inputSchema: z.object({
-      bearerToken: z.string(),
-      projectId: z.string(),
-      inviteId: z.string(),
-    }),
-  },
-  {
-    name: 'update_project_member_role',
-    group: 'members',
-    description: 'Update the role of a project collaborator.',
-    inputSchema: z.object({
-      bearerToken: z.string(),
-      projectId: z.string(),
-      userId: z.string(),
-      role: z.string(),
-    }),
-  },
-  {
-    name: 'remove_project_member',
-    group: 'members',
-    description: 'Remove a collaborator from a project.',
-    inputSchema: z.object({
-      bearerToken: z.string(),
-      projectId: z.string(),
-      userId: z.string(),
-    }),
-  },
-  {
-    name: 'leave_project',
-    group: 'members',
-    description: 'Leave a shared project as the authenticated collaborator.',
-    inputSchema: z.object({
-      bearerToken: z.string(),
-      projectId: z.string(),
-    }),
-  },
+  ...MEMBER_MCP_TOOL_CATALOG,
   {
     name: 'list_services',
     group: 'services',

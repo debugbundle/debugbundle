@@ -16,6 +16,9 @@ import type {
   AnalyticsOpportunityStatus,
   AnalyticsReferrerMetricsResponse,
   AnalyticsRouteMetricsResponse,
+  AnalyticsSavedFunnel,
+  AnalyticsSavedFunnelCreate,
+  AnalyticsSavedFunnelUpdate,
   AnalyticsUsageSummaryResponse
 } from "../../../packages/shared-types/src/index.js";
 import type {
@@ -29,6 +32,32 @@ import type {
 } from "../../../packages/storage/src/index.js";
 
 export interface ApiAnalyticsDependencies {
+  analyticsSavedFunnels?: {
+    listSavedFunnelsForProject(input: {
+      organization_id: string;
+      project_id: string;
+    }): Promise<AnalyticsSavedFunnel[]>;
+    createSavedFunnelForProject(input: {
+      organization_id: string;
+      project_id: string;
+      created_by_user_id: string;
+      definition: AnalyticsSavedFunnelCreate;
+    }): Promise<
+      | { status: "created"; funnel: AnalyticsSavedFunnel }
+      | { status: "project_not_found" | "funnel_key_taken" | "limit_reached" }
+    >;
+    updateSavedFunnelForProject(input: {
+      organization_id: string;
+      project_id: string;
+      funnel_key: string;
+      update: AnalyticsSavedFunnelUpdate;
+    }): Promise<AnalyticsSavedFunnel | null>;
+    archiveSavedFunnelForProject(input: {
+      organization_id: string;
+      project_id: string;
+      funnel_key: string;
+    }): Promise<AnalyticsSavedFunnel | null>;
+  } | undefined;
   analyticsSettingsManagement?: {
     getAnalyticsSettingsForProject(input: {
       organization_id: string;

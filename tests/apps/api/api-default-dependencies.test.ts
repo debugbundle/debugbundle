@@ -20,6 +20,7 @@ const {
   createPostgresAnalyticsJourneySampleStoreMock,
   createPostgresAnalyticsMetricsStoreMock,
   createPostgresAnalyticsOpportunityStoreMock,
+  createPostgresAnalyticsSavedFunnelStoreMock,
   createPostgresAnalyticsSettingsStoreMock,
   createPostgresAnalyticsUsageStoreMock,
   createPostgresCapturePolicyStoreMock,
@@ -69,6 +70,7 @@ const {
   createPostgresAnalyticsJourneySampleStoreMock: vi.fn(),
   createPostgresAnalyticsMetricsStoreMock: vi.fn(),
   createPostgresAnalyticsOpportunityStoreMock: vi.fn(),
+  createPostgresAnalyticsSavedFunnelStoreMock: vi.fn(),
   createPostgresAnalyticsSettingsStoreMock: vi.fn(),
   createPostgresAnalyticsUsageStoreMock: vi.fn(),
   createPostgresCapturePolicyStoreMock: vi.fn(),
@@ -148,6 +150,7 @@ vi.mock("../../../packages/storage/src/index.js", () => ({
   createPostgresAnalyticsJourneySampleStore: createPostgresAnalyticsJourneySampleStoreMock,
   createPostgresAnalyticsMetricsStore: createPostgresAnalyticsMetricsStoreMock,
   createPostgresAnalyticsOpportunityStore: createPostgresAnalyticsOpportunityStoreMock,
+  createPostgresAnalyticsSavedFunnelStore: createPostgresAnalyticsSavedFunnelStoreMock,
   createPostgresAnalyticsSettingsStore: createPostgresAnalyticsSettingsStoreMock,
   createPostgresAnalyticsUsageStore: createPostgresAnalyticsUsageStoreMock,
   createPostgresCapturePolicyStore: createPostgresCapturePolicyStoreMock,
@@ -245,6 +248,7 @@ describe("api default dependencies", () => {
     createPostgresAnalyticsJourneySampleStoreMock.mockReset();
     createPostgresAnalyticsMetricsStoreMock.mockReset();
     createPostgresAnalyticsOpportunityStoreMock.mockReset();
+    createPostgresAnalyticsSavedFunnelStoreMock.mockReset();
     createPostgresAnalyticsSettingsStoreMock.mockReset();
     createPostgresAnalyticsUsageStoreMock.mockReset();
     createPostgresCapturePolicyStoreMock.mockReset();
@@ -348,6 +352,12 @@ describe("api default dependencies", () => {
     createPostgresAnalyticsOpportunityStoreMock.mockReturnValue({
       listAnalyticsOpportunitiesForProject: vi.fn(),
       getAnalyticsOpportunityForProject: vi.fn()
+    });
+    createPostgresAnalyticsSavedFunnelStoreMock.mockReturnValue({
+      listSavedFunnelsForProject: vi.fn(),
+      createSavedFunnelForProject: vi.fn(),
+      updateSavedFunnelForProject: vi.fn(),
+      archiveSavedFunnelForProject: vi.fn()
     });
     createPostgresAnalyticsSettingsStoreMock.mockReturnValue({
       getAnalyticsSettingsByProjectId: vi.fn(),
@@ -812,6 +822,8 @@ describe("api default dependencies", () => {
     expect(typeof deps.captureRuleManagement.recordCaptureRuleMatch).toBe("function");
     expect(typeof deps.analyticsSettingsManagement.getAnalyticsSettingsForProject).toBe("function");
     expect(typeof deps.analyticsSettingsManagement.updateAnalyticsSettingsForProject).toBe("function");
+    expect(typeof deps.analyticsSavedFunnels?.listSavedFunnelsForProject).toBe("function");
+    expect(typeof deps.analyticsSavedFunnels?.createSavedFunnelForProject).toBe("function");
     expect(typeof deps.analyticsMetrics.getUsageSummaryForProject).toBe("function");
     expect(typeof deps.analyticsMetrics.getRouteMetricsForProject).toBe("function");
     expect(typeof deps.analyticsMetrics.getJourneyPatternsForProject).toBe("function");

@@ -2,6 +2,8 @@ import {
   AnalyticsBundleAnalysisKindSchema,
   AnalyticsBundleSeveritySchema,
   AnalyticsOpportunityBundleStatusSchema,
+  AnalyticsSavedFunnelCreateSchema,
+  AnalyticsSavedFunnelUpdateSchema,
   type AnalyticsBundleAnalysisKind,
   type AnalyticsSettingsUpdate
 } from "../../../packages/shared-types/src/index.js";
@@ -9,6 +11,12 @@ import {
   getAnalyticsSettingsWithAuthCommand as defaultGetAnalyticsSettingsCommand,
   setAnalyticsSettingsWithAuthCommand as defaultSetAnalyticsSettingsCommand
 } from "./analytics-settings-commands.js";
+import {
+  archiveAnalyticsSavedFunnelWithAuthCommand as defaultArchiveAnalyticsSavedFunnelCommand,
+  createAnalyticsSavedFunnelWithAuthCommand as defaultCreateAnalyticsSavedFunnelCommand,
+  listAnalyticsSavedFunnelsWithAuthCommand as defaultListAnalyticsSavedFunnelsCommand,
+  updateAnalyticsSavedFunnelWithAuthCommand as defaultUpdateAnalyticsSavedFunnelCommand
+} from "./analytics-saved-funnel-commands.js";
 import {
   createAnalyticsBundleWithAuthCommand as defaultCreateAnalyticsBundleCommand,
   getAnalyticsBundleWithAuthCommand as defaultGetAnalyticsBundleCommand,
@@ -44,7 +52,10 @@ import {
   requirePositional,
   type ParsedArgv
 } from "./argv-helpers.js";
-import type { CliCommandResult, ManagementCommandDependencies } from "./management-command-dependencies.js";
+import type {
+  CliCommandResult,
+  ManagementCommandDependencies
+} from "./management-command-dependencies.js";
 
 function readFloatOption(parsedArgv: ParsedArgv, optionName: string): number | undefined {
   const rawValue = readStringOption(parsedArgv, optionName);
@@ -78,7 +89,9 @@ function readAnalyticsOpportunityBundleStatus(
   throw new CliInputError("Invalid value for --bundle-status.");
 }
 
-function readPrivacyMode(parsedArgv: ParsedArgv): AnalyticsSettingsUpdate["privacy_mode"] | undefined {
+function readPrivacyMode(
+  parsedArgv: ParsedArgv
+): AnalyticsSettingsUpdate["privacy_mode"] | undefined {
   const privacyMode = readStringOption(parsedArgv, "privacy-mode");
   if (privacyMode === undefined) {
     return undefined;
@@ -102,7 +115,9 @@ function readAnalyticsGranularity(parsedArgv: ParsedArgv): "hour" | "day" | unde
   throw new CliInputError("Invalid value for --granularity.");
 }
 
-function readAnalyticsOpportunityStatus(parsedArgv: ParsedArgv): "open" | "resolved" | "snoozed" | "all" | undefined {
+function readAnalyticsOpportunityStatus(
+  parsedArgv: ParsedArgv
+): "open" | "resolved" | "snoozed" | "all" | undefined {
   const status = readStringOption(parsedArgv, "status");
   if (status === undefined) {
     return undefined;
@@ -114,7 +129,9 @@ function readAnalyticsOpportunityStatus(parsedArgv: ParsedArgv): "open" | "resol
   throw new CliInputError("Invalid value for --status.");
 }
 
-function readAnalyticsOpportunityKind(parsedArgv: ParsedArgv): AnalyticsBundleAnalysisKind | undefined {
+function readAnalyticsOpportunityKind(
+  parsedArgv: ParsedArgv
+): AnalyticsBundleAnalysisKind | undefined {
   const kind = readStringOption(parsedArgv, "kind");
   if (kind === undefined) {
     return undefined;
@@ -162,7 +179,9 @@ function readApprovedCustomDimensions(parsedArgv: ParsedArgv): string[] | undefi
   const csvDimensions = readCsvOption(parsedArgv, "approved-custom-dimensions");
   const jsonDimensions = readJsonOption(parsedArgv, "approved-custom-dimensions-json");
   if (csvDimensions !== undefined && jsonDimensions !== undefined) {
-    throw new CliInputError("Use either --approved-custom-dimensions or --approved-custom-dimensions-json.");
+    throw new CliInputError(
+      "Use either --approved-custom-dimensions or --approved-custom-dimensions-json."
+    );
   }
   if (jsonDimensions === undefined) {
     return csvDimensions;
@@ -271,18 +290,19 @@ export async function handleAnalyticsCommand(
     });
     const command =
       resource === "summary"
-        ? dependencies.getAnalyticsSummaryCommand ?? defaultGetAnalyticsSummaryCommand
+        ? (dependencies.getAnalyticsSummaryCommand ?? defaultGetAnalyticsSummaryCommand)
         : resource === "routes"
-          ? dependencies.getAnalyticsRoutesCommand ?? defaultGetAnalyticsRoutesCommand
+          ? (dependencies.getAnalyticsRoutesCommand ?? defaultGetAnalyticsRoutesCommand)
           : resource === "journeys"
-            ? dependencies.getAnalyticsJourneysCommand ?? defaultGetAnalyticsJourneysCommand
+            ? (dependencies.getAnalyticsJourneysCommand ?? defaultGetAnalyticsJourneysCommand)
             : resource === "devices"
-              ? dependencies.getAnalyticsDevicesCommand ?? defaultGetAnalyticsDevicesCommand
+              ? (dependencies.getAnalyticsDevicesCommand ?? defaultGetAnalyticsDevicesCommand)
               : resource === "referrers"
-                ? dependencies.getAnalyticsReferrersCommand ?? defaultGetAnalyticsReferrersCommand
+                ? (dependencies.getAnalyticsReferrersCommand ?? defaultGetAnalyticsReferrersCommand)
                 : resource === "actions"
-                  ? dependencies.getAnalyticsActionsCommand ?? defaultGetAnalyticsActionsCommand
-                  : dependencies.listAnalyticsFunnelsCommand ?? defaultListAnalyticsFunnelsCommand;
+                  ? (dependencies.getAnalyticsActionsCommand ?? defaultGetAnalyticsActionsCommand)
+                  : (dependencies.listAnalyticsFunnelsCommand ??
+                    defaultListAnalyticsFunnelsCommand);
 
     return await command(input);
   }
@@ -344,7 +364,9 @@ export async function handleAnalyticsCommand(
       throw new CliInputError("Missing required option --project.");
     }
 
-    return await (dependencies.getAnalyticsIncidentImpactCommand ?? defaultGetAnalyticsIncidentImpactCommand)(
+    return await (
+      dependencies.getAnalyticsIncidentImpactCommand ?? defaultGetAnalyticsIncidentImpactCommand
+    )(
       appendCommonAuthOptions(parsedArgv, {
         projectId,
         incidentId,
@@ -387,7 +409,9 @@ export async function handleAnalyticsCommand(
       throw new CliInputError("Missing required option --project or --all-projects.");
     }
 
-    return await (dependencies.listAnalyticsOpportunitiesCommand ?? defaultListAnalyticsOpportunitiesCommand)(
+    return await (
+      dependencies.listAnalyticsOpportunitiesCommand ?? defaultListAnalyticsOpportunitiesCommand
+    )(
       appendCommonAuthOptions(parsedArgv, {
         projectId,
         status: readAnalyticsOpportunityStatus(parsedArgv),
@@ -418,7 +442,9 @@ export async function handleAnalyticsCommand(
       throw new CliInputError("Missing required option --project.");
     }
 
-    return await (dependencies.getAnalyticsOpportunityCommand ?? defaultGetAnalyticsOpportunityCommand)(
+    return await (
+      dependencies.getAnalyticsOpportunityCommand ?? defaultGetAnalyticsOpportunityCommand
+    )(
       appendCommonAuthOptions(parsedArgv, {
         projectId,
         opportunityId
@@ -502,7 +528,9 @@ export async function handleAnalyticsCommand(
         throw new CliInputError("Missing required option --project.");
       }
 
-      return await (dependencies.createAnalyticsBundleCommand ?? defaultCreateAnalyticsBundleCommand)(
+      return await (
+        dependencies.createAnalyticsBundleCommand ?? defaultCreateAnalyticsBundleCommand
+      )(
         appendCommonAuthOptions(parsedArgv, {
           projectId,
           analysisKind: readRequiredAnalyticsBundleKind(parsedArgv),
@@ -558,7 +586,9 @@ export async function handleAnalyticsCommand(
         throw new CliInputError("Missing required option --project.");
       }
 
-      return await (dependencies.listAnalyticsJourneySamplesCommand ?? defaultListAnalyticsJourneySamplesCommand)(
+      return await (
+        dependencies.listAnalyticsJourneySamplesCommand ?? defaultListAnalyticsJourneySamplesCommand
+      )(
         appendCommonAuthOptions(parsedArgv, {
           projectId,
           service: readStringOption(parsedArgv, "service"),
@@ -582,12 +612,84 @@ export async function handleAnalyticsCommand(
       throw new CliInputError("Missing required option --project.");
     }
 
-    return await (dependencies.getAnalyticsJourneySampleCommand ?? defaultGetAnalyticsJourneySampleCommand)(
+    return await (
+      dependencies.getAnalyticsJourneySampleCommand ?? defaultGetAnalyticsJourneySampleCommand
+    )(
       appendCommonAuthOptions(parsedArgv, {
         projectId,
         sampleId
       })
     );
+  }
+
+  if (resource === "saved-funnels") {
+    const action = requirePositional(parsedArgv, 2, "saved-funnels action");
+    const projectId = readProjectOption(parsedArgv);
+    if (projectId === undefined) throw new CliInputError("Missing required option --project.");
+
+    if (action === "list") {
+      expectNoUnknownOptions(parsedArgv, ["project", "project-id", "auth-file", "json"]);
+      ensureNoExtraPositionals(parsedArgv, 3);
+      return await (
+        dependencies.listAnalyticsSavedFunnelsCommand ?? defaultListAnalyticsSavedFunnelsCommand
+      )(appendCommonAuthOptions(parsedArgv, { projectId }));
+    }
+
+    if (action === "create") {
+      expectNoUnknownOptions(parsedArgv, [
+        "project",
+        "project-id",
+        "key",
+        "name",
+        "steps-json",
+        "auth-file",
+        "json"
+      ]);
+      ensureNoExtraPositionals(parsedArgv, 3);
+      const definition = AnalyticsSavedFunnelCreateSchema.safeParse({
+        funnel_key: readStringOption(parsedArgv, "key"),
+        display_name: readStringOption(parsedArgv, "name"),
+        steps: readJsonOption(parsedArgv, "steps-json")
+      });
+      if (!definition.success) throw new CliInputError("Invalid saved funnel definition.");
+      return await (
+        dependencies.createAnalyticsSavedFunnelCommand ?? defaultCreateAnalyticsSavedFunnelCommand
+      )(appendCommonAuthOptions(parsedArgv, { projectId, definition: definition.data }));
+    }
+
+    if (action === "update") {
+      expectNoUnknownOptions(parsedArgv, [
+        "project",
+        "project-id",
+        "name",
+        "steps-json",
+        "auth-file",
+        "json"
+      ]);
+      ensureNoExtraPositionals(parsedArgv, 4);
+      const funnelKey = requirePositional(parsedArgv, 3, "saved funnel key");
+      const displayName = readStringOption(parsedArgv, "name");
+      const steps = readJsonOption(parsedArgv, "steps-json");
+      const update = AnalyticsSavedFunnelUpdateSchema.safeParse({
+        ...(displayName === undefined ? {} : { display_name: displayName }),
+        ...(steps === undefined ? {} : { steps })
+      });
+      if (!update.success) throw new CliInputError("Invalid saved funnel update.");
+      return await (
+        dependencies.updateAnalyticsSavedFunnelCommand ?? defaultUpdateAnalyticsSavedFunnelCommand
+      )(appendCommonAuthOptions(parsedArgv, { projectId, funnelKey, update: update.data }));
+    }
+
+    if (action === "archive") {
+      expectNoUnknownOptions(parsedArgv, ["project", "project-id", "auth-file", "json"]);
+      ensureNoExtraPositionals(parsedArgv, 4);
+      const funnelKey = requirePositional(parsedArgv, 3, "saved funnel key");
+      return await (
+        dependencies.archiveAnalyticsSavedFunnelCommand ?? defaultArchiveAnalyticsSavedFunnelCommand
+      )(appendCommonAuthOptions(parsedArgv, { projectId, funnelKey }));
+    }
+
+    throw new CliInputError("Unknown analytics saved-funnels command.");
   }
 
   if (resource !== "settings") {

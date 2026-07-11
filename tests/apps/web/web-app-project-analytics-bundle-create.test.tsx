@@ -114,7 +114,8 @@ function installCreateFetch(
         });
       }
       if (url.endsWith("/v1/analytics/bundles") && init?.method === "POST") {
-        createBodies.push(JSON.parse(String(init.body)) as Record<string, unknown>);
+        if (typeof init.body !== "string") throw new Error("expected_json_request_body");
+        createBodies.push(JSON.parse(init.body) as Record<string, unknown>);
         const headers = new Headers({ "Content-Type": "application/json" });
         if (input.includeGenerationHeader ?? true) {
           headers.set("X-DebugBundle-Generation-Id", GENERATION_ID);

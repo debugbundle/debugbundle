@@ -15,7 +15,7 @@ export const AnalyticsSavedFunnelStepSchema = z
   .strict();
 export type AnalyticsSavedFunnelStep = z.infer<typeof AnalyticsSavedFunnelStepSchema>;
 
-const AnalyticsSavedFunnelStepsSchema = z
+export const AnalyticsSavedFunnelStepsSchema = z
   .array(AnalyticsSavedFunnelStepSchema)
   .min(2)
   .max(20)

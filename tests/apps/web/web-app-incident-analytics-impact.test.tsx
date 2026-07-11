@@ -63,16 +63,18 @@ function installFetch(
     impact?: Record<string, unknown>;
     createResponse?: Response;
   } = {}
-): { createBodies: Array<Record<string, unknown>> } {
+): { createBodies: Array<Record<string, unknown>>; requestedUrls: string[] } {
   const project = createProject({ project_id: PROJECT_ID, organization_plan: "team" });
   const incident = createIncident({ incident_id: INCIDENT_ID, project_id: PROJECT_ID });
   const createBodies: Array<Record<string, unknown>> = [];
   const impactResponses = [...(input.impactResponses ?? [])];
+  const requestedUrls: string[] = [];
 
   vi.stubGlobal(
     "fetch",
     vi.fn((request: RequestInfo | URL, init?: RequestInit) => {
       const url = requestUrl(request);
+      requestedUrls.push(url);
 
       if (url.endsWith("/v1/auth/session")) {
         return jsonResponse(200, { session: createSession({ organization_plan: "team" }) });
@@ -93,7 +95,8 @@ function installFetch(
         return jsonResponse(200, { status: "pending" });
       }
       if (url.endsWith("/v1/analytics/bundles") && init?.method === "POST") {
-        createBodies.push(JSON.parse(String(init.body)) as Record<string, unknown>);
+        if (typeof init.body !== "string") throw new Error("expected_json_request_body");
+        createBodies.push(JSON.parse(init.body) as Record<string, unknown>);
         return (
           input.createResponse ??
           new Response(JSON.stringify({ status: "pending", bundle_generation_id: GENERATION_ID }), {
@@ -115,7 +118,7 @@ function installFetch(
     })
   );
 
-  return { createBodies };
+  return { createBodies, requestedUrls };
 }
 
 afterEach(() => {
@@ -217,7 +220,9 @@ describe("web app - incident analytics impact", () => {
     render(<App initialEntries={[`/projects/${PROJECT_ID}/incidents/${INCIDENT_ID}`]} />);
 
     await user.click(await screen.findByRole("button", { name: "Generate AnalyticsBundle" }));
-    expect(await screen.findByText("Processing")).toBeInTheDocument();
+    await waitFor(() => {
+      expect(state.requestedUrls.some((url) => url.includes(`/v1/analytics/bundles/${GENERATION_ID}?`))).toBe(true);
+    });
     expect(state.createBodies).toEqual([
       {
         project_id: PROJECT_ID,

@@ -23,6 +23,7 @@ import { registerAdminAnalyticsRoutes } from "./routes/admin-analytics.js";
 import { registerAdminBillingRoutes } from "./routes/admin-billing.js";
 import { registerAnalyticsRoutes } from "./routes/analytics.js";
 import { registerAnalyticsSettingsRoutes } from "./routes/analytics-settings.js";
+import { registerAnalyticsSavedFunnelRoutes } from "./routes/analytics-saved-funnels.js";
 import { registerAvailabilityCheckRoutes } from "./routes/availability-checks.js";
 import { registerBillingRoutes } from "./routes/billing.js";
 import { registerCapturePolicyRoutes } from "./routes/capture-policy.js";
@@ -402,6 +403,7 @@ export function createApiServer(
   registerAlertRoutes(app, dependencies);
   registerAnalyticsRoutes(app, dependencies);
   registerAnalyticsSettingsRoutes(app, dependencies);
+  registerAnalyticsSavedFunnelRoutes(app, dependencies);
   registerCapturePolicyRoutes(app, dependencies);
   registerCaptureRuleRoutes(app, dependencies);
   registerImprovementSettingsRoutes(app, dependencies);

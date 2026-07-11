@@ -14,6 +14,7 @@ import { createAnalyticsBundleApi } from "../../cli/src/analytics-bundle-command
 import { createAnalyticsJourneySampleApi } from "../../cli/src/analytics-journey-sample-commands.js";
 import { createAnalyticsMetricsApi } from "../../cli/src/analytics-metrics-commands.js";
 import { createAnalyticsSettingsApi } from "../../cli/src/analytics-settings-commands.js";
+import { createAnalyticsSavedFunnelApi } from "../../cli/src/analytics-saved-funnel-commands.js";
 import { createCaptureRuleApi } from "../../cli/src/capture-rule-commands.js";
 import { createCapturePolicyApi } from "../../cli/src/capture-policy-commands.js";
 import { createImprovementSettingsApi } from "../../cli/src/improvement-settings-commands.js";
@@ -28,6 +29,7 @@ import { createAlertMcpTools } from "./alert-tools.js";
 import { createAnalyzeMcpTools } from "./analyze-tools.js";
 import { createAnalyticsMetricsMcpTools } from "./analytics-metrics-tools.js";
 import { createAnalyticsSettingsMcpTools } from "./analytics-settings-tools.js";
+import { createAnalyticsSavedFunnelMcpTools } from "./analytics-saved-funnel-tools.js";
 import { createBillingMcpTools } from "./billing-tools.js";
 import { createCaptureRuleMcpTools } from "./capture-rule-tools.js";
 import { createCapturePolicyMcpTools } from "./capture-policy-tools.js";
@@ -120,6 +122,7 @@ export async function createDefaultMcpTools(input: { apiBaseUrl?: string } = {})
         ...createAnalyticsJourneySampleApi(httpClient)
       }),
       ...createAnalyticsSettingsMcpTools(createAnalyticsSettingsApi(httpClient)),
+      ...createAnalyticsSavedFunnelMcpTools(createAnalyticsSavedFunnelApi(httpClient)),
       ...createCaptureRuleMcpTools(createCaptureRuleApi(httpClient)),
       ...createCapturePolicyMcpTools(createCapturePolicyApi(httpClient)),
       ...createImprovementSettingsMcpTools(createImprovementSettingsApi(httpClient)),

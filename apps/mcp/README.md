@@ -63,6 +63,7 @@ DebugBundle does not expose a hosted remote MCP endpoint today; this package is 
 - Fetch deterministic debug bundles and reproduction artifacts.
 - Query aggregate usage, routes, device/browser/OS/language segments, referrers, actions, funnels, and journey patterns without waiting for an analysis artifact.
 - Inspect retained redacted journey samples, analytics opportunities, and generated AnalyticsBundles; request a bounded analysis artifact when aggregate metrics alone are insufficient.
+- List saved analytics funnels and, with owner/admin access, create, update, or archive reusable funnel definitions through `list_saved_analytics_funnels`, `create_saved_analytics_funnel`, `update_saved_analytics_funnel`, and `archive_saved_analytics_funnel`.
 - Inspect hosted health checks, probes, alerts, webhooks, projects, members, billing, capture policy, and GitHub automation state.
 - Run local and hosted verification through tools such as `verify_local`, `verify_cloud`, `doctor`, `smoke`, and `analyze`.
 - Resolve or reopen incidents after verification.

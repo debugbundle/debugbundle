@@ -15,7 +15,12 @@ import {
   AnalyticsJourneyPatternsResponseSchema,
   AnalyticsReferrerMetricsResponseSchema,
   AnalyticsRouteMetricsResponseSchema,
-  AnalyticsUsageSummaryResponseSchema
+  AnalyticsUsageSummaryResponseSchema,
+  AnalyticsSavedFunnelCreateSchema,
+  AnalyticsSavedFunnelKeySchema,
+  AnalyticsSavedFunnelResponseSchema,
+  AnalyticsSavedFunnelsResponseSchema,
+  AnalyticsSavedFunnelUpdateSchema
 } from "../../../packages/shared-types/src/index.js";
 
 type SecurityRequirement = Record<string, []>;
@@ -31,7 +36,7 @@ type ResponseSpec = {
 };
 
 type OperationSpec = {
-  method: "get";
+  method: "get" | "post" | "patch" | "delete";
   path: string;
   operationId: string;
   summary: string;
@@ -39,6 +44,7 @@ type OperationSpec = {
   security?: SecurityRequirement[];
   params?: unknown;
   query?: unknown;
+  requestBody?: SchemaComponent;
   responses: Record<string, ResponseSpec>;
 };
 
@@ -86,6 +92,10 @@ const AnalyticsBundlesQuerySchema = z
   })
   .strict();
 const AnalyticsOpportunityQuerySchema = z.object({ project_id: z.string().uuid() }).strict();
+const AnalyticsSavedFunnelProjectParamsSchema = z.object({ id: z.string().uuid() }).strict();
+const AnalyticsSavedFunnelParamsSchema = AnalyticsSavedFunnelProjectParamsSchema.extend({
+  funnelKey: AnalyticsSavedFunnelKeySchema
+}).strict();
 
 function component(name: string, schema: unknown): SchemaComponent {
   return { name, schema };
@@ -95,17 +105,26 @@ export function createAnalyticsMetricOpenApiOperations(options: {
   apiError: SchemaComponent;
   anyMemberAuth: SecurityRequirement[];
 }): OperationSpec[] {
-  const analyticsUsageSummaryResponse = component("AnalyticsUsageSummaryResponse", AnalyticsUsageSummaryResponseSchema);
+  const analyticsUsageSummaryResponse = component(
+    "AnalyticsUsageSummaryResponse",
+    AnalyticsUsageSummaryResponseSchema
+  );
   const analyticsOpportunitiesListResponse = component(
     "AnalyticsOpportunitiesListResponse",
     AnalyticsOpportunitiesListResponseSchema
   );
-  const analyticsOpportunityResponse = component("AnalyticsOpportunityResponse", AnalyticsOpportunityResponseSchema);
+  const analyticsOpportunityResponse = component(
+    "AnalyticsOpportunityResponse",
+    AnalyticsOpportunityResponseSchema
+  );
   const analyticsBundleGenerationsListResponse = component(
     "AnalyticsBundleGenerationsListResponse",
     AnalyticsBundleGenerationsListResponseSchema
   );
-  const analyticsRouteMetricsResponse = component("AnalyticsRouteMetricsResponse", AnalyticsRouteMetricsResponseSchema);
+  const analyticsRouteMetricsResponse = component(
+    "AnalyticsRouteMetricsResponse",
+    AnalyticsRouteMetricsResponseSchema
+  );
   const analyticsJourneyPatternsResponse = component(
     "AnalyticsJourneyPatternsResponse",
     AnalyticsJourneyPatternsResponseSchema
@@ -118,20 +137,103 @@ export function createAnalyticsMetricOpenApiOperations(options: {
     "AnalyticsReferrerMetricsResponse",
     AnalyticsReferrerMetricsResponseSchema
   );
-  const analyticsActionMetricsResponse = component("AnalyticsActionMetricsResponse", AnalyticsActionMetricsResponseSchema);
+  const analyticsActionMetricsResponse = component(
+    "AnalyticsActionMetricsResponse",
+    AnalyticsActionMetricsResponseSchema
+  );
   const analyticsFunnelAnalysisResponse = component(
     "AnalyticsFunnelAnalysisResponse",
     AnalyticsFunnelAnalysisResponseSchema
   );
-  const analyticsFunnelsResponse = component("AnalyticsFunnelsResponse", AnalyticsFunnelsResponseSchema);
+  const analyticsFunnelsResponse = component(
+    "AnalyticsFunnelsResponse",
+    AnalyticsFunnelsResponseSchema
+  );
+  const savedFunnelCreate = component(
+    "AnalyticsSavedFunnelCreate",
+    AnalyticsSavedFunnelCreateSchema
+  );
+  const savedFunnelUpdate = component(
+    "AnalyticsSavedFunnelUpdate",
+    AnalyticsSavedFunnelUpdateSchema
+  );
+  const savedFunnelResponse = component(
+    "AnalyticsSavedFunnelResponse",
+    AnalyticsSavedFunnelResponseSchema
+  );
+  const savedFunnelsResponse = component(
+    "AnalyticsSavedFunnelsResponse",
+    AnalyticsSavedFunnelsResponseSchema
+  );
   const responses = {
     "400": { description: "Invalid query parameters.", schema: options.apiError },
     "401": { description: "Authentication is invalid.", schema: options.apiError },
     "403": { description: "An eligible tier is required.", schema: options.apiError },
-    "404": { description: "Project was not found or analytics metrics are unavailable.", schema: options.apiError }
+    "404": {
+      description: "Project was not found or analytics metrics are unavailable.",
+      schema: options.apiError
+    }
   };
 
   return [
+    {
+      method: "get",
+      path: "/v1/projects/{id}/analytics/saved-funnels",
+      operationId: "listSavedAnalyticsFunnels",
+      summary: "List active saved analytics funnels for a project",
+      tags: ["Analytics"],
+      security: options.anyMemberAuth,
+      params: AnalyticsSavedFunnelProjectParamsSchema,
+      responses: {
+        "200": { description: "Active saved analytics funnels.", schema: savedFunnelsResponse },
+        ...responses
+      }
+    },
+    {
+      method: "post",
+      path: "/v1/projects/{id}/analytics/saved-funnels",
+      operationId: "createSavedAnalyticsFunnel",
+      summary: "Create a saved analytics funnel for a project",
+      tags: ["Analytics"],
+      security: options.anyMemberAuth,
+      params: AnalyticsSavedFunnelProjectParamsSchema,
+      requestBody: savedFunnelCreate,
+      responses: {
+        "201": { description: "Saved analytics funnel created.", schema: savedFunnelResponse },
+        ...responses,
+        "409": {
+          description: "The key exists or the saved-funnel limit was reached.",
+          schema: options.apiError
+        }
+      }
+    },
+    {
+      method: "patch",
+      path: "/v1/projects/{id}/analytics/saved-funnels/{funnelKey}",
+      operationId: "updateSavedAnalyticsFunnel",
+      summary: "Update a saved analytics funnel",
+      tags: ["Analytics"],
+      security: options.anyMemberAuth,
+      params: AnalyticsSavedFunnelParamsSchema,
+      requestBody: savedFunnelUpdate,
+      responses: {
+        "200": { description: "Saved analytics funnel updated.", schema: savedFunnelResponse },
+        ...responses
+      }
+    },
+    {
+      method: "delete",
+      path: "/v1/projects/{id}/analytics/saved-funnels/{funnelKey}",
+      operationId: "archiveSavedAnalyticsFunnel",
+      summary: "Archive a saved analytics funnel",
+      tags: ["Analytics"],
+      security: options.anyMemberAuth,
+      params: AnalyticsSavedFunnelParamsSchema,
+      responses: {
+        "200": { description: "Saved analytics funnel archived.", schema: savedFunnelResponse },
+        ...responses
+      }
+    },
     {
       method: "get",
       path: "/v1/analytics/bundles",
@@ -141,7 +243,10 @@ export function createAnalyticsMetricOpenApiOperations(options: {
       security: options.anyMemberAuth,
       query: AnalyticsBundlesQuerySchema,
       responses: {
-        "200": { description: "AnalyticsBundle generations.", schema: analyticsBundleGenerationsListResponse },
+        "200": {
+          description: "AnalyticsBundle generations.",
+          schema: analyticsBundleGenerationsListResponse
+        },
         ...responses
       }
     },
@@ -154,7 +259,10 @@ export function createAnalyticsMetricOpenApiOperations(options: {
       security: options.anyMemberAuth,
       query: AnalyticsOpportunitiesQuerySchema,
       responses: {
-        "200": { description: "Analytics opportunities.", schema: analyticsOpportunitiesListResponse },
+        "200": {
+          description: "Analytics opportunities.",
+          schema: analyticsOpportunitiesListResponse
+        },
         ...responses
       }
     },
@@ -181,7 +289,10 @@ export function createAnalyticsMetricOpenApiOperations(options: {
       security: options.anyMemberAuth,
       query: AnalyticsSummaryQuerySchema,
       responses: {
-        "200": { description: "Analytics usage summary metrics.", schema: analyticsUsageSummaryResponse },
+        "200": {
+          description: "Analytics usage summary metrics.",
+          schema: analyticsUsageSummaryResponse
+        },
         ...responses
       }
     },
@@ -239,7 +350,10 @@ export function createAnalyticsMetricOpenApiOperations(options: {
       security: options.anyMemberAuth,
       query: AnalyticsSummaryQuerySchema,
       responses: {
-        "200": { description: "Analytics referrer and UTM metrics.", schema: analyticsReferrerMetricsResponse },
+        "200": {
+          description: "Analytics referrer and UTM metrics.",
+          schema: analyticsReferrerMetricsResponse
+        },
         ...responses
       }
     },
