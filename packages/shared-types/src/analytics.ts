@@ -2,6 +2,7 @@ import { z } from "zod";
 
 export const ANALYTICS_EVENT_SCHEMA_VERSION = "2026-07-analytics-01";
 export const ANALYTICS_BUNDLE_SCHEMA_VERSION = "analytics_bundle.v1";
+export const ANALYTICS_BUNDLE_GENERATION_ID_HEADER = "X-DebugBundle-Generation-Id";
 export const MAX_ANALYTICS_CUSTOM_DIMENSIONS_PER_EVENT = 8;
 
 export const AnalyticsEventKindValues = [

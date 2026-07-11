@@ -341,6 +341,46 @@ describe("analytics metrics store", () => {
     });
   });
 
+  it("narrows route and journey-pattern queries to an explicit route context", async (): Promise<void> => {
+    const observed: Array<{ sql: string; params: unknown[] }> = [];
+    const queryMock = vi.fn(async (sql: string, params: unknown[]) => {
+      observed.push({ sql, params });
+      return { rows: [] };
+    });
+    const store = createPostgresAnalyticsMetricsStore({ query: queryMock as Queryable["query"] });
+    const input = {
+      project_id: PROJECT_ID,
+      from: "2026-03-01T00:00:00.000Z",
+      to: "2026-03-08T00:00:00.000Z",
+      granularity: "day" as const,
+      route: "/checkout"
+    };
+
+    await store.getRouteMetrics(input);
+    await store.getJourneyPatterns(input);
+
+    const routeQuery = observed.find((query) => query.sql.includes("FROM analytics_route_rollups"));
+    const patternQuery = observed.find((query) => query.sql.includes("FROM analytics_transition_rollups"));
+    expect(routeQuery?.sql).toContain("route_key = $5");
+    expect(routeQuery?.params).toEqual([
+      PROJECT_ID,
+      input.from,
+      input.to,
+      "day",
+      "/checkout",
+      10
+    ]);
+    expect(patternQuery?.sql).toContain("(from_route_key = $5 OR to_route_key = $5)");
+    expect(patternQuery?.params).toEqual([
+      PROJECT_ID,
+      input.from,
+      input.to,
+      "day",
+      "/checkout",
+      10
+    ]);
+  });
+
   it("reads incident impact only from correlation links, aggregate ledgers, and generation metadata", async (): Promise<void> => {
     const incidentId = "00000000-0000-4000-8000-000000000701";
     const queryMock = vi.fn(async (sqlText: string, params: unknown[]) => {

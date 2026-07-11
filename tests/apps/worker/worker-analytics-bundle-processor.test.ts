@@ -189,6 +189,44 @@ describe("worker processor - build-analytics-bundle", () => {
     expect(bundle.metrics.affected_sessions).toBe(6);
   });
 
+  it("applies nested safe scope and route context to aggregate evidence reads", async (): Promise<void> => {
+    const metricsStore = createMetricsStore();
+
+    await buildBundleForGeneration(
+      {
+        analysis_kind: "route_health",
+        analysis_spec: {
+          from: "2026-07-01T00:00:00.000Z",
+          to: "2026-07-08T00:00:00.000Z",
+          route: "/checkout",
+          filters: { service: "storefront", environment: "staging" }
+        }
+      },
+      {},
+      { metricsStore }
+    );
+
+    const sharedScope = expect.objectContaining({
+      project_id: PROJECT_ID,
+      service: "storefront",
+      environment: "staging"
+    });
+    expect(metricsStore.getUsageSummary).toHaveBeenCalledWith(sharedScope);
+    expect(metricsStore.getDeviceBreakdown).toHaveBeenCalledWith(sharedScope);
+    expect(metricsStore.getReferrerMetrics).toHaveBeenCalledWith(sharedScope);
+    expect(metricsStore.getRouteMetrics).toHaveBeenCalledWith(
+      expect.objectContaining({
+        project_id: PROJECT_ID,
+        service: "storefront",
+        environment: "staging",
+        route: "/checkout"
+      })
+    );
+    expect(metricsStore.getJourneyPatterns).toHaveBeenCalledWith(
+      expect.objectContaining({ route: "/checkout" })
+    );
+  });
+
   it("builds journey-friction bundles from transition-pattern sessions", async (): Promise<void> => {
     const bundle = await buildBundleForGeneration(
       {
@@ -209,6 +247,40 @@ describe("worker processor - build-analytics-bundle", () => {
       severity: "high"
     });
     expect(bundle.metrics.affected_sessions).toBe(12);
+  });
+
+  it("includes aggregate action evidence for feature-usage analysis", async (): Promise<void> => {
+    const bundle = await buildBundleForGeneration(
+      {
+        analysis_kind: "feature_usage",
+        analysis_spec: {
+          from: "2026-07-01T00:00:00.000Z",
+          to: "2026-07-08T00:00:00.000Z"
+        }
+      },
+      {
+        actions: [
+          {
+            action_key: "feature.saved_search",
+            kind: "action",
+            event_count: 44,
+            unique_sessions: 18
+          }
+        ]
+      }
+    );
+
+    expect(bundle.metrics.affected_sessions).toBe(18);
+    expect(bundle.metrics.current).toMatchObject({
+      actions: [
+        {
+          action_key: "feature.saved_search",
+          kind: "action",
+          event_count: 44,
+          unique_sessions: 18
+        }
+      ]
+    });
   });
 
   it("ranks representative journeys by aggregate reach before hydrating bounded samples", async (): Promise<void> => {
@@ -553,6 +625,7 @@ async function buildBundleForGeneration(
     journeySampleStore?: ReturnType<typeof createJourneySampleStore>;
     getObject?: (input: { key: string }) => Promise<Buffer>;
     logger?: Pick<RuntimeLogger, "warn">;
+    metricsStore?: AnalyticsMetricsStore;
   } = {}
 ) {
   const putObject = vi.fn().mockResolvedValue(undefined);
@@ -583,7 +656,7 @@ async function buildBundleForGeneration(
       }),
       markAnalyticsBundleGenerationFailed: vi.fn()
     },
-    analyticsMetricsStore: createMetricsStore(metricsOverrides),
+    analyticsMetricsStore: dependencyOverrides.metricsStore ?? createMetricsStore(metricsOverrides),
     analyticsJourneySampleStore: dependencyOverrides.journeySampleStore ?? createJourneySampleStore(),
     objectStore: {
       putObject,
@@ -602,6 +675,7 @@ type MetricsStoreOverrides = {
   journeySessions?: number;
   journeyPatterns?: Awaited<ReturnType<AnalyticsMetricsStore["getJourneyPatterns"]>>["patterns"];
   incidentJourneyPatterns?: Awaited<ReturnType<AnalyticsMetricsStore["getIncidentImpact"]>>["journey_patterns"];
+  actions?: Awaited<ReturnType<AnalyticsMetricsStore["getActionMetrics"]>>["actions"];
 };
 
 function createMetricsStore(overrides: MetricsStoreOverrides = {}): AnalyticsMetricsStore {
@@ -695,7 +769,7 @@ function createMetricsStore(overrides: MetricsStoreOverrides = {}): AnalyticsMet
     }),
     getActionMetrics: vi.fn().mockResolvedValue({
       window: metricWindow(),
-      actions: []
+      actions: overrides.actions ?? []
     }),
     listFunnels: vi.fn().mockResolvedValue({
       window: metricWindow(),

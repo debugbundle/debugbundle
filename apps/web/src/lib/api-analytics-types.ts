@@ -1,7 +1,9 @@
 import type {
+  AnalyticsBundleAnalysisKind,
   AnalyticsBundleV1,
   ProjectColorTag
 } from "../../../../packages/shared-types/src/index.js";
+export type { AnalyticsBundleAnalysisKind } from "../../../../packages/shared-types/src/index.js";
 
 export type AnalyticsPrivacyMode = "strict" | "standard" | "custom";
 
@@ -268,3 +270,21 @@ export type ProjectAnalyticsBundleResponse =
   | AnalyticsBundleV1
   | { status: "pending"; bundle_generation_id: string }
   | { status: "failed"; reason: string };
+
+export interface ProjectAnalyticsBundleCreateInput {
+  analysisKind: AnalyticsBundleAnalysisKind;
+  last?: "7d" | "30d" | "90d";
+  from?: string;
+  to?: string;
+  funnel?: string;
+  route?: string;
+  incidentId?: string;
+  deployId?: string;
+  service?: string;
+  environment?: string;
+}
+
+export interface ProjectAnalyticsBundleCreateResult {
+  bundle: ProjectAnalyticsBundleResponse;
+  generationId: string | null;
+}

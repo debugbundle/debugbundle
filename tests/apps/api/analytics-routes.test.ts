@@ -960,6 +960,7 @@ describe("analytics metrics routes", () => {
 
     expect(response.statusCode).toBe(200);
     expect(response.json()).toEqual({ status: "pending", bundle_generation_id: BUNDLE_GENERATION_ID });
+    expect(response.headers["x-debugbundle-generation-id"]).toBe(BUNDLE_GENERATION_ID);
     expect(analyticsSettingsManagement.getAnalyticsSettingsForProject).toHaveBeenCalledWith({
       organization_id: "org_123",
       project_id: PROJECT_ID
@@ -1185,6 +1186,7 @@ describe("analytics metrics routes", () => {
     });
 
     expect(response.statusCode).toBe(200);
+    expect(response.headers["x-debugbundle-generation-id"]).toBe(BUNDLE_GENERATION_ID);
     expect(response.json()).toEqual(bundle);
     expect(analyticsBundles.getAnalyticsBundleGenerationForProject).toHaveBeenCalledWith({
       organization_id: "org_123",

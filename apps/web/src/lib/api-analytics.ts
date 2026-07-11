@@ -1,4 +1,5 @@
 import { API_BASE, buildBrowserSessionHeaders, readJson } from "./api-client.js";
+import { ANALYTICS_BUNDLE_GENERATION_ID_HEADER } from "../../../../packages/shared-types/src/index.js";
 import type {
   AnalyticsBundleGenerationsListResponse,
   AnalyticsBundleInventoryQuery,
@@ -12,6 +13,8 @@ import type {
   ProjectAnalyticsJourneyPatternsResponse,
   ProjectAnalyticsJourneySampleResponse,
   ProjectAnalyticsBundleResponse,
+  ProjectAnalyticsBundleCreateInput,
+  ProjectAnalyticsBundleCreateResult,
   ProjectAnalyticsReferrerMetricsResponse,
   ProjectAnalyticsRouteMetricsResponse,
   ProjectAnalyticsSettingsResponse,
@@ -216,4 +219,34 @@ export async function getProjectAnalyticsBundle(
       { credentials: "include" }
     )
   );
+}
+
+export async function createProjectAnalyticsBundle(
+  projectId: string,
+  input: ProjectAnalyticsBundleCreateInput
+): Promise<ProjectAnalyticsBundleCreateResult> {
+  const filters = {
+    ...(input.service === undefined ? {} : { service: input.service }),
+    ...(input.environment === undefined ? {} : { environment: input.environment })
+  };
+  const response = await fetch(`${API_BASE}/v1/analytics/bundles`, {
+    method: "POST",
+    credentials: "include",
+    headers: buildBrowserSessionHeaders(true),
+    body: JSON.stringify({
+      project_id: projectId,
+      analysis_kind: input.analysisKind,
+      ...(input.last === undefined ? {} : { last: input.last }),
+      ...(input.from === undefined ? {} : { from: input.from }),
+      ...(input.to === undefined ? {} : { to: input.to }),
+      ...(input.funnel === undefined ? {} : { funnel: input.funnel }),
+      ...(input.route === undefined ? {} : { route: input.route }),
+      ...(input.incidentId === undefined ? {} : { incident_id: input.incidentId }),
+      ...(input.deployId === undefined ? {} : { deploy_id: input.deployId }),
+      filters
+    })
+  });
+  const generationId = response.headers.get(ANALYTICS_BUNDLE_GENERATION_ID_HEADER);
+  const bundle = await readJson<ProjectAnalyticsBundleResponse>(response);
+  return { bundle, generationId };
 }

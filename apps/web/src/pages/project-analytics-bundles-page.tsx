@@ -1,6 +1,6 @@
-import { PackageIcon } from "lucide-react";
+import { PackageIcon, PlusIcon } from "lucide-react";
 import { useMemo } from "react";
-import { useOutletContext } from "react-router-dom";
+import { Link, useOutletContext } from "react-router-dom";
 
 import { AnalyticsBundlesTable } from "../components/system/analytics-bundles-table.js";
 import { CursorPaginationControls } from "../components/system/cursor-pagination-controls.js";
@@ -51,7 +51,13 @@ export function ProjectAnalyticsBundlesPage(): JSX.Element {
           Review ready analysis artifacts and track generations still being processed.
         </p>
       </div>
-      <div className="flex justify-end">
+      <div className="flex flex-wrap justify-end gap-2">
+        <Button asChild>
+          <Link to={`/projects/${projectId}/analytics/bundles/new`}>
+            <PlusIcon data-icon="inline-start" />
+            Generate AnalyticsBundle
+          </Link>
+        </Button>
         <TableRefreshButton
           isLoading={pagination.isLoading}
           label="Refresh project AnalyticsBundles"

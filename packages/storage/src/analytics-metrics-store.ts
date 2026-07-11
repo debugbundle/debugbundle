@@ -35,14 +35,18 @@ export interface AnalyticsUsageSummaryInput {
   limit?: number | undefined;
 }
 
+export interface AnalyticsRouteContextInput extends AnalyticsUsageSummaryInput {
+  route?: string | undefined;
+}
+
 export interface AnalyticsFunnelAnalysisInput extends AnalyticsUsageSummaryInput {
   funnel_key: string;
 }
 
 export interface AnalyticsMetricsStore {
   getUsageSummary(input: AnalyticsUsageSummaryInput): Promise<AnalyticsUsageSummaryResponse>;
-  getRouteMetrics(input: AnalyticsUsageSummaryInput): Promise<AnalyticsRouteMetricsResponse>;
-  getJourneyPatterns(input: AnalyticsUsageSummaryInput): Promise<AnalyticsJourneyPatternsResponse>;
+  getRouteMetrics(input: AnalyticsRouteContextInput): Promise<AnalyticsRouteMetricsResponse>;
+  getJourneyPatterns(input: AnalyticsRouteContextInput): Promise<AnalyticsJourneyPatternsResponse>;
   getDeviceBreakdown(input: AnalyticsUsageSummaryInput): Promise<AnalyticsDeviceBreakdownResponse>;
   getReferrerMetrics(input: AnalyticsUsageSummaryInput): Promise<AnalyticsReferrerMetricsResponse>;
   getActionMetrics(input: AnalyticsUsageSummaryInput): Promise<AnalyticsActionMetricsResponse>;
@@ -191,7 +195,7 @@ export function createPostgresAnalyticsMetricsStore(db: Queryable): AnalyticsMet
 
     async getRouteMetrics(input) {
       const limit = normalizeLimit(input.limit);
-      const where = buildAnalyticsRollupWhere(input);
+      const where = buildAnalyticsRollupWhere(input, { routeColumns: ["route_key"] });
       const result = await db.query<AnalyticsRouteMetricRow>(
         `
           SELECT
@@ -227,7 +231,9 @@ export function createPostgresAnalyticsMetricsStore(db: Queryable): AnalyticsMet
 
     async getJourneyPatterns(input) {
       const limit = normalizeLimit(input.limit);
-      const where = buildAnalyticsRollupWhere(input);
+      const where = buildAnalyticsRollupWhere(input, {
+        routeColumns: ["from_route_key", "to_route_key"]
+      });
       const result = await db.query<AnalyticsJourneyPatternRow>(
         `
           SELECT
@@ -584,7 +590,11 @@ async function readJourneyPatternSampleIds(
 
 function buildAnalyticsRollupWhere(
   input: AnalyticsUsageSummaryInput,
-  options: { extraConditions?: string[]; extraParams?: unknown[] } = {}
+  options: {
+    extraConditions?: string[];
+    extraParams?: unknown[];
+    routeColumns?: string[];
+  } = {}
 ): { sql: string; params: unknown[] } {
   const conditions = [
     "project_id = $1",
@@ -602,6 +612,13 @@ function buildAnalyticsRollupWhere(
   if (input.environment !== undefined) {
     params.push(input.environment);
     conditions.push(`environment = $${params.length}`);
+  }
+
+  const route = "route" in input && typeof input.route === "string" ? input.route : undefined;
+  if (route !== undefined && options.routeColumns !== undefined && options.routeColumns.length > 0) {
+    params.push(route);
+    const placeholder = `$${params.length}`;
+    conditions.push(`(${options.routeColumns.map((column) => `${column} = ${placeholder}`).join(" OR ")})`);
   }
 
   for (const extraParam of options.extraParams ?? []) {

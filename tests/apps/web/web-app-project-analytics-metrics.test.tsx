@@ -468,6 +468,10 @@ describe("web app - project analytics metrics", () => {
     render(<App initialEntries={["/projects/proj_123/analytics/bundles"]} />);
 
     const table = await screen.findByRole("table", { name: "Project AnalyticsBundles" });
+    expect(screen.getByRole("link", { name: "Generate AnalyticsBundle" })).toHaveAttribute(
+      "href",
+      "/projects/proj_123/analytics/bundles/new"
+    );
     expect(within(table).queryByRole("columnheader", { name: "Project" })).not.toBeInTheDocument();
     expect(within(table).getByRole("link", { name: "Funnel Dropoff" })).toHaveAttribute(
       "href",

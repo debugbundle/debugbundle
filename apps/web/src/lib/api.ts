@@ -92,6 +92,7 @@ export {
   updateProjectGitHubRule
 } from "./api-github.js";
 export {
+  createProjectAnalyticsBundle,
   getProjectAnalyticsDevices,
   getProjectAnalyticsFunnel,
   getProjectAnalyticsFunnels,

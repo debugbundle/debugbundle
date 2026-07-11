@@ -46,6 +46,7 @@ type NormalizedBundleAnalysisSpec = {
   environment?: string | undefined;
   limit: number;
   funnel_key?: string | undefined;
+  route?: string | undefined;
   incident_id?: string | undefined;
 };
 
@@ -168,12 +169,14 @@ async function buildAnalyticsBundleInput(input: {
     environment: spec.environment,
     limit: spec.limit
   };
-  const [usage, routes, journeys, devices, referrers, funnel] = await Promise.all([
+  const routeMetricsInput = { ...metricsInput, route: spec.route };
+  const [usage, routes, journeys, devices, referrers, actions, funnel] = await Promise.all([
     input.metricsStore.getUsageSummary(metricsInput),
-    input.metricsStore.getRouteMetrics(metricsInput),
-    input.metricsStore.getJourneyPatterns(metricsInput),
+    input.metricsStore.getRouteMetrics(routeMetricsInput),
+    input.metricsStore.getJourneyPatterns(routeMetricsInput),
     input.metricsStore.getDeviceBreakdown(metricsInput),
     input.metricsStore.getReferrerMetrics(metricsInput),
+    input.metricsStore.getActionMetrics(metricsInput),
     spec.funnel_key === undefined
       ? Promise.resolve(null)
       : input.metricsStore.getFunnelAnalysis({ ...metricsInput, funnel_key: spec.funnel_key })
@@ -183,7 +186,8 @@ async function buildAnalyticsBundleInput(input: {
     sessionsAnalyzed: usage.summary.sessions,
     funnel,
     routes: routes.routes,
-    journeys: journeys.patterns
+    journeys: journeys.patterns,
+    actions: actions.actions
   });
   const representativeJourneys = [
     ...readRecordArray(input.generation.analysis_spec["representative_journeys"]),
@@ -211,7 +215,7 @@ async function buildAnalyticsBundleInput(input: {
       granularity: spec.granularity as AnalyticsBundleGranularity
     },
     summary: {
-      title: buildBundleTitle(input.generation.analysis_kind, spec.funnel_key),
+      title: buildBundleTitle(input.generation.analysis_kind, spec.funnel_key, spec.route),
       description: buildBundleDescription(input.generation.analysis_kind, usage.summary.sessions, affectedSessions),
       confidence: inferConfidence(usage.summary.sessions),
       severity: inferSeverity(usage.summary.sessions, affectedSessions)
@@ -222,6 +226,7 @@ async function buildAnalyticsBundleInput(input: {
       current: {
         usage: usage.summary,
         routes: routes.routes,
+        actions: actions.actions,
         funnel: funnel?.funnel ?? null
       }
     },
@@ -291,7 +296,7 @@ async function buildIncidentImpactAnalyticsBundleInput(input: {
       granularity: input.spec.granularity as AnalyticsBundleGranularity
     },
     summary: {
-      title: buildBundleTitle(input.generation.analysis_kind, undefined),
+      title: buildBundleTitle(input.generation.analysis_kind, undefined, undefined),
       description: buildBundleDescription(input.generation.analysis_kind, usage.summary.sessions, affectedSessions),
       confidence: inferConfidence(affectedSessions),
       severity: inferSeverity(usage.summary.sessions, affectedSessions)
@@ -585,6 +590,7 @@ function toRouteKey(route: RepresentativeJourneySampleEvent["route"]): string | 
 
 function normalizeBundleAnalysisSpec(generation: AnalyticsBundleGenerationRecord): NormalizedBundleAnalysisSpec {
   const spec = generation.analysis_spec;
+  const filters = isRecord(spec["filters"]) ? spec["filters"] : {};
   const fallbackTo = readIsoString(spec["to"]) ?? generation.created_at;
   const to = readIsoString(spec["to"]) ?? fallbackTo;
   const fallbackFrom = new Date(Date.parse(to) - DEFAULT_ANALYSIS_WINDOW_DAYS * 24 * 60 * 60 * 1000).toISOString();
@@ -595,10 +601,11 @@ function normalizeBundleAnalysisSpec(generation: AnalyticsBundleGenerationRecord
     from,
     to,
     granularity: spec["granularity"] === "hour" ? "hour" : "day",
-    service: readNonEmptyString(spec["service"]),
-    environment: readNonEmptyString(spec["environment"]),
+    service: readNonEmptyString(spec["service"]) ?? readNonEmptyString(filters["service"]),
+    environment: readNonEmptyString(spec["environment"]) ?? readNonEmptyString(filters["environment"]),
     limit: readPositiveInteger(spec["limit"]) ?? DEFAULT_METRIC_LIMIT,
     funnel_key: readNonEmptyString(spec["funnel_key"]) ?? readNonEmptyString(spec["funnel"]),
+    route: readNonEmptyString(spec["route"]),
     incident_id: readUuid(spec["incident_id"])
   };
 }
@@ -609,6 +616,7 @@ function inferAffectedSessions(input: {
   funnel: Awaited<ReturnType<AnalyticsMetricsStore["getFunnelAnalysis"]>> | null;
   routes: Awaited<ReturnType<AnalyticsMetricsStore["getRouteMetrics"]>>["routes"];
   journeys: Awaited<ReturnType<AnalyticsMetricsStore["getJourneyPatterns"]>>["patterns"];
+  actions: Awaited<ReturnType<AnalyticsMetricsStore["getActionMetrics"]>>["actions"];
 }): number | null {
   if (input.analysisKind === "funnel_dropoff" && input.funnel !== null) {
     return input.funnel.funnel.dropoffs;
@@ -621,6 +629,11 @@ function inferAffectedSessions(input: {
 
   if (input.analysisKind === "journey_friction" || input.analysisKind === "conversion_path") {
     const affected = input.journeys.reduce((sum, journey) => sum + journey.unique_sessions, 0);
+    return Math.min(input.sessionsAnalyzed, affected);
+  }
+
+  if (input.analysisKind === "feature_usage") {
+    const affected = input.actions.reduce((sum, action) => sum + action.unique_sessions, 0);
     return Math.min(input.sessionsAnalyzed, affected);
   }
 
@@ -649,10 +662,15 @@ function inferSeverity(
 
 function buildBundleTitle(
   analysisKind: AnalyticsBundleGenerationRecord["analysis_kind"],
-  funnelKey: string | undefined
+  funnelKey: string | undefined,
+  route: string | undefined
 ): string {
   if (analysisKind === "funnel_dropoff" && funnelKey !== undefined) {
     return `Funnel dropoff analysis for ${funnelKey}`;
+  }
+
+  if (analysisKind === "route_health" && route !== undefined) {
+    return `Route health analysis for ${route}`;
   }
 
   return `${analysisKind.replaceAll("_", " ")} analysis`;

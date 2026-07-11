@@ -7,6 +7,7 @@ import {
   readCookieValue
 } from "../../../packages/auth/src/index.js";
 import type { RuntimeLogger } from "../../../packages/runtime-logger/src/index.js";
+import { ANALYTICS_BUNDLE_GENERATION_ID_HEADER } from "../../../packages/shared-types/src/index.js";
 
 import type { ApiDependencies } from "./api-types.js";
 import {
@@ -260,6 +261,7 @@ function registerApiCors(app: FastifyInstance, allowedOrigins: string[]): void {
 
     reply.header("Access-Control-Allow-Origin", requestOrigin);
     reply.header("Access-Control-Allow-Credentials", "true");
+    reply.header("Access-Control-Expose-Headers", ANALYTICS_BUNDLE_GENERATION_ID_HEADER);
 
     if (!isCorsPreflightRequest(request)) {
       return;

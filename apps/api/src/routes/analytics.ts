@@ -4,6 +4,7 @@ import { z } from "zod";
 
 import {
   AnalyticsActionMetricsResponseSchema,
+  ANALYTICS_BUNDLE_GENERATION_ID_HEADER,
   AnalyticsBundleAnalysisKindSchema,
   AnalyticsBundleSeveritySchema,
   AnalyticsBundleGenerationsListResponseSchema,
@@ -666,6 +667,8 @@ async function sendAnalyticsBundleGenerationResponse(
   dependencies: ApiDependencies,
   generation: AnalyticsBundleGeneration
 ): Promise<FastifyReply> {
+  reply.header(ANALYTICS_BUNDLE_GENERATION_ID_HEADER, generation.generation_id);
+
   if (generation.status === "pending" || generation.status === "running") {
     return reply.status(200).send({
       status: "pending",

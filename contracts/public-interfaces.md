@@ -782,6 +782,7 @@ Journey sample responses must not expose the internal object-storage key. Expire
 
 `last` may be supplied instead of `from` for relative windows such as `"7d"`; `to` may still be supplied with `last` to anchor the window.
 When `incident_id` or `deploy_id` is supplied, the generation stores those values as linked incident/deploy evidence for the AnalyticsBundle artifact while preserving the scalar request fields for compatibility.
+The web generation surface may submit only the bounded `service` and `environment` keys inside `filters`; it does not expose arbitrary JSON or custom-filter entry. Bundle workers apply these nested scope values while continuing to accept legacy top-level `service` and `environment` analysis specifications. When `route` is supplied, route metrics and journey-pattern evidence are restricted to that normalized route context.
 
 **Analytics inventory list scope:** `GET /v1/analytics/opportunities` and `GET /v1/analytics/bundles` retain their existing project-scoped behavior when `project_id=<uuid>` is supplied. An authorized browser session or member token may omit `project_id` only for these list endpoints to return records across projects in the caller's organization. Cross-project pagination remains ordered by the record timestamp and unique record ID, and bundle rows include `project_name` and `project_color_tag` metadata. Detail, metric, journey-sample, settings, and generation endpoints remain project-scoped.
 
@@ -817,7 +818,7 @@ CLI callers must opt into this inventory scope with `--all-projects`; the defaul
 }
 ```
 
-**AnalyticsBundle response:** full `AnalyticsBundleV1` JSON when ready; `{ "status": "pending", "bundle_generation_id": "uuid" }` while queued/running; `{ "status": "failed", "reason": "..." }` when generation failed or allowance is exhausted. Hydrated representative journeys are capped at five and expose deterministic `selection_rank`, `selection_basis`, and aggregate selection counts. Incident-impact journeys remain eligible only through the exact internal correlation/session, transition, service/environment, bounded-window, completed-artifact constraint; those internal hashes are never exposed.
+**AnalyticsBundle response:** full `AnalyticsBundleV1` JSON when ready; `{ "status": "pending", "bundle_generation_id": "uuid" }` while queued/running; `{ "status": "failed", "reason": "..." }` when generation failed or allowance is exhausted. Every successful generation POST/detail response also includes additive `X-DebugBundle-Generation-Id: <uuid>` metadata, including already-completed and failed deterministic generations whose strict response body has no generation ID. Credentialed app CORS responses expose this header so the web client can navigate to the canonical detail route without changing API/CLI/MCP response bodies. Hydrated representative journeys are capped at five and expose deterministic `selection_rank`, `selection_basis`, and aggregate selection counts. Incident-impact journeys remain eligible only through the exact internal correlation/session, transition, service/environment, bounded-window, completed-artifact constraint; those internal hashes are never exposed.
 
 Authorization failure: `401 { "error": "invalid_member_token" }` or `401 { "error": "invalid_session" }`.
 Out-of-scope or missing project/opportunity/bundle: `404`.

@@ -176,7 +176,8 @@ export function ProjectAnalyticsLayout(): JSX.Element {
         </div>
       </Tabs>
 
-      <form className="flex flex-col gap-4" onSubmit={applyFilters}>
+      {location.pathname.endsWith("/bundles/new") ? null : (
+        <form className="flex flex-col gap-4" onSubmit={applyFilters}>
         <FieldGroup className="grid gap-4 sm:grid-cols-2 lg:grid-cols-[12rem_1fr_1fr_auto] lg:items-end">
           <Field>
             <FieldLabel id="analytics-window-label" htmlFor="analytics-window">
@@ -237,7 +238,8 @@ export function ProjectAnalyticsLayout(): JSX.Element {
             Apply filters
           </Button>
         </FieldGroup>
-      </form>
+        </form>
+      )}
 
       <Outlet context={{ projectId, query } satisfies ProjectAnalyticsContext} />
     </div>
@@ -250,7 +252,7 @@ function resolveAnalyticsSection(pathname: string): AnalyticsSection {
   if (pathname.endsWith("/audiences")) return "audiences";
   if (pathname.endsWith("/journeys")) return "journeys";
   if (pathname.endsWith("/opportunities")) return "opportunities";
-  if (pathname.endsWith("/bundles")) return "bundles";
+  if (pathname.includes("/analytics/bundles")) return "bundles";
   return "overview";
 }
 
