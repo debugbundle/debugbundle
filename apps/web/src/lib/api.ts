@@ -97,6 +97,7 @@ export {
   getProjectAnalyticsFunnels,
   getProjectAnalyticsJourneyPatterns,
   getProjectAnalyticsJourneySample,
+  getProjectAnalyticsOpportunity,
   getProjectAnalyticsReferrers,
   getProjectAnalyticsRoutes,
   getProjectAnalyticsSettings,

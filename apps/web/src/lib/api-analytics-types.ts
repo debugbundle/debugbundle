@@ -205,6 +205,10 @@ export interface AnalyticsOpportunitiesListResponse {
   next_cursor: string | null;
 }
 
+export interface AnalyticsOpportunityResponse {
+  opportunity: AnalyticsOpportunityRecord;
+}
+
 export interface AnalyticsOpportunityInventoryQuery {
   projectId?: string;
   status?: AnalyticsOpportunityRecord["status"] | "all";

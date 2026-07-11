@@ -4,6 +4,7 @@ import type {
   AnalyticsBundleInventoryQuery,
   AnalyticsMetricsQuery,
   AnalyticsOpportunitiesListResponse,
+  AnalyticsOpportunityResponse,
   AnalyticsOpportunityInventoryQuery,
   ProjectAnalyticsDeviceMetricsResponse,
   ProjectAnalyticsFunnelAnalysisResponse,
@@ -147,6 +148,19 @@ export async function listProjectAnalyticsOpportunities(
     await fetch(`${API_BASE}/v1/analytics/opportunities?${searchParams.toString()}`, {
       credentials: "include"
     })
+  );
+}
+
+export async function getProjectAnalyticsOpportunity(
+  projectId: string,
+  opportunityId: string
+): Promise<AnalyticsOpportunityResponse> {
+  const searchParams = new URLSearchParams({ project_id: projectId });
+  return readJson<AnalyticsOpportunityResponse>(
+    await fetch(
+      `${API_BASE}/v1/analytics/opportunities/${encodeURIComponent(opportunityId)}?${searchParams.toString()}`,
+      { credentials: "include" }
+    )
   );
 }
 

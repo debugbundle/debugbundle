@@ -1,15 +1,11 @@
 import { LightbulbIcon } from "lucide-react";
 import { useState } from "react";
-import { Link } from "react-router-dom";
-
 import {
   listAnalyticsOpportunities,
   type AnalyticsOpportunityInventoryQuery,
-  type AnalyticsOpportunityRecord,
   type ProjectRecord
 } from "../../lib/api.js";
 import { useCursorPagination } from "../../lib/use-cursor-pagination.js";
-import { Badge } from "../ui/badge.js";
 import { Button } from "../ui/button.js";
 import { Card, CardContent, CardHeader, CardTitle } from "../ui/card.js";
 import {
@@ -21,16 +17,8 @@ import {
 } from "../ui/empty.js";
 import { Notice } from "../ui/notice.js";
 import { Skeleton } from "../ui/skeleton.js";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow
-} from "../ui/table.js";
+import { AnalyticsOpportunitiesTable } from "./analytics-opportunities-table.js";
 import { CursorPaginationControls } from "./cursor-pagination-controls.js";
-import { ProjectColorTagDot } from "./project-color-tag-dot.js";
 import { ResourceListState } from "./resource-list-state.js";
 import { TableRefreshButton } from "./table-refresh-button.js";
 import {
@@ -40,15 +28,6 @@ import {
   WorkspaceAnalyticsFilters,
   type WorkspaceAnalyticsFilterValues
 } from "./workspace-analytics-filters.js";
-
-const PERCENT_FORMAT = new Intl.NumberFormat(undefined, {
-  style: "percent",
-  maximumFractionDigits: 0
-});
-const DATE_FORMAT = new Intl.DateTimeFormat(undefined, {
-  dateStyle: "medium",
-  timeStyle: "short"
-});
 
 export function WorkspaceAnalyticsOpportunities({
   projects
@@ -129,7 +108,7 @@ export function WorkspaceAnalyticsOpportunities({
           >
             {(opportunities) => (
               <div className="flex flex-col gap-4">
-                <OpportunitiesTable opportunities={opportunities} />
+                <AnalyticsOpportunitiesTable opportunities={opportunities} />
                 <CursorPaginationControls
                   page={pagination.page}
                   hasNextPage={pagination.hasNextPage}
@@ -143,79 +122,6 @@ export function WorkspaceAnalyticsOpportunities({
         )}
       </CardContent>
     </Card>
-  );
-}
-
-function OpportunitiesTable({
-  opportunities
-}: {
-  opportunities: AnalyticsOpportunityRecord[];
-}): JSX.Element {
-  return (
-    <Table aria-label="Analytics opportunities" className="min-w-[1180px]">
-      <TableHeader>
-        <TableRow>
-          <TableHead>Opportunity</TableHead>
-          <TableHead>Project</TableHead>
-          <TableHead>Service</TableHead>
-          <TableHead>Environment</TableHead>
-          <TableHead>Kind</TableHead>
-          <TableHead>Severity</TableHead>
-          <TableHead>Status</TableHead>
-          <TableHead>Bundle state</TableHead>
-          <TableHead className="text-right">Confidence</TableHead>
-          <TableHead className="text-right">Last detected</TableHead>
-        </TableRow>
-      </TableHeader>
-      <TableBody>
-        {opportunities.map((opportunity) => (
-          <TableRow key={opportunity.opportunity_id}>
-            <TableCell className="max-w-80 whitespace-normal">
-              <Link
-                to={`/projects/${opportunity.project_id}/analytics`}
-                className="font-medium text-foreground hover:underline"
-              >
-                {opportunity.title}
-              </Link>
-              <p className="mt-1 text-xs text-muted-foreground whitespace-normal">
-                {opportunity.summary}
-              </p>
-            </TableCell>
-            <TableCell>
-              <Link
-                to={`/projects/${opportunity.project_id}/analytics`}
-                className="inline-flex items-center gap-2 hover:underline"
-              >
-                <ProjectColorTagDot colorTag={opportunity.project_color_tag} />
-                {opportunity.project_name}
-              </Link>
-            </TableCell>
-            <TableCell>{opportunity.service ?? "All"}</TableCell>
-            <TableCell>{opportunity.environment ?? "All"}</TableCell>
-            <TableCell>{formatLabel(opportunity.kind)}</TableCell>
-            <TableCell>
-              <Badge variant={opportunity.severity === "high" ? "warning" : "outline"}>
-                {formatLabel(opportunity.severity)}
-              </Badge>
-            </TableCell>
-            <TableCell>
-              <Badge variant="outline">{formatLabel(opportunity.status)}</Badge>
-            </TableCell>
-            <TableCell>
-              <Badge variant={bundleStateVariant(opportunity.bundle_status)}>
-                {formatBundleState(opportunity.bundle_status)}
-              </Badge>
-            </TableCell>
-            <TableCell className="text-right tabular-nums">
-              {PERCENT_FORMAT.format(opportunity.confidence)}
-            </TableCell>
-            <TableCell className="text-right whitespace-nowrap">
-              {DATE_FORMAT.format(new Date(opportunity.last_detected_at))}
-            </TableCell>
-          </TableRow>
-        ))}
-      </TableBody>
-    </Table>
   );
 }
 
@@ -275,25 +181,4 @@ function InventorySkeleton(): JSX.Element {
       <Skeleton className="h-12 w-full" />
     </div>
   );
-}
-
-function formatBundleState(value: AnalyticsOpportunityRecord["bundle_status"]): string {
-  if (value === "completed") return "Ready";
-  return formatLabel(value);
-}
-
-function bundleStateVariant(
-  value: AnalyticsOpportunityRecord["bundle_status"]
-): "default" | "destructive" | "outline" | "secondary" {
-  if (value === "completed") return "default";
-  if (value === "failed") return "destructive";
-  if (value === "pending" || value === "running") return "secondary";
-  return "outline";
-}
-
-function formatLabel(value: string): string {
-  return value
-    .split("_")
-    .map((part) => (part.length === 0 ? part : `${part[0]!.toUpperCase()}${part.slice(1)}`))
-    .join(" ");
 }

@@ -41,7 +41,8 @@ const analyticsSections = [
   { value: "routes", label: "Routes", suffix: "/routes" },
   { value: "funnels", label: "Funnels", suffix: "/funnels" },
   { value: "audiences", label: "Audiences", suffix: "/audiences" },
-  { value: "journeys", label: "Journeys", suffix: "/journeys" }
+  { value: "journeys", label: "Journeys", suffix: "/journeys" },
+  { value: "opportunities", label: "Opportunities", suffix: "/opportunities" }
 ] as const;
 type AnalyticsSection = (typeof analyticsSections)[number]["value"];
 
@@ -159,13 +160,19 @@ export function ProjectAnalyticsLayout(): JSX.Element {
   return (
     <div className="flex flex-col gap-6">
       <Tabs value={activeSection} onValueChange={changeSection}>
-        <TabsList variant="line" aria-label="Analytics sections">
-          {analyticsSections.map((section) => (
-            <TabsTrigger key={section.value} value={section.value}>
-              {section.label}
-            </TabsTrigger>
-          ))}
-        </TabsList>
+        <div className="overflow-x-auto overscroll-x-contain pb-1">
+          <TabsList
+            variant="line"
+            aria-label="Analytics sections"
+            className="min-w-max justify-start"
+          >
+            {analyticsSections.map((section) => (
+              <TabsTrigger key={section.value} value={section.value} className="shrink-0 flex-none">
+                {section.label}
+              </TabsTrigger>
+            ))}
+          </TabsList>
+        </div>
       </Tabs>
 
       <form className="flex flex-col gap-4" onSubmit={applyFilters}>
@@ -241,6 +248,7 @@ function resolveAnalyticsSection(pathname: string): AnalyticsSection {
   if (pathname.endsWith("/funnels")) return "funnels";
   if (pathname.endsWith("/audiences")) return "audiences";
   if (pathname.endsWith("/journeys")) return "journeys";
+  if (pathname.endsWith("/opportunities")) return "opportunities";
   return "overview";
 }
 

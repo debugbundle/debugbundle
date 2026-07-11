@@ -165,7 +165,12 @@ describe("web app - workspace analytics", () => {
     expect(
       await screen.findByRole("heading", { name: "Analytics opportunities" })
     ).toBeInTheDocument();
-    expect(screen.getByText("Checkout completion drops after shipping")).toBeInTheDocument();
+    expect(
+      screen.getByRole("link", { name: "Checkout completion drops after shipping" })
+    ).toHaveAttribute(
+      "href",
+      `/projects/${PROJECT_ID}/analytics/opportunities/${OPPORTUNITY_ID}`
+    );
   });
 
   it("applies complete opportunity filters and paginates through server cursors", async () => {

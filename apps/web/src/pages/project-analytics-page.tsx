@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { Link, useOutletContext } from "react-router-dom";
 
 import { TableRefreshButton } from "../components/system/table-refresh-button.js";
+import { opportunityDetailPath } from "../components/system/analytics-opportunities-table.js";
 import { Badge } from "../components/ui/badge.js";
 import { Button } from "../components/ui/button.js";
 import {
@@ -227,7 +228,15 @@ function AnalyticsOverviewContent({ overview }: { overview: AnalyticsOverviewDat
         </MetricTableSection>
       </div>
 
-      <MetricTableSection title="Open opportunities" id="analytics-open-opportunities-title">
+      <MetricTableSection
+        title="Open opportunities"
+        id="analytics-open-opportunities-title"
+        action={
+          <Button asChild variant="ghost" size="sm">
+            <Link to={`/projects/${summary.project_id}/analytics/opportunities`}>View all</Link>
+          </Button>
+        }
+      >
         {overview.opportunities === null ? (
           <p className="text-sm text-muted-foreground">Opportunity preview unavailable.</p>
         ) : overview.opportunities.length === 0 ? (
@@ -249,7 +258,12 @@ function AnalyticsOverviewContent({ overview }: { overview: AnalyticsOverviewDat
                 <TableRow key={opportunity.opportunity_id}>
                   <TableCell>
                     <div className="flex max-w-xl flex-col gap-1">
-                      <span className="font-medium whitespace-normal">{opportunity.title}</span>
+                      <Link
+                        to={opportunityDetailPath(opportunity)}
+                        className="font-medium whitespace-normal hover:underline"
+                      >
+                        {opportunity.title}
+                      </Link>
                       <span className="text-xs text-muted-foreground whitespace-normal">
                         {opportunity.summary}
                       </span>
@@ -277,17 +291,22 @@ function AnalyticsOverviewContent({ overview }: { overview: AnalyticsOverviewDat
 function MetricTableSection({
   title,
   id,
-  children
+  children,
+  action
 }: {
   title: string;
   id: string;
   children: React.ReactNode;
+  action?: React.ReactNode;
 }): JSX.Element {
   return (
     <section className="flex min-w-0 flex-col gap-3" aria-labelledby={id}>
-      <h3 id={id} className="text-base font-medium">
-        {title}
-      </h3>
+      <div className="flex items-center justify-between gap-3">
+        <h3 id={id} className="text-base font-medium">
+          {title}
+        </h3>
+        {action}
+      </div>
       {children}
     </section>
   );

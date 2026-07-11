@@ -47,6 +47,7 @@ function installMetricsFetch(
     failFunnelDetailOnce?: boolean;
     failFunnelsOnce?: boolean;
     failJourneysOnce?: boolean;
+    failOpportunitiesOnce?: boolean;
     failRoutesOnce?: boolean;
     failSettingsOnce?: boolean;
   } = {}
@@ -58,6 +59,7 @@ function installMetricsFetch(
   let funnelRequests = 0;
   let funnelDetailRequests = 0;
   let journeyRequests = 0;
+  let opportunityRequests = 0;
   let settingsRequests = 0;
 
   vi.stubGlobal(
@@ -226,6 +228,46 @@ function installMetricsFetch(
         });
       }
 
+      if (url.includes("/v1/analytics/opportunities?")) {
+        opportunityRequests += 1;
+        if (input.failOpportunitiesOnce && opportunityRequests === 1) {
+          return jsonResponse(503, { error: "unavailable" });
+        }
+        return jsonResponse(200, {
+          opportunities: input.empty
+            ? []
+            : [
+                {
+                  opportunity_id: "55555555-5555-4555-8555-555555555555",
+                  project_id: "proj_123",
+                  project_name: "Project",
+                  project_color_tag: null,
+                  service: "web",
+                  environment: "production",
+                  kind: "funnel_dropoff",
+                  status: "open",
+                  severity: "high",
+                  confidence: 0.91,
+                  title: "Checkout dropoff increased",
+                  summary: "Sessions leave after shipping.",
+                  evidence: {},
+                  related_incident_ids: [],
+                  related_deploy_ids: [],
+                  first_detected_at: "2026-07-01T00:00:00.000Z",
+                  last_detected_at: "2026-07-10T00:00:00.000Z",
+                  resolved_at: null,
+                  snoozed_until: null,
+                  bundle_generation_id: null,
+                  bundle_status: "not_requested",
+                  bundle_created_at: null,
+                  bundle_updated_at: null,
+                  bundle_failure_reason: null
+                }
+              ],
+          next_cursor: null
+        });
+      }
+
       return jsonResponse(404, { error: "not_found" });
     })
   );
@@ -247,7 +289,8 @@ describe("web app - project analytics metrics", () => {
       "Routes",
       "Funnels",
       "Audiences",
-      "Journeys"
+      "Journeys",
+      "Opportunities"
     ]);
 
     await user.click(within(sectionTabs).getByRole("tab", { name: "Audiences" }));
@@ -349,6 +392,40 @@ describe("web app - project analytics metrics", () => {
     expect(await screen.findByText(/could not load journey patterns/i)).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Retry journey patterns" }));
     expect(await screen.findByText(/no journey transitions in this window/i)).toBeInTheDocument();
+  });
+
+  it("shows project-scoped opportunities and opens their detail route", async () => {
+    const state = installMetricsFetch();
+
+    render(<App initialEntries={["/projects/proj_123/analytics/opportunities"]} />);
+
+    const table = await screen.findByRole("table", { name: "Project analytics opportunities" });
+    expect(within(table).getByText("Checkout dropoff increased")).toBeInTheDocument();
+    expect(within(table).queryByRole("columnheader", { name: "Project" })).not.toBeInTheDocument();
+    expect(within(table).getByRole("link", { name: "Checkout dropoff increased" })).toHaveAttribute(
+      "href",
+      "/projects/proj_123/analytics/opportunities/55555555-5555-4555-8555-555555555555"
+    );
+    expect(
+      state.requestedUrls().some(
+        (url) =>
+          url.includes("/v1/analytics/opportunities?") &&
+          url.includes("project_id=proj_123") &&
+          url.includes("status=all") &&
+          url.includes("limit=20")
+      )
+    ).toBe(true);
+  });
+
+  it("retries failed project opportunity reads and renders an empty state", async () => {
+    const user = userEvent.setup();
+    installMetricsFetch({ failOpportunitiesOnce: true, empty: true });
+
+    render(<App initialEntries={["/projects/proj_123/analytics/opportunities"]} />);
+
+    expect(await screen.findByText(/could not load project analytics opportunities/i)).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Retry project analytics opportunities" }));
+    expect(await screen.findByText(/no analytics opportunities in this project/i)).toBeInTheDocument();
   });
 
   it("shows complete route metrics and applies shared filters", async () => {
