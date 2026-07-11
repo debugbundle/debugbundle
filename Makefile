@@ -52,6 +52,7 @@ help:
 	@echo "  make lint            Run eslint via Docker"
 	@echo "  make typecheck       Run TypeScript checks via Docker"
 	@echo "  make web-check       Run focused web auth/account tests via Docker"
+	@echo "  make compose-check   Run local Docker Compose configuration checks"
 	@echo "  make load-check      Run noisy-ingestion load checks via Docker"
 	@echo "  make perf-check      Run performance benchmark checks via Docker"
 	@echo "  make test-unit       Run unit tests with coverage gates via Docker"
@@ -156,6 +157,10 @@ typecheck:
 .PHONY: web-check
 web-check:
 	$(NODE_RUN) "corepack enable && $(PNPM_INSTALL_RELAXED) && corepack pnpm vitest run tests/apps/web/web-app-auth.test.tsx tests/apps/web/web-app-management.test.tsx tests/apps/web/web-app-incidents.test.tsx tests/apps/web/web-dogfooding.test.ts && corepack pnpm typecheck"
+
+.PHONY: compose-check
+compose-check:
+	$(NODE_RUN) "corepack enable && corepack pnpm vitest run tests/infrastructure/local-compose.test.ts"
 
 .PHONY: perf-check
 perf-check:

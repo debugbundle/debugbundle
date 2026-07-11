@@ -83,6 +83,22 @@ export interface ProjectAnalyticsRouteMetricsResponse {
   routes: ProjectAnalyticsRouteMetric[];
 }
 
+export interface ProjectAnalyticsDeviceMetricsResponse {
+  window: ProjectAnalyticsMetricsWindow;
+  device_types: AnalyticsMetricsSegment[];
+  browsers: AnalyticsMetricsSegment[];
+  os: AnalyticsMetricsSegment[];
+  languages: AnalyticsMetricsSegment[];
+}
+
+export interface ProjectAnalyticsReferrerMetricsResponse {
+  window: ProjectAnalyticsMetricsWindow;
+  referrers: AnalyticsMetricsSegment[];
+  utm_sources: AnalyticsMetricsSegment[];
+  utm_mediums: AnalyticsMetricsSegment[];
+  utm_campaigns: AnalyticsMetricsSegment[];
+}
+
 export type AnalyticsOpportunityKind =
   | "usage_summary"
   | "route_health"

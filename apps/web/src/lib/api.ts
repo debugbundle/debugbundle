@@ -34,6 +34,8 @@ import type {
   ProjectCapturePolicyUpdate,
   ProjectAnalyticsSettingsResponse,
   ProjectAnalyticsSettingsUpdate,
+  ProjectAnalyticsDeviceMetricsResponse,
+  ProjectAnalyticsReferrerMetricsResponse,
   ProjectAnalyticsRouteMetricsResponse,
   ProjectAnalyticsUsageSummaryResponse,
   ProjectImprovementSettingsResponse,
@@ -519,6 +521,30 @@ export async function getProjectAnalyticsRoutes(
   const searchParams = buildProjectAnalyticsSearchParams(projectId, query);
   return readJson<ProjectAnalyticsRouteMetricsResponse>(
     await fetch(`${API_BASE}/v1/analytics/routes?${searchParams.toString()}`, {
+      credentials: "include"
+    })
+  );
+}
+
+export async function getProjectAnalyticsDevices(
+  projectId: string,
+  query: AnalyticsMetricsQuery
+): Promise<ProjectAnalyticsDeviceMetricsResponse> {
+  const searchParams = buildProjectAnalyticsSearchParams(projectId, query);
+  return readJson<ProjectAnalyticsDeviceMetricsResponse>(
+    await fetch(`${API_BASE}/v1/analytics/devices?${searchParams.toString()}`, {
+      credentials: "include"
+    })
+  );
+}
+
+export async function getProjectAnalyticsReferrers(
+  projectId: string,
+  query: AnalyticsMetricsQuery
+): Promise<ProjectAnalyticsReferrerMetricsResponse> {
+  const searchParams = buildProjectAnalyticsSearchParams(projectId, query);
+  return readJson<ProjectAnalyticsReferrerMetricsResponse>(
+    await fetch(`${API_BASE}/v1/analytics/referrers?${searchParams.toString()}`, {
       credentials: "include"
     })
   );

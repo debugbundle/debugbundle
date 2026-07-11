@@ -63,6 +63,9 @@ import { ProjectHealthPage } from "./pages/project-health-page.js";
 import { ProjectProbesPage } from "./pages/project-probes-page.js";
 import { ProjectSettingsPage } from "./pages/project-settings-page.js";
 import { ProjectAnalyticsPage } from "./pages/project-analytics-page.js";
+import { ProjectAnalyticsAudiencesPage } from "./pages/project-analytics-audiences-page.js";
+import { ProjectAnalyticsLayout } from "./pages/project-analytics-layout.js";
+import { ProjectAnalyticsRoutesPage } from "./pages/project-analytics-routes-page.js";
 import { SettingsPage } from "./pages/settings-page.js";
 import { ProjectWebhooksPage } from "./pages/project-webhooks-page.js";
 import { SidebarInset, SidebarProvider } from "./components/ui/sidebar.js";
@@ -195,7 +198,11 @@ export function App({ initialEntries }: AppProps): JSX.Element {
                 <Route path="incidents/:incidentId" element={<IncidentDetailPage />} />
                 <Route path="improvements" element={<ProjectImprovementsPage />} />
                 <Route path="improvements/:improvementId" element={<ImprovementDetailPage />} />
-                <Route path="analytics" element={<ProjectAnalyticsPage />} />
+                <Route path="analytics" element={<ProjectAnalyticsLayout />}>
+                  <Route index element={<ProjectAnalyticsPage />} />
+                  <Route path="routes" element={<ProjectAnalyticsRoutesPage />} />
+                  <Route path="audiences" element={<ProjectAnalyticsAudiencesPage />} />
+                </Route>
                 <Route path="bundles" element={<ProjectBundlesPage />} />
                 <Route path="bundles/:incidentId" element={<IncidentDetailPage />} />
                 <Route path="health" element={<ProjectHealthPage />} />
@@ -242,7 +249,11 @@ export function App({ initialEntries }: AppProps): JSX.Element {
                 <Route path="incidents/:incidentId" element={<IncidentDetailPage />} />
                 <Route path="improvements" element={<ProjectImprovementsPage />} />
                 <Route path="improvements/:improvementId" element={<ImprovementDetailPage />} />
-                <Route path="analytics" element={<ProjectAnalyticsPage />} />
+                <Route path="analytics" element={<ProjectAnalyticsLayout />}>
+                  <Route index element={<ProjectAnalyticsPage />} />
+                  <Route path="routes" element={<ProjectAnalyticsRoutesPage />} />
+                  <Route path="audiences" element={<ProjectAnalyticsAudiencesPage />} />
+                </Route>
                 <Route path="bundles" element={<ProjectBundlesPage />} />
                 <Route path="bundles/:incidentId" element={<IncidentDetailPage />} />
                 <Route path="health" element={<ProjectHealthPage />} />

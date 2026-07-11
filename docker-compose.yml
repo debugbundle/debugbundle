@@ -71,6 +71,7 @@ services:
         condition: service_healthy
     volumes:
       - .:/workspace
+      - node-corepack-cache:/root/.cache/node/corepack
     working_dir: /workspace
     environment:
       <<: *node-pnpm-env
@@ -94,6 +95,7 @@ services:
         condition: service_completed_successfully
     volumes:
       - .:/workspace
+      - node-corepack-cache:/root/.cache/node/corepack
     working_dir: /workspace
     environment:
       <<: *node-pnpm-env
@@ -124,6 +126,7 @@ services:
         condition: service_completed_successfully
     volumes:
       - .:/workspace
+      - node-corepack-cache:/root/.cache/node/corepack
     working_dir: /workspace
     ports:
       - "3003:3000"
@@ -194,6 +197,7 @@ services:
         condition: service_completed_successfully
     volumes:
       - .:/workspace
+      - node-corepack-cache:/root/.cache/node/corepack
     working_dir: /workspace
     environment:
       <<: *node-pnpm-env
@@ -226,6 +230,7 @@ services:
       - api
     volumes:
       - .:/workspace
+      - node-corepack-cache:/root/.cache/node/corepack
     working_dir: /workspace/apps/web
     ports:
       - "${WEB_PORT:-5291}:5291"
@@ -247,3 +252,5 @@ services:
 volumes:
   postgres-data:
   localstack-data:
+  # Bootstrap prepares pnpm once; later services must not require npm registry access to start.
+  node-corepack-cache:
