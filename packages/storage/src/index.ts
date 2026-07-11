@@ -67,6 +67,11 @@ export type { ImprovementSettingsStore } from "./improvement-settings-store.js";
 export { createPostgresImprovementSettingsStore } from "./improvement-settings-store.js";
 export type { AnalyticsSettingsStore } from "./analytics-settings-store.js";
 export { createPostgresAnalyticsSettingsStore } from "./analytics-settings-store.js";
+export type {
+  AnalyticsSavedFunnelStore,
+  CreateAnalyticsSavedFunnelResult
+} from "./analytics-saved-funnel-store.js";
+export { createPostgresAnalyticsSavedFunnelStore } from "./analytics-saved-funnel-store.js";
 export type { AnalyticsRollupStore } from "./analytics-rollup-store.js";
 export { createPostgresAnalyticsRollupStore } from "./analytics-rollup-store.js";
 export type {

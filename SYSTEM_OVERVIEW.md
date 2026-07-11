@@ -243,6 +243,7 @@ packages/
       analytics-rollup-store.ts — Postgres analytics ingestion ledger and idempotent hourly/daily session, route, action/conversion/marker, and funnel rollup writes
       analytics-usage-store.ts — Durable internal analytics allowance counters with atomic claim/release for hosted event/session, retained journey sample, and AnalyticsBundle generation quota checks
       analytics-settings-store.ts — Postgres AnalyticsBundle settings reads and merge-upserts for project opt-in/privacy/retention/custom-dimension settings
+      analytics-saved-funnel-store.ts — Postgres saved-funnel definition lifecycle with project-scoped reads, soft archival, and transactionally enforced active-definition limits
       s3-client.ts           — S3-compatible object store adapter
       redis-queue.ts         — Redis queue client (enqueue/dequeue)
       migrations.ts          — Authoritative bootstrap schema + required-table manifests
