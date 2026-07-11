@@ -46,6 +46,7 @@ function installMetricsFetch(
     failDevices?: boolean;
     failFunnelDetailOnce?: boolean;
     failFunnelsOnce?: boolean;
+    failJourneysOnce?: boolean;
     failRoutesOnce?: boolean;
     failSettingsOnce?: boolean;
   } = {}
@@ -56,6 +57,7 @@ function installMetricsFetch(
   let routeRequests = 0;
   let funnelRequests = 0;
   let funnelDetailRequests = 0;
+  let journeyRequests = 0;
   let settingsRequests = 0;
 
   vi.stubGlobal(
@@ -202,6 +204,28 @@ function installMetricsFetch(
         });
       }
 
+      if (url.includes("/v1/analytics/journey-patterns?")) {
+        journeyRequests += 1;
+        if (input.failJourneysOnce && journeyRequests === 1) {
+          return jsonResponse(503, { error: "unavailable" });
+        }
+        return jsonResponse(200, {
+          window: metricsWindow,
+          patterns: input.empty
+            ? []
+            : [
+                {
+                  from_route_key: "/pricing",
+                  to_route_key: "/checkout",
+                  transition_count: 420,
+                  unique_sessions: 350,
+                  transition_share: 0.42,
+                  sample_ids: ["44444444-4444-4444-8444-444444444444"]
+                }
+              ]
+        });
+      }
+
       return jsonResponse(404, { error: "not_found" });
     })
   );
@@ -222,7 +246,8 @@ describe("web app - project analytics metrics", () => {
       "Overview",
       "Routes",
       "Funnels",
-      "Audiences"
+      "Audiences",
+      "Journeys"
     ]);
 
     await user.click(within(sectionTabs).getByRole("tab", { name: "Audiences" }));
@@ -288,6 +313,42 @@ describe("web app - project analytics metrics", () => {
     render(<App initialEntries={["/projects/proj_123/analytics/funnels"]} />);
 
     expect(await screen.findByText(/no funnel activity in this window/i)).toBeInTheDocument();
+  });
+
+  it("shows aggregate journey transitions and retained sample references", async () => {
+    installMetricsFetch();
+
+    render(<App initialEntries={["/projects/proj_123/analytics/journeys"]} />);
+
+    const table = await screen.findByRole("table", { name: "Journey patterns" });
+    for (const heading of [
+      "From route",
+      "To route",
+      "Transitions",
+      "Unique sessions",
+      "Share",
+      "Retained samples"
+    ]) {
+      expect(within(table).getByRole("columnheader", { name: heading })).toBeInTheDocument();
+    }
+    expect(within(table).getByText("/pricing")).toBeInTheDocument();
+    expect(within(table).getByText("/checkout")).toBeInTheDocument();
+    expect(within(table).getByText("42%")).toBeInTheDocument();
+    expect(within(table).getByRole("link", { name: "Sample 1" })).toHaveAttribute(
+      "href",
+      "/projects/proj_123/analytics/journeys/44444444-4444-4444-8444-444444444444"
+    );
+  });
+
+  it("retries failed journey-pattern reads and renders an empty state", async () => {
+    const user = userEvent.setup();
+    installMetricsFetch({ failJourneysOnce: true, empty: true });
+
+    render(<App initialEntries={["/projects/proj_123/analytics/journeys"]} />);
+
+    expect(await screen.findByText(/could not load journey patterns/i)).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Retry journey patterns" }));
+    expect(await screen.findByText(/no journey transitions in this window/i)).toBeInTheDocument();
   });
 
   it("shows complete route metrics and applies shared filters", async () => {

@@ -95,6 +95,8 @@ export {
   getProjectAnalyticsDevices,
   getProjectAnalyticsFunnel,
   getProjectAnalyticsFunnels,
+  getProjectAnalyticsJourneyPatterns,
+  getProjectAnalyticsJourneySample,
   getProjectAnalyticsReferrers,
   getProjectAnalyticsRoutes,
   getProjectAnalyticsSettings,

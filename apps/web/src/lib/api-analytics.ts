@@ -8,6 +8,8 @@ import type {
   ProjectAnalyticsDeviceMetricsResponse,
   ProjectAnalyticsFunnelAnalysisResponse,
   ProjectAnalyticsFunnelsResponse,
+  ProjectAnalyticsJourneyPatternsResponse,
+  ProjectAnalyticsJourneySampleResponse,
   ProjectAnalyticsReferrerMetricsResponse,
   ProjectAnalyticsRouteMetricsResponse,
   ProjectAnalyticsSettingsResponse,
@@ -96,6 +98,26 @@ export async function getProjectAnalyticsFunnel(
     projectId,
     `/v1/analytics/funnels/${encodeURIComponent(funnelKey)}`,
     query
+  );
+}
+
+export async function getProjectAnalyticsJourneyPatterns(
+  projectId: string,
+  query: AnalyticsMetricsQuery
+): Promise<ProjectAnalyticsJourneyPatternsResponse> {
+  return getProjectAnalyticsMetric(projectId, "/v1/analytics/journey-patterns", query);
+}
+
+export async function getProjectAnalyticsJourneySample(
+  projectId: string,
+  sampleId: string
+): Promise<ProjectAnalyticsJourneySampleResponse> {
+  const searchParams = new URLSearchParams({ project_id: projectId });
+  return readJson<ProjectAnalyticsJourneySampleResponse>(
+    await fetch(
+      `${API_BASE}/v1/analytics/journey-samples/${encodeURIComponent(sampleId)}?${searchParams.toString()}`,
+      { credentials: "include" }
+    )
   );
 }
 

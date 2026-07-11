@@ -128,6 +128,41 @@ export interface ProjectAnalyticsFunnelAnalysisResponse {
   steps: ProjectAnalyticsFunnelStepMetric[];
 }
 
+export interface ProjectAnalyticsJourneyPattern {
+  from_route_key: string;
+  to_route_key: string;
+  transition_count: number;
+  unique_sessions: number;
+  transition_share: number;
+  sample_ids: string[];
+}
+
+export interface ProjectAnalyticsJourneyPatternsResponse {
+  window: ProjectAnalyticsMetricsWindow;
+  patterns: ProjectAnalyticsJourneyPattern[];
+}
+
+export interface ProjectAnalyticsJourneySampleMetadata {
+  sample_id: string;
+  project_id: string;
+  service: string | null;
+  environment: string | null;
+  session_id_hash: string;
+  visitor_id_hash: string | null;
+  analysis_tags: string[];
+  first_seen_at: string;
+  last_seen_at: string;
+  dimensions_summary: Record<string, unknown>;
+  has_artifact: boolean;
+  expires_at: string;
+  created_at: string;
+}
+
+export interface ProjectAnalyticsJourneySampleResponse {
+  sample: ProjectAnalyticsJourneySampleMetadata;
+  journey: Record<string, unknown>;
+}
+
 export type AnalyticsOpportunityKind =
   | "usage_summary"
   | "route_health"

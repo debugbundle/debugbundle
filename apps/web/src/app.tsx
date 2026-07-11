@@ -66,6 +66,8 @@ import { ProjectAnalyticsPage } from "./pages/project-analytics-page.js";
 import { ProjectAnalyticsAudiencesPage } from "./pages/project-analytics-audiences-page.js";
 import { ProjectAnalyticsFunnelsPage } from "./pages/project-analytics-funnels-page.js";
 import { ProjectAnalyticsLayout } from "./pages/project-analytics-layout.js";
+import { ProjectAnalyticsJourneysPage } from "./pages/project-analytics-journeys-page.js";
+import { ProjectAnalyticsJourneySamplePage } from "./pages/project-analytics-journey-sample-page.js";
 import { ProjectAnalyticsRoutesPage } from "./pages/project-analytics-routes-page.js";
 import { SettingsPage } from "./pages/settings-page.js";
 import { WorkspaceAnalyticsPage } from "./pages/workspace-analytics-page.js";
@@ -202,11 +204,16 @@ export function App({ initialEntries }: AppProps): JSX.Element {
                 <Route path="incidents/:incidentId" element={<IncidentDetailPage />} />
                 <Route path="improvements" element={<ProjectImprovementsPage />} />
                 <Route path="improvements/:improvementId" element={<ImprovementDetailPage />} />
+                <Route
+                  path="analytics/journeys/:sampleId"
+                  element={<ProjectAnalyticsJourneySamplePage />}
+                />
                 <Route path="analytics" element={<ProjectAnalyticsLayout />}>
                   <Route index element={<ProjectAnalyticsPage />} />
                   <Route path="routes" element={<ProjectAnalyticsRoutesPage />} />
                   <Route path="funnels" element={<ProjectAnalyticsFunnelsPage />} />
                   <Route path="audiences" element={<ProjectAnalyticsAudiencesPage />} />
+                  <Route path="journeys" element={<ProjectAnalyticsJourneysPage />} />
                 </Route>
                 <Route path="bundles" element={<ProjectBundlesPage />} />
                 <Route path="bundles/:incidentId" element={<IncidentDetailPage />} />
@@ -256,11 +263,16 @@ export function App({ initialEntries }: AppProps): JSX.Element {
                 <Route path="incidents/:incidentId" element={<IncidentDetailPage />} />
                 <Route path="improvements" element={<ProjectImprovementsPage />} />
                 <Route path="improvements/:improvementId" element={<ImprovementDetailPage />} />
+                <Route
+                  path="analytics/journeys/:sampleId"
+                  element={<ProjectAnalyticsJourneySamplePage />}
+                />
                 <Route path="analytics" element={<ProjectAnalyticsLayout />}>
                   <Route index element={<ProjectAnalyticsPage />} />
                   <Route path="routes" element={<ProjectAnalyticsRoutesPage />} />
                   <Route path="funnels" element={<ProjectAnalyticsFunnelsPage />} />
                   <Route path="audiences" element={<ProjectAnalyticsAudiencesPage />} />
+                  <Route path="journeys" element={<ProjectAnalyticsJourneysPage />} />
                 </Route>
                 <Route path="bundles" element={<ProjectBundlesPage />} />
                 <Route path="bundles/:incidentId" element={<IncidentDetailPage />} />
