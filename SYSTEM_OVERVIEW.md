@@ -283,6 +283,8 @@ site/                    — Real standalone clone of github.com/debugbundle/sit
                            for day-to-day documentation and marketing work. The core repo ignores this
                            path locally and can still refresh vendorable artifacts into `site/public/`
                            through `scripts/public-site-artifacts.ts` before running site-local commands.
+                           AnalyticsBundle public guidance lives here across concept/privacy/self-hosting,
+                           browser SDK, CLI, API, MCP, navigation, search, and agent-discovery surfaces.
 
   bundle-engine/ — Deterministic bundle assembly
   analytics-bundle-engine/ — Deterministic AnalyticsBundle artifact shaping
