@@ -10,6 +10,7 @@ import type {
   ProjectAnalyticsDeviceMetricsResponse,
   ProjectAnalyticsFunnelAnalysisResponse,
   ProjectAnalyticsFunnelsResponse,
+  ProjectAnalyticsIncidentImpactResponse,
   ProjectAnalyticsJourneyPatternsResponse,
   ProjectAnalyticsJourneySampleResponse,
   ProjectAnalyticsBundleResponse,
@@ -111,6 +112,17 @@ export async function getProjectAnalyticsJourneyPatterns(
   query: AnalyticsMetricsQuery
 ): Promise<ProjectAnalyticsJourneyPatternsResponse> {
   return getProjectAnalyticsMetric(projectId, "/v1/analytics/journey-patterns", query);
+}
+
+export async function getProjectAnalyticsIncidentImpact(
+  projectId: string,
+  incidentId: string
+): Promise<ProjectAnalyticsIncidentImpactResponse> {
+  return getProjectAnalyticsMetric(
+    projectId,
+    `/v1/analytics/incidents/${encodeURIComponent(incidentId)}/impact`,
+    {}
+  );
 }
 
 export async function getProjectAnalyticsJourneySample(

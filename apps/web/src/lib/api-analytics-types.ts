@@ -147,6 +147,32 @@ export interface ProjectAnalyticsJourneyPatternsResponse {
   patterns: ProjectAnalyticsJourneyPattern[];
 }
 
+export interface ProjectAnalyticsIncidentImpactResponse {
+  incident_id: string;
+  window: ProjectAnalyticsMetricsWindow;
+  affected_sessions: number;
+  affected_routes: Array<{ route_key: string; affected_sessions: number }>;
+  affected_funnels: Array<{ funnel_key: string; affected_sessions: number }>;
+  top_device_types: Array<{ value: string; affected_sessions: number }>;
+  top_browsers: Array<{ value: string; affected_sessions: number }>;
+  journey_patterns: Array<{
+    from_route_key: string;
+    to_route_key: string;
+    affected_sessions: number;
+    sample_ids: string[];
+  }>;
+  conversion_delta: {
+    availability: "available" | "unavailable";
+    value: number | null;
+    unit: "percentage_points";
+  };
+  analytics_bundle: {
+    status: "not_requested" | AnalyticsBundleGenerationStatus;
+    generation_id: string | null;
+    failure_reason: string | null;
+  };
+}
+
 export interface ProjectAnalyticsJourneySampleMetadata {
   sample_id: string;
   project_id: string;

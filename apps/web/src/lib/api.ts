@@ -98,6 +98,7 @@ export {
   getProjectAnalyticsFunnels,
   getProjectAnalyticsJourneyPatterns,
   getProjectAnalyticsJourneySample,
+  getProjectAnalyticsIncidentImpact,
   getProjectAnalyticsBundle,
   getProjectAnalyticsOpportunity,
   getProjectAnalyticsReferrers,
