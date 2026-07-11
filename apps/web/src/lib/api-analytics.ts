@@ -7,6 +7,11 @@ import type {
   AnalyticsOpportunitiesListResponse,
   AnalyticsOpportunityResponse,
   AnalyticsOpportunityInventoryQuery,
+  AnalyticsSavedFunnel,
+  AnalyticsSavedFunnelCreate,
+  AnalyticsSavedFunnelResponse,
+  AnalyticsSavedFunnelsResponse,
+  AnalyticsSavedFunnelUpdate,
   ProjectAnalyticsDeviceMetricsResponse,
   ProjectAnalyticsFunnelAnalysisResponse,
   ProjectAnalyticsFunnelsResponse,
@@ -45,6 +50,64 @@ export async function updateProjectAnalyticsSettings(
       body: JSON.stringify(payload)
     })
   );
+}
+
+function projectAnalyticsSavedFunnelsPath(projectId: string): string {
+  return `${API_BASE}/v1/projects/${encodeURIComponent(projectId)}/analytics/saved-funnels`;
+}
+
+export async function listProjectAnalyticsSavedFunnels(
+  projectId: string
+): Promise<AnalyticsSavedFunnel[]> {
+  const response = await readJson<AnalyticsSavedFunnelsResponse>(
+    await fetch(projectAnalyticsSavedFunnelsPath(projectId), { credentials: "include" })
+  );
+  return response.funnels;
+}
+
+export async function createProjectAnalyticsSavedFunnel(
+  projectId: string,
+  definition: AnalyticsSavedFunnelCreate
+): Promise<AnalyticsSavedFunnel> {
+  const response = await readJson<AnalyticsSavedFunnelResponse>(
+    await fetch(projectAnalyticsSavedFunnelsPath(projectId), {
+      method: "POST",
+      credentials: "include",
+      headers: buildBrowserSessionHeaders(true),
+      body: JSON.stringify(definition)
+    })
+  );
+  return response.funnel;
+}
+
+export async function updateProjectAnalyticsSavedFunnel(
+  projectId: string,
+  funnelKey: string,
+  update: AnalyticsSavedFunnelUpdate
+): Promise<AnalyticsSavedFunnel> {
+  const response = await readJson<AnalyticsSavedFunnelResponse>(
+    await fetch(`${projectAnalyticsSavedFunnelsPath(projectId)}/${encodeURIComponent(funnelKey)}`, {
+      method: "PATCH",
+      credentials: "include",
+      headers: buildBrowserSessionHeaders(true),
+      body: JSON.stringify(update)
+    })
+  );
+  return response.funnel;
+}
+
+export async function archiveProjectAnalyticsSavedFunnel(
+  projectId: string,
+  funnelKey: string
+): Promise<AnalyticsSavedFunnel> {
+  const response = await readJson<AnalyticsSavedFunnelResponse>(
+    await fetch(`${projectAnalyticsSavedFunnelsPath(projectId)}/${encodeURIComponent(funnelKey)}`, {
+      method: "DELETE",
+      credentials: "include",
+      headers: buildBrowserSessionHeaders()
+    })
+  );
+  return response.funnel;
 }
 
 function buildProjectAnalyticsSearchParams(

@@ -18,6 +18,7 @@ import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectVa
 import { Skeleton } from "../ui/skeleton.js";
 import { Switch } from "../ui/switch.js";
 import { PlanUpgradeCallout } from "./plan-upgrade-callout.js";
+import { ProjectAnalyticsSavedFunnelsSection } from "./project-analytics-saved-funnels-section.js";
 
 interface ProjectAnalyticsSettingsCardProps {
   projectId: string;
@@ -341,6 +342,13 @@ export function ProjectAnalyticsSettingsCard(props: ProjectAnalyticsSettingsCard
             <SummaryTile label="Raw retention" value={`${settingsDraft.raw_retention_days} days`} />
             <SummaryTile label="Aggregate retention" value={`${settingsDraft.aggregate_retention_months} months`} />
           </div>
+        ) : null}
+        {hasLoadedSettings && settingsDraft.analytics_available ? (
+          <ProjectAnalyticsSavedFunnelsSection
+            projectId={projectId}
+            canManage={canManage}
+            maxSavedFunnels={baseline?.max_saved_funnels ?? settingsDraft.max_saved_funnels}
+          />
         ) : null}
       </CardContent>
     </Card>

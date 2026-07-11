@@ -523,6 +523,12 @@ Analytics shares browser SDK capture primitives with debug capture where that re
 | PATCH | `/v1/projects/{id}/analytics/saved-funnels/{key}` | Browser Session or Member Token, owner/admin | Update a saved funnel definition |
 | DELETE | `/v1/projects/{id}/analytics/saved-funnels/{key}` | Browser Session or Member Token, owner/admin | Soft-archive a saved funnel definition |
 
+The web client exposes these saved-funnel operations inside Project Settings under
+Product analytics. It lists active definitions for authorized members and exposes
+create, update, and soft-archive controls only to owners/admins. Browser mutations
+use the same cookie-session CSRF protection and server-owned validation, tier, and
+active-definition limit enforcement as the API.
+
 **Common query params:** `project_id` (required unless the endpoint explicitly supports cross-project summary), `service`, `environment`, `from`, `to`, `granularity`, `route`, `funnel`, `device_type`, `browser`, `os`, `language`, `country`, `auth_state`, `custom_dimension.<key>`, `limit`, `cursor`.
 
 **Analytics summary response shape:**

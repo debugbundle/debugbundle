@@ -3,7 +3,15 @@ import type {
   AnalyticsBundleV1,
   ProjectColorTag
 } from "../../../../packages/shared-types/src/index.js";
-export type { AnalyticsBundleAnalysisKind } from "../../../../packages/shared-types/src/index.js";
+export type {
+  AnalyticsBundleAnalysisKind,
+  AnalyticsSavedFunnel,
+  AnalyticsSavedFunnelCreate,
+  AnalyticsSavedFunnelResponse,
+  AnalyticsSavedFunnelsResponse,
+  AnalyticsSavedFunnelStep,
+  AnalyticsSavedFunnelUpdate
+} from "../../../../packages/shared-types/src/index.js";
 
 export type AnalyticsPrivacyMode = "strict" | "standard" | "custom";
 

@@ -92,6 +92,8 @@ export {
   updateProjectGitHubRule
 } from "./api-github.js";
 export {
+  archiveProjectAnalyticsSavedFunnel,
+  createProjectAnalyticsSavedFunnel,
   createProjectAnalyticsBundle,
   getProjectAnalyticsDevices,
   getProjectAnalyticsFunnel,
@@ -107,7 +109,9 @@ export {
   getProjectAnalyticsSummary,
   listAnalyticsBundles,
   listAnalyticsOpportunities,
+  listProjectAnalyticsSavedFunnels,
   listProjectAnalyticsOpportunities,
+  updateProjectAnalyticsSavedFunnel,
   updateProjectAnalyticsSettings
 } from "./api-analytics.js";
 export {
