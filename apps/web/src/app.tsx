@@ -64,6 +64,7 @@ import { ProjectProbesPage } from "./pages/project-probes-page.js";
 import { ProjectSettingsPage } from "./pages/project-settings-page.js";
 import { ProjectAnalyticsPage } from "./pages/project-analytics-page.js";
 import { ProjectAnalyticsAudiencesPage } from "./pages/project-analytics-audiences-page.js";
+import { ProjectAnalyticsFunnelsPage } from "./pages/project-analytics-funnels-page.js";
 import { ProjectAnalyticsLayout } from "./pages/project-analytics-layout.js";
 import { ProjectAnalyticsRoutesPage } from "./pages/project-analytics-routes-page.js";
 import { SettingsPage } from "./pages/settings-page.js";
@@ -204,6 +205,7 @@ export function App({ initialEntries }: AppProps): JSX.Element {
                 <Route path="analytics" element={<ProjectAnalyticsLayout />}>
                   <Route index element={<ProjectAnalyticsPage />} />
                   <Route path="routes" element={<ProjectAnalyticsRoutesPage />} />
+                  <Route path="funnels" element={<ProjectAnalyticsFunnelsPage />} />
                   <Route path="audiences" element={<ProjectAnalyticsAudiencesPage />} />
                 </Route>
                 <Route path="bundles" element={<ProjectBundlesPage />} />
@@ -257,6 +259,7 @@ export function App({ initialEntries }: AppProps): JSX.Element {
                 <Route path="analytics" element={<ProjectAnalyticsLayout />}>
                   <Route index element={<ProjectAnalyticsPage />} />
                   <Route path="routes" element={<ProjectAnalyticsRoutesPage />} />
+                  <Route path="funnels" element={<ProjectAnalyticsFunnelsPage />} />
                   <Route path="audiences" element={<ProjectAnalyticsAudiencesPage />} />
                 </Route>
                 <Route path="bundles" element={<ProjectBundlesPage />} />

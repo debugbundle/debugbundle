@@ -8,11 +8,6 @@ import type {
   AlertChannel,
   AlertConditionType,
   AlertSeverityLifecycleScope,
-  AnalyticsMetricsQuery,
-  AnalyticsBundleGenerationsListResponse,
-  AnalyticsBundleInventoryQuery,
-  AnalyticsOpportunityInventoryQuery,
-  AnalyticsOpportunitiesListResponse,
   AdminAnalyticsAccessStatus,
   AdminMalformedRejectionBreakdown,
   AdminAnalyticsSummary,
@@ -35,12 +30,6 @@ import type {
   CreatedProbeActivation,
   ProjectCapturePolicyResponse,
   ProjectCapturePolicyUpdate,
-  ProjectAnalyticsSettingsResponse,
-  ProjectAnalyticsSettingsUpdate,
-  ProjectAnalyticsDeviceMetricsResponse,
-  ProjectAnalyticsReferrerMetricsResponse,
-  ProjectAnalyticsRouteMetricsResponse,
-  ProjectAnalyticsUsageSummaryResponse,
   ProjectImprovementSettingsResponse,
   ProjectImprovementSettingsUpdate,
   ProjectRecord,
@@ -52,6 +41,11 @@ import type {
   WebhookEventType,
   WebhookRecord
 } from "./api-types.js";
+import {
+  normalizeImprovementRecord,
+  normalizeIncidentRecord,
+  normalizeProjectRecord
+} from "./api-record-normalizers.js";
 
 export * from "./api-types.js";
 export {
@@ -97,40 +91,37 @@ export {
   setProjectGitHubRepo,
   updateProjectGitHubRule
 } from "./api-github.js";
-
-function normalizeProjectRecord(
-  project: Omit<ProjectRecord, "metrics"> & { metrics?: Partial<ProjectRecord["metrics"]> }
-): ProjectRecord {
-  return {
-    ...project,
-    color_tag: project.color_tag ?? null,
-    metrics: {
-      open_incidents: project.metrics?.open_incidents ?? 0,
-      regressed_incidents: project.metrics?.regressed_incidents ?? 0,
-      attention_incidents_today: project.metrics?.attention_incidents_today ?? project.metrics?.opened_incidents_today ?? 0,
-      opened_incidents_today: project.metrics?.opened_incidents_today ?? 0,
-      opened_incidents_month: project.metrics?.opened_incidents_month ?? 0,
-      monthly_bundle_requests: project.metrics?.monthly_bundle_requests ?? 0,
-      monthly_raw_ingested_events: project.metrics?.monthly_raw_ingested_events ?? 0,
-      retained_bundles: project.metrics?.retained_bundles ?? 0,
-      monthly_alert_deliveries: project.metrics?.monthly_alert_deliveries ?? 0
-    }
-  };
-}
-
-function normalizeIncidentRecord(incident: IncidentRecord): IncidentRecord {
-  return {
-    ...incident,
-    project_color_tag: incident.project_color_tag ?? null
-  };
-}
-
-function normalizeImprovementRecord(improvement: ImprovementRecord): ImprovementRecord {
-  return {
-    ...improvement,
-    project_color_tag: improvement.project_color_tag ?? null
-  };
-}
+export {
+  getProjectAnalyticsDevices,
+  getProjectAnalyticsFunnel,
+  getProjectAnalyticsFunnels,
+  getProjectAnalyticsReferrers,
+  getProjectAnalyticsRoutes,
+  getProjectAnalyticsSettings,
+  getProjectAnalyticsSummary,
+  listAnalyticsBundles,
+  listAnalyticsOpportunities,
+  listProjectAnalyticsOpportunities,
+  updateProjectAnalyticsSettings
+} from "./api-analytics.js";
+export {
+  bulkReopenIncidents,
+  bulkResolveIncidents,
+  getImprovement,
+  getImprovementBundle,
+  getIncident,
+  getIncidentBundle,
+  getIncidentReproduction,
+  listProjectImprovements,
+  listProjectIncidents,
+  reopenImprovement,
+  reopenIncident,
+  resolveImprovement,
+  resolveIncident,
+  snoozeImprovement,
+  type ArtifactPendingOrFailedResponse,
+  type BundleRecord
+} from "./api-artifacts.js";
 
 function getBrowserTimeZone(): string {
   return Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
@@ -464,147 +455,6 @@ export async function updateProjectImprovementSettings(
       credentials: "include",
       headers: buildBrowserSessionHeaders(true),
       body: JSON.stringify(payload)
-    })
-  );
-}
-
-export async function getProjectAnalyticsSettings(
-  projectId: string
-): Promise<ProjectAnalyticsSettingsResponse> {
-  return readJson<ProjectAnalyticsSettingsResponse>(
-    await fetch(`${API_BASE}/v1/projects/${projectId}/analytics-settings`, {
-      credentials: "include"
-    })
-  );
-}
-
-export async function updateProjectAnalyticsSettings(
-  projectId: string,
-  payload: ProjectAnalyticsSettingsUpdate
-): Promise<ProjectAnalyticsSettingsResponse> {
-  return readJson<ProjectAnalyticsSettingsResponse>(
-    await fetch(`${API_BASE}/v1/projects/${projectId}/analytics-settings`, {
-      method: "PATCH",
-      credentials: "include",
-      headers: buildBrowserSessionHeaders(true),
-      body: JSON.stringify(payload)
-    })
-  );
-}
-
-function buildProjectAnalyticsSearchParams(
-  projectId: string,
-  query: AnalyticsMetricsQuery
-): URLSearchParams {
-  const searchParams = new URLSearchParams({ project_id: projectId });
-  if (query.last !== undefined) searchParams.set("last", query.last);
-  if (query.granularity !== undefined) searchParams.set("granularity", query.granularity);
-  if (query.service !== undefined) searchParams.set("service", query.service);
-  if (query.environment !== undefined) searchParams.set("environment", query.environment);
-  if (query.limit !== undefined) searchParams.set("limit", String(query.limit));
-  return searchParams;
-}
-
-export async function getProjectAnalyticsSummary(
-  projectId: string,
-  query: AnalyticsMetricsQuery
-): Promise<ProjectAnalyticsUsageSummaryResponse> {
-  const searchParams = buildProjectAnalyticsSearchParams(projectId, query);
-  return readJson<ProjectAnalyticsUsageSummaryResponse>(
-    await fetch(`${API_BASE}/v1/analytics/summary?${searchParams.toString()}`, {
-      credentials: "include"
-    })
-  );
-}
-
-export async function getProjectAnalyticsRoutes(
-  projectId: string,
-  query: AnalyticsMetricsQuery
-): Promise<ProjectAnalyticsRouteMetricsResponse> {
-  const searchParams = buildProjectAnalyticsSearchParams(projectId, query);
-  return readJson<ProjectAnalyticsRouteMetricsResponse>(
-    await fetch(`${API_BASE}/v1/analytics/routes?${searchParams.toString()}`, {
-      credentials: "include"
-    })
-  );
-}
-
-export async function getProjectAnalyticsDevices(
-  projectId: string,
-  query: AnalyticsMetricsQuery
-): Promise<ProjectAnalyticsDeviceMetricsResponse> {
-  const searchParams = buildProjectAnalyticsSearchParams(projectId, query);
-  return readJson<ProjectAnalyticsDeviceMetricsResponse>(
-    await fetch(`${API_BASE}/v1/analytics/devices?${searchParams.toString()}`, {
-      credentials: "include"
-    })
-  );
-}
-
-export async function getProjectAnalyticsReferrers(
-  projectId: string,
-  query: AnalyticsMetricsQuery
-): Promise<ProjectAnalyticsReferrerMetricsResponse> {
-  const searchParams = buildProjectAnalyticsSearchParams(projectId, query);
-  return readJson<ProjectAnalyticsReferrerMetricsResponse>(
-    await fetch(`${API_BASE}/v1/analytics/referrers?${searchParams.toString()}`, {
-      credentials: "include"
-    })
-  );
-}
-
-export async function listProjectAnalyticsOpportunities(
-  projectId: string,
-  limit = 20
-): Promise<AnalyticsOpportunitiesListResponse> {
-  const searchParams = new URLSearchParams({
-    project_id: projectId,
-    status: "open",
-    limit: String(limit)
-  });
-  return readJson<AnalyticsOpportunitiesListResponse>(
-    await fetch(`${API_BASE}/v1/analytics/opportunities?${searchParams.toString()}`, {
-      credentials: "include"
-    })
-  );
-}
-
-function buildAnalyticsInventorySearchParams(
-  query: AnalyticsOpportunityInventoryQuery | AnalyticsBundleInventoryQuery
-): URLSearchParams {
-  const searchParams = new URLSearchParams();
-  if (query.projectId !== undefined) searchParams.set("project_id", query.projectId);
-  if (query.status !== undefined) searchParams.set("status", query.status);
-  if (query.kind !== undefined) searchParams.set("kind", query.kind);
-  if (query.service !== undefined) searchParams.set("service", query.service);
-  if (query.environment !== undefined) searchParams.set("environment", query.environment);
-  if (query.from !== undefined) searchParams.set("from", query.from);
-  if (query.to !== undefined) searchParams.set("to", query.to);
-  if (query.cursor !== undefined) searchParams.set("cursor", query.cursor);
-  if (query.limit !== undefined) searchParams.set("limit", String(query.limit));
-  return searchParams;
-}
-
-export async function listAnalyticsOpportunities(
-  query: AnalyticsOpportunityInventoryQuery
-): Promise<AnalyticsOpportunitiesListResponse> {
-  const searchParams = buildAnalyticsInventorySearchParams(query);
-  if (query.severity !== undefined) searchParams.set("severity", query.severity);
-  if (query.bundleStatus !== undefined) searchParams.set("bundle_status", query.bundleStatus);
-  return readJson<AnalyticsOpportunitiesListResponse>(
-    await fetch(`${API_BASE}/v1/analytics/opportunities?${searchParams.toString()}`, {
-      credentials: "include"
-    })
-  );
-}
-
-export async function listAnalyticsBundles(
-  query: AnalyticsBundleInventoryQuery
-): Promise<AnalyticsBundleGenerationsListResponse> {
-  const searchParams = buildAnalyticsInventorySearchParams(query);
-  return readJson<AnalyticsBundleGenerationsListResponse>(
-    await fetch(`${API_BASE}/v1/analytics/bundles?${searchParams.toString()}`, {
-      credentials: "include"
     })
   );
 }
@@ -1118,256 +968,4 @@ export async function deleteAlert(alertId: string, projectId: string): Promise<v
     const body = (await response.json().catch(() => null)) as { error?: string } | null;
     throw new Error(body?.error ?? `request_failed_${response.status}`);
   }
-}
-
-export async function getIncident(incidentId: string): Promise<IncidentRecord> {
-  const body = await readJson<{ incident: IncidentRecord }>(
-    await fetch(`${API_BASE}/v1/incidents/${incidentId}`, {
-      credentials: "include"
-    })
-  );
-
-  return normalizeIncidentRecord(body.incident);
-}
-
-export async function getImprovement(improvementId: string): Promise<ImprovementRecord> {
-  const body = await readJson<{ improvement: ImprovementRecord }>(
-    await fetch(`${API_BASE}/v1/improvements/${improvementId}`, {
-      credentials: "include"
-    })
-  );
-
-  return normalizeImprovementRecord(body.improvement);
-}
-
-export async function resolveIncident(incidentId: string): Promise<IncidentRecord> {
-  const body = await readJson<{ incident: IncidentRecord }>(
-    await fetch(`${API_BASE}/v1/incidents/${incidentId}/resolve`, {
-      method: "POST",
-      credentials: "include",
-      headers: buildBrowserSessionHeaders()
-    })
-  );
-
-  return normalizeIncidentRecord(body.incident);
-}
-
-export async function bulkResolveIncidents(incidentIds: string[]): Promise<IncidentRecord[]> {
-  const body = await readJson<{ incidents: IncidentRecord[] }>(
-    await fetch(`${API_BASE}/v1/incidents/resolve`, {
-      method: "POST",
-      credentials: "include",
-      headers: buildBrowserSessionHeaders(true),
-      body: JSON.stringify({ incident_ids: incidentIds })
-    })
-  );
-
-  return body.incidents.map(normalizeIncidentRecord);
-}
-
-export async function reopenIncident(incidentId: string): Promise<IncidentRecord> {
-  const body = await readJson<{ incident: IncidentRecord }>(
-    await fetch(`${API_BASE}/v1/incidents/${incidentId}/reopen`, {
-      method: "POST",
-      credentials: "include",
-      headers: buildBrowserSessionHeaders()
-    })
-  );
-
-  return normalizeIncidentRecord(body.incident);
-}
-
-export async function bulkReopenIncidents(incidentIds: string[]): Promise<IncidentRecord[]> {
-  const body = await readJson<{ incidents: IncidentRecord[] }>(
-    await fetch(`${API_BASE}/v1/incidents/reopen`, {
-      method: "POST",
-      credentials: "include",
-      headers: buildBrowserSessionHeaders(true),
-      body: JSON.stringify({ incident_ids: incidentIds })
-    })
-  );
-
-  return body.incidents.map(normalizeIncidentRecord);
-}
-
-export async function resolveImprovement(improvementId: string): Promise<ImprovementRecord> {
-  const body = await readJson<{ improvement: ImprovementRecord }>(
-    await fetch(`${API_BASE}/v1/improvements/${improvementId}/resolve`, {
-      method: "POST",
-      credentials: "include",
-      headers: buildBrowserSessionHeaders()
-    })
-  );
-
-  return normalizeImprovementRecord(body.improvement);
-}
-
-export async function reopenImprovement(improvementId: string): Promise<ImprovementRecord> {
-  const body = await readJson<{ improvement: ImprovementRecord }>(
-    await fetch(`${API_BASE}/v1/improvements/${improvementId}/reopen`, {
-      method: "POST",
-      credentials: "include",
-      headers: buildBrowserSessionHeaders()
-    })
-  );
-
-  return normalizeImprovementRecord(body.improvement);
-}
-
-export async function snoozeImprovement(
-  improvementId: string,
-  snoozedUntil: string
-): Promise<ImprovementRecord> {
-  const body = await readJson<{ improvement: ImprovementRecord }>(
-    await fetch(`${API_BASE}/v1/improvements/${improvementId}/snooze`, {
-      method: "POST",
-      credentials: "include",
-      headers: {
-        ...buildBrowserSessionHeaders(),
-        "content-type": "application/json"
-      },
-      body: JSON.stringify({ snoozed_until: snoozedUntil })
-    })
-  );
-
-  return normalizeImprovementRecord(body.improvement);
-}
-
-export interface BundleRecord {
-  bundle_id: string;
-  incident_id: string;
-  project_id: string;
-  version: string;
-  summary: { title: string; severity: string; environment: string };
-  [key: string]: unknown;
-}
-
-export async function getIncidentBundle(
-  incidentId: string
-): Promise<{ status: "ready"; bundle: BundleRecord } | { status: "pending" | "failed" }> {
-  const response = await fetch(`${API_BASE}/v1/incidents/${incidentId}/bundle`, {
-    credentials: "include"
-  });
-
-  if (!response.ok) {
-    throw new Error(`request_failed_${response.status}`);
-  }
-
-  const body = (await response.json()) as unknown;
-
-  if (isArtifactPendingOrFailedResponse(body)) {
-    return { status: body.status };
-  }
-
-  return { status: "ready", bundle: body as BundleRecord };
-}
-
-export type ArtifactPendingOrFailedResponse =
-  | { status: "pending" }
-  | { status: "failed"; reason?: string; related_incident_ids?: string[] };
-
-export async function getImprovementBundle(
-  projectId: string,
-  improvementId: string
-): Promise<{ status: "ready"; bundle: BundleRecord } | ArtifactPendingOrFailedResponse> {
-  const response = await fetch(
-    `${API_BASE}/v1/projects/${projectId}/improvements/${improvementId}/bundle`,
-    {
-      credentials: "include"
-    }
-  );
-
-  if (!response.ok) {
-    throw new Error(`request_failed_${response.status}`);
-  }
-
-  const body = (await response.json()) as unknown;
-
-  if (isArtifactPendingOrFailedResponse(body)) {
-    return body;
-  }
-
-  return { status: "ready", bundle: body as BundleRecord };
-}
-
-export async function getIncidentReproduction(
-  incidentId: string
-): Promise<
-  { status: "ready"; reproduction: Record<string, unknown> } | { status: "pending" | "failed" }
-> {
-  const response = await fetch(`${API_BASE}/v1/incidents/${incidentId}/reproduction`, {
-    credentials: "include"
-  });
-
-  if (!response.ok) {
-    throw new Error(`request_failed_${response.status}`);
-  }
-
-  const body = (await response.json()) as unknown;
-
-  if (isArtifactPendingOrFailedResponse(body)) {
-    return { status: body.status };
-  }
-
-  return { status: "ready", reproduction: body as Record<string, unknown> };
-}
-
-function isArtifactPendingOrFailedResponse(
-  value: unknown
-): value is ArtifactPendingOrFailedResponse {
-  if (typeof value !== "object" || value === null || !("status" in value)) {
-    return false;
-  }
-
-  const status = (value as { status?: unknown }).status;
-  return status === "pending" || status === "failed";
-}
-
-export async function listProjectIncidents(
-  projectId: string,
-  limit = 50,
-  cursor?: string,
-  status?: IncidentStatusFilter
-): Promise<{ incidents: IncidentRecord[]; nextCursor: string | null }> {
-  const searchParams = new URLSearchParams({
-    project_id: projectId,
-    limit: String(limit)
-  });
-
-  if (cursor !== undefined) {
-    searchParams.set("cursor", cursor);
-  }
-  if (status !== undefined) {
-    searchParams.set("status", status);
-  }
-
-  const body = await readJson<{ incidents: IncidentRecord[]; next_cursor: string | null }>(
-    await fetch(`${API_BASE}/v1/incidents?${searchParams.toString()}`, {
-      credentials: "include"
-    })
-  );
-
-  return {
-    incidents: body.incidents,
-    nextCursor: body.next_cursor
-  };
-}
-
-export async function listProjectImprovements(
-  projectId: string,
-  limit = 50,
-  cursor?: string,
-  status?: ImprovementRecord["status"]
-): Promise<{ improvements: ImprovementRecord[]; nextCursor: string | null }> {
-  const body = await listImprovements({
-    projectId,
-    limit,
-    ...(cursor === undefined ? {} : { cursor }),
-    ...(status === undefined ? {} : { status })
-  });
-
-  return {
-    improvements: body.improvements,
-    nextCursor: body.nextCursor
-  };
 }

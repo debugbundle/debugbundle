@@ -101,6 +101,33 @@ export interface ProjectAnalyticsReferrerMetricsResponse {
   utm_campaigns: AnalyticsMetricsSegment[];
 }
 
+export interface ProjectAnalyticsFunnelMetric {
+  funnel_key: string;
+  sessions_entered: number;
+  sessions_completed: number;
+  dropoffs: number;
+  conversion_rate: number;
+}
+
+export interface ProjectAnalyticsFunnelsResponse {
+  window: ProjectAnalyticsMetricsWindow;
+  funnels: ProjectAnalyticsFunnelMetric[];
+}
+
+export interface ProjectAnalyticsFunnelStepMetric {
+  step_key: string;
+  step_order: number;
+  sessions_entered: number;
+  sessions_completed: number;
+  dropoffs: number;
+  conversion_rate: number;
+}
+
+export interface ProjectAnalyticsFunnelAnalysisResponse {
+  funnel: ProjectAnalyticsMetricsWindow & ProjectAnalyticsFunnelMetric;
+  steps: ProjectAnalyticsFunnelStepMetric[];
+}
+
 export type AnalyticsOpportunityKind =
   | "usage_summary"
   | "route_health"

@@ -44,6 +44,8 @@ function installMetricsFetch(
     empty?: boolean;
     enabled?: boolean;
     failDevices?: boolean;
+    failFunnelDetailOnce?: boolean;
+    failFunnelsOnce?: boolean;
     failRoutesOnce?: boolean;
     failSettingsOnce?: boolean;
   } = {}
@@ -52,6 +54,8 @@ function installMetricsFetch(
 } {
   const requestedUrls: string[] = [];
   let routeRequests = 0;
+  let funnelRequests = 0;
+  let funnelDetailRequests = 0;
   let settingsRequests = 0;
 
   vi.stubGlobal(
@@ -140,6 +144,64 @@ function installMetricsFetch(
         });
       }
 
+      if (url.includes("/v1/analytics/funnels/checkout?")) {
+        funnelDetailRequests += 1;
+        if (input.failFunnelDetailOnce && funnelDetailRequests === 1) {
+          return jsonResponse(503, { error: "unavailable" });
+        }
+        return jsonResponse(200, {
+          funnel: {
+            ...metricsWindow,
+            funnel_key: "checkout",
+            sessions_entered: 510,
+            sessions_completed: 280,
+            dropoffs: 230,
+            conversion_rate: 0.549
+          },
+          steps: input.empty
+            ? []
+            : [
+                {
+                  step_key: "payment",
+                  step_order: 1,
+                  sessions_entered: 360,
+                  sessions_completed: 280,
+                  dropoffs: 80,
+                  conversion_rate: 0.778
+                },
+                {
+                  step_key: "shipping",
+                  step_order: 0,
+                  sessions_entered: 510,
+                  sessions_completed: 360,
+                  dropoffs: 150,
+                  conversion_rate: 0.706
+                }
+              ]
+        });
+      }
+
+      if (url.includes("/v1/analytics/funnels?")) {
+        funnelRequests += 1;
+        if (input.failFunnelsOnce && funnelRequests === 1) {
+          return jsonResponse(503, { error: "unavailable" });
+        }
+        return jsonResponse(200, {
+          window: metricsWindow,
+          funnels: input.empty
+            ? []
+            : [
+                {
+                  funnel_key: "checkout",
+                  sessions_entered: 510,
+                  sessions_completed: 280,
+                  dropoffs: 230,
+                  conversion_rate: 0.549
+                }
+              ]
+        });
+      }
+
       return jsonResponse(404, { error: "not_found" });
     })
   );
@@ -159,6 +221,7 @@ describe("web app - project analytics metrics", () => {
     expect(within(sectionTabs).getAllByRole("tab").map((tab) => tab.textContent)).toEqual([
       "Overview",
       "Routes",
+      "Funnels",
       "Audiences"
     ]);
 
@@ -168,6 +231,63 @@ describe("web app - project analytics metrics", () => {
       "data-state",
       "active"
     );
+  });
+
+  it("shows funnel summaries and expands an ordered step analysis inline", async () => {
+    const user = userEvent.setup();
+    const state = installMetricsFetch();
+
+    render(<App initialEntries={["/projects/proj_123/analytics/funnels"]} />);
+
+    const summaryTable = await screen.findByRole("table", { name: "Funnel metrics" });
+    for (const heading of [
+      "Funnel",
+      "Entered",
+      "Completed",
+      "Dropoffs",
+      "Conversion rate"
+    ]) {
+      expect(within(summaryTable).getByRole("columnheader", { name: heading })).toBeInTheDocument();
+    }
+    expect(within(summaryTable).getByText("checkout")).toBeInTheDocument();
+    expect(within(summaryTable).getByText("54.9%")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "View steps for checkout" }));
+
+    const stepsTable = await screen.findByRole("table", { name: "Checkout funnel steps" });
+    expect(within(stepsTable).getAllByRole("row")[1]).toHaveTextContent("shipping");
+    expect(within(stepsTable).getAllByRole("row")[2]).toHaveTextContent("payment");
+    expect(
+      state.requestedUrls().some(
+        (url) =>
+          url.includes("/v1/analytics/funnels/checkout?") &&
+          url.includes("project_id=proj_123") &&
+          url.includes("last=30d")
+      )
+    ).toBe(true);
+  });
+
+  it("retries funnel summary and detail failures independently", async () => {
+    const user = userEvent.setup();
+    installMetricsFetch({ failFunnelsOnce: true, failFunnelDetailOnce: true });
+
+    render(<App initialEntries={["/projects/proj_123/analytics/funnels"]} />);
+
+    expect(await screen.findByText(/could not load funnel analytics/i)).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Retry funnel analytics" }));
+    await user.click(await screen.findByRole("button", { name: "View steps for checkout" }));
+
+    expect(await screen.findByText(/could not load checkout steps/i)).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Retry checkout steps" }));
+    expect(await screen.findByRole("table", { name: "Checkout funnel steps" })).toBeInTheDocument();
+  });
+
+  it("shows an explicit funnel empty state", async () => {
+    installMetricsFetch({ empty: true });
+
+    render(<App initialEntries={["/projects/proj_123/analytics/funnels"]} />);
+
+    expect(await screen.findByText(/no funnel activity in this window/i)).toBeInTheDocument();
   });
 
   it("shows complete route metrics and applies shared filters", async () => {

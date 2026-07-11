@@ -39,8 +39,10 @@ export interface ProjectAnalyticsContext {
 const analyticsSections = [
   { value: "overview", label: "Overview", suffix: "" },
   { value: "routes", label: "Routes", suffix: "/routes" },
+  { value: "funnels", label: "Funnels", suffix: "/funnels" },
   { value: "audiences", label: "Audiences", suffix: "/audiences" }
 ] as const;
+type AnalyticsSection = (typeof analyticsSections)[number]["value"];
 
 const timeWindowOptions: Array<{ value: AnalyticsFilters["last"]; label: string }> = [
   { value: "7d", label: "Last 7 days" },
@@ -82,11 +84,7 @@ export function ProjectAnalyticsLayout(): JSX.Element {
     };
   }, [projectId, settingsAttempt]);
 
-  const activeSection = location.pathname.endsWith("/routes")
-    ? "routes"
-    : location.pathname.endsWith("/audiences")
-      ? "audiences"
-      : "overview";
+  const activeSection = resolveAnalyticsSection(location.pathname);
   const query: AnalyticsMetricsQuery = {
     last: filters.last,
     granularity: "day",
@@ -235,6 +233,13 @@ export function ProjectAnalyticsLayout(): JSX.Element {
       <Outlet context={{ projectId, query } satisfies ProjectAnalyticsContext} />
     </div>
   );
+}
+
+function resolveAnalyticsSection(pathname: string): AnalyticsSection {
+  if (pathname.endsWith("/routes")) return "routes";
+  if (pathname.endsWith("/funnels")) return "funnels";
+  if (pathname.endsWith("/audiences")) return "audiences";
+  return "overview";
 }
 
 function ProjectAnalyticsLayoutSkeleton(): JSX.Element {
