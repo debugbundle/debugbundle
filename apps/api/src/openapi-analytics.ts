@@ -2,7 +2,11 @@ import { z } from "zod";
 
 import {
   AnalyticsActionMetricsResponseSchema,
+  AnalyticsBundleGenerationsListResponseSchema,
+  AnalyticsBundleGenerationStatusSchema,
+  AnalyticsBundleSeveritySchema,
   AnalyticsOpportunitiesListResponseSchema,
+  AnalyticsOpportunityBundleStatusSchema,
   AnalyticsOpportunityResponseSchema,
   AnalyticsDeviceBreakdownResponseSchema,
   AnalyticsFunnelAnalysisResponseSchema,
@@ -58,6 +62,25 @@ const AnalyticsOpportunitiesQuerySchema = z
     project_id: z.string().uuid().optional(),
     status: z.enum(["open", "resolved", "snoozed", "all"]).optional(),
     kind: AnalyticsBundleAnalysisKindSchema.optional(),
+    service: z.string().min(1).max(120).optional(),
+    environment: z.string().min(1).max(120).optional(),
+    severity: AnalyticsBundleSeveritySchema.optional(),
+    bundle_status: AnalyticsOpportunityBundleStatusSchema.optional(),
+    from: z.string().datetime().optional(),
+    to: z.string().datetime().optional(),
+    cursor: z.string().optional(),
+    limit: z.number().int().min(1).max(100).optional()
+  })
+  .strict();
+const AnalyticsBundlesQuerySchema = z
+  .object({
+    project_id: z.string().uuid().optional(),
+    status: z.union([AnalyticsBundleGenerationStatusSchema, z.literal("all")]).optional(),
+    kind: AnalyticsBundleAnalysisKindSchema.optional(),
+    service: z.string().min(1).max(120).optional(),
+    environment: z.string().min(1).max(120).optional(),
+    from: z.string().datetime().optional(),
+    to: z.string().datetime().optional(),
     cursor: z.string().optional(),
     limit: z.number().int().min(1).max(100).optional()
   })
@@ -78,6 +101,10 @@ export function createAnalyticsMetricOpenApiOperations(options: {
     AnalyticsOpportunitiesListResponseSchema
   );
   const analyticsOpportunityResponse = component("AnalyticsOpportunityResponse", AnalyticsOpportunityResponseSchema);
+  const analyticsBundleGenerationsListResponse = component(
+    "AnalyticsBundleGenerationsListResponse",
+    AnalyticsBundleGenerationsListResponseSchema
+  );
   const analyticsRouteMetricsResponse = component("AnalyticsRouteMetricsResponse", AnalyticsRouteMetricsResponseSchema);
   const analyticsJourneyPatternsResponse = component(
     "AnalyticsJourneyPatternsResponse",
@@ -105,6 +132,19 @@ export function createAnalyticsMetricOpenApiOperations(options: {
   };
 
   return [
+    {
+      method: "get",
+      path: "/v1/analytics/bundles",
+      operationId: "listAnalyticsBundles",
+      summary: "List AnalyticsBundle generations for a project or across the caller organization",
+      tags: ["Analytics"],
+      security: options.anyMemberAuth,
+      query: AnalyticsBundlesQuerySchema,
+      responses: {
+        "200": { description: "AnalyticsBundle generations.", schema: analyticsBundleGenerationsListResponse },
+        ...responses
+      }
+    },
     {
       method: "get",
       path: "/v1/analytics/opportunities",

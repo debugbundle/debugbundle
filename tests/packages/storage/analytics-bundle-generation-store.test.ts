@@ -203,10 +203,18 @@ describe("analytics bundle generation store", () => {
     const queryMock = vi.fn(async (sqlText: string, params: unknown[]) => {
       expect(sqlText).toContain("JOIN projects p ON p.id = abg.project_id");
       expect(sqlText).toContain("p.organization_id = $1::uuid");
-      expect(sqlText).toContain("(abg.created_at, abg.id) < ($2::timestamptz, $3::uuid)");
+      expect(sqlText).toContain("abg.analysis_spec #>> '{filters,service}' = $2");
+      expect(sqlText).toContain("abg.analysis_spec #>> '{filters,environment}' = $3");
+      expect(sqlText).toContain("abg.created_at >= $4::timestamptz");
+      expect(sqlText).toContain("abg.created_at <= $5::timestamptz");
+      expect(sqlText).toContain("(abg.created_at, abg.id) < ($6::timestamptz, $7::uuid)");
       expect(sqlText).toContain("ORDER BY abg.created_at DESC, abg.id DESC");
       expect(params).toEqual([
         "55555555-5555-4555-8555-555555555555",
+        "web",
+        "production",
+        "2026-07-01T00:00:00.000Z",
+        "2026-07-10T00:00:00.000Z",
         "2026-07-09T00:00:00.000Z",
         GENERATION_ID,
         2
@@ -225,6 +233,10 @@ describe("analytics bundle generation store", () => {
     await expect(
       store.listAnalyticsBundleGenerationsForOrganization!({
         organization_id: "55555555-5555-4555-8555-555555555555",
+        service: "web",
+        environment: "production",
+        from: "2026-07-01T00:00:00.000Z",
+        to: "2026-07-10T00:00:00.000Z",
         cursor: {
           created_at: "2026-07-09T00:00:00.000Z",
           generation_id: GENERATION_ID

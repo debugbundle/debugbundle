@@ -44,11 +44,23 @@ describe("analytics opportunity store", () => {
       expect(sqlText).toContain("ao.status = 'open'");
       expect(sqlText).toContain("ao.snoozed_until <= now()");
       expect(sqlText).toContain("ao.kind = $3");
-      expect(sqlText).toContain("ao.last_detected_at < $4::timestamptz");
+      expect(sqlText).toContain("ao.service = $4");
+      expect(sqlText).toContain("ao.environment = $5");
+      expect(sqlText).toContain("ao.severity = $6");
+      expect(sqlText).toContain("COALESCE(bg.status, ao.bundle_status) = $7");
+      expect(sqlText).toContain("ao.last_detected_at >= $8::timestamptz");
+      expect(sqlText).toContain("ao.last_detected_at <= $9::timestamptz");
+      expect(sqlText).toContain("ao.last_detected_at < $10::timestamptz");
       expect(params).toEqual([
         ORGANIZATION_ID,
         PROJECT_ID,
         "funnel_dropoff",
+        "web",
+        "production",
+        "medium",
+        "completed",
+        "2026-07-01T00:00:00.000Z",
+        "2026-07-08T00:00:00.000Z",
         "2026-07-07T00:00:00.000Z",
         OPPORTUNITY_ID,
         1
@@ -65,6 +77,12 @@ describe("analytics opportunity store", () => {
         project_id: PROJECT_ID,
         status: "open",
         kind: "funnel_dropoff",
+        service: "web",
+        environment: "production",
+        severity: "medium",
+        bundle_status: "completed",
+        from: "2026-07-01T00:00:00.000Z",
+        to: "2026-07-08T00:00:00.000Z",
         cursor: {
           last_detected_at: "2026-07-07T00:00:00.000Z",
           opportunity_id: OPPORTUNITY_ID

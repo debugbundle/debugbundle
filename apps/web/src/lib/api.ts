@@ -9,6 +9,9 @@ import type {
   AlertConditionType,
   AlertSeverityLifecycleScope,
   AnalyticsMetricsQuery,
+  AnalyticsBundleGenerationsListResponse,
+  AnalyticsBundleInventoryQuery,
+  AnalyticsOpportunityInventoryQuery,
   AnalyticsOpportunitiesListResponse,
   AdminAnalyticsAccessStatus,
   AdminMalformedRejectionBreakdown,
@@ -561,6 +564,46 @@ export async function listProjectAnalyticsOpportunities(
   });
   return readJson<AnalyticsOpportunitiesListResponse>(
     await fetch(`${API_BASE}/v1/analytics/opportunities?${searchParams.toString()}`, {
+      credentials: "include"
+    })
+  );
+}
+
+function buildAnalyticsInventorySearchParams(
+  query: AnalyticsOpportunityInventoryQuery | AnalyticsBundleInventoryQuery
+): URLSearchParams {
+  const searchParams = new URLSearchParams();
+  if (query.projectId !== undefined) searchParams.set("project_id", query.projectId);
+  if (query.status !== undefined) searchParams.set("status", query.status);
+  if (query.kind !== undefined) searchParams.set("kind", query.kind);
+  if (query.service !== undefined) searchParams.set("service", query.service);
+  if (query.environment !== undefined) searchParams.set("environment", query.environment);
+  if (query.from !== undefined) searchParams.set("from", query.from);
+  if (query.to !== undefined) searchParams.set("to", query.to);
+  if (query.cursor !== undefined) searchParams.set("cursor", query.cursor);
+  if (query.limit !== undefined) searchParams.set("limit", String(query.limit));
+  return searchParams;
+}
+
+export async function listAnalyticsOpportunities(
+  query: AnalyticsOpportunityInventoryQuery
+): Promise<AnalyticsOpportunitiesListResponse> {
+  const searchParams = buildAnalyticsInventorySearchParams(query);
+  if (query.severity !== undefined) searchParams.set("severity", query.severity);
+  if (query.bundleStatus !== undefined) searchParams.set("bundle_status", query.bundleStatus);
+  return readJson<AnalyticsOpportunitiesListResponse>(
+    await fetch(`${API_BASE}/v1/analytics/opportunities?${searchParams.toString()}`, {
+      credentials: "include"
+    })
+  );
+}
+
+export async function listAnalyticsBundles(
+  query: AnalyticsBundleInventoryQuery
+): Promise<AnalyticsBundleGenerationsListResponse> {
+  const searchParams = buildAnalyticsInventorySearchParams(query);
+  return readJson<AnalyticsBundleGenerationsListResponse>(
+    await fetch(`${API_BASE}/v1/analytics/bundles?${searchParams.toString()}`, {
       credentials: "include"
     })
   );

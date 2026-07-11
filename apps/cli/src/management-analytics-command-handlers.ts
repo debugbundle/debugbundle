@@ -1,5 +1,7 @@
 import {
   AnalyticsBundleAnalysisKindSchema,
+  AnalyticsBundleSeveritySchema,
+  AnalyticsOpportunityBundleStatusSchema,
   type AnalyticsBundleAnalysisKind,
   type AnalyticsSettingsUpdate
 } from "../../../packages/shared-types/src/index.js";
@@ -56,6 +58,24 @@ function readFloatOption(parsedArgv: ParsedArgv, optionName: string): number | u
   }
 
   return value;
+}
+
+function readAnalyticsSeverity(parsedArgv: ParsedArgv): "low" | "medium" | "high" | undefined {
+  const severity = readStringOption(parsedArgv, "severity");
+  if (severity === undefined) return undefined;
+  const parsed = AnalyticsBundleSeveritySchema.safeParse(severity);
+  if (parsed.success) return parsed.data;
+  throw new CliInputError("Invalid value for --severity.");
+}
+
+function readAnalyticsOpportunityBundleStatus(
+  parsedArgv: ParsedArgv
+): "not_requested" | "pending" | "running" | "completed" | "failed" | undefined {
+  const status = readStringOption(parsedArgv, "bundle-status");
+  if (status === undefined) return undefined;
+  const parsed = AnalyticsOpportunityBundleStatusSchema.safeParse(status);
+  if (parsed.success) return parsed.data;
+  throw new CliInputError("Invalid value for --bundle-status.");
 }
 
 function readPrivacyMode(parsedArgv: ParsedArgv): AnalyticsSettingsUpdate["privacy_mode"] | undefined {
@@ -346,6 +366,12 @@ export async function handleAnalyticsCommand(
       "all-projects",
       "status",
       "kind",
+      "service",
+      "environment",
+      "severity",
+      "bundle-status",
+      "from",
+      "to",
       "cursor",
       "limit",
       "auth-file",
@@ -366,6 +392,12 @@ export async function handleAnalyticsCommand(
         projectId,
         status: readAnalyticsOpportunityStatus(parsedArgv),
         kind: readAnalyticsOpportunityKind(parsedArgv),
+        service: readStringOption(parsedArgv, "service"),
+        environment: readStringOption(parsedArgv, "environment"),
+        severity: readAnalyticsSeverity(parsedArgv),
+        bundleStatus: readAnalyticsOpportunityBundleStatus(parsedArgv),
+        from: readStringOption(parsedArgv, "from"),
+        to: readStringOption(parsedArgv, "to"),
         cursor: readStringOption(parsedArgv, "cursor"),
         limit: readIntegerOption(parsedArgv, "limit")
       })
@@ -403,6 +435,10 @@ export async function handleAnalyticsCommand(
         "all-projects",
         "status",
         "kind",
+        "service",
+        "environment",
+        "from",
+        "to",
         "cursor",
         "limit",
         "auth-file",
@@ -434,6 +470,10 @@ export async function handleAnalyticsCommand(
           projectId,
           status,
           kind: readAnalyticsOpportunityKind(parsedArgv),
+          service: readStringOption(parsedArgv, "service"),
+          environment: readStringOption(parsedArgv, "environment"),
+          from: readStringOption(parsedArgv, "from"),
+          to: readStringOption(parsedArgv, "to"),
           cursor: readStringOption(parsedArgv, "cursor"),
           limit: readIntegerOption(parsedArgv, "limit")
         })

@@ -1,7 +1,11 @@
 import { AnalyticsMetricsApiError } from "../../cli/src/analytics-metrics-commands.js";
 import {
   AnalyticsBundleAnalysisKindSchema,
-  type AnalyticsBundleAnalysisKind
+  AnalyticsBundleSeveritySchema,
+  AnalyticsOpportunityBundleStatusSchema,
+  type AnalyticsBundleAnalysisKind,
+  type AnalyticsBundleSeverity,
+  type AnalyticsOpportunityBundleStatus
 } from "../../../packages/shared-types/src/index.js";
 
 export const ANALYTICS_METRICS_MCP_TOOL_NAMES = [
@@ -228,6 +232,12 @@ type AnalyticsOpportunitiesToolInput = {
   projectId?: string | undefined;
   status?: "open" | "resolved" | "snoozed" | "all" | undefined;
   kind?: AnalyticsBundleAnalysisKind | undefined;
+  service?: string | undefined;
+  environment?: string | undefined;
+  severity?: AnalyticsBundleSeverity | undefined;
+  bundleStatus?: AnalyticsOpportunityBundleStatus | undefined;
+  from?: string | undefined;
+  to?: string | undefined;
   cursor?: string | undefined;
   limit?: number | undefined;
 };
@@ -265,6 +275,10 @@ type AnalyticsBundleListToolInput = {
   projectId?: string | undefined;
   status?: "all" | "pending" | "running" | "completed" | "failed" | undefined;
   kind?: AnalyticsBundleAnalysisKind | undefined;
+  service?: string | undefined;
+  environment?: string | undefined;
+  from?: string | undefined;
+  to?: string | undefined;
   cursor?: string | undefined;
   limit?: number | undefined;
 };
@@ -300,11 +314,19 @@ function readMetricsInput(input: Record<string, unknown>): AnalyticsMetricsToolI
 function readOpportunitiesInput(input: Record<string, unknown>): AnalyticsOpportunitiesToolInput {
   const status = input["status"];
   const kind = AnalyticsBundleAnalysisKindSchema.safeParse(input["kind"]);
+  const severity = AnalyticsBundleSeveritySchema.safeParse(input["severity"]);
+  const bundleStatus = AnalyticsOpportunityBundleStatusSchema.safeParse(input["bundleStatus"]);
   return {
     bearerToken: String(input["bearerToken"]),
     projectId: readOptionalString(input, "projectId"),
     status: status === "open" || status === "resolved" || status === "snoozed" || status === "all" ? status : undefined,
     kind: kind.success ? kind.data : undefined,
+    service: readOptionalString(input, "service"),
+    environment: readOptionalString(input, "environment"),
+    severity: severity.success ? severity.data : undefined,
+    bundleStatus: bundleStatus.success ? bundleStatus.data : undefined,
+    from: readOptionalString(input, "from"),
+    to: readOptionalString(input, "to"),
     cursor: readOptionalString(input, "cursor"),
     limit: readOptionalNumber(input, "limit")
   };
@@ -336,6 +358,10 @@ function readBundleListInput(input: Record<string, unknown>): AnalyticsBundleLis
         ? status
         : undefined,
     kind: kind.success ? kind.data : undefined,
+    service: readOptionalString(input, "service"),
+    environment: readOptionalString(input, "environment"),
+    from: readOptionalString(input, "from"),
+    to: readOptionalString(input, "to"),
     cursor: readOptionalString(input, "cursor"),
     limit: readOptionalNumber(input, "limit")
   };

@@ -40,6 +40,10 @@ export interface AnalyticsBundleListCommandInput {
   projectId?: string | undefined;
   status?: AnalyticsBundleGenerationStatus | "all" | undefined;
   kind?: AnalyticsBundleAnalysisKind | undefined;
+  service?: string | undefined;
+  environment?: string | undefined;
+  from?: string | undefined;
+  to?: string | undefined;
   cursor?: string | undefined;
   limit?: number | undefined;
   json?: boolean | undefined;
@@ -112,6 +116,10 @@ export function createAnalyticsBundleApi(httpClient: {
       if (input.kind !== undefined) {
         params.set("kind", input.kind);
       }
+      if (input.service !== undefined) params.set("service", input.service);
+      if (input.environment !== undefined) params.set("environment", input.environment);
+      if (input.from !== undefined) params.set("from", input.from);
+      if (input.to !== undefined) params.set("to", input.to);
       if (input.cursor !== undefined) {
         params.set("cursor", input.cursor);
       }
@@ -261,6 +269,10 @@ export async function listAnalyticsBundlesCommand(
       projectId: input.projectId,
       status: input.status,
       kind: input.kind,
+      service: input.service,
+      environment: input.environment,
+      from: input.from,
+      to: input.to,
       cursor: input.cursor,
       limit: input.limit
     });
@@ -388,6 +400,10 @@ export async function listAnalyticsBundlesWithAuthCommand(
           projectId: input.projectId,
           status: input.status,
           kind: input.kind,
+          service: input.service,
+          environment: input.environment,
+          from: input.from,
+          to: input.to,
           cursor: input.cursor,
           limit: input.limit,
           json: input.json

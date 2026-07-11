@@ -6,7 +6,12 @@ describe("api openapi spec", () => {
   it("publishes github bootstrap routes and browser-session security directly from source", () => {
     const document = buildPublicOpenApiSpec() as {
       openapi?: string;
-      paths?: Record<string, Record<string, { operationId?: string; security?: unknown; responses?: Record<string, unknown> }>>;
+      paths?: Record<string, Record<string, {
+        operationId?: string;
+        security?: unknown;
+        responses?: Record<string, unknown>;
+        parameters?: Array<{ name?: string; in?: string }>;
+      }>>;
       components?: {
         securitySchemes?: Record<string, { type?: string; scheme?: string; in?: string; name?: string }>;
       };
@@ -28,6 +33,39 @@ describe("api openapi spec", () => {
     expect(document.paths?.["/v1/projects/{id}/availability-checks"]?.["get"]?.operationId).toBe("listAvailabilityChecks");
     expect(document.paths?.["/v1/projects/{id}/availability-checks/{checkId}"]?.["patch"]?.operationId).toBe("updateAvailabilityCheck");
     expect(document.paths?.["/v1/projects/{id}/availability-checks/test"]?.["post"]?.responses).toHaveProperty("200");
+    expect(document.paths?.["/v1/analytics/bundles"]?.["get"]?.operationId).toBe("listAnalyticsBundles");
+    expect(
+      document.paths?.["/v1/analytics/opportunities"]?.["get"]?.parameters?.map(
+        (parameter) => parameter.name
+      )
+    ).toEqual([
+      "project_id",
+      "status",
+      "kind",
+      "service",
+      "environment",
+      "severity",
+      "bundle_status",
+      "from",
+      "to",
+      "cursor",
+      "limit"
+    ]);
+    expect(
+      document.paths?.["/v1/analytics/bundles"]?.["get"]?.parameters?.map(
+        (parameter) => parameter.name
+      )
+    ).toEqual([
+      "project_id",
+      "status",
+      "kind",
+      "service",
+      "environment",
+      "from",
+      "to",
+      "cursor",
+      "limit"
+    ]);
     const availabilityCheckResponseSchema = (document as {
       components?: {
         schemas?: Record<string, { properties?: Record<string, { properties?: Record<string, unknown> }> }>;

@@ -1,6 +1,10 @@
 import { z } from "zod";
 
-import { AnalyticsBundleAnalysisKindSchema } from "../../../packages/shared-types/src/index.js";
+import {
+  AnalyticsBundleAnalysisKindSchema,
+  AnalyticsBundleSeveritySchema,
+  AnalyticsOpportunityBundleStatusSchema
+} from "../../../packages/shared-types/src/index.js";
 
 export const ANALYTICS_METRICS_MCP_TOOL_CATALOG = [
   {
@@ -104,6 +108,12 @@ export const ANALYTICS_METRICS_MCP_TOOL_CATALOG = [
       projectId: z.string().optional(),
       status: z.enum(["open", "resolved", "snoozed", "all"]).optional(),
       kind: AnalyticsBundleAnalysisKindSchema.optional(),
+      service: z.string().optional(),
+      environment: z.string().optional(),
+      severity: AnalyticsBundleSeveritySchema.optional(),
+      bundleStatus: AnalyticsOpportunityBundleStatusSchema.optional(),
+      from: z.string().optional(),
+      to: z.string().optional(),
       cursor: z.string().optional(),
       limit: z.number().optional()
     })
@@ -127,6 +137,10 @@ export const ANALYTICS_METRICS_MCP_TOOL_CATALOG = [
       projectId: z.string().optional(),
       status: z.enum(["all", "pending", "running", "completed", "failed"]).optional(),
       kind: AnalyticsBundleAnalysisKindSchema.optional(),
+      service: z.string().optional(),
+      environment: z.string().optional(),
+      from: z.string().optional(),
+      to: z.string().optional(),
       cursor: z.string().optional(),
       limit: z.number().optional()
     })

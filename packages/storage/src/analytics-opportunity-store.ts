@@ -2,7 +2,9 @@ import {
   AnalyticsOpportunitiesListResponseSchema,
   AnalyticsOpportunityResponseSchema,
   type AnalyticsBundleAnalysisKind,
+  type AnalyticsBundleSeverity,
   type AnalyticsOpportunitiesListResponse,
+  type AnalyticsOpportunityBundleStatus,
   type AnalyticsOpportunityRecord,
   type AnalyticsOpportunityResponse,
   type AnalyticsOpportunityStatus
@@ -14,19 +16,26 @@ export type AnalyticsOpportunitiesCursor = {
   opportunity_id: string;
 };
 
+export interface AnalyticsOpportunityListFilters {
+  status?: AnalyticsOpportunityStatus | undefined;
+  kind?: AnalyticsBundleAnalysisKind | undefined;
+  service?: string | undefined;
+  environment?: string | undefined;
+  severity?: AnalyticsBundleSeverity | undefined;
+  bundle_status?: AnalyticsOpportunityBundleStatus | undefined;
+  from?: string | undefined;
+  to?: string | undefined;
+}
+
 export interface AnalyticsOpportunityStore {
-  listAnalyticsOpportunitiesForProject(input: {
+  listAnalyticsOpportunitiesForProject(input: AnalyticsOpportunityListFilters & {
     organization_id: string;
     project_id: string;
-    status?: AnalyticsOpportunityStatus | undefined;
-    kind?: AnalyticsBundleAnalysisKind | undefined;
     cursor?: AnalyticsOpportunitiesCursor | undefined;
     limit: number;
   }): Promise<AnalyticsOpportunitiesListResponse>;
-  listAnalyticsOpportunitiesForOrganization(input: {
+  listAnalyticsOpportunitiesForOrganization(input: AnalyticsOpportunityListFilters & {
     organization_id: string;
-    status?: AnalyticsOpportunityStatus | undefined;
-    kind?: AnalyticsBundleAnalysisKind | undefined;
     cursor?: AnalyticsOpportunitiesCursor | undefined;
     limit: number;
   }): Promise<AnalyticsOpportunitiesListResponse>;
@@ -192,6 +201,12 @@ function buildAnalyticsOpportunityWhere(input: {
   project_id?: string | undefined;
   status?: AnalyticsOpportunityStatus | undefined;
   kind?: AnalyticsBundleAnalysisKind | undefined;
+  service?: string | undefined;
+  environment?: string | undefined;
+  severity?: AnalyticsBundleSeverity | undefined;
+  bundle_status?: AnalyticsOpportunityBundleStatus | undefined;
+  from?: string | undefined;
+  to?: string | undefined;
   cursor?: AnalyticsOpportunitiesCursor | undefined;
 }): { sql: string; params: unknown[] } {
   const conditions = ["p.organization_id = $1::uuid"];
@@ -229,6 +244,36 @@ function buildAnalyticsOpportunityWhere(input: {
   if (input.kind !== undefined) {
     params.push(input.kind);
     conditions.push(`ao.kind = $${params.length}`);
+  }
+
+  if (input.service !== undefined) {
+    params.push(input.service);
+    conditions.push(`ao.service = $${params.length}`);
+  }
+
+  if (input.environment !== undefined) {
+    params.push(input.environment);
+    conditions.push(`ao.environment = $${params.length}`);
+  }
+
+  if (input.severity !== undefined) {
+    params.push(input.severity);
+    conditions.push(`ao.severity = $${params.length}`);
+  }
+
+  if (input.bundle_status !== undefined) {
+    params.push(input.bundle_status);
+    conditions.push(`COALESCE(bg.status, ao.bundle_status) = $${params.length}`);
+  }
+
+  if (input.from !== undefined) {
+    params.push(input.from);
+    conditions.push(`ao.last_detected_at >= $${params.length}::timestamptz`);
+  }
+
+  if (input.to !== undefined) {
+    params.push(input.to);
+    conditions.push(`ao.last_detected_at <= $${params.length}::timestamptz`);
   }
 
   if (input.cursor !== undefined) {

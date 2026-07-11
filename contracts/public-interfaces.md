@@ -785,9 +785,11 @@ When `incident_id` or `deploy_id` is supplied, the generation stores those value
 
 **Analytics inventory list scope:** `GET /v1/analytics/opportunities` and `GET /v1/analytics/bundles` retain their existing project-scoped behavior when `project_id=<uuid>` is supplied. An authorized browser session or member token may omit `project_id` only for these list endpoints to return records across projects in the caller's organization. Cross-project pagination remains ordered by the record timestamp and unique record ID, and bundle rows include `project_name` and `project_color_tag` metadata. Detail, metric, journey-sample, settings, and generation endpoints remain project-scoped.
 
+Opportunity inventory filters are `project_id`, `status`, `kind`, `service`, `environment`, `severity`, `bundle_status`, `from`, `to`, `cursor`, and `limit`. Bundle-generation inventory filters are `project_id`, `status`, `kind`, `service`, `environment`, `from`, `to`, `cursor`, and `limit`. Opportunity windows filter `last_detected_at`; bundle windows filter `created_at`. `from` must be earlier than or equal to `to`. Service and environment bundle filters match the normalized values retained in `analysis_spec.filters`; they do not inspect arbitrary custom-dimension values.
+
 CLI callers must opt into this inventory scope with `--all-projects`; the default list command continues to require `--project-id`. MCP callers may omit `projectId` only for `list_analytics_opportunities` and `list_analytics_bundles`.
 
-**AnalyticsBundle generation list response:** `GET /v1/analytics/bundles?project_id=<uuid>&status=all|pending|running|completed|failed&kind=<kind>&cursor=<cursor>&limit=<n>` returns:
+**AnalyticsBundle generation list response:** `GET /v1/analytics/bundles?project_id=<uuid>&status=all|pending|running|completed|failed&kind=<kind>&service=<service>&environment=<environment>&from=<ISO8601>&to=<ISO8601>&cursor=<cursor>&limit=<n>` returns:
 
 ```json
 {

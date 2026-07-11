@@ -394,6 +394,12 @@ describe("cli analytics metrics commands", () => {
         projectId: PROJECT_ID,
         status: "all",
         kind: "funnel_dropoff",
+        service: "web",
+        environment: "production",
+        severity: "high",
+        bundleStatus: "completed",
+        from: FROM,
+        to: TO,
         cursor: "cursor-1",
         limit: 5,
         json: true
@@ -407,6 +413,12 @@ describe("cli analytics metrics commands", () => {
       projectId: PROJECT_ID,
       status: "all",
       kind: "funnel_dropoff",
+      service: "web",
+      environment: "production",
+      severity: "high",
+      bundleStatus: "completed",
+      from: FROM,
+      to: TO,
       cursor: "cursor-1",
       limit: 5
     });
@@ -516,6 +528,12 @@ describe("cli analytics metrics commands", () => {
       projectId: PROJECT_ID,
       status: "all",
       kind: "funnel_dropoff",
+      service: "web",
+      environment: "production",
+      severity: "high",
+      bundleStatus: "completed",
+      from: FROM,
+      to: TO,
       cursor: "cursor-1",
       limit: 5
     });
@@ -572,7 +590,7 @@ describe("cli analytics metrics commands", () => {
     });
     expect(request).toHaveBeenCalledWith({
       method: "GET",
-      path: `/v1/analytics/opportunities?project_id=${PROJECT_ID}&status=all&kind=funnel_dropoff&cursor=cursor-1&limit=5`,
+      path: `/v1/analytics/opportunities?project_id=${PROJECT_ID}&status=all&kind=funnel_dropoff&service=web&environment=production&severity=high&bundle_status=completed&from=${encodeURIComponent(FROM)}&to=${encodeURIComponent(TO)}&cursor=cursor-1&limit=5`,
       bearerToken: "dbundle_mem_x"
     });
     expect(request).toHaveBeenCalledWith({

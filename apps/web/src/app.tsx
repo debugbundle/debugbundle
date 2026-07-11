@@ -67,6 +67,7 @@ import { ProjectAnalyticsAudiencesPage } from "./pages/project-analytics-audienc
 import { ProjectAnalyticsLayout } from "./pages/project-analytics-layout.js";
 import { ProjectAnalyticsRoutesPage } from "./pages/project-analytics-routes-page.js";
 import { SettingsPage } from "./pages/settings-page.js";
+import { WorkspaceAnalyticsPage } from "./pages/workspace-analytics-page.js";
 import { ProjectWebhooksPage } from "./pages/project-webhooks-page.js";
 import { SidebarInset, SidebarProvider } from "./components/ui/sidebar.js";
 import { isSystemEmailReviewEnabled } from "./lib/system-email-previews.js";
@@ -186,6 +187,8 @@ export function App({ initialEntries }: AppProps): JSX.Element {
               <Route path="/incidents/:incidentId" element={<IncidentDetailPage />} />
               <Route path="/health-status" element={<HealthStatusPage />} />
               <Route path="/improvements" element={<ImprovementsPage />} />
+              <Route path="/analytics/workspace" element={<WorkspaceAnalyticsPage />} />
+              <Route path="/analytics/workspace/bundles" element={<WorkspaceAnalyticsPage />} />
               <Route path="/billing" element={<BillingPage />} />
               <Route path="/projects" element={<ProjectsPage />} />
               {isSystemEmailReviewEnabled() ? (
@@ -237,6 +240,8 @@ export function App({ initialEntries }: AppProps): JSX.Element {
               <Route path="/incidents/:incidentId" element={<IncidentDetailPage />} />
               <Route path="/health-status" element={<HealthStatusPage />} />
               <Route path="/improvements" element={<ImprovementsPage />} />
+              <Route path="/analytics/workspace" element={<WorkspaceAnalyticsPage />} />
+              <Route path="/analytics/workspace/bundles" element={<WorkspaceAnalyticsPage />} />
               <Route path="/billing" element={<BillingPage />} />
               <Route path="/projects" element={<ProjectsPage />} />
               {isSystemEmailReviewEnabled() ? (

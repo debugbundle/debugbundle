@@ -179,6 +179,10 @@ describe("cli analytics bundle commands", () => {
         projectId: PROJECT_ID,
         status: "completed",
         kind: "usage_summary",
+        service: "web",
+        environment: "production",
+        from: FROM,
+        to: TO,
         cursor: `${FROM}|${BUNDLE_GENERATION_ID}`,
         limit: 5,
         json: true
@@ -213,6 +217,10 @@ describe("cli analytics bundle commands", () => {
       projectId: PROJECT_ID,
       status: "completed",
       kind: "usage_summary",
+      service: "web",
+      environment: "production",
+      from: FROM,
+      to: TO,
       cursor: `${FROM}|${BUNDLE_GENERATION_ID}`,
       limit: 5
     });
@@ -251,6 +259,10 @@ describe("cli analytics bundle commands", () => {
       projectId: PROJECT_ID,
       status: "completed",
       kind: "usage_summary",
+      service: "web",
+      environment: "production",
+      from: FROM,
+      to: TO,
       cursor: `${FROM}|${BUNDLE_GENERATION_ID}`,
       limit: 5
     });
@@ -271,7 +283,7 @@ describe("cli analytics bundle commands", () => {
 
     expect(request).toHaveBeenCalledWith({
       method: "GET",
-      path: `/v1/analytics/bundles?project_id=${PROJECT_ID}&status=completed&kind=usage_summary&cursor=${encodeURIComponent(`${FROM}|${BUNDLE_GENERATION_ID}`)}&limit=5`,
+      path: `/v1/analytics/bundles?project_id=${PROJECT_ID}&status=completed&kind=usage_summary&service=web&environment=production&from=${encodeURIComponent(FROM)}&to=${encodeURIComponent(TO)}&cursor=${encodeURIComponent(`${FROM}|${BUNDLE_GENERATION_ID}`)}&limit=5`,
       bearerToken: "dbundle_mem_x"
     });
     expect(request).toHaveBeenCalledWith({

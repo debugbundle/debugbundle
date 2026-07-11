@@ -132,6 +132,12 @@ describe("mcp analytics metrics tools", () => {
         projectId: "proj_1",
         status: "all",
         kind: "funnel_dropoff",
+        service: "web",
+        environment: "production",
+        severity: "high",
+        bundleStatus: "completed",
+        from: "2026-03-01T00:00:00.000Z",
+        to: "2026-03-08T00:00:00.000Z",
         cursor: "cursor-1",
         limit: 5
       })
@@ -152,6 +158,10 @@ describe("mcp analytics metrics tools", () => {
         projectId: "proj_1",
         status: "completed",
         kind: "usage_summary",
+        service: "web",
+        environment: "production",
+        from: "2026-03-01T00:00:00.000Z",
+        to: "2026-03-08T00:00:00.000Z",
         cursor: "cursor-1",
         limit: 5
       })
@@ -226,6 +236,12 @@ describe("mcp analytics metrics tools", () => {
       projectId: "proj_1",
       status: "all",
       kind: "funnel_dropoff",
+      service: "web",
+      environment: "production",
+      severity: "high",
+      bundleStatus: "completed",
+      from: "2026-03-01T00:00:00.000Z",
+      to: "2026-03-08T00:00:00.000Z",
       cursor: "cursor-1",
       limit: 5
     });
@@ -234,6 +250,12 @@ describe("mcp analytics metrics tools", () => {
       projectId: undefined,
       status: "all",
       kind: undefined,
+      service: undefined,
+      environment: undefined,
+      severity: undefined,
+      bundleStatus: undefined,
+      from: undefined,
+      to: undefined,
       cursor: undefined,
       limit: undefined
     });
@@ -247,6 +269,10 @@ describe("mcp analytics metrics tools", () => {
       projectId: "proj_1",
       status: "completed",
       kind: "usage_summary",
+      service: "web",
+      environment: "production",
+      from: "2026-03-01T00:00:00.000Z",
+      to: "2026-03-08T00:00:00.000Z",
       cursor: "cursor-1",
       limit: 5
     });
@@ -255,6 +281,10 @@ describe("mcp analytics metrics tools", () => {
       projectId: undefined,
       status: "completed",
       kind: undefined,
+      service: undefined,
+      environment: undefined,
+      from: undefined,
+      to: undefined,
       cursor: undefined,
       limit: undefined
     });

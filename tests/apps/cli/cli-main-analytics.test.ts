@@ -386,10 +386,19 @@ describe("cli main analytics routing", () => {
     const listAnalyticsBundlesCommand = vi.fn().mockResolvedValue({ exitCode: 0, output: "bundles" });
 
     await expect(
-      runCli(["analytics", "opportunities", "--all-projects"], { listAnalyticsOpportunitiesCommand })
+      runCli([
+        "analytics", "opportunities", "--all-projects",
+        "--service", "web", "--environment", "production", "--severity", "high",
+        "--bundle-status", "completed", "--from", "2026-03-01T00:00:00.000Z",
+        "--to", "2026-03-08T00:00:00.000Z"
+      ], { listAnalyticsOpportunitiesCommand })
     ).resolves.toEqual({ exitCode: 0, output: "opportunities" });
     await expect(
-      runCli(["analytics", "bundle", "list", "--all-projects"], { listAnalyticsBundlesCommand })
+      runCli([
+        "analytics", "bundle", "list", "--all-projects",
+        "--service", "web", "--environment", "production",
+        "--from", "2026-03-01T00:00:00.000Z", "--to", "2026-03-08T00:00:00.000Z"
+      ], { listAnalyticsBundlesCommand })
     ).resolves.toEqual({ exitCode: 0, output: "bundles" });
     await expect(
       runCli(["analytics", "opportunities"], { listAnalyticsOpportunitiesCommand })
@@ -404,7 +413,21 @@ describe("cli main analytics routing", () => {
       output: expect.stringContaining("Use either --project or --all-projects.")
     });
 
-    expect(listAnalyticsOpportunitiesCommand).toHaveBeenCalledWith({ projectId: undefined });
-    expect(listAnalyticsBundlesCommand).toHaveBeenCalledWith({ projectId: undefined });
+    expect(listAnalyticsOpportunitiesCommand).toHaveBeenCalledWith({
+      projectId: undefined,
+      service: "web",
+      environment: "production",
+      severity: "high",
+      bundleStatus: "completed",
+      from: "2026-03-01T00:00:00.000Z",
+      to: "2026-03-08T00:00:00.000Z"
+    });
+    expect(listAnalyticsBundlesCommand).toHaveBeenCalledWith({
+      projectId: undefined,
+      service: "web",
+      environment: "production",
+      from: "2026-03-01T00:00:00.000Z",
+      to: "2026-03-08T00:00:00.000Z"
+    });
   });
 });

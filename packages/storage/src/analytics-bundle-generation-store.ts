@@ -37,19 +37,24 @@ export interface ReserveAnalyticsBundleGenerationInput {
   analysis_spec?: Record<string, unknown> | undefined;
 }
 
+export interface AnalyticsBundleGenerationListFilters {
+  status?: AnalyticsBundleGenerationStatus | undefined;
+  analysis_kind?: AnalyticsBundleAnalysisKind | undefined;
+  service?: string | undefined;
+  environment?: string | undefined;
+  from?: string | undefined;
+  to?: string | undefined;
+}
+
 export interface AnalyticsBundleGenerationStore {
   reserveAnalyticsBundleGeneration(input: ReserveAnalyticsBundleGenerationInput): Promise<AnalyticsBundleGenerationRecord>;
-  listAnalyticsBundleGenerationsForProject(input: {
+  listAnalyticsBundleGenerationsForProject(input: AnalyticsBundleGenerationListFilters & {
     project_id: string;
-    status?: AnalyticsBundleGenerationStatus | undefined;
-    analysis_kind?: AnalyticsBundleAnalysisKind | undefined;
     cursor?: { created_at: string; generation_id: string } | undefined;
     limit: number;
   }): Promise<{ bundles: AnalyticsBundleGenerationRecord[]; next_cursor: string | null }>;
-  listAnalyticsBundleGenerationsForOrganization?(input: {
+  listAnalyticsBundleGenerationsForOrganization?(input: AnalyticsBundleGenerationListFilters & {
     organization_id: string;
-    status?: AnalyticsBundleGenerationStatus | undefined;
-    analysis_kind?: AnalyticsBundleAnalysisKind | undefined;
     cursor?: { created_at: string; generation_id: string } | undefined;
     limit: number;
   }): Promise<{ bundles: AnalyticsBundleGenerationInventoryRecord[]; next_cursor: string | null }>;
@@ -183,22 +188,7 @@ export function createPostgresAnalyticsBundleGenerationStore(db: Queryable): Ana
       const params: unknown[] = [input.project_id];
       const where = ["project_id = $1::uuid"];
 
-      if (input.status !== undefined) {
-        params.push(input.status);
-        where.push(`status = $${params.length}`);
-      }
-
-      if (input.analysis_kind !== undefined) {
-        params.push(input.analysis_kind);
-        where.push(`analysis_kind = $${params.length}`);
-      }
-
-      if (input.cursor !== undefined) {
-        params.push(input.cursor.created_at, input.cursor.generation_id);
-        const createdAtIndex = params.length - 1;
-        const idIndex = params.length;
-        where.push(`(created_at, id) < ($${createdAtIndex}::timestamptz, $${idIndex}::uuid)`);
-      }
+      appendAnalyticsBundleGenerationFilters(params, where, input);
 
       params.push(limit + 1);
       const result = await db.query<AnalyticsBundleGenerationRow>(
@@ -229,22 +219,7 @@ export function createPostgresAnalyticsBundleGenerationStore(db: Queryable): Ana
       const params: unknown[] = [input.organization_id];
       const where = ["p.organization_id = $1::uuid"];
 
-      if (input.status !== undefined) {
-        params.push(input.status);
-        where.push(`abg.status = $${params.length}`);
-      }
-
-      if (input.analysis_kind !== undefined) {
-        params.push(input.analysis_kind);
-        where.push(`abg.analysis_kind = $${params.length}`);
-      }
-
-      if (input.cursor !== undefined) {
-        params.push(input.cursor.created_at, input.cursor.generation_id);
-        const createdAtIndex = params.length - 1;
-        const idIndex = params.length;
-        where.push(`(abg.created_at, abg.id) < ($${createdAtIndex}::timestamptz, $${idIndex}::uuid)`);
-      }
+      appendAnalyticsBundleGenerationFilters(params, where, input, "abg");
 
       params.push(limit + 1);
       const result = await db.query<AnalyticsBundleGenerationInventoryRow>(
@@ -428,6 +403,56 @@ export function createPostgresAnalyticsBundleGenerationStore(db: Queryable): Ana
       });
     }
   };
+}
+
+function appendAnalyticsBundleGenerationFilters(
+  params: unknown[],
+  where: string[],
+  input: AnalyticsBundleGenerationListFilters & {
+    cursor?: { created_at: string; generation_id: string } | undefined;
+  },
+  tableAlias?: string
+): void {
+  const prefix = tableAlias === undefined ? "" : `${tableAlias}.`;
+
+  if (input.status !== undefined) {
+    params.push(input.status);
+    where.push(`${prefix}status = $${params.length}`);
+  }
+
+  if (input.analysis_kind !== undefined) {
+    params.push(input.analysis_kind);
+    where.push(`${prefix}analysis_kind = $${params.length}`);
+  }
+
+  if (input.service !== undefined) {
+    params.push(input.service);
+    where.push(`${prefix}analysis_spec #>> '{filters,service}' = $${params.length}`);
+  }
+
+  if (input.environment !== undefined) {
+    params.push(input.environment);
+    where.push(`${prefix}analysis_spec #>> '{filters,environment}' = $${params.length}`);
+  }
+
+  if (input.from !== undefined) {
+    params.push(input.from);
+    where.push(`${prefix}created_at >= $${params.length}::timestamptz`);
+  }
+
+  if (input.to !== undefined) {
+    params.push(input.to);
+    where.push(`${prefix}created_at <= $${params.length}::timestamptz`);
+  }
+
+  if (input.cursor !== undefined) {
+    params.push(input.cursor.created_at, input.cursor.generation_id);
+    const createdAtIndex = params.length - 1;
+    const idIndex = params.length;
+    where.push(
+      `(${prefix}created_at, ${prefix}id) < ($${createdAtIndex}::timestamptz, $${idIndex}::uuid)`
+    );
+  }
 }
 
 export function buildAnalyticsBundleInputFingerprint(input: {

@@ -95,7 +95,8 @@ describe("web app - project analytics settings", () => {
         "content-type": "application/json",
         "x-csrf-token": "csrf-token-123"
       });
-      expect(JSON.parse(String(init.body))).toEqual({
+      expect(typeof init.body).toBe("string");
+      expect(JSON.parse(init.body as string)).toEqual({
         ...defaultSettings,
         capture_actions: true,
         max_custom_dimensions: 2,

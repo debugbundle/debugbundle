@@ -6,13 +6,16 @@ import {
   AnalyticsIncidentImpactResponseSchema,
   AnalyticsJourneyPatternsResponseSchema,
   AnalyticsOpportunitiesListResponseSchema,
+  AnalyticsOpportunityBundleStatusSchema,
   AnalyticsOpportunityResponseSchema,
+  AnalyticsBundleSeveritySchema,
   AnalyticsOpportunityStatusSchema,
   AnalyticsReferrerMetricsResponseSchema,
   AnalyticsRouteMetricsResponseSchema,
   AnalyticsUsageSummaryResponseSchema,
   type AnalyticsActionMetricsResponse,
   type AnalyticsBundleAnalysisKind,
+  type AnalyticsBundleSeverity,
   type AnalyticsDeviceBreakdownResponse,
   type AnalyticsFunnelAnalysisResponse,
   type AnalyticsFunnelsResponse,
@@ -21,6 +24,7 @@ import {
   type AnalyticsMetricsGranularity,
   type AnalyticsOpportunitiesListResponse,
   type AnalyticsOpportunityResponse,
+  type AnalyticsOpportunityBundleStatus,
   type AnalyticsOpportunityStatus,
   type AnalyticsReferrerMetricsResponse,
   type AnalyticsRouteMetricsResponse,
@@ -80,6 +84,12 @@ export interface AnalyticsOpportunitiesCommandInput {
   projectId?: string | undefined;
   status?: AnalyticsOpportunityStatus | "all" | undefined;
   kind?: AnalyticsBundleAnalysisKind | undefined;
+  service?: string | undefined;
+  environment?: string | undefined;
+  severity?: AnalyticsBundleSeverity | undefined;
+  bundleStatus?: AnalyticsOpportunityBundleStatus | undefined;
+  from?: string | undefined;
+  to?: string | undefined;
   cursor?: string | undefined;
   limit?: number | undefined;
   json?: boolean | undefined;
@@ -324,6 +334,12 @@ function buildOpportunitiesQueryString(input: Omit<AnalyticsOpportunitiesCommand
   appendOptionalParam(params, "project_id", input.projectId);
   appendOptionalParam(params, "status", input.status);
   appendOptionalParam(params, "kind", input.kind);
+  appendOptionalParam(params, "service", input.service);
+  appendOptionalParam(params, "environment", input.environment);
+  appendOptionalParam(params, "severity", input.severity);
+  appendOptionalParam(params, "bundle_status", input.bundleStatus);
+  appendOptionalParam(params, "from", input.from);
+  appendOptionalParam(params, "to", input.to);
   appendOptionalParam(params, "cursor", input.cursor);
   if (input.limit !== undefined) {
     params.set("limit", String(input.limit));
@@ -668,12 +684,24 @@ export async function listAnalyticsOpportunitiesCommand(
     if (input.status !== undefined && input.status !== "all" && !AnalyticsOpportunityStatusSchema.safeParse(input.status).success) {
       return { exitCode: 4, output: "Invalid value for --status." };
     }
+    if (input.severity !== undefined && !AnalyticsBundleSeveritySchema.safeParse(input.severity).success) {
+      return { exitCode: 4, output: "Invalid value for --severity." };
+    }
+    if (input.bundleStatus !== undefined && !AnalyticsOpportunityBundleStatusSchema.safeParse(input.bundleStatus).success) {
+      return { exitCode: 4, output: "Invalid value for --bundle-status." };
+    }
 
     const response = await api.listOpportunities({
       bearerToken: input.bearerToken,
       projectId: input.projectId,
       status: input.status,
       kind: input.kind,
+      service: input.service,
+      environment: input.environment,
+      severity: input.severity,
+      bundleStatus: input.bundleStatus,
+      from: input.from,
+      to: input.to,
       cursor: input.cursor,
       limit: input.limit
     });
@@ -909,6 +937,12 @@ export async function listAnalyticsOpportunitiesWithAuthCommand(
           projectId: input.projectId,
           status: input.status,
           kind: input.kind,
+          service: input.service,
+          environment: input.environment,
+          severity: input.severity,
+          bundleStatus: input.bundleStatus,
+          from: input.from,
+          to: input.to,
           cursor: input.cursor,
           limit: input.limit,
           json: input.json

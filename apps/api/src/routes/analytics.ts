@@ -5,6 +5,7 @@ import { z } from "zod";
 import {
   AnalyticsActionMetricsResponseSchema,
   AnalyticsBundleAnalysisKindSchema,
+  AnalyticsBundleSeveritySchema,
   AnalyticsBundleGenerationsListResponseSchema,
   AnalyticsBundleGenerationStatusSchema,
   AnalyticsBundleV1Schema,
@@ -16,6 +17,7 @@ import {
   AnalyticsMetricsGranularitySchema,
   AnalyticsOpportunitiesListResponseSchema,
   AnalyticsOpportunityResponseSchema,
+  AnalyticsOpportunityBundleStatusSchema,
   AnalyticsOpportunityStatusSchema,
   AnalyticsReferrerMetricsResponseSchema,
   AnalyticsRouteMetricsResponseSchema,
@@ -37,6 +39,8 @@ import { registerAnalyticsJourneySampleRoutes } from "./analytics-journey-sample
 
 const DEFAULT_LAST_MS = 7 * 24 * 60 * 60 * 1000;
 const MAX_LAST_MS = 370 * 24 * 60 * 60 * 1000;
+type AnalyticsOpportunitiesDependency = NonNullable<ApiDependencies["analyticsOpportunities"]>;
+type AnalyticsBundlesDependency = NonNullable<ApiDependencies["analyticsBundles"]>;
 
 const AnalyticsSummaryQuerySchema = z
   .object({
@@ -64,10 +68,20 @@ const AnalyticsOpportunitiesQuerySchema = z
     project_id: z.string().uuid().optional(),
     status: z.union([AnalyticsOpportunityStatusSchema, z.literal("all")]).optional().default("open"),
     kind: AnalyticsBundleAnalysisKindSchema.optional(),
+    service: z.string().trim().min(1).max(120).optional(),
+    environment: z.string().trim().min(1).max(120).optional(),
+    severity: AnalyticsBundleSeveritySchema.optional(),
+    bundle_status: AnalyticsOpportunityBundleStatusSchema.optional(),
+    from: z.string().datetime().optional(),
+    to: z.string().datetime().optional(),
     cursor: z.string().trim().min(1).optional(),
     limit: z.coerce.number().int().min(1).max(100).optional().default(20)
   })
-  .strict();
+  .strict()
+  .refine((value) => value.from === undefined || value.to === undefined || Date.parse(value.from) <= Date.parse(value.to), {
+    message: "from must be before or equal to to",
+    path: ["from"]
+  });
 
 const AnalyticsOpportunityParamsSchema = z.object({
   id: z.string().uuid()
@@ -82,10 +96,18 @@ const AnalyticsBundlesListQuerySchema = z
     project_id: z.string().uuid().optional(),
     status: z.union([AnalyticsBundleGenerationStatusSchema, z.literal("all")]).optional().default("all"),
     kind: AnalyticsBundleAnalysisKindSchema.optional(),
+    service: z.string().trim().min(1).max(120).optional(),
+    environment: z.string().trim().min(1).max(120).optional(),
+    from: z.string().datetime().optional(),
+    to: z.string().datetime().optional(),
     cursor: z.string().trim().min(1).optional(),
     limit: z.coerce.number().int().min(1).max(100).optional().default(20)
   })
-  .strict();
+  .strict()
+  .refine((value) => value.from === undefined || value.to === undefined || Date.parse(value.from) <= Date.parse(value.to), {
+    message: "from must be before or equal to to",
+    path: ["from"]
+  });
 
 const AnalyticsBundleQuerySchema = z
   .object({
@@ -142,6 +164,12 @@ export function registerAnalyticsRoutes(app: FastifyInstance, dependencies: ApiD
     const filters = {
       ...(parsedQuery.data.status === "all" ? {} : { status: parsedQuery.data.status }),
       ...(parsedQuery.data.kind === undefined ? {} : { kind: parsedQuery.data.kind }),
+      ...(parsedQuery.data.service === undefined ? {} : { service: parsedQuery.data.service }),
+      ...(parsedQuery.data.environment === undefined ? {} : { environment: parsedQuery.data.environment }),
+      ...(parsedQuery.data.severity === undefined ? {} : { severity: parsedQuery.data.severity }),
+      ...(parsedQuery.data.bundle_status === undefined ? {} : { bundle_status: parsedQuery.data.bundle_status }),
+      ...(parsedQuery.data.from === undefined ? {} : { from: parsedQuery.data.from }),
+      ...(parsedQuery.data.to === undefined ? {} : { to: parsedQuery.data.to }),
       ...(parsedCursor === null ? {} : { cursor: parsedCursor }),
       limit: parsedQuery.data.limit
     };
@@ -301,6 +329,10 @@ export function registerAnalyticsRoutes(app: FastifyInstance, dependencies: ApiD
     const filters = {
       ...(parsedQuery.data.status === "all" ? {} : { status: parsedQuery.data.status }),
       ...(parsedQuery.data.kind === undefined ? {} : { analysis_kind: parsedQuery.data.kind }),
+      ...(parsedQuery.data.service === undefined ? {} : { service: parsedQuery.data.service }),
+      ...(parsedQuery.data.environment === undefined ? {} : { environment: parsedQuery.data.environment }),
+      ...(parsedQuery.data.from === undefined ? {} : { from: parsedQuery.data.from }),
+      ...(parsedQuery.data.to === undefined ? {} : { to: parsedQuery.data.to }),
       ...(parsedCursor === null ? {} : { cursor: parsedCursor }),
       limit: parsedQuery.data.limit
     };
@@ -490,10 +522,16 @@ async function listProjectAnalyticsOpportunities(
   filters: {
     status?: z.infer<typeof AnalyticsOpportunityStatusSchema> | undefined;
     kind?: z.infer<typeof AnalyticsBundleAnalysisKindSchema> | undefined;
+    service?: string | undefined;
+    environment?: string | undefined;
+    severity?: z.infer<typeof AnalyticsBundleSeveritySchema> | undefined;
+    bundle_status?: z.infer<typeof AnalyticsOpportunityBundleStatusSchema> | undefined;
+    from?: string | undefined;
+    to?: string | undefined;
     cursor?: { last_detected_at: string; opportunity_id: string } | undefined;
     limit: number;
   }
-) {
+): Promise<Awaited<ReturnType<AnalyticsOpportunitiesDependency["listAnalyticsOpportunitiesForProject"]>> | null> {
   const access = await requireAnalyticsProjectReadAccess(request, reply, dependencies, projectId);
   if (access === null) {
     return null;
@@ -517,10 +555,16 @@ async function listOrganizationAnalyticsOpportunities(
   filters: {
     status?: z.infer<typeof AnalyticsOpportunityStatusSchema> | undefined;
     kind?: z.infer<typeof AnalyticsBundleAnalysisKindSchema> | undefined;
+    service?: string | undefined;
+    environment?: string | undefined;
+    severity?: z.infer<typeof AnalyticsBundleSeveritySchema> | undefined;
+    bundle_status?: z.infer<typeof AnalyticsOpportunityBundleStatusSchema> | undefined;
+    from?: string | undefined;
+    to?: string | undefined;
     cursor?: { last_detected_at: string; opportunity_id: string } | undefined;
     limit: number;
   }
-) {
+): Promise<Awaited<ReturnType<AnalyticsOpportunitiesDependency["listAnalyticsOpportunitiesForOrganization"]>> | null> {
   const organizationId = await requireAnalyticsOrganizationReadAccess(request, reply, dependencies);
   if (organizationId === null) {
     return null;
@@ -544,10 +588,14 @@ async function listProjectAnalyticsBundles(
   filters: {
     status?: z.infer<typeof AnalyticsBundleGenerationStatusSchema> | undefined;
     analysis_kind?: z.infer<typeof AnalyticsBundleAnalysisKindSchema> | undefined;
+    service?: string | undefined;
+    environment?: string | undefined;
+    from?: string | undefined;
+    to?: string | undefined;
     cursor?: { created_at: string; generation_id: string } | undefined;
     limit: number;
   }
-) {
+): Promise<Awaited<ReturnType<AnalyticsBundlesDependency["listAnalyticsBundleGenerationsForProject"]>> | null> {
   const access = await requireAnalyticsProjectReadAccess(request, reply, dependencies, projectId);
   if (access === null) {
     return null;
@@ -571,10 +619,14 @@ async function listOrganizationAnalyticsBundles(
   filters: {
     status?: z.infer<typeof AnalyticsBundleGenerationStatusSchema> | undefined;
     analysis_kind?: z.infer<typeof AnalyticsBundleAnalysisKindSchema> | undefined;
+    service?: string | undefined;
+    environment?: string | undefined;
+    from?: string | undefined;
+    to?: string | undefined;
     cursor?: { created_at: string; generation_id: string } | undefined;
     limit: number;
   }
-) {
+): Promise<Awaited<ReturnType<AnalyticsBundlesDependency["listAnalyticsBundleGenerationsForOrganization"]>> | null> {
   const organizationId = await requireAnalyticsOrganizationReadAccess(request, reply, dependencies);
   if (organizationId === null) {
     return null;

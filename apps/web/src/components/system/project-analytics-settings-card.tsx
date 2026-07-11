@@ -92,8 +92,22 @@ function parseCustomDimensionKeys(value: string): string[] {
 }
 
 function settingsPayload(draft: AnalyticsSettingsDraft): ProjectAnalyticsSettings {
-  const { access_mode: _accessMode, analytics_available: _available, approved_custom_dimensions_text: _text, ...settings } = draft;
-  return settings;
+  return {
+    enabled: draft.enabled,
+    privacy_mode: draft.privacy_mode,
+    consent_required: draft.consent_required,
+    capture_page_views: draft.capture_page_views,
+    capture_route_changes: draft.capture_route_changes,
+    capture_actions: draft.capture_actions,
+    capture_friction_signals: draft.capture_friction_signals,
+    journey_sample_rate: draft.journey_sample_rate,
+    raw_retention_days: draft.raw_retention_days,
+    sample_retention_days: draft.sample_retention_days,
+    aggregate_retention_months: draft.aggregate_retention_months,
+    max_saved_funnels: draft.max_saved_funnels,
+    max_custom_dimensions: draft.max_custom_dimensions,
+    approved_custom_dimensions: draft.approved_custom_dimensions
+  };
 }
 
 function draftsEqual(left: AnalyticsSettingsDraft, right: AnalyticsSettingsDraft): boolean {

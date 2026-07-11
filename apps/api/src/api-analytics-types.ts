@@ -3,6 +3,7 @@ import type {
   AnalyticsSettingsUpdate,
   AnalyticsActionMetricsResponse,
   AnalyticsBundleAnalysisKind,
+  AnalyticsBundleSeverity,
   AnalyticsDeviceBreakdownResponse,
   AnalyticsFunnelAnalysisResponse,
   AnalyticsFunnelsResponse,
@@ -11,6 +12,7 @@ import type {
   AnalyticsJourneyPatternsResponse,
   AnalyticsOpportunitiesListResponse,
   AnalyticsOpportunityResponse,
+  AnalyticsOpportunityBundleStatus,
   AnalyticsOpportunityStatus,
   AnalyticsReferrerMetricsResponse,
   AnalyticsRouteMetricsResponse,
@@ -73,6 +75,12 @@ export interface ApiAnalyticsDependencies {
       project_id: string;
       status?: AnalyticsOpportunityStatus | undefined;
       kind?: AnalyticsBundleAnalysisKind | undefined;
+      service?: string | undefined;
+      environment?: string | undefined;
+      severity?: AnalyticsBundleSeverity | undefined;
+      bundle_status?: AnalyticsOpportunityBundleStatus | undefined;
+      from?: string | undefined;
+      to?: string | undefined;
       cursor?: { last_detected_at: string; opportunity_id: string } | undefined;
       limit: number;
     }): Promise<AnalyticsOpportunitiesListResponse>;
@@ -80,6 +88,12 @@ export interface ApiAnalyticsDependencies {
       organization_id: string;
       status?: AnalyticsOpportunityStatus | undefined;
       kind?: AnalyticsBundleAnalysisKind | undefined;
+      service?: string | undefined;
+      environment?: string | undefined;
+      severity?: AnalyticsBundleSeverity | undefined;
+      bundle_status?: AnalyticsOpportunityBundleStatus | undefined;
+      from?: string | undefined;
+      to?: string | undefined;
       cursor?: { last_detected_at: string; opportunity_id: string } | undefined;
       limit: number;
     }): Promise<AnalyticsOpportunitiesListResponse>;
@@ -103,6 +117,10 @@ export interface ApiAnalyticsDependencies {
       project_id: string;
       status?: AnalyticsBundleGenerationStatus | undefined;
       analysis_kind?: AnalyticsBundleAnalysisKind | undefined;
+      service?: string | undefined;
+      environment?: string | undefined;
+      from?: string | undefined;
+      to?: string | undefined;
       cursor?: { created_at: string; generation_id: string } | undefined;
       limit: number;
     }): Promise<{ bundles: AnalyticsBundleGenerationRecord[]; next_cursor: string | null }>;
@@ -110,6 +128,10 @@ export interface ApiAnalyticsDependencies {
       organization_id: string;
       status?: AnalyticsBundleGenerationStatus | undefined;
       analysis_kind?: AnalyticsBundleAnalysisKind | undefined;
+      service?: string | undefined;
+      environment?: string | undefined;
+      from?: string | undefined;
+      to?: string | undefined;
       cursor?: { created_at: string; generation_id: string } | undefined;
       limit: number;
     }): Promise<{ bundles: AnalyticsBundleGenerationInventoryRecord[]; next_cursor: string | null }>;

@@ -108,6 +108,7 @@ export type {
 } from "./analytics-bundle-jobs.js";
 export type {
   AnalyticsBundleGenerationRecord,
+  AnalyticsBundleGenerationListFilters,
   AnalyticsBundleGenerationInventoryRecord,
   AnalyticsBundleGenerationStatus,
   AnalyticsBundleGenerationStore,
@@ -120,6 +121,7 @@ export {
   createPostgresAnalyticsBundleGenerationStore
 } from "./analytics-bundle-generation-store.js";
 export type {
+  AnalyticsOpportunityListFilters,
   AnalyticsOpportunitiesCursor,
   AnalyticsOpportunityStore
 } from "./analytics-opportunity-store.js";

@@ -559,7 +559,7 @@ describe("analytics metrics routes", () => {
     const cursor = `${TO}|${opportunityId}`;
     const list = await app.inject({
       method: "GET",
-      url: `/v1/analytics/opportunities?project_id=${PROJECT_ID}&status=all&kind=funnel_dropoff&cursor=${encodeURIComponent(cursor)}&limit=5`,
+      url: `/v1/analytics/opportunities?project_id=${PROJECT_ID}&status=all&kind=funnel_dropoff&service=web&environment=production&severity=high&bundle_status=completed&from=2026-03-01T00%3A00%3A00.000Z&to=2026-03-09T00%3A00%3A00.000Z&cursor=${encodeURIComponent(cursor)}&limit=5`,
       headers: authHeaders
     });
     const detail = await app.inject({
@@ -576,6 +576,12 @@ describe("analytics metrics routes", () => {
       organization_id: "org_123",
       project_id: PROJECT_ID,
       kind: "funnel_dropoff",
+      service: "web",
+      environment: "production",
+      severity: "high",
+      bundle_status: "completed",
+      from: "2026-03-01T00:00:00.000Z",
+      to: "2026-03-09T00:00:00.000Z",
       cursor: {
         last_detected_at: TO,
         opportunity_id: opportunityId
@@ -642,6 +648,13 @@ describe("analytics metrics routes", () => {
       url: `/v1/analytics/opportunities?project_id=${PROJECT_ID}`,
       headers: { authorization: "Bearer dbundle_mem_test_token" }
     });
+    const invertedWindow = await createDependencies({
+      analyticsOpportunities: createAnalyticsOpportunitiesDependency()
+    }).inject({
+      method: "GET",
+      url: `/v1/analytics/opportunities?from=${encodeURIComponent(TO)}&to=${encodeURIComponent(FROM)}`,
+      headers: { authorization: "Bearer dbundle_mem_test_token" }
+    });
     const notFound = await createDependencies({
       analyticsOpportunities: createAnalyticsOpportunitiesDependency({
         getAnalyticsOpportunityForProject: vi.fn().mockResolvedValue(null)
@@ -654,6 +667,8 @@ describe("analytics metrics routes", () => {
 
     expect(invalidCursor.statusCode).toBe(400);
     expect(invalidCursor.json()).toEqual({ error: "invalid_query" });
+    expect(invertedWindow.statusCode).toBe(400);
+    expect(invertedWindow.json()).toEqual({ error: "invalid_query" });
     expect(unavailable.statusCode).toBe(404);
     expect(unavailable.json()).toEqual({ error: "analytics_opportunities_not_available" });
     expect(notFound.statusCode).toBe(404);
@@ -729,7 +744,7 @@ describe("analytics metrics routes", () => {
 
     const response = await app.inject({
       method: "GET",
-      url: `/v1/analytics/bundles?status=completed&cursor=${encodeURIComponent(`${FROM}|${BUNDLE_GENERATION_ID}`)}&limit=5`,
+      url: `/v1/analytics/bundles?status=completed&service=web&environment=production&from=2026-03-01T00%3A00%3A00.000Z&to=2026-03-09T00%3A00%3A00.000Z&cursor=${encodeURIComponent(`${FROM}|${BUNDLE_GENERATION_ID}`)}&limit=5`,
       headers: { authorization: "Bearer dbundle_mem_test_token" }
     });
 
@@ -746,6 +761,10 @@ describe("analytics metrics routes", () => {
     expect(listAnalyticsBundleGenerationsForOrganization).toHaveBeenCalledWith({
       organization_id: "org_123",
       status: "completed",
+      service: "web",
+      environment: "production",
+      from: "2026-03-01T00:00:00.000Z",
+      to: "2026-03-09T00:00:00.000Z",
       cursor: {
         created_at: FROM,
         generation_id: BUNDLE_GENERATION_ID
@@ -767,9 +786,18 @@ describe("analytics metrics routes", () => {
       url: `/v1/analytics/bundles?project_id=${PROJECT_ID}`,
       headers: { authorization: "Bearer dbundle_mem_test_token" }
     });
+    const invertedWindow = await createDependencies({
+      analyticsBundles: createAnalyticsBundlesDependency()
+    }).inject({
+      method: "GET",
+      url: `/v1/analytics/bundles?from=${encodeURIComponent(TO)}&to=${encodeURIComponent(FROM)}`,
+      headers: { authorization: "Bearer dbundle_mem_test_token" }
+    });
 
     expect(invalidCursor.statusCode).toBe(400);
     expect(invalidCursor.json()).toEqual({ error: "invalid_query" });
+    expect(invertedWindow.statusCode).toBe(400);
+    expect(invertedWindow.json()).toEqual({ error: "invalid_query" });
     expect(unavailable.statusCode).toBe(404);
     expect(unavailable.json()).toEqual({ error: "analytics_bundles_not_available" });
   });

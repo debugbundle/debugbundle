@@ -1,3 +1,5 @@
+import type { ProjectColorTag } from "../../../../packages/shared-types/src/index.js";
+
 export type AnalyticsPrivacyMode = "strict" | "standard" | "custom";
 
 export interface ProjectAnalyticsSettings {
@@ -113,7 +115,7 @@ export interface AnalyticsOpportunityRecord {
   opportunity_id: string;
   project_id: string;
   project_name: string;
-  project_color_tag: string | null;
+  project_color_tag: ProjectColorTag | null;
   service: string | null;
   environment: string | null;
   kind: AnalyticsOpportunityKind;
@@ -139,4 +141,56 @@ export interface AnalyticsOpportunityRecord {
 export interface AnalyticsOpportunitiesListResponse {
   opportunities: AnalyticsOpportunityRecord[];
   next_cursor: string | null;
+}
+
+export interface AnalyticsOpportunityInventoryQuery {
+  projectId?: string;
+  status?: AnalyticsOpportunityRecord["status"] | "all";
+  kind?: AnalyticsOpportunityKind;
+  service?: string;
+  environment?: string;
+  severity?: AnalyticsOpportunityRecord["severity"];
+  bundleStatus?: AnalyticsOpportunityRecord["bundle_status"];
+  from?: string;
+  to?: string;
+  cursor?: string;
+  limit?: number;
+}
+
+export type AnalyticsBundleGenerationStatus = "pending" | "running" | "completed" | "failed";
+
+export interface AnalyticsBundleGenerationRecord {
+  generation_id: string;
+  project_id: string;
+  project_name?: string;
+  project_color_tag?: ProjectColorTag | null;
+  opportunity_id: string | null;
+  requested_by_user_id: string | null;
+  analysis_kind: AnalyticsOpportunityKind;
+  analysis_spec: Record<string, unknown>;
+  input_fingerprint: string;
+  status: AnalyticsBundleGenerationStatus;
+  has_artifact: boolean;
+  failure_reason: string | null;
+  created_at: string;
+  claimed_at: string | null;
+  completed_at: string | null;
+  updated_at: string;
+}
+
+export interface AnalyticsBundleGenerationsListResponse {
+  bundles: AnalyticsBundleGenerationRecord[];
+  next_cursor: string | null;
+}
+
+export interface AnalyticsBundleInventoryQuery {
+  projectId?: string;
+  status?: AnalyticsBundleGenerationStatus | "all";
+  kind?: AnalyticsOpportunityKind;
+  service?: string;
+  environment?: string;
+  from?: string;
+  to?: string;
+  cursor?: string;
+  limit?: number;
 }
