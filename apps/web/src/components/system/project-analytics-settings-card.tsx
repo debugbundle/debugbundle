@@ -222,7 +222,7 @@ export function ProjectAnalyticsSettingsCard(props: ProjectAnalyticsSettingsCard
         {!hasLoadedSettings || settingsDraft.analytics_available ? null : (
           <PlanUpgradeCallout
             title="Upgrade to Solo or Team to unlock product analytics"
-            description="Product analytics capture, aggregate metrics, journey evidence, and AnalyticsBundles are available on paid plans."
+            description="Product analytics capture, aggregate metrics, journey evidence, and analytics bundles are available on paid plans."
           />
         )}
 

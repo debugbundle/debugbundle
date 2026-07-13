@@ -173,8 +173,8 @@ export function ProjectImprovementSettingsCard({
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Automated improvement bundles</CardTitle>
-        <CardDescription>Generate hosted hardening signals for this project.</CardDescription>
+        <CardTitle>Improvement bundles</CardTitle>
+        <CardDescription>Generate automated hosted hardening signals for this project.</CardDescription>
       </CardHeader>
       <CardContent className="flex flex-col gap-6">
         {settingsDraft.cloud_automation_available ? null : <HostedImprovementsUpgradeCallout scope="project" />}

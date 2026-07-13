@@ -12,6 +12,11 @@ import { Input } from "../ui/input.js";
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "../ui/select.js";
 import { Switch } from "../ui/switch.js";
 import { Textarea } from "../ui/textarea.js";
+import {
+  joinScopeValues,
+  ProjectScopeMultiSelect,
+  splitScopeValues
+} from "./project-scope-controls.js";
 
 const NO_VALUE = "__none__";
 
@@ -86,6 +91,8 @@ export interface CaptureRuleCreateDraft {
 interface CaptureRuleCreateFormProps {
   draft: CaptureRuleCreateDraft;
   disabled: boolean;
+  serviceOptions?: string[];
+  environmentOptions?: string[];
   onDraftChange: (draft: CaptureRuleCreateDraft) => void;
 }
 
@@ -178,7 +185,13 @@ export function buildProjectCaptureRuleCreate(draft: CaptureRuleCreateDraft): Pr
   };
 }
 
-export function CaptureRuleCreateForm({ draft, disabled, onDraftChange }: CaptureRuleCreateFormProps): JSX.Element {
+export function CaptureRuleCreateForm({
+  draft,
+  disabled,
+  serviceOptions = [],
+  environmentOptions = [],
+  onDraftChange
+}: CaptureRuleCreateFormProps): JSX.Element {
   function update<Key extends keyof CaptureRuleCreateDraft>(key: Key, value: CaptureRuleCreateDraft[Key]): void {
     onDraftChange({ ...draft, [key]: value });
   }
@@ -273,23 +286,25 @@ export function CaptureRuleCreateForm({ draft, disabled, onDraftChange }: Captur
       <div className="grid gap-4 md:grid-cols-2">
         <Field>
           <FieldLabel htmlFor="capture-rule-create-services">Services</FieldLabel>
-          <Input
+          <ProjectScopeMultiSelect
             id="capture-rule-create-services"
-            value={draft.serviceNames}
-            onChange={(event) => update("serviceNames", event.currentTarget.value)}
+            label="Services"
+            value={splitScopeValues(draft.serviceNames)}
+            options={serviceOptions}
+            onValueChange={(values) => update("serviceNames", joinScopeValues(values))}
             disabled={disabled}
-            placeholder="web, api"
           />
         </Field>
 
         <Field>
           <FieldLabel htmlFor="capture-rule-create-environments">Environments</FieldLabel>
-          <Input
+          <ProjectScopeMultiSelect
             id="capture-rule-create-environments"
-            value={draft.environments}
-            onChange={(event) => update("environments", event.currentTarget.value)}
+            label="Environments"
+            value={splitScopeValues(draft.environments)}
+            options={environmentOptions}
+            onValueChange={(values) => update("environments", joinScopeValues(values))}
             disabled={disabled}
-            placeholder="production, staging"
           />
         </Field>
       </div>

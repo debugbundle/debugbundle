@@ -126,7 +126,7 @@ describe("web app - project analytics opportunity detail", () => {
     );
     expect(screen.getByText("deploy-42")).toBeInTheDocument();
     expect(screen.getByText("Ready")).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "View AnalyticsBundle" })).toHaveAttribute(
+    expect(screen.getByRole("link", { name: "View analytics bundle" })).toHaveAttribute(
       "href",
       `/projects/${PROJECT_ID}/analytics/bundles/77777777-7777-4777-8777-777777777777`
     );

@@ -6,6 +6,10 @@ import {
   toAnalyticsDateEnd,
   toAnalyticsDateStart
 } from "../components/system/workspace-analytics-filters.js";
+import {
+  ProjectScopeSelect,
+  useProjectScopeOptions
+} from "../components/system/project-scope-controls.js";
 import { Button } from "../components/ui/button.js";
 import {
   Field,
@@ -76,7 +80,7 @@ const routeContextKinds = new Set<AnalyticsBundleAnalysisKind>([
 ]);
 
 export function ProjectAnalyticsBundleCreatePage(): JSX.Element {
-  const { projectId, query } = useOutletContext<ProjectAnalyticsContext>();
+  const { projectId, environmentDefault, query } = useOutletContext<ProjectAnalyticsContext>();
   const navigate = useNavigate();
   const [draft, setDraft] = useState<FormDraft>(() => ({
     analysisKind: "usage_summary",
@@ -97,6 +101,7 @@ export function ProjectAnalyticsBundleCreatePage(): JSX.Element {
   const [incidents, setIncidents] = useState<IncidentRecord[] | null>(null);
   const [incidentsError, setIncidentsError] = useState(false);
   const [incidentsAttempt, setIncidentsAttempt] = useState(0);
+  const scopeOptions = useProjectScopeOptions(projectId, environmentDefault);
 
   useEffect(() => {
     if (draft.analysisKind !== "incident_impact") return;
@@ -172,13 +177,13 @@ export function ProjectAnalyticsBundleCreatePage(): JSX.Element {
         <Button asChild variant="ghost" size="sm">
           <Link to={`/projects/${projectId}/analytics/bundles`}>
             <ArrowLeftIcon data-icon="inline-start" />
-            Back to AnalyticsBundles
+            Back to analytics bundles
           </Link>
         </Button>
       </div>
 
       <header className="flex max-w-2xl flex-col gap-2">
-        <h2 className="text-xl font-semibold">Generate AnalyticsBundle</h2>
+        <h2 className="text-xl font-semibold">Generate analytics bundle</h2>
         <p className="text-sm leading-relaxed text-muted-foreground">
           Create a deterministic analysis artifact from aggregate analytics and bounded journey
           evidence.
@@ -189,13 +194,13 @@ export function ProjectAnalyticsBundleCreatePage(): JSX.Element {
         <Notice
           title={
             submitError === "analytics_quota_exceeded"
-              ? "AnalyticsBundle limit reached"
-              : "Could not generate AnalyticsBundle"
+              ? "Analytics bundle limit reached"
+              : "Could not generate analytics bundle"
           }
           tone="destructive"
         >
           {submitError === "analytics_quota_exceeded"
-            ? "The monthly AnalyticsBundle generation allowance is exhausted."
+            ? "The monthly analytics bundle generation allowance is exhausted."
             : submitError}
         </Notice>
       )}
@@ -380,22 +385,24 @@ export function ProjectAnalyticsBundleCreatePage(): JSX.Element {
           <FieldGroup className="grid gap-5 md:grid-cols-2">
             <Field>
               <FieldLabel htmlFor="analytics-bundle-service">Service</FieldLabel>
-              <Input
+              <ProjectScopeSelect
                 id="analytics-bundle-service"
+                label="Service"
                 value={draft.service}
-                maxLength={120}
-                placeholder="All services"
-                onChange={(event) => update("service", event.currentTarget.value)}
+                options={scopeOptions.services}
+                allLabel="All services"
+                onValueChange={(service) => update("service", service)}
               />
             </Field>
             <Field>
               <FieldLabel htmlFor="analytics-bundle-environment">Environment</FieldLabel>
-              <Input
+              <ProjectScopeSelect
                 id="analytics-bundle-environment"
+                label="Environment"
                 value={draft.environment}
-                maxLength={120}
-                placeholder="All environments"
-                onChange={(event) => update("environment", event.currentTarget.value)}
+                options={scopeOptions.environments}
+                allLabel="All environments"
+                onValueChange={(environment) => update("environment", environment)}
               />
             </Field>
           </FieldGroup>
@@ -406,7 +413,7 @@ export function ProjectAnalyticsBundleCreatePage(): JSX.Element {
             {isSubmitting ? (
               <LoaderCircleIcon className="animate-spin" data-icon="inline-start" />
             ) : null}
-            Generate AnalyticsBundle
+            Generate analytics bundle
           </Button>
           <Button asChild type="button" variant="outline">
             <Link to={`/projects/${projectId}/analytics/bundles`}>Cancel</Link>
@@ -502,7 +509,7 @@ function formatCreateError(error: unknown): string {
   if (error instanceof ApiRequestError) {
     if (error.code === "analytics_quota_exceeded") return error.code;
     if (error.code === "analytics_disabled") return "Analytics is disabled for this project.";
-    if (error.code === "upgrade_required") return "This plan does not include AnalyticsBundles.";
+    if (error.code === "upgrade_required") return "This plan does not include analytics bundles.";
     if (error.code === "incident_not_found")
       return "The selected incident is no longer accessible.";
     if (error.code === "invalid_body") return "The analysis request contains invalid values.";

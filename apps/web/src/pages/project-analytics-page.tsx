@@ -2,8 +2,8 @@ import { BarChart3Icon } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link, useOutletContext } from "react-router-dom";
 
-import { TableRefreshButton } from "../components/system/table-refresh-button.js";
 import { opportunityDetailPath } from "../components/system/analytics-opportunities-table.js";
+import { AnalyticsSectionHeader } from "../components/system/analytics-section-header.js";
 import { Badge } from "../components/ui/badge.js";
 import { Button } from "../components/ui/button.js";
 import {
@@ -105,20 +105,12 @@ export function ProjectAnalyticsPage(): JSX.Element {
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex flex-col gap-1">
-        <h2 className="text-lg font-medium">Analytics overview</h2>
-        <p className="text-sm text-muted-foreground">
-          Aggregate product usage, navigation, and improvement signals for this project.
-        </p>
-      </div>
-
-      <div className="flex justify-end">
-        <TableRefreshButton
-          isLoading={isOverviewLoading}
-          label="Refresh analytics overview"
-          onRefresh={() => setOverviewAttempt((attempt) => attempt + 1)}
-        />
-      </div>
+      <AnalyticsSectionHeader
+        title="Analytics overview"
+        description="Aggregate product usage, navigation, and improvement signals for this project."
+        isLoading={isOverviewLoading}
+        onRefresh={() => setOverviewAttempt((attempt) => attempt + 1)}
+      />
 
       {isOverviewLoading && overview === null ? <AnalyticsOverviewSkeleton /> : null}
 

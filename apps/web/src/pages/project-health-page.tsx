@@ -5,6 +5,10 @@ import { Link, useOutletContext } from "react-router-dom";
 
 import { DialogFormContent } from "../components/system/dialog-form-content.js";
 import { PlanUpgradeCallout } from "../components/system/plan-upgrade-callout.js";
+import {
+  ProjectScopeSelect,
+  useProjectScopeOptions
+} from "../components/system/project-scope-controls.js";
 import { ProjectResourceEmptyState } from "../components/system/project-resource-empty-state.js";
 import type { ProjectContext } from "../components/system/project-layout.js";
 import {
@@ -43,7 +47,6 @@ import {
 } from "../lib/api.js";
 import { showErrorToast, showSuccessToast } from "../lib/notify.js";
 import { getProjectEffectiveRole } from "../lib/project-access.js";
-import { CUSTOM_PROJECT_ENVIRONMENT_VALUE, PROJECT_ENVIRONMENT_OPTIONS } from "../lib/project-form.js";
 import { useDelayedVisibility } from "../lib/use-delayed-visibility.js";
 import {
   availabilityResultVariant,
@@ -103,7 +106,6 @@ export function ProjectHealthPage(): JSX.Element {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [formMode, setFormMode] = useState<FormMode>("create");
   const [editingCheckId, setEditingCheckId] = useState<string | null>(null);
-  const [customEnvironment, setCustomEnvironment] = useState("");
   const [formState, setFormState] = useState<AvailabilityCheckFormState>({
     ...DEFAULT_FORM_STATE,
     environment: project.environment_default
@@ -131,9 +133,7 @@ export function ProjectHealthPage(): JSX.Element {
   const refreshIntervalMs = hasPendingInitialHealthCheckResult(checks)
     ? PENDING_HEALTH_CHECK_REFRESH_INTERVAL_MS
     : autoRefreshIntervalMs;
-  const selectedEnvironmentOption = PROJECT_ENVIRONMENT_OPTIONS.some((option) => option.value === formState.environment)
-    ? formState.environment
-    : CUSTOM_PROJECT_ENVIRONMENT_VALUE;
+  const scopeOptions = useProjectScopeOptions(projectId, project.environment_default);
   const testResultNotice =
     testMessage === null ? null : (
       <Notice tone={testResult?.result.status === "success" ? "success" : "warning"} title={testResult === null ? "Test failed" : "Latest test result"}>
@@ -263,11 +263,6 @@ export function ProjectHealthPage(): JSX.Element {
 
     if (check === undefined) {
       const defaultEnvironment = project.environment_default;
-      setCustomEnvironment(
-        PROJECT_ENVIRONMENT_OPTIONS.some((option) => option.value === defaultEnvironment)
-          ? ""
-          : defaultEnvironment
-      );
       setFormState({
         ...DEFAULT_FORM_STATE,
         interval_seconds: String(defaultIntervalSeconds),
@@ -276,11 +271,6 @@ export function ProjectHealthPage(): JSX.Element {
       return;
     }
 
-    setCustomEnvironment(
-      PROJECT_ENVIRONMENT_OPTIONS.some((option) => option.value === check.environment)
-        ? ""
-        : check.environment
-    );
     setFormState({
       name: check.name,
       url: check.url,
@@ -295,20 +285,6 @@ export function ProjectHealthPage(): JSX.Element {
       service_name: check.service_name ?? "",
       enabled: check.enabled
     });
-  }
-
-  function handleEnvironmentChange(value: string): void {
-    if (value === CUSTOM_PROJECT_ENVIRONMENT_VALUE) {
-      setFormState((current) => ({ ...current, environment: customEnvironment }));
-      return;
-    }
-
-    setFormState((current) => ({ ...current, environment: value }));
-  }
-
-  function handleCustomEnvironmentChange(value: string): void {
-    setCustomEnvironment(value);
-    setFormState((current) => ({ ...current, environment: value }));
   }
 
   function openCreateDialog(): void {
@@ -596,41 +572,30 @@ export function ProjectHealthPage(): JSX.Element {
                   <Field>
                     <FieldLabel htmlFor="health-check-environment">Environment label</FieldLabel>
                     <FieldDescription>Defaults to the project environment so incidents line up with the rest of the project.</FieldDescription>
-                    <Select value={selectedEnvironmentOption} onValueChange={handleEnvironmentChange}>
-                      <SelectTrigger id="health-check-environment" className="w-full">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent position="popper">
-                        <SelectGroup>
-                          {PROJECT_ENVIRONMENT_OPTIONS.map((option) => (
-                            <SelectItem key={option.value} value={option.value}>
-                              {option.label}
-                            </SelectItem>
-                          ))}
-                        </SelectGroup>
-                      </SelectContent>
-                    </Select>
-                    {selectedEnvironmentOption !== CUSTOM_PROJECT_ENVIRONMENT_VALUE ? null : (
-                      <Input
-                        id="health-check-environment-custom"
-                        aria-label="Custom environment"
-                        value={customEnvironment}
-                        onChange={(event) => handleCustomEnvironmentChange(event.currentTarget.value)}
-                        placeholder="preview"
-                        required
-                      />
-                    )}
+                    <ProjectScopeSelect
+                      id="health-check-environment"
+                      label="Environment"
+                      value={formState.environment}
+                      options={scopeOptions.environments}
+                      allLabel="All environments"
+                      includeAll={false}
+                      onValueChange={(environment) =>
+                        setFormState((current) => ({ ...current, environment }))
+                      }
+                    />
                   </Field>
                   <Field>
                     <FieldLabel htmlFor="health-check-service">Service label</FieldLabel>
                     <FieldDescription>Optional service name to group uptime incidents with the same service filters.</FieldDescription>
-                    <Input
+                    <ProjectScopeSelect
                       id="health-check-service"
+                      label="Service"
                       value={formState.service_name}
-                      onChange={(event) => {
-                        const value = event.currentTarget.value;
-                        setFormState((current) => ({ ...current, service_name: value }));
-                      }}
+                      options={scopeOptions.services}
+                      allLabel="No service label"
+                      onValueChange={(service_name) =>
+                        setFormState((current) => ({ ...current, service_name }))
+                      }
                     />
                   </Field>
                 </div>

@@ -11,6 +11,7 @@ import { createProject, createSession, jsonResponse, requestUrl } from "./web-te
 const PROJECT_ID = "11111111-1111-4111-8111-111111111111";
 const OPPORTUNITY_ID = "22222222-2222-4222-8222-222222222222";
 const GENERATION_ID = "33333333-3333-4333-8333-333333333333";
+const DESKTOP_VIEWPORT_WIDTH = 1024;
 
 async function chooseSelectOption(
   user: ReturnType<typeof userEvent.setup>,
@@ -24,6 +25,10 @@ async function chooseSelectOption(
 }
 
 afterEach(() => {
+  Object.defineProperty(window, "innerWidth", {
+    configurable: true,
+    value: DESKTOP_VIEWPORT_WIDTH
+  });
   resetBrowserSessionClientState();
   vi.unstubAllGlobals();
 });
@@ -61,6 +66,21 @@ function installWorkspaceAnalyticsFetch(
               name: "Main App",
               organization_plan: "team"
             })
+          ]
+        });
+      }
+
+      if (url.includes(`/v1/services?project_id=${PROJECT_ID}`)) {
+        return jsonResponse(200, {
+          services: [
+            {
+              service_id: "44444444-4444-4444-8444-444444444444",
+              project_id: PROJECT_ID,
+              name: "web",
+              runtime: "browser",
+              framework: null,
+              environment: "production"
+            }
           ]
         });
       }
@@ -164,9 +184,17 @@ describe("web app - workspace analytics", () => {
     expect(analyticsLink).toHaveAttribute("href", "/analytics/workspace");
 
     await user.click(analyticsLink);
-    expect(
-      await screen.findByRole("heading", { name: "Analytics opportunities" })
-    ).toBeInTheDocument();
+    const inventoryHeading = await screen.findByRole("heading", {
+      name: "Analytics opportunities"
+    });
+    const inventoryCard = inventoryHeading.closest('[data-slot="card"]');
+    expect(inventoryCard).not.toBeNull();
+    const inventoryControls = within(inventoryCard as HTMLElement).getByRole("group", {
+      name: "Analytics inventory controls"
+    });
+    expect(within(inventoryControls).getByRole("button", { name: "Refresh" })).toBeInTheDocument();
+    expect(within(inventoryControls).getByRole("button", { name: "Filters" })).toBeInTheDocument();
+    expect(screen.getByText(/generated analytics bundles for this workspace/i)).toBeInTheDocument();
     expect(
       screen.getByRole("link", { name: "Checkout completion drops after shipping" })
     ).toHaveAttribute("href", `/projects/${PROJECT_ID}/analytics/opportunities/${OPPORTUNITY_ID}`);
@@ -179,9 +207,35 @@ describe("web app - workspace analytics", () => {
     render(<App initialEntries={["/analytics/workspace"]} />);
     await screen.findByText("Checkout completion drops after shipping");
 
+    expect(screen.queryByLabelText("Project")).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Filters" }));
+    const filterDialog = await screen.findByRole("dialog", {
+      name: "Filter analytics opportunities"
+    });
+    expect(filterDialog).toHaveClass("w-[min(48rem,calc(100vw-2rem))]");
+    const fieldGroup = within(filterDialog)
+      .getByLabelText("Project")
+      .closest('[data-slot="field-group"]');
+    expect(fieldGroup).toHaveClass("lg:grid-cols-3");
+    for (const label of [
+      "Project",
+      "Service",
+      "Environment",
+      "Analysis kind",
+      "Status",
+      "Severity",
+      "Bundle state",
+      "From",
+      "To"
+    ]) {
+      expect(within(filterDialog).getByLabelText(label)).toBeInTheDocument();
+    }
     await chooseSelectOption(user, "Project", "Main App");
-    await user.type(screen.getByLabelText("Service"), "web");
-    await user.type(screen.getByLabelText("Environment"), "production");
+    await waitFor(() => {
+      expect(screen.getByRole("combobox", { name: "Service" })).not.toBeDisabled();
+    });
+    await chooseSelectOption(user, "Service", "web");
+    await chooseSelectOption(user, "Environment", "production");
     await chooseSelectOption(user, "Severity", "High");
     await chooseSelectOption(user, "Bundle state", "Ready");
     fireEvent.change(screen.getByLabelText("From"), { target: { value: "2026-07-01" } });
@@ -204,6 +258,16 @@ describe("web app - workspace analytics", () => {
           )
       ).toBe(true);
     });
+    expect(screen.queryByText("Filter analytics opportunities")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Remove Service: web filter" })).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Remove Service: web filter" }));
+    await waitFor(() => {
+      const opportunityUrls = state
+        .requestedUrls()
+        .filter((url) => url.includes("/v1/analytics/opportunities?"));
+      expect(opportunityUrls.at(-1)).not.toContain("service=web");
+    });
 
     await user.click(await screen.findByRole("button", { name: "Go to next page" }));
     await waitFor(() => {
@@ -221,7 +285,13 @@ describe("web app - workspace analytics", () => {
     const tabs = await screen.findByRole("tablist", { name: "Workspace analytics views" });
     await user.click(within(tabs).getByRole("tab", { name: "Bundles" }));
 
-    const table = await screen.findByRole("table", { name: "AnalyticsBundles" });
+    await user.click(screen.getByRole("button", { name: "Filters" }));
+    expect(await screen.findByText("Filter analytics bundles")).toBeInTheDocument();
+    expect(screen.getByLabelText("Status")).toBeInTheDocument();
+    expect(screen.queryByLabelText("Severity")).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Apply filters" }));
+
+    const table = await screen.findByRole("table", { name: "Analytics bundles" });
     for (const heading of [
       "Analysis",
       "Project",
@@ -257,5 +327,113 @@ describe("web app - workspace analytics", () => {
     expect(
       await screen.findByText(/no analytics opportunities match these filters/i)
     ).toBeInTheDocument();
+  });
+
+  it("keeps the default open status implicit and tags an all-statuses override", async () => {
+    const user = userEvent.setup();
+    const state = installWorkspaceAnalyticsFetch();
+
+    render(<App initialEntries={["/analytics/workspace"]} />);
+
+    await screen.findByText("Checkout completion drops after shipping");
+    expect(
+      screen.queryByRole("button", { name: "Remove Status: Open filter" })
+    ).not.toBeInTheDocument();
+    await waitFor(() => {
+      const opportunityUrls = state
+        .requestedUrls()
+        .filter((url) => url.includes("/v1/analytics/opportunities?"));
+      expect(opportunityUrls.at(-1)).toContain("status=open");
+    });
+
+    const filterControls = screen.getByRole("group", { name: "Analytics filter controls" });
+    await user.click(within(filterControls).getByRole("button", { name: "Filters" }));
+    await chooseSelectOption(user, "Status", "All statuses");
+    await user.click(screen.getByRole("button", { name: "Apply filters" }));
+
+    const statusFilter = await screen.findByRole("button", {
+      name: "Remove Status: All statuses filter"
+    });
+    expect(within(filterControls).getByRole("button", { name: /filters.*1/i })).toBeInTheDocument();
+    const appliedFilterList = screen.getByLabelText("Applied filters");
+    const inventoryControls = screen.getByRole("group", { name: "Analytics inventory controls" });
+    expect(
+      within(filterControls).getByRole("button", { name: "Reset filters" })
+    ).toBeInTheDocument();
+    expect(inventoryControls.parentElement).toBe(appliedFilterList.parentElement);
+    expect(
+      inventoryControls.compareDocumentPosition(appliedFilterList) &
+        Node.DOCUMENT_POSITION_FOLLOWING
+    ).toBeTruthy();
+    await waitFor(() => {
+      const opportunityUrls = state
+        .requestedUrls()
+        .filter((url) => url.includes("/v1/analytics/opportunities?"));
+      expect(opportunityUrls.at(-1)).toContain("status=all");
+    });
+
+    await user.click(statusFilter);
+    await waitFor(() => {
+      const opportunityUrls = state
+        .requestedUrls()
+        .filter((url) => url.includes("/v1/analytics/opportunities?"));
+      expect(opportunityUrls.at(-1)).toContain("status=open");
+    });
+    expect(screen.getByRole("button", { name: "Filters" })).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Remove Status: All statuses filter" })
+    ).not.toBeInTheDocument();
+  });
+
+  it("discards unapplied filter changes when the desktop popover is dismissed", async () => {
+    const user = userEvent.setup();
+    const state = installWorkspaceAnalyticsFetch();
+
+    render(<App initialEntries={["/analytics/workspace"]} />);
+
+    await screen.findByText("Checkout completion drops after shipping");
+    await user.click(screen.getByRole("button", { name: "Filters" }));
+    expect(
+      await screen.findByRole("dialog", { name: "Filter analytics opportunities" })
+    ).toBeInTheDocument();
+    await chooseSelectOption(user, "Project", "Main App");
+    await user.keyboard("{Escape}");
+
+    await waitFor(() => {
+      expect(screen.queryByText("Filter analytics opportunities")).not.toBeInTheDocument();
+    });
+
+    await user.click(screen.getByRole("button", { name: "Filters" }));
+    expect(screen.getByLabelText("Project")).toHaveTextContent("All projects");
+
+    const opportunityUrls = state
+      .requestedUrls()
+      .filter((url) => url.includes("/v1/analytics/opportunities?"));
+    expect(opportunityUrls.at(-1)).not.toContain("project_id=");
+  });
+
+  it("opens analytics filters in an accessible sheet on phones", async () => {
+    Object.defineProperty(window, "innerWidth", { configurable: true, value: 375 });
+    const user = userEvent.setup();
+    installWorkspaceAnalyticsFetch();
+
+    render(<App initialEntries={["/analytics/workspace"]} />);
+
+    const trigger = await screen.findByRole("button", { name: "Filters" });
+    expect(screen.getByRole("group", { name: "Analytics filter controls" })).toContainElement(
+      trigger
+    );
+    await user.click(trigger);
+    const sheet = await screen.findByRole("dialog", { name: "Filter analytics opportunities" });
+    expect(within(sheet).getByLabelText("Project")).toBeInTheDocument();
+    expect(within(sheet).getByLabelText("From")).toBeInTheDocument();
+    expect(within(sheet).getByLabelText("To")).toBeInTheDocument();
+
+    await user.click(within(sheet).getByRole("button", { name: "Apply filters" }));
+    await waitFor(() => {
+      expect(
+        screen.queryByRole("dialog", { name: "Filter analytics opportunities" })
+      ).not.toBeInTheDocument();
+    });
   });
 });

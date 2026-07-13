@@ -1,7 +1,8 @@
-import { ChevronDownIcon, ChevronRightIcon, GitForkIcon } from "lucide-react";
+import { ChevronDownIcon, ChevronRightIcon, FunnelIcon } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useOutletContext } from "react-router-dom";
 
+import { AnalyticsSectionHeader } from "../components/system/analytics-section-header.js";
 import { TableRefreshButton } from "../components/system/table-refresh-button.js";
 import { Button } from "../components/ui/button.js";
 import {
@@ -79,27 +80,21 @@ export function ProjectAnalyticsFunnelsPage(): JSX.Element {
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex flex-col gap-1">
-        <h2 className="text-lg font-medium">Funnel analytics</h2>
-        <p className="text-sm text-muted-foreground">
-          Compare entries, completions, and dropoffs, then inspect each funnel step.
-        </p>
-      </div>
-
-      <div className="flex justify-end">
-        <TableRefreshButton
-          isLoading={isLoading}
-          label="Refresh funnel analytics"
-          onRefresh={() => setAttempt((current) => current + 1)}
-        />
-      </div>
+      <AnalyticsSectionHeader
+        title="Funnel analytics"
+        description="Compare entries, completions, and dropoffs, then inspect each funnel step."
+        isLoading={isLoading}
+        onRefresh={() => setAttempt((current) => current + 1)}
+      />
 
       {isLoading && response === null ? <Skeleton className="h-64 w-full" /> : null}
 
       {hasError ? (
         <Notice title="Could not load funnel analytics" tone="destructive">
           <div className="flex flex-col items-start gap-2">
-            <p>Aggregate funnel metrics are temporarily unavailable. Analytics capture continues.</p>
+            <p>
+              Aggregate funnel metrics are temporarily unavailable. Analytics capture continues.
+            </p>
             <Button
               type="button"
               variant="outline"
@@ -249,8 +244,8 @@ function FunnelStepAnalysis({
         </div>
         <TableRefreshButton
           isLoading={isLoading}
-          label={`Refresh ${funnelKey} steps`}
           onRefresh={() => setAttempt((current) => current + 1)}
+          mobileIconOnly
         />
       </div>
 
@@ -285,7 +280,8 @@ function FunnelStepsTable({
   steps: ProjectAnalyticsFunnelStepMetric[];
 }): JSX.Element {
   const orderedSteps = [...steps].sort(
-    (left, right) => left.step_order - right.step_order || left.step_key.localeCompare(right.step_key)
+    (left, right) =>
+      left.step_order - right.step_order || left.step_key.localeCompare(right.step_key)
   );
   return (
     <Table aria-label={`${title} funnel steps`}>
@@ -326,7 +322,7 @@ function FunnelEmptyState(): JSX.Element {
     <Empty>
       <EmptyHeader>
         <EmptyMedia variant="icon">
-          <GitForkIcon />
+          <FunnelIcon />
         </EmptyMedia>
         <EmptyTitle>No funnel activity in this window</EmptyTitle>
         <EmptyDescription>

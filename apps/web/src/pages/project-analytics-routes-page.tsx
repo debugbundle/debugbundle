@@ -1,8 +1,8 @@
-import { RouteIcon } from "lucide-react";
+import { WaypointsIcon } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useOutletContext } from "react-router-dom";
 
-import { TableRefreshButton } from "../components/system/table-refresh-button.js";
+import { AnalyticsSectionHeader } from "../components/system/analytics-section-header.js";
 import { Button } from "../components/ui/button.js";
 import {
   Empty,
@@ -63,20 +63,12 @@ export function ProjectAnalyticsRoutesPage(): JSX.Element {
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex flex-col gap-1">
-        <h2 className="text-lg font-medium">Route analytics</h2>
-        <p className="text-sm text-muted-foreground">
-          Compare navigation volume, exits, bounce signals, and incident-linked sessions.
-        </p>
-      </div>
-
-      <div className="flex justify-end">
-        <TableRefreshButton
-          isLoading={isLoading}
-          label="Refresh route analytics"
-          onRefresh={() => setAttempt((current) => current + 1)}
-        />
-      </div>
+      <AnalyticsSectionHeader
+        title="Route analytics"
+        description="Compare navigation volume, exits, bounce signals, and incident-linked sessions."
+        isLoading={isLoading}
+        onRefresh={() => setAttempt((current) => current + 1)}
+      />
 
       {isLoading && response === null ? <Skeleton className="h-64 w-full" /> : null}
 
@@ -100,7 +92,7 @@ export function ProjectAnalyticsRoutesPage(): JSX.Element {
         <Empty>
           <EmptyHeader>
             <EmptyMedia variant="icon">
-              <RouteIcon />
+              <WaypointsIcon />
             </EmptyMedia>
             <EmptyTitle>No route activity in this window</EmptyTitle>
             <EmptyDescription>
@@ -145,7 +137,5 @@ export function ProjectAnalyticsRoutesPage(): JSX.Element {
 }
 
 function MetricCell({ value }: { value: number }): JSX.Element {
-  return (
-    <TableCell className="text-right tabular-nums">{INTEGER_FORMAT.format(value)}</TableCell>
-  );
+  return <TableCell className="text-right tabular-nums">{INTEGER_FORMAT.format(value)}</TableCell>;
 }

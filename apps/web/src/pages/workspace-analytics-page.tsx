@@ -35,7 +35,7 @@ export function WorkspaceAnalyticsPage(): JSX.Element {
 
   return (
     <div className="flex flex-col gap-6">
-      <PageHeader description="Cross-project product-usage opportunities and generated AnalyticsBundles for this workspace." />
+      <PageHeader description="Cross-project product-usage opportunities and generated analytics bundles for this workspace." />
       <Tabs
         value={activeView}
         onValueChange={(value) => {

@@ -55,14 +55,14 @@ export function ProjectAnalyticsBundleDetailPage(): JSX.Element {
         <Button asChild variant="ghost" size="sm">
           <Link to={`/projects/${projectId}/analytics/bundles`}>
             <ArrowLeftIcon data-icon="inline-start" />
-            Back to AnalyticsBundles
+            Back to analytics bundles
           </Link>
         </Button>
       </div>
 
       {response === null && !hasError ? <DetailSkeleton /> : null}
       {hasError ? (
-        <Notice title="Could not load AnalyticsBundle" tone="destructive">
+        <Notice title="Could not load analytics bundle" tone="destructive">
           <div className="flex flex-col items-start gap-2">
             <p>The artifact is temporarily unavailable or no longer accessible.</p>
             <RefreshButton onRefresh={() => setAttempt((current) => current + 1)} />
@@ -112,7 +112,7 @@ function RefreshButton({ onRefresh }: { onRefresh: () => void }): JSX.Element {
   return (
     <Button type="button" variant="outline" size="sm" onClick={onRefresh}>
       <RefreshCwIcon data-icon="inline-start" />
-      Refresh AnalyticsBundle status
+      Refresh
     </Button>
   );
 }
@@ -549,7 +549,7 @@ function readNumber(value: unknown): number | null {
 
 function DetailSkeleton(): JSX.Element {
   return (
-    <div className="flex flex-col gap-4" aria-label="Loading AnalyticsBundle">
+    <div className="flex flex-col gap-4" aria-label="Loading analytics bundle">
       <Skeleton className="h-8 w-80 max-w-full" />
       <Skeleton className="h-24 w-full" />
       <Skeleton className="h-40 w-full" />

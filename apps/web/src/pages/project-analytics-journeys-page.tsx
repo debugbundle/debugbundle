@@ -1,8 +1,8 @@
-import { WaypointsIcon } from "lucide-react";
+import { RouteIcon } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link, useOutletContext } from "react-router-dom";
 
-import { TableRefreshButton } from "../components/system/table-refresh-button.js";
+import { AnalyticsSectionHeader } from "../components/system/analytics-section-header.js";
 import { Button } from "../components/ui/button.js";
 import {
   Empty,
@@ -67,20 +67,12 @@ export function ProjectAnalyticsJourneysPage(): JSX.Element {
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex flex-col gap-1">
-        <h2 className="text-lg font-medium">Journey patterns</h2>
-        <p className="text-sm text-muted-foreground">
-          Compare common route transitions and inspect the retained structured samples behind them.
-        </p>
-      </div>
-
-      <div className="flex justify-end">
-        <TableRefreshButton
-          isLoading={isLoading}
-          label="Refresh journey patterns"
-          onRefresh={() => setAttempt((current) => current + 1)}
-        />
-      </div>
+      <AnalyticsSectionHeader
+        title="Journey patterns"
+        description="Compare common route transitions and inspect the retained structured samples behind them."
+        isLoading={isLoading}
+        onRefresh={() => setAttempt((current) => current + 1)}
+      />
 
       {isLoading && response === null ? <Skeleton className="h-64 w-full" /> : null}
 
@@ -104,7 +96,7 @@ export function ProjectAnalyticsJourneysPage(): JSX.Element {
         <Empty>
           <EmptyHeader>
             <EmptyMedia variant="icon">
-              <WaypointsIcon />
+              <RouteIcon />
             </EmptyMedia>
             <EmptyTitle>No journey transitions in this window</EmptyTitle>
             <EmptyDescription>

@@ -144,7 +144,7 @@ describe("web app - incident analytics impact", () => {
       "href",
       `/projects/${PROJECT_ID}/analytics/journeys/${SAMPLE_ID}`
     );
-    expect(within(panel).getByRole("link", { name: "View AnalyticsBundle" })).toHaveAttribute(
+    expect(within(panel).getByRole("link", { name: "View analytics bundle" })).toHaveAttribute(
       "href",
       `/projects/${PROJECT_ID}/analytics/bundles/${GENERATION_ID}`
     );
@@ -174,7 +174,7 @@ describe("web app - incident analytics impact", () => {
     expect(within(panel).getByText(/no analytics-linked sessions were found/i)).toBeInTheDocument();
     expect(within(panel).getByText("Unavailable")).toBeInTheDocument();
     expect(
-      within(panel).getByRole("button", { name: "Generate AnalyticsBundle" })
+      within(panel).getByRole("button", { name: "Generate analytics bundle" })
     ).toBeInTheDocument();
   });
 
@@ -219,7 +219,7 @@ describe("web app - incident analytics impact", () => {
     const user = userEvent.setup();
     render(<App initialEntries={[`/projects/${PROJECT_ID}/incidents/${INCIDENT_ID}`]} />);
 
-    await user.click(await screen.findByRole("button", { name: "Generate AnalyticsBundle" }));
+    await user.click(await screen.findByRole("button", { name: "Generate analytics bundle" }));
     await waitFor(() => {
       expect(state.requestedUrls.some((url) => url.includes(`/v1/analytics/bundles/${GENERATION_ID}?`))).toBe(true);
     });
@@ -248,12 +248,12 @@ describe("web app - incident analytics impact", () => {
     render(<App initialEntries={[`/projects/${PROJECT_ID}/incidents/${INCIDENT_ID}`]} />);
 
     const generateButton = await screen.findByRole("button", {
-      name: "Generate AnalyticsBundle"
+      name: "Generate analytics bundle"
     });
     await user.click(generateButton);
 
     expect(
-      await screen.findByText(/monthly AnalyticsBundle generation allowance/i)
+      await screen.findByText(/monthly analytics bundle generation allowance/i)
     ).toBeInTheDocument();
     expect(generateButton).toBeEnabled();
   });
@@ -273,7 +273,7 @@ describe("web app - incident analytics impact", () => {
     const panel = await screen.findByRole("region", { name: "Analytics impact" });
     expect(within(panel).getByText("Failed")).toBeInTheDocument();
     expect(within(panel).getByText(/aggregate evidence was unavailable/i)).toBeInTheDocument();
-    expect(within(panel).getByRole("link", { name: "View AnalyticsBundle" })).toHaveAttribute(
+    expect(within(panel).getByRole("link", { name: "View analytics bundle" })).toHaveAttribute(
       "href",
       `/projects/${PROJECT_ID}/analytics/bundles/${GENERATION_ID}`
     );

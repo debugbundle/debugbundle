@@ -55,11 +55,13 @@ import {
 import { CursorPaginationControls } from "./cursor-pagination-controls.js";
 import { Dialog } from "../ui/dialog.js";
 import { DialogFormContent } from "./dialog-form-content.js";
+import { useProjectScopeOptions } from "./project-scope-controls.js";
 
 const CAPTURE_RULES_PAGE_SIZE = 6;
 
 interface ProjectCaptureRulesCardProps {
   projectId: string;
+  environmentDefault: string;
   canEdit: boolean;
 }
 
@@ -90,6 +92,7 @@ function draftsEqual(left: RuleDraft, right: RuleDraft): boolean {
 
 export function ProjectCaptureRulesCard({
   projectId,
+  environmentDefault,
   canEdit
 }: ProjectCaptureRulesCardProps): JSX.Element {
   const [rulesResponse, setRulesResponse] = useState<ProjectCaptureRulesResponse | null>(null);
@@ -109,6 +112,7 @@ export function ProjectCaptureRulesCard({
   const [isCreating, setIsCreating] = useState(false);
   const [hasSubmittedCreate, setHasSubmittedCreate] = useState(false);
   const [rulesPage, setRulesPage] = useState(1);
+  const scopeOptions = useProjectScopeOptions(projectId, environmentDefault);
 
   async function loadRules(showRefreshing = false): Promise<void> {
     if (showRefreshing) {
@@ -617,6 +621,8 @@ export function ProjectCaptureRulesCard({
           <CaptureRuleCreateForm
             draft={createDraft}
             disabled={isCreating}
+            serviceOptions={scopeOptions.services}
+            environmentOptions={scopeOptions.environments}
             onDraftChange={setCreateDraft}
           />
         </DialogFormContent>

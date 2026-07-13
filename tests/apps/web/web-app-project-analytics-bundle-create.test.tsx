@@ -43,12 +43,21 @@ if (typeof HTMLElement !== "undefined") {
 async function chooseSelectOption(
   user: ReturnType<typeof userEvent.setup>,
   label: string,
-  optionName: string
+  optionName: string | RegExp
 ): Promise<void> {
   const trigger = screen.getByLabelText(label);
   trigger.focus();
   fireEvent.keyDown(trigger, { key: "ArrowDown", code: "ArrowDown" });
   await user.click(await screen.findByRole("option", { name: optionName }));
+}
+
+async function chooseCustomScopeValue(
+  user: ReturnType<typeof userEvent.setup>,
+  label: "Service" | "Environment",
+  value: string
+): Promise<void> {
+  await chooseSelectOption(user, label, new RegExp(`custom ${label.toLowerCase()}`, "i"));
+  await user.type(screen.getByRole("textbox", { name: new RegExp(`custom ${label.toLowerCase()}`, "i") }), value);
 }
 
 function installCreateFetch(
@@ -152,16 +161,16 @@ describe("web app - project AnalyticsBundle generation", () => {
     render(<App initialEntries={[`/projects/${PROJECT_ID}/analytics/bundles/new`]} />);
 
     expect(
-      await screen.findByRole("heading", { name: "Generate AnalyticsBundle" })
+      await screen.findByRole("heading", { name: "Generate analytics bundle" })
     ).toBeInTheDocument();
     await chooseSelectOption(user, "Analysis kind", "Funnel Dropoff");
     await user.type(screen.getByLabelText("Funnel key"), "checkout");
-    await user.type(screen.getByLabelText("Service"), "storefront");
-    await user.type(screen.getByLabelText("Environment"), "production");
-    await user.click(screen.getByRole("button", { name: "Generate AnalyticsBundle" }));
+    await chooseCustomScopeValue(user, "Service", "storefront");
+    await chooseSelectOption(user, "Environment", "production");
+    await user.click(screen.getByRole("button", { name: "Generate analytics bundle" }));
 
     expect(await screen.findByText("Processing")).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Back to AnalyticsBundles" })).toHaveAttribute(
+    expect(screen.getByRole("link", { name: "Back to analytics bundles" })).toHaveAttribute(
       "href",
       `/projects/${PROJECT_ID}/analytics/bundles`
     );
@@ -181,13 +190,13 @@ describe("web app - project AnalyticsBundle generation", () => {
     const state = installCreateFetch();
     render(<App initialEntries={[`/projects/${PROJECT_ID}/analytics/bundles/new`]} />);
 
-    await screen.findByRole("heading", { name: "Generate AnalyticsBundle" });
+    await screen.findByRole("heading", { name: "Generate analytics bundle" });
     await chooseSelectOption(user, "Analysis kind", "Route Health");
     await chooseSelectOption(user, "Time window", "Custom range");
     await user.type(screen.getByLabelText("From"), "2026-07-01");
     await user.type(screen.getByLabelText("To"), "2026-07-10");
     await user.type(screen.getByLabelText("Route"), "/checkout?step=payment");
-    await user.click(screen.getByRole("button", { name: "Generate AnalyticsBundle" }));
+    await user.click(screen.getByRole("button", { name: "Generate analytics bundle" }));
 
     expect(
       screen.getByText(/route must not contain query strings or fragments/i)
@@ -196,7 +205,7 @@ describe("web app - project AnalyticsBundle generation", () => {
 
     await user.clear(screen.getByLabelText("Route"));
     await user.type(screen.getByLabelText("Route"), "/checkout");
-    await user.click(screen.getByRole("button", { name: "Generate AnalyticsBundle" }));
+    await user.click(screen.getByRole("button", { name: "Generate analytics bundle" }));
     await waitFor(() => expect(state.createBodies()).toHaveLength(1));
     expect(state.createBodies()[0]).toMatchObject({
       analysis_kind: "route_health",
@@ -212,10 +221,10 @@ describe("web app - project AnalyticsBundle generation", () => {
     const state = installCreateFetch();
     render(<App initialEntries={[`/projects/${PROJECT_ID}/analytics/bundles/new`]} />);
 
-    await screen.findByRole("heading", { name: "Generate AnalyticsBundle" });
+    await screen.findByRole("heading", { name: "Generate analytics bundle" });
     await chooseSelectOption(user, "Analysis kind", "Incident Impact");
     await chooseSelectOption(user, "Incident", "Checkout API errors");
-    await user.click(screen.getByRole("button", { name: "Generate AnalyticsBundle" }));
+    await user.click(screen.getByRole("button", { name: "Generate analytics bundle" }));
 
     await waitFor(() => expect(state.createBodies()).toHaveLength(1));
     expect(state.createBodies()[0]).toMatchObject({
@@ -229,7 +238,7 @@ describe("web app - project AnalyticsBundle generation", () => {
     installCreateFetch({ failIncidentsOnce: true });
     render(<App initialEntries={[`/projects/${PROJECT_ID}/analytics/bundles/new`]} />);
 
-    await screen.findByRole("heading", { name: "Generate AnalyticsBundle" });
+    await screen.findByRole("heading", { name: "Generate analytics bundle" });
     await chooseSelectOption(user, "Analysis kind", "Incident Impact");
     expect(await screen.findByText("Could not load project incidents")).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Retry incidents" }));
@@ -243,8 +252,8 @@ describe("web app - project AnalyticsBundle generation", () => {
     });
     render(<App initialEntries={[`/projects/${PROJECT_ID}/analytics/bundles/new`]} />);
 
-    await screen.findByRole("heading", { name: "Generate AnalyticsBundle" });
-    await user.click(screen.getByRole("button", { name: "Generate AnalyticsBundle" }));
+    await screen.findByRole("heading", { name: "Generate analytics bundle" });
+    await user.click(screen.getByRole("button", { name: "Generate analytics bundle" }));
 
     expect(await screen.findByText("Generation failed")).toBeInTheDocument();
     expect(screen.getByText("Monthly Quota Exceeded")).toBeInTheDocument();
@@ -259,11 +268,11 @@ describe("web app - project AnalyticsBundle generation", () => {
     });
     render(<App initialEntries={[`/projects/${PROJECT_ID}/analytics/bundles/new`]} />);
 
-    await screen.findByRole("heading", { name: "Generate AnalyticsBundle" });
-    await user.type(screen.getByLabelText("Service"), "storefront");
-    await user.click(screen.getByRole("button", { name: "Generate AnalyticsBundle" }));
+    await screen.findByRole("heading", { name: "Generate analytics bundle" });
+    await chooseCustomScopeValue(user, "Service", "storefront");
+    await user.click(screen.getByRole("button", { name: "Generate analytics bundle" }));
 
-    expect(await screen.findByText("AnalyticsBundle limit reached")).toBeInTheDocument();
-    expect(screen.getByLabelText("Service")).toHaveValue("storefront");
+    expect(await screen.findByText("Analytics bundle limit reached")).toBeInTheDocument();
+    expect(screen.getByRole("textbox", { name: "Custom service" })).toHaveValue("storefront");
   });
 });

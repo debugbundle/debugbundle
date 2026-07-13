@@ -738,6 +738,7 @@ export function ProjectWeeklyReportSettingsCard({
               <ProjectResourceEmptyState
                 icon={BellRingIcon}
                 title="No Slack weekly reports yet"
+                variant="outlined"
                 description="Create a Slack weekly report when your team wants the weekly summary in a connected channel."
                 {...(canEdit
                   ? {

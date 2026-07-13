@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { userEvent } from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -29,6 +29,32 @@ const analyticsSettings = {
   max_custom_dimensions: 0,
   approved_custom_dimensions: []
 } as const;
+
+if (typeof HTMLElement !== "undefined") {
+  HTMLElement.prototype.hasPointerCapture ??= () => false;
+  HTMLElement.prototype.setPointerCapture ??= () => {};
+  HTMLElement.prototype.releasePointerCapture ??= () => {};
+}
+
+async function chooseSelectOption(
+  user: ReturnType<typeof userEvent.setup>,
+  label: string,
+  optionName: string
+): Promise<void> {
+  const trigger = screen.getByLabelText(label);
+  trigger.focus();
+  fireEvent.keyDown(trigger, { key: "ArrowDown", code: "ArrowDown" });
+  await user.click(await screen.findByRole("option", { name: optionName }));
+}
+
+async function chooseCustomScopeValue(
+  user: ReturnType<typeof userEvent.setup>,
+  label: "Service" | "Environment",
+  value: string
+): Promise<void> {
+  await chooseSelectOption(user, label, `Custom ${label.toLowerCase()}`);
+  await user.type(screen.getByRole("textbox", { name: `Custom ${label.toLowerCase()}` }), value);
+}
 
 function installOverviewFetch(
   input: {
@@ -189,6 +215,7 @@ describe("web app - project analytics overview", () => {
     await user.click(analyticsTab);
 
     expect(await screen.findByRole("heading", { name: "Analytics overview" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Refresh" })).toBeInTheDocument();
     expect(analyticsTab).toHaveAttribute("data-state", "active");
   });
 
@@ -213,8 +240,10 @@ describe("web app - project analytics overview", () => {
     render(<App initialEntries={["/projects/proj_123/analytics"]} />);
 
     await screen.findByText("1,280");
-    await user.type(screen.getByLabelText("Service"), "storefront");
-    await user.type(screen.getByLabelText("Environment"), "staging");
+    expect(screen.queryByLabelText("Service")).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "More filters" }));
+    await chooseCustomScopeValue(user, "Service", "storefront");
+    await chooseSelectOption(user, "Environment", "staging");
     await user.click(screen.getByRole("button", { name: "Apply filters" }));
 
     await waitFor(() => {
@@ -230,6 +259,49 @@ describe("web app - project analytics overview", () => {
           )
       ).toBe(true);
     });
+    const serviceFilter = screen.getByRole("button", {
+      name: "Remove Service: storefront filter"
+    });
+    const filterControls = screen.getByRole("group", {
+      name: "Project analytics filter controls"
+    });
+    const primaryFilterControls = within(filterControls).getByRole("group", {
+      name: "Primary project analytics filters"
+    });
+    expect(
+      within(primaryFilterControls).getByRole("button", { name: /more filters.*2/i })
+    ).toBeInTheDocument();
+    const appliedFilterList = within(filterControls).getByLabelText("Applied filters");
+    expect(serviceFilter).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Remove Environment: staging filter" })
+    ).toBeInTheDocument();
+    expect(within(primaryFilterControls).getByLabelText("Time window")).toBeInTheDocument();
+    expect(
+      within(primaryFilterControls).getByRole("button", { name: "Reset filters" })
+    ).toBeInTheDocument();
+    expect(
+      primaryFilterControls.compareDocumentPosition(appliedFilterList) &
+        Node.DOCUMENT_POSITION_FOLLOWING
+    ).toBeTruthy();
+  });
+
+  it("applies the visible time window without opening secondary filters", async () => {
+    const user = userEvent.setup();
+    const state = installOverviewFetch();
+
+    render(<App initialEntries={["/projects/proj_123/analytics"]} />);
+
+    await screen.findByText("1,280");
+    await chooseSelectOption(user, "Time window", "Last 7 days");
+
+    await waitFor(() => {
+      const summaryUrls = state
+        .requestedUrls()
+        .filter((url) => url.includes("/v1/analytics/summary?"));
+      expect(summaryUrls.at(-1)).toContain("last=7d");
+    });
+    expect(screen.queryByText("More analytics filters")).not.toBeInTheDocument();
   });
 
   it("shows a setup action when paid analytics capture is disabled", async () => {
@@ -258,6 +330,7 @@ describe("web app - project analytics overview", () => {
         name: /upgrade to solo or team to unlock product analytics/i
       })
     ).toBeInTheDocument();
+    expect(screen.getByText(/analytics bundles are available on paid plans/i)).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /open billing/i })).toHaveAttribute("href", "/billing");
     expect(state.metricsRequests()).toBe(0);
   });

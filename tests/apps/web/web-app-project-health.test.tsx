@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { userEvent } from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -12,6 +12,23 @@ import {
   type AvailabilityCheckResultRecord
 } from "../../../apps/web/src/lib/api.ts";
 import { createProject, createSession, jsonResponse, requestUrl } from "./web-test-helpers.js";
+
+if (typeof HTMLElement !== "undefined") {
+  HTMLElement.prototype.hasPointerCapture ??= () => false;
+  HTMLElement.prototype.setPointerCapture ??= () => {};
+  HTMLElement.prototype.releasePointerCapture ??= () => {};
+}
+
+async function chooseSelectOption(
+  user: ReturnType<typeof userEvent.setup>,
+  label: string,
+  optionName: string
+): Promise<void> {
+  const trigger = screen.getByLabelText(label);
+  trigger.focus();
+  fireEvent.keyDown(trigger, { key: "ArrowDown", code: "ArrowDown" });
+  await user.click(await screen.findByRole("option", { name: optionName }));
+}
 
 function createHealthCheck(overrides: Partial<AvailabilityCheckRecord> = {}): AvailabilityCheckRecord {
   return {
@@ -185,8 +202,8 @@ describe("web app — project health page", () => {
     await user.type(screen.getByLabelText(/check url/i), "https://checkout.example.com/health");
     await user.clear(screen.getByLabelText(/interval/i));
     await user.type(screen.getByLabelText(/interval/i), "30");
-    await user.clear(screen.getByLabelText(/service label/i));
-    await user.type(screen.getByLabelText(/service label/i), "checkout");
+    await chooseSelectOption(user, "Service", "Custom service");
+    await user.type(screen.getByRole("textbox", { name: "Custom service" }), "checkout");
 
     await user.click(screen.getByRole("button", { name: /test endpoint/i }));
     expect(await screen.findByText(/endpoint responded within the expected status range/i)).toBeInTheDocument();

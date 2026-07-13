@@ -159,7 +159,7 @@ export function IncidentAnalyticsImpact({
       </div>
 
       {generationError === null ? null : (
-        <Notice title="Could not generate AnalyticsBundle" tone="destructive">
+        <Notice title="Could not generate analytics bundle" tone="destructive">
           {generationError}
         </Notice>
       )}
@@ -260,7 +260,7 @@ export function IncidentAnalyticsImpact({
       )}
 
       {impact.analytics_bundle.failure_reason === null ? null : (
-        <Notice title="AnalyticsBundle generation failed" tone="destructive">
+        <Notice title="Analytics bundle generation failed" tone="destructive">
           {impact.analytics_bundle.failure_reason}
         </Notice>
       )}
@@ -287,7 +287,7 @@ function BundleAction({
         </Badge>
         <Button asChild variant="outline" size="sm">
           <Link to={`/projects/${projectId}/analytics/bundles/${bundle.generation_id}`}>
-            View AnalyticsBundle
+            View analytics bundle
             <ArrowRightIcon aria-hidden="true" />
           </Link>
         </Button>
@@ -301,7 +301,7 @@ function BundleAction({
   return (
     <GenerateButton
       isGenerating={isGenerating}
-      label={bundle.status === "failed" ? "Generate again" : "Generate AnalyticsBundle"}
+      label={bundle.status === "failed" ? "Generate again" : "Generate analytics bundle"}
       onClick={onGenerate}
     />
   );
@@ -405,9 +405,9 @@ function formatGenerationError(error: unknown): string {
   const code =
     error instanceof ApiRequestError ? error.code : typeof error === "string" ? error : null;
   if (code === "analytics_quota_exceeded")
-    return "The monthly AnalyticsBundle generation allowance is exhausted.";
+    return "The monthly analytics bundle generation allowance is exhausted.";
   if (code === "analytics_disabled") return "Analytics is disabled for this project.";
-  if (code === "upgrade_required") return "This plan does not include AnalyticsBundles.";
+  if (code === "upgrade_required") return "This plan does not include analytics bundles.";
   if (code === "incident_not_found") return "This incident is no longer accessible.";
   return "The generation request could not be completed.";
 }

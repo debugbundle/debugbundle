@@ -3,9 +3,9 @@ import { useMemo } from "react";
 import { Link, useOutletContext } from "react-router-dom";
 
 import { AnalyticsBundlesTable } from "../components/system/analytics-bundles-table.js";
+import { AnalyticsSectionHeader } from "../components/system/analytics-section-header.js";
 import { CursorPaginationControls } from "../components/system/cursor-pagination-controls.js";
 import { ResourceListState } from "../components/system/resource-list-state.js";
-import { TableRefreshButton } from "../components/system/table-refresh-button.js";
 import { Button } from "../components/ui/button.js";
 import {
   Empty,
@@ -45,36 +45,31 @@ export function ProjectAnalyticsBundlesPage(): JSX.Element {
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex flex-col gap-1">
-        <h2 className="text-lg font-medium">Generated AnalyticsBundles</h2>
-        <p className="text-sm text-muted-foreground">
-          Review ready analysis artifacts and track generations still being processed.
-        </p>
-      </div>
-      <div className="flex flex-wrap justify-end gap-2">
-        <Button asChild>
-          <Link to={`/projects/${projectId}/analytics/bundles/new`}>
-            <PlusIcon data-icon="inline-start" />
-            Generate AnalyticsBundle
-          </Link>
-        </Button>
-        <TableRefreshButton
-          isLoading={pagination.isLoading}
-          label="Refresh project AnalyticsBundles"
-          onRefresh={pagination.refreshPage}
-        />
-      </div>
+      <AnalyticsSectionHeader
+        title="Generated analytics bundles"
+        description="Review ready analysis artifacts and track generations still being processed."
+        isLoading={pagination.isLoading}
+        onRefresh={pagination.refreshPage}
+        actions={
+          <Button asChild>
+            <Link to={`/projects/${projectId}/analytics/bundles/new`}>
+              <PlusIcon data-icon="inline-start" />
+              Generate analytics bundle
+            </Link>
+          </Button>
+        }
+      />
       {pagination.hasError ? (
-        <Notice title="Could not load project AnalyticsBundles" tone="destructive">
+        <Notice title="Could not load project analytics bundles" tone="destructive">
           <div className="flex flex-col items-start gap-2">
-            <p>The project AnalyticsBundle inventory is temporarily unavailable.</p>
+            <p>The project analytics bundle inventory is temporarily unavailable.</p>
             <Button
               type="button"
               variant="outline"
               size="sm"
               onClick={() => void pagination.refreshPage()}
             >
-              Retry project AnalyticsBundles
+              Retry project analytics bundles
             </Button>
           </div>
         </Notice>
@@ -88,7 +83,7 @@ export function ProjectAnalyticsBundlesPage(): JSX.Element {
                 <EmptyMedia variant="icon">
                   <PackageIcon />
                 </EmptyMedia>
-                <EmptyTitle>No AnalyticsBundles in this project</EmptyTitle>
+                <EmptyTitle>No analytics bundles in this project</EmptyTitle>
                 <EmptyDescription>
                   Generated, pending, and failed analysis artifacts in this window will appear here.
                 </EmptyDescription>
@@ -100,7 +95,7 @@ export function ProjectAnalyticsBundlesPage(): JSX.Element {
             <div className="flex flex-col gap-4">
               <AnalyticsBundlesTable
                 bundles={bundles}
-                ariaLabel="Project AnalyticsBundles"
+                ariaLabel="Project analytics bundles"
                 showProject={false}
               />
               <CursorPaginationControls
@@ -126,7 +121,7 @@ function buildWindow(last: keyof typeof WINDOW_DAYS): { from: string; to: string
 
 function InventorySkeleton(): JSX.Element {
   return (
-    <div className="flex flex-col gap-3" aria-label="Loading project AnalyticsBundles">
+    <div className="flex flex-col gap-3" aria-label="Loading project analytics bundles">
       <Skeleton className="h-12 w-full" />
       <Skeleton className="h-12 w-full" />
       <Skeleton className="h-12 w-full" />

@@ -2,6 +2,7 @@ import {
   ArrowDownIcon,
   ArrowUpIcon,
   ArchiveIcon,
+  FunnelIcon,
   PencilIcon,
   PlusIcon,
   Trash2Icon
@@ -37,6 +38,7 @@ import { Notice } from "../ui/notice.js";
 import { Skeleton } from "../ui/skeleton.js";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../ui/table.js";
 import { DialogFormContent } from "./dialog-form-content.js";
+import { ProjectResourceEmptyState } from "./project-resource-empty-state.js";
 
 interface ProjectAnalyticsSavedFunnelsSectionProps {
   projectId: string;
@@ -285,16 +287,16 @@ export function ProjectAnalyticsSavedFunnelsSection({
           <Skeleton className="h-16 w-full" />
         </div>
       ) : loadError === null && funnels.length === 0 ? (
-        <div className="flex flex-col items-start gap-3 rounded-lg border border-dashed p-4">
-          <div>
-            <p className="text-sm font-medium">No saved funnels</p>
-            <p className="text-sm text-muted-foreground">
-              {canManage
-                ? "Add an ordered journey to make conversion analysis repeatable."
-                : "This project has no active saved funnel definitions."}
-            </p>
-          </div>
-        </div>
+        <ProjectResourceEmptyState
+          icon={FunnelIcon}
+          title="No saved funnels"
+          variant="outlined"
+          description={
+            canManage
+              ? "Add an ordered journey to make conversion analysis repeatable."
+              : "This project has no active saved funnel definitions."
+          }
+        />
       ) : loadError === null ? (
         <Table>
           <TableHeader>
@@ -510,7 +512,7 @@ export function ProjectAnalyticsSavedFunnelsSection({
             <AlertDialogTitle>Archive saved funnel</AlertDialogTitle>
             <AlertDialogDescription>
               The active definition will be removed. Existing aggregate metrics and generated
-              AnalyticsBundles remain available for their configured retention periods.
+              Analytics bundles remain available for their configured retention periods.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

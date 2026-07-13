@@ -8,24 +8,22 @@ import {
 import { useCursorPagination } from "../../lib/use-cursor-pagination.js";
 import { Button } from "../ui/button.js";
 import { Card, CardContent, CardHeader, CardTitle } from "../ui/card.js";
-import {
-  Empty,
-  EmptyDescription,
-  EmptyHeader,
-  EmptyMedia,
-  EmptyTitle
-} from "../ui/empty.js";
+import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "../ui/empty.js";
 import { Notice } from "../ui/notice.js";
 import { Skeleton } from "../ui/skeleton.js";
 import { AnalyticsOpportunitiesTable } from "./analytics-opportunities-table.js";
+import { AppliedAnalyticsFilterList } from "./analytics-filter-panel.js";
 import { CursorPaginationControls } from "./cursor-pagination-controls.js";
 import { ResourceListState } from "./resource-list-state.js";
 import { TableRefreshButton } from "./table-refresh-button.js";
 import {
+  clearWorkspaceAnalyticsFilter,
+  createWorkspaceAnalyticsAppliedFilters,
   createWorkspaceAnalyticsFilters,
   toAnalyticsDateEnd,
   toAnalyticsDateStart,
   WorkspaceAnalyticsFilters,
+  type WorkspaceAnalyticsFilterKey,
   type WorkspaceAnalyticsFilterValues
 } from "./workspace-analytics-filters.js";
 
@@ -52,25 +50,45 @@ export function WorkspaceAnalyticsOpportunities({
     setFilters(nextFilters);
   }
 
+  function removeFilter(key: WorkspaceAnalyticsFilterKey): void {
+    const nextFilters = clearWorkspaceAnalyticsFilter("opportunities", filters, key);
+    setDraftFilters(nextFilters);
+    setFilters(nextFilters);
+  }
+
+  const appliedFilters = createWorkspaceAnalyticsAppliedFilters(
+    "opportunities",
+    filters,
+    projects,
+    removeFilter
+  );
+
   return (
-    <Card className="min-w-0">
-      <CardHeader className="flex flex-col gap-4">
-        <div className="flex items-center justify-between gap-3">
-          <CardTitle>Analytics opportunities</CardTitle>
+    <Card className="w-full min-w-0">
+      <CardHeader className="grid grid-cols-1 items-center gap-3 sm:grid-cols-[minmax(0,1fr)_auto]">
+        <CardTitle>Analytics opportunities</CardTitle>
+        <div
+          role="group"
+          aria-label="Analytics inventory controls"
+          className="flex w-full flex-wrap items-center justify-end gap-2 sm:w-auto"
+        >
           <TableRefreshButton
             isLoading={pagination.isLoading}
-            label="Refresh analytics opportunities"
             onRefresh={pagination.refreshPage}
+            mobileIconOnly
+          />
+          <WorkspaceAnalyticsFilters
+            mode="opportunities"
+            projects={projects}
+            value={draftFilters}
+            activeFilterCount={appliedFilters.length}
+            onChange={setDraftFilters}
+            onApply={() => setFilters(normalizeFilters(draftFilters))}
+            onReset={resetFilters}
+            onDismiss={() => setDraftFilters(filters)}
           />
         </div>
-        <WorkspaceAnalyticsFilters
-          mode="opportunities"
-          projects={projects}
-          value={draftFilters}
-          onChange={setDraftFilters}
-          onApply={() => setFilters(normalizeFilters(draftFilters))}
-          onReset={resetFilters}
-        />
+        <AppliedAnalyticsFilterList filters={appliedFilters} className="sm:col-span-2" />
       </CardHeader>
       <CardContent>
         {pagination.hasError ? (
@@ -153,11 +171,10 @@ function buildOpportunityQuery(
     ...(filters.bundleStatus === "all"
       ? {}
       : {
-          bundleStatus:
-            filters.bundleStatus as Exclude<
-              AnalyticsOpportunityInventoryQuery["bundleStatus"],
-              undefined
-            >
+          bundleStatus: filters.bundleStatus as Exclude<
+            AnalyticsOpportunityInventoryQuery["bundleStatus"],
+            undefined
+          >
         }),
     ...(from === undefined ? {} : { from }),
     ...(to === undefined ? {} : { to }),

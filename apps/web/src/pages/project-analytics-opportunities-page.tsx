@@ -3,9 +3,9 @@ import { useMemo } from "react";
 import { useOutletContext } from "react-router-dom";
 
 import { AnalyticsOpportunitiesTable } from "../components/system/analytics-opportunities-table.js";
+import { AnalyticsSectionHeader } from "../components/system/analytics-section-header.js";
 import { CursorPaginationControls } from "../components/system/cursor-pagination-controls.js";
 import { ResourceListState } from "../components/system/resource-list-state.js";
-import { TableRefreshButton } from "../components/system/table-refresh-button.js";
 import { Button } from "../components/ui/button.js";
 import {
   Empty,
@@ -45,20 +45,12 @@ export function ProjectAnalyticsOpportunitiesPage(): JSX.Element {
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex flex-col gap-1">
-        <h2 className="text-lg font-medium">Analytics opportunities</h2>
-        <p className="text-sm text-muted-foreground">
-          Review deterministic improvement signals found in aggregate product usage.
-        </p>
-      </div>
-
-      <div className="flex justify-end">
-        <TableRefreshButton
-          isLoading={pagination.isLoading}
-          label="Refresh project analytics opportunities"
-          onRefresh={pagination.refreshPage}
-        />
-      </div>
+      <AnalyticsSectionHeader
+        title="Analytics opportunities"
+        description="Review deterministic improvement signals found in aggregate product usage."
+        isLoading={pagination.isLoading}
+        onRefresh={pagination.refreshPage}
+      />
 
       {pagination.hasError ? (
         <Notice title="Could not load project analytics opportunities" tone="destructive">

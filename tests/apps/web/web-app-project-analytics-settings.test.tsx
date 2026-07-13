@@ -163,6 +163,7 @@ describe("web app - project analytics settings", () => {
     expect(
       await screen.findByRole("heading", { name: /upgrade to solo or team to unlock product analytics/i })
     ).toBeInTheDocument();
+    expect(screen.getByText(/analytics bundles are available on paid plans/i)).toBeInTheDocument();
     expect(screen.getAllByRole("link", { name: /open billing/i })[0]).toHaveAttribute("href", "/billing");
     expect(screen.queryByRole("button", { name: /save analytics settings/i })).toBeNull();
   });

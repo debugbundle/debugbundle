@@ -7,6 +7,10 @@ import { DialogFormContent } from "../components/system/dialog-form-content.js";
 import { CalloutCard } from "../components/system/callout-card.js";
 import { PlaintextTokenReveal } from "../components/system/plaintext-token-reveal.js";
 import { PlanUpgradeCallout } from "../components/system/plan-upgrade-callout.js";
+import {
+  ProjectScopeSelect,
+  useProjectScopeOptions
+} from "../components/system/project-scope-controls.js";
 import { ProjectResourceEmptyState } from "../components/system/project-resource-empty-state.js";
 import type { ProjectContext } from "../components/system/project-layout.js";
 import { Badge } from "../components/ui/badge.js";
@@ -58,6 +62,7 @@ export function ProjectProbesPage(): JSX.Element {
   const [createdActivation, setCreatedActivation] = useState<CreatedProbeActivation | null>(null);
   const [deactivatingId, setDeactivatingId] = useState<string | null>(null);
   const [loadErrorMessage, setLoadErrorMessage] = useState<string | null>(null);
+  const scopeOptions = useProjectScopeOptions(project.project_id, project.environment_default);
 
   const remoteProbesEnabled = project.organization_plan !== "free";
   const hasPreservedActivations = (activations?.length ?? 0) > 0;
@@ -168,19 +173,29 @@ export function ProjectProbesPage(): JSX.Element {
                     <FieldDescription>
                       Use * to match every service in this project.
                     </FieldDescription>
-                    <Input
+                    <ProjectScopeSelect
                       id="probe-service"
+                      label="Service"
                       value={service}
-                      onChange={(event) => setService(event.currentTarget.value)}
+                      options={scopeOptions.services}
+                      allLabel="All services"
+                      includeAll={false}
+                      wildcardLabel="Every service"
+                      onValueChange={setService}
                     />
                   </Field>
                   <Field>
                     <FieldLabel htmlFor="probe-environment">Environment</FieldLabel>
                     <FieldDescription>Use * to match every environment.</FieldDescription>
-                    <Input
+                    <ProjectScopeSelect
                       id="probe-environment"
+                      label="Environment"
                       value={environment}
-                      onChange={(event) => setEnvironment(event.currentTarget.value)}
+                      options={scopeOptions.environments}
+                      allLabel="All environments"
+                      includeAll={false}
+                      wildcardLabel="Every environment"
+                      onValueChange={setEnvironment}
                     />
                   </Field>
                 </div>

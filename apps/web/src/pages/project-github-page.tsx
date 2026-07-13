@@ -5,6 +5,12 @@ import { CalloutCard } from "../components/system/callout-card.js";
 import { DialogFormContent } from "../components/system/dialog-form-content.js";
 import { GitHubMark } from "../components/system/github-mark.js";
 import { PlanUpgradeCallout } from "../components/system/plan-upgrade-callout.js";
+import {
+  joinScopeValues,
+  ProjectScopeMultiSelect,
+  splitScopeValues,
+  useProjectScopeOptions
+} from "../components/system/project-scope-controls.js";
 import type { ProjectContext } from "../components/system/project-layout.js";
 import { getProjectEffectiveRole } from "../lib/project-access.js";
 import { useSession } from "../lib/session.js";
@@ -94,6 +100,7 @@ export function ProjectGitHubPage(): JSX.Element {
   const [ruleCooldownSeconds, setRuleCooldownSeconds] = useState("300");
   const [editingRuleId, setEditingRuleId] = useState<string | null>(null);
   const [activeRuleDeleteId, setActiveRuleDeleteId] = useState<string | null>(null);
+  const scopeOptions = useProjectScopeOptions(project.project_id, project.environment_default);
 
   const effectiveRole = getProjectEffectiveRole(project);
   const canManageConnections = effectiveRole === "owner" || effectiveRole === "admin";
@@ -678,13 +685,25 @@ export function ProjectGitHubPage(): JSX.Element {
             </Field>
             <Field>
               <FieldLabel htmlFor="github-rule-environments">Environment list</FieldLabel>
-              <Input id="github-rule-environments" value={ruleEnvironments} onChange={(event) => setRuleEnvironments(event.currentTarget.value)} />
-              <FieldDescription>Comma-separated environments. Leave blank for all environments.</FieldDescription>
+              <ProjectScopeMultiSelect
+                id="github-rule-environments"
+                label="Environments"
+                value={splitScopeValues(ruleEnvironments)}
+                options={scopeOptions.environments}
+                onValueChange={(values) => setRuleEnvironments(joinScopeValues(values))}
+              />
+              <FieldDescription>Leave empty for all environments.</FieldDescription>
             </Field>
             <Field>
               <FieldLabel htmlFor="github-rule-services">Service list</FieldLabel>
-              <Input id="github-rule-services" value={ruleServices} onChange={(event) => setRuleServices(event.currentTarget.value)} />
-              <FieldDescription>Comma-separated services. Leave blank for all services.</FieldDescription>
+              <ProjectScopeMultiSelect
+                id="github-rule-services"
+                label="Services"
+                value={splitScopeValues(ruleServices)}
+                options={scopeOptions.services}
+                onValueChange={(values) => setRuleServices(joinScopeValues(values))}
+              />
+              <FieldDescription>Leave empty for all services.</FieldDescription>
             </Field>
             <Field>
               <FieldLabel id="github-rule-severity-label" htmlFor="github-rule-severity">Minimum severity</FieldLabel>

@@ -12,7 +12,7 @@ const DATE_FORMAT = new Intl.DateTimeFormat(undefined, {
 
 export function AnalyticsBundlesTable({
   bundles,
-  ariaLabel = "AnalyticsBundles",
+  ariaLabel = "Analytics bundles",
   showProject = true
 }: {
   bundles: AnalyticsBundleGenerationRecord[];

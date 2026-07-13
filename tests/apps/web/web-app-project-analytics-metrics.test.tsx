@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { userEvent } from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -38,6 +38,32 @@ const metricsWindow = {
   service: null,
   environment: null
 } as const;
+
+if (typeof HTMLElement !== "undefined") {
+  HTMLElement.prototype.hasPointerCapture ??= () => false;
+  HTMLElement.prototype.setPointerCapture ??= () => {};
+  HTMLElement.prototype.releasePointerCapture ??= () => {};
+}
+
+async function chooseSelectOption(
+  user: ReturnType<typeof userEvent.setup>,
+  label: string,
+  optionName: string
+): Promise<void> {
+  const trigger = screen.getByLabelText(label);
+  trigger.focus();
+  fireEvent.keyDown(trigger, { key: "ArrowDown", code: "ArrowDown" });
+  await user.click(await screen.findByRole("option", { name: optionName }));
+}
+
+async function chooseCustomScopeValue(
+  user: ReturnType<typeof userEvent.setup>,
+  label: "Service" | "Environment",
+  value: string
+): Promise<void> {
+  await chooseSelectOption(user, label, `Custom ${label.toLowerCase()}`);
+  await user.type(screen.getByRole("textbox", { name: `Custom ${label.toLowerCase()}` }), value);
+}
 
 function installMetricsFetch(
   input: {
@@ -383,7 +409,10 @@ describe("web app - project analytics metrics", () => {
 
     render(<App initialEntries={["/projects/proj_123/analytics/funnels"]} />);
 
-    expect(await screen.findByText(/no funnel activity in this window/i)).toBeInTheDocument();
+    const emptyTitle = await screen.findByText(/no funnel activity in this window/i);
+    expect(
+      emptyTitle.closest('[data-slot="empty"]')?.querySelector(".lucide-funnel")
+    ).not.toBeNull();
   });
 
   it("shows aggregate journey transitions and retained sample references", async () => {
@@ -419,7 +448,10 @@ describe("web app - project analytics metrics", () => {
 
     expect(await screen.findByText(/could not load journey patterns/i)).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Retry journey patterns" }));
-    expect(await screen.findByText(/no journey transitions in this window/i)).toBeInTheDocument();
+    const emptyTitle = await screen.findByText(/no journey transitions in this window/i);
+    expect(
+      emptyTitle.closest('[data-slot="empty"]')?.querySelector(".lucide-route")
+    ).not.toBeNull();
   });
 
   it("shows project-scoped opportunities and opens their detail route", async () => {
@@ -467,8 +499,8 @@ describe("web app - project analytics metrics", () => {
 
     render(<App initialEntries={["/projects/proj_123/analytics/bundles"]} />);
 
-    const table = await screen.findByRole("table", { name: "Project AnalyticsBundles" });
-    expect(screen.getByRole("link", { name: "Generate AnalyticsBundle" })).toHaveAttribute(
+    const table = await screen.findByRole("table", { name: "Project analytics bundles" });
+    expect(screen.getByRole("link", { name: "Generate analytics bundle" })).toHaveAttribute(
       "href",
       "/projects/proj_123/analytics/bundles/new"
     );
@@ -500,9 +532,11 @@ describe("web app - project analytics metrics", () => {
 
     render(<App initialEntries={["/projects/proj_123/analytics/bundles"]} />);
 
-    expect(await screen.findByText(/could not load project AnalyticsBundles/i)).toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: "Retry project AnalyticsBundles" }));
-    expect(await screen.findByText(/no AnalyticsBundles in this project/i)).toBeInTheDocument();
+    expect(
+      await screen.findByText(/could not load project analytics bundles/i)
+    ).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Retry project analytics bundles" }));
+    expect(await screen.findByText(/no analytics bundles in this project/i)).toBeInTheDocument();
   });
 
   it("shows complete route metrics and applies shared filters", async () => {
@@ -527,8 +561,9 @@ describe("web app - project analytics metrics", () => {
     expect(within(table).getByText("830")).toBeInTheDocument();
     expect(within(table).getByText("18")).toBeInTheDocument();
 
-    await user.type(screen.getByLabelText("Service"), "storefront");
-    await user.type(screen.getByLabelText("Environment"), "staging");
+    await user.click(screen.getByRole("button", { name: "More filters" }));
+    await chooseCustomScopeValue(user, "Service", "storefront");
+    await chooseSelectOption(user, "Environment", "staging");
     await user.click(screen.getByRole("button", { name: "Apply filters" }));
 
     await waitFor(() => {
@@ -573,6 +608,17 @@ describe("web app - project analytics metrics", () => {
     expect(
       state.requestedUrls().filter((url) => url.includes("/v1/analytics/routes?")).length
     ).toBe(2);
+  });
+
+  it("uses the journey icon for an empty route window", async () => {
+    installMetricsFetch({ empty: true });
+
+    render(<App initialEntries={["/projects/proj_123/analytics/routes"]} />);
+
+    const emptyTitle = await screen.findByText(/no route activity in this window/i);
+    expect(
+      emptyTitle.closest('[data-slot="empty"]')?.querySelector(".lucide-waypoints")
+    ).not.toBeNull();
   });
 
   it("does not read child metrics when analytics capture is disabled", async () => {

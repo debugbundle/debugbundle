@@ -139,7 +139,11 @@ export function ProjectSettingsPage(): JSX.Element {
   return (
     <div className="space-y-4">
       <ProjectCapturePolicyCard projectId={project.project_id} organizationPlan={project.organization_plan} canEdit={canManageProject} />
-      <ProjectCaptureRulesCard projectId={project.project_id} canEdit={canManageProject} />
+      <ProjectCaptureRulesCard
+        projectId={project.project_id}
+        environmentDefault={project.environment_default}
+        canEdit={canManageProject}
+      />
       <ProjectImprovementSettingsCard
         projectId={project.project_id}
         organizationPlan={project.organization_plan}

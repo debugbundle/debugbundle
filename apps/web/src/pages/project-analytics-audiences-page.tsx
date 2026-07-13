@@ -2,7 +2,7 @@ import { UsersIcon } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useOutletContext } from "react-router-dom";
 
-import { TableRefreshButton } from "../components/system/table-refresh-button.js";
+import { AnalyticsSectionHeader } from "../components/system/analytics-section-header.js";
 import {
   Empty,
   EmptyDescription,
@@ -79,20 +79,12 @@ export function ProjectAnalyticsAudiencesPage(): JSX.Element {
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex flex-col gap-1">
-        <h2 className="text-lg font-medium">Audience analytics</h2>
-        <p className="text-sm text-muted-foreground">
-          Understand devices, platforms, languages, acquisition sources, and campaigns.
-        </p>
-      </div>
-
-      <div className="flex justify-end">
-        <TableRefreshButton
-          isLoading={isLoading}
-          label="Refresh audience analytics"
-          onRefresh={() => setAttempt((current) => current + 1)}
-        />
-      </div>
+      <AnalyticsSectionHeader
+        title="Audience analytics"
+        description="Understand devices, platforms, languages, acquisition sources, and campaigns."
+        isLoading={isLoading}
+        onRefresh={() => setAttempt((current) => current + 1)}
+      />
 
       {isLoading && data === null ? <AudienceSkeleton /> : null}
 
@@ -194,9 +186,7 @@ function AudienceSection({
           <TableBody>
             {segments.map((segment) => (
               <TableRow key={segment.value}>
-                <TableCell className="max-w-64 truncate">
-                  {segment.value}
-                </TableCell>
+                <TableCell className="max-w-64 truncate">{segment.value}</TableCell>
                 <TableCell className="text-right tabular-nums">
                   {INTEGER_FORMAT.format(segment.sessions)}
                 </TableCell>

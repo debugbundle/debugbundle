@@ -13,14 +13,18 @@ import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "..
 import { Notice } from "../ui/notice.js";
 import { Skeleton } from "../ui/skeleton.js";
 import { AnalyticsBundlesTable } from "./analytics-bundles-table.js";
+import { AppliedAnalyticsFilterList } from "./analytics-filter-panel.js";
 import { CursorPaginationControls } from "./cursor-pagination-controls.js";
 import { ResourceListState } from "./resource-list-state.js";
 import { TableRefreshButton } from "./table-refresh-button.js";
 import {
+  clearWorkspaceAnalyticsFilter,
+  createWorkspaceAnalyticsAppliedFilters,
   createWorkspaceAnalyticsFilters,
   toAnalyticsDateEnd,
   toAnalyticsDateStart,
   WorkspaceAnalyticsFilters,
+  type WorkspaceAnalyticsFilterKey,
   type WorkspaceAnalyticsFilterValues
 } from "./workspace-analytics-filters.js";
 
@@ -47,38 +51,58 @@ export function WorkspaceAnalyticsBundles({
     setFilters(nextFilters);
   }
 
+  function removeFilter(key: WorkspaceAnalyticsFilterKey): void {
+    const nextFilters = clearWorkspaceAnalyticsFilter("bundles", filters, key);
+    setDraftFilters(nextFilters);
+    setFilters(nextFilters);
+  }
+
+  const appliedFilters = createWorkspaceAnalyticsAppliedFilters(
+    "bundles",
+    filters,
+    projects,
+    removeFilter
+  );
+
   return (
-    <Card className="min-w-0">
-      <CardHeader className="flex flex-col gap-4">
-        <div className="flex items-center justify-between gap-3">
-          <CardTitle>Generated AnalyticsBundles</CardTitle>
+    <Card className="w-full min-w-0">
+      <CardHeader className="grid grid-cols-1 items-center gap-3 sm:grid-cols-[minmax(0,1fr)_auto]">
+        <CardTitle>Generated analytics bundles</CardTitle>
+        <div
+          role="group"
+          aria-label="Analytics inventory controls"
+          className="flex w-full flex-wrap items-center justify-end gap-2 sm:w-auto"
+        >
           <TableRefreshButton
             isLoading={pagination.isLoading}
-            label="Refresh AnalyticsBundles"
             onRefresh={pagination.refreshPage}
+            mobileIconOnly
+          />
+          <WorkspaceAnalyticsFilters
+            mode="bundles"
+            projects={projects}
+            value={draftFilters}
+            activeFilterCount={appliedFilters.length}
+            onChange={setDraftFilters}
+            onApply={() => setFilters(normalizeFilters(draftFilters))}
+            onReset={resetFilters}
+            onDismiss={() => setDraftFilters(filters)}
           />
         </div>
-        <WorkspaceAnalyticsFilters
-          mode="bundles"
-          projects={projects}
-          value={draftFilters}
-          onChange={setDraftFilters}
-          onApply={() => setFilters(normalizeFilters(draftFilters))}
-          onReset={resetFilters}
-        />
+        <AppliedAnalyticsFilterList filters={appliedFilters} className="sm:col-span-2" />
       </CardHeader>
       <CardContent>
         {pagination.hasError ? (
-          <Notice title="Could not load AnalyticsBundles" tone="destructive">
+          <Notice title="Could not load analytics bundles" tone="destructive">
             <div className="flex flex-col items-start gap-2">
-              <p>The cross-project AnalyticsBundle inventory is temporarily unavailable.</p>
+              <p>The cross-project analytics bundle inventory is temporarily unavailable.</p>
               <Button
                 type="button"
                 variant="outline"
                 size="sm"
                 onClick={() => void pagination.refreshPage()}
               >
-                Retry AnalyticsBundles
+                Retry analytics bundles
               </Button>
             </div>
           </Notice>
@@ -92,7 +116,7 @@ export function WorkspaceAnalyticsBundles({
                   <EmptyMedia variant="icon">
                     <PackageIcon />
                   </EmptyMedia>
-                  <EmptyTitle>No AnalyticsBundles match these filters</EmptyTitle>
+                  <EmptyTitle>No analytics bundles match these filters</EmptyTitle>
                   <EmptyDescription>
                     Generated, pending, and failed analysis artifacts will appear here.
                   </EmptyDescription>
@@ -150,7 +174,7 @@ function normalizeFilters(filters: WorkspaceAnalyticsFilterValues): WorkspaceAna
 
 function InventorySkeleton(): JSX.Element {
   return (
-    <div className="flex flex-col gap-3" aria-label="Loading AnalyticsBundles">
+    <div className="flex flex-col gap-3" aria-label="Loading analytics bundles">
       <Skeleton className="h-12 w-full" />
       <Skeleton className="h-12 w-full" />
       <Skeleton className="h-12 w-full" />

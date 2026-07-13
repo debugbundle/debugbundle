@@ -183,7 +183,7 @@ function OpportunityDetailContent({
 
       <section aria-labelledby="opportunity-bundle-heading" className="flex flex-col gap-4">
         <h3 id="opportunity-bundle-heading" className="text-base font-medium">
-          AnalyticsBundle
+          Analytics bundle
         </h3>
         <div className="flex flex-wrap items-center gap-2">
           <Badge variant={analyticsBundleStateVariant(opportunity.bundle_status)}>
@@ -201,13 +201,13 @@ function OpportunityDetailContent({
               <Link
                 to={`/projects/${projectId}/analytics/bundles/${opportunity.bundle_generation_id}`}
               >
-                View AnalyticsBundle
+                View analytics bundle
               </Link>
             </Button>
           </div>
         )}
         {opportunity.bundle_failure_reason === null ? null : (
-          <Notice title="AnalyticsBundle generation failed" tone="destructive">
+          <Notice title="Analytics bundle generation failed" tone="destructive">
             {opportunity.bundle_failure_reason}
           </Notice>
         )}

@@ -154,6 +154,22 @@ describe("web app - project analytics saved funnels", () => {
     render(<App initialEntries={[`/projects/${PROJECT_ID}/settings`]} />);
 
     expect(await screen.findByRole("heading", { name: "Saved funnels" })).toBeInTheDocument();
+    const emptyTitle = screen.getByText("No saved funnels");
+    const emptyState = emptyTitle.closest('[data-slot="empty"]');
+    expect(emptyState).not.toBeNull();
+    expect(emptyState).toHaveClass(
+      "min-h-[11rem]",
+      "border",
+      "border-dashed",
+      "border-border/80",
+      "bg-background/50"
+    );
+    expect(emptyState?.querySelector('[data-slot="empty-icon"]')).not.toBeNull();
+    expect(
+      within(emptyState as HTMLElement).getByText(
+        "Add an ordered journey to make conversion analysis repeatable."
+      )
+    ).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Add funnel" }));
     const createDialog = screen.getByRole("dialog", { name: "Create saved funnel" });
     await user.type(within(createDialog).getByLabelText("Funnel key"), "signup");
@@ -193,6 +209,9 @@ describe("web app - project analytics saved funnels", () => {
 
     await user.click(screen.getByRole("button", { name: "Archive Onboarding" }));
     const archiveDialog = screen.getByRole("alertdialog");
+    expect(
+      within(archiveDialog).getByText(/analytics bundles remain available/i)
+    ).toBeInTheDocument();
     await user.click(within(archiveDialog).getByRole("button", { name: "Archive funnel" }));
     await waitFor(() => expect(screen.queryByText("Onboarding")).toBeNull());
     expect(state.requests[2]).toMatchObject({

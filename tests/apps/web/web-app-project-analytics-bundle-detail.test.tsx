@@ -174,7 +174,7 @@ describe("web app - project AnalyticsBundle detail", () => {
     expect(
       await screen.findByRole("heading", { name: "Checkout funnel dropoff analysis" })
     ).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Back to AnalyticsBundles" })).toHaveAttribute(
+    expect(screen.getByRole("link", { name: "Back to analytics bundles" })).toHaveAttribute(
       "href",
       `/projects/${PROJECT_ID}/analytics/bundles`
     );
@@ -230,7 +230,7 @@ describe("web app - project AnalyticsBundle detail", () => {
     render(<App initialEntries={[`/projects/${PROJECT_ID}/analytics/bundles/${GENERATION_ID}`]} />);
 
     expect(await screen.findByText("Processing")).toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: "Refresh AnalyticsBundle status" }));
+    await user.click(screen.getByRole("button", { name: "Refresh" }));
     expect(
       await screen.findByRole("heading", { name: "Checkout funnel dropoff analysis" })
     ).toBeInTheDocument();
@@ -243,9 +243,7 @@ describe("web app - project AnalyticsBundle detail", () => {
 
     expect(await screen.findByText("Generation failed")).toBeInTheDocument();
     expect(screen.getByText("Monthly Quota Exceeded")).toBeInTheDocument();
-    expect(
-      screen.getByRole("button", { name: "Refresh AnalyticsBundle status" })
-    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Refresh" })).toBeInTheDocument();
   });
 
   it("retries a failed artifact read", async () => {
@@ -254,8 +252,8 @@ describe("web app - project AnalyticsBundle detail", () => {
 
     render(<App initialEntries={[`/projects/${PROJECT_ID}/analytics/bundles/${GENERATION_ID}`]} />);
 
-    expect(await screen.findByText(/could not load AnalyticsBundle/i)).toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: "Refresh AnalyticsBundle status" }));
+    expect(await screen.findByText(/could not load analytics bundle/i)).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Refresh" }));
     expect(
       await screen.findByRole("heading", { name: "Checkout funnel dropoff analysis" })
     ).toBeInTheDocument();

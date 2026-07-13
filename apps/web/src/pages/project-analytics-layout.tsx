@@ -1,13 +1,21 @@
-import { Settings2Icon } from "lucide-react";
+import { RotateCcwIcon, Settings2Icon } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link, Outlet, useLocation, useNavigate, useOutletContext } from "react-router-dom";
 
 import { CalloutCard } from "../components/system/callout-card.js";
+import {
+  AnalyticsFilterPanel,
+  AppliedAnalyticsFilterList,
+  type AppliedAnalyticsFilter
+} from "../components/system/analytics-filter-panel.js";
 import { PlanUpgradeCallout } from "../components/system/plan-upgrade-callout.js";
+import {
+  ProjectScopeSelect,
+  useProjectScopeOptions
+} from "../components/system/project-scope-controls.js";
 import type { ProjectContext } from "../components/system/project-layout.js";
 import { Button } from "../components/ui/button.js";
 import { Field, FieldGroup, FieldLabel } from "../components/ui/field.js";
-import { Input } from "../components/ui/input.js";
 import { Notice } from "../components/ui/notice.js";
 import {
   Select,
@@ -33,6 +41,7 @@ interface AnalyticsFilters {
 
 export interface ProjectAnalyticsContext {
   projectId: string;
+  environmentDefault: string;
   query: AnalyticsMetricsQuery;
 }
 
@@ -68,6 +77,7 @@ export function ProjectAnalyticsLayout(): JSX.Element {
   const [settingsAttempt, setSettingsAttempt] = useState(0);
   const [draftFilters, setDraftFilters] = useState(defaultFilters);
   const [filters, setFilters] = useState(defaultFilters);
+  const scopeOptions = useProjectScopeOptions(projectId, project.environment_default);
 
   useEffect(() => {
     let active = true;
@@ -96,13 +106,27 @@ export function ProjectAnalyticsLayout(): JSX.Element {
     ...(filters.environment.length === 0 ? {} : { environment: filters.environment })
   };
 
-  function applyFilters(event: React.FormEvent<HTMLFormElement>): void {
-    event.preventDefault();
-    setFilters({
-      last: draftFilters.last,
+  function applyScopeFilters(): void {
+    setFilters((current) => ({
+      ...current,
       service: draftFilters.service.trim(),
       environment: draftFilters.environment.trim()
-    });
+    }));
+  }
+
+  function changeTimeWindow(last: AnalyticsFilters["last"]): void {
+    setDraftFilters((current) => ({ ...current, last }));
+    setFilters((current) => ({ ...current, last }));
+  }
+
+  function resetScopeFilters(): void {
+    setDraftFilters((current) => ({ ...current, service: "", environment: "" }));
+    setFilters((current) => ({ ...current, service: "", environment: "" }));
+  }
+
+  function removeScopeFilter(key: "service" | "environment"): void {
+    setDraftFilters((current) => ({ ...current, [key]: "" }));
+    setFilters((current) => ({ ...current, [key]: "" }));
   }
 
   function changeSection(value: string): void {
@@ -135,7 +159,7 @@ export function ProjectAnalyticsLayout(): JSX.Element {
     return (
       <PlanUpgradeCallout
         title="Upgrade to Solo or Team to unlock product analytics"
-        description="Product analytics capture, aggregate metrics, journey evidence, and AnalyticsBundles are available on paid plans."
+        description="Product analytics capture, aggregate metrics, journey evidence, and analytics bundles are available on paid plans."
       />
     );
   }
@@ -158,6 +182,27 @@ export function ProjectAnalyticsLayout(): JSX.Element {
     );
   }
 
+  const appliedFilters: AppliedAnalyticsFilter[] = [
+    ...(filters.service.length === 0
+      ? []
+      : [
+          {
+            key: "service",
+            label: `Service: ${filters.service}`,
+            onRemove: () => removeScopeFilter("service")
+          }
+        ]),
+    ...(filters.environment.length === 0
+      ? []
+      : [
+          {
+            key: "environment",
+            label: `Environment: ${filters.environment}`,
+            onRemove: () => removeScopeFilter("environment")
+          }
+        ])
+  ];
+
   return (
     <div className="flex flex-col gap-6">
       <Tabs value={activeSection} onValueChange={changeSection}>
@@ -177,71 +222,100 @@ export function ProjectAnalyticsLayout(): JSX.Element {
       </Tabs>
 
       {location.pathname.endsWith("/bundles/new") ? null : (
-        <form className="flex flex-col gap-4" onSubmit={applyFilters}>
-        <FieldGroup className="grid gap-4 sm:grid-cols-2 lg:grid-cols-[12rem_1fr_1fr_auto] lg:items-end">
-          <Field>
-            <FieldLabel id="analytics-window-label" htmlFor="analytics-window">
-              Time window
-            </FieldLabel>
-            <Select
-              value={draftFilters.last}
-              onValueChange={(last) =>
-                setDraftFilters((current) => ({
-                  ...current,
-                  last: last as AnalyticsFilters["last"]
-                }))
-              }
-            >
-              <SelectTrigger
-                id="analytics-window"
-                aria-labelledby="analytics-window-label analytics-window"
-                className="w-full"
+        <div
+          role="group"
+          aria-label="Project analytics filter controls"
+          className="flex w-full min-w-0 flex-col gap-2"
+        >
+          <div
+            role="group"
+            aria-label="Primary project analytics filters"
+            className="flex w-full flex-wrap items-end gap-2"
+          >
+            <Field className="w-full sm:w-48">
+              <FieldLabel id="analytics-window-label" htmlFor="analytics-window">
+                Time window
+              </FieldLabel>
+              <Select
+                value={draftFilters.last}
+                onValueChange={(last) => changeTimeWindow(last as AnalyticsFilters["last"])}
               >
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent position="popper">
-                <SelectGroup>
-                  {timeWindowOptions.map((option) => (
-                    <SelectItem key={option.value} value={option.value}>
-                      {option.label}
-                    </SelectItem>
-                  ))}
-                </SelectGroup>
-              </SelectContent>
-            </Select>
-          </Field>
-          <Field>
-            <FieldLabel htmlFor="analytics-service">Service</FieldLabel>
-            <Input
-              id="analytics-service"
-              value={draftFilters.service}
-              placeholder="All services"
-              maxLength={120}
-              onChange={(event) =>
-                setDraftFilters((current) => ({ ...current, service: event.target.value }))
-              }
-            />
-          </Field>
-          <Field>
-            <FieldLabel htmlFor="analytics-environment">Environment</FieldLabel>
-            <Input
-              id="analytics-environment"
-              value={draftFilters.environment}
-              placeholder={project.environment_default}
-              maxLength={120}
-              onChange={(event) =>
-                setDraftFilters((current) => ({ ...current, environment: event.target.value }))
-              }
-            />
-          </Field>
-          <Button type="submit" variant="outline">
-            Apply filters
-          </Button>
-        </FieldGroup>
-        </form>
+                <SelectTrigger
+                  id="analytics-window"
+                  aria-labelledby="analytics-window-label analytics-window"
+                  className="w-full"
+                >
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent position="popper">
+                  <SelectGroup>
+                    {timeWindowOptions.map((option) => (
+                      <SelectItem key={option.value} value={option.value}>
+                        {option.label}
+                      </SelectItem>
+                    ))}
+                  </SelectGroup>
+                </SelectContent>
+              </Select>
+            </Field>
+            <AnalyticsFilterPanel
+              triggerLabel="More filters"
+              title="More analytics filters"
+              description="Limit analytics to a specific service or environment."
+              activeFilterCount={appliedFilters.length}
+              onApply={applyScopeFilters}
+              onReset={resetScopeFilters}
+              onDismiss={() => setDraftFilters(filters)}
+            >
+              <FieldGroup className="gap-4">
+                <Field>
+                  <FieldLabel htmlFor="analytics-service">Service</FieldLabel>
+                  <ProjectScopeSelect
+                    id="analytics-service"
+                    label="Service"
+                    value={draftFilters.service}
+                    options={scopeOptions.services}
+                    allLabel="All services"
+                    onValueChange={(service) =>
+                      setDraftFilters((current) => ({ ...current, service }))
+                    }
+                  />
+                </Field>
+                <Field>
+                  <FieldLabel htmlFor="analytics-environment">Environment</FieldLabel>
+                  <ProjectScopeSelect
+                    id="analytics-environment"
+                    label="Environment"
+                    value={draftFilters.environment}
+                    options={scopeOptions.environments}
+                    allLabel="All environments"
+                    onValueChange={(environment) =>
+                      setDraftFilters((current) => ({ ...current, environment }))
+                    }
+                  />
+                </Field>
+              </FieldGroup>
+            </AnalyticsFilterPanel>
+            {appliedFilters.length === 0 ? null : (
+              <Button type="button" variant="outline" onClick={resetScopeFilters}>
+                <RotateCcwIcon data-icon="inline-start" />
+                Reset filters
+              </Button>
+            )}
+          </div>
+          <AppliedAnalyticsFilterList filters={appliedFilters} />
+        </div>
       )}
 
-      <Outlet context={{ projectId, query } satisfies ProjectAnalyticsContext} />
+      <Outlet
+        context={
+          {
+            projectId,
+            environmentDefault: project.environment_default,
+            query
+          } satisfies ProjectAnalyticsContext
+        }
+      />
     </div>
   );
 }
