@@ -11,6 +11,7 @@ export interface WebDogfoodingEnv {
   VITE_DEBUGBUNDLE_DOGFOOD_ENVIRONMENT?: string;
   VITE_DEBUGBUNDLE_DOGFOOD_EXPOSE_TRIGGERS?: string;
   VITE_DEBUGBUNDLE_DOGFOOD_CAPTURE_CONSOLE?: string;
+  VITE_DEBUGBUNDLE_DOGFOOD_ANALYTICS_ENABLED?: string;
 }
 
 export interface WebDogfoodingConfig {
@@ -138,6 +139,11 @@ export function initializeWebDogfooding(
       return null;
     }
     const tracePropagationTargets = resolveTracePropagationTargets(env);
+    const analyticsEnabled =
+      parseBooleanFlag(
+        env.VITE_DEBUGBUNDLE_DOGFOOD_ANALYTICS_ENABLED,
+        "VITE_DEBUGBUNDLE_DOGFOOD_ANALYTICS_ENABLED"
+      ) ?? false;
 
     sdk.init({
       ...(config.projectToken === null || isRelayEndpoint(config.endpoint) ? {} : { projectToken: config.projectToken }),
@@ -146,6 +152,7 @@ export function initializeWebDogfooding(
       service: config.service,
       captureConsole: config.captureConsole,
       breadcrumbsOnErrorOnly: false,
+      ...(analyticsEnabled ? { analytics: { enabled: true } } : {}),
       ...(tracePropagationTargets === undefined ? {} : { tracePropagationTargets })
     } satisfies DebugBundleBrowserInitConfig);
 

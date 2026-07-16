@@ -18,6 +18,58 @@ const ALL_REQUIRED_TABLES = Array.from(
 );
 
 describe("storage schema migrations", () => {
+  it("should replace the provisional saved-funnel default with tier capacity", (): void => {
+    const migration = STORAGE_SCHEMA_MIGRATIONS.find(
+      (entry) => entry.id === "202607130001_expand_default_saved_funnel_capacity"
+    );
+
+    expect(migration).toBeDefined();
+    expect(migration?.statements.join("\n")).toContain(
+      "ALTER COLUMN max_saved_funnels SET DEFAULT 10"
+    );
+    expect(migration?.statements.join("\n")).toContain("WHEN 'team' THEN 50");
+    expect(migration?.statements.join("\n")).toContain("WHEN 'solo' THEN 10");
+    expect(migration?.statements.join("\n")).toContain("settings.max_saved_funnels = 3");
+  });
+
+  it("should expand existing Free projects to the preview funnel capacity", (): void => {
+    const migration = STORAGE_SCHEMA_MIGRATIONS.find(
+      (entry) => entry.id === "202607140001_enable_free_analytics_preview"
+    );
+
+    expect(migration).toBeDefined();
+    expect(migration?.statements.join("\n")).toContain("organizations.plan = 'free'");
+    expect(migration?.statements.join("\n")).toContain("max_saved_funnels = 1");
+    expect(migration?.statements.join("\n")).toContain("settings.max_saved_funnels = 0");
+  });
+
+  it("should expand default custom-dimension capacity by tier", (): void => {
+    const migration = STORAGE_SCHEMA_MIGRATIONS.find(
+      (entry) => entry.id === "202607140002_expand_custom_dimension_capacity"
+    );
+
+    expect(migration).toBeDefined();
+    expect(migration?.statements.join("\n")).toContain(
+      "ALTER COLUMN max_custom_dimensions SET DEFAULT 3"
+    );
+    expect(migration?.statements.join("\n")).toContain("WHEN 'team' THEN 8");
+    expect(migration?.statements.join("\n")).toContain("WHEN 'solo' THEN 3");
+    expect(migration?.statements.join("\n")).toContain("ELSE 1");
+    expect(migration?.statements.join("\n")).toContain("settings.max_custom_dimensions = 0");
+  });
+
+  it("should add bounded hourly analytics retention with tier defaults", (): void => {
+    const migration = STORAGE_SCHEMA_MIGRATIONS.find(
+      (entry) => entry.id === "202607160002_add_analytics_hourly_retention"
+    );
+
+    expect(migration).toBeDefined();
+    expect(migration?.statements.join("\n")).toContain("hourly_retention_days");
+    expect(migration?.statements.join("\n")).toContain("WHEN 'team' THEN 90");
+    expect(migration?.statements.join("\n")).toContain("WHEN 'solo' THEN 30");
+    expect(migration?.statements.join("\n")).toContain("ELSE 7");
+  });
+
   it("should apply pending migrations once and persist checksums", async (): Promise<void> => {
     const query = vi
       .fn()
@@ -40,7 +92,9 @@ describe("storage schema migrations", () => {
       expect.stringContaining("CREATE TABLE IF NOT EXISTS slack_destinations")
     );
     expect(query.mock.calls.map((call) => String(call[0]))).toContainEqual(
-      expect.stringContaining("ALTER TABLE github_dispatch_deliveries ADD COLUMN IF NOT EXISTS rule_name text")
+      expect.stringContaining(
+        "ALTER TABLE github_dispatch_deliveries ADD COLUMN IF NOT EXISTS rule_name text"
+      )
     );
     expect(query.mock.calls.map((call) => String(call[0]))).toContainEqual(
       expect.stringContaining("CREATE TABLE IF NOT EXISTS plan_cleanup_tasks")
@@ -70,7 +124,27 @@ describe("storage schema migrations", () => {
       expect.stringContaining("ALTER TABLE projects ADD COLUMN IF NOT EXISTS color_tag text")
     );
     expect(query.mock.calls.map((call) => String(call[0]))).toContainEqual(
-      expect.stringContaining("ALTER TABLE alert_rules ADD COLUMN IF NOT EXISTS severity_lifecycle_scope text")
+      expect.stringContaining(
+        "ALTER TABLE alert_rules ADD COLUMN IF NOT EXISTS severity_lifecycle_scope text"
+      )
+    );
+    expect(query.mock.calls.map((call) => String(call[0]))).toContainEqual(
+      expect.stringContaining("CREATE TABLE IF NOT EXISTS project_analytics_settings")
+    );
+    expect(query.mock.calls.map((call) => String(call[0]))).toContainEqual(
+      expect.stringContaining("CREATE TABLE IF NOT EXISTS analytics_rollup_uniques")
+    );
+    expect(query.mock.calls.map((call) => String(call[0]))).toContainEqual(
+      expect.stringContaining("CREATE TABLE IF NOT EXISTS analytics_bundle_generations")
+    );
+    expect(query.mock.calls.map((call) => String(call[0]))).toContainEqual(
+      expect.stringContaining("ADD COLUMN IF NOT EXISTS analytics_journey_samples")
+    );
+    expect(query.mock.calls.map((call) => String(call[0]))).toContainEqual(
+      expect.stringContaining("ADD COLUMN IF NOT EXISTS has_artifact")
+    );
+    expect(query.mock.calls.map((call) => String(call[0]))).toContainEqual(
+      expect.stringContaining("ADD COLUMN IF NOT EXISTS correlation_session_hash")
     );
   });
 
@@ -178,9 +252,7 @@ describe("storage schema migrations", () => {
     const result = await migrateStorageSchema({ query } as Queryable);
 
     expect(result.applied).toEqual([]);
-    expect(result.already_applied).toEqual(
-      STORAGE_SCHEMA_MIGRATIONS.map((entry) => entry.id)
-    );
+    expect(result.already_applied).toEqual(STORAGE_SCHEMA_MIGRATIONS.map((entry) => entry.id));
     expect(query.mock.calls.map((call) => String(call[0]))).toContainEqual(
       expect.stringContaining("UPDATE storage_migration_ledger")
     );
@@ -232,7 +304,14 @@ describe("storage schema migrations", () => {
       { table_name: "organizations", column_name: "trial_plan" },
       { table_name: "account_analytics_accounts", column_name: "metrics_collection_started_at" },
       { table_name: "account_payment_retention_records", column_name: "provider" },
+      { table_name: "analytics_bundle_generations", column_name: "input_fingerprint" },
+      { table_name: "analytics_journey_samples", column_name: "correlation_session_hash" },
+      { table_name: "analytics_journey_samples", column_name: "has_artifact" },
+      { table_name: "analytics_usage_counters", column_name: "analytics_events" },
+      { table_name: "analytics_usage_counters", column_name: "analytics_journey_samples" },
       { table_name: "plan_cleanup_tasks", column_name: "cleanup_type" },
+      { table_name: "project_analytics_settings", column_name: "enabled" },
+      { table_name: "project_analytics_settings", column_name: "hourly_retention_days" },
       { table_name: "project_usage_counters", column_name: "updated_at" },
       { table_name: "project_tokens", column_name: "allowed_origins" },
       { table_name: "projects", column_name: "color_tag" },

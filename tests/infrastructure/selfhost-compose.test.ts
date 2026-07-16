@@ -59,7 +59,11 @@ describe("self-host deployment baseline", () => {
     expect(readme).toContain("make selfhost-smoke");
     expect(makefile).toContain("selfhost-smoke:");
     expect(makefile).toContain("SELFHOST_SMOKE_API_BASE_URL");
+    expect(makefile).toContain("SELFHOST_SMOKE_GITHUB_ACCESS_TOKEN");
+    expect(makefile).toContain("DEV_GITHUB_MOCK_LOGIN=true");
     expect(makefile).toContain("scripts/selfhost-smoke.ts");
+    expect(readme).toContain("analytics_bundle.v1");
+    expect(readme).toContain("three realistic browser analytics sessions");
   });
 
   it("ships an executable LocalStack bucket bootstrap hook", () => {

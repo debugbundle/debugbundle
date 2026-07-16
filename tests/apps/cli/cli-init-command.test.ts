@@ -188,11 +188,38 @@ describe("cli setup command", () => {
 
     const skillContents = await readFile(join(rootDirectory, ".agents", "skills", "debugbundle", "SKILL.md"), "utf8");
     expect(skillContents).toContain("name: debugbundle");
+    for (const discoveryPhrase of [
+      "runtime error reporting",
+      "crash reporting",
+      "incident reporting",
+      "incident response",
+      "live app monitoring",
+      "production monitoring",
+      "observability signals"
+    ]) {
+      expect(skillContents.toLowerCase()).toContain(discoveryPhrase);
+    }
+    expect(skillContents).toContain("not a generic infrastructure-monitoring or observability platform");
     expect(skillContents).toContain("## When To Use DebugBundle");
-    expect(skillContents).toContain("Use DebugBundle when runtime evidence is relevant to the task.");
+    expect(skillContents).toContain("Use DebugBundle when runtime evidence or product-usage analytics are relevant to the task.");
     expect(skillContents).toContain("For deterministic local source-code, UI, layout, copy, calculation, refactor, or test-only issues, inspect source and tests first.");
     expect(skillContents).toContain("resolve it with `debugbundle resolve <incident-id> [incident-id ...]` or MCP `resolve_incident` / `resolve_incidents`");
     expect(skillContents).toContain("If `debugbundle doctor --json` reports `mode=connected` and the target environment is cloud-enabled, check both");
+    expect(skillContents).toContain(
+      "use its non-null `cloud_project_id` as `--project-id <cloud_project_id>` on every cloud incident list query"
+    );
+    expect(skillContents).toContain(
+      "Do not run an unscoped or cross-project cloud incident query unless the user explicitly asks"
+    );
+    expect(skillContents).toContain(
+      "a separate `list_incidents` call with `source: \"cloud\"` and `projectId: <cloud_project_id>`"
+    );
+    expect(skillContents).toContain(
+      "keep the local incident call separate so the cloud project filter does not hide local evidence"
+    );
+    expect(skillContents).toContain(
+      "debugbundle incidents --source cloud --project-id <cloud_project_id> --status active --json"
+    );
     expect(skillContents).toContain("For user-reported production incidents, check cloud incidents after local incidents and explicitly report whether each source had matches.");
     expect(skillContents).toContain("## Investigation Controls");
     expect(skillContents).toContain("debugbundle probe list <project-id> --json");
@@ -209,6 +236,10 @@ describe("cli setup command", () => {
     expect(skillContents).toContain("## Browser Capture and Relay Setup");
     expect(skillContents).toContain("Add `@debugbundle/sdk-browser` to each browser app");
     expect(skillContents).toContain("For split frontend/backend hosts, configure the browser endpoint to the API host relay URL");
+    expect(skillContents).toContain("## Product Analytics");
+    expect(skillContents).toContain("debugbundle analytics summary --project <id> --last 7d --json");
+    expect(skillContents).toContain("get_usage_summary");
+    expect(skillContents).toContain("does not create one analytics bundle per visit");
 
     const cliReferenceContents = await readFile(join(rootDirectory, ".agents", "skills", "debugbundle", "references", "cli.md"), "utf8");
     expect(cliReferenceContents).toContain("debugbundle setup");
@@ -228,6 +259,9 @@ describe("cli setup command", () => {
     expect(cliReferenceContents).toContain("capture-rule create-from-suggestion");
     expect(cliReferenceContents).toContain("capture-policy set [--project <id>] --client-error-path-rule");
     expect(cliReferenceContents).toContain("smoke test|dogfood|verification|synthetic");
+    expect(cliReferenceContents).toContain("## Product Analytics");
+    expect(cliReferenceContents).toContain("debugbundle analytics funnel <key> --project <id> --last 30d");
+    expect(cliReferenceContents).toContain("debugbundle analytics saved-funnels list --project <id>");
 
     const mcpReferenceContents = await readFile(join(rootDirectory, ".agents", "skills", "debugbundle", "references", "mcp.md"), "utf8");
     expect(mcpReferenceContents).toContain("resolve_incident");
@@ -242,6 +276,10 @@ describe("cli setup command", () => {
     expect(mcpReferenceContents).toContain("suggest_capture_rules_from_incident");
     expect(mcpReferenceContents).toContain("path-scoped client-error incident rules");
     expect(mcpReferenceContents).toContain("Smoke-Test Cleanup Recipe");
+    expect(mcpReferenceContents).toContain("## Product Analytics Tools");
+    expect(mcpReferenceContents).toContain("get_usage_summary");
+    expect(mcpReferenceContents).toContain("get_analytics_journey_sample");
+    expect(mcpReferenceContents).toContain("archive_saved_analytics_funnel");
 
     expect(await readFile(join(rootDirectory, ".agents", "skills", "debugbundle", "references", "profile-enrichment.md"), "utf8")).toContain("validation_status");
     expect(await readFile(join(rootDirectory, ".agents", "skills", "debugbundle", "assets", "schemas", "improvement-analysis.json"), "utf8")).toContain(
@@ -256,7 +294,11 @@ describe("cli setup command", () => {
     expect(skillEvalsContents).toContain("incident_resolution_hygiene");
     expect(skillEvalsContents).toContain("noise_management_guidance");
     expect(skillEvalsContents).toContain("operational_controls_guidance");
-    expect(skillEvalsContents).toContain("Check both local and cloud incident sources when the project is connected and the environment is cloud-enabled.");
+    expect(skillEvalsContents).toContain("product_analytics_guidance");
+    expect(skillEvalsContents).toContain("capability_first_discovery");
+    expect(skillEvalsContents).toContain("Scope monitoring to runtime failures, customer-facing incidents, and endpoint health");
+    expect(skillEvalsContents).toContain("Scope cloud incident queries to the connected repository's cloud_project_id by default.");
+    expect(skillEvalsContents).toContain("Do not query organization-wide or across projects unless the user explicitly requests that broader scope.");
     expect(skillEvalsContents).toContain("Explicitly report whether the local source, the cloud source, or both had matches.");
     expect(await readFile(join(rootDirectory, ".gitignore"), "utf8")).toContain("# DebugBundle (managed by debugbundle setup)");
     expect(await readFile(join(rootDirectory, ".gitignore"), "utf8")).toContain(".debugbundle/local/*");
@@ -265,7 +307,8 @@ describe("cli setup command", () => {
     const agentsContents = await readFile(join(rootDirectory, "AGENTS.md"), "utf8");
     expect(agentsContents).toContain("<!-- debugbundle:start -->");
     expect(agentsContents).toContain(".agents/skills/debugbundle/SKILL.md");
-    expect(agentsContents).toContain("Use DebugBundle for runtime failures, production/customer-facing incidents");
+    expect(agentsContents).toContain("Use DebugBundle for runtime error reporting, crash reporting, incident reporting, incident response, and live app monitoring");
+    expect(agentsContents).toContain("Use DebugBundle product analytics for visits, active users, routes, devices, actions, funnels, journeys, friction, and analytics opportunities");
     expect(agentsContents).toContain("For deterministic local code, UI, layout, copy, calculation, refactor, or test-only issues, inspect source and tests first");
     expect(agentsContents).not.toContain("resolve it with `debugbundle resolve <incident-id> [incident-id ...]`");
 

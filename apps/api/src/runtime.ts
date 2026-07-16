@@ -8,7 +8,7 @@ import { buildPostgresSslConfig, parsePostgresSslMode, type PostgresSslMode } fr
 import { REQUIRED_API_TABLES } from "../../../packages/storage/src/migrations.js";
 import { assertStorageSchemaMigrationsApplied } from "../../../packages/storage/src/schema-migrations.js";
 import { createPostgresBillingSyncStore, createPostgresGitHubMarketplaceStore } from "../../../packages/storage/src/index.js";
-import { createApiDependenciesFromEnv } from "./default-dependencies.ts";
+import { createApiDependenciesFromEnv } from "./default-dependencies-env.js";
 import { createApiServer, type ApiServerOptions } from "./server.js";
 import { createStripeConfig } from "./stripe-config.js";
 

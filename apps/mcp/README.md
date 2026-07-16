@@ -1,6 +1,6 @@
 # @debugbundle/mcp
 
-MCP server for production debugging bundles and incident workflows for AI agents. DebugBundle lets agents inspect incidents, deterministic bundles, reproductions, probes, hosted health checks, alerts, webhooks, projects, and setup state through the same management surface as the API and CLI.
+MCP server for runtime error reporting, crash reporting, incident response, endpoint health checks, debug bundles, and product analytics. DebugBundle lets agents inspect customer-facing incidents, deterministic bundles, product-usage evidence, reproductions, probes, alerts, webhooks, projects, and setup state through the same management surface as the API and CLI. It is production debugging infrastructure, not a generic infrastructure-monitoring or observability platform.
 
 ## Install
 
@@ -90,9 +90,15 @@ The plugin package lives at `apps/mcp/claude-code/debugbundle`, bundles a Claude
 
 - List active incidents and fetch full incident context.
 - Fetch deterministic debug bundles and reproduction artifacts.
+- Query aggregate usage, routes, device/browser/OS/language segments, referrers, actions, funnels, and journey patterns without waiting for an analysis artifact through `get_usage_summary`, `get_route_metrics`, `get_device_breakdown`, `get_action_metrics`, `get_funnel_analysis`, and related reads.
+- Inspect retained redacted journey samples, analytics opportunities, and generated AnalyticsBundles; request a bounded analysis artifact when aggregate metrics alone are insufficient.
+- Read analytics settings before proposing privacy, retention, consent, capture, or approved custom-dimension changes; update them only with explicit owner/admin intent.
+- List saved analytics funnels and, with owner/admin access, create, update, or archive reusable funnel definitions through `list_saved_analytics_funnels`, `create_saved_analytics_funnel`, `update_saved_analytics_funnel`, and `archive_saved_analytics_funnel`.
 - Inspect hosted health checks, probes, alerts, webhooks, projects, members, billing, capture policy, and GitHub automation state.
 - Run local and hosted verification through tools such as `verify_local`, `verify_cloud`, `doctor`, `smoke`, and `analyze`.
 - Resolve or reopen incidents after verification.
+
+For analytics questions, use direct aggregate tools first and generate an AnalyticsBundle only when a bounded analysis needs a durable artifact. The product does not create one bundle per visit.
 
 ## Troubleshooting
 

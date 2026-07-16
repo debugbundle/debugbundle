@@ -73,7 +73,8 @@ After the GitHub-managed npm publish for `@debugbundle/mcp` succeeds, maintainer
 5. Publishing the portable shared skill from `apps/mcp/clawhub/debugbundle/` to ClawHub/OpenClaw.
 6. Building, validating, and publishing the OpenClaw plugin package from `apps/openclaw-plugin/` to ClawHub.
 7. Verifying that Smithery publication is publicly indexed, not merely addressable by an exact object URL. Exact-record existence without public registry visibility is a failed release state.
-8. Emitting the follow-up discovery checklist for pull-based directories such as Glama and LobeHub, which should be treated as verification surfaces unless they later document a first-party publish API.
+8. Verifying ClawHub discovery against the bounded capability-first query/rank checks in `apps/mcp/ecosystem-release-manifest.json`, with limited retries for index propagation. Exact-slug lookup alone is not sufficient.
+9. Emitting the follow-up discovery checklist for pull-based directories such as Glama and LobeHub, which should be treated as verification surfaces unless they later document a first-party publish API.
 
 Because these registry-authenticated workflows depend on local browser login state, host-installed publisher tools, and marketplace-specific credentials, they intentionally run through the host-side `make release-mcp-ecosystem-*` targets instead of the Docker-backed CI lanes. The source-of-truth config for this follow-through lives in `apps/mcp/ecosystem-release-manifest.json`.
 
@@ -188,6 +189,8 @@ Each example must include:
 
 - DebugBundle SDKs do NOT collect anonymous usage data in V1.
 - If telemetry is added post-V1, it must be opt-in only.
+- AnalyticsBundle product analytics is customer-owned telemetry for the customer's own project. It must still be disabled by default, consent-aware where configured, privacy-documented, and separate from DebugBundle's own product telemetry.
+- AnalyticsBundle releases must document collected fields, retained fields, retention windows, custom dimension limits, identity/hash behavior, self-host behavior, and how analytics differs from incident/debug capture.
 - Telemetry decisions must be documented in `PRIVACY.md`.
 - Self-hosted instances never phone home.
 

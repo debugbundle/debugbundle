@@ -23,35 +23,37 @@ function textResponse(status: number, body: string, init: ResponseInit = {}): Re
 }
 
 describe("self-host smoke runner", () => {
-  it("proves the self-host session, ingest, and bundle flow end to end", async () => {
+  it("proves the self-host member auth, ingest, and bundle flow end to end", async () => {
+    const analytics = {
+      acceptedEvents: 27,
+      directAcceptedEvents: 18,
+      relayAcceptedEvents: 9,
+      sessions: 3,
+      pageviews: 6,
+      conversions: 2,
+      journeySampleId: "33333333-3333-4333-8333-333333333333",
+      bundleGenerationId: "22222222-2222-4222-8222-222222222222",
+      bundleSchemaVersion: "analytics_bundle.v1" as const
+    };
+    const runAnalyticsSmoke = vi.fn().mockResolvedValue(analytics);
     const fetchImpl = vi
       .fn<typeof fetch>()
       .mockResolvedValueOnce(jsonResponse(200, { status: "ok" }))
       .mockResolvedValueOnce(textResponse(200, "<html><body>DebugBundle</body></html>"))
-      .mockResolvedValueOnce(jsonResponse(200, { success: true }))
       .mockResolvedValueOnce(
-        jsonResponse(
-          200,
-          {
-            session: {
-              session_id: "ses_123",
-              user_id: "usr_123",
-              email: "selfhost-smoke@example.com",
-              email_verified_at: null,
-              organization_id: "org_123",
-              role: "owner",
-              created_at: "2026-04-03T00:00:00.000Z",
-              expires_at: "2026-04-03T12:00:00.000Z",
-              revoked_at: null,
-              csrf_token: "csrf_123"
-            }
-          },
-          {
-            headers: {
-              "set-cookie": "dbundle_session=session-secret; Path=/; HttpOnly; SameSite=Strict"
-            }
+        jsonResponse(200, {
+          token: {
+            token_id: "tok_123",
+            user_id: "usr_123",
+            organization_id: "org_123",
+            label: "Self-host smoke",
+            created_at: "2026-04-03T00:00:00.000Z",
+            last_used_at: null,
+            revoked_at: null,
+            expires_at: null,
+            plaintext: "dbundle_mem_smoke"
           }
-        )
+        })
       )
       .mockResolvedValueOnce(
         jsonResponse(201, {
@@ -85,7 +87,9 @@ describe("self-host smoke runner", () => {
         })
       )
       .mockResolvedValueOnce(jsonResponse(200, { status: "pending" }))
-      .mockResolvedValueOnce(jsonResponse(200, { bundle_version: 1, summary: { title: "Self-host smoke" } }));
+      .mockResolvedValueOnce(
+        jsonResponse(200, { bundle_version: 1, summary: { title: "Self-host smoke" } })
+      );
 
     const result = await runSelfhostSmoke({
       apiBaseUrl: "http://api.debugbundle.test",
@@ -94,37 +98,51 @@ describe("self-host smoke runner", () => {
       pollIntervalMs: 0,
       timeoutMs: 100,
       fetchImpl,
-      wait: async () => undefined
+      wait: async () => undefined,
+      runAnalyticsSmoke
     });
 
     expect(result).toMatchObject({
       projectId: "11111111-1111-4111-8111-111111111111",
       incidentId: "inc_123",
       bundleVersion: 1,
+      analytics,
       checks: [
         { name: "api-health", status: "ok" },
         { name: "web-health", status: "ok" },
-        { name: "browser-session-auth", status: "ok" },
+        { name: "member-token-auth", status: "ok" },
         { name: "project-token-ingestion", status: "ok" },
         { name: "incident-retrieval", status: "ok" },
-        { name: "bundle-retrieval", status: "ok" }
+        { name: "bundle-retrieval", status: "ok" },
+        { name: "browser-analytics-ingestion", status: "ok" },
+        { name: "analytics-rollups", status: "ok" },
+        { name: "analytics-journey-sample", status: "ok" },
+        { name: "analytics-bundle-retrieval", status: "ok" }
       ]
     });
 
+    expect(runAnalyticsSmoke).toHaveBeenCalledWith(
+      expect.objectContaining({
+        apiBaseUrl: "http://api.debugbundle.test",
+        memberToken: "dbundle_mem_smoke",
+        projectToken: "dbundle_proj_smoke",
+        projectId: "11111111-1111-4111-8111-111111111111"
+      })
+    );
+
     expect(fetchImpl).toHaveBeenNthCalledWith(
-      5,
+      4,
       "http://api.debugbundle.test/v1/projects",
       expect.objectContaining({
         method: "POST",
         headers: expect.objectContaining({
-          cookie: expect.stringContaining("dbundle_session=session-secret"),
-          "x-csrf-token": "csrf_123"
+          authorization: "Bearer dbundle_mem_smoke"
         })
       })
     );
 
     expect(fetchImpl).toHaveBeenNthCalledWith(
-      7,
+      6,
       "http://api.debugbundle.test/v1/events",
       expect.objectContaining({
         method: "POST",
@@ -139,23 +157,20 @@ describe("self-host smoke runner", () => {
       expect.objectContaining({
         method: "GET",
         headers: expect.objectContaining({
-          cookie: expect.stringContaining("dbundle_session=session-secret")
+          authorization: "Bearer dbundle_mem_smoke"
         })
       })
     );
   });
 
-  it("fails clearly when login does not return the self-host session cookie", async () => {
+  it("fails clearly when bootstrap auth does not return a member token", async () => {
     const fetchImpl = vi
       .fn<typeof fetch>()
       .mockResolvedValueOnce(jsonResponse(200, { status: "ok" }))
       .mockResolvedValueOnce(textResponse(200, "<html><body>DebugBundle</body></html>"))
-      .mockResolvedValueOnce(jsonResponse(200, { success: true }))
       .mockResolvedValueOnce(
         jsonResponse(200, {
-          session: {
-            csrf_token: "csrf_123"
-          }
+          token: {}
         })
       );
 
@@ -169,6 +184,6 @@ describe("self-host smoke runner", () => {
         fetchImpl,
         wait: async () => undefined
       })
-    ).rejects.toThrow("Self-host login did not return a session cookie.");
+    ).rejects.toThrow("Self-host bootstrap did not return a member token.");
   });
 });

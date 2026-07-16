@@ -23,6 +23,7 @@ export function useCursorPagination<TItem>(
 ): {
   items: TItem[] | null;
   isLoading: boolean;
+  hasError: boolean;
   page: number;
   hasNextPage: boolean;
   goToNextPage: () => Promise<void>;
@@ -32,6 +33,7 @@ export function useCursorPagination<TItem>(
   const [pages, setPages] = useState<CachedCursorPage<TItem>[]>([]);
   const [pageIndex, setPageIndex] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
+  const [hasError, setHasError] = useState(false);
   const dependencySignature = JSON.stringify(dependencies);
 
   useEffect(() => {
@@ -40,6 +42,7 @@ export function useCursorPagination<TItem>(
     setPages([]);
     setPageIndex(0);
     setIsLoading(true);
+    setHasError(false);
 
     void (async () => {
       try {
@@ -48,10 +51,12 @@ export function useCursorPagination<TItem>(
         if (!isCancelled) {
           setPages([firstPage]);
           setPageIndex(0);
+          setHasError(false);
         }
       } catch {
         if (!isCancelled) {
           setPages([EMPTY_PAGE as CachedCursorPage<TItem>]);
+          setHasError(true);
           showErrorToast("Could not load the current page.");
         }
       } finally {
@@ -84,7 +89,9 @@ export function useCursorPagination<TItem>(
       const nextPage = await loadPage(currentPage.nextCursor);
       setPages((current) => [...current, nextPage]);
       setPageIndex((current) => current + 1);
+      setHasError(false);
     } catch {
+      setHasError(true);
       showErrorToast("Could not load the next page.");
     } finally {
       setIsLoading(false);
@@ -107,7 +114,9 @@ export function useCursorPagination<TItem>(
     try {
       const refreshedPage = await loadPage(cursor);
       setPages((current) => [...current.slice(0, pageIndex), refreshedPage]);
+      setHasError(false);
     } catch {
+      setHasError(true);
       showErrorToast("Could not refresh the current page.");
     } finally {
       setIsLoading(false);
@@ -117,6 +126,7 @@ export function useCursorPagination<TItem>(
   return {
     items: currentPage?.items ?? null,
     isLoading,
+    hasError,
     page: pageIndex + 1,
     hasNextPage: currentPage !== undefined && currentPage.nextCursor !== null,
     goToNextPage,

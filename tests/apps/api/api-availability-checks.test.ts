@@ -210,7 +210,7 @@ describe("api availability check routes", () => {
     expect(listResponse.statusCode).toBe(200);
     expect(listResponse.json()).toMatchObject({
       checks: [expect.objectContaining({ check_id: checkFixture.check_id, linked_incident_status: null })],
-      limits: { max_checks_per_project: 5, min_interval_seconds: 60 }
+      limits: { max_checks_per_project: 3, min_interval_seconds: 60 }
     });
 
     const getResponse = await app.inject({
@@ -401,7 +401,7 @@ describe("api availability check routes", () => {
     expect(createResponse.statusCode).toBe(409);
     expect(createResponse.json()).toEqual({
       error: "availability_check_limit_reached",
-      limits: { max_checks_per_project: 5, min_interval_seconds: 60 }
+      limits: { max_checks_per_project: 3, min_interval_seconds: 60 }
     });
 
     const updateResponse = await app.inject({
@@ -415,7 +415,7 @@ describe("api availability check routes", () => {
     expect(updateResponse.statusCode).toBe(409);
     expect(updateResponse.json()).toEqual({
       error: "availability_check_interval_too_low",
-      limits: { max_checks_per_project: 5, min_interval_seconds: 60 }
+      limits: { max_checks_per_project: 3, min_interval_seconds: 60 }
     });
 
     const testResponse = await app.inject({

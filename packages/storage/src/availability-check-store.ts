@@ -239,7 +239,12 @@ export function createPostgresAvailabilityCheckStore(db: Queryable): Availabilit
 
     async createCheckForProjectInOrganization(input) {
       return await runInTransaction(db, async (tx) => {
-        const project = await projectExistsForAvailabilityChecks(tx, input);
+        // Serialize the count-and-insert boundary so concurrent creates cannot exceed the project cap.
+        const project = await projectExistsForAvailabilityChecks(tx, {
+          organization_id: input.organization_id,
+          project_id: input.project_id,
+          lock_project: true
+        });
         if (project === null) {
           return "project_not_found";
         }

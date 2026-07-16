@@ -15,12 +15,29 @@ export function buildRawEventObjectKey(input: BuildRawEventObjectKeyInput): stri
   return `raw-events/${input.projectId}/${year}/${month}/${day}/${hour}/${input.eventId}.json.gz`;
 }
 
+export function buildAnalyticsRawEventObjectKey(input: BuildRawEventObjectKeyInput): string {
+  const year = input.occurredAt.getUTCFullYear().toString();
+  const month = toTwoDigits(input.occurredAt.getUTCMonth() + 1);
+  const day = toTwoDigits(input.occurredAt.getUTCDate());
+  const hour = toTwoDigits(input.occurredAt.getUTCHours());
+
+  return `analytics-events/${input.projectId}/${year}/${month}/${day}/${hour}/${input.eventId}.json.gz`;
+}
+
 export function buildBundleObjectKey(projectId: string, incidentId: string): string {
   return `bundles/${projectId}/${incidentId}/bundle.json.gz`;
 }
 
 export function buildImprovementBundleObjectKey(projectId: string, opportunityId: string): string {
   return `improvement-bundles/${projectId}/${opportunityId}/bundle.json.gz`;
+}
+
+export function buildAnalyticsJourneyObjectKey(projectId: string, sampleId: string): string {
+  return `analytics-journeys/${projectId}/${sampleId}.json.gz`;
+}
+
+export function buildAnalyticsBundleObjectKey(projectId: string, generationId: string): string {
+  return `analytics-bundles/${projectId}/${generationId}/analytics-bundle.json.gz`;
 }
 
 export function buildReproductionObjectKey(projectId: string, incidentId: string): string {
@@ -39,7 +56,15 @@ export function buildImprovementBundleRegenerationLeaseKey(opportunityId: string
   return `leases:improvement-bundle-regeneration:${opportunityId}`;
 }
 
-const PROJECT_OBJECT_PREFIXES = ["raw-events", "bundles", "improvement-bundles", "reproductions"] as const;
+const PROJECT_OBJECT_PREFIXES = [
+  "raw-events",
+  "bundles",
+  "improvement-bundles",
+  "reproductions",
+  "analytics-events",
+  "analytics-journeys",
+  "analytics-bundles"
+] as const;
 
 export async function deleteProjectObjects(
   objectStore: { deleteObjectsByPrefix(prefix: string): Promise<void> },

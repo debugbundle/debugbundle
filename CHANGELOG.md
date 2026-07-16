@@ -6,8 +6,18 @@ The format is based on Keep a Changelog and this project follows Semantic Versio
 
 ## [Unreleased]
 
+## [1.6.3] - 2026-07-16
+
+### Added
+
+- Added the production-ready AnalyticsBundle product lane across browser capture, direct and relay ingestion, aggregate usage/routes/devices/referrers/actions/funnels, retained structured journeys, deterministic opportunities, generated analytics bundles, project/workspace web surfaces, and matching API, CLI, and MCP interfaces.
+- Added a bounded Free analytics preview plus fixed tier capabilities for saved funnels, controlled custom dimensions, and hourly retention; paid monthly event, session, retained-journey, and generated-bundle allowances scale with purchased capacity units.
+- Documented the AnalyticsBundle release surface across the repository README, CLI and MCP package READMEs, public interface contract, self-host operating guide, and documentation source tree. The release guidance covers aggregate metrics, bounded structured journey evidence, privacy/retention controls, exact incident-impact correlation, migration order, and the leased bounded scheduled evaluator.
+
 ### Changed
 
+- Extended maintained server SDK relays to accept strict credential-free analytics envelopes and attach configured project credentials only on authenticated upstream forwarding, while preserving existing debug relay behavior.
+- Added bounded analytics worker scheduling, independent raw/hourly/daily/journey/bundle retention, stable opportunity lifecycle evaluation, deterministic failed-generation retry, and complete opportunity-to-bundle incident/deploy linkage.
 - Bumped `@debugbundle/cli` to `1.6.4` for the alert severity lifecycle-scope release.
 - Bumped `@debugbundle/mcp` and `@debugbundle/openclaw-plugin` to `1.6.2` for the coordinated MCP alert lifecycle-scope release.
 - Added official MCP Registry availability documentation for `com.debugbundle/mcp` and noted the registry listing milestone for the published `@debugbundle/mcp` package.
@@ -16,6 +26,7 @@ The format is based on Keep a Changelog and this project follows Semantic Versio
 
 ### Fixed
 
+- Hardened analytics aggregation against session/dimension overcount, incomplete funnel accounting, project-token persistence, auth-state leakage, stale remote settings races, shared browser transport interference, partial quota-claim leakage, duplicate journey/bundle work, incomplete pagination, and API/CLI/MCP filter drift.
 - Updated the local MCP ecosystem verifier to prefer the official registry entry matching the release version when registry search returns multiple active versions.
 
 ## [1.6.2] - 2026-06-21

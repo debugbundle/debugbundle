@@ -151,7 +151,7 @@ afterEach(() => {
 });
 
 describe("web app — admin analytics", () => {
-  it("renders the admin analytics dashboard without exposing a sidebar nav item", async () => {
+  it("renders the admin analytics dashboard while the sidebar links to workspace analytics", async () => {
     const fetchMock = vi.fn((input: RequestInfo | URL) => {
       const url = requestUrl(input);
 
@@ -188,7 +188,10 @@ describe("web app — admin analytics", () => {
     expect(screen.getByText("Top sources")).toBeInTheDocument();
     expect(screen.getByText("Tasktime")).toBeInTheDocument();
     expect(screen.getByText("payload.stack")).toBeInTheDocument();
-    expect(screen.queryByRole("link", { name: /^analytics$/i })).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /^analytics$/i })).toHaveAttribute(
+      "href",
+      "/analytics/workspace"
+    );
   });
 
   it("shows the email-code gate for allowlisted analytics sessions authenticated with GitHub", async () => {

@@ -309,6 +309,9 @@ describe("availability check store", () => {
       })
     ).resolves.toEqual(expect.objectContaining({ check_id: "chk_1" }));
     expect(transactionalCreateStoreDb.query).not.toHaveBeenCalled();
+    expect(String(transactionalCreateStoreDb.txQuery.mock.calls[0]?.[0])).toContain(
+      "FOR UPDATE OF p"
+    );
 
     const createFailureStore = createPostgresAvailabilityCheckStore(
       createSequentialDb([

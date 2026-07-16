@@ -37,6 +37,9 @@ describe('public site content source', () => {
     expect(existsSync(join(publicSiteRoot, 'content/docs/how-it-works.mdx'))).toBe(true);
     expect(existsSync(join(publicSiteRoot, 'content/docs/installation.mdx'))).toBe(true);
     expect(existsSync(join(publicSiteRoot, 'content/docs/core-concepts.mdx'))).toBe(true);
+    expect(existsSync(join(publicSiteRoot, 'content/docs/analytics/index.mdx'))).toBe(true);
+    expect(existsSync(join(publicSiteRoot, 'content/docs/analytics/privacy.mdx'))).toBe(true);
+    expect(existsSync(join(publicSiteRoot, 'content/docs/analytics/self-hosting.mdx'))).toBe(true);
     expect(existsSync(join(publicSiteRoot, 'content/docs/agent-workflows.mdx'))).toBe(true);
     expect(existsSync(join(publicSiteRoot, 'content/docs/agent-workflows/skill-file.mdx'))).toBe(true);
     expect(existsSync(join(publicSiteRoot, 'content/docs/agent-workflows/automation-recipes.mdx'))).toBe(true);
@@ -58,6 +61,7 @@ describe('public site content source', () => {
     expect(existsSync(join(publicSiteRoot, 'content/docs/cli/tokens.mdx'))).toBe(true);
     expect(existsSync(join(publicSiteRoot, 'content/docs/cli/webhooks.mdx'))).toBe(true);
     expect(existsSync(join(publicSiteRoot, 'content/docs/cli/alerts.mdx'))).toBe(true);
+    expect(existsSync(join(publicSiteRoot, 'content/docs/cli/analytics.mdx'))).toBe(true);
     expect(existsSync(join(publicSiteRoot, 'content/docs/api/index.mdx'))).toBe(true);
     expect(existsSync(join(publicSiteRoot, 'content/docs/api/authentication.mdx'))).toBe(true);
     expect(existsSync(join(publicSiteRoot, 'content/docs/api/incidents.mdx'))).toBe(true);
@@ -67,6 +71,7 @@ describe('public site content source', () => {
     expect(existsSync(join(publicSiteRoot, 'content/docs/api/probes.mdx'))).toBe(true);
     expect(existsSync(join(publicSiteRoot, 'content/docs/api/webhooks.mdx'))).toBe(true);
     expect(existsSync(join(publicSiteRoot, 'content/docs/api/billing.mdx'))).toBe(true);
+    expect(existsSync(join(publicSiteRoot, 'content/docs/api/analytics.mdx'))).toBe(true);
     expect(existsSync(join(publicSiteRoot, 'content/docs/mcp/index.mdx'))).toBe(true);
     expect(existsSync(join(publicSiteRoot, 'content/docs/mcp/tools.mdx'))).toBe(true);
     expect(existsSync(join(publicSiteRoot, 'content/docs/mcp/workflows.mdx'))).toBe(true);

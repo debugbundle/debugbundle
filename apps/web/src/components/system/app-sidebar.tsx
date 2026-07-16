@@ -1,5 +1,6 @@
 import {
   CreditCardIcon,
+  BarChart3Icon,
   FolderKanbanIcon,
   HeartPulseIcon,
   HomeIcon,
@@ -30,6 +31,7 @@ const navMain = [
   { to: "/incidents", label: "Incidents", icon: SirenIcon },
   { to: "/health-status", label: "Health Status", icon: HeartPulseIcon },
   { to: "/improvements", label: "Improvements", icon: SparklesIcon },
+  { to: "/analytics/workspace", label: "Analytics", icon: BarChart3Icon },
   { to: "/projects", label: "Projects", icon: FolderKanbanIcon },
   { to: "/billing", label: "Billing", icon: CreditCardIcon },
   { to: "/member-tokens", label: "Member tokens", icon: KeySquareIcon }

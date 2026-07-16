@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { gzipSync } from "node:zlib";
 
 import { describe, expect, it, vi } from "vitest";
@@ -9,6 +10,10 @@ describe("worker processor \u2013 normalize-events", () => {
   it("should process next normalize-events job and persist processed event", async (): Promise<void> => {
     const event = createEventEnvelope({
       event_type: "log_event",
+      correlation: {
+        session_id: "session-123",
+        trace_id: "trace-123"
+      },
       service: {
         name: "checkout-api",
         environment: "production",
@@ -53,7 +58,11 @@ describe("worker processor \u2013 normalize-events", () => {
         project_id: "proj_123",
         event_id: event.event_id,
         event_type: "log_event",
-        severity: "low"
+        severity: "low",
+        session_id_hash: createHash("sha256")
+          .update('{"project_id":"proj_123","session_id":"session-123"}', "utf8")
+          .digest("hex"),
+        trace_id_hash: createHash("sha256").update("trace-123", "utf8").digest("hex")
       })
     );
   });

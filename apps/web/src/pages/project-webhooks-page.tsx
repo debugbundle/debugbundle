@@ -3,6 +3,12 @@ import { useEffect, useState } from "react";
 import { useOutletContext } from "react-router-dom";
 import { DialogFormContent } from "../components/system/dialog-form-content.js";
 import { PlaintextTokenReveal } from "../components/system/plaintext-token-reveal.js";
+import {
+  joinScopeValues,
+  ProjectScopeMultiSelect,
+  splitScopeValues,
+  useProjectScopeOptions
+} from "../components/system/project-scope-controls.js";
 import { ProjectResourceEmptyState } from "../components/system/project-resource-empty-state.js";
 import type { ProjectContext } from "../components/system/project-layout.js";
 import { Badge } from "../components/ui/badge.js";
@@ -78,7 +84,7 @@ const ANY_SEVERITY_SELECT_VALUE = "__any_severity__";
 type DeliveryState = Record<string, WebhookDeliveryRecord[]>;
 
 export function ProjectWebhooksPage(): JSX.Element {
-  const { projectId } = useOutletContext<ProjectContext>();
+  const { project, projectId } = useOutletContext<ProjectContext>();
   const [webhooks, setWebhooks] = useState<WebhookRecord[] | null>(null);
   const showWebhooksLoading = useDelayedVisibility(webhooks === null);
   const [deliveriesByWebhook, setDeliveriesByWebhook] = useState<DeliveryState>({});
@@ -92,6 +98,7 @@ export function ProjectWebhooksPage(): JSX.Element {
   const [selectedBundleTypes, setSelectedBundleTypes] = useState<Array<"failure" | "improvement">>([]);
   const [verificationScope, setVerificationScope] = useState<"all" | "verification_only" | "non_verification_only">("all");
   const [activeTestWebhookId, setActiveTestWebhookId] = useState<string | null>(null);
+  const scopeOptions = useProjectScopeOptions(projectId, project.environment_default);
 
   useEffect(() => {
     void loadWebhooks(projectId, setWebhooks, setDeliveriesByWebhook);
@@ -251,22 +258,24 @@ export function ProjectWebhooksPage(): JSX.Element {
                     <div className="grid gap-4 pt-1 md:grid-cols-2">
                       <Field>
                         <FieldLabel htmlFor="webhook-filter-environment">Environments</FieldLabel>
-                        <FieldDescription>Comma-separated app environment names, for example <span className="font-mono">production, staging</span>.</FieldDescription>
-                        <Input
+                        <FieldDescription>Limit delivery to selected app environments. Leave empty to deliver every environment.</FieldDescription>
+                        <ProjectScopeMultiSelect
                           id="webhook-filter-environment"
-                          value={environmentFilter}
-                          onChange={(event) => setEnvironmentFilter(event.currentTarget.value)}
-                          placeholder="production, staging"
+                          label="Environments"
+                          value={splitScopeValues(environmentFilter)}
+                          options={scopeOptions.environments}
+                          onValueChange={(values) => setEnvironmentFilter(joinScopeValues(values))}
                         />
                       </Field>
                       <Field>
                         <FieldLabel htmlFor="webhook-filter-service">Services</FieldLabel>
-                        <FieldDescription>Comma-separated app service names, for example <span className="font-mono">checkout-api, worker</span>.</FieldDescription>
-                        <Input
+                        <FieldDescription>Limit delivery to selected app services. Leave empty to deliver every service.</FieldDescription>
+                        <ProjectScopeMultiSelect
                           id="webhook-filter-service"
-                          value={serviceFilter}
-                          onChange={(event) => setServiceFilter(event.currentTarget.value)}
-                          placeholder="checkout-api, worker"
+                          label="Services"
+                          value={splitScopeValues(serviceFilter)}
+                          options={scopeOptions.services}
+                          onValueChange={(values) => setServiceFilter(joinScopeValues(values))}
                         />
                       </Field>
                       <Field>

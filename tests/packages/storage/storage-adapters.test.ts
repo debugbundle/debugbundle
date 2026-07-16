@@ -92,8 +92,7 @@ import {
   createRedisIncidentFrequencyCounter,
   createRedisQueueClient,
   createRedisRequestAnomalyCounter,
-  createS3ObjectStoreClient,
-  deleteProjectObjects
+  createS3ObjectStoreClient
 } from "../../../packages/storage/src/index.js";
 
 describe("storage adapters", () => {
@@ -235,18 +234,6 @@ describe("storage adapters", () => {
     await client.deleteObjectsByPrefix("raw-events/nonexistent/");
 
     expect(sendMock).toHaveBeenCalledTimes(1);
-  });
-
-  it("should delete objects under all project prefixes via deleteProjectObjects", async (): Promise<void> => {
-    const deleteObjectsByPrefix = vi.fn().mockResolvedValue(undefined);
-
-    await deleteProjectObjects({ deleteObjectsByPrefix }, "proj_abc");
-
-    expect(deleteObjectsByPrefix).toHaveBeenCalledTimes(4);
-    expect(deleteObjectsByPrefix).toHaveBeenNthCalledWith(1, "raw-events/proj_abc/");
-    expect(deleteObjectsByPrefix).toHaveBeenNthCalledWith(2, "bundles/proj_abc/");
-    expect(deleteObjectsByPrefix).toHaveBeenNthCalledWith(3, "improvement-bundles/proj_abc/");
-    expect(deleteObjectsByPrefix).toHaveBeenNthCalledWith(4, "reproductions/proj_abc/");
   });
 
   it("should throw when S3 get returns no body", async (): Promise<void> => {
@@ -395,6 +382,80 @@ describe("storage adapters", () => {
       delivery_id: "del_123",
       attempt: 2
     });
+  });
+
+  it("should enqueue and dequeue aggregate analytics jobs", async (): Promise<void> => {
+    redisLpopMock = vi.fn().mockResolvedValue(
+      '{"project_id":"proj_123","event_id":"550e8400-e29b-41d4-a716-446655440000","object_key":"analytics-events/proj_123/e.json.gz"}'
+    );
+
+    const queue = createRedisQueueClient({ redisUrl: "redis://redis:6379" });
+    const analyticsQueue = queue as typeof queue & {
+      enqueue(jobName: "aggregate-analytics-events", payload: {
+        project_id: string;
+        event_id: string;
+        object_key: string;
+      }): Promise<void>;
+      dequeue(jobName: "aggregate-analytics-events"): Promise<{
+        project_id: string;
+        event_id: string;
+        object_key: string;
+      } | null>;
+    };
+
+    await analyticsQueue.enqueue("aggregate-analytics-events", {
+      project_id: "proj_123",
+      event_id: "550e8400-e29b-41d4-a716-446655440000",
+      object_key: "analytics-events/proj_123/e.json.gz"
+    });
+
+    const next = await analyticsQueue.dequeue("aggregate-analytics-events");
+
+    expect(next).toEqual({
+      project_id: "proj_123",
+      event_id: "550e8400-e29b-41d4-a716-446655440000",
+      object_key: "analytics-events/proj_123/e.json.gz"
+    });
+  });
+
+  it("should enqueue, inspect, dequeue, and claim analytics bundle jobs", async (): Promise<void> => {
+    const payload = {
+      project_id: "proj_123",
+      generation_id: "550e8400-e29b-41d4-a716-446655440001",
+      requested_at: "2026-07-08T12:00:00.000Z",
+      trigger: "opportunity" as const
+    };
+    const serializedPayload = JSON.stringify(payload);
+    const envelope = JSON.stringify({ claim_id: "claim_analytics_bundle", payload: serializedPayload });
+    redisLrangeMock = vi.fn().mockResolvedValue([serializedPayload]);
+    redisLpopMock = vi.fn().mockResolvedValue(serializedPayload);
+    redisEvalMock = vi.fn().mockResolvedValue([serializedPayload, envelope]);
+
+    const queue = createRedisQueueClient({ redisUrl: "redis://redis:6379" });
+
+    await queue.enqueue("build-analytics-bundle", payload);
+    const jobs = await queue.readJobQueue("build-analytics-bundle");
+    const next = await queue.dequeue("build-analytics-bundle");
+    const claimed = await queue.claim("build-analytics-bundle");
+    await claimed?.ack();
+    await queue.clearJobQueue("build-analytics-bundle");
+
+    expect(jobs).toEqual([serializedPayload]);
+    expect(next).toEqual(payload);
+    expect(claimed?.payload).toEqual(payload);
+    expect(redisRpushMock).toHaveBeenCalledWith("jobs:build-analytics-bundle", serializedPayload);
+    expect(redisLrangeMock).toHaveBeenCalledWith("jobs:build-analytics-bundle", 0, -1);
+    expect(redisLpopMock).toHaveBeenCalledWith("jobs:build-analytics-bundle");
+    expect(redisEvalMock).toHaveBeenCalledWith(
+      expect.stringContaining("LPOP"),
+      2,
+      "jobs:build-analytics-bundle",
+      "jobs:build-analytics-bundle:processing",
+      expect.any(String),
+      expect.any(String)
+    );
+    expect(redisZremMock).toHaveBeenCalledWith("jobs:build-analytics-bundle:processing", envelope);
+    expect(redisDelMock).toHaveBeenCalledWith("jobs:build-analytics-bundle", "jobs:build-analytics-bundle:processing");
   });
 
   it("should enqueue and dequeue evaluate-alerts jobs", async (): Promise<void> => {

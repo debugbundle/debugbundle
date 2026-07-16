@@ -66,7 +66,21 @@
       },
       "skillPath": "apps/mcp/clawhub/debugbundle",
       "cliPackage": "clawhub",
-      "cliVersion": "0.22.0"
+      "cliVersion": "0.22.0",
+      "discoveryQueries": [
+        { "query": "error reporting incident monitoring live apps", "maxRank": 10 },
+        { "query": "runtime error reporting", "maxRank": 10 },
+        { "query": "crash reporting", "maxRank": 10 },
+        { "query": "incident response", "maxRank": 10 },
+        { "query": "production monitoring", "maxRank": 10 },
+        { "query": "health checks", "maxRank": 10 },
+        { "query": "debug bundles", "maxRank": 10 }
+      ],
+      "discoveryVerification": {
+        "attempts": 6,
+        "retryDelayMs": 5000,
+        "limit": 25
+      }
     },
     "clawhubPlugin": {
       "type": "push",

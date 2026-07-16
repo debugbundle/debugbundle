@@ -46,6 +46,8 @@ describe('Phase 15 — Homepage, Marketing & Blog', () => {
       expect(pricing).toContain('Free');
       expect(pricing).toContain('Solo');
       expect(pricing).toContain('Team');
+      expect(pricing).toContain('3 health checks /project');
+      expect(pricing).toContain('8 health checks /project');
       // Must NOT still contain placeholder text
       expect(pricing).not.toContain('richer allowance and slot details');
     });

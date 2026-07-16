@@ -18,6 +18,8 @@ const routeTitles: Record<string, string> = {
   "/incidents": "Incidents",
   "/health-status": "Health Status",
   "/improvements": "Improvements",
+  "/analytics/workspace": "Analytics",
+  "/analytics/workspace/bundles": "Analytics",
   "/projects": "Projects",
   "/billing": "Billing",
   "/member-tokens": "Member Tokens",
@@ -46,6 +48,7 @@ const projectTabLabels: Record<string, string> = {
   health: "Health",
   incidents: "Incidents",
   improvements: "Improvements",
+  analytics: "Analytics",
   bundles: "Bundles"
 };
 

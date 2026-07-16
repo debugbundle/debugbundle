@@ -45,7 +45,7 @@ Local convenience must not introduce a different auth model than hosted deployme
 	docker compose ps
 	```
 
-4. Run the shipped smoke flow to prove browser-session auth, project-token ingestion, worker processing, and bundle retrieval:
+4. Run the shipped smoke flow to prove member bootstrap, project-token ingestion, worker processing, browser analytics rollups, retained journeys, and both bundle families:
 
 	```sh
 	make selfhost-smoke
@@ -91,6 +91,7 @@ The checked-in `.env.example` includes the baseline configuration needed to boot
 - `POSTGRES_*`, `REDIS_PORT`, `LOCALSTACK_PORT`, `S3_REGION`, and `S3_BUCKET` define the stateful services
 - `DEBUGBUNDLE_PROBE_TRIGGER_SECRET` is mandatory
 - `ANALYTICS_HASH_SECRET` is mandatory
+- `ANALYTICS_OPPORTUNITY_EVALUATION_INTERVAL_MS` controls the bounded aggregate-only opportunity scan; it defaults to six hours
 - `AUTH_COOKIE_SECURE=false` is the local default; set it to `true` behind HTTPS
 - GitHub OAuth, GitHub App, and GitHub Marketplace webhook variables remain optional until those features are enabled
 
@@ -100,6 +101,24 @@ Default local endpoints after `docker compose up -d`:
 - Postgres: `localhost:5434`
 - Redis: `localhost:6380`
 - LocalStack S3: `http://localhost:4567`
+
+## AnalyticsBundle Operations
+
+AnalyticsBundle is disabled per project until an owner or admin enables it through the authenticated API, CLI, MCP, or web settings surface. Self-host mode removes tier and allowance enforcement, but it does not bypass consent, privacy, validation, redaction, or retention controls.
+
+Analytics data uses three independent project settings:
+
+| Setting | Range | What expires |
+| --- | --- | --- |
+| `raw_retention_days` | 1-30 days | Short-lived raw analytics input objects and ingestion-ledger entries. |
+| `sample_retention_days` | 1-365 days | Retained redacted representative journey samples and their object-storage artifacts. |
+| `aggregate_retention_months` | 1-120 months | Aggregate rollups, completed/failed AnalyticsBundle generations, and their artifacts. |
+
+The worker cleanup lane deletes expired objects and metadata automatically. Aggregate metrics remain the normal query model; no analytics raw-event search surface exists. Generated journey timelines contain only redacted safe fields, and incident-impact replay remains restricted to correlation-backed retained samples.
+
+`ANALYTICS_OPPORTUNITY_EVALUATION_INTERVAL_MS` controls the additional idle, aggregate-only opportunity scan. It is six hours by default, uses a distributed lease and cursor-bounded batches, and never scans raw analytics objects. Event-triggered aggregation remains the low-latency evaluation path.
+
+For an existing installation, deploy the current `db-migrate` service before API or Worker containers that use AnalyticsBundle tables. Do not run `db-bootstrap` as an upgrade mechanism: it is only for empty databases. Preserve `ANALYTICS_HASH_SECRET` across deploys because it protects deletion-safe account analytics identifiers and their deduplication continuity; it is not the incident-impact correlation hash.
 
 ## Health Checks
 
@@ -134,13 +153,16 @@ Typical failure reasons now surface explicitly in container logs, for example:
 `make selfhost-smoke` boots the full self-host stack in an isolated Compose project, waits for API and web readiness, then runs the checked-in smoke runner at `scripts/selfhost-smoke.ts`.
 
 That smoke flow proves the core hosted-parity path end to end:
-- browser-session signup/login against the API
-- project creation and project-token minting through the session-authenticated management API
+- dev-only GitHub bootstrap to a write-once member token inside the isolated smoke environment
+- project creation and project-token minting through the member-authenticated management API
 - `POST /v1/events` ingestion with the minted project token
 - worker-owned incident creation and bundle generation
-- session-authenticated incident and bundle retrieval
+- member-authenticated incident and bundle retrieval
+- three realistic browser analytics sessions spanning desktop/mobile, browser, OS, language, route, action, funnel, conversion, and journey-marker signals
+- asynchronous analytics rollups, device breakdowns, funnel visibility, and retained representative journey metadata
+- on-demand `analytics_bundle.v1` generation and retrieval
 
-Use it after changing self-host compose config, auth wiring, worker startup behavior, or object-store/bootstrap behavior.
+Use it after changing self-host compose config, auth wiring, ingestion, analytics storage/processing, worker startup behavior, or object-store/bootstrap behavior. The GitHub mock provider is enabled only for this isolated acceptance target; normal self-host deployments keep it disabled unless explicitly configured.
 
 ## Updating
 
@@ -151,7 +173,7 @@ git pull
 docker compose up -d --force-recreate workspace-init db-bootstrap db-migrate api worker web
 ```
 
-No manual schema command is required on clean startup. The one-shot `db-bootstrap` service bootstraps an empty database before the API starts, and the one-shot `db-migrate` service applies ordered forward migrations before runtime services consume the schema. This is required for additive runtime-dependent changes such as the no-card trial lifecycle worker, which now depends on both `trial_lifecycle_events` and the expanded `operational_email_deliveries` shape before the worker can report ready. Destructive schema cleanup should be shipped in a later deploy after additive migrations and compatible application code are already live.
+No manual schema command is required on clean startup. The one-shot `db-bootstrap` service bootstraps an empty database before the API starts, and the one-shot `db-migrate` service applies ordered forward migrations before runtime services consume the schema. This is required for additive runtime-dependent changes such as the no-card trial lifecycle worker and AnalyticsBundle incident-correlation storage; API and worker readiness fail closed until their required migrations are recorded. Destructive schema cleanup should be shipped in a later deploy after additive migrations and compatible application code are already live.
 
 ## GitHub App Setup (Optional)
 

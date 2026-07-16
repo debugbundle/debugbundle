@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 
 import {
   getGitHubInstallation,
+  getProjectAnalyticsSettings,
   getProjectCapturePolicy,
   getProjectGitHubRepo,
   getProjectImprovementSettings,
@@ -15,6 +16,7 @@ import {
   type GitHubDispatchRuleRecord,
   type GitHubInstallationRecord,
   type ProbeActivationRecord,
+  type ProjectAnalyticsSettingsResponse,
   type ProjectCapturePolicyResponse,
   type ProjectGitHubRepoRecord,
   type ProjectImprovementSettingsResponse,
@@ -45,6 +47,7 @@ interface GitHubOverviewSummary {
 
 interface ProjectSetupSummaryState {
   alerts: SummaryLoadState<AlertRecord[]>;
+  analytics: SummaryLoadState<ProjectAnalyticsSettingsResponse>;
   webhooks: SummaryLoadState<WebhookRecord[]>;
   probes: SummaryLoadState<ProbeActivationRecord[]>;
   healthChecks: SummaryLoadState<Awaited<ReturnType<typeof listProjectAvailabilityChecks>>>;
@@ -55,7 +58,9 @@ interface ProjectSetupSummaryState {
 }
 
 export function ProjectSetupSummaryGrid({ project }: { project: ProjectRecord }): JSX.Element {
-  const [summary, setSummary] = useState<ProjectSetupSummaryState>(() => buildLoadingProjectSetupSummary());
+  const [summary, setSummary] = useState<ProjectSetupSummaryState>(() =>
+    buildLoadingProjectSetupSummary()
+  );
 
   useEffect(() => {
     let isActive = true;
@@ -65,6 +70,7 @@ export function ProjectSetupSummaryGrid({ project }: { project: ProjectRecord })
     void (async () => {
       const [
         alertsResult,
+        analyticsResult,
         webhooksResult,
         probesResult,
         healthChecksResult,
@@ -74,6 +80,7 @@ export function ProjectSetupSummaryGrid({ project }: { project: ProjectRecord })
         githubResult
       ] = await Promise.allSettled([
         listProjectAlerts(project.project_id, PROJECT_SETUP_SUMMARY_LIST_LIMIT),
+        getProjectAnalyticsSettings(project.project_id),
         listProjectWebhooks(project.project_id, PROJECT_SETUP_SUMMARY_LIST_LIMIT),
         listProjectProbeActivations(project.project_id),
         listProjectAvailabilityChecks(project.project_id, PROJECT_SETUP_SUMMARY_LIST_LIMIT),
@@ -89,6 +96,7 @@ export function ProjectSetupSummaryGrid({ project }: { project: ProjectRecord })
 
       setSummary({
         alerts: toSummaryLoadState(alertsResult),
+        analytics: toSummaryLoadState(analyticsResult),
         webhooks: toSummaryLoadState(webhooksResult),
         probes: toSummaryLoadState(probesResult),
         healthChecks: toSummaryLoadState(healthChecksResult),
@@ -111,13 +119,14 @@ export function ProjectSetupSummaryGrid({ project }: { project: ProjectRecord })
   return (
     <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
       {renderAlertsSummaryBlock(summary.alerts)}
-      {renderWebhooksSummaryBlock(summary.webhooks)}
+      {renderAnalyticsSummaryBlock(summary.analytics)}
       {renderHealthChecksSummaryBlock(summary.healthChecks)}
-      {renderProbesSummaryBlock(summary.probes, project.organization_plan)}
-      {renderGitHubSummaryBlock(summary.github, project.organization_plan)}
+      {renderImprovementSummaryBlock(summary.improvementSettings)}
       {renderWeeklyReportsSummaryBlock(summary.weeklyReports)}
       {renderCapturePolicySummaryBlock(summary.capturePolicy)}
-      {renderImprovementSummaryBlock(summary.improvementSettings)}
+      {renderProbesSummaryBlock(summary.probes, project.organization_plan)}
+      {renderWebhooksSummaryBlock(summary.webhooks)}
+      {renderGitHubSummaryBlock(summary.github, project.organization_plan)}
     </div>
   );
 }
@@ -125,6 +134,7 @@ export function ProjectSetupSummaryGrid({ project }: { project: ProjectRecord })
 function buildLoadingProjectSetupSummary(): ProjectSetupSummaryState {
   return {
     alerts: { status: "loading" },
+    analytics: { status: "loading" },
     webhooks: { status: "loading" },
     probes: { status: "loading" },
     healthChecks: { status: "loading" },
@@ -159,12 +169,15 @@ async function loadGitHubOverviewSummary(projectId: string): Promise<GitHubOverv
 }
 
 function toSummaryLoadState<T>(result: PromiseSettledResult<T>): SummaryLoadState<T> {
-  return result.status === "fulfilled" ? { status: "ready", data: result.value } : { status: "error" };
+  return result.status === "fulfilled"
+    ? { status: "ready", data: result.value }
+    : { status: "error" };
 }
 
 function isProjectSetupSummaryLoading(summary: ProjectSetupSummaryState): boolean {
   return (
     summary.alerts.status === "loading" ||
+    summary.analytics.status === "loading" ||
     summary.webhooks.status === "loading" ||
     summary.probes.status === "loading" ||
     summary.healthChecks.status === "loading" ||
@@ -178,7 +191,7 @@ function isProjectSetupSummaryLoading(summary: ProjectSetupSummaryState): boolea
 function ProjectSetupSummarySkeleton(): JSX.Element {
   return (
     <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-      {Array.from({ length: 8 }, (_, index) => (
+      {Array.from({ length: 9 }, (_, index) => (
         <div key={index} className="rounded-lg border border-border/80 bg-background/60 p-4">
           <Skeleton className="h-3 w-24" />
           <Skeleton className="mt-3 h-7 w-28" />
@@ -189,9 +202,73 @@ function ProjectSetupSummarySkeleton(): JSX.Element {
   );
 }
 
+function renderAnalyticsSummaryBlock(
+  summary: SummaryLoadState<ProjectAnalyticsSettingsResponse>
+): JSX.Element {
+  if (summary.status === "loading") {
+    return (
+      <SetupSummaryBlock
+        label="Analytics"
+        value="Loading..."
+        badge={{ label: "Loading", variant: "outline" }}
+        description="Loading analytics capture status."
+      />
+    );
+  }
+
+  if (summary.status === "error") {
+    return (
+      <SetupSummaryBlock
+        label="Analytics"
+        value="Unavailable"
+        badge={{ label: "Could not load", variant: "outline" }}
+        description="Analytics capture settings could not be loaded for this project."
+      />
+    );
+  }
+
+  if (!summary.data.analytics_available) {
+    return (
+      <SetupSummaryBlock
+        label="Analytics"
+        value="Unavailable"
+        badge={{ label: "Unavailable", variant: "outline" }}
+        description="Product analytics availability could not be resolved for this project."
+      />
+    );
+  }
+
+  const { settings } = summary.data;
+
+  return (
+    <SetupSummaryBlock
+      label="Analytics"
+      value={settings.enabled ? "Enabled" : "Off"}
+      badge={{
+        label: `${formatAnalyticsPrivacyMode(settings.privacy_mode)} privacy`,
+        variant: settings.enabled ? "success" : "secondary"
+      }}
+      description={
+        settings.enabled
+          ? settings.consent_required
+            ? "Browser analytics capture waits for explicit visitor consent."
+            : "Browser analytics capture accepts events from opted-in SDKs."
+          : "Enable analytics in project settings to collect aggregate product-usage signals."
+      }
+    />
+  );
+}
+
 function renderAlertsSummaryBlock(summary: SummaryLoadState<AlertRecord[]>): JSX.Element {
   if (summary.status === "loading") {
-    return <SetupSummaryBlock label="Alerts" value="Loading..." badge={{ label: "Loading", variant: "outline" }} description="Loading alert rule status." />;
+    return (
+      <SetupSummaryBlock
+        label="Alerts"
+        value="Loading..."
+        badge={{ label: "Loading", variant: "outline" }}
+        description="Loading alert rule status."
+      />
+    );
   }
 
   if (summary.status === "error") {
@@ -227,7 +304,14 @@ function renderAlertsSummaryBlock(summary: SummaryLoadState<AlertRecord[]>): JSX
 
 function renderWebhooksSummaryBlock(summary: SummaryLoadState<WebhookRecord[]>): JSX.Element {
   if (summary.status === "loading") {
-    return <SetupSummaryBlock label="Webhooks" value="Loading..." badge={{ label: "Loading", variant: "outline" }} description="Loading webhook status." />;
+    return (
+      <SetupSummaryBlock
+        label="Webhooks"
+        value="Loading..."
+        badge={{ label: "Loading", variant: "outline" }}
+        description="Loading webhook status."
+      />
+    );
   }
 
   if (summary.status === "error") {
@@ -267,7 +351,14 @@ function renderProbesSummaryBlock(
   organizationPlan: ProjectRecord["organization_plan"]
 ): JSX.Element {
   if (summary.status === "loading") {
-    return <SetupSummaryBlock label="Probes" value="Loading..." badge={{ label: "Loading", variant: "outline" }} description="Loading remote probe status." />;
+    return (
+      <SetupSummaryBlock
+        label="Probes"
+        value="Loading..."
+        badge={{ label: "Loading", variant: "outline" }}
+        description="Loading remote probe status."
+      />
+    );
   }
 
   if (summary.status === "error") {
@@ -308,7 +399,11 @@ function renderProbesSummaryBlock(
   return (
     <SetupSummaryBlock
       label="Probes"
-      value={totalActivations === 0 ? "Not configured" : `${formatBoundedCount(totalActivations, PROJECT_SETUP_SUMMARY_LIST_LIMIT)} active`}
+      value={
+        totalActivations === 0
+          ? "Not configured"
+          : `${formatBoundedCount(totalActivations, PROJECT_SETUP_SUMMARY_LIST_LIMIT)} active`
+      }
       badge={{
         label:
           totalActivations === 0
@@ -331,7 +426,14 @@ function renderHealthChecksSummaryBlock(
   summary: SummaryLoadState<Awaited<ReturnType<typeof listProjectAvailabilityChecks>>>
 ): JSX.Element {
   if (summary.status === "loading") {
-    return <SetupSummaryBlock label="Health checks" value="Loading..." badge={{ label: "Loading", variant: "outline" }} description="Loading health-check status." />;
+    return (
+      <SetupSummaryBlock
+        label="Health checks"
+        value="Loading..."
+        badge={{ label: "Loading", variant: "outline" }}
+        description="Loading health-check status."
+      />
+    );
   }
 
   if (summary.status === "error") {
@@ -380,7 +482,14 @@ function renderGitHubSummaryBlock(
   organizationPlan: ProjectRecord["organization_plan"]
 ): JSX.Element {
   if (summary.status === "loading") {
-    return <SetupSummaryBlock label="GitHub automation" value="Loading..." badge={{ label: "Loading", variant: "outline" }} description="Loading GitHub automation status." />;
+    return (
+      <SetupSummaryBlock
+        label="GitHub automation"
+        value="Loading..."
+        badge={{ label: "Loading", variant: "outline" }}
+        description="Loading GitHub automation status."
+      />
+    );
   }
 
   if (summary.status === "error") {
@@ -471,9 +580,18 @@ function renderGitHubSummaryBlock(
   );
 }
 
-function renderWeeklyReportsSummaryBlock(summary: SummaryLoadState<WeeklyReportChannelRecord[]>): JSX.Element {
+function renderWeeklyReportsSummaryBlock(
+  summary: SummaryLoadState<WeeklyReportChannelRecord[]>
+): JSX.Element {
   if (summary.status === "loading") {
-    return <SetupSummaryBlock label="Weekly reports" value="Loading..." badge={{ label: "Loading", variant: "outline" }} description="Loading weekly report status." />;
+    return (
+      <SetupSummaryBlock
+        label="Weekly reports"
+        value="Loading..."
+        badge={{ label: "Loading", variant: "outline" }}
+        description="Loading weekly report status."
+      />
+    );
   }
 
   if (summary.status === "error") {
@@ -488,7 +606,8 @@ function renderWeeklyReportsSummaryBlock(summary: SummaryLoadState<WeeklyReportC
   }
 
   const emailChannel = summary.data.find((channel) => channel.channel === "email") ?? null;
-  const recipientCount = emailChannel === null ? 0 : readWeeklyReportRecipients(emailChannel).length;
+  const recipientCount =
+    emailChannel === null ? 0 : readWeeklyReportRecipients(emailChannel).length;
 
   if (emailChannel === null) {
     return (
@@ -506,7 +625,10 @@ function renderWeeklyReportsSummaryBlock(summary: SummaryLoadState<WeeklyReportC
       label="Weekly reports"
       value={emailChannel.is_enabled ? "Enabled" : "Off"}
       badge={{
-        label: recipientCount > 0 ? `${recipientCount} recipient${recipientCount === 1 ? "" : "s"}` : "No recipients",
+        label:
+          recipientCount > 0
+            ? `${recipientCount} recipient${recipientCount === 1 ? "" : "s"}`
+            : "No recipients",
         variant: emailChannel.is_enabled ? "success" : "secondary"
       }}
       description={
@@ -518,9 +640,18 @@ function renderWeeklyReportsSummaryBlock(summary: SummaryLoadState<WeeklyReportC
   );
 }
 
-function renderCapturePolicySummaryBlock(summary: SummaryLoadState<ProjectCapturePolicyResponse>): JSX.Element {
+function renderCapturePolicySummaryBlock(
+  summary: SummaryLoadState<ProjectCapturePolicyResponse>
+): JSX.Element {
   if (summary.status === "loading") {
-    return <SetupSummaryBlock label="Capture policy" value="Loading..." badge={{ label: "Loading", variant: "outline" }} description="Loading capture policy." />;
+    return (
+      <SetupSummaryBlock
+        label="Capture policy"
+        value="Loading..."
+        badge={{ label: "Loading", variant: "outline" }}
+        description="Loading capture policy."
+      />
+    );
   }
 
   if (summary.status === "error") {
@@ -541,7 +672,10 @@ function renderCapturePolicySummaryBlock(summary: SummaryLoadState<ProjectCaptur
       label="Capture policy"
       value={`${formatCapturePreset(summary.data.policy.preset)} preset`}
       badge={{
-        label: clientErrorStatuses.length > 0 ? `${clientErrorStatuses.length} client 4xx` : "Preset defaults",
+        label:
+          clientErrorStatuses.length > 0
+            ? `${clientErrorStatuses.length} client 4xx`
+            : "Preset defaults",
         variant: clientErrorStatuses.length > 0 ? "warning" : "outline"
       }}
       description={formatCapturePolicySummary(summary.data)}
@@ -549,9 +683,18 @@ function renderCapturePolicySummaryBlock(summary: SummaryLoadState<ProjectCaptur
   );
 }
 
-function renderImprovementSummaryBlock(summary: SummaryLoadState<ProjectImprovementSettingsResponse>): JSX.Element {
+function renderImprovementSummaryBlock(
+  summary: SummaryLoadState<ProjectImprovementSettingsResponse>
+): JSX.Element {
   if (summary.status === "loading") {
-    return <SetupSummaryBlock label="Improvement bundles" value="Loading..." badge={{ label: "Loading", variant: "outline" }} description="Loading improvement settings." />;
+    return (
+      <SetupSummaryBlock
+        label="Improvement bundles"
+        value="Loading..."
+        badge={{ label: "Loading", variant: "outline" }}
+        description="Loading improvement settings."
+      />
+    );
   }
 
   if (summary.status === "error") {
@@ -582,7 +725,9 @@ function renderImprovementSummaryBlock(summary: SummaryLoadState<ProjectImprovem
       value={summary.data.settings.automated_improvement_bundles_enabled ? "Enabled" : "Off"}
       badge={{
         label: `${formatImprovementSensitivity(summary.data.settings.improvement_bundle_sensitivity)} sensitivity`,
-        variant: summary.data.settings.automated_improvement_bundles_enabled ? "success" : "secondary"
+        variant: summary.data.settings.automated_improvement_bundles_enabled
+          ? "success"
+          : "secondary"
       }}
       description="Hosted improvement detection uses the shared retained bundle allowance."
     />
@@ -605,7 +750,9 @@ function SetupSummaryBlock({
 }): JSX.Element {
   return (
     <div className="rounded-lg border border-border/80 bg-background/60 p-4">
-      <p className="text-xs font-medium uppercase tracking-[0.18em] text-muted-foreground">{label}</p>
+      <p className="text-xs font-medium uppercase tracking-[0.18em] text-muted-foreground">
+        {label}
+      </p>
       <div className="mt-3 flex flex-wrap items-start justify-between gap-3">
         <p className="text-base font-semibold text-foreground">{value}</p>
         <Badge variant={badge.variant}>{badge.label}</Badge>
@@ -645,7 +792,9 @@ function countDistinctWebhookEvents(webhooks: WebhookRecord[]): number {
 
 function readWeeklyReportRecipients(channel: WeeklyReportChannelRecord): string[] {
   const recipients = channel.config["to"];
-  return Array.isArray(recipients) && recipients.every((recipient) => typeof recipient === "string") ? recipients : [];
+  return Array.isArray(recipients) && recipients.every((recipient) => typeof recipient === "string")
+    ? recipients
+    : [];
 }
 
 function formatWeeklyReportSchedule(channel: WeeklyReportChannelRecord): string {
@@ -684,6 +833,19 @@ function formatCapturePreset(value: ProjectCapturePolicyResponse["policy"]["pres
   }
 }
 
+function formatAnalyticsPrivacyMode(
+  value: ProjectAnalyticsSettingsResponse["settings"]["privacy_mode"]
+): string {
+  switch (value) {
+    case "strict":
+      return "Strict";
+    case "standard":
+      return "Standard";
+    case "custom":
+      return "Custom";
+  }
+}
+
 function formatCapturePolicySummary(summary: ProjectCapturePolicyResponse): string {
   return [
     formatCaptureLogs(summary.policy.capture_logs),
@@ -705,7 +867,9 @@ function formatCaptureLogs(value: ProjectCapturePolicyResponse["policy"]["captur
   }
 }
 
-function formatCaptureRequests(value: ProjectCapturePolicyResponse["policy"]["capture_request_events"]): string {
+function formatCaptureRequests(
+  value: ProjectCapturePolicyResponse["policy"]["capture_request_events"]
+): string {
   switch (value) {
     case "off":
       return "no request events";
@@ -718,7 +882,9 @@ function formatCaptureRequests(value: ProjectCapturePolicyResponse["policy"]["ca
   }
 }
 
-function formatCaptureBreadcrumbs(value: ProjectCapturePolicyResponse["policy"]["capture_breadcrumbs"]): string {
+function formatCaptureBreadcrumbs(
+  value: ProjectCapturePolicyResponse["policy"]["capture_breadcrumbs"]
+): string {
   switch (value) {
     case "local_only":
       return "local-only breadcrumbs";

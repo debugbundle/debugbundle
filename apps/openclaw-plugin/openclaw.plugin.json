@@ -1,8 +1,8 @@
 {
   "id": "debugbundle",
   "name": "DebugBundle",
-  "description": "Use DebugBundle tools to inspect incidents, bundles, reproductions, probes, health checks, and operational debugging surfaces.",
-  "version": "1.6.2",
+  "description": "Use DebugBundle for runtime error reporting, incident response, live app monitoring, health checks, debug bundles, and product analytics.",
+  "version": "1.6.3",
   "configSchema": {
     "type": "object",
     "properties": {
@@ -85,6 +85,28 @@
       "debugbundle_delete_capture_rule",
       "debugbundle_suggest_capture_rules_from_incident",
       "debugbundle_create_capture_rule_from_incident_suggestion",
+      "debugbundle_get_usage_summary",
+      "debugbundle_get_route_metrics",
+      "debugbundle_get_journey_patterns",
+      "debugbundle_list_analytics_journey_samples",
+      "debugbundle_get_analytics_journey_sample",
+      "debugbundle_get_device_breakdown",
+      "debugbundle_get_referrer_metrics",
+      "debugbundle_get_action_metrics",
+      "debugbundle_list_funnel_metrics",
+      "debugbundle_get_funnel_analysis",
+      "debugbundle_get_incident_impact",
+      "debugbundle_list_analytics_opportunities",
+      "debugbundle_get_analytics_opportunity",
+      "debugbundle_list_analytics_bundles",
+      "debugbundle_generate_analytics_bundle",
+      "debugbundle_get_analytics_bundle",
+      "debugbundle_get_analytics_settings",
+      "debugbundle_update_analytics_settings",
+      "debugbundle_list_saved_analytics_funnels",
+      "debugbundle_create_saved_analytics_funnel",
+      "debugbundle_update_saved_analytics_funnel",
+      "debugbundle_archive_saved_analytics_funnel",
       "debugbundle_get_capture_policy",
       "debugbundle_update_capture_policy",
       "debugbundle_get_improvement_settings",
@@ -240,6 +262,21 @@
       "optional": true
     },
     "debugbundle_create_capture_rule_from_incident_suggestion": {
+      "optional": true
+    },
+    "debugbundle_generate_analytics_bundle": {
+      "optional": true
+    },
+    "debugbundle_update_analytics_settings": {
+      "optional": true
+    },
+    "debugbundle_create_saved_analytics_funnel": {
+      "optional": true
+    },
+    "debugbundle_update_saved_analytics_funnel": {
+      "optional": true
+    },
+    "debugbundle_archive_saved_analytics_funnel": {
       "optional": true
     },
     "debugbundle_update_capture_policy": {

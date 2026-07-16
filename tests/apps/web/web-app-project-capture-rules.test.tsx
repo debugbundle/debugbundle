@@ -58,6 +58,10 @@ async function openSelect(label: RegExp | string): Promise<HTMLButtonElement> {
   return trigger;
 }
 
+async function openCaptureRulesSettings(): Promise<void> {
+  fireEvent.click(await screen.findByRole("button", { name: "Capture rules" }));
+}
+
 describe("web app — project capture rules", () => {
   it("renders capture rules between capture policy and improvement settings and lets managers pause a rule", async () => {
     const user = userEvent.setup();
@@ -134,6 +138,7 @@ describe("web app — project capture rules", () => {
     vi.stubGlobal("fetch", fetchMock);
 
     render(<App initialEntries={["/projects/proj_123/settings"]} />);
+    await openCaptureRulesSettings();
 
     const capturePolicyHeading = await screen.findByRole("heading", {
       name: /capture policy/i,
@@ -144,7 +149,7 @@ describe("web app — project capture rules", () => {
       level: 3
     });
     const improvementHeading = await screen.findByRole("heading", {
-      name: /automated improvement bundles/i,
+      name: /^improvement bundles$/i,
       level: 3
     });
 
@@ -156,6 +161,11 @@ describe("web app — project capture rules", () => {
       captureRulesHeading.compareDocumentPosition(improvementHeading) &
         Node.DOCUMENT_POSITION_FOLLOWING
     ).toBeTruthy();
+    const createRuleButton = screen.getByRole("button", { name: /^create rule$/i });
+    const reviewIncidentsLink = screen.getByRole("link", { name: /^review incidents$/i });
+    const refreshRulesButton = screen.getByRole("button", { name: /^refresh rules$/i });
+    expect(createRuleButton.parentElement).toBe(reviewIncidentsLink.parentElement);
+    expect(createRuleButton.parentElement).toBe(refreshRulesButton.parentElement);
     expect(screen.getByText(/demote analytics resource errors/i)).toBeInTheDocument();
     expect(screen.getByText(/known third-party browser resource noise/i)).toBeInTheDocument();
 
@@ -247,6 +257,7 @@ describe("web app — project capture rules", () => {
     vi.stubGlobal("fetch", fetchMock);
 
     render(<App initialEntries={["/projects/proj_123/settings"]} />);
+    await openCaptureRulesSettings();
 
     expect(
       await screen.findByRole("heading", { name: /capture rules/i, level: 3 })
@@ -338,6 +349,7 @@ describe("web app — project capture rules", () => {
     vi.stubGlobal("fetch", fetchMock);
 
     render(<App initialEntries={["/projects/proj_123/settings"]} />);
+    await openCaptureRulesSettings();
 
     const matcherSummary = await screen.findByText(
       `events: frontend_exception • fingerprint: v1:${fingerprint}`
@@ -422,6 +434,7 @@ describe("web app — project capture rules", () => {
     vi.stubGlobal("fetch", fetchMock);
 
     render(<App initialEntries={["/projects/proj_123/settings"]} />);
+    await openCaptureRulesSettings();
 
     expect(await screen.findByText(/capture rule 01/i)).toBeInTheDocument();
     expect(screen.getByText(/capture rule 06/i)).toBeInTheDocument();
@@ -526,6 +539,7 @@ describe("web app — project capture rules", () => {
     vi.stubGlobal("fetch", fetchMock);
 
     render(<App initialEntries={["/projects/proj_123/settings"]} />);
+    await openCaptureRulesSettings();
 
     expect(
       await screen.findByRole("heading", { name: /capture rules/i, level: 3 })

@@ -35,6 +35,25 @@ debugbundle explain <incident-id> --source cloud
 
 The CLI reads local project configuration from `.debugbundle/` and can use member-token authentication for connected cloud operations. Use `debugbundle connect` to configure cloud access, or pass `--auth-file` to commands that support explicit auth state.
 
+## AnalyticsBundle
+
+Analytics commands require connected member authentication and a project with AnalyticsBundle enabled. They query aggregate rollups or request an asynchronous analysis artifact; they do not read raw analytics events.
+
+```sh
+debugbundle analytics summary --project <project-id> --last 7d
+debugbundle analytics devices --project <project-id> --last 7d
+debugbundle analytics journeys --project <project-id> --last 7d
+debugbundle analytics opportunities --project <project-id>
+debugbundle analytics opportunities --all-projects
+debugbundle analytics bundle create --project <project-id> --kind journey_friction --last 7d
+debugbundle analytics bundle list --project <project-id>
+debugbundle analytics bundle list --all-projects
+debugbundle analytics saved-funnels list --project <project-id>
+debugbundle analytics saved-funnels create --project <project-id> --key signup --name "Signup" --steps-json '[{"step_key":"landing","display_name":"Landing"},{"step_key":"complete","display_name":"Complete"}]'
+```
+
+Use `debugbundle analytics settings get --project <project-id>` to inspect availability and capture/retention settings. Owners and admins can enable it with `debugbundle analytics settings set --project <project-id> --enabled true`; Team projects can additionally manage approved custom dimensions. Saved funnels are reusable project definitions, not per-visit bundles; members can list them and owners/admins can create, update, or archive them within the independent tier cap. Project tokens remain SDK-ingestion-only and cannot read analytics.
+
 ## Documentation
 
 Full CLI documentation: https://debugbundle.com/docs/cli

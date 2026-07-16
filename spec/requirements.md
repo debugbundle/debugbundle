@@ -130,7 +130,7 @@ Last updated: 2026-07-04
 
 **FR-AVC-03:** Availability checks must be manageable through API, CLI, MCP, and web using the same domain services. Authorized project members may read checks and retained results. Owner/admin callers may create, update, delete, enable/disable, and test checks. Test execution must be side-effect-free in V1 and must not create incidents or retained history rows.
 
-**FR-AVC-04:** Hosted availability checks must enforce tier limits per project: Free `1` check with minimum `300` second interval, Solo `5` checks with minimum `60` second interval, Team `25` checks with minimum `30` second interval. Checks that exceed current plan limits after downgrade remain visible but pause execution until the project is eligible again.
+**FR-AVC-04:** Hosted availability checks must enforce tier limits per project: Free `1` check with minimum `300` second interval, Solo `3` checks with minimum `60` second interval, Team `8` checks with minimum `30` second interval. Checks that exceed current plan limits after downgrade remain visible but pause execution until the project is eligible again.
 
 **FR-AVC-05:** DebugBundle must retain availability-check raw execution results and per-day rollups for at least 30 days, then purge older records. The retained daily rollups must be sufficient to back a future project status-history surface without a schema redesign.
 
@@ -390,6 +390,8 @@ When a collaborator is removed from a project or leaves a shared project, DebugB
 
 **FR-AUTH-14:** GitHub device flow must be server-mediated: the CLI talks to DebugBundle, DebugBundle talks to GitHub, and successful approval must result in a normal DebugBundle member token issuance rather than a separate credential type.
 
+**FR-AUTH-15:** Successful authentication with an active project token or member token must advance that token's `last_used_at` metadata. Implementations may coalesce writes for frequently used tokens, but a token whose `last_used_at` is `NULL` must be updated on its first successful authentication. Unknown, revoked, and expired tokens must not be marked as used.
+
 ### 1.13 Email System
 
 **FR-EMAIL-01:** Transactional and product-critical lifecycle emails only: email sign-in codes, account-deletion OTPs, security alerts, billing events, invites, weekly reports, and mandatory operational owner notifications listed in `/spec/system-emails.md`.
@@ -431,6 +433,8 @@ When a collaborator is removed from a project or leaves a shared project, DebugB
 **FR-PROF-11:** The agent skill is placed at `.agents/skills/debugbundle/` following the agentskills.io specification. Old locations (`.debugbundle/skill/`, `skills/debugbundle/`) are removed.
 
 **FR-PROF-12:** The AGENTS.md section written by `debugbundle setup` must instruct agents to: (a) check DebugBundle for existing incidents before investigating bugs, (b) read `.agents/skills/debugbundle/SKILL.md` for the full debugging workflow, (c) use `debugbundle inspect` / MCP `get_bundle` when a user reports an issue, (d) run reproduction artifacts from `.debugbundle/bundles/local/reproductions/` before proposing a fix, (e) invoke `debugbundle doctor` to validate local setup when debugging connectivity issues.
+
+**FR-PROF-13:** Generated and portable DebugBundle skills plus MCP/OpenClaw publication metadata must use truthful, capability-first discovery language for runtime error reporting, crash reporting, incident reporting and response, live-app/production monitoring, health checks, debug bundles, and product analytics. Monitoring and observability language must be explicitly scoped to runtime failures, customer-facing incidents, and endpoint health; DebugBundle must not be represented as a generic infrastructure-monitoring platform. The portable source under `apps/mcp/clawhub/debugbundle/` remains shared by ClawHub and Smithery Skills, while MCP package/registry metadata remains suitable for Claude and other MCP clients.
 
 ### 1.15 Verification System
 
@@ -572,11 +576,100 @@ This ensures Free behaves as **failure-first, not telemetry-first**.
 
 ---
 
+### 1.18b AnalyticsBundle & Agent-Native Product Analytics
+
+> AnalyticsBundle is a second product pillar under the DebugBundle brand. It is opt-in, browser-SDK-first, agent-native product analytics that helps humans and agents understand usage, journeys, funnels, friction, and incident impact without turning DebugBundle into a generic analytics warehouse.
+
+#### Analytics Event Lane
+
+**FR-ANL-01:** Analytics capture must be disabled by default. Existing SDK installs must not begin collecting analytics after upgrade unless the project/browser SDK explicitly enables analytics.
+
+**FR-ANL-02:** The first supported analytics capture surface is the browser SDK. Browser analytics must support sessions, page views, route changes, semantic actions, opt-in structural actions, funnel steps, conversions, journey markers, session summaries, device/browser/OS/language context, referrer/UTM context, auth state, and controlled custom dimensions.
+
+**FR-ANL-03:** Analytics events are a separate ingestion lane from the eight debug event types in FR-SDK-05. Analytics events must never create, reopen, regress, or materially update incidents; must never dispatch incident alerts/webhooks/GitHub automation; and must not be assigned `event_class` values used by debug event billing and incident eligibility.
+
+**FR-ANL-04:** The existing `/v1/events` ingestion endpoint may accept mixed debug and analytics batches for transport simplicity, but ingestion must split the batch by event family. Debug events continue through capture-policy enforcement, debug raw-event persistence, normalization, event classification, and incident processing. Analytics events continue through analytics enablement checks, analytics quota checks, short-lived raw analytics persistence, analytics queueing, and aggregate rollup processing.
+
+**FR-ANL-04a:** Browser debug capture and AnalyticsBundle capture should share privacy-safe frontend primitives where possible, including session identity, route normalization, device/browser context collection, referrer parsing, action/click sanitization, and structured journey formatting. Sharing implementation primitives must not merge the debug and analytics event lanes: a browser signal may produce a debug breadcrumb, an analytics event, or both depending on independent debug and analytics settings, consent, sampling, and caps.
+
+**FR-ANL-04b:** DebugBundle incident/debug capture must not depend on AnalyticsBundle being enabled. Existing frontend exceptions, breadcrumbs, route changes, request events, and debug bundles must continue to work when analytics is disabled, unavailable on the current tier, blocked by consent, sampled out, or failing internally.
+
+**FR-ANL-05:** Analytics events must have separate usage accounting from debug incident ingestion. Analytics event/session allowances, retained journey samples, saved funnels, custom dimensions, and AnalyticsBundle generations must be meterable independently from existing incident event and failure bundle allowances. Hosted Free includes a bounded monthly preview of 5,000 analytics events, 1,000 sessions, 100 retained journey samples, 3 AnalyticsBundle generations, and 1 active saved funnel. Hosted monthly analytics event, session, retained-journey-sample, and AnalyticsBundle-generation allowances on paid tiers must scale with the organization's total included plus purchased capacity units. Hosted analytics event/session ingestion and on-demand AnalyticsBundle generation quota checks use durable analytics-specific internal counters and must not require adding analytics keys to the public billing summary `allowances` response until public billing clients are migrated to a compatible shape. Saved funnels and custom dimensions are fixed tier capabilities rather than capacity-unit multipliers: active saved-funnel caps are 1 on Free, 10 on Solo, and 50 on Team, while controlled custom-dimension caps are 1 on Free, 3 on Solo, and 8 on Team; self-host supports up to 100 saved funnels and 20 custom dimensions. Project settings may deliberately lower a tier cap, and settings plus ingestion boundaries must reject values above the current tier capability.
+
+**FR-ANL-06:** Analytics ingestion must remain lightweight: authenticate, validate, apply analytics enablement/quota checks, persist short-lived raw input when accepted, enqueue analytics processing, and return. No aggregation, bundle generation, or heavy analysis may run synchronously in the API request path.
+
+**FR-ANL-07:** Analytics processing must be idempotent. Reprocessing the same analytics event must not double-count rollups, duplicate journey samples, duplicate opportunities, or create duplicate bundle-generation records.
+
+#### Privacy And Capture Controls
+
+**FR-ANL-08:** Analytics SDK configuration must support privacy modes:
+- `strict`: session-only analytics, no persistent visitor identifier.
+- `standard`: first-party anonymous visitor identifier scoped to the project and represented server-side as a hash for returning-visitor and active-user metrics.
+- `custom`: customer-owned consent/identity integration, still bounded by DebugBundle schemas, redaction, and server enforcement.
+
+**FR-ANL-09:** Browser analytics must expose consent controls. If a project or SDK config requires consent and consent is absent or false, analytics capture must be disabled locally without affecting debug incident capture.
+
+**FR-ANL-09a:** Direct browser SDKs using a project token must explicitly opt into and hydrate the bounded project analytics capture block from `GET /v1/sdk/config` on initialization. The existing SDK-config response must remain unchanged for clients that do not opt in. Project settings may disable or narrow locally opted-in analytics capture, require explicit consent, or force `strict` privacy, but may never opt an SDK into analytics or widen its local capture configuration. Relay-mode browser SDKs must remain credential-free and rely on their local configuration plus server-side ingestion enforcement.
+
+**FR-ANL-10:** Analytics must not collect form values, raw click text, raw DOM snapshots, screenshots, video replay, precise coordinates, precise location, raw IP addresses, emails, names, phone numbers, addresses, tokens, payment data, or customer secrets by default.
+
+**FR-ANL-10a:** When `analytics.trackActions` is enabled, browser auto-capture may emit only fixed, privacy-safe structural action keys for a bounded allowlist of interactive element or ARIA-role categories. It must not retain DOM selectors, element IDs, URLs, raw attributes, input values, or user-visible text, and it must remain independently configurable from debug click breadcrumbs.
+
+**FR-ANL-10b:** When `analytics.trackFrictionSignals` is enabled, browser auto-capture may emit only fixed `journey_marker` keys for bounded local heuristics: rapid repeated clicks on the same in-memory interactive target, rapid repeated clicks on the same eligible non-interactive target, and a quick safe route reversal. The SDK must use only ephemeral in-memory target identity and timing to make that decision; it must not emit selectors, IDs, text, URLs, attributes, input values, or any target-derived dimensions. Project settings may disable friction capture through the restrictive analytics SDK-config block.
+
+**FR-ANL-11:** Analytics paths and routes must strip query strings by default before long-term aggregation. Raw URLs with query strings may not be stored in long-term analytics tables.
+
+**FR-ANL-12:** Coarse geography is optional. When enabled, geography must be derived server-side and retained only as coarse country/region fields. Raw IP addresses must not be stored in analytics rollups or AnalyticsBundle artifacts.
+
+**FR-ANL-13:** Custom analytics data must use controlled custom dimensions, not arbitrary retained JSON payloads. Allowed custom dimensions must be low-cardinality, bounded, redacted, allowlisted per project, and limited by the current tier capability. Sensitive or high-cardinality fields such as raw user IDs, emails, order IDs, workspace IDs, ticket IDs, URLs with tokens, and free-form user text must be rejected, dropped, or redacted before aggregation.
+
+#### Metrics And Rollups
+
+**FR-ANL-14:** The analytics worker must write aggregate rollups for sessions, page views, active users, routes, route transitions, actions, funnels, conversions, devices, browsers, OS, language/locale, referrer/UTM, auth state, approved custom dimensions, and incident/deploy correlation. Rollups are precomputed bounded aggregate rows keyed by time bucket and dimensions; they are not raw event logs, arbitrary event search indexes, or long-term per-visit timelines.
+
+**FR-ANL-15:** Analytics rollups must support direct metrics retrieval for humans and agents. Required metric families include usage summary, route/page metrics, device/browser/OS/language breakdown, referrer/UTM metrics, funnel conversion/dropoff, journey patterns, feature/custom-event usage, deploy comparison inputs, and incident impact inputs.
+
+**FR-ANL-16:** Long-term analytics storage must be aggregate-first. Raw analytics event objects and representative journey samples must have bounded retention; hourly detail must expire independently through a bounded project setting (hosted defaults/caps: 7 days Free, 30 Solo, 90 Team; self-host up to 365); daily and longer-horizon visits must remain aggregates governed by the longer aggregate-retention window.
+
+**FR-ANL-17:** Journey replay for AnalyticsBundle must be structured timeline replay, not video replay. Representative journeys may include route changes, semantic actions, funnel steps, conversion markers, friction markers, linked debug incidents, and timing/click counts, but must exclude raw user text and sensitive payload data.
+
+**FR-ANL-17a:** Incident-impact journey replay selection must require an exact match between a retained sample's internal project-scoped session subject and an affected incident-session link, plus the affected route-transition tag and bounded analysis window. Route, service, environment, or time overlap alone must never qualify a retained journey sample for an incident-impact response or artifact. Internal correlation hashes must not be exposed through public journey-sample interfaces; samples captured before this correlation field exists remain ineligible rather than being backfilled from raw session identifiers.
+
+#### AnalyticsBundle Artifacts
+
+**FR-ANL-18:** AnalyticsBundle must be a first-class generated artifact type with its own versioned schema (`AnalyticsBundleV1`). It must not be represented as a failure bundle and must not require one bundle per visit.
+
+**FR-ANL-19:** AnalyticsBundles are generated for analysis units such as usage summary, route health, funnel dropoff, journey friction, feature usage, incident impact, deploy comparison, and conversion path analysis. Focused kinds must reject ambiguous requests: route health requires a normalized route, funnel dropoff requires a funnel, incident impact requires an accessible project incident, deploy comparison requires a deploy, and conversion path requires a route or funnel. A request linked by `opportunity_id` must derive its kind, analysis window, scope, focus, aggregate evidence, and complete related incident/deploy sets from that authorized project opportunity; conflicting caller input must be rejected. Deterministic duplicate requests reuse the existing generation, while an identical failed generation may be reset and retried without consuming a second durable quota claim.
+
+**FR-ANL-20:** AnalyticsBundle generation must be deterministic for the same analysis specification and same aggregate/sample inputs. Arrays must be sorted deterministically. Representative journeys must rank incident-impact evidence by correlation-backed affected-session reach and other evidence by unique-session reach, transition count, transition share, route transition, and sample ID; the artifact must expose the resulting rank and aggregate selection basis. Wall-clock generation time must not appear in deterministic evidence sections.
+
+**FR-ANL-21:** AnalyticsBundles must include summary, confidence, severity, analysis window, aggregate metrics, affected segments, journey patterns, representative redacted journeys, linked incidents, linked deploys, recommendations, redaction metadata, and input fingerprint where applicable.
+
+**FR-ANL-22:** Analytics opportunities must be created from deterministic aggregate thresholds such as funnel dropoff, route exit/backtrack increases, fixed browser friction-marker counts for repeated/dead clicks and backtracks, conversion decreases after deploy, and incidents affecting a material share of sessions. Route and deploy regressions compare the current seven-day window with a bounded prior baseline; incident impact requires correlation-backed affected sessions. Event-triggered evaluation may be supplemented by a leased, bounded scheduled pass over enabled projects with recent aggregate activity. Evaluators must upsert stable fingerprints, refresh complete related incident/deploy IDs, reopen a previously resolved signal when it recurs, leave snoozed opportunities untouched, and resolve open opportunities not detected during a complete evaluation window. Friction evidence must retain only the fixed marker key, safe route, and aggregate counts. Tiny-sample opportunities must either be suppressed or clearly marked low confidence.
+
+#### Public Interfaces And UI
+
+**FR-ANL-23:** Analytics metrics, opportunities, and AnalyticsBundles must be available through API, CLI, MCP, and web using the same domain services. Analytics must not be dashboard-only.
+
+**FR-ANL-24:** Analytics read/manage routes must require browser session or member token authorization. Project tokens remain write-only and may only submit analytics events through SDK/relay/direct ingestion paths.
+
+**FR-ANL-25:** The web app must include a main sidebar Analytics surface similar to Incidents and Improvements. It must show cross-project analytics opportunities and generated AnalyticsBundles for accessible projects, including pending/failed bundle states. Its two cross-project inventory reads must be backed by additive organization-scoped API/domain reads rather than browser fanout; CLI must require explicit `--all-projects`, and only the matching MCP list tools may omit `projectId`.
+
+**FR-ANL-26:** Each project must have one Analytics tab. Routes, funnels, devices, referrers, opportunities, and generated AnalyticsBundles must live as internal sub-tabs or sections inside that single project Analytics tab rather than adding more top-level project tabs.
+
+**FR-ANL-27:** Incident detail views must expose analytics impact when analytics is enabled and data exists, including affected sessions, affected route/funnel, conversion delta, top device/browser segments, linked journey patterns, and an action to generate or view an incident-impact AnalyticsBundle.
+
+**FR-ANL-28:** Project analytics settings must support enable/disable, privacy mode, consent requirement, sampling, retention, saved funnels, and tier-bounded controlled custom dimensions.
+
+**FR-ANL-29:** Analytics UI implementation must follow `/rules/design-discipline.md`: reuse existing app patterns and components, prefer tables for comparable records, avoid decorative dashboard card sprawl, include loading/empty/error/disabled/quota/partial-data states, and keep analytics opportunities and bundles visible in both sidebar-level Analytics and project-level Analytics surfaces.
+
+---
+
 ### 1.12 Browser Relay
 
 **FR-REL-01:** Every V1 server SDK or integration surface with backend framework support must provide a full browser relay handler that accepts browser-originated events via a `POST /debugbundle/browser` endpoint on the user's own backend. Same-origin relay is the default recommendation; split frontend/backend deployments may expose the relay on a separate backend origin when explicit origin allowlisting is configured. Full relay handlers must answer allowed `OPTIONS /debugbundle/browser` CORS preflight requests and include matching CORS response headers on allowed relay POST responses. V1 required surfaces are Node.js (Express, Fastify, Next.js), Python (Django, Flask, FastAPI), PHP (Laravel, Symfony), and the WordPress plugin REST relay. Node.js must expose the relay as subpath exports (`@debugbundle/sdk-node/relay`, `@debugbundle/sdk-node/relay/express`, `@debugbundle/sdk-node/relay/fastify`, `@debugbundle/sdk-node/relay/nextjs`). Other SDKs must expose equivalent language-idiomatic handlers and framework adapters.
 
-**FR-REL-02:** The relay handler must validate incoming payloads against a strict schema, accepting only known browser event types: `frontend_exception`, `error_suppressed`, `frontend_breadcrumb`, `request_event`, `probe_event`. Unknown event types and unknown fields must be rejected/stripped.
+**FR-REL-02:** The relay handler must validate incoming payloads against a strict schema, accepting only known browser event types: `frontend_exception`, `error_suppressed`, `frontend_breadcrumb`, `request_event`, `probe_event`, and opt-in `analytics_event`. Analytics relay events use the same versioned analytics envelope and privacy-safe field constraints as direct browser ingestion; the credential-free browser request must not carry a project token, and the authenticated relay attaches its configured write-only project token only when forwarding accepted events. Unknown event types and unknown fields must be rejected/stripped.
 
 **FR-REL-03:** The relay handler must enforce origin validation by checking the `Origin` header (fallback: `Referer`) against a configurable allowlist. Default: same-origin derived from the request's `Host` header. Requests with missing or non-matching origins must be rejected with `403`.
 
@@ -708,6 +801,8 @@ This ensures Free behaves as **failure-first, not telemetry-first**.
 
 **NFR-SCALE-01:** V1 architecture must scale reasonably without becoming an observability-company architecture. Avoid premature Kafka, ClickHouse, OpenSearch, Kubernetes.
 
+**NFR-SCALE-01a:** AnalyticsBundle must use aggregate-first storage and bounded journey samples. Analytics implementation must not introduce Kafka, ClickHouse, OpenSearch, tracing backends, arbitrary query engines, or long-term raw analytics event tables before product volume proves the need and the architecture is explicitly approved.
+
 **NFR-SCALE-02:** Rate limiting (Redis sliding window, `429` + `Retry-After`):
 
 | Scope | Free | Solo | Team | Key |
@@ -728,6 +823,8 @@ Self-hosted deployments have no enforced rate limits (configurable via environme
 **NFR-RET-03:** Metadata: longer-lived.
 
 **NFR-RET-04:** Retention cleanup jobs must run automatically.
+
+**NFR-RET-05:** Analytics raw event objects and representative journey samples must have short, tier-configurable retention. Hourly/daily/monthly/yearly analytics rollups may retain longer, but they must not preserve raw payloads, raw IPs, raw URLs with query strings, or high-cardinality customer identifiers.
 
 ### 2.6 Portability
 

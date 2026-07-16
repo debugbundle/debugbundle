@@ -817,6 +817,11 @@ export {
   type ImprovementSettingsUpdate
 } from "./improvement-settings.js";
 
+export * from "./analytics.js";
+export * from "./analytics-product.js";
+export * from "./analytics-journey-samples.js";
+export * from "./analytics-saved-funnels.js";
+
 export {
   PROJECT_COLOR_TAG_VALUES,
   ProjectColorTagSchema,

@@ -2,19 +2,19 @@
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
   "name": "com.debugbundle/mcp",
   "title": "DebugBundle",
-  "description": "DebugBundle MCP server for incidents, bundles, reproductions, health checks, probes, and ops.",
+  "description": "DebugBundle MCP: runtime error reporting, incident response, health checks, and product analytics.",
   "repository": {
     "url": "https://github.com/debugbundle/debugbundle",
     "source": "github",
     "subfolder": "apps/mcp"
   },
-  "version": "1.6.2",
+  "version": "1.6.3",
   "packages": [
     {
       "registryType": "npm",
       "registryBaseUrl": "https://registry.npmjs.org",
       "identifier": "@debugbundle/mcp",
-      "version": "1.6.2",
+      "version": "1.6.3",
       "transport": {
         "type": "stdio"
       },

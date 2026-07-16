@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { Link, Navigate, useLocation, useParams } from "react-router-dom";
 import { CalloutCard } from "../components/system/callout-card.js";
 import { IncidentCaptureRuleSuggestionsDialog } from "../components/system/incident-capture-rule-suggestions-dialog.js";
+import { IncidentAnalyticsImpact } from "../components/system/incident-analytics-impact.js";
 import { HighlightedCodeBlock } from "../components/system/highlighted-code-block.js";
 import { Badge } from "../components/ui/badge.js";
 import { Button } from "../components/ui/button.js";
@@ -173,6 +174,11 @@ export function IncidentDetailPage(): JSX.Element {
               <DetailRow label="Regressed" value={formatDate(incident.regressed_at)} />
             ) : null}
           </div>
+
+          <IncidentAnalyticsImpact
+            projectId={incident.project_id}
+            incidentId={incident.incident_id}
+          />
 
           <Tabs defaultValue="bundle">
             <TabsList>

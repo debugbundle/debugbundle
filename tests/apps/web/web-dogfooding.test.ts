@@ -208,6 +208,30 @@ describe("web dogfooding", () => {
     });
   });
 
+  it("enables browser analytics only when local dogfooding explicitly opts in", () => {
+    const sdk = {
+      init: vi.fn()
+    };
+    const target: DogfoodingWindowTarget = {
+      setTimeout: vi.fn()
+    };
+
+    initializeWebDogfooding(
+      {
+        DEV: true,
+        MODE: "development",
+        VITE_DEBUGBUNDLE_DOGFOOD_ENABLED: "true",
+        VITE_DEBUGBUNDLE_DOGFOOD_ANALYTICS_ENABLED: "true"
+      },
+      target,
+      sdk
+    );
+
+    expect(sdk.init).toHaveBeenCalledWith(expect.objectContaining({
+      analytics: { enabled: true }
+    }));
+  });
+
   it("allowlists the configured api base url for split-origin request promotion", () => {
     const sdk = {
       init: vi.fn()

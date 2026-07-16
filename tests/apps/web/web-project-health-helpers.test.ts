@@ -122,8 +122,8 @@ describe("web project health helpers", () => {
   it("chooses a conservative default interval for new checks", () => {
     expect(getDefaultAvailabilityCheckIntervalSeconds(null)).toBe(300);
     expect(getDefaultAvailabilityCheckIntervalSeconds({ max_checks_per_project: 1, min_interval_seconds: 300 })).toBe(300);
-    expect(getDefaultAvailabilityCheckIntervalSeconds({ max_checks_per_project: 5, min_interval_seconds: 60 })).toBe(60);
-    expect(getDefaultAvailabilityCheckIntervalSeconds({ max_checks_per_project: 25, min_interval_seconds: 30 })).toBe(60);
+    expect(getDefaultAvailabilityCheckIntervalSeconds({ max_checks_per_project: 3, min_interval_seconds: 60 })).toBe(60);
+    expect(getDefaultAvailabilityCheckIntervalSeconds({ max_checks_per_project: 8, min_interval_seconds: 30 })).toBe(60);
   });
 
   it("derives auto-refresh from the smallest active health-check interval", () => {

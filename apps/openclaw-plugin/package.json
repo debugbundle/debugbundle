@@ -1,8 +1,8 @@
 {
   "name": "@debugbundle/openclaw-plugin",
-  "version": "1.6.2",
+  "version": "1.6.3",
   "private": false,
-  "description": "OpenClaw tool plugin for DebugBundle incidents, bundles, probes, health checks, and operational debugging.",
+  "description": "OpenClaw tools for runtime error reporting, incident response, live app monitoring, health checks, debug bundles, and product analytics.",
   "license": "AGPL-3.0-only",
   "repository": {
     "type": "git",
@@ -16,6 +16,13 @@
   "keywords": [
     "debugbundle",
     "debugging",
+    "error-reporting",
+    "crash-reporting",
+    "runtime-errors",
+    "incident-response",
+    "production-monitoring",
+    "health-checks",
+    "product-analytics",
     "ai-agent",
     "openclaw",
     "clawhub",

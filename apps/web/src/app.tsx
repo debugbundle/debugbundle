@@ -15,6 +15,7 @@ import {
 import { Toaster } from "sonner";
 
 import { AppSidebar } from "./components/system/app-sidebar.js";
+import { createProjectRoutes } from "./app-project-routes.js";
 import { AppUpdateNotifier } from "./components/system/app-update-notifier.js";
 import { BrandLockup } from "./components/system/brand-lockup.js";
 import { CalloutCard } from "./components/system/callout-card.js";
@@ -41,29 +42,15 @@ import { showErrorToast, showInfoToast, showSuccessToast } from "./lib/notify.js
 import { SessionProvider, useSession } from "./lib/session.js";
 import { BillingPage } from "./pages/billing-page.js";
 import { AdminAnalyticsPage } from "./pages/admin-analytics-page.js";
-import { ImprovementDetailPage } from "./pages/improvement-detail-page.js";
 import { ImprovementsPage } from "./pages/improvements-page.js";
 import { MemberTokensPage } from "./pages/member-tokens-page.js";
-import { ProjectsPage, ProjectTokensPage } from "./pages/management-pages.js";
+import { ProjectsPage } from "./pages/management-pages.js";
 import { IncidentsPage } from "./pages/incidents-page.js";
 import { IncidentDetailPage } from "./pages/incident-detail-page.js";
 import { HealthStatusPage } from "./pages/health-status-page.js";
-import { ProjectLayout } from "./components/system/project-layout.js";
-import { ProjectAlertsPage } from "./pages/project-alerts-page.js";
 import { ProjectInvitePage } from "./pages/project-invite-page.js";
-import { ProjectMembersPage } from "./pages/project-members-page.js";
-import { ProjectGitHubPage } from "./pages/project-github-page.js";
-import {
-  ProjectBundlesPage,
-  ProjectIncidentsPage,
-  ProjectOverviewPage
-} from "./pages/project-overview-page.js";
-import { ProjectImprovementsPage } from "./pages/project-improvements-page.js";
-import { ProjectHealthPage } from "./pages/project-health-page.js";
-import { ProjectProbesPage } from "./pages/project-probes-page.js";
-import { ProjectSettingsPage } from "./pages/project-settings-page.js";
 import { SettingsPage } from "./pages/settings-page.js";
-import { ProjectWebhooksPage } from "./pages/project-webhooks-page.js";
+import { WorkspaceAnalyticsPage } from "./pages/workspace-analytics-page.js";
 import { SidebarInset, SidebarProvider } from "./components/ui/sidebar.js";
 import { isSystemEmailReviewEnabled } from "./lib/system-email-previews.js";
 import { ThemeProvider, useTheme } from "./lib/theme.js";
@@ -182,29 +169,15 @@ export function App({ initialEntries }: AppProps): JSX.Element {
               <Route path="/incidents/:incidentId" element={<IncidentDetailPage />} />
               <Route path="/health-status" element={<HealthStatusPage />} />
               <Route path="/improvements" element={<ImprovementsPage />} />
+              <Route path="/analytics/workspace" element={<WorkspaceAnalyticsPage />} />
+              <Route path="/analytics/workspace/bundles" element={<WorkspaceAnalyticsPage />} />
               <Route path="/billing" element={<BillingPage />} />
               <Route path="/projects" element={<ProjectsPage />} />
               {isSystemEmailReviewEnabled() ? (
                 <Route path="/__dev/system-emails" element={<SystemEmailReviewPage />} />
               ) : null}
               <Route path="/organization" element={<Navigate replace to="/projects" />} />
-              <Route path="/projects/:projectId" element={<ProjectLayout />}>
-                <Route index element={<ProjectOverviewPage />} />
-                <Route path="incidents" element={<ProjectIncidentsPage />} />
-                <Route path="incidents/:incidentId" element={<IncidentDetailPage />} />
-                <Route path="improvements" element={<ProjectImprovementsPage />} />
-                <Route path="improvements/:improvementId" element={<ImprovementDetailPage />} />
-                <Route path="bundles" element={<ProjectBundlesPage />} />
-                <Route path="bundles/:incidentId" element={<IncidentDetailPage />} />
-                <Route path="health" element={<ProjectHealthPage />} />
-                <Route path="probes" element={<ProjectProbesPage />} />
-                <Route path="github" element={<ProjectGitHubPage />} />
-                <Route path="members" element={<ProjectMembersPage />} />
-                <Route path="settings" element={<ProjectSettingsPage />} />
-                <Route path="tokens" element={<ProjectTokensPage />} />
-                <Route path="alerts" element={<ProjectAlertsPage />} />
-                <Route path="webhooks" element={<ProjectWebhooksPage />} />
-              </Route>
+              {createProjectRoutes()}
               <Route path="/settings" element={<SettingsPage />} />
               <Route path="/member-tokens" element={<MemberTokensPage />} />
             </Route>
@@ -228,29 +201,15 @@ export function App({ initialEntries }: AppProps): JSX.Element {
               <Route path="/incidents/:incidentId" element={<IncidentDetailPage />} />
               <Route path="/health-status" element={<HealthStatusPage />} />
               <Route path="/improvements" element={<ImprovementsPage />} />
+              <Route path="/analytics/workspace" element={<WorkspaceAnalyticsPage />} />
+              <Route path="/analytics/workspace/bundles" element={<WorkspaceAnalyticsPage />} />
               <Route path="/billing" element={<BillingPage />} />
               <Route path="/projects" element={<ProjectsPage />} />
               {isSystemEmailReviewEnabled() ? (
                 <Route path="/__dev/system-emails" element={<SystemEmailReviewPage />} />
               ) : null}
               <Route path="/organization" element={<Navigate replace to="/projects" />} />
-              <Route path="/projects/:projectId" element={<ProjectLayout />}>
-                <Route index element={<ProjectOverviewPage />} />
-                <Route path="incidents" element={<ProjectIncidentsPage />} />
-                <Route path="incidents/:incidentId" element={<IncidentDetailPage />} />
-                <Route path="improvements" element={<ProjectImprovementsPage />} />
-                <Route path="improvements/:improvementId" element={<ImprovementDetailPage />} />
-                <Route path="bundles" element={<ProjectBundlesPage />} />
-                <Route path="bundles/:incidentId" element={<IncidentDetailPage />} />
-                <Route path="health" element={<ProjectHealthPage />} />
-                <Route path="probes" element={<ProjectProbesPage />} />
-                <Route path="github" element={<ProjectGitHubPage />} />
-                <Route path="members" element={<ProjectMembersPage />} />
-                <Route path="settings" element={<ProjectSettingsPage />} />
-                <Route path="tokens" element={<ProjectTokensPage />} />
-                <Route path="alerts" element={<ProjectAlertsPage />} />
-                <Route path="webhooks" element={<ProjectWebhooksPage />} />
-              </Route>
+              {createProjectRoutes()}
               <Route path="/settings" element={<SettingsPage />} />
               <Route path="/member-tokens" element={<MemberTokensPage />} />
             </Route>

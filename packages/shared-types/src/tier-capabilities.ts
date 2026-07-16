@@ -17,6 +17,7 @@ export const TIER_CAPABILITIES = {
     github_automation: false,
     slack_integration: false,
     cloud_improvement_bundles: false,
+    analytics_bundle: true,
     shared_dashboards: false,
     member_invites: false,
     included_capacity_units: 1,
@@ -32,14 +33,22 @@ export const TIER_CAPABILITIES = {
     monthly_remote_activations: 0,
     monthly_alert_deliveries: 25,
     monthly_webhook_deliveries: 100,
+    monthly_analytics_events: 5_000,
+    monthly_analytics_sessions: 1_000,
+    monthly_analytics_journey_samples: 100,
+    monthly_analytics_bundle_generations: 3,
+    max_analytics_saved_funnels: 1,
+    max_analytics_custom_dimensions: 1,
+    analytics_hourly_retention_days: 7,
     availability_checks_per_project: 1,
-    availability_check_min_interval_seconds: 300,
+    availability_check_min_interval_seconds: 300
   },
   solo: {
     remote_probes: true,
     github_automation: true,
     slack_integration: false,
     cloud_improvement_bundles: true,
+    analytics_bundle: true,
     shared_dashboards: false,
     member_invites: false,
     included_capacity_units: 3,
@@ -55,14 +64,22 @@ export const TIER_CAPABILITIES = {
     monthly_remote_activations: 25,
     monthly_alert_deliveries: 75,
     monthly_webhook_deliveries: 250,
-    availability_checks_per_project: 5,
-    availability_check_min_interval_seconds: 60,
+    monthly_analytics_events: 50_000,
+    monthly_analytics_sessions: 10_000,
+    monthly_analytics_journey_samples: 1_000,
+    monthly_analytics_bundle_generations: 25,
+    max_analytics_saved_funnels: 10,
+    max_analytics_custom_dimensions: 3,
+    analytics_hourly_retention_days: 30,
+    availability_checks_per_project: 3,
+    availability_check_min_interval_seconds: 60
   },
   team: {
     remote_probes: true,
     github_automation: true,
     slack_integration: true,
     cloud_improvement_bundles: true,
+    analytics_bundle: true,
     shared_dashboards: true,
     member_invites: true,
     included_capacity_units: 15,
@@ -78,9 +95,16 @@ export const TIER_CAPABILITIES = {
     monthly_remote_activations: 50,
     monthly_alert_deliveries: 300,
     monthly_webhook_deliveries: 1_000,
-    availability_checks_per_project: 25,
-    availability_check_min_interval_seconds: 30,
-  },
+    monthly_analytics_events: 250_000,
+    monthly_analytics_sessions: 50_000,
+    monthly_analytics_journey_samples: 10_000,
+    monthly_analytics_bundle_generations: 100,
+    max_analytics_saved_funnels: 50,
+    max_analytics_custom_dimensions: 8,
+    analytics_hourly_retention_days: 90,
+    availability_checks_per_project: 8,
+    availability_check_min_interval_seconds: 30
+  }
 } as const;
 
 export type TierName = keyof typeof TIER_CAPABILITIES;
@@ -91,6 +115,7 @@ export interface TierCapabilities {
   readonly github_automation: boolean;
   readonly slack_integration: boolean;
   readonly cloud_improvement_bundles: boolean;
+  readonly analytics_bundle: boolean;
   readonly shared_dashboards: boolean;
   readonly member_invites: boolean;
   readonly included_capacity_units: number;
@@ -105,6 +130,13 @@ export interface TierCapabilities {
   readonly monthly_remote_activations: number;
   readonly monthly_alert_deliveries: number;
   readonly monthly_webhook_deliveries: number;
+  readonly monthly_analytics_events: number;
+  readonly monthly_analytics_sessions: number;
+  readonly monthly_analytics_journey_samples: number;
+  readonly monthly_analytics_bundle_generations: number;
+  readonly max_analytics_saved_funnels: number;
+  readonly max_analytics_custom_dimensions: number;
+  readonly analytics_hourly_retention_days: number;
   readonly availability_checks_per_project: number;
   readonly availability_check_min_interval_seconds: number;
 }
@@ -119,6 +151,7 @@ const SELFHOST_CAPABILITIES: TierCapabilities = {
   github_automation: true,
   slack_integration: true,
   cloud_improvement_bundles: true,
+  analytics_bundle: true,
   shared_dashboards: true,
   member_invites: true,
   included_capacity_units: 1_000_000,
@@ -133,8 +166,15 @@ const SELFHOST_CAPABILITIES: TierCapabilities = {
   monthly_remote_activations: 1_000_000,
   monthly_alert_deliveries: 1_000_000,
   monthly_webhook_deliveries: 1_000_000,
+  monthly_analytics_events: 1_000_000_000,
+  monthly_analytics_sessions: 1_000_000_000,
+  monthly_analytics_journey_samples: 1_000_000_000,
+  monthly_analytics_bundle_generations: 1_000_000_000,
+  max_analytics_saved_funnels: 100,
+  max_analytics_custom_dimensions: 20,
+  analytics_hourly_retention_days: 365,
   availability_checks_per_project: 1_000_000,
-  availability_check_min_interval_seconds: 30,
+  availability_check_min_interval_seconds: 30
 };
 
 /** Whether the instance is running in self-host mode (all tier limits bypassed). */

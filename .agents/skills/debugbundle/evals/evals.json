@@ -54,6 +54,25 @@
       ]
     },
     {
+      "name": "product_analytics_guidance",
+      "prompt": "The user asks where visitors abandon checkout and whether an analytics bundle should be generated for every visit. Confirm the skill teaches the aggregate-first analytics workflow.",
+      "expected_behavior": [
+        "Start with direct aggregate usage and funnel reads, then inspect bounded journey evidence only when needed.",
+        "Do not generate one analytics bundle per visit; generate a durable artifact only for a bounded analysis question.",
+        "Use member authentication for analytics reads and require explicit intent for settings, saved-funnel, or bundle-generation mutations.",
+        "Preserve consent, redaction, and custom-dimension privacy constraints."
+      ]
+    },
+    {
+      "name": "capability_first_discovery",
+      "prompt": "The user asks what is available for error reporting, crash reporting, incident response, and monitoring a live application. Confirm the skill is discoverable for those capabilities without claiming a generic infrastructure-monitoring platform.",
+      "expected_behavior": [
+        "Recognize runtime error reporting, crash reporting, incident reporting, incident response, live app monitoring, production monitoring, health checks, debug bundles, and product analytics as DebugBundle capabilities.",
+        "Scope monitoring to runtime failures, customer-facing incidents, and endpoint health.",
+        "Do not present DebugBundle as a generic infrastructure-monitoring or observability platform."
+      ]
+    },
+    {
       "name": "artifact_path_discovery",
       "prompt": "The user reports an unknown local runtime error. Confirm the skill tells the agent which DebugBundle paths and commands to inspect first.",
       "expected_behavior": [
@@ -65,7 +84,9 @@
       "name": "connected_incident_fetch",
       "prompt": "The user says a production incident fired in the hosted DebugBundle project. Confirm the skill points the agent to the cloud retrieval path.",
       "expected_behavior": [
-        "Check both local and cloud incident sources when the project is connected and the environment is cloud-enabled.",
+        "Scope cloud incident queries to the connected repository's cloud_project_id by default.",
+        "Do not query organization-wide or across projects unless the user explicitly requests that broader scope.",
+        "Use separate local and cloud incident-list calls so the cloud project filter does not suppress local evidence.",
         "Explicitly report whether the local source, the cloud source, or both had matches.",
         "Fetch inspect, context, bundle, and reproduction artifacts before editing code."
       ]

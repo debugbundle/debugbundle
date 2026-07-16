@@ -268,10 +268,22 @@ describe("cli validate command", () => {
     });
     expect(await readFile(join(rootDirectory, ".agents", "skills", "debugbundle", "SKILL.md"), "utf8")).toContain("Investigation Quickstart");
     expect(await readFile(join(rootDirectory, ".agents", "skills", "debugbundle", "SKILL.md"), "utf8")).toContain(
+      "runtime error reporting, crash reporting, incident reporting, incident response, live app monitoring"
+    );
+    expect(await readFile(join(rootDirectory, ".agents", "skills", "debugbundle", "SKILL.md"), "utf8")).toContain(
+      "not a generic infrastructure-monitoring or observability platform"
+    );
+    expect(await readFile(join(rootDirectory, ".agents", "skills", "debugbundle", "SKILL.md"), "utf8")).toContain(
       "For deterministic local source-code, UI, layout, copy, calculation, refactor, or test-only issues, inspect source and tests first."
     );
     expect(await readFile(join(rootDirectory, ".agents", "skills", "debugbundle", "SKILL.md"), "utf8")).toContain(
       "For user-reported production incidents, check cloud incidents after local incidents and explicitly report whether each source had matches."
+    );
+    expect(await readFile(join(rootDirectory, ".agents", "skills", "debugbundle", "SKILL.md"), "utf8")).toContain(
+      "use its non-null `cloud_project_id` as `--project-id <cloud_project_id>` on every cloud incident list query"
+    );
+    expect(await readFile(join(rootDirectory, ".agents", "skills", "debugbundle", "SKILL.md"), "utf8")).toContain(
+      "Do not run an unscoped or cross-project cloud incident query unless the user explicitly asks"
     );
     expect(await readFile(join(rootDirectory, ".agents", "skills", "debugbundle", "SKILL.md"), "utf8")).toContain(
       "## Investigation Controls"
@@ -281,6 +293,9 @@ describe("cli validate command", () => {
     );
     expect(await readFile(join(rootDirectory, ".agents", "skills", "debugbundle", "SKILL.md"), "utf8")).toContain(
       "## Notification Delivery"
+    );
+    expect(await readFile(join(rootDirectory, ".agents", "skills", "debugbundle", "SKILL.md"), "utf8")).toContain(
+      "## Product Analytics"
     );
     expect(await readFile(join(rootDirectory, ".agents", "skills", "debugbundle", "references", "cli.md"), "utf8")).toContain(
       "debugbundle health checks list --project-id <id>"
@@ -293,6 +308,9 @@ describe("cli validate command", () => {
     );
     expect(await readFile(join(rootDirectory, ".agents", "skills", "debugbundle", "references", "mcp.md"), "utf8")).toContain(
       "## Probe Tools"
+    );
+    expect(await readFile(join(rootDirectory, ".agents", "skills", "debugbundle", "references", "mcp.md"), "utf8")).toContain(
+      "## Product Analytics Tools"
     );
     expect(await readFile(join(rootDirectory, ".agents", "skills", "debugbundle", "references", "mcp.md"), "utf8")).toContain(
       "Use the same runtime-evidence-gated workflow through MCP"

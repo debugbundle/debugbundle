@@ -5,34 +5,50 @@ import { mockedObject, type MockedMethods } from "../../helpers/vitest.ts";
 
 type ApiServerDependencies = Parameters<typeof createApiServer>[0];
 type IngestionMetadataDependency = MockedMethods<ApiServerDependencies["ingestionMetadata"]>;
-type CapturePolicyManagementDependency = MockedMethods<NonNullable<ApiServerDependencies["capturePolicyManagement"]>>;
-type BillingManagementDependency = MockedMethods<NonNullable<ApiServerDependencies["billingManagement"]>>;
-type ProbeManagementDependency = MockedMethods<NonNullable<ApiServerDependencies["probeManagement"]>>;
-type ProjectManagementDependency = MockedMethods<NonNullable<ApiServerDependencies["projectManagement"]>>;
+type CapturePolicyManagementDependency = MockedMethods<
+  NonNullable<ApiServerDependencies["capturePolicyManagement"]>
+>;
+type BillingManagementDependency = MockedMethods<
+  NonNullable<ApiServerDependencies["billingManagement"]>
+>;
+type ProbeManagementDependency = MockedMethods<
+  NonNullable<ApiServerDependencies["probeManagement"]>
+>;
+type ProjectManagementDependency = MockedMethods<
+  NonNullable<ApiServerDependencies["projectManagement"]>
+>;
 type MemberAuthDependency = MockedMethods<ApiServerDependencies["memberAuth"]>;
 
 const originalProbeTriggerSecret = process.env["DEBUGBUNDLE_PROBE_TRIGGER_SECRET"];
 
-function createServer(overrides: {
-  ingestionMetadata?: IngestionMetadataDependency;
-  capturePolicyManagement?: CapturePolicyManagementDependency;
-  billingManagement?: Partial<BillingManagementDependency>;
-  probeManagement?: ProbeManagementDependency;
-  projectManagement?: Partial<ProjectManagementDependency>;
-  operationalEmailDelivery?: ApiServerDependencies["operationalEmailDelivery"];
-  memberAuth?: MemberAuthDependency;
-  authRateLimiter?: ApiServerDependencies["authRateLimiter"];
-} = {}): ReturnType<typeof createApiServer> {
+function createServer(
+  overrides: {
+    ingestionMetadata?: IngestionMetadataDependency;
+    capturePolicyManagement?: CapturePolicyManagementDependency;
+    analyticsSettingsManagement?: ApiServerDependencies["analyticsSettingsManagement"];
+    billingManagement?: Partial<BillingManagementDependency>;
+    probeManagement?: ProbeManagementDependency;
+    projectManagement?: Partial<ProjectManagementDependency>;
+    operationalEmailDelivery?: ApiServerDependencies["operationalEmailDelivery"];
+    memberAuth?: MemberAuthDependency;
+    authRateLimiter?: ApiServerDependencies["authRateLimiter"];
+  } = {}
+): ReturnType<typeof createApiServer> {
   const billingManagement =
     overrides.billingManagement === undefined
       ? undefined
       : mockedObject<NonNullable<ApiServerDependencies["billingManagement"]>>({
-          getBillingSummaryForOrganization: overrides.billingManagement.getBillingSummaryForOrganization,
+          getBillingSummaryForOrganization:
+            overrides.billingManagement.getBillingSummaryForOrganization,
           ...(overrides.billingManagement.getBillingSummaryForProject === undefined
             ? {}
-            : { getBillingSummaryForProject: overrides.billingManagement.getBillingSummaryForProject }),
-          createCheckoutLink: overrides.billingManagement.createCheckoutLink ?? vi.fn().mockResolvedValue(null),
-          createPortalLink: overrides.billingManagement.createPortalLink ?? vi.fn().mockResolvedValue(null)
+            : {
+                getBillingSummaryForProject: overrides.billingManagement.getBillingSummaryForProject
+              }),
+          createCheckoutLink:
+            overrides.billingManagement.createCheckoutLink ?? vi.fn().mockResolvedValue(null),
+          createPortalLink:
+            overrides.billingManagement.createPortalLink ?? vi.fn().mockResolvedValue(null)
         });
 
   return createApiServer({
@@ -45,12 +61,16 @@ function createServer(overrides: {
     ingestionMetadata:
       overrides.ingestionMetadata ??
       mockedObject<ApiServerDependencies["ingestionMetadata"]>({
-        resolveProjectByTokenHash: vi.fn().mockResolvedValue({ project_id: "proj_123", organization_plan: "free" })
+        resolveProjectByTokenHash: vi
+          .fn()
+          .mockResolvedValue({ project_id: "proj_123", organization_plan: "free" })
       }),
     memberAuth:
       overrides.memberAuth ??
       mockedObject<ApiServerDependencies["memberAuth"]>({
-        resolveMemberByTokenHash: vi.fn().mockResolvedValue({ member_id: "usr_123", organization_id: "org_123" })
+        resolveMemberByTokenHash: vi
+          .fn()
+          .mockResolvedValue({ member_id: "usr_123", organization_id: "org_123" })
       }),
     tokenManagement: mockedObject<ApiServerDependencies["tokenManagement"]>({
       listProjectTokensForOrganization: vi.fn().mockResolvedValue([]),
@@ -82,7 +102,9 @@ function createServer(overrides: {
       overrides.probeManagement ??
       mockedObject<NonNullable<ApiServerDependencies["probeManagement"]>>({
         listActiveProbesForProject: vi.fn().mockResolvedValue([]),
-        listActiveProbesForProjectInOrganization: vi.fn().mockResolvedValue({ organization_plan: "solo", activations: [] }),
+        listActiveProbesForProjectInOrganization: vi
+          .fn()
+          .mockResolvedValue({ organization_plan: "solo", activations: [] }),
         createProbeActivationForProjectInOrganization: vi.fn().mockResolvedValue({
           organization_plan: "solo",
           activation: {
@@ -116,6 +138,7 @@ function createServer(overrides: {
     },
     operationalEmailDelivery: overrides.operationalEmailDelivery,
     capturePolicyManagement: overrides.capturePolicyManagement,
+    analyticsSettingsManagement: overrides.analyticsSettingsManagement,
     billingManagement
   });
 }
@@ -212,7 +235,9 @@ describe("api probe routes", () => {
     const app = createServer({
       probeManagement,
       ingestionMetadata: {
-        resolveProjectByTokenHash: vi.fn().mockResolvedValue({ project_id: "proj_123", organization_plan: "free" })
+        resolveProjectByTokenHash: vi
+          .fn()
+          .mockResolvedValue({ project_id: "proj_123", organization_plan: "free" })
       }
     });
 
@@ -224,6 +249,7 @@ describe("api probe routes", () => {
 
     expect(response.statusCode).toBe(200);
     expect(response.headers["cache-control"]).toBe("public, s-maxage=30");
+    expect(response.headers["vary"]).toBe("X-DebugBundle-Analytics-Config");
     expect(response.json()).toEqual({
       probes_enabled: true,
       remote_probes_enabled: false,
@@ -238,6 +264,89 @@ describe("api probe routes", () => {
         capture_probe_events: "buffer_only",
         immediate_client_error_statuses: [],
         immediate_client_error_path_rules: []
+      }
+    });
+  });
+
+  it("should return restrictive project analytics capture settings to opted-in Free browser SDKs", async (): Promise<void> => {
+    const analyticsSettingsManagement = {
+      getAnalyticsSettingsForProject: vi.fn().mockResolvedValue({
+        enabled: true,
+        privacy_mode: "strict",
+        consent_required: true,
+        capture_page_views: false,
+        capture_route_changes: true,
+        capture_actions: false,
+        capture_friction_signals: false,
+        journey_sample_rate: 0.5,
+        raw_retention_days: 1,
+        sample_retention_days: 7,
+        hourly_retention_days: 30,
+        aggregate_retention_months: 12,
+        max_saved_funnels: 1,
+        max_custom_dimensions: 0,
+        approved_custom_dimensions: []
+      }),
+      updateAnalyticsSettingsForProject: vi.fn()
+    };
+    const app = createServer({
+      ingestionMetadata: {
+        resolveProjectByTokenHash: vi
+          .fn()
+          .mockResolvedValue({ project_id: "proj_123", organization_plan: "free" })
+      },
+      analyticsSettingsManagement
+    });
+
+    const response = await app.inject({
+      method: "GET",
+      url: "/v1/sdk/config",
+      headers: {
+        authorization: "Bearer dbundle_proj_test",
+        "x-debugbundle-analytics-config": "1"
+      }
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toMatchObject({
+      analytics: {
+        enabled: true,
+        privacy_mode: "strict",
+        consent_required: true,
+        capture_page_views: false,
+        capture_route_changes: true,
+        capture_actions: false,
+        capture_friction_signals: false
+      }
+    });
+    expect(analyticsSettingsManagement.getAnalyticsSettingsForProject).toHaveBeenCalledWith({
+      organization_id: "",
+      project_id: "proj_123"
+    });
+  });
+
+  it("should return disabled analytics config when opted-in SDK settings storage is unavailable", async (): Promise<void> => {
+    const app = createServer();
+
+    const response = await app.inject({
+      method: "GET",
+      url: "/v1/sdk/config",
+      headers: {
+        authorization: "Bearer dbundle_proj_test",
+        "x-debugbundle-analytics-config": "1"
+      }
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toMatchObject({
+      analytics: {
+        enabled: false,
+        privacy_mode: "strict",
+        consent_required: false,
+        capture_page_views: true,
+        capture_route_changes: true,
+        capture_actions: false,
+        capture_friction_signals: true
       }
     });
   });
@@ -259,10 +368,14 @@ describe("api probe routes", () => {
     const app = createApiServer({
       ingestionPersistence: { persistAndEnqueue: vi.fn() },
       ingestionMetadata: {
-        resolveProjectByTokenHash: vi.fn().mockResolvedValue({ project_id: "proj_123", organization_plan: "solo" })
+        resolveProjectByTokenHash: vi
+          .fn()
+          .mockResolvedValue({ project_id: "proj_123", organization_plan: "solo" })
       },
       memberAuth: {
-        resolveMemberByTokenHash: vi.fn().mockResolvedValue({ member_id: "usr_123", organization_id: "org_123" })
+        resolveMemberByTokenHash: vi
+          .fn()
+          .mockResolvedValue({ member_id: "usr_123", organization_id: "org_123" })
       },
       tokenManagement: {
         listProjectTokensForOrganization: vi.fn().mockResolvedValue([]),
@@ -328,7 +441,9 @@ describe("api probe routes", () => {
   it("should return sdk config with active probes for paid tier projects", async (): Promise<void> => {
     const app = createServer({
       ingestionMetadata: {
-        resolveProjectByTokenHash: vi.fn().mockResolvedValue({ project_id: "proj_123", organization_plan: "solo" })
+        resolveProjectByTokenHash: vi
+          .fn()
+          .mockResolvedValue({ project_id: "proj_123", organization_plan: "solo" })
       },
       probeManagement: {
         listActiveProbesForProject: vi.fn().mockResolvedValue([
@@ -378,7 +493,9 @@ describe("api probe routes", () => {
   it("should return balanced capture policy defaults for solo projects without a stored policy row", async (): Promise<void> => {
     const app = createServer({
       ingestionMetadata: {
-        resolveProjectByTokenHash: vi.fn().mockResolvedValue({ project_id: "proj_123", organization_plan: "solo" })
+        resolveProjectByTokenHash: vi
+          .fn()
+          .mockResolvedValue({ project_id: "proj_123", organization_plan: "solo" })
       },
       capturePolicyManagement: {
         getCapturePolicyForProject: vi.fn().mockResolvedValue(null),
@@ -411,7 +528,9 @@ describe("api probe routes", () => {
     const app = createServer({
       probeManagement: {
         listActiveProbesForProject: vi.fn().mockResolvedValue([]),
-        listActiveProbesForProjectInOrganization: vi.fn().mockResolvedValue({ organization_plan: "free", activations: [] }),
+        listActiveProbesForProjectInOrganization: vi
+          .fn()
+          .mockResolvedValue({ organization_plan: "free", activations: [] }),
         createProbeActivationForProjectInOrganization: vi.fn().mockResolvedValue({
           organization_plan: "free",
           activation: {
@@ -446,7 +565,9 @@ describe("api probe routes", () => {
 
   it("should reject remote probe activation when monthly activation quota is exhausted", async (): Promise<void> => {
     const createProbeActivationForProjectInOrganization = vi.fn();
-    const queueProjectOperationalEmailDelivery = vi.fn().mockResolvedValue({ delivery_id: "op_123", created: true });
+    const queueProjectOperationalEmailDelivery = vi
+      .fn()
+      .mockResolvedValue({ delivery_id: "op_123", created: true });
     const app = createServer({
       billingManagement: {
         getBillingSummaryForOrganization: vi.fn().mockResolvedValue({
@@ -474,7 +595,9 @@ describe("api probe routes", () => {
       },
       probeManagement: {
         listActiveProbesForProject: vi.fn().mockResolvedValue([]),
-        listActiveProbesForProjectInOrganization: vi.fn().mockResolvedValue({ organization_plan: "solo", activations: [] }),
+        listActiveProbesForProjectInOrganization: vi
+          .fn()
+          .mockResolvedValue({ organization_plan: "solo", activations: [] }),
         createProbeActivationForProjectInOrganization,
         deactivateProbeActivationForProjectInOrganization: vi.fn().mockResolvedValue(null)
       },
@@ -507,7 +630,9 @@ describe("api probe routes", () => {
   });
 
   it("queues an 80 percent allowance warning after a successful remote probe activation", async (): Promise<void> => {
-    const queueProjectOperationalEmailDelivery = vi.fn().mockResolvedValue({ delivery_id: "op_123", created: true });
+    const queueProjectOperationalEmailDelivery = vi
+      .fn()
+      .mockResolvedValue({ delivery_id: "op_123", created: true });
     const app = createServer({
       billingManagement: {
         getBillingSummaryForOrganization: vi.fn().mockResolvedValue({
@@ -588,7 +713,9 @@ describe("api probe routes", () => {
     const app = createServer({
       probeManagement: {
         listActiveProbesForProject: vi.fn().mockResolvedValue([]),
-        listActiveProbesForProjectInOrganization: vi.fn().mockResolvedValue({ organization_plan: "solo", activations: [] }),
+        listActiveProbesForProjectInOrganization: vi
+          .fn()
+          .mockResolvedValue({ organization_plan: "solo", activations: [] }),
         createProbeActivationForProjectInOrganization: vi.fn().mockResolvedValue({
           organization_plan: "solo",
           activation: {
@@ -648,7 +775,9 @@ describe("api probe routes", () => {
     const app = createServer({
       probeManagement: {
         listActiveProbesForProject: vi.fn().mockResolvedValue([]),
-        listActiveProbesForProjectInOrganization: vi.fn().mockResolvedValue({ organization_plan: "solo", activations: [] }),
+        listActiveProbesForProjectInOrganization: vi
+          .fn()
+          .mockResolvedValue({ organization_plan: "solo", activations: [] }),
         createProbeActivationForProjectInOrganization,
         deactivateProbeActivationForProjectInOrganization: vi.fn().mockResolvedValue(null)
       }
@@ -678,10 +807,14 @@ describe("api probe routes", () => {
         persistAndEnqueue: vi.fn()
       },
       ingestionMetadata: {
-        resolveProjectByTokenHash: vi.fn().mockResolvedValue({ project_id: "proj_123", organization_plan: "solo" })
+        resolveProjectByTokenHash: vi
+          .fn()
+          .mockResolvedValue({ project_id: "proj_123", organization_plan: "solo" })
       },
       memberAuth: {
-        resolveMemberByTokenHash: vi.fn().mockResolvedValue({ member_id: "usr_123", organization_id: "org_123" })
+        resolveMemberByTokenHash: vi
+          .fn()
+          .mockResolvedValue({ member_id: "usr_123", organization_id: "org_123" })
       },
       tokenManagement: {
         listProjectTokensForOrganization: vi.fn().mockResolvedValue([]),
@@ -837,7 +970,9 @@ describe("api probe routes", () => {
     const app = createServer({
       probeManagement: {
         listActiveProbesForProject: vi.fn().mockResolvedValue([]),
-        listActiveProbesForProjectInOrganization: vi.fn().mockResolvedValue({ organization_plan: "solo", activations: [] }),
+        listActiveProbesForProjectInOrganization: vi
+          .fn()
+          .mockResolvedValue({ organization_plan: "solo", activations: [] }),
         createProbeActivationForProjectInOrganization: vi.fn().mockResolvedValue(null),
         deactivateProbeActivationForProjectInOrganization: vi.fn().mockResolvedValue({
           organization_plan: "free",
@@ -965,11 +1100,15 @@ describe("api probe routes", () => {
   it("should allow team tier access to remote probes via capability lookup", async (): Promise<void> => {
     const app = createServer({
       ingestionMetadata: {
-        resolveProjectByTokenHash: vi.fn().mockResolvedValue({ project_id: "proj_123", organization_plan: "team" })
+        resolveProjectByTokenHash: vi
+          .fn()
+          .mockResolvedValue({ project_id: "proj_123", organization_plan: "team" })
       },
       probeManagement: {
         listActiveProbesForProject: vi.fn().mockResolvedValue([]),
-        listActiveProbesForProjectInOrganization: vi.fn().mockResolvedValue({ organization_plan: "team", activations: [] }),
+        listActiveProbesForProjectInOrganization: vi
+          .fn()
+          .mockResolvedValue({ organization_plan: "team", activations: [] }),
         createProbeActivationForProjectInOrganization: vi.fn().mockResolvedValue({
           organization_plan: "team",
           activation: {
@@ -1048,7 +1187,9 @@ describe("api probe routes", () => {
     };
     const probeManagement = {
       listActiveProbesForProject: vi.fn().mockResolvedValue([]),
-      listActiveProbesForProjectInOrganization: vi.fn().mockResolvedValue({ organization_plan: "solo", activations: [] }),
+      listActiveProbesForProjectInOrganization: vi
+        .fn()
+        .mockResolvedValue({ organization_plan: "solo", activations: [] }),
       createProbeActivationForProjectInOrganization: vi.fn().mockResolvedValue({
         organization_plan: "solo",
         activation: {
@@ -1071,7 +1212,9 @@ describe("api probe routes", () => {
     };
     const app = createServer({
       memberAuth: mockedObject<ApiServerDependencies["memberAuth"]>({
-        resolveMemberByTokenHash: vi.fn().mockResolvedValue({ member_id: "usr_member", organization_id: "org_member" })
+        resolveMemberByTokenHash: vi
+          .fn()
+          .mockResolvedValue({ member_id: "usr_member", organization_id: "org_member" })
       }),
       projectManagement,
       billingManagement,
@@ -1142,7 +1285,9 @@ describe("api probe routes", () => {
     };
     const app = createServer({
       ingestionMetadata: {
-        resolveProjectByTokenHash: vi.fn().mockResolvedValue({ project_id: "proj_123", organization_plan: "solo" })
+        resolveProjectByTokenHash: vi
+          .fn()
+          .mockResolvedValue({ project_id: "proj_123", organization_plan: "solo" })
       },
       probeManagement
     });
@@ -1184,7 +1329,9 @@ describe("api probe routes", () => {
     const projectId = "00000000-0000-4000-8000-000000000001";
     const probeManagement = {
       listActiveProbesForProject: vi.fn().mockResolvedValue([]),
-      listActiveProbesForProjectInOrganization: vi.fn().mockResolvedValue({ organization_plan: "solo", activations: [] }),
+      listActiveProbesForProjectInOrganization: vi
+        .fn()
+        .mockResolvedValue({ organization_plan: "solo", activations: [] }),
       createProbeActivationForProjectInOrganization: vi.fn().mockResolvedValue({
         organization_plan: "solo",
         activation: {
@@ -1207,10 +1354,14 @@ describe("api probe routes", () => {
     const app = createApiServer({
       ingestionPersistence: { persistAndEnqueue: vi.fn() },
       ingestionMetadata: {
-        resolveProjectByTokenHash: vi.fn().mockResolvedValue({ project_id: "proj_123", organization_plan: "solo" })
+        resolveProjectByTokenHash: vi
+          .fn()
+          .mockResolvedValue({ project_id: "proj_123", organization_plan: "solo" })
       },
       memberAuth: {
-        resolveMemberByTokenHash: vi.fn().mockResolvedValue({ member_id: "usr_123", organization_id: "org_123" })
+        resolveMemberByTokenHash: vi
+          .fn()
+          .mockResolvedValue({ member_id: "usr_123", organization_id: "org_123" })
       },
       tokenManagement: {
         listProjectTokensForOrganization: vi.fn().mockResolvedValue([]),
@@ -1272,7 +1423,9 @@ describe("api probe routes", () => {
     const app = createServer({
       probeManagement: {
         listActiveProbesForProject: vi.fn().mockResolvedValue([]),
-        listActiveProbesForProjectInOrganization: vi.fn().mockResolvedValue({ organization_plan: "solo", activations: [] }),
+        listActiveProbesForProjectInOrganization: vi
+          .fn()
+          .mockResolvedValue({ organization_plan: "solo", activations: [] }),
         createProbeActivationForProjectInOrganization: vi.fn().mockResolvedValue({
           organization_plan: "solo",
           activation: null,

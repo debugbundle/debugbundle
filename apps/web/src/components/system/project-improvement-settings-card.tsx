@@ -10,7 +10,7 @@ import {
 import { showErrorToast, showSuccessToast } from "../../lib/notify.js";
 import { HostedImprovementsUpgradeCallout } from "./hosted-improvements-upgrade-callout.js";
 import { Button } from "../ui/button.js";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../ui/card.js";
+import { CollapsibleCard } from "../ui/collapsible-card.js";
 import { Field, FieldDescription, FieldGroup, FieldLabel } from "../ui/field.js";
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "../ui/select.js";
 import { Switch } from "../ui/switch.js";
@@ -171,12 +171,11 @@ export function ProjectImprovementSettingsCard({
   }
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Automated improvement bundles</CardTitle>
-        <CardDescription>Generate hosted hardening signals for this project.</CardDescription>
-      </CardHeader>
-      <CardContent className="flex flex-col gap-6">
+    <CollapsibleCard
+      title="Improvement bundles"
+      description="Generate automated hosted hardening signals for this project."
+      contentClassName="flex flex-col gap-6"
+    >
         {settingsDraft.cloud_automation_available ? null : <HostedImprovementsUpgradeCallout scope="project" />}
 
         {errorMessage === null ? null : (
@@ -286,8 +285,7 @@ export function ProjectImprovementSettingsCard({
           ) : null}
 
         </form>
-      </CardContent>
-    </Card>
+    </CollapsibleCard>
   );
 }
 

@@ -41,6 +41,10 @@ async function openSelect(label: RegExp | string): Promise<HTMLElement> {
   return trigger;
 }
 
+async function openProjectSettingsSection(name: string): Promise<void> {
+  fireEvent.click(await screen.findByRole("button", { name }));
+}
+
 async function chooseSelectOption(
   user: ReturnType<typeof userEvent.setup>,
   label: RegExp | string,
@@ -50,7 +54,24 @@ async function chooseSelectOption(
   await user.click(await screen.findByRole("option", { name: optionName }));
 }
 
-function createHealthCheck(overrides: Partial<AvailabilityCheckRecord> = {}): AvailabilityCheckRecord {
+async function addCustomScopeValues(
+  user: ReturnType<typeof userEvent.setup>,
+  label: "Services" | "Environments",
+  values: string[]
+): Promise<void> {
+  for (const value of values) {
+    await user.click(screen.getByRole("button", { name: new RegExp(`^${label}:`, "i") }));
+    await user.type(
+      screen.getByRole("textbox", { name: new RegExp(`add custom ${label}`, "i") }),
+      value
+    );
+    await user.click(screen.getByRole("button", { name: new RegExp(`add custom ${label}`, "i") }));
+  }
+}
+
+function createHealthCheck(
+  overrides: Partial<AvailabilityCheckRecord> = {}
+): AvailabilityCheckRecord {
   return {
     check_id: "chk_123",
     project_id: "proj_123",
@@ -272,11 +293,13 @@ describe("web app — management routes", () => {
               updated_at: "2026-03-17T09:00:00.000Z"
             }
           ],
-          limits: { max_checks_per_project: 25, min_interval_seconds: 30 }
+          limits: { max_checks_per_project: 8, min_interval_seconds: 30 }
         });
       }
 
-      if (url.endsWith("/v1/projects/proj_123/availability-checks/chk_123/daily-rollups?limit=30")) {
+      if (
+        url.endsWith("/v1/projects/proj_123/availability-checks/chk_123/daily-rollups?limit=30")
+      ) {
         return jsonResponse(200, {
           rollups: [createHealthRollup()]
         });
@@ -382,15 +405,31 @@ describe("web app — management routes", () => {
     expect(screen.getAllByText(/^1 enabled$/i)).toHaveLength(4);
     expect(screen.getByText(/^2 recipients$/i)).toBeInTheDocument();
     expect(screen.getByText(/^2 client 4xx$/i)).toBeInTheDocument();
-    expect(screen.getByText(/^matching sdk probe labels can ship independently before the next error\.$/i)).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        /^matching sdk probe labels can ship independently before the next error\.$/i
+      )
+    ).toBeInTheDocument();
     expect(screen.getByText(/^3 event types subscribed across endpoints\.$/i)).toBeInTheDocument();
-    expect(screen.getByText(/^plan minimum interval 30s with 30-day retained history\.$/i)).toBeInTheDocument();
-    expect(screen.getByText(/^2 dispatch rules configured for debugbundle\/app\.$/i)).toBeInTheDocument();
+    expect(
+      screen.getByText(/^plan minimum interval 30s with 30-day retained history\.$/i)
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(/^2 dispatch rules configured for debugbundle\/app\.$/i)
+    ).toBeInTheDocument();
     expect(screen.getByText(/^monday at 09:00 utc$/i)).toBeInTheDocument();
-    expect(screen.getByText(/^warning logs, failed requests, exception breadcrumb trails$/i)).toBeInTheDocument();
-    expect(screen.getByText(/^hosted improvement detection uses the shared retained bundle allowance\.$/i)).toBeInTheDocument();
+    expect(
+      screen.getByText(/^warning logs, failed requests, exception breadcrumb trails$/i)
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        /^hosted improvement detection uses the shared retained bundle allowance\.$/i
+      )
+    ).toBeInTheDocument();
     expect(screen.getByText(/^verbose sensitivity$/i)).toBeInTheDocument();
-    expect(fetchMock.mock.calls.some(([input]) => requestUrl(input).includes("/github/"))).toBe(true);
+    expect(fetchMock.mock.calls.some(([input]) => requestUrl(input).includes("/github/"))).toBe(
+      true
+    );
   });
 
   it("shows github automation as unavailable on free projects when no preserved setup exists", async () => {
@@ -494,17 +533,23 @@ describe("web app — management routes", () => {
     expect(githubDescription).toBeInTheDocument();
     const healthChecksBlock = screen.getByText(/^health checks$/i).closest("div.rounded-lg");
     expect(healthChecksBlock).not.toBeNull();
-    expect(within(healthChecksBlock as HTMLDivElement).getByText(/^not configured$/i)).toBeInTheDocument();
+    expect(
+      within(healthChecksBlock as HTMLDivElement).getByText(/^not configured$/i)
+    ).toBeInTheDocument();
     expect(within(healthChecksBlock as HTMLDivElement).getByText(/^off$/i)).toBeInTheDocument();
     expect(
-      within(healthChecksBlock as HTMLDivElement).getByText(/^no hosted health checks are configured yet\.$/i)
+      within(healthChecksBlock as HTMLDivElement).getByText(
+        /^no hosted health checks are configured yet\.$/i
+      )
     ).toBeInTheDocument();
     expect(
       fetchMock.mock.calls.some(([input]) =>
         requestUrl(input).endsWith("/v1/alerts?project_id=proj_123&limit=100")
       )
     ).toBe(true);
-    expect(fetchMock.mock.calls.some(([input]) => requestUrl(input).includes("/github/"))).toBe(true);
+    expect(fetchMock.mock.calls.some(([input]) => requestUrl(input).includes("/github/"))).toBe(
+      true
+    );
   });
 
   it("shows incident inventory from the signed-in incidents route and exposes the sidebar entry", async () => {
@@ -558,7 +603,9 @@ describe("web app — management routes", () => {
       await screen.findByRole("heading", { name: /incidents/i, level: 1 })
     ).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /incidents/i })).toHaveAttribute("href", "/incidents");
-    expect(screen.getByRole("combobox", { name: /status/i })).toHaveTextContent(/^needs attention$/i);
+    expect(screen.getByRole("combobox", { name: /status/i })).toHaveTextContent(
+      /^needs attention$/i
+    );
     expect(
       await screen.findByText(/request anomaly: get \/checkout\/:orderid returned 404 repeatedly/i)
     ).toBeInTheDocument();
@@ -932,7 +979,11 @@ describe("web app — management routes", () => {
     await waitFor(() => {
       expect(screen.getByText(/ci deploy/i)).toBeInTheDocument();
     });
-    expect(screen.getByText(/browser origins: https:\/\/app\.example\.com, https:\/\/preview\.example\.com/i)).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        /browser origins: https:\/\/app\.example\.com, https:\/\/preview\.example\.com/i
+      )
+    ).toBeInTheDocument();
   });
 
   it("revokes a project token from the project tokens page", async () => {
@@ -1986,8 +2037,8 @@ describe("web app — management routes", () => {
     await user.click(screen.getByRole("button", { name: /create rule/i }));
     await user.type(screen.getByLabelText(/^rule name$/i), "Critical incidents");
     await chooseSelectOption(user, /event type/i, /^bundle\.created$/i);
-    await user.type(screen.getByLabelText(/environment list/i), "production");
-    await user.type(screen.getByLabelText(/service list/i), "checkout-api");
+    await addCustomScopeValues(user, "Environments", ["production"]);
+    await addCustomScopeValues(user, "Services", ["checkout-api"]);
     await chooseSelectOption(user, /minimum severity/i, /^critical$/i);
     await chooseSelectOption(user, /incident state/i, /^new_only$/i);
     await user.clear(screen.getByLabelText(/cooldown seconds/i));
@@ -2271,7 +2322,9 @@ describe("web app — management routes", () => {
 
       if (url.endsWith("/v1/projects") && init?.method === undefined) {
         return jsonResponse(200, {
-          projects: [createProject({ relationship: "shared", effective_role: "admin", color_tag: "rose" })]
+          projects: [
+            createProject({ relationship: "shared", effective_role: "admin", color_tag: "rose" })
+          ]
         });
       }
 
@@ -2294,9 +2347,15 @@ describe("web app — management routes", () => {
     render(<App initialEntries={["/projects/proj_123/settings"]} />);
 
     await user.click(await screen.findByRole("button", { name: /edit project/i }));
-    expect(await screen.findByRole("button", { name: /clear color tag/i })).toHaveAttribute("aria-pressed", "false");
+    expect(await screen.findByRole("button", { name: /clear color tag/i })).toHaveAttribute(
+      "aria-pressed",
+      "false"
+    );
     await user.click(screen.getByRole("button", { name: /clear color tag/i }));
-    expect(screen.getByRole("button", { name: /clear color tag/i })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByRole("button", { name: /clear color tag/i })).toHaveAttribute(
+      "aria-pressed",
+      "true"
+    );
     await user.click(screen.getByRole("button", { name: /save changes/i }));
 
     await waitFor(() => {
@@ -2491,8 +2550,11 @@ describe("web app — management routes", () => {
     vi.stubGlobal("fetch", fetchMock);
 
     render(<App initialEntries={["/projects/proj_123/settings"]} />);
+    await openProjectSettingsSection("Weekly reports");
 
-    expect(await screen.findByRole("button", { name: /save email weekly report/i })).toBeInTheDocument();
+    expect(
+      await screen.findByRole("button", { name: /save email weekly report/i })
+    ).toBeInTheDocument();
 
     const enabledSwitches = await screen.findAllByRole("switch", { name: /enabled/i });
     await user.click(enabledSwitches[enabledSwitches.length - 1]!);
@@ -2540,7 +2602,10 @@ describe("web app — management routes", () => {
         });
       }
 
-      if (url.endsWith("/v1/weekly-report-channels?project_id=proj_123&limit=50") && init?.method === undefined) {
+      if (
+        url.endsWith("/v1/weekly-report-channels?project_id=proj_123&limit=50") &&
+        init?.method === undefined
+      ) {
         return jsonResponse(200, {
           channels: [
             {
@@ -2607,8 +2672,19 @@ describe("web app — management routes", () => {
     vi.stubGlobal("fetch", fetchMock);
 
     render(<App initialEntries={["/projects/proj_123/settings"]} />);
+    await openProjectSettingsSection("Weekly reports");
 
-    expect(await screen.findByRole("button", { name: /create slack weekly report/i })).toBeInTheDocument();
+    const emptyWeeklyReportsTitle = await screen.findByText("No Slack weekly reports yet");
+    expect(emptyWeeklyReportsTitle.closest('[data-slot="empty"]')).toHaveClass(
+      "min-h-[11rem]",
+      "border",
+      "border-dashed",
+      "border-border/80",
+      "bg-background/50"
+    );
+    expect(
+      await screen.findByRole("button", { name: /create slack weekly report/i })
+    ).toBeInTheDocument();
     await user.click(await screen.findByRole("button", { name: /create slack weekly report/i }));
 
     const dialog = await screen.findByRole("dialog");
@@ -2655,7 +2731,10 @@ describe("web app — management routes", () => {
         });
       }
 
-      if (url.endsWith("/v1/weekly-report-channels?project_id=proj_123&limit=50") && init?.method === undefined) {
+      if (
+        url.endsWith("/v1/weekly-report-channels?project_id=proj_123&limit=50") &&
+        init?.method === undefined
+      ) {
         return jsonResponse(200, {
           channels: [
             {
@@ -2707,9 +2786,14 @@ describe("web app — management routes", () => {
     vi.stubGlobal("fetch", fetchMock);
 
     render(<App initialEntries={["/projects/proj_123/settings"]} />);
+    await openProjectSettingsSection("Weekly reports");
 
-    expect(await screen.findByText(/slack weekly reports are paused on the current plan/i)).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /create slack weekly report/i })).not.toBeInTheDocument();
+    expect(
+      await screen.findByText(/slack weekly reports are paused on the current plan/i)
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: /create slack weekly report/i })
+    ).not.toBeInTheDocument();
     expect(await screen.findByText(/acme workspace - #weekly-reports/i)).toBeInTheDocument();
     expect(screen.getByText(/friday at 16:00 America\/New_York/i)).toBeInTheDocument();
   });
@@ -2870,8 +2954,8 @@ describe("web app — management routes", () => {
       "https://hooks.example.test/filtered"
     );
     await user.click(screen.getByLabelText(/bundle\.reopened/i));
-    await user.type(screen.getByLabelText(/environments/i), "production, staging");
-    await user.type(screen.getByLabelText(/services/i), "checkout-api, worker");
+    await addCustomScopeValues(user, "Environments", ["production", "staging"]);
+    await addCustomScopeValues(user, "Services", ["checkout-api", "worker"]);
     await chooseSelectOption(user, /minimum severity/i, /^high$/i);
     await chooseSelectOption(user, /verification scope/i, /non-verification events only/i);
     await user.click(screen.getByLabelText(/failure bundles/i));
@@ -3437,7 +3521,9 @@ describe("web app — management routes", () => {
     expect(
       await screen.findByText(/saved slack channels will resume after an upgrade/i)
     ).toBeInTheDocument();
-    expect(screen.getByText(/slack alert delivery and channel management are paused/i)).toBeInTheDocument();
+    expect(
+      screen.getByText(/slack alert delivery and channel management are paused/i)
+    ).toBeInTheDocument();
     expect(screen.getByText(/acme - #alerts/i)).toBeInTheDocument();
   });
 
@@ -3961,24 +4047,30 @@ describe("web app — management routes", () => {
       if (url.endsWith("/v1/projects/proj_123/availability-checks?limit=100")) {
         return jsonResponse(200, {
           checks: [createHealthCheck({ project_id: "proj_123", status: "passing" })],
-          limits: { max_checks_per_project: 5, min_interval_seconds: 60 }
+          limits: { max_checks_per_project: 3, min_interval_seconds: 60 }
         });
       }
 
       if (url.endsWith("/v1/projects/proj_456/availability-checks?limit=100")) {
         return jsonResponse(200, {
-          checks: [createHealthCheck({ check_id: "chk_456", project_id: "proj_456", status: "failing" })],
-          limits: { max_checks_per_project: 5, min_interval_seconds: 60 }
+          checks: [
+            createHealthCheck({ check_id: "chk_456", project_id: "proj_456", status: "failing" })
+          ],
+          limits: { max_checks_per_project: 3, min_interval_seconds: 60 }
         });
       }
 
-      if (url.endsWith("/v1/projects/proj_123/availability-checks/chk_123/daily-rollups?limit=30")) {
+      if (
+        url.endsWith("/v1/projects/proj_123/availability-checks/chk_123/daily-rollups?limit=30")
+      ) {
         return jsonResponse(200, {
           rollups: [createHealthRollup({ check_id: "chk_123", project_id: "proj_123" })]
         });
       }
 
-      if (url.endsWith("/v1/projects/proj_456/availability-checks/chk_456/daily-rollups?limit=30")) {
+      if (
+        url.endsWith("/v1/projects/proj_456/availability-checks/chk_456/daily-rollups?limit=30")
+      ) {
         return jsonResponse(200, {
           rollups: [
             createHealthRollup({
@@ -4045,10 +4137,14 @@ describe("web app — management routes", () => {
       expect(cardWithValueExists("Regressed incidents", /^3$/)).toBe(true);
     });
 
-    expect(screen.getByText(/open or regressed incidents across all projects/i)).toBeInTheDocument();
+    expect(
+      screen.getByText(/open or regressed incidents across all projects/i)
+    ).toBeInTheDocument();
     expect(screen.getByText(/opened or regressed today across all projects/i)).toBeInTheDocument();
     expect(screen.getByText(/1 check failing across all projects/i)).toBeInTheDocument();
-    expect(screen.getByText(/current regressed incidents across all projects/i)).toBeInTheDocument();
+    expect(
+      screen.getByText(/current regressed incidents across all projects/i)
+    ).toBeInTheDocument();
     expect(fetchMock.mock.calls.some(([input]) => requestUrl(input).endsWith("/v1/billing"))).toBe(
       false
     );
@@ -4096,7 +4192,9 @@ describe("web app — management routes", () => {
 
     await screen.findByText(/open or regressed incidents across all projects/i);
 
-    const openIncidentsCard = screen.getByText(/open or regressed incidents across all projects/i).closest("a");
+    const openIncidentsCard = screen
+      .getByText(/open or regressed incidents across all projects/i)
+      .closest("a");
     expect(openIncidentsCard).not.toBeNull();
 
     await user.click(openIncidentsCard as HTMLAnchorElement);
@@ -4145,7 +4243,9 @@ describe("web app — management routes", () => {
 
     await user.click(healthStatusCard);
 
-    expect(await screen.findByRole("heading", { name: /health status/i, level: 1 })).toBeInTheDocument();
+    expect(
+      await screen.findByRole("heading", { name: /health status/i, level: 1 })
+    ).toBeInTheDocument();
     expect(await screen.findByText(/no health checks yet/i)).toBeInTheDocument();
   });
 
@@ -4276,7 +4376,12 @@ describe("web app — management routes", () => {
     const todayIncidents = Array.from({ length: 11 }, (_, index) =>
       createIncident({
         incident_id: `inc_today_${index + 1}`,
-        title: index === 0 ? "Checkout timeout" : index === 10 ? "Retry storm" : `Dashboard incident ${index + 1}`,
+        title:
+          index === 0
+            ? "Checkout timeout"
+            : index === 10
+              ? "Retry storm"
+              : `Dashboard incident ${index + 1}`,
         first_seen_at: firstSeenAt,
         regressed_at: null
       })
@@ -4322,7 +4427,9 @@ describe("web app — management routes", () => {
 
     expect(await card.findByRole("link", { name: /retry storm/i })).toBeInTheDocument();
     expect(card.getByText(/page 2/i)).toBeInTheDocument();
-    expect(fetchMock.mock.calls.some(([input]) => requestUrl(input).includes("attention_after="))).toBe(false);
+    expect(
+      fetchMock.mock.calls.some(([input]) => requestUrl(input).includes("attention_after="))
+    ).toBe(false);
   });
 
   it("loads the dashboard incidents-today table without requiring the attention_after API filter", async () => {
@@ -4376,7 +4483,9 @@ describe("web app — management routes", () => {
     const card = within(incidentsTodayCard as HTMLElement);
 
     expect(await card.findByRole("link", { name: /dashboard incident/i })).toBeInTheDocument();
-    expect(fetchMock.mock.calls.some(([input]) => requestUrl(input).includes("attention_after="))).toBe(false);
+    expect(
+      fetchMock.mock.calls.some(([input]) => requestUrl(input).includes("attention_after="))
+    ).toBe(false);
     expect(screen.queryByText(/could not load the current page/i)).not.toBeInTheDocument();
   });
 
@@ -4427,8 +4536,12 @@ describe("web app — management routes", () => {
     render(<App initialEntries={["/dashboard"]} />);
 
     expect(await screen.findByText(/no incidents today/i)).toBeInTheDocument();
-    expect(fetchMock.mock.calls.some(([input]) => requestUrl(input).includes("cursor=cursor_2"))).toBe(false);
-    expect(fetchMock.mock.calls.some(([input]) => requestUrl(input).includes("attention_after="))).toBe(false);
+    expect(
+      fetchMock.mock.calls.some(([input]) => requestUrl(input).includes("cursor=cursor_2"))
+    ).toBe(false);
+    expect(
+      fetchMock.mock.calls.some(([input]) => requestUrl(input).includes("attention_after="))
+    ).toBe(false);
     expect(screen.queryByText(/could not load the current page/i)).not.toBeInTheDocument();
   });
 
@@ -4899,7 +5012,9 @@ describe("web app — management routes", () => {
 
     await user.click(screen.getByRole("button", { name: /manage capacity/i }));
     expect(
-      await screen.findByText(/internal admin-managed accounts update purchased allowance units immediately/i)
+      await screen.findByText(
+        /internal admin-managed accounts update purchased allowance units immediately/i
+      )
     ).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /keep current units/i })).not.toBeInTheDocument();
 
@@ -5312,7 +5427,9 @@ describe("web app — management routes", () => {
     render(<App initialEntries={[`/projects/${project.project_id}/incidents`]} />);
 
     const statusFilter = await screen.findByRole("combobox", { name: /status/i });
-    expect(await screen.findByText(/no incidents need attention for this project/i)).toBeInTheDocument();
+    expect(
+      await screen.findByText(/no incidents need attention for this project/i)
+    ).toBeInTheDocument();
     expect(statusFilter).toHaveTextContent(/^needs attention$/i);
 
     await chooseSelectOption(user, /status/i, /^resolved$/i);

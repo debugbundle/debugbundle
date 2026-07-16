@@ -1,59 +1,10 @@
 import { describe, expect, it } from "vitest";
 
 import { assertDatabaseSchema, parseApiRuntimeEnv, type Queryable } from "../../../apps/api/src/runtime.js";
+import { REQUIRED_API_TABLES } from "../../../packages/storage/src/migrations.js";
 import { STORAGE_SCHEMA_MIGRATIONS } from "../../../packages/storage/src/schema-migrations.js";
 
-const API_TABLE_ROWS = [
-  { table_name: "users" },
-  { table_name: "sessions" },
-  { table_name: "email_auth_challenges" },
-  { table_name: "account_deletion_challenges" },
-  { table_name: "oauth_identities" },
-  { table_name: "organizations" },
-  { table_name: "organization_members" },
-  { table_name: "projects" },
-  { table_name: "project_members" },
-  { table_name: "project_invites" },
-  { table_name: "project_tokens" },
-  { table_name: "member_tokens" },
-  { table_name: "github_device_authorizations" },
-  { table_name: "probe_activations" },
-  { table_name: "availability_checks" },
-  { table_name: "availability_check_results" },
-  { table_name: "availability_check_daily_rollups" },
-  { table_name: "services" },
-  { table_name: "deployments" },
-  { table_name: "incidents" },
-  { table_name: "incident_events" },
-  { table_name: "improvement_opportunities" },
-  { table_name: "improvement_opportunity_events" },
-  { table_name: "bundle_generations" },
-  { table_name: "weekly_report_channels" },
-  { table_name: "alert_rules" },
-  { table_name: "agent_webhooks" },
-  { table_name: "webhook_deliveries" },
-  { table_name: "operational_email_deliveries" },
-  { table_name: "slack_destinations" },
-  { table_name: "capture_policies" },
-  { table_name: "capture_rules" },
-  { table_name: "audit_logs" },
-  { table_name: "processed_billing_events" },
-  { table_name: "account_analytics_accounts" },
-  { table_name: "account_metric_periods" },
-  { table_name: "account_metric_events" },
-  { table_name: "account_payment_retention_records" },
-  { table_name: "account_payment_provider_events" },
-  { table_name: "trial_lifecycle_events" },
-  { table_name: "plan_cleanup_tasks" },
-  { table_name: "project_usage_counters" },
-  { table_name: "ingestion_rejection_diagnostic_periods" },
-  { table_name: "github_installations" },
-  { table_name: "github_marketplace_accounts" },
-  { table_name: "project_github_repos" },
-  { table_name: "github_dispatch_rules" },
-  { table_name: "github_dispatch_deliveries" },
-  { table_name: "processed_github_marketplace_events" }
-];
+const API_TABLE_ROWS = REQUIRED_API_TABLES.map((table_name) => ({ table_name }));
 
 function buildMigratedApiSchemaDb(): Queryable {
   return {

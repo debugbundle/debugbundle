@@ -1,13 +1,13 @@
 # DebugBundle
 
-Production debugging bundles for AI agents.
+Production debugging bundles for AI agents, with runtime error reporting and incident response.
 
 ![CI](https://img.shields.io/github/actions/workflow/status/debugbundle/debugbundle/ci.yml?branch=main&label=ci)
 ![CLI](https://img.shields.io/npm/v/%40debugbundle%2Fcli?label=cli&color=blue)
 ![MCP](https://img.shields.io/npm/v/%40debugbundle%2Fmcp?label=mcp&color=blue)
 ![License](https://img.shields.io/badge/license-AGPL--3.0--only-blue)
 
-DebugBundle captures runtime failures, groups them into incidents, and publishes deterministic debug bundles for humans and AI agents.
+DebugBundle provides runtime error reporting, crash reporting, incident response, endpoint health checks, and product analytics for humans and AI agents. It captures runtime failures, groups them into incidents, and publishes deterministic debug bundles. Its monitoring scope is customer-facing runtime behavior and endpoint health, not generic infrastructure metrics.
 
 ## Why DebugBundle?
 
@@ -20,6 +20,17 @@ Key properties:
 - **Local-first setup:** start without a cloud account by writing events to `.debugbundle/local/events/`, then connect to DebugBundle Cloud when ready.
 - **Safe SDKs:** SDK failures are swallowed internally, sensitive fields are redacted before transport, and duplicate storms are suppressed locally.
 - **Self-hostable core:** Compose-based stack for the web app, API, worker, Postgres, Redis, and S3-compatible object storage.
+
+## AnalyticsBundle
+
+AnalyticsBundle extends debugging from incident evidence to product-usage evidence without turning DebugBundle into a long-term raw-event store. It is opt-in browser analytics for the questions a human or agent needs to improve a product: visits and active users, routes and funnels, device/browser/OS/language segments, feature use, friction markers, incident impact, and bounded structured journey replay.
+
+- **Ask directly:** API, CLI, and MCP expose aggregate metrics, journey patterns, opportunities, and generated AnalyticsBundles through the same project-authorized surface.
+- **Generate by analysis unit:** bundles describe a usage, funnel, route, friction, conversion, deploy, or incident-impact question. DebugBundle does not create one AnalyticsBundle per visit.
+- **Keep evidence explainable:** a generated bundle includes aggregate metrics, linked incidents/deploys, privacy-safe journey timelines, and deterministic journey-selection rank/basis for agent review.
+- **Stay privacy- and cost-conscious:** raw analytics inputs and retained journey samples expire; long-lived usage is aggregate rollups. Debug capture remains independent when analytics is disabled, unavailable, sampled out, quota-limited, or unhealthy.
+
+See the repository [public interface contract](contracts/public-interfaces.md#12b-analyticsbundle-and-product-analytics) for API/CLI/MCP parity and the [self-host guide](deploy/selfhost/README.md#analyticsbundle-operations) for retention and upgrade behavior.
 
 ## Quick Start
 

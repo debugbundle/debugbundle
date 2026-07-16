@@ -28,6 +28,17 @@ Use the same runtime-evidence-gated workflow through MCP when an agent is operat
 
 Use these tools for repeated low-value operational noise only after inspecting incident evidence. Keep frontend suppression scoped by structured browser and client signals, and use path-scoped capture policy for known 4xx routes.
 
+## Product Analytics Tools
+
+- Aggregate reads: `get_usage_summary`, `get_route_metrics`, `get_device_breakdown`, `get_referrer_metrics`, and `get_action_metrics`.
+- Funnel and journey reads: `list_funnel_metrics`, `get_funnel_analysis`, `get_journey_patterns`, `list_analytics_journey_samples`, and `get_analytics_journey_sample`.
+- Correlation and opportunities: `get_incident_impact`, `list_analytics_opportunities`, and `get_analytics_opportunity`.
+- Durable analysis artifacts: `list_analytics_bundles`, `generate_analytics_bundle`, and `get_analytics_bundle`.
+- Settings: `get_analytics_settings` and `update_analytics_settings`.
+- Saved funnels: `list_saved_analytics_funnels`, `create_saved_analytics_funnel`, `update_saved_analytics_funnel`, and `archive_saved_analytics_funnel`.
+
+Start with aggregate reads and narrow only as the question requires. Journey samples are bounded redacted event sequences, not video. Generate a bundle only for a durable bounded analysis question, not one bundle per visit. Treat bundle generation, settings updates, and saved-funnel changes as explicit mutations. Use member auth; project tokens are ingestion-only.
+
 ## Probe Tools
 
 - `activate_probe` — activate a remote probe pattern with optional service/environment scope and TTL.
@@ -64,6 +75,7 @@ Use these tools for endpoint downtime, public reachability, and project Health t
 - Probes: `https://debugbundle.com/docs/probes`
 - Capture policy and rules: `https://debugbundle.com/docs/capture-policy`
 - Managing noise: `https://debugbundle.com/docs/managing-noise`
+- Product analytics: `https://debugbundle.com/docs/analytics`
 - Alerts: `https://debugbundle.com/docs/alerts`
 - Webhooks: `https://debugbundle.com/docs/webhooks`
 - API ingestion: `https://debugbundle.com/docs/api/ingestion`

@@ -697,7 +697,7 @@ runIntegration("ingestion integration \u2013 replay idempotency", () => {
       project_id: projectId,
       event_id: incomingEventId,
       event_type: "request_event" as const,
-      event_class: "context_signal" as const,
+      event_class: "incident_signal" as const,
       service_name: "checkout-api",
       environment: "production",
       fingerprint: "fp_bundle_repro_conf_replay",

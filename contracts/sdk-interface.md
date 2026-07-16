@@ -103,6 +103,24 @@ These behaviors are mandatory across all SDKs. A new language SDK is non-complia
 | `sessionSampleRate` | number (0.0–1.0) | `1.0` | Session-level sampling. Decision made once per session — entire journey captured or nothing. Independent of `sampleRate`. |
 | `maxEventsPerSession` | number | `100` | Hard cap on events per session. After cap, only `frontend_exception` events are captured. |
 | `beforeSend` | `(event) → event \| null` | — | Browser-supported synchronous final hook before buffering. Returning `null` drops the event locally. |
+| `analytics` | object | `{ enabled: false }` | Opt-in AnalyticsBundle product-usage capture. Analytics events use the analytics lane and are not debug incident events. |
+
+**Browser analytics config fields (sdk-browser only, opt-in):**
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `analytics.enabled` | boolean | `false` | Enables AnalyticsBundle product-usage capture. Existing installs remain analytics-off after upgrade unless this is explicitly true. |
+| `analytics.privacyMode` | `strict \| standard \| custom` | `strict` | `strict` uses session-only analytics. In direct browser mode, `standard` keeps a project-scoped first-party anonymous ID in browser storage and emits only its SHA-256-derived hash for returning-visitor metrics; it is deleted when consent is withdrawn or server settings force `strict`. Relay mode stays session-only until it has an authenticated project-scope bootstrap. `custom` uses customer-owned consent/identity callbacks while preserving schema/redaction limits. |
+| `analytics.consentRequired` | boolean | `false` | When true, analytics capture is disabled until `debugbundle.analytics.setConsent(true)` is called. |
+| `analytics.trackPageViews` | boolean | `true` | Captures initial page views when analytics is enabled. |
+| `analytics.trackRouteChanges` | boolean | `true` | Captures SPA route changes when analytics is enabled. |
+| `analytics.trackSessions` | boolean | `true` | Captures session-start/session-summary signals when analytics is enabled. |
+| `analytics.trackReferrers` | boolean | `true` | Captures referrer domain and bounded UTM fields. |
+| `analytics.trackActions` | boolean | `false` | Enables structural action/click capture. Must not capture raw text or form values. Semantic `track()` calls are preferred. |
+| `analytics.trackFrictionSignals` | boolean | `true` | Captures only fixed friction journey markers: three rapid clicks on the same in-memory interactive target yield `friction.repeated_click`, three rapid clicks on an eligible non-interactive target yield `friction.dead_click`, and a quick safe route reversal yields `friction.backtrack`. No target-derived data leaves the page. |
+| `analytics.sampleRate` | number (0.0–1.0) | `1.0` | Analytics event sampling, separate from debug event sampling. |
+| `analytics.journeySampleRate` | number (0.0–1.0) | tier/project default | Controls retained representative journey samples. |
+
+Browser debug breadcrumbs and AnalyticsBundle events should reuse shared frontend primitives where possible: session id management, route/path normalization, device/browser context collection, referrer/UTM parsing, action/click sanitization, and structured journey timeline formatting. Reuse is an SDK implementation concern only. Debug and analytics capture remain independently configured and emitted as separate envelopes with separate consent, sampling, quota, retention, and processing behavior.
 
 Browser `fetch()` calls may include an optional `debugbundle` metadata object in the init bag:
 
@@ -399,6 +417,65 @@ Browser `unhandledrejection` captures may include `frontend_exception.payload.re
 - Browser SDKs must apply the same duplicate suppression and loop-protection guarantees defined in Required Volume-Control Behavior above.
 - `frontend_exception` and `error_suppressed` events remain capturable even when non-exception session caps are exhausted.
 - Browser SDKs must retain buffered events across failed or throttled flush attempts and retry after the backoff window instead of discarding them.
+
+### AnalyticsBundle Browser API
+
+Analytics APIs live under `debugbundle.analytics` so product-usage capture remains distinct from debug/error capture.
+
+```ts
+debugbundle.analytics.setConsent(true);
+debugbundle.analytics.setConsent(false);
+
+debugbundle.analytics.pageView({
+  path: "/pricing",
+  title: "Pricing"
+});
+
+debugbundle.analytics.track("feature.used", {
+  feature: "billing_portal"
+});
+
+debugbundle.analytics.funnel("checkout", "payment_submitted", {
+  plan_selected: "team"
+});
+
+debugbundle.analytics.convert("subscription_started", {
+  plan_selected: "team"
+});
+
+debugbundle.analytics.marker("checkout.validation_failed", {
+  attempt_bucket: 3
+});
+
+debugbundle.analytics.setContext({
+  auth_state: "authenticated",
+  account_tier: "pro",
+  onboarding_state: "invited"
+});
+
+debugbundle.analytics.setUserHash("sha256:...");
+```
+
+Required behavior:
+
+- Analytics APIs are no-ops unless analytics is enabled and consent rules allow capture.
+- Analytics API failures never throw into host pages.
+- Analytics batching, retry, unload flushing, and backoff must not block debug event capture or host page behavior.
+- Existing debug capture must continue to work when analytics is disabled, tier-unavailable, missing consent, sampled out, quota-blocked, or internally failing.
+- A direct browser SDK with a project token explicitly requests and reads the bounded `analytics` block from `GET /v1/sdk/config` once at initialization. The request adds `X-DebugBundle-Analytics-Config: 1`, so legacy SDK-config clients receive their unchanged response shape. This remote block may only make a local analytics opt-in more restrictive: it can disable capture, disable page/route/action capture, require explicit consent, or force `strict` privacy. It must not enable a locally analytics-disabled SDK or widen a local capture setting. Relay-mode browser SDKs do not fetch this block because relay transport must remain credential-free; server-side ingestion still enforces project settings for every transport.
+- In direct browser `standard` privacy mode, the SDK derives a browser-storage key from the SHA-256 digest of the public write-only project token, stores only an opaque anonymous first-party value under that key, and emits a separate SHA-256-derived value as `visitor_id_hash`. It never persists or emits the project token or the raw visitor value. Identifier initialization is bounded in memory; unavailable browser storage or Web Crypto falls back to session-only capture without affecting debug capture. Relay mode does not derive a visitor identifier without an authenticated project scope.
+- Analytics events must use `event_type: "analytics_event"` with a `payload.kind` rather than adding many top-level event types.
+- SDKs may derive debug breadcrumbs and analytics events from the same sanitized browser signal, but they must decide independently whether to emit a debug breadcrumb, an analytics event, or both.
+- Semantic analytics keys are stored in `payload.signal`: `track(name)` emits `kind: "action"` plus `signal.action_key`, `funnel(name, step)` emits `kind: "funnel_step"` plus `signal.funnel_key` and `signal.step_key`, `convert(name)` emits `kind: "conversion"` plus `signal.conversion_key`, and journey friction markers emit `kind: "journey_marker"` plus `signal.marker_key`.
+- With `analytics.trackActions: true`, browser structural auto-capture emits only a fixed allowlist of generic action keys, currently `click.link`, `click.button`, `click.input`, `click.input.button`, `click.input.checkbox`, `click.input.radio`, `click.input.reset`, `click.input.submit`, `click.select`, `click.summary`, `click.checkbox`, `click.menuitem`, `click.radio`, `click.switch`, and `click.tab`. It uses the last safe route when available, never stores selectors, IDs, target attributes, URLs, input values, or visible text, and is independent from `captureClicks` debug-breadcrumb configuration.
+- With `analytics.trackFrictionSignals: true`, the browser SDK keeps only ephemeral in-memory target-object identity and timing. Three clicks within two seconds on the same structural target emit `friction.repeated_click`; three on the same eligible non-interactive target emit `friction.dead_click`; a safe `A -> B -> A` route reversal within ten seconds emits `friction.backtrack`. Each target has a ten-second local cooldown. Markers contain no target-derived dimensions and remote `capture_friction_signals: false` disables them without changing debug or permitted route analytics.
+- `marker(name, dimensions?)` is an explicit bounded semantic journey marker. It uses the last safe route when available and must apply the same custom-dimension sanitization as other analytics methods.
+- When session tracking is enabled, the browser SDK emits one `session_summary` before a non-persisted `pagehide` and uses the existing unload-safe beacon/keepalive transport. It must not emit a summary for a page entering the back-forward cache.
+- Browser `route_change` analytics events may include `payload.previous_route` with the same privacy-safe route shape as `payload.route`; both routes must strip query strings and fragments so workers can aggregate route transitions without retaining raw URLs.
+- Analytics events do not receive `event_class` and cannot create incidents.
+- `setContext()` accepts only bounded low-cardinality values. Sensitive, overlong, unapproved, or high-cardinality values must be dropped or redacted locally where possible and rejected/dropped server-side as a backstop.
+- `setUserHash()` accepts a customer-supplied privacy-safe hash only. The SDK must not derive raw identity.
+- Auto-captured analytics must not include form values, raw click text, screenshots, DOM snapshots, precise coordinates, precise location, raw query strings, tokens, secrets, names, emails, phone numbers, or payment data.
 
 ---
 

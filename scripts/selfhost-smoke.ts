@@ -1,7 +1,21 @@
 import { createEventEnvelope } from "../packages/shared-types/src/index.js";
+import {
+  runSelfhostAnalyticsSmoke,
+  type AnalyticsSmokeResult
+} from "./selfhost-smoke-analytics.js";
 
 type SmokeCheck = {
-  name: "api-health" | "web-health" | "browser-session-auth" | "project-token-ingestion" | "incident-retrieval" | "bundle-retrieval";
+  name:
+    | "api-health"
+    | "web-health"
+    | "member-token-auth"
+    | "project-token-ingestion"
+    | "incident-retrieval"
+    | "bundle-retrieval"
+    | "browser-analytics-ingestion"
+    | "analytics-rollups"
+    | "analytics-journey-sample"
+    | "analytics-bundle-retrieval";
   status: "ok";
   message: string;
 };
@@ -9,11 +23,13 @@ type SmokeCheck = {
 type SelfhostSmokeInput = {
   apiBaseUrl: string;
   webBaseUrl: string;
+  githubAccessToken?: string;
   runId?: string;
   pollIntervalMs?: number;
   timeoutMs?: number;
   fetchImpl?: typeof fetch;
   wait?: (milliseconds: number) => Promise<void>;
+  runAnalyticsSmoke?: typeof runSelfhostAnalyticsSmoke;
 };
 
 type SelfhostSmokeResult = {
@@ -21,10 +37,7 @@ type SelfhostSmokeResult = {
   projectId: string;
   incidentId: string;
   bundleVersion: number;
-};
-
-type LoginSession = {
-  csrf_token: string;
+  analytics: AnalyticsSmokeResult;
 };
 
 function normalizeBaseUrl(value: string): string {
@@ -48,19 +61,6 @@ function buildJsonHeaders(extra: Record<string, string> = {}): HeadersInit {
 
 function parseJson<T>(value: unknown): T {
   return value as T;
-}
-
-function getSessionCookie(response: Response): string | null {
-  const withGetSetCookie = response.headers as Headers & { getSetCookie?: () => string[] };
-  const setCookies = typeof withGetSetCookie.getSetCookie === "function"
-    ? withGetSetCookie.getSetCookie()
-    : [];
-
-  if (setCookies.length > 0) {
-    return setCookies[0] ?? null;
-  }
-
-  return response.headers.get("set-cookie");
 }
 
 async function sleep(milliseconds: number): Promise<void> {
@@ -156,49 +156,32 @@ async function expectJsonResponse<T>(response: Response, errorPrefix: string): P
   return parseJson<T>(payload);
 }
 
-async function signupAndLogin(input: {
+async function bootstrapMemberToken(input: {
   apiBaseUrl: string;
-  email: string;
-  password: string;
+  githubAccessToken: string;
   fetchImpl: typeof fetch;
-}): Promise<{ cookie: string; csrfToken: string }> {
-  const signupResponse = await input.fetchImpl(`${input.apiBaseUrl}/v1/auth/signup`, {
+}): Promise<string> {
+  const response = await input.fetchImpl(`${input.apiBaseUrl}/v1/auth/github/token/exchange`, {
     method: "POST",
     headers: buildJsonHeaders(),
     body: JSON.stringify({
-      email: input.email,
-      password: input.password
+      github_access_token: input.githubAccessToken,
+      label: "Self-host smoke",
+      accepted_terms: true
     })
   });
-  await expectJsonResponse<{ success: true }>(signupResponse, "Self-host signup");
-
-  const loginResponse = await input.fetchImpl(`${input.apiBaseUrl}/v1/auth/login`, {
-    method: "POST",
-    headers: buildJsonHeaders(),
-    body: JSON.stringify({
-      email: input.email,
-      password: input.password
-    })
-  });
-  const loginPayload = await expectJsonResponse<{ session?: LoginSession }>(loginResponse, "Self-host login");
-
-  const cookie = getSessionCookie(loginResponse);
-  if (cookie === null || cookie.length === 0) {
-    throw new Error("Self-host login did not return a session cookie.");
+  const payload = await expectJsonResponse<{ token?: { plaintext?: string } }>(response, "Self-host bootstrap");
+  const plaintext = payload.token?.plaintext;
+  if (typeof plaintext !== "string" || plaintext.length === 0) {
+    throw new Error("Self-host bootstrap did not return a member token.");
   }
 
-  const csrfToken = loginPayload.session?.csrf_token;
-  if (typeof csrfToken !== "string" || csrfToken.length === 0) {
-    throw new Error("Self-host login did not return a CSRF token.");
-  }
-
-  return { cookie, csrfToken };
+  return plaintext;
 }
 
 async function createProject(input: {
   apiBaseUrl: string;
-  cookie: string;
-  csrfToken: string;
+  memberToken: string;
   name: string;
   slug: string;
   fetchImpl: typeof fetch;
@@ -206,8 +189,7 @@ async function createProject(input: {
   const response = await input.fetchImpl(`${input.apiBaseUrl}/v1/projects`, {
     method: "POST",
     headers: buildJsonHeaders({
-      cookie: input.cookie,
-      "x-csrf-token": input.csrfToken
+      authorization: `Bearer ${input.memberToken}`
     }),
     body: JSON.stringify({
       name: input.name,
@@ -226,16 +208,14 @@ async function createProject(input: {
 
 async function createProjectToken(input: {
   apiBaseUrl: string;
-  cookie: string;
-  csrfToken: string;
+  memberToken: string;
   projectId: string;
   fetchImpl: typeof fetch;
 }): Promise<string> {
   const response = await input.fetchImpl(`${input.apiBaseUrl}/v1/projects/${input.projectId}/tokens`, {
     method: "POST",
     headers: buildJsonHeaders({
-      cookie: input.cookie,
-      "x-csrf-token": input.csrfToken
+      authorization: `Bearer ${input.memberToken}`
     }),
     body: JSON.stringify({
       label: "selfhost-smoke"
@@ -307,7 +287,7 @@ async function ingestEvent(input: {
 
 async function pollIncident(input: {
   apiBaseUrl: string;
-  cookie: string;
+  memberToken: string;
   projectId: string;
   serviceName: string;
   timeoutMs: number;
@@ -329,9 +309,7 @@ async function pollIncident(input: {
 
       const response = await input.fetchImpl(url.toString(), {
         method: "GET",
-        headers: {
-          cookie: input.cookie
-        }
+        headers: { authorization: `Bearer ${input.memberToken}` }
       });
       const payload = await expectJsonResponse<{ incidents?: Array<{ incident_id?: string }> }>(response, "Self-host incident retrieval");
       const incidentId = payload.incidents?.[0]?.incident_id;
@@ -342,7 +320,7 @@ async function pollIncident(input: {
 
 async function pollBundle(input: {
   apiBaseUrl: string;
-  cookie: string;
+  memberToken: string;
   incidentId: string;
   timeoutMs: number;
   pollIntervalMs: number;
@@ -357,9 +335,7 @@ async function pollBundle(input: {
     execute: async () => {
       const response = await input.fetchImpl(`${input.apiBaseUrl}/v1/incidents/${input.incidentId}/bundle`, {
         method: "GET",
-        headers: {
-          cookie: input.cookie
-        }
+        headers: { authorization: `Bearer ${input.memberToken}` }
       });
       const payload = parseJson<{ status?: string; bundle_version?: number }>(await response.json());
       if (!response.ok) {
@@ -387,8 +363,6 @@ export async function runSelfhostSmoke(input: SelfhostSmokeInput): Promise<Selfh
   const apiBaseUrl = normalizeBaseUrl(input.apiBaseUrl);
   const webBaseUrl = normalizeBaseUrl(input.webBaseUrl);
   const runId = resolveRunId(input.runId);
-  const email = `selfhost-smoke+${runId}@debugbundle.local`;
-  const password = `DebugBundle-${runId}-Pass1!`;
   const projectName = `Self-Host Smoke ${runId}`;
   const projectSlug = `selfhost-smoke-${runId.toLowerCase().replace(/[^a-z0-9-]/g, "-")}`;
   const serviceName = `selfhost-smoke-${runId}`;
@@ -408,25 +382,27 @@ export async function runSelfhostSmoke(input: SelfhostSmokeInput): Promise<Selfh
     message: `Web app root responded from ${webBaseUrl}.`
   });
 
-  const session = await signupAndLogin({ apiBaseUrl, email, password, fetchImpl });
+  const memberToken = await bootstrapMemberToken({
+    apiBaseUrl,
+    githubAccessToken: input.githubAccessToken ?? "debugbundle-dev-mock-code",
+    fetchImpl
+  });
   const projectId = await createProject({
     apiBaseUrl,
-    cookie: session.cookie,
-    csrfToken: session.csrfToken,
+    memberToken,
     name: projectName,
     slug: projectSlug,
     fetchImpl
   });
   checks.push({
-    name: "browser-session-auth",
+    name: "member-token-auth",
     status: "ok",
-    message: `Created smoke project ${projectId} through the browser-session flow.`
+    message: `Created smoke project ${projectId} through the member-token bootstrap flow.`
   });
 
   const projectToken = await createProjectToken({
     apiBaseUrl,
-    cookie: session.cookie,
-    csrfToken: session.csrfToken,
+    memberToken,
     projectId,
     fetchImpl
   });
@@ -445,7 +421,7 @@ export async function runSelfhostSmoke(input: SelfhostSmokeInput): Promise<Selfh
 
   const incidentId = await pollIncident({
     apiBaseUrl,
-    cookie: session.cookie,
+    memberToken,
     projectId,
     serviceName,
     timeoutMs,
@@ -456,12 +432,12 @@ export async function runSelfhostSmoke(input: SelfhostSmokeInput): Promise<Selfh
   checks.push({
     name: "incident-retrieval",
     status: "ok",
-    message: `Retrieved incident ${incidentId} through the session-authenticated API.`
+    message: `Retrieved incident ${incidentId} through the member-authenticated API.`
   });
 
   const bundleVersion = await pollBundle({
     apiBaseUrl,
-    cookie: session.cookie,
+    memberToken,
     incidentId,
     timeoutMs,
     pollIntervalMs,
@@ -474,11 +450,44 @@ export async function runSelfhostSmoke(input: SelfhostSmokeInput): Promise<Selfh
     message: `Retrieved bundle v${bundleVersion} for incident ${incidentId}.`
   });
 
+  const analytics = await (input.runAnalyticsSmoke ?? runSelfhostAnalyticsSmoke)({
+    apiBaseUrl,
+    memberToken,
+    projectToken,
+    projectId,
+    serviceName: `${serviceName}-browser`,
+    pollIntervalMs,
+    timeoutMs,
+    fetchImpl,
+    wait
+  });
+  checks.push({
+    name: "browser-analytics-ingestion",
+    status: "ok",
+    message: `Accepted ${analytics.acceptedEvents} realistic browser analytics events across ${analytics.sessions} sessions.`
+  });
+  checks.push({
+    name: "analytics-rollups",
+    status: "ok",
+    message: `Read aggregate rollups with ${analytics.pageviews} page views and ${analytics.conversions} conversions.`
+  });
+  checks.push({
+    name: "analytics-journey-sample",
+    status: "ok",
+    message: `Retrieved retained journey sample ${analytics.journeySampleId}.`
+  });
+  checks.push({
+    name: "analytics-bundle-retrieval",
+    status: "ok",
+    message: `Retrieved ${analytics.bundleSchemaVersion} generation ${analytics.bundleGenerationId}.`
+  });
+
   return {
     checks,
     projectId,
     incidentId,
-    bundleVersion
+    bundleVersion,
+    analytics
   };
 }
 
@@ -488,7 +497,8 @@ function formatSmokeResult(result: SelfhostSmokeResult): string {
     ...result.checks.map((check) => `- ${check.name}: ${check.message}`),
     `Project: ${result.projectId}`,
     `Incident: ${result.incidentId}`,
-    `Bundle version: ${result.bundleVersion}`
+    `Bundle version: ${result.bundleVersion}`,
+    `AnalyticsBundle: ${result.analytics.bundleGenerationId} (${result.analytics.bundleSchemaVersion})`
   ].join("\n");
 }
 
@@ -496,6 +506,9 @@ async function main(): Promise<void> {
   const result = await runSelfhostSmoke({
     apiBaseUrl: process.env["SELFHOST_SMOKE_API_BASE_URL"] ?? "http://localhost:3000",
     webBaseUrl: process.env["SELFHOST_SMOKE_WEB_BASE_URL"] ?? "http://localhost:5291",
+    ...(process.env["SELFHOST_SMOKE_GITHUB_ACCESS_TOKEN"] === undefined
+      ? {}
+      : { githubAccessToken: process.env["SELFHOST_SMOKE_GITHUB_ACCESS_TOKEN"] }),
     ...(process.env["SELFHOST_SMOKE_RUN_ID"] === undefined ? {} : { runId: process.env["SELFHOST_SMOKE_RUN_ID"] }),
     ...(process.env["SELFHOST_SMOKE_POLL_INTERVAL_MS"] === undefined
       ? {}

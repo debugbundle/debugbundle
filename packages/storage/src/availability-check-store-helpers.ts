@@ -161,6 +161,7 @@ export async function projectExistsForAvailabilityChecks(
   input: {
     organization_id: string;
     project_id: string;
+    lock_project?: boolean;
   }
 ): Promise<{ environment_default: string; organization_plan: TierName } | null> {
   const result = await db.query<Record<string, unknown>>(
@@ -173,6 +174,7 @@ export async function projectExistsForAvailabilityChecks(
       WHERE p.id = $1::uuid
         AND p.organization_id = $2::uuid
       LIMIT 1
+      ${input.lock_project === true ? "FOR UPDATE OF p" : ""}
     `,
     [input.project_id, input.organization_id]
   );

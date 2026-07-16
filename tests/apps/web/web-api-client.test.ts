@@ -110,14 +110,14 @@ describe("web api client", () => {
 
       if (url.endsWith("/v1/projects/proj_1/availability-checks?limit=50")) {
         return Promise.resolve(
-          new Response(JSON.stringify({ checks: [check], limits: { max_checks_per_project: 5, min_interval_seconds: 60 } }), {
+          new Response(JSON.stringify({ checks: [check], limits: { max_checks_per_project: 3, min_interval_seconds: 60 } }), {
             status: 200
           })
         );
       }
       if (url.endsWith("/v1/projects/proj_1/availability-checks/chk_1") && init?.method === undefined) {
         return Promise.resolve(
-          new Response(JSON.stringify({ check, limits: { max_checks_per_project: 5, min_interval_seconds: 60 } }), {
+          new Response(JSON.stringify({ check, limits: { max_checks_per_project: 3, min_interval_seconds: 60 } }), {
             status: 200
           })
         );
@@ -166,11 +166,11 @@ describe("web api client", () => {
 
     await expect(listProjectAvailabilityChecks("proj_1", 50)).resolves.toEqual({
       checks: [check],
-      limits: { max_checks_per_project: 5, min_interval_seconds: 60 }
+      limits: { max_checks_per_project: 3, min_interval_seconds: 60 }
     });
     await expect(getProjectAvailabilityCheck("proj_1", "chk_1")).resolves.toEqual({
       check,
-      limits: { max_checks_per_project: 5, min_interval_seconds: 60 }
+      limits: { max_checks_per_project: 3, min_interval_seconds: 60 }
     });
     await expect(
       createProjectAvailabilityCheck("proj_1", {

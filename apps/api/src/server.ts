@@ -7,6 +7,7 @@ import {
   readCookieValue
 } from "../../../packages/auth/src/index.js";
 import type { RuntimeLogger } from "../../../packages/runtime-logger/src/index.js";
+import { ANALYTICS_BUNDLE_GENERATION_ID_HEADER } from "../../../packages/shared-types/src/index.js";
 
 import type { ApiDependencies } from "./api-types.js";
 import {
@@ -20,6 +21,9 @@ import { registerAlertRoutes } from "./routes/alerts.js";
 import { registerAccountRoutes } from "./routes/account.js";
 import { registerAdminAnalyticsRoutes } from "./routes/admin-analytics.js";
 import { registerAdminBillingRoutes } from "./routes/admin-billing.js";
+import { registerAnalyticsRoutes } from "./routes/analytics.js";
+import { registerAnalyticsSettingsRoutes } from "./routes/analytics-settings.js";
+import { registerAnalyticsSavedFunnelRoutes } from "./routes/analytics-saved-funnels.js";
 import { registerAvailabilityCheckRoutes } from "./routes/availability-checks.js";
 import { registerBillingRoutes } from "./routes/billing.js";
 import { registerCapturePolicyRoutes } from "./routes/capture-policy.js";
@@ -65,6 +69,7 @@ const ALLOWED_CORS_HEADERS = [
   "Authorization",
   "Content-Type",
   "X-CSRF-Token",
+  "X-DebugBundle-Analytics-Config",
   "X-Debugbundle-Trace-Id"
 ];
 const ALLOWED_CORS_METHODS = ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"];
@@ -257,6 +262,7 @@ function registerApiCors(app: FastifyInstance, allowedOrigins: string[]): void {
 
     reply.header("Access-Control-Allow-Origin", requestOrigin);
     reply.header("Access-Control-Allow-Credentials", "true");
+    reply.header("Access-Control-Expose-Headers", ANALYTICS_BUNDLE_GENERATION_ID_HEADER);
 
     if (!isCorsPreflightRequest(request)) {
       return;
@@ -395,6 +401,9 @@ export function createApiServer(
   registerSlackRoutes(app, dependencies);
   registerTokenRoutes(app, dependencies);
   registerAlertRoutes(app, dependencies);
+  registerAnalyticsRoutes(app, dependencies);
+  registerAnalyticsSettingsRoutes(app, dependencies);
+  registerAnalyticsSavedFunnelRoutes(app, dependencies);
   registerCapturePolicyRoutes(app, dependencies);
   registerCaptureRuleRoutes(app, dependencies);
   registerImprovementSettingsRoutes(app, dependencies);

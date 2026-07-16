@@ -24,6 +24,7 @@ INTEGRATION_APP_BASE_URL ?= http://localhost:$(INTEGRATION_WEB_PORT)
 INTEGRATION_WEB_API_URL ?= http://localhost:$(INTEGRATION_API_PORT)
 INTEGRATION_PROBE_TRIGGER_SECRET ?= debugbundle-selfhost-smoke-secret
 INTEGRATION_ANALYTICS_HASH_SECRET ?= debugbundle-selfhost-analytics-secret
+INTEGRATION_GITHUB_MOCK_TOKEN ?= debugbundle-dev-mock-code
 S3_BUCKET ?= debugbundle-raw-events
 WORKER_POLL_INTERVAL_MS ?= 1000
 WORKER_RUN_ONCE ?= 0
@@ -52,13 +53,14 @@ help:
 	@echo "  make lint            Run eslint via Docker"
 	@echo "  make typecheck       Run TypeScript checks via Docker"
 	@echo "  make web-check       Run focused web auth/account tests via Docker"
+	@echo "  make compose-check   Run local Docker Compose configuration checks"
 	@echo "  make load-check      Run noisy-ingestion load checks via Docker"
 	@echo "  make perf-check      Run performance benchmark checks via Docker"
 	@echo "  make test-unit       Run unit tests with coverage gates via Docker"
 	@echo "  make test            Alias of test-unit"
 	@echo "  make test-all        Run unit+coverage and integration tests"
 	@echo "  make test-all-quick  Run unit (no coverage) and integration tests"
-	@echo "  make selfhost-smoke  Boot the self-host stack and prove auth + ingest + bundle retrieval"
+	@echo "  make selfhost-smoke  Prove self-host auth, debug ingestion, browser analytics, rollups, and bundles"
 	@echo "  make build           Run build via Docker"
 	@echo "  make ci              Run lint + typecheck + test + build via Docker"
 	@echo "  make release-mcp-ecosystem-plan VERSION=x.y.z"
@@ -157,6 +159,10 @@ typecheck:
 web-check:
 	$(NODE_RUN) "corepack enable && $(PNPM_INSTALL_RELAXED) && corepack pnpm vitest run tests/apps/web/web-app-auth.test.tsx tests/apps/web/web-app-management.test.tsx tests/apps/web/web-app-incidents.test.tsx tests/apps/web/web-dogfooding.test.ts && corepack pnpm typecheck"
 
+.PHONY: compose-check
+compose-check:
+	$(NODE_RUN) "corepack enable && corepack pnpm vitest run tests/infrastructure/local-compose.test.ts"
+
 .PHONY: perf-check
 perf-check:
 	$(NODE_RUN) "corepack enable && $(PNPM_INSTALL_RELAXED) && node --import tsx scripts/perf-check.ts"
@@ -228,7 +234,7 @@ test-integration:
 		-e S3_ENDPOINT=http://localstack:4566 \
 		-e S3_REGION=us-east-1 \
 		-e S3_BUCKET=debugbundle-raw-events \
-			$(NODE_IMAGE) sh -lc "corepack enable && $(PNPM_INSTALL_RELAXED) && corepack pnpm db:bootstrap && corepack pnpm db:migrate && corepack pnpm vitest run --no-file-parallelism --maxWorkers=1 tests/integration/availability-checks.integration.test.ts tests/integration/ingestion-core.integration.test.ts tests/integration/ingestion-bundle-triggers.integration.test.ts tests/integration/ingestion-replay-idempotency.integration.test.ts tests/integration/ingestion-lifecycle-webhooks.integration.test.ts tests/integration/billing-sync.integration.test.ts tests/integration/project-deletion.integration.test.ts tests/integration/retention-cleanup.integration.test.ts tests/integration/retention-sampling.integration.test.ts tests/integration/storage-migrations.integration.test.ts"
+			$(NODE_IMAGE) sh -lc "corepack enable && $(PNPM_INSTALL_RELAXED) && corepack pnpm db:bootstrap && corepack pnpm db:migrate && corepack pnpm vitest run --no-file-parallelism --maxWorkers=1 tests/integration/analytics-correlation.integration.test.ts tests/integration/analytics-saved-funnels.integration.test.ts tests/integration/availability-checks.integration.test.ts tests/integration/ingestion-core.integration.test.ts tests/integration/ingestion-bundle-triggers.integration.test.ts tests/integration/ingestion-replay-idempotency.integration.test.ts tests/integration/ingestion-lifecycle-webhooks.integration.test.ts tests/integration/billing-sync.integration.test.ts tests/integration/project-deletion.integration.test.ts tests/integration/retention-cleanup.integration.test.ts tests/integration/retention-sampling.integration.test.ts tests/integration/storage-migrations.integration.test.ts"
 
 .PHONY: test-integration-down
 test-integration-down:
@@ -239,8 +245,8 @@ selfhost-smoke:
 	@set -e; \
 	chmod +x deploy/selfhost/localstack-init/01-create-bucket.sh; \
 	trap 'POSTGRES_PORT=$(INTEGRATION_POSTGRES_PORT) REDIS_PORT=$(INTEGRATION_REDIS_PORT) LOCALSTACK_PORT=$(INTEGRATION_LOCALSTACK_PORT) API_PORT=$(INTEGRATION_API_PORT) WEB_PORT=$(INTEGRATION_WEB_PORT) APP_BASE_URL=$(INTEGRATION_APP_BASE_URL) VITE_API_URL=$(INTEGRATION_WEB_API_URL) CONTAINER_PREFIX=$(INTEGRATION_CONTAINER_PREFIX) DEBUGBUNDLE_PROBE_TRIGGER_SECRET=$(INTEGRATION_PROBE_TRIGGER_SECRET) ANALYTICS_HASH_SECRET=$(INTEGRATION_ANALYTICS_HASH_SECRET) $(INTEGRATION_COMPOSE) down -v' EXIT; \
-	POSTGRES_PORT=$(INTEGRATION_POSTGRES_PORT) REDIS_PORT=$(INTEGRATION_REDIS_PORT) LOCALSTACK_PORT=$(INTEGRATION_LOCALSTACK_PORT) API_PORT=$(INTEGRATION_API_PORT) WEB_PORT=$(INTEGRATION_WEB_PORT) APP_BASE_URL=$(INTEGRATION_APP_BASE_URL) VITE_API_URL=$(INTEGRATION_WEB_API_URL) CONTAINER_PREFIX=$(INTEGRATION_CONTAINER_PREFIX) DEBUGBUNDLE_PROBE_TRIGGER_SECRET=$(INTEGRATION_PROBE_TRIGGER_SECRET) ANALYTICS_HASH_SECRET=$(INTEGRATION_ANALYTICS_HASH_SECRET) $(INTEGRATION_COMPOSE) up -d postgres redis localstack workspace-init api worker web; \
-	POSTGRES_PORT=$(INTEGRATION_POSTGRES_PORT) REDIS_PORT=$(INTEGRATION_REDIS_PORT) LOCALSTACK_PORT=$(INTEGRATION_LOCALSTACK_PORT) API_PORT=$(INTEGRATION_API_PORT) WEB_PORT=$(INTEGRATION_WEB_PORT) APP_BASE_URL=$(INTEGRATION_APP_BASE_URL) VITE_API_URL=$(INTEGRATION_WEB_API_URL) CONTAINER_PREFIX=$(INTEGRATION_CONTAINER_PREFIX) DEBUGBUNDLE_PROBE_TRIGGER_SECRET=$(INTEGRATION_PROBE_TRIGGER_SECRET) ANALYTICS_HASH_SECRET=$(INTEGRATION_ANALYTICS_HASH_SECRET) $(INTEGRATION_COMPOSE) exec -T web sh -lc "SELFHOST_SMOKE_API_BASE_URL=http://api:3000 SELFHOST_SMOKE_WEB_BASE_URL=http://127.0.0.1:$(INTEGRATION_WEB_PORT) node --import tsx /workspace/scripts/selfhost-smoke.ts"
+	POSTGRES_PORT=$(INTEGRATION_POSTGRES_PORT) REDIS_PORT=$(INTEGRATION_REDIS_PORT) LOCALSTACK_PORT=$(INTEGRATION_LOCALSTACK_PORT) API_PORT=$(INTEGRATION_API_PORT) WEB_PORT=$(INTEGRATION_WEB_PORT) APP_BASE_URL=$(INTEGRATION_APP_BASE_URL) VITE_API_URL=$(INTEGRATION_WEB_API_URL) CONTAINER_PREFIX=$(INTEGRATION_CONTAINER_PREFIX) DEBUGBUNDLE_PROBE_TRIGGER_SECRET=$(INTEGRATION_PROBE_TRIGGER_SECRET) ANALYTICS_HASH_SECRET=$(INTEGRATION_ANALYTICS_HASH_SECRET) DEV_GITHUB_MOCK_LOGIN=true $(INTEGRATION_COMPOSE) up -d postgres redis localstack workspace-init api worker web; \
+	POSTGRES_PORT=$(INTEGRATION_POSTGRES_PORT) REDIS_PORT=$(INTEGRATION_REDIS_PORT) LOCALSTACK_PORT=$(INTEGRATION_LOCALSTACK_PORT) API_PORT=$(INTEGRATION_API_PORT) WEB_PORT=$(INTEGRATION_WEB_PORT) APP_BASE_URL=$(INTEGRATION_APP_BASE_URL) VITE_API_URL=$(INTEGRATION_WEB_API_URL) CONTAINER_PREFIX=$(INTEGRATION_CONTAINER_PREFIX) DEBUGBUNDLE_PROBE_TRIGGER_SECRET=$(INTEGRATION_PROBE_TRIGGER_SECRET) ANALYTICS_HASH_SECRET=$(INTEGRATION_ANALYTICS_HASH_SECRET) DEV_GITHUB_MOCK_LOGIN=true $(INTEGRATION_COMPOSE) exec -T web sh -lc "SELFHOST_SMOKE_API_BASE_URL=http://api:3000 SELFHOST_SMOKE_WEB_BASE_URL=http://127.0.0.1:$(INTEGRATION_WEB_PORT) SELFHOST_SMOKE_GITHUB_ACCESS_TOKEN=$(INTEGRATION_GITHUB_MOCK_TOKEN) node --import tsx /workspace/scripts/selfhost-smoke.ts"
 
 .PHONY: api-check
 api-check:

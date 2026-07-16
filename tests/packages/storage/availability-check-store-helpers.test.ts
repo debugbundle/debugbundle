@@ -52,15 +52,15 @@ describe("availability check store helpers", () => {
     expect(normalizeAvailabilityCheckPlan("team")).toBe("team");
     expect(normalizeAvailabilityCheckPlan("enterprise")).toBe("free");
     expect(getPlanCheckLimit("free")).toBe(1);
-    expect(getPlanCheckLimit("solo")).toBe(5);
-    expect(getPlanCheckLimit("team")).toBe(25);
+    expect(getPlanCheckLimit("solo")).toBe(3);
+    expect(getPlanCheckLimit("team")).toBe(8);
     expect(getPlanMinIntervalSeconds("free")).toBe(300);
     expect(getPlanMinIntervalSeconds("solo")).toBe(60);
     expect(getPlanMinIntervalSeconds("team")).toBe(30);
   });
 
   it("builds plan eligibility SQL for check counts and intervals", () => {
-    expect(buildPlanEligibilityCaseSql("limit")).toContain("WHEN 'team' THEN 25");
+    expect(buildPlanEligibilityCaseSql("limit")).toContain("WHEN 'team' THEN 8");
     expect(buildPlanEligibilityCaseSql("limit")).toContain("ELSE 1");
     expect(buildPlanEligibilityCaseSql("interval")).toContain("WHEN 'solo' THEN 60");
     expect(buildPlanEligibilityCaseSql("interval")).toContain("ELSE 300");

@@ -1,5 +1,7 @@
 import type { ProjectColorTag } from "../../../../packages/shared-types/src/index.js";
 
+export * from "./api-analytics-types.js";
+
 export interface SessionRecord {
   session_id: string;
   user_id: string;

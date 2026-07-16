@@ -45,6 +45,7 @@ import type {
   UpdateProjectMemberRoleResult,
   IngestionMetadataService,
   IngestionPersistenceService,
+  AnalyticsIngestionPersistenceService,
   ObjectStoreClient,
   ObjectStoreReader,
   MemberAuthService,
@@ -66,9 +67,11 @@ import type {
   WebhookEventType,
   WebhookDeliveryStore
 } from "../../../packages/storage/src/index.js";
+import type { ApiAnalyticsDependencies } from "./api-analytics-types.js";
 
-export interface ApiDependencies {
-  ingestionPersistence: Pick<IngestionPersistenceService, "persistAndEnqueue">;
+export interface ApiDependencies extends ApiAnalyticsDependencies {
+  ingestionPersistence: Pick<IngestionPersistenceService, "persistAndEnqueue"> &
+    Partial<AnalyticsIngestionPersistenceService>;
   ingestionMetadata: Pick<IngestionMetadataService, "resolveProjectByTokenHash">;
   accountAnalytics?: Pick<AccountAnalyticsStore, "recordMetricDeltas"> | undefined;
   ingestionRejectionDiagnostics?: Pick<

@@ -20,7 +20,7 @@ import {
 } from "../ui/alert-dialog.js";
 import { Badge } from "../ui/badge.js";
 import { Button } from "../ui/button.js";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../ui/card.js";
+import { CollapsibleCard } from "../ui/collapsible-card.js";
 import { Dialog } from "../ui/dialog.js";
 import { Field, FieldDescription, FieldGroup, FieldLabel } from "../ui/field.js";
 import { Input } from "../ui/input.js";
@@ -529,12 +529,11 @@ export function ProjectWeeklyReportSettingsCard({
   const showPausedSlackReportLoading = !slackEnabled && slackChannels.length > 0 && !slackDestinationsLoaded;
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Weekly reports</CardTitle>
-        <CardDescription>Send a weekly summary for this project when there was reportable activity.</CardDescription>
-      </CardHeader>
-      <CardContent className="flex flex-col gap-6">
+    <CollapsibleCard
+      title="Weekly reports"
+      description="Send a weekly summary for this project when there was reportable activity."
+      contentClassName="flex flex-col gap-6"
+    >
         {errorMessage === null ? null : (
           <div className="rounded-lg border border-destructive/25 bg-destructive/5 p-3 text-sm text-destructive">{errorMessage}</div>
         )}
@@ -738,6 +737,7 @@ export function ProjectWeeklyReportSettingsCard({
               <ProjectResourceEmptyState
                 icon={BellRingIcon}
                 title="No Slack weekly reports yet"
+                variant="outlined"
                 description="Create a Slack weekly report when your team wants the weekly summary in a connected channel."
                 {...(canEdit
                   ? {
@@ -931,8 +931,7 @@ export function ProjectWeeklyReportSettingsCard({
             </DialogFormContent>
           )}
         </Dialog>
-      </CardContent>
-    </Card>
+    </CollapsibleCard>
   );
 }
 

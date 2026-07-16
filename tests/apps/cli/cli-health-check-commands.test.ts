@@ -98,13 +98,13 @@ describe("cli health check commands", () => {
     const listApi = {
       listHealthChecks: vi.fn().mockResolvedValue({
         checks: [checkFixture],
-        limits: { max_checks_per_project: 5, min_interval_seconds: 60 }
+        limits: { max_checks_per_project: 3, min_interval_seconds: 60 }
       })
     };
     const getApi = {
       getHealthCheck: vi.fn().mockResolvedValue({
         check: checkFixture,
-        limits: { max_checks_per_project: 5, min_interval_seconds: 60 }
+        limits: { max_checks_per_project: 3, min_interval_seconds: 60 }
       })
     };
 
@@ -121,7 +121,7 @@ describe("cli health check commands", () => {
     );
     expect(JSON.parse(listJson.output)).toEqual({
       checks: [checkFixture],
-      limits: { max_checks_per_project: 5, min_interval_seconds: 60 }
+      limits: { max_checks_per_project: 3, min_interval_seconds: 60 }
     });
 
     const getHuman = await getHealthCheckCommand(
@@ -129,7 +129,7 @@ describe("cli health check commands", () => {
       getApi
     );
     expect(getHuman.exitCode).toBe(0);
-    expect(getHuman.output).toContain("limits=5 min_interval=60s");
+    expect(getHuman.output).toContain("limits=3 min_interval=60s");
   });
 
   it("renders create, update, delete, test, and results outputs", async () => {
@@ -270,10 +270,10 @@ describe("cli health check commands", () => {
       request: vi.fn(
         async (request: HealthCheckHttpRequest): Promise<HealthCheckHttpResponse> => {
         if (request.method === "GET" && request.path.includes("/availability-checks?")) {
-          return { status: 200, body: { checks: [checkFixture], limits: { max_checks_per_project: 5, min_interval_seconds: 60 } } };
+          return { status: 200, body: { checks: [checkFixture], limits: { max_checks_per_project: 3, min_interval_seconds: 60 } } };
         }
         if (request.method === "GET" && request.path.endsWith("/availability-checks/chk_1")) {
-          return { status: 200, body: { check: checkFixture, limits: { max_checks_per_project: 5, min_interval_seconds: 60 } } };
+          return { status: 200, body: { check: checkFixture, limits: { max_checks_per_project: 3, min_interval_seconds: 60 } } };
         }
         if (request.method === "POST" && request.path.endsWith("/availability-checks")) {
           return { status: 201, body: { check: checkFixture } };
@@ -318,10 +318,10 @@ describe("cli health check commands", () => {
 
     await expect(
       api.listHealthChecks({ bearerToken: "dbundle_mem_x", projectId: "proj 1", limit: 3 })
-    ).resolves.toEqual({ checks: [checkFixture], limits: { max_checks_per_project: 5, min_interval_seconds: 60 } });
+    ).resolves.toEqual({ checks: [checkFixture], limits: { max_checks_per_project: 3, min_interval_seconds: 60 } });
     await expect(
       api.getHealthCheck({ bearerToken: "dbundle_mem_x", projectId: "proj_1", checkId: "chk_1" })
-    ).resolves.toEqual({ check: checkFixture, limits: { max_checks_per_project: 5, min_interval_seconds: 60 } });
+    ).resolves.toEqual({ check: checkFixture, limits: { max_checks_per_project: 3, min_interval_seconds: 60 } });
     await expect(
       api.createHealthCheck({
         bearerToken: "dbundle_mem_x",
@@ -501,11 +501,11 @@ describe("cli health check commands", () => {
     const api = {
       listHealthChecks: vi.fn().mockResolvedValue({
         checks: [checkFixture],
-        limits: { max_checks_per_project: 5, min_interval_seconds: 60 }
+        limits: { max_checks_per_project: 3, min_interval_seconds: 60 }
       }),
       getHealthCheck: vi.fn().mockResolvedValue({
         check: checkFixture,
-        limits: { max_checks_per_project: 5, min_interval_seconds: 60 }
+        limits: { max_checks_per_project: 3, min_interval_seconds: 60 }
       }),
       createHealthCheck: vi.fn().mockResolvedValue({ check: checkFixture }),
       updateHealthCheck: vi.fn().mockResolvedValue({ check: checkFixture }),

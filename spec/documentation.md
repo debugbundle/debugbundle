@@ -56,7 +56,7 @@ The complete docs page tree for `/docs`. Every entry below is a page that must e
 |---|------|-------|------|---------|
 | 1 | `/docs/sdks` | SDKs Overview | Landing | SDK philosophy, universal interface table, language support matrix. Links to each SDK page. |
 | 2 | `/docs/sdks/node` | Node.js SDK | Guide | Full guide: install, init, config options table, vanilla hooks, framework integrations (Express, Fastify, Next.js), logger integrations (pino, winston, bunyan), local-first transport, error handling, sampling, redaction, probes. Complete working examples for each framework. |
-| 3 | `/docs/sdks/browser` | Browser SDK | Guide | Full guide: install, init, config options table, breadcrumb capture, error capture, network filtering, session controls, device context, trace correlation, relay transport vs static transport, unload-safe flushing, probes. |
+| 3 | `/docs/sdks/browser` | Browser SDK | Guide | Full guide: install, init, config options table, breadcrumb capture, error capture, network filtering, session controls, device context, trace correlation, relay transport vs static transport, unload-safe flushing, probes, and opt-in AnalyticsBundle capture with consent, restrictive remote settings, safe markers, and debug/analytics isolation. |
 | 4 | `/docs/sdks/python` | Python SDK | Guide | Full guide: install, init, vanilla hooks (sys.excepthook, logging, asyncio), framework integrations (Django, Flask, FastAPI), logger integrations (structlog, loguru), config options. |
 | 5 | `/docs/sdks/php` | PHP SDK | Guide | Full guide: install, init, vanilla hooks (set_error_handler, set_exception_handler, register_shutdown_function), framework integrations (Laravel middleware, Symfony event subscriber), Monolog handler, config options. |
 | 6 | `/docs/sdks/android` | Android SDK | Guide | Full guide: install, init, crash/ANR replay, lifecycle and navigation breadcrumbs, OkHttp/Ktor, offline queueing, WorkManager flushing, Timber, capture policy, probes, and privacy defaults. |
@@ -77,6 +77,7 @@ The complete docs page tree for `/docs`. Every entry below is a page that must e
 | 6 | `/docs/cli/tokens` | Token Management | Guide | `token project list/create/revoke`, `token member list/create/revoke`. When to use which token type. |
 | 7 | `/docs/cli/webhooks` | Webhook Management | Guide | `webhook list/create/update/delete/test/deliveries/retry` commands with examples. |
 | 8 | `/docs/cli/alerts` | Alert Management | Guide | `alert list/create/update/delete` with channel examples (email, Slack, Discord, webhook). |
+| 9 | `/docs/cli/analytics` | AnalyticsBundle CLI | Guide | Aggregate metrics, opportunities, journey sample reads, AnalyticsBundle generation/status, settings, required member auth, and JSON examples. |
 
 ### 1.4 API
 
@@ -91,13 +92,14 @@ The complete docs page tree for `/docs`. Every entry below is a page that must e
 | 7 | `/docs/api/projects` | Projects API | Guide | List, create, update, delete projects. Token management endpoints. Capture policy endpoints. |
 | 8 | `/docs/api/billing` | Billing API | Guide | Billing summary, capacity management, and owner-only endpoints. |
 | 9 | `/docs/api/probes` | Probes API | Guide | Activate, deactivate, list remote probes. Trigger token issuance. SDK config endpoint. |
+| 10 | `/docs/api/analytics` | AnalyticsBundle API | Guide | Analytics settings, aggregate metrics, retained redacted journey samples, opportunities, generation/status, authorization, quota, and error examples. |
 
 ### 1.5 MCP
 
 | # | Path | Title | Type | Purpose |
 |---|------|-------|------|---------|
 | 1 | `/docs/mcp` | MCP Overview | Landing | What MCP is, who it's for (AI agents in IDEs), how to configure the MCP server, auth model (CLI auth state, `DEBUGBUNDLE_MEMBER_TOKEN`, or per-call `bearerToken`). |
-| 2 | `/docs/mcp/tools` | MCP Tools | Reference | Complete tool inventory with parameters, return types, and example invocations. Organized by domain: incidents, bundles, webhooks, alerts, tokens, diagnostics. |
+| 2 | `/docs/mcp/tools` | MCP Tools | Reference | Complete tool inventory with parameters, return types, and example invocations. Organized by domain: incidents, bundles, AnalyticsBundle metrics/opportunities/generation, webhooks, alerts, tokens, diagnostics. |
 | 3 | `/docs/mcp/workflows` | MCP Agent Workflows | Guide | Practical agent workflow patterns: "investigate incident", "activate probe and share trigger link", "set up webhook pipeline", "run doctor checks". |
 
 ### 1.6 Webhooks & Alerts
@@ -135,6 +137,14 @@ The complete docs page tree for `/docs`. Every entry below is a page that must e
 | 5 | `/docs/capture-policy` | Capture Policy | Concept+Guide | Event classes (A/B/C), capture presets (minimal/balanced/investigative), per-project overrides, how policies affect billing, SDK-side enforcement. |
 | 6 | `/docs/managing-noise` | Managing Noise | Guide | How operators and agents reduce recurring low-value incidents using bundle evidence, capture-rule suggestions, scoped capture rules, and client-error path rules. |
 
+### 1.9a AnalyticsBundle
+
+| # | Path | Title | Type | Purpose |
+|---|------|-------|------|---------|
+| 1 | `/docs/analytics` | AnalyticsBundle | Concept+Guide | Agent-native product usage analysis: aggregate-first metrics, journeys, funnels, friction, incident impact, opportunities, and generated AnalyticsBundles. Clarifies that no bundle is created per visit. |
+| 2 | `/docs/analytics/privacy` | AnalyticsBundle Privacy & Retention | Guide | Consent, strict/standard privacy modes, custom-dimension controls, raw/sample/aggregate retention, redacted structured replay, and debug/analytics isolation. |
+| 3 | `/docs/analytics/self-hosting` | Self-Hosted AnalyticsBundle | Guide | Required migration order, `ANALYTICS_HASH_SECRET`, cleanup, retention settings, idle evaluator configuration, and operational checks. |
+
 ### 1.10 Self-Hosting
 
 | # | Path | Title | Type | Purpose |
@@ -153,7 +163,7 @@ The complete docs page tree for `/docs`. Every entry below is a page that must e
 
 | # | Path | Title | Type | Purpose |
 |---|------|-------|------|---------|
-| 1 | `/docs/agent-workflows` | Agent Workflows | Concept+Guide | The agent-first thesis. How agents use DebugBundle: webhook pipelines (webhook → fetch bundle → analyze → open PR), probe activation for live debugging, MCP tool usage patterns, agent skill file explained. |
+| 1 | `/docs/agent-workflows` | Agent Workflows | Concept+Guide | The agent-first thesis. How agents use DebugBundle: webhook pipelines (webhook → fetch bundle → analyze → open PR), AnalyticsBundle metric/journey/funnel review, probe activation for live debugging, MCP tool usage patterns, agent skill file explained. |
 | 2 | `/docs/agent-workflows/skill-file` | Agent Skill File | Reference | `.agents/skills/debugbundle/SKILL.md` structure, agentskills.io spec, how agents discover and use the skill, progressive disclosure sections, references/assets/evals. |
 | 3 | `/docs/agent-workflows/automation-recipes` | Automation Recipes | Guide | Concrete end-to-end recipes: "Auto-investigate on webhook", "Activate probe with trigger token for end-user", "Agent-driven setup from scratch", "PR-on-failure pipeline". |
 
@@ -221,6 +231,10 @@ Fumadocs uses `meta.json` files in content directories to control sidebar orderi
     "---Bundles & Incidents---",
     "bundles/...",
     "incidents/...",
+    "---AnalyticsBundle---",
+    "[Overview](/docs/analytics)",
+    "[Privacy & Retention](/docs/analytics/privacy)",
+    "[Self-Hosting](/docs/analytics/self-hosting)",
     "---Configuration---",
     "project-setup/...",
     "capture-policy",
@@ -244,6 +258,10 @@ Fumadocs uses `meta.json` files in content directories to control sidebar orderi
   ]
 }
 ```
+
+AnalyticsBundle uses one flat sidebar section. Its child labels stay concise because the
+section already supplies product context; full product names remain in page titles and
+metadata for standalone pages, search, and sharing.
 
 Sub-directories (`sdks/`, `cli/`, `api/`, etc.) each get their own `meta.json` to control ordering within the section.
 

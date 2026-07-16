@@ -1,15 +1,20 @@
-import type { FastifyBaseLogger, FastifyInstance } from "fastify";
-import type { ZodIssue } from "zod";
+import type { FastifyInstance } from "fastify";
 
 import { hashToken, readBearerToken, requireProjectToken } from "../../../../packages/auth/src/index.js";
 import { classifyEvent, validateEvent } from "../../../../packages/event-normalizer/src/index.js";
 import {
-  buildIngestionMetricBatch,
   countsTowardMonthlyIngestAllowance,
   queueAllowanceLimitReachedNotification,
   queueAllowanceThresholdNotifications
 } from "../../../../packages/storage/src/index.js";
-import { getTierCapabilities, resolvePolicy, PRESET_DEFAULTS, shouldCaptureEvent, getDefaultPreset, isSelfHostMode } from "../../../../packages/shared-types/src/index.js";
+import {
+  getTierCapabilities,
+  resolvePolicy,
+  PRESET_DEFAULTS,
+  shouldCaptureEvent,
+  getDefaultPreset,
+  isSelfHostMode
+} from "../../../../packages/shared-types/src/index.js";
 import {
   applyCaptureRuleEventClass,
   buildCaptureRuleEvaluationContext,
@@ -19,221 +24,35 @@ import {
   type ResolvedCapturePolicy
 } from "../../../../packages/shared-types/src/index.js";
 import type { ApiDependencies } from "../api-types.js";
+import {
+  claimAnalyticsIngestionQuota,
+  getAnalyticsQuotaClaimKeysForEvent,
+  releaseAnalyticsQuotaClaimBestEffort,
+  toRetryAfterSeconds as toAnalyticsRetryAfterSeconds
+} from "../analytics-quota.js";
 import { redactEvent } from "../api-helpers.js";
 import { SMALL_REQUEST_BODY_LIMIT_BYTES } from "../http-limits.js";
 import { isProjectTokenOriginAllowed } from "../project-token-origins.js";
 import { IngestionRequestSchema } from "../schemas.js";
+import {
+  isAnalyticsEventCandidate,
+  parseAnalyticsEventCandidate,
+  selectAcceptedAnalyticsEvents,
+  type ValidAnalyticsEvent
+} from "./analytics-ingestion.js";
+import {
+  buildRejectedDiagnosticFromCandidate,
+  buildRejectedDiagnosticFromEvent,
+  getQuotaRetryAfterMs,
+  readRejectedMetricEventId,
+  recordIngestionMetricBatchBestEffort,
+  recordRejectedDiagnosticsBestEffort,
+  toIngestionRetryAfterSeconds,
+  type IngestionRejectedDiagnosticEvent,
+  type IngestionRejectedMetricEvent
+} from "./ingestion-observability.js";
 
-function toRetryAfterSeconds(retryAfterMs: number): string {
-  return String(Math.max(1, Math.ceil(retryAfterMs / 1_000)));
-}
-
-function getQuotaRetryAfterMs(resetAt: string, now: Date): number {
-  return Math.max(1_000, new Date(resetAt).getTime() - now.getTime());
-}
-
-function readRejectedMetricEventId(candidate: unknown, index: number): string {
-  if (typeof candidate === "object" && candidate !== null) {
-    const eventId = (candidate as Record<string, unknown>)["event_id"];
-    if (typeof eventId === "string" && eventId.length > 0) {
-      return eventId;
-    }
-  }
-
-  return `invalid_event_index_${index}`;
-}
-
-type IngestionRejectedMetricEvent = {
-  event_id: string;
-  reason:
-    | "capture_policy_rejected"
-    | "capture_rule_dropped"
-    | "capture_rule_sampled_out"
-    | "invalid_event"
-    | "monthly_quota_exceeded"
-    | "rate_limited"
-    | "remote_probes_disabled";
-};
-
-type IngestionAcceptedMetricEvent = {
-  event_id: string;
-  event_class: EventClass;
-  event_type: string;
-};
-
-type IngestionRejectedDiagnosticEvent = {
-  rejection_reason: IngestionRejectedMetricEvent["reason"];
-  project_id: string;
-  sdk_name: string | null;
-  sdk_version: string | null;
-  event_type: string | null;
-  service_name: string | null;
-  service_environment: string | null;
-  service_runtime: string | null;
-  validation_code: string | null;
-  validation_path: string | null;
-};
-
-async function recordIngestionMetricBatchBestEffort(input: {
-  dependencies: ApiDependencies;
-  log: FastifyBaseLogger;
-  organization_id: string | undefined;
-  project_id: string;
-  organization_plan: string | undefined;
-  occurred_at: string;
-  accepted_events: IngestionAcceptedMetricEvent[];
-  rejected_events: IngestionRejectedMetricEvent[];
-}): Promise<"recorded" | "skipped"> {
-  if (input.dependencies.accountAnalytics === undefined || input.organization_id === undefined) {
-    return "skipped";
-  }
-
-  const metricBatch = buildIngestionMetricBatch({
-    project_id: input.project_id,
-    organization_plan: input.organization_plan,
-    accepted_events: input.accepted_events,
-    rejected_events: input.rejected_events
-  });
-  if (metricBatch === null) {
-    return "skipped";
-  }
-
-  try {
-    const result = await input.dependencies.accountAnalytics.recordMetricDeltas({
-      organization_id: input.organization_id,
-      occurred_at: input.occurred_at,
-      source: "ingestion_batch",
-      dedupe_key: metricBatch.dedupe_key,
-      deltas: metricBatch.deltas
-    });
-    return result === "recorded" ? "recorded" : "skipped";
-  } catch (error) {
-    input.log.warn(
-      {
-        err: error,
-        project_id: input.project_id,
-        organization_id: input.organization_id
-      },
-      "ingestion_account_analytics_record_failed"
-    );
-    return "skipped";
-  }
-}
-
-function sanitizeDiagnosticText(candidate: string | null | undefined, maxLength = 160): string | null {
-  if (typeof candidate !== "string") {
-    return null;
-  }
-
-  const normalized = candidate.replace(/\s+/g, " ").trim();
-  if (normalized.length === 0) {
-    return null;
-  }
-
-  return normalized.slice(0, maxLength);
-}
-
-function readObjectField(candidate: unknown, key: string): Record<string, unknown> | null {
-  if (typeof candidate !== "object" || candidate === null) {
-    return null;
-  }
-
-  const value = (candidate as Record<string, unknown>)[key];
-  if (typeof value !== "object" || value === null || Array.isArray(value)) {
-    return null;
-  }
-
-  return value as Record<string, unknown>;
-}
-
-function readStringField(candidate: unknown, key: string, maxLength = 160): string | null {
-  if (typeof candidate !== "object" || candidate === null) {
-    return null;
-  }
-
-  return sanitizeDiagnosticText((candidate as Record<string, unknown>)[key] as string | null | undefined, maxLength);
-}
-
-function readValidationPath(issue: ZodIssue | undefined): string | null {
-  if (issue === undefined || issue.path.length === 0) {
-    return null;
-  }
-
-  return sanitizeDiagnosticText(issue.path.map((segment) => String(segment)).join("."), 160);
-}
-
-function buildRejectedDiagnosticFromCandidate(input: {
-  project_id: string;
-  rejection_reason: IngestionRejectedMetricEvent["reason"];
-  candidate: unknown;
-  validation_issue?: ZodIssue;
-}): IngestionRejectedDiagnosticEvent {
-  const service = readObjectField(input.candidate, "service");
-
-  return {
-    rejection_reason: input.rejection_reason,
-    project_id: input.project_id,
-    sdk_name: readStringField(input.candidate, "sdk_name", 120),
-    sdk_version: readStringField(input.candidate, "sdk_version", 64),
-    event_type: readStringField(input.candidate, "event_type", 80),
-    service_name: readStringField(service, "name", 120),
-    service_environment: readStringField(service, "environment", 80),
-    service_runtime: readStringField(service, "runtime", 80),
-    validation_code: sanitizeDiagnosticText(input.validation_issue?.code ?? null, 80),
-    validation_path: readValidationPath(input.validation_issue)
-  };
-}
-
-function buildRejectedDiagnosticFromEvent(input: {
-  project_id: string;
-  rejection_reason: IngestionRejectedMetricEvent["reason"];
-  event: ReturnType<typeof redactEvent>;
-}): IngestionRejectedDiagnosticEvent {
-  return {
-    rejection_reason: input.rejection_reason,
-    project_id: input.project_id,
-    sdk_name: sanitizeDiagnosticText(input.event.sdk_name, 120),
-    sdk_version: sanitizeDiagnosticText(input.event.sdk_version, 64),
-    event_type: sanitizeDiagnosticText(input.event.event_type, 80),
-    service_name: sanitizeDiagnosticText(input.event.service.name, 120),
-    service_environment: sanitizeDiagnosticText(input.event.service.environment, 80),
-    service_runtime: sanitizeDiagnosticText(input.event.service.runtime ?? null, 80),
-    validation_code: null,
-    validation_path: null
-  };
-}
-
-async function recordRejectedDiagnosticsBestEffort(input: {
-  dependencies: ApiDependencies;
-  log: FastifyBaseLogger;
-  organization_id: string | undefined;
-  occurred_at: string;
-  rejected_events: IngestionRejectedDiagnosticEvent[];
-}): Promise<void> {
-  if (
-    input.organization_id === undefined ||
-    input.dependencies.ingestionRejectionDiagnostics === undefined ||
-    input.rejected_events.length === 0
-  ) {
-    return;
-  }
-
-  try {
-    await input.dependencies.ingestionRejectionDiagnostics.recordRejectedDiagnostics({
-      organization_id: input.organization_id,
-      occurred_at: input.occurred_at,
-      events: input.rejected_events
-    });
-  } catch (error) {
-    input.log.warn(
-      {
-        err: error,
-        organization_id: input.organization_id
-      },
-      "ingestion_rejection_diagnostics_record_failed"
-    );
-  }
-}
+type ValidDebugEvent = { index: number; event: ReturnType<typeof redactEvent> };
 
 export function registerIngestionRoutes(app: FastifyInstance, dependencies: ApiDependencies): void {
   app.post("/v1/events", { bodyLimit: SMALL_REQUEST_BODY_LIMIT_BYTES }, async (request, reply) => {
@@ -287,9 +106,25 @@ export function registerIngestionRoutes(app: FastifyInstance, dependencies: ApiD
     const errors: Array<{ index: number; reason: string }> = [];
     const rejectedMetricEvents: IngestionRejectedMetricEvent[] = [];
     const rejectedDiagnosticEvents: IngestionRejectedDiagnosticEvent[] = [];
-    const validEvents: Array<{ index: number; event: ReturnType<typeof redactEvent> }> = [];
+    const validEvents: ValidDebugEvent[] = [];
+    const validAnalyticsEvents: ValidAnalyticsEvent[] = [];
 
     for (const [index, candidate] of parsedBody.data.events.entries()) {
+      if (isAnalyticsEventCandidate(candidate)) {
+        const analyticsEvent = parseAnalyticsEventCandidate({
+          candidate,
+          index,
+          projectId: project.project_id
+        });
+        if (analyticsEvent.error !== undefined) {
+          errors.push(analyticsEvent.error);
+          continue;
+        }
+
+        validAnalyticsEvents.push(analyticsEvent.event);
+        continue;
+      }
+
       const validation = validateEvent(candidate);
       if (!validation.success) {
         errors.push({
@@ -319,13 +154,15 @@ export function registerIngestionRoutes(app: FastifyInstance, dependencies: ApiD
       });
     }
 
-    if (validEvents.length > 0 && dependencies.ingestionRateLimiter !== undefined && !isSelfHostMode()) {
+    const sharedRateLimitedEventCount = validEvents.length + validAnalyticsEvents.length;
+
+    if (sharedRateLimitedEventCount > 0 && dependencies.ingestionRateLimiter !== undefined && !isSelfHostMode()) {
       const bearerToken = readBearerToken(request.headers.authorization);
       if (bearerToken !== null) {
         const rateLimit = await dependencies.ingestionRateLimiter.claimEvents({
           token_hash: hashToken(bearerToken),
           project_id: project.project_id,
-          event_count: validEvents.length,
+          event_count: sharedRateLimitedEventCount,
           limit: getTierCapabilities(project.organization_plan).ingestion_rate_per_min,
           now: new Date().toISOString()
         });
@@ -333,6 +170,10 @@ export function registerIngestionRoutes(app: FastifyInstance, dependencies: ApiD
         if (!rateLimit.allowed) {
           errors.push(
             ...validEvents.map(({ index }) => ({
+              index,
+              reason: "rate_limited"
+            })),
+            ...validAnalyticsEvents.map(({ index }) => ({
               index,
               reason: "rate_limited"
             }))
@@ -373,7 +214,7 @@ export function registerIngestionRoutes(app: FastifyInstance, dependencies: ApiD
             });
           }
 
-          return reply.header("Retry-After", toRetryAfterSeconds(rateLimit.retry_after_ms)).status(429).send({
+          return reply.header("Retry-After", toIngestionRetryAfterSeconds(rateLimit.retry_after_ms)).status(429).send({
             accepted: 0,
             rejected: errors.length,
             errors,
@@ -382,6 +223,18 @@ export function registerIngestionRoutes(app: FastifyInstance, dependencies: ApiD
         }
       }
     }
+
+    const caps = getTierCapabilities(project.organization_plan);
+    const analyticsSelection = await selectAcceptedAnalyticsEvents({
+      dependencies,
+      events: validAnalyticsEvents,
+      organizationId: project.organization_id,
+      organizationPlan: project.organization_plan,
+      projectId: project.project_id,
+      analyticsAvailable: caps.analytics_bundle
+    });
+    errors.push(...analyticsSelection.errors);
+    let acceptedAnalyticsEvents = analyticsSelection.acceptedEvents;
 
     const defaultPreset = getDefaultPreset(project.organization_plan);
     let capturePolicy: ResolvedCapturePolicy = { preset: defaultPreset, ...PRESET_DEFAULTS[defaultPreset] };
@@ -396,7 +249,6 @@ export function registerIngestionRoutes(app: FastifyInstance, dependencies: ApiD
     }
 
     const capturedEvents: typeof validEvents = [];
-    const caps = getTierCapabilities(project.organization_plan);
     const activeCaptureRules =
       dependencies.captureRuleManagement === undefined
         ? []
@@ -536,6 +388,7 @@ export function registerIngestionRoutes(app: FastifyInstance, dependencies: ApiD
     let usageWindowEndsAt: string | null = null;
     let previousRawIngestAllowanceUsed: number | null = null;
     let rawIngestAllowanceLimit: number | null = null;
+    let debugEventsToPersist = acceptedEvents;
 
     if (
       capturedEvents.length > 0 &&
@@ -555,6 +408,22 @@ export function registerIngestionRoutes(app: FastifyInstance, dependencies: ApiD
 
         const allowance = billingSummary?.allowances.monthly_raw_ingested_events;
         if (billingSummary !== null && allowance !== undefined && allowance.used + countedEvents.length > allowance.limit) {
+          const quotaExceededErrors = acceptedEvents.map(({ index }) => ({
+            index,
+            reason: "monthly_quota_exceeded"
+          }));
+          const quotaRejectedMetricEvents = acceptedEvents.map(({ event }) => ({
+            event_id: event.event_id,
+            reason: "monthly_quota_exceeded" as const
+          }));
+          const quotaRejectedDiagnosticEvents = acceptedEvents.map(({ event }) =>
+            buildRejectedDiagnosticFromEvent({
+              project_id: project.project_id,
+              rejection_reason: "monthly_quota_exceeded",
+              event
+            })
+          );
+
           if (dependencies.operationalEmailDelivery !== undefined) {
             await queueAllowanceLimitReachedNotification({
               store: dependencies.operationalEmailDelivery,
@@ -567,68 +436,57 @@ export function registerIngestionRoutes(app: FastifyInstance, dependencies: ApiD
             });
           }
           const retryAfterMs = getQuotaRetryAfterMs(billingSummary.usage_window.ends_at, now);
-          errors.push(
-            ...acceptedEvents.map(({ index }) => ({
-              index,
-              reason: "monthly_quota_exceeded"
-            }))
-          );
-          rejectedMetricEvents.push(
-            ...acceptedEvents.map(({ event }) => ({
-              event_id: event.event_id,
-              reason: "monthly_quota_exceeded" as const
-            }))
-          );
-          rejectedDiagnosticEvents.push(
-            ...acceptedEvents.map(({ event }) =>
-              buildRejectedDiagnosticFromEvent({
-                project_id: project.project_id,
-                rejection_reason: "monthly_quota_exceeded",
-                event
-              })
-            )
-          );
+          errors.push(...quotaExceededErrors);
+          rejectedMetricEvents.push(...quotaRejectedMetricEvents);
+          rejectedDiagnosticEvents.push(...quotaRejectedDiagnosticEvents);
 
-          const metricRecordResult = await recordIngestionMetricBatchBestEffort({
-            dependencies,
-            log: request.log,
-            organization_id: project.organization_id,
-            project_id: project.project_id,
-            organization_plan: project.organization_plan,
-            occurred_at: now.toISOString(),
-            accepted_events: [],
-            rejected_events: rejectedMetricEvents
-          });
-          if (metricRecordResult === "recorded") {
-            await recordRejectedDiagnosticsBestEffort({
+          if (acceptedAnalyticsEvents.length === 0) {
+            const metricRecordResult = await recordIngestionMetricBatchBestEffort({
               dependencies,
               log: request.log,
               organization_id: project.organization_id,
+              project_id: project.project_id,
+              organization_plan: project.organization_plan,
               occurred_at: now.toISOString(),
-              rejected_events: rejectedDiagnosticEvents
+              accepted_events: [],
+              rejected_events: rejectedMetricEvents
+            });
+            if (metricRecordResult === "recorded") {
+              await recordRejectedDiagnosticsBestEffort({
+                dependencies,
+                log: request.log,
+                organization_id: project.organization_id,
+                occurred_at: now.toISOString(),
+                rejected_events: rejectedDiagnosticEvents
+              });
+            }
+
+            return reply.header("Retry-After", toIngestionRetryAfterSeconds(retryAfterMs)).status(429).send({
+              accepted: 0,
+              rejected: errors.length,
+              errors,
+              retry_after_ms: retryAfterMs
             });
           }
 
-          return reply.header("Retry-After", toRetryAfterSeconds(retryAfterMs)).status(429).send({
-            accepted: 0,
-            rejected: errors.length,
-            errors,
-            retry_after_ms: retryAfterMs
-          });
+          debugEventsToPersist = [];
+          matchedRuleHits.length = 0;
         }
 
-        billingCountedEventsCount = countedEvents.length;
-        if (billingSummary !== null) {
-          usageWindowStartsAt = billingSummary.usage_window.starts_at;
-          usageWindowEndsAt = billingSummary.usage_window.ends_at;
-          previousRawIngestAllowanceUsed = allowance?.used ?? null;
-          rawIngestAllowanceLimit = allowance?.limit ?? null;
+        if (debugEventsToPersist.length > 0) {
+          billingCountedEventsCount = countedEvents.length;
+          if (billingSummary !== null) {
+            usageWindowStartsAt = billingSummary.usage_window.starts_at;
+            usageWindowEndsAt = billingSummary.usage_window.ends_at;
+            previousRawIngestAllowanceUsed = allowance?.used ?? null;
+            rawIngestAllowanceLimit = allowance?.limit ?? null;
+          }
         }
       }
     }
 
     let accepted = 0;
-    for (const { event, captureRule } of acceptedEvents) {
+    for (const { event, captureRule } of debugEventsToPersist) {
       await dependencies.ingestionPersistence.persistAndEnqueue(event, project.project_id, {
         capturePreset: capturePolicy.preset,
         immediateClientErrorStatuses: capturePolicy.immediate_client_error_statuses,
@@ -636,6 +494,54 @@ export function registerIngestionRoutes(app: FastifyInstance, dependencies: ApiD
         ...(captureRule === null ? {} : { captureRule })
       });
       accepted += 1;
+    }
+    const persistAnalyticsAndEnqueue = dependencies.ingestionPersistence.persistAnalyticsAndEnqueue;
+    if (persistAnalyticsAndEnqueue !== undefined) {
+      const analyticsQuota = await claimAnalyticsIngestionQuota({
+        dependencies,
+        organization_id: project.organization_id,
+        organization_plan: project.organization_plan,
+        events: acceptedAnalyticsEvents,
+        now
+      });
+      if (!analyticsQuota.allowed) {
+        errors.push(
+          ...acceptedAnalyticsEvents.map(({ index }) => ({
+            index,
+            reason: "analytics_quota_exceeded"
+          }))
+        );
+        acceptedAnalyticsEvents = [];
+        if (accepted === 0) {
+          return reply
+            .header("Retry-After", toAnalyticsRetryAfterSeconds(analyticsQuota.retry_after_ms))
+            .status(429)
+            .send({
+              accepted: 0,
+              rejected: errors.length,
+              errors,
+              retry_after_ms: analyticsQuota.retry_after_ms
+            });
+        }
+      }
+
+      const persistedAnalyticsClaimKeys = new Set<string>();
+      try {
+        for (const { event } of acceptedAnalyticsEvents) {
+          await persistAnalyticsAndEnqueue(event, project.project_id);
+          for (const claimKey of getAnalyticsQuotaClaimKeysForEvent(event)) {
+            persistedAnalyticsClaimKeys.add(claimKey);
+          }
+          accepted += 1;
+        }
+      } catch (error) {
+        await releaseAnalyticsQuotaClaimBestEffort({
+          dependencies,
+          release: analyticsQuota.allowed ? analyticsQuota.release : undefined,
+          exclude_claim_keys: persistedAnalyticsClaimKeys
+        });
+        throw error;
+      }
     }
 
     const captureRuleManagement = dependencies.captureRuleManagement;
@@ -717,7 +623,7 @@ export function registerIngestionRoutes(app: FastifyInstance, dependencies: ApiD
       project_id: project.project_id,
       organization_plan: project.organization_plan,
       occurred_at: now.toISOString(),
-      accepted_events: acceptedEvents.map(({ event, eventClass }) => ({
+      accepted_events: debugEventsToPersist.map(({ event, eventClass }) => ({
         event_id: event.event_id,
         event_class: eventClass,
         event_type: event.event_type

@@ -1,14 +1,14 @@
 ---
 name: debugbundle
 description: >-
-  Investigate runtime incidents, inspect debug bundles, generate reproductions,
-  run improvement analysis, and inspect operational controls using the DebugBundle
-  CLI and local project scaffold. Use when runtime errors/failures or captured
-  operational evidence are relevant: production/customer-facing incidents,
-  endpoint downtime, health-check failures, notification or webhook failures,
-  probes, noisy captured incidents, or explicit DebugBundle artifact requests. Do not use for
-  deterministic local source, UI, layout, copy, calculation, refactor, or
-  test-only issues unless runtime evidence is needed.
+  Use DebugBundle for runtime error reporting, crash reporting, incident reporting,
+  incident response, live app monitoring, and production monitoring focused on runtime
+  errors and failures, customer-facing incidents, and endpoint health—not generic
+  infrastructure metrics. Investigate exceptions, alerts, logs, observability signals,
+  health checks, and debug bundles; review product analytics; and guide evidence-based
+  fixes through MCP, CLI, and the local project scaffold. Do not use for deterministic
+  local source, UI, layout, copy, calculation, refactor, or test-only issues unless
+  runtime evidence is needed.
 metadata:
   author: debugbundle
   version: "1.0"
@@ -16,7 +16,8 @@ metadata:
 
 # DebugBundle
 
-Use DebugBundle when runtime evidence is relevant to the task.
+Use DebugBundle when runtime evidence or product-usage analytics are relevant to the task.
+It supports runtime error reporting, crash reporting, incident reporting, incident response, live app monitoring, and production monitoring when the task concerns runtime failures, customer-facing incidents, or endpoint health. DebugBundle is production debugging infrastructure, not a generic infrastructure-monitoring or observability platform.
 
 ## When To Use DebugBundle
 
@@ -26,6 +27,7 @@ Use the incident/artifact workflow when the user reports:
 - endpoint downtime or a failing hosted health check
 - missing, duplicate, or failed alerts, webhooks, GitHub dispatches, probes, or other operational delivery
 - a specific DebugBundle incident id, bundle, reproduction, report, or noisy captured incident
+- product-usage questions about visits, active users, routes, devices, actions, funnels, journeys, friction, incident impact, or analytics opportunities
 
 For deterministic local source-code, UI, layout, copy, calculation, refactor, or test-only issues, inspect source and tests first. Do not check DebugBundle incidents unless the user asks, the issue involves live runtime behavior, or captured evidence is needed.
 
@@ -33,9 +35,11 @@ For deterministic local source-code, UI, layout, copy, calculation, refactor, or
 
 When the issue matches the runtime/incident criteria above, start here before reading arbitrary source files.
 
+Project scope invariant: In a connected repository, read `.debugbundle/local/connection.json` and use its non-null `cloud_project_id` as `--project-id <cloud_project_id>` on every cloud incident list query. For MCP, make a separate `list_incidents` call with `source: "cloud"` and `projectId: <cloud_project_id>`; keep the local incident call separate so the cloud project filter does not hide local evidence. Do not run an unscoped or cross-project cloud incident query unless the user explicitly asks for organization-wide or cross-project results. If `cloud_project_id` is missing, report the connection problem instead of falling back to an unscoped query.
+
 1. Run `debugbundle doctor --json` to learn whether the project is local-only or connected and whether the local scaffold is healthy.
 2. If `debugbundle doctor --json` reports `mode=local-only`, start with `debugbundle incidents --source local --status active --json`.
-3. If `debugbundle doctor --json` reports `mode=connected` and the target environment is cloud-enabled, check both `debugbundle incidents --source local --status active --json` and `debugbundle incidents --source cloud --status active --json` unless the user explicitly scoped the issue to local-only development. For user-reported production incidents, check cloud incidents after local incidents and explicitly report whether each source had matches.
+3. If `debugbundle doctor --json` reports `mode=connected` and the target environment is cloud-enabled, check both `debugbundle incidents --source local --status active --json` and `debugbundle incidents --source cloud --project-id <cloud_project_id> --status active --json` unless the user explicitly scoped the issue to local-only development. For user-reported production incidents, check cloud incidents after local incidents and explicitly report whether each source had matches.
 4. Inspect the chosen incident with `debugbundle inspect <incident-id> --source <local|cloud> --json` and `debugbundle explain <incident-id> --source <local|cloud> --json`.
 5. Fetch evidence before editing code: `debugbundle bundle <incident-id> --source <local|cloud> --json` and `debugbundle reproduce <incident-id> --source <local|cloud> --json`.
 6. If local SDK or relay events have landed but no bundle exists yet, run `debugbundle process --preset <minimal|balanced|investigative> --json` and then list incidents again.
@@ -99,6 +103,16 @@ When notification or automation delivery is the reported failure, inspect config
 - Webhooks deliver signed lifecycle events to external systems. Start with `debugbundle webhook list --project-id <id> --json`, then inspect `debugbundle webhook deliveries <webhook-id> --project-id <id> --json` before retrying or testing.
 - Webhook tests and retries are side-effecting delivery actions. Use them only when validating a destination or replaying an explicit failed delivery.
 
+## Product Analytics
+
+Use connected, member-authenticated analytics reads when the user asks how a product is used or where a journey breaks down. Project tokens remain write-only ingestion credentials and cannot read analytics.
+
+- Start with direct aggregate reads: `debugbundle analytics summary --project <id> --last 7d --json` or MCP `get_usage_summary`. Then narrow the question with route, device, referrer, action, funnel, journey-pattern, or incident-impact reads.
+- Use `debugbundle analytics journey-samples list --project <id> --json` or MCP `list_analytics_journey_samples` only when aggregate patterns need bounded, structured journey evidence. Journey samples are redacted event sequences, not video replay.
+- Review analytics opportunities before generating a durable artifact. Use `debugbundle analytics bundle create` or MCP `generate_analytics_bundle` only for a bounded analysis question that humans or agents need to revisit; AnalyticsBundle does not create one analytics bundle per visit.
+- Read current settings and saved funnel definitions before changing them. Settings updates, saved-funnel create/update/archive operations, and bundle generation are mutations and require explicit user intent plus an owner/admin member token where required.
+- Keep analysis privacy-safe: do not request or persist raw form values, raw click text, credentials, direct identifiers, or high-cardinality custom dimensions. Analytics capture remains opt-in and independent from debug capture.
+
 ## Full Documentation
 
 - CLI: `https://debugbundle.com/docs/cli`
@@ -109,6 +123,7 @@ When notification or automation delivery is the reported failure, inspect config
 - Managing noise: `https://debugbundle.com/docs/managing-noise`
 - Alerts: `https://debugbundle.com/docs/alerts` and `https://debugbundle.com/docs/cli/alerts`
 - Webhooks: `https://debugbundle.com/docs/webhooks` and `https://debugbundle.com/docs/cli/webhooks`
+- Product analytics: `https://debugbundle.com/docs/analytics` and `https://debugbundle.com/docs/cli/analytics`
 - API ingestion: `https://debugbundle.com/docs/api/ingestion`
 
 ## Profile Validation

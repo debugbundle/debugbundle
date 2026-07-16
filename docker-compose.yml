@@ -71,6 +71,7 @@ services:
         condition: service_healthy
     volumes:
       - .:/workspace
+      - node-corepack-cache:/root/.cache/node/corepack
     working_dir: /workspace
     environment:
       <<: *node-pnpm-env
@@ -94,6 +95,7 @@ services:
         condition: service_completed_successfully
     volumes:
       - .:/workspace
+      - node-corepack-cache:/root/.cache/node/corepack
     working_dir: /workspace
     environment:
       <<: *node-pnpm-env
@@ -124,6 +126,7 @@ services:
         condition: service_completed_successfully
     volumes:
       - .:/workspace
+      - node-corepack-cache:/root/.cache/node/corepack
     working_dir: /workspace
     ports:
       - "3003:3000"
@@ -194,6 +197,7 @@ services:
         condition: service_completed_successfully
     volumes:
       - .:/workspace
+      - node-corepack-cache:/root/.cache/node/corepack
     working_dir: /workspace
     environment:
       <<: *node-pnpm-env
@@ -209,6 +213,7 @@ services:
       AWS_ACCESS_KEY_ID: test
       AWS_SECRET_ACCESS_KEY: test
       WORKER_POLL_INTERVAL_MS: ${WORKER_POLL_INTERVAL_MS:-1000}
+      ANALYTICS_OPPORTUNITY_EVALUATION_INTERVAL_MS: ${ANALYTICS_OPPORTUNITY_EVALUATION_INTERVAL_MS:-21600000}
       AVAILABILITY_CHECK_LOOP_INTERVAL_MS: ${AVAILABILITY_CHECK_LOOP_INTERVAL_MS:-250}
       AVAILABILITY_CHECK_CLAIM_BATCH_SIZE: ${AVAILABILITY_CHECK_CLAIM_BATCH_SIZE:-20}
       AVAILABILITY_CHECK_CONCURRENCY: ${AVAILABILITY_CHECK_CONCURRENCY:-8}
@@ -225,6 +230,7 @@ services:
       - api
     volumes:
       - .:/workspace
+      - node-corepack-cache:/root/.cache/node/corepack
     working_dir: /workspace/apps/web
     ports:
       - "${WEB_PORT:-5291}:5291"
@@ -239,6 +245,7 @@ services:
       VITE_DEBUGBUNDLE_DOGFOOD_ENVIRONMENT: ${VITE_DEBUGBUNDLE_DOGFOOD_ENVIRONMENT:-development}
       VITE_DEBUGBUNDLE_DOGFOOD_EXPOSE_TRIGGERS: ${VITE_DEBUGBUNDLE_DOGFOOD_EXPOSE_TRIGGERS:-false}
       VITE_DEBUGBUNDLE_DOGFOOD_CAPTURE_CONSOLE: ${VITE_DEBUGBUNDLE_DOGFOOD_CAPTURE_CONSOLE:-false}
+      VITE_DEBUGBUNDLE_DOGFOOD_ANALYTICS_ENABLED: ${VITE_DEBUGBUNDLE_DOGFOOD_ANALYTICS_ENABLED:-false}
     command: sh -lc "corepack enable && corepack pnpm dev -- --host 0.0.0.0 --port 5291"
     profiles:
       - dev
@@ -246,3 +253,5 @@ services:
 volumes:
   postgres-data:
   localstack-data:
+  # Bootstrap prepares pnpm once; later services must not require npm registry access to start.
+  node-corepack-cache:

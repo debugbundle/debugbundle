@@ -47,6 +47,7 @@ export function parseArgv(argv: string[]): ParsedArgv {
       || token === "--events"
       || token === "--bundles"
       || token === "--all"
+      || token === "--all-projects"
       || token === "--trigger-5xx"
       || token === "--expect-app-event"
       || token === "--github"

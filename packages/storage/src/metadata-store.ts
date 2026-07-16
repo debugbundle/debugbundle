@@ -11,6 +11,10 @@ import { buildBillableIncidentEventsPredicateSql, getRequiredStringField } from 
 import { deriveIncidentReasonFromSignal } from "./incident-reason.js";
 import { pruneRetainedBundleOwnersForProject } from "./retained-bundle-pruning.js";
 import { runInTransaction } from "./transaction.js";
+import {
+  resolveMemberTokenAndRecordUsage,
+  resolveProjectTokenAndRecordUsage
+} from "./token-usage-store.js";
 import type {
   AlertRuleRecord,
   BuildBundleJob,
@@ -732,26 +736,7 @@ export function createPostgresMetadataStore(
 
   return {
     async resolveProjectByTokenHash(tokenHash: string): Promise<ResolveProjectResult | null> {
-      const result = await db.query<ResolveProjectResult & Record<string, unknown>>(
-        `
-          SELECT
-            pt.project_id,
-            p.organization_id,
-            COALESCE(o.plan, 'free') AS organization_plan,
-            COALESCE(pt.allowed_origins, '[]'::jsonb) AS allowed_origins,
-            revoked_at::text AS revoked_at,
-            expires_at::text AS expires_at
-          FROM project_tokens pt
-          JOIN projects p ON p.id = pt.project_id
-          JOIN organizations o ON o.id = p.organization_id
-          WHERE pt.token_hash = $1
-            AND o.suspended_at IS NULL
-          LIMIT 1
-        `,
-        [tokenHash]
-      );
-
-      return result.rows[0] ?? null;
+      return resolveProjectTokenAndRecordUsage(db, tokenHash);
     },
     async getBundleFailureReasonForOrganization(input): Promise<string | null> {
       const result = await db.query<{ bundle_failure_reason: string | null }>(
@@ -817,31 +802,7 @@ export function createPostgresMetadataStore(
     },
 
     async resolveMemberByTokenHash(tokenHash: string): Promise<ResolveMemberResult | null> {
-      const result = await db.query<ResolveMemberResult & Record<string, unknown>>(
-        `
-          SELECT
-            mt.user_id AS member_id,
-            mt.organization_id,
-            u.email,
-            om.role,
-            mt.revoked_at::text AS revoked_at,
-            mt.expires_at::text AS expires_at
-          FROM member_tokens mt
-          JOIN users u
-            ON u.id = mt.user_id
-          JOIN organization_members om
-            ON om.organization_id = mt.organization_id
-           AND om.user_id = mt.user_id
-          JOIN organizations org ON org.id = mt.organization_id
-          WHERE mt.token_hash = $1
-            AND om.suspended_at IS NULL
-            AND org.suspended_at IS NULL
-          LIMIT 1
-        `,
-        [tokenHash]
-      );
-
-      return result.rows[0] ?? null;
+      return resolveMemberTokenAndRecordUsage(db, tokenHash);
     },
 
     async resolveProjectAccessForUser(input): Promise<ProjectAccessRecord | null> {

@@ -53,11 +53,25 @@ export const REQUIRED_API_TABLES = [
   "trial_lifecycle_events",
   "plan_cleanup_tasks",
   "processed_billing_events",
-  "processed_github_marketplace_events"
-  ,
+  "processed_github_marketplace_events",
   "availability_checks",
   "availability_check_results",
-  "availability_check_daily_rollups"
+  "availability_check_daily_rollups",
+  "project_analytics_settings",
+  "analytics_ingestion_ledger",
+  "analytics_usage_counters",
+  "analytics_rollup_uniques",
+  "analytics_session_rollups",
+  "analytics_route_rollups",
+  "analytics_action_rollups",
+  "analytics_funnel_definitions",
+  "analytics_funnel_rollups",
+  "analytics_transition_rollups",
+  "analytics_journey_samples",
+  "analytics_opportunities",
+  "analytics_bundle_generations",
+  "analytics_incident_correlations",
+  "analytics_incident_session_links"
 ] as const;
 
 export const REQUIRED_WORKER_TABLES = [
@@ -94,6 +108,21 @@ export const REQUIRED_WORKER_TABLES = [
   "availability_checks",
   "availability_check_results",
   "availability_check_daily_rollups",
+  "project_analytics_settings",
+  "analytics_ingestion_ledger",
+  "analytics_usage_counters",
+  "analytics_rollup_uniques",
+  "analytics_session_rollups",
+  "analytics_route_rollups",
+  "analytics_action_rollups",
+  "analytics_funnel_definitions",
+  "analytics_funnel_rollups",
+  "analytics_transition_rollups",
+  "analytics_journey_samples",
+  "analytics_opportunities",
+  "analytics_bundle_generations",
+  "analytics_incident_correlations",
+  "analytics_incident_session_links",
 ] as const;
 
 const LEGACY_SCHEMA_TABLE = "schema_migrations";

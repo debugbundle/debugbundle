@@ -63,7 +63,7 @@ export async function pruneRetainedBundleOwnersForProject(
       bundle_owners_to_delete AS (
         SELECT owner_type, project_id, incident_id, improvement_opportunity_id
         FROM ranked_bundle_owners
-        WHERE bundle_rank > $2::int
+        WHERE bundle_rank > $2::bigint
       ),
       deleted_incidents AS (
         DELETE FROM incidents i

@@ -60,6 +60,11 @@ const MUTATION_MCP_TOOLS = new Set<DebugBundleMcpToolName>([
   "create_capture_rule_from_incident_suggestion",
   "update_capture_policy",
   "update_improvement_settings",
+  "generate_analytics_bundle",
+  "update_analytics_settings",
+  "create_saved_analytics_funnel",
+  "update_saved_analytics_funnel",
+  "archive_saved_analytics_funnel",
   "activate_probe",
   "deactivate_probe",
   "create_health_check",
@@ -126,7 +131,7 @@ export default defineToolPlugin({
   id: "debugbundle",
   name: "DebugBundle",
   description:
-    "Use DebugBundle tools to inspect incidents, bundles, reproductions, probes, health checks, and operational debugging surfaces.",
+    "Use DebugBundle for runtime error reporting, incident response, live app monitoring, health checks, debug bundles, and product analytics.",
   configSchema: Type.Object(
     {
       apiBaseUrl: Type.Optional(

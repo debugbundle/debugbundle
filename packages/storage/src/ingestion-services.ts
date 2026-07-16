@@ -2,6 +2,7 @@ import { gzipSync } from "node:zlib";
 
 import { FINGERPRINT_VERSION, inferMatchedFields } from "../../event-normalizer/src/index.js";
 import {
+  type AnalyticsEventEnvelope,
   normalizeImmediateClientErrorStatuses,
   normalizeImmediateClientErrorPathRules,
   type CapturePreset,
@@ -9,7 +10,17 @@ import {
   type ImmediateClientErrorPathRule
 } from "../../shared-types/src/index.js";
 import type { AccountAnalyticsStore } from "./account-analytics-store.js";
-import { buildRawEventObjectKey, hashToken, inferEventLogLevel, inferSeverity } from "./helpers.js";
+import type {
+  AnalyticsIngestionPersistenceService,
+  AnalyticsQueueClient,
+} from "./analytics-ingestion-jobs.js";
+import {
+  buildAnalyticsRawEventObjectKey,
+  buildRawEventObjectKey,
+  hashToken,
+  inferEventLogLevel,
+  inferSeverity
+} from "./helpers.js";
 import type {
   IncidentFrequencyCounter,
   IngestionMetadataService,
@@ -170,7 +181,9 @@ interface CreateIngestionPersistenceServiceInput {
 
 export function createIngestionPersistenceService(
   input: CreateIngestionPersistenceServiceInput
-): IngestionPersistenceService {
+): IngestionPersistenceService & AnalyticsIngestionPersistenceService {
+  const analyticsQueue = input.queue as typeof input.queue & AnalyticsQueueClient;
+
   return {
     async persistAndEnqueue(
       event: EventEnvelope,
@@ -217,6 +230,36 @@ export function createIngestionPersistenceService(
               )
             }),
         ...(options?.captureRule === undefined ? {} : { capture_rule: options.captureRule })
+      });
+
+      return {
+        object_key: objectKey
+      };
+    },
+
+    async persistAnalyticsAndEnqueue(
+      event: AnalyticsEventEnvelope,
+      projectId: string
+    ): Promise<{ object_key: string }> {
+      const objectKey = buildAnalyticsRawEventObjectKey({
+        projectId,
+        eventId: event.event_id,
+        occurredAt: new Date(event.occurred_at)
+      });
+
+      const body = gzipSync(Buffer.from(JSON.stringify(event), "utf8"));
+
+      await input.objectStore.putObject({
+        key: objectKey,
+        body,
+        contentType: "application/json",
+        contentEncoding: "gzip"
+      });
+
+      await analyticsQueue.enqueue("aggregate-analytics-events", {
+        project_id: projectId,
+        event_id: event.event_id,
+        object_key: objectKey
       });
 
       return {

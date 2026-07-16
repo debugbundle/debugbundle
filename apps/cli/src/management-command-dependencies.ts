@@ -9,6 +9,38 @@ import type {
   setCapturePolicyWithAuthCommand as defaultSetCapturePolicyCommand
 } from "./capture-policy-commands.js";
 import type {
+  getAnalyticsSettingsWithAuthCommand as defaultGetAnalyticsSettingsCommand,
+  setAnalyticsSettingsWithAuthCommand as defaultSetAnalyticsSettingsCommand
+} from "./analytics-settings-commands.js";
+import type {
+  archiveAnalyticsSavedFunnelWithAuthCommand as defaultArchiveAnalyticsSavedFunnelCommand,
+  createAnalyticsSavedFunnelWithAuthCommand as defaultCreateAnalyticsSavedFunnelCommand,
+  listAnalyticsSavedFunnelsWithAuthCommand as defaultListAnalyticsSavedFunnelsCommand,
+  updateAnalyticsSavedFunnelWithAuthCommand as defaultUpdateAnalyticsSavedFunnelCommand
+} from "./analytics-saved-funnel-commands.js";
+import type {
+  createAnalyticsBundleWithAuthCommand as defaultCreateAnalyticsBundleCommand,
+  getAnalyticsBundleWithAuthCommand as defaultGetAnalyticsBundleCommand,
+  listAnalyticsBundlesWithAuthCommand as defaultListAnalyticsBundlesCommand
+} from "./analytics-bundle-commands.js";
+import type {
+  getAnalyticsJourneySampleWithAuthCommand as defaultGetAnalyticsJourneySampleCommand,
+  listAnalyticsJourneySamplesWithAuthCommand as defaultListAnalyticsJourneySamplesCommand
+} from "./analytics-journey-sample-commands.js";
+import type {
+  getAnalyticsActionsWithAuthCommand as defaultGetAnalyticsActionsCommand,
+  getAnalyticsDevicesWithAuthCommand as defaultGetAnalyticsDevicesCommand,
+  getAnalyticsFunnelWithAuthCommand as defaultGetAnalyticsFunnelCommand,
+  getAnalyticsIncidentImpactWithAuthCommand as defaultGetAnalyticsIncidentImpactCommand,
+  getAnalyticsJourneysWithAuthCommand as defaultGetAnalyticsJourneysCommand,
+  getAnalyticsOpportunityWithAuthCommand as defaultGetAnalyticsOpportunityCommand,
+  getAnalyticsReferrersWithAuthCommand as defaultGetAnalyticsReferrersCommand,
+  getAnalyticsRoutesWithAuthCommand as defaultGetAnalyticsRoutesCommand,
+  getAnalyticsSummaryWithAuthCommand as defaultGetAnalyticsSummaryCommand,
+  listAnalyticsFunnelsWithAuthCommand as defaultListAnalyticsFunnelsCommand,
+  listAnalyticsOpportunitiesWithAuthCommand as defaultListAnalyticsOpportunitiesCommand
+} from "./analytics-metrics-commands.js";
+import type {
   createCaptureRuleWithAuthCommand as defaultCreateCaptureRuleCommand,
   deleteCaptureRuleWithAuthCommand as defaultDeleteCaptureRuleCommand,
   listCaptureRulesWithAuthCommand as defaultListCaptureRulesCommand,
@@ -143,6 +175,28 @@ export type ManagementCommandDependencies = {
   deleteSlackDestinationCommand?: typeof defaultDeleteSlackDestinationCommand;
   getCapturePolicyCommand?: typeof defaultGetCapturePolicyCommand;
   setCapturePolicyCommand?: typeof defaultSetCapturePolicyCommand;
+  getAnalyticsSettingsCommand?: typeof defaultGetAnalyticsSettingsCommand;
+  setAnalyticsSettingsCommand?: typeof defaultSetAnalyticsSettingsCommand;
+  listAnalyticsSavedFunnelsCommand?: typeof defaultListAnalyticsSavedFunnelsCommand;
+  createAnalyticsSavedFunnelCommand?: typeof defaultCreateAnalyticsSavedFunnelCommand;
+  updateAnalyticsSavedFunnelCommand?: typeof defaultUpdateAnalyticsSavedFunnelCommand;
+  archiveAnalyticsSavedFunnelCommand?: typeof defaultArchiveAnalyticsSavedFunnelCommand;
+  getAnalyticsSummaryCommand?: typeof defaultGetAnalyticsSummaryCommand;
+  getAnalyticsRoutesCommand?: typeof defaultGetAnalyticsRoutesCommand;
+  getAnalyticsJourneysCommand?: typeof defaultGetAnalyticsJourneysCommand;
+  getAnalyticsDevicesCommand?: typeof defaultGetAnalyticsDevicesCommand;
+  getAnalyticsReferrersCommand?: typeof defaultGetAnalyticsReferrersCommand;
+  getAnalyticsActionsCommand?: typeof defaultGetAnalyticsActionsCommand;
+  listAnalyticsFunnelsCommand?: typeof defaultListAnalyticsFunnelsCommand;
+  getAnalyticsFunnelCommand?: typeof defaultGetAnalyticsFunnelCommand;
+  getAnalyticsIncidentImpactCommand?: typeof defaultGetAnalyticsIncidentImpactCommand;
+  createAnalyticsBundleCommand?: typeof defaultCreateAnalyticsBundleCommand;
+  getAnalyticsBundleCommand?: typeof defaultGetAnalyticsBundleCommand;
+  listAnalyticsBundlesCommand?: typeof defaultListAnalyticsBundlesCommand;
+  listAnalyticsJourneySamplesCommand?: typeof defaultListAnalyticsJourneySamplesCommand;
+  getAnalyticsJourneySampleCommand?: typeof defaultGetAnalyticsJourneySampleCommand;
+  listAnalyticsOpportunitiesCommand?: typeof defaultListAnalyticsOpportunitiesCommand;
+  getAnalyticsOpportunityCommand?: typeof defaultGetAnalyticsOpportunityCommand;
   listCaptureRulesCommand?: typeof defaultListCaptureRulesCommand;
   createCaptureRuleCommand?: typeof defaultCreateCaptureRuleCommand;
   updateCaptureRuleCommand?: typeof defaultUpdateCaptureRuleCommand;
