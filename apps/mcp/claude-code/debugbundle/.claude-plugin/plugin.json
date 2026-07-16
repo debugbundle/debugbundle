@@ -1,0 +1,52 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
+  "name": "debugbundle",
+  "displayName": "DebugBundle",
+  "version": "1.6.2",
+  "description": "Production debugging bundles for AI agents. Connect Claude Code to DebugBundle incidents, deterministic bundles, reproductions, health checks, probes, alerts, webhooks, projects, and verification workflows.",
+  "author": {
+    "name": "DebugBundle",
+    "url": "https://debugbundle.com"
+  },
+  "homepage": "https://debugbundle.com/docs/mcp",
+  "repository": "https://github.com/debugbundle/debugbundle",
+  "license": "AGPL-3.0-only",
+  "keywords": [
+    "debugbundle",
+    "mcp",
+    "mcp-server",
+    "model-context-protocol",
+    "claude-code",
+    "ai-agent",
+    "ai-agent-debugging",
+    "debugging",
+    "production-debugging",
+    "runtime-errors",
+    "error-monitoring",
+    "incident-response",
+    "incident-management",
+    "observability",
+    "debug-bundles",
+    "reproductions",
+    "alerts",
+    "webhooks",
+    "verification",
+    "developer-tools",
+    "health-checks"
+  ],
+  "userConfig": {
+    "member_token": {
+      "type": "string",
+      "title": "DebugBundle member token",
+      "description": "Optional. Use a DebugBundle member token for Claude Code MCP read and management tools. Leave blank to use local DebugBundle CLI auth state.",
+      "sensitive": true,
+      "default": ""
+    },
+    "api_url": {
+      "type": "string",
+      "title": "DebugBundle API URL",
+      "description": "Optional. Leave blank for DebugBundle Cloud. Set only for self-hosted or non-default API hosts.",
+      "default": ""
+    }
+  }
+}

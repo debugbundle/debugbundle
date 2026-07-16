@@ -40,6 +40,7 @@ Use `npx -y @debugbundle/mcp` in clients that require noninteractive package exe
 | --- | --- | --- |
 | Generic local MCP client | `npx @debugbundle/mcp` | stdio transport |
 | Claude Desktop local MCP | local MCP server config | uses local machine auth/config |
+| Claude Code plugin | `/plugin marketplace add debugbundle/debugbundle` | installs bundled MCP config and DebugBundle skill |
 | Cursor | MCP config with `npx @debugbundle/mcp` | stdio transport |
 | VS Code / GitHub MCP Registry | `com.debugbundle/mcp` | official registry metadata |
 | OpenClaw / ClawHub | DebugBundle skill plus MCP config | use the published skill for workflow guidance |
@@ -47,6 +48,34 @@ Use `npx -y @debugbundle/mcp` in clients that require noninteractive package exe
 | Self-hosted DebugBundle | `DEBUGBUNDLE_API_URL` plus member auth | points the server at your API base URL |
 
 DebugBundle does not expose a hosted remote MCP endpoint today; this package is the local stdio path.
+
+## Claude Desktop
+
+In Claude Desktop, open Settings > Developer, edit the local MCP config, and add:
+
+```json
+{
+  "mcpServers": {
+    "debugbundle": {
+      "command": "npx",
+      "args": ["-y", "@debugbundle/mcp"]
+    }
+  }
+}
+```
+
+Run `debugbundle login` first to reuse local CLI auth state, or add `DEBUGBUNDLE_MEMBER_TOKEN` to the server environment for managed/headless use. Set `DEBUGBUNDLE_API_URL` only for self-hosted or non-default API hosts.
+
+## Claude Code Plugin
+
+Claude Code users can add DebugBundle's first-party marketplace from this repository:
+
+```text
+/plugin marketplace add debugbundle/debugbundle
+/plugin install debugbundle@debugbundle
+```
+
+The plugin package lives at `apps/mcp/claude-code/debugbundle`, bundles a Claude Code skill, and starts the MCP server with the current published `@debugbundle/mcp` version. It is also structured for Claude community marketplace review; do not describe it as listed in `claude-community` until Anthropic accepts and publishes it.
 
 ## Authentication
 

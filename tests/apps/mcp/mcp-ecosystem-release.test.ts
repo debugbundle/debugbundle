@@ -23,6 +23,7 @@ describe("mcp ecosystem release pipeline", () => {
       publishTargets?: Record<string, {
         type?: string;
         discoveryQueries?: Array<{ query?: string; maxRank?: number }>;
+        catalog?: { categories?: string[]; topics?: string[] };
       }>;
     };
     const script = readFileSync(scriptPath, "utf8");
@@ -43,8 +44,20 @@ describe("mcp ecosystem release pipeline", () => {
     expect(manifest.publishTargets).toMatchObject({
       officialRegistry: { type: "push" },
       smithery: { type: "push" },
-      smitherySkill: { type: "push" },
-      clawhub: { type: "push" },
+      smitherySkill: {
+        type: "push",
+        catalog: {
+          categories: ["Operations", "Development", "Agents"],
+          topics: ["debugging", "incident-response", "observability", "developer-tools", "health-checks"]
+        }
+      },
+      clawhub: {
+        type: "push",
+        catalog: {
+          categories: ["Operations", "Development", "Agents"],
+          topics: ["debugging", "incident-response", "observability", "developer-tools", "health-checks"]
+        }
+      },
       clawhubPlugin: { type: "push" },
       glama: { type: "discovery" },
       pulseMcp: { type: "discovery" },
@@ -76,6 +89,7 @@ describe("mcp ecosystem release pipeline", () => {
     expect(releaseSources).toContain("fetchText");
     expect(script).toContain('resources: "skills"');
     expect(script).toContain("registryIndexed");
+    expect(script).toContain("expectedCatalog");
     expect(script).toContain('"inspect"');
     expect(script).toContain("verifyClawHubDiscovery");
     expect(releaseSources).toContain("https://clawhub.ai/api/v1/search?q=");
@@ -144,7 +158,7 @@ describe("mcp ecosystem release pipeline", () => {
       version?: string;
       packageName?: string;
       mcpb?: { bundlePath?: string };
-      publishTargets?: Array<{ key?: string; type?: string }>;
+      publishTargets?: Array<{ key?: string; type?: string; catalog?: { categories?: string[]; topics?: string[] } }>;
       discoveryTargets?: Array<{ key?: string; type?: string }>;
     };
 
@@ -154,8 +168,22 @@ describe("mcp ecosystem release pipeline", () => {
     expect(plan.publishTargets).toEqual([
       expect.objectContaining({ key: "officialRegistry", type: "push" }),
       expect.objectContaining({ key: "smithery", type: "push" }),
-      expect.objectContaining({ key: "smitherySkill", type: "push" }),
-      expect.objectContaining({ key: "clawhub", type: "push" }),
+      expect.objectContaining({
+        key: "smitherySkill",
+        type: "push",
+        catalog: {
+          categories: ["Operations", "Development", "Agents"],
+          topics: ["debugging", "incident-response", "observability", "developer-tools", "health-checks"]
+        }
+      }),
+      expect.objectContaining({
+        key: "clawhub",
+        type: "push",
+        catalog: {
+          categories: ["Operations", "Development", "Agents"],
+          topics: ["debugging", "incident-response", "observability", "developer-tools", "health-checks"]
+        }
+      }),
       expect.objectContaining({ key: "clawhubPlugin", type: "push" })
     ]);
     expect(plan.discoveryTargets).toEqual([
