@@ -162,6 +162,9 @@ function createBrowserAnalyticsFixtureEvents(input: {
   fixtureIndex: number;
   serviceName: string;
 }): AnalyticsEventEnvelope[] {
+  const terminalKinds: AnalyticsEventKind[] = input.fixture.converted
+    ? ["funnel_step", "conversion"]
+    : ["journey_marker"];
   const eventKinds: AnalyticsEventKind[] = [
     "session_start",
     "page_view",
@@ -170,7 +173,7 @@ function createBrowserAnalyticsFixtureEvents(input: {
     "page_view",
     "funnel_step",
     "route_change",
-    ...(input.fixture.converted ? ["funnel_step", "conversion"] : ["journey_marker"]),
+    ...terminalKinds,
     "session_summary"
   ];
 
@@ -206,11 +209,20 @@ function createBrowserAnalyticsFixtureEvents(input: {
   }));
 }
 
-function fixtureSignal(kind: AnalyticsEventKind) {
-  if (kind === "action") return { action_key: "signup_click" };
-  if (kind === "funnel_step") return { funnel_key: "checkout", step_key: "signup_started" };
-  if (kind === "conversion") return { conversion_key: "subscription_started" };
-  if (kind === "journey_marker") return { marker_key: "checkout.abandoned" };
+function fixtureSignal(
+  kind: AnalyticsEventKind
+): NonNullable<AnalyticsEventEnvelope["payload"]["signal"]> | undefined {
+  const signal = {
+    action_key: null,
+    funnel_key: null,
+    step_key: null,
+    conversion_key: null,
+    marker_key: null
+  };
+  if (kind === "action") return { ...signal, action_key: "signup_click" };
+  if (kind === "funnel_step") return { ...signal, funnel_key: "checkout", step_key: "signup_started" };
+  if (kind === "conversion") return { ...signal, conversion_key: "subscription_started" };
+  if (kind === "journey_marker") return { ...signal, marker_key: "checkout.abandoned" };
   return undefined;
 }
 
