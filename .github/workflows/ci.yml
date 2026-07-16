@@ -15,6 +15,16 @@ jobs:
         with:
           fetch-depth: 0
 
+      # Public-documentation contracts live in the separately distributed site
+      # repository, so validate them against the published main branch in CI.
+      - name: Checkout public site
+        uses: actions/checkout@v6
+        with:
+          repository: debugbundle/site
+          ref: main
+          path: site
+          fetch-depth: 0
+
       - name: Setup Node
         uses: actions/setup-node@v6
         with:
