@@ -1,6 +1,6 @@
 # @debugbundle/mcp
 
-MCP server for production debugging bundles, AnalyticsBundles, and incident workflows for AI agents. DebugBundle lets agents inspect incidents, deterministic bundles, product-usage evidence, reproductions, probes, hosted health checks, alerts, webhooks, projects, and setup state through the same management surface as the API and CLI.
+MCP server for runtime error reporting, crash reporting, incident response, endpoint health checks, debug bundles, and product analytics. DebugBundle lets agents inspect customer-facing incidents, deterministic bundles, product-usage evidence, reproductions, probes, alerts, webhooks, projects, and setup state through the same management surface as the API and CLI. It is production debugging infrastructure, not a generic infrastructure-monitoring or observability platform.
 
 ## Install
 

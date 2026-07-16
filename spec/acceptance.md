@@ -585,6 +585,7 @@ If CLI says something is healthy and MCP says something different, that is a pro
 - **When** the release train prepares MCP ecosystem follow-through
 - **Then** the plugin builds to `dist/index.js`
 - **And** `openclaw.plugin.json` declares `contracts.tools`, `configSchema`, activation, and OpenClaw compatibility metadata
+- **And** package and manifest descriptions use the same truthful capability-first positioning as the shared DebugBundle skill
 - **And** ClawHub package validation and dry-run publish pass before the package is published
 
 ---
@@ -972,6 +973,8 @@ If CLI says something is healthy and MCP says something different, that is a pro
 ### AC-ONB-02: Skill Discovery
 - **Given** `debugbundle setup` has run
 - **Then** `.agents/skills/debugbundle/SKILL.md` exists per agentskills.io spec and is structured for agent discovery
+- **And** its description explicitly covers runtime error reporting, crash reporting, incident reporting and response, live-app/production monitoring, health checks, debug bundles, and product analytics
+- **And** monitoring and observability language is scoped to runtime failures, customer-facing incidents, and endpoint health rather than claiming a generic infrastructure-monitoring platform
 - **And** the skill teaches agents to: check incidents for qualifying runtime, production, health-check, notification, webhook, or captured-artifact issues; inspect source and tests first for deterministic local UI, layout, copy, calculation, refactor, or test-only issues unless runtime evidence is needed; fetch/analyze bundles; validate the profile; evaluate repeated low-value incidents for scoped capture-rule or path-scoped client-error capture-policy handling; and resolve incidents after a fix is verified or after intentional verification incidents have served their purpose
 
 ### AC-ONB-03: Two-Phase Profile Generation

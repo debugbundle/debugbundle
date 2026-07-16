@@ -219,7 +219,7 @@ When the product is in production and a task touches Postgres tables, columns, i
 
 <!-- debugbundle:start -->
 ## DebugBundle
-- Use DebugBundle for runtime failures, production/customer-facing incidents, endpoint downtime, notification/webhook delivery failures, health-check failures, specific incident reports, or symptoms likely to have generated captured events.
+- Use DebugBundle for runtime error reporting, crash reporting, incident reporting, incident response, and live app monitoring when the task concerns runtime failures, production/customer-facing incidents, endpoint health, notification/webhook delivery failures, or captured events; it is not a generic infrastructure-monitoring platform.
 - Use DebugBundle product analytics for visits, active users, routes, devices, actions, funnels, journeys, friction, and analytics opportunities; start with aggregate reads and generate an analytics bundle only for a bounded durable analysis.
 - For deterministic local code, UI, layout, copy, calculation, refactor, or test-only issues, inspect source and tests first; do not check DebugBundle incidents unless runtime evidence is needed or the user asks.
 - Read `.agents/skills/debugbundle/SKILL.md` for the full DebugBundle workflow.

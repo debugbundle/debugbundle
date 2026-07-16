@@ -51,15 +51,14 @@ export function buildSkill(): string {
     "---",
     "name: debugbundle",
     "description: >-",
-    "  Investigate runtime incidents, inspect debug bundles, generate reproductions,",
-    "  run improvement analysis, review product analytics, and inspect operational controls",
-    "  using the DebugBundle CLI and local project scaffold. Use when runtime errors/failures,",
-    "  captured operational evidence, or product-usage questions are relevant:",
-    "  production/customer-facing incidents, route and funnel analysis,",
-    "  endpoint downtime, health-check failures, notification or webhook failures,",
-    "  probes, noisy captured incidents, or explicit DebugBundle artifact requests. Do not use for",
-    "  deterministic local source, UI, layout, copy, calculation, refactor, or",
-    "  test-only issues unless runtime evidence is needed.",
+    "  Use DebugBundle for runtime error reporting, crash reporting, incident reporting,",
+    "  incident response, live app monitoring, and production monitoring focused on runtime",
+    "  errors and failures, customer-facing incidents, and endpoint health—not generic",
+    "  infrastructure metrics. Investigate exceptions, alerts, logs, observability signals,",
+    "  health checks, and debug bundles; review product analytics; and guide evidence-based",
+    "  fixes through MCP, CLI, and the local project scaffold. Do not use for deterministic",
+    "  local source, UI, layout, copy, calculation, refactor, or test-only issues unless",
+    "  runtime evidence is needed.",
     "metadata:",
     "  author: debugbundle",
     '  version: "1.0"',
@@ -68,6 +67,7 @@ export function buildSkill(): string {
     "# DebugBundle",
     "",
     "Use DebugBundle when runtime evidence or product-usage analytics are relevant to the task.",
+    "It supports runtime error reporting, crash reporting, incident reporting, incident response, live app monitoring, and production monitoring when the task concerns runtime failures, customer-facing incidents, or endpoint health. DebugBundle is production debugging infrastructure, not a generic infrastructure-monitoring or observability platform.",
     "",
     "## When To Use DebugBundle",
     "",
@@ -625,6 +625,15 @@ export function buildSkillEvals(): string {
             "Do not generate one analytics bundle per visit; generate a durable artifact only for a bounded analysis question.",
             "Use member authentication for analytics reads and require explicit intent for settings, saved-funnel, or bundle-generation mutations.",
             "Preserve consent, redaction, and custom-dimension privacy constraints."
+          ]
+        },
+        {
+          name: "capability_first_discovery",
+          prompt: "The user asks what is available for error reporting, crash reporting, incident response, and monitoring a live application. Confirm the skill is discoverable for those capabilities without claiming a generic infrastructure-monitoring platform.",
+          expected_behavior: [
+            "Recognize runtime error reporting, crash reporting, incident reporting, incident response, live app monitoring, production monitoring, health checks, debug bundles, and product analytics as DebugBundle capabilities.",
+            "Scope monitoring to runtime failures, customer-facing incidents, and endpoint health.",
+            "Do not present DebugBundle as a generic infrastructure-monitoring or observability platform."
           ]
         },
         {

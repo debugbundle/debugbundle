@@ -1,15 +1,14 @@
 ---
 name: debugbundle
 description: >-
-  Investigate runtime incidents, inspect debug bundles, generate reproductions,
-  run improvement analysis, review product analytics, and inspect operational controls
-  using the DebugBundle CLI and local project scaffold. Use when runtime errors/failures,
-  captured operational evidence, or product-usage questions are relevant:
-  production/customer-facing incidents, route and funnel analysis,
-  endpoint downtime, health-check failures, notification or webhook failures,
-  probes, noisy captured incidents, or explicit DebugBundle artifact requests. Do not use for
-  deterministic local source, UI, layout, copy, calculation, refactor, or
-  test-only issues unless runtime evidence is needed.
+  Use DebugBundle for runtime error reporting, crash reporting, incident reporting,
+  incident response, live app monitoring, and production monitoring focused on runtime
+  errors and failures, customer-facing incidents, and endpoint health—not generic
+  infrastructure metrics. Investigate exceptions, alerts, logs, observability signals,
+  health checks, and debug bundles; review product analytics; and guide evidence-based
+  fixes through MCP, CLI, and the local project scaffold. Do not use for deterministic
+  local source, UI, layout, copy, calculation, refactor, or test-only issues unless
+  runtime evidence is needed.
 metadata:
   author: debugbundle
   version: "1.0"
@@ -18,6 +17,7 @@ metadata:
 # DebugBundle
 
 Use DebugBundle when runtime evidence or product-usage analytics are relevant to the task.
+It supports runtime error reporting, crash reporting, incident reporting, incident response, live app monitoring, and production monitoring when the task concerns runtime failures, customer-facing incidents, or endpoint health. DebugBundle is production debugging infrastructure, not a generic infrastructure-monitoring or observability platform.
 
 ## When To Use DebugBundle
 

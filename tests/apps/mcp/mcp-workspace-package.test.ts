@@ -51,7 +51,7 @@ describe("mcp workspace package", () => {
     expect(packageJson.mcpName).toBe("com.debugbundle/mcp");
     expect(packageJson.private).toBe(false);
     expect(packageJson.description).toBe(
-      "MCP server for production debugging, product analytics, and incident workflows for AI agents"
+      "MCP server for runtime error reporting, incident response, health checks, debug bundles, and product analytics"
     );
     expect(packageJson.license).toBe("AGPL-3.0-only");
     expect(packageJson.repository).toEqual({
@@ -65,8 +65,14 @@ describe("mcp workspace package", () => {
       "debugbundle",
       "debugging",
       "production-debugging",
+      "error-reporting",
+      "crash-reporting",
+      "runtime-errors",
+      "production-monitoring",
       "incident-management",
+      "incident-response",
       "debug-bundles",
+      "health-checks",
       "ai-agent",
       "ai-agent-debugging",
       "mcp",
@@ -101,7 +107,7 @@ describe("mcp workspace package", () => {
     expect(serverJson.name).toBe(packageJson.mcpName);
     expect(serverJson.version).toBe(packageJson.version);
     expect(serverJson.description).toBe(
-      "DebugBundle MCP server for incidents, analytics, bundles, health checks, probes, and ops."
+      "DebugBundle MCP: runtime error reporting, incident response, health checks, and product analytics."
     );
     expect(serverJson.description?.length).toBeLessThanOrEqual(100);
     expect(serverJson.packages).toEqual([
@@ -154,6 +160,8 @@ describe("mcp workspace package", () => {
     expect(listing).toContain("get_usage_summary");
     expect(listing).toContain("get_funnel_analysis");
     expect(listing).toContain("AnalyticsBundle");
+    expect(listing).toContain("Runtime error reporting, incident response, debug bundles, and product analytics for AI agents.");
+    expect(listing).not.toContain("Production debugging and product analytics for AI agents.");
     expect(license).toContain("GNU AFFERO GENERAL PUBLIC LICENSE");
     expect(license).toContain("Version 3, 19 November 2007");
   });

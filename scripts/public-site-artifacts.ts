@@ -196,7 +196,7 @@ function buildLlmsTxt(): string {
     [
       '# DebugBundle',
       '',
-      'DebugBundle captures runtime failures, groups them into incidents, and publishes deterministic debug bundles for humans and AI agents.',
+      'DebugBundle provides runtime error reporting, crash reporting, incident response, endpoint health checks, and product analytics for humans and AI agents. It turns runtime failures and customer-facing product signals into deterministic evidence; it is not a generic infrastructure-monitoring platform.',
       '',
       `Primary docs: ${toAbsoluteUrl(publicSiteConfig.docsHome)}`,
       `App: ${publicSiteConfig.appUrl}`,

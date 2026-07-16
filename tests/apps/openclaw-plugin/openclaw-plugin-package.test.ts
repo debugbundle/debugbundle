@@ -18,6 +18,7 @@ describe("openclaw plugin package", () => {
       version?: string;
       private?: boolean;
       description?: string;
+      keywords?: string[];
       license?: string;
       repository?: { type?: string; url?: string; directory?: string };
       engines?: Record<string, string>;
@@ -34,7 +35,18 @@ describe("openclaw plugin package", () => {
     expect(packageJson.name).toBe("@debugbundle/openclaw-plugin");
     expect(packageJson.version).toBe("1.6.2");
     expect(packageJson.private).toBe(false);
-    expect(packageJson.description).toContain("product analytics");
+    expect(packageJson.description).toBe(
+      "OpenClaw tools for runtime error reporting, incident response, live app monitoring, health checks, debug bundles, and product analytics."
+    );
+    expect(packageJson.keywords).toEqual(expect.arrayContaining([
+      "error-reporting",
+      "crash-reporting",
+      "runtime-errors",
+      "incident-response",
+      "production-monitoring",
+      "health-checks",
+      "product-analytics"
+    ]));
     expect(packageJson.license).toBe("AGPL-3.0-only");
     expect(packageJson.repository).toEqual({
       type: "git",
@@ -76,6 +88,7 @@ describe("openclaw plugin package", () => {
     const license = readFileSync(join(packageRoot, "LICENSE"), "utf8");
     const manifest = JSON.parse(readFileSync(join(packageRoot, "openclaw.plugin.json"), "utf8")) as {
       id?: string;
+      description?: string;
       activation?: { onStartup?: boolean };
       configSchema?: Record<string, unknown>;
       contracts?: { tools?: string[] };
@@ -90,6 +103,9 @@ describe("openclaw plugin package", () => {
     expect(readme).toContain("debugbundle_generate_analytics_bundle");
     expect(license).toContain("GNU AFFERO GENERAL PUBLIC LICENSE");
     expect(manifest.id).toBe("debugbundle");
+    expect(manifest.description).toBe(
+      "Use DebugBundle for runtime error reporting, incident response, live app monitoring, health checks, debug bundles, and product analytics."
+    );
     expect(manifest.activation).toEqual({ onStartup: true });
     expect(manifest.configSchema).toMatchObject({
       type: "object",

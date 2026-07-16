@@ -38,8 +38,8 @@ Do not describe a downstream directory as live, official, verified, or indexed u
 
 ## Canonical Positioning
 
-- Short description: `Production debugging and product analytics for AI agents.`
-- Full description: `DebugBundle turns production incidents and product-usage signals into deterministic evidence for AI agents. Agents can inspect aggregate analytics, funnels, journeys, opportunities, analytics bundles, incidents, debug bundles, reproductions, health checks, probes, and operational controls through API, CLI, or MCP.`
+- Short description: `Runtime error reporting, incident response, debug bundles, and product analytics for AI agents.`
+- Full description: `DebugBundle turns runtime errors, crashes, customer-facing incidents, endpoint health checks, and product-usage signals into deterministic evidence for AI agents. Agents can inspect incidents, debug bundles, reproductions, aggregate analytics, funnels, journeys, opportunities, probes, alerts, and operational controls through API, CLI, or MCP. DebugBundle is production debugging infrastructure, not a generic infrastructure-monitoring platform.`
 
 ## Install And Auth
 
@@ -83,6 +83,15 @@ debugbundle-mcp
 - `@debugbundle/mcp`
 - `com.debugbundle/mcp`
 - `production debugging bundles`
+- `runtime error reporting`
+- `crash reporting`
+- `incident reporting`
+- `incident response`
+- `live app monitoring`
+- `production monitoring`
+- `runtime errors`
+- `exceptions and alerts`
+- `endpoint health checks`
 - `incident debugging MCP`
 - `AI agent debugging`
 - `MCP production debugging`
@@ -125,7 +134,7 @@ debugbundle-mcp
 - Keep the MCP-specific subfolder in the content/body: `https://github.com/debugbundle/debugbundle/tree/main/apps/mcp`
 - Preferred display name: `DebugBundle`
 - Preferred author/org label: `debugbundle`
-- Preferred short description: `Production debugging and product analytics for AI agents.`
+- Preferred short description: `Runtime error reporting, incident response, debug bundles, and product analytics for AI agents.`
 - Suggested tags:
   - `debugbundle`
   - `mcp`
@@ -151,7 +160,7 @@ debugbundle-mcp
   - Click `Add MCP Server`.
   - Submit repository URL: `https://github.com/debugbundle/debugbundle`
   - Display name: `DebugBundle`
-  - Short description: `Production debugging and product analytics for AI agents.`
+  - Short description: `Runtime error reporting, incident response, debug bundles, and product analytics for AI agents.`
 - Indexing expectations:
   - Glama verifies GitHub maintainer access before listing.
   - Discoverability can remain withheld until Glama can build and introspect the server successfully.

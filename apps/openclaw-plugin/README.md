@@ -1,6 +1,6 @@
 # @debugbundle/openclaw-plugin
 
-OpenClaw tool plugin for DebugBundle incidents, product analytics, bundles, reproductions, probes, health checks, and operational debugging.
+OpenClaw tools for runtime error reporting, crash reporting, incident response, live app monitoring, endpoint health checks, debug bundles, and product analytics. Monitoring is scoped to runtime failures, customer-facing incidents, and endpoint health; DebugBundle is not a generic infrastructure-monitoring platform.
 
 ## Install
 

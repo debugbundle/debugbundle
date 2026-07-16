@@ -252,10 +252,13 @@ describe("public site AnalyticsBundle documentation", () => {
     expect(artifactSource).toContain("'/docs/api/analytics/'");
   });
 
-  it("publishes AnalyticsBundle links in the generated agent discovery artifact", async () => {
+  it("publishes capability-first positioning and AnalyticsBundle links in the generated agent discovery artifact", async () => {
     const artifacts = await buildMachineReadableArtifacts();
     const llms = artifacts.find((artifact) => artifact.routePath === "/llms.txt");
 
+    expect(llms?.content).toContain(
+      "runtime error reporting, crash reporting, incident response, endpoint health checks, and product analytics"
+    );
     expect(llms?.content).toContain("- AnalyticsBundle: https://debugbundle.com/docs/analytics/");
     expect(llms?.content).toContain(
       "- AnalyticsBundle privacy: https://debugbundle.com/docs/analytics/privacy/"

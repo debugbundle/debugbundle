@@ -131,7 +131,7 @@ export default defineToolPlugin({
   id: "debugbundle",
   name: "DebugBundle",
   description:
-    "Use DebugBundle tools to inspect incidents, product analytics, bundles, reproductions, health checks, and operational debugging surfaces.",
+    "Use DebugBundle for runtime error reporting, incident response, live app monitoring, health checks, debug bundles, and product analytics.",
   configSchema: Type.Object(
     {
       apiBaseUrl: Type.Optional(

@@ -14,9 +14,25 @@ describe("mcp ClawHub skill", () => {
 
     const skill = readFileSync(skillPath, "utf8");
     const license = readFileSync(skillLicensePath, "utf8");
+    const normalizedSkill = skill.toLowerCase();
 
     expect(skill).toContain("name: debugbundle");
-    expect(skill).toContain("description: Use DebugBundle MCP and CLI workflows");
+    for (const discoveryPhrase of [
+      "runtime error reporting",
+      "crash reporting",
+      "incident reporting",
+      "incident response",
+      "live app monitoring",
+      "production monitoring",
+      "observability signals",
+      "health checks",
+      "debug bundles",
+      "product analytics"
+    ]) {
+      expect(normalizedSkill).toContain(discoveryPhrase);
+    }
+    expect(skill).toContain("not a generic infrastructure-monitoring or observability platform");
+    expect(skill).not.toMatch(/^version:/mu);
     expect(skill).toContain("metadata:");
     expect(skill).toContain("openclaw:");
     expect(skill).toContain("DEBUGBUNDLE_MEMBER_TOKEN");

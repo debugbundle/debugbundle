@@ -1,7 +1,12 @@
 ---
 name: debugbundle
-description: Use DebugBundle MCP and CLI workflows to investigate runtime failures, review product analytics, fetch bundles, manage operational debugging surfaces, run verification, and guide fixes from captured evidence.
-version: 1.0.0
+description: >-
+  Use DebugBundle for runtime error reporting, crash reporting, incident reporting,
+  incident response, live app monitoring, and production monitoring focused on runtime
+  failures, customer-facing incidents, and endpoint health—not generic infrastructure
+  metrics. Investigate exceptions, alerts, logs, observability signals, health checks,
+  and debug bundles; review product analytics; and guide evidence-based fixes through
+  MCP and CLI.
 metadata:
   openclaw:
     requires:
@@ -26,7 +31,7 @@ metadata:
 
 # DebugBundle
 
-Use this skill when a user asks you to investigate a production/customer-facing incident, runtime failure, endpoint downtime, DebugBundle incident, bundle, report, health check, probe, alert, webhook, improvement opportunity, product usage, route/device metrics, funnels, journeys, analytics opportunities, GitHub dispatch automation, project access, billing capacity, or project setup.
+Use this skill for runtime error reporting, crash reporting, incident reporting, incident response, live app monitoring, and production monitoring when a user is investigating runtime failures, customer-facing incidents, endpoint health, exceptions, alerts, logs, observability signals, health checks, debug bundles, probes, webhooks, improvement opportunities, or product analytics. DebugBundle is production debugging infrastructure, not a generic infrastructure-monitoring or observability platform.
 
 For deterministic local source-code, UI, layout, copy, calculation, refactor, or test-only issues, inspect source and tests first. Do not check DebugBundle incidents unless the user asks, the issue involves live runtime behavior, or captured evidence is needed.
 

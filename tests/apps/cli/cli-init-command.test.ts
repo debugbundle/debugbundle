@@ -188,6 +188,18 @@ describe("cli setup command", () => {
 
     const skillContents = await readFile(join(rootDirectory, ".agents", "skills", "debugbundle", "SKILL.md"), "utf8");
     expect(skillContents).toContain("name: debugbundle");
+    for (const discoveryPhrase of [
+      "runtime error reporting",
+      "crash reporting",
+      "incident reporting",
+      "incident response",
+      "live app monitoring",
+      "production monitoring",
+      "observability signals"
+    ]) {
+      expect(skillContents.toLowerCase()).toContain(discoveryPhrase);
+    }
+    expect(skillContents).toContain("not a generic infrastructure-monitoring or observability platform");
     expect(skillContents).toContain("## When To Use DebugBundle");
     expect(skillContents).toContain("Use DebugBundle when runtime evidence or product-usage analytics are relevant to the task.");
     expect(skillContents).toContain("For deterministic local source-code, UI, layout, copy, calculation, refactor, or test-only issues, inspect source and tests first.");
@@ -283,6 +295,8 @@ describe("cli setup command", () => {
     expect(skillEvalsContents).toContain("noise_management_guidance");
     expect(skillEvalsContents).toContain("operational_controls_guidance");
     expect(skillEvalsContents).toContain("product_analytics_guidance");
+    expect(skillEvalsContents).toContain("capability_first_discovery");
+    expect(skillEvalsContents).toContain("Scope monitoring to runtime failures, customer-facing incidents, and endpoint health");
     expect(skillEvalsContents).toContain("Scope cloud incident queries to the connected repository's cloud_project_id by default.");
     expect(skillEvalsContents).toContain("Do not query organization-wide or across projects unless the user explicitly requests that broader scope.");
     expect(skillEvalsContents).toContain("Explicitly report whether the local source, the cloud source, or both had matches.");
@@ -293,7 +307,7 @@ describe("cli setup command", () => {
     const agentsContents = await readFile(join(rootDirectory, "AGENTS.md"), "utf8");
     expect(agentsContents).toContain("<!-- debugbundle:start -->");
     expect(agentsContents).toContain(".agents/skills/debugbundle/SKILL.md");
-    expect(agentsContents).toContain("Use DebugBundle for runtime failures, production/customer-facing incidents");
+    expect(agentsContents).toContain("Use DebugBundle for runtime error reporting, crash reporting, incident reporting, incident response, and live app monitoring");
     expect(agentsContents).toContain("Use DebugBundle product analytics for visits, active users, routes, devices, actions, funnels, journeys, friction, and analytics opportunities");
     expect(agentsContents).toContain("For deterministic local code, UI, layout, copy, calculation, refactor, or test-only issues, inspect source and tests first");
     expect(agentsContents).not.toContain("resolve it with `debugbundle resolve <incident-id> [incident-id ...]`");

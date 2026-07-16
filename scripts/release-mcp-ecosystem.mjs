@@ -6,6 +6,18 @@ import { dirname, join, resolve } from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
 
+import {
+  collectVerificationFailures,
+  fetchJson,
+  fetchOptionalJson,
+  fetchText,
+  findOfficialRegistryEntry,
+  findSmitheryQualifiedEntry,
+  findSmitheryQualifiedSkill,
+  matchesGlamaServer,
+  verifyClawHubDiscovery
+} from "./mcp-ecosystem-verification.mjs";
+
 const scriptDirectory = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(scriptDirectory, "..");
 const manifestPath = join(repoRoot, "apps", "mcp", "ecosystem-release-manifest.json");
@@ -247,7 +259,7 @@ function buildMcpbManifest(context) {
     version: context.version,
     description: context.serverJson.description,
     long_description:
-      "Run the official DebugBundle MCP server locally over stdio. The bundle includes the packaged Node entrypoint, production dependencies, and optional DebugBundle member-token and API URL configuration for hosted or self-hosted workflows.",
+      "Run the official DebugBundle MCP server locally over stdio for runtime error reporting, incident response, health checks, debug bundles, and product analytics. The bundle includes the packaged Node entrypoint, production dependencies, and optional DebugBundle member-token and API URL configuration for hosted or self-hosted workflows.",
     author: {
       name: "DebugBundle",
       url: "https://debugbundle.com"
@@ -658,94 +670,6 @@ async function publish(context, options) {
   return report;
 }
 
-async function fetchJson(url, init) {
-  const response = await fetch(url, init);
-  if (!response.ok) {
-    throw new Error(`http_${response.status}:${url}`);
-  }
-  return response.json();
-}
-
-async function fetchText(url, init) {
-  const response = await fetch(url, init);
-  if (!response.ok) {
-    throw new Error(`http_${response.status}:${url}`);
-  }
-  return response.text();
-}
-
-async function fetchOptionalJson(url, init) {
-  const response = await fetch(url, init);
-  if (response.status === 404) {
-    return undefined;
-  }
-  if (!response.ok) {
-    throw new Error(`http_${response.status}:${url}`);
-  }
-  return response.json();
-}
-
-function findOfficialRegistryEntry(payload, serverName, version) {
-  const candidates = Array.isArray(payload?.servers) ? payload.servers : [];
-  const matchingCandidates = candidates.filter((candidate) => {
-    const server = candidate?.server ?? candidate;
-    return server?.name === serverName;
-  });
-
-  const latestMatchingCandidate = matchingCandidates.find((candidate) => {
-    const server = candidate?.server ?? candidate;
-    const metadata = candidate?._meta?.["io.modelcontextprotocol.registry/official"];
-    return server?.version === version && metadata?.isLatest === true;
-  });
-
-  if (latestMatchingCandidate !== undefined) {
-    return latestMatchingCandidate;
-  }
-
-  return matchingCandidates.find((candidate) => {
-    const server = candidate?.server ?? candidate;
-    return server?.version === version;
-  }) ?? matchingCandidates.find((candidate) => {
-    const metadata = candidate?._meta?.["io.modelcontextprotocol.registry/official"];
-    return metadata?.isLatest === true;
-  }) ?? matchingCandidates.at(0);
-}
-
-function normalizeUrl(value) {
-  if (typeof value !== "string" || value.length === 0) {
-    return null;
-  }
-
-  return value.replace(/\/+$/u, "").toLowerCase();
-}
-
-function findSmitheryQualifiedEntry(payload, qualifiedName) {
-  const candidates = Array.isArray(payload?.servers) ? payload.servers : [];
-
-  return candidates.find((candidate) => candidate?.qualifiedName === qualifiedName);
-}
-
-function findSmitheryQualifiedSkill(payload, qualifiedName) {
-  const candidates = Array.isArray(payload?.skills) ? payload.skills : [];
-
-  return candidates.find((candidate) => `${candidate?.namespace}/${candidate?.slug}` === qualifiedName);
-}
-
-function matchesGlamaServer(candidate, context) {
-  const candidateRepositoryUrl = normalizeUrl(candidate?.repository?.url);
-  const sourceRepositoryUrl = normalizeUrl(context.serverJson?.repository?.url);
-
-  if (candidateRepositoryUrl !== null && sourceRepositoryUrl !== null && candidateRepositoryUrl === sourceRepositoryUrl) {
-    return true;
-  }
-
-  const names = [candidate?.name, candidate?.slug, candidate?.namespace]
-    .filter((value) => typeof value === "string")
-    .map((value) => value.toLowerCase());
-
-  return names.some((value) => value.includes("debugbundle"));
-}
-
 async function verify(context) {
   const report = loadReport(context);
   report.verify = report.verify ?? {};
@@ -838,15 +762,19 @@ async function verify(context) {
         const latestVersion = payload.latestVersion;
         const owner = payload.owner;
         const moderation = payload.moderation;
+        const discovery = skill === undefined
+          ? { status: "missing", discoveryChecks: [] }
+          : await verifyClawHubDiscovery(target);
         report.verify.clawhub = {
-          status: skill === undefined ? "missing" : "found",
+          status: discovery.status,
           slug: target.slug,
-          pageUrl: `https://clawhub.ai/${target.owner}/${target.slug}`,
+          pageUrl: `https://clawhub.ai/${target.owner}/skills/${target.slug}`,
           owner: owner?.handle ?? null,
           latestVersion: latestVersion?.version ?? null,
           license: latestVersion?.license ?? null,
           moderationVerdict: moderation?.verdict ?? null,
-          moderationSummary: moderation?.summary ?? null
+          moderationSummary: moderation?.summary ?? null,
+          discoveryChecks: discovery.discoveryChecks
         };
         continue;
       }
@@ -988,23 +916,6 @@ async function verify(context) {
 
   writeReport(context, report);
   return report;
-}
-
-function collectVerificationFailures(context, report) {
-  const failures = [];
-
-  for (const [targetKey, target] of context.targetEntries) {
-    if (target.type !== "push") {
-      continue;
-    }
-
-    const status = report.verify?.[targetKey]?.status;
-    if (status !== "found") {
-      failures.push(`${targetKey}:${status ?? "missing"}`);
-    }
-  }
-
-  return failures;
 }
 
 function printHelp() {
