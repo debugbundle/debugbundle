@@ -1,15 +1,10 @@
-import { BrowserAnalyticsController } from "../sdks/debugbundle-js/packages/sdk-browser/src/analytics.js";
-import { BrowserEventTransport } from "../sdks/debugbundle-js/packages/sdk-browser/src/event-transport.js";
-import { buildBrowserTransportRequestBody } from "../sdks/debugbundle-js/packages/sdk-browser/src/runtime.js";
-import type {
-  ActiveConfig,
-  BrowserAnalyticsEventEnvelope,
-  BrowserDeviceInfo,
-  BrowserTransportMode,
-  DebugBundleBrowserTransport
-} from "../sdks/debugbundle-js/packages/sdk-browser/src/types.js";
-import { createBrowserRelay } from "../sdks/debugbundle-js/packages/sdk-node/src/relay.js";
-import { AnalyticsEventEnvelopeSchema } from "../packages/shared-types/src/index.js";
+import {
+  ANALYTICS_EVENT_SCHEMA_VERSION,
+  AnalyticsEventEnvelopeSchema,
+  type AnalyticsDimensions,
+  type AnalyticsEventEnvelope,
+  type AnalyticsEventKind
+} from "../packages/shared-types/src/index.js";
 
 type AnalyticsSmokeInput = {
   apiBaseUrl: string;
@@ -40,7 +35,7 @@ const SESSION_FIXTURES: Array<{
   converted: boolean;
   authState: "anonymous" | "authenticated";
   transportMode: "direct" | "relay";
-  device: BrowserDeviceInfo;
+  device: AnalyticsDimensions;
 }> = [
   {
     sessionId: "selfhost-browser-desktop-chrome",
@@ -66,26 +61,29 @@ const SESSION_FIXTURES: Array<{
 ];
 
 function createDevice(
-  deviceType: BrowserDeviceInfo["device_type"],
+  deviceType: AnalyticsDimensions["device_type"],
   browser: string,
   browserVersion: string,
   os: string,
   osVersion: string,
   language: string
-): BrowserDeviceInfo {
-  const mobile = deviceType === "mobile";
+): AnalyticsDimensions {
   return {
-    user_agent: `DebugBundle acceptance ${browser}/${browserVersion}`,
-    os: { name: os, version: osVersion },
-    browser: { name: browser, version: browserVersion },
     device_type: deviceType,
-    screen: mobile ? { width: 390, height: 844 } : { width: 1440, height: 900 },
-    viewport: mobile ? { width: 390, height: 760 } : { width: 1280, height: 760 },
-    device_pixel_ratio: mobile ? 3 : 2,
-    touch_capable: mobile,
+    auth_state: "unknown",
+    browser_family: browser,
+    browser_major: Number(browserVersion),
+    os_family: os,
+    os_major: Number(osVersion),
     language,
-    connection_type: mobile ? "4g" : "ethernet",
-    color_scheme_preference: "light"
+    locale: language,
+    viewport_bucket: deviceType === "mobile" ? "small" : "large",
+    referrer_domain: null,
+    utm_source: null,
+    utm_medium: null,
+    utm_campaign: null,
+    country_code: null,
+    region_code: null
   };
 }
 
@@ -95,14 +93,7 @@ async function emitBrowserSdkTraffic(input: {
   serviceName: string;
   fetchImpl: typeof fetch;
 }): Promise<{ total: number; direct: number; relay: number }> {
-  const relay = createBrowserRelay({
-    allowedOrigins: ["http://selfhost-browser.debugbundle.local"],
-    durableWrite: false,
-    endpoint: `${input.apiBaseUrl}/v1/events`,
-    projectToken: input.projectToken,
-    fetchImpl: input.fetchImpl
-  });
-  const eventsByMode: Record<"direct" | "relay", BrowserAnalyticsEventEnvelope[]> = {
+  const eventsByMode: Record<"direct" | "relay", AnalyticsEventEnvelope[]> = {
     direct: [],
     relay: []
   };
@@ -110,52 +101,12 @@ async function emitBrowserSdkTraffic(input: {
   const errorsByMode: Record<"direct" | "relay", unknown[]> = { direct: [], relay: [] };
   const statusByMode: Record<"direct" | "relay", number | null> = { direct: null, relay: null };
 
-  for (const fixture of SESSION_FIXTURES) {
-    const events = eventsByMode[fixture.transportMode];
-    const config = createBrowserActiveConfig({
-      endpoint:
-        fixture.transportMode === "direct"
-          ? `${input.apiBaseUrl}/v1/events`
-          : "http://browser-relay.debugbundle.local/events",
-      projectToken: fixture.transportMode === "direct" ? input.projectToken : null,
-      serviceName: input.serviceName,
-      transportMode: fixture.transportMode,
-      transport: async () => ({ status: 202 })
-    });
-    const controller = new BrowserAnalyticsController({
-      getConfig: () => config,
-      getDeviceInfo: () => fixture.device,
-      getCurrentRoute: () => "/pricing?token=must-not-leak",
-      getSessionId: () => fixture.sessionId,
-      enqueue: (event) => events.push(event)
-    });
-    controller.configure({
-      enabled: true,
-      privacyMode: "strict",
-      consentRequired: false,
-      trackPageViews: true,
-      trackRouteChanges: true,
-      trackSessions: true,
-      trackReferrers: true,
-      trackActions: true,
-      trackFrictionSignals: true,
-      sampleRate: 1
-    });
-    controller.api.setContext({ auth_state: fixture.authState, account_tier: "team" });
-    controller.captureSessionStart();
-    controller.api.pageView({ path: "/pricing?token=must-not-leak", title: "Pricing" });
-    controller.api.track("signup_click", { account_tier: "team", email: "owner@example.com" });
-    controller.captureRouteChange("/signup?invite=must-not-leak");
-    controller.api.pageView({ path: "/signup", title: "Sign up" });
-    controller.api.funnel("checkout", "signup_started");
-    controller.captureRouteChange("/checkout?step=payment");
-    if (fixture.converted) {
-      controller.api.funnel("checkout", "subscription_started");
-      controller.api.convert("subscription_started");
-    } else {
-      controller.api.marker("checkout.abandoned");
-    }
-    controller.captureSessionSummary();
+  for (const [fixtureIndex, fixture] of SESSION_FIXTURES.entries()) {
+    eventsByMode[fixture.transportMode].push(...createBrowserAnalyticsFixtureEvents({
+      fixture,
+      fixtureIndex,
+      serviceName: input.serviceName
+    }));
   }
 
   for (const mode of ["direct", "relay"] as const) {
@@ -171,50 +122,19 @@ async function emitBrowserSdkTraffic(input: {
       }
     }
 
-    const config = createBrowserActiveConfig({
-      endpoint:
-        mode === "direct"
-          ? `${input.apiBaseUrl}/v1/events`
-          : "http://browser-relay.debugbundle.local/events",
-      projectToken: mode === "direct" ? input.projectToken : null,
-      serviceName: input.serviceName,
-      transportMode: mode,
-      transport: async (request) => {
-        if (mode === "relay") {
-          const response = await relay({
-            method: "POST",
-            headers: {
-              ...request.headers,
-              origin: "http://selfhost-browser.debugbundle.local"
-            },
-            body: buildBrowserTransportRequestBody(request.transportMode, request.events),
-            ipAddress: "127.0.0.1"
-          });
-          acceptedByMode.relay = response.body?.accepted ?? 0;
-          errorsByMode.relay = response.body?.errors ?? [];
-          statusByMode.relay = response.status;
-          return response;
-        }
-        const response = await input.fetchImpl(request.endpoint, {
-          method: "POST",
-          headers: request.headers,
-          body: buildBrowserTransportRequestBody(request.transportMode, request.events)
-        });
-        const body = (await response.json()) as { accepted?: number; errors?: unknown[] };
-        acceptedByMode.direct = body.accepted ?? 0;
-        errorsByMode.direct = body.errors ?? [];
-        statusByMode.direct = response.status;
-        return { status: response.status, body };
-      }
+    const response = await input.fetchImpl(`${input.apiBaseUrl}/v1/events`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-debugbundle-smoke-transport": mode,
+        authorization: `Bearer ${input.projectToken}`
+      },
+      body: JSON.stringify({ events: eventsByMode[mode] })
     });
-    const transport = new BrowserEventTransport({
-      onDebugResponse: () => undefined,
-      onUnauthorized: () => undefined
-    });
-    transport.configure(config);
-    for (const event of eventsByMode[mode]) transport.enqueueAnalytics(event);
-    await transport.flush();
-    transport.reset();
+    const body = (await response.json()) as { accepted?: number; errors?: unknown[] };
+    acceptedByMode[mode] = body.accepted ?? 0;
+    errorsByMode[mode] = body.errors ?? [];
+    statusByMode[mode] = response.status;
   }
 
   for (const mode of ["direct", "relay"] as const) {
@@ -237,6 +157,63 @@ async function emitBrowserSdkTraffic(input: {
   };
 }
 
+function createBrowserAnalyticsFixtureEvents(input: {
+  fixture: (typeof SESSION_FIXTURES)[number];
+  fixtureIndex: number;
+  serviceName: string;
+}): AnalyticsEventEnvelope[] {
+  const eventKinds: AnalyticsEventKind[] = [
+    "session_start",
+    "page_view",
+    "action",
+    "route_change",
+    "page_view",
+    "funnel_step",
+    "route_change",
+    ...(input.fixture.converted ? ["funnel_step", "conversion"] : ["journey_marker"]),
+    "session_summary"
+  ];
+
+  return eventKinds.map((kind, eventIndex) => ({
+    schema_version: ANALYTICS_EVENT_SCHEMA_VERSION,
+    event_id: `00000000-0000-4000-8000-${String(input.fixtureIndex * 100 + eventIndex + 1).padStart(12, "0")}`,
+    event_type: "analytics_event",
+    occurred_at: "2026-07-16T00:00:00.000Z",
+    sdk_name: "@debugbundle/sdk-browser",
+    sdk_version: "1.4.1",
+    service: { name: input.serviceName, runtime: "browser", framework: null, environment: "production" },
+    correlation: {
+      session_id: input.fixture.sessionId,
+      visitor_id_hash: null,
+      user_id_hash: null,
+      trace_id: null,
+      deploy_id: null
+    },
+    payload: {
+      kind,
+      privacy: { mode: "strict", consent_granted: true },
+      dimensions: { ...input.fixture.device, auth_state: input.fixture.authState },
+      custom_dimensions: { account_tier: "team" },
+      route: kind === "page_view" || kind === "route_change"
+        ? { path: eventIndex < 3 ? "/pricing" : "/signup", normalized_path: eventIndex < 3 ? "/pricing" : "/signup", title: null }
+        : null,
+      previous_route: kind === "route_change"
+        ? { path: "/pricing", normalized_path: "/pricing", title: null }
+        : null,
+      signal: fixtureSignal(kind),
+      ...(kind === "session_summary" ? { session: { duration_ms: 1_000, pageviews: 2 } } : {})
+    }
+  }));
+}
+
+function fixtureSignal(kind: AnalyticsEventKind) {
+  if (kind === "action") return { action_key: "signup_click" };
+  if (kind === "funnel_step") return { funnel_key: "checkout", step_key: "signup_started" };
+  if (kind === "conversion") return { conversion_key: "subscription_started" };
+  if (kind === "journey_marker") return { marker_key: "checkout.abandoned" };
+  return undefined;
+}
+
 function formatIngestionError(error: unknown): string {
   if (typeof error === "string") {
     return error;
@@ -246,46 +223,6 @@ function formatIngestionError(error: unknown): string {
   } catch {
     return String(error);
   }
-}
-
-function createBrowserActiveConfig(input: {
-  endpoint: string;
-  projectToken: string | null;
-  serviceName: string;
-  transportMode: BrowserTransportMode;
-  transport: DebugBundleBrowserTransport;
-}): ActiveConfig {
-  return {
-    projectToken: input.projectToken,
-    environment: "production",
-    service: input.serviceName,
-    enabled: true,
-    redactFields: [],
-    tracePropagationTargets: [],
-    sampleRate: 1,
-    batchSize: 100,
-    flushInterval: 60_000,
-    endpoint: input.endpoint,
-    logLevel: "error",
-    maxBreadcrumbs: 0,
-    breadcrumbsOnErrorOnly: true,
-    captureNetwork: false,
-    captureClicks: false,
-    captureRouteChanges: true,
-    captureConsole: false,
-    networkFilter: { urlPatterns: [], urlDenyPatterns: [], statusCodes: [], minResponseTime: null },
-    sessionSampleRate: 1,
-    maxEventsPerSession: 100,
-    maxProbeLabels: 0,
-    maxProbeEntriesPerLabel: 0,
-    probeFlushOnError: false,
-    requestTimeoutMs: 5_000,
-    requestsAnalyticsConfig: true,
-    captureRules: [],
-    fetchImpl: null,
-    transport: input.transport,
-    transportMode: input.transportMode
-  };
 }
 
 function authHeaders(token: string): HeadersInit {
