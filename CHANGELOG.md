@@ -6,6 +6,8 @@ The format is based on Keep a Changelog and this project follows Semantic Versio
 
 ## [Unreleased]
 
+## [1.6.3] - 2026-07-16
+
 ### Added
 
 - Added the production-ready AnalyticsBundle product lane across browser capture, direct and relay ingestion, aggregate usage/routes/devices/referrers/actions/funnels, retained structured journeys, deterministic opportunities, generated analytics bundles, project/workspace web surfaces, and matching API, CLI, and MCP interfaces.

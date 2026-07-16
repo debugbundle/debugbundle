@@ -2,7 +2,7 @@
   "id": "debugbundle",
   "name": "DebugBundle",
   "description": "Use DebugBundle for runtime error reporting, incident response, live app monitoring, health checks, debug bundles, and product analytics.",
-  "version": "1.6.2",
+  "version": "1.6.3",
   "configSchema": {
     "type": "object",
     "properties": {

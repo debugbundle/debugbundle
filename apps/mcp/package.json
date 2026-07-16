@@ -1,7 +1,7 @@
 {
   "name": "@debugbundle/mcp",
   "mcpName": "com.debugbundle/mcp",
-  "version": "1.6.2",
+  "version": "1.6.3",
   "private": false,
   "description": "MCP server for runtime error reporting, incident response, health checks, debug bundles, and product analytics",
   "license": "AGPL-3.0-only",

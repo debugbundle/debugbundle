@@ -1,6 +1,6 @@
 # DebugBundle
 
-Runtime error reporting, incident response, and production debugging bundles for AI agents.
+Production debugging bundles for AI agents, with runtime error reporting and incident response.
 
 ![CI](https://img.shields.io/github/actions/workflow/status/debugbundle/debugbundle/ci.yml?branch=main&label=ci)
 ![CLI](https://img.shields.io/npm/v/%40debugbundle%2Fcli?label=cli&color=blue)
