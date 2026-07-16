@@ -133,7 +133,7 @@ describe("web app — project health page", () => {
       if (url.endsWith("/v1/projects/proj_123/availability-checks?limit=50")) {
         return jsonResponse(200, {
           checks,
-          limits: { max_checks_per_project: 25, min_interval_seconds: 30 }
+          limits: { max_checks_per_project: 8, min_interval_seconds: 30 }
         });
       }
       if (url.endsWith("/v1/projects/proj_123/availability-checks/chk_1/results?limit=20")) {
@@ -256,7 +256,7 @@ describe("web app — project health page", () => {
         if (url.endsWith("/v1/projects/proj_123/availability-checks?limit=50")) {
           return jsonResponse(200, {
             checks,
-            limits: { max_checks_per_project: 25, min_interval_seconds: 30 }
+            limits: { max_checks_per_project: 8, min_interval_seconds: 30 }
           });
         }
         if (url.endsWith("/v1/projects/proj_123/availability-checks/chk_1/results?limit=20")) {

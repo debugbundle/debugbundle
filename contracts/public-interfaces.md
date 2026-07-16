@@ -1892,7 +1892,7 @@ Availability checks are hosted external HTTP checks executed by DebugBundle infr
     }
   ],
   "limits": {
-    "max_checks_per_project": 5,
+    "max_checks_per_project": 3,
     "min_interval_seconds": 60
   }
 }
@@ -1946,7 +1946,7 @@ Guardrails:
 
 | Constraint | Free | Solo | Team |
 |------------|------|------|------|
-| Max checks per project | 1 | 5 | 25 |
+| Max checks per project | 1 | 3 | 8 |
 | Minimum interval | 300s (5m) | 60s | 30s |
 | History retention | 30 days | 30 days | 30 days |
 | Read access | Authorized project member | Authorized project member | Authorized project member |

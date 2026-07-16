@@ -71,7 +71,7 @@ export const TIER_CAPABILITIES = {
     max_analytics_saved_funnels: 10,
     max_analytics_custom_dimensions: 3,
     analytics_hourly_retention_days: 30,
-    availability_checks_per_project: 5,
+    availability_checks_per_project: 3,
     availability_check_min_interval_seconds: 60
   },
   team: {
@@ -102,7 +102,7 @@ export const TIER_CAPABILITIES = {
     max_analytics_saved_funnels: 50,
     max_analytics_custom_dimensions: 8,
     analytics_hourly_retention_days: 90,
-    availability_checks_per_project: 25,
+    availability_checks_per_project: 8,
     availability_check_min_interval_seconds: 30
   }
 } as const;

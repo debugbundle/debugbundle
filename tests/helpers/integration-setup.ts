@@ -59,7 +59,28 @@ export function createQueryable(pool: Pool): Queryable {
     query: async <Row extends Record<string, unknown>>(
       sql: string,
       params: unknown[]
-    ) => pool.query<Row>(sql, params)
+    ) => pool.query<Row>(sql, params),
+    transaction: async <Result>(callback: (db: Queryable) => Promise<Result>) => {
+      const client = await pool.connect();
+      const tx: Queryable = {
+        query: async <Row extends Record<string, unknown>>(
+          sql: string,
+          params: unknown[]
+        ) => client.query<Row>(sql, params)
+      };
+
+      try {
+        await client.query("BEGIN", []);
+        const result = await callback(tx);
+        await client.query("COMMIT", []);
+        return result;
+      } catch (error) {
+        await client.query("ROLLBACK", []).catch(() => undefined);
+        throw error;
+      } finally {
+        client.release();
+      }
+    }
   };
 }
 

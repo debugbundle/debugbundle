@@ -138,6 +138,12 @@ runIntegration("ingestion integration \u2013 core pipeline", () => {
 
     expect(response.statusCode).toBe(202);
 
+    const tokenUsage = await pool.query<{ last_used_at: string | null }>(
+      "SELECT last_used_at::text AS last_used_at FROM project_tokens WHERE token_hash = $1",
+      [tokenHash]
+    );
+    expect(tokenUsage.rows[0]?.last_used_at).not.toBeNull();
+
     const jobs = await queue.readJobQueue("normalize-events");
     expect(jobs).toHaveLength(1);
 
@@ -173,6 +179,52 @@ runIntegration("ingestion integration \u2013 core pipeline", () => {
 
     expect(parsed.payload.request.headers.authorization).toBe("[REDACTED]");
     expect(parsed.payload.request.body.password).toBe("[REDACTED]");
+
+    await pool.query(
+      "UPDATE project_tokens SET last_used_at = NULL, revoked_at = now() WHERE token_hash = $1",
+      [tokenHash]
+    );
+    const revokedResponse = await app.inject({
+      method: "POST",
+      url: "/v1/events",
+      headers: {
+        authorization: `Bearer ${projectToken}`
+      },
+      payload: {
+        events: [event]
+      }
+    });
+    expect(revokedResponse.statusCode).toBe(401);
+    const revokedTokenUsage = await pool.query<{ last_used_at: string | null }>(
+      "SELECT last_used_at::text AS last_used_at FROM project_tokens WHERE token_hash = $1",
+      [tokenHash]
+    );
+    expect(revokedTokenUsage.rows[0]?.last_used_at).toBeNull();
+
+    await pool.query(
+      `
+        UPDATE project_tokens
+        SET revoked_at = NULL, expires_at = now() - interval '1 minute'
+        WHERE token_hash = $1
+      `,
+      [tokenHash]
+    );
+    const expiredResponse = await app.inject({
+      method: "POST",
+      url: "/v1/events",
+      headers: {
+        authorization: `Bearer ${projectToken}`
+      },
+      payload: {
+        events: [event]
+      }
+    });
+    expect(expiredResponse.statusCode).toBe(401);
+    const expiredTokenUsage = await pool.query<{ last_used_at: string | null }>(
+      "SELECT last_used_at::text AS last_used_at FROM project_tokens WHERE token_hash = $1",
+      [tokenHash]
+    );
+    expect(expiredTokenUsage.rows[0]?.last_used_at).toBeNull();
 
     await s3Admin.send(new DeleteObjectCommand({ Bucket: s3Bucket, Key: key }));
   });

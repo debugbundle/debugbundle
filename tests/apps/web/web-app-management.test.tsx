@@ -293,7 +293,7 @@ describe("web app — management routes", () => {
               updated_at: "2026-03-17T09:00:00.000Z"
             }
           ],
-          limits: { max_checks_per_project: 25, min_interval_seconds: 30 }
+          limits: { max_checks_per_project: 8, min_interval_seconds: 30 }
         });
       }
 
@@ -4047,7 +4047,7 @@ describe("web app — management routes", () => {
       if (url.endsWith("/v1/projects/proj_123/availability-checks?limit=100")) {
         return jsonResponse(200, {
           checks: [createHealthCheck({ project_id: "proj_123", status: "passing" })],
-          limits: { max_checks_per_project: 5, min_interval_seconds: 60 }
+          limits: { max_checks_per_project: 3, min_interval_seconds: 60 }
         });
       }
 
@@ -4056,7 +4056,7 @@ describe("web app — management routes", () => {
           checks: [
             createHealthCheck({ check_id: "chk_456", project_id: "proj_456", status: "failing" })
           ],
-          limits: { max_checks_per_project: 5, min_interval_seconds: 60 }
+          limits: { max_checks_per_project: 3, min_interval_seconds: 60 }
         });
       }
 

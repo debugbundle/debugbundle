@@ -193,6 +193,21 @@ describe("cli setup command", () => {
     expect(skillContents).toContain("For deterministic local source-code, UI, layout, copy, calculation, refactor, or test-only issues, inspect source and tests first.");
     expect(skillContents).toContain("resolve it with `debugbundle resolve <incident-id> [incident-id ...]` or MCP `resolve_incident` / `resolve_incidents`");
     expect(skillContents).toContain("If `debugbundle doctor --json` reports `mode=connected` and the target environment is cloud-enabled, check both");
+    expect(skillContents).toContain(
+      "use its non-null `cloud_project_id` as `--project-id <cloud_project_id>` on every cloud incident list query"
+    );
+    expect(skillContents).toContain(
+      "Do not run an unscoped or cross-project cloud incident query unless the user explicitly asks"
+    );
+    expect(skillContents).toContain(
+      "a separate `list_incidents` call with `source: \"cloud\"` and `projectId: <cloud_project_id>`"
+    );
+    expect(skillContents).toContain(
+      "keep the local incident call separate so the cloud project filter does not hide local evidence"
+    );
+    expect(skillContents).toContain(
+      "debugbundle incidents --source cloud --project-id <cloud_project_id> --status active --json"
+    );
     expect(skillContents).toContain("For user-reported production incidents, check cloud incidents after local incidents and explicitly report whether each source had matches.");
     expect(skillContents).toContain("## Investigation Controls");
     expect(skillContents).toContain("debugbundle probe list <project-id> --json");
@@ -268,7 +283,8 @@ describe("cli setup command", () => {
     expect(skillEvalsContents).toContain("noise_management_guidance");
     expect(skillEvalsContents).toContain("operational_controls_guidance");
     expect(skillEvalsContents).toContain("product_analytics_guidance");
-    expect(skillEvalsContents).toContain("Check both local and cloud incident sources when the project is connected and the environment is cloud-enabled.");
+    expect(skillEvalsContents).toContain("Scope cloud incident queries to the connected repository's cloud_project_id by default.");
+    expect(skillEvalsContents).toContain("Do not query organization-wide or across projects unless the user explicitly requests that broader scope.");
     expect(skillEvalsContents).toContain("Explicitly report whether the local source, the cloud source, or both had matches.");
     expect(await readFile(join(rootDirectory, ".gitignore"), "utf8")).toContain("# DebugBundle (managed by debugbundle setup)");
     expect(await readFile(join(rootDirectory, ".gitignore"), "utf8")).toContain(".debugbundle/local/*");

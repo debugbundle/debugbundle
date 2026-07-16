@@ -130,7 +130,7 @@ Last updated: 2026-07-04
 
 **FR-AVC-03:** Availability checks must be manageable through API, CLI, MCP, and web using the same domain services. Authorized project members may read checks and retained results. Owner/admin callers may create, update, delete, enable/disable, and test checks. Test execution must be side-effect-free in V1 and must not create incidents or retained history rows.
 
-**FR-AVC-04:** Hosted availability checks must enforce tier limits per project: Free `1` check with minimum `300` second interval, Solo `5` checks with minimum `60` second interval, Team `25` checks with minimum `30` second interval. Checks that exceed current plan limits after downgrade remain visible but pause execution until the project is eligible again.
+**FR-AVC-04:** Hosted availability checks must enforce tier limits per project: Free `1` check with minimum `300` second interval, Solo `3` checks with minimum `60` second interval, Team `8` checks with minimum `30` second interval. Checks that exceed current plan limits after downgrade remain visible but pause execution until the project is eligible again.
 
 **FR-AVC-05:** DebugBundle must retain availability-check raw execution results and per-day rollups for at least 30 days, then purge older records. The retained daily rollups must be sufficient to back a future project status-history surface without a schema redesign.
 
@@ -389,6 +389,8 @@ When a collaborator is removed from a project or leaves a shared project, DebugB
 **FR-AUTH-13:** GitHub CLI bootstrap must be additive, not a replacement for browser auth. The existing email-code and browser GitHub session flows remain the primary interactive path for humans without GitHub accounts or without local CLI access.
 
 **FR-AUTH-14:** GitHub device flow must be server-mediated: the CLI talks to DebugBundle, DebugBundle talks to GitHub, and successful approval must result in a normal DebugBundle member token issuance rather than a separate credential type.
+
+**FR-AUTH-15:** Successful authentication with an active project token or member token must advance that token's `last_used_at` metadata. Implementations may coalesce writes for frequently used tokens, but a token whose `last_used_at` is `NULL` must be updated on its first successful authentication. Unknown, revoked, and expired tokens must not be marked as used.
 
 ### 1.13 Email System
 

@@ -274,6 +274,12 @@ describe("cli validate command", () => {
       "For user-reported production incidents, check cloud incidents after local incidents and explicitly report whether each source had matches."
     );
     expect(await readFile(join(rootDirectory, ".agents", "skills", "debugbundle", "SKILL.md"), "utf8")).toContain(
+      "use its non-null `cloud_project_id` as `--project-id <cloud_project_id>` on every cloud incident list query"
+    );
+    expect(await readFile(join(rootDirectory, ".agents", "skills", "debugbundle", "SKILL.md"), "utf8")).toContain(
+      "Do not run an unscoped or cross-project cloud incident query unless the user explicitly asks"
+    );
+    expect(await readFile(join(rootDirectory, ".agents", "skills", "debugbundle", "SKILL.md"), "utf8")).toContain(
       "## Investigation Controls"
     );
     expect(await readFile(join(rootDirectory, ".agents", "skills", "debugbundle", "SKILL.md"), "utf8")).toContain(

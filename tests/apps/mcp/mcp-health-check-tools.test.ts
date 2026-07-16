@@ -19,7 +19,7 @@ describe("mcp health check tools", () => {
 
   it("returns payloads for all health-check operations", async () => {
     const tools = createHealthCheckMcpTools({
-      listHealthChecks: vi.fn().mockResolvedValue({ checks: [], limits: { max_checks_per_project: 5, min_interval_seconds: 60 } }),
+      listHealthChecks: vi.fn().mockResolvedValue({ checks: [], limits: { max_checks_per_project: 3, min_interval_seconds: 60 } }),
       getHealthCheck: vi.fn().mockResolvedValue({ check: { check_id: "chk_1" } }),
       createHealthCheck: vi.fn().mockResolvedValue({ check: { check_id: "chk_1" } }),
       updateHealthCheck: vi.fn().mockResolvedValue({ check: { check_id: "chk_1", enabled: false } }),
@@ -34,7 +34,7 @@ describe("mcp health check tools", () => {
 
     await expect(
       tools.list_health_checks({ bearerToken: "dbundle_mem_x", projectId: "proj_1", limit: 10 })
-    ).resolves.toEqual({ checks: [], limits: { max_checks_per_project: 5, min_interval_seconds: 60 } });
+    ).resolves.toEqual({ checks: [], limits: { max_checks_per_project: 3, min_interval_seconds: 60 } });
     await expect(
       tools.get_health_check({ bearerToken: "dbundle_mem_x", projectId: "proj_1", checkId: "chk_1" })
     ).resolves.toEqual({ check: { check_id: "chk_1" } });

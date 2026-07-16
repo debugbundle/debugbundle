@@ -9,7 +9,7 @@ import {
 import { createPgError } from "../../helpers/fake-pg-error.ts";
 
 describe("postgres metadata store", () => {
-  it("should resolve project by token hash", async (): Promise<void> => {
+  it("should resolve a project token and record successful use", async (): Promise<void> => {
     const query = vi.fn().mockResolvedValue({ rows: [{ project_id: "proj_123", organization_id: "org_123", revoked_at: null, expires_at: null }] });
     const db: Queryable = { query };
 
@@ -18,7 +18,14 @@ describe("postgres metadata store", () => {
 
     expect(resolved).toEqual({ project_id: "proj_123", organization_id: "org_123", revoked_at: null, expires_at: null });
     expect(query).toHaveBeenCalledOnce();
-    expect(String(query.mock.calls[0]?.[0] ?? "")).toContain("o.suspended_at IS NULL");
+    const sql = String(query.mock.calls[0]?.[0] ?? "");
+    expect(sql).toContain("o.suspended_at IS NULL");
+    expect(sql).toContain("UPDATE project_tokens");
+    expect(sql).toContain("SET last_used_at = now()");
+    expect(sql).toContain("resolved_token.revoked_at IS NULL");
+    expect(sql).toContain("resolved_token.expires_at > now()");
+    expect(sql).toContain("project_tokens.last_used_at < now() - $2::interval");
+    expect(query).toHaveBeenCalledWith(expect.any(String), ["hash_abc", "5 minutes"]);
   });
 
   it("should return null when token hash is unknown", async (): Promise<void> => {
@@ -47,7 +54,7 @@ describe("postgres metadata store", () => {
     expect(resolved).toEqual({ project_id: "proj_123", organization_id: "org_123", organization_plan: "solo", revoked_at: null, expires_at: null });
   });
 
-  it("should resolve member by member token hash", async (): Promise<void> => {
+  it("should resolve a member token and record successful use", async (): Promise<void> => {
     const query = vi
       .fn()
       .mockResolvedValue({
@@ -66,8 +73,15 @@ describe("postgres metadata store", () => {
       expires_at: null
     });
     expect(query).toHaveBeenCalledOnce();
-    expect(String(query.mock.calls[0]?.[0] ?? "")).toContain("om.suspended_at IS NULL");
-    expect(String(query.mock.calls[0]?.[0] ?? "")).toContain("org.suspended_at IS NULL");
+    const sql = String(query.mock.calls[0]?.[0] ?? "");
+    expect(sql).toContain("om.suspended_at IS NULL");
+    expect(sql).toContain("org.suspended_at IS NULL");
+    expect(sql).toContain("UPDATE member_tokens");
+    expect(sql).toContain("SET last_used_at = now()");
+    expect(sql).toContain("resolved_token.revoked_at IS NULL");
+    expect(sql).toContain("resolved_token.expires_at > now()");
+    expect(sql).toContain("member_tokens.last_used_at < now() - $2::interval");
+    expect(query).toHaveBeenCalledWith(expect.any(String), ["hash_member", "5 minutes"]);
   });
 
   it("should list projects for an organization", async (): Promise<void> => {

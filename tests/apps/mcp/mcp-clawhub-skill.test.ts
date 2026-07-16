@@ -24,6 +24,9 @@ describe("mcp ClawHub skill", () => {
     expect(skill).toContain("package: \"@debugbundle/mcp\"");
     expect(skill).toContain("\"args\": [\"@debugbundle/mcp\"]");
     expect(skill).toContain("should not replace a repository's generated `.agents/skills/debugbundle/SKILL.md`");
+    expect(skill).toContain("a separate `list_incidents` call with `source: \"cloud\"` and `projectId: <cloud_project_id>`");
+    expect(skill).toContain("keep the local incident call separate so the cloud project filter does not hide local evidence");
+    expect(skill).toContain("Do not run organization-wide or cross-project incident inventory unless the user explicitly asks");
     expect(skill).toContain("Hosted Health Checks");
     expect(skill).toContain("test_health_check");
     expect(skill).toContain("Operations Surfaces");

@@ -925,7 +925,7 @@ Emitted by SDKs when duplicate suppression is active:
 | project_id | uuid | FK → projects, CASCADE |
 | token_hash | text | UNIQUE NOT NULL |
 | label | text | NOT NULL |
-| last_used_at | timestamptz | |
+| last_used_at | timestamptz | Advances after successful active-token authentication; writes may be coalesced for high-frequency ingestion |
 | created_at | timestamptz | NOT NULL DEFAULT now() |
 | revoked_at | timestamptz | |
 
@@ -937,7 +937,7 @@ Emitted by SDKs when duplicate suppression is active:
 | organization_id | uuid | FK → organizations, CASCADE |
 | token_hash | text | UNIQUE NOT NULL |
 | label | text | NOT NULL |
-| last_used_at | timestamptz | |
+| last_used_at | timestamptz | Advances after successful active-token authentication; writes may be coalesced for high-frequency API use |
 | created_at | timestamptz | NOT NULL DEFAULT now() |
 | revoked_at | timestamptz | |
 

@@ -374,6 +374,7 @@ Member and project tokens must:
 - be hashed before persistence
 - be compared using constant-time checks after lookup
 - carry enough metadata for revocation, audit, and attribution
+- update `last_used_at` on successful active-token authentication; high-frequency project-token paths may coalesce writes within a short bounded interval
 
 ### 8.6 CSRF and Cookie Rules
 

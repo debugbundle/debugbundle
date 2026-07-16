@@ -217,6 +217,7 @@ Last updated: 2026-07-04
 - **Then** existing checks remain readable through API, CLI, MCP, and web
 - **And** out-of-policy checks show paused state and stop executing
 - **And** create/update attempts that violate current tier limits return explicit limit errors
+- **And** per-project count caps are 1 on Free, 3 on Solo, and 8 on Team
 
 ### AC-AVC-04: Health Check Test Is Side-Effect-Free
 - **Given** an owner or admin runs a one-off health-check test against a valid target
@@ -645,6 +646,12 @@ If CLI says something is healthy and MCP says something different, that is a pro
 - **When** the user calls a member-authorized route once through the web session and once through a member token
 - **Then** both requests resolve to the same authorization outcome
 - **And** both execute the same underlying domain behavior
+
+### AC-AUTH-06a: Token Last-Used Metadata
+- **Given** an active project token or member token whose `last_used_at` is `null`
+- **When** the token is accepted for authentication on one of its token-scoped routes
+- **Then** its persisted `last_used_at` becomes a non-null timestamp and is returned by the matching token-list API
+- **And** unknown, revoked, or expired token attempts do not update `last_used_at`
 
 ### AC-AUTH-07: Browser Auth Storage Boundary
 - **Given** a normal web-app login flow

@@ -69,7 +69,7 @@ describe("web app — health status", () => {
                 updated_at: "2026-06-17T12:00:00.000Z"
               }
             ],
-            limits: { max_checks_per_project: 25, min_interval_seconds: 30 }
+            limits: { max_checks_per_project: 8, min_interval_seconds: 30 }
           });
         }
 
@@ -182,7 +182,7 @@ describe("web app — health status", () => {
                 updated_at: "2026-06-17T12:00:00.000Z"
               }
             ],
-            limits: { max_checks_per_project: 25, min_interval_seconds: 30 }
+            limits: { max_checks_per_project: 8, min_interval_seconds: 30 }
           });
         }
 

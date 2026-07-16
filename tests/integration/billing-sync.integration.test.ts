@@ -91,6 +91,53 @@ runIntegration("billing integration – stripe sync", () => {
           })
         })
       );
+      const memberTokenUsage = await pool.query<{ last_used_at: string | null }>(
+        "SELECT last_used_at::text AS last_used_at FROM member_tokens WHERE user_id = $1",
+        [owner.userId]
+      );
+      expect(memberTokenUsage.rows[0]?.last_used_at).not.toBeNull();
+      await pool.query(
+        "UPDATE member_tokens SET last_used_at = NULL, revoked_at = now() WHERE user_id = $1",
+        [owner.userId]
+      );
+      const revokedMemberResponse = await appContext.app.inject({
+        method: "GET",
+        url: "/v1/projects",
+        headers: {
+          authorization: `Bearer ${owner.memberToken}`
+        }
+      });
+      expect(revokedMemberResponse.statusCode).toBe(401);
+      const revokedMemberTokenUsage = await pool.query<{ last_used_at: string | null }>(
+        "SELECT last_used_at::text AS last_used_at FROM member_tokens WHERE user_id = $1",
+        [owner.userId]
+      );
+      expect(revokedMemberTokenUsage.rows[0]?.last_used_at).toBeNull();
+      await pool.query(
+        `
+          UPDATE member_tokens
+          SET revoked_at = NULL, expires_at = now() - interval '1 minute'
+          WHERE user_id = $1
+        `,
+        [owner.userId]
+      );
+      const expiredMemberResponse = await appContext.app.inject({
+        method: "GET",
+        url: "/v1/projects",
+        headers: {
+          authorization: `Bearer ${owner.memberToken}`
+        }
+      });
+      expect(expiredMemberResponse.statusCode).toBe(401);
+      const expiredMemberTokenUsage = await pool.query<{ last_used_at: string | null }>(
+        "SELECT last_used_at::text AS last_used_at FROM member_tokens WHERE user_id = $1",
+        [owner.userId]
+      );
+      expect(expiredMemberTokenUsage.rows[0]?.last_used_at).toBeNull();
+      await pool.query(
+        "UPDATE member_tokens SET expires_at = NULL WHERE user_id = $1",
+        [owner.userId]
+      );
 
       stripe.checkoutCreate.mockResolvedValue({ url: "https://billing.stripe.test/checkout/team" });
       const checkout = await appContext.app.inject({

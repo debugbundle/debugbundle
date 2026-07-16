@@ -70,9 +70,9 @@ describe("tier capabilities", () => {
   it("should expose health-check limits per tier", (): void => {
     expect(getTierCapabilities("free").availability_checks_per_project).toBe(1);
     expect(getTierCapabilities("free").availability_check_min_interval_seconds).toBe(300);
-    expect(getTierCapabilities("solo").availability_checks_per_project).toBe(5);
+    expect(getTierCapabilities("solo").availability_checks_per_project).toBe(3);
     expect(getTierCapabilities("solo").availability_check_min_interval_seconds).toBe(60);
-    expect(getTierCapabilities("team").availability_checks_per_project).toBe(25);
+    expect(getTierCapabilities("team").availability_checks_per_project).toBe(8);
     expect(getTierCapabilities("team").availability_check_min_interval_seconds).toBe(30);
   });
 

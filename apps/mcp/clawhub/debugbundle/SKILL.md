@@ -61,13 +61,14 @@ Use `DEBUGBUNDLE_API_URL` only when the user is targeting self-hosted, staging, 
 
 1. Run `doctor` first when setup, auth, connectivity, privacy, or local file state is uncertain.
 2. For qualifying runtime/incident work, check incidents before inspecting code. Start with `list_incidents`, then fetch `get_incident_context` or `get_bundle`.
-3. Use reproduction artifacts when available before proposing a fix.
-4. For live debugging, use `activate_probe` only when the user asks for additional runtime evidence or the current bundle lacks enough context. Prefer short TTLs and scoped labels.
-5. For endpoint downtime or Health tab issues, start with `list_health_checks`, inspect `list_health_check_results` and `list_health_check_daily_rollups`, and use `test_health_check` before creating or updating saved monitoring.
-6. After a fix is verified, resolve the incident with `resolve_incident`. Also resolve intentional verification incidents after they have served their purpose.
-7. For repeated low-value operational noise, inspect the incident evidence first, then evaluate capture-rule suggestions or path-scoped capture policy instead of repeatedly resolving the same pattern.
-8. For recurring quality or performance work, inspect hosted improvement opportunities with `list_improvements`, fetch the improvement and bundle, then resolve, snooze, or reopen only after the user confirms the intended lifecycle change.
-9. For product-usage questions, start with direct aggregate analytics reads, narrow to funnels or structured journey evidence when needed, and generate an analytics bundle only when a bounded analysis question needs a durable artifact.
+3. When working inside a connected repository, read `.debugbundle/local/connection.json`. For MCP, make a separate `list_incidents` call with `source: "cloud"` and `projectId: <cloud_project_id>`; keep the local incident call separate so the cloud project filter does not hide local evidence. For CLI cloud queries, pass the same non-null `cloud_project_id` as `--project-id`. Do not run organization-wide or cross-project incident inventory unless the user explicitly asks. If the project id is missing, report the connection problem instead of broadening the query.
+4. Use reproduction artifacts when available before proposing a fix.
+5. For live debugging, use `activate_probe` only when the user asks for additional runtime evidence or the current bundle lacks enough context. Prefer short TTLs and scoped labels.
+6. For endpoint downtime or Health tab issues, start with `list_health_checks`, inspect `list_health_check_results` and `list_health_check_daily_rollups`, and use `test_health_check` before creating or updating saved monitoring.
+7. After a fix is verified, resolve the incident with `resolve_incident`. Also resolve intentional verification incidents after they have served their purpose.
+8. For repeated low-value operational noise, inspect the incident evidence first, then evaluate capture-rule suggestions or path-scoped capture policy instead of repeatedly resolving the same pattern.
+9. For recurring quality or performance work, inspect hosted improvement opportunities with `list_improvements`, fetch the improvement and bundle, then resolve, snooze, or reopen only after the user confirms the intended lifecycle change.
+10. For product-usage questions, start with direct aggregate analytics reads, narrow to funnels or structured journey evidence when needed, and generate an analytics bundle only when a bounded analysis question needs a durable artifact.
 
 ## Local Repository Setup
 

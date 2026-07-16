@@ -75,7 +75,9 @@
       "name": "connected_incident_fetch",
       "prompt": "The user says a production incident fired in the hosted DebugBundle project. Confirm the skill points the agent to the cloud retrieval path.",
       "expected_behavior": [
-        "Check both local and cloud incident sources when the project is connected and the environment is cloud-enabled.",
+        "Scope cloud incident queries to the connected repository's cloud_project_id by default.",
+        "Do not query organization-wide or across projects unless the user explicitly requests that broader scope.",
+        "Use separate local and cloud incident-list calls so the cloud project filter does not suppress local evidence.",
         "Explicitly report whether the local source, the cloud source, or both had matches.",
         "Fetch inspect, context, bundle, and reproduction artifacts before editing code."
       ]
